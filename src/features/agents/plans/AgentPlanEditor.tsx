@@ -9,8 +9,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { reorderIds, usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button, IconButton, Input, OptionSelect, Textarea, type SelectOption } from "@/shared/ui";
+import { reorderIds, usePointerReorder } from "@misty/ui";
+import { Button, IconButton, Input, OptionSelect, Textarea, type SelectOption } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { useCollaborationStore } from "./store";
 import type { AgentPlan, AgentPlanStep, PlanRisk } from "./planTypes";

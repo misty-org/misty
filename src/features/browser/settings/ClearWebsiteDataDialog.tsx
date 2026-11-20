@@ -16,7 +16,7 @@ import {
   SelectValue,
   Text,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { browserLibrary, type BrowserWebsiteDataKind } from "../library/native";
 
 // Every menu row starts with an icon: a clock for the recent spans, history for all of it.

@@ -9,7 +9,7 @@ import {
   Input,
   Text,
   cn,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
 import { spaceInitials } from "../components/SpaceAvatar";
 import { CreateSpaceInvitePeople } from "./CreateSpaceInvitePeople";

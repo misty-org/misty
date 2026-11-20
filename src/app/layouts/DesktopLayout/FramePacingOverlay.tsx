@@ -1,5 +1,5 @@
 import type { FramePacingState } from "@/app/layouts/desktop-state";
-import { Surface, Text } from "@/shared/ui";
+import { Surface, Text } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { frameOverlayBaseClass, frameOverlayLevelEdge } from "./styles";
 

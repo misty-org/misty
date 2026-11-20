@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { BackButton, Input, Surface, useNotice } from "@/shared/ui";
+import { BackButton, Input, Surface, useNotice } from "@misty/ui";
 
 /**
  * The workbook page's one bar: back to Data, the title (renamed in place), then the page's tools

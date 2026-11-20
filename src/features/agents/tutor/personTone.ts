@@ -1,4 +1,4 @@
-import type { AvatarTone as ItemTone } from "@/shared/ui";
+import type { AvatarTone as ItemTone } from "@misty/ui";
 
 const tones: ItemTone[] = ["blue", "green", "orange", "violet", "pink", "amber", "teal"];
 

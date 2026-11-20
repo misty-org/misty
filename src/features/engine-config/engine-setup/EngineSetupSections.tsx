@@ -10,7 +10,7 @@
 import { LogIn } from "lucide-react";
 import { useState } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import type { EngineId } from "../channels/engines";
 import { refreshCliStatus } from "../clis/useCliVersionStatus";
 import { SignInDialog } from "../clis/SignInDialog";

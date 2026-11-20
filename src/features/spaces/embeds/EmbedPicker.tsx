@@ -14,7 +14,7 @@ import {
   PopoverTrigger,
   SkeletonList,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useState, type ReactElement } from "react";
 import { setItemVisibility, type ItemVisibility } from "../api/visibility";

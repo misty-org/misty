@@ -1,4 +1,4 @@
-import { brandIconAsset, LogoTile } from "@/shared/ui";
+import { brandIconAsset, LogoTile } from "@misty/ui";
 import { DirectAppLogo } from "../connected-apps/DirectAppLogo";
 
 /** A GitHub user or organization's name, as GitHub allows it. */

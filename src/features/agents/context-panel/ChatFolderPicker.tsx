@@ -10,7 +10,7 @@ import {
   MenuTrigger,
   Skeleton,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { folderName } from "../engines/enginesApi";
 import { useChatFolder, useChatFolders, useProjectFolders } from "../shared-folders/chatFolder";
 import { errorText } from "./projectApi";

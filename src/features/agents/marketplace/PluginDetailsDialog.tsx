@@ -19,7 +19,7 @@ import {
   Skeleton,
   Switch,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   canTurnOff,
   categoryLabel,

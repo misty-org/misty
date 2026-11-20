@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { Separator, Surface, useNotice } from "@/shared/ui";
+import { Separator, Surface, useNotice } from "@misty/ui";
 import { followIsStale, lookForNews } from "../notebookFollow";
 import type { TutorActions } from "../TutorPage";
 import { jobTitle, notebookContext } from "../tutorPrompts";
@@ -22,7 +22,7 @@ import { NoteReader, SourceReader } from "./Reader";
 import { SourcesPanel, type Opened } from "./SourcesPanel";
 import { StudioPanel } from "./StudioPanel";
 import "./tutorPresentation.css";
-import { designPx, remCss } from "@/shared/lib/uiScale";
+import { designPx, remCss } from "@misty/ui";
 
 /**
  * Starts the notebook's overview when its sources changed since the last one. In a notebook

@@ -7,7 +7,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { MemberDialogsState } from "./useMemberDialogs";
 
 /** Confirms the two destructive member actions: transfer ownership and remove. */

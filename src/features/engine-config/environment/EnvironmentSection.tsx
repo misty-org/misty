@@ -21,7 +21,7 @@ import {
   Skeleton,
   SkeletonControl,
   useConfirmDelete,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { EnginePicker } from "../channels/ChannelsSection";
 import type { EngineId } from "../channels/engines";
 import { engineEnvApi, type EngineEnvVar } from "./api";

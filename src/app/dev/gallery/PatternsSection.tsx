@@ -1,4 +1,4 @@
-import { MenuItem, MessageActions, SecretField, ShortcutField, Text } from "@/shared/ui";
+import { MenuItem, MessageActions, SecretField, ShortcutField, Text } from "@misty/ui";
 import { Copy, Pencil, RotateCcw, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";

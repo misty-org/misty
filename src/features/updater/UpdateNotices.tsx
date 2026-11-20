@@ -1,4 +1,4 @@
-import { useNotice } from "@/shared/ui";
+import { useNotice } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { getCurrentWindow } from "@tauri-apps/api/window";

@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IconButton, Input, ChoiceGroup, SkeletonList, Surface, Text } from "@/shared/ui";
+import { IconButton, Input, ChoiceGroup, SkeletonList, Surface, Text } from "@misty/ui";
 import { errorText } from "../projectApi";
 import { filesApi, type SearchHit } from "./filesApi";
 import { useFileIndex, type IndexEntry } from "./fileIndex";

@@ -46,7 +46,7 @@ import {
   Switch,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { EngineSetupSections } from "../engine-setup/EngineSetupSections";
 import { channelsApi } from "./api";
 import { ChannelRow, Pill, ROW } from "./ChannelRow";

@@ -1,5 +1,5 @@
 import { invoke } from "@/native/invoke";
-import { sketchInk } from "@/shared/ui";
+import { sketchInk } from "@misty/ui";
 import type { DisplayCapture } from "./protocol";
 
 /** A trail shorter than this (in global units) is a pointer that drifted, not something drawn. */

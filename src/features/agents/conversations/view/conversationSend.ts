@@ -45,3 +45,14 @@ export async function submitWorkspaceMessage(
   if (handoff && handoff.surfaceId !== "files" && useMistyStore.getState().handoff === handoff)
     useMistyStore.setState({ handoff: undefined, context: [] });
 }
+
+/** Resolves once no run is working, checked twice in a row so the gap before a run starts doesn't count. */
+export async function untilIdle(timeoutMs = 180_000): Promise<void> {
+  const started = Date.now();
+  let idle = 0;
+  while (Date.now() - started < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    idle = useMistyStore.getState().working ? 0 : idle + 1;
+    if (idle >= 2) return;
+  }
+}

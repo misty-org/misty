@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
-import type { BarLayout } from "@/shared/ui";
+import type { BarLayout } from "@misty/ui";
 import { readDeviceState, updateDeviceState } from "./folders/deviceState";
 
 /** Everything the chat's right rail can show, in its default order. */
 export const railItemIds = [
   "new-task",
   "goal",
+  "memory",
   "session",
   "steps",
   "changes",

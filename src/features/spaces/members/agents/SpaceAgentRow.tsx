@@ -4,7 +4,7 @@ import { PrivateLabel, VisibilityMenu } from "../../components/VisibilityMenu";
 import { AgentAvatar } from "@/features/agents";
 import { useAuth } from "@/features/account";
 import type { AgentProfile } from "@/shared/schemas";
-import { IconButton, Text, cn } from "@/shared/ui";
+import { IconButton, Text, cn } from "@misty/ui";
 import { X } from "lucide-react";
 import { agentOwnerLabel } from "./useSpaceAgentMembers";
 

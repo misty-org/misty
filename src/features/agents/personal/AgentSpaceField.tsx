@@ -17,7 +17,7 @@ import {
   SelectValue,
   Skeleton,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useAgentAccountId } from "./agentAccount";
 import { moveAgentHome } from "./agentHomeSpace";
 import { usePersonalAgentsStore } from "./personalAgentsStore";

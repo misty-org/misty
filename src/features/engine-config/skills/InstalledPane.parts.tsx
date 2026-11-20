@@ -23,7 +23,7 @@ import {
   Surface,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   EmptyLine,
   EngineGlyph,

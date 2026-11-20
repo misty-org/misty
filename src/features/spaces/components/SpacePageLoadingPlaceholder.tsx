@@ -8,7 +8,7 @@ import {
   Skeleton,
   SkeletonControl,
   Surface,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { SpaceLabSkeleton } from "@/features/agents";
 import { ConversationLoadState } from "../chat/components/ConversationStates";
 import { SpaceHomeSkeleton } from "../home/SpaceHomeSkeleton";

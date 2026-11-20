@@ -3,16 +3,24 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 
-const read = (name: string) => readFileSync(new URL(`../src-tauri/features/browser/kiri_link/scripts/${name}.js`, import.meta.url), "utf8");
+const read = (name: string) =>
+  readFileSync(
+    new URL(`../src-tauri/features/browser/kiri_link/scripts/${name}.js`, import.meta.url),
+    "utf8",
+  );
 
 test("cursor follows dispatched actions, never stale targets, and does not intercept input", () => {
-  const dom = new JSDOM('<button>Generate</button>', { url: "https://example.test", runScripts: "outside-only" });
+  const dom = new JSDOM("<button>Generate</button>", {
+    url: "https://example.test",
+    runScripts: "outside-only",
+  });
   try {
     const w = dom.window;
     w.eval(read("agent_cursor"));
     assert.equal(w.document.querySelector("misty-agent-cursor"), null);
     const button = w.document.querySelector("button")!;
-    button.getBoundingClientRect = () => ({ left: 100, top: 200, width: 40, height: 20 } as DOMRect);
+    button.getBoundingClientRect = () =>
+      ({ left: 100, top: 200, width: 40, height: 20 }) as DOMRect;
     let clicks = 0;
     button.addEventListener("click", () => clicks++);
     const inspect = () => w.eval(`(${read("inspection_snapshot")})`)("nonce", 1000, 100);
@@ -29,7 +37,9 @@ test("cursor follows dispatched actions, never stale targets, and does not inter
     assert.equal(cursor.getAttribute("aria-hidden"), "true");
     w[Symbol.for("misty.browser.agent.cursor")].hide();
     assert.equal(cursor.style.opacity, "0");
-  } finally { dom.window.close(); }
+  } finally {
+    dom.window.close();
+  }
 });
 
 test("cursor respects reduced motion and ignores invalid coordinates", () => {
@@ -48,5 +58,7 @@ test("cursor respects reduced motion and ignores invalid coordinates", () => {
     assert.equal(host.style.transform, "translate3d(98px,98px,0)");
     w.document.dispatchEvent(new w.Event("visibilitychange"));
     assert.equal(host.style.opacity, "0");
-  } finally { dom.window.close(); }
+  } finally {
+    dom.window.close();
+  }
 });

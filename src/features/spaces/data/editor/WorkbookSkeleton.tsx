@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonControl, Surface } from "@/shared/ui";
+import { Skeleton, SkeletonControl, Surface } from "@misty/ui";
 
 /** The workbook page standing in while its record loads: its bar, the formula row and a grid. */
 export function WorkbookSkeleton(props: { label: string }) {

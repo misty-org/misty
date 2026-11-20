@@ -21,7 +21,7 @@ import {
   Separator,
   Skeleton,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { markSlotClass } from "../styles";
 import { openNewChat, openWorkspaceRoute } from "../spaceNavigation";
 import { markParts, type Part } from "./searchRank";

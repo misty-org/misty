@@ -1,4 +1,4 @@
-import { Pressable, Surface, Text } from "@/shared/ui";
+import { Pressable, Surface, Text } from "@misty/ui";
 import { showView, type AgentBrowserChat, type AgentViewStatus } from "./agentBrowserStore";
 
 export const statusWord: Record<AgentViewStatus, string> = {

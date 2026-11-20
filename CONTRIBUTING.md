@@ -4,7 +4,7 @@
 
 | Path | What lives there |
 | --- | --- |
-| `src/` | The React and TypeScript app, organized by feature under `src/features/`. Shared components are in `src/shared/ui`. |
+| `src/` | The React and TypeScript app, organized by feature under `src/features/`. Components come from `@misty/ui` (the `misty-ui` repository). |
 | `src-tauri/` | The Tauri app in Rust. Each feature, with its macOS, Windows and Linux code, tests and worker programs, is in `src-tauri/features/<feature>/`. |
 | `src-tauri/features/kiri/` | Kiri, the native layer that adds the web APIs the system webviews leave out. |
 | `tasks/` | The dev runner behind `npm run tauri` and the Node tests for the scripts the app injects into pages. |
@@ -57,9 +57,9 @@ component rather than adding a parallel one, and don't leave dead code behind.
 
 ## UI rules
 
-Everything visible is built from `src/shared/ui`. A feature combines shared components and doesn't
+Everything visible is built from `@misty/ui`. A feature combines shared components and doesn't
 pick its own colors, borders, corners, sizes or spacing. If it needs a look the shared set doesn't
-have, add it to `src/shared/ui` first. `src/tests/architecture/uiRules.ts` enforces this. Some of
+have, add it to `@misty/ui` first. `src/tests/architecture/uiRules.ts` enforces this. Some of
 the rules:
 
 - Sentence case for labels, buttons and headings.

@@ -9,7 +9,7 @@ import {
   Surface,
   Text,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";

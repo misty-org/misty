@@ -1,5 +1,5 @@
 import { Fragment, memo, useMemo } from "react";
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import type { GlobalAiConversation } from "../state/conversationTypes";
 import type { LedgerRow } from "../../checkpoints/ledger";
 import { LessonObjectives } from "../../tutor/lessons/LessonObjectives";

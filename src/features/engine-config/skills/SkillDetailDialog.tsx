@@ -25,7 +25,7 @@ import {
   cn,
   OverflowFadeText,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { skillsHubApi } from "./api";
 import { EngineGlyph, InlineError, SourceBadge } from "./components";
 import { t } from "./strings";

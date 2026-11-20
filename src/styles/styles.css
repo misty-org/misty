@@ -1,15 +1,8 @@
 @import "tailwindcss" source("../../");
-@import "tw-animate-css";
-/* Inter, bundled (weight and optical-size axes), so every window has it with no download and no install. */
-@import "@fontsource-variable/inter/opsz.css";
+/* Misty's components and their design: the theme, type, popup edges, layers, keyframes, glyphs. */
+@import "@misty/ui/styles.css";
 /* JetBrains Mono, bundled, the code editor's default face (Settings › Appearance › Editor). */
 @import "@fontsource-variable/jetbrains-mono/index.css";
-@import "./scrollbars.css";
-@import "./theme.css";
 /* OpenCut's color names, on Misty's theme, for the vendored video editor (vendor/opencut). */
 @import "../../vendor/opencut/src/opencut-theme.css";
-@import "./overlays.css";
 @import "./base.css";
-@import "./components.css";
-@import "./layers.css";
-@import "./animations.css";

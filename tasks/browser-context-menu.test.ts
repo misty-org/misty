@@ -50,7 +50,11 @@ test("context menu opens on normal right click when no page handler prevents it"
 
     target.dispatchEvent(event);
 
-    assert.equal(event.defaultPrevented, true, "default should be prevented to suppress native menu");
+    assert.equal(
+      event.defaultPrevented,
+      true,
+      "default should be prevented to suppress native menu",
+    );
     assert.equal(navigations.length, 1, "should have sent one navigation");
     assert.match(navigations[0], /^misty-context-menu:open\?token=/);
     assert.match(navigations[0], new RegExp(token));
@@ -118,7 +122,11 @@ test("context menu is suppressed when page prevents default on mousedown with bu
     });
     canvas.dispatchEvent(contextEvent);
 
-    assert.equal(navigations.length, 0, "Misty context menu should NOT open when right click was handled");
+    assert.equal(
+      navigations.length,
+      0,
+      "Misty context menu should NOT open when right click was handled",
+    );
   } finally {
     dom.window.close();
   }
@@ -138,7 +146,11 @@ test("context menu is not opened on editable inputs to preserve native autofill/
 
     input.dispatchEvent(event);
 
-    assert.equal(event.defaultPrevented, false, "default should not be prevented on editable inputs");
+    assert.equal(
+      event.defaultPrevented,
+      false,
+      "default should not be prevented on editable inputs",
+    );
     assert.equal(navigations.length, 0, "Misty context menu should NOT open on editable inputs");
   } finally {
     dom.window.close();

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type PointerEvent } from "react";
-import { Avatar, AvatarFallback, Input, Surface, Tooltip } from "@/shared/ui";
+import { Avatar, AvatarFallback, Input, Surface, Tooltip } from "@misty/ui";
 import { personInitials } from "@/shared/lib/personInitials";
 import { editKeyAction, type Direction, type Rect } from "./selection";
 import { rowHeaderWidth, rowHeight, type SheetView } from "./sheetView";

@@ -1,6 +1,6 @@
 import type { LibraryEditDefinition } from "../../api/dto/common";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import { Palette, RotateCw } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { LibrarySelect } from "../SpaceLibraryPrimitives";

@@ -17,7 +17,7 @@ import {
   Surface,
   Switch,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { mcpApi } from "./api";
 import { copy, engineLabel, readonlyReasonText, scopeLabels, sourceLabel } from "./copy";
 import { ProbeDetail } from "./ProbeControls";

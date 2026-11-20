@@ -3,6 +3,7 @@ import {
   GitCompareArrows,
   GaugeCircle,
   Globe,
+  BookOpenText,
   ListOrdered,
   SquarePen,
   SquareTerminal,
@@ -10,7 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { CustomizableBar, IconButton, type BarItem } from "@/shared/ui";
+import { CustomizableBar, IconButton, type BarItem } from "@misty/ui";
 import {
   closeAgentBrowser,
   isBrowserOpen,
@@ -22,6 +23,7 @@ import { toggleChatBrowser } from "../tabs/agentPersonTabs";
 import { chatKey } from "../conversations/state/draftChat";
 import { useContextPanel, type ContextPanelTab } from "./contextPanelStore";
 import { useRailLayout, type RailItemId } from "./railLayoutStore";
+import { useSearchParams } from "react-router-dom";
 
 /** The panels the rail opens: the chat's session, then the project folder's views. */
 const panels: [ContextPanelTab, string, LucideIcon][] = [
@@ -46,6 +48,7 @@ export function ContextRail(props: {
   disabled: boolean;
   onNewTask(): void;
 }) {
+  const [, setParams] = useSearchParams();
   const open = useContextPanel((state) => state.tab);
   const session = useContextPanel((state) => state.session);
   const toggle = useContextPanel((state) => state.toggle);
@@ -84,6 +87,24 @@ export function ContextRail(props: {
     // Every tool works whether or not the chat has started: a goal or a browser set on an empty
     // chat becomes the chat's own with its first message (`draftChat.ts`).
     goal: { label: "Goal", node: <SessionGoalButton conversationId={chat} /> },
+    memory: {
+      label: "Memory",
+      node: (
+        <IconButton
+          label="Memory"
+          tooltipSide="left"
+          onClick={() =>
+            setParams((current) => {
+              const next = new URLSearchParams(current);
+              next.set("view", "memory");
+              return next;
+            })
+          }
+        >
+          <BookOpenText />
+        </IconButton>
+      ),
+    },
     ...(Object.fromEntries(
       panels.map(([id, label, Icon]) => [
         id,

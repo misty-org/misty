@@ -13,7 +13,7 @@ import {
   MenuItem,
   MessageComposerAction,
   type ActionBarItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
 import { blocksAgent, useEngineReadiness } from "../../engines/engineReadiness";
 import { EngineNextStep } from "../../engines/EngineNextStep";

@@ -8,7 +8,7 @@ import {
   DialogTitle,
   Input,
   Label,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useState } from "react";
 export interface NewNoteDialogProps {
   open: boolean;

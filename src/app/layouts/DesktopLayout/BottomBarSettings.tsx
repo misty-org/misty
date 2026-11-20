@@ -2,8 +2,8 @@ import { X } from "lucide-react";
 import { useEffect, useId, type KeyboardEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
-import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
-import { Button, cn, IconButton, Pressable, Surface, Text, Tooltip } from "@/shared/ui";
+import { usePointerReorder } from "@misty/ui";
+import { Button, cn, IconButton, Pressable, Surface, Text, Tooltip } from "@misty/ui";
 import { bottomBarItems } from "./BottomBarItems";
 import {
   bottomBarDefaults,

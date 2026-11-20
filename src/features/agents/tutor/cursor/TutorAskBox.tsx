@@ -3,7 +3,7 @@ import "@/styles/styles.css";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Input, Surface } from "@/shared/ui";
+import { Input, Surface } from "@misty/ui";
 
 /**
  * Tutor's text box beside the pointer (tap Control twice, `cursor/host/ask.rs`): Enter sends the

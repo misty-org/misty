@@ -8,7 +8,7 @@ import {
   ErrorState,
   HomeSection,
   spaceHomeClass,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { defaultEngineAgent, useDefaultEngine } from "../engines/defaultEngine";
 import { NotebookCardsSkeleton } from "./TutorHome";
 import { TutorPage } from "./TutorPage";

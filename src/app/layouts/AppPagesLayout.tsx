@@ -1,7 +1,7 @@
 import { routes } from "@/app/shell";
 import { useNativeSessionStore } from "@/features/account";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Surface, Text } from "@/shared/ui";
+import { Surface, Text } from "@misty/ui";
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 

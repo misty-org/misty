@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { VideoDestination, VideoEditorProps, VideoSpaceMedia } from "@/features/files";
 import { recognizeAudioWords, useSpeechSupport } from "@/features/voice";
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 import { libraryItemMIME } from "../library-primitives/libraryMediaTypes";

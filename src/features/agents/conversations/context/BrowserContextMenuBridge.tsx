@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
   MenuItem,
   Portal,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 interface BrowserMenuPresentation {

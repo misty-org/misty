@@ -31,7 +31,7 @@ import {
   IconButton,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { notifyCliConfigChanged } from "../channels/providers";
 import { ENGINE_NAMES, type EngineId } from "../channels/engines";
 import { binKey, useEngineSettings, type EngineSettings } from "./api";

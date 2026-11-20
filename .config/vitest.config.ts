@@ -3,9 +3,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   envDir: false,
-  server: { fs: { allow: [process.cwd()] } },
+  server: {
+    fs: { allow: [process.cwd(), new URL("../../misty-ui", import.meta.url).pathname] },
+  },
   resolve: {
-    dedupe: ["react", "react-dom"],
+    // @misty/ui is linked from ../misty-ui as source: its React and icons are this app's own.
+    dedupe: ["react", "react-dom", "lucide-react"],
     alias: [
       { find: "@", replacement: new URL("../src", import.meta.url).pathname },
       { find: "@opencut", replacement: new URL("../vendor/opencut/src", import.meta.url).pathname },

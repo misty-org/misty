@@ -16,7 +16,7 @@ import {
   OverflowFadeText,
   RowActions,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   AppWindow,
   Brain,

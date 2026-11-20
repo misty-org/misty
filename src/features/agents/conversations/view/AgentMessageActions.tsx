@@ -1,6 +1,6 @@
 import type { GlobalAiMessage } from "../state/conversationTypes";
 import { useMistyStore } from "../state/useMistyStore";
-import { MessageActions, Tooltip, type MessageAction } from "@/shared/ui";
+import { MessageActions, Tooltip, type MessageAction } from "@misty/ui";
 import {
   Copy,
   Forward,

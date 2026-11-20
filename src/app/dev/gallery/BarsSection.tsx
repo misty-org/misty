@@ -10,7 +10,7 @@ import {
   SearchField,
   Text,
   type ActionBarItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   ArrowUp,
   Copy,

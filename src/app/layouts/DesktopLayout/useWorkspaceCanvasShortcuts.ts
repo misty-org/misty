@@ -16,7 +16,7 @@ import type { DockSplitDirection } from "@/features/app-windows";
 import { minimumForWorkspaceViews } from "./dockSplitFit";
 import { closeWindow, openNewWindow } from "@/features/app-windows";
 import { flushWorkspaceRecovery } from "@/features/app-windows";
-import { designPx } from "@/shared/lib/uiScale";
+import { designPx } from "@misty/ui";
 
 /** Pane and window keyboard shortcuts for the workspace. */
 export function useWorkspaceCanvasShortcuts(actions: {

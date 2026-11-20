@@ -1,6 +1,6 @@
 import { routes } from "@/app/shell";
 import { MistyBrandIcon } from "@/features/app-windows";
-import { Button, IconButton, Surface, Text } from "@/shared/ui";
+import { Button, IconButton, Surface, Text } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ComponentType, SVGProps } from "react";
 import { useLocation, useNavigate } from "react-router-dom";

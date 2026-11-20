@@ -1,4 +1,4 @@
-import { useNotice } from "@/shared/ui";
+import { useNotice } from "@misty/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { type AiUserSettings } from "../runs/invocations/aiSettingsTypes";

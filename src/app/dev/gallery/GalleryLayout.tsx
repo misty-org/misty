@@ -1,4 +1,4 @@
-import { cn, Separator, Surface, Text } from "@/shared/ui";
+import { cn, Separator, Surface, Text } from "@misty/ui";
 import type { ReactNode } from "react";
 
 export function GallerySection(props: { title: string; children: ReactNode }) {

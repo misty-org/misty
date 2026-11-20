@@ -1,2 +1,2 @@
-import { appIcon } from "@/shared/ui";
+import { appIcon } from "@misty/ui";
 export { appIcon as workspaceAppIcon };

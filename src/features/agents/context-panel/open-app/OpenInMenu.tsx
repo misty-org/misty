@@ -13,7 +13,7 @@ import {
   Skeleton,
   SplitButton,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useFolderSettings } from "../folders/folderSettings";
 import { useFilesStore } from "../files/filesStore";
 import { isWithinDirectory } from "../files/repositorySelection";

@@ -8,7 +8,7 @@ import {
   Kbd,
   Text,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { CalendarDays, List } from "lucide-react";
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";

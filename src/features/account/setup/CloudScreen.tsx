@@ -5,7 +5,7 @@ import { useAuth } from "../sessions/authState";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
 import { accountFinishSetupKey, accountRedeemSetupKey } from "../sessions/useAccountStore";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { useEffect, useState, type FormEvent } from "react";
 import { isSetupKey, parseServerAddress, parseSetupLink } from "./serverAddress";
 import { takeSetupLink, useSetupLinkStore } from "./setupLinkStore";

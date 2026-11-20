@@ -23,7 +23,7 @@ vi.mock("../export/AccountExportDialog", () => ({
   },
 }));
 
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { AccountClosingNotice } from "./AccountClosingNotice";
 
 describe("AccountClosingNotice", () => {

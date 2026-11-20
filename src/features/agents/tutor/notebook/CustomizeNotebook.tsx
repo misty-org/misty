@@ -8,7 +8,7 @@ import {
   ChoiceGroup,
   Text,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useTutorStore } from "../tutorStore";
 import type { Notebook, NotebookChatStyle } from "../tutorTypes";
 

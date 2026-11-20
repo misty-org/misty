@@ -9,7 +9,7 @@ import {
   OverflowFadeText,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useState } from "react";
 import { copyLibraryItemsToClipboard } from "./libraryClipboard";
 import { libraryMediaKind } from "./library-viewer/libraryMediaKind";

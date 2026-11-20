@@ -65,7 +65,7 @@ import {
 import { TourInfoButton, tourForRoute } from "@/features/onboarding";
 import { SpaceBarMenu, SpacePresence } from "@/features/spaces";
 import { CaptureBarStatus } from "@/features/voice";
-import { Button, StateMark } from "@/shared/ui";
+import { Button, StateMark } from "@misty/ui";
 import {
   FocusButton,
   HelpButton,

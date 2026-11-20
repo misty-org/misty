@@ -9,7 +9,7 @@ import {
   MenuTrigger,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { preferredDefaultSpace, spaceNavigationName } from "../../routes/defaultSpace";
 import { useSpacesStore } from "../../list/useSpacesStore";
 import { SpaceAvatar } from "../SpaceAvatar";

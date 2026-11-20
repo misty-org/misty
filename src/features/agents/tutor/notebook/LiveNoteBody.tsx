@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import * as Y from "yjs";
-import { SetupState } from "@/shared/ui";
+import { SetupState } from "@misty/ui";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { noteMap, noteSeed, setNoteMarkdown, takeLease } from "../notebookDoc";
 import { liveNotebookError, retryLiveNotebook, useLiveNotebook } from "../notebookLive";

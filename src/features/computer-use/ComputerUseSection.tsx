@@ -7,7 +7,7 @@
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { DesktopSettingsRow } from "@/features/settings";
-import { Button, SetupState, useNotice, Text } from "@/shared/ui";
+import { Button, SetupState, useNotice, Text } from "@misty/ui";
 import { computerUseApi, type ComputerUsePermissions } from "./computerUseAttachment";
 
 function Grant(props: {

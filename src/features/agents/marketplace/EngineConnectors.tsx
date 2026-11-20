@@ -2,7 +2,7 @@ import { ExternalLink, RefreshCw } from "lucide-react";
 import { useCachedResource } from "@/api/cache/cached-resource";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
-import { Button, EmptyState, ListRowSkeleton, Text } from "@/shared/ui";
+import { Button, EmptyState, ListRowSkeleton, Text } from "@misty/ui";
 import { DirectAppLogo } from "../connected-apps/DirectAppLogo";
 import { failureText, marketApi, type EngineConnector } from "./api";
 

@@ -1,14 +1,9 @@
 import {
-  Blocks,
-  Cable,
   CodeXml,
   EyeOff,
-  FileText,
   Keyboard,
   Mic,
   Palette,
-  Plug,
-  ScrollText,
   Search,
   Server,
   SlidersHorizontal,
@@ -19,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { spaceIcons } from "@/shared/ui";
+import { spaceIcons } from "@misty/ui";
 import type { SettingOwnership } from "./device-preferences/registry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
@@ -42,12 +37,7 @@ type SettingsArea =
   | "space"
   | "code"
   | "agents"
-  | "engines"
-  | "plugins"
-  | "skills"
-  | "prompts"
-  | "mcp"
-  | "apps";
+  | "engines";
 
 interface SettingsAreaInfo {
   label: string;
@@ -68,19 +58,13 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   code: { label: "Code", icon: CodeXml },
   agents: { label: "Agents", icon: Users },
   engines: { label: "Engines", icon: SquareTerminal },
-  plugins: { label: "Plugins", icon: Blocks },
-  skills: { label: "Skills", icon: ScrollText },
-  prompts: { label: "Prompts", icon: FileText },
-  mcp: { label: "Connectors", icon: Cable },
-  apps: { label: "Apps", icon: Plug },
 };
 
 /**
  * Sidebar groups, named by feature, in sidebar order. Pages holds one page for each of the app's
  * places, with that place's name and icon, so what each can adjust is easy to find. Agents is one
- * page holding the person's team, personas, engine, behavior, tutor and access. Engines is one
- * page for the engines' CLIs, channels, environment and usage. Tools holds everything those
- * engines can use.
+ * page holding the person's team, engine, behavior, tutor and access. Engines is one
+ * page for the engines' CLIs, channels, environment and usage.
  */
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
   { label: "Account", areas: ["account", "server"] },
@@ -89,7 +73,6 @@ export const settingsGroups: readonly { label: string; areas: readonly SettingsA
     areas: ["general", "appearance", "shortcuts", "voice", "privacy", "advanced"],
   },
   { label: "Pages", areas: ["search", "space", "code", "agents", "engines"] },
-  { label: "Tools", areas: ["plugins", "skills", "prompts", "mcp", "apps"] },
 ];
 
 interface SettingsBlock {
@@ -131,7 +114,6 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("space", "space", "Home"),
   block("code", "editor", "Editor"),
   block("agents", "agents-list", "Team", "resource"),
-  block("agents", "agents-personas", "Personas", "resource"),
   block("agents", "models", "Engine"),
   block("agents", "agents-defaults", "Conversations"),
   block("agents", "agents-companion", "Tutor"),
@@ -141,11 +123,6 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("engines", "engines-channels", "Channels", "resource"),
   block("engines", "engines-environment", "Environment", "resource"),
   block("engines", "engines-usage", "Usage", "resource"),
-  block("plugins", "tools-plugins", "Plugins", "resource"),
-  block("skills", "tools-skills", "Skills", "resource"),
-  block("prompts", "tools-prompts", "Prompts", "resource"),
-  block("mcp", "tools-mcp", "Connectors", "resource"),
-  block("apps", "tools-apps", "Apps", "resource"),
 ];
 
 /**

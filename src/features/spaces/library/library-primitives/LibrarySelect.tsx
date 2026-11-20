@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@misty/ui";
 
 // Radix rejects an empty string as an item value, so "no selection" round-trips
 // through this sentinel instead.

@@ -2,7 +2,7 @@ import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/desktop-stat
 import { reportSystemError } from "@/shared/platform/systemErrors";
 import { useAppStore } from "@/app/shell";
 import { useSettingsStore } from "@/features/settings";
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import { memo, useEffect, useRef } from "react";
 
 /**

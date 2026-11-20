@@ -1,4 +1,4 @@
-import { Button, IconButton, PropertyList } from "@/shared/ui";
+import { Button, IconButton, PropertyList } from "@misty/ui";
 import { BringToFront, Copy, SendToBack, Trash2 } from "lucide-react";
 import type { MarkStyle, MarkupTool } from "./editorTypes";
 import { outputSize, type ImageEdit, type Mark } from "./imageEdit";

@@ -6,7 +6,7 @@ import {
   type WorkspaceView,
 } from "@/features/app-windows";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
-import { QuietPane } from "@/shared/ui";
+import { QuietPane } from "@misty/ui";
 
 export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   // A new tab or split waits idle until something is opened in it. It sits outside the wrapper

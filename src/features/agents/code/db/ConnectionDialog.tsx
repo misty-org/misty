@@ -13,7 +13,7 @@ import {
   OptionSelect,
   SecretField,
   notify,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   dbApi,
   errorText,

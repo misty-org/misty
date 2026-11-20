@@ -6,7 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   MenuItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { markHandoffHandled } from "./handledHandoffs";
 
 /**

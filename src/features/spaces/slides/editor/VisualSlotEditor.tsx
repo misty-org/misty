@@ -8,7 +8,7 @@ import {
   MenuSubmenu,
   Pressable,
   spaceIcons,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { ItemVisibility } from "../../api/visibility";
 import type { VisualSlotSpec } from "../deck/layouts";
 import type { DeckTheme } from "../deck/themes";

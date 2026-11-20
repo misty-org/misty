@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { shortAgo } from "../page/useChatStatuses";
-import { Meter, Pressable, OverflowFadeText, Surface, Text } from "@/shared/ui";
+import { Meter, Pressable, OverflowFadeText, Surface, Text } from "@misty/ui";
 import { lessonProgress } from "./lessons/lessonRouter";
 import { useLessonStore } from "./lessons/lessonStore";
 import type { Course, Lesson } from "./lessons/lessonTypes";

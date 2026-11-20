@@ -1,6 +1,6 @@
 import { AppRouter } from "./router";
 import { NativeWindowSetup } from "./layouts/NativeWindowSetup";
-import { NoticeViewport, TooltipProvider } from "@/shared/ui";
+import { NoticeViewport, TooltipProvider } from "@misty/ui";
 import { McpProbeConfirmHost } from "@/features/engine-config/mcp";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
 

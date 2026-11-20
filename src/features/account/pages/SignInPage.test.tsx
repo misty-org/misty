@@ -44,7 +44,7 @@ vi.mock("../sessions/useAccountStore", () => ({
   accountSignIn: mocks.accountSignIn,
 }));
 
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import SignIn from "./SignInPage";
 import { useSetupStore } from "../setup/useSetupStore";
 import { SavedAccountSessionUnavailableError } from "../sessions/sessionErrors";

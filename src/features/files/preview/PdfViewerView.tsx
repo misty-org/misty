@@ -1,12 +1,12 @@
 import type { PreviewErrorComponent } from "./previewTypes";
-import { IconButton, SetupState, Surface, Text } from "@/shared/ui";
+import { IconButton, SetupState, Surface, Text } from "@misty/ui";
 import { Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 
 // Bundle the pdf.js worker as a same-origin asset so it loads under the app's
 // strict CSP (no external script hosts). Its version is pinned to react-pdf's

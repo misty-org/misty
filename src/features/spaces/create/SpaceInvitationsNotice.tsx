@@ -1,5 +1,5 @@
 import type { SpaceInvitation } from "../api/dto/entities";
-import { Button, Surface, Text } from "@/shared/ui";
+import { Button, Surface, Text } from "@misty/ui";
 import { Check } from "lucide-react";
 
 /** Pending Space invitations, shown above the Space list in the side panel. */

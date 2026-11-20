@@ -7,7 +7,7 @@ import {
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { IconButton, TabStrip, type TabStripTab } from "@/shared/ui";
+import { IconButton, TabStrip, type TabStripTab } from "@misty/ui";
 import { LayoutButton } from "./LayoutButton";
 import { openNewTab } from "./spaceNavigation";
 import { ViewIcon } from "./WorkspaceViewGroupButton";

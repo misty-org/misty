@@ -12,7 +12,7 @@ import { DrawingPreviewHeader } from "./components/DrawingPreviewHeader";
 import { DrawingPreview } from "./components/DrawingPreview";
 import { NewDrawingDialog } from "./components/NewDrawingDialog";
 import { SpaceDrawingsView, type DrawingsViewRuntime } from "./SpaceDrawingsView";
-import { lazyTool } from "@/shared/ui";
+import { lazyTool } from "@misty/ui";
 const Canvas = lazyTool(() => import("./components/CollaborativeDrawingCanvas"));
 const emptyMembers: never[] = [];
 function Title({ title, tab }: { title: string; tab?: string }) {

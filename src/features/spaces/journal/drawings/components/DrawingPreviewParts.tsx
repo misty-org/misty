@@ -1,4 +1,4 @@
-import { ColorSwatch, CustomColorSwatch, Text } from "@/shared/ui";
+import { ColorSwatch, CustomColorSwatch, Text } from "@misty/ui";
 import type { ReactNode } from "react";
 
 export const previewSurfaceColors = [

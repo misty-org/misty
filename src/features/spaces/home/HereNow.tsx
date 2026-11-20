@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserStore } from "@/features/account/core";
 import { LabDoing, PersonAvatar, personTone } from "@/features/agents";
-import { OverflowFadeText, Tooltip } from "@/shared/ui";
+import { OverflowFadeText, Tooltip } from "@misty/ui";
 import { useSpacesStore } from "../list/useSpacesStore";
 import type { GalleryItem } from "./galleryItems";
 import { OverviewCard, OverviewRow } from "./OverviewCard";

@@ -14,7 +14,7 @@ import { libraryItemThumbnailEligible } from "../libraryThumbnail";
 import { LibraryTextPreview } from "./LibraryTextPreview";
 import { libraryItemMIME } from "./libraryMediaTypes";
 import { TEXT_PREVIEW_MAX_BYTES, textPreviewKind } from "./textPreviewKind";
-import { PlaceholderIcon, Surface } from "@/shared/ui";
+import { PlaceholderIcon, Surface } from "@misty/ui";
 
 /**
  * A grid thumbnail, preferring the server preview and falling back to the file.

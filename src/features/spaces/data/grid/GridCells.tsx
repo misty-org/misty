@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from "react";
-import { Surface, Text, cn } from "@/shared/ui";
+import { Surface, Text, cn } from "@misty/ui";
 import type { WorkbookEngine } from "../formula/engine";
 import { cellKey, type CellAlign } from "../workbook/schema";
 import { cellAlignment, displayValue, isCellError } from "../workbook/values";

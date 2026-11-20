@@ -11,7 +11,7 @@ import {
   Slider,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 import { formatBytes } from "./libraryFormat";
 

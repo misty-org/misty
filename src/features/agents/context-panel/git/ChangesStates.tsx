@@ -14,7 +14,7 @@ import {
   ErrorState,
   Separator,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 /**
  * A folder outside any repository: says so, and offers `git init` right there. Nothing else in

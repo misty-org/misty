@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { spaceKindsWithItemPath } from "@/shared/ui";
+import { spaceKindsWithItemPath } from "@misty/ui";
 
 const validSections = new Set([
   "home",
@@ -13,12 +13,18 @@ const validSections = new Set([
   "planner",
   "calendar",
   "lab",
+  "explore",
   "media",
+  "app",
   "members",
   "settings",
 ]);
-/** Old names for a page, still accepted in links: the Library became Media. */
-const renamedSections: Record<string, string> = { files: "media", library: "media" };
+/** Old names for a page, still accepted in links. */
+const renamedSections: Record<string, string> = {
+  agents: "explore",
+  files: "media",
+  library: "media",
+};
 const validSettingsSections = new Set(["general", "members", "connections", "suggestions"]);
 
 interface SpaceRoute {
@@ -55,13 +61,17 @@ export function useSpaceRoute(): SpaceRoute {
       : "general",
     libraryCollection: search.get("collection") ?? "recent",
     conversationId: search.get("conversation"),
-    itemId: spaceKindsWithItemPath.has(routeSection) ? decodeRouteSegment(routeParts[3] ?? "") : "",
+    // A built-in app on the SDK opens at /app/<id>.
+    itemId:
+      spaceKindsWithItemPath.has(routeSection) || routeSection === "app"
+        ? decodeRouteSegment(routeParts[3] ?? "")
+        : "",
   };
 }
 
 /**
- * The same address under a page's current name, when it uses an old one (`/spaces/:id/library`
- * opens `/spaces/:id/media`), or null when it already uses the current one.
+ * The same address under a page's current name when a Space link uses an old name, or null when
+ * it already uses the current one.
  */
 export function renamedSectionPath(pathname: string): string | null {
   const parts = pathname.split("/");

@@ -1,5 +1,5 @@
 import { Check, SendHorizontal } from "lucide-react";
-import { Button, ColorChip, Separator, Surface, Text, Tooltip } from "@/shared/ui";
+import { Button, ColorChip, Separator, Surface, Text, Tooltip } from "@misty/ui";
 import { sizeLabel, styleNames } from "./pickedElement";
 import type { PagePick } from "./pickApi";
 

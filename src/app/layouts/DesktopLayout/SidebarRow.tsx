@@ -1,5 +1,5 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
-import { Kbd, NavRow, OverflowFadeText } from "@/shared/ui";
+import { Kbd, NavRow, OverflowFadeText } from "@misty/ui";
 import { markSlotClass } from "./styles";
 
 /** One row of the sidebar's places: an icon, a label and, for some, a key hint. */

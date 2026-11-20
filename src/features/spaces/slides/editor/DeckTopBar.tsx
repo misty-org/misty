@@ -37,7 +37,7 @@ import {
   useNotice,
   type ActionBarItem,
   type ActionBarMode,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { EmbedPicker, type EmbedReference } from "@/features/spaces/embeds";
 import type { ItemVisibility } from "../../api/visibility";
 import { slideLayouts } from "../deck/layouts";

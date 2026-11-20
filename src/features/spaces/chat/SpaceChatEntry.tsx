@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Bot, LogOut, MessagesSquare, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { SpaceConversation } from "../api/dto/entities";
 import { useAuth } from "@/features/account";
@@ -12,6 +12,9 @@ import guildLayout from "./fluxer/css/GuildLayout.module.css";
 import shell from "./fluxer/css/SpaceChatShell.module.css";
 import { CreateEditConversationDialog } from "./sidebar/CreateEditConversationDialog";
 import { NewDirectMessageDialog } from "./sidebar/NewDirectMessageDialog";
+import { AddPeopleDialog, ConversationAgentsDialog } from "./sidebar/GroupDirectDialogs";
+import { isGroupDirectMessage } from "./sidebar/conversationGroups";
+import { useOwnMentionableAgents } from "./ownAgents";
 import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
 import { spacesApi } from "../api/api";
 import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
@@ -32,9 +35,9 @@ import {
   Surface,
   useNotice,
   type ActionBarItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
-import { useSpaceEveryoneUnread } from "./spaceConversationsResource";
+import { reloadSpaceConversations, useSpaceEveryoneUnread } from "./spaceConversationsResource";
 import { SpaceChat } from "./SpaceChat";
 import { spaceCan } from "../roles/useSpaceRoles";
 import { useEffect } from "react";
@@ -65,6 +68,15 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const canManageChannels = spaceCan(space, "channels.manage") || isOwner;
   const [editing, setEditing] = useState<SpaceConversation | null>();
   const [directMessageOpen, setDirectMessageOpen] = useState(false);
+  const [addingPeople, setAddingPeople] = useState(false);
+  const [agentsOpen, setAgentsOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState("");
+  const ownAgents = useOwnMentionableAgents(user?.id);
+  const openConversation = data.conversations.find((item) => item.id === conversationId);
+  const openDirect = openConversation?.kind === "dm" ? openConversation : undefined;
+  const openGroup =
+    openDirect && isGroupDirectMessage(openDirect, user?.id) ? openDirect : undefined;
   const [deleting, setDeleting] = useState<SpaceConversation | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -79,6 +91,7 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   };
   // Search results, then an open thread, take the member list's place, as in Fluxer.
   const threadOpen = useChatSidePanel((panel) => Boolean(panel.threadRootId));
+  const threadsListOpen = useChatSidePanel((panel) => panel.threadsListOpen);
   const preferences = useChatSidebarPreferences((state) => state.value);
   const savePreferences = useChatSidebarPreferences((state) => state.set);
   const membersShown = !preferences.hideMembers;
@@ -148,14 +161,68 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       icon: Users,
       label: "Members",
       variant: "quiet",
-      pressed: membersShown && !searchedText && !threadOpen,
+      pressed: membersShown && !searchedText && !threadOpen && !threadsListOpen,
       priority: 3,
       onSelect: () => {
         closeSearch();
+        useChatSidePanel.getState().reset();
         savePreferences((current) => ({ ...current, hideMembers: membersShown }));
       },
     },
+    {
+      id: "threads",
+      icon: MessagesSquare,
+      label: "Threads",
+      variant: "quiet",
+      pressed: threadsListOpen || threadOpen,
+      priority: 3,
+      onSelect: () => {
+        closeSearch();
+        const panel = useChatSidePanel.getState();
+        if (panel.threadsListOpen || panel.threadRootId) panel.reset();
+        else panel.openThreadsList();
+      },
+    },
   ];
+  if (openGroup && !referenceOnly)
+    actions.push({
+      id: "add-people",
+      icon: UserPlus,
+      label: "Add people",
+      variant: "quiet",
+      priority: 2,
+      onSelect: () => setAddingPeople(true),
+    });
+  if (openDirect && !referenceOnly)
+    actions.push({
+      id: "chat-agents",
+      icon: Bot,
+      label: "Agents in this chat",
+      variant: "quiet",
+      priority: 2,
+      onSelect: () => setAgentsOpen(true),
+    });
+  if (openGroup && !referenceOnly)
+    actions.push({
+      id: "leave-group",
+      icon: LogOut,
+      label: "Leave group",
+      variant: "quiet",
+      priority: 1,
+      onSelect: () => setLeaving(true),
+    });
+  const leaveGroup = async () => {
+    if (!openGroup) return;
+    setLeaveError("");
+    try {
+      await spacesApi.leaveConversation(spaceId, openGroup.id);
+      data.remove(openGroup.id);
+      setLeaving(false);
+      navigate(spaceChatPath(spaceId));
+    } catch (reason) {
+      setLeaveError(reason instanceof Error ? reason.message : "You couldn't leave the group.");
+    }
+  };
   if (space && spaceCan(space, "space.invite") && !referenceOnly)
     actions.push({
       id: "invite",
@@ -251,6 +318,47 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
                 }}
               >
                 Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        {openGroup ? (
+          <AddPeopleDialog
+            spaceId={spaceId}
+            conversation={openGroup}
+            members={members ?? []}
+            open={addingPeople}
+            onOpenChange={setAddingPeople}
+            onChanged={(changed) => data.upsert(changed)}
+          />
+        ) : null}
+        {openDirect ? (
+          <ConversationAgentsDialog
+            spaceId={spaceId}
+            conversation={openDirect}
+            currentUserId={user?.id}
+            agents={ownAgents}
+            open={agentsOpen}
+            onOpenChange={setAgentsOpen}
+            onChanged={() => void reloadSpaceConversations(spaceId).catch(() => undefined)}
+          />
+        ) : null}
+        <AlertDialog open={leaving} onOpenChange={(next) => !next && setLeaving(false)}>
+          <AlertDialogContent>
+            <AlertDialogTitle>Leave this group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {leaveError ||
+                "You and your agents leave. What you wrote stays, and someone can add you back."}
+            </AlertDialogDescription>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(event) => {
+                  event.preventDefault();
+                  void leaveGroup();
+                }}
+              >
+                Leave
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

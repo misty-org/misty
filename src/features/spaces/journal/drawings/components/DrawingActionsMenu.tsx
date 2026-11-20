@@ -7,7 +7,7 @@ import {
   MenuItem,
   MenuSeparator,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { FileDown, FileUp, History, MoreHorizontal, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { HistoryDialog } from "../../../history/HistoryDialog";

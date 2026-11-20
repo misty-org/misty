@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-import { Button, Dialog, DialogContent, DialogTitle } from "@/shared/ui";
+import { Button, Dialog, DialogContent, DialogTitle } from "@misty/ui";
 import type { EngineId } from "./engines";
 import {
   ClaudeFormSections,

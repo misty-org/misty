@@ -7,7 +7,7 @@ import {
   type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import type { WorkbookSession } from "../session";
 import {
   readWorkbookClipboard,

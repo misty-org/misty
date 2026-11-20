@@ -8,7 +8,7 @@ vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
 
 import { useFolderSettings } from "../folders/folderSettings";
 import { availableTargets, chosenTarget, useOpenApps } from "./openApp";
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { OpenInMenu } from "./OpenInMenu";
 
 afterEach(cleanup);

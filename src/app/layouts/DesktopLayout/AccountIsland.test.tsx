@@ -18,7 +18,7 @@ vi.mock("./NavRail", () => ({
 }));
 vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
 
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { AccountIsland } from "./AccountIsland";
 
 afterEach(() => {

@@ -1,4 +1,4 @@
-import { NumberedList, Text } from "@/shared/ui";
+import { NumberedList, Text } from "@misty/ui";
 
 const points = [
   "An AI does the work. You pick which one, and some are free.",

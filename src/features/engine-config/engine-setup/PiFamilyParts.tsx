@@ -2,7 +2,7 @@
 // PiFamilyOauthSection.tsx, PiFamilyApiKeySection.tsx and PiFamilyCustomSection.tsx.
 // See NOTICE.
 import type { ReactNode } from "react";
-import { cn, Surface, Text } from "@/shared/ui";
+import { cn, Surface, Text } from "@misty/ui";
 
 /** What Pi's and Oh My Pi's provider settings share: rows, cards and a signed-in state. */
 

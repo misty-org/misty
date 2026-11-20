@@ -1,4 +1,4 @@
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import type { SpaceChatStarter } from "./ChatMessages";
 
 /** The opening screen of an empty conversation. */

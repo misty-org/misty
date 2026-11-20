@@ -8,7 +8,7 @@ import {
   DialogTitle,
   Pressable,
   Surface,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useDeckAssetUrl } from "../render/renderHooks";
 
 /**

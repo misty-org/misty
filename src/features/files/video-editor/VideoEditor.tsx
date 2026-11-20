@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { SetupState, lazyTool, ToolSuspense } from "@/shared/ui";
+import { SetupState, lazyTool, ToolSuspense } from "@misty/ui";
 import { EditorPane } from "../EditorPane";
 import { loadOpencutWasm } from "@opencut/wasm/load";
 import { canEditVideo, VIDEO_EDITING_UNAVAILABLE } from "./support";

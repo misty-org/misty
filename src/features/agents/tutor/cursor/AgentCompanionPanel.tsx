@@ -1,7 +1,7 @@
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, IconButton, Kbd, Switch, Slider, Text, useNotice } from "@/shared/ui";
+import { Button, IconButton, Kbd, Switch, Slider, Text, useNotice } from "@misty/ui";
 import { RotateCcw, Square, VolumeX } from "lucide-react";
 import { useState } from "react";
 import { setCompanionOn, useCompanionOn } from "./companionOn";

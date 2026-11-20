@@ -30,7 +30,7 @@ vi.mock("../setup/useServerSwitch", () => ({
 }));
 
 import { useServerChoice } from "@/api/deployment/serverChoice";
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { SignInSheet as Sheet } from "./SignInSheet";
 import { openSignInSheet, useSignInSheetStore } from "./signInSheetStore";
 import { openSignOutSheet, SignOutSheet } from "./SignOutSheet";

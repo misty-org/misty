@@ -9,7 +9,7 @@ import {
   Spinner,
   notify,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 

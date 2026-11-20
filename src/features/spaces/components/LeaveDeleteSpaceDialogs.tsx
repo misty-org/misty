@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
   Input,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { SpaceLifecycleActions } from "./useSpaceLifecycleActions";
 
 /* Confirmation dialogs for leaving and deleting a Space; both share the store error. */

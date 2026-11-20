@@ -1,6 +1,6 @@
 import { ChevronDown, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { OverflowFadeText, Pressable, RowTools, Text } from "@/shared/ui";
+import { OverflowFadeText, Pressable, RowTools, Text } from "@misty/ui";
 
 /**
  * A titled group of rows, after OpenChamber's session card: the header is one row tall, its glyph

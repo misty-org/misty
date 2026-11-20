@@ -11,7 +11,7 @@ import {
   MoveHorizontal,
   Trash2,
 } from "lucide-react";
-import { MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuSubmenu } from "@/shared/ui";
+import { MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuSubmenu } from "@misty/ui";
 
 export const widthChoices = [
   { value: "80", label: "Narrow" },

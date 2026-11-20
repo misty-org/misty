@@ -13,8 +13,8 @@ import {
   Surface,
   Text,
   notify,
-} from "@/shared/ui";
-import { uiPx } from "@/shared/lib/uiScale";
+} from "@misty/ui";
+import { uiPx } from "@misty/ui";
 import type { CellValue, QueryResult } from "./dbApi";
 import { cellText } from "./sqlText";
 

@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { UpdateNotices } from "./UpdateNotices";
 
 const mocks = vi.hoisted(() => ({ check: vi.fn(), enabled: true, native: true, apps: vi.fn() }));

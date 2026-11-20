@@ -44,7 +44,7 @@ import {
   useSpaceGallery,
   useWindowSpace,
 } from "@/features/spaces";
-import { itemToneClass, spaceMadeKinds } from "@/shared/ui";
+import { itemToneClass, spaceMadeKinds } from "@misty/ui";
 import { agentChatRoute } from "../spaceNavigation";
 import { excerpt, fieldScore, matchScore, rank } from "./searchRank";
 import { useSearchUses } from "./searchStore";

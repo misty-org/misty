@@ -2,7 +2,7 @@ import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 import { File, Image, Music2, Video } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { PlaceholderIcon } from "@/shared/ui";
+import { PlaceholderIcon } from "@misty/ui";
 
 /** A picker tile's preview, fetched once it scrolls near view; other files show their kind. */
 export function MistyLibraryPickerThumbnail({

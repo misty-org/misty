@@ -1,7 +1,7 @@
 import { NotebookText } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type * as Y from "yjs";
-import { Text, Textarea } from "@/shared/ui";
+import { Text, Textarea } from "@misty/ui";
 
 /**
  * The speaker notes strip under the slide, bound to the slide's notes in the room. It grows as

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Button, Input, Text, useNotice } from "@/shared/ui";
+import { Button, Input, Text, useNotice } from "@misty/ui";
 import { useSpacesStore } from "../list/useSpacesStore";
 import {
   activeClaims,

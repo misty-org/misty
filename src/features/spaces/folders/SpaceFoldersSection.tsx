@@ -13,7 +13,7 @@ import {
   Text,
   useConfirmDelete,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { formatBytes } from "../library/libraryFormat";
 import { ShareFolderDialog, errorText } from "./ShareFolderDialog";
 import { downloadFolder, folderSource, forgetFolderSource, pickFolderToShare } from "./shareFolder";

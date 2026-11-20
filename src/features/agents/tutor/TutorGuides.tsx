@@ -11,7 +11,7 @@ import {
   useNotice,
   type SurfaceEdge,
   type TextTone,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
 import { startLesson } from "./notebookThread";
 import { deckPrompt, jobTitle, quizPrompt, teachPrompt } from "./tutorPrompts";

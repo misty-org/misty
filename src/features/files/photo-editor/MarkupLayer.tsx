@@ -1,4 +1,4 @@
-import { ShapeSelection, cn, type SelectionHandle } from "@/shared/ui";
+import { ShapeSelection, cn, type SelectionHandle } from "@misty/ui";
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { MarkStyle, MarkupTool, TextDraft } from "./editorTypes";
 import {

@@ -25,7 +25,7 @@ import {
   Surface,
   Text,
   type Tint,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { shortAgo } from "../../page/useChatStatuses";
 import { DeckView, ReviewSession } from "../TutorDecks";
 import { GuideView, OverviewView, QuizView } from "../TutorGuides";

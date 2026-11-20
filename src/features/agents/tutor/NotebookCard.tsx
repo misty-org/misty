@@ -10,7 +10,7 @@ import {
   Text,
   Tooltip,
   cn,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { shortAgo } from "../page/useChatStatuses";
 import { spacesGateway } from "../spaces-gateway/spacesGateway";
 import { useTeamMembers } from "../now/teamMembers";

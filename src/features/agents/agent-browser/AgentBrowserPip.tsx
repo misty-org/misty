@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, PictureInPicture, X } from "lucide-react";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { FloatingPip, IconButton, type PipCorner } from "@/shared/ui";
+import { FloatingPip, IconButton, type PipCorner } from "@misty/ui";
 import { closeAgentBrowser, showView, useAgentBrowser } from "./agentBrowserStore";
 
 const corners: readonly PipCorner[] = ["top-left", "top-right", "bottom-left", "bottom-right"];

@@ -25,7 +25,7 @@ import {
   IconButton,
   Input,
   MenuItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 /**
  * A conversation's actions: the overflow menu, the same items for a right-click menu,

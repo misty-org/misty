@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ChannelDivider } from "@/shared/ui";
+import { ChannelDivider } from "@misty/ui";
 
 import { spacesApi } from "../../api/api";
 import { useSpacesStore } from "../../list/useSpacesStore";

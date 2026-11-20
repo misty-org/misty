@@ -34,7 +34,7 @@ import {
   ToolbarDivider,
   Tooltip,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { spacesGateway } from "../spaces-gateway/spacesGateway";
 import { useStudioOpen, useTeamMembers, type TeamMember } from "../now/teamMembers";
 import { PersonAvatar } from "./notebook/LivePeople";

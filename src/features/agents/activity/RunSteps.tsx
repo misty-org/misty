@@ -28,7 +28,7 @@ import {
   Surface,
   Text,
   rowShapeWrap,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { RunStep } from "./activityApi";
 import { describeSteps, offsetLabel, type DescribedStep, type StepVerb } from "./stepSentences";
 import { useStepPicture } from "./useRunSteps";

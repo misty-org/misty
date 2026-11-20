@@ -1,4 +1,4 @@
-import { cn, Input, Textarea } from "@/shared/ui";
+import { cn, Input, Textarea } from "@misty/ui";
 import { type ChangeEvent } from "react";
 
 import { settingsDisabledControlClass } from "./settingsConstants";

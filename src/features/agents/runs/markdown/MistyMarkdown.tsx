@@ -1,6 +1,6 @@
 import "katex/dist/katex.min.css";
 import "./mistyMarkdown.css";
-import { Button, IconButton, lazyTool, ToolSuspense } from "@/shared/ui";
+import { Button, IconButton, lazyTool, ToolSuspense } from "@misty/ui";
 import {
   Check,
   CircleAlert,

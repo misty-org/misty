@@ -1,5 +1,5 @@
 import { FolderOpen } from "lucide-react";
-import { IconButton, Surface, Text } from "@/shared/ui";
+import { IconButton, Surface, Text } from "@misty/ui";
 import { mcpApi } from "./api";
 import { copy, engineLabel, sourceLabel } from "./copy";
 import type { McpEngineInventory, McpSourceInfo } from "./types";

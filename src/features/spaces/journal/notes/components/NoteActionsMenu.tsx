@@ -8,7 +8,7 @@ import {
   MenuSubmenu,
   spaceMadeKind,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Download, History, MoreHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { HistoryDialog } from "../../../history/HistoryDialog";

@@ -14,7 +14,7 @@ import {
   Surface,
   Text,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useSpeechSupport } from "@/features/voice";
 import { jobTitle } from "../tutorPrompts";
 import { startJob } from "../tutorRuns";

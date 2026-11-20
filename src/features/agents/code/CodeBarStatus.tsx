@@ -21,7 +21,7 @@ import {
   MenuRadioItem,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { fileName, useFilesStore } from "../context-panel/files/filesStore";
 import { LineCounts } from "../context-panel/git/LineCounts";
 import { useGitStore } from "../context-panel/git/store";

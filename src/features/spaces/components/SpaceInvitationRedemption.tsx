@@ -15,7 +15,7 @@ import {
   Surface,
   Text,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useSpacesStore } from "../list/useSpacesStore";
 
 export function SpaceInvitationRedemption() {

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DesktopSettingsRow } from "@/features/settings/desktop";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Progress } from "@/shared/ui";
+import { Button, Progress } from "@misty/ui";
 import { rememberReleaseNotes } from "./releaseNotes";
 import { onUpdateCheckRequest } from "./updateCheckRequest";
 import {

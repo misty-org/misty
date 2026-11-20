@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonControl, Surface } from "@/shared/ui";
+import { Skeleton, SkeletonControl, Surface } from "@misty/ui";
 
 /**
  * The canvas standing in until the drawing opens: Excalidraw's floating toolbar over a canvas

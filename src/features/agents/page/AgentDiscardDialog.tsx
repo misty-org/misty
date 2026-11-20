@@ -6,7 +6,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 /** Confirms leaving unsaved agent edits or an unsent message. */
 export function AgentDiscardDialog({

@@ -1,5 +1,5 @@
 import type { AgentProfile } from "@/shared/schemas";
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import { AgentAvatar } from "./AgentAvatar";
 
 /**

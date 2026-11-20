@@ -2,7 +2,7 @@ import { readAgentsImage } from "@/features/agents/AgentsRuntime";
 import { ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MistyImageAttachment } from "../state/conversationTypes";
-import { PlaceholderIcon, Surface } from "@/shared/ui";
+import { PlaceholderIcon, Surface } from "@misty/ui";
 
 export function MistyMessageAttachments({
   attachments = [],

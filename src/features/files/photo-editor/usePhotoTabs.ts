@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { CropRect } from "@/shared/ui";
+import type { CropRect } from "@misty/ui";
 import type { EditorMode } from "./editorTypes";
 import {
   aspectRatio,

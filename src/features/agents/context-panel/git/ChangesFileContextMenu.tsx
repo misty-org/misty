@@ -16,7 +16,7 @@ import {
   ContextMenuContent,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { isCodePageShown } from "../../code/codePageStore";
 import { useContextPanel } from "../contextPanelStore";
 import { filesApi } from "../files/filesApi";

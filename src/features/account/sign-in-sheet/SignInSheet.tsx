@@ -3,7 +3,7 @@ import { isAuthPath, isSignedOutPath, routes } from "@/app/shell/routes";
 import { setupFlow, type SetupStep } from "../setup/setupFlow";
 import { useSetupStore } from "../setup/useSetupStore";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
-import { BackButton, Button, Dialog, DialogContent, DialogTitle, useNotice } from "@/shared/ui";
+import { BackButton, Button, Dialog, DialogContent, DialogTitle, useNotice } from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import RegisterForm from "../components/RegisterForm";

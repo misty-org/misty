@@ -1,6 +1,6 @@
 import { Eye, Undo2, X } from "lucide-react";
 import { useState } from "react";
-import { ActionBar, CodeDiff, EmptyState, IconButton, ScrollArea, Text, TopBar } from "@/shared/ui";
+import { ActionBar, CodeDiff, EmptyState, IconButton, ScrollArea, Text, TopBar } from "@misty/ui";
 import { diffLines } from "./liveDiff";
 import { useRoomView } from "./livePeople";
 import type { LiveRoom } from "./liveRoom";

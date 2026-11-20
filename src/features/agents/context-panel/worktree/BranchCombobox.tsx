@@ -12,7 +12,7 @@ import {
   Text,
   Tooltip,
   rowShape,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { BranchInfo } from "./worktreeApi";
 
 /** A branch row: the check column, the name, then where it lives or why it can't be picked. */

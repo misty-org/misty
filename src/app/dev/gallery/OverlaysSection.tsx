@@ -31,7 +31,7 @@ import {
   SheetTitle,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 

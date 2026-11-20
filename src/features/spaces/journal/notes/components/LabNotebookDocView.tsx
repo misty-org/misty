@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type * as Y from "yjs";
 import { MistyMarkdown } from "@/features/agents";
-import { Button, Surface } from "@/shared/ui";
+import { Button, Surface } from "@misty/ui";
 
 /** Whether a doc is the Lab's (a notebook, or someone's questions about one): the Lab writes its
  * own types into it. */

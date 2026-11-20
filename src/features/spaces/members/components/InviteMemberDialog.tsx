@@ -8,7 +8,7 @@ import {
   DialogTitle,
   Input,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { MemberDialogsState } from "./useMemberDialogs";

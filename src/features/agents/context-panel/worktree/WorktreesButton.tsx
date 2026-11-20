@@ -15,7 +15,7 @@ import {
   Text,
   Tooltip,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useChatFolders, useProjectFolders } from "../../shared-folders/chatFolder";
 import { DeleteWorktreeDialog } from "./DeleteWorktreeDialog";
 import { dirNameOf } from "./prInput";

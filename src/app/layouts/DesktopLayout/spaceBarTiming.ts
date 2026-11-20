@@ -1,4 +1,4 @@
-import { remCss } from "@/shared/lib/uiScale";
+import { remCss } from "@misty/ui";
 import { dockingMetrics } from "./dockingGeometry";
 
 /** The bar's own height; the page's top margin below it is the gap to the page. */

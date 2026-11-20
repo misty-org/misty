@@ -1,4 +1,4 @@
-import { useNotice } from "@/shared/ui";
+import { useNotice } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { type ScreenLocation } from "../runs/invocations/aiSettingsTypes";

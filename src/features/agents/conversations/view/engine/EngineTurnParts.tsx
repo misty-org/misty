@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Text, Tooltip } from "@/shared/ui";
+import { Text, Tooltip } from "@misty/ui";
 import { EnginePlanReview } from "./EnginePlanReview";
 import { EngineQuestionCard } from "./EngineQuestionCard";
 import { EngineSubagents } from "./EngineSubagents";

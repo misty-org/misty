@@ -5,7 +5,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   MenuItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { Editor, JSONContent } from "@tiptap/react";
 import {
   Copy,

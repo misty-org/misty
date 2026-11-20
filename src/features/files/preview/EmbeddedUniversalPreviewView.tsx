@@ -20,7 +20,7 @@ import {
   Text,
   lazyTool,
   ToolSuspense,
-} from "@/shared/ui";
+} from "@misty/ui";
 import ReactMarkdown from "react-markdown";
 
 const PdfViewer = lazyTool(() => import("./PdfViewerView"));

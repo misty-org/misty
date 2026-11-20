@@ -9,7 +9,7 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { openSettings, type SettingsSection } from "@/features/settings";
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import { onCall, openReading, soundOn } from "@/features/voice";
 import { mergeVoiceTurn, voiceContext } from "./companionConversationHistory";
 import { SpokenSentences, spokenParts } from "./companionSentences";

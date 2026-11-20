@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import {
   actionQuestionHasDetails,

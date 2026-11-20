@@ -1,5 +1,5 @@
 import type { NavigateFunction } from "react-router-dom";
-import { spaceMadeKind } from "@/shared/ui";
+import { spaceMadeKind } from "@misty/ui";
 import { drawingsApi } from "../journal/drawings/api/api";
 import { decksApi } from "../slides/api";
 import { workbooksApi } from "../data/api";

@@ -8,7 +8,7 @@ import {
   Skeleton,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ChevronRight, FileText, Link2, PanelRightClose } from "lucide-react";
 import { useSpaceResource } from "../../../api/spaceResource";
 import type { UnifiedNote } from "../noteTypes";

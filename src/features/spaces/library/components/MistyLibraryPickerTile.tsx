@@ -1,5 +1,5 @@
 import type { SpaceLibraryItem } from "../../api/dto/entities";
-import { OverflowFadeText, Pressable, Surface, Text, type PressableProps } from "@/shared/ui";
+import { OverflowFadeText, Pressable, Surface, Text, type PressableProps } from "@misty/ui";
 import { Check } from "lucide-react";
 import { MistyLibraryPickerThumbnail } from "./MistyLibraryPickerThumbnail";
 

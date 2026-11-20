@@ -11,7 +11,7 @@ import {
   Text,
   Textarea,
   type TextTone,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { getFileTreeIconSvg } from "../../context-panel/files/fileIcons";
 import { useFilesStore } from "../../context-panel/files/filesStore";
 import { resolveWorkspaceRepository } from "../../context-panel/files/repositorySelection";

@@ -68,7 +68,10 @@ export function useSpaceChatScope(options: {
     [activeConversation],
   );
   const directRecipient = useMemo(() => {
-    if (activeConversation?.kind !== "dm" || activeConversation.participants.length > 2)
+    if (
+      activeConversation?.kind !== "dm" ||
+      activeConversation.participants.filter((participant) => participant.kind === "person").length > 2
+    )
       return undefined;
     const other = activeConversation.participants.find(
       (participant) =>

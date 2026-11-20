@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useCachedResource } from "@/api/cache/cached-resource";
 import { downloadsGrantId, sandboxPermissionSet, sandboxPermissionsList } from "@/native/sandbox";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, ErrorState, useNotice } from "@/shared/ui";
+import { Button, ErrorState, useNotice } from "@misty/ui";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsRowSkeleton,

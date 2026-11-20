@@ -1,5 +1,5 @@
 import { Compass } from "lucide-react";
-import { InfoCorner } from "@/shared/ui";
+import { InfoCorner } from "@misty/ui";
 import { startTour, useTours } from "./tourStore";
 import { tours, type TourId } from "./tours";
 

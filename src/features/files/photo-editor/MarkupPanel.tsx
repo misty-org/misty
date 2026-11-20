@@ -1,4 +1,4 @@
-import { ChoiceTile } from "@/shared/ui";
+import { ChoiceTile } from "@misty/ui";
 import { ArrowUpRight, Circle, Grid3x3, Minus, MousePointer2, Pencil, Square } from "lucide-react";
 import { markupToolKeys, type MarkStyle, type MarkupTool } from "./editorTypes";
 import { MarkStyleControls } from "./MarkStyleControls";

@@ -1,4 +1,4 @@
-import type { TourStep } from "@/shared/ui";
+import type { TourStep } from "@misty/ui";
 
 /**
  * The tours of Misty's utility surfaces: search, the layout popup and the agents dialogs.

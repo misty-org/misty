@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useMistyStore } from "../state/useMistyStore";
 import { requestHostContext } from "../context/contextBridge";
 import { assertMistyAvailable } from "../state/availability";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 
 export function MistyContextBar() {
   const notice = useMistyStore((s) => s.handoff?.notice);

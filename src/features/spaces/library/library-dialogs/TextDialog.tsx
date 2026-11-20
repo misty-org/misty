@@ -8,7 +8,7 @@ import {
   DialogTitle,
   Input,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { DialogField } from "./DialogField";
 
 /** The shared one-or-two-field prompt used for folder, memory and item renames. */

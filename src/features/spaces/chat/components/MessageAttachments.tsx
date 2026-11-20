@@ -1,7 +1,7 @@
 import { copyLibraryItemsToClipboard } from "../../library";
 import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "../../api/dto/entities";
-import { Badge, Button, Surface, Tooltip } from "@/shared/ui";
+import { Badge, Button, Surface, Tooltip } from "@misty/ui";
 import { LibraryBig, Paperclip } from "lucide-react";
 
 interface MessageAttachmentsProps {

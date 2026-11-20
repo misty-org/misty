@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 
 /** Form feedback shows as a notice in the corner, so it never shifts the form around. */
 export default function AuthMessage({ tone, message }: AuthMessageProps) {

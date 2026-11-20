@@ -9,7 +9,7 @@ import {
   Input,
   Switch,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useState, type FormEvent } from "react";
 import type { SpaceCalendarEvent, SpaceCalendarEventInput } from "../planner/api";
 import { clockField, eventDayKey, eventTimes } from "./calendarDates";

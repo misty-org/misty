@@ -4,7 +4,7 @@ import {
   DropdownMenuTrigger,
   MenuItem,
   MenuTrigger,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AiSuggestedAction } from "../invocations/invocationTypes";

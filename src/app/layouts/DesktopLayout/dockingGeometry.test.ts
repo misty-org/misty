@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dockingGeometry, dockingMetrics } from "./dockingGeometry";
 import { tabSides } from "@/app/shell/dockingLayout";
-import { remCss } from "@/shared/lib/uiScale";
+import { remCss } from "@misty/ui";
 
 describe.each(tabSides)("tabs on the %s", (tabs) => {
   const layout = { tabs, navigation: tabs === "left" ? ("right" as const) : ("left" as const) };

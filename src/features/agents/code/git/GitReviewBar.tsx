@@ -1,6 +1,6 @@
 import { getChunks, rejectChunk } from "@codemirror/merge";
 import { useFilesStore } from "../../context-panel/files/filesStore";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import { editorCommandsOf } from "../editorCommands";
 import { reviewViews, useGitReview } from "./gitReviewStore";
 

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
@@ -7,7 +7,8 @@ import { ChatSessionCard, ChatSidePanels } from "../context-panel/ChatSidePanels
 import { isUnread, markConversationRead } from "./conversationReads";
 import { LabInSpace } from "../tutor/LabInSpace";
 import { CodePage } from "../code/CodePage";
-import { cn, Surface } from "@/shared/ui";
+import { cn, Surface } from "@misty/ui";
+import { AgentMemoryPage } from "../memory/AgentMemoryPage";
 
 /**
  * A new chat in the workspace starts a little way down the canvas, its greeting over the composer
@@ -31,7 +32,7 @@ const emptyChatClass = cn(
 /** Queued or working: read state doesn't apply yet. */
 const isRunInProgress = (state?: string) => state === "running" || state === "queued";
 
-export type AgentWorkspacePage = "task" | "lab" | "code";
+export type AgentWorkspacePage = "task" | "lab" | "code" | "memory";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -50,6 +51,7 @@ type RecentConversation = {
  */
 export function AgentWorkspaceFrame({
   agent,
+  accountId,
   page,
   conversations,
   activity,
@@ -59,6 +61,7 @@ export function AgentWorkspaceFrame({
   onNewTask,
 }: {
   agent: AgentProfile;
+  accountId: string;
   page: AgentWorkspacePage;
   conversations: RecentConversation[];
   /** This agent's runs, to mark the open conversation read once its run settles. */
@@ -68,6 +71,7 @@ export function AgentWorkspaceFrame({
   children: ReactNode;
   onNewTask(): void;
 }) {
+  const chatPageRef = useRef<HTMLDivElement>(null);
   // The open conversation is read once its run settles while the window is in view.
   const activeId = page === "task" ? conversationId : undefined;
   let latest: MistyActivityEntry | undefined;
@@ -88,6 +92,13 @@ export function AgentWorkspaceFrame({
     document.addEventListener("visibilitychange", read);
     return () => document.removeEventListener("visibilitychange", read);
   }, [activeId, readable]);
+  // Every opened chat starts at its newest reply. Older pages keep their scroll position because
+  // the conversation id does not change while they are prepended.
+  useLayoutEffect(() => {
+    if (page !== "task") return;
+    const scroll = chatPageRef.current?.querySelector<HTMLElement>(".agent-conversation-scroll");
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+  }, [page, conversationId]);
   useSessionGoalRunner(activeId ?? "");
   return (
     // A main column (a body: the chat, under its floating bar, or another view and, when open, the
@@ -108,7 +119,7 @@ export function AgentWorkspaceFrame({
               its own stacking inside, so the cards stay on top where they float over it. */}
           <Surface tone="page" className="relative isolate min-h-0 min-w-90 flex-1 overflow-hidden">
             {/* Keep the live conversation mounted while browsing other views; its draft and voice state belong to it. */}
-            <div className="flex h-full min-w-0" hidden={page !== "task"}>
+            <div ref={chatPageRef} className="flex h-full min-w-0" hidden={page !== "task"}>
               {children}
             </div>
             {/* The session card floats over the chat's top right, taking none of its width. */}
@@ -118,6 +129,15 @@ export function AgentWorkspaceFrame({
             {/* The Lab is a page of the agent's home Space; its tab goes there. */}
             {page === "lab" ? <LabInSpace agent={agent} /> : null}
             {page === "code" ? <CodePage /> : null}
+            {page === "memory" ? (
+              <AgentMemoryPage
+                accountId={accountId}
+                agentId={agent.id}
+                agentName={agent.name}
+                engine={agent.engine}
+                conversationId={conversationId}
+              />
+            ) : null}
           </Surface>
           {/* The chat's side panel, between the chat and the rail. */}
           {page === "task" ? (

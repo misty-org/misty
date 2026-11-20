@@ -14,7 +14,7 @@ import {
   Slider,
   Switch,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { LayoutGrid, List, Rows3 } from "lucide-react";
 import { useId, useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";

@@ -1,4 +1,4 @@
-import { ListCard, ListRow } from "@/shared/ui";
+import { ListCard, ListRow } from "@misty/ui";
 import { Cloud, Server } from "lucide-react";
 
 export type ServerChoiceTarget = "cloud" | "own";

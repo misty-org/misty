@@ -2,7 +2,7 @@ import { personalAgentsApi } from "./personalAgentsApi";
 import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentEngineField } from "../engines/AgentEngineField";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, useNotice, Field, Input, Text, Textarea } from "@/shared/ui";
+import { Button, useNotice, Field, Input, Text, Textarea } from "@misty/ui";
 import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";

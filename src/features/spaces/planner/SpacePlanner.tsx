@@ -7,7 +7,7 @@ import {
   SearchField,
   Surface,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";

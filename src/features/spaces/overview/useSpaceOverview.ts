@@ -11,7 +11,7 @@ import { useSpaceDrawingList } from "../journal/drawings/api/drawingsResource";
 import { useSpaceDeckList, useSpaceWorkbookList } from "../api/madeLists";
 import { decksApi } from "../slides/api";
 import { workbooksApi } from "../data/api";
-import { spaceMadeKind } from "@/shared/ui";
+import { spaceMadeKind } from "@misty/ui";
 import { useSpaceConversationList } from "../chat/spaceConversationsResource";
 import { spacesApi } from "../api/api";
 import { libraryItemsPath } from "../api/library-items-query";

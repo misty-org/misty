@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { spacesApi } from "../api/api";
 import type { Space } from "../api/dto/entities";
-import { Avatar, AvatarFallback, AvatarImage, cn } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, cn } from "@misty/ui";
 
 /**
  * Spaces' uploaded pictures, fetched once per version for this session: an object URL, or null

@@ -14,7 +14,7 @@ import {
   TextSearch,
   Trash2,
 } from "lucide-react";
-import { ContextMenuContent, ContextMenuSeparator, MenuItem } from "@/shared/ui";
+import { ContextMenuContent, ContextMenuSeparator, MenuItem } from "@misty/ui";
 import { canOpenInBrowser } from "../editor/editorViewMode";
 import { parentPath } from "./filesStore";
 import type { FileTreeMenuTarget } from "./useFileTreeOperations";

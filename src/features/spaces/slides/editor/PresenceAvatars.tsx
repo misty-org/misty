@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, Tooltip, type AvatarTone } from "@/shared/ui";
+import { Avatar, AvatarFallback, Tooltip, type AvatarTone } from "@misty/ui";
 import type { DeckPeer } from "../hooks/useDeckPresence";
 
 const tones: AvatarTone[] = ["blue", "red", "green", "orange", "violet", "pink", "amber", "teal"];

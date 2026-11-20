@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { useEffect, type KeyboardEvent } from "react";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
-import { cn, SetupState, Surface, Text } from "@/shared/ui";
+import { cn, SetupState, Surface, Text } from "@misty/ui";
 import { useEngineReadiness } from "./engineReadiness";
 import { EngineNextStep } from "./EngineNextStep";
 

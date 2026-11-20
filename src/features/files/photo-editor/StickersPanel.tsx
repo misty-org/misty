@@ -1,4 +1,4 @@
-import { ChoiceTile, SearchField, Text } from "@/shared/ui";
+import { ChoiceTile, SearchField, Text } from "@misty/ui";
 import { useMemo, useState } from "react";
 import { stickerDragType } from "./editorTypes";
 import { ColorChoices } from "./MarkStyleControls";

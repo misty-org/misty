@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Portal, Surface, Text, ViewportLayer } from "@/shared/ui";
+import { Portal, Surface, Text, ViewportLayer } from "@misty/ui";
 import type { ItemVisibility } from "../../api/visibility";
 import type { SlideSnapshot } from "../deck/snapshot";
 import type { DeckTheme } from "../deck/themes";

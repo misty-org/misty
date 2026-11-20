@@ -16,7 +16,7 @@ import {
   Text,
   Textarea,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
 import { AgentAvatar, AgentCloudImage } from "./AgentAvatar";
 import { agentCloudVariants } from "./agentCloudAvatars";

@@ -1,6 +1,6 @@
 import { AppWindow } from "lucide-react";
 import type { ScreenRequest } from "../../runs/invocations/invocationTypes";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
 import { declineScreenRequest, openScreenAndContinue } from "./screenRequests";
 import { useMistyStore } from "../state/useMistyStore";

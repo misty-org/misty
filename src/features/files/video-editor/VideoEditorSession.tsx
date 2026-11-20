@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { IconButton, notify, OverflowFadeText, SetupState, Text, TopBar } from "@/shared/ui";
+import { IconButton, notify, OverflowFadeText, SetupState, Text, TopBar } from "@misty/ui";
 import { EditorProvider } from "@opencut/components/providers/editor-provider";
 import { EditorLayout } from "@opencut/components/editor/editor-layout";
 import { ExportButton } from "@opencut/components/editor/export-button";

@@ -1,4 +1,4 @@
-import { cn, EmptyState, Pressable, Skeleton, Surface, Text, Tooltip } from "@/shared/ui";
+import { cn, EmptyState, Pressable, Skeleton, Surface, Text, Tooltip } from "@misty/ui";
 import { dayKey, monthDays, type CalendarEntry } from "./calendarDates";
 import { useNow } from "@/shared/hooks/useNow";
 

@@ -9,7 +9,7 @@ import {
   Textarea,
   Tooltip,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { VoiceNoteMode } from "./captureApi";
 import { openCapturedNote, askAboutCapturedNote } from "./openNote";
 import { speakersOf } from "./transcriptTurns";

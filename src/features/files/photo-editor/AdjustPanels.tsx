@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Button, ChoiceTile } from "@/shared/ui";
+import { Button, ChoiceTile } from "@misty/ui";
 import {
   adjustmentIds,
   defaultImageEdit,

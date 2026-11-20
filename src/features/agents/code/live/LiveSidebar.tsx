@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSpaceWindowStore } from "@/features/app-windows";
-import { Button, EmptyState, ListRow, ListRowSkeleton, SectionHeading, Text } from "@/shared/ui";
+import { Button, EmptyState, ListRow, ListRowSkeleton, SectionHeading, Text } from "@misty/ui";
 import { codeSessionsApi, type CodeSession } from "./codeSessionsApi";
 import { GoLiveDialog } from "./GoLiveDialog";
 import { liveApi, liveErrorText } from "./liveApi";

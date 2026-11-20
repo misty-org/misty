@@ -12,12 +12,12 @@ import {
   Text,
   Tooltip,
   type TextTone,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { FileTreeColor, RepositorySummary } from "./filesApi";
 import { getFileTreeIconSvg } from "./fileIcons";
 import { useFilesStore } from "./filesStore";
 import type { VisibleNode } from "./visibleNodes";
-import { remCss } from "@/shared/lib/uiScale";
+import { remCss } from "@misty/ui";
 
 /** The badge's words for a repository: `branch, clean` or `branch, 2 changed, 1 new`. */
 function repositoryLabel(repo: RepositorySummary): string {

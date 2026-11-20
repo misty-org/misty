@@ -11,11 +11,11 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Checkbox, Pressable, Surface, Text } from "@/shared/ui";
+import { Checkbox, Pressable, Surface, Text } from "@misty/ui";
 import { buildGitTree, flattenGitTree } from "./git-tree";
 import type { GitFileEntry, GitStatus } from "./gitApi";
 import { DirectoryRow, FileRow } from "./GitTreeRow";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 
 /** A row's height in design pixels; uiPx gives the CSS pixels the virtualizer places rows by. */
 const ROW_HEIGHT = 32;

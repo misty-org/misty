@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sketchInk } from "@/shared/ui";
+import { sketchInk } from "@misty/ui";
 import {
   mapSketch,
   MAX_SKETCH_ELEMENTS,

@@ -1,6 +1,6 @@
 import { spaceWorkspaceToolFromRoute, type WorkspaceView } from "@/features/app-windows";
 import { workspaceAppIcon } from "@/features/app-windows";
-import { appIconStrokeWidth, BrandIcon, brandIconAsset, Text } from "@/shared/ui";
+import { appIconStrokeWidth, BrandIcon, brandIconAsset, Text } from "@misty/ui";
 import { Armchair, CodeXml, FlaskConical, type LucideIcon } from "lucide-react";
 import { AgentAvatar, defaultAgentOf, usePersonalAgentsStore } from "@/features/agents";
 import { DestinationIcon } from "./NavigatorDestinationIcon";

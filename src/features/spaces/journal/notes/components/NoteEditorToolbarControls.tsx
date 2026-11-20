@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverHeader,
   PopoverTrigger,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { Editor } from "@tiptap/react";
 import {
   Bold,

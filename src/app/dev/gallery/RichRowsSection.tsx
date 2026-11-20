@@ -19,7 +19,7 @@ import {
   SuggestionItem,
   SuggestionList,
   type CollectionItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   Activity,
   Bot,

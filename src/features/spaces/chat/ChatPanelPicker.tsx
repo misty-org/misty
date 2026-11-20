@@ -11,7 +11,7 @@ import {
   MenuTrigger,
   Popover,
   PopoverContent,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { conversationName } from "./sidebar/conversationGroups";
 
 /**

@@ -1,5 +1,5 @@
 import type { DockDropZone } from "@/features/app-windows";
-import { Surface } from "@/shared/ui";
+import { Surface } from "@misty/ui";
 export function DockDropPreview({ zone }: { zone: DockDropZone }) {
   const position =
     zone === "center"

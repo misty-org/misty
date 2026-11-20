@@ -2,7 +2,7 @@ import { RotateCw } from "lucide-react";
 import { type ReactNode } from "react";
 import { useWorkspaceViewId } from "@/features/app-windows";
 import type { AgentProfile } from "@/shared/schemas";
-import { ErrorState, SidePanelHeader, Text, lazyTool, ToolSuspense } from "@/shared/ui";
+import { ErrorState, SidePanelHeader, Text, lazyTool, ToolSuspense } from "@misty/ui";
 import type { ContextPanelSurface } from "./contextPanelStore";
 import { FilesBreadcrumbs } from "./files/FilesBreadcrumbs";
 import { FilesPanel } from "./files/FilesPanel";

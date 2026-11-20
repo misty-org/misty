@@ -27,7 +27,7 @@ import {
   StateMark,
   Text,
   type DialogSize,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Filter, Info, MessageSquarePlus, Plus } from "lucide-react";
 import { useState } from "react";
 import { GalleryRow, GallerySection, GalleryStage } from "./GalleryLayout";
@@ -171,13 +171,13 @@ export function StructureSection() {
             label="Run details"
             items={[
               { label: "Model", value: "claude-opus-with-a-long-model-name-that-fades" },
-              { label: "Folder", value: "~/misty-org/misty/src/shared/ui" },
+              { label: "Folder", value: "~/misty-org/misty-ui/src" },
               { label: "State", value: <StateMark kind="done" /> },
             ]}
           />
           <PropertyList
             layout="stacked"
-            items={[{ label: "Path", value: "~/misty-org/misty/src/shared/ui/display/Prose.tsx" }]}
+            items={[{ label: "Path", value: "~/misty-org/misty-ui/src/display/Prose.tsx" }]}
           />
         </div>
       </GalleryRow>
@@ -223,7 +223,7 @@ export function StructureSection() {
             <tbody>
               <tr>
                 <td>Prose</td>
-                <td>src/shared/ui/display</td>
+                <td>@misty/ui</td>
               </tr>
             </tbody>
           </ProseTable>

@@ -5,7 +5,7 @@ import { spansToText } from "../chat/components/messageText";
 import { dayKey, eventTimes } from "../calendar/calendarDates";
 import { notesApi } from "../journal/notes/api/api";
 import { plannerApi, type SpaceCalendarEvent, type SpaceTask } from "../planner/api";
-import { isSpaceMadeKind, spaceMadeKind, type SpaceMadeKind } from "@/shared/ui";
+import { isSpaceMadeKind, spaceMadeKind, type SpaceMadeKind } from "@misty/ui";
 
 /**
  * What ⌘K search finds in a Space. Docs, decks, workbooks, whiteboards and messages are searched by

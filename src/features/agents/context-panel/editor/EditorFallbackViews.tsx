@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useState } from "react";
-import { Surface, Text } from "@/shared/ui";
+import { Surface, Text } from "@misty/ui";
 
 function sizeText(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

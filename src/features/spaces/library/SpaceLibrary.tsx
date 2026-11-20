@@ -1,7 +1,7 @@
 import type { AiSurfaceAdapter } from "@/features/agents";
 import { useAiSurfaceAdapter } from "@/features/agents";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
-import { CollectionPage } from "@/shared/ui";
+import { CollectionPage } from "@misty/ui";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";

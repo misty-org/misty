@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useCachedResource } from "@/api/cache/cached-resource";
 import { grantsApi, groupGrants, lastUsedText } from "../grants/api";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow as Row,

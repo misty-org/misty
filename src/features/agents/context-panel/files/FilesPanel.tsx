@@ -18,7 +18,7 @@ import {
   Tooltip,
   lazyTool,
   ToolSuspense,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { FileSearchOverlay } from "./FileSearchOverlay";
 import { FileTree } from "./FileTree";
 import { getFileTreeIconSvg } from "./fileIcons";

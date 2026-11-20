@@ -1,4 +1,4 @@
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 
 /** What the run is doing, in one shimmering word or phrase; "Thinking" until it says more. */
 function taskAwarePhrase(value?: string) {

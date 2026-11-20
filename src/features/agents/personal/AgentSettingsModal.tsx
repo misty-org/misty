@@ -1,5 +1,5 @@
 import { TourCorner } from "../TourCorner";
-import { IconButton, Sheet, SheetContent, SheetDescription, SheetTitle } from "@/shared/ui";
+import { IconButton, Sheet, SheetContent, SheetDescription, SheetTitle } from "@misty/ui";
 import { X } from "lucide-react";
 import { useRef } from "react";
 import { AgentCompanionPanel } from "../tutor/cursor/AgentCompanionPanel";

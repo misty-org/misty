@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import type { WorkspaceView } from "@/features/app-windows/core";
-import { NoticeViewport, resetNotices } from "@/shared/ui";
+import { NoticeViewport, resetNotices } from "@misty/ui";
 import { SpaceWorkspaceSurface } from "./SpaceWorkspaceSurface";
 const state = vi.hoisted(() => ({
   user: { id: "one" } as { id: string } | null,

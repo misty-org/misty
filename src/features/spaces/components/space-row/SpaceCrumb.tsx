@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Button, OverflowFadeText, Text } from "@/shared/ui";
+import { Button, OverflowFadeText, Text } from "@misty/ui";
 import { useSpacesStore } from "../../list/useSpacesStore";
 import { SpaceAvatar } from "../SpaceAvatar";
 

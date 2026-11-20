@@ -2,7 +2,7 @@ import { Server } from "lucide-react";
 import { currentApiBase, isMistyCloud, useServerChoice } from "@/api/deployment/serverChoice";
 import { useSpacesConnection } from "@/features/spaces";
 import { openSettings } from "@/features/settings";
-import { Button, StateMark } from "@/shared/ui";
+import { Button, StateMark } from "@misty/ui";
 
 // The bottom bar's server items: the server this device uses and, while it is down, the problem.
 

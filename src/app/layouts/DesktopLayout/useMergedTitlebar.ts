@@ -1,5 +1,5 @@
 import { useLayoutEffect, type RefObject } from "react";
-import { remCss, uiPx } from "@/shared/lib/uiScale";
+import { remCss, uiPx } from "@misty/ui";
 import { dockingMetrics } from "./dockingGeometry";
 
 /** Native controls only exclude the part of a toolbar they actually overlap. The bounds and the

@@ -13,7 +13,7 @@ import {
   CollectionFilterMenu,
   CollectionViewToggle,
   IconButton,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   AudioLines,
   Clapperboard,

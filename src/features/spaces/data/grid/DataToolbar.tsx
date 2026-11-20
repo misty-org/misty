@@ -23,7 +23,7 @@ import {
   PopoverAnchor,
   iconBarItem,
   type ActionBarItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { CellAlign, NumberFormat } from "../workbook/schema";
 
 const formats: ReadonlyArray<{ value: NumberFormat | "auto"; label: string }> = [

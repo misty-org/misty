@@ -1,4 +1,4 @@
-import { EmptyState, ErrorState, PageHeader, Skeleton, Surface } from "@/shared/ui";
+import { EmptyState, ErrorState, PageHeader, Skeleton, Surface } from "@misty/ui";
 import { SpaceCrumb } from "../../components/space-row/SpaceCrumb";
 import { ChatMessagesSkeleton } from "./ChatMessagesSkeleton";
 

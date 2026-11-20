@@ -138,7 +138,7 @@ import SignIn from "@/features/account/pages/SignInPage";
 import { notifyAccountScopeReset } from "@/features/account/sessions/accountEvents";
 import { useSettingsStore } from "@/features/settings";
 import { useMistyPanelStore } from "@/features/agents";
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { DesktopLayout } from "./index";
 
 describe("DesktopLayout on Auth Routes", () => {

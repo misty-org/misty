@@ -1,7 +1,7 @@
 // Layout adapted from OpenChamber (MIT, Copyright (c) 2025 Bohdan Triapitsyn).
 import { useId, useState } from "react";
 import { Brain } from "lucide-react";
-import { Text, ToolBody, ToolList, ToolRow } from "@/shared/ui";
+import { Text, ToolBody, ToolList, ToolRow } from "@misty/ui";
 import { Fold } from "../../../progress/WorkGroup";
 
 /** The reasoning's first words, for the folded row: one line, Markdown marks dropped. */

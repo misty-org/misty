@@ -5,7 +5,7 @@ import {
   screenMarkClass,
   ViewportLayer,
   type CompanionTint,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { normalizeCompanionSize } from "./companionSize";
 import type { Presentation } from "./protocol";
 

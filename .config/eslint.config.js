@@ -32,12 +32,12 @@ const forbidRawButtonRule = {
     type: "suggestion",
     docs: {
       description:
-        "Forbid raw <button> elements in favor of @/shared/ui Button, IconButton, or CVA primitives",
+        "Forbid raw <button> elements in favor of @misty/ui Button, IconButton, or CVA primitives",
     },
     schema: [],
     messages: {
       noRawButton:
-        "Do not use raw <button>. Use <Button>, <IconButton>, or a CVA primitive from '@/shared/ui'.",
+        "Do not use raw <button>. Use <Button>, <IconButton>, or a CVA primitive from '@misty/ui'.",
     },
   },
   create(context) {
@@ -170,9 +170,9 @@ export default tseslint.config(
     },
   },
 
-  // UI component design system boundary: shared/ui owns raw button elements and primitives.
+  // Tests may render raw elements; the components themselves live in @misty/ui (misty-ui).
   {
-    files: ["src/shared/ui/**/*.{ts,tsx}", "**/*.test.{ts,tsx}", "src/tests/**/*.{ts,tsx}"],
+    files: ["**/*.test.{ts,tsx}", "src/tests/**/*.{ts,tsx}"],
     rules: {
       "shared-ui/no-raw-button": "off",
     },

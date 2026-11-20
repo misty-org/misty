@@ -9,8 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
-import { cn, Surface } from "@/shared/ui";
-import { designPx, remCss } from "@/shared/lib/uiScale";
+import { cn, Surface } from "@misty/ui";
+import { designPx, remCss } from "@misty/ui";
 import type { MistyPanelSide } from "./mistyPanelSide";
 import {
   MISTY_PANEL_MAX_WIDTH,

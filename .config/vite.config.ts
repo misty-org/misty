@@ -96,9 +96,11 @@ export default defineConfig(({ command, mode }) => {
       entries: ["index.html"],
       // Photon (Midscene's screenshot resizer) loads its .wasm next to its own
       // module; pre-bundling moves the module and the file is no longer found.
-      exclude: ["@silvia-odwyer/photon"],
+      exclude: ["@silvia-odwyer/photon", "@misty/ui"],
     },
     resolve: {
+      // @misty/ui is linked from ../misty-ui as source: its React and icons are this app's own.
+      dedupe: ["react", "react-dom", "lucide-react"],
       alias: [
         { find: "@", replacement: fileURLToPath(new URL("../src", import.meta.url)) },
         // OpenCut's editor, vendored (vendor/opencut/README.md), under its own name.
@@ -149,7 +151,8 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       fs: {
-        allow: [process.cwd()],
+        // ../misty-ui, where @misty/ui is linked from during development.
+        allow: [process.cwd(), fileURLToPath(new URL("../../misty-ui", import.meta.url))],
       },
       host: tauriDevHost ?? "127.0.0.1",
       port: desktopDevPort,

@@ -8,7 +8,7 @@ import {
   Text,
   type TextTone,
   type TextWeight,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { File } from "lucide-react";
 import { useEffect, useState } from "react";
 import { codeTokens, csvPreview } from "./codeTokens";

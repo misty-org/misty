@@ -4,7 +4,7 @@ import { keepsLayoutWhileHidden } from "./keptTabs";
 import { selectPaneFocusPreferences } from "@/features/app-windows";
 import { useSettingsStore } from "@/features/settings";
 import { allLayoutViews, dockWidgetRegistry } from "@/features/app-windows";
-import { usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
+import { usePointerDropTarget } from "@misty/ui";
 import {
   dockLeaves,
   useWorkspaceStore,
@@ -13,7 +13,7 @@ import {
   type WorkspacePane,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { cn, Surface, Text } from "@/shared/ui";
+import { cn, Surface, Text } from "@misty/ui";
 import { memo, useMemo, useRef, useState, type DragEvent } from "react";
 import { EmptyWorkspacePane, WorkspaceSurface } from "./WorkspaceSurface";
 import { AiPaneHost } from "@/features/agents";

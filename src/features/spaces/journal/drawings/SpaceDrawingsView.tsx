@@ -1,6 +1,6 @@
 import type { AiSurfaceAdapter } from "@/features/agents";
 import { JournalDeleteDialog } from "..";
-import { EmptyState, Surface, Text } from "@/shared/ui";
+import { EmptyState, Surface, Text } from "@misty/ui";
 import { DrawingCanvasSkeleton, DrawingWorkspace } from "./components/DrawingWorkspace";
 import {
   useCallback,

@@ -6,13 +6,13 @@ import {
   IconButton,
   Pressable,
   Surface,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { EllipsisVertical } from "lucide-react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { formatBytes, formatTime } from "../libraryFormat";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { libraryFileTypeLabel, LibraryItemThumbnail } from "../SpaceLibraryPrimitives";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 
 export const ITEM_ACTION_MENU_WIDTH = 224;
 

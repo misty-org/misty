@@ -6,7 +6,7 @@
  */
 import { Check } from "lucide-react";
 import { useState, type PointerEvent } from "react";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { filterItems } from "../conversations/composer/controls/composerTriggers";
 import { enabledPersonas, makeAgentFromPersona, personaToken } from "./catalogApi";
 

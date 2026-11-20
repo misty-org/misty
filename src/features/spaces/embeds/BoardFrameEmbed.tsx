@@ -1,4 +1,4 @@
-import { SetupState, Surface, Text } from "@/shared/ui";
+import { SetupState, Surface, Text } from "@misty/ui";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
 import { useEffect, useState } from "react";
 import {

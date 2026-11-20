@@ -14,7 +14,7 @@ import {
   Spinner,
   Text,
   TopBar,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { liveErrorText } from "./liveApi";
 import type { CommitPreview } from "./liveCommits";
 import { endSession, previewEnd, type EndStage } from "./liveEnd";

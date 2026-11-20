@@ -99,10 +99,14 @@ pub async fn tutor_pick_sources(
 pub(crate) use crate::agents::chats::commands::{
     __cmd__agent_chats_adopt, __cmd__agent_chats_delete, __cmd__agent_chats_get,
     __cmd__agent_chats_list, __cmd__agent_chats_put, __cmd__agent_chats_swap,
+    __cmd__agent_chats_messages_page, __cmd__agent_chats_messages_upsert,
     __tauri_command_name_agent_chats_adopt, __tauri_command_name_agent_chats_delete,
     __tauri_command_name_agent_chats_get, __tauri_command_name_agent_chats_list,
     __tauri_command_name_agent_chats_put, __tauri_command_name_agent_chats_swap, agent_chats_adopt,
-    agent_chats_delete, agent_chats_get, agent_chats_list, agent_chats_put, agent_chats_swap,
+    __tauri_command_name_agent_chats_messages_page,
+    __tauri_command_name_agent_chats_messages_upsert, agent_chats_delete, agent_chats_get,
+    agent_chats_list, agent_chats_messages_page, agent_chats_messages_upsert, agent_chats_put,
+    agent_chats_swap,
 };
 pub(crate) use crate::agents::connected_apps::commands::{
     __cmd__apps_grants_list, __cmd__apps_grants_revoke, __cmd__apps_request_decide,

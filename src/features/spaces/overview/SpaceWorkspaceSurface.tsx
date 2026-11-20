@@ -4,7 +4,7 @@ import { useAuth } from "@/features/account";
 import { useWorkspaceViewFocused } from "@/features/app-windows";
 import type { WorkspaceView } from "@/features/app-windows/core";
 import { SpaceOverviewProvider } from "./useSpaceOverview";
-import { Button, Surface, Text, useNotice } from "@/shared/ui";
+import { Button, Surface, Text, useNotice } from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../create/GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
 import { preferredDefaultSpace, windowSpace } from "../routes/defaultSpace";

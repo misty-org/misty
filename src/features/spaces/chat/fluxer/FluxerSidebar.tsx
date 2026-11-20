@@ -184,7 +184,7 @@ export function FluxerSidebar(props: FluxerSidebarProps) {
                 </div>
                 {directMessages.conversations.map((conversation) => {
                   const other = conversation.participants.find(
-                    (person) => person.user_id !== props.currentUserId,
+                    (person) => person.kind === "person" && person.user_id !== props.currentUserId,
                   );
                   const selected = props.selected === conversation.id;
                   const unread = !selected && (conversation.unread_count ?? 0) > 0;

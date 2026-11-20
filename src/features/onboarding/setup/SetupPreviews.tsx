@@ -1,5 +1,5 @@
 import type { TabSide } from "@/app/shell/dockingLayout";
-import { Surface } from "@/shared/ui";
+import { Surface } from "@misty/ui";
 
 /** A tiny window with the tab sidebar on one side and a page beside it. */
 export function TabsPreview(props: { side: TabSide }) {

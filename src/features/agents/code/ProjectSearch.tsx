@@ -10,7 +10,7 @@ import {
   Surface,
   Text,
   ToolbarDivider,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEditorReveal } from "../context-panel/editor/editorReveal";
 import { errorText } from "../context-panel/projectApi";
 import { filesApi, type SearchHit } from "../context-panel/files/filesApi";

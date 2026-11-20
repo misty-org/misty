@@ -8,7 +8,7 @@ import {
   MenuCheckItem,
   RoleDot,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { spacesApi } from "../api/api";
 import type { Space, SpaceMember } from "../api/dto/entities";
 import { useSpacesStore } from "../list/useSpacesStore";

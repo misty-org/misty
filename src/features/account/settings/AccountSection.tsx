@@ -4,7 +4,7 @@ import { AccountDeleteDialog } from "../export/AccountDeleteDialog";
 import { useAuth } from "../sessions/authState";
 import { openSignInSheet } from "../setup/serverSetup";
 import { useUserStore } from "../sessions/useUserStore";
-import { Button, cn, Input, Skeleton, SkeletonControl, Text, useNotice } from "@/shared/ui";
+import { Button, cn, Input, Skeleton, SkeletonControl, Text, useNotice } from "@misty/ui";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   DesktopSettingsNotice,

@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { memo, useEffect, useRef, useState } from "react";
-import { cn } from "@/shared/ui";
+import { cn } from "@misty/ui";
 
 /**
  * A number that rolls like an odometer as it changes: each digit is a 0 to 9 strip moved with a

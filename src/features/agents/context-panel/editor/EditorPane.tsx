@@ -6,7 +6,7 @@ import { EditorSelection, type Extension } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import { EditorSkeleton } from "../PanelSkeletons";
 import { errorText } from "../projectApi";
 import { imageFileUrl, type FileContent } from "../files/filesApi";

@@ -11,7 +11,7 @@ import {
   Checkbox,
   OverflowFadeText,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   chosenByDefault,
   fileKey,

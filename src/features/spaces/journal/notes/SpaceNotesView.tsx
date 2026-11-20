@@ -1,5 +1,5 @@
 import { JournalDeleteDialog } from "..";
-import { Surface, Text } from "@/shared/ui";
+import { Surface, Text } from "@misty/ui";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { useCallback, useEffect, useRef, useState, type ComponentType } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";

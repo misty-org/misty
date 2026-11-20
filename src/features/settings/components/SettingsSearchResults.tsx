@@ -1,4 +1,4 @@
-import { Pressable, Surface, Text } from "@/shared/ui";
+import { Pressable, Surface, Text } from "@misty/ui";
 import { settingSearchEntries } from "../device-preferences/registry";
 import {
   preferenceSection,

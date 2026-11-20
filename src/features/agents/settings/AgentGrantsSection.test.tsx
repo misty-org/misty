@@ -6,7 +6,7 @@ vi.mock("@/features/agents/grants/api", async (original) => ({
   grantsApi: { list: mocks.list, revoke: mocks.revoke, revokeAll: mocks.revokeAll },
 }));
 vi.mock("@/shared/lib/confirmAction", () => ({ confirmAction: vi.fn(async () => true) }));
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 
 afterEach(cleanup);

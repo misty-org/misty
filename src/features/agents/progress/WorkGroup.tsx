@@ -1,4 +1,4 @@
-import { cn, OverflowFadeText, Pressable, Text } from "@/shared/ui";
+import { cn, OverflowFadeText, Pressable, Text } from "@misty/ui";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 /** Sent to a closed fold that holds the chat search's current match, so it opens (`timelineSearch.ts`). */

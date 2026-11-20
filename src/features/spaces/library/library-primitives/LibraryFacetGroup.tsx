@@ -1,5 +1,5 @@
 import type { LibrarySearchFacets } from "../../api/dto/entities";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 
 type Facet = LibrarySearchFacets["tags"][number];
 

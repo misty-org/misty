@@ -11,7 +11,7 @@ import {
   PopoverText,
   PopoverTrigger,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useSessionGoals } from "./sessionGoals";
 
 /**

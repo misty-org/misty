@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { Surface, Textarea } from "@/shared/ui";
+import { Surface, Textarea } from "@misty/ui";
 import type { WorkbookEngine } from "../formula/engine";
 import { defaultColWidth } from "../workbook/schema";
 import { ColumnHeader } from "./ColumnHeader";

@@ -1,5 +1,5 @@
 import { useServerChoice } from "@/api/deployment/serverChoice";
-import { BackButton, Button } from "@/shared/ui";
+import { BackButton, Button } from "@misty/ui";
 import { Cloud, Server } from "lucide-react";
 import { useState } from "react";
 import AuthMessage from "../components/AuthMessage";

@@ -13,7 +13,7 @@ import {
   OptionSelect,
   Skeleton,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 
 // A Space chat message holds 3000 characters; the handoff mark takes the first few.

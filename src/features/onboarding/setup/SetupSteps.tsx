@@ -5,7 +5,7 @@ import {
 } from "@/app/shell/dockingLayout";
 import { useProjectsHome, useProjectsHomePath } from "@/features/agents";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/app-windows";
-import { Button, Surface, Text, useNotice } from "@/shared/ui";
+import { Button, Surface, Text, useNotice } from "@misty/ui";
 import { FolderOpen } from "lucide-react";
 import { useState } from "react";
 import { PreviewChoice } from "./PreviewChoice";

@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { ChevronRight, RotateCw, Save, Search, WrapText } from "lucide-react";
 import { Fragment } from "react";
-import { Button, ChoiceGroup, cn, IconButton, Surface, Text, Tooltip } from "@/shared/ui";
+import { Button, ChoiceGroup, cn, IconButton, Surface, Text, Tooltip } from "@misty/ui";
 import type { EditorAppearance } from "../../code/editorAddons";
 import { getFileTreeIconSvg } from "../files/fileIcons";
 import { useFilesStore } from "../files/filesStore";

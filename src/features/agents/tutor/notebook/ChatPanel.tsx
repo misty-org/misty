@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { ArrowUp, Plus, RotateCcw } from "lucide-react";
-import { Button, IconButton, Pressable, Skeleton, Surface, Text, Textarea } from "@/shared/ui";
+import { Button, IconButton, Pressable, Skeleton, Surface, Text, Textarea } from "@misty/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import type { TutorActions } from "../TutorPage";
 import type { Notebook } from "../tutorTypes";

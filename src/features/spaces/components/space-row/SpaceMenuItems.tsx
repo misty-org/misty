@@ -1,7 +1,7 @@
 import { LogOut, Pencil, Plus, Trash2, UserPlus, UsersRound } from "lucide-react";
 import type { Space } from "../../api/dto/entities";
 import { switchSpaceWindow } from "@/features/app-windows";
-import { DropdownMenuSeparator, MenuCheckItem, MenuItem } from "@/shared/ui";
+import { DropdownMenuSeparator, MenuCheckItem, MenuItem } from "@misty/ui";
 import {
   canManageSpaceLifecycle,
   preferredDefaultSpace,

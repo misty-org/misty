@@ -1,4 +1,4 @@
-import { Skeleton, cn } from "@/shared/ui";
+import { Skeleton, cn } from "@misty/ui";
 
 /** Each placeholder message: its name's width, then the width of each 24px body line. */
 const rows: { name: string; lines: string[] }[] = [

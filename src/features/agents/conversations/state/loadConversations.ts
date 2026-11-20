@@ -67,7 +67,7 @@ export function createLoadConversations(
       });
       const saved = await localChats.conversations(accountId);
       const local = saved.map(normalizeConversation);
-      markStoredChats(local);
+      markStoredChats(local, accountId);
       if (get().accountId === accountId && !get().working && !get().conversations.length)
         set({ conversations: local });
       const response = {
@@ -85,7 +85,7 @@ export function createLoadConversations(
       }
       const conversations = response.conversations.map(normalizeConversation);
       // What the sync returned is saved already.
-      markStoredChats(conversations);
+      markStoredChats(conversations, accountId);
       if (
         expected &&
         (expected.accountId !== accountId ||

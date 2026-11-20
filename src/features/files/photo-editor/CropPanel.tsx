@@ -6,7 +6,7 @@ import {
   MenuRadioGroup,
   MenuRadioItem,
   MenuTrigger,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw } from "lucide-react";
 import { aspectIds, type AspectId, type ImageEdit } from "./imageEdit";
 import { PanelSection, PanelSlider, PhotoPanelView } from "./PhotoPanelView";

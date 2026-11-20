@@ -9,7 +9,7 @@ import {
   DialogTitle,
   ChoiceGroup,
   Surface,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { MistyFilePickerProps } from "./FilePicker";
 
 const sharedPickerDialogClassName = [

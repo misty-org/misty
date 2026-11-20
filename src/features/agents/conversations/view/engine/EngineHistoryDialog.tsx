@@ -15,7 +15,7 @@ import {
   RenameItemDialog,
   Skeleton,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { defaultEngineAgent } from "../../../engines/defaultEngine";
 import { folderName } from "../../../engines/enginesApi";
 import { useChatFolders } from "../../../shared-folders/chatFolder";

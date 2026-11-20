@@ -1,0 +1,9 @@
+{
+  "id": "media",
+  "name": "Media",
+  "version": "1.0.0",
+  "logo": "logo.svg",
+  "entry": "index.html",
+  "opens": ["image/*", "video/*", "audio/*"],
+  "permissions": ["files"]
+}

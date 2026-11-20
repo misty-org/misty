@@ -12,7 +12,7 @@ import {
   PI_FAMILY_APIKEY_PROVIDERS,
   PI_FAMILY_OAUTH_PROVIDERS,
 } from "@/features/engine-config/engine-setup/piFamilyAuthCatalog";
-import { BrandIcon, adaptiveMarks, logoPlates } from "@/shared/ui";
+import { BrandIcon, adaptiveMarks, logoPlates } from "@misty/ui";
 import { repositoryRoot } from "./repositoryPolicy";
 
 /**
@@ -21,7 +21,7 @@ import { repositoryRoot } from "./repositoryPolicy";
  * brand has none, an entry in `logoPlates`.
  */
 
-const brandIconFolder = resolve(repositoryRoot, "src/shared/ui/icons/brand-icons");
+const brandIconFolder = resolve(repositoryRoot, "node_modules/@misty/ui/src/icons/brand-icons");
 const DARK = "#131313";
 const LIGHT = "#ffffff";
 /** Below this a logo's best color is all but invisible on the background. */

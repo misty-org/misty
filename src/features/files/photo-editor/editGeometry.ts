@@ -1,7 +1,7 @@
 /*
  * Where an edit puts things: the turned, straightened and cropped image's sizes and frames.
  */
-import type { CropRect } from "@/shared/ui";
+import type { CropRect } from "@misty/ui";
 import type { ImageEdit, Rotation, AspectId, Point } from "./imageEdit";
 
 export const fullCrop: CropRect = { x: 0, y: 0, width: 1, height: 1 };

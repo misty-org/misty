@@ -269,6 +269,19 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             message: format!("This agent isn't allowed to use {name}. Nothing was done."),
         };
     }
+    // A tool of an app's own MCP server (`apps/mcp.rs`). Only what the app marks read-only runs without
+    // asking, a planning mode refuses the rest, and what it answers is data (`untrusted`).
+    if name.starts_with("app.") {
+        let read_only = crate::apps::mcp::is_read_only(name);
+        if facts.planning && !read_only {
+            return Decision::Refuse {
+                code: "plan_mode",
+                message: "Plan mode is read-only. Put this action in the plan as a step instead."
+                    .to_owned(),
+            };
+        }
+        return if facts.auto || read_only { Decision::Run } else { ask("") };
+    }
     let computer = COMPUTER_ACTS.contains(&name) || COMPUTER_READS.contains(&name);
     if computer && !facts.computer_use {
         return Decision::Refuse {

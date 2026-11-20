@@ -6,7 +6,7 @@ import {
   highlightSupported,
   type TextSearchOptions,
 } from "./domTextSearch";
-import { FIND_CURRENT_HIGHLIGHT, FIND_MATCH_HIGHLIGHT } from "@/shared/ui";
+import { FIND_CURRENT_HIGHLIGHT, FIND_MATCH_HIGHLIGHT } from "@misty/ui";
 import { REVEAL_FOLD_EVENT } from "../../../progress/WorkGroup";
 
 /**

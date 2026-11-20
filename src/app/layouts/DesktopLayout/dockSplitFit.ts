@@ -10,7 +10,7 @@ import {
   type WorkspaceView,
   workspaceSurfaceFromRoute,
 } from "@/features/app-windows";
-import { designPx } from "@/shared/lib/uiScale";
+import { designPx } from "@misty/ui";
 
 export function dropZoneAt(rect: DOMRect, x: number, y: number): DockDropZone {
   const localX = (x - rect.left) / Math.max(1, rect.width);

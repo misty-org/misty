@@ -10,7 +10,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { flushWorkspaceRecovery } from "./recoveryStorage";
 

@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { AgentPlanCard } from "../../plans/AgentPlanCard";
 import type { AgentPlan, AgentPlanVersion } from "../../plans/planTypes";
 import { AgentConversationView } from "./AgentConversationView";

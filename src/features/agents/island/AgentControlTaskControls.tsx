@@ -1,6 +1,6 @@
 import { Check, Hand, Play, Square } from "lucide-react";
 import { formatShortcutLabel, detectShortcutPlatform } from "@/shared/shortcuts/bindings";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import { finishLocalExecution, type Execution } from "../runs/local-execution/localExecution";
 import { autopilotStopShortcut } from "../runs/jobs/workspaceAutopilot";
 

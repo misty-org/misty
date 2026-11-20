@@ -1,4 +1,4 @@
-import { cn, Surface, Text, windowToolbarClass } from "@/shared/ui";
+import { cn, Surface, Text, windowToolbarClass } from "@misty/ui";
 import type { ReactNode } from "react";
 
 export function standaloneWorkspaceRouteTitle(pathname: string): string | null {

@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
   IconButton,
   MenuItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { parentPath, useFilesStore } from "./filesStore";
 import { useTreePreferences } from "./treePreferences";
 

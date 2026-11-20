@@ -1,4 +1,4 @@
-import { Button, cn, Surface, Text } from "@/shared/ui";
+import { Button, cn, Surface, Text } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { useDevicePreferences } from "../device-preferences/store";
 

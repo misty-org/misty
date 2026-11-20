@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { chartData } from "../charts/chartData";
 import { ChartView } from "../charts/ChartView";
 import { resolveAnchoredRange } from "../workbook/anchors";

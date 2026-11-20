@@ -8,7 +8,7 @@ import {
   Text,
   Tooltip,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { preloadSettingsWorkspace } from "@/features/settings";
 import { AccountNavButton } from "./NavRail";
 import { AccountMenu } from "./AccountMenu";

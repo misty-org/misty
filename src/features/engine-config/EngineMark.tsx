@@ -6,7 +6,7 @@
 // https://github.com/can1357/oh-my-pi (packages/collab-web/public/favicon.svg, MIT), without the
 // favicon's dark tile. The marks belong to their owners and only name their products.
 import { createElement, useId, type ReactNode } from "react";
-import { LogoInitial, MistyMark } from "@/shared/ui";
+import { LogoInitial, MistyMark } from "@misty/ui";
 import shapes from "./engineMarks.json";
 
 /** One SVG element: its tag, its attributes, and its children, if any. */

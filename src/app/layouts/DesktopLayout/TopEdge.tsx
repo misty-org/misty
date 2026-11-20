@@ -1,4 +1,4 @@
-import { cn, Surface, windowToolbarClass } from "@/shared/ui";
+import { cn, Surface, windowToolbarClass } from "@misty/ui";
 import { barHeight, closedHeight, openHeight } from "./spaceBarTiming";
 import { useWindowButtonsOnBar } from "./useWindowButtonsOnBar";
 

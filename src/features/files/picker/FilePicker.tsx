@@ -1,5 +1,5 @@
 import { useAppStore } from "@/app/shell";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef } from "react";
 

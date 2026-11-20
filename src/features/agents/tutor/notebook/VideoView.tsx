@@ -11,7 +11,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, IconButton, Pressable, Surface, Text, useNotice } from "@/shared/ui";
+import { Button, IconButton, Pressable, Surface, Text, useNotice } from "@misty/ui";
 import { deleteVideoAudio, makeVideoAudio, sceneAudioBytes } from "../tutorAudio";
 import { useTutorStore } from "../tutorStore";
 import type { Guide } from "../tutorTypes";

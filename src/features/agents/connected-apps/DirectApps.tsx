@@ -16,7 +16,7 @@ import {
   useNotice,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { DirectAppLogo } from "./DirectAppLogo";
 import {
   directAppsApi,

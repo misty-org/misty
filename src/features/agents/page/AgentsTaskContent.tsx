@@ -2,13 +2,13 @@ import { ChatStart, ChatStartIdeas } from "./ChatStart";
 import { needsDefaultEngine, openEngineSettings } from "../engines/engineNeeded";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { AgentWorkspaceConversation } from "../conversations/view/AgentWorkspaceConversation";
-import { AgentConversationHeading, ChatTitle } from "./AgentConversationHeading";
+import { AgentConversationHeading, ChatHeaderButtons, ChatTitle } from "./AgentConversationHeading";
 import type { AgentsPageActions, AgentsPageView } from "./agentsPageActions";
 import type { AgentsPageState } from "./useAgentsPageState";
 import { AgentBrowserPip } from "../agent-browser/AgentBrowserPip";
 import { setBrowserExpanded } from "../agent-browser/agentBrowserStore";
 import { chatKey } from "../conversations/state/draftChat";
-import { cn, Surface, windowToolbarClass } from "@/shared/ui";
+import { cn, Surface, windowToolbarClass } from "@misty/ui";
 
 /**
  * The chat's header (the heading, or the studio bar in the workspace) floats over the top of the
@@ -106,7 +106,8 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                 )}
                 data-window-toolbar
               >
-                <ChatTitle conversation={conversation} />
+                <ChatTitle conversation={conversation} agent={profile} />
+                <ChatHeaderButtons />
               </Surface>
             ) : null}
             {/* The agent browser as a picture-in-picture floating over the chat; opening it puts

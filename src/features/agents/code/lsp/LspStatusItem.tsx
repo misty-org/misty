@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, Spinner, Text, Tooltip } from "@/shared/ui";
+import { Button, Spinner, Text, Tooltip } from "@misty/ui";
 import { retryLanguageServers } from "./install";
 import { lspFileKind, serverNames } from "./languages";
 import type { LspInstallState } from "./lspStore";

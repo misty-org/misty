@@ -1,6 +1,6 @@
 import { reportSystemError } from "@/shared/platform/systemErrors";
 import { NotePreviewView, type NotePreviewProps } from "./NotePreviewView";
-import { lazyTool } from "@/shared/ui";
+import { lazyTool } from "@misty/ui";
 const Editor = lazyTool(() => import("./NoteBlockEditor"));
 export function NotePreview(props: NotePreviewProps) {
   return (

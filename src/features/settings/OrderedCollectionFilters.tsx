@@ -1,5 +1,5 @@
 import { useState, type ComponentProps } from "react";
-import { CollectionFilters, useNotice } from "@/shared/ui";
+import { CollectionFilters, useNotice } from "@misty/ui";
 import { useDevicePreferences } from "./device-preferences/store";
 import { resolveSetting } from "./device-preferences/settingResolution";
 

@@ -143,7 +143,7 @@ export function useRemoteHits({
               excerpt: app.description ? plain(app.description) : undefined,
               icon: icon(Plug),
               match,
-              open: () => openAgentsHub("apps"),
+              open: () => openAgentsHub("connections"),
             },
           ];
         });

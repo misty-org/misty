@@ -1,6 +1,6 @@
 import { Check, ChevronDown, ChevronUp, MessageCircleQuestion } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { BackButton, Button, cn, IconButton, Input, Pressable, Surface, Text } from "@/shared/ui";
+import { BackButton, Button, cn, IconButton, Input, Pressable, Surface, Text } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { useCollaborationStore } from "./store";
 import type { AgentQuestionAnswer, AgentQuestionSet } from "./planTypes";

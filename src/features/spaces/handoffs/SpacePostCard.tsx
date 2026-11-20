@@ -1,6 +1,6 @@
 import { Check, Forward, Hammer } from "lucide-react";
 import { useUserStore } from "@/features/account/core";
-import { Surface, Text } from "@/shared/ui";
+import { Surface, Text } from "@misty/ui";
 import type { SpaceMessage } from "../api/dto/entities";
 import { useHandledHandoffs } from "./handledHandoffs";
 import { HandoffActions } from "./HandoffActions";

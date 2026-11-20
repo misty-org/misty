@@ -27,6 +27,13 @@ pub fn allows(label: &str, url: &Url, dev_origin: Option<&str>) -> bool {
         "http" | "https" if url.host_str() == Some("tauri.localhost") => {
             url.port().is_none() && url.username().is_empty() && url.password().is_none()
         }
+        // A built-in or installed app's bundle, loaded into its sandboxed frame (`apps/scheme.rs`). The
+        // frame runs with no origin of its own and cannot navigate the window; the scheme serves only
+        // hash-checked bundles from Misty's app cache, and only to Misty's own windows.
+        "misty-app" => url.host_str().is_some_and(|host| host == "localhost" || crate::apps::manifest::valid_id(host)),
+        "http" if url.host_str() == Some("misty-app.localhost") => {
+            url.port().is_none() && url.username().is_empty() && url.password().is_none()
+        }
         "http" | "https" => {
             dev_origin.is_some_and(|origin| url.origin().ascii_serialization() == origin)
         }
@@ -69,6 +76,12 @@ mod tests {
             assert!(allows(label, &url("http://tauri.localhost/settings"), None));
             assert!(allows(label, &url("https://tauri.localhost/"), None));
             assert!(allows(label, &url("about:blank"), None));
+            assert!(allows(label, &url("misty-app://localhost/planner/1.0.0/index.html"), None));
+            assert!(allows(label, &url("http://misty-app.localhost/planner/1.0.0/"), None));
+            assert!(allows(label, &url("misty-app://photocraft/0.23.1/index.html"), None));
+            assert!(!allows(label, &url("misty-app://Evil.com/planner/1.0.0/"), None));
+            assert!(!allows(label, &url("misty-app://a/planner/1.0.0/"), None));
+            assert!(!allows(label, &url("http://misty-app.localhost.evil.com/"), None));
             assert!(allows(
                 label,
                 &url("blob:tauri://localhost/3f1c0f7e-2c4b-4a6e-9a55-0b1f5f0f8f10"),

@@ -1,4 +1,4 @@
-import { spaceMadeKind, SuggestionItem, SuggestionList, Text } from "@/shared/ui";
+import { spaceMadeKind, SuggestionItem, SuggestionList, Text } from "@misty/ui";
 import type { Editor } from "@tiptap/react";
 import type { EmbedKind } from "../../../embeds/embedTypes";
 import {

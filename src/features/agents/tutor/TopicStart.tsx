@@ -8,7 +8,7 @@ import {
   PlaceChip,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { notebookTopics, startOf, topicOf } from "./notebookTopics";
 import { jobTitle } from "./tutorPrompts";
 import { startJob } from "./tutorRuns";

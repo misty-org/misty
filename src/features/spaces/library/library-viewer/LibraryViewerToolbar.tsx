@@ -1,5 +1,5 @@
 import type { LibraryEditVersion, SpaceLibraryItem } from "../../api/dto/entities";
-import { Button, DialogClose, IconButton } from "@/shared/ui";
+import { Button, DialogClose, IconButton } from "@misty/ui";
 import { ClipboardCopy, Copy, SlidersHorizontal, Trash2, X } from "lucide-react";
 
 interface LibraryViewerToolbarProps {

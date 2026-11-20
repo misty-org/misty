@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Clock, Pencil, X } from "lucide-react";
-import { ComposerStatusRow, IconButton } from "@/shared/ui";
+import { ComposerStatusRow, IconButton } from "@misty/ui";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
 import { useEngineQueue } from "./engineQueue";
 

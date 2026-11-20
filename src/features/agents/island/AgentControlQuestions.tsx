@@ -1,4 +1,4 @@
-import { Surface } from "@/shared/ui";
+import { Surface } from "@misty/ui";
 import { AgentActionQuestions } from "./AgentActionQuestions";
 import { islandClass } from "./agentControlStatus";
 

@@ -16,7 +16,7 @@ import {
   Label,
   SkeletonList,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { t } from "./strings";
 import type { SkillRepo } from "./types";
 import { useSkillDiscovery } from "./useSkillDiscovery";

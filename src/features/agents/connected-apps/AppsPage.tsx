@@ -3,8 +3,8 @@ import { EngineConnectors } from "../marketplace/EngineConnectors";
 import { DirectApps } from "./DirectApps";
 
 /**
- * Agents › Apps: the apps agents sign in to, in two settings panels. First what Claude Code
- * already reaches under the person's own sign-in, then the apps whose makers run their own
+ * Explore › Connected apps: the apps agents sign in to, in two settings panels. First what Claude
+ * Code already reaches under the person's own sign-in, then the apps whose makers run their own
  * sign-in, which Misty connects directly. Any other app is used through its web page.
  */
 export function AppsPage() {

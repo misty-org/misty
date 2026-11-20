@@ -1,7 +1,7 @@
 import { developmentServer } from "@/api/deployment/serverChoice";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type FormEvent } from "react";
 import { parseServerAddress } from "./serverAddress";

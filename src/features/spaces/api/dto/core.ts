@@ -84,6 +84,11 @@ export interface SpaceMessage {
   attachments?: MessageAttachment[];
   reactions?: SpaceMessageReaction[];
   reply_to_message_id?: string;
+  /** Set on a reply made in a thread's panel; such a reply is not in the channel's own list. */
+  thread_root_id?: string;
+  /** On a thread's root: how many replies it has and when the last came. */
+  reply_count?: number;
+  last_reply_at?: string;
   edited_at?: string;
   origin?: {
     kind?: string;
@@ -152,4 +157,12 @@ export interface SpacesSnapshot {
       reserved_bytes: number;
     }>;
   };
+}
+
+/** A thread the person follows: its root, its replies' count and how many they haven't read. */
+export interface SpaceThread {
+  root: SpaceMessage;
+  reply_count: number;
+  last_reply_at: string;
+  unread_count: number;
 }

@@ -1,4 +1,4 @@
-import { CollectionHeading, CollectionPage, Skeleton, SkeletonControl, Surface } from "@/shared/ui";
+import { CollectionHeading, CollectionPage, Skeleton, SkeletonControl, Surface } from "@misty/ui";
 import { HomeSection } from "./HomeSection";
 import { homeChipsClass, homePairClass, spaceHomeClass } from "./homeLayout";
 import { OverviewCard, OverviewRowsSkeleton } from "./OverviewCard";

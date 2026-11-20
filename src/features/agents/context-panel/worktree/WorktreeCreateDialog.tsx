@@ -16,7 +16,7 @@ import {
   Surface,
   Switch,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { currentSpaceKey } from "../../engines/enginesApi";
 import { BranchCombobox } from "./BranchCombobox";
 import {

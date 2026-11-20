@@ -1,4 +1,4 @@
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import type { AgentNotebook } from "../../runs/invocations/invocationTypes";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import { StatusRow, StatusTable } from "../../progress/StatusTable";

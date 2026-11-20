@@ -8,7 +8,7 @@ import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Button, cn, Input, OverflowFadeText, Skeleton, SkeletonControl } from "@/shared/ui";
+import { Button, cn, Input, OverflowFadeText, Skeleton, SkeletonControl } from "@misty/ui";
 import { DropdownControl } from "../../settings/SettingsControls";
 import {
   applyFontPreferences,

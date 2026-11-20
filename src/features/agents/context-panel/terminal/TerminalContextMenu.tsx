@@ -8,7 +8,7 @@ import {
   ContextMenuContent,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { isMacPlatform, isPathUnder, probePath } from "./links";
 import { openTerminalPath, resolveTerminalPath } from "./openTarget";
 import { filesApi } from "../files/filesApi";

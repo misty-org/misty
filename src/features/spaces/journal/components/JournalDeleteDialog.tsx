@@ -8,7 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useState } from "react";
 
 type JournalDocumentKind = "drawing" | "note";

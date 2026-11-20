@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonControl, cn } from "@/shared/ui";
+import { Skeleton, SkeletonControl, cn } from "@misty/ui";
 
 /** Each paragraph's lines, by width; the last line of each runs short, as text does. */
 const paragraphs = [

@@ -6,7 +6,7 @@ import {
   type NoteReadingRuntime,
   type NoteReadingPaneProps,
 } from "./NoteReadingPaneView";
-import { lazyTool } from "@/shared/ui";
+import { lazyTool } from "@misty/ui";
 const runtime: NoteReadingRuntime = {
   useCollaborationRoom(spaceId, noteId) {
     const room = useNoteCollaborationRoom(spaceId, noteId);

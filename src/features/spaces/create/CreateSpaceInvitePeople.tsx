@@ -12,7 +12,7 @@ import {
   Text,
   Tooltip,
   cn,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

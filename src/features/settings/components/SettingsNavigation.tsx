@@ -1,4 +1,4 @@
-import { cn, NavGroupHeading, NavList, NavRow, OverflowFadeText } from "@/shared/ui";
+import { cn, NavGroupHeading, NavList, NavRow, OverflowFadeText } from "@misty/ui";
 import type { LucideIcon } from "lucide-react";
 export interface DesktopSettingsNavEntry<Id extends string = string> {
   id: Id;

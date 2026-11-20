@@ -18,7 +18,7 @@ import {
   stringSetting,
 } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settingsTypes";
-import { Input } from "@/shared/ui";
+import { Input } from "@misty/ui";
 import { validClockTime } from "@/features/settings";
 import { normalizeDockingLayout, rememberDockingLayout } from "@/app/shell/dockingLayout";
 import { useWindowDockingLayout } from "../panes/useWindowDockingLayout";

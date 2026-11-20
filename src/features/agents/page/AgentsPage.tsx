@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { cn, Skeleton, SkeletonControl, Surface, windowToolbarClass } from "@/shared/ui";
+import { cn, Skeleton, SkeletonControl, Surface, windowToolbarClass } from "@misty/ui";
 import { AgentSettingsModal } from "../personal/AgentSettingsModal";
 import { AgentSetup } from "../personal/AgentSetup";
 import { AgentEditor } from "../personal/AgentEditor";
@@ -44,7 +44,7 @@ function AgentsWorkspacePage() {
     load,
   } = state;
   const { setEditorStatus } = guard;
-  const { select, closeSettings, saveProfile, removeProfile, openApps } = actions;
+  const { select, closeSettings, saveProfile, removeProfile, openConnections } = actions;
   // A link opens any agent's settings (?agentSettings=<id>) without moving the page to that
   // agent's chat.
   const [editingId, setEditingId] = useState<string>();
@@ -98,6 +98,7 @@ function AgentsWorkspacePage() {
         <AgentWorkspaceFrame
           key={user?.id}
           agent={profile}
+          accountId={user.id}
           page={workspacePage}
           conversations={agentConversations}
           activity={activity.entries}
@@ -123,7 +124,7 @@ function AgentsWorkspacePage() {
           <AgentSetup
             key={`${user?.id}:create`}
             access={access}
-            onConnections={openApps}
+            onConnections={openConnections}
             onStatusChange={setEditorStatus}
             onSaved={saveProfile}
           />

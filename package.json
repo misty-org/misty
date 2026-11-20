@@ -9,6 +9,9 @@
     "build": "tsc && vite build --mode desktop --config .config/vite.config.ts",
     "preview": "vite preview --mode desktop --config .config/vite.config.ts",
     "tauri": "node tasks/tauri.ts",
+    "build:apps": "node tasks/build-apps.ts",
+    "sync:apps": "node tasks/sync-apps-catalog.ts",
+    "design:rules": "node tasks/design-rules.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --config .config/eslint.config.js",
     "lint:fix": "eslint src --fix --config .config/eslint.config.js",
@@ -21,6 +24,7 @@
     "check:desktop-agent": "cargo test --manifest-path src-tauri/Cargo.toml --lib agent_pointer_clicks_types_and_selects_in_textedit -- --ignored --nocapture"
   },
   "dependencies": {
+    "@misty/ui": "file:../misty-ui",
     "@codemirror/autocomplete": "^6.20.4",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-sql": "^6.10.0",

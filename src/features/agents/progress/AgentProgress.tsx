@@ -27,7 +27,7 @@ import {
   ToolPath,
   ToolRow,
   TurnFold,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Fold } from "./WorkGroup";
 import {
   groupProgress,

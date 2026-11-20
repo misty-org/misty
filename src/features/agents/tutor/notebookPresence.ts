@@ -1,5 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
-import type { AvatarTone as ItemTone } from "@/shared/ui";
+import type { AvatarTone as ItemTone } from "@misty/ui";
 import type { AgentAtWork } from "./notebookAgents";
 import { liveNotebook, useLiveNotebook } from "./notebookLive";
 import { personColor, personTone } from "./personTone";

@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useEffect, useState } from "react";
-import { SkeletonDocument, Surface, Text } from "@/shared/ui";
+import { SkeletonDocument, Surface, Text } from "@misty/ui";
 import { filesApi } from "../files/filesApi";
 
 /** No `allow-same-origin`: the page gets an opaque origin, so it can't read storage or anything

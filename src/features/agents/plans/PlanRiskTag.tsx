@@ -1,5 +1,5 @@
 import { CircleAlert, Eye, FilePen, OctagonAlert, PencilLine } from "lucide-react";
-import { Text, Tooltip } from "@/shared/ui";
+import { Text, Tooltip } from "@misty/ui";
 import type { PlanRisk } from "./planTypes";
 
 /** Risk carries an icon and a word, never a color. */

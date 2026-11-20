@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { spaceIcons } from "@/shared/ui";
+import { spaceIcons } from "@misty/ui";
 import { useNow } from "@/shared/hooks/useNow";
 import { useSettingsStore } from "@/features/settings";
 import { comingUpDays } from "./comingUpDays";

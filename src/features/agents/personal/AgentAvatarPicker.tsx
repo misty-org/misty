@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, ChoiceTile, Input, Pressable, Surface, Text } from "@/shared/ui";
+import { Button, ChoiceTile, Input, Pressable, Surface, Text } from "@misty/ui";
 import { AgentAvatar, AgentCloudImage } from "./AgentAvatar";
 import { agentCloudAvatar, agentCloudVariants } from "./agentCloudAvatars";
 

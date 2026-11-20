@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, IconButton, Input, Separator, Surface, Text, Textarea } from "@/shared/ui";
+import { Button, IconButton, Input, Separator, Surface, Text, Textarea } from "@misty/ui";
 import { dueCards, nextLabel, type Grade } from "./spacedReview";
 import { useTutorStore } from "./tutorStore";
 import type { Deck, Flashcard } from "./tutorTypes";

@@ -3,7 +3,7 @@ import * as accessErrors from "../api/access-errors";
 import type { SpaceEvent } from "../api/dto/entities";
 import { writeRealtimeCursor } from "../api/realtime-cursor";
 import { errorText } from "@/shared/lib/format";
-import { mergeSpaceMessages, messageFromSpaceEvent } from "../chat/useSpaceMessageSpansStore";
+import { mergeSpaceMessages, messageFromSpaceEvent, withThreadReply } from "../chat/useSpaceMessageSpansStore";
 import { coalescedReload } from "./coalescedReload";
 import {
   reloadSpaceConversations,
@@ -55,7 +55,7 @@ async function applyRealtimeEvent(
       }),
     );
     // A new message changes a chat's unread count, which comes with the conversation list.
-    if (event.type === "message.created")
+    if (event.type === "message.created" && !includedMessage?.thread_root_id)
       void reloadSpaceConversationsForMessage(event.space_id).catch(() => undefined);
     const deletedId =
       event.type === "message.deleted" && typeof event.payload.message_id === "string"
@@ -71,7 +71,19 @@ async function applyRealtimeEvent(
           ),
         },
       }));
-    else if (!conversationId && includedMessage)
+    else if (!conversationId && includedMessage?.thread_root_id) {
+      // A thread reply belongs to its panel; in the list it only adds to its root's count.
+      if (event.type === "message.created")
+        set((state) => ({
+          messagesBySpace: {
+            ...state.messagesBySpace,
+            [event.space_id]: withThreadReply(
+              state.messagesBySpace[event.space_id] ?? [],
+              includedMessage,
+            ),
+          },
+        }));
+    } else if (!conversationId && includedMessage)
       set((state) => ({
         messagesBySpace: {
           ...state.messagesBySpace,

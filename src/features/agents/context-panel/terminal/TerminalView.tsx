@@ -2,7 +2,7 @@
 import type { IDisposable, Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { cn, SetupState } from "@/shared/ui";
+import { cn, SetupState } from "@misty/ui";
 import { errorText } from "../projectApi";
 import {
   TERMINAL_FONT_SIZE,
@@ -24,7 +24,7 @@ import {
 import { TerminalContextMenu } from "./TerminalContextMenu";
 import { TERMINAL_GONE, terminalApi } from "./terminalApi";
 import { loadXterm, type XtermModules } from "@/shared/lib/terminal/xtermLoader";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 
 /** The shell hears a new size this long after the last change: one call per frame stalled the
  * native side and made dragging feel sticky. */

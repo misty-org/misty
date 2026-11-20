@@ -12,7 +12,7 @@ import {
   MenuSeparator,
   MenuTrigger,
   notify,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { AgentScope } from "../personal/agentScope";
 import {
   agentsDeviceSnapshot,

@@ -1,5 +1,5 @@
 import { routes } from "@/app/shell";
-import { InlineLink, Text } from "@/shared/ui";
+import { InlineLink, Text } from "@misty/ui";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import AuthCard from "../components/AuthCard";

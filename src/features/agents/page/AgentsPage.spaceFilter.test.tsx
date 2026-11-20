@@ -99,11 +99,11 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
 it("names the chat, not its agent, with nothing to switch", () => {
   fixture.includeSecond = true;
   renderAgentsPage();
-  // The tab names the agent; the chat's bar shows only the chat's title.
-  expect(screen.getByRole("heading", { name: "New chat" })).toBeTruthy();
-  expect(screen.queryByText("Communications")).toBeNull();
+  // The chat's bar reads "Agent · chat title", as a direct message does, and is not a switch.
+  expect(screen.getByRole("heading", { name: /· New chat$/ })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: /^Communications/ })).toBeTruthy();
   openChat("research");
-  expect(screen.queryByText("Research")).toBeNull();
+  expect(screen.getByRole("heading", { name: /^Research/ })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^Switch agent/ })).toBeNull();
   expect(useMistyStore.getState().selectedAgentId).toBe("research");
 });

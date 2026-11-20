@@ -1,7 +1,7 @@
 // Layout adapted from OpenChamber (MIT, Copyright (c) 2025 Bohdan Triapitsyn).
 import { useEffect, useMemo, useState } from "react";
 import { Check, CircleHelp, Clock, X } from "lucide-react";
-import { Button, CodeText, OverflowFadeText, Surface, Text, Tooltip } from "@/shared/ui";
+import { Button, CodeText, OverflowFadeText, Surface, Text, Tooltip } from "@misty/ui";
 import { useWorkspaceViewShown } from "@/features/app-windows";
 import { ErrorNotice } from "../ErrorNotice";
 import {

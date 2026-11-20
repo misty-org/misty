@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Skeleton, Text } from "@/shared/ui";
+import { Skeleton, Text } from "@misty/ui";
 import {
   agentActivityApi,
   doingLabel,

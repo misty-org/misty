@@ -1,7 +1,7 @@
 import { ClipboardCopy, Trash2, X } from "lucide-react";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 
-import { Button, IconButton, Surface } from "@/shared/ui";
+import { Button, IconButton, Surface } from "@misty/ui";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { LibraryFacetGroup } from "../SpaceLibraryPrimitives";

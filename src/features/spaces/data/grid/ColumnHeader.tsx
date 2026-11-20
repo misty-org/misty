@@ -1,5 +1,5 @@
 import { memo, useRef, useState, type ReactNode } from "react";
-import { RowActions, Surface, Text } from "@/shared/ui";
+import { RowActions, Surface, Text } from "@misty/ui";
 import { columnLabel } from "../workbook/a1";
 import { minColWidth, maxColWidth } from "../workbook/schema";
 import { headerHeight, rowHeaderWidth } from "./sheetView";

@@ -1,4 +1,4 @@
-import { spaceMadeKindForSection } from "@/shared/ui";
+import { spaceMadeKindForSection } from "@misty/ui";
 
 /** Canonical content identity. Tool indexes and UI-only query parameters never become recents. */
 export function spaceItemKeyFromRoute(route: string, spaceId: string): string | undefined {

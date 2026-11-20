@@ -35,7 +35,7 @@ import {
   Skeleton,
   Spinner,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { CliUpdatePlan } from "./api";
 import type { CliUpdateFlow, CliUpdateFlowState } from "./useCliUpdateFlow";
 

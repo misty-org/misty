@@ -14,7 +14,7 @@ import {
   type SkeletonTrailing,
   useNotice,
   WorkspaceSidebar,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { X } from "lucide-react";
 import { Children, createContext, isValidElement, useContext, type ReactNode } from "react";
 import { useSettingReset } from "../device-preferences/SettingScope";

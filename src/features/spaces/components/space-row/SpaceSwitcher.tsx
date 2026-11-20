@@ -6,7 +6,7 @@ import {
   MenuTrigger,
   Popover,
   PopoverAnchor,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../../create/GlobalCreateSpaceDialog";
 import { spaceNavigationName } from "../../routes/defaultSpace";
 import { SpaceAvatar } from "../SpaceAvatar";

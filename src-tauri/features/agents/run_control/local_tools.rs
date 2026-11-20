@@ -209,7 +209,9 @@ fn pending() -> &'static Mutex<HashMap<String, PendingCall>> {
 /// Whether a call can simply be asked again when the page running it reloads: it changes nothing, or,
 /// for `agent.delegate`, a repeat waits for the children the first try started.
 fn repeats_safely(name: &str) -> bool {
-    READ_ONLY.contains(&name) || name == "agent.delegate"
+    READ_ONLY.contains(&name)
+        || name == "agent.delegate"
+        || crate::apps::mcp::is_read_only(name)
 }
 
 /// A window that just loaded knows nothing of the calls its last page was running. Those that can't be
@@ -358,12 +360,13 @@ impl AppToolHost {
 
 impl LocalToolHost for AppToolHost {
     fn runs(&self, name: &str) -> bool {
-        LOCAL_TOOLS.contains(&name)
+        LOCAL_TOOLS.contains(&name) || crate::apps::mcp::is_registered(name)
     }
 
     fn call<'a>(&'a self, call: LocalToolCall) -> BoxFuture<'a, LocalToolOutcome> {
         Box::pin(async move {
-            let read_only = READ_ONLY.contains(&call.name.as_str());
+            let read_only =
+                READ_ONLY.contains(&call.name.as_str()) || crate::apps::mcp::is_read_only(&call.name);
             let store = self.store();
             let facts = tool_gate::facts_of_run(&self.app, &call.run_id).await;
             let journal = ToolJournal::new(store.clone(), &facts.account, self.saved_runs().await);

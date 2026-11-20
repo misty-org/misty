@@ -1,4 +1,4 @@
-import { OverflowFadeText, Text, type TextSize, type TextTone, type TextWeight } from "@/shared/ui";
+import { OverflowFadeText, Text, type TextSize, type TextTone, type TextWeight } from "@misty/ui";
 import { GalleryRow, GallerySection } from "./GalleryLayout";
 
 const sizes: ReadonlyArray<{ size: TextSize; px: number; use: string }> = [

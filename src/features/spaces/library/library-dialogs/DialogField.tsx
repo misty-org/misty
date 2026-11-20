@@ -1,4 +1,4 @@
-import { Label } from "@/shared/ui";
+import { Label } from "@misty/ui";
 import type { ReactNode } from "react";
 
 export function DialogField({ label, children }: { label: string; children: ReactNode }) {

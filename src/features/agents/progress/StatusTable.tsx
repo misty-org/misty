@@ -1,7 +1,7 @@
 import { Check, Circle, CircleAlert, CircleMinus, CircleX, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn, Surface, Text, type TextTone } from "@/shared/ui";
-import { remCss } from "@/shared/lib/uiScale";
+import { cn, Surface, Text, type TextTone } from "@misty/ui";
+import { remCss } from "@misty/ui";
 
 /**
  * Every list of steps in a conversation (checklist, sub-agents, plan, requests,

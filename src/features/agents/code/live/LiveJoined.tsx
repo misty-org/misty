@@ -8,7 +8,7 @@ import {
   SectionHeading,
   SetupState,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { PersonAvatar } from "../../tutor/notebook/LivePeople";
 import { personTone } from "../../tutor/personTone";
 import { liveErrorText } from "./liveApi";

@@ -1,4 +1,4 @@
-import { Portal, Pressable, Text, Tooltip } from "@/shared/ui";
+import { Portal, Pressable, Text, Tooltip } from "@misty/ui";
 import { useCallback, useRef, type RefObject } from "react";
 import { CloseGlyph, MaximizeGlyph, MinimizeGlyph, RestoreGlyph } from "./RestoreGlyph";
 import * as styles from "./styles";

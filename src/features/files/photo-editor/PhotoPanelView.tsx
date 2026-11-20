@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Separator, Slider, Text } from "@/shared/ui";
+import { Separator, Slider, Text } from "@misty/ui";
 
 /**
  * One of the editor's side panels, as OpenCut's panel views: a 44px header with the panel's name

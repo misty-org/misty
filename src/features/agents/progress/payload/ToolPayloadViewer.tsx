@@ -10,7 +10,7 @@ import {
   Text,
   type CodeDiffLine,
   type CodeDiffLineKind,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { indentedJson } from "../../runs/markdown/readableJson";
 import {
   computeDiffLines,

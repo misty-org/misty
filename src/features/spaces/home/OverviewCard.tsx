@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn, Pressable, Skeleton, Surface, Text, Tooltip } from "@/shared/ui";
+import { cn, Pressable, Skeleton, Surface, Text, Tooltip } from "@misty/ui";
 import { overviewRowClass } from "./homeLayout";
 import { HomeSection, OverviewDot } from "./HomeSection";
 

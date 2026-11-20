@@ -1,4 +1,4 @@
-import type { ItemTone } from "@/shared/ui";
+import type { ItemTone } from "@misty/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";

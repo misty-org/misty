@@ -11,7 +11,7 @@ import {
   ListRow,
   ListRowSkeleton,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { historyApi, type HistoryKind, type HistoryVersion } from "./historyApi";
 import { HistoryPreview, HistoryPreviewSkeleton } from "./HistoryPreview";

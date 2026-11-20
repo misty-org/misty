@@ -1,5 +1,5 @@
 import { getAppliedAppRenderScale } from "@/shared/hooks/useAppZoom";
-import { cssLengthPx } from "@/shared/lib/uiScale";
+import { cssLengthPx } from "@misty/ui";
 import { opaqueColorHex } from "./opaqueColorHex";
 import type { BrowserBounds } from "@/features/app-windows";
 

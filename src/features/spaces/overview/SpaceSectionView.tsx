@@ -1,6 +1,6 @@
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
-import { EmptyState, spaceKindsWithItemPath, spaceMadeKindForSection } from "@/shared/ui";
+import { EmptyState, spaceKindsWithItemPath, spaceMadeKindForSection } from "@misty/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -46,11 +46,21 @@ async function loadLab() {
   return { default: SpaceLab };
 }
 const Lab = lazy(loadLab);
+async function loadExplore() {
+  const { ExplorePage } = await import("@/features/agents");
+  return { default: ExplorePage };
+}
+const Explore = lazy(loadExplore);
 async function loadHome() {
   const { SpaceHome } = await import("../home/SpaceHome");
   return { default: SpaceHome };
 }
 const Home = lazy(loadHome);
+async function loadApp() {
+  const { SpaceAppPage } = await import("../apps/SpaceAppPage");
+  return { default: SpaceAppPage };
+}
+const BuiltInApp = lazy(loadApp);
 
 export async function preloadSpaceSection(section: string) {
   switch (section) {
@@ -85,6 +95,13 @@ export async function preloadSpaceSection(section: string) {
     case "lab":
       await loadLab();
       break;
+    case "agents":
+    case "explore":
+      await loadExplore();
+      break;
+    case "app":
+      await loadApp();
+      break;
   }
 }
 
@@ -96,6 +113,7 @@ const sectionTabTitles: Record<string, string> = {
   planner: "Planner",
   calendar: "Calendar",
   lab: "Lab",
+  explore: "Explore",
 };
 
 /**
@@ -199,6 +217,13 @@ export function SpaceSectionView(props: {
           <Calendar spaceId={spaceId} />
         ) : section === "lab" ? (
           <Lab spaceId={spaceId} />
+        ) : section === "explore" ? (
+          <Explore
+            spaceId={spaceId}
+            canManageApps={Boolean(space.permissions?.includes("apps.manage"))}
+          />
+        ) : section === "app" ? (
+          <BuiltInApp space={space} appId={itemId} workspaceTabId={props.workspaceTabId} />
         ) : section === "social" || section === "chat" ? (
           <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (

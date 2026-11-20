@@ -1,4 +1,4 @@
-import { ChoiceTile, Surface } from "@/shared/ui";
+import { ChoiceTile, Surface } from "@misty/ui";
 import { SLIDE_HEIGHT, SLIDE_WIDTH, slideLayouts, type SlotSpec } from "../deck/layouts";
 import { deckThemeList, fontStack, screenColor } from "../deck/themes";
 import { slideLayoutIds, type DeckThemeId, type SlideLayoutId } from "../deck/types";

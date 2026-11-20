@@ -9,7 +9,7 @@
  */
 import { Activity, AlertTriangle, Check, X } from "lucide-react";
 import { useMemo } from "react";
-import { Badge, Button, IconButton, Spinner, Surface, Text, Tooltip } from "@/shared/ui";
+import { Badge, Button, IconButton, Spinner, Surface, Text, Tooltip } from "@misty/ui";
 import { copy } from "./copy";
 import { probeStateFor, useMcpProbeStore } from "./probe-store";
 import type { McpConfigEntry } from "./types";

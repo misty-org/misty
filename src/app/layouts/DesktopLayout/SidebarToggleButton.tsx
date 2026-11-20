@@ -1,5 +1,5 @@
 import { PanelLeft, PanelRight } from "lucide-react";
-import { IconButton } from "@/shared/ui";
+import { IconButton } from "@misty/ui";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { useSidebarCollapsedStore } from "../../shell/sidebarCollapsed";
 

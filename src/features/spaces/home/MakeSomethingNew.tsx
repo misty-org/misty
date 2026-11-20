@@ -13,7 +13,7 @@ import {
   notify,
   spaceMadeKinds,
   type ItemTone,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { createSpaceItem, type SpaceCreateKind } from "./createSpaceItem";
 import { importableKinds, importSpaceItem, type ImportableKind } from "./importSpaceItem";
 

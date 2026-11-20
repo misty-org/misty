@@ -14,7 +14,7 @@ import {
   DesktopSettingsRow,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Button, ErrorState, Input, Skeleton, Switch } from "@/shared/ui";
+import { Button, ErrorState, Input, Skeleton, Switch } from "@misty/ui";
 import { proxyApi, type ProxySettings } from "./api";
 
 /** The draft when no proxy has been set yet. */

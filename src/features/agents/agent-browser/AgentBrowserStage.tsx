@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { usePresentedPageHost } from "@/features/browser";
 import { useBrowserRuntimeStore } from "@/features/app-windows";
-import { SetupState, Surface, Text } from "@/shared/ui";
+import { SetupState, Surface, Text } from "@misty/ui";
 import { agentTab, setShownAgentTab, wakeAgentTab } from "../tabs/agentTabs";
 import { useAgentBrowser } from "./agentBrowserStore";
 import { agentPageKey, useAgentPageGeometry } from "./useAgentPageGeometry";

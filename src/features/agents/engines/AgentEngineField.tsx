@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { EngineMark } from "@/features/engine-config/EngineMark";
-import { Field, Input, OptionSelect } from "@/shared/ui";
+import { Field, Input, OptionSelect } from "@misty/ui";
 import { listEngineModels, mistyEngine, useEnginesList, type EngineModel } from "./enginesApi";
 
 /**

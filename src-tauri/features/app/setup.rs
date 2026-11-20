@@ -32,6 +32,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     if let Err(error) = database::misty_home::ensure_misty_home() {
         eprintln!("Could not prepare ~/.misty: {error}");
     }
+    // Misty's own apps are built in: served from where Misty ships them.
+    crate::apps::use_shipped(app.handle());
     let runtime = MistyRuntime::new();
     #[cfg(desktop)]
     database::retired_coding_data::remove_once_in_background(&runtime.environment);

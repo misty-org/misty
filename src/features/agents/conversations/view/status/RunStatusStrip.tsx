@@ -9,7 +9,7 @@ import {
   Tooltip,
   type StepDotState,
   rowShapeWrap,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { checklistForInvocation } from "../../../plans/checklists";
 import { useCollaborationStore } from "../../../plans/store";
 import type { ChecklistItem } from "../../../plans/planTypes";

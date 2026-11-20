@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { DialogField } from "./DialogField";
 
 const titles: Record<string, string> = {

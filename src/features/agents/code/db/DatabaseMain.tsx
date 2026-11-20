@@ -10,7 +10,7 @@ import {
   TabStrip,
   Text,
   type ActionBarItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useDbStore, primaryKeyOf, tableOf, type DbTab } from "./dbStore";
 import { ResultsGrid, ResultsSkeleton } from "./ResultsGrid";
 import { SaveChangesDialog } from "./SaveChangesDialog";

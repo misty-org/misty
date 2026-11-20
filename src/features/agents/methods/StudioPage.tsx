@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn, Surface } from "@/shared/ui";
+import { cn, Surface } from "@misty/ui";
 
 /**
  * A page the Agents sidebar opens beside the chats (notebooks), after Polar's: the

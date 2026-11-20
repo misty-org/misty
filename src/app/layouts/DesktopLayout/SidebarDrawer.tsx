@@ -13,8 +13,8 @@ import {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "@/features/app-windows";
-import { cn, Surface } from "@/shared/ui";
-import { designPx, uiPx } from "@/shared/lib/uiScale";
+import { cn, Surface } from "@misty/ui";
+import { designPx, uiPx } from "@misty/ui";
 import { dockingMetrics } from "./dockingGeometry";
 
 /** The sidebar header shares the Space bar's centerline, so the window buttons that sit on it drop

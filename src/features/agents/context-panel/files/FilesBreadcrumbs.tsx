@@ -9,7 +9,7 @@ import {
   OverflowFadeText,
   Text,
   SidePanelLead,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { fileName, useFilesStore } from "./filesStore";
 import { treeLineage } from "./paths";
 

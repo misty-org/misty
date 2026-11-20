@@ -9,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { SkeletonList, SuggestionItem, SuggestionList, Text } from "@/shared/ui";
+import { SkeletonList, SuggestionItem, SuggestionList, Text } from "@misty/ui";
 import { mistyEngine } from "../../../engines/enginesApi";
 import { commandIcon } from "../commands/commandIcons";
 import { catalogFor, mistyCommandsFor } from "../commands/engineCommands";

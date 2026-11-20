@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { copy } from "./copy";
 import { answerProbeConfirm, currentProbeConfirm, subscribeProbeConfirm } from "./probe-confirm";
 import type { McpProbePlan } from "./types";

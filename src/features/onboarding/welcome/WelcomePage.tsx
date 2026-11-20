@@ -1,6 +1,6 @@
 import { routes } from "@/app/shell";
 import { mistyPublicPage } from "@/shared/platform/mistyPublicUrl";
-import { Button, FlyingMisty, HeroPage, InlineLink } from "@/shared/ui";
+import { Button, FlyingMisty, HeroPage, InlineLink } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WelcomeNav } from "@/features/account";

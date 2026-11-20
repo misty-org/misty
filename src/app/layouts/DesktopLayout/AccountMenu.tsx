@@ -19,7 +19,7 @@ import {
   Spinner,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ShortcutText } from "@/features/shortcuts/runtime";
 import {
   Check,

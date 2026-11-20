@@ -1,4 +1,4 @@
-import { Button, ListCard, ListRow, SectionHeading, notify } from "@/shared/ui";
+import { Button, ListCard, ListRow, SectionHeading, notify } from "@misty/ui";
 import { Compass, LayoutDashboard, PanelTopOpen, RefreshCw, Signpost } from "lucide-react";
 import { routes } from "@/app/shell";
 import { useState } from "react";

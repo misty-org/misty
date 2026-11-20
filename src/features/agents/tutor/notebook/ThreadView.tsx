@@ -9,7 +9,7 @@ import {
   Surface,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import { spacesGateway, type DocVisibility } from "../../spaces-gateway/spacesGateway";
 import type { Turn } from "../notebookThread";

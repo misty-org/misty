@@ -19,7 +19,7 @@ import {
   ListRow,
   Spinner,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ENGINE_IDS, ENGINE_NAMES, type EngineId } from "../channels/engines";
 import { EngineMark } from "../EngineMark";
 import { cliApi, type CliVersionStatus } from "./api";

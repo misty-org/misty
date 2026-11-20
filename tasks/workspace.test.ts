@@ -20,7 +20,11 @@ test("features share the host React runtime", () => {
 test("owned tooling is TypeScript", () => {
   const inspect = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (["node_modules", "target", "dist", ".build"].includes(entry.name) || entry.isSymbolicLink()) continue;
+      if (
+        ["node_modules", "target", "dist", ".build"].includes(entry.name) ||
+        entry.isSymbolicLink()
+      )
+        continue;
       const path = resolve(directory, entry.name);
       if (entry.isDirectory()) inspect(path);
       else assert.equal(entry.name.endsWith(".mjs"), false, path);
@@ -30,6 +34,9 @@ test("owned tooling is TypeScript", () => {
 });
 
 test("the app needs none of the JIT rights a bundled Node did", () => {
-  const entitlements = readFileSync(resolve(root, "src-tauri/packaging/Entitlements.plist"), "utf8");
+  const entitlements = readFileSync(
+    resolve(root, "src-tauri/packaging/Entitlements.plist"),
+    "utf8",
+  );
   assert.doesNotMatch(entitlements, /allow-jit|allow-unsigned-executable-memory/);
 });

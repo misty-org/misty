@@ -1,4 +1,4 @@
-import { ErrorState } from "@/shared/ui";
+import { ErrorState } from "@misty/ui";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryEmptyState } from "../components/SpaceLibraryEmptyState";
 import { LibraryItemsSkeleton } from "../components/LibraryItemSkeletons";

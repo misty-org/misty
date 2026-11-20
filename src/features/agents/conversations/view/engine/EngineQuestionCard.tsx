@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { EngineQuestion } from "../../../runs/invocations/invocationTypes";
-import { Button, Input, Pressable, Surface, Text } from "@/shared/ui";
+import { Button, Input, Pressable, Surface, Text } from "@misty/ui";
 import { answerEngineQuestion, type EngineAnswers } from "./engineApi";
 import type { EngineAsk } from "./engineTurnStore";
 

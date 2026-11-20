@@ -11,7 +11,7 @@ import {
   Text,
   useConfirmDelete,
   type RowState,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { GalleryPane, GalleryRow, GallerySection } from "./GalleryLayout";

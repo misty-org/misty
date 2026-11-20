@@ -3,7 +3,7 @@ import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings"
 import { invoke } from "@/native/invoke";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, useNotice } from "@/shared/ui";
+import { Button, useNotice } from "@misty/ui";
 import { useProjectsHome, useProjectsHomePath } from "../shared-folders/projectsHome";
 import { activityApi } from "./activityApi";
 import { forgetStepPictures } from "./useRunSteps";

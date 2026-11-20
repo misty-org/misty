@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Plus, RotateCcw, Trash2, Wand2 } from "lucide-react";
-import { Button, ChoiceGroup, IconButton, Input, Surface, Text, Textarea } from "@/shared/ui";
+import { Button, ChoiceGroup, IconButton, Input, Surface, Text, Textarea } from "@misty/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import {
   builtinTransformations,

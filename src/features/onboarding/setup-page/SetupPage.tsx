@@ -13,7 +13,7 @@ import {
   type EngineSetupState,
 } from "@/features/agents";
 import type { EngineId } from "@/features/engine-config/channels";
-import { Button, StepPage } from "@/shared/ui";
+import { Button, StepPage } from "@misty/ui";
 import { AppsStep } from "./AppsStep";
 import { HowMistyWorksStep } from "./HowMistyWorksStep";
 

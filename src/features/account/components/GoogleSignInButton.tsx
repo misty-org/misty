@@ -1,6 +1,6 @@
 import { accountApi } from "../api/api";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { BrandIcon, Button, Field, Input, Separator, Text, useNotice } from "@/shared/ui";
+import { BrandIcon, Button, Field, Input, Separator, Text, useNotice } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../AuthContext";

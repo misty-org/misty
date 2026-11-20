@@ -8,7 +8,7 @@ import {
   Surface,
   Text,
   rowShapeTwoLine,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { offsetLabel } from "../activity/stepSentences";
 import { browserLogApi, type BrowserLogRow } from "./browserLogApi";
 import { actionIcon, actionSentence, siteOf, verdictWords } from "./browserLogSentences";

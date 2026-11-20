@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { MoreHorizontal } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, IconButton } from "@/shared/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, IconButton } from "@misty/ui";
 import { useSpaceOverviewActions } from "./useSpaceOverviewActions";
 import type { SpaceOverviewItem } from "./useSpaceOverview";
 const access = vi.hoisted(() => ({ referenceOnly: false }));

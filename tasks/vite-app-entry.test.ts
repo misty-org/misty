@@ -23,11 +23,13 @@ test("dev servers on different ports do not rewrite each other's dependency cach
     const config = await resolveConfig({ configFile: ${JSON.stringify(configFile)}, mode: "desktop", logLevel: "silent" }, "serve");
     console.log(JSON.stringify({ cache: config.cacheDir, port: config.server.port }));
   `;
-  const configuration = (port) => JSON.parse(execFileSync(
-    process.execPath,
-    ["--input-type=module", "-e", script],
-    { encoding: "utf8", env: { ...process.env, MISTY_DESKTOP_DEV_PORT: String(port) } },
-  ));
+  const configuration = (port) =>
+    JSON.parse(
+      execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+        encoding: "utf8",
+        env: { ...process.env, MISTY_DESKTOP_DEV_PORT: String(port) },
+      }),
+    );
   const first = configuration(5173);
   const second = configuration(5174);
   assert.equal(first.port, 5173);
@@ -41,13 +43,17 @@ test("the app dependency scan succeeds before Drawings is opened", { timeout: 60
   // probe HTML must not poison this scan or alter a running developer's cache.
   const cacheDir = await mkdtemp(join(tmpdir(), "misty-app-entry-test-"));
   try {
-    const config = await resolveConfig({ configFile: join(import.meta.dirname, "../.config/vite.config.ts"), cacheDir, mode: "desktop", logLevel: "error" }, "serve");
+    const config = await resolveConfig(
+      {
+        configFile: join(import.meta.dirname, "../.config/vite.config.ts"),
+        cacheDir,
+        mode: "desktop",
+        logLevel: "error",
+      },
+      "serve",
+    );
     const metadata = await optimizeDeps(config, true, true);
-    for (const dependency of [
-      "react",
-      "react-dom/client",
-      "@excalidraw/excalidraw",
-    ]) {
+    for (const dependency of ["react", "react-dom/client", "@excalidraw/excalidraw"]) {
       assert.ok(metadata.optimized[dependency], `${dependency} must be ready before navigation`);
     }
   } finally {

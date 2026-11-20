@@ -2,7 +2,7 @@ import { nativeWorkspaceRecoveryEnabled } from "@/features/app-windows";
 import { useWorkspaceRecoveryState } from "@/features/app-windows";
 import { useWorkspaceRecoveryRetry } from "@/features/app-windows";
 import { SpacesRealtimeBridge } from "@/features/spaces/SpacesRealtimeBridge";
-import { LoadingScreen } from "@/shared/ui";
+import { LoadingScreen } from "@misty/ui";
 import { AgentExecutionSurface, defaultChoices, useEnginesList } from "@/features/agents";
 import { UpdateNotices } from "@/features/updater/UpdateNotices";
 import { EngineUpdatesPrompt } from "@/features/engine-config/clis";

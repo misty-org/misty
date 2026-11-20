@@ -6,7 +6,7 @@ import {
   FindBar,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ChartBoard } from "../charts/ChartBoard";
 import { ChartEditor } from "../charts/ChartEditor";
 import { useCharts } from "../charts/useCharts";

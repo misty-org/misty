@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import type { AppRequest, AppRequestDecision } from "./api";
 
 function formatCap(cap: NonNullable<AppRequest["paymentCap"]>) {

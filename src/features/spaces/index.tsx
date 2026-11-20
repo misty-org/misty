@@ -34,3 +34,14 @@ export {
   spaceTasks,
   type SpaceSearchHit,
 } from "./search/spaceSearch";
+
+// The Space's sidebar (`app/layouts/DesktopLayout/SpaceNavigator.tsx`).
+export { SpaceSelector } from "./components/space-row/SpaceSelector";
+export { useSpaceApps } from "./apps/useSpaceApps";
+export { appRoute, isAppRoute, officialAppRoute } from "./apps/appRoutes";
+export { catalogApps, catalogLogoUrl } from "./apps/thirdPartyApps";
+export { useSpaceConversations } from "./chat/sidebar/useSpaceConversations";
+export { conversationName, groupConversations, isGroupDirectMessage } from "./chat/sidebar/conversationGroups";
+export { conversationPath } from "./chat/chatRoute";
+export { useTasksDueCount } from "./home/useTasksDue";
+export type { Space } from "./api/dto/entities";

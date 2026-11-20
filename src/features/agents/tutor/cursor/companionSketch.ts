@@ -1,4 +1,4 @@
-import { sketchInk, type SketchColor, type SketchInk } from "@/shared/ui";
+import { sketchInk, type SketchColor, type SketchInk } from "@misty/ui";
 
 /**
  * Drawings in companion replies (companion_sketch_prompt.txt): a fenced

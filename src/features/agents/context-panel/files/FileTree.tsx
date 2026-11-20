@@ -20,7 +20,7 @@ import {
   Input,
   Text,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { FileTreeSkeleton } from "../PanelSkeletons";
 import { FileTreeContextMenu } from "./FileTreeContextMenu";
 import { TreeChildErrorRow, TreeChildRowsSkeleton, TreeRow } from "./FileTreeRow";

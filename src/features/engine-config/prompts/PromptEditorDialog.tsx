@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { CustomPromptEntry, PromptScope } from "./promptsApi";
 
 export interface PromptEditorValue {

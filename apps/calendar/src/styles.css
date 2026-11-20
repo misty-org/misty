@@ -1,0 +1,41 @@
+/* The look comes from misty-theme.css's tokens, so Planner matches the window around it. */
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input { font: inherit; color: inherit; }
+.planner { display: flex; flex-direction: column; height: 100vh; min-width: 0; }
+.bar { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 16px; flex: none; }
+.bar h1 { margin: 0; font-size: 0.875rem; font-weight: 600; color: var(--misty-theme-text-bright); }
+.add { display: flex; gap: 8px; margin-left: auto; min-width: 0; }
+.add input { width: 16rem; max-width: 100%; height: 32px; padding: 0 10px; border-radius: 8px; border: var(--hairline) solid var(--misty-theme-border-strong); background: transparent; outline: none; }
+button { height: 32px; padding: 0 12px; border-radius: 8px; border: var(--hairline) solid var(--misty-theme-border); background: transparent; cursor: pointer; }
+button:hover:not(:disabled) { background: var(--misty-theme-hover); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: var(--misty-theme-text); color: var(--misty-theme-bg); border-color: transparent; }
+button.quiet { border-color: transparent; color: var(--misty-theme-text-muted); }
+button.danger { color: var(--misty-theme-danger); }
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; flex: 1; min-height: 0; overflow: auto; align-items: start; }
+@media (max-width: 720px) { .board { grid-template-columns: minmax(0, 1fr); } }
+.column { background: var(--misty-theme-card); border: var(--hairline) solid var(--misty-theme-border); border-radius: 12px; padding: 12px; min-width: 0; }
+.column h2 { margin: 0 0 8px; font-size: 0.8125rem; font-weight: 600; color: var(--misty-theme-text-muted); }
+.count { margin-left: 4px; font-weight: 500; }
+ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.card { background: var(--misty-theme-bg); border: var(--hairline) solid var(--misty-theme-border); border-radius: 10px; padding: 10px; }
+.card-title { margin: 0; color: var(--misty-theme-text-bright); overflow-wrap: anywhere; }
+.card-meta { margin: 2px 0 8px; font-size: 0.75rem; color: var(--misty-theme-text-muted); }
+.card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-actions button { height: 24px; padding: 0 8px; font-size: 0.75rem; }
+.empty, .note { margin: 0; padding: 8px 0; color: var(--misty-theme-text-muted); font-size: 0.8125rem; }
+.note { padding: 24px 16px; }
+.alert { margin: 0 16px 8px; color: var(--misty-theme-danger); font-size: 0.8125rem; }
+.skeleton { height: 56px; border-radius: 10px; background: var(--misty-theme-hover); margin-bottom: 8px; opacity: 0.5; }
+.cal { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: 12px; padding: 0 16px 16px; flex: 1; min-height: 0; overflow: auto; align-items: start; }
+@media (max-width: 720px) { .cal { grid-template-columns: minmax(0, 1fr); } }
+.month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.weekday { padding: 4px 6px; font-size: 0.75rem; color: var(--misty-theme-text-muted); }
+.day { height: 64px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; padding: 6px; border-radius: 8px; border: var(--hairline) solid transparent; text-align: left; }
+.day.outside { color: var(--misty-theme-text-muted); }
+.day.today span:first-child { font-weight: 700; color: var(--misty-theme-text-bright); }
+.day.picked { background: var(--misty-theme-active); }
+.dots { color: var(--misty-theme-text-muted); letter-spacing: 1px; line-height: 1; }
+.stack { display: grid; gap: 8px; margin-top: 12px; }
+.stack input { height: 32px; padding: 0 10px; border-radius: 8px; border: var(--hairline) solid var(--misty-theme-border-strong); background: transparent; outline: none; min-width: 0; }

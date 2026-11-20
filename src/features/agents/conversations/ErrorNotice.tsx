@@ -1,4 +1,4 @@
-import { useNotice, type NoticeAction } from "@/shared/ui";
+import { useNotice, type NoticeAction } from "@misty/ui";
 
 /**
  * A failure as an error notice that stays while `message` is set, at most with one way out. It

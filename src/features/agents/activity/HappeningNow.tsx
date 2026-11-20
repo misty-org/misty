@@ -1,7 +1,7 @@
 import { Eye, Hand, Square } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { Button, OverflowFadeText, Surface, Text } from "@/shared/ui";
+import { Button, OverflowFadeText, Surface, Text } from "@misty/ui";
 import { useContextPanel } from "../context-panel/contextPanelStore";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import { AgentAvatar } from "../personal/AgentAvatar";

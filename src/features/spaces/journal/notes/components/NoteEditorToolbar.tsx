@@ -1,4 +1,4 @@
-import { Button, Separator } from "@/shared/ui";
+import { Button, Separator } from "@misty/ui";
 import type { Editor } from "@tiptap/react";
 import {
   AlignCenter,

@@ -9,7 +9,7 @@ import {
   spaceIcons,
   Text,
   type MenuIcon,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 import {
   AppWindow,

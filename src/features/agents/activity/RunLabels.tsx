@@ -1,4 +1,4 @@
-import { cn, Text, type TextTone } from "@/shared/ui";
+import { cn, Text, type TextTone } from "@misty/ui";
 import type { RunRow } from "./activityApi";
 
 const stateLabel: Record<RunRow["state"], string> = {

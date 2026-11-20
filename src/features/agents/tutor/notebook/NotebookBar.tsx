@@ -19,7 +19,7 @@ import {
   MenuSeparator,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { lookForNews, setFollow } from "../notebookFollow";
 import { useTutorStore } from "../tutorStore";
 import type { Notebook } from "../tutorTypes";

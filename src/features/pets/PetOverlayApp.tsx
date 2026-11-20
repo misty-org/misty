@@ -20,7 +20,7 @@ import {
   PET_SCALE_OPTIONS,
 } from "./petScale";
 import { petScaleEvent, petStateEvent, petsApi, type NativePetState } from "./petsApi";
-import { cn, OverflowFadeText, screenMarkClass, Surface } from "@/shared/ui";
+import { cn, OverflowFadeText, screenMarkClass, Surface } from "@misty/ui";
 // The pet's window draws with the app's own classes; its page stays transparent (pet.html), so
 // only the sprite and its bubble show over the desktop.
 import "@/styles/styles.css";

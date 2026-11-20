@@ -5,7 +5,7 @@ import {
   SkeletonControl,
   SkeletonDocument,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { StepsSkeleton } from "../activity/StepsSkeleton";
 import type { ContextPanelSurface } from "./contextPanelStore";
 import { canPreviewFile, opensInPreview } from "./editor/editorViewMode";

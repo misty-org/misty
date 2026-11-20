@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useId, useState, type KeyboardEvent } from "react";
-import { cn, Pressable, RailTick, Surface, Text } from "@/shared/ui";
+import { cn, Pressable, RailTick, Surface, Text } from "@misty/ui";
 import type { MessageAnchor } from "./timelineAnchors";
 
 type VisibleMessageAnchor = {

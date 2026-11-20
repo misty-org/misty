@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { GlobalAiMessage } from "../state/conversationTypes";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
-import { Button, OverflowFadeText, Separator, Text, Tooltip } from "@/shared/ui";
+import { Button, OverflowFadeText, Separator, Text, Tooltip } from "@misty/ui";
 import { AgentProgress } from "../../progress/AgentProgress";
 import { useMessageProgress } from "../../progress/useMessageProgress";
 import { visibleConversationContent } from "./conversationTurns";

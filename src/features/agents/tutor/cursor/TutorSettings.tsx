@@ -17,7 +17,7 @@ import {
   Text,
   useNotice,
   type CompanionTint,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { companionAvailable, setCompanionOn, useCompanionOn } from "./companionOn";
 import {
   companionSizeDefault,

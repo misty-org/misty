@@ -6,7 +6,7 @@ import type { SpaceConversation } from "../api/dto/conversation-types";
 import type { SpaceLibraryItem } from "../api/dto/entities";
 import type { ItemVisibility, VisibilityItemKind } from "../api/visibility";
 import { libraryItemMIME } from "../library";
-import { spaceMadeKind } from "@/shared/ui";
+import { spaceMadeKind } from "@misty/ui";
 import { conversationPath } from "../chat/chatRoute";
 
 /** One thing made in a Space, as the Space home shows it. */

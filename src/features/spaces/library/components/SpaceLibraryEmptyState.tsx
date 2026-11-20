@@ -1,4 +1,4 @@
-import { Button, EmptyState, Text } from "@/shared/ui";
+import { Button, EmptyState, Text } from "@misty/ui";
 import { Upload } from "lucide-react";
 
 export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {

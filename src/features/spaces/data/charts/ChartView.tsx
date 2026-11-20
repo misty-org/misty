@@ -18,7 +18,7 @@ import {
   YAxis,
 } from "recharts";
 import type { ReactElement } from "react";
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import type { ChartData } from "./chartData";
 
 /**

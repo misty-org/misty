@@ -9,7 +9,7 @@ import {
   Input,
   Skeleton,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { gitApi, gitErrorText } from "../../context-panel/git/gitApi";
 import { liveApi, liveErrorText } from "./liveApi";
 import { goLive } from "./liveSession";

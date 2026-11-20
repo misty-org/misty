@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CropRect } from "@/shared/ui";
+import type { CropRect } from "@misty/ui";
 import type { ImageEdit } from "./imageEdit";
 
 type StageProps = {

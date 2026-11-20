@@ -9,7 +9,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 import { MistyMarkdown } from "@/features/agents";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Dialog, DialogContent, DialogTitle, Text } from "@/shared/ui";
+import { Button, Dialog, DialogContent, DialogTitle, Text } from "@misty/ui";
 import { type ReleaseNotes, takeReleaseNotes } from "./releaseNotes";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });

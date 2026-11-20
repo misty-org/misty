@@ -18,6 +18,18 @@ export function mergeSpaceMessages(
 }
 
 /**
+ * A new reply in a thread adds to its root's count, if the root is in the list. The reply itself is
+ * not in the list: it lives in the thread's panel.
+ */
+export function withThreadReply(current: SpaceMessage[], reply: SpaceMessage): SpaceMessage[] {
+  return current.map((message) =>
+    message.id === reply.thread_root_id
+      ? { ...message, reply_count: (message.reply_count ?? 0) + 1, last_reply_at: reply.created_at }
+      : message,
+  );
+}
+
+/**
  * How far back a chat can still read: `more` while older pages may exist, `loading` while one is
  * read, `complete` once the first message is in.
  */

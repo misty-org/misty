@@ -48,6 +48,7 @@ pub(crate) mod job;
 pub mod kimi;
 mod kimi_acp;
 pub(crate) mod mcp;
+pub(crate) mod recall;
 pub mod minimax;
 mod minimax_acp;
 pub mod models;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Surface, Text } from "@/shared/ui";
+import { Button, Surface, Text } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { resumeExecutionAfterWait } from "../runs/jobs/executionHandoff";
 import { useLocalExecution } from "../runs/local-execution/localExecution";

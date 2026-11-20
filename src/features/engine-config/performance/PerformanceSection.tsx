@@ -8,7 +8,7 @@ import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Button, CodeBlock, Skeleton } from "@/shared/ui";
+import { Button, CodeBlock, Skeleton } from "@misty/ui";
 import { SwitchControl } from "../../settings/SettingsControls";
 import { exportPerformanceReport } from "./export";
 import { appVersion, performanceApi } from "./nativeApi";

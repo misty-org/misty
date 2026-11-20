@@ -8,7 +8,7 @@ import {
   SignInDialog,
   useCliUpdateFlow,
 } from "@/features/engine-config/clis";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import type { EngineSetupState, useEngineReadiness } from "./engineReadiness";
 
 /**

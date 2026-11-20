@@ -15,7 +15,7 @@
  */
 import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { skillsHubApi } from "./api";
 import { t } from "./strings";
 import { FeedbackLine, type Feedback } from "./components";

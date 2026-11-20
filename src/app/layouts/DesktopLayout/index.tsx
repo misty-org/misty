@@ -14,7 +14,7 @@ import { blockIfUnsaved } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { useWindowDockingLayout } from "@/features/app-windows";
 import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
-import { cn, Surface } from "@/shared/ui";
+import { cn, Surface } from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { isTopEdgeDragPress } from "./windowChromeDrag";

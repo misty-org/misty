@@ -1,6 +1,6 @@
 import { spacesApi } from "../../api/api";
 import type { SpaceInvitation } from "../../api/dto/entities";
-import { Button, Card, IconButton, OverflowFadeText, Text } from "@/shared/ui";
+import { Button, Card, IconButton, OverflowFadeText, Text } from "@misty/ui";
 import { Link2, XCircle } from "lucide-react";
 import { useState } from "react";
 

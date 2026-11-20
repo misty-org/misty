@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { aiSurfaceApi } from "../../runs/invocations/api";
 import type { AgentSubagent } from "../../runs/invocations/invocationTypes";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
 import { WorkGroup } from "../../progress/WorkGroup";
 

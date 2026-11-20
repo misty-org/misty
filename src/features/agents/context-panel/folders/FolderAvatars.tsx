@@ -2,7 +2,7 @@
 import { Folder } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { invoke } from "@/native/invoke";
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import { agentAccountId } from "../../personal/agentAccount";
 
 /**

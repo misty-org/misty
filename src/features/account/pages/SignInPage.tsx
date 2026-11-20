@@ -9,7 +9,7 @@ import {
   MenuItem,
   Spinner,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";

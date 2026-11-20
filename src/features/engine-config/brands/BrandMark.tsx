@@ -6,7 +6,7 @@
 // The marks belong to their owners and only name their products.
 import { Globe } from "lucide-react";
 import { createElement, useId, type ReactNode } from "react";
-import { LogoPlate, Text } from "@/shared/ui";
+import { LogoPlate, Text } from "@misty/ui";
 import shapes from "./brandMarks.json";
 
 type Shape = [string, Record<string, string>, Shape[]?];

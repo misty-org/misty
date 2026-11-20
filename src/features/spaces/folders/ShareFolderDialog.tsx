@@ -18,7 +18,7 @@ import {
   Text,
   Textarea,
   TreeRow,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { formatBytes } from "../library/libraryFormat";
 import { folderNative, type FolderScan } from "./folderNative";
 import { buildTree, toggledIgnore, visibleRows, type FolderNode } from "./folderTree";

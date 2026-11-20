@@ -36,7 +36,8 @@ if (process.argv[1] && basename(process.argv[1]) === "run-windows-desktop.ts") {
     // Windows cannot exec in place, so end the copy with this wrapper when
     // Tauri stops it for a native reload.
     const stop = () => {
-      if (child.pid) spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+      if (child.pid)
+        spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
     };
     process.on("SIGINT", stop);
     process.on("SIGTERM", stop);

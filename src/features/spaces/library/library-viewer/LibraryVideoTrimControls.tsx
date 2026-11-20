@@ -1,5 +1,5 @@
 import type { LibraryEditDefinition } from "../../api/dto/common";
-import { Button, Input, Text } from "@/shared/ui";
+import { Button, Input, Text } from "@misty/ui";
 import { Gauge } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { LibrarySelect } from "../SpaceLibraryPrimitives";

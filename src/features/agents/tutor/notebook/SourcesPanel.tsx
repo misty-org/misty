@@ -24,7 +24,7 @@ import {
   OverflowFadeText,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { jobTitle } from "../tutorPrompts";
 import { dismissJob, retryJob, startJob, unusableReply } from "../tutorRuns";
 import { researchPrompt } from "../tutorStudio";

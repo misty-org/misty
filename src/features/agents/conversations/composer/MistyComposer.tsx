@@ -13,7 +13,7 @@ import {
   Text,
   Tooltip,
   type ActionBarItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ImagePlus, Plus, ScanLine, X } from "lucide-react";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef } from "react";

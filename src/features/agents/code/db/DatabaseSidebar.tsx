@@ -11,8 +11,8 @@ import {
   SkeletonList,
   Text,
   TreeRow,
-} from "@/shared/ui";
-import { uiPx } from "@/shared/lib/uiScale";
+} from "@misty/ui";
+import { uiPx } from "@misty/ui";
 import { ConnectionDialog } from "./ConnectionDialog";
 import type { SavedConnection, SchemaTable } from "./dbApi";
 import { useDbStore, type SchemaState } from "./dbStore";

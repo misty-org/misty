@@ -1,4 +1,4 @@
-import { usePointerReorder } from "@/shared/hooks/usePointerReorder";
+import { usePointerReorder } from "@misty/ui";
 import {
   Button,
   IconButton,
@@ -9,7 +9,7 @@ import {
   Surface,
   Text,
   type PressableProps,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { SpaceTask, SpaceTaskStatus } from "./api";

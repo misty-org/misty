@@ -1,7 +1,7 @@
 import { FindAndReplacePluginKey } from "@tiptap/extension-find-and-replace";
 import { useEditorState, type Editor } from "@tiptap/react";
 import { useState, type KeyboardEvent } from "react";
-import { FindBar } from "@/shared/ui";
+import { FindBar } from "@misty/ui";
 
 /** Find and replace in a note, on the shared find bar docked under the note's toolbar: the same
  * bar as code, previews and chats, over Tiptap's find-and-replace extension. */

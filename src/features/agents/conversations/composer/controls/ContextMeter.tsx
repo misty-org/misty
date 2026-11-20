@@ -11,7 +11,7 @@ import {
   Surface,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { rememberContextWindow, resolveContextMax } from "../../view/meta/contextWindowMemory";
 import { formatTokens } from "../../view/meta/format";
 import { USAGE_PART_LABELS, usageBreakdown } from "../../view/meta/usageBreakdown";

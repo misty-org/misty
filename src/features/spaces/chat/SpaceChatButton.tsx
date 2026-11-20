@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { IconButton, IndicatorDot, spaceIcons } from "@/shared/ui";
+import { IconButton, IndicatorDot, spaceIcons } from "@misty/ui";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 import { spaceChatPath } from "./chatRoute";
 import { useSpaceConversationList, useSpaceEveryoneUnread } from "./spaceConversationsResource";

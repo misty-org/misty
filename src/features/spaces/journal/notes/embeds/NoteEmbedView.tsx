@@ -1,4 +1,4 @@
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from "@tiptap/react";
 import type { ItemVisibility } from "../../../api/visibility";
 import { LiveEmbed } from "../../../embeds/LiveEmbed";

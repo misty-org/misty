@@ -17,7 +17,7 @@ vi.mock("../sessions/useAccountStore", () => ({
 vi.mock("./useServerSwitch", () => ({ useServerSwitch: () => ({ moveTo: mocks.moveTo }) }));
 
 import { useServerChoice } from "@/api/deployment/serverChoice";
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { CloudScreen } from "./CloudScreen";
 import { useSetupLinkStore } from "./setupLinkStore";
 

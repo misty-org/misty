@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { EngineId } from "@/features/engine-config/channels";
 import { blocksAgent, useEngineReadiness } from "../engines/engineReadiness";
 import { EngineNextStep } from "../engines/EngineNextStep";

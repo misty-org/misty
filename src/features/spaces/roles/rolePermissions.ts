@@ -43,6 +43,11 @@ export const permissionGroups: { title: string; permissions: PermissionInfo[] }[
         label: "Manage connected apps",
         line: "The apps connected to the Space.",
       },
+      {
+        permission: "apps.manage",
+        label: "Manage apps",
+        line: "Install and remove the Space's apps.",
+      },
     ],
   },
   {

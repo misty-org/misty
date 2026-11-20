@@ -2,7 +2,7 @@ import "@/app/featureSeams";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DropdownMenu, DropdownMenuTrigger } from "@/shared/ui";
+import { DropdownMenu, DropdownMenuTrigger } from "@misty/ui";
 import { AccountMenu } from "./AccountMenu";
 import { useHelpDialog } from "./HelpDialog";
 

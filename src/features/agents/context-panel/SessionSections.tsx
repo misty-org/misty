@@ -25,7 +25,7 @@ import { useWorkspaceViewId } from "@/features/app-windows";
 import { readonlyReasonText, useMcpInventory } from "@/features/engine-config/mcp";
 import { useInstalledSkills } from "@/features/engine-config/skills";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Switch, Tooltip } from "@/shared/ui";
+import { Switch, Tooltip } from "@misty/ui";
 import { formatTokens, tookText } from "../conversations/view/meta/format";
 import { openAgentsHub } from "../hub/agentsHubStore";
 import { useMistyStore } from "../conversations/state/useMistyStore";

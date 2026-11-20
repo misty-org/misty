@@ -1,4 +1,4 @@
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import type { MarkStyle } from "./editorTypes";
 import { MarkStyleControls } from "./MarkStyleControls";
 import { PhotoPanelView } from "./PhotoPanelView";

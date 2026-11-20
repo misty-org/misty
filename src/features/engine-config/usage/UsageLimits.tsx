@@ -2,7 +2,7 @@
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { refreshCachedResource, useCachedResource } from "@/api/cache/cached-resource";
 import { EngineMark } from "../EngineMark";
-import { Button, cn, Progress, Skeleton, SkeletonControl, Text } from "@/shared/ui";
+import { Button, cn, Progress, Skeleton, SkeletonControl, Text } from "@misty/ui";
 import { useCallback, useState } from "react";
 import { type ProviderLimits } from "./usageApi";
 import { engineName, formatReset, limitsStatusText, windowName } from "./usageFormat";

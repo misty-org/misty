@@ -7,7 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   MenuItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { UserPlus } from "lucide-react";
 import { useEffect } from "react";
 

@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
   Input,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import {
   accountDeletionError,

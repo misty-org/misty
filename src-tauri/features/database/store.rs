@@ -850,6 +850,125 @@ const MIGRATIONS: &[&str] = &[
      ) WITHOUT ROWID;
      CREATE INDEX agent_browser_log_call ON agent_browser_log(run_id, call_id);
      CREATE INDEX agent_browser_log_account ON agent_browser_log(account, at);",
+    // 42: an agent is one long thread now, so the scratch chats made before it go, once, as the
+    // person asked: each chat, its notebook, composer choices and collaboration, its engine session
+    // and its folder record. Kept: chats in a project (Code's), the studio's, lessons' and Tutor's.
+    "CREATE TEMP TABLE scratch_chats AS
+         SELECT c.account AS account, c.id AS id FROM agent_chats c
+         WHERE c.kind = 'conversation'
+           AND COALESCE(json_extract(c.document, '$.place'), '') <> 'studio'
+           AND NOT EXISTS (SELECT 1 FROM agent_chats l
+                           WHERE l.account = c.account AND l.kind = 'lesson' AND l.id = c.id)
+           AND NOT EXISTS (SELECT 1 FROM agent_chats t
+                           WHERE t.account = c.account
+                             AND t.kind IN ('tutor_notebook', 'tutor_job')
+                             AND instr(t.document, c.id) > 0)
+           AND NOT EXISTS (SELECT 1 FROM chat_folders f
+                           WHERE f.account = c.account AND f.conversation_id = c.id
+                             AND f.kind = 'project');
+     DELETE FROM engine_sessions
+         WHERE EXISTS (SELECT 1 FROM scratch_chats s
+                       WHERE s.account = engine_sessions.account
+                         AND s.id = engine_sessions.conversation_id);
+     DELETE FROM chat_folders
+         WHERE EXISTS (SELECT 1 FROM scratch_chats s
+                       WHERE s.account = chat_folders.account
+                         AND s.id = chat_folders.conversation_id);
+     DELETE FROM agent_chats
+         WHERE kind IN ('collaboration', 'composer')
+           AND EXISTS (SELECT 1 FROM scratch_chats s
+                       WHERE s.account = agent_chats.account AND s.id = agent_chats.id);
+     DELETE FROM agent_chats
+         WHERE kind = 'notebook'
+           AND EXISTS (SELECT 1 FROM scratch_chats s
+                       WHERE s.account = agent_chats.account
+                         AND 'conversation:' || s.id = agent_chats.id);
+     DELETE FROM agent_chats
+         WHERE kind = 'conversation'
+           AND EXISTS (SELECT 1 FROM scratch_chats s
+                       WHERE s.account = agent_chats.account AND s.id = agent_chats.id);
+     DROP TABLE scratch_chats;",
+    // 43: what an agent recalls from its chats (engines/recall.rs): every finished message of a chat
+    // as text in an FTS5 table (trigram, so a typo still shares most of its pieces with the word),
+    // kept up to date as chats are saved. `chat_recall_seen` says which messages are in it, so a
+    // save adds only the new ones. Rebuilt from the chats, so never synced.
+    "CREATE VIRTUAL TABLE chat_recall USING fts5(
+         text, account UNINDEXED, agent_id UNINDEXED, conversation UNINDEXED,
+         role UNINDEXED, at UNINDEXED, tokenize = 'trigram'
+     );
+     CREATE TABLE chat_recall_seen (
+         account TEXT NOT NULL,
+         conversation TEXT NOT NULL,
+         message TEXT NOT NULL,
+         PRIMARY KEY (account, conversation, message)
+     ) WITHOUT ROWID;
+     INSERT INTO chat_recall (text, account, agent_id, conversation, role, at)
+         SELECT json_extract(m.value, '$.content'), c.account,
+                COALESCE(json_extract(c.document, '$.agentId'), ''), c.id,
+                COALESCE(json_extract(m.value, '$.role'), ''),
+                COALESCE(json_extract(m.value, '$.createdAt'), '')
+         FROM agent_chats c, json_each(c.document, '$.messages') m
+         WHERE c.kind = 'conversation'
+           AND COALESCE(json_extract(m.value, '$.state'), 'completed') = 'completed'
+           AND trim(COALESCE(json_extract(m.value, '$.content'), '')) <> '';
+     INSERT OR IGNORE INTO chat_recall_seen (account, conversation, message)
+         SELECT c.account, c.id, json_extract(m.value, '$.id')
+         FROM agent_chats c, json_each(c.document, '$.messages') m
+         WHERE c.kind = 'conversation'
+           AND COALESCE(json_extract(m.value, '$.state'), 'completed') = 'completed'
+           AND trim(COALESCE(json_extract(m.value, '$.content'), '')) <> ''
+           AND json_extract(m.value, '$.id') IS NOT NULL;",
+    // 44: agent chat documents keep metadata only. Each message is its own row, so a long-running
+    // direct thread can be read and saved in bounded windows. Recall tracks the message row it
+    // indexes so an edited or removed message can be replaced in the same transaction.
+    "CREATE TABLE agent_chat_messages (
+         account TEXT NOT NULL,
+         conversation TEXT NOT NULL,
+         seq INTEGER NOT NULL,
+         id TEXT NOT NULL,
+         document TEXT NOT NULL,
+         PRIMARY KEY (account, conversation, seq),
+         UNIQUE (account, conversation, id)
+     ) WITHOUT ROWID;
+     CREATE INDEX agent_chat_messages_window
+         ON agent_chat_messages (account, conversation, seq DESC);
+     INSERT OR IGNORE INTO agent_chat_messages (account, conversation, seq, id, document)
+         SELECT c.account, c.id, CAST(m.key AS INTEGER), json_extract(m.value, '$.id'), m.value
+         FROM agent_chats c, json_each(c.document, '$.messages') m
+         WHERE c.kind = 'conversation' AND json_extract(m.value, '$.id') IS NOT NULL;
+     UPDATE agent_chats SET document = json_remove(document, '$.messages')
+         WHERE kind = 'conversation';
+     DROP TABLE chat_recall;
+     DROP TABLE chat_recall_seen;
+     CREATE VIRTUAL TABLE chat_recall USING fts5(
+         text, account UNINDEXED, agent_id UNINDEXED, conversation UNINDEXED,
+         role UNINDEXED, at UNINDEXED, message UNINDEXED, tokenize = 'trigram'
+     );
+     CREATE TABLE chat_recall_seen (
+         account TEXT NOT NULL,
+         conversation TEXT NOT NULL,
+         message TEXT NOT NULL,
+         recall_rowid INTEGER NOT NULL,
+         PRIMARY KEY (account, conversation, message)
+     ) WITHOUT ROWID;
+     CREATE TEMP TABLE chat_recall_seed AS
+         SELECT ROW_NUMBER() OVER (ORDER BY c.account, c.id, m.seq) AS recall_rowid,
+                m.document AS document, c.account AS account, c.id AS conversation,
+                COALESCE(json_extract(c.document, '$.agentId'), '') AS agent_id
+         FROM agent_chat_messages m JOIN agent_chats c
+           ON c.account = m.account AND c.id = m.conversation AND c.kind = 'conversation'
+         WHERE COALESCE(json_extract(m.document, '$.state'), 'completed') = 'completed'
+           AND trim(COALESCE(json_extract(m.document, '$.content'), '')) <> '';
+     INSERT INTO chat_recall (rowid, text, account, agent_id, conversation, role, at, message)
+         SELECT recall_rowid, json_extract(document, '$.content'), account, agent_id, conversation,
+                COALESCE(json_extract(document, '$.role'), ''),
+                COALESCE(json_extract(document, '$.createdAt'), ''),
+                COALESCE(json_extract(document, '$.id'), '')
+         FROM chat_recall_seed;
+     INSERT INTO chat_recall_seen (account, conversation, message, recall_rowid)
+         SELECT account, conversation, json_extract(document, '$.id'), recall_rowid
+         FROM chat_recall_seed;
+     DROP TABLE chat_recall_seed;",
 ];
 
 #[derive(Debug, Clone)]

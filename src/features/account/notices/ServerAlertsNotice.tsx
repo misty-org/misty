@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { accountApi, AccountApiError } from "../api/api";
 import type { ServerAlert } from "../api/accountTypes";
-import { useNotice } from "@/shared/ui";
+import { useNotice } from "@misty/ui";
 import { useAuth } from "../sessions/authState";
 
 const refreshEvery = 5 * 60 * 1000;

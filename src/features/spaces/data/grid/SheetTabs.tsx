@@ -6,7 +6,7 @@ import {
   MenuSeparator,
   TabStrip,
   type TabStripTab,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 export type WorkbookMode = "sheet" | "charts" | "dashboard";
 

@@ -1,4 +1,4 @@
-import { Text, Tooltip } from "@/shared/ui";
+import { Text, Tooltip } from "@misty/ui";
 import { PersonAvatar } from "../../tutor/notebook/LivePeople";
 import { personTone } from "../../tutor/personTone";
 import { useRoomView } from "./livePeople";

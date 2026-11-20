@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { NoticeViewport, resetNotices } from "@/shared/ui";
+import { NoticeViewport, resetNotices } from "@misty/ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({

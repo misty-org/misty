@@ -1,4 +1,5 @@
 import { invoke } from "@/native/invoke";
+import { notify } from "@misty/ui";
 import { pickSaveFile } from "@/native/sandbox";
 import { engineModels, modelNamed } from "../../../engines/enginesApi";
 import { engineModesFor } from "../../../engines/engineModes";
@@ -35,6 +36,10 @@ export {
 
 const replies = (messages: GlobalAiMessage[]) =>
   messages.filter((message) => message.role === "assistant" && message.content.trim());
+
+/** What the agent is asked just before `/clear` drops its context. */
+const saveMemoryPrompt =
+  "I'm about to clear your context. Before I do, save anything worth keeping to your memory, using your own memory system: what you learned about me, decisions we made, preferences, and work still in progress. Update notes that already exist instead of adding duplicates. Reply with just \"Saved.\" when you're done.";
 
 const tokens = (count: number) => count.toLocaleString();
 
@@ -91,28 +96,25 @@ function contextSections(messages: GlobalAiMessage[]): CommandSection[] {
 export const mistyCommands: readonly MistyCommand[] = [
   ...goalCommands,
   {
-    name: "new",
-    description: "Start a new chat with this agent",
-    on: "all",
-    wins: "always",
-    run: (_args, scope) => {
-      scope.newChat?.();
-      return null;
-    },
-  },
-  {
     name: "clear",
     aliases: ["reset"],
-    description: "Start the engine's next turn in a new session",
+    description: "Save what's worth remembering, then clear the agent's context",
     on: "outside",
     wins: "always",
     run: async (_args, scope) => {
-      if (!scope.conversationId) return null;
-      await invoke("engine_chat_clear", {
-        account: agentAccountId(),
-        conversation: scope.conversationId,
-      });
-      return done("The next message starts a new session");
+      const conversation = scope.conversationId;
+      if (!conversation) return null;
+      const clear = async () => {
+        await invoke("engine_chat_clear", { account: agentAccountId(), conversation });
+        notify({ message: "Context cleared" });
+      };
+      // Nothing was said yet, or a turn is still running: there is nothing to save, so clear now.
+      if (scope.working || !replies(scope.messages).length) {
+        await clear();
+        return null;
+      }
+      // The agent saves to its own memory first, in the context it is about to lose.
+      return { send: saveMemoryPrompt, after: clear };
     },
   },
   {

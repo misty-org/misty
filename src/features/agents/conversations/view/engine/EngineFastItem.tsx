@@ -1,7 +1,7 @@
 import { Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { invoke } from "@/native/invoke";
-import { MenuCheckItem, MenuSeparator } from "@/shared/ui";
+import { MenuCheckItem, MenuSeparator } from "@misty/ui";
 import type { EngineModel } from "../../../engines/enginesApi";
 
 /** This device's engine settings, as native code keeps them in misty.db. */

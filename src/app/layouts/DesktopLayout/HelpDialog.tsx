@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { SupportRecoverySection } from "@/features/support";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/shared/ui";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@misty/ui";
 
 /** Whether Help is open. The account menu opens it; the dialog lives beside the shell. */
 export const useHelpDialog = create<{ open: boolean; setOpen: (open: boolean) => void }>((set) => ({

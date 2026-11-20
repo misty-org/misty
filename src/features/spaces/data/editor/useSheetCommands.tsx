@@ -1,5 +1,5 @@
 import type * as Y from "yjs";
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import type { WorkbookEngine } from "../formula/engine";
 import { chartFromSelection, runOps, setColumnWidth, sortRows } from "../grid/gridEdits";
 import { cellSelection } from "../grid/selection";

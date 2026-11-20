@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, Pencil, Trash2 } from "lucide-react";
-import { MenuItem, RenameItemDialog, useConfirmDelete } from "@/shared/ui";
+import { MenuItem, RenameItemDialog, useConfirmDelete } from "@misty/ui";
 import { notifyDrawingListChanged, closeDrawingCollaborationSession } from "../journal";
 import { closeDeckCollaborationSession } from "../slides/session";
 import { closeWorkbookCollaborationSession } from "../data/session";

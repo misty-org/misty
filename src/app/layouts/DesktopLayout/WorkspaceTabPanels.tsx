@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import { layoutTabs, tabLabel } from "@/features/app-windows";
 import type { WorkspaceLayout, WorkspaceTab } from "@/features/app-windows";
 import { useMistyPanelSide } from "@/features/agents";
-import { cn, PaneFrame } from "@/shared/ui";
+import { cn, PaneFrame } from "@misty/ui";
 import { WorkspaceMistyDock } from "./WorkspaceMistyDock";
 import { treeKeepsLayoutWhileHidden } from "./keptTabs";
 

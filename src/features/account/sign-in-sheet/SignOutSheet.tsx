@@ -8,7 +8,7 @@ import {
   DialogDescription,
   DialogTitle,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { useAuth } from "../AuthContext";

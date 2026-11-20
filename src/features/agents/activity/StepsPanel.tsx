@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCachedResource } from "@/api/cache/cached-resource";
-import { Button, cn, ErrorState, Pressable, Text, rowShapeWrap } from "@/shared/ui";
+import { Button, cn, ErrorState, Pressable, Text, rowShapeWrap } from "@misty/ui";
 import { useChatFolder } from "../shared-folders/chatFolder";
 import { activityApi, type RunRow } from "./activityApi";
 import { RunSteps, RunStepsEmpty } from "./RunSteps";

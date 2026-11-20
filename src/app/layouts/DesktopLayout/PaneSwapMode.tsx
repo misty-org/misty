@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { dockLeaves, useWorkspaceStore, type WorkspacePane } from "@/features/app-windows";
 import { liftPanePresentation } from "@/features/app-windows";
-import { usePointerDrag } from "@/shared/hooks/usePointerReorder";
+import { usePointerDrag } from "@misty/ui";
 import { paneViewLabel } from "@/features/app-windows";
 import { usePaneSwapMode, type PaneSwapDirection } from "@/features/app-windows";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { cn, Portal, Surface } from "@/shared/ui";
+import { cn, Portal, Surface } from "@misty/ui";
 
 const arrowDirections: Record<string, PaneSwapDirection> = {
   ArrowLeft: "left",

@@ -30,7 +30,7 @@ import {
   useNotice,
   rowShapeWrap,
   cn,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { BranchInfo } from "./gitApi";
 import { useGitStore } from "./store";
 

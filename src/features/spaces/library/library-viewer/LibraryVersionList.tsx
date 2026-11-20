@@ -1,6 +1,6 @@
 import type { LibraryEditVersion } from "../../api/dto/entities";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
-import { Button, IconButton, Pressable, Surface, Text } from "@/shared/ui";
+import { Button, IconButton, Pressable, Surface, Text } from "@misty/ui";
 import { Trash2 } from "lucide-react";
 import { formatTime } from "../libraryFormat";
 import { libraryRenditionStatus } from "../SpaceLibraryViewerUtils";

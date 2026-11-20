@@ -1,4 +1,4 @@
-import { modelInk, screenMarkClass, sketchInk } from "@/shared/ui";
+import { modelInk, screenMarkClass, sketchInk } from "@misty/ui";
 import type { SketchElement, Vector3 } from "./companionSketch";
 import type * as ThreeModule from "three";
 import type { OrbitControls as OrbitControlsType } from "three/addons/controls/OrbitControls.js";

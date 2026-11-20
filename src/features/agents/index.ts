@@ -10,9 +10,16 @@ export { useMistyPanelSide } from "./panel/mistyPanelSide";
 export { useMistyPanelStore, type MistyPanelView } from "./panel/mistyPanelStore";
 
 export { defaultAgentOf, usePersonalAgentsStore } from "./personal/personalAgentsStore";
-export { agentsHubSections, openAgentsHub, type AgentsHubPage } from "./hub/agentsHubStore";
+export {
+  agentsHubSections,
+  openAgentsHub,
+  openAgentsPage,
+  openAgentsPageEvent,
+  type AgentsHubPage,
+} from "./hub/agentsHubStore";
 export { HubAgentsPage } from "./hub/HubAgentsPage";
 export { EngineMarketplace, showSkillCatalog } from "./marketplace/EngineMarketplace";
+export { ExplorePage, type MarketTab } from "./marketplace/ExplorePage";
 
 export type { AppRequest } from "./connected-apps/api";
 export { appsApi } from "./connected-apps/api";
@@ -171,3 +178,11 @@ export {
   revertVideoTurn,
   useMediaAgent,
 } from "./video/VideoAgentPanel";
+
+// Tools that come and go while Misty runs, such as the ones an app's MCP server offers.
+export {
+  LocalToolRejected,
+  registerLocalTools,
+  unregisterLocalTools,
+  type LocalToolHandler,
+} from "./tools/host";

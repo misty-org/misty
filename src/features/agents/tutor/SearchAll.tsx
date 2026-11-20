@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FileText, StickyNote } from "lucide-react";
-import { Pressable, SearchField, Skeleton, OverflowFadeText, Surface, Text } from "@/shared/ui";
+import { Pressable, SearchField, Skeleton, OverflowFadeText, Surface, Text } from "@misty/ui";
 import type { TutorActions } from "./TutorPage";
 import { searchNotebooks, type SearchHit } from "./tutorSearch";
 import { useTutorStore } from "./tutorStore";

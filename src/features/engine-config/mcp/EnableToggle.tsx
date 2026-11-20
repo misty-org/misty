@@ -6,7 +6,7 @@
  * read-only source still shows its real state, dimmed and not clickable, with the reason on hover.
  */
 import { Power, PowerOff } from "lucide-react";
-import { cn, IconButton } from "@/shared/ui";
+import { cn, IconButton } from "@misty/ui";
 import { copy, readonlyReasonText } from "./copy";
 import type { McpConfigEntry } from "./types";
 

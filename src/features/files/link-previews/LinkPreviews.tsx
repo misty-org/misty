@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { Pressable, Skeleton, Surface, Text, Tooltip } from "@/shared/ui";
+import { Pressable, Skeleton, Surface, Text, Tooltip } from "@misty/ui";
 import { knownLinkPreview, loadLinkPreview, type LinkPreview } from "./api";
 import { extractLinks } from "./links";
 import { useLinkPreviewSetting } from "./settings";

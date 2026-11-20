@@ -98,7 +98,9 @@ export function workspaceOpenActions(
           .filter(
             (tab) =>
               !tab.placeholder &&
-              (spaceId
+              (request.groupKey.startsWith("app:")
+                ? tab.groupKey === request.groupKey
+                : spaceId
                 ? tab.surfaceId === "space" && tab.groupKey.split(":")[1] === spaceId
                 : tab.groupKey === request.groupKey),
           )

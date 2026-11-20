@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   FieldError,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { errorText } from "./dbApi";
 import { rowKey, useDbStore, type DbTab } from "./dbStore";
 import { updateStatement } from "./sqlText";

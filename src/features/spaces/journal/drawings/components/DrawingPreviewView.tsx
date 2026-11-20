@@ -7,7 +7,7 @@ import {
   useNotice,
   SetupState,
   Surface,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { ExcalidrawElement, NonDeleted } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
 import { ClipboardCopy, FileCode, FileImage, ImageDown } from "lucide-react";

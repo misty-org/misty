@@ -29,11 +29,20 @@ export function groupConversations(conversations: SpaceConversation[]): Conversa
     },
   ];
 }
-/** A conversation is titled by its name; a DM by the other people in it. */
+/** A direct message with more than one other member, people or agents: it lists with the one-to-one ones. */
+export function isGroupDirectMessage(conversation: SpaceConversation, currentUserId?: string) {
+  return (
+    conversation.kind === "dm" &&
+    conversation.participants.filter((p) => p.kind === "person" && p.user_id !== currentUserId)
+      .length > 1
+  );
+}
+
+/** A conversation is titled by its name; a DM by the other members in it, agents included. */
 export function conversationName(conversation: SpaceConversation, currentUserId?: string) {
   if (conversation.kind === "dm") {
     const others = conversation.participants.filter(
-      (p) => p.user_id && p.user_id !== currentUserId,
+      (p) => (p.user_id || p.agent_id) && p.user_id !== currentUserId,
     );
     const names = others.flatMap((p) => (p.name ? [p.name] : []));
     if (names.length) return names.join(", ");

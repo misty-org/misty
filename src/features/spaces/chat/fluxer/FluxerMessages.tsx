@@ -27,7 +27,7 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import { useNotice } from "@/shared/ui";
+import { useNotice } from "@misty/ui";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { AgentMark } from "@/features/agents";
 import { LinkPreviews } from "@/features/files";
@@ -44,7 +44,6 @@ import {
   isAgentAuthoredMessage,
   messageReplyPreviewText,
   spansToText,
-  threadRootOf,
 } from "../components/messageText";
 import { useChatSidePanel } from "../chatSidePanelStore";
 import { useSpaceRolesStore } from "../../roles/useSpaceRoles";
@@ -120,15 +119,6 @@ export function FluxerMessages(props: SpaceChatMessagesProps) {
     () => new Map(props.messages.map((message) => [message.id, message])),
     [props.messages],
   );
-  const replyCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const message of props.messages) {
-      if (!message.reply_to_message_id) continue;
-      const root = threadRootOf(message, byId);
-      if (root !== message.id) counts.set(root, (counts.get(root) ?? 0) + 1);
-    }
-    return counts;
-  }, [props.messages, byId]);
   const rowProps = useStableRowProps(props);
   const avatarFor = (message: SpaceMessage) =>
     message.origin?.author_avatar_url || avatars.get(message.sender_user_id) || "";
@@ -190,7 +180,7 @@ export function FluxerMessages(props: SpaceChatMessagesProps) {
         avatarUrl={avatarFor(message)}
         replied={replied}
         repliedAvatarUrl={replied ? avatarFor(replied) : ""}
-        replyCount={replyCounts.get(message.id) ?? 0}
+        replyCount={message.reply_count ?? 0}
         props={rowProps}
       />,
     );
@@ -410,11 +400,11 @@ function MessageRowView({
       ...(props.canWrite
         ? [{ label: "Reply", icon: Reply, onSelect: () => props.onReply(message.id) }]
         : []),
-      ...(message.reply_to_message_id
+      ...(message.local_delivery_state
         ? []
         : [
             {
-              label: "Create thread",
+              label: message.reply_count ? "Open thread" : "Create thread",
               icon: MessagesSquare,
               onSelect: () => useChatSidePanel.getState().openThread(message.id),
             },
@@ -632,7 +622,7 @@ function MessageRowView({
           canWrite={props.canWrite}
           canEdit={canEdit}
           canDelete={canDelete}
-          threadable={!message.reply_to_message_id}
+          threadable={!message.local_delivery_state}
           reacted={(emoji) =>
             message.reactions?.some(
               (reaction) => reaction.emoji === emoji && reaction.reacted_by_me,

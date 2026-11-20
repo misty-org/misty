@@ -17,7 +17,7 @@ import { setBrowserWebviewsSuspended, useLayoutEditor } from "@/features/app-win
 import { useMistyPanelStore } from "@/features/agents";
 import { openSettings, useAppThemeStore, useSettingsStore } from "@/features/settings";
 import { appZoomDefault, setAppZoom, useAppZoomValue } from "@/shared/hooks/useAppZoom";
-import { Button, IconButton, Tooltip } from "@/shared/ui";
+import { Button, IconButton, Tooltip } from "@misty/ui";
 import { useBottomBarOpen as useOpen } from "./bottomBarOpenContext";
 import { useHelpDialog } from "./HelpDialog";
 import { useSearchDialog } from "./search/searchStore";

@@ -5,7 +5,7 @@ import {
   useDevicePreferences,
   useSettingsStore,
 } from "@/features/settings";
-import { EmptyState } from "@/shared/ui";
+import { EmptyState } from "@misty/ui";
 import { DropdownControl } from "../../settings/SettingsControls";
 import { openAgentsHub } from "../hub/agentsHubStore";
 import { setDefaultEngine, useDefaultEngine } from "./defaultEngine";

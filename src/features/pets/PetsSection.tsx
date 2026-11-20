@@ -8,7 +8,7 @@ import {
 } from "@/features/settings";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn, ErrorState, Skeleton, SkeletonControl, useNotice } from "@/shared/ui";
+import { Button, cn, ErrorState, Skeleton, SkeletonControl, useNotice } from "@misty/ui";
 import { DropdownControl, SwitchControl } from "../settings/SettingsControls";
 import type { PetSummary } from "./petAtlas";
 import { normalizePetScale, PET_SCALE_OPTIONS } from "./petScale";

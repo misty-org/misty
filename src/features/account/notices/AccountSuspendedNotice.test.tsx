@@ -11,7 +11,7 @@ const db = await vi.hoisted(async () =>
 
 vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
 vi.mock("../sessions/authState", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
-vi.mock("@/shared/ui", () => ({
+vi.mock("@misty/ui", () => ({
   // Records what is held up on each render, as the notice stack would show it.
   useNotice: (show: boolean, options: Held) => {
     if (show) notices.shown.push(options);

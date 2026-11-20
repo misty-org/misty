@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 
-const script = readFileSync(new URL("../src-tauri/features/browser/kiri_link/scripts/background.js", import.meta.url), "utf8");
+const script = readFileSync(
+  new URL("../src-tauri/features/browser/kiri_link/scripts/background.js", import.meta.url),
+  "utf8",
+);
 test("native background reporting coalesces changes and sends only changed colors", () => {
   const reports: string[] = [];
   const timers = new Map<number, () => void>();
@@ -12,18 +15,29 @@ test("native background reporting coalesces changes and sends only changed color
   let pixels = [32, 33, 36, 255];
   const painted: string[] = [];
   const context = {
-    fillStyle: "", globalAlpha: 1,
-    fillRect() { painted.push(this.fillStyle); },
+    fillStyle: "",
+    globalAlpha: 1,
+    fillRect() {
+      painted.push(this.fillStyle);
+    },
     getImageData: () => ({ data: new Uint8ClampedArray(pixels) }),
   };
   const window: Record<string, unknown> = {
-    webkit: { messageHandlers: { kiriHost: { postMessage: (value: string) => reports.push(value) } } },
+    webkit: {
+      messageHandlers: { kiriHost: { postMessage: (value: string) => reports.push(value) } },
+    },
   };
   window.top = window;
   runInNewContext(script, {
     // The viewport script supplies the token and its captured native channel.
-    window, shortcutToken: "test-token", innerWidth: 1000, innerHeight: 700,
-    sendToHost: (message: string) => { reports.push(message); return true; },
+    window,
+    shortcutToken: "test-token",
+    innerWidth: 1000,
+    innerHeight: 700,
+    sendToHost: (message: string) => {
+      reports.push(message);
+      return true;
+    },
     document: {
       body: {},
       createElement: () => ({ getContext: () => context }),
@@ -31,25 +45,36 @@ test("native background reporting coalesces changes and sends only changed color
     },
     getComputedStyle: () => ({ backgroundColor: "rgb(32, 33, 36)" }),
     MutationObserver: class {
-      constructor(callback: () => void) { mutate = callback; }
+      constructor(callback: () => void) {
+        mutate = callback;
+      }
       observe() {}
     },
     addEventListener() {},
     matchMedia: () => ({ addEventListener() {} }),
-    setTimeout: (callback: () => void) => { timers.set(++sequence, callback); return sequence; },
+    setTimeout: (callback: () => void) => {
+      timers.set(++sequence, callback);
+      return sequence;
+    },
     clearTimeout: (id: number) => timers.delete(id),
   });
-  const flush = () => { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(callback => callback()); };
+  const flush = () => {
+    const callbacks = [...timers.values()];
+    timers.clear();
+    callbacks.forEach((callback) => callback());
+  };
   for (let i = 0; i < 100; i++) mutate();
   assert.equal(timers.size, 1);
   assert.equal(reports.length, 0);
   flush();
   assert.deepEqual(JSON.parse(reports[0]), { token: "test-token", background: "#202124" });
   assert.deepEqual(painted, ["#ffffff", "rgb(32, 33, 36)"]);
-  mutate(); flush();
+  mutate();
+  flush();
   assert.equal(reports.length, 1);
   pixels = [255, 255, 255, 255];
-  mutate(); flush();
+  mutate();
+  flush();
   assert.equal(JSON.parse(reports[1]).background, "#ffffff");
 });
 test("subframes cannot report the containing page's background", () => {

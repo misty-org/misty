@@ -1,4 +1,4 @@
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext";

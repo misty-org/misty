@@ -3,6 +3,7 @@ pub mod account;
 pub mod agent_catalog;
 pub mod agents;
 mod app;
+pub mod apps;
 pub mod bots;
 #[cfg(desktop)]
 pub mod browser;

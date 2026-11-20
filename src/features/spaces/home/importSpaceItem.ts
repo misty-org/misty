@@ -1,4 +1,4 @@
-import { spaceMadeKind } from "@/shared/ui";
+import { spaceMadeKind } from "@misty/ui";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 
 /** The made kinds a file can become, and the files each takes. */

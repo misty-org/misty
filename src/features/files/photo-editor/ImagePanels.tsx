@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Field, FieldError, Input, OptionSelect, Switch, Text } from "@/shared/ui";
+import { Button, Field, FieldError, Input, OptionSelect, Switch, Text } from "@misty/ui";
 import { croppedSize, maxSide, outputSize, type ImageEdit, type Resize } from "./imageEdit";
 import { defaultQuality, imageFormats, type ImageMimeType, type SaveFormat } from "./imageRender";
 import { PanelSection, PanelSlider, PhotoPanelView } from "./PhotoPanelView";

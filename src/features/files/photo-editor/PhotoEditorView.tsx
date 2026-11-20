@@ -1,5 +1,5 @@
 import type { PreviewErrorComponent } from "../preview/previewTypes";
-import { IconButton, Skeleton, TopBar } from "@/shared/ui";
+import { IconButton, Skeleton, TopBar } from "@misty/ui";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { PhotoEditorProps } from "./editorTypes";

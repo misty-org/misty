@@ -1,12 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AgentConversationFolder } from "../../api/conversation-folders";
-import type { GlobalAiConversation } from "./conversationTypes";
+import type { GlobalAiConversation, GlobalAiMessage } from "./conversationTypes";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
 /**
- * Agent chats live on this device, as Claude Code's and Codex's do: each conversation, with its
- * messages and timelines, is one document in misty.db, and so is each folder. Each turn's run reads the
- * history kept here.
+ * Agent chats live on this device. Conversation metadata and each message are separate rows in
+ * misty.db, so long-running agent threads load and save a bounded window at a time.
  */
 
 type Kind =
@@ -64,9 +63,34 @@ export const localDocuments = {
 
 /** Conversation objects known to match what is saved, so loading them writes nothing. */
 const stored = new WeakSet<GlobalAiConversation>();
+const storedMessageDocuments = new Map<string, Map<string, string>>();
 
-export function markStoredChats(conversations: GlobalAiConversation[]): void {
-  for (const conversation of conversations) stored.add(conversation);
+function chatKey(account: string, conversation: string) {
+  return `${account}\0${conversation}`;
+}
+
+function storableMessage(message: GlobalAiMessage): GlobalAiMessage {
+  const { activity: _activity, ...storedMessage } = message;
+  return storedMessage;
+}
+
+function messageDocuments(conversation: GlobalAiConversation): Map<string, string> {
+  return new Map(
+    conversation.messages.map((message) => [
+      message.id,
+      JSON.stringify(storableMessage(message)),
+    ]),
+  );
+}
+
+export function markStoredChats(
+  conversations: GlobalAiConversation[],
+  account?: string,
+): void {
+  for (const conversation of conversations) {
+    stored.add(conversation);
+    if (account) storedMessageDocuments.set(chatKey(account, conversation.id), messageDocuments(conversation));
+  }
 }
 
 export function isStoredChat(conversation: GlobalAiConversation): boolean {
@@ -75,19 +99,105 @@ export function isStoredChat(conversation: GlobalAiConversation): boolean {
 
 /** Turn state that only means something while this app is open. */
 function storable(conversation: GlobalAiConversation): GlobalAiConversation {
-  return {
-    ...conversation,
-    messages: conversation.messages.map(({ activity: _activity, ...message }) => message),
-  };
+  const {
+    messages: _messages,
+    messageBeforeSeq: _messageBeforeSeq,
+    hasOlderMessages: _hasOlderMessages,
+    ...metadata
+  } = conversation;
+  return metadata as GlobalAiConversation;
+}
+
+export interface LocalChatMessagePage {
+  messages: GlobalAiMessage[];
+  beforeSeq?: number;
+  hasOlder: boolean;
+}
+
+const messagePageSize = 50;
+
+async function saveConversation(
+  account: string,
+  conversation: GlobalAiConversation,
+  changedMessages: GlobalAiMessage[] = conversation.messages,
+  deletedMessages: string[] = [],
+): Promise<void> {
+  if (!hasTauriInternals() || !account) return;
+  await put(account, "conversation", conversation.id, storable(conversation));
+  if (changedMessages.length || deletedMessages.length) {
+    await invoke("agent_chats_messages_upsert", {
+      account,
+      conversation: conversation.id,
+      messages: changedMessages.map((message) => JSON.stringify(storableMessage(message))),
+      deleted: deletedMessages,
+    });
+  }
+  storedMessageDocuments.set(chatKey(account, conversation.id), messageDocuments(conversation));
+  stored.add(conversation);
+}
+
+async function saveChangedConversation(
+  account: string,
+  conversation: GlobalAiConversation,
+): Promise<void> {
+  const key = chatKey(account, conversation.id);
+  const known = storedMessageDocuments.get(key) ?? new Map<string, string>();
+  const current = messageDocuments(conversation);
+  const changedMessages = conversation.messages.filter(
+    (message) => known.get(message.id) !== current.get(message.id),
+  );
+  const deletedMessages = [...known.keys()].filter((id) => !current.has(id));
+  await saveConversation(account, conversation, changedMessages, deletedMessages);
+}
+
+async function messagesPage(
+  account: string,
+  conversation: string,
+  beforeSeq?: number,
+): Promise<LocalChatMessagePage> {
+  if (!hasTauriInternals() || !account) return { messages: [], hasOlder: false };
+  const page = await invoke<{
+    messages: string[];
+    beforeSeq: number | null;
+    hasOlder: boolean;
+  }>("agent_chats_messages_page", {
+    account,
+    conversation,
+    beforeSeq: beforeSeq ?? null,
+    limit: messagePageSize,
+  });
+  const messages = page.messages.flatMap((document) => {
+    try {
+      return [JSON.parse(document) as GlobalAiMessage];
+    } catch {
+      return [];
+    }
+  });
+  return { messages, beforeSeq: page.beforeSeq ?? undefined, hasOlder: page.hasOlder };
 }
 
 export const localChats = {
   available: () => hasTauriInternals(),
-  conversations: (account: string) => list<GlobalAiConversation>(account, "conversation"),
-  saveConversation: (account: string, conversation: GlobalAiConversation) =>
-    put(account, "conversation", conversation.id, storable(conversation)),
+  conversations: async (account: string) => {
+    const conversations = await list<GlobalAiConversation>(account, "conversation");
+    return Promise.all(
+      conversations.map(async (conversation) => {
+        const page = await messagesPage(account, conversation.id);
+        return {
+          ...conversation,
+          messages: page.messages,
+          messageBeforeSeq: page.beforeSeq,
+          hasOlderMessages: page.hasOlder,
+        };
+      }),
+    );
+  },
+  saveConversation,
+  saveChangedConversation,
+  messagesPage,
   deleteConversation: async (account: string, id: string) => {
     await remove(account, "conversation", id);
+    storedMessageDocuments.delete(chatKey(account, id));
     // Its plans, goal, questions and notebook go with it.
     await remove(account, "collaboration", id).catch(() => undefined);
     await remove(account, "notebook", `conversation:${id}`).catch(() => undefined);

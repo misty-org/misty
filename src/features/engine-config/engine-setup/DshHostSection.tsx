@@ -17,7 +17,7 @@ import {
   DesktopSettingsRowSkeleton,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Badge, Button, cn, ErrorState, Input, Surface, Switch, Text } from "@/shared/ui";
+import { Badge, Button, cn, ErrorState, Input, Surface, Switch, Text } from "@misty/ui";
 import { CliUpdateDialog } from "../clis/CliUpdateDialog";
 import { useCliUpdateFlow } from "../clis/useCliUpdateFlow";
 import { binKey, dshHostApi, useEngineSettings, type DshHostStatus } from "./api";

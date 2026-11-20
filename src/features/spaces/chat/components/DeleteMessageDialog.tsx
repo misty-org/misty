@@ -7,7 +7,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 export function DeleteMessageDialog({
   open,

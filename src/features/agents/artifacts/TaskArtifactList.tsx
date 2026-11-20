@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@/native/invoke";
 import { useTaskArtifacts } from "./taskArtifacts";
-import { InlineLink, OverflowFadeText, Text } from "@/shared/ui";
+import { InlineLink, OverflowFadeText, Text } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 
 const status = {

@@ -1,4 +1,4 @@
-import { Skeleton } from "@/shared/ui";
+import { Skeleton } from "@misty/ui";
 
 const sentenceWidths = ["w-3/5", "w-1/2", "w-2/3", "w-2/5", "w-1/2"];
 

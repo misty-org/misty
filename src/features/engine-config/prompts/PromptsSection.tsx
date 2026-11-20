@@ -42,7 +42,7 @@ import {
   Skeleton,
   SkeletonControl,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { PromptEditorDialog, type PromptEditorValue } from "./PromptEditorDialog";
 import { revealPrompts, type CustomPromptEntry, type PromptScope } from "./promptsApi";
 import {

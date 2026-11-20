@@ -1,4 +1,4 @@
-import type { SketchInk } from "@/shared/ui";
+import type { SketchInk } from "@misty/ui";
 import { sketchBounds, sketchSkeleton, type SketchElement } from "./companionSketch";
 
 /** Space around a drawing inside its SVG, in drawing units. */

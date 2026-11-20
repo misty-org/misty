@@ -90,7 +90,7 @@ export function createAgentsPageActions(state: AgentsPageState) {
       next.set("view", page);
       setParams(next);
     }, false);
-  const openApps = () => openAgentsHub("apps");
+  const openConnections = () => openAgentsHub("connections");
   return {
     openSettingsModal,
     select,
@@ -98,7 +98,7 @@ export function createAgentsPageActions(state: AgentsPageState) {
     closeSettings,
     saveProfile,
     removeProfile,
-    openApps,
+    openConnections,
     openPage,
   };
 }

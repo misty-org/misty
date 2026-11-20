@@ -1,8 +1,11 @@
 import type { ChannelOverwrite, SpacePermission } from "./role-types";
 interface SpaceParticipant {
-  kind: "person";
+  /** An agent answers only when its owner mentions it. */
+  kind: "person" | "agent";
   user_id?: string;
   agent_id?: string;
+  /** The person an agent participant belongs to. */
+  owner_user_id?: string;
   name: string;
   email?: string;
   avatar?: AgentAvatar;

@@ -1,4 +1,4 @@
-import { ChoiceGroup, FilterChip } from "@/shared/ui";
+import { ChoiceGroup, FilterChip } from "@misty/ui";
 import { CalendarDays, LayoutGrid, List, MessageSquare, Pin } from "lucide-react";
 import { useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";

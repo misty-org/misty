@@ -8,7 +8,7 @@ import {
   Input,
   Label,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useState } from "react";
 
 interface NewDrawingDialogProps {

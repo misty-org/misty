@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Button, notify, Text } from "@/shared/ui";
+import { Button, notify, Text } from "@misty/ui";
 import { spacesGateway } from "../spaces-gateway/spacesGateway";
 import { AgentWorkspaceConversation } from "../conversations/view/AgentWorkspaceConversation";
 import { newLocalConversation } from "../conversations/state/localConversation";

@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import { IconButton } from "@/shared/ui";
+import { IconButton } from "@misty/ui";
 import { AiSelectionMenu } from "@/features/agents";
 import type { AiSuggestedAction, AiCompanionAnchor } from "@/features/agents";
 import type { MistyAiControlsSnapshot } from "@/shared/schemas";

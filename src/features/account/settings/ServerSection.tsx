@@ -1,7 +1,7 @@
 import { currentApiBase, useServerChoice } from "@/api/deployment/serverChoice";
 import { useAuth } from "../sessions/authState";
 import { openSignInSheet, serverHost } from "../setup/serverSetup";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 
 /**

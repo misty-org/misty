@@ -13,7 +13,7 @@ import {
   Surface,
   Text,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { toolKey } from "../activity/stepSentences";
 import type { GlobalAiMessage } from "../conversations/state/conversationTypes";
 import { useMistyStore } from "../conversations/state/useMistyStore";

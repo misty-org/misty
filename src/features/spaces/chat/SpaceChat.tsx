@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
-import { conversationName } from "./sidebar/conversationGroups";
+import { conversationName, isGroupDirectMessage } from "./sidebar/conversationGroups";
 import { SpaceChatThread } from "./components/SpaceChatThread";
 import { useChatScrollRestoration } from "./hooks/useChatScrollRestoration";
 import { useChatSuggestions } from "./hooks/useChatSuggestions";
@@ -38,6 +38,8 @@ import { useChatReadReceipts } from "./hooks/useChatReadReceipts";
 import { ConversationLoadState, ConversationUnavailable } from "./components/ConversationStates";
 import { useBringMentionedAgents, useOwnMentionableAgents } from "./ownAgents";
 import { ChatThreadColumn } from "./components/ChatThreadColumn";
+import { ChatThreadsList } from "./components/ChatThreadsList";
+import { useSpaceThread } from "./hooks/useSpaceThread";
 import { useChatSidePanel } from "./chatSidePanelStore";
 export function SpaceChat({
   spaceId,
@@ -68,6 +70,8 @@ export function SpaceChat({
   const conversationId = openConversationId ?? searchParams.get("conversation") ?? "";
   const chatRootRef = useRef<HTMLDivElement>(null);
   const threadRootId = useChatSidePanel((panel) => panel.threadRootId);
+  const threadSnapshot = useChatSidePanel((panel) => panel.threadRoot);
+  const threadsListOpen = useChatSidePanel((panel) => panel.threadsListOpen);
   // Panels belong to the chat they were opened in.
   useEffect(() => useChatSidePanel.getState().reset(), [spaceId, conversationId]);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -138,7 +142,21 @@ export function SpaceChat({
   const editing = useMessageEditing();
   // Only the person's own agents can be @mentioned, and so run; nobody runs anyone else's.
   const agents = useOwnMentionableAgents(user?.id);
-  const bringMentionedAgents = useBringMentionedAgents(spaceId, agents);
+  const bringMentionedAgents = useBringMentionedAgents(
+    spaceId,
+    agents,
+    conversation && isGroupDirectMessage(conversation, user?.id) ? conversationId : "",
+  );
+  const threadState = useSpaceThread({
+    spaceId,
+    conversationId,
+    rootId: threadRootId,
+    currentUser: user ? { id: user.id, name: user.username } : undefined,
+    members: scope.members,
+    agents,
+    roles: mentionableRoles,
+    beforeSend: bringMentionedAgents,
+  });
   const suggestions = useChatSuggestions({
     spaceId,
     members: scope.members,
@@ -302,14 +320,22 @@ export function SpaceChat({
     );
   const thread = threadRootId ? (
     <ChatThreadColumn
-      rootId={threadRootId}
-      messages={scope.messages}
+      root={scope.messages.find((message) => message.id === threadRootId) ?? threadSnapshot}
+      replies={threadState.replies}
+      loading={threadState.loading}
+      loadingOlder={threadState.loadingOlder}
+      hasOlder={threadState.hasOlder}
+      error={threadState.error}
       canWrite={access.canWriteMessages}
       typingLabel={typing.label}
+      channelName={isDirect ? `@${channelName}` : `#${channelName}`}
       onTypingInput={typing.onTextInput}
       onStopTyping={typing.stop}
-      onSend={actions.sendReply}
+      onLoadOlder={threadState.loadOlder}
+      onSend={threadState.send}
     />
+  ) : threadsListOpen ? (
+    <ChatThreadsList spaceId={spaceId} conversationId={conversationId} />
   ) : null;
   const chat = (
     <div ref={chatRootRef} className={chatLayout.container}>

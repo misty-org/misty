@@ -1,6 +1,6 @@
 import "./agentCloudAvatars.testFixtures";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { NoticeViewport, resetNotices } from "@/shared/ui";
+import { NoticeViewport, resetNotices } from "@misty/ui";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const save = vi.hoisted(() => vi.fn());
 vi.mock("@/features/agents/personal/personalAgentsApi", () => ({ personalAgentsApi: { save } }));

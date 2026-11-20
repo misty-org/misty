@@ -38,7 +38,7 @@ describe("OpenCut's core in Misty", () => {
 
 describe("OpenCut's notices are Misty's", () => {
   it("joins a description to its message and marks errors", async () => {
-    const notices = await import("@/shared/ui");
+    const notices = await import("@misty/ui");
     const notify = vi.spyOn(notices, "notify");
     const { toast } = await import("@opencut/components/toast");
     toast.error("Export failed", { description: "Disk full" });
@@ -79,7 +79,7 @@ describe("OpenCut's controls are drawn by Misty's", () => {
   it("reads a tooltip's words out of its parts", async () => {
     const { Tooltip, TooltipContent, TooltipTrigger } =
       await import("@opencut/components/ui/tooltip");
-    const { TooltipProvider } = await import("@/shared/ui");
+    const { TooltipProvider } = await import("@misty/ui");
     render(
       <TooltipProvider>
         <Tooltip>
@@ -97,7 +97,7 @@ describe("OpenCut's controls are drawn by Misty's", () => {
 
   it("gives an icon-only button its label as its name", async () => {
     const { Button } = await import("@opencut/components/ui/button");
-    const { TooltipProvider } = await import("@/shared/ui");
+    const { TooltipProvider } = await import("@misty/ui");
     render(
       <TooltipProvider>
         <Button size="icon" variant="ghost" aria-label="Delete element">

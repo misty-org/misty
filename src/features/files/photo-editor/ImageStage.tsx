@@ -5,7 +5,7 @@ import {
   Surface,
   cn,
   type CropRect,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   useEffect,
   useMemo,

@@ -1,4 +1,4 @@
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import { openSettings, type SettingsSection } from "@/features/settings";
 import { openAgentsHub, type AgentsHubPage } from "../../../hub/agentsHubStore";
 import { useContextPanel, type ContextPanelTab } from "../../../context-panel/contextPanelStore";
@@ -29,6 +29,8 @@ export interface CommandScope {
 export interface CommandSend {
   send: string;
   conversationId?: string;
+  /** Runs once the sent turn has finished (`/clear` saves memory first, then drops the session). */
+  after?(): Promise<void>;
 }
 
 /** undefined: not Misty's to run, send as typed · null: done, nothing to send · else: send this. */

@@ -21,7 +21,7 @@ import {
   Input,
   Label,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { EngineGlyph } from "./components";
 import { t } from "./strings";
 import type { SkillTargetId, SkillTargetInfo } from "./types";

@@ -6,7 +6,7 @@ import {
   type ButtonVariant,
   type IconButtonSize,
   type IconButtonVariant,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ArrowRight, Download, Pause, Play, Plus, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { GalleryMatrix, GalleryRow, GallerySection, GalleryStage } from "./GalleryLayout";

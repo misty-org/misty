@@ -10,7 +10,7 @@ import {
 import { EditorSelection } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { findNext, findPrevious, replaceAll, replaceNext } from "@codemirror/search";
-import { FindBar } from "@/shared/ui";
+import { FindBar } from "@misty/ui";
 import {
   EDITOR_SEARCH_MATCH_LIMIT,
   EMPTY_EDITOR_SEARCH_MATCH_INFO,

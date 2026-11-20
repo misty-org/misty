@@ -12,7 +12,7 @@ import {
   OverflowFadeText,
   SectionHeading,
   Skeleton,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { failureText, marketApi, unaddedSuggestions, type MarketEngine } from "./api";
 import { MakerLogo, pluginMaker } from "./PluginMaker";
 import { useEngineMarket } from "./useEngineMarket";

@@ -3,7 +3,7 @@ import type { EnginePlanReview as PlanReview } from "../../../runs/invocations/i
 import { MistyMarkdown } from "../../../runs/markdown/MistyMarkdown";
 import { setPermissionMode } from "../../../plans/permissionMode";
 import { useCollaborationStore } from "../../../plans/store";
-import { Button, Surface, Text, Textarea } from "@/shared/ui";
+import { Button, Surface, Text, Textarea } from "@misty/ui";
 import { respondToPlan, type PlanDecision } from "./engineApi";
 
 /** What the chat sends the engine once the person approves its plan, in Auto. */

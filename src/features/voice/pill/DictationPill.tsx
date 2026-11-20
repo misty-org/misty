@@ -2,9 +2,9 @@ import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Lock, Mic, MicOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { IconButton, Spinner, Surface } from "@/shared/ui";
+import { IconButton, Spinner, Surface } from "@misty/ui";
 import type { PillState } from "../dictationEngine";
-import { remCss } from "@/shared/lib/uiScale";
+import { remCss } from "@misty/ui";
 
 const initial: PillState = {
   phase: "listening",

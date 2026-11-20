@@ -1,5 +1,6 @@
 import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
-import { Trash2 } from "lucide-react";
+import { spaceNavigationName } from "../routes/defaultSpace";
+import { BellOff, Pin, Trash2, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Space } from "../api/dto/entities";
@@ -17,11 +18,14 @@ import {
   EmptyState,
   ErrorState,
   MenuItem,
+  spaceIcons,
   spaceMadeKind,
+  Surface,
   useCollectionRefinement,
   useNotice,
+  ViewHeader,
   type SpaceMadeKind,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
 import { confirmAction } from "@/shared/lib/confirmAction";
 import { useSpacesStore } from "@/features/spaces/core";
@@ -31,7 +35,6 @@ import { closeWorkbookCollaborationSession } from "../data/session";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
 import { SpaceOptionsMenu } from "../components/space-row/SpaceOptionsMenu";
-import { SpaceSwitcher } from "../components/space-row/SpaceSwitcher";
 import { editedLabel, galleryFilters, type GalleryItem, isGalleryFilter } from "./galleryItems";
 import { GalleryPreview, itemIcon } from "./GalleryPreview";
 import { useHomePreferences } from "./homePreferences";
@@ -39,11 +42,12 @@ import { HomeSection } from "./HomeSection";
 import { homeItemsClass, homeItemsWrapClass, spaceHomeClass } from "./homeLayout";
 import { MakeSomethingNew } from "./MakeSomethingNew";
 import { SpaceItemCard, SpaceItemCardsSkeleton } from "./SpaceItemCard";
+import { SpaceHero } from "./SpaceHero";
+import { SpaceMembersPanel } from "./SpaceMembersPanel";
 import { SpaceOverview } from "./SpaceOverview";
-import { SpacePlaces } from "./SpacePlaces";
-import { SpaceChatButton } from "../chat/SpaceChatButton";
+import { SpaceAppsSection } from "../apps/SpaceAppsSection";
 import { useSpaceGallery } from "./useSpaceGallery";
-import { HereFaces, useHereNow } from "./HereNow";
+import { useHereNow } from "./HereNow";
 import { useNow } from "@/shared/hooks/useNow";
 
 const removalVerb = (items: GalleryItem[]) => {
@@ -109,6 +113,8 @@ export function SpaceHome({ space, page }: { space: Space; page?: SpaceMadeKind 
   const { view, scope } = useHomePreferences((state) => state.value);
   const setHomePreferences = useHomePreferences((state) => state.set);
   const [query, setQuery] = useState("");
+  // The members panel beside the home, shown or hidden from the header.
+  const [membersOpen, setMembersOpen] = useState(true);
   const [openError, setOpenError] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -240,57 +246,59 @@ export function SpaceHome({ space, page }: { space: Space; page?: SpaceMadeKind 
     action: { label: "Retry", onSelect: gallery.reload },
   });
 
-  return (
+  const sheet = (
     <CollectionPage>
-      <CollectionHeading
-        title={
-          pageKind ? (
-            <SpaceCrumb spaceId={space.id} here={pageKind.page} />
-          ) : (
-            <span data-tour="space-switcher" className="contents">
-              <SpaceSwitcher space={space} />
-            </span>
-          )
-        }
-        end={
-          <div className="flex min-w-0 items-center gap-2">
-            {!page && <HereFaces spaceId={space.id} here={here} />}
-            {!page && <SpaceChatButton spaceId={space.id} />}
-            <CollectionSearch
-              data-tour="space-search"
-              aria-label={pageKind ? `Search ${pageKind.page}` : "Search this Space"}
-              placeholder="Search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <span data-tour="space-make" className="contents">
-              <MakeSomethingNew
-                spaceId={space.id}
-                onCreated={gallery.reload}
-                only={page ? [page] : undefined}
+      {page && pageKind ? (
+        <CollectionHeading
+          title={<SpaceCrumb spaceId={space.id} here={pageKind.page} />}
+          end={
+            <div className="flex min-w-0 items-center gap-2">
+              <CollectionSearch
+                data-tour="space-search"
+                aria-label={`Search ${pageKind.page}`}
+                placeholder="Search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
               />
-            </span>
-            {!page && (
-              <span data-tour="space-options" className="contents">
-                <SpaceOptionsMenu space={space} />
+              <span data-tour="space-make" className="contents">
+                <MakeSomethingNew spaceId={space.id} onCreated={gallery.reload} only={[page]} />
               </span>
-            )}
-          </div>
-        }
-      />
+            </div>
+          }
+        />
+      ) : null}
       {/* After the Lab's home: the Space's pages to go to, what is going on in it, then its
           things as the page's one collection, with their count, whose, filters and view. */}
       <div className={spaceHomeClass}>
+        {!page && (
+          <SpaceHero
+            space={space}
+            online={here.length}
+            actions={
+              <>
+                <span data-tour="space-make" className="contents">
+                  <MakeSomethingNew spaceId={space.id} onCreated={gallery.reload} />
+                </span>
+                <span data-tour="space-options" className="contents">
+                  <SpaceOptionsMenu space={space} />
+                </span>
+              </>
+            }
+          />
+        )}
         {!page && !searching && (
           <>
             <span data-tour="space-places" className="contents">
-              <SpacePlaces spaceId={space.id} />
+              <SpaceAppsSection
+                spaceId={space.id}
+                isMod={Boolean(space.permissions?.includes("apps.manage"))}
+              />
             </span>
-            <SpaceOverview spaceId={space.id} shared={space.is_shared} here={here} />
+            <SpaceOverview spaceId={space.id} shared={space.is_shared} />
           </>
         )}
         <HomeSection
-          title={searching ? "Results" : (pageKind?.page ?? "In this Space")}
+          title={searching ? "Results" : (pageKind?.page ?? "Recent")}
           count={gallery.loading || gallery.unavailable ? undefined : refinement.items.length}
           // Under the overview's panels, a hairline starts the Space's own things.
           divided={!page && !searching}
@@ -403,5 +411,38 @@ export function SpaceHome({ space, page }: { space: Space; page?: SpaceMadeKind 
         </HomeSection>
       </div>
     </CollectionPage>
+  );
+  // A kind's page keeps its own heading; the home has the header, the sheet and the members beside it.
+  if (page) return sheet;
+  return (
+    <Surface tone="workspace" className="flex h-full min-h-0 min-w-0 flex-col">
+      <ViewHeader
+        title={spaceNavigationName(space)}
+        lead={spaceIcons.space}
+        actions={[
+          // Neither has anything behind it yet, so they stand disabled, in the mockup's places.
+          {
+            id: "notifications",
+            icon: BellOff,
+            label: "Notifications",
+            priority: 3,
+            disabled: true,
+          },
+          { id: "pinned", icon: Pin, label: "Pinned", priority: 2, disabled: true },
+          {
+            id: "members",
+            icon: Users,
+            label: membersOpen ? "Hide members" : "Show members",
+            priority: 1,
+            pressed: membersOpen,
+            onSelect: () => setMembersOpen((open) => !open),
+          },
+        ]}
+      />
+      <div className="flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1">{sheet}</div>
+        {membersOpen ? <SpaceMembersPanel space={space} /> : null}
+      </div>
+    </Surface>
   );
 }

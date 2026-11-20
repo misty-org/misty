@@ -13,6 +13,7 @@ import ReactDOM from "react-dom/client";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { applyCachedAppTheme } from "@/features/settings";
+import { installUiStorage } from "@/shared/lib/uiStorage";
 // A link a person clicks opens in their own browser: Misty shows web pages only to agents.
 configureMistyBrowserLinkOpener(async (url) => {
   if (!hasTauriInternals()) throw new Error("Links open only from the desktop app.");
@@ -22,6 +23,7 @@ installExternalLinkRouting();
 initializeHostAgentsRuntime();
 // The theme chosen last time, so a light-theme window doesn't open dark before settings load.
 applyCachedAppTheme();
+installUiStorage();
 // The interface and code fonts chosen in Settings, and the performance panel's recording when on.
 void applySavedFonts();
 if (hasTauriInternals()) startPerformanceRecording();

@@ -1,7 +1,7 @@
 import { ArrowUpRight, X } from "lucide-react";
 import { useAuth } from "@/features/account";
 import { createDeviceSettingMap } from "@/shared/lib/deviceSettingMap";
-import { IconButton, Surface, lazyTool, ToolSuspense } from "@/shared/ui";
+import { IconButton, Surface, lazyTool, ToolSuspense } from "@misty/ui";
 import { spaceNavigationName } from "../routes/defaultSpace";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { ChatPanelPicker } from "./ChatPanelPicker";

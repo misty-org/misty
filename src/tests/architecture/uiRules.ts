@@ -10,8 +10,6 @@ import {
 import {
   allRules,
   cssRules,
-  sharedCssRuleIds,
-  sharedUiRuleIds,
   uiRules,
   type AppUiRuleId,
   type CssRuleId,
@@ -22,9 +20,8 @@ import {
 } from "./uiRuleDefinitions.ts";
 
 /**
- * The UI rules in CONTRIBUTING.md, as lint. Code outside src/shared/ui composes shared components
- * instead of restyling or re-implementing them, and shared UI itself keeps to the type scale, the
- * tokens and Misty's tooltip. Existing debt is counted per file and rule in
+ * The UI rules in CONTRIBUTING.md, as lint. Misty's code composes @misty/ui's components (the
+ * misty-ui repository) instead of restyling or re-implementing them. Existing debt is counted per file and rule in
  * ui-exceptions-baseline.json, and those counts may only go down.
  *
  * The rules are in uiRuleDefinitions.ts (with their counters in uiRuleCounters.ts and the JSX tag
@@ -45,7 +42,7 @@ export {
 // ---------------------------------------------------------------------------------------------
 // Which files get which rules.
 
-type UiRuleScope = "app" | "shared" | "css" | "shared-css";
+type UiRuleScope = "app" | "css";
 
 function uiRuleScope(path: string): UiRuleScope | null {
   if (/\.test\.tsx?$/.test(path) || path.endsWith(".d.ts") || path.startsWith("src/tests/")) {
@@ -53,16 +50,14 @@ function uiRuleScope(path: string): UiRuleScope | null {
   }
   if (path.endsWith(".css")) {
     if (!path.startsWith("src/") || path.startsWith("src/styles/")) return null;
-    return path.startsWith("src/shared/ui/") ? "shared-css" : "css";
+    return "css";
   }
   if (!/^src\/.*\.tsx?$/.test(path)) return null;
-  return path.startsWith("src/shared/ui/") ? "shared" : "app";
+  return "app";
 }
 
 function rulesFor(scope: UiRuleScope): UiRuleId[] {
   if (scope === "css") return Object.keys(cssRules) as CssRuleId[];
-  if (scope === "shared-css") return [...sharedCssRuleIds];
-  if (scope === "shared") return [...sharedUiRuleIds];
   return Object.keys(uiRules) as AppUiRuleId[];
 }
 

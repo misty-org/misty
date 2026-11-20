@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useSetupStore } from "@/features/account";
-import { shownOnScreen, Tour, tourTargetShown, useSplashShowing, type TourStep } from "@/shared/ui";
+import { shownOnScreen, Tour, tourTargetShown, useSplashShowing, type TourStep } from "@misty/ui";
 import { startTourEvent, useTours } from "./tourStore";
 import { tours, type TourId } from "./tours";
 

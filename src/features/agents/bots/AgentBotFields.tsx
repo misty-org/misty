@@ -6,7 +6,7 @@
  */
 import { useState } from "react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, useNotice, Field, Input, Surface, Text, Textarea } from "@/shared/ui";
+import { Button, useNotice, Field, Input, Surface, Text, Textarea } from "@misty/ui";
 import { exportBotBundle } from "./botBundle";
 import { assembleAgentPrompt, duplicateProseLines, proseOverLimit, PROSE_LIMIT } from "./botPrompt";
 

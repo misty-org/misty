@@ -39,7 +39,7 @@ import {
   Surface,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { BrandTile } from "../brands/BrandMark";
 import { notifyCliConfigChanged } from "../channels/providers";
 import { SignInDialog } from "../clis/SignInDialog";

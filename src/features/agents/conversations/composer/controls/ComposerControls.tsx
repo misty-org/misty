@@ -26,7 +26,7 @@ import {
   type ActionBarItem,
   type ActionBarMode,
   type ButtonIcon,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { invoke } from "@/native/invoke";
 import { captureAttachmentFromDataUrl } from "../../../runs/invocations/captureAttachment";
 import { EngineFastItem } from "../../view/engine/EngineFastItem";

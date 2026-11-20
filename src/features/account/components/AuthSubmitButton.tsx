@@ -1,4 +1,4 @@
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 
 /** The form's one primary button. The form's column stretches it to the fields' width. */
 export default function AuthSubmitButton({ idleLabel, loading, disabled }: AuthSubmitButtonProps) {

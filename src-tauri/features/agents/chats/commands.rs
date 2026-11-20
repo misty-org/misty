@@ -50,6 +50,38 @@ pub async fn agent_chats_get(
 }
 
 #[tauri::command]
+pub async fn agent_chats_messages_page(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    conversation: String,
+    before_seq: Option<i64>,
+    limit: usize,
+) -> Result<super::AgentChatMessagePage, String> {
+    require_person_window(&webview)?;
+    state
+        .agent_chats
+        .messages_page(account, conversation, before_seq, limit)
+        .await
+}
+
+#[tauri::command]
+pub async fn agent_chats_messages_upsert(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    conversation: String,
+    messages: Vec<String>,
+    deleted: Vec<String>,
+) -> Result<(), String> {
+    require_person_window(&webview)?;
+    state
+        .agent_chats
+        .upsert_messages(account, conversation, messages, deleted)
+        .await
+}
+
+#[tauri::command]
 pub async fn agent_chats_swap(
     webview: tauri::Webview,
     state: State<'_, MistyRuntime>,

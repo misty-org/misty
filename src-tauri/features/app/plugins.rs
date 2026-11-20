@@ -45,6 +45,11 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
             crate::project::file_protocol::SCHEME,
             crate::project::file_protocol::handle,
         )
+        // A Space app's bundle for its sandboxed frame, from the installed copy only.
+        .register_asynchronous_uri_scheme_protocol(
+            crate::apps::scheme::SCHEME,
+            crate::apps::scheme::handle,
+        )
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())

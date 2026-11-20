@@ -2,9 +2,24 @@ import { useState } from "react";
 import { spacesApi } from "../../api/api";
 import type { SpaceConversation, SpaceMember } from "../../api/dto/entities";
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, ListRow, Text } from "@/shared/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  ListRow,
+  Text,
+} from "@misty/ui";
 
-/** Opens the DM with another person in the Space, starting it if there isn't one yet. */
+/** The most other people a group DM takes; the server's limit is ten with the person who starts it. */
+const maxOthers = 9;
+
+/**
+ * Starts a direct message. Pick one person for the DM with them (opened, or started if there isn't one
+ * yet); pick several and a new group DM is made with all of them.
+ */
 export function NewDirectMessageDialog({
   spaceId,
   open,
@@ -20,15 +35,25 @@ export function NewDirectMessageDialog({
   currentUserId?: string;
   onOpened: (conversation: SpaceConversation) => void;
 }) {
+  const [picked, setPicked] = useState<string[]>([]);
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState("");
   const others = members.filter((member) => member.user_id !== currentUserId);
-  const openWith = async (userId: string) => {
-    if (opening) return;
+  const toggle = (userId: string) =>
+    setPicked((current) =>
+      current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId],
+    );
+  const start = async () => {
+    if (opening || !picked.length) return;
     setOpening(true);
     setError("");
     try {
-      onOpened(await spacesApi.openDirectMessage(spaceId, userId));
+      const opened =
+        picked.length === 1
+          ? await spacesApi.openDirectMessage(spaceId, picked[0]!)
+          : await spacesApi.openGroupDirectMessage(spaceId, picked);
+      setPicked([]);
+      onOpened(opened);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The message couldn't be opened.");
     } finally {
@@ -36,7 +61,13 @@ export function NewDirectMessageDialog({
     }
   };
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setPicked([]);
+        onOpenChange(next);
+      }}
+    >
       <DialogContent aria-describedby={undefined} className="max-w-sm">
         <DialogHeader>
           <DialogTitle>New direct message</DialogTitle>
@@ -47,8 +78,11 @@ export function NewDirectMessageDialog({
               <ListRow
                 key={member.user_id}
                 label={member.name}
-                disabled={opening}
-                onOpen={() => void openWith(member.user_id)}
+                checked={picked.includes(member.user_id)}
+                disabled={
+                  opening || (!picked.includes(member.user_id) && picked.length >= maxOthers)
+                }
+                onOpen={() => toggle(member.user_id)}
               />
             ))
           ) : (
@@ -64,6 +98,20 @@ export function NewDirectMessageDialog({
             title="Message could not be opened"
           />
         ) : null}
+        <DialogFooter className="mt-5">
+          <Button
+            variant="secondary"
+            size="lg"
+            type="button"
+            disabled={opening}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button size="lg" type="button" disabled={opening || !picked.length} onClick={() => void start()}>
+            Start
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

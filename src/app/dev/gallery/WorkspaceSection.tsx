@@ -8,7 +8,7 @@ import {
   Text,
   TreeRow,
   type TabStripTab,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Cloud, FileCode, Folder, GitBranch, Pencil, Plus, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { GalleryRow, GallerySection } from "./GalleryLayout";

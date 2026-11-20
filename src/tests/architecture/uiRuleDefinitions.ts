@@ -95,11 +95,11 @@ const themeData = [/^src\/features\/settings\/preferences\/appTheme\.ts$/] as co
 // ---------------------------------------------------------------------------------------------
 // The rules.
 
-/** Rules for every .ts and .tsx file outside src/shared/ui and src/tests. */
+/** Rules for every .ts and .tsx file outside src/tests. */
 export const uiRules = {
   "raw-control": {
     pattern: /<(?:button|input|select|textarea)\b/g,
-    guidance: "use Button, IconButton, Input, Select, or Textarea from @/shared/ui",
+    guidance: "use Button, IconButton, Input, Select, or Textarea from @misty/ui",
   },
   "full-screen-overlay": {
     pattern: /\bfixed\s+inset-0\b/g,
@@ -239,7 +239,7 @@ export const uiRules = {
     ),
     guidance:
       "never loading text: first loads use a Skeleton shaped like the content (ListRowSkeleton, " +
-      "SkeletonList), and work on a click is the Button's loading prop",
+      "SkeletonList), and work on a click disables its Button while progress shows where the work happens",
   },
   "status-word": {
     count: countStatusWords,
@@ -317,7 +317,7 @@ export const uiRules = {
     ),
     guidance:
       "spacing and sizes come from the 4px scale (w-80, h-8, gap-3), never one-off pixels; " +
-      "a size the shared set lacks is added to src/shared/ui first",
+      "a size the shared set lacks is added to @misty/ui first",
   },
   "icon-sizing": {
     count: countIconSizing,
@@ -364,27 +364,14 @@ export const uiRules = {
   },
 } as const satisfies Record<string, UiRule>;
 
-/** The subset that shared UI itself keeps to: its components are where these would start. */
-export const sharedUiRuleIds = [
-  "hex-color",
-  "font-size-literal",
-  "native-title",
-  "ellipsis",
-  "arbitrary-px",
-  "half-pixel-edge",
-  "sparkles-icon",
-  // Shared components compose buttons too (InfoCorner's "i" was drawn round here).
-  "button-restyle",
-] as const satisfies readonly (keyof typeof uiRules)[];
-
-/** Rules for every .css file outside src/styles and src/shared/ui. */
+/** Rules for every .css file outside src/styles. */
 export const cssRules = {
   "feature-stylesheet": {
     count: () => 1,
     allow: contentStylesheets,
     guidance:
       "features have no stylesheets: compose shared components, and add a missing look to " +
-      "src/shared/ui first",
+      "@misty/ui first",
   },
   "css-font-size": {
     pattern: /font-size:(?!\s*(?:var\(--text-|inherit\b|1em\b|100%))/g,
@@ -432,7 +419,7 @@ export const cssRules = {
         .length,
     guidance:
       "features add no CSS rules: compose shared components, and add a missing look to " +
-      "src/shared/ui first",
+      "@misty/ui first",
   },
   "css-shared-slot": {
     // A shared component's parts are named by data-slot; a feature selector naming one restyles
@@ -443,7 +430,7 @@ export const cssRules = {
       ).length,
     guidance:
       "never style a shared component's parts from a feature: give the component the variant or " +
-      "prop it lacks in src/shared/ui",
+      "prop it lacks in @misty/ui",
   },
   "css-icon-size": {
     // Sizing glyphs from a stylesheet is how one sidebar icon became 18px beside 16px ones.
@@ -475,15 +462,13 @@ export const cssRules = {
       }).length,
     guidance:
       "a button's hover, pressed and open looks belong to the shared Button: use its variants, " +
-      "or add the look to src/shared/ui",
+      "or add the look to @misty/ui",
   },
 } as const satisfies Record<string, UiRule>;
 
 export type AppUiRuleId = keyof typeof uiRules;
 export type CssRuleId = keyof typeof cssRules;
 
-/** The one rule shared UI's own stylesheets keep to: they draw the edges everything else wears. */
-export const sharedCssRuleIds = ["css-half-pixel-edge"] as const satisfies readonly CssRuleId[];
 export type UiRuleId = AppUiRuleId | CssRuleId;
 
 export const allRules: Record<UiRuleId, UiRule> = { ...uiRules, ...cssRules };

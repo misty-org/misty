@@ -49,6 +49,7 @@ export type SpacePermission =
   | "studio.view"
   | "ask.run"
   | "integrations.manage"
+  | "apps.manage"
   | "space.leave"
   | "space.transfer"
   | "space.delete";

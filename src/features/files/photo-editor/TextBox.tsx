@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverHeader,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { TextDraft } from "./editorTypes";
 
 /** The box text is written in: anchored where the text goes, Enter to add, Shift+Enter for a new line. */

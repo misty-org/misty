@@ -6,17 +6,23 @@ import { JSDOM } from "jsdom";
 // Exercise the real initialization script: no separate viewport helper may
 // change website scrolling, even when the user zooms the native WebView.
 const part = (name) =>
-  readFileSync(new URL(`../src-tauri/features/browser/kiri_link/scripts/${name}`, import.meta.url), "utf8");
+  readFileSync(
+    new URL(`../src-tauri/features/browser/kiri_link/scripts/${name}`, import.meta.url),
+    "utf8",
+  );
 // BROWSER_VIEWPORT_SCRIPT in browser/kiri_link/scripts/mod.rs, with its window-drag part.
-const viewport = `\n${part("viewport.js")}`
-  .replace("__MISTY_WINDOW_DRAG_PLACEHOLDER__", () => part("window_drag.js"));
+const viewport = `\n${part("viewport.js")}`.replace("__MISTY_WINDOW_DRAG_PLACEHOLDER__", () =>
+  part("window_drag.js"),
+);
 const context = readFileSync(
   new URL("../src-tauri/features/browser/kiri_link/scripts/context_menu.js", import.meta.url),
   "utf8",
 );
 // Kiri's host channel sender as WebKit renders it (src-tauri/features/kiri/src/channel/macos.rs).
-const sender = readFileSync(new URL("../src-tauri/features/kiri/src/channel/macos.rs", import.meta.url), "utf8")
-  .match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
+const sender = readFileSync(
+  new URL("../src-tauri/features/kiri/src/channel/macos.rs", import.meta.url),
+  "utf8",
+).match(/SENDER_SCRIPT: &str = "(.*)";/)[1];
 const script = viewport
   // Native background reporting is exercised separately in browser-background.test.ts.
   .replace("__KIRI_HOST_SENDER_PLACEHOLDER__", sender)

@@ -1,4 +1,4 @@
-import type { TourStep } from "@/shared/ui";
+import type { TourStep } from "@misty/ui";
 import { utilityTours } from "./utilityTours";
 
 /**
@@ -38,9 +38,9 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body: "Here's a quick look around. You can see this again any time from your account menu.",
       },
       {
-        target: "sidebar-new",
+        target: "sidebar-dms",
         title: "Start a chat",
-        body: "Talk to your AI here, the same way you'd text a friend.",
+        body: "Your agents are under Direct messages. Pick one to talk to it the way you'd text a friend; only you see these chats.",
       },
       {
         target: "composer",
@@ -68,19 +68,14 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body: "Share docs, whiteboards and files with friends, and see what everyone's agents are working on.",
       },
       {
-        target: "sidebar-lab",
-        title: "The lab",
-        body: "Learn anything. Your AI finds sources, explains them and quizzes you.",
-      },
-      {
         target: "sidebar-search",
         title: "Search",
         body: "Find anything you've made, and any chat.",
       },
       {
-        target: "sidebar-more",
-        title: "More",
-        body: "Places you unpinned wait in here. Your agents and their engines are in Settings.",
+        target: "sidebar-explore",
+        title: "Explore",
+        body: "Find agents and apps to add, and see the tools they can use.",
       },
       {
         target: "account",
@@ -113,14 +108,14 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
     label: "Space tour",
     steps: [
       {
-        target: "space-switcher",
+        target: "sidebar-space",
         title: "Your space",
-        body: "A shared place for a project, a class or friends. Switch spaces or start a new one here.",
+        body: "A shared place for a project, a class or friends. Its name opens the home; the arrow switches spaces or starts a new one.",
       },
       {
         target: "space-places",
-        title: "Pages",
-        body: "Chat with everyone here, write docs together, plan tasks and keep files.",
+        title: "Apps",
+        body: "Docs, whiteboards, tasks and files live in this Space's apps. Open one, or add more.",
       },
       {
         target: "space-make",
@@ -128,9 +123,11 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body: "Start a doc or a whiteboard that everyone here can edit at the same time.",
       },
       {
-        target: "space-switcher",
+        target: "sidebar-space",
         title: "Invite friends",
-        body: "If you made this space, invite people from this menu. They see what you share and what your agents are doing, never your chats.",
+        body:
+          "If you made this space, invite people with the button at the right of its name. " +
+          "They see what you share and what your agents are doing, never your chats.",
       },
     ],
   },

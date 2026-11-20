@@ -9,7 +9,7 @@ import {
   Surface,
   Text,
   ToolSuspense,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Link2 } from "lucide-react";
 import { useEffect, useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../noteTypes";

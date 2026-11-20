@@ -29,7 +29,7 @@ import {
   TableRow,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useMemo, useState } from "react";
 import {
   localDay,

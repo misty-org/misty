@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { DockingLayout } from "@/app/shell/dockingLayout";
-import { remCss } from "@/shared/lib/uiScale";
+import { remCss } from "@misty/ui";
 
 /** Design pixels, drawn in rem so they grow with the window's root (src/shared/lib/uiScale.ts). */
 export const dockingMetrics = {

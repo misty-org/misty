@@ -4,7 +4,7 @@ export type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
 
 import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import { useAuth } from "@/features/account";
-import { Button, Skeleton, Surface, Text } from "@/shared/ui";
+import { Button, Skeleton, Surface, Text } from "@misty/ui";
 import { UserPlus } from "lucide-react";
 import { BringAgentMenu } from "../agents/BringAgentMenu";
 import { useSpaceAgentMembers } from "../agents/useSpaceAgentMembers";

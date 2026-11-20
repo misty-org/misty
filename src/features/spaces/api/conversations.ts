@@ -22,6 +22,34 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
         method: "POST",
         body: JSON.stringify({ user_id: userId }),
       }),
+    /** A DM with two or more other people. One is the one-to-one DM, found or made; more make a new group. */
+    openGroupDirectMessage: (spaceId: string, userIds: string[]) =>
+      request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations/dm`, {
+        method: "POST",
+        body: JSON.stringify({ user_ids: userIds }),
+      }),
+    /** Adds people to a group DM of three or more. */
+    addConversationMembers: (spaceId: string, conversationId: string, userIds: string[]) =>
+      request<SpaceConversation>(
+        `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/members`,
+        { method: "POST", body: JSON.stringify({ user_ids: userIds }) },
+      ),
+    leaveConversation: (spaceId: string, conversationId: string) =>
+      request(
+        `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/members/me`,
+        { method: "DELETE" },
+      ),
+    /** Lists one of the person's agents in a DM; it answers only when they mention it. */
+    addConversationAgent: (spaceId: string, conversationId: string, agentId: string, name: string) =>
+      request(
+        `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/agents/${encodeURIComponent(agentId)}`,
+        { method: "PUT", body: JSON.stringify({ name }) },
+      ),
+    removeConversationAgent: (spaceId: string, conversationId: string, agentId: string) =>
+      request(
+        `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/agents/${encodeURIComponent(agentId)}`,
+        { method: "DELETE" },
+      ),
     updateConversation: (spaceId: string, conversationId: string, title: string) =>
       request<SpaceConversation>(
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}`,
@@ -55,6 +83,7 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
       replyToMessageId = "",
       clientNonce = "",
       inputModality: "text" | "voice" = "text",
+      threadRootId = "",
     ) =>
       request<{
         message: SpaceMessage;
@@ -68,6 +97,7 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
             attachment_ids: attachmentIds,
             library_item_ids: libraryItemIds,
             reply_to_message_id: replyToMessageId,
+            thread_root_id: threadRootId,
             client_nonce: clientNonce,
             input_modality: inputModality,
           }),

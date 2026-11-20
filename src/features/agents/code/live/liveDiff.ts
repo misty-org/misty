@@ -1,6 +1,6 @@
 import { Chunk } from "@codemirror/merge";
 import { Text } from "@codemirror/state";
-import type { CodeDiffLine } from "@/shared/ui";
+import type { CodeDiffLine } from "@misty/ui";
 
 const context = 3;
 

@@ -12,7 +12,7 @@ import {
   SearchField,
   Skeleton,
   SkeletonControl,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEnginesList } from "../engines/enginesApi";
 import { openAgentsHub } from "../hub/agentsHubStore";
 import {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrandIcon, LogoInitial, brandIconAsset } from "@/shared/ui";
+import { BrandIcon, LogoInitial, brandIconAsset } from "@misty/ui";
 import { directAppsApi } from "./directApi";
 
 /** Logos fetched this session, by address; null when one couldn't be had. */

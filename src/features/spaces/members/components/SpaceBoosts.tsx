@@ -1,6 +1,6 @@
 import { openOnWebsite } from "@/features/account";
 import { reportSystemError } from "@/shared/platform/systemErrors";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import { Rocket } from "lucide-react";
 import { useEffect, useState } from "react";
 import { spaceRequest } from "../../api/api";

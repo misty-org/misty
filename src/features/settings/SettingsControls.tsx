@@ -7,7 +7,7 @@ import {
   Text,
   type MenuIcon,
   type SelectOption,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useContext } from "react";
 
 import { SettingsControlLabelContext } from "./components/DesktopSettingsUI";

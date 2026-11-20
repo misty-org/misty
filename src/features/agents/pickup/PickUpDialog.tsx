@@ -12,7 +12,7 @@ import {
   Label,
   Skeleton,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { AgentProfile } from "@/shared/schemas";
 import { folderName, mistyEngine, useEnginesList } from "../engines/enginesApi";
 import { useChatFolder } from "../shared-folders/chatFolder";

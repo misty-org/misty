@@ -1,5 +1,6 @@
-import { CodeXml, Plus, Search, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Hash, House, Search, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAuth } from "@/features/account";
 import {
   useChatStatuses,
   useAgentAccountId,
@@ -12,50 +13,33 @@ import {
   useProjectChats,
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
-import { useWindowSpace } from "@/features/spaces";
+import type { Space } from "@/features/spaces";
 import {
-  cn,
-  CustomizableBar,
+  conversationName,
+  conversationPath,
+  groupConversations,
+  isGroupDirectMessage,
+  SpaceSelector,
+  useSpaceConversations,
+  useWindowSpace,
+} from "@/features/spaces";
+import {
   ErrorState,
   NavGroupHeading,
   NavRow,
+  NavRowLabel,
   Skeleton,
   spaceIcons,
-} from "@/shared/ui";
-import { SidebarChats } from "./SidebarChats";
-import { SidebarMore, type SidebarPlace } from "./SidebarPins";
+  Text,
+} from "@misty/ui";
+import { toggleSection, useCollapsedSections } from "./collapsedSections";
+import { SidebarAgentThreads } from "./SidebarAgentThreads";
 import { SidebarRow as Row } from "./SidebarRow";
-import {
-  sidebarPinDefaults,
-  spacePageSections,
-  useSidebarPins,
-  type SidebarPlaceId,
-} from "./sidebarPinsStore";
 import { chatSectionClass, markSlotClass } from "./styles";
 import { useSearchDialog } from "./search/searchStore";
-import {
-  agentChatRoute,
-  openNewChat,
-  openWorkspaceRoute,
-  openWorkspaceRouteIn,
-} from "./spaceNavigation";
+import { agentChatRoute, openWorkspaceRoute } from "./spaceNavigation";
 
-/** The sidebar's places, Misty's main ones: search, the window's Space and Code, the editor for
- * the Space's folder. Agents are set up in Settings. */
-const placeNames: Record<SidebarPlaceId, { label: string; icon: LucideIcon }> = {
-  search: { label: "Search", icon: Search },
-  space: { label: "Space", icon: spaceIcons.space },
-  code: { label: "Code", icon: CodeXml },
-  chat: { label: "Chat", icon: spaceIcons.chat },
-  docs: { label: "Docs", icon: spaceIcons.docs },
-  slides: { label: "Slides", icon: spaceIcons.slides },
-  data: { label: "Data", icon: spaceIcons.data },
-  whiteboards: { label: "Whiteboards", icon: spaceIcons.whiteboards },
-  lab: { label: "Lab", icon: spaceIcons.lab },
-  planner: { label: "Planner", icon: spaceIcons.planner },
-  calendar: { label: "Calendar", icon: spaceIcons.calendar },
-  media: { label: "Media", icon: spaceIcons.media },
-};
+const ExploreIcon = spaceIcons.explore;
 
 /** The route of the page the person is looking at: the focused pane's open view. */
 function useFocusedRoute(): string {
@@ -80,36 +64,104 @@ function RowSkeletons({ count }: { count: number }) {
   );
 }
 
-const chatTitleWidths = ["w-32", "w-24", "w-36", "w-28", "w-20", "w-32"];
-
 /**
- * The chats on their very first read, in the list's own shape: one section with its group
- * heading, then chat rows with the agent's mark, a title and the time at the right end.
+ * The Space's own part of the sidebar, under Explore: its channels and the people the person has
+ * direct messages with. Each row opens in the focused pane, and unread messages show at the right.
  */
-function ChatSkeletons() {
+function SpaceSections({
+  space,
+  route,
+  onOpen,
+  children,
+}: {
+  space: Space;
+  route: string;
+  onOpen(view: WorkspaceView): void;
+  /** The person's agents with their chats, listed in Direct messages under the people. */
+  children?: ReactNode;
+}) {
+  const { user } = useAuth();
+  const { conversations, error, retry } = useSpaceConversations(space.id);
+  const collapsed = useCollapsedSections((state) => state.value);
+  const channelsOpen = !collapsed.includes("channels");
+  const dmsOpen = !collapsed.includes("dms");
+  const [channels, dms] = useMemo(() => {
+    const [channelGroup, dmGroup] = groupConversations(conversations);
+    return [channelGroup?.conversations ?? [], dmGroup?.conversations ?? []];
+  }, [conversations]);
+  const [path, query = ""] = route.split("?");
+  const openConversation = path.includes("/social/misty")
+    ? new URLSearchParams(query).get("conversation")
+    : null;
+  const open = (target: string) => openWorkspaceRoute(target, onOpen);
+
+  const conversationRow = (conversation: (typeof conversations)[number]) => {
+    const unread = conversation.unread_count ?? 0;
+    return (
+      <NavRow
+        key={conversation.id}
+        current={openConversation === conversation.id}
+        onClick={() => open(conversationPath(space.id, conversation))}
+      >
+        <span className={markSlotClass}>
+          {conversation.kind !== "dm" ? (
+            <Hash aria-hidden="true" />
+          ) : isGroupDirectMessage(conversation, user?.id) ? (
+            <Users aria-hidden="true" />
+          ) : null}
+        </span>
+        <NavRowLabel bright={unread > 0} className="flex-1">
+          {conversationName(conversation, user?.id)}
+        </NavRowLabel>
+        {unread > 0 ? (
+          <Text size="caption" tone="chrome" aria-label={`${unread} unread`}>
+            {unread}
+          </Text>
+        ) : null}
+      </NavRow>
+    );
+  };
+
   return (
-    <section role="status" aria-label="Chats" aria-busy="true" className={chatSectionClass}>
-      <NavGroupHeading aria-hidden="true">
-        <Skeleton className="h-2.5 w-10 rounded-sm" />
-      </NavGroupHeading>
-      {chatTitleWidths.map((width, index) => (
-        <NavRow key={index} still data-skeleton="" aria-hidden="true">
-          <span className={markSlotClass}>
-            <Skeleton className="size-4 rounded-sm" />
-          </span>
-          <Skeleton className={`h-3 ${width}`} />
-          <Skeleton className="ml-auto h-2.5 w-6 shrink-0 rounded-sm" />
-        </NavRow>
-      ))}
-    </section>
+    <>
+      <section className={chatSectionClass} aria-label="Channels">
+        <NavGroupHeading
+          name="Channels"
+          collapsible={{ open: channelsOpen, onToggle: () => toggleSection("channels") }}
+        />
+        {!channelsOpen ? null : error && !conversations.length ? (
+          <ErrorState
+            inline
+            title="Channels couldn't load"
+            line={error}
+            action={{ label: "Try again", variant: "secondary", onClick: retry }}
+          />
+        ) : (
+          channels.map(conversationRow)
+        )}
+      </section>
+      <section className={chatSectionClass} aria-label="Direct messages" data-tour="sidebar-dms">
+        <NavGroupHeading
+          name="Direct messages"
+          collapsible={{ open: dmsOpen, onToggle: () => toggleSection("dms") }}
+        />
+        {dmsOpen ? (
+          <>
+            {dms.map(conversationRow)}
+            {children}
+          </>
+        ) : null}
+      </section>
+    </>
   );
 }
 
 /**
- * What the sidebar holds: a new chat, the places the person pinned and More for the rest, then
- * every chat the person has, newest first, each marked with its agent. A chat works in its own
- * Space, whichever the window shows. Lesson chats, and the chats Tutor's runs make, live under
- * Tutor instead. Each row opens in the focused pane.
+ * What the sidebar holds, top to bottom: the Space's selector, Home, Search and Explore, then the
+ * Space's channels and direct messages. Apps launch from Home; the person's agent chats are listed
+ * under Direct messages beside the people.
+ * There is no New row: starting a direct message starts a chat. Lesson chats, and the chats Tutor's runs make,
+ * live under Tutor instead.
  */
 export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }) {
   const accountId = useAgentAccountId();
@@ -163,146 +215,84 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     );
   }, [conversations, projectChats, lessons, tutorJobs, tutorNotebooks]);
-  // Stable while the agents are, so the sidebar groups chats by agent only when something changed.
-  const agentOf = useCallback(
-    (agentId?: string) =>
-      agents.find((agent) => agent.id === agentId) ??
-      (agentId ? undefined : agents.find((agent) => agent.system_managed)),
-    [agents],
-  );
   const [path, query = ""] = route.split("?");
   const params = new URLSearchParams(query);
   const view = path === "/agents" ? params.get("view") : null;
   const openChat = path === "/agents" && !view ? params.get("conversation") : null;
   const base = space ? `/spaces/${encodeURIComponent(space.id)}` : "";
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
-  // Search opens a window over the page, not a page of its own.
-  type Page = Exclude<SidebarPlaceId, "search">;
-  const isPage = (id: SidebarPlaceId): id is Page => id !== "search";
-  const current = (id: Page) => {
-    const section = spacePageSections[id];
-    if (section) return Boolean(base) && path.startsWith(`${base}/${section}`);
-    if (id !== "space") return view === id;
-    // The Space's row is lit for its pages that have no row of their own pinned.
-    const pinnedPage = Object.entries(spacePageSections).some(
-      ([place, page]) =>
-        pinned.includes(place as SidebarPlaceId) && path.startsWith(`${base}/${page}`),
-    );
-    return Boolean(base) && (path === base || path.startsWith(`${base}/`)) && !pinnedPage;
-  };
-  const target = (id: Page) => {
-    const section = spacePageSections[id];
-    if (section) return `${base}/${section}`;
-    return id === "space" ? base : `/agents?view=${id}`;
-  };
-  const order = useSidebarPins((state) => state.order);
-  const pinned = useSidebarPins((state) => state.pinned);
-  useEffect(() => void useSidebarPins.getState().load(), []);
-  const places = Object.fromEntries(
-    order.map((id) => [
-      id,
-      {
-        ...placeNames[id],
-        current: isPage(id) && current(id),
-        open: () => (isPage(id) ? open(target(id)) : useSearchDialog.getState().setOpen(true)),
-      },
-    ]),
-  ) as Record<SidebarPlaceId, SidebarPlace>;
-  const row = (id: SidebarPlaceId) => {
-    const { label, icon: Icon, current: here, open: go } = places[id];
-    return (
-      <Row
-        key={id}
-        label={label}
-        icon={<Icon aria-hidden="true" />}
-        shortcut={id === "search" ? "Meta+K" : undefined}
-        current={here}
-        onOpen={go}
-        data-tour={`sidebar-${id}`}
-      />
-    );
-  };
 
   return (
     <>
-      {/* A new chat and the Space's pages; the rows keep a visible gap, so a hovered row never
-          runs into the current one. */}
+      {/* The selector and Search; the rows keep a visible gap, so a hovered row never runs into the
+          current one. */}
       <nav
         className="mt-1.5 flex flex-none flex-col gap-1.5"
         aria-label="Space"
+        data-tour="sidebar-space"
         data-misty-window-drag-block="true"
       >
-        <Row
-          label="New"
-          icon={<Plus aria-hidden="true" />}
-          onOpen={() => openNewChat(onOpen)}
-          data-tour="sidebar-new"
-        />
         {space ? (
-          <>
-            {/* The pinned places drag into the person's order; a right-click on them pins or
-                unpins any place, and More keeps the rest. */}
-            <CustomizableBar
-              label="Places"
-              axis="y"
-              items={Object.fromEntries(
-                order.map((id) => [id, { label: places[id].label, node: row(id) }]),
-              )}
-              layout={{ order, hidden: order.filter((id) => !pinned.includes(id)) }}
-              onChange={(next) =>
-                useSidebarPins.getState().set({
-                  order: next.order as SidebarPlaceId[],
-                  pinned: (next.order as SidebarPlaceId[]).filter(
-                    (id) => !next.hidden.includes(id),
-                  ),
-                })
-              }
-              onReset={() => useSidebarPins.getState().set(sidebarPinDefaults)}
-              className="items-stretch gap-1.5"
-            />
-            <SidebarMore places={places} />
-          </>
+          <SpaceSelector space={space} onOpenHome={() => open(base)} />
         ) : (
-          <RowSkeletons count={pinned.length + 1} />
+          <Skeleton className="h-4 w-32" />
         )}
+        <Row
+          label="Home"
+          icon={<House aria-hidden="true" />}
+          current={Boolean(space) && (path === base || path === `${base}/home`)}
+          onOpen={() => open(base)}
+          data-tour="sidebar-home"
+        />
+        <Row
+          label="Search"
+          icon={<Search aria-hidden="true" />}
+          shortcut="Meta+K"
+          onOpen={() => useSearchDialog.getState().setOpen(true)}
+          data-tour="sidebar-search"
+        />
+        <Row
+          label="Explore"
+          icon={<ExploreIcon aria-hidden="true" />}
+          current={Boolean(space) && path === `${base}/explore`}
+          onOpen={() => open(`${base}/explore`)}
+          data-tour="sidebar-explore"
+        />
       </nav>
-      {/* The chats take the room that is left and scroll inside it. */}
+      {/* The rest takes the room that is left and scrolls inside it. */}
       <nav
-        className={cn(
-          "mt-3.5 flex min-h-0 flex-1 flex-col gap-2.5 overflow-x-hidden overflow-y-auto",
-          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-        )}
-        aria-label="Chats"
+        className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-label="Space conversations"
         data-misty-window-drag-block="true"
       >
-        {conversationsError && !conversations.length ? (
-          // The reads go on behind this; the first that works brings the list.
-          <ErrorState
-            inline
-            title="Chats couldn't load"
-            line={conversationsError}
-            action={{
-              label: "Try again",
-              variant: "secondary",
-              onClick: () => void useMistyStore.getState().loadConversations(),
-            }}
-          />
-        ) : chatsPending ? (
-          <ChatSkeletons />
+        {space ? (
+          <SpaceSections space={space} route={route} onOpen={onOpen}>
+            {conversationsError && !conversations.length ? (
+              // The reads go on behind this; the first that works brings the list.
+              <ErrorState
+                inline
+                title="Agent chats couldn't load"
+                line={conversationsError}
+                action={{
+                  label: "Try again",
+                  variant: "secondary",
+                  onClick: () => void useMistyStore.getState().loadConversations(),
+                }}
+              />
+            ) : chatsPending ? (
+              <RowSkeletons count={3} />
+            ) : (
+              <SidebarAgentThreads
+                agents={agents}
+                chats={chats}
+                statuses={statuses}
+                openChat={openChat}
+                onOpen={(agent, chatId) => open(agentChatRoute(agent.id, chatId))}
+              />
+            )}
+          </SpaceSections>
         ) : (
-          // With no chats yet, the list still shows its "Chats" heading.
-          <SidebarChats
-            chats={chats}
-            agentOf={agentOf}
-            statuses={statuses}
-            openChat={openChat}
-            onOpen={(agent, chatId) => open(agentChatRoute(agent.id, chatId))}
-            onOpenIn={(agent, chatId, place) =>
-              openWorkspaceRouteIn(agentChatRoute(agent.id, chatId), place, onOpen)
-            }
-            dragRoute={(agent, chatId) => agentChatRoute(agent.id, chatId)}
-            onOpenGone={() => openNewChat(onOpen)}
-          />
+          <RowSkeletons count={6} />
         )}
       </nav>
     </>

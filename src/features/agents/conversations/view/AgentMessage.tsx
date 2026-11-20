@@ -7,7 +7,7 @@ import type { GlobalAiMessage } from "../state/conversationTypes";
 import { LinkPreviews } from "@/features/files";
 import { MistyAppRequestCard } from "../state/MistyAppRequestCard";
 import { ScreenRequestCard } from "../context/ScreenRequestCard";
-import { Button, Surface, Text } from "@/shared/ui";
+import { Button, Surface, Text } from "@misty/ui";
 import { splitLedger, type LedgerRow } from "../../checkpoints/ledger";
 import { AgentAnsweredQuestions } from "../../plans/AgentAnsweredQuestions";
 import { AgentMessageChecklist } from "../../plans/AgentChecklist";

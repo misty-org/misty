@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { ActionBar, iconBarItem, Meter, OverflowFadeText, Text } from "@/shared/ui";
+import { ActionBar, iconBarItem, Meter, OverflowFadeText, Text } from "@misty/ui";
 import { EngineMark } from "@/features/engine-config/EngineMark";
 import { usageLimits, windowLength, type LimitWindow } from "@/features/engine-config/usage";
 import { mistyEngine, useEnginesList, type EngineInfo } from "../engines/enginesApi";

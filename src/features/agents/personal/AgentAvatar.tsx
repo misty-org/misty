@@ -2,7 +2,7 @@ import { usePersonalAgentsStore } from "./personalAgentsStore";
 import { Cloud } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, Surface, Text } from "@/shared/ui";
+import { cn, Surface, Text } from "@misty/ui";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { mistyEngine } from "../engines/enginesApi";
 import { agentCloudAvatar, type agentCloudVariants } from "./agentCloudAvatars";

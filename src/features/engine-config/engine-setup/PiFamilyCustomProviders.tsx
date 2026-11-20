@@ -18,7 +18,7 @@ import {
   SkeletonList,
   Text,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { BrandTile } from "../brands/BrandMark";
 import { notifyCliConfigChanged } from "../channels/providers";
 

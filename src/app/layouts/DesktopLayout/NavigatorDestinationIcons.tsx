@@ -1,5 +1,5 @@
 import { Folders, Heart, Images, Trash2, type LucideIcon, type LucideProps } from "lucide-react";
-import { spaceMadeKind } from "@/shared/ui";
+import { spaceMadeKind } from "@misty/ui";
 
 function destinationIcon(Icon: LucideIcon, feature: string) {
   return function DestinationIcon(props: LucideProps) {

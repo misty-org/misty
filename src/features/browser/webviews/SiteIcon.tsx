@@ -1,6 +1,6 @@
 import { Globe } from "lucide-react";
 import { useEffect, useState } from "react";
-import { cn } from "@/shared/ui";
+import { cn } from "@misty/ui";
 import { knownSiteIcon, loadSiteIcon } from "./siteIconLoader";
 
 /**

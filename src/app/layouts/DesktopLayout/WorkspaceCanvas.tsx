@@ -22,12 +22,13 @@ import { LayoutPopup } from "./LayoutPopup";
 import { WorkspaceTabBar } from "./WorkspaceTabBar";
 import { WorkspaceSearch } from "./search/WorkspaceSearch";
 import { openChatRoute, openNewChat, openWorkspaceRoute } from "./spaceNavigation";
-import { TrayAgentsSync } from "@/features/agents";
+import { openAgentsPageEvent, TrayAgentsSync } from "@/features/agents";
+import { useWindowSpace } from "@/features/spaces";
 import type { WorkspaceTab } from "@/features/app-windows";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
-import { Surface } from "@/shared/ui";
+import { Surface } from "@misty/ui";
 
 export function WorkspaceCanvas(props: {
   /** The side of the window the sidebar sits on. */
@@ -110,6 +111,20 @@ export function WorkspaceCanvas(props: {
     },
     [focusTab, location.pathname, location.search, navigate],
   );
+
+  // Opening Explore from anywhere (a command, a link in a chat) lands on the window's Space,
+  // in the focused pane.
+  const windowSpace = useWindowSpace();
+  useEffect(() => {
+    if (!windowSpace) return;
+    const open = (event: Event) => {
+      const tab = (event as CustomEvent<{ tab?: string }>).detail?.tab ?? "agents";
+      const route = `/spaces/${encodeURIComponent(windowSpace.id)}/explore?tab=${encodeURIComponent(tab)}`;
+      openWorkspaceRoute(route, openTab);
+    };
+    window.addEventListener(openAgentsPageEvent, open);
+    return () => window.removeEventListener(openAgentsPageEvent, open);
+  }, [openTab, windowSpace]);
 
   const closeWorkspaceTab = useCallback(
     (tab: WorkspaceView) => {

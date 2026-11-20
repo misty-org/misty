@@ -17,7 +17,7 @@ import {
   SkeletonControl,
   Text,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { channelsApi, type OfficialConfigFile } from "./api";
 import { engineName } from "./engines";
 import type { CliConfigState } from "./useCliConfig";

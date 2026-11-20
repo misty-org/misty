@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BrandIcon, Button, useNotice } from "@/shared/ui";
+import { BrandIcon, Button, useNotice } from "@misty/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
 import { ApprovalActions } from "./ApprovalActions";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { AgentPlanEditor } from "./AgentPlanEditor";

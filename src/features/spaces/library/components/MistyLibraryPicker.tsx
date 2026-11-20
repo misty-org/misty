@@ -21,7 +21,7 @@ import {
   Skeleton,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 import { AudioLines, FileText, Film, ImageIcon, LibraryBig, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";

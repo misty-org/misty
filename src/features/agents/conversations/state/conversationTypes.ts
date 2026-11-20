@@ -176,5 +176,8 @@ export interface GlobalAiConversation {
   modelOverride?: string;
   reasoningEffort?: "" | "low" | "medium" | "high" | "xhigh";
   messages: GlobalAiMessage[];
+  /** Cursor and older-page state for the device-local message window. */
+  messageBeforeSeq?: number;
+  hasOlderMessages?: boolean;
   remote: boolean;
 }

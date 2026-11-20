@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { IconButton, Input, Pressable, SidePanelHeader } from "@/shared/ui";
+import { IconButton, Input, Pressable, SidePanelHeader } from "@misty/ui";
 import { terminalTabTitle, useTerminalStore, type TerminalTab } from "./terminalStore";
 import { TerminalView } from "./TerminalView";
 import "./terminal.css";

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 import { editorFonts, editorThemes } from "@/shared/lib/codemirror/editorThemes";
-import { Button, OptionSelect, Switch } from "@/shared/ui";
+import { Button, OptionSelect, Switch } from "@misty/ui";
 import { useEditorFont, useEditorTheme } from "../editorAppearance";
 import { useEditorNvimMappings, useEditorVim, useEditorWordWrap } from "./editorVimSettings";
 import { useNvimConfig, type NvimConfig } from "./nvimConfig";

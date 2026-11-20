@@ -14,7 +14,7 @@ import {
   FolderOpen,
   type LucideIcon,
 } from "lucide-react";
-import { cn, itemToneClass, itemTones, type ItemTone } from "@/shared/ui";
+import { cn, itemToneClass, itemTones, type ItemTone } from "@misty/ui";
 
 // Group by content rather than assigning a different brand/color to every format.
 const fileTypes: ReadonlyArray<readonly [LucideIcon, ItemTone, ReadonlySet<string>]> = [

@@ -1,5 +1,5 @@
 import { EmbeddedUniversalPreview } from "@/features/files";
-import { Button, IconButton, Surface } from "@/shared/ui";
+import { Button, IconButton, Surface } from "@misty/ui";
 import { ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";
 import type { CSSProperties, RefObject } from "react";
 

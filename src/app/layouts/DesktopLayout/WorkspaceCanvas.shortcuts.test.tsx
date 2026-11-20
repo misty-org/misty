@@ -61,14 +61,14 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     Object.defineProperty(navigator, "platform", { configurable: true, value: "Linux x86_64" });
   });
 
-  it("does not add shell history when the sidebar opens a chat", () => {
+  it("does not add shell history when the tab bar opens a new tab", () => {
     const ui = render(
       <MemoryRouter initialEntries={["/before", "/browser"]} initialIndex={1}>
         <WorkspaceCanvas />
         <LocationProbe />
       </MemoryRouter>,
     );
-    fireEvent.click(ui.getByRole("button", { name: "New" }));
+    fireEvent.click(ui.getByRole("button", { name: "New tab" }));
     expect(ui.getByTestId("location").textContent).toBe("/agents");
     fireEvent.click(ui.getByRole("button", { name: "Go back in shell" }));
     expect(ui.getByTestId("location").textContent).toBe("/before");

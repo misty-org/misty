@@ -1,5 +1,5 @@
 import { useAuth } from "@/features/account";
-import { cn, SetupState, Surface } from "@/shared/ui";
+import { cn, SetupState, Surface } from "@misty/ui";
 import { isChangeOrigin } from "@tiptap/extension-collaboration";
 import DragHandle from "@tiptap/extension-drag-handle-react";
 import type { JSONContent } from "@tiptap/react";

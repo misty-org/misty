@@ -10,7 +10,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/app/shell";
 import type { AgentProfile } from "@/shared/schemas/native-agents";
-import { EmptyState, StarterPrompts, Text, type StarterPrompt } from "@/shared/ui";
+import { EmptyState, StarterPrompts, Text, type StarterPrompt } from "@misty/ui";
 import { useMistyStore } from "../conversations/state/useMistyStore";
 import { useDefaultEngine } from "../engines/defaultEngine";
 import { useNow } from "@/shared/hooks/useNow";

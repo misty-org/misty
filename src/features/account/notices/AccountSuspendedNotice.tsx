@@ -4,7 +4,7 @@ import {
   useAccountSuspension,
 } from "@/api/client/accountLimits";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { useNotice } from "@/shared/ui";
+import { useNotice } from "@misty/ui";
 import { useEffect } from "react";
 import { useAuth } from "../sessions/authState";
 

@@ -6,7 +6,7 @@
  */
 import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Badge, Button, cn, Skeleton, SkeletonControl, Text } from "@/shared/ui";
+import { Badge, Button, cn, Skeleton, SkeletonControl, Text } from "@misty/ui";
 import { EmptyLine, InlineError } from "./components";
 import { t } from "./strings";
 import type { SkillActivityEntry, SkillUsageResult } from "./types";

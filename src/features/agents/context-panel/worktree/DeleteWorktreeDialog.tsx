@@ -13,7 +13,7 @@ import {
   Surface,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { currentSpaceKey } from "../../engines/enginesApi";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { multirunFolderOf } from "../../multirun/multirunFolders";

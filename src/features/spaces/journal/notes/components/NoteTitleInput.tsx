@@ -1,4 +1,4 @@
-import { Input } from "@/shared/ui";
+import { Input } from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
 import type { Text as YText } from "yjs";
 import type { NoteReadingRuntime } from "./NoteReadingPaneView";

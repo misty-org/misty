@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { accountApi } from "../api/api";
 import { accountClosingMessage, useAccountClosing } from "@/api/client/accountLimits";
-import { useNotice } from "@/shared/ui";
+import { useNotice } from "@misty/ui";
 import { AccountExportDialog } from "../export/AccountExportDialog";
 import { useAuth } from "../sessions/authState";
 

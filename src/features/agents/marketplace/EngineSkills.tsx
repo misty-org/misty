@@ -19,7 +19,7 @@ import {
   notify,
   SectionHeading,
   useConfirmDelete,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { failureText } from "./api";
 import { MakerLogo, pluginMaker, sourceLabel } from "./PluginMaker";
 

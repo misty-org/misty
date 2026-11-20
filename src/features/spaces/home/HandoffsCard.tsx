@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, useNotice } from "@/shared/ui";
+import { Text, useNotice } from "@misty/ui";
 import { HandoffActions } from "../handoffs/HandoffActions";
 import { postedAgo } from "../handoffs/spacePosts";
 import { useIncomingHandoffs } from "../handoffs/useIncomingHandoffs";

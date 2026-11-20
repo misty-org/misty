@@ -13,7 +13,7 @@ import {
   Surface,
   Text,
   cn,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { ItemVisibility } from "../../api/visibility";
 import type { SlideSnapshot } from "../deck/snapshot";
 import type { DeckTheme } from "../deck/themes";

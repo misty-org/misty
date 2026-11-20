@@ -12,7 +12,7 @@ import {
   Input,
   Switch,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Lock } from "lucide-react";
 import { useSpaceRoles } from "../../roles/useSpaceRoles";
 import { allowedRoleIds, withPrivacy } from "../../roles/channelPrivacy";

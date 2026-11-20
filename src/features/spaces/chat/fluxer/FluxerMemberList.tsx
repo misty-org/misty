@@ -143,7 +143,7 @@ export function FluxerMemberList(props: {
           style={{ transform: `translateY(${y}px)` }}
         >
           <span className={members.groupHeaderLabel}>{group.title}</span>
-          <span className={members.groupHeaderSeparator}>—</span>
+          <span className={members.groupHeaderSeparator}>·</span>
           <span className={members.groupHeaderCount}>{numbers.format(group.rows.length)}</span>
         </div>
       ),

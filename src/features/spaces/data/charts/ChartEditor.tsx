@@ -20,7 +20,7 @@ import {
   PopoverContent,
   PopoverHeader,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { WorkbookEngine } from "../formula/engine";
 import { runOps } from "../grid/gridEdits";
 import { columnLabel, parseA1Range, rangeBounds } from "../workbook/a1";

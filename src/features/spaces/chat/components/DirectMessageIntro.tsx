@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { spacesApi } from "../../api/api";
-import { Avatar, AvatarFallback, AvatarImage, Text } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Text } from "@misty/ui";
 
 interface DirectRecipient {
   userId: string;

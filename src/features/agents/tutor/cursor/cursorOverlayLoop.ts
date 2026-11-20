@@ -1,7 +1,7 @@
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { RefObject } from "react";
-import { cn, screenMarkClass } from "@/shared/ui";
+import { cn, screenMarkClass } from "@misty/ui";
 import { companionFollowPoint, normalizeCompanionSize } from "./companionSize";
 import { listenToCursorInputs, type CursorInputs } from "./cursorOverlayInputs";
 import {

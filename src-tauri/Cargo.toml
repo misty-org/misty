@@ -33,6 +33,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 aes-gcm = "0.10"
+# Fuzzy scoring for an agent's recall (pure Rust, the matcher Helix uses).
+nucleo-matcher = "0.3"
 regex = "1"
 # A small local HTTP server: routing, state/path extractors and raw responses.
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }

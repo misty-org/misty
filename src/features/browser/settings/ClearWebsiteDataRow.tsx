@@ -1,5 +1,5 @@
 import { ClearWebsiteDataDialog } from "./ClearWebsiteDataDialog";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { useState } from "react";
 import { DesktopSettingsRow } from "@/features/settings";
 

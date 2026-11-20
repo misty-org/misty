@@ -1,6 +1,6 @@
 import { Square } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button, StateMark, Tooltip } from "@/shared/ui";
+import { Button, StateMark, Tooltip } from "@misty/ui";
 import { useCaptureStore } from "./useCaptureStore";
 
 /**

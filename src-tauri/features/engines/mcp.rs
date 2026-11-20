@@ -85,6 +85,8 @@ opened returns that tab. When a page needs the person (a sign-in, a CAPTCHA, a c
 browser_request_user_action instead of asking in text.";
 
 /// The person's apps, connected once in Misty and shared by every engine.
+const RECALL_INSTRUCTIONS: &str = "The recall tool searches your own memory: your notes and your \
+earlier chat with this person. Use it before saying you don't remember.";
 const APPS_INSTRUCTIONS: &str = "The integration_* tools reach the apps the user connected in \
 Misty (such as Notion, Linear or Gmail), signed in as them: find a tool with integration_search, \
 then run it with integration_execute. Prefer them to the app's web page.";
@@ -174,7 +176,7 @@ impl Caller {
         } else {
             INSTRUCTIONS
         };
-        let base = format!("{space} {APPS_INSTRUCTIONS}");
+        let base = format!("{space} {APPS_INSTRUCTIONS} {RECALL_INSTRUCTIONS}");
         if self.computer() {
             format!("{base} {}", crate::computer_use::tools::INSTRUCTIONS)
         } else {
@@ -217,6 +219,44 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
         let arguments = params["arguments"].clone();
         return crate::computer_use::tools::call(app, &caller.run_id, name, arguments).await;
     }
+    // An agent searching its own memory: read in this process, never another agent's.
+    if name == super::recall::RECALL {
+        let Some(body) = super::runs::request_of(&caller.run_id) else {
+            return tool_error("Recall needs your chat's run, and Misty can't find it.".into());
+        };
+        let text = |key: &str| body[key].as_str().unwrap_or("").to_string();
+        let query = params["arguments"]["query"].as_str().unwrap_or("").to_string();
+        if query.trim().is_empty() {
+            return tool_error("Say what to look for.".into());
+        }
+        let limit = params["arguments"]["limit"].as_u64().unwrap_or(8) as usize;
+        let (account, agent, engine) = (
+            text("account"),
+            text("agent_id"),
+            body["engine"]["id"].as_str().unwrap_or("").to_string(),
+        );
+        let folder = super::runs::folder_of(&caller.run_id);
+        let store = tauri::Manager::state::<crate::app::runtime::MistyRuntime>(app)
+            .environment
+            .store();
+        let found = tokio::task::spawn_blocking(move || {
+            super::recall::search(
+                &store,
+                &account,
+                &agent,
+                &engine,
+                folder.as_deref(),
+                &query,
+                limit,
+            )
+        })
+        .await
+        .unwrap_or_else(|error| Err(error.to_string()));
+        return match found {
+            Ok(text) => json!({ "content": [{ "type": "text", "text": text }] }),
+            Err(message) => tool_error(message),
+        };
+    }
     // The offer is the card the app draws from this call; the person answers it there.
     if name == OPEN_IN_CODE {
         return json!({
@@ -234,6 +274,28 @@ project goes and confirm it; until then, carry on in this chat and don't move an
         .filter(|id| !id.is_empty());
     if let Some(wire) = wire {
         super::bridge::note_mcp_call(wire, &format!("mcp__misty__{name}"), &params["arguments"]);
+    }
+    // A tool of an app's own MCP server: the same journal and gate as any other, under its internal name.
+    if let Some((internal, _)) = crate::apps::mcp::resolve(name) {
+        let host = AppToolHost { app: app.clone() };
+        let outcome = host
+            .call(LocalToolCall {
+                run_id: caller.run_id.clone(),
+                call_id: wire
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("mcp_{}", uuid::Uuid::new_v4().simple())),
+                turn: 0,
+                name: internal,
+                input: params["arguments"].clone(),
+            })
+            .await;
+        return match outcome {
+            LocalToolOutcome::Result(value) => result_content(value),
+            LocalToolOutcome::Rejected { code, message } => json!({
+                "isError": true,
+                "content": [{ "type": "text", "text": format!("{message} ({code})") }],
+            }),
+        };
     }
     let offered = caller.offers(&json!({ "name": name }));
     let found = offered
@@ -331,6 +393,9 @@ async fn serve(AxumState(app): AxumState<AppHandle>, headers: HeaderMap, body: B
             if caller.computer() {
                 tools.extend(crate::computer_use::tools::offered());
             }
+            tools.push(super::recall::tool());
+            // What the apps open in Misty offer, over their own MCP servers (`apps/mcp.rs`).
+            tools.extend(crate::apps::mcp::offered());
             reply(id, json!({ "tools": tools }))
         }
         "tools/call" => reply(id, call_tool(&app, &caller, &message["params"]).await),

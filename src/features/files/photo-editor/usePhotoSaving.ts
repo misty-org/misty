@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import { clearImageEdit, type ImageDocParts } from "./imageDoc";
 import type { ImageEdit } from "./imageEdit";
 import {

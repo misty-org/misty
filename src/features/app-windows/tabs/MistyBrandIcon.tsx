@@ -1,4 +1,4 @@
-import { MistyMark, cn } from "@/shared/ui";
+import { MistyMark, cn } from "@misty/ui";
 
 export function MistyBrandIcon(props: {
   className?: string;

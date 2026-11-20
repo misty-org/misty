@@ -14,7 +14,7 @@ import {
   Text,
   Tooltip,
   type TextTone,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { absoluteOf, openChangedFile } from "./ChangesFileContextMenu";
 import { diffSteps, type DiffStep } from "./diffSteps";
 import {
@@ -26,7 +26,7 @@ import {
   type GitStatus,
 } from "./gitApi";
 import type { DiffTarget } from "./store";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 
 const DIFF_TRUNCATE_LINES = 2000;
 /** The before and after of an image, side by side. */

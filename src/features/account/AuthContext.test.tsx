@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth, type AuthContextValue } from "./AuthContext";
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import SignIn from "./pages/SignInPage";
 const mocks = vi.hoisted(() => {
   const accountA = {

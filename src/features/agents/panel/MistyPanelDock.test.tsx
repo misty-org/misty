@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { settleDeviceSettings } from "@/tests/fakeDeviceSettings";
 import { MistyPanelDock } from "./MistyPanelDock";
-import { remCss } from "@/shared/lib/uiScale";
+import { remCss } from "@misty/ui";
 import {
   MISTY_PANEL_MAX_WIDTH,
   MISTY_PANEL_MIN_WIDTH,

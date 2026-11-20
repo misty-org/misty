@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { spaceAgentsApi, useAgentAccountId, usePersonalAgentsStore } from "@/features/agents";
+import { spacesApi } from "../api/api";
 import type { SpaceMessage } from "../api/dto/entities";
 import type { MentionableAgent } from "./useSpaceMessageSpansStore";
 
@@ -31,10 +32,15 @@ export function useOwnMentionableAgents(userId: string | undefined): Mentionable
 
 /**
  * Before a message that mentions one of the person's agents is sent, brings that agent into the
- * Space, as the Space only takes mentions of agents it lists. The Space learns its name and nothing
+ * Space (or, in a group DM, into the group), as each only takes mentions of agents it lists. The Space learns its name and nothing
  * else about it.
  */
-export function useBringMentionedAgents(spaceId: string, agents: readonly MentionableAgent[]) {
+export function useBringMentionedAgents(
+  spaceId: string,
+  agents: readonly MentionableAgent[],
+  /** The open group DM, whose own roster lists the agents that may be mentioned in it. */
+  groupConversationId = "",
+) {
   const brought = useRef(new Set<string>());
   return async (content: SpaceMessage["content"]) => {
     const mentioned = new Set(
@@ -43,9 +49,17 @@ export function useBringMentionedAgents(spaceId: string, agents: readonly Mentio
       ),
     );
     for (const agent of agents) {
-      const key = `${spaceId}:${agent.agent_id}`;
+      const key = `${spaceId}:${groupConversationId}:${agent.agent_id}`;
       if (!mentioned.has(agent.agent_id) || brought.current.has(key)) continue;
-      await spaceAgentsApi.add(spaceId, agent.agent_id, agent.agent_name);
+      // A private group lists its agents itself, so one never shows in the whole Space.
+      if (groupConversationId)
+        await spacesApi.addConversationAgent(
+          spaceId,
+          groupConversationId,
+          agent.agent_id,
+          agent.agent_name,
+        );
+      else await spaceAgentsApi.add(spaceId, agent.agent_id, agent.agent_name);
       brought.current.add(key);
     }
   };

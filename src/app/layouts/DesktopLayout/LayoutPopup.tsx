@@ -1,7 +1,7 @@
 import { TourInfoButton } from "@/features/onboarding";
 import { Blocks, Check, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-import { usePointerDrag, usePointerDropTarget } from "@/shared/hooks/usePointerReorder";
+import { usePointerDrag, usePointerDropTarget } from "@misty/ui";
 import {
   allLayoutPanes,
   allLayoutViews,
@@ -32,7 +32,7 @@ import {
   Pressable,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { dropZoneAt } from "./dockSplitFit";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
 

@@ -15,7 +15,7 @@ import {
   notify,
   SectionHeading,
   useConfirmDelete,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   failureText,
   marketApi,

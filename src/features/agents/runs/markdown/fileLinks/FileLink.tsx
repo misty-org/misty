@@ -7,7 +7,7 @@ import {
   ContextMenuTrigger,
   MenuItem,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { resolveFilePath } from "./fileLinks";
 import {
   copyChatFilePath,

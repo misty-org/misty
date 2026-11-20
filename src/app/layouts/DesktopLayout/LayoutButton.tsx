@@ -1,6 +1,6 @@
 import { LayoutPanelLeft } from "lucide-react";
 import { useLayoutEditor } from "@/features/app-windows";
-import { IconButton } from "@/shared/ui";
+import { IconButton } from "@misty/ui";
 
 /** Opens the layout picker, which splits and joins the current tab's pages. It sits at the far end
  * of the tab row. */

@@ -7,7 +7,7 @@ import {
   Surface,
   Text,
   ToolSuspense,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ItemVisibility } from "../api/visibility";
 import { readEmbedSource, type EmbedSourceState } from "./embedSources";

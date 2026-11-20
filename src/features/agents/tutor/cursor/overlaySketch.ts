@@ -1,4 +1,4 @@
-import { cn, screenMarkClass, sketchInk } from "@/shared/ui";
+import { cn, screenMarkClass, sketchInk } from "@misty/ui";
 import { mapSketch } from "./companionSketch";
 import { createModelView, type ModelView } from "./modelView";
 import { boardCardBox } from "./pointLayout";

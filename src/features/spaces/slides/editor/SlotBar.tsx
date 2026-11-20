@@ -1,6 +1,6 @@
 import { Bold, List } from "lucide-react";
 import type { ReactNode } from "react";
-import { IconButton, Surface } from "@/shared/ui";
+import { IconButton, Surface } from "@misty/ui";
 import { SLIDE_HEIGHT, type SlotBox } from "../deck/layouts";
 
 /** Screen pixels between the bar and the slot it sits over. */

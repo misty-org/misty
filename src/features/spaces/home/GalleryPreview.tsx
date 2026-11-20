@@ -8,7 +8,7 @@ import {
   Text,
   type ItemTone,
   type SpaceMadeKind,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { GalleryItem, GalleryKind } from "./galleryItems";
 
 type KindIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;

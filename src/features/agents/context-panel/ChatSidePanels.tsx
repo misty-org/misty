@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, IconButton, SideCard, SidePanel, lazyTool, ToolSuspense } from "@/shared/ui";
+import { cn, IconButton, SideCard, SidePanel, lazyTool, ToolSuspense } from "@misty/ui";
 import { AgentBrowser } from "../agent-browser/AgentBrowser";
 import {
   closeAgentBrowser,

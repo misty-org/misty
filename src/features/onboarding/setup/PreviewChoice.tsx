@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
-import { Pressable, Surface, Text } from "@/shared/ui";
+import { Pressable, Surface, Text } from "@misty/ui";
 
 /** A preview tile; the selected one gets a stronger border and a checkmark. */
 export function PreviewChoice(props: {

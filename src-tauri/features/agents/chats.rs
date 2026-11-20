@@ -1,8 +1,9 @@
 //! Agent chats kept on this computer, per account, in `misty.db`: conversations with their
 //! messages, and the folders that group them. Like Claude Code and Codex, a chat lives on the
 //! computer it was started on and never syncs; the server only runs its turns
-//! Documents are the app's own JSON, stored as they are. A lesson
-//! is a Teach-mode chat's progress (goal, objectives, hint level), kept beside its chat.
+//! Documents are the app's own JSON, stored as they are; a conversation's messages live separately
+//! so the transcript can page them. A lesson is a Teach-mode chat's progress (goal, objectives,
+//! hint level), kept beside its chat.
 //! A chat's run state (plans, goals, questions, checklists) and notebook live here too, and a run
 //! notes which chat it belongs to.
 
@@ -10,6 +11,8 @@ pub mod commands;
 pub(crate) mod storage;
 
 use rusqlite::OptionalExtension;
+use serde::Serialize;
+use serde_json::{json, Value};
 
 use database::store::Store;
 
@@ -38,8 +41,10 @@ const KINDS: &[&str] = &[
     // The virtual studio on this computer: each Space's room and how each agent looks in it.
     "studio",
 ];
-/// A long chat with its timelines stays far below this.
+/// Bound every local document at the IPC boundary.
 const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
+const CHAT_MESSAGE_PAGE_SIZE: usize = 50;
+const MAX_CHAT_MESSAGE_PAGE_SIZE: usize = 100;
 
 fn valid_key(value: &str) -> bool {
     !value.is_empty() && value.len() <= 256 && !value.chars().any(char::is_control)
@@ -57,6 +62,124 @@ fn check_document(document: &str) -> Result<(), String> {
         || serde_json::from_str::<serde_json::Value>(document).is_err()
     {
         return Err("invalid_agent_chat".into());
+    }
+    Ok(())
+}
+
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentChatMessagePage {
+    /// Messages in display order, oldest to newest within this page.
+    pub messages: Vec<String>,
+    /// The cursor for the next older page.
+    pub before_seq: Option<i64>,
+    pub has_older: bool,
+}
+
+fn read_message_page(
+    connection: &rusqlite::Connection,
+    account: &str,
+    conversation: &str,
+    before_seq: Option<i64>,
+    limit: usize,
+) -> rusqlite::Result<AgentChatMessagePage> {
+    let limit = limit.clamp(1, MAX_CHAT_MESSAGE_PAGE_SIZE);
+    let mut statement = connection.prepare(
+        "SELECT seq, document FROM agent_chat_messages
+         WHERE account = ?1 AND conversation = ?2 AND (?3 IS NULL OR seq < ?3)
+         ORDER BY seq DESC LIMIT ?4",
+    )?;
+    let rows = statement.query_map(
+        rusqlite::params![account, conversation, before_seq, (limit + 1) as i64],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+    )?;
+    let mut rows = rows.collect::<Result<Vec<_>, _>>()?;
+    let has_older = rows.len() > limit;
+    rows.truncate(limit);
+    rows.reverse();
+    let before_seq = rows.first().map(|(seq, _)| *seq);
+    Ok(AgentChatMessagePage {
+        messages: rows.into_iter().map(|(_, document)| document).collect(),
+        before_seq,
+        has_older,
+    })
+}
+
+/// Replaces one finished-message recall row, or removes its old row when the message is no longer
+/// complete. The FTS entry and message row are always changed in the same SQLite transaction.
+fn update_recall(
+    transaction: &rusqlite::Transaction<'_>,
+    account: &str,
+    conversation: &str,
+    agent: &str,
+    message: &Value,
+) -> rusqlite::Result<()> {
+    let Some(id) = message["id"].as_str() else {
+        return Ok(());
+    };
+    if let Some(rowid) = transaction
+        .query_row(
+            "SELECT recall_rowid FROM chat_recall_seen
+             WHERE account = ?1 AND conversation = ?2 AND message = ?3",
+            rusqlite::params![account, conversation, id],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+    {
+        transaction.execute("DELETE FROM chat_recall WHERE rowid = ?1", [rowid])?;
+        transaction.execute(
+            "DELETE FROM chat_recall_seen WHERE account = ?1 AND conversation = ?2 AND message = ?3",
+            rusqlite::params![account, conversation, id],
+        )?;
+    }
+    let text = message["content"].as_str().unwrap_or("");
+    let state = message["state"].as_str().unwrap_or("completed");
+    if state != "completed" || text.trim().is_empty() {
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO chat_recall (text, account, agent_id, conversation, role, at, message)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![
+            text,
+            account,
+            agent,
+            conversation,
+            message["role"].as_str().unwrap_or(""),
+            message["createdAt"].as_str().unwrap_or(""),
+            id,
+        ],
+    )?;
+    let rowid = transaction.last_insert_rowid();
+    transaction.execute(
+        "INSERT INTO chat_recall_seen (account, conversation, message, recall_rowid)
+         VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![account, conversation, id, rowid],
+    )?;
+    Ok(())
+}
+
+fn delete_recall_message(
+    transaction: &rusqlite::Transaction<'_>,
+    account: &str,
+    conversation: &str,
+    message: &str,
+) -> rusqlite::Result<()> {
+    if let Some(rowid) = transaction
+        .query_row(
+            "SELECT recall_rowid FROM chat_recall_seen
+             WHERE account = ?1 AND conversation = ?2 AND message = ?3",
+            rusqlite::params![account, conversation, message],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+    {
+        transaction.execute("DELETE FROM chat_recall WHERE rowid = ?1", [rowid])?;
+        transaction.execute(
+            "DELETE FROM chat_recall_seen WHERE account = ?1 AND conversation = ?2 AND message = ?3",
+            rusqlite::params![account, conversation, message],
+        )?;
     }
     Ok(())
 }
@@ -110,19 +233,99 @@ impl AgentChatsService {
         let store = self.store.clone();
         tokio::task::spawn_blocking(move || {
             let mut connection = store.connect().map_err(|e| e.to_string())?;
-            let transaction = connection.transaction().map_err(|e| e.to_string())?;
-            let moved = transaction
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|e| e.to_string())?;
+            transaction
                 .execute(
-                    "UPDATE OR IGNORE agent_chats SET account = ?2 WHERE account = ?1
-                     AND NOT (kind = 'agent' AND id LIKE 'sitegrant\\_%' ESCAPE '\\')",
+                    "CREATE TEMP TABLE chats_to_adopt AS
+                         SELECT kept.id FROM agent_chats AS kept
+                         WHERE kept.account = ?1 AND kept.kind = 'conversation'
+                           AND NOT EXISTS (SELECT 1 FROM agent_chats theirs
+                               WHERE theirs.account = ?2 AND theirs.kind = kept.kind
+                                 AND theirs.id = kept.id)",
                     rusqlite::params![from, to],
                 )
                 .map_err(|e| e.to_string())?;
             transaction
                 .execute(
+                    "DELETE FROM chat_recall
+                     WHERE rowid IN (SELECT recall_rowid FROM chat_recall_seen
+                         WHERE account = ?1 AND conversation IN
+                           (SELECT id FROM chats_to_adopt))",
+                    [&from],
+                )
+                .map_err(|e| e.to_string())?;
+            transaction
+                .execute(
+                    "DELETE FROM chat_recall_seen WHERE account = ?1 AND conversation IN
+                         (SELECT id FROM chats_to_adopt)",
+                    [&from],
+                )
+                .map_err(|e| e.to_string())?;
+            transaction
+                .execute(
+                    "UPDATE agent_chat_messages SET account = ?2 WHERE account = ?1
+                     AND conversation IN (SELECT id FROM chats_to_adopt)",
+                    rusqlite::params![from, to],
+                )
+                .map_err(|e| e.to_string())?;
+            let moved = transaction
+                .execute(
+                    "UPDATE OR IGNORE agent_chats SET account = ?2 WHERE account = ?1
+                     AND NOT (kind = 'agent' AND id LIKE 'sitegrant\\_%' ESCAPE '\\')
+                     AND NOT EXISTS (SELECT 1 FROM agent_chats theirs
+                         WHERE theirs.account = ?2 AND theirs.kind = agent_chats.kind
+                           AND theirs.id = agent_chats.id)",
+                    rusqlite::params![from, to],
+                )
+                .map_err(|e| e.to_string())?;
+            // Recall's FTS rows carry the account and agent as searchable metadata, so rebuild only
+            // the rows for conversations that actually moved to the new account.
+            let mut chats = transaction
+                .prepare(
+                    "SELECT c.id, c.document FROM agent_chats c
+                     WHERE c.account = ?1 AND c.kind = 'conversation'
+                       AND c.id IN (SELECT id FROM chats_to_adopt)",
+                )
+                .map_err(|e| e.to_string())?;
+            let rows = chats
+                .query_map([&to], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+                .map_err(|e| e.to_string())?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| e.to_string())?;
+            drop(chats);
+            for (conversation, metadata) in rows {
+                let agent = serde_json::from_str::<Value>(&metadata)
+                    .ok()
+                    .and_then(|chat| chat["agentId"].as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                let mut statement = transaction
+                    .prepare(
+                        "SELECT document FROM agent_chat_messages
+                         WHERE account = ?1 AND conversation = ?2 ORDER BY seq ASC",
+                    )
+                    .map_err(|e| e.to_string())?;
+                let messages = statement
+                    .query_map(rusqlite::params![to, conversation], |row| row.get::<_, String>(0))
+                    .map_err(|e| e.to_string())?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| e.to_string())?;
+                for message in messages {
+                    if let Ok(value) = serde_json::from_str::<Value>(&message) {
+                        update_recall(&transaction, &to, &conversation, &agent, &value)
+                            .map_err(|e| e.to_string())?;
+                    }
+                }
+            }
+            transaction
+                .execute(
                     "UPDATE agent_tool_journal SET account = ?2 WHERE account = ?1",
                     rusqlite::params![from, to],
                 )
+                .map_err(|e| e.to_string())?;
+            transaction
+                .execute_batch("DROP TABLE chats_to_adopt;")
                 .map_err(|e| e.to_string())?;
             transaction.commit().map_err(|e| e.to_string())?;
             Ok(moved as u64)
@@ -146,11 +349,165 @@ impl AgentChatsService {
             let rows = statement
                 .query_map(rusqlite::params![account, kind], |row| row.get(0))
                 .map_err(|e| e.to_string())?;
-            rows.collect::<Result<Vec<String>, _>>()
-                .map_err(|e| e.to_string())
+            let mut documents = rows
+                .collect::<Result<Vec<String>, _>>()
+                .map_err(|e| e.to_string())?;
+            if kind == "conversation" {
+                for document in &mut documents {
+                    let Ok(mut value) = serde_json::from_str::<Value>(document) else {
+                        continue;
+                    };
+                    let Some(id) = value["id"].as_str() else {
+                        continue;
+                    };
+                    let page = read_message_page(
+                        &connection,
+                        &account,
+                        id,
+                        None,
+                        CHAT_MESSAGE_PAGE_SIZE,
+                    )
+                    .map_err(|e| e.to_string())?;
+                    let messages: Vec<Value> = page
+                        .messages
+                        .iter()
+                        .filter_map(|message| serde_json::from_str(message).ok())
+                        .collect();
+                    value["messages"] = json!(messages);
+                    value["messageBeforeSeq"] = json!(page.before_seq);
+                    value["hasOlderMessages"] = json!(page.has_older);
+                    *document = serde_json::to_string(&value).map_err(|e| e.to_string())?;
+                }
+            }
+            Ok(documents)
         })
         .await
         .map_err(|e| e.to_string())?
+    }
+
+    /// One bounded window of messages, oldest to newest within the page.
+    pub async fn messages_page(
+        &self,
+        account: String,
+        conversation: String,
+        before_seq: Option<i64>,
+        limit: usize,
+    ) -> Result<AgentChatMessagePage, String> {
+        check(&account, "conversation", &conversation)?;
+        let store = self.store.clone();
+        tokio::task::spawn_blocking(move || {
+            let connection = store.connect().map_err(|error| error.to_string())?;
+            read_message_page(&connection, &account, &conversation, before_seq, limit)
+                .map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
+    }
+
+    /// Upserts only the changed message documents and removes messages discarded by a rewind.
+    pub async fn upsert_messages(
+        &self,
+        account: String,
+        conversation: String,
+        messages: Vec<String>,
+        deleted: Vec<String>,
+    ) -> Result<(), String> {
+        check(&account, "conversation", &conversation)?;
+        if messages.len() > MAX_CHAT_MESSAGE_PAGE_SIZE {
+            return Err("invalid_agent_chat".into());
+        }
+        let parsed = messages
+            .into_iter()
+            .map(|document| {
+                check_document(&document)?;
+                let value: Value = serde_json::from_str(&document).map_err(|_| "invalid_agent_chat")?;
+                let id = value["id"].as_str().filter(|id| valid_key(id)).ok_or("invalid_agent_chat")?;
+                Ok((id.to_string(), value, document))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        if deleted.len() > MAX_CHAT_MESSAGE_PAGE_SIZE || deleted.iter().any(|id| !valid_key(id)) {
+            return Err("invalid_agent_chat".into());
+        }
+        let store = self.store.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut connection = store.connect().map_err(|error| error.to_string())?;
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|error| error.to_string())?;
+            let metadata = transaction
+                .query_row(
+                    "SELECT document FROM agent_chats
+                     WHERE account = ?1 AND kind = 'conversation' AND id = ?2",
+                    rusqlite::params![account, conversation],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|error| error.to_string())?
+                .ok_or_else(|| "This chat is no longer available.".to_string())?;
+            let agent = serde_json::from_str::<Value>(&metadata)
+                .ok()
+                .and_then(|chat| chat["agentId"].as_str().map(str::to_owned))
+                .unwrap_or_default();
+            for message in deleted {
+                transaction
+                    .execute(
+                        "DELETE FROM agent_chat_messages
+                         WHERE account = ?1 AND conversation = ?2 AND id = ?3",
+                        rusqlite::params![account, conversation, message],
+                    )
+                    .map_err(|error| error.to_string())?;
+                delete_recall_message(&transaction, &account, &conversation, &message)
+                    .map_err(|error| error.to_string())?;
+            }
+            for (id, value, document) in parsed {
+                let sequence = transaction
+                    .query_row(
+                        "SELECT seq FROM agent_chat_messages
+                         WHERE account = ?1 AND conversation = ?2 AND id = ?3",
+                        rusqlite::params![account, conversation, id],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .optional()
+                    .map_err(|error| error.to_string())?;
+                if let Some(sequence) = sequence {
+                    transaction
+                        .execute(
+                            "UPDATE agent_chat_messages SET document = ?1
+                             WHERE account = ?2 AND conversation = ?3 AND seq = ?4",
+                            rusqlite::params![document, account, conversation, sequence],
+                        )
+                        .map_err(|error| error.to_string())?;
+                } else {
+                    let sequence = transaction
+                        .query_row(
+                            "SELECT COALESCE(MAX(seq) + 1, 0) FROM agent_chat_messages
+                             WHERE account = ?1 AND conversation = ?2",
+                            rusqlite::params![account, conversation],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .map_err(|error| error.to_string())?;
+                    transaction
+                        .execute(
+                            "INSERT INTO agent_chat_messages (account, conversation, seq, id, document)
+                             VALUES (?1, ?2, ?3, ?4, ?5)",
+                            rusqlite::params![account, conversation, sequence, id, document],
+                        )
+                        .map_err(|error| error.to_string())?;
+                }
+                update_recall(&transaction, &account, &conversation, &agent, &value)
+                    .map_err(|error| error.to_string())?;
+            }
+            transaction
+                .execute(
+                    "UPDATE agent_chats SET updated_at = ?1
+                     WHERE account = ?2 AND kind = 'conversation' AND id = ?3",
+                    rusqlite::params![now_ms(), account, conversation],
+                )
+                .map_err(|error| error.to_string())?;
+            transaction.commit().map_err(|error| error.to_string())
+        })
+        .await
+        .map_err(|error| error.to_string())?
     }
 
     pub async fn get(
@@ -206,7 +563,8 @@ impl AgentChatsService {
                     rusqlite::params![account, kind, id, document, now],
                 ),
             };
-            changed.map(|rows| rows == 1).map_err(|e| e.to_string())
+            let changed = changed.map(|rows| rows == 1).map_err(|e| e.to_string())?;
+            Ok(changed)
         })
         .await
         .map_err(|e| e.to_string())?
@@ -233,8 +591,8 @@ impl AgentChatsService {
                      DO UPDATE SET document = excluded.document, updated_at = excluded.updated_at",
                     rusqlite::params![account, kind, id, document, now],
                 )
-                .map(|_| ())
-                .map_err(|e| e.to_string())
+                .map_err(|e| e.to_string())?;
+            Ok(())
         })
         .await
         .map_err(|e| e.to_string())?
@@ -244,14 +602,40 @@ impl AgentChatsService {
         check(&account, &kind, &id)?;
         let store = self.store.clone();
         tokio::task::spawn_blocking(move || {
-            let connection = store.connect().map_err(|e| e.to_string())?;
-            connection
+            let mut connection = store.connect().map_err(|e| e.to_string())?;
+            let transaction = connection
+                .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                .map_err(|e| e.to_string())?;
+            if kind == "conversation" {
+                transaction
+                    .execute(
+                        "DELETE FROM chat_recall WHERE rowid IN (
+                             SELECT recall_rowid FROM chat_recall_seen
+                             WHERE account = ?1 AND conversation = ?2
+                         )",
+                        rusqlite::params![account, id],
+                    )
+                    .map_err(|e| e.to_string())?;
+                transaction
+                    .execute(
+                    "DELETE FROM chat_recall_seen WHERE account = ?1 AND conversation = ?2",
+                    rusqlite::params![account, id],
+                    )
+                    .map_err(|e| e.to_string())?;
+                transaction
+                    .execute(
+                        "DELETE FROM agent_chat_messages WHERE account = ?1 AND conversation = ?2",
+                        rusqlite::params![account, id],
+                    )
+                    .map_err(|e| e.to_string())?;
+            }
+            transaction
                 .execute(
                     "DELETE FROM agent_chats WHERE account = ?1 AND kind = ?2 AND id = ?3",
                     rusqlite::params![account, kind, id],
                 )
-                .map(|_| ())
-                .map_err(|e| e.to_string())
+                .map_err(|e| e.to_string())?;
+            transaction.commit().map_err(|e| e.to_string())
         })
         .await
         .map_err(|e| e.to_string())?

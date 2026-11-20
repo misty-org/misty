@@ -10,4 +10,4 @@ export {
   homeSectionClass,
   overviewRowClass,
   spaceHomeClass,
-} from "@/shared/ui";
+} from "@misty/ui";

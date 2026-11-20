@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ENGINE_IDS, type EngineId } from "@/features/engine-config/channels";
-import { DisclosureButton, ListCard } from "@/shared/ui";
+import { DisclosureButton, ListCard } from "@misty/ui";
 import { EngineSetupRow, type EngineSetupState } from "./EngineSetupRow";
 
 /**

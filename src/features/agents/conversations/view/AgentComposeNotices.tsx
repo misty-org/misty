@@ -2,7 +2,7 @@ import { Reply, X } from "lucide-react";
 import type { GlobalAiConversation } from "../state/conversationTypes";
 import { useMistyStore } from "../state/useMistyStore";
 import { needsDefaultEngine, openEngineSettings } from "../../engines/engineNeeded";
-import { IconButton, Surface, Text } from "@/shared/ui";
+import { IconButton, Surface, Text } from "@misty/ui";
 import { ErrorNotice } from "../ErrorNotice";
 
 /**

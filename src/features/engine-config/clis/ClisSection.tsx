@@ -28,7 +28,7 @@ import {
   SetupState,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ENGINE_DOCS_URLS, ENGINE_IDS, ENGINE_NAMES, type EngineId } from "../channels/engines";
 import { cliApi, type CliRemoveKind, type CliVersionStatus } from "./api";
 import { CliUpdateDialog } from "./CliUpdateDialog";

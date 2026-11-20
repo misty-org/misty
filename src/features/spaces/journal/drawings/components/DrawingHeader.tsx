@@ -1,4 +1,4 @@
-import { BackButton, Button, Input, Surface, Text, useNotice } from "@/shared/ui";
+import { BackButton, Button, Input, Surface, Text, useNotice } from "@misty/ui";
 import { useEffect, useState } from "react";
 import type { SpaceDrawing } from "../drawingTypes";
 import { DrawingActionsMenu } from "./DrawingActionsMenu";

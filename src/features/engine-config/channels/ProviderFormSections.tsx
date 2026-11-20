@@ -16,7 +16,7 @@ import {
   OverflowFadeText,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { BrandMark } from "../brands/BrandMark";
 import type { EngineId } from "./engines";
 import {

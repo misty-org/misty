@@ -13,7 +13,7 @@ import {
   Text,
   Tooltip,
   notify,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { personInitials } from "@/shared/lib/personInitials";
 import {
   exportFilename,

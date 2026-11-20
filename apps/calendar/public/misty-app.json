@@ -1,0 +1,8 @@
+{
+  "id": "calendar",
+  "name": "Calendar",
+  "version": "1.0.0",
+  "logo": "logo.svg",
+  "entry": "index.html",
+  "permissions": ["chat.post", "members", "records"]
+}

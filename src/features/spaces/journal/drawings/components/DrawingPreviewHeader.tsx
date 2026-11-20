@@ -8,7 +8,7 @@ import {
   MenuItem,
   Text,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { ArrowRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { SpaceDrawing } from "../drawingTypes";

@@ -1,4 +1,4 @@
-import { OverflowFadeText, StepDot, Text } from "@/shared/ui";
+import { OverflowFadeText, StepDot, Text } from "@misty/ui";
 import { useNow } from "@/shared/hooks/useNow";
 import { tookText } from "../meta/format";
 import { RollingStat } from "./RollingStat";

@@ -17,7 +17,7 @@ import {
   RoleDot,
   SectionHeading,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useAuth } from "@/features/account";
 import { spacesApi } from "../api/api";
 import type { RoleInput, Space, SpaceRoleDef } from "../api/dto/entities";

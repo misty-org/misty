@@ -1,4 +1,4 @@
-import { IconButton } from "@/shared/ui";
+import { IconButton } from "@misty/ui";
 import { ArrowLeft, ArrowRight, RotateCw, X } from "lucide-react";
 import { browserToolbarStyles } from "./browserToolbarStyles";
 

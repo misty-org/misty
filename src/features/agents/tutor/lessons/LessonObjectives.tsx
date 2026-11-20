@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { useCollaborationStore } from "../../plans/store";
 import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";

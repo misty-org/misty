@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
   Progress,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { LibraryUploadJob } from "../hook-signatures/useSpaceLibraryData";
 
 /**

@@ -15,7 +15,6 @@ import {
 } from "./uiRules";
 
 const extensions = new Set([".ts", ".tsx"]);
-const uiImplementationRoots = ["src/shared/ui/"];
 /** Files whose job is defining custom properties that stylesheets read. */
 const customPropertyDefinitionOwners = new Set([
   // Runtime geometry and user-selected group colors feed the shell stylesheets.
@@ -64,13 +63,12 @@ describe("UI architecture contract", () => {
   it("imports shared UI only through its barrel", () => {
     const failures = walk("src", extensions)
       .map(repositoryPath)
-      .filter((path) => !uiImplementationRoots.some((root) => path.startsWith(root)))
       .filter((path) =>
         /from\s+["'](?:@\/shared\/ui\/|(?:\.\.?\/)+(?:[\w-]+\/)*shared\/ui\/)/.test(
           readFileSync(path, "utf8"),
         ),
       )
-      .map((path) => `${path}: import from "@/shared/ui"`);
+      .map((path) => `${path}: import from "@misty/ui"`);
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
@@ -97,15 +95,13 @@ describe("UI architecture contract", () => {
       if (relative.endsWith(".test.ts") || relative.endsWith(".test.tsx")) continue;
       const text = readFileSync(path, "utf8");
       if (
-        !uiImplementationRoots.some((root) => relative.startsWith(root)) &&
         /from\s+["'](?:@radix-ui\/|radix-ui["'])/.test(text)
       ) {
-        failures.push(`${relative}: import Radix only inside src/shared/ui`);
+        failures.push(`${relative}: import Radix only inside @misty/ui`);
       }
       // Reading a token with var() inside a Tailwind class is fine; defining new custom
       // properties inline is where styling escapes the design system.
       if (
-        !uiImplementationRoots.some((root) => relative.startsWith(root)) &&
         !customPropertyDefinitionOwners.has(relative) &&
         /["']--[a-z][a-z0-9-]*["']\s*:/.test(text)
       ) {
@@ -291,18 +287,6 @@ describe("UI rules", () => {
     expect(count(feature, `// never truncate here\n/* line-clamp-2 */\nconst a = 1;`)).toEqual({});
   });
 
-  it("applies the shared subset inside src/shared/ui", () => {
-    const shared = "src/shared/ui/controls/Example.tsx";
-    const text = `<span title="x" className="truncate w-[13px] text-cream bg-[#fff] text-[13px]" />`;
-    expect(count(shared, text)).toEqual({
-      "native-title": 1,
-      ellipsis: 1,
-      "arbitrary-px": 1,
-      "hex-color": 1,
-      "font-size-literal": 1,
-    });
-  });
-
   it("checks feature stylesheets", () => {
     const css = `
       /* font-size: 13px in a comment doesn't count */
@@ -319,7 +303,6 @@ describe("UI rules", () => {
       "css-z": 1,
     });
     expect(count("src/styles/theme.css", css)).toEqual({});
-    expect(count("src/shared/ui/feedback/example.css", css)).toEqual({});
   });
 });
 

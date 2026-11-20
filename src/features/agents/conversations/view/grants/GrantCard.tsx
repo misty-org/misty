@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useEffect, useState } from "react";
 import { Check, FolderLock, RotateCcw, X } from "lucide-react";
-import { Button, Surface, Text } from "@/shared/ui";
+import { Button, Surface, Text } from "@misty/ui";
 import type { FolderGrant, GlobalAiMessage } from "../../state/conversationTypes";
 import { folderGrantScope, patchFolderGrant, requestFolderGrant } from "./folderGrants";
 

@@ -15,7 +15,7 @@ import {
   Switch,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { ProviderEntry } from "./providers";
 
 export const ROW = "flex min-h-13 w-full items-center gap-3 border-b px-3 py-2.5 last:border-b-0";

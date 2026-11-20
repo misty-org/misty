@@ -3,7 +3,7 @@ import { directAppsApi, type DirectConnection } from "../connected-apps/directAp
 import { agentsDeviceSnapshot } from "./useAgentsStore";
 import type { AgentDeviceSnapshot } from "./agentScope";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, ListRow, ListRowSkeleton, Text, useNotice } from "@/shared/ui";
+import { Button, ListRow, ListRowSkeleton, Text, useNotice } from "@misty/ui";
 import { Cable, Layers } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 

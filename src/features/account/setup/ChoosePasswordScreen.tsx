@@ -2,7 +2,7 @@ import { useAuth } from "../sessions/authState";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
 import { accountSetFirstPassword } from "../sessions/accountPassword";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { useState, type FormEvent } from "react";
 
 /**

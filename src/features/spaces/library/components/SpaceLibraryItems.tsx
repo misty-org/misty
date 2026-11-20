@@ -1,4 +1,4 @@
-import { Button, CollectionItems, SkeletonList, Text } from "@/shared/ui";
+import { Button, CollectionItems, SkeletonList, Text } from "@misty/ui";
 import { Fragment, type MouseEvent as ReactMouseEvent } from "react";
 import {
   formatBytes,
@@ -16,7 +16,7 @@ import { ITEM_ACTION_MENU_WIDTH, LibraryItemCard } from "./LibraryItemCard";
 import { hasLibraryItemMenuRows, LibraryItemMenuRows } from "./LibraryItemContextMenu";
 import { useLibraryItemMenuActions } from "./useLibraryItemMenuActions";
 import { useRangeSelection } from "@/shared/hooks/useRangeSelection";
-import { remCss, uiPx } from "@/shared/lib/uiScale";
+import { remCss, uiPx } from "@misty/ui";
 const ITEM_ACTION_MENU_HEIGHT = 336;
 function clampMenuPosition(left: number, top: number, anchor?: Element) {
   const pane = anchor?.closest<HTMLElement>("[data-workspace-pane]");

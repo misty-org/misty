@@ -1,4 +1,4 @@
-import { Button, EmptyState, Surface, useNotice, ToolSuspense } from "@/shared/ui";
+import { Button, EmptyState, Surface, useNotice, ToolSuspense } from "@misty/ui";
 import { ClipboardCopy } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import type { UnifiedNote } from "../noteTypes";

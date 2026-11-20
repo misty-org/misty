@@ -8,7 +8,7 @@ import {
   IconButton,
   MenuCheckItem,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 /** A lock and the word, so the layer never rests on the icon alone. */
 export function PrivateLabel({ className }: { className?: string }) {

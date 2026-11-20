@@ -1,5 +1,6 @@
 import { Lock, Users } from "lucide-react";
 import {
+  AppLogo,
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
@@ -10,7 +11,8 @@ import {
   Tooltip,
   cn,
   itemToneClass,
-} from "@/shared/ui";
+  type OfficialAppId,
+} from "@misty/ui";
 import { homeItemsClass, homeItemsWrapClass } from "./homeLayout";
 import type { ItemVisibility } from "../api/visibility";
 import { VisibilityMenu } from "../components/VisibilityMenu";
@@ -18,6 +20,26 @@ import { editedLabel, type GalleryItem } from "./galleryItems";
 import { GalleryPreview, itemIcon } from "./GalleryPreview";
 import type { MouseEvent, ReactNode } from "react";
 import { useNow } from "@/shared/hooks/useNow";
+
+/** The app a thing was made in, whose logo marks its card. Chats belong to no app. */
+export function itemApp(item: GalleryItem): OfficialAppId | undefined {
+  if (item.notebook) return "lab";
+  switch (item.kind) {
+    case "note":
+      return "docs";
+    case "drawing":
+      return "whiteboards";
+    case "deck":
+      return "slides";
+    case "workbook":
+      return "data";
+    case "file":
+    case "image":
+      return "media";
+    default:
+      return undefined;
+  }
+}
 
 /**
  * One thing in a Space as a card: a live preview, the kind's glyph sitting on its
@@ -41,6 +63,7 @@ export function SpaceItemCard(props: {
   const now = useNow();
   const { item } = props;
   const { Icon, tone, label } = itemIcon(item);
+  const app = itemApp(item);
   const isPrivate = props.solo || Boolean(item.private) || item.visibility === "private";
   const Access = isPrivate ? Lock : Users;
   const access = isPrivate
@@ -57,7 +80,7 @@ export function SpaceItemCard(props: {
         else props.onOpen();
       }}
       cover={<GalleryPreview item={item} spaceId={props.spaceId} />}
-      glyph={<Icon className={itemToneClass(tone)} />}
+      glyph={app ? <AppLogo app={app} size="row" /> : <Icon className={itemToneClass(tone)} />}
       title={item.title}
       meta={
         <>

@@ -12,7 +12,7 @@ import {
   Text,
   Tooltip,
   ZoomControl,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   ClipboardCopy,
   Copy,

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { OverflowFadeText, Surface, Text } from "@/shared/ui";
+import { OverflowFadeText, Surface, Text } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { interventionLabels } from "../interventions/api";
 import { useAgentInterventions } from "../interventions/store";

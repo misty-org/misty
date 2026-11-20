@@ -45,6 +45,11 @@ export function registerLocalTools(tools: Record<string, LocalToolHandler>) {
   for (const [name, handler] of Object.entries(tools)) handlers.set(name, handler);
 }
 
+/** Takes tools back, such as an app's when it closes. A tool called after this answers as unavailable. */
+export function unregisterLocalTools(names: string[]) {
+  for (const name of names) handlers.delete(name);
+}
+
 interface Asked {
   id: string;
   run_id: string;

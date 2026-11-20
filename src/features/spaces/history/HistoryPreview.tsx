@@ -1,4 +1,4 @@
-import { ErrorState, Skeleton, SkeletonDocument, Surface, Text } from "@/shared/ui";
+import { ErrorState, Skeleton, SkeletonDocument, Surface, Text } from "@misty/ui";
 import type { OrderedExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { BinaryFiles } from "@excalidraw/excalidraw/types";
 import { useEffect, useState } from "react";

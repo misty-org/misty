@@ -1,5 +1,5 @@
 import type { GlobalAiMessage } from "../state/conversationTypes";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { LedgerTable } from "../../checkpoints/LedgerTable";
 import type { LedgerRow } from "../../checkpoints/ledger";
 import { StatusRow, StatusTable } from "../../progress/StatusTable";

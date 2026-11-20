@@ -8,7 +8,7 @@ import {
   PopoverContent,
   PopoverHeader,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 
 /**
  * A column's filter: the values it shows, each with a check; unchecking one hides its rows. Only

@@ -2,7 +2,7 @@ import { MessagesSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNow } from "@/shared/hooks/useNow";
-import { Button, OverflowFadeText, Text } from "@/shared/ui";
+import { Button, OverflowFadeText, Text } from "@misty/ui";
 import { shortAgo } from "../../page/useChatStatuses";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { NOTEBOOK_DOC_PREFIX } from "../notebookMarkdown";

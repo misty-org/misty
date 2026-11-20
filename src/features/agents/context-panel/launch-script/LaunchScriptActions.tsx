@@ -17,7 +17,7 @@ import {
   Textarea,
   Tooltip,
   useNotice,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { errorText } from "../projectApi";
 import { createLaunchScriptEntry, useLaunchScripts, type LaunchScriptEntry } from "./launchScripts";
 import { runLaunchScript } from "./runLaunchScript";

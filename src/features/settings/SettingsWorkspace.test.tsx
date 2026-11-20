@@ -25,7 +25,7 @@ const PAGES: SettingsSection[] = settingsGroups.flatMap((group) =>
   group.areas.map((area) => settingsAreaEntry(area)!.id),
 );
 /** Pages whose content comes from the engines or a catalog, which nothing answers here. */
-const fromEngines = new Set<SettingsSection>(["agents-personas", "engines-channels"]);
+const fromEngines = new Set<SettingsSection>(["engines-channels"]);
 const mocks = vi.hoisted(() => {
   const settingsState = {
     activeSection: "general" as SettingsSection,
@@ -142,7 +142,6 @@ describe("SettingsWorkspace", () => {
       "Pages",
       "Agents",
       "Engines",
-      "Tools",
     ]);
     const entries = [...container.querySelectorAll("[data-settings-nav-entry]")];
     expect(entries.map((entry) => entry.getAttribute("data-settings-nav-entry"))).toEqual(PAGES);

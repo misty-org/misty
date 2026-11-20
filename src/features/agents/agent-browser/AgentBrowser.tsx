@@ -3,7 +3,7 @@ import { Globe, Hand, MousePointerClick, PictureInPicture2, Play, ScrollText } f
 import { useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { BrowserNavigationButtons } from "@/features/browser";
-import { Button, IconButton, Input, SidePanelHeader } from "@/shared/ui";
+import { Button, IconButton, Input, SidePanelHeader } from "@misty/ui";
 import { AgentBrowserStage } from "./AgentBrowserStage";
 import { AgentBrowserTabs } from "./AgentBrowserTabs";
 import { AgentViewSwitcher } from "./AgentViewSwitcher";

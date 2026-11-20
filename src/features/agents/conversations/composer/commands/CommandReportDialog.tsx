@@ -6,7 +6,7 @@ import {
   DialogTitle,
   PropertyList,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { MistyMarkdown } from "../../../runs/markdown/MistyMarkdown";
 import { useCommandReport } from "./commandOutput";
 

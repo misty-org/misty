@@ -9,7 +9,7 @@ import {
   Switch,
   Text,
   roleColorPresets,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { RoleInput, SpaceMember, SpaceRoleDef } from "../api/dto/entities";
 import { permissionGroups } from "./rolePermissions";
 

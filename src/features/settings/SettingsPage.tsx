@@ -1,5 +1,5 @@
 import { useAppStore } from "@/app/shell";
-import { Button, ErrorState, SearchField } from "@/shared/ui";
+import { Button, ErrorState, SearchField } from "@misty/ui";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";

@@ -8,7 +8,7 @@ import {
   MenuTrigger,
   Switch,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { MarkStyle, MarkupTool } from "./editorTypes";
 import { markColors, nearestPreset, strokeSizes, textSizes, type Mark } from "./imageEdit";
 import { PanelSection } from "./PhotoPanelView";

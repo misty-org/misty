@@ -10,7 +10,7 @@ import {
   OptionSelect,
   Slider,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useEffect, useState } from "react";
 import { imageFormats, type ImageMimeType } from "./imageRender";
 

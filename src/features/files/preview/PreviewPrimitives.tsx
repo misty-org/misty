@@ -1,4 +1,4 @@
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 
 export function PreviewMessage(props: {
   icon: React.ReactNode;

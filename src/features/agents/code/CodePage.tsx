@@ -19,7 +19,7 @@ import {
   SplitHandle,
   lazyTool,
   ToolSuspense,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { useChatFolder, useChatFolders } from "../shared-folders/chatFolder";
 import { ChatFolderPicker, ProjectPicker } from "../context-panel/ChatFolderPicker";
 import { ContextPanelSkeleton } from "../context-panel/PanelSkeletons";

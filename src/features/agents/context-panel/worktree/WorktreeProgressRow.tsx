@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { X } from "lucide-react";
-import { Button, IconButton, Spinner, Text, Tooltip, rowShape, cn } from "@/shared/ui";
+import { Button, IconButton, Spinner, Text, Tooltip, rowShape, cn } from "@misty/ui";
 import { useWorktreeStore, type PendingCreation } from "./worktreeStore";
 
 /** Each fixed failure code the native side sends, as words. */

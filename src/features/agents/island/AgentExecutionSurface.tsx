@@ -9,7 +9,7 @@ import {
   pauseLocalExecution,
   useLocalExecution,
 } from "../runs/local-execution/localExecution";
-import { Button, Surface, Text, ViewportLayer } from "@/shared/ui";
+import { Button, Surface, Text, ViewportLayer } from "@misty/ui";
 import { AgentControlIsland } from "./AgentControlIsland";
 
 import { TaskArtifacts } from "../artifacts/TaskArtifactList";

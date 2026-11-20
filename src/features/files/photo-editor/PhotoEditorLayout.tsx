@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { IconButton, Separator, SplitHandle, Surface } from "@/shared/ui";
+import { IconButton, Separator, SplitHandle, Surface } from "@misty/ui";
 import {
   Blend,
   Bot,

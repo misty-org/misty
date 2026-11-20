@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Maximize2, Minus, Plus, Trash2 } from "lucide-react";
 import { confirmAction } from "@/shared/lib/confirmAction";
-import { Button, IconButton, Pressable, Separator, Surface, Text } from "@/shared/ui";
+import { Button, IconButton, Pressable, Separator, Surface, Text } from "@misty/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import { slidesOf } from "../tutorStudio";
 import { useTutorStore } from "../tutorStore";

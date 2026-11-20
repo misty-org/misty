@@ -5,7 +5,7 @@ import type { AgentProfile } from "@/shared/schemas";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type * as ActionQuestions from "@/features/agents/island/actionQuestions";
-import { NoticeViewport } from "@/shared/ui";
+import { NoticeViewport } from "@misty/ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initialCompanionPresentation, useCompanionState } from "../../tutor/cursor/companionState";
 import { AgentCompanionPanel } from "../../tutor/cursor/AgentCompanionPanel";

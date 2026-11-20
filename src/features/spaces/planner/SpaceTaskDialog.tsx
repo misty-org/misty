@@ -10,7 +10,7 @@ import {
   Input,
   OptionSelect,
   Textarea,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   ArrowDown,
   ArrowUp,

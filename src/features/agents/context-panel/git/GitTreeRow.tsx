@@ -13,11 +13,11 @@ import {
   Text,
   Tooltip,
   type TextTone,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { getFileTreeIconSvg } from "../files/fileIcons";
 import type { GitTreeDirNode } from "./git-tree";
 import type { GitFileEntry } from "./gitApi";
-import { remCss } from "@/shared/lib/uiScale";
+import { remCss } from "@misty/ui";
 
 /** The one-letter mark Git uses for each state, shown before the name. */
 const LETTERS: Record<GitFileEntry["status"], string> = {

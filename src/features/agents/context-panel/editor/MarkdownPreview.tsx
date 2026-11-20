@@ -8,7 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { FindBar, Text } from "@/shared/ui";
+import { FindBar, Text } from "@misty/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
 import { imageFileUrl } from "../files/filesApi";
 import { useFilesStore } from "../files/filesStore";

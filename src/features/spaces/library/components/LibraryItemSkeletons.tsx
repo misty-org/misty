@@ -1,5 +1,5 @@
-import { CollectionSkeleton, Skeleton, Surface, cn } from "@/shared/ui";
-import { remCss } from "@/shared/lib/uiScale";
+import { CollectionSkeleton, Skeleton, Surface, cn } from "@misty/ui";
+import { remCss } from "@misty/ui";
 
 /** The narrowest a grid card goes at each item size, the grid's own column minimums. */
 export const GRID_COLUMN_WIDTHS = [172, 224, 300] as const;

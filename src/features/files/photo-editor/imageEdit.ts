@@ -1,4 +1,4 @@
-import type { CropRect } from "@/shared/ui";
+import type { CropRect } from "@misty/ui";
 import { canonicalStickerId } from "./stickerCatalog";
 
 export * from "./editGeometry";

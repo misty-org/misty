@@ -4,7 +4,7 @@ import { measureElement as defaultMeasureElement, useVirtualizer } from "@tansta
 import { joinPath, useFilesStore } from "./filesStore";
 import { useTreePreferences } from "./treePreferences";
 import { buildVisibleNodes, type VisibleNode } from "./visibleNodes";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 
 /**
  * Derives the visible row list from the store (`visibleNodes.ts`, honoring

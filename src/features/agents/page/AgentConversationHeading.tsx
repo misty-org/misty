@@ -1,6 +1,7 @@
+import { BellOff, Pin } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, Skeleton, Surface, Text, windowToolbarClass } from "@/shared/ui";
+import { cn, IconButton, Skeleton, Surface, Text, windowToolbarClass } from "@misty/ui";
 import { useTitlePending } from "../conversations/state/conversationTitles";
 import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
 import { AgentAvatar } from "../personal/AgentAvatar";
@@ -10,7 +11,14 @@ import { AgentIdentity } from "../personal/AgentIdentity";
  * The open chat's name, as its title call made it: a skeleton while that call runs, "New chat"
  * before the first message. The tab above names the agent; the chat itself shows only this.
  */
-export function ChatTitle({ conversation }: { conversation?: { id: string; title?: string } }) {
+export function ChatTitle({
+  conversation,
+  agent,
+}: {
+  conversation?: { id: string; title?: string };
+  /** The chat's agent: the title reads "Juno · what's good", the agent first, as a direct message does. */
+  agent?: AgentProfile;
+}) {
   const titlePending = useTitlePending(conversation);
   if (titlePending)
     return (
@@ -22,8 +30,34 @@ export function ChatTitle({ conversation }: { conversation?: { id: string; title
     );
   return (
     <Text as="h1" size="control" weight="semibold" className="min-w-0 flex-1">
-      {conversation ? conversation.title || "Untitled conversation" : "New chat"}
+      {agent?.name ? `${agent.name} ` : null}
+      {agent?.name ? (
+        <Text bare tone="muted" weight="regular">
+          {`· ${conversation ? conversation.title || "Untitled conversation" : "New chat"}`}
+        </Text>
+      ) : conversation ? (
+        conversation.title || "Untitled conversation"
+      ) : (
+        "New chat"
+      )}
     </Text>
+  );
+}
+
+/**
+ * The direct message's own buttons at the right of its header, as a Space's views have them. Neither has
+ * anything behind it yet, so both stand disabled.
+ */
+export function ChatHeaderButtons() {
+  return (
+    <div role="toolbar" aria-label="Chat actions" className="flex shrink-0 items-center gap-1">
+      <IconButton label="Notifications" variant="quiet" disabled>
+        <BellOff />
+      </IconButton>
+      <IconButton label="Pinned" variant="quiet" disabled>
+        <Pin />
+      </IconButton>
+    </div>
   );
 }
 

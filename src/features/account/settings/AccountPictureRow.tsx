@@ -2,7 +2,7 @@ import { accountApi } from "../api/api";
 import type { AccountMeResponse } from "../api/accountTypes";
 import { useAccountAvatarUrl } from "../hooks/useAccountAvatarUrl";
 import { useUserStore } from "../sessions/useUserStore";
-import { Avatar, AvatarFallback, AvatarImage, Button, FileInput, useNotice } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button, FileInput, useNotice } from "@misty/ui";
 import { useRef, useState } from "react";
 import { DesktopSettingsRow as Row } from "@/features/settings";
 import { MAX_PICTURE_BYTES, PICTURE_TYPES, toSquarePng } from "@/shared/lib/squarePng";

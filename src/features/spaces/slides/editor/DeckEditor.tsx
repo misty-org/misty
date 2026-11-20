@@ -13,7 +13,7 @@ import {
 import { AiSelectionMenu, useAiSurfaceActions, useAiSurfaceAdapter } from "@/features/agents";
 import { MistyFilePicker, readFileFromPath } from "@/features/files";
 import type { EmbedReference } from "@/features/spaces/embeds";
-import { ConfirmDeleteDialog, EmptyState, IconButton, Surface, notify } from "@/shared/ui";
+import { ConfirmDeleteDialog, EmptyState, IconButton, Surface, notify } from "@misty/ui";
 import { MistyLibraryPicker } from "../../library";
 import type { SpaceDeck } from "../api";
 import { layoutSlot } from "../deck/layouts";

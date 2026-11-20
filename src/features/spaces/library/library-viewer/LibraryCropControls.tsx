@@ -1,5 +1,5 @@
 import type { LibraryEditDefinition } from "../../api/dto/common";
-import { Button, Text } from "@/shared/ui";
+import { Button, Text } from "@misty/ui";
 import type { Dispatch, SetStateAction } from "react";
 import { LibraryEditRange } from "../SpaceLibraryViewerUtils";
 

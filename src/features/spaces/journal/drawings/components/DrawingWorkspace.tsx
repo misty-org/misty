@@ -1,5 +1,5 @@
 import type { AiArtifact, AiSelectionSnapshot, AiSurfaceAdapter } from "@/features/agents";
-import { SetupState, Surface, ToolSuspense } from "@/shared/ui";
+import { SetupState, Surface, ToolSuspense } from "@misty/ui";
 import { DrawingCanvasSkeleton } from "./DrawingCanvasSkeleton";
 import { useMemo, useState } from "react";
 import type { DrawingUser } from "../hooks/useDrawingRoomView";

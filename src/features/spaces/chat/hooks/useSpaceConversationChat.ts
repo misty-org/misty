@@ -16,6 +16,7 @@ import {
   mergeSpaceMessages,
   messageFromSpaceEvent,
   oldestServerMessage,
+  withThreadReply,
   type SpaceMessageHistory,
 } from "../useSpaceMessageSpansStore";
 import { spacesResyncEvent } from "../../list/spacesResync";
@@ -160,6 +161,12 @@ export function useSpaceConversationChat(spaceId: string, conversationId: string
         return;
       }
       const includedMessage = detail.event ? messageFromSpaceEvent(detail.event) : undefined;
+      if (includedMessage?.thread_root_id) {
+        // A thread reply belongs to its panel; here it only adds to its root's count.
+        if (detail.event?.type === "message.created")
+          setMessages((current) => withThreadReply(current, includedMessage));
+        return;
+      }
       if (includedMessage) {
         setMessages((current) => mergeSpaceMessages(current, [includedMessage]));
         return;

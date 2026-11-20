@@ -1,5 +1,5 @@
 import { ListPlus } from "lucide-react";
-import { IconButton, MessageComposer, MessageComposerSend } from "@/shared/ui";
+import { IconButton, MessageComposer, MessageComposerSend } from "@misty/ui";
 
 /** The island's message box: Send steers the task, the list button queues a new one. */
 export function AgentControlComposer({

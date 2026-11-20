@@ -3,9 +3,17 @@ import { MistyContextBar } from "../composer/MistyContextBar";
 import { useGlobalMistyAttachments } from "../composer/useGlobalMistyAttachments";
 import { useMistyStore } from "../state/useMistyStore";
 import type { AgentProfile } from "@/shared/schemas";
-import { useEffect, useRef, useState, type Ref, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Ref,
+  type ReactNode,
+} from "react";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
-import { Text } from "@/shared/ui";
+import { Skeleton, Text } from "@misty/ui";
 import { useMistyWhileShown } from "../state/useMistyWhileShown";
 import { useCompanionState } from "../../tutor/cursor/companionState";
 import {
@@ -15,7 +23,7 @@ import {
 } from "./AgentComposeNotices";
 import { AgentConversationComposer } from "./AgentConversationComposer";
 import { AgentConversationTranscript } from "./AgentConversationTranscript";
-import { steerRunningTask, submitWorkspaceMessage } from "./conversationSend";
+import { steerRunningTask, submitWorkspaceMessage, untilIdle } from "./conversationSend";
 import { useConversationTurnActions } from "./useConversationTurnActions";
 import { RewindFilesDialog } from "./RewindFilesDialog";
 import { useConversationVoice, type AgentVoiceControl } from "./useConversationVoice";
@@ -40,6 +48,7 @@ import { EngineQueueChips } from "./engine/EngineQueueChips";
 import { EngineHistoryDialog } from "./engine/EngineHistoryDialog";
 import { useEngineQueue } from "./engine/engineQueue";
 import { syncChat } from "./engine/engineSessionImport";
+import { localChats, markStoredChats } from "../state/localChats";
 export type { AgentVoiceControl } from "./useConversationVoice";
 /**
  * The conversation's column, and the rhythm of the Markdown replies in it: only the person's
@@ -110,6 +119,9 @@ export function AgentWorkspaceConversation({
   const [reply, setReply] = useState("");
   /** The engine's own history, opened with `/resume`. */
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const loadingOlderRef = useRef(false);
+  const lastAutoScrolledConversation = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scoped = state.conversations.filter(
@@ -124,10 +136,67 @@ export function AgentWorkspaceConversation({
   // The folder the chat works in, as the composer reads it, for the commands that need it.
   const outsideEngine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
   const { folder } = useChatFolder(conversation?.id);
-  const reportError = (error: string) =>
-    useMistyStore.setState({
-      error: error || null,
-    });
+  const activeConversationId = conversationId ?? state.activeConversationId;
+  const activeConversationIdRef = useRef(activeConversationId);
+  activeConversationIdRef.current = activeConversationId;
+  const reportError = useCallback((error: string) => {
+    useMistyStore.setState({ error: error || null });
+  }, []);
+  const loadOlderMessages = useCallback(async () => {
+    const current = useMistyStore
+      .getState()
+      .conversations.find((item) => item.id === activeConversationId);
+    const scroller = scrollRef.current;
+    if (
+      !current?.hasOlderMessages ||
+      loadingOlderRef.current ||
+      !scroller ||
+      !accountId
+    )
+      return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    const previousHeight = scroller.scrollHeight;
+    const previousTop = scroller.scrollTop;
+    const anchor = scroller.querySelector<HTMLElement>("[data-message-id]");
+    const anchorTop = anchor?.getBoundingClientRect().top;
+    try {
+      const page = await localChats.messagesPage(accountId, current.id, current.messageBeforeSeq);
+      const latest = useMistyStore.getState().conversations.find((item) => item.id === current.id);
+      if (!latest) return;
+      const loaded = new Set(latest.messages.map((message) => message.id));
+      const older = page.messages.filter((message) => !loaded.has(message.id));
+      const updated = {
+        ...latest,
+        messages: [...older, ...latest.messages],
+        messageBeforeSeq: page.beforeSeq,
+        hasOlderMessages: older.length > 0 && page.hasOlder,
+      };
+      useMistyStore.setState({
+        conversations: useMistyStore
+          .getState()
+          .conversations.map((item) => (item.id === updated.id ? updated : item)),
+      });
+      markStoredChats([updated], accountId);
+      requestAnimationFrame(() => {
+        if (
+          scrollRef.current === scroller &&
+          activeConversationIdRef.current === updated.id &&
+          anchor?.isConnected &&
+          anchorTop !== undefined
+        ) {
+          scroller.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+        } else if (scrollRef.current === scroller && activeConversationIdRef.current === updated.id) {
+          scroller.scrollTop = previousTop + (scroller.scrollHeight - previousHeight);
+        }
+      });
+    } catch (reason) {
+      reportError(reason instanceof Error ? reason.message : "Older messages couldn't be read.");
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
+    }
+  }, [accountId, activeConversationId, reportError]);
   const companion = useCompanionState((s) => s.presentation);
   const voice = useConversationVoice({
     contextKey: `${accountId}:${agent?.id}:${conversation?.id ?? ""}`,
@@ -147,6 +216,19 @@ export function AgentWorkspaceConversation({
       void store.loadConversations();
   }, [accountId]);
   useFollowLatestMessage(scrollRef, conversation?.messages, state.working);
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    if (
+      !conversation?.id ||
+      !conversation.messages.length ||
+      !scroller ||
+      scroller.closest("[hidden]") ||
+      lastAutoScrolledConversation.current === conversation.id
+    )
+      return;
+    scroller.scrollTop = scroller.scrollHeight;
+    lastAutoScrolledConversation.current = conversation.id;
+  }, [conversation?.id, conversation?.messages.length]);
   useChatShortcuts(scrollRef, textareaRef, state.working);
   const prepare = () =>
     useMistyStore.setState({
@@ -206,6 +288,7 @@ export function AgentWorkspaceConversation({
     const onEngine = Boolean(outsideEngine);
     // A `/` command Misty runs: its own, or one of the engine's that only its terminal app runs
     // (`engineCommands.ts`). What it leaves to send goes on as the message.
+    let after: (() => Promise<void>) | undefined;
     if (!quote && typed.trim().startsWith("/")) {
       let ran;
       try {
@@ -233,6 +316,7 @@ export function AgentWorkspaceConversation({
       }
       if (ran) {
         typed = ran.send;
+        after = ran.after;
         if (ran.conversationId && ran.conversationId !== conversation?.id) {
           setDraft("");
           void send(ran.send, "", ran.conversationId);
@@ -274,6 +358,13 @@ export function AgentWorkspaceConversation({
       setDraft("");
       setReply("");
       attachments.consume();
+      // `/clear`: the memory-saving turn has ended, so the session can go now.
+      if (after) {
+        await untilIdle();
+        await after().catch((error: unknown) =>
+          reportError(error instanceof Error ? error.message : String(error)),
+        );
+      }
     }
   };
   const { retryPrompt, resumeLedger, changeLedger, filesAsk, chooseFiles } =
@@ -297,9 +388,23 @@ export function AgentWorkspaceConversation({
       aria-label={`${agent?.name || "Misty"} conversation`}
     >
       <div
-        className="agent-conversation-scroll misty-scrollbar-flush min-h-0 flex-1 overflow-auto overscroll-contain"
+        className="agent-conversation-scroll misty-scrollbar-flush min-h-0 flex-1 overflow-auto overscroll-contain [overflow-anchor:none]"
         ref={scrollRef}
+        onScroll={(event) => {
+          if (event.currentTarget.scrollTop < 72) void loadOlderMessages();
+        }}
       >
+        {loadingOlder ? (
+          <div
+            role="status"
+            aria-label="Older messages"
+            className="mx-auto grid w-full max-w-209 gap-3 px-6 pt-7"
+          >
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3.5 w-3/4" />
+          </div>
+        ) : null}
         <AgentConversationTranscript
           view={{
             conversation,

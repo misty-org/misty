@@ -6,7 +6,7 @@ import { LibraryEditPanel } from "./LibraryEditPanel";
 import { LibraryMetadataForm } from "./LibraryMetadataForm";
 import { LibraryMetadataList } from "./LibraryMetadataList";
 import { LibraryVersionList } from "./LibraryVersionList";
-import { Surface } from "@/shared/ui";
+import { Surface } from "@misty/ui";
 
 interface LibraryViewerSidebarProps {
   item: SpaceLibraryItem;

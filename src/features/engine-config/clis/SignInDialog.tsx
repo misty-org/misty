@@ -36,11 +36,11 @@ import {
   Spinner,
   Surface,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { engineName } from "../channels/engines";
 import { signInChoiceLabel } from "./SignInButton";
 import { listenSignIn, signInApi, type SignInRequest, type SignInStarted } from "./signInApi";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 

@@ -1,5 +1,5 @@
 import type { FramePacingState } from "@/app/layouts/desktop-state";
-import type { SurfaceEdge } from "@/shared/ui";
+import type { SurfaceEdge } from "@misty/ui";
 
 // The drawer, tab inset, and titlebar controls must move on the same timeline.
 export const navigatorMotionClass =

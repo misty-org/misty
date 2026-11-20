@@ -13,7 +13,7 @@
 import { FolderGit2 } from "lucide-react";
 import { useState } from "react";
 import { DesktopSettingsSection as Section } from "@/features/settings";
-import { Button, ChoiceGroup } from "@/shared/ui";
+import { Button, ChoiceGroup } from "@misty/ui";
 import { InstalledPane } from "./InstalledPane";
 import { SkillReposDialog } from "./SkillReposDialog";
 import { SkillUsagePane } from "./SkillUsagePane";

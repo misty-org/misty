@@ -23,7 +23,8 @@ const MARKED: &[&str] = &[
 
 /// The result as the model should read it. Other tools' results keep their bytes.
 pub(super) fn marked(name: &str, result: Value) -> Value {
-    if !MARKED.contains(&name) {
+    // An app's tools answer with the app's own content, which the person doesn't control either.
+    if !MARKED.contains(&name) && !name.starts_with("app.") {
         return result;
     }
     match result {

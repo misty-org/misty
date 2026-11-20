@@ -2,7 +2,7 @@ import { useInRouterContext, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { useFocusedPaneHistory } from "@/features/app-windows";
-import { IconButton } from "@/shared/ui";
+import { IconButton } from "@misty/ui";
 
 function NavButtons(props: {
   canBack: boolean;

@@ -2,7 +2,7 @@ import { UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { Button, IconButton, Surface, Text } from "@/shared/ui";
+import { Button, IconButton, Surface, Text } from "@misty/ui";
 
 export function SpaceSetupCards({
   spaceId,

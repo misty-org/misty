@@ -1,6 +1,6 @@
 import { CalendarClock, MessageCircle, SquareCheck, type LucideIcon } from "lucide-react";
 import type { SpaceSearchHit } from "@/features/spaces";
-import { spaceMadeKind } from "@/shared/ui";
+import { spaceMadeKind } from "@misty/ui";
 
 /** A result's glyph at the size every row uses. */
 export const icon = (Icon: LucideIcon) => <Icon aria-hidden />;

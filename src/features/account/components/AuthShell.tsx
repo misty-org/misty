@@ -1,6 +1,6 @@
 import { WelcomeNav } from "./WelcomeNav";
 import type { ReactNode } from "react";
-import { PageEnter, Text } from "@/shared/ui";
+import { PageEnter, Text } from "@misty/ui";
 
 /** A signed-out page: the floating nav, then the page's heading and its card in one centered
  * column. The signed-out window grows to fit the column (`data-signed-out-page` and

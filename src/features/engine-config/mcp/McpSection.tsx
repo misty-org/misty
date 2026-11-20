@@ -34,7 +34,7 @@ import {
   Surface,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { EngineNotices, McpSourceHint } from "./McpNotices";
 import { McpDetailDialog } from "./McpDetailDialog";
 import { McpProbeConfirmHost } from "./McpProbeConfirmHost";

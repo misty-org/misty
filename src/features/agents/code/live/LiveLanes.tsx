@@ -1,4 +1,4 @@
-import { itemToneClass, Text, Tooltip } from "@/shared/ui";
+import { itemToneClass, Text, Tooltip } from "@misty/ui";
 import { personTone } from "../../tutor/personTone";
 import { authorKey, mainAuthor, ownerKey, type LivePerson, type LiveStep } from "./liveTypes";
 

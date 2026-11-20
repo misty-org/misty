@@ -1,5 +1,5 @@
 import type { PreviewErrorComponent } from "../preview/previewTypes";
-import { ConfirmDeleteDialog, IconButton, ToolbarDivider, TopBar } from "@/shared/ui";
+import { ConfirmDeleteDialog, IconButton, ToolbarDivider, TopBar } from "@misty/ui";
 import { ChevronLeft, ChevronRight, Redo2, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import * as Y from "yjs";

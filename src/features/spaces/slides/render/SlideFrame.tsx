@@ -1,5 +1,5 @@
 import { useRef, type CSSProperties, type ReactNode } from "react";
-import { cn } from "@/shared/ui";
+import { cn } from "@misty/ui";
 import { SLIDE_HEIGHT, SLIDE_WIDTH } from "../deck/layouts";
 import { useElementSize } from "./renderHooks";
 

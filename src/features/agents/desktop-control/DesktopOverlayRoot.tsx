@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, type FormEvent } from "react";
-import { Button, cn, Input, screenMarkClass, Surface, ViewportLayer } from "@/shared/ui";
+import { Button, cn, Input, screenMarkClass, Surface, ViewportLayer } from "@misty/ui";
 import { DictationPill } from "@/features/voice";
 // These windows draw with the app's own classes; the mist's page stays transparent
 // (desktop.html), so nothing opaque ever covers the screen.

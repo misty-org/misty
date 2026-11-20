@@ -1,4 +1,4 @@
-import { Input, Surface, Text } from "@/shared/ui";
+import { Input, Surface, Text } from "@misty/ui";
 import { editKeyAction, type Direction } from "./selection";
 
 /**

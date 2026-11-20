@@ -1,6 +1,6 @@
 import { useMemo, type RefObject } from "react";
 import { useShortcutHandler } from "@/features/shortcuts";
-import { FindBar } from "@/shared/ui";
+import { FindBar } from "@misty/ui";
 import type { GlobalAiMessage } from "../../state/conversationTypes";
 import { MessageAnchorRail } from "./MessageAnchorRail";
 import { createAnchorsBuilder } from "./timelineAnchors";

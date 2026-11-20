@@ -1,4 +1,4 @@
-import { screenMarkClass } from "@/shared/ui";
+import { screenMarkClass } from "@misty/ui";
 
 /** The most points a trail draws; the oldest go first. */
 const TRAIL_POINTS = 1_500;

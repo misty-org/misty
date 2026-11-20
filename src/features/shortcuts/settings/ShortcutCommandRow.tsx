@@ -1,6 +1,6 @@
 import { type ShortcutCommandDefinition } from "@/shared/shortcuts/shortcutTypes";
 import type { ShortcutBindingSet } from "@/native/ipc";
-import { Button, IconButton, ShortcutField } from "@/shared/ui";
+import { Button, IconButton, ShortcutField } from "@misty/ui";
 import { RotateCcw } from "lucide-react";
 import { DesktopSettingsRow } from "@/features/settings";
 import { settingsDisabledControlClass } from "../../settings/settingsConstants";

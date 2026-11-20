@@ -8,7 +8,7 @@ import {
   IconButton,
   Popover,
   PopoverAnchor,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { isSpacePanel, SpaceDialogs, type SpaceDialog } from "./SpaceDialogs";
 import { SpaceSettingsItems } from "./SpaceMenuItems";
 

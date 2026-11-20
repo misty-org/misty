@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import { openReading } from "@/features/voice";
-import { Button, SetupState, sketchInk, spaceMadeKind, Surface, Text } from "@/shared/ui";
+import { Button, SetupState, sketchInk, spaceMadeKind, Surface, Text } from "@misty/ui";
 import {
   spacesSnapshot,
   useWorkspaceStore,

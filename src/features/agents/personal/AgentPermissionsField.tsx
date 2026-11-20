@@ -1,5 +1,5 @@
 import { ClipboardList, Shield, ShieldCheck, ShieldOff, type LucideIcon } from "lucide-react";
-import { Field, OptionSelect } from "@/shared/ui";
+import { Field, OptionSelect } from "@misty/ui";
 import { resolveEngineMode, useEngineModes, type EngineModeKind } from "../engines/engineModes";
 
 const kindIcons: Record<EngineModeKind, LucideIcon> = {

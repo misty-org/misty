@@ -1,4 +1,5 @@
 import type { OpenWorkspaceSurfaceRequest, WorkspaceSurfaceId } from "./workspaceViews";
+import { officialApps } from "@misty/ui";
 
 /** A route that once opened a web page for the person. Web pages are only for agents now, so it
  * opens nothing. */
@@ -31,6 +32,25 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
     } catch {
       return null;
     }
+    // Apps run in their own page inside a Space. Keep each app's route distinct from the Space
+    // home and from other apps, or navigation can focus an unrelated earlier Space tab.
+    if (parts[2] === "app") {
+      let appId = "";
+      try {
+        appId = decodeURIComponent(parts[3] ?? "");
+      } catch {
+        return null;
+      }
+      if (!spaceId || !appId) return null;
+      const app = officialApps.find((candidate) => candidate.id === appId);
+      return request(
+        "space",
+        `app:${spaceId}:${appId}`,
+        app?.name ?? appId,
+        pathname,
+        `${spaceId}:${appId}`,
+      );
+    }
     const tool = spaceToolFromSection(parts[2]);
     return request(
       "space",
@@ -54,6 +74,7 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
 }
 
 type SpaceWorkspaceTool =
+  | "explore"
   | "journal"
   | "slides"
   | "data"
@@ -67,6 +88,7 @@ type SpaceWorkspaceTool =
 
 /** A Space tab's name, by the tool it shows. */
 const spaceToolTitles: Record<SpaceWorkspaceTool, string> = {
+  explore: "Explore",
   journal: "Docs",
   slides: "Slides",
   data: "Data",
@@ -105,6 +127,7 @@ function request(
 /** Which of a Space's tabs a section opens in. Home is the bare Space (its gallery); it never
  * shares Chat's tab, or opening one would swap the other's page under the wrong name. */
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
+  if (section === "explore" || section === "agents") return "explore";
   // Docs, Slides, Data and Whiteboards are pages of their own, each in its own tab.
   if (section === "notes") return "journal";
   if (section === "slides" || section === "data") return section;

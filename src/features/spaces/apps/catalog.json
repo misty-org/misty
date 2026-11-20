@@ -1,0 +1,517 @@
+{
+  "schema": 2,
+  "apps": [
+    {
+      "id": "cadcraft",
+      "name": "CADCraft",
+      "description": "Open-source CAD and drafting",
+      "maker": "storytold",
+      "upstream": "storytold/cadcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.20.1",
+      "tag": "v0.20.1",
+      "url": "https://github.com/storytold/cadcraft/releases/download/v0.20.1/cadcraft-web-0.20.1.zip",
+      "sha256": "300e870c50b66d371055915ba95e3ddbfd4c45431466d5214743b5dcab95a0e1",
+      "size": 11420690,
+      "logo": "https://raw.githubusercontent.com/storytold/cadcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.cadcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "CADCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "craft-anything",
+      "name": "Craft Anything",
+      "description": "Explore how software works and build your own version",
+      "maker": "storytold",
+      "upstream": "storytold/craft-anything",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.6.1",
+      "tag": "v0.6.1",
+      "url": "https://github.com/storytold/craft-anything/releases/download/v0.6.1/craft-anything-web-0.6.1.zip",
+      "sha256": "e87273b5c0181785ce9059f5348353be44e18b4ba6485203babc26ef17f71d84",
+      "size": 2667952,
+      "logo": "https://raw.githubusercontent.com/storytold/craft-anything/v0.6.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.craft-anything.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "Craft Anything",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "deckcraft",
+      "name": "DeckCraft",
+      "description": "Slide presentations and delivery",
+      "maker": "storytold",
+      "upstream": "storytold/deckcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.18.1",
+      "tag": "v0.18.1",
+      "url": "https://github.com/storytold/deckcraft/releases/download/v0.18.1/deckcraft-web-0.18.1.zip",
+      "sha256": "3196e537fcfab538aaa2e88584bc74e29bb584459b916ab584ac22fbafe32db5",
+      "size": 11910503,
+      "logo": "https://raw.githubusercontent.com/storytold/deckcraft/v0.18.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.deckcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "DeckCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "designcraft",
+      "name": "DesignCraft",
+      "description": "Open-source page layout and publishing",
+      "maker": "storytold",
+      "upstream": "storytold/designcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.20.1",
+      "tag": "v0.20.1",
+      "url": "https://github.com/storytold/designcraft/releases/download/v0.20.1/designcraft-web-0.20.1.zip",
+      "sha256": "50fb2bebce1f48065318953393626b84b25cd1736c556e523275dadc46ae6906",
+      "size": 27265672,
+      "logo": "https://raw.githubusercontent.com/storytold/designcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.designcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "DesignCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "effectcraft",
+      "name": "EffectCraft",
+      "description": "Open-source motion graphics and VFX",
+      "maker": "storytold",
+      "upstream": "storytold/effectcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.24.1",
+      "tag": "v0.24.1",
+      "url": "https://github.com/storytold/effectcraft/releases/download/v0.24.1/effectcraft-web-0.24.1.zip",
+      "sha256": "8adc985f345d73207abc69a27938905aba1729b63c6c9b332d0244a7567424f1",
+      "size": 22524556,
+      "logo": "https://raw.githubusercontent.com/storytold/effectcraft/v0.24.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.effectcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "EffectCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["video/*"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "figcraft",
+      "name": "FigCraft",
+      "description": "Open-source interface design and prototyping",
+      "maker": "storytold",
+      "upstream": "storytold/figcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.18.1",
+      "tag": "v0.18.1",
+      "url": "https://github.com/storytold/figcraft/releases/download/v0.18.1/figcraft-web-0.18.1.zip",
+      "sha256": "2fbeb93f5022b0a7cc9d8528f1ed7e2b54c94d213ef79e65128aa898c399f02b",
+      "size": 10534024,
+      "logo": "https://raw.githubusercontent.com/storytold/figcraft/v0.18.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.figcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "FigCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "filmcraft",
+      "name": "FilmCraft",
+      "description": "Open-source video editor",
+      "maker": "storytold",
+      "upstream": "storytold/filmcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.20.1",
+      "tag": "v0.20.1",
+      "url": "https://github.com/storytold/filmcraft/releases/download/v0.20.1/filmcraft-web-0.20.1.zip",
+      "sha256": "1cf3072e3f3b6535fcd024d6f6ab2a16cf7776345d868037dc630de0ad0dbbb8",
+      "size": 15630847,
+      "logo": "https://raw.githubusercontent.com/storytold/filmcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.filmcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "FilmCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["video/*"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "gridcraft",
+      "name": "GridCraft",
+      "description": "Open-source spreadsheets and data analysis",
+      "maker": "storytold",
+      "upstream": "storytold/gridcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.19.1",
+      "tag": "v0.19.1",
+      "url": "https://github.com/storytold/gridcraft/releases/download/v0.19.1/gridcraft-web-0.19.1.zip",
+      "sha256": "48c5d1b101befebb3c5ba3b7a14914f01c3207934813ed07dc4251b7ae116a78",
+      "size": 9679862,
+      "logo": "https://raw.githubusercontent.com/storytold/gridcraft/v0.19.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.gridcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "GridCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "lightcraft",
+      "name": "LightCraft",
+      "description": "Open-source photo library and raw developer",
+      "maker": "storytold",
+      "upstream": "storytold/lightcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.21.1",
+      "tag": "v0.21.1",
+      "url": "https://github.com/storytold/lightcraft/releases/download/v0.21.1/lightcraft-web-0.21.1.zip",
+      "sha256": "57147383a46eaab3b0cc036acf9443b221450c6a19f5dc303ae165bb9678b8cb",
+      "size": 74569049,
+      "logo": "https://raw.githubusercontent.com/storytold/lightcraft/v0.21.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.lightcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "LightCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["image/*"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "materialcraft",
+      "name": "MaterialCraft",
+      "description": "Open-source node-based procedural materials",
+      "maker": "storytold",
+      "upstream": "storytold/materialcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.4.1",
+      "tag": "v0.4.1",
+      "url": "https://github.com/storytold/materialcraft/releases/download/v0.4.1/materialcraft-web-0.4.1.zip",
+      "sha256": "73b8c319881fd7218737d30b5eeb033801a17427bcf3d31920da32a1fbb1ffec",
+      "size": 5245824,
+      "logo": "https://raw.githubusercontent.com/storytold/materialcraft/v0.4.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.materialcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "MaterialCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "pdfcraft",
+      "name": "PdfCraft",
+      "description": "Open-source PDF workbench",
+      "maker": "storytold",
+      "upstream": "storytold/pdfcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.21.1",
+      "tag": "v0.21.1",
+      "url": "https://github.com/storytold/pdfcraft/releases/download/v0.21.1/pdfcraft-web-0.21.1.zip",
+      "sha256": "fe9708d46af191aebb56f70eb32cf8b112b0b9452d17ae6ba3a8c4a8665fe748",
+      "size": 34367297,
+      "logo": "https://raw.githubusercontent.com/storytold/pdfcraft/v0.21.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.pdfcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "PdfCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["application/pdf"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "photocraft",
+      "name": "PhotoCraft",
+      "description": "Open-source image editor",
+      "maker": "storytold",
+      "upstream": "storytold/photocraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.23.1",
+      "tag": "v0.23.1",
+      "url": "https://github.com/storytold/photocraft/releases/download/v0.23.1/photocraft-web-0.23.1.zip",
+      "sha256": "3a498eb517bca6cec89f9c6b1fc6448269a05428c8a3a4637c16817da157f03c",
+      "size": 16064050,
+      "logo": "https://raw.githubusercontent.com/storytold/photocraft/v0.23.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.photocraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "PhotoCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["image/*", ".psd"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "soundcraft",
+      "name": "SoundCraft",
+      "description": "Digital audio recording, editing, and mixing",
+      "maker": "storytold",
+      "upstream": "storytold/soundcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.20.1",
+      "tag": "v0.20.1",
+      "url": "https://github.com/storytold/soundcraft/releases/download/v0.20.1/soundcraft-web-0.20.1.zip",
+      "sha256": "ca7c03c53cf4b7ec9ae26ef2cbde5d86566d006127040fe694fb95f9773a34e4",
+      "size": 7179733,
+      "logo": "https://raw.githubusercontent.com/storytold/soundcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.soundcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "SoundCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["audio/*"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "texturecraft",
+      "name": "TextureCraft",
+      "description": "Open-source 3D texture painting",
+      "maker": "storytold",
+      "upstream": "storytold/texturecraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.6.1",
+      "tag": "v0.6.1",
+      "url": "https://github.com/storytold/texturecraft/releases/download/v0.6.1/texturecraft-web-0.6.1.zip",
+      "sha256": "6dea6a9f77a161cba3258ab4c6db591bdb4dd32b7385d16a7db997ab671a5f3b",
+      "size": 9488618,
+      "logo": "https://raw.githubusercontent.com/storytold/texturecraft/v0.6.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.texturecraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "TextureCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["image/*"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "vectorcraft",
+      "name": "VectorCraft",
+      "description": "Open-source vector illustration",
+      "maker": "storytold",
+      "upstream": "storytold/vectorcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.24.1",
+      "tag": "v0.24.1",
+      "url": "https://github.com/storytold/vectorcraft/releases/download/v0.24.1/vectorcraft-web-0.24.1.zip",
+      "sha256": "de31befd175476f252e3563b4b1fdc6c887d5842b33fb7d1f5fdf007dc7633aa",
+      "size": 38342892,
+      "logo": "https://raw.githubusercontent.com/storytold/vectorcraft/v0.24.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.vectorcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "VectorCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": ["image/svg+xml"],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    },
+    {
+      "id": "wordcraft",
+      "name": "WordCraft",
+      "description": "Open-source word processor",
+      "maker": "storytold",
+      "upstream": "storytold/wordcraft",
+      "license": "MIT OR Apache-2.0",
+      "version": "0.18.1",
+      "tag": "v0.18.1",
+      "url": "https://github.com/storytold/wordcraft/releases/download/v0.18.1/wordcraft-web-0.18.1.zip",
+      "sha256": "3daa7c2d1f209a7eeb2527fcefa3fe31e875848fb1970d68f54edae55fe0bc9f",
+      "size": 22536015,
+      "logo": "https://raw.githubusercontent.com/storytold/wordcraft/v0.18.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.wordcraft.png",
+      "permissions": ["files"],
+      "manifest": {
+        "name": "WordCraft",
+        "logo": "logo.png",
+        "entry": "index.html",
+        "opens": [],
+        "own_origin": true,
+        "inline_scripts": true,
+        "shim": true,
+        "permissions": ["files"]
+      },
+      "add_copies": [
+        {
+          "from": "snippets",
+          "to": "app/snippets"
+        }
+      ],
+      "strip_top": true
+    }
+  ]
+}

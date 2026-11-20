@@ -8,7 +8,7 @@ import {
   Text,
   Tooltip,
   type AvatarSize,
-} from "@/shared/ui";
+} from "@misty/ui";
 import type { AgentProfile } from "@/shared/schemas";
 import { AgentAvatar } from "../../personal/AgentAvatar";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";

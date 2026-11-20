@@ -30,7 +30,7 @@ import {
   PlaceholderIcon,
   Skeleton,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { Ellipsis, Mail, ShieldCheck, Trash2, Users } from "lucide-react";
 
 const rowClass = "flex min-h-18 min-w-0 items-center gap-3 px-4 py-3";

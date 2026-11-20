@@ -5,7 +5,7 @@ import { useAiSurfaceAdapter, type AiSurfaceAdapter } from "@/features/agents";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { HistoryDialog } from "@/features/spaces/history";
 import { SystemErrorNotice, reportSystemError } from "@/shared/platform/systemErrors";
-import { ConfirmDeleteDialog, EmptyState, SetupState, Surface, Text } from "@/shared/ui";
+import { ConfirmDeleteDialog, EmptyState, SetupState, Surface, Text } from "@misty/ui";
 import { useSpacesStore } from "../list/useSpacesStore";
 import type { SpaceWorkbook } from "./api";
 import { DataHeader } from "./editor/DataHeader";

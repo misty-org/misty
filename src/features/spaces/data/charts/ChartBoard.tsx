@@ -11,7 +11,7 @@ import {
   Surface,
   Text,
   notify,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { exportFilename, saveBlob } from "../export/workbookExport";
 import type { WorkbookEngine } from "../formula/engine";
 import { runOps } from "../grid/gridEdits";

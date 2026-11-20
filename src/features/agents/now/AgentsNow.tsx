@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn, OverflowFadeText, Pressable, Skeleton, Surface, Text, Tooltip } from "@/shared/ui";
+import { cn, OverflowFadeText, Pressable, Skeleton, Surface, Text, Tooltip } from "@misty/ui";
 import { AgentAvatar } from "../personal/AgentAvatar";
 import { claimedByOthers, fileName, type TeammateAgent, useTeammateAgents } from "./teammates";
 import { useStudioAgents } from "./useStudioAgents";

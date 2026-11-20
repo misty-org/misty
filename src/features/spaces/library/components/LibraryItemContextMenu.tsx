@@ -9,7 +9,7 @@ import {
   MenuItem,
   MenuSeparator,
   OverflowFadeText,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   ArchiveRestore,
   AudioLines,

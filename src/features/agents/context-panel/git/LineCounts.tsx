@@ -1,4 +1,4 @@
-import { Text } from "@/shared/ui";
+import { Text } from "@misty/ui";
 import type { GitStatus } from "./gitApi";
 
 /** Lines added and removed across the folder's changed files, in their own colors. */

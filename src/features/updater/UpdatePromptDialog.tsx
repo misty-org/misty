@@ -18,7 +18,7 @@ import {
   DialogTitle,
   Progress,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { rememberReleaseNotes } from "./releaseNotes";
 import {
   applyUpdateProgress,

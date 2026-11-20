@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
-import { SetupState, Skeleton, Surface, EmptyState } from "@/shared/ui";
+import { SetupState, Skeleton, Surface, EmptyState } from "@misty/ui";
 import { useSpacesStore } from "../list/useSpacesStore";
 import type { SpaceDeck } from "./api";
 import { DeckEditor } from "./editor/DeckEditor";

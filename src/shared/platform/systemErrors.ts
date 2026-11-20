@@ -1,4 +1,4 @@
-import { notify } from "@/shared/ui";
+import { notify } from "@misty/ui";
 import { redactText } from "./redaction";
 import { useEffect, useRef } from "react";
 

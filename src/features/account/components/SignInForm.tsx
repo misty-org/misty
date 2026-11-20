@@ -1,5 +1,5 @@
 import { isMistyCloud, mistyWebsite, useServerChoice } from "@/api/deployment/serverChoice";
-import { Button } from "@/shared/ui";
+import { Button } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { FormEvent } from "react";
 import { useState } from "react";

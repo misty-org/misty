@@ -11,7 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Text, Tooltip } from "@/shared/ui";
+import { Button, Text, Tooltip } from "@misty/ui";
 import { runtimeAiApi } from "./AgentsRuntime";
 import { useSpaceRuns } from "./activity/useSpaceRuns";
 import { setBrowserExpanded, useAgentBrowser } from "./agent-browser/agentBrowserStore";

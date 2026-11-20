@@ -1,4 +1,4 @@
-import { Button, cn, Surface, Text } from "@/shared/ui";
+import { Button, cn, Surface, Text } from "@misty/ui";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 export class RenderErrorBoundary extends Component<

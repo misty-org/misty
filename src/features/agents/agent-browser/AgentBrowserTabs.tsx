@@ -10,7 +10,7 @@ import {
   Surface,
   Text,
   Tooltip,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { addPersonTab } from "../tabs/agentPersonTabs";
 import { closeAgentTab } from "../tabs/agentTabs";
 import {

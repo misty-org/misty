@@ -1,4 +1,4 @@
-import { cn, Surface, Text } from "@/shared/ui";
+import { cn, Surface, Text } from "@misty/ui";
 import { RenderErrorBoundary } from "@/app/layouts/RenderErrorBoundary";
 import { AuthProvider, useAuth } from "@/features/account";
 import { useNativeSessionStore } from "@/features/account";

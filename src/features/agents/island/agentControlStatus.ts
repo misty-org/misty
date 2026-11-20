@@ -1,4 +1,4 @@
-import { cn } from "@/shared/ui";
+import { cn } from "@misty/ui";
 import type { useMistyStore } from "../conversations/state/useMistyStore";
 import type { GlobalAiMessage } from "../conversations/state/conversationTypes";
 import type { Execution } from "../runs/local-execution/localExecution";

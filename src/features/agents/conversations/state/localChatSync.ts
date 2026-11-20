@@ -27,7 +27,7 @@ async function settleOrphanedReplies(
     }),
   );
   if (!orphaned.size) return conversation;
-  return {
+  const next = {
     ...conversation,
     messages: conversation.messages.map((message) =>
       orphaned.has(message.id)
@@ -40,6 +40,7 @@ async function settleOrphanedReplies(
         : message,
     ),
   };
+  return next;
 }
 
 /** This device's chats, with replies whose run is gone settled and saved. */
@@ -51,8 +52,17 @@ export async function syncLocalChats(
   const settled = await Promise.all(
     local.map(async (conversation) => {
       const next = await settleOrphanedReplies(conversation, runningInvocation());
-      if (next !== conversation)
-        await localChats.saveConversation(accountId, next).catch(() => undefined);
+      if (next !== conversation) {
+        const changed = next.messages.filter(
+          (message) => !conversation.messages.some((before) => before.id === message.id && before === message),
+        );
+        const deleted = conversation.messages
+          .filter((before) => !next.messages.some((message) => message.id === before.id))
+          .map((message) => message.id);
+        await localChats
+          .saveConversation(accountId, next, changed, deleted)
+          .catch(() => undefined);
+      }
       return next;
     }),
   );
@@ -74,6 +84,7 @@ export function persistLocalChats(
   if (!localChats.available()) return () => undefined;
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const latest = new Map<string, { accountId: string; conversation: GlobalAiConversation }>();
+  const writes = new Map<string, Promise<void>>();
   return subscribe((state, previous) => {
     if (!state.accountId || state.conversations === previous.conversations) return;
     if (state.accountId !== previous.accountId) return;
@@ -88,10 +99,20 @@ export function persistLocalChats(
           timers.delete(conversation.id);
           const entry = latest.get(conversation.id);
           latest.delete(conversation.id);
-          if (entry)
-            void localChats
-              .saveConversation(entry.accountId, entry.conversation)
-              .catch(() => undefined);
+          if (entry) {
+            const previous = writes.get(conversation.id) ?? Promise.resolve();
+            const write = previous
+              .catch(() => undefined)
+              .then(() =>
+                localChats.saveChangedConversation(entry.accountId, entry.conversation),
+              );
+            writes.set(conversation.id, write);
+            void write
+              .catch(() => undefined)
+              .finally(() => {
+                if (writes.get(conversation.id) === write) writes.delete(conversation.id);
+              });
+          }
         }, 400),
       );
     }

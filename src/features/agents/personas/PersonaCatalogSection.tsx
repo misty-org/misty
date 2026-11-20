@@ -22,7 +22,7 @@ import {
   useNotice,
   OverflowFadeText,
   Text,
-} from "@/shared/ui";
+} from "@misty/ui";
 import {
   disabledPersonas,
   makeAgentFromPersona,

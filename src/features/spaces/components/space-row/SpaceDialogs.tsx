@@ -17,7 +17,7 @@ import {
   PopoverContent,
   PopoverHeader,
   PopoverText,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { SpaceMembers } from "../../members";
 import { LeaveDeleteSpaceDialogs } from "../LeaveDeleteSpaceDialogs";
 import { useSpaceLifecycleActions } from "../useSpaceLifecycleActions";

@@ -12,7 +12,7 @@ vi.mock("@/features/app-windows", async (original) => ({
   switchSpaceWindow: vi.fn(),
 }));
 
-import { DropdownMenu, DropdownMenuContent } from "@/shared/ui";
+import { DropdownMenu, DropdownMenuContent } from "@misty/ui";
 import { SpaceMenuItems, SpaceSettingsItems } from "./SpaceMenuItems";
 
 afterEach(cleanup);

@@ -10,7 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   MenuItem,
-} from "@/shared/ui";
+} from "@misty/ui";
 import { PI_FAMILY_OAUTH_PROVIDERS } from "../engine-setup/piFamilyAuthCatalog";
 
 export interface SignInChoice {

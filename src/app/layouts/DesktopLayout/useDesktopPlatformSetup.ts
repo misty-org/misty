@@ -7,7 +7,7 @@ import {
 } from "@/native";
 import { useWindowDockingLayout } from "@/features/app-windows";
 import { dockingMetrics } from "./dockingGeometry";
-import { uiPx } from "@/shared/lib/uiScale";
+import { uiPx } from "@misty/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
