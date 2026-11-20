@@ -80,6 +80,13 @@ impl Policy {
             .any(|rule| rule.gives(access) && rule.covers(real))
     }
 
+    /// Whether a rule of `reach` covers `real`, whatever access it gives.
+    pub fn reach_covers(&self, reach: Reach, real: &Path) -> bool {
+        self.rules
+            .iter()
+            .any(|rule| rule.reach == reach && rule.covers(real))
+    }
+
     /// Whether the person picked exactly this file in a system dialog.
     pub fn was_picked(&self, real: &Path) -> bool {
         self.rules

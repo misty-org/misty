@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { useStableCallback } from "@/shared/hooks/useStableCallback";
-import { Skeleton, Text } from "@misty/ui";
+import { PaneLoading, Text } from "@misty/ui";
 import { useMistyWhileShown } from "../state/useMistyWhileShown";
 import { useCompanionState } from "../../tutor/cursor/companionState";
 import {
@@ -395,15 +395,7 @@ export function AgentWorkspaceConversation({
         }}
       >
         {loadingOlder ? (
-          <div
-            role="status"
-            aria-label="Older messages"
-            className="mx-auto grid w-full max-w-209 gap-3 px-6 pt-7"
-          >
-            <Skeleton className="h-3.5 w-2/3" />
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-3/4" />
-          </div>
+          <PaneLoading label="Loading older messages" inline />
         ) : null}
         <AgentConversationTranscript
           view={{

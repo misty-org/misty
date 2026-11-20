@@ -7,7 +7,7 @@ import { useLibraryItemLink } from "./useLibraryItemLink";
 
 function wrapper({ children }: PropsWithChildren) {
   return (
-    <MemoryRouter initialEntries={["/spaces/one/library?item=target&sort=updated"]}>
+    <MemoryRouter initialEntries={["/spaces/one/files?item=target&sort=updated"]}>
       {children}
     </MemoryRouter>
   );

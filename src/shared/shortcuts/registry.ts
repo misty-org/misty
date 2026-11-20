@@ -76,9 +76,9 @@ const shellCommands: ShortcutCommandDefinition[] = [
   }),
 ];
 
-/** A Space's home, its Docs and Whiteboards pages, and its files, on ⌘1 to ⌘4 while a Space is
- * focused (window tabs elsewhere). */
-const spaceSections = ["Home", "Docs", "Whiteboards", "Files"] as const;
+/** A Space's chat, its Files and its Lab, on ⌘1 to ⌘3 while a Space is focused (window tabs
+ * elsewhere). */
+const spaceSections = ["Chat", "Files", "Lab"] as const;
 
 const tabAndToolCommands = [
   ...spaceSections.map((label, index) =>

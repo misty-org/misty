@@ -176,9 +176,9 @@ describe("shortcut dispatcher", () => {
     const store = useWorkspaceStore.getState();
     store.openSurface({
       surfaceId: "space",
-      groupKey: "space:alpha:notes",
-      title: "Notes",
-      route: "/spaces/alpha/notes",
+      groupKey: "space:alpha:files",
+      title: "Files",
+      route: "/spaces/alpha/files",
       instancePolicy: "multiple",
     });
     const sectionHandler = vi.fn();

@@ -53,7 +53,7 @@ function Harness() {
 }
 function mount() {
   return render(
-    <MemoryRouter initialEntries={["/spaces/family/notes"]}>
+    <MemoryRouter initialEntries={["/spaces/family/files"]}>
       <Harness />
     </MemoryRouter>,
   );
@@ -68,7 +68,7 @@ beforeEach(() => {
     loadMembers: vi.fn(async () => {}),
   });
   preload.mockReset().mockResolvedValue(undefined);
-  open("/spaces/family/notes");
+  open("/spaces/family/files");
 });
 afterEach(() => {
   cleanup();
@@ -79,38 +79,37 @@ afterEach(() => {
 const route = () => activeLayoutView(useWorkspaceStore.getState().layout)?.route;
 const press = (id: string) => act(async () => shortcuts.get(id)!());
 
-it("opens the Space home in the owning tab after loading it", async () => {
+it("opens the Space's chat in the owning tab after loading it", async () => {
   const before = activeLayoutView(useWorkspaceStore.getState().layout)?.id;
   mount();
   await press("space.section_1");
-  await waitFor(() => expect(route()).toBe("/spaces/family/home"));
-  expect(preload).toHaveBeenCalledWith("home");
+  await waitFor(() => expect(route()).toBe("/spaces/family/chat"));
+  expect(preload).toHaveBeenCalledWith("chat");
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.id).toBe(before);
 });
 
-it("opens Docs, Whiteboards and the home's files with the other section shortcuts", async () => {
+it("opens the Lab and Files with the other section shortcuts", async () => {
   mount();
   await press("space.section_3");
-  await waitFor(() => expect(route()).toBe("/spaces/family/drawings"));
-  expect(preload).toHaveBeenCalledWith("drawings");
+  await waitFor(() => expect(route()).toBe("/spaces/family/lab"));
+  expect(preload).toHaveBeenCalledWith("lab");
   await press("space.section_2");
-  await waitFor(() => expect(route()).toBe("/spaces/family/notes"));
-  await press("space.section_4");
-  await waitFor(() => expect(route()).toBe("/spaces/family/home?filter=files"));
+  await waitFor(() => expect(route()).toBe("/spaces/family/files"));
+  expect(preload).toHaveBeenCalledWith("files");
 });
 
 it("follows the focused Space", async () => {
   mount();
   act(() => open("/spaces/work/social"));
   await press("space.section_1");
-  await waitFor(() => expect(route()).toBe("/spaces/work/home"));
+  await waitFor(() => expect(route()).toBe("/spaces/work/chat"));
 });
 
 it("keeps the current page on load failure and ignores loads after the pane route changes", async () => {
   mount();
   preload.mockRejectedValueOnce(new Error("offline"));
   await press("space.section_1");
-  expect(route()).toBe("/spaces/family/notes");
+  expect(route()).toBe("/spaces/family/files");
   let finish!: () => void;
   preload.mockImplementationOnce(
     () =>

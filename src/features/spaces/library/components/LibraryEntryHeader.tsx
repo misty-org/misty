@@ -1,14 +1,10 @@
-import { SpaceCrumb } from "../../components/space-row/SpaceCrumb";
 import { OrderedCollectionFilters as CollectionFilters } from "@/features/settings/OrderedCollectionFilters";
 import type { LibraryItemQuery } from "../../api/dto/entities";
 import { mediaTypeOptions, sortOptions } from "../libraryFilterOptions";
 import { SpaceLibraryUploadTray } from "./SpaceLibraryUploadTray";
 import {
+  Button,
   CollectionHeading,
-  DropdownMenu,
-  DropdownMenuContent,
-  MenuItem,
-  MenuTrigger,
   CollectionSearch,
   CollectionFilterMenu,
   CollectionViewToggle,
@@ -16,7 +12,6 @@ import {
 } from "@misty/ui";
 import {
   AudioLines,
-  Clapperboard,
   FileText,
   Film,
   ImageIcon,
@@ -26,18 +21,13 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useState } from "react";
-import { canEditVideo, isVideoProjectFile } from "@/features/files";
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
-import { libraryItemMIME } from "../library-primitives/libraryMediaTypes";
-import { libraryMediaKind } from "../library-viewer/libraryMediaKind";
-import { createVideoProject } from "../library-viewer/videoProjects";
 import { useLibraryUploadState } from "../library-surfaces/useLibraryUploadState";
 import type { LibraryCollectionKind } from "../hook-signatures/useSpaceLibraryData";
 
 /**
- * The page's tabs: everything, one per kind of file (the photo and video editors open from the
- * first two), and the trash. A kind tab is the media-type filter with a tab of its own.
+ * The page's tabs: everything, one per kind of file, and the trash. A kind tab is the media-type
+ * filter with a tab of its own.
  */
 const sections = [
   { value: "recent", label: "All", icon: LayoutGrid },
@@ -56,55 +46,18 @@ export function mediaTab(collection: LibraryCollectionKind, mediaType: string): 
   return kindTabs.has(mediaType) ? (mediaType as MediaTab) : "recent";
 }
 
-/**
- * Media's create action: upload files, or make a video, empty or from the photos and videos
- * selected (in the order they were picked).
- */
-function NewInMedia() {
-  const { data } = useSpaceLibraryContext();
+/** Files' create action: upload files into the Space. */
+function UploadFiles() {
   const upload = useLibraryUploadState();
-  const [busy, setBusy] = useState(false);
-  const clips = (data.selectedItems ?? []).filter((item) => {
-    const mime = libraryItemMIME(item);
-    const kind = libraryMediaKind(mime, item.file.intrinsic_metadata);
-    return (kind.isImage || kind.isVideo) && !isVideoProjectFile(mime, item.file.original_filename);
-  });
-  // Video projects are only offered where this computer can edit video.
-  const videos = canEditVideo();
-  const makeVideo = async (from: string[]) => {
-    setBusy(true);
-    try {
-      const item = await createVideoProject(data.spaceId, "Untitled video", from);
-      data.setItems((current) => [item, ...current]);
-      data.setSelectedItemId(item.id);
-    } catch (error) {
-      data.setLocalError(error instanceof Error ? error.message : "The video could not be made.");
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
-    <DropdownMenu>
-      <MenuTrigger
-        label="New"
-        variant="primary"
-        icon={Plus}
-        disabled={busy || upload.uploadDisabled || upload.uploading}
-      />
-      <DropdownMenuContent align="end" className="min-w-44">
-        <MenuItem icon={Upload} label="Upload files" onSelect={upload.onUpload} />
-        {videos && (
-          <MenuItem icon={Clapperboard} label="New video" onSelect={() => void makeVideo([])} />
-        )}
-        {videos && clips.length > 0 && (
-          <MenuItem
-            icon={Film}
-            label="Video from selection"
-            onSelect={() => void makeVideo(clips.map((item) => item.id))}
-          />
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant="primary"
+      icon={Upload}
+      disabled={upload.uploadDisabled || upload.uploading}
+      onClick={upload.onUpload}
+    >
+      Upload
+    </Button>
   );
 }
 
@@ -114,13 +67,12 @@ export function LibraryEntryHeader() {
   return (
     <>
       <CollectionHeading
-        title={<SpaceCrumb spaceId={data.spaceId} here="Media" />}
         end={
           <>
             <CollectionSearch
               data-tour="library-search"
-              aria-label="Search media"
-              placeholder={data.collection === "deleted" ? "Search trash" : "Search media"}
+              aria-label="Search files"
+              placeholder={data.collection === "deleted" ? "Search trash" : "Search files"}
               value={data.searchInput}
               onChange={(e) => data.setSearchInput(e.target.value)}
               onFocus={() => data.setSearchFocused(true)}
@@ -128,7 +80,7 @@ export function LibraryEntryHeader() {
             />
             {data.collection !== "deleted" && upload.inHeader && (
               <span data-tour="library-upload" className="contents">
-                <NewInMedia />
+                <UploadFiles />
               </span>
             )}
           </>
@@ -159,7 +111,7 @@ export function LibraryEntryHeader() {
               }}
               groups={[
                 {
-                  label: "Media type",
+                  label: "File type",
                   submenu: true,
                   value: data.mediaType || "all",
                   options: mediaTypeOptions.map((x) => ({ ...x, value: x.value || "all" })),

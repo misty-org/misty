@@ -1,7 +1,8 @@
 import { parseSketch } from "./companionSketch";
 
 /** The tags the engine puts in an answer, which are acted on and never read aloud. */
-export const replyTags = /\[(?:POINT|GUIDE|TASK|FOCUS|OPEN|SETTINGS|DRIVE)[^\]]*\]/g;
+export const replyTags =
+  /\[(?:POINT|GUIDE|TASK|FOCUS|OPEN|SETTINGS|DRIVE|REASSIGN|CHAT|REMEMBER|FORGET)[^\]]*\]/g;
 const tags = replyTags;
 /** A point at something on screen, where it sits among the words. */
 const pointTag = /\[POINT:(?!\s*none\s*\])[^\]]*\]/gi;

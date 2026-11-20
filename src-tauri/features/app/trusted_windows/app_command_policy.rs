@@ -160,7 +160,9 @@ mod tests {
     }
 
     #[test]
-    fn cursor_overlays_can_only_read_their_presentation_snapshot() {
+    /// An overlay reads what to show, and Misty there may take the pointer for her own window
+    /// (to be clicked or handed a file) and open Tutor's text box. Nothing else.
+    fn cursor_overlays_only_present_and_take_the_pointer_for_misty() {
         let permissions = capability("cursor-companion")["permissions"].clone();
         let app_commands: Vec<_> = permissions
             .as_array()
@@ -171,7 +173,14 @@ mod tests {
                 permission.starts_with("allow-") || permission.starts_with("action-")
             })
             .collect();
-        assert_eq!(app_commands, ["allow-cursor-companion-snapshot"]);
+        assert_eq!(
+            app_commands,
+            [
+                "allow-cursor-companion-snapshot",
+                "allow-cursor-companion-hit",
+                "allow-cursor-companion-ask-open"
+            ]
+        );
     }
 
     /// Capabilities scoped by window would also cover website views attached to that window, and one

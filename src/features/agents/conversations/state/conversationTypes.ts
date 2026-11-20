@@ -11,10 +11,6 @@ type GlobalAiCitationKind =
   | "note"
   | "message"
   | "conversation"
-  | "calendar"
-  | "drawing"
-  | "deck"
-  | "workbook"
   | "library"
   | "folder"
   | "file"
@@ -76,6 +72,8 @@ export interface GlobalAiMessage {
   usage?: MessageUsage;
   /** The model the engine says answered. */
   model?: string;
+  /** On a Tutor turn: the agent the work was handed to, and the chat it went to. */
+  tutorHandoff?: { agentId: string; conversationId: string };
   /** How long the run took, set when it completes. */
   durationMs?: number;
   /** Folders the engine was refused during this reply, each offered to the person to allow. */
@@ -165,8 +163,10 @@ export interface GlobalAiConversation {
   /** When it was archived, which keeps it out of the sidebar's lists. */
   archivedAt?: string;
   /** Where it was started. A talk in the studio is the studio's own: it stays in the studio's
-   * talk panel, spoken and heard there, and is never listed with the chats. */
-  place?: "studio";
+   * talk panel, spoken and heard there, and is never listed with the chats. Tutor's is its
+   * conversation at the cursor (`tutor/cursor/tutorConversation.ts`): never listed either, and
+   * never an agent's. */
+  place?: "studio" | "tutor";
   /** The device that keeps this chat; absent while it waits in the server's inbox. */
   keptOnDeviceId?: string;
   /** Running notes on turns too old to send, written by this device's model; opaque here. */

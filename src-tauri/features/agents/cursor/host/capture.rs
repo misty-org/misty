@@ -165,7 +165,7 @@ impl Drop for CaptureGuard {
                 && state
                     .data
                     .lock()
-                    .map(|d| d.presentation["visible"].as_bool().unwrap_or(false))
+                    .map(|d| super::shown(&d.presentation))
                     .unwrap_or(false);
             if visible && !state.capture.load(Ordering::SeqCst) {
                 for (label, w) in app.webview_windows() {

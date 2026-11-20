@@ -82,8 +82,6 @@ const presentedMedia = [
 const contentStylesheets = [
   ...codeStylesheets,
   ...presentedMedia,
-  // Skins for a third-party widget's own DOM (Excalidraw), which shared components can't reach.
-  /^src\/features\/spaces\/journal\/drawings\/components\/collaborativeDrawingCanvas\.css$/,
 ] as const;
 
 /** Recognizing a search site's redirect links is reading them, not searching with them. */
@@ -239,7 +237,7 @@ export const uiRules = {
     ),
     guidance:
       "never loading text: first loads use a Skeleton shaped like the content (ListRowSkeleton, " +
-      "SkeletonList), and work on a click disables its Button while progress shows where the work happens",
+      "SkeletonList), or PaneLoading when its shape depends on the data, and work on a click disables its Button while progress shows where the work happens",
   },
   "status-word": {
     count: countStatusWords,
@@ -251,7 +249,7 @@ export const uiRules = {
     count: countLegacyVariants,
     guidance:
       "Button and IconButton variants are primary, secondary, quiet and danger (IconButton also " +
-      "overlay): default and outline → secondary, ghost, toolbar and link → quiet, destructive " +
+      "overlay; store actions get and get-filled): default and outline → secondary, ghost, toolbar and link → quiet, destructive " +
       "→ danger, chip → ChoiceGroup or FilterChip. An old variant's size sm is 32: make it md",
   },
   "legacy-button-size": {
@@ -291,11 +289,12 @@ export const uiRules = {
   "skeleton-fallback": {
     // A lazy tool's code arriving is the tool getting ready, not data: a skeleton there looks
     // like content that never comes.
-    pattern: /fallback=\{\s*<\w*Skeleton\b/g,
+    pattern: /fallback=\{\s*<(?:\w*Skeleton|PaneLoading)\b/g,
     jsx: true,
     guidance:
       "load a tool's code with lazyTool inside ToolSuspense, which says \"Setting up the code " +
-      'editor" and offers Try again; never a skeleton fallback, which stands in for data only',
+      'editor" and offers Try again; never a skeleton or PaneLoading fallback, which stand in for data ' +
+      "only",
   },
   duckduckgo: {
     pattern: /duckduckgo/gi,
@@ -309,6 +308,14 @@ export const uiRules = {
       "an edge is never 0.5px: use var(--hairline) or the hairline-outline utility (1px below " +
       "2x screens, 0.5px on them); a half pixel fades out on Windows' scaled displays and " +
       "rounded corners look cut off",
+  },
+  "focus-ring": {
+    // A ring, outline or glow drawn on focus, written as a class.
+    pattern:
+      /(?<![\w-])(?:group-|peer-)?focus(?:-visible|-within)?(?:\/[\w-]+)?:(?:[\w-]+:)*-?(?:outline|ring|shadow)(?!-none\b|-hidden\b)/g,
+    guidance:
+      "focus never draws a ring, outline or glow: a focused control shows its hover wash " +
+      "(Pressable, Button and IconButton already do), a field its edge",
   },
   "arbitrary-px": {
     pattern: classToken(
@@ -406,6 +413,14 @@ export const cssRules = {
       "an edge is never 0.5px: use var(--hairline) or the hairline-outline utility (1px below " +
       "2x screens, 0.5px on them); a half pixel fades out on Windows' scaled displays and " +
       "rounded corners look cut off",
+  },
+  "css-focus-ring": {
+    // A rule about focus that draws an outline or a shadow.
+    pattern:
+      /:focus(?:-visible|-within)?[^{}]*\{[^}]*(?:outline(?:-width|-style|-color)?|box-shadow)\s*:\s*(?!none\b|0\b|transparent\b)/g,
+    guidance:
+      "focus never draws a ring, outline or glow: a focused control shows its hover wash, a " +
+      "field its edge",
   },
   "css-z": {
     pattern: /z-index:\s*-?\d/g,

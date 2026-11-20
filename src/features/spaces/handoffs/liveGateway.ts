@@ -2,6 +2,7 @@ import { useUserStore } from "@/features/account/core";
 import { spacesApi } from "../api/api";
 import { notesApi } from "../journal/notes/api/api";
 import { followPendingMarkdown } from "../journal/notes/components/noteEditorContent";
+import { pageMisty } from "../apps/pageMisty";
 import {
   acquireNoteCollaborationSession,
   releaseNoteCollaborationSession,
@@ -13,35 +14,8 @@ import { LabNoteBodyEditor } from "../journal/notes/components/LabNoteBodyEditor
 import { handoffBody } from "./spacePosts";
 import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
 import { VisibilityMenu } from "../components/VisibilityMenu";
-import type { ItemVisibility } from "../api/visibility";
-import { setHostVisibility } from "../embeds/hostVisibility";
-import { spaceRequest } from "../api/api";
-import type { SpaceLibraryItem } from "../api/dto/entities";
-import { libraryItemMIME } from "../library/library-primitives/libraryMediaTypes";
-import { editedImageFilename } from "../library/library-viewer/libraryMediaKind";
-import {
-  acquireImageSession,
-  releaseImageSession,
-} from "../library/library-viewer/imageCollaboration";
-import {
-  clearImageEdit,
-  imageDocBase,
-  imageDocParts,
-  isVideoProjectFile,
-  newerProject,
-  parseVideoProject,
-  readRoomProject,
-  VIDEO_PROJECT_MIME,
-  writeRoomProject,
-  type VideoProjectDocument,
-} from "@/features/files";
-import { libraryFileById } from "../library/library-viewer/useVideoEditorSpace";
-
-/** Tells the open Library a file changed, so it shows the new one. */
-const notifyLibraryChanged = (spaceId: string) =>
-  window.dispatchEvent(
-    new CustomEvent("misty:space-library-event", { detail: { space_id: spaceId } }),
-  );
+import { setItemVisibility, type ItemVisibility } from "../api/visibility";
+import { libraryFileById } from "../library/library-data/libraryFile";
 
 const noteChanged = (spaceId: string) =>
   window.dispatchEvent(
@@ -60,170 +34,57 @@ export const liveGateway = {
     return me ? { userId: me.id, name: me.username || me.email } : undefined;
   },
 
-  /** A notebook's live room: its shared doc and awareness, held until `close`. */
+  /**
+   * A notebook's live room, through misty-sdk as any app's: its shared doc and awareness, held until `close`.
+   * The note's own role and the rewrites the server writes into it come from the note's connection here.
+   */
   async openLiveDoc(spaceId: string, docId: string) {
     const session = await acquireNoteCollaborationSession(spaceId, docId);
+    const room = pageMisty(spaceId, "lab").room(docId);
     let closed = false;
-    const provider = session.provider;
-    const synced = provider.synced
-      ? Promise.resolve()
-      : new Promise<void>((resolve) => {
-          const onSync = (done: boolean) => {
-            if (!done) return;
-            provider.off("sync", onSync);
-            resolve();
-          };
-          provider.on("sync", onSync);
-        });
+    // Deleted or no longer theirs; anything else (the connection closing) isn't a loss the notebook shows, and a
+    // room that never syncs says so when its open times out.
+    const lost = (): "deleted" | "revoked" | null =>
+      room.lost?.code === "not_found"
+        ? "deleted"
+        : room.lost?.code === "permission_denied"
+          ? "revoked"
+          : session.access.lost;
     return {
-      doc: session.doc,
-      awareness: provider.awareness,
+      doc: room.doc,
+      awareness: room.awareness,
       role: session.ticket.role,
-      synced,
-      lost: () => session.access.lost,
-      onLost: (listener: () => void) => session.access.subscribe(listener),
+      // A room that can't open settles through `lost`, which `onLost` reports.
+      synced: room.synced.catch(() => new Promise<void>(() => {})),
+      lost,
+      onLost(listener: () => void) {
+        const stopRoom = room.onLost(() => listener());
+        const stopSession = session.access.subscribe(listener);
+        return () => {
+          stopRoom();
+          stopSession();
+        };
+      },
       /**
        * Hands `apply` the Markdown the server wrote into this doc (an API or agent rewrite), in
        * one open copy only, so the notebook can take it into its own types.
        */
       followRewrites: (apply: (markdown: string) => void) =>
         followPendingMarkdown(
-          { role: session.ticket.role, metadata: session.metadata, provider },
+          { role: session.ticket.role, metadata: session.metadata, provider: session.provider },
           { gone: () => closed, apply },
         ),
       close() {
         if (closed) return;
         closed = true;
-        provider.awareness.setLocalState(null);
+        room.destroy();
         releaseNoteCollaborationSession(spaceId, docId);
       },
     };
   },
 
-  /**
-   * A Library image's live edit, for an agent: the item, the room everyone editing it shares, and
-   * saving the edit into an image. An edit left from before the image last changed is cleared
-   * once the room's copy arrives, as the editor does.
-   */
-  async openLibraryImage(spaceId: string, itemId: string) {
-    const itemPath = `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}`;
-    const item = await spaceRequest<SpaceLibraryItem>(itemPath);
-    const mimeType = libraryItemMIME(item);
-    if (!mimeType.startsWith("image/")) throw new Error("This Library item isn't an image.");
-    const session = await acquireImageSession(spaceId, itemId);
-    const provider = session.provider;
-    let closed = false;
-    const synced = (
-      provider.synced
-        ? Promise.resolve()
-        : new Promise<void>((resolve) => {
-            const onSync = (done: boolean) => {
-              if (!done) return;
-              provider.off("synced", onSync);
-              resolve();
-            };
-            provider.on("synced", onSync);
-          })
-    ).then(() => {
-      if (session.role === "viewer") return;
-      const parts = imageDocParts(session.doc);
-      const base = imageDocBase(parts);
-      if (base === null) session.doc.transact(() => parts.meta.set("base", String(item.version)));
-      else if (!(Number(base) >= item.version))
-        clearImageEdit(parts, String(item.version), { image: "base" });
-    });
-    const metadata = item.file.intrinsic_metadata;
-    return {
-      name: item.display_name,
-      version: item.version,
-      mimeType,
-      width: Number(metadata.width ?? 0),
-      height: Number(metadata.height ?? 0),
-      doc: session.doc,
-      awareness: provider.awareness,
-      role: session.role,
-      synced,
-      original: () => spacesApi.libraryContent(spaceId, itemId),
-      async replace(blob: Blob) {
-        // The item as it is now, so a save over a newer version is refused, not lost.
-        const current = await spaceRequest<SpaceLibraryItem>(itemPath);
-        const result = await spacesApi.replaceLibraryItemContent(
-          spaceId,
-          current,
-          blob,
-          editedImageFilename(current.display_name, blob.type || mimeType),
-        );
-        notifyLibraryChanged(spaceId);
-        return result.item?.version ?? current.version + 1;
-      },
-      async saveCopy(blob: Blob, filename: string) {
-        const result = await spacesApi.uploadLibraryBlob(spaceId, blob, filename, "library");
-        notifyLibraryChanged(spaceId);
-        return result.item ? { id: result.item.id } : undefined;
-      },
-      close() {
-        if (closed) return;
-        closed = true;
-        releaseImageSession(spaceId, itemId);
-      },
-    };
-  },
-
-  /** One of a Space's Media files, read whole. */
+  /** One of a Space's files, read whole. */
   libraryFile: (spaceId: string, itemId: string) => libraryFileById(spaceId, itemId),
-
-  /**
-   * A video project in Media, for an agent: read as the newer of its file and its live room, and
-   * kept as a new version of its file and in the room, so open editors show the change at once.
-   */
-  async openLibraryVideo(spaceId: string, itemId: string) {
-    const itemPath = `/spaces/${encodeURIComponent(spaceId)}/library/items/${encodeURIComponent(itemId)}`;
-    const item = await spaceRequest<SpaceLibraryItem>(itemPath);
-    if (!isVideoProjectFile(libraryItemMIME(item), item.file.original_filename))
-      throw new Error("This Media item isn't a video project.");
-    const session = await acquireImageSession(spaceId, itemId);
-    const provider = session.provider;
-    const synced = provider.synced
-      ? Promise.resolve()
-      : new Promise<void>((resolve) => {
-          const onSync = (done: boolean) => {
-            if (!done) return;
-            provider.off("synced", onSync);
-            resolve();
-          };
-          provider.on("synced", onSync);
-          // A room that can't be reached doesn't hold the project back: the file still is.
-          window.setTimeout(resolve, 8000);
-        });
-    let closed = false;
-    return {
-      name: item.display_name.replace(/\.mistyvideo$/i, ""),
-      role: session.role,
-      async read() {
-        await synced;
-        const blob = await spacesApi.libraryContent(spaceId, itemId);
-        return newerProject(parseVideoProject(await blob.text()), readRoomProject(session.doc));
-      },
-      async keep(document: VideoProjectDocument) {
-        if (session.role === "viewer") throw new Error("This video can only be viewed here.");
-        const current = await spaceRequest<SpaceLibraryItem>(itemPath);
-        await spacesApi.replaceLibraryItemContent(
-          spaceId,
-          current,
-          new Blob([JSON.stringify(document)], { type: VIDEO_PROJECT_MIME }),
-          current.file.original_filename || `${current.display_name}.mistyvideo`,
-        );
-        writeRoomProject(session.doc, document);
-        notifyLibraryChanged(spaceId);
-      },
-      loadMedia: (mediaId: string) => libraryFileById(spaceId, mediaId),
-      close() {
-        if (closed) return;
-        closed = true;
-        releaseImageSession(spaceId, itemId);
-      },
-    };
-  },
 
   /** Makes the Space doc a new notebook lives in. */
   async createNotebookDoc(spaceId: string, title: string, markdown: string) {
@@ -241,8 +102,7 @@ export const liveGateway = {
 
   /** Puts the person's own doc on a layer: private to them, or shared with the Space. */
   async setDocVisibility(spaceId: string, docId: string, visibility: ItemVisibility) {
-    // A doc turning shared shares what it embeds first; declined, it stays as it was.
-    await setHostVisibility(spaceId, "note", docId, visibility);
+    await setItemVisibility(spaceId, "note", docId, visibility);
     noteChanged(spaceId);
   },
 

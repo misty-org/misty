@@ -1,7 +1,9 @@
 export interface ConversationTool {
   callId: string;
-  name: "start_task" | "steer_task" | "cancel_task" | "get_task_status";
+  name: "start_task" | "steer_task" | "cancel_task" | "get_task_status" | "reassign_task";
   instruction: string;
+  /** The agent the person named for the work ("ask Ada to…"), or for reassign_task the new one. */
+  agent?: string;
   key: string;
   invocationId: string;
 }
@@ -10,6 +12,8 @@ export interface SavedVoiceTurn {
   prompt: string;
   reply: string;
   interrupted: boolean;
+  /** The agent the turn's work was handed to, and the chat it went to. */
+  handoff?: { agentId: string; conversationId: string };
 }
 
 /** A promise with its resolve and reject at hand; an unawaited rejection is not reported. */

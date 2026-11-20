@@ -82,6 +82,11 @@ pub enum Reach {
     /// build starts its own stores there from the ones it shared before.
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     WebsiteData,
+    /// A mounted Space drive and what it needs (`space_drive`): `~/.misty/mnt*/<Space>`, and on
+    /// macOS the domain's folder `~/Library/CloudStorage/Misty-<Space>` behind that link and the
+    /// app group container Misty shares with its File Provider extension. Allowed only while the
+    /// drive is mounted (`allow_space_drive`), taken back when it is unmounted.
+    SpaceDrive,
     /// Unit tests build their fixtures anywhere in the temp folder.
     #[cfg(any(test, feature = "test-fixtures"))]
     TestFixtures,
@@ -266,6 +271,28 @@ pub fn allow_shared_folder(folder: &Path, access: Access) {
 
 pub fn revoke_shared_folder(folder: &Path) {
     with_policy(|policy| policy.remove(Reach::SharedFolder, folder));
+}
+
+/// A Space drive's folder, once it is mounted. Only the drive's own mounting calls this, with a
+/// path it made itself (`~/.misty/mnt*/<Space>`), one macOS answered for the domain it registered
+/// (`~/Library/CloudStorage/Misty-*`), or Misty's own app group container, never one a window
+/// named.
+pub fn allow_space_drive(folder: &Path) {
+    with_policy(|policy| policy.add(Reach::SpaceDrive, folder, Shape::Folder, Access::Write));
+}
+
+pub fn revoke_space_drive(folder: &Path) {
+    with_policy(|policy| policy.remove(Reach::SpaceDrive, folder));
+}
+
+/// Whether `path` is inside a mounted Space drive.
+pub fn is_in_space_drive(path: &Path) -> bool {
+    real_path::resolve(path).is_ok_and(|real| {
+        POLICY
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .reach_covers(Reach::SpaceDrive, &real)
+    })
 }
 
 pub fn allow_linked_folder(folder: &Path) {

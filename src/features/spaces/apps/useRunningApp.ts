@@ -1,5 +1,7 @@
 import { invoke } from "@/native";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createScreenChannel, noteRunningApp, useAppControl, type ScreenChannel } from "./appScreen";
+import { createScreenTools } from "./appScreenTools";
 import { offerAppTools } from "./appTools";
 import { createHostChannel } from "./hostChannel";
 import type { HostChannel, HostHandlers } from "./hostChannel";
@@ -13,11 +15,16 @@ export interface AppManifest {
   entry: string;
   opens: string[];
   permissions: string[];
-  mcp?: "frame" | "binary";
+  mcp?: "frame" | "binary" | "adapter";
   webview: boolean;
   own_origin?: boolean;
   inline_scripts?: boolean;
   shim?: boolean;
+  license?: string;
+  platforms?: ("macos" | "windows" | "linux")[];
+  network?: { host: string; paid?: boolean }[];
+  collab?: "room";
+  adapter?: string;
 }
 
 /** Where a version that isn't on this computer comes from: the catalog's address and checksum. */
@@ -29,13 +36,20 @@ export interface BundleSource {
     manifest: Record<string, unknown>;
     add_copies: { from: string; to: string }[];
     strip_top: boolean;
+    auto_top?: boolean;
+    add_files?: { path: string; content: string }[];
   };
 }
 
 export type RunningApp =
   | { status: "setup" }
   | { status: "failed"; error: string }
-  | { status: "ready"; manifest: AppManifest; start: (frame: Window) => void };
+  | {
+      status: "ready";
+      manifest: AppManifest;
+      /** Called when the frame has loaded: its window, and the frame itself for where it is in the page. */
+      start: (frame: Window, element: HTMLIFrameElement) => void;
+    };
 
 const asMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -49,8 +63,8 @@ export function useRunningApp(options: {
   spaceId: string;
   appId: string;
   version: string;
-  /** What a mod approved at install, or `"manifest"` for a built-in app, which gets what its manifest asks. */
-  approved: string[] | "manifest";
+  /** What a mod approved when the app was added. */
+  approved: string[];
   source?: BundleSource;
   makeHandlers: (manifest: AppManifest) => HostHandlers;
 }): { app: RunningApp; retry: () => void; connected: boolean } {
@@ -70,6 +84,8 @@ export function useRunningApp(options: {
     let session: string | undefined;
     let channel: HostChannel | undefined;
     let tools: ReturnType<typeof offerAppTools> | undefined;
+    let screen: ScreenChannel | undefined;
+    let unnote: (() => void) | undefined;
     setApp({ status: "setup" });
     setConnected(false);
 
@@ -89,12 +105,12 @@ export function useRunningApp(options: {
       }
       if (manifest.webview)
         throw new Error(`${manifest.name} needs a window of its own, which isn't ready yet.`);
-      const approvedNow = JSON.parse(approvedKey) as string[] | "manifest";
+      const approvedNow = JSON.parse(approvedKey) as string[];
       const opened = await invoke<string>("space_app_session_open", {
         spaceId,
         appId,
         version,
-        approved: approvedNow === "manifest" ? manifest.permissions : approvedNow,
+        approved: approvedNow,
       });
       if (!live) {
         void invoke("space_app_session_close", { session: opened }).catch(() => {});
@@ -105,11 +121,34 @@ export function useRunningApp(options: {
       setApp({
         status: "ready",
         manifest: running,
-        start(frame) {
+        start(frame, element) {
           channel?.dispose();
           tools?.dispose();
-          // An app with its own MCP server offers its tools to agents; native gates every call.
-          tools = running.mcp === "frame" ? offerAppTools({ appId, session: opened }) : undefined;
+          screen?.dispose();
+          // Every app offers Misty's screen tools, so an agent can work in it in the person's window; an app with
+          // its own MCP server in its frame offers that server's tools too. Native gates every call.
+          screen = createScreenChannel(frame, () => useAppControl.getState().takeBack(appId));
+          unnote?.();
+          const handle = {
+            appId,
+            appName: running.name,
+            screen,
+            frame: () => (element.isConnected ? element : null),
+          };
+          unnote = noteRunningApp(handle);
+          const screenTools = createScreenTools({
+            appId,
+            appName: running.name,
+            screen,
+            frame: () => (element.isConnected ? element : null),
+          });
+          tools = offerAppTools({
+            appId,
+            session: opened,
+            mcp: running.mcp === "frame",
+            adapter: running.mcp === "adapter" ? screen : undefined,
+            extra: screenTools,
+          });
           const offered = tools;
           channel = createHostChannel({
             frame,
@@ -118,11 +157,11 @@ export function useRunningApp(options: {
             onActivity: () => setConnected(true),
             handlers: {
               ...handlersRef.current(running),
-              mcp: offered ? (message) => offered.receive(message) : undefined,
+              mcp: running.mcp === "frame" ? (message) => offered.receive(message) : undefined,
             },
           });
           channel.start();
-          offered?.attach(channel, (error) =>
+          offered.attach(channel, (error) =>
             console.warn(`${running.name}'s tools aren't available:`, error),
           );
         },
@@ -135,6 +174,9 @@ export function useRunningApp(options: {
       live = false;
       channel?.dispose();
       tools?.dispose();
+      screen?.dispose();
+      unnote?.();
+      useAppControl.getState().leave(appId);
       if (session) void invoke("space_app_session_close", { session }).catch(() => {});
     };
   }, [spaceId, appId, version, approvedKey, url, sha256, wrapKey, attempt]);

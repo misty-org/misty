@@ -47,30 +47,6 @@
         "readOnly": true
       },
       {
-        "description": "Search Notes visible in a Space.",
-        "locality": "routed",
-        "name": "note.search",
-        "readOnly": true
-      },
-      {
-        "description": "Read one Note visible in a Space, including its Markdown body (empty means the Note has no text yet).",
-        "locality": "routed",
-        "name": "note.read",
-        "readOnly": true
-      },
-      {
-        "description": "List collaborative Excalidraw drawings visible in a Space.",
-        "locality": "routed",
-        "name": "drawing.list",
-        "readOnly": true
-      },
-      {
-        "description": "Read one live Excalidraw scene, including native element JSON, background state, revision, and content hash.",
-        "locality": "routed",
-        "name": "drawing.read",
-        "readOnly": true
-      },
-      {
         "description": "Read metadata, caption, tags, and file facts for one visible Library item in a Space.",
         "locality": "routed",
         "name": "file.read",
@@ -89,7 +65,7 @@
         "readOnly": true
       },
       {
-        "description": "Search notes and messages at once, ranked by relevance. Use it when you do not know where something is; then read the item with its own tool.",
+        "description": "Search the Space's Lab notebooks and messages at once, ranked by relevance. Use it when you do not know where something is; then read the item with its own tool.",
         "locality": "server",
         "name": "search.all",
         "readOnly": true

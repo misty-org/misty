@@ -55,6 +55,14 @@ export const router = createBrowserRouter([
                 element: null,
               },
               {
+                path: "dms/*",
+                element: null,
+              },
+              {
+                path: "friends",
+                element: null,
+              },
+              {
                 path: "welcome",
                 element: <WelcomePage />,
               },

@@ -253,8 +253,9 @@ fn note(run_id: &str, note: RunNote) {
 
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
-/// Each running turn's Space folders: the shared folders of its Space downloaded on this computer,
-/// which its engine may read beside its own folder (`launch_dirs`). Gone when the run ends.
+/// Each running turn's Space folders: its Space's drive where it is mounted on this computer
+/// (`~/.misty/mnt/<Space>`), which its engine may read beside its own folder (`launch_dirs`).
+/// Gone when the run ends.
 static SPACE_DIRS: std::sync::LazyLock<std::sync::Mutex<HashMap<String, Vec<String>>>> =
     std::sync::LazyLock::new(Default::default);
 
@@ -318,11 +319,11 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         .map_err(|error| error.to_string())??
     };
     if let Some(space) = body["engine"]["space"].as_str().filter(|space| !space.is_empty()) {
-        let misty_dir = app.state::<MistyRuntime>().environment.misty_dir();
-        let dirs: Vec<String> = crate::spaces_folders::downloaded_folders(&misty_dir, space)
-            .into_iter()
-            .map(|dir| dir.to_string_lossy().into_owned())
-            .collect();
+        // The Space's drive, where it is mounted on this computer: the engine reads it, and
+        // writes there only as its mode allows, like a project folder.
+        let dirs: Vec<String> = crate::spaces_drive::run_folder(space)
+            .map(|drive| vec![drive.to_string_lossy().into_owned()])
+            .unwrap_or_default();
         if !dirs.is_empty() {
             SPACE_DIRS
                 .lock()

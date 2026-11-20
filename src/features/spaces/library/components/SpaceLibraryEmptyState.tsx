@@ -21,7 +21,7 @@ export function SpaceLibraryEmptyState(props: SpaceLibraryEmptyStateProps) {
         title="No files yet"
         line={
           props.uploadAvailable
-            ? "Upload photos and videos, then edit them yourself or ask your agent to."
+            ? "Upload files, or save them here from the apps this Space added."
             : "Files shared with this Space will show here."
         }
         action={

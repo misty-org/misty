@@ -150,14 +150,14 @@ fn a_signed_out_run_has_nothing_that_needs_the_server() {
         run_catalog(&signed_out_request(), &CatalogInputs { signed_in, ..CatalogInputs::default() }).into_iter().map(|tool| tool.name).collect()
     };
     let out = names(false);
-    for gone in ["space.list", "space.manage", "note.read", "message.send", "file.search", "folder.send", "search.all", "agent.configure"] {
+    for gone in ["space.list", "space.manage", "file.read", "message.send", "file.search", "folder.send", "search.all", "agent.configure"] {
         assert!(!out.iter().any(|name| name == gone), "{gone} should need an account");
     }
     for kept in ["web.fetch", "screen.open", "browser.run", "shell.run", "folder.read", "log.work.write", "conversation.ask_user", "agent.delegate"] {
         assert!(out.iter().any(|name| name == kept), "{kept} should work signed out");
     }
     let signed_in = names(true);
-    assert!(signed_in.iter().any(|name| name == "note.read") && signed_in.iter().any(|name| name == "folder.send"));
+    assert!(signed_in.iter().any(|name| name == "file.read") && signed_in.iter().any(|name| name == "folder.send"));
 }
 
 #[test]

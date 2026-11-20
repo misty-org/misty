@@ -6,7 +6,7 @@ fn the_same_provider_id_in_a_later_turn_is_another_call() {
         run_id: "r".into(),
         call_id: "call_1".into(),
         turn,
-        name: "note.update".into(),
+        name: "file.update".into(),
         input: json!({}),
     };
     assert_ne!(journal_key(&call(1)), journal_key(&call(2)));
@@ -48,7 +48,7 @@ fn call(replay: Option<Value>) -> PendingCall {
 fn a_reload_asks_again_only_what_is_safe_to_repeat() {
     assert!(repeats_safely("agent.delegate"));
     assert!(repeats_safely("agent.wait"));
-    assert!(repeats_safely("note.read"));
+    assert!(repeats_safely("file.read"));
     assert!(!repeats_safely("file.create"));
     assert!(!repeats_safely("log.work.write"));
     assert!(!repeats_safely("shell.run"));

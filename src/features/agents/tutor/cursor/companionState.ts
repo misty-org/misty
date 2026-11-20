@@ -40,6 +40,11 @@ export type CompanionControl =
       tint: string;
     }
   | {
+      /** Misty beside the cursor all the time, or only while Tutor works. */
+      kind: "sprite";
+      sprite: boolean;
+    }
+  | {
       /** Starts Tutor's hands-on tour, or stops it. */
       kind: "tour";
       start: boolean;

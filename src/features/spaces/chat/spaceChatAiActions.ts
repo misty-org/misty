@@ -14,13 +14,6 @@ export const spaceChatSuggestedActions: AiSuggestedAction[] = [
     prompt: "Extract decisions and explain the evidence for each one.",
   },
   {
-    id: "action-items",
-    label: "Action items",
-    prompt:
-      "Extract a reviewed set of actionable Space tasks from this conversation. Do not invent owners or due dates.",
-    requestedArtifactKind: "task_set",
-  },
-  {
     id: "draft-message",
     label: "Draft message",
     prompt: "Draft a concise message for this exact Space conversation. Do not post it.",

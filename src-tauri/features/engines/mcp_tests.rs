@@ -6,7 +6,7 @@ fn offers_space_tools_under_names_clients_accept() {
         .iter()
         .filter_map(|tool| tool["name"].as_str())
         .collect();
-    assert!(names.contains(&"note_read"));
+    assert!(names.contains(&"file_read"));
     assert!(names.contains(&"file_create"));
     assert!(names.contains(&ASK_MISTY));
     assert!(names.iter().all(|name| name
@@ -31,7 +31,7 @@ fn offers_the_browser_only_to_a_run_it_was_attached_to() {
         browser: false,
         computer: false,
     };
-    assert!(plain.offers(&json!({ "name": "note_read" })));
+    assert!(plain.offers(&json!({ "name": "file_read" })));
     // Without the Browser attachment a run has no browser at all.
     for name in ["screen_open", "browser_snapshot", "browser_steps"] {
         assert!(!plain.offers(&json!({ "name": name })), "{name}");
@@ -63,8 +63,8 @@ fn offers_the_browser_only_to_a_run_it_was_attached_to() {
 #[test]
 fn maps_a_call_back_to_misty_s_own_tool() {
     assert_eq!(
-        misty_call("note_read", json!({ "id": "n1" })),
-        Some(("note.read".to_string(), json!({ "id": "n1" })))
+        misty_call("file_read", json!({ "id": "n1" })),
+        Some(("file.read".to_string(), json!({ "id": "n1" })))
     );
     let (tool, input) = misty_call(ASK_MISTY, json!({ "goal": "Book it" })).unwrap();
     assert_eq!(tool, "agent.delegate");
@@ -77,7 +77,7 @@ fn knows_its_own_tools_however_an_engine_spells_them() {
     for spelled in [
         "mcp__misty__screen_open",
         "misty_browser_snapshot",
-        "Misty: note_read",
+        "Misty: file_read",
     ] {
         assert!(names_misty_tool(spelled, &Value::Null), "{spelled}");
     }

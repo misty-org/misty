@@ -322,11 +322,11 @@ mod tests {
 
     #[test]
     fn a_finished_tool_reports_its_time_and_a_failed_one_its_error() {
-        let done = checkpoint_events(&json!({ "node_id": "tool:c", "state": "completed", "phase": "working", "output": { "tool": "note.read", "duration_ms": 40 } }));
+        let done = checkpoint_events(&json!({ "node_id": "tool:c", "state": "completed", "phase": "working", "output": { "tool": "file.read", "duration_ms": 40 } }));
         assert_eq!(done[0]["type"], "tool.completed");
-        assert_eq!(done[0]["toolName"], "note.read");
+        assert_eq!(done[0]["toolName"], "file.read");
         assert_eq!(done[0]["durationMs"], 40);
-        let bad = checkpoint_events(&json!({ "node_id": "tool:c", "state": "failed", "phase": "tool_failed", "error_message": "x".repeat(500), "output": { "tool": "note.read" } }));
+        let bad = checkpoint_events(&json!({ "node_id": "tool:c", "state": "failed", "phase": "tool_failed", "error_message": "x".repeat(500), "output": { "tool": "file.read" } }));
         assert_eq!(bad[0]["type"], "tool.failed");
         assert_eq!(bad[0]["error"].as_str().unwrap().chars().count(), MAX_ERROR);
     }

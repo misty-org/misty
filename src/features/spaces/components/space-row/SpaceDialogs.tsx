@@ -19,12 +19,13 @@ import {
   PopoverText,
 } from "@misty/ui";
 import { SpaceMembers } from "../../members";
+import { SpaceFoldersSection } from "../../folders/SpaceFoldersSection";
 import { LeaveDeleteSpaceDialogs } from "../LeaveDeleteSpaceDialogs";
 import { useSpaceLifecycleActions } from "../useSpaceLifecycleActions";
 import { useSpacesStore } from "../../list/useSpacesStore";
 
 /** The small windows the Space menu and People open, in place of a settings page. */
-export type SpaceDialog = "rename" | "members" | "invite" | "leave" | "delete" | null;
+export type SpaceDialog = "rename" | "members" | "invite" | "folders" | "leave" | "delete" | null;
 
 export function SpaceDialogs({
   space,
@@ -70,6 +71,14 @@ export function SpaceDialogs({
             <DialogTitle>{`People in ${space.name}`}</DialogTitle>
           </DialogHeader>
           {people ? <SpaceMembers embedded spaceId={space.id} invite={open === "invite"} /> : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={open === "folders"} onOpenChange={(next) => !next && onClose()}>
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>Shared folders</DialogTitle>
+          </DialogHeader>
+          {open === "folders" ? <SpaceFoldersSection spaceId={space.id} /> : null}
         </DialogContent>
       </Dialog>
       <LeaveDeleteSpaceDialogs spaceName={space.name} controller={controller} />

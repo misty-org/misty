@@ -2,7 +2,8 @@ import type { DockingLayout } from "@/app/shell/dockingLayout";
 
 export { browserHomeUrl } from "../addresses/browserHome";
 
-export type WorkspaceSurfaceId = "space" | "agents";
+/** `direct` is the person's DMs and Friends, outside any Space (`/dms/<id>`, `/friends`). */
+export type WorkspaceSurfaceId = "space" | "agents" | "direct";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 type WorkspaceInstancePolicy = "multiple" | "single";

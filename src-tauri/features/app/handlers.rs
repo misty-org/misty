@@ -105,6 +105,7 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::voice::commands::speech_stop,
             crate::voice::commands::speech_output_muted,
             crate::voice::commands::speech_on_call,
+            crate::voice::commands::speech_open_voice_settings,
             crate::voice::commands::speech_copy_answer,
             crate::voice::commands::speech_sound_on,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
@@ -141,6 +142,10 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::agents::commands::cursor_companion_trail,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_ask_close,
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+            crate::agents::commands::cursor_companion_ask_open,
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+            crate::agents::commands::cursor_companion_hit,
             crate::agents::commands::agent_foreground_queue,
             crate::agents::commands::agent_workspace_acquire,
             #[cfg(desktop)]

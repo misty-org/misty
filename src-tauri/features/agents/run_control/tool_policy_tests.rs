@@ -69,11 +69,11 @@ fn the_engines_own_mode_decides_by_its_kind_and_a_page_cant_name_another() {
     // An engine mode that works without asking doesn't stop Misty's Space writes.
     let taint = Taint::default();
     assert_eq!(
-        decide(&edits, &taint, "note.update", &json!({})),
+        decide(&edits, &taint, "file.update", &json!({})),
         Decision::Run
     );
     assert!(matches!(
-        decide(&manual, &taint, "note.update", &json!({})),
+        decide(&manual, &taint, "file.update", &json!({})),
         Decision::Ask { .. }
     ));
 }
@@ -96,7 +96,7 @@ fn auto_does_not_stop_for_ordinary_work() {
         "browser.fill_form",
         "browser.run",
         "shell.run",
-        "note.update",
+        "file.update",
         "message.send",
         "agent.configure",
     ] {
@@ -138,7 +138,7 @@ fn ask_stops_every_change_and_a_screen_with_an_address() {
         "browser.navigate",
         "browser.steps",
         "shell.run",
-        "note.update",
+        "file.update",
     ] {
         assert!(
             asks(&decide(&run(false), &plain, name, &json!({}))),
@@ -170,7 +170,7 @@ fn ask_stops_every_change_and_a_screen_with_an_address() {
         Decision::Run
     );
     assert_eq!(
-        decide(&run(false), &plain, "note.read", &json!({})),
+        decide(&run(false), &plain, "file.read", &json!({})),
         Decision::Run
     );
     assert_eq!(

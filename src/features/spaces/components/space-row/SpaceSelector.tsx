@@ -1,15 +1,12 @@
-import { ChevronDown, UserPlus } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { Space } from "../../api/dto/entities";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  IconButton,
-  MenuTrigger,
+  DropdownMenuTrigger,
+  NavTitleButton,
   Popover,
   PopoverAnchor,
-  Pressable,
-  Text,
 } from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../../create/GlobalCreateSpaceDialog";
 import { spaceNavigationName } from "../../routes/defaultSpace";
@@ -18,37 +15,35 @@ import { isSpacePanel, SpaceDialogs, type SpaceDialog } from "./SpaceDialogs";
 import { SpaceMenuItems } from "./SpaceMenuItems";
 
 /**
- * The first row of the Space's sidebar, inset like a row so its icon sits in the rows' mark column and its
- * name where their labels start: the Space's icon and its name in bold, which opens the Space's home,
- * a small chevron, which opens the switcher (your Spaces, a new Space), and Invite at the right for the one
- * who can. The name is shown whole, never faded; a Space's name is at most 64 characters.
+ * The first row of the Space's sidebar: the Space's avatar, its name in bold and a chevron, one
+ * compact button that opens the Space menu (your Spaces, a new Space, inviting people for the one
+ * who can, then the Space's people, shared folders, name and leaving or deleting it). A Space has
+ * no home page. The name is shown whole, never faded; a Space's name is at most 64 characters.
  */
-export function SpaceSelector({ space, onOpenHome }: { space: Space; onOpenHome(): void }) {
+export function SpaceSelector({ space }: { space: Space }) {
   const [dialog, setDialog] = useState<SpaceDialog>(null);
   const close = useCallback(() => setDialog(null), []);
   const name = spaceNavigationName(space);
   return (
     <Popover open={isSpacePanel(dialog)} onOpenChange={(next) => !next && close()}>
       <PopoverAnchor asChild>
-        <div className="flex min-h-9 min-w-0 items-center gap-1 pl-2 pr-1">
-          <Pressable
-            onClick={onOpenHome}
-            aria-label={`${name}, open home`}
-            className="flex min-w-0 items-center gap-2 rounded-md"
-          >
-            <SpaceAvatar
-              space={space}
-              className="size-4 shrink-0 rounded-sm"
-              fallbackClassName="text-3xs font-semibold"
-            />
-            <Text tone="bright" size="body" weight="semibold" wrap className="min-w-0 break-words">
-              {name}
-            </Text>
-          </Pressable>
+        <div className="flex min-w-0 items-center">
           <GlobalCreateSpaceDialog>
             {(create) => (
               <DropdownMenu>
-                <MenuTrigger label="Switch Space" iconOnly icon={ChevronDown} />
+                <DropdownMenuTrigger asChild>
+                  <NavTitleButton
+                    aria-label={`${name}, switch Space`}
+                    name={name}
+                    mark={
+                      <SpaceAvatar
+                        space={space}
+                        className="size-4 shrink-0 rounded-sm"
+                        fallbackClassName="text-3xs font-semibold"
+                      />
+                    }
+                  />
+                </DropdownMenuTrigger>
                 <DropdownMenuContent
                   side="bottom"
                   align="start"
@@ -59,16 +54,6 @@ export function SpaceSelector({ space, onOpenHome }: { space: Space; onOpenHome(
               </DropdownMenu>
             )}
           </GlobalCreateSpaceDialog>
-          {space.role === "owner" ? (
-            <IconButton
-              label="Invite people"
-              variant="quiet"
-              className="ml-auto"
-              onClick={() => setDialog("invite")}
-            >
-              <UserPlus />
-            </IconButton>
-          ) : null}
           <SpaceDialogs space={space} open={dialog} onClose={close} />
         </div>
       </PopoverAnchor>

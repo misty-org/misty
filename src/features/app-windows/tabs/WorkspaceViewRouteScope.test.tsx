@@ -22,8 +22,8 @@ function PaneProbe() {
       <button type="button" onClick={() => setParams({ mine: "0", status: "open" })}>
         Filter
       </button>
-      <button type="button" onClick={() => navigate("/spaces/team/drawings/drawing-2")}>
-        Drawing
+      <button type="button" onClick={() => navigate("/spaces/team/lab")}>
+        Lab
       </button>
       <button type="button" onClick={() => navigate(-1)}>
         Back
@@ -73,11 +73,11 @@ describe("WorkspaceTabRouteScope", () => {
   it("shadows the global URL and writes navigation to the owning tab", async () => {
     const tab = useWorkspaceStore.getState().openSurface({
       surfaceId: "space",
-      groupKey: "space:team:planner",
-      instanceKey: "team:planner",
+      groupKey: "space:team:files",
+      instanceKey: "team:files",
       instancePolicy: "multiple",
-      title: "Planner",
-      route: "/spaces/team/planner/tasks/board?mine=1",
+      title: "Files",
+      route: "/spaces/team/files?mine=1",
     });
     await act(async () => {
       root.render(
@@ -88,7 +88,7 @@ describe("WorkspaceTabRouteScope", () => {
     });
 
     expect(container.querySelector('[data-testid="pane-route"]')?.textContent).toBe(
-      "/spaces/team/planner/tasks/board?mine=1",
+      "/spaces/team/files?mine=1",
     );
     expect(container.querySelector('[data-testid="outer-route"]')?.textContent).toBe("/outside");
 
@@ -97,19 +97,19 @@ describe("WorkspaceTabRouteScope", () => {
     });
     expect(useWorkspaceStore.getState().layout.root.type).toBe("leaf");
     expect(dockTreeViews(useWorkspaceStore.getState().layout.root)[0]?.route).toBe(
-      "/spaces/team/planner/tasks/board?mine=0&status=open",
+      "/spaces/team/files?mine=0&status=open",
     );
     expect(container.querySelector('[data-testid="outer-route"]')?.textContent).toBe(
-      "/spaces/team/planner/tasks/board?mine=0&status=open",
+      "/spaces/team/files?mine=0&status=open",
     );
 
     await act(async () => {
       [...container.querySelectorAll<HTMLButtonElement>("button")]
-        .find((button) => button.textContent === "Drawing")
+        .find((button) => button.textContent === "Lab")
         ?.click();
     });
     expect(container.querySelector('[data-testid="pane-route"]')?.textContent).toBe(
-      "/spaces/team/drawings/drawing-2",
+      "/spaces/team/lab",
     );
 
     await act(async () => {
@@ -118,7 +118,7 @@ describe("WorkspaceTabRouteScope", () => {
         ?.click();
     });
     expect(container.querySelector('[data-testid="pane-route"]')?.textContent).toBe(
-      "/spaces/team/planner/tasks/board?mine=0&status=open",
+      "/spaces/team/files?mine=0&status=open",
     );
   });
 
@@ -126,22 +126,22 @@ describe("WorkspaceTabRouteScope", () => {
     const store = useWorkspaceStore.getState();
     const first = store.openSurface({
       surfaceId: "space",
-      groupKey: "space:team:planner",
+      groupKey: "space:team:files",
       instancePolicy: "multiple",
       forceNew: true,
-      title: "First planner",
-      route: "/spaces/team/planner/tasks/board",
+      title: "First files",
+      route: "/spaces/team/files",
     });
     const firstPaneId = dockLeaves(useWorkspaceStore.getState().layout.root)[0].id;
     const secondPaneId = store.splitPane(firstPaneId, "right")!;
     const second = store.openSurface({
       surfaceId: "space",
-      groupKey: "space:team:planner",
+      groupKey: "space:team:files",
       instancePolicy: "multiple",
       forceNew: true,
       paneId: secondPaneId,
-      title: "Second planner",
-      route: "/spaces/team/planner/tasks/list",
+      title: "Second files",
+      route: "/spaces/team/files?view=list",
     });
 
     await act(async () => {

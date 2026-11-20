@@ -16,54 +16,28 @@ vi.mock("@/features/account", () => ({
 vi.mock("../list/useSpacesStore", () => ({
   useSpacesStore: (selector: (value: typeof state) => unknown) => selector(state),
 }));
-vi.mock("@/features/spaces/journal/notes/SpaceNotes", () => ({
-  SpaceNotes: ({ spaceId }: { spaceId: string }) => <div>Notes in {spaceId}</div>,
-}));
-vi.mock("@/features/spaces/journal/drawings/SpaceDrawings", () => ({
-  SpaceDrawings: ({ spaceId }: { spaceId: string }) => <div>Drawings in {spaceId}</div>,
-}));
-vi.mock("@/features/spaces/slides/SpaceSlides", () => ({
-  SpaceSlides: ({ spaceId }: { spaceId: string }) => <div>Slides in {spaceId}</div>,
-}));
-vi.mock("@/features/spaces/data/SpaceData", () => ({
-  SpaceData: ({ spaceId }: { spaceId: string }) => <div>Data in {spaceId}</div>,
-}));
 vi.mock("@/features/spaces/library/SpaceLibrary", () => ({
-  SpaceLibrary: ({ spaceId }: { spaceId: string }) => <div>Library in {spaceId}</div>,
+  SpaceLibrary: ({ spaceId }: { spaceId: string }) => <div>Files in {spaceId}</div>,
 }));
 vi.mock("../chat/SpaceChatEntry", () => ({
   SpaceChatEntry: ({ spaceId }: { spaceId: string }) => <div>Chat in {spaceId}</div>,
 }));
-vi.mock("../home/SpaceHome", () => ({
-  SpaceHome: ({ space, page }: { space: { id: string }; page?: string }) => (
-    <div>
-      Home in {space.id}
-      {page ? ` for ${page}` : ""}
-    </div>
-  ),
-}));
 afterEach(() => {
   cleanup();
 });
-// Docs and Whiteboards without an item show the home narrowed to their kind; the item opens them.
+// A Space's own address, and its old settings links, open its chat; Files opens its own page.
 it.each([
-  ["home", "Home", "", ""],
-  ["notes", "Home", "", ""],
-  ["drawings", "Home", "", ""],
-  ["notes", "Notes", "?note=n1", ""],
-  ["drawings", "Drawings", "", "d1"],
-  ["slides", "Slides", "", "k1"],
-  ["data", "Data", "", "w1"],
-  ["media", "Library", "", ""],
-  ["social", "Chat", "", ""],
-])("opens %s as %s directly without an installed app", async (section, label, search, kind) => {
+  ["home", "Chat"],
+  ["settings", "Chat"],
+  ["chat", "Chat"],
+  ["files", "Files"],
+  ["social", "Chat"],
+])("opens %s as %s directly without an installed app", async (section, label) => {
   render(
     <MemoryRouter
-      initialEntries={[
-        `/spaces/family/${section === "social" ? "social/misty" : section}${search}`,
-      ]}
+      initialEntries={[`/spaces/family/${section === "social" ? "social/misty" : section}`]}
     >
-      <SpaceSectionView spaceId="family" section={section} itemId={kind} />
+      <SpaceSectionView spaceId="family" section={section} />
     </MemoryRouter>,
   );
   expect(
@@ -71,16 +45,11 @@ it.each([
   ).toBeTruthy();
 });
 
-it.each([
-  ["notes", "note"],
-  ["slides", "deck"],
-  ["data", "workbook"],
-  ["drawings", "drawing"],
-])("opens %s without an item as the %s page", async (section, kind) => {
+it("says a removed view isn't available", async () => {
   render(
-    <MemoryRouter initialEntries={[`/spaces/family/${section}`]}>
-      <SpaceSectionView spaceId="family" section={section} />
+    <MemoryRouter initialEntries={["/spaces/family/notes"]}>
+      <SpaceSectionView spaceId="family" section="notes" />
     </MemoryRouter>,
   );
-  expect(await screen.findByText(`Home in family for ${kind}`, {}, { timeout: 5000 })).toBeTruthy();
+  expect(await screen.findByText("This Space view isn’t available")).toBeTruthy();
 });

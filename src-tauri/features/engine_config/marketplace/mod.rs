@@ -133,7 +133,7 @@ async fn run(engine: &str, args: &[&str], limit: Duration) -> Result<ProcOutput,
 }
 
 /// The output of a run that must succeed, or the engine's own last words.
-async fn run_ok(engine: &str, args: &[&str], limit: Duration) -> Result<String, String> {
+pub(crate) async fn run_ok(engine: &str, args: &[&str], limit: Duration) -> Result<String, String> {
     let output = run(engine, args, limit).await?;
     if output.status.is_some_and(|status| status.success()) {
         Ok(output.stdout)

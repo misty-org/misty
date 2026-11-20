@@ -245,7 +245,7 @@ mod tests {
         for index in 0..30 {
             call.insert(format!("field{index}"), json!("z".repeat(500)));
         }
-        let text = question_text("note.update", &Value::Object(call), &none()).unwrap();
+        let text = question_text("file.update", &Value::Object(call), &none()).unwrap();
         for index in 0..30 {
             assert!(text.contains(&format!("field{index}: {}", "z".repeat(500))));
         }

@@ -68,7 +68,7 @@ export function useLiveAddon(ctx: EditorAddonContext): EditorAddon {
     if (!text || !running || !undoManager) return null;
     const { room, recorder } = running;
     return [
-      yCollab(text, room.provider.awareness, { undoManager }),
+      yCollab(text, room.awareness, { undoManager }),
       liveEditorExtensions({
         room,
         text,

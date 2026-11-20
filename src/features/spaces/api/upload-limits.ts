@@ -14,7 +14,7 @@ export const UPLOAD_LIMIT_BYTES: Record<UploadPurpose, number> = {
 };
 
 const PURPOSE_LABEL: Record<UploadPurpose, string> = {
-  library: "Media file",
+  library: "File",
   attachment: "Chat attachment",
   note_attachment: "Doc attachment",
 };

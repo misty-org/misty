@@ -23,7 +23,7 @@ import { WorkspaceTabBar } from "./WorkspaceTabBar";
 import { WorkspaceSearch } from "./search/WorkspaceSearch";
 import { openChatRoute, openNewChat, openWorkspaceRoute } from "./spaceNavigation";
 import { openAgentsPageEvent, TrayAgentsSync } from "@/features/agents";
-import { useWindowSpace } from "@/features/spaces";
+import { useAppPrograms, useAppStandby, useWindowSpace } from "@/features/spaces";
 import type { WorkspaceTab } from "@/features/app-windows";
 import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
 import { useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
@@ -115,6 +115,9 @@ export function WorkspaceCanvas(props: {
   // Opening Explore from anywhere (a command, a link in a chat) lands on the window's Space,
   // in the focused pane.
   const windowSpace = useWindowSpace();
+  // Agents can use the window Space's apps that run as their maker's own program, such as SoundCraft.
+  useAppPrograms(windowSpace?.id);
+  useAppStandby(windowSpace?.id);
   useEffect(() => {
     if (!windowSpace) return;
     const open = (event: Event) => {

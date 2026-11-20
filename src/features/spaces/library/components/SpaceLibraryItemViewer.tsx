@@ -3,7 +3,7 @@ import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryViewer } from "../SpaceLibraryViewer";
 import type { SpaceLibraryData } from "../hook-signatures/useSpaceLibraryData";
 
-/** The item open in Media, or null when none is. */
+/** The item open in Files, or null when none is. */
 export function openLibraryItem(data: SpaceLibraryData): SpaceLibraryItem | null {
   const { selectedItemId, displayItems, items } = data;
   if (!selectedItemId) return null;
@@ -14,7 +14,7 @@ export function openLibraryItem(data: SpaceLibraryData): SpaceLibraryItem | null
   );
 }
 
-/** The open item: in its editor in the page, or in the viewer over it. */
+/** The open item, in the preview over Files. */
 export function SpaceLibraryItemViewer({ item }: { item: SpaceLibraryItem }) {
   const { data, itemActions } = useSpaceLibraryContext();
   const { spaceId, canEditLibrary, displayItems, setSelectedItemId } = data;
@@ -26,12 +26,9 @@ export function SpaceLibraryItemViewer({ item }: { item: SpaceLibraryItem }) {
       canEdit={canEditLibrary}
       canCopy
       returnFocusRef={data.libraryViewerTriggerRef}
-      onCopyEdit={(definition) => data.setCopiedEditDefinition(structuredClone(definition))}
       onClose={() => setSelectedItemId("")}
       onSelect={setSelectedItemId}
       onUpdate={itemActions.updateItem}
-      onReplaceItem={itemActions.replaceItem}
-      onRenditionReady={() => data.setReloadKey((current) => current + 1)}
       onTrash={itemActions.trashItem}
     />
   );

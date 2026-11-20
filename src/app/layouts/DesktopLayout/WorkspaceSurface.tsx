@@ -1,5 +1,6 @@
 import { SpaceWorkspaceSurface } from "@/features/spaces";
 import { AgentsPage } from "@/features/agents";
+import { DirectSurface } from "@/features/direct";
 import {
   WorkspaceViewRouteScope,
   useWorkspaceStore,
@@ -24,6 +25,8 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
             <SpaceWorkspaceSurface tab={tab} />
           ) : tab.surfaceId === "agents" ? (
             <AgentsPage />
+          ) : tab.surfaceId === "direct" ? (
+            <DirectSurface tab={tab} />
           ) : (
             // A view this build has no page for. Saved ones are dropped as a window loads.
             <EmptyWorkspacePane />

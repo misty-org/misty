@@ -25,7 +25,7 @@ export function mergeVoiceTurn(
     .filter((m) => m.id !== assistantId)
     .map((m) => (m.id === userId ? user : m));
   if (!previous) messages.push(user);
-  if (saved.reply)
+  if (saved.reply || saved.handoff)
     messages.splice(messages.findIndex((m) => m.id === userId) + 1, 0, {
       id: assistantId,
       invocationId: saved.id,
@@ -34,6 +34,7 @@ export function mergeVoiceTurn(
       content: saved.reply,
       state: "completed",
       createdAt: new Date().toISOString(),
+      ...(saved.handoff ? { tutorHandoff: saved.handoff } : {}),
     });
   return {
     ...conversation,

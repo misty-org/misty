@@ -139,12 +139,12 @@ export function useRoomVersion(room: LiveRoom | undefined): number {
       });
     };
     room.doc.on("update", bump);
-    room.provider.awareness.on("change", bump);
+    room.awareness.on("change", bump);
     bump();
     return () => {
       window.cancelAnimationFrame(frame);
       room.doc.off("update", bump);
-      room.provider.awareness.off("change", bump);
+      room.awareness.off("change", bump);
     };
   }, [room]);
   return version;

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SpaceLibraryItem } from "@/features/spaces/api/dto/entities";
-import type { ServerSpaceNote } from "../journal/notes/api/api";
-import { chatItem, editedLabel, libraryKind, noteItem } from "./galleryItems";
+import { chatItem, editedLabel, libraryKind } from "./galleryItems";
 
-describe("Space home gallery", () => {
+describe("Space gallery", () => {
   it("lists chats as one more kind, named after who they're with", () => {
     const chat = chatItem(
       "s1",
@@ -32,25 +31,6 @@ describe("Space home gallery", () => {
     expect(libraryKind(file("venue.jpg"))).toBe("image");
     expect(libraryKind(file("tour.mp4"))).toBe("image");
     expect(libraryKind(file("budget.csv"))).toBe("file");
-  });
-  it("opens a Lab notebook's doc in the Lab, named without its prefix", () => {
-    const doc = (title: string) =>
-      ({
-        id: "d 1",
-        title,
-        markdown: "Lava\n\nflows",
-        creator_user_id: "ada",
-        updated_at: "2026-10-16T13:00:00Z",
-      }) as unknown as ServerSpaceNote;
-    const notebook = noteItem("s1", doc("Notebook: Volcanoes"));
-    expect(notebook).toMatchObject({ kind: "note", notebook: true, title: "Volcanoes" });
-    expect(notebook.href).toBe("/spaces/s1/lab?doc=d%201");
-    expect(notebook.excerpt).toBe("Lava flows");
-    expect(noteItem("s1", doc("Notebook: ")).title).toBe("Untitled notebook");
-
-    const plain = noteItem("s1", doc("Volcanoes"));
-    expect(plain.notebook).toBeUndefined();
-    expect(plain.href).toBe("/spaces/s1/notes?note=d%201");
   });
   it("says when something was edited", () => {
     const now = Date.parse("2026-10-16T12:00:00Z");

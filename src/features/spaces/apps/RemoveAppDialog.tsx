@@ -17,7 +17,7 @@ export function RemoveAppDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`Remove ${appName}?`}
-      what={`${appName} goes from the Space for everyone, with the settings it kept. What it saved stays in Media.`}
+      what={`${appName} goes from the Space for everyone, with the settings it kept. What it saved stays in Files.`}
       confirmLabel="Remove"
       onConfirm={onRemove}
     />

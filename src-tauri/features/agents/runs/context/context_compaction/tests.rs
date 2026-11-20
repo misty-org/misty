@@ -58,8 +58,8 @@ fn clears_all_but_the_most_recent_tool_results_and_keeps_every_call_paired() {
 fn keeps_errors_but_shortens_long_ones() {
     let mut messages = vec![task()];
     messages.extend(step(1));
-    messages.push(call_message("e", "note_update", "{}"));
-    messages.push(result_message("e", "note_update", error_output(&"x".repeat(5_000))));
+    messages.push(call_message("e", "file_update", "{}"));
+    messages.push(result_message("e", "file_update", error_output(&"x".repeat(5_000))));
     messages.extend(step(2));
     let (cleared, _) = clear_old_tool_results(&messages, 1);
     let Message::Tool { content, .. } = &cleared[4] else {

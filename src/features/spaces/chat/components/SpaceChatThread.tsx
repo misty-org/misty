@@ -7,7 +7,7 @@ import type { useSpaceChatScope, useSpaceChatStore } from "../hooks/useSpaceChat
 import type { useSpaceChatMessageActions } from "../hooks/useSpaceChatMessageActions";
 import type { SpaceChatAccess } from "../hooks/useSpaceChatAccess";
 import type { SpaceChatMessagesProps } from "./ChatMessages";
-import { FluxerMessages } from "../fluxer/FluxerMessages";
+import { ChatMessageList } from "./ChatMessageList";
 
 export interface SpaceChatThreadProps extends Pick<
   SpaceChatMessagesProps,
@@ -43,7 +43,7 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
   const { spaceId, access, scope, store, editing, actions, suggestions } = props;
 
   return (
-    <FluxerMessages
+    <ChatMessageList
       error={props.error}
       loading={props.loading}
       messages={scope.messages}

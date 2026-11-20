@@ -56,16 +56,6 @@ const skillTargets: Partial<Record<string, SkillTargetId>> = {
 
 export const skillTargetOf = (engine: string) => skillTargets[engine];
 
-/** What the page offers for an engine, in the order its switch shows them. */
-export type MarketKind = "plugins" | "skills";
-
-export function kindsFor(engine: string): MarketKind[] {
-  return [
-    ...(hasPlugins(engine) ? (["plugins"] as const) : []),
-    ...(skillTargetOf(engine) ? (["skills"] as const) : []),
-  ];
-}
-
 interface SuggestedMarketplace {
   /** What the engine's `plugin marketplace add` takes. */
   source: string;
@@ -236,15 +226,6 @@ export function orderItems(items: MarketItem[]) {
   );
 }
 
-const installsFormat = new Intl.NumberFormat(undefined, { notation: "compact" });
-
-/** How used a plugin is, as its card's foot says it: installs, else GitHub stars. */
-export function usageLabel(item: MarketItem) {
-  if (item.installs) return `${installsFormat.format(item.installs)} installs`;
-  if (item.stars) return `${installsFormat.format(item.stars)} stars`;
-  return "";
-}
-
 /** A category as a card's chip shows it: `productivity` → `Productivity`. */
 export const categoryLabel = (category: string | null) =>
   category ? category.charAt(0).toUpperCase() + category.slice(1).replace(/[-_]/g, " ") : "";
@@ -259,15 +240,3 @@ export function categoriesOf(items: MarketItem[]) {
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-/** The muted line under a plugin: what it does, where it's from, how used it is. */
-export function itemDetails(item: MarketItem) {
-  return [
-    item.description,
-    item.marketplace,
-    item.installs ? `${installsFormat.format(item.installs)} installs` : "",
-    item.stars ? `${installsFormat.format(item.stars)} stars` : "",
-    item.signIn === "on_install" ? "Signs in when installed" : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}

@@ -1,5 +1,7 @@
-import { SetupState } from "@misty/ui";
+import { LivePointer, SetupState, useNotice } from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
+import { personTone } from "@/features/agents";
+import { useAppControl } from "./appScreen";
 import { appBundleUrl } from "./appUrl";
 import type { HostHandlers } from "./hostChannel";
 import { useRunningApp } from "./useRunningApp";
@@ -27,9 +29,10 @@ export function SpaceAppFrame({
   appId: string;
   /** For the setup line, before the app's own manifest has been read. */
   appName: string;
-  /** What the Space recorded: a version, or `bundled` for an app Misty ships. */
+  /** The version the Space added. */
   version: string;
-  approved: string[] | "manifest";
+  /** What a mod approved when the app was added. */
+  approved: string[];
   source?: BundleSource;
   makeHandlers: (manifest: AppManifest) => HostHandlers;
   /** False while the tab is hidden: the frame isn't there then, so the app stops running. */
@@ -44,6 +47,24 @@ export function SpaceAppFrame({
     makeHandlers,
   });
   const frame = useRef<HTMLIFrameElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const agent = useAppControl((state) => state.agents[appId]);
+  const held = useAppControl((state) => Boolean(state.held[appId]));
+  // The person's own click or key in the app took control back: the agent waits until they hand it back.
+  useNotice(Boolean(agent && held), {
+    message: agent ? `You have control of ${appName}. ${agent.name} is waiting.` : "",
+    action: { label: "Hand back", onSelect: () => useAppControl.getState().handBack(appId) },
+  });
+  useEffect(() => {
+    const element = box.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setSize({ width: entry.contentRect.width, height: entry.contentRect.height }),
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [app.status]);
   // An app that never calls in (its files blocked, a script failing) would leave a blank frame: say so instead.
   const [silent, setSilent] = useState(false);
   const ready = app.status === "ready";
@@ -71,7 +92,7 @@ export function SpaceAppFrame({
   if (app.status === "setup")
     return <SetupState tool={appName} label={`Setting up ${appName}`} stallAfterMs={false} />;
   return (
-    <div className="size-full min-h-0">
+    <div ref={box} className="relative size-full min-h-0">
       <iframe
         ref={frame}
         key={`${appId}@${version}`}
@@ -88,9 +109,20 @@ export function SpaceAppFrame({
         referrerPolicy="no-referrer"
         className="size-full border-0"
         onLoad={() => {
-          if (frame.current?.contentWindow) app.start(frame.current.contentWindow);
+          if (frame.current?.contentWindow) app.start(frame.current.contentWindow, frame.current);
         }}
       />
+      {size && agent ? (
+        // The agent working in the app, where it last acted: its pointer, never the person's own.
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+          <LivePointer
+            name={agent.name}
+            tone={personTone(agent.agentId)}
+            left={agent.x * size.width}
+            top={agent.y * size.height}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

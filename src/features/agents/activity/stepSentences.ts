@@ -47,10 +47,6 @@ const namespaces = [
   "browser",
   "file",
   "folder",
-  "note",
-  "drawing",
-  "deck",
-  "workbook",
   "message",
   "thread",
   "space",
@@ -157,13 +153,7 @@ export function verbOf(tool: string): StepVerb {
   }
   if (space === "computer")
     return action.includes("type") || action.includes("key") ? "type" : "click";
-  if (
-    space === "file" ||
-    space === "folder" ||
-    space === "drawing" ||
-    space === "deck" ||
-    space === "workbook"
-  ) {
+  if (space === "file" || space === "folder") {
     return /read|list|search/.test(action)
       ? action.includes("search")
         ? "search"
@@ -259,33 +249,6 @@ function describeStep(step: RunStep, options: { folder?: string; page?: string }
     if (action.includes("move") || action.includes("rename")) return `Moved ${name}`;
     if (action.includes("promote")) return "Saved an attachment to the Space";
     return `Edited ${name}`;
-  }
-  if (key.startsWith("note.")) {
-    if (action.includes("search")) return "Searched the Space's notes";
-    if (action.includes("read")) return "Read a note";
-    if (action.includes("create")) return "Wrote a note";
-    if (action.includes("tag")) return "Tagged a note";
-    return "Updated a note";
-  }
-  if (key.startsWith("drawing."))
-    return action.includes("read") || action.includes("list")
-      ? "Looked at a whiteboard"
-      : "Drew on a whiteboard";
-  if (key.startsWith("deck.")) {
-    if (action.includes("read") || action.includes("list")) return "Looked at a deck";
-    if (action.includes("create")) return "Made slides";
-    return "Changed a deck";
-  }
-  if (key.startsWith("workbook.")) {
-    if (action.includes("read") || action.includes("list")) return "Read a workbook";
-    if (action.includes("create")) return "Made a workbook";
-    if (action.includes("import")) return "Imported data into a workbook";
-    return "Changed a workbook";
-  }
-  if (key.startsWith("image.")) {
-    if (action.includes("read")) return "Looked at an image's edit";
-    if (action.includes("save")) return "Saved an edited image";
-    return "Edited an image";
   }
   if (key.startsWith("message.") || key.startsWith("thread.")) {
     if (action.includes("search")) return "Searched the Space chat";

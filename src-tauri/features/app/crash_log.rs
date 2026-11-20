@@ -11,7 +11,7 @@
 use std::backtrace::Backtrace;
 use std::io::Write;
 use std::panic::PanicHookInfo;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
 use file_access::fs;
@@ -20,6 +20,8 @@ use file_access::fs;
 const KEEP_BYTES: u64 = 1024 * 1024;
 
 static LOG: OnceLock<Mutex<fs::File>> = OnceLock::new();
+/// Where the crash log is, for showing it in the file manager.
+static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 /// Opens the crash log in `home` (this build's data folder) and adds the hook that writes to it,
 /// in front of the default one, which still prints the panic to stderr.
@@ -38,6 +40,7 @@ pub fn install(home: &Path) {
     if LOG.set(Mutex::new(file)).is_err() {
         return;
     }
+    let _ = LOG_PATH.set(path.clone());
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         write_entry(info);
@@ -72,4 +75,17 @@ fn write_entry(info: &PanicHookInfo<'_>) {
     );
     let _ = file.write_all(entry.as_bytes());
     let _ = file.flush();
+}
+
+/// Shows the crash log in the system's file manager, for Settings › Advanced › Diagnostics.
+#[tauri::command]
+pub fn app_reveal_crash_log(webview: tauri::Webview, app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    if !crate::browser::app_windows::is_person_window(webview.label()) {
+        return Err("Only the main workspace can show the log".into());
+    }
+    let path = LOG_PATH.get().ok_or("There is no log on this computer")?;
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(|error| error.to_string())
 }

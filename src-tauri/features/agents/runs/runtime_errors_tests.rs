@@ -149,7 +149,7 @@ fn returns_correctable_validation_errors_to_the_model_without_workflow_internals
 
 #[test]
 fn never_retries_permanent_mcp_protocol_or_authorization_failures() {
-    let unknown = classify_tool_transport_error(&RuntimeError::named("ProtocolError", "MCP error -32601: unknown tool \"note.read\""));
+    let unknown = classify_tool_transport_error(&RuntimeError::named("ProtocolError", "MCP error -32601: unknown tool \"file.read\""));
     assert_eq!((unknown.code, unknown.transient, unknown.recognized), ("tool_unavailable", false, true));
     let forbidden = classify_tool_transport_error(&RuntimeError::named("SdkHttpError", "forbidden").with_status(403));
     assert_eq!((forbidden.code, forbidden.transient), ("permission_denied", false));
@@ -173,7 +173,7 @@ fn names_the_failed_action_without_claiming_success() {
 fn uses_stable_call_signatures() {
     let first = JsValue::parse(r#"{"b":2,"a":1}"#).unwrap();
     let second = JsValue::parse(r#"{"a":1,"b":2}"#).unwrap();
-    assert_eq!(tool_failure_signature("note.read", &first), tool_failure_signature("note.read", &second));
+    assert_eq!(tool_failure_signature("file.read", &first), tool_failure_signature("file.read", &second));
 }
 
 #[test]

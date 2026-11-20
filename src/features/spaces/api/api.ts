@@ -21,7 +21,6 @@ import type {
 import { createSpaceMembersApi } from "./members";
 import { createSpaceRolesApi } from "./roles";
 import { createSpaceChatApi } from "./chat";
-import { createSpaceLibraryEditsApi } from "./library-edits";
 import { createSpaceLibraryItemsApi } from "./library-items";
 import { fetchProtectedBlob } from "./protected-download";
 import type { SpaceRequestInit } from "./spaceRequestTypes";
@@ -128,8 +127,7 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     account_suspended: accountLimitMessages.account_suspended!,
     account_closing: accountLimitMessages.account_closing!,
     model_key_needed: "Pick a default engine in Settings › Agents.",
-    library_uploads_disabled: "Uploads to Media are temporarily unavailable.",
-    library_media_processor_unavailable: "Edited media rendering is temporarily unavailable.",
+    library_uploads_disabled: "Uploads to Files are temporarily unavailable.",
     upload_verification_failed: "Misty could not verify the uploaded file.",
     dangerous_file_type: "This file type cannot be stored safely.",
     malware_detected: "This upload was rejected because it matched a malware signature.",
@@ -141,7 +139,6 @@ export function spaceErrorMessage(code: string | undefined, fallback: string): s
     provider_not_configured:
       "This provider’s sign-in is not available on the current Misty server.",
     invite_expired: "That invitation has expired.",
-    library_editing_disabled: "Editing in the library isn't turned on for this server.",
     library_previews_disabled: "Previews aren't turned on for this server.",
     preview_unavailable: "There's no preview for this file.",
     library_object_mismatch: "The uploaded file didn't match what was sent. Try again.",
@@ -223,5 +220,4 @@ export const spacesApi = {
       allowWhileReferenceOnly: true,
     }),
   ...createSpaceLibraryItemsApi(spaceRequest),
-  ...createSpaceLibraryEditsApi(spaceRequest),
 };

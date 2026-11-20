@@ -8,7 +8,7 @@ describe("native personal agents", () => {
     });
     expect(agent.model_mode).toBe("automatic");
     expect(agent.enabled).toBe(true);
-    expect(AgentProfileInputSchema.safeParse({ ...agent, app_ids: ["planner"] }).success).toBe(
+    expect(AgentProfileInputSchema.safeParse({ ...agent, app_ids: ["linear"] }).success).toBe(
       false,
     );
   });

@@ -57,7 +57,7 @@ export function tourForPage(pathname: string, search: string): TourId | null {
   }
   const space = /^\/spaces\/[^/]+(?:\/([^/]+)(?:\/([^/]+))?)?/.exec(pathname);
   if (space) {
-    const [, section = "home", item] = space;
+    const [, section = "home"] = space;
     switch (section) {
       case "home":
       case "settings":
@@ -65,22 +65,10 @@ export function tourForPage(pathname: string, search: string): TourId | null {
       case "chat":
       case "social":
         return "space-chat";
-      case "notes":
-        return params.get("note") ? "doc" : "docs";
-      case "drawings":
-        return item ? "drawing" : "whiteboards";
-      case "slides":
-        return item ? "deck" : "slides";
-      case "data":
-        return item ? "workbook" : "data";
       case "media":
       case "library":
       case "files":
         return "library";
-      case "planner":
-        return "planner";
-      case "calendar":
-        return "calendar";
       case "lab":
         return params.get("item")?.startsWith("notebook:") ? "notebook" : "lab";
     }

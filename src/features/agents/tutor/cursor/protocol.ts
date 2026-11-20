@@ -1,4 +1,5 @@
 import type { AiCaptureAttachment } from "../../runs/invocations/invocationTypes";
+import type { AgentProfile } from "@/shared/schemas";
 import type { SketchElement } from "./companionSketch";
 type CompanionMode = "team" | "auto";
 type CompanionPhase = "idle" | "listening" | "processing" | "responding";
@@ -44,6 +45,14 @@ export interface CursorSample {
   x: number;
   y: number;
   displays: DisplayFrame[];
+  /** Several keys in quick succession just now (only the timing, never the keys). */
+  typing?: boolean;
+  /** The main mouse button is held: something is being dragged. */
+  dragging?: boolean;
+  /** The window in front fills its display: a full-screen app or video. */
+  fullscreen?: boolean;
+  /** Whether the system draws the pointer now; apps hide it while typing or playing video. */
+  cursorShown?: boolean;
 }
 export interface Presentation {
   generation: number;
@@ -72,7 +81,38 @@ export interface Presentation {
    * the tour asks for next (`tip`).
    */
   caption?: { text: string; tip?: boolean };
+  /**
+   * Misty, the cloud, beside the cursor all the time instead of only while Tutor works
+   * (Settings › Tutor › Show Misty at the cursor). Defaults on.
+   */
+  sprite?: boolean;
+  /** The cloud steps away for now: while the microphone is in use by a call or a recording. */
+  spriteAway?: boolean;
+  /** Misty waves hello beside the pointer (the tour starting). */
+  wave?: boolean;
+  /**
+   * The sentence Tutor is saying now, as Misty bobs with it: how many words, the speaking rate
+   * from Settings › Voice, and when it began (`Date.now()`). Absent between sentences.
+   */
+  words?: { count: number; rate: number; at: number };
+  /**
+   * The shortcuts, said beside Misty in her first week: as she first shows (`first`), and after
+   * the pointer has rested a minute. Absent once the week is over.
+   */
+  hint?: { text: string; first: boolean };
+  /** Work handed to one of the person's agents: who took it and how it's going. */
+  handoff?: PresentedHandoff;
 }
+/** The agent a hand-off went to, as the bubble beside the companion shows it. */
+export interface PresentedHandoff {
+  /** The turn doing the work. */
+  task: string;
+  conversationId: string;
+  agent: Pick<AgentProfile, "id" | "name" | "engine" | "avatar">;
+  state: HandoffState;
+}
+/** working while it runs, waiting while it needs the person, then done or failed. */
+export type HandoffState = "working" | "waiting" | "done" | "failed";
 /**
  * A drawing on its way to the overlay. A board sits beside the cursor; screen marks
  * are in the same global units as cursor samples, on one display.

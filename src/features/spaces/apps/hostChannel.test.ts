@@ -36,16 +36,16 @@ describe("createHostChannel", () => {
 
   it("authorizes a call before it runs, then answers it", async () => {
     const { port, received, authorize, handlers } = setup();
-    port.postMessage({ t: "req", id: 1, method: "tasks.list" });
+    port.postMessage({ t: "req", id: 1, method: "files.list" });
     await settle();
-    expect(authorize).toHaveBeenCalledWith("call", "tasks.list");
-    expect(handlers.call).toHaveBeenCalledWith("tasks.list", undefined);
-    expect(received).toEqual([{ t: "res", id: 1, ok: true, result: { method: "tasks.list" } }]);
+    expect(authorize).toHaveBeenCalledWith("call", "files.list");
+    expect(handlers.call).toHaveBeenCalledWith("files.list", undefined);
+    expect(received).toEqual([{ t: "res", id: 1, ok: true, result: { method: "files.list" } }]);
   });
 
   it("answers permission_denied and runs nothing when native refuses", async () => {
     const authorize = vi.fn(async () => {
-      throw new Error("Planner wasn't approved for files.save.");
+      throw new Error("Sketch wasn't approved for files.save.");
     });
     const { port, received, handlers } = setup({}, authorize);
     port.postMessage({ t: "req", id: 2, method: "files.save" });
@@ -56,7 +56,7 @@ describe("createHostChannel", () => {
         t: "res",
         id: 2,
         ok: false,
-        error: { code: "permission_denied", message: "Planner wasn't approved for files.save." },
+        error: { code: "permission_denied", message: "Sketch wasn't approved for files.save." },
       },
     ]);
   });
@@ -84,7 +84,7 @@ describe("createHostChannel", () => {
       return stop;
     });
     const { port, received } = setup({ subscribe });
-    port.postMessage({ t: "sub", id: 7, topic: "tasks" });
+    port.postMessage({ t: "sub", id: 7, topic: "files.watch" });
     await settle();
     emit([1]);
     await settle();
@@ -93,6 +93,34 @@ describe("createHostChannel", () => {
     emit([2]);
     await settle();
     expect(received).toEqual([{ t: "evt", id: 7, data: [1] }]);
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("ends a subscription the handler stops on its own, with why, and stops it once", async () => {
+    let finish: (error?: unknown) => void = () => {};
+    let emit: (data: unknown) => void = () => {};
+    const stop = vi.fn();
+    const subscribe = vi.fn(
+      (_topic: string, _params: unknown, send: (data: unknown) => void, end: (error?: unknown) => void) => {
+        emit = send;
+        finish = end;
+        return stop;
+      },
+    );
+    const { port, received } = setup({ subscribe });
+    port.postMessage({ t: "sub", id: 4, topic: "room" });
+    await settle();
+    emit("first");
+    finish(new HostError("not_found", "The room was deleted."));
+    finish(new HostError("internal", "again"));
+    emit("late");
+    await settle();
+    port.postMessage({ t: "unsub", id: 4 });
+    await settle();
+    expect(received).toEqual([
+      { t: "evt", id: 4, data: "first" },
+      { t: "end", id: 4, error: { code: "not_found", message: "The room was deleted." } },
+    ]);
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
@@ -110,7 +138,7 @@ describe("createHostChannel", () => {
     let release: () => void = () => {};
     const slow = vi.fn(() => new Promise<void>((resolve) => (release = resolve)));
     const early = setup({}, slow);
-    early.port.postMessage({ t: "sub", id: 2, topic: "tasks" });
+    early.port.postMessage({ t: "sub", id: 2, topic: "files.watch" });
     await settle();
     early.port.postMessage({ t: "unsub", id: 2 });
     await settle();
@@ -141,12 +169,12 @@ describe("createHostChannel", () => {
   it("ends every subscription when disposed and sends nothing after", async () => {
     const stop = vi.fn();
     const { channel, port, received } = setup({ subscribe: vi.fn(() => stop) });
-    port.postMessage({ t: "sub", id: 1, topic: "tasks" });
+    port.postMessage({ t: "sub", id: 1, topic: "files.watch" });
     await settle();
     channel.dispose();
     channel.dispose();
     expect(stop).toHaveBeenCalledTimes(1);
-    port.postMessage({ t: "req", id: 9, method: "tasks.list" });
+    port.postMessage({ t: "req", id: 9, method: "files.list" });
     await settle();
     expect(received).toEqual([]);
   });
@@ -165,8 +193,8 @@ describe("createHostChannel activity", () => {
     channel.start();
     const port = (frame.postMessage.mock.calls[0] as [unknown, string, MessagePort[]])[2][0]!;
     expect(onActivity).not.toHaveBeenCalled();
-    port.postMessage({ t: "req", id: 1, method: "tasks.list" });
-    port.postMessage({ t: "req", id: 2, method: "tasks.list" });
+    port.postMessage({ t: "req", id: 1, method: "files.list" });
+    port.postMessage({ t: "req", id: 2, method: "files.list" });
     await settle();
     expect(onActivity).toHaveBeenCalledTimes(1);
     channel.dispose();

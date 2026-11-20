@@ -96,7 +96,7 @@ const categoryIcons: Record<string, MenuIcon> = {
   Windows: AppWindowMac,
   Navigation: ArrowLeftRight,
   Spaces: spaceIcons.space,
-  Media: spaceIcons.media,
+  Files: spaceIcons.files,
   Chat: spaceIcons.chat,
   Code: CodeXml,
 };

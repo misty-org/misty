@@ -1,6 +1,4 @@
 import {
-  NotesDestinationIcon,
-  DrawingsDestinationIcon,
   AllItemsDestinationIcon,
   FavoritesDestinationIcon,
   CollectionsDestinationIcon,
@@ -9,24 +7,16 @@ import {
 import type { NavigationItem as MistyNavigationItem } from "@/app/layouts/DesktopLayout/NavigationItem";
 import { FileText } from "lucide-react";
 
-/** The icon for a section of an app, such as a Space's notes or the library's favorites. */
+/** The icon for a section of a page, such as Files' favorites. */
 export function DestinationIcon({
   appId,
   item,
 }: {
-  /** The workspace app the destination belongs to, such as "journal" or "media". */
+  /** The workspace page the destination belongs to, such as "files". */
   appId: string;
   item: MistyNavigationItem;
 }) {
-  const nativeIcon = {
-    notes: NotesDestinationIcon,
-    drawings: DrawingsDestinationIcon,
-  }[item.id];
-  if (nativeIcon) {
-    const Icon = nativeIcon;
-    return <Icon aria-hidden />;
-  }
-  if (appId === "media" || appId === "library") {
+  if (appId === "files" || appId === "media" || appId === "library") {
     const Icon = {
       recent: AllItemsDestinationIcon,
       favorites: FavoritesDestinationIcon,

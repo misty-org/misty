@@ -15,10 +15,9 @@ pub mod engine_config;
 pub mod engines;
 pub mod known_names;
 #[cfg(desktop)]
-pub mod media;
-#[cfg(desktop)]
 pub mod pets;
 pub mod project;
+pub mod spaces_drive;
 pub mod spaces_folders;
 #[cfg(desktop)]
 pub mod sync;

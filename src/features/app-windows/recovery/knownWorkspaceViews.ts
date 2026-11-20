@@ -18,6 +18,8 @@ export function knownWorkspaceView(view: WorkspaceView | null | undefined): Work
   if (typeof view.id !== "string" || typeof view.route !== "string") return null;
   if (view.surfaceId === "space") return /^\/spaces(?:\/|$)/.test(view.route) ? view : null;
   if (view.surfaceId === "agents") return /^\/agents(?:[/?#]|$)/.test(view.route) ? view : null;
+  if (view.surfaceId === "direct")
+    return /^\/(?:dms\/[^/?#]+|friends)(?:[?#]|$)/.test(view.route) ? view : null;
   return null;
 }
 

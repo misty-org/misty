@@ -11,7 +11,7 @@ import {
   useNotice,
 } from "@misty/ui";
 import type { VoiceNoteMode } from "./captureApi";
-import { openCapturedNote, askAboutCapturedNote } from "./openNote";
+import { askAboutCapturedNote } from "./openNote";
 import { speakersOf } from "./transcriptTurns";
 import { useCaptureStore } from "./useCaptureStore";
 
@@ -110,11 +110,6 @@ export function CapturePanel() {
           >
             <MessageSquare /> Ask about it
           </Button>
-          {store.noteId && (
-            <Button variant="quiet" onClick={openCapturedNote}>
-              Open note
-            </Button>
-          )}
         </footer>
       )}
     </aside>

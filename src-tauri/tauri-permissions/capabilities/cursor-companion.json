@@ -1,6 +1,6 @@
 {
   "identifier": "cursor-companion",
-  "description": "Presentation-only cursor overlays and companion controls",
+  "description": "Cursor overlays: presentation, and Misty there taking the pointer to be clicked or handed a file",
   "platforms": [
     "macOS",
     "windows"
@@ -10,7 +10,9 @@
   ],
   "permissions": [
     "core:event:default",
-    "allow-cursor-companion-snapshot"
+    "allow-cursor-companion-snapshot",
+    "allow-cursor-companion-hit",
+    "allow-cursor-companion-ask-open"
   ],
   "$schema": "../../gen/schemas/desktop-schema.json"
 }

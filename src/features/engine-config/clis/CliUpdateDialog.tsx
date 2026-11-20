@@ -32,7 +32,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  Skeleton,
+  PaneLoading,
   Spinner,
   Text,
 } from "@misty/ui";
@@ -207,15 +207,7 @@ function PlanSummary({ plan }: { plan: CliUpdatePlan }) {
 
 /** PlanSummary's shape while the plan is asked for: the badges, "Will run" and the steps. */
 function PlanSummarySkeleton() {
-  return (
-    <div className="grid gap-3" role="status" aria-label="Preparing the plan">
-      <Skeleton className="h-5 w-48" />
-      <div className="grid gap-1">
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-13 w-full" />
-      </div>
-    </div>
-  );
+  return <PaneLoading label="Preparing the plan" inline />;
 }
 
 /** The installer's output, kept on the newest line while it streams. */

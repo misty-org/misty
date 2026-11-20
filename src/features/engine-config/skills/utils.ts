@@ -22,27 +22,6 @@ export function sourceKindOf(skill: Pick<SkillRow, "managed" | "sourceKind">): S
   return skill.managed ? "managed" : "local";
 }
 
-interface SkillFilter {
-  query: string;
-  /** "" = all engines. */
-  target: SkillTargetId | "";
-}
-
-export function filterSkills(skills: SkillRow[], filter: SkillFilter): SkillRow[] {
-  const needle = filter.query.trim().toLowerCase();
-  return skills.filter((skill) => {
-    if (filter.target) {
-      const state = skill.targetStates?.[filter.target] ?? "off";
-      if (state === "off") return false;
-    }
-    if (needle) {
-      const haystack = `${skill.name}\n${skill.description}\n${skill.directory}`.toLowerCase();
-      if (!haystack.includes(needle)) return false;
-    }
-    return true;
-  });
-}
-
 /** Managed entries first (the app owns them), then by name — stable across
  *  refreshes because the backend already sorts by name. */
 export function sortSkills(skills: SkillRow[]): SkillRow[] {
@@ -70,18 +49,6 @@ export function relevantTargets(skill: SkillRow, targets: SkillTargetInfo[]): Sk
     if (target.available !== false) return true;
     return (skill.targetStates?.[target.id] ?? "off") !== "off";
   });
-}
-
-/** Engine filter chips: the same rule as the row strip, applied to the whole
- *  list, so filtering by an uninstalled CLI's leftovers still works. */
-export function visibleEngines(skills: SkillRow[], targets: SkillTargetInfo[]): SkillTargetInfo[] {
-  const inUse = new Set<string>();
-  for (const skill of skills) {
-    for (const [targetId, state] of Object.entries(skill.targetStates ?? {})) {
-      if (state !== "off") inUse.add(targetId);
-    }
-  }
-  return targets.filter((target) => target.available !== false || inUse.has(target.id));
 }
 
 /** The next target list after toggling one engine. The backend only reports
@@ -141,10 +108,6 @@ export function summarizeTargetResults(
     .filter((result) => !result.ok)
     .map((result) => ({ target: result.target, error: result.error }));
   return { allOk: failed.length === 0, failed };
-}
-
-export function hasOrphanCopy(skill: SkillRow): boolean {
-  return Object.values(skill.targetStates ?? {}).some((state) => state === "orphan");
 }
 
 /** Longest matching root wins, so a nested root never shadows its parent.

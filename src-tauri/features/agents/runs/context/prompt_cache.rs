@@ -246,8 +246,8 @@ mod tests {
     fn leaves_other_tools_results_alone() {
         let mut messages = vec![user_message("Go")];
         for index in 0..8 {
-            messages.push(call_message(&format!("n{index}"), "note_search", "{}"));
-            messages.push(result_message(&format!("n{index}"), "note_search", text_output(format!(r#"{{"tree":{}}}"#, quoted(&tree(index))))));
+            messages.push(call_message(&format!("n{index}"), "file_search", "{}"));
+            messages.push(result_message(&format!("n{index}"), "file_search", text_output(format!(r#"{{"tree":{}}}"#, quoted(&tree(index))))));
         }
         assert_eq!(prune_stale_page_snapshots(&messages).1, 0);
     }

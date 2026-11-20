@@ -24,15 +24,9 @@ export const AI_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export type AiSurfaceId =
   | "global"
   | "space.chat"
-  | "notes"
-  | "slides"
-  | "data"
-  | "drawings"
-  | "media"
   | "browser"
   | "extensions"
   | "files"
-  | "photo-editor"
   | "agents"
   | "settings";
 type AiInvocationMode = "quick" | "drawer" | "companion";
@@ -83,16 +77,11 @@ export interface AiCaptureAttachment {
 }
 export type AiArtifactKind =
   | "text_patch"
-  | "task_set"
-  | "calendar_event"
-  | "roadmap_patch"
-  | "drawing_patch"
   | "message_draft"
   | "terminal_command"
   | "browser_action"
   | "transfer_plan"
-  | "extension_action"
-  | "image_edit";
+  | "extension_action";
 interface AiArtifactTarget {
   kind: string;
   id: string;

@@ -1,5 +1,4 @@
 import { conversationForGlobalPrompt } from "../../conversations/state/globalMistyConversationScope";
-import { useCollaborationStore } from "../../plans/store";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import {
   CompanionConversation,
@@ -15,6 +14,10 @@ import { mergeVoiceTurn, voiceContext } from "./companionConversationHistory";
 import { SpokenSentences, spokenParts } from "./companionSentences";
 import { withTrail } from "./companionTrail";
 import type { CompanionOrigin, CursorCompanionSession } from "./cursorCompanionSession";
+import { keptTutorTurns, tutorConversation } from "./tutorConversation";
+import { CursorCompanionTasks, taskReply } from "./cursorCompanionTasks";
+import { handoffAgents, openAgentThread } from "./tutorHandoff";
+import { forgetTutorStyle, rememberTutorStyle, tutorStyle } from "./tutorStyle";
 
 const mutedNotice = /Mac/.test(navigator.platform)
   ? "Your Mac is muted, so the answer is on your clipboard."
@@ -40,19 +43,24 @@ const everyMonitor =
 export class CursorCompanionVoice {
   /** Tasks whose work was read out as it happened, so their answer isn't read again at the end. */
   private narrated = new Set<string>();
+  /** The work spoken turns hand on: to an agent's thread, or the open lesson in Teach mode. */
+  readonly tasks: CursorCompanionTasks;
 
-  constructor(private readonly s: CursorCompanionSession) {}
+  constructor(private readonly s: CursorCompanionSession) {
+    this.tasks = new CursorCompanionTasks(s, () => this.settleDelegatedTask());
+  }
 
   /**
    * Starts a task done in front of the person ([DRIVE:…]) and reads its steps aloud as the
    * agent writes them, so they hear what's being done and why while they watch.
    */
-  drive = async (request: string, conversationId: string, key: string) => {
+  drive = async (request: string, conversationId: string, key: string, agent?: string) => {
     const id = await this.tool(
       {
         callId: key,
         name: "start_task",
         instruction: `${request}\n\n${driveNote}`,
+        agent,
         key,
         invocationId: "",
       },
@@ -76,7 +84,7 @@ export class CursorCompanionVoice {
     stop = useMistyStore.subscribe(() => {
       // A new spoken turn takes the voice; the task carries on in its chat.
       if (!s.active(turn)) return finished();
-      const reply = this.reply(invocationId);
+      const reply = taskReply(this.s, invocationId);
       if (!reply) return;
       sentences.update(spokenParts(reply.content).text);
       if (reply.state === "completed" || reply.state === "failed" || reply.state === "canceled") {
@@ -115,7 +123,7 @@ export class CursorCompanionVoice {
       s.voicePending = false;
       s.clearFocus();
       s.sketch.release();
-      s.change({ phase: "idle" });
+      s.change({ phase: "idle", handoff: undefined });
       s.maybeHide();
     } catch (error) {
       if (!controller.signal.aborted) this.speechFailed(id, generation, error);
@@ -125,10 +133,15 @@ export class CursorCompanionVoice {
   saveTurn = (saved: SavedVoiceTurn, conversationId: string) => {
     if (!saved.prompt) return; // Task summaries already have a durable task result.
     if (this.s.disposed || useMistyStore.getState().accountId !== this.s.accountId) return;
+    const handoff = this.tasks.handoffFor(saved.id);
+    const turn = handoff ? { ...saved, handoff } : saved;
     useMistyStore.setState((current) => ({
-      conversations: current.conversations.map((c) =>
-        c.id === conversationId ? mergeVoiceTurn(c, saved) : c,
-      ),
+      conversations: current.conversations.map((c) => {
+        if (c.id !== conversationId) return c;
+        const merged = mergeVoiceTurn(c, turn);
+        // Tutor's own conversation keeps only the last day.
+        return c.place === "tutor" ? keptTutorTurns(merged) : merged;
+      }),
     }));
   };
 
@@ -137,90 +150,53 @@ export class CursorCompanionVoice {
     const origin = s.conversationScope;
     if (!origin || origin.conversationId !== conversationId || !s.originIsCurrent(origin))
       throw new Error("The voice conversation changed.");
+    if (!origin.tutor) return this.tasks.lesson(tool, conversationId, origin);
     const current = useMistyStore.getState();
+    const task = s.delegatedTask;
+    const running = Boolean(task && current.working && current.invocationId === task.id);
     if (tool.name === "get_task_status") {
-      // Read from this chat: the task's state and its saved answer, if it has one.
-      const id =
-        current.invocationConversationId === conversationId ? current.invocationId : undefined;
-      if (!id) return JSON.stringify({ state: "none" });
+      if (!task) return JSON.stringify({ state: "none" });
       return JSON.stringify({
-        invocation_id: id,
-        state: current.working ? "running" : "completed",
-        reply: (this.reply(id)?.content ?? "").slice(0, 6000),
+        invocation_id: task.id,
+        state: running ? "running" : "completed",
+        reply: (taskReply(this.s, task.id)?.content ?? "").slice(0, 6000),
       });
     }
-    if (tool.name === "start_task") {
-      if (current.working) throw new Error("A task is already running; use steering.");
-      const generation = s.turn;
-      // Every spoken request carries every display, the cursor's first; the
-      // run decides what matters.
-      s.captures = [];
-      const screens = s.nativeReady
-        ? await s
-            .capture(generation, new AbortController().signal)
-            .then((captured) => s.withFocusCapture(captured, generation))
-            .catch(() => [])
-        : [];
-      if (!s.originIsCurrent(origin) || !s.active(generation)) return undefined;
-      if (useMistyStore.getState().working)
-        throw new Error("A task is already running; use steering.");
-      s.captures = screens;
-      await useMistyStore.getState().submitAnswer(
-        tool.instruction,
-        [],
-        undefined,
-        [],
-        { conversationId, context: [] },
-        {
-          turn: generation,
-          executionMode: "user",
-          interactionMode: s.state.mode,
-          idempotencyKey: tool.key,
-          ...(screens.length ? { displayCaptures: screens } : {}),
-          // Teach mode steps go only to lesson chats (the shortcut opened one).
-          ...(s.state.teach && useCollaborationStore.getState().modeFor(conversationId) === "teach"
-            ? { collaborationMode: "teach" as const }
-            : {}),
-        },
-      );
-      const admitted = useMistyStore.getState();
-      if (!s.originIsCurrent(origin)) return undefined;
-      if (admitted.error) throw new Error(admitted.error);
-      if (admitted.invocationId) {
-        s.sketch.follow(admitted.invocationId);
-        s.delegatedTask = { id: admitted.invocationId, conversationId };
-        queueMicrotask(() => this.settleDelegatedTask());
-      }
-      return admitted.invocationId;
-    }
-    if (
-      !current.working ||
-      current.invocationId !== tool.invocationId ||
-      current.invocationConversationId !== conversationId
-    )
+    if (tool.name === "reassign_task") return this.tasks.reassign(tool, conversationId);
+    if (tool.name === "start_task") return this.tasks.handOff(tool, origin);
+    if (!task || !running || (tool.invocationId && tool.invocationId !== task.id))
       throw new Error("No matching active task.");
-    if (tool.name === "steer_task") await current.steerResponse?.(tool.instruction, conversationId);
+    if (tool.name === "steer_task")
+      await current.steerResponse?.(tool.instruction, task.conversationId);
     else if (tool.name === "cancel_task") await current.cancelResponse?.();
     else throw new Error("Unknown companion tool.");
-    return tool.invocationId;
+    return task.id;
   };
 
-  /** The voice session for the open conversation, started if needed. */
+  /**
+   * The voice session, started if needed: in Tutor's own conversation, or in Teach mode the open
+   * lesson's chat.
+   */
   start = () => {
     const s = this.s;
-    if (s.conversationVoice && s.conversationScope && s.originIsCurrent(s.conversationScope))
+    const tutor = !s.state.teach;
+    if (
+      s.conversationVoice &&
+      s.conversationScope &&
+      Boolean(s.conversationScope.tutor) === tutor &&
+      s.originIsCurrent(s.conversationScope)
+    )
       return s.conversationVoice;
     s.closeConversationVoice();
-    const scope: CompanionOrigin = {
-      conversationId: useMistyStore.getState().activeConversationId,
-      agentId: useMistyStore.getState().selectedAgentId,
-    };
+    const scope: CompanionOrigin = s.turnOrigin();
     s.conversationScope = scope;
     const session: CompanionConversation = new CompanionConversation({
       conversation: async () => {
         s.creatingConversation = true;
         try {
-          const id = await conversationForGlobalPrompt(useMistyStore.getState, "");
+          const id = tutor
+            ? await tutorConversation()
+            : await conversationForGlobalPrompt(useMistyStore.getState, "");
           if (
             s.disposed ||
             useMistyStore.getState().accountId !== s.accountId ||
@@ -260,7 +236,8 @@ export class CursorCompanionVoice {
       },
       onError: (error) => {
         if (s.conversationVoice !== session) return;
-        if (s.originIsCurrent(scope))
+        // Tutor's own failures show at the cursor, not in whichever chat is open.
+        if (!scope.tutor && s.originIsCurrent(scope))
           useMistyStore.setState(() => ({ error: `Voice: ${error.message}` }));
         s.closeConversationVoice();
         s.change({ phase: "idle", visible: true, error: error.message });
@@ -272,11 +249,26 @@ export class CursorCompanionVoice {
       context: (conversationId) => {
         const state = useMistyStore.getState();
         const conversation = state.conversations.find((c) => c.id === conversationId);
+        if (!scope.tutor) {
+          const task =
+            state.invocationConversationId === conversationId ? (state.invocationId ?? "") : "";
+          return { history: voiceContext(conversation), task, agents: [] };
+        }
+        // Who is doing the work handed off last, while it runs, in words the engine can use.
+        const handed = s.delegatedTask;
+        const owner =
+          handed?.handoff && handoffAgents().find((a) => a.id === handed.handoff!.agentId);
         const task =
-          state.invocationConversationId === conversationId ? (state.invocationId ?? "") : "";
-        return { history: voiceContext(conversation), task };
+          handed && owner && state.working && state.invocationId === handed.id
+            ? `${owner.name} is working on "${handed.handoff!.instruction.slice(0, 300)}"`
+            : "";
+        return {
+          history: voiceContext(conversation),
+          task,
+          agents: handoffAgents().map((agent) => agent.name),
+        };
       },
-      taskResult: (invocationId) => this.reply(invocationId)?.content ?? "",
+      taskResult: (invocationId) => taskReply(this.s, invocationId)?.content ?? "",
       // Every spoken turn carries every display, the cursor's first.
       screens: async (asked) => {
         const generation = s.turn;
@@ -303,7 +295,9 @@ export class CursorCompanionVoice {
       },
       companionMode: () => s.state.mode,
       present: (reply, runId) => {
-        if (s.conversationVoice === session) s.pointer.present(reply, runId, true);
+        // A walkthrough Tutor gives itself goes on in Tutor's own conversation.
+        if (s.conversationVoice === session)
+          s.pointer.present(reply, runId, true, scope.tutor ? scope.conversationId : undefined);
       },
       drawing: (answer, id, shown) => {
         if (s.conversationVoice === session) s.sketch.show(answer, `voice:${id}`, shown);
@@ -327,7 +321,19 @@ export class CursorCompanionVoice {
           .catch(() => undefined);
         openSettings(page as SettingsSection);
       },
-      drive: (request, conversationId, key) => this.drive(request, conversationId, key),
+      openChat: () => {
+        if (s.conversationVoice === session) this.tasks.openHandoff();
+      },
+      takeHanded: () => {
+        const handed = s.handed;
+        s.handed = undefined;
+        return handed;
+      },
+      style: tutorStyle,
+      remember: (line) => void rememberTutorStyle(line).catch(() => undefined),
+      forget: () => void forgetTutorStyle().catch(() => undefined),
+      drive: (request, conversationId, key, agent) =>
+        this.drive(request, conversationId, key, agent),
       onMuted: () => {
         if (s.conversationVoice !== session) return;
         s.notice(mutedNotice);
@@ -366,22 +372,28 @@ export class CursorCompanionVoice {
     const s = this.s;
     let task = s.delegatedTask;
     const current = useMistyStore.getState();
+    // A hand-off works in its agent's thread, open or not; a lesson step in the open lesson.
     if (
       !task ||
       s.disposed ||
       current.accountId !== s.accountId ||
-      current.activeConversationId !== task.conversationId
+      (!task.handoff && current.activeConversationId !== task.conversationId)
     )
       return;
+    this.tasks.showHandoff();
     if (task.awaitingContinuation) {
       if (
         current.invocationId &&
         current.invocationId !== task.id &&
         current.invocationConversationId === task.conversationId
       ) {
-        task = { id: current.invocationId, conversationId: task.conversationId };
+        task = {
+          id: current.invocationId,
+          conversationId: task.conversationId,
+          handoff: task.handoff,
+        };
         s.delegatedTask = task;
-      } else if (openingScreen(this.reply(task.id)?.screenRequest?.state)) return;
+      } else if (openingScreen(taskReply(this.s, task.id)?.screenRequest?.state)) return;
     }
     // Wait while the person is talking or a spoken reply plays.
     if (
@@ -391,7 +403,7 @@ export class CursorCompanionVoice {
       s.state.phase === "responding"
     )
       return;
-    const reply = this.reply(task.id);
+    const reply = taskReply(this.s, task.id);
     if (
       reply?.state === "completed" &&
       !task.awaitingContinuation &&
@@ -401,18 +413,33 @@ export class CursorCompanionVoice {
       return;
     }
     s.delegatedTask = undefined;
+    const shown = s.state.handoff?.task === task.id ? s.state.handoff : undefined;
     if (reply?.state === "completed") {
-      // Stop audio may have hidden the cursor while the task kept running.
-      s.change({ visible: true });
+      // Stop audio may have hidden the cursor while the task kept running. The bubble says the
+      // agent is done while its answer is read.
+      s.change({ visible: true, handoff: shown && { ...shown, state: "done" } });
+      if (shown)
+        notify({
+          id: `tutor-handoff-${task.id}`,
+          message: `${shown.agent.name} is done`,
+          action: {
+            label: "Open chat",
+            onSelect: () => openAgentThread(shown.agent.id, shown.conversationId),
+          },
+        });
       s.pointer.present(reply.content, task.id, true);
       // A task done in front of them was already read out step by step.
       if (this.narrated.delete(task.id)) {
-        s.change({ phase: "idle" });
+        s.change({ phase: "idle", handoff: undefined });
         s.maybeHide();
         return;
       }
       void this.speak(task.id, s.turn);
       return;
+    }
+    if (shown) {
+      s.change({ handoff: undefined });
+      s.notice(`${shown.agent.name} couldn't finish this. It's in their chat.`);
     }
     if (s.state.phase === "processing") s.change({ phase: "idle" });
     s.maybeHide();
@@ -424,12 +451,6 @@ export class CursorCompanionVoice {
       this.s.delegatedTask?.awaitingContinuation &&
       this.s.delegatedTask.conversationId === conversationId,
     );
-
-  private reply = (invocationId: string) =>
-    useMistyStore
-      .getState()
-      .conversations.find((c) => c.id === useMistyStore.getState().activeConversationId)
-      ?.messages.find((m) => m.role === "assistant" && m.invocationId === invocationId);
 }
 
 /** A screen the task asked for is still being chosen or opened. */

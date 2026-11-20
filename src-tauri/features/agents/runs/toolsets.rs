@@ -86,10 +86,9 @@ enum Group {
 // The person's Misty data and its social tools: about 50 of a run's 65 tools and
 // 9,000 tokens on every turn of a web task that never uses them.
 // They load up front when the request is about Misty's own things, and otherwise on request.
-const MISTY_DATA: [&str; 16] = [
-    "drawing.", "deck.", "workbook.", "image.", "note.", "thread.", "file.", "voice.", "message.",
-    "space.", "item.", "search.all", "agent.configure", "agent.request", "agent.directory",
-    "agent.list",
+const MISTY_DATA: [&str; 11] = [
+    "thread.", "file.", "voice.", "message.", "space.", "item.", "search.all", "agent.configure",
+    "agent.request", "agent.directory", "agent.list",
 ];
 
 static MISTY_REQUEST: LazyLock<Regex> = LazyLock::new(|| {

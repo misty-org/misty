@@ -24,23 +24,3 @@ export function libraryMediaKind(
     isAudio: /^audio\//.test(mimeType),
   };
 }
-
-export function editedImageFilename(displayName: string, mimeType: string) {
-  // A GIF arrives only as a file an agent saved over the item as it was made.
-  const extension =
-    mimeType === "image/jpeg"
-      ? "jpg"
-      : mimeType === "image/webp"
-        ? "webp"
-        : mimeType === "image/gif"
-          ? "gif"
-          : "png";
-  const base = (displayName || "image").replace(/\.[^./\\]+$/, "");
-  return `${base}.${extension}`;
-}
-
-export function editedImageMimeType(mimeType: string) {
-  if (mimeType === "image/jpeg") return "image/jpeg";
-  if (mimeType === "image/webp") return "image/webp";
-  return "image/png";
-}

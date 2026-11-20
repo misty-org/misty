@@ -1,6 +1,6 @@
 /**
  * At launch, the installed engines that have a newer release, offered in one dialog: each with its
- * version now and the new one, then Update all or Later. Updates run the way Settings › Engines
+ * version now and the new one, then Update all or Later. Updates run the way Settings › Agents › Setup
  * runs them, one engine after another, inside the app. Later keeps it quiet for a while; Settings
  * still updates any engine on its own. It follows "Check for updates automatically".
  */
@@ -127,7 +127,7 @@ export function EngineUpdatesPrompt({ accountScope }: { accountScope: string }) 
             );
           })}
           {failed ? (
-            <Text tone="muted">Settings › Engines shows what went wrong and can try again.</Text>
+            <Text tone="muted">Settings › Agents › Setup shows what went wrong and can try again.</Text>
           ) : null}
         </DialogBody>
         <DialogFooter>

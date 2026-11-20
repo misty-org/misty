@@ -92,6 +92,9 @@ export const filesApi = {
     invoke<DirEntry[]>("project_list_dir", { account: account(), path, gitIgnoreRoot }),
   readFile: (path: string) =>
     invoke<FileContent>("project_read_file", { account: account(), path }),
+  /** A file's bytes, whole, up to Media's upload limit, to add it to a Space (the file picker). */
+  readBytes: (path: string) =>
+    invoke<ArrayBuffer>("project_read_bytes", { account: account(), path }),
   writeFile: (path: string, content: string) =>
     invoke<void>("project_write_file", { account: account(), path, content }),
   createDir: (path: string) => invoke<void>("project_create_dir", { account: account(), path }),

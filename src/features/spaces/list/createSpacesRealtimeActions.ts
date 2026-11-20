@@ -1,4 +1,5 @@
 import { useMemberAgents, type MemberAgentStatus } from "./memberAgents";
+import { dispatchRealtimeExtra, setRealtimeSender } from "./realtimeExtras";
 import { httpOutageRemainingMs } from "@/api/client/http";
 import { applyRealtimeEventSafely } from "./applyRealtimeEvent";
 import { coalescedReload, resetCoalescedReloads } from "./coalescedReload";
@@ -8,7 +9,6 @@ import { errorText } from "@/shared/lib/format";
 import type { SpacesStore } from "./spacesStoreTypes";
 import { spaceTypingScopeKey, type PresencePlace, type RealtimeEnvelope } from "./realtimeTypes";
 import { spacesResyncEvent } from "./spacesResync";
-import { realtimePlannerEvent } from "../planner/plannerEvents";
 import { setSpacesConnection, useSpacesConnection } from "./spacesConnection";
 
 const realtimeConnectTimeoutMs = 12_000;
@@ -103,6 +103,11 @@ export function createSpacesRealtimeActions(
             clearRealtimeOpenTimer();
             realtimeOpenedAt = Date.now();
             setSpacesConnection("connected");
+            setRealtimeSender((payload) => {
+              if (realtimeSocket !== socket || socket.readyState !== WebSocket.OPEN) return false;
+              socket.send(payload);
+              return true;
+            });
             set((state) => ({ error: state.snapshotReady ? null : state.error }));
             if (!get().snapshotReady || get().referenceOnly)
               void get().load({ force: true, accountId });
@@ -147,7 +152,7 @@ export function createSpacesRealtimeActions(
                     },
                   };
                 });
-              } else {
+              } else if (!dispatchRealtimeExtra(envelope)) {
                 void resyncSpaces(get);
               }
             } catch {
@@ -163,6 +168,7 @@ export function createSpacesRealtimeActions(
               return;
             clearRealtimeOpenTimer();
             realtimeSocket = null;
+            setRealtimeSender(null);
             if (realtimeOpenedAt && Date.now() - realtimeOpenedAt >= stableConnectionMs)
               reconnectAttempt = 0;
             realtimeOpenedAt = 0;
@@ -235,17 +241,8 @@ function resyncSpaces(get: () => SpacesStore) {
     for (const spaceId of Object.keys(get().messagesBySpace))
       void coalescedReload(`messages:${spaceId}`, () => get().loadMessages(spaceId));
     window.dispatchEvent(new Event(spacesResyncEvent));
-    // Docs, decks, workbooks, whiteboards and the planner read again as on any change of theirs,
-    // for every Space.
-    // The planner listens by family, so its tasks and its calendar are told separately.
-    const pages: [string, string][] = [
-      ["misty:space-note-event", "note.resync"],
-      ["misty:space-drawing-event", "drawing.resync"],
-      ["misty:space-deck-event", "deck.resync"],
-      ["misty:space-workbook-event", "workbook.resync"],
-      [realtimePlannerEvent, "task.resync"],
-      [realtimePlannerEvent, "calendar.resync"],
-    ];
+    // Lab notebooks read again as on any change of theirs, for every Space.
+    const pages: [string, string][] = [["misty:space-note-event", "note.resync"]];
     for (const space of get().spaces)
       for (const [page, type] of pages)
         window.dispatchEvent(

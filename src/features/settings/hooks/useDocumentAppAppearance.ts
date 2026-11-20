@@ -25,6 +25,7 @@ export function useDocumentAppAppearance() {
   useEffect(() => {
     const root = document.documentElement;
     root.dataset.compactMode = String(appearance.compactModeEnabled);
+    root.dataset.reduceMotion = String(appearance.reduceMotion);
   }, [appearance]);
 
   // Until the saved settings arrive the document holds only defaults (dark): the theme painted

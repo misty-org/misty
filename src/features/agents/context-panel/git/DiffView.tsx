@@ -7,9 +7,8 @@ import {
   cn,
   IconButton,
   Pressable,
+  PaneLoading,
   Separator,
-  Skeleton,
-  SkeletonCode,
   Surface,
   Text,
   Tooltip,
@@ -203,7 +202,7 @@ export function DiffView(props: {
           {error ? (
             <DiffNote error>{error}</DiffNote>
           ) : lines === null ? (
-            <SkeletonCode label="Diff" lines={12} />
+            <PaneLoading label="Loading diff" />
           ) : stepping && step ? (
             <StepBody step={step} />
           ) : (
@@ -394,9 +393,7 @@ function ImageDiffBody(props: { file: string; sides: GitImageDiff | null; error:
   }
   if (props.sides === null) {
     return (
-      <div className={imagesClass} aria-hidden="true">
-        <Skeleton className="h-full min-h-32 flex-1" />
-      </div>
+      <PaneLoading label="Loading images" />
     );
   }
   const both = props.sides.old !== null && props.sides.new !== null;

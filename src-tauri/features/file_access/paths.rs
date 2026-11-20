@@ -53,7 +53,9 @@ pub const SHARED_FOLDER: &str = "shared";
 /// - `projects`: where an engine works when a chat names no folder. The engines key their own
 ///   sessions and trust by its path, so it never moves.
 /// - `multirun`: git worktrees, which their repositories know by path.
-pub const SHARED_ENTRIES: &[&str] = &["engines", "projects", "multirun"];
+/// - `drive`: each account's Space drive records and content cache (`drive/<account id>/`), which
+///   an update must not clone or leave behind.
+pub const SHARED_ENTRIES: &[&str] = &["engines", "projects", "multirun", "drive"];
 /// The release folder of a process with no version to go by (helper binaries).
 const UNVERSIONED: &str = "unversioned";
 
@@ -155,6 +157,12 @@ fn requested_kind() -> Option<String> {
 /// The folder `.misty` sits in: `MISTY_DATA_ROOT`, else the home folder.
 pub fn misty_data_root() -> Option<PathBuf> {
     resolve_desktop_home_dir()
+}
+
+/// Where Space drives are mounted: `~/.misty/mnt`, or `~/.misty/mnt-dev` for a debug build, so a
+/// development build's drives never sit where a release's are.
+pub fn misty_mount_dir() -> Option<PathBuf> {
+    misty_root_dir().map(|root| root.join(if cfg!(debug_assertions) { "mnt-dev" } else { "mnt" }))
 }
 
 /// `~/.misty` itself, which holds `misty.conf`, every data folder and what they share.

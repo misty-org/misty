@@ -5,7 +5,8 @@
 // from one place. `generate_handler!` needs each command's hidden macros beside it, so those are named too.
 pub(crate) use super::speech::{
     __cmd__speech_copy_answer, __cmd__speech_listen_start, __cmd__speech_listen_stop,
-    __cmd__speech_on_call, __cmd__speech_output_muted, __cmd__speech_reading_add,
+    __cmd__speech_on_call, __cmd__speech_open_voice_settings, __cmd__speech_output_muted,
+    __cmd__speech_reading_add,
     __cmd__speech_reading_end, __cmd__speech_reading_progress, __cmd__speech_reading_start,
     __cmd__speech_recognize_audio,
     __cmd__speech_recognize_file, __cmd__speech_say,
@@ -13,7 +14,8 @@ pub(crate) use super::speech::{
     __cmd__speech_stream_push, __cmd__speech_stream_start, __cmd__speech_stream_stop,
     __cmd__speech_support, __tauri_command_name_speech_copy_answer,
     __tauri_command_name_speech_listen_start, __tauri_command_name_speech_listen_stop,
-    __tauri_command_name_speech_on_call, __tauri_command_name_speech_output_muted,
+    __tauri_command_name_speech_on_call, __tauri_command_name_speech_open_voice_settings,
+    __tauri_command_name_speech_output_muted,
     __tauri_command_name_speech_reading_add, __tauri_command_name_speech_reading_end,
     __tauri_command_name_speech_reading_progress, __tauri_command_name_speech_reading_start,
     __tauri_command_name_speech_recognize_audio,
@@ -23,7 +25,7 @@ pub(crate) use super::speech::{
     __tauri_command_name_speech_stream_push, __tauri_command_name_speech_stream_start,
     __tauri_command_name_speech_stream_stop, __tauri_command_name_speech_support,
     speech_copy_answer, speech_listen_start, speech_listen_stop, speech_on_call,
-    speech_output_muted, speech_reading_add, speech_reading_end, speech_reading_progress,
+    speech_open_voice_settings, speech_output_muted, speech_reading_add, speech_reading_end, speech_reading_progress,
     speech_reading_start, speech_recognize_audio,
     speech_recognize_file, speech_say,
     speech_sound_on, speech_stop, speech_stream_poll, speech_stream_push, speech_stream_start,

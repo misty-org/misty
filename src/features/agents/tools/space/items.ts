@@ -1,6 +1,5 @@
 import type { LocalToolHandler, LocalToolRequest } from "../host";
 import {
-  SpaceCallRefused,
   readRoute,
   refuse,
   rewordRefusal,
@@ -9,56 +8,11 @@ import {
   writeRoute,
 } from "./api";
 import { onlyFields, text } from "./args";
-import { listSpaces, namedSpace, spaceArgument, spaceTargets, type SpaceRow } from "./routing";
+import { namedSpace, type SpaceRow } from "./routing";
 
-const DELETE_KINDS = [
-  "note",
-  "drawing",
-  "deck",
-  "workbook",
-  "thread",
-  "library_item",
-  "shared_file",
-] as const;
-const RENAME_KINDS = ["drawing", "deck", "workbook", "thread"] as const;
+const DELETE_KINDS = ["thread", "library_item", "shared_file"] as const;
+const RENAME_KINDS = ["thread"] as const;
 
-interface Found<T> {
-  space: SpaceRow;
-  item: T;
-}
-
-/**
- * Notes, drawings, decks and workbooks are found by id alone. Routes are under a Space, so this looks in the run's
- * one Space, which is all `listSpaces` gives.
- */
-async function findInSpaces<T>(
-  request: LocalToolRequest,
-  path: (space: SpaceRow) => string,
-): Promise<Found<T> | undefined> {
-  const spaces = spaceTargets(await listSpaces(request), spaceArgument(request.input));
-  for (const space of spaces) {
-    try {
-      return { space, item: await readRoute<T>(request, path(space)) };
-    } catch (error) {
-      const elsewhere =
-        error instanceof SpaceCallRefused && (error.status === 403 || error.status === 404);
-      if (!elsewhere) throw error;
-    }
-  }
-  return undefined;
-}
-
-const notePath = (space: SpaceRow, id: string) => spacePath(space.id, `/notes/${segment(id)}`);
-const drawingPath = (space: SpaceRow, id: string) =>
-  spacePath(space.id, `/drawings/${segment(id)}`);
-/** Where a note, drawing, deck or workbook lives, found by id alone. */
-const ownPaths = {
-  note: notePath,
-  drawing: drawingPath,
-  deck: (space: SpaceRow, id: string) => spacePath(space.id, `/decks/${segment(id)}`),
-  workbook: (space: SpaceRow, id: string) => spacePath(space.id, `/workbooks/${segment(id)}`),
-} as const;
-const hasOwnPath = (kind: string): kind is keyof typeof ownPaths => kind in ownPaths;
 const threadPath = (space: SpaceRow, id: string) =>
   spacePath(space.id, `/conversations/${segment(id)}`);
 
@@ -81,16 +35,6 @@ async function findDoomed(
   kind: string,
   id: string,
 ): Promise<Doomed | undefined> {
-  if (hasOwnPath(kind)) {
-    const path = (space: SpaceRow) => ownPaths[kind](space, id);
-    const found = await findInSpaces<{ title: string }>(request, path);
-    if (!found) return undefined;
-    return {
-      spaceId: found.space.id,
-      title: found.item.title,
-      remove: () => writeRoute(request, path(found.space), "DELETE"),
-    };
-  }
   const space = await namedSpace(request);
   if (kind === "thread") {
     const title = await threadTitle(request, space, id);
@@ -151,22 +95,6 @@ const renameItem: LocalToolHandler = async (request) => {
   const name = text(request.input, "name", { required: true, min: 1, max: 200 }).trim();
   const missing = `no ${kind} ${id} that you can rename`;
   const anyRefusal = () => missing;
-  if (hasOwnPath(kind)) {
-    const path = ownPaths[kind];
-    const found = await rewordRefusal(
-      () => findInSpaces(request, (space) => path(space, id)),
-      anyRefusal,
-    );
-    if (!found) throw refuse(missing);
-    const item = await rewordRefusal(
-      () =>
-        writeRoute<{ id: string; title: string }>(request, path(found.space, id), "PATCH", {
-          title: name,
-        }),
-      anyRefusal,
-    );
-    return { renamed: kind, id: item.id, name: item.title };
-  }
   const space = await namedSpace(request);
   const title = await rewordRefusal(() => threadTitle(request, space, id), anyRefusal);
   if (title === undefined) throw refuse(missing);

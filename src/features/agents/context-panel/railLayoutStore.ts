@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
+import {
+  announceDeviceSetting,
+  createDeviceSetting,
+  onDeviceSettingChange,
+} from "@/shared/lib/deviceSetting";
 import type { BarLayout } from "@misty/ui";
 import { readDeviceState, updateDeviceState } from "./folders/deviceState";
 
@@ -77,3 +81,13 @@ export const useRailLayout = create<
 }));
 
 onDeviceSettingChange(scope, () => void useRailLayout.getState().load());
+
+/**
+ * Whether the rail shows at all. It stays folded away until the person opens it with Tools in
+ * the window's top-right corner, so a chat reads as a chat; the choice is kept for the device.
+ */
+export const useRailShown = createDeviceSetting<boolean>({
+  scope: "context-rail-shown",
+  defaults: false,
+  normalize: (stored) => stored === true,
+});

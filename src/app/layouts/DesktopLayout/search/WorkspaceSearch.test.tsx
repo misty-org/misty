@@ -7,7 +7,6 @@ const calls = vi.hoisted(() => ({
   routes: [] as string[],
   asked: [] as [string, string][],
   found: [] as [string, string][],
-  made: [] as [string, string][],
 }));
 
 vi.mock("@/features/account", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
@@ -51,6 +50,11 @@ vi.mock("@/features/agents", () => {
   };
   return {
     defaultAgentOf: (list: typeof agents) => list.find((agent) => agent.engine),
+    defaultEngineAgent: () => undefined,
+    folderName: (path: string) => path,
+    notebookRoute: () => "/lab",
+    openAgentsHub: vi.fn(),
+    openCodeChat: vi.fn(),
     // No chat here works in a project, so every chat is the sidebar's.
     useProjectChats: () => ({}),
     AgentAvatar: () => <span />,
@@ -94,27 +98,11 @@ vi.mock("@/features/spaces", () => {
   const Icon = () => null;
   const kind = { Icon, tone: "neutral", label: "Note" };
   return {
-    createSpaceEvent: vi.fn(),
-    createSpaceNote: vi.fn(),
-    createSpaceTask: async (space: string, title: string) => {
-      calls.made.push([space, title]);
-      return "/spaces/s1/planner?task=t9";
-    },
-    kindIcon: { chat: kind, note: kind, drawing: kind, image: kind, file: kind },
+    kindIcon: { chat: kind, note: kind, image: kind, file: kind },
     searchSpaceText: async (_space: string, words: string) => {
       calls.searched.push(words);
       return [];
     },
-    spaceEvents: async () => [],
-    spaceTasks: async () => [
-      {
-        kind: "task",
-        id: "t1",
-        title: "Budget spreadsheet",
-        text: "",
-        href: "/spaces/s1/planner?task=t1",
-      },
-    ],
     useSpaceGallery: () => ({ items: [], loading: false }),
     useWindowSpace: () => ({ id: "s1" }),
   };
@@ -148,7 +136,6 @@ beforeEach(() => {
   calls.routes.length = 0;
   calls.asked.length = 0;
   calls.found.length = 0;
-  calls.made.length = 0;
   calls.searched.length = 0;
   host = document.createElement("div");
   document.body.append(host);
@@ -168,7 +155,6 @@ describe("⌘K search", () => {
     type("budget");
     await settle();
     expect(rows()).toContain("Release notes");
-    expect(rows()).toContain("Budget spreadsheet");
     const excerpt = document.querySelector(".misty-search-excerpt mark");
     expect(excerpt?.textContent).toBe("budget");
     const chat = [...document.querySelectorAll<HTMLElement>(".misty-search-item")].find((row) =>
@@ -207,15 +193,5 @@ describe("⌘K search", () => {
     type("launch email");
     await settle();
     expect(calls.searched).toEqual(["launch email"]);
-  });
-
-  it("makes a task from task:", async () => {
-    type("task: call the bank");
-    expect(rows()[0]).toBe("New task: call the bank");
-    await act(async () => {
-      document.querySelector<HTMLElement>(".misty-search-item")!.click();
-    });
-    expect(calls.made).toEqual([["s1", "call the bank"]]);
-    expect(calls.routes).toEqual(["/spaces/s1/planner?task=t9"]);
   });
 });

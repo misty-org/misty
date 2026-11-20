@@ -87,7 +87,7 @@ describe("Space Library upload query action", () => {
   it("opens the existing file picker state and consumes the upload command", async () => {
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/library?collection=recent&upload=1"]}>
+        <MemoryRouter initialEntries={["/spaces/space-1/files?collection=recent&upload=1"]}>
           <SpaceLibrary spaceId="space-1" />
           <LocationProbe />
         </MemoryRouter>,
@@ -102,33 +102,29 @@ describe("Space Library upload query action", () => {
   });
 });
 
-describe("the Media page's AI pane", () => {
-  it("tells the agent which photos are picked in the grid, by item id and name", async () => {
+describe("the Files page's AI pane", () => {
+  it("tells the agent which files are picked, by item id and name", async () => {
     libraryData.selectedItems = [
       libraryItem("p1", "Beach.jpg", "image/jpeg"),
       libraryItem("d1", "Notes.pdf", "application/pdf"),
-      libraryItem("p2", "Dunes.png", "image/png"),
     ];
     const container = document.createElement("div");
     document.body.append(container);
     const root = createRoot(container);
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={["/spaces/space-1/library"]}>
+        <MemoryRouter initialEntries={["/spaces/space-1/files"]}>
           <SpaceLibrary spaceId="space-1" />
         </MemoryRouter>,
       );
       await Promise.resolve();
     });
     const adapter = vi.mocked(useAiSurfaceAdapter).mock.calls.at(-1)?.[0] as AiSurfaceAdapter;
-    const selection = adapter.getSelection?.();
-    expect(selection?.kind).toBe("objects");
-    expect(JSON.parse(selection?.content ?? "{}")).toEqual({
-      selected_photos: [
-        { item_id: "p1", name: "Beach.jpg" },
-        { item_id: "p2", name: "Dunes.png" },
-      ],
-    });
+    expect(adapter).toMatchObject({ surfaceId: "files", label: "2 items in Files" });
+    expect(adapter.getContext().map((item) => [item.id, item.title, item.href])).toEqual([
+      ["p1", "Beach.jpg", "/spaces/space-1/files?item=p1"],
+      ["d1", "Notes.pdf", "/spaces/space-1/files?item=d1"],
+    ]);
     await act(async () => root.unmount());
     container.remove();
   });

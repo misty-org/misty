@@ -1,3 +1,5 @@
+import { emit } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useRef } from "react";
 // The companion's window draws with the app's own classes; its page stays transparent
 // (companion.html), so only the marks show over the screen.
@@ -22,6 +24,15 @@ function CursorOverlay() {
   const sketch = useRef<HTMLDivElement>(null);
   const trail = useRef<HTMLDivElement>(null);
   const caption = useRef<HTMLDivElement>(null);
+  // Files dropped on Misty (the overlay takes the pointer only while it's on her) go to Tutor's
+  // next turn: the main window reads them back from the paths the system dropped.
+  useEffect(() => {
+    const stop = getCurrentWebview().onDragDropEvent(({ payload }) => {
+      if (payload.type === "drop" && payload.paths.length)
+        void emit("misty://cursor-drop", { paths: payload.paths });
+    });
+    return () => void stop.then((unlisten) => unlisten());
+  }, []);
   useEffect(
     () =>
       startCursorOverlayLoop({

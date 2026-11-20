@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewFocused } from "@/features/app-windows";
 import type { WorkspaceView } from "@/features/app-windows/core";
-import { SpaceOverviewProvider } from "./useSpaceOverview";
 import { Button, Surface, Text, useNotice } from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../create/GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
@@ -109,7 +108,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       </Text>
     );
   return (
-    <SpaceOverviewProvider accountId={user.id} space={space}>
+    <>
       <ViewingSpace spaceId={space.id} onView={setViewingSpace} />
       <Surface
         as="section"
@@ -131,7 +130,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
           </div>
         </div>
       </Surface>
-    </SpaceOverviewProvider>
+    </>
   );
 }
 

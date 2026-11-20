@@ -139,7 +139,7 @@ mod tests {
     async fn any_other_tool_still_goes_to_the_gateway() {
         let host = Host { calls: Mutex::default(), outcome: LocalToolOutcome::Result(json!({})) };
         let server = Server { called: Mutex::default() };
-        let result = run(&host, &server, "note.read").await.unwrap();
+        let result = run(&host, &server, "file.read").await.unwrap();
         assert_eq!(result.stringify(), r#"{"from":"server"}"#);
         assert!(host.calls.lock().unwrap().is_empty());
     }

@@ -1,5 +1,4 @@
 import type { OpenWorkspaceSurfaceRequest, WorkspaceSurfaceId } from "./workspaceViews";
-import { officialApps } from "@misty/ui";
 
 /** A route that once opened a web page for the person. Web pages are only for agents now, so it
  * opens nothing. */
@@ -42,11 +41,11 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
         return null;
       }
       if (!spaceId || !appId) return null;
-      const app = officialApps.find((candidate) => candidate.id === appId);
+      // The app's page names its tab once its catalog entry is read.
       return request(
         "space",
         `app:${spaceId}:${appId}`,
-        app?.name ?? appId,
+        appId,
         pathname,
         `${spaceId}:${appId}`,
       );
@@ -61,6 +60,11 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       "single",
     );
   }
+  // DMs and Friends belong to the account, not a Space: one tab moves between them.
+  if (path === "/friends")
+    return request("direct", "tool:direct", "Friends", pathname, "direct", "single");
+  if (path.startsWith("/dms/") && path.split("/").filter(Boolean).length === 2)
+    return request("direct", "tool:direct", "Direct message", pathname, "direct", "single");
   if (path === "/agents" || path === "/apps/agents")
     return request(
       "agents",
@@ -73,30 +77,13 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   return null;
 }
 
-type SpaceWorkspaceTool =
-  | "explore"
-  | "journal"
-  | "slides"
-  | "data"
-  | "whiteboards"
-  | "social"
-  | "planner"
-  | "calendar"
-  | "media"
-  | "lab"
-  | "space";
+type SpaceWorkspaceTool = "explore" | "social" | "files" | "lab" | "space";
 
 /** A Space tab's name, by the tool it shows. */
 const spaceToolTitles: Record<SpaceWorkspaceTool, string> = {
   explore: "Explore",
-  journal: "Docs",
-  slides: "Slides",
-  data: "Data",
-  whiteboards: "Whiteboards",
   social: "Chat",
-  planner: "Planner",
-  calendar: "Calendar",
-  media: "Media",
+  files: "Files",
   lab: "Lab",
   space: "Space",
 };
@@ -128,13 +115,9 @@ function request(
  * shares Chat's tab, or opening one would swap the other's page under the wrong name. */
 function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
   if (section === "explore" || section === "agents") return "explore";
-  // Docs, Slides, Data and Whiteboards are pages of their own, each in its own tab.
-  if (section === "notes") return "journal";
-  if (section === "slides" || section === "data") return section;
-  if (section === "drawings") return "whiteboards";
   if (section === "chat" || section === "social") return "social";
-  // The Library became Media; a tab saved under the old name opens Media.
-  if (section === "media" || section === "library" || section === "files") return "media";
-  if (section === "planner" || section === "calendar" || section === "lab") return section;
+  // The Library became Media, then Files; a tab saved under an old name opens Files.
+  if (section === "files" || section === "media" || section === "library") return "files";
+  if (section === "lab") return section;
   return "space";
 }

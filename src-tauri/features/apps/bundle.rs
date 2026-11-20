@@ -1,12 +1,10 @@
-//! App bundles on disk. Misty's own apps are built in: they are served straight from the folder Misty ships
-//! them in (`<resources>/apps/<id>/`), at the version `bundled`, with nothing to install or copy. A third-party
-//! app is kept in `<data>/apps/<id>/<version>/`; a downloaded bundle is checked against the catalog's hash
-//! before a single file of it is written, and unpacked into a staging folder that only becomes the bundle
-//! when all of it is valid. Either way `misty-app.json` is at the bundle's top.
+//! App bundles on disk. Misty makes no apps of its own: every app is an open-source maker's release, kept in
+//! `<data>/apps/<id>/<version>/`. A downloaded bundle is checked against its pinned hash before a single file of
+//! it is written, and unpacked into a staging folder that only becomes the bundle when all of it is valid.
+//! `misty-app.json` is at the bundle's top.
 
 use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
-use std::sync::OnceLock;
 
 use file_access::fs;
 use sha2::{Digest, Sha256};
@@ -14,15 +12,21 @@ use sha2::{Digest, Sha256};
 use super::manifest::{safe_relative, valid_id, valid_version, AppManifest};
 
 pub const MANIFEST_FILE: &str = "misty-app.json";
-/// The version of an app Misty ships: the one this Misty carries, which is never installed.
-pub const BUNDLED: &str = "bundled";
 /// The most a bundle may unpack to, and the most one file of it may be. WebGPU apps carry large wasm.
 const MAX_UNPACKED_BYTES: u64 = 512 << 20;
 const MAX_ENTRIES: usize = 20_000;
 const MAX_MANIFEST_BYTES: u64 = 64 << 10;
 
+/// A folder tests keep bundles in instead of Misty's own.
+#[cfg(test)]
+pub static TEST_CACHE: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
 /// Misty's folder for app bundles.
 pub fn cache_root() -> Result<PathBuf, String> {
+    #[cfg(test)]
+    if let Some(dir) = TEST_CACHE.lock().map_err(|error| error.to_string())?.clone() {
+        return Ok(dir);
+    }
     file_access::paths::misty_home_dir()
         .map(|home| home.join("apps"))
         .ok_or_else(|| "Misty has no data folder to keep apps in.".to_owned())
@@ -36,39 +40,13 @@ pub fn bundle_dir(root: &Path, id: &str, version: &str) -> Result<PathBuf, Strin
     Ok(root.join(id).join(version))
 }
 
-/// The folders Misty ships its own apps in, set once at launch.
-static SHIPPED: OnceLock<Vec<PathBuf>> = OnceLock::new();
-
-pub fn set_shipped(dirs: Vec<PathBuf>) {
-    let _ = SHIPPED.set(dirs);
-}
-
-fn shipped() -> &'static [PathBuf] {
-    SHIPPED.get().map_or(&[], Vec::as_slice)
-}
-
-/// Where an app's files are: a built-in app (`bundled`) in the folder Misty ships it in, any other version in
-/// the cache. The id and version are checked, so they are one path part each.
-pub fn locate_in(cache: &Path, shipped: &[PathBuf], id: &str, version: &str) -> Result<PathBuf, String> {
-    if version == BUNDLED {
-        if !valid_id(id) {
-            return Err("That isn't an app id.".into());
-        }
-        return shipped
-            .iter()
-            .map(|dir| dir.join(id))
-            .find(|dir| fs::is_file(dir.join(MANIFEST_FILE)))
-            .ok_or_else(|| "That app isn't part of this version of Misty.".to_owned());
-    }
-    bundle_dir(cache, id, version)
-}
-
+/// Where an app version's files are in the cache.
 pub fn locate(id: &str, version: &str) -> Result<PathBuf, String> {
-    locate_in(&cache_root()?, shipped(), id, version)
+    bundle_dir(&cache_root()?, id, version)
 }
 
 /// The manifest in a bundle's folder, `None` when there isn't one, and an error when it is damaged or names
-/// another app. A built-in app's manifest carries the version this Misty ships, whatever `version` asked for.
+/// another app or version.
 pub fn manifest_in(dir: &Path, id: &str, version: &str) -> Result<Option<AppManifest>, String> {
     let Ok(bytes) = fs::read(dir.join(MANIFEST_FILE)) else {
         return Ok(None);
@@ -77,7 +55,7 @@ pub fn manifest_in(dir: &Path, id: &str, version: &str) -> Result<Option<AppMani
         return Err("The app's misty-app.json is too large.".into());
     }
     let manifest = AppManifest::parse(&bytes)?;
-    if manifest.id != id || (version != BUNDLED && manifest.version != version) {
+    if manifest.id != id || manifest.version != version {
         return Err("The app's misty-app.json names a different id or version.".into());
     }
     Ok(Some(manifest))
@@ -136,6 +114,32 @@ pub struct Wrap {
     /// The release holds everything in one top folder (`photocraft-web-0.23.1/`), whose contents are the bundle.
     #[serde(default)]
     pub strip_top: bool,
+    /// The release's layout isn't known ahead (an app added by its link alone): a single top folder, when there is
+    /// one, is stripped, and a release with its files at the top is taken as it is.
+    #[serde(default)]
+    pub auto_top: bool,
+    /// Files Misty adds beside the release, such as an adapter script from misty-apps that gives the app its tools
+    /// (`mcp: adapter`). They go only under `misty/`, never over a file of the release.
+    #[serde(default)]
+    pub add_files: Vec<AddFile>,
+}
+
+/// A file Misty writes into a wrapped release.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct AddFile {
+    pub path: String,
+    pub content: String,
+}
+
+/// The most the files Misty adds to a release may be, all together.
+const MAX_ADDED_BYTES: usize = 256 << 10;
+
+/// How the zip's top folder is treated.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Top {
+    Keep,
+    Strip,
+    StripIfOne,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -182,7 +186,12 @@ fn install_with(
         return Err("The downloaded app doesn't match the catalog's checksum, so it wasn't installed.".into());
     }
     let staging = root.join(format!(".staging-{}", uuid::Uuid::new_v4()));
-    let result = unpack(&staging, zip_bytes, wrap.is_some_and(|wrap| wrap.strip_top)).and_then(|()| {
+    let top = match wrap {
+        Some(wrap) if wrap.strip_top => Top::Strip,
+        Some(wrap) if wrap.auto_top => Top::StripIfOne,
+        _ => Top::Keep,
+    };
+    let result = unpack(&staging, zip_bytes, top).and_then(|()| {
         if let Some(wrap) = wrap {
             add_wrapper(&staging, id, version, wrap)?;
         }
@@ -226,6 +235,23 @@ fn add_wrapper(staging: &Path, id: &str, version: &str, wrap: &Wrap) -> Result<(
         }
         fs::copy_tree(&from, &to).map_err(|error| format!("Couldn't save the app: {error}"))?;
     }
+    let added: usize = wrap.add_files.iter().map(|file| file.content.len()).sum();
+    if added > MAX_ADDED_BYTES {
+        return Err("The files Misty adds to the app are too large.".into());
+    }
+    for file in &wrap.add_files {
+        if !safe_relative(&file.path) || !file.path.starts_with("misty/") || !file.path.ends_with(".js") {
+            return Err("A file Misty adds to an app is a script under misty/.".into());
+        }
+        let target = staging.join(&file.path);
+        if fs::exists(&target) {
+            return Err("The release already has a file where Misty adds one.".into());
+        }
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|error| format!("Couldn't save the app: {error}"))?;
+        }
+        fs::write(&target, file.content.as_bytes()).map_err(|error| format!("Couldn't save the app: {error}"))?;
+    }
     if fs::exists(staging.join(MANIFEST_FILE)) {
         return Err("The release already has a misty-app.json, which Misty adds.".into());
     }
@@ -237,14 +263,18 @@ fn add_wrapper(staging: &Path, id: &str, version: &str, wrap: &Wrap) -> Result<(
     fs::write(staging.join(MANIFEST_FILE), text).map_err(|error| format!("Couldn't save the app: {error}"))
 }
 
-fn unpack(staging: &Path, zip_bytes: &[u8], strip_top: bool) -> Result<(), String> {
+fn unpack(staging: &Path, zip_bytes: &[u8], top: Top) -> Result<(), String> {
     let mut archive =
         zip::ZipArchive::new(Cursor::new(zip_bytes)).map_err(|_| "The app's download isn't a zip file.".to_owned())?;
     if archive.len() > MAX_ENTRIES {
         return Err("The app has too many files.".into());
     }
     // A release with everything in one top folder has that folder's contents as the bundle.
-    let top = if strip_top { single_top_folder(&mut archive)? } else { None };
+    let top = match top {
+        Top::Keep => None,
+        Top::Strip => single_top_folder(&mut archive)?,
+        Top::StripIfOne => single_top_folder(&mut archive).ok().flatten(),
+    };
     fs::create_dir_all(staging).map_err(|error| format!("Couldn't save the app: {error}"))?;
     let mut total = 0u64;
     for index in 0..archive.len() {
@@ -376,13 +406,13 @@ mod tests {
 
     /// Whether a third-party version is in the cache.
     fn installed(root: &Path, id: &str, version: &str) -> bool {
-        locate_in(root, &[], id, version)
+        bundle_dir(root, id, version)
             .ok()
             .is_some_and(|dir| matches!(manifest_in(&dir, id, version), Ok(Some(_))))
     }
 
     fn file(root: &Path, id: &str, version: &str, relative: &str) -> Result<PathBuf, FileError> {
-        let dir = locate_in(root, &[], id, version).map_err(|_| FileError::Invalid)?;
+        let dir = bundle_dir(root, id, version).map_err(|_| FileError::Invalid)?;
         resolve_file_in(&dir, relative)
     }
 
@@ -432,35 +462,6 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    #[test]
-    fn built_in_apps_are_found_where_misty_ships_them_with_nothing_installed() {
-        let shipped = temp_root("shipped");
-        let cache = temp_root("cache");
-        let dir = shipped.join("demo");
-        std::fs::create_dir_all(dir.join("assets")).unwrap();
-        std::fs::write(dir.join(MANIFEST_FILE), manifest_json("demo", "1.0.0")).unwrap();
-        std::fs::write(dir.join("index.html"), "x").unwrap();
-        std::fs::write(dir.join("logo.svg"), "x").unwrap();
-        std::fs::write(dir.join("assets/app.js"), "1").unwrap();
-        let roots = [shipped.clone()];
-
-        // `bundled` is the folder Misty ships; the cache is never touched.
-        let found = locate_in(&cache, &roots, "demo", BUNDLED).unwrap();
-        assert_eq!(found, dir);
-        let manifest = manifest_in(&found, "demo", BUNDLED).unwrap().unwrap();
-        assert_eq!(manifest.version, "1.0.0");
-        assert!(resolve_file_in(&found, "assets/app.js").is_ok());
-        assert_eq!(resolve_file_in(&found, "../x"), Err(FileError::Invalid));
-        assert!(std::fs::read_dir(&cache).unwrap().next().is_none());
-
-        // An app Misty doesn't ship, a bad id, and a folder that names another app are all refused.
-        assert!(locate_in(&cache, &roots, "nothing", BUNDLED).is_err());
-        assert!(locate_in(&cache, &roots, "../demo", BUNDLED).is_err());
-        assert!(manifest_in(&found, "liar", BUNDLED).is_err());
-        std::fs::remove_dir_all(&shipped).unwrap();
-        std::fs::remove_dir_all(&cache).unwrap();
-    }
-
     fn vendor_zip(top: Option<&str>, files: &[(&str, &[u8])]) -> Vec<u8> {
         let prefix = top.map(|folder| format!("{folder}/")).unwrap_or_default();
         let named: Vec<(String, &[u8])> = files.iter().map(|(name, data)| (format!("{prefix}{name}"), *data)).collect();
@@ -476,7 +477,38 @@ mod tests {
             }),
             add_copies: copies.iter().map(|(from, to)| AddCopy { from: (*from).into(), to: (*to).into() }).collect(),
             strip_top,
+            auto_top: false,
+            add_files: Vec::new(),
         }
+    }
+
+    #[test]
+    fn an_adapter_is_added_under_misty_and_never_over_the_release() {
+        let root = temp_root("adapter");
+        let zip = vendor_zip(None, &[("index.html", b"<html>")]);
+        let with = |path: &str| Wrap {
+            add_files: vec![AddFile { path: path.into(), content: "window.mistyAdapter = {};".into() }],
+            ..wrap(false, &[])
+        };
+        install_wrapped(&root, "demo", "1.0.0", &zip, &sha256_hex(&zip), &with("misty/adapter.js")).unwrap();
+        assert!(bundle_dir(&root, "demo", "1.0.0").unwrap().join("misty/adapter.js").exists());
+        for bad in ["adapter.js", "misty/../index.html", "misty/a.html", "index.html"] {
+            assert!(install_wrapped(&root, "demo", "2.0.0", &zip, &sha256_hex(&zip), &with(bad)).is_err(), "{bad}");
+        }
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_release_of_unknown_layout_is_taken_with_or_without_its_top_folder() {
+        let root = temp_root("auto-top");
+        let auto = Wrap { strip_top: false, auto_top: true, ..wrap(false, &[]) };
+        let nested = vendor_zip(Some("demo-web"), &[("index.html", b"<html>")]);
+        let flat = vendor_zip(None, &[("index.html", b"<html>")]);
+        install_wrapped(&root, "demo", "1.0.0", &nested, &sha256_hex(&nested), &auto).unwrap();
+        install_wrapped(&root, "demo", "2.0.0", &flat, &sha256_hex(&flat), &auto).unwrap();
+        assert!(bundle_dir(&root, "demo", "1.0.0").unwrap().join("index.html").exists());
+        assert!(bundle_dir(&root, "demo", "2.0.0").unwrap().join("index.html").exists());
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
@@ -491,7 +523,7 @@ mod tests {
             install_wrapped(&root, "demo", "1.0.0", &bytes, &sum, &wrap(true, &[("snippets", "app/snippets")])).unwrap();
         assert_eq!((manifest.id.as_str(), manifest.version.as_str()), ("demo", "1.0.0"));
         assert!(manifest.own_origin && manifest.inline_scripts && manifest.shim);
-        let dir = locate_in(&root, &[], "demo", "1.0.0").unwrap();
+        let dir = bundle_dir(&root, "demo", "1.0.0").unwrap();
         // The top folder is the bundle's root, the release's files are as they were, and the copy sits beside the glue.
         assert_eq!(std::fs::read(dir.join("index.html")).unwrap(), b"<html/>");
         assert_eq!(std::fs::read(dir.join("snippets/s.js")).unwrap(), b"s");
@@ -544,7 +576,7 @@ mod tests {
         let bytes = std::fs::read(zip).unwrap();
         let root = temp_root("real");
         let manifest = install_wrapped(&root, &id, version, &bytes, entry["sha256"].as_str().unwrap(), &wrap).unwrap();
-        let dir = locate_in(&root, &[], &id, version).unwrap();
+        let dir = bundle_dir(&root, &id, version).unwrap();
         assert!(resolve_file_in(&dir, &manifest.entry).is_ok());
         std::fs::remove_dir_all(&root).unwrap();
     }

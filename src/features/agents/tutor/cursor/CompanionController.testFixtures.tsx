@@ -8,6 +8,8 @@ import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { CursorCompanionController } from "./CursorCompanionController";
 import type { CompanionConversation } from "./companionConversation";
+import type * as TutorConversationModule from "./tutorConversation";
+import type * as MistyUi from "@misty/ui";
 const mocks = vi.hoisted(() => ({
   listeners: new Map<string, (e: { payload: unknown }) => void>(),
   invoke: vi.fn(),
@@ -26,6 +28,11 @@ const mocks = vi.hoisted(() => ({
   taskId: "desktop-task",
   submit: vi.fn(),
   steer: vi.fn(),
+  /** Settles once the voice session has opened Tutor's conversation. */
+  conversationReady: Promise.resolve() as Promise<unknown>,
+  /** The agent Tutor hands work to. */
+  agent: { id: "ada", name: "Ada", engine: "claude", avatar: {} },
+  openThread: vi.fn(),
   loadConversations: vi.fn(async () => {}),
   state: {
     accountId: "account",
@@ -60,11 +67,57 @@ vi.mock("@tauri-apps/api/window", () => ({
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
 }));
+// Notices aren't what these tests check; drawing their host isn't needed.
+vi.mock("@misty/ui", async (original) => ({
+  ...(await original<typeof MistyUi>()),
+  notify: vi.fn(),
+}));
+// Tutor's own conversation is the fixture's one conversation.
+vi.mock("./tutorConversation", async (original) => ({
+  ...(await original<typeof TutorConversationModule>()),
+  tutorConversation: async () => "conversation",
+}));
+// Work goes to one agent, Ada, whose thread is the fixture's conversation, through submitAnswer.
+vi.mock("./tutorHandoff", () => ({
+  handoffAgents: () => [mocks.agent],
+  agentNamed: (name?: string) =>
+    name && mocks.agent.name.toLowerCase().startsWith(name.toLowerCase()) ? mocks.agent : undefined,
+  pickAgent: () => mocks.agent,
+  workingAgent: () => undefined,
+  agentThreadId: () => "conversation",
+  NoAgentError: class extends Error {},
+  openAgentThread: mocks.openThread,
+  handOff: async (input: {
+    instruction: string;
+    key: string;
+    turn: number;
+    interactionMode: string;
+    screens: unknown[];
+  }) => {
+    await mocks.submit(
+      input.instruction,
+      [],
+      undefined,
+      [],
+      { conversationId: "conversation", context: [] },
+      {
+        turn: input.turn,
+        executionMode: "user",
+        interactionMode: input.interactionMode,
+        idempotencyKey: input.key,
+        ...(input.screens.length ? { displayCaptures: input.screens } : {}),
+      },
+    );
+    if (mocks.state.error) throw new Error(mocks.state.error);
+    return { invocationId: mocks.state.invocationId ?? "", conversationId: "conversation" };
+  },
+}));
 vi.mock("./companionConversation", () => ({
   CompanionConversation: class {
     constructor(private options: ConstructorParameters<typeof CompanionConversation>[0]) {
       mocks.conversationOpen();
       mocks.conversationOptions = options;
+      mocks.conversationReady = options.conversation().catch(() => undefined);
     }
     begin = mocks.conversationBegin;
     append = mocks.voiceAppend;
@@ -104,6 +157,11 @@ const emit = (event: string, payload: unknown) =>
     mocks.listeners.get(`misty://cursor-${event}`)?.({
       payload,
     });
+  });
+/** Waits for the voice session to open Tutor's conversation. */
+const opened = () =>
+  act(async () => {
+    await mocks.conversationReady;
   });
 const presentations = () =>
   mocks.invoke.mock.calls
@@ -147,6 +205,7 @@ beforeEach(() => {
   mocks.conversationCommit.mockReset().mockResolvedValue(undefined);
   mocks.conversationInterrupt.mockResolvedValue(undefined);
   mocks.conversationOptions = undefined;
+  mocks.conversationReady = Promise.resolve();
   Object.defineProperty(navigator, "platform", {
     configurable: true,
     value: "MacIntel",
@@ -178,4 +237,4 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-export { emit, mocks, mounted, presentations, saveCompanion };
+export { emit, mocks, mounted, opened, presentations, saveCompanion };

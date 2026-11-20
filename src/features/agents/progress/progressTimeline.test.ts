@@ -145,14 +145,14 @@ describe("progress timeline", () => {
       { type: "tool", id: "a", name: "browser.tab.list", state: "completed" },
       { type: "tool", id: "b", name: "browser.read", state: "failed" },
       { type: "note", text: "Found it." },
-      { type: "tool", id: "c", name: "note.search", state: "running" },
+      { type: "tool", id: "c", name: "message.search", state: "running" },
     ]);
     expect(groups.map((group) => group.type)).toEqual(["tools", "note", "tools"]);
     expect(toolGroupSummary(groups[0].type === "tools" ? groups[0].tools : [])).toBe(
       "Listed tabs, read browser",
     );
     expect(toolGroupSummary(groups[2].type === "tools" ? groups[2].tools : [])).toBe(
-      "Searched docs",
+      "Searched messages",
     );
   });
 
@@ -184,9 +184,8 @@ describe("progress timeline", () => {
   it("names tools in plain words", () => {
     expect(toolLabel("browser.tab.list", false)).toBe("Listed tabs");
     expect(toolLabel("misty_notes_search", true)).toBe("Searching notes");
-    expect(toolLabel("note.query", false)).toBe("Checked docs");
-    expect(toolLabel("deck.read", false)).toBe("Read decks");
-    expect(toolLabel("drawing.list", false)).toBe("Listed whiteboards");
+    expect(toolLabel("note.query", false)).toBe("Checked notebooks");
+    expect(toolLabel("file.list", false)).toBe("Listed Files");
     expect(toolLabel("weather.forecast", false)).toBe("Used weather forecast");
     expect(toolLabel("agent.finish", false)).toBe("Wrapped up");
   });

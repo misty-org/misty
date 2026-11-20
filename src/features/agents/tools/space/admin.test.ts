@@ -19,33 +19,37 @@ const refusal = (error: unknown) => (error as LocalToolRejected).message;
 
 beforeEach(() => vi.clearAllMocks());
 
+const ITEM = "/spaces/s1/library/items/i";
+
 describe("item.delete", () => {
-  it("finds a note by id in the run's home Space, and no other", async () => {
+  it("finds a Library item by id in the run's home Space, and no other", async () => {
     serve({
       ...SPACES,
-      "GET /spaces/s1/notes/n": { title: "Old" },
-      "DELETE /spaces/s1/notes/n": undefined,
+      [`GET ${ITEM}`]: { display_name: "Old" },
+      [`POST ${ITEM}/trash`]: { id: "i" },
     });
-    await expect(call(tool("item.delete"), { kind: "note", id: "n" })).resolves.toEqual({
-      deleted: "note",
-      id: "n",
+    await expect(
+      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }),
+    ).resolves.toEqual({
+      deleted: "library_item",
+      id: "i",
       title: "Old",
       space_id: "s1",
     });
     await expect(
-      call(tool("item.delete"), { kind: "note", id: "n", space: "s0" }).catch(refusal),
+      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s0" }).catch(refusal),
     ).resolves.toBe("I can only work in Work. Ask an agent in that Space.");
   });
 
-  it("deletes a drawing, naming one with no title", async () => {
+  it("deletes a thread, naming one with no title", async () => {
     serve({
       ...SPACES,
-      "GET /spaces/s1/drawings/d": { title: " " },
-      "DELETE /spaces/s1/drawings/d": undefined,
+      "GET /spaces/s1/conversations": { conversations: [{ id: "t", title: " " }] },
+      "DELETE /spaces/s1/conversations/t": undefined,
     });
-    await expect(call(tool("item.delete"), { kind: "drawing", id: "d" })).resolves.toMatchObject({
-      title: "Untitled drawing",
-    });
+    await expect(
+      call(tool("item.delete"), { kind: "thread", id: "t", space: "s1" }),
+    ).resolves.toMatchObject({ title: "Untitled thread" });
   });
 
   it("deletes a thread and a shared file in the Space it's told", async () => {
@@ -70,8 +74,8 @@ describe("item.delete", () => {
   it("moves a Library item to the trash rather than deleting it", async () => {
     const calls = serve({
       ...SPACES,
-      "GET /spaces/s1/library/items/i": { display_name: "a.png" },
-      "POST /spaces/s1/library/items/i/trash": { id: "i" },
+      [`GET ${ITEM}`]: { display_name: "a.png" },
+      [`POST ${ITEM}/trash`]: { id: "i" },
     });
     await expect(
       call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }),
@@ -80,78 +84,70 @@ describe("item.delete", () => {
   });
 
   it("says what it couldn't find or may not delete", async () => {
-    serve({
-      ...SPACES,
-      "GET /spaces/s1/notes/n": refusedWith(404),
-      "GET /spaces/s0/notes/n": refusedWith(404),
-    });
-    await expect(call(tool("item.delete"), { kind: "note", id: "n" }).catch(refusal)).resolves.toBe(
-      "no note n that you can delete",
-    );
+    serve({ ...SPACES, [`GET ${ITEM}`]: refusedWith(404) });
+    await expect(
+      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }).catch(refusal),
+    ).resolves.toBe("no library_item i that you can delete");
     serve({ ...SPACES, "GET /spaces/s1/conversations": { conversations: [] } });
     await expect(
       call(tool("item.delete"), { kind: "thread", id: "t", space: "s1" }).catch(refusal),
     ).resolves.toBe("no thread t that you can delete");
     serve({
       ...SPACES,
-      "GET /spaces/s1/notes/n": { title: "T" },
-      "DELETE /spaces/s1/notes/n": refusedWith(403, "forbidden"),
+      [`GET ${ITEM}`]: { display_name: "T" },
+      [`POST ${ITEM}/trash`]: refusedWith(403, "forbidden"),
     });
-    await expect(call(tool("item.delete"), { kind: "note", id: "n" }).catch(refusal)).resolves.toBe(
-      "you do not have permission to delete that note",
-    );
-    await expect(call(tool("item.delete"), { kind: "task", id: "n" }).catch(refusal)).resolves.toBe(
-      "The arguments do not match this tool's input schema.",
-    );
+    await expect(
+      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }).catch(refusal),
+    ).resolves.toBe("you do not have permission to delete that library_item");
+    await expect(
+      call(tool("item.delete"), { kind: "note", id: "n", space: "s1" }).catch(refusal),
+    ).resolves.toBe("The arguments do not match this tool's input schema.");
   });
 
   it("doesn't call a failed delete a refusal when nobody answered", async () => {
     serve({
       ...SPACES,
-      "GET /spaces/s1/notes/n": { title: "T" },
-      "DELETE /spaces/s1/notes/n": new Error("Load failed"),
+      [`GET ${ITEM}`]: { display_name: "T" },
+      [`POST ${ITEM}/trash`]: new Error("Load failed"),
     });
-    await expect(call(tool("item.delete"), { kind: "note", id: "n" })).rejects.toBeInstanceOf(
-      LocalToolUncertain,
-    );
+    await expect(
+      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }),
+    ).rejects.toBeInstanceOf(LocalToolUncertain);
   });
 });
 
 describe("item.rename", () => {
-  it("renames a drawing wherever it is, and a thread in its Space", async () => {
+  it("renames a thread in its Space", async () => {
     const calls = serve({
       ...SPACES,
-      "GET /spaces/s1/drawings/d": { title: "Old" },
-      "PATCH /spaces/s1/drawings/d": { id: "d", title: "New" },
       "GET /spaces/s1/conversations": { conversations: [{ id: "t", title: "Old" }] },
       "PATCH /spaces/s1/conversations/t": { id: "t", title: "New" },
     });
     await expect(
-      call(tool("item.rename"), { kind: "drawing", id: "d", name: " New " }),
-    ).resolves.toEqual({ renamed: "drawing", id: "d", name: "New" });
-    expect(calls.find((request) => request.method === "PATCH")?.body).toEqual({ title: "New" });
-    await expect(
-      call(tool("item.rename"), { kind: "thread", id: "t", name: "New", space: "Work" }),
+      call(tool("item.rename"), { kind: "thread", id: "t", name: " New ", space: "Work" }),
     ).resolves.toEqual({ renamed: "thread", id: "t", name: "New" });
+    expect(calls.find((request) => request.method === "PATCH")?.body).toEqual({ title: "New" });
   });
 
   it("says what it can't rename", async () => {
+    serve({ ...SPACES, "GET /spaces/s1/conversations": { conversations: [] } });
+    await expect(
+      call(tool("item.rename"), { kind: "thread", id: "t", name: "x", space: "s1" }).catch(refusal),
+    ).resolves.toBe("no thread t that you can rename");
     serve({
       ...SPACES,
-      "GET /spaces/s1/drawings/d": refusedWith(404),
-      "GET /spaces/s0/drawings/d": refusedWith(404),
+      "GET /spaces/s1/conversations": { conversations: [{ id: "t", title: "T" }] },
+      "PATCH /spaces/s1/conversations/t": refusedWith(403, "forbidden"),
     });
     await expect(
-      call(tool("item.rename"), { kind: "drawing", id: "d", name: "x" }).catch(refusal),
-    ).resolves.toBe("no drawing d that you can rename");
-    serve({
-      ...SPACES,
-      "GET /spaces/s1/drawings/d": { title: "T" },
-      "PATCH /spaces/s1/drawings/d": refusedWith(403, "forbidden"),
-    });
+      call(tool("item.rename"), { kind: "thread", id: "t", name: "x", space: "s1" }).catch(refusal),
+    ).resolves.toBe("no thread t that you can rename");
     await expect(
-      call(tool("item.rename"), { kind: "drawing", id: "d", name: "x" }).catch(refusal),
-    ).resolves.toBe("no drawing d that you can rename");
+      call(tool("item.rename"), { kind: "drawing", id: "d", name: "x", space: "s1" }).catch(
+        refusal,
+      ),
+    ).resolves.toBe("The arguments do not match this tool's input schema.");
   });
 });
 

@@ -22,13 +22,9 @@ describe("search prefixes", () => {
     expect(readQuery("@codex hi", agents).ask).toBeUndefined();
   });
 
-  it("reads what to make", () => {
-    expect(readQuery("new task: ship search", agents).create).toEqual({
-      what: "task",
-      title: "ship search",
-    });
-    expect(readQuery("note: ideas", agents).create).toEqual({ what: "note", title: "ideas" });
-    expect(readQuery("new doc: plan", agents).create).toEqual({ what: "note", title: "plan" });
-    expect(readQuery("notes about x", agents).create).toBeUndefined();
+
+  it("reads plain words as a search, never as something to make", () => {
+    expect(readQuery("new task: ship search", agents)).toEqual({ text: "new task: ship search" });
+    expect(readQuery("  note: ideas", agents)).toEqual({ text: "note: ideas" });
   });
 });

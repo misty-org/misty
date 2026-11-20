@@ -155,8 +155,20 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     });
     std::thread::spawn(move || {
         let mut topology = Instant::now();
+        // Looked at on the first pass, then every FRONT_EVERY.
+        let mut front = Instant::now().checked_sub(FRONT_EVERY).unwrap_or_else(Instant::now);
         loop {
             if state.enabled.load(Ordering::SeqCst) {
+                if front.elapsed() >= FRONT_EVERY {
+                    front = Instant::now();
+                    let (displays, overlays) = {
+                        let data = state.data.lock().unwrap();
+                        (data.displays.clone(), data.overlays.clone())
+                    };
+                    let full = platform::foreground_window(&overlays)
+                        .is_some_and(|window| fills_a_display(&window, &displays));
+                    state.fullscreen.store(full, Ordering::SeqCst);
+                }
                 if let Some((x, y)) = platform::cursor() {
                     // The trail the person draws while they ask, skipping a pointer at rest.
                     if state.held.load(Ordering::SeqCst) {
@@ -169,7 +181,17 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         }
                     }
                     let displays = state.data.lock().unwrap().displays.clone();
-                    let payload = json!({"x":x,"y":y,"displays":displays});
+                    // What Misty beside the pointer steps away for: typing, a drag, a full-screen
+                    // app. Only the facts, never the keys typed.
+                    let payload = json!({
+                        "x": x,
+                        "y": y,
+                        "displays": displays,
+                        "typing": crate::voice::hold_to_talk::typing(),
+                        "dragging": platform::button_held(),
+                        "fullscreen": state.fullscreen.load(Ordering::SeqCst),
+                        "cursorShown": platform::cursor_shown(),
+                    });
                     for (label, w) in app.webview_windows() {
                         if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
                             let _ = w.emit("misty://cursor-sample", &payload);
@@ -187,4 +209,17 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             std::thread::sleep(Duration::from_millis(16));
         }
     });
+}
+
+/// How often the sampler looks at the window in front, which costs more than the pointer.
+const FRONT_EVERY: Duration = Duration::from_millis(500);
+
+/// Whether a window covers a whole display, give or take a point at the edges.
+fn fills_a_display(window: &platform::ForegroundWindow, displays: &[Display]) -> bool {
+    displays.iter().any(|d| {
+        (window.x - d.x).abs() <= 1.
+            && (window.y - d.y).abs() <= 1.
+            && window.width >= d.width - 1.
+            && window.height >= d.height - 1.
+    })
 }

@@ -196,16 +196,3 @@ export function useAutoProbe(
   }, [enabled, fingerprint, runningAll, eligible, probeAll, workspacePath]);
 }
 
-/** The latest check time among the shown entries (for "checked at …"). */
-export function latestCheckedAt(
-  entries: McpConfigEntry[],
-  results: Record<string, McpProbeState>,
-): number | null {
-  let latest: number | null = null;
-  for (const entry of entries) {
-    const state = probeStateFor(results, entry);
-    if (!state) continue;
-    latest = latest === null ? state.checkedAt : Math.max(latest, state.checkedAt);
-  }
-  return latest;
-}

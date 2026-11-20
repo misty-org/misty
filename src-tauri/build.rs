@@ -23,7 +23,6 @@ fn main() {
             "CoreVideo",
             "NaturalLanguage",
             "UserNotifications",
-            "Vision",
         ] {
             println!("cargo:rustc-link-lib=framework={framework}");
         }

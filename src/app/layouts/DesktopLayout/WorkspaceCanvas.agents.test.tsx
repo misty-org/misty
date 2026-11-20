@@ -37,7 +37,7 @@ it("keeps the sidebar for a lone Agents view", () => {
   );
   expect(screen.getByRole("navigation", { name: "Sidebar" })).toBeTruthy();
   act(() => {
-    useWorkspaceStore.getState().openSurface(workspaceSurfaceFromRoute("/spaces/family/notes")!);
+    useWorkspaceStore.getState().openSurface(workspaceSurfaceFromRoute("/spaces/family/files")!);
   });
   expect(screen.getByRole("navigation", { name: "Sidebar" })).toBeTruthy();
 });

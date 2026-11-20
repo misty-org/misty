@@ -32,6 +32,9 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
       await writeDevicePreference("agents.companion.captions", control.captions);
       s.change({ captions: control.captions });
       if (!control.captions) s.setSpoken(undefined);
+    } else if (control.kind === "sprite") {
+      await writeDevicePreference("agents.companion.sprite", control.sprite);
+      s.change({ sprite: control.sprite });
     } else if (control.kind === "tint") {
       await writeDevicePreference("agents.companion.tint", control.tint);
       s.change({ tint: control.tint });

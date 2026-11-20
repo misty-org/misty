@@ -1,14 +1,13 @@
 import {
+  PaneLoading,
+  SetupState,
   SidePanelHeader,
   Skeleton,
-  SkeletonCode,
   SkeletonControl,
-  SkeletonDocument,
   Text,
 } from "@misty/ui";
 import { StepsSkeleton } from "../activity/StepsSkeleton";
 import type { ContextPanelSurface } from "./contextPanelStore";
-import { canPreviewFile, opensInPreview } from "./editor/editorViewMode";
 import { fileName } from "./files/paths";
 
 /*
@@ -57,22 +56,17 @@ export function FileTreeSkeleton({ rows = 12 }: { rows?: number }) {
 }
 
 /**
- * An open file before its text is first read: the editor's bar with the file's own name, its
- * switches and Save, then lines of code, or a page for a file that opens rendered.
+ * An open file before its text is first read: the editor's bar with the file's own name, then
+ * one spinner where its text goes, since a file's lines aren't known until they're read.
  */
 export function EditorSkeleton({ path }: { path: string }) {
   const name = fileName(path);
-  const preview = canPreviewFile(name) && opensInPreview(name);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex h-10 flex-none items-center gap-2 border-b pr-2 pl-3 text-meta">
         <Text tone="default">{name}</Text>
-        <div className="flex-1" />
-        {canPreviewFile(name) ? <Skeleton className="h-8 w-32 shrink-0 rounded-lg" /> : null}
-        {preview ? null : <SkeletonControl kind="icon" />}
-        <SkeletonControl kind="button" />
       </div>
-      {preview ? <SkeletonDocument label={name} /> : <SkeletonCode label={name} lines={20} />}
+      <PaneLoading label={`Loading ${name}`} />
     </div>
   );
 }
@@ -126,20 +120,9 @@ function ChangesHeadSkeleton() {
   );
 }
 
-/** A terminal starting: its first tab in the header row, and one prompt line. */
+/** A terminal starting is a tool getting ready, so it says so in words. */
 function TerminalSkeleton() {
-  return (
-    <>
-      <SidePanelHeader>
-        <div className="flex min-w-0 flex-1 items-center" aria-hidden="true">
-          <Skeleton className="h-6.5 w-24 rounded-md" />
-        </div>
-      </SidePanelHeader>
-      <div role="status" aria-label="Terminal" aria-busy="true" className="pt-3 pr-1.5 pl-3.5">
-        <Skeleton className="h-3 w-2/5 rounded-sm" />
-      </div>
-    </>
-  );
+  return <SetupState tool="terminal" />;
 }
 
 /**

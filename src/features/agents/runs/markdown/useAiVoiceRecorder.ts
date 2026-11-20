@@ -1,16 +1,7 @@
-import { recognizeAudio } from "@/features/voice";
+import { recognizeAudio, savedInputDevice } from "@/features/voice";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 import { microphoneSettingsHint } from "@/shared/platform/desktopOs";
-
-/** The microphone picked for voice input, kept for the device in misty.db; empty is the default. */
-const savedInputDevice = createDeviceSetting<string>({
-  scope: "voice-input-device",
-  defaults: "",
-  normalize: (stored) => (typeof stored === "string" ? stored.trim() : ""),
-  legacyKey: "misty.voice.input-device",
-});
 
 interface AiVoiceInputDevice {
   deviceId: string;

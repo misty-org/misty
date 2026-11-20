@@ -84,10 +84,14 @@ pub(super) async fn rebuild(app: &AppHandle) -> Result<(), String> {
     }
     on_main(app, move |app| {
         let state = host_state(&app);
+        let mut overlays = Vec::new();
         for d in &frames {
             let Some(window) = app.get_webview_window(&format!("{PREFIX}{}", d.id)) else {
                 continue;
             };
+            if let Some(handle) = super::screens::native_handle(&window) {
+                overlays.push(handle);
+            }
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             platform::position_overlay(&window, d)?;
             #[cfg(windows)]
@@ -100,19 +104,17 @@ pub(super) async fn rebuild(app: &AppHandle) -> Result<(), String> {
                     .map_err(|e| e.to_string())?;
             }
             platform::configure_overlay(&window)?;
-            if state.data.lock().unwrap().presentation["visible"]
-                .as_bool()
-                .unwrap_or(true)
+            if super::shown(&state.data.lock().unwrap().presentation)
                 && !state.capture.load(Ordering::SeqCst)
             {
                 platform::show_overlay(&window);
             }
         }
-        state
-            .data
-            .lock()
-            .map_err(|_| "Companion unavailable")?
-            .displays = frames;
+        {
+            let mut data = state.data.lock().map_err(|_| "Companion unavailable")?;
+            data.displays = frames;
+            data.overlays = overlays;
+        }
         let _ = crate::browser::app_windows::emit_to_primary(
             &app,
             "misty://cursor-displays-changed",

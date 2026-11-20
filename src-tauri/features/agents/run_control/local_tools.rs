@@ -58,15 +58,6 @@ const LOCAL_TOOLS: &[&str] = &[
     "browser.wait_for",
     "browser.workspace.visual",
     "conversation.ask_user",
-    "deck.apply",
-    "deck.create",
-    "deck.list",
-    "deck.read",
-    "drawing.apply",
-    "drawing.create",
-    "drawing.from_mermaid",
-    "drawing.list",
-    "drawing.read",
     "file.create",
     "file.promote_attachment",
     "file.read",
@@ -76,11 +67,6 @@ const LOCAL_TOOLS: &[&str] = &[
     "folder.list",
     "folder.read",
     "folder.send",
-    "image.cutout",
-    "image.edit",
-    "image.read",
-    "image.save",
-    "image.view",
     "integration.connect",
     "integration.connected",
     "integration.execute",
@@ -93,11 +79,6 @@ const LOCAL_TOOLS: &[&str] = &[
     "log.work.write",
     "message.search",
     "message.send",
-    "note.create",
-    "note.read",
-    "note.search",
-    "note.tag",
-    "note.update",
     "plan.propose",
     "plan.update",
     "screen.close",
@@ -114,18 +95,6 @@ const LOCAL_TOOLS: &[&str] = &[
     "thread.post",
     "thread.read",
     "media.fetch",
-    "video.analysis",
-    "video.duplicate",
-    "video.edit",
-    "video.export",
-    "video.frames",
-    "video.read",
-    "video.transcript",
-    "workbook.apply",
-    "workbook.create",
-    "workbook.import",
-    "workbook.list",
-    "workbook.read",
 ];
 
 /// Tools that change nothing, so an interrupted one is simply run again. A wait for the person counts:
@@ -153,20 +122,6 @@ pub(super) const READ_ONLY: &[&str] = &[
     "space.list",
     "space.member.list",
     "space.member.resolve",
-    "note.read",
-    "note.search",
-    "drawing.list",
-    "drawing.read",
-    "deck.list",
-    "deck.read",
-    "workbook.list",
-    "workbook.read",
-    "image.read",
-    "image.view",
-    "video.analysis",
-    "video.read",
-    "video.frames",
-    "video.transcript",
     "file.read",
     "file.search",
     "message.search",
@@ -400,7 +355,18 @@ impl LocalToolHost for AppToolHost {
                 input,
                 ..call.clone()
             };
-            let answer = self.ask(&admitted, &facts).await;
+            // An app whose server is its maker's own program is answered here, in the run's folder; every other
+            // tool by the window that runs agent jobs.
+            let answer = match crate::apps::mcp::served_by_program(&call.name) {
+                Some((app_id, tool)) => Some(
+                    match crate::apps::program::call(&call.run_id, &app_id, &tool, admitted.input.clone()).await {
+                        crate::apps::program::Outcome::Done(result) => Answer::Done { result },
+                        crate::apps::program::Outcome::Failed { code, message } => Answer::Failed { code, message },
+                        crate::apps::program::Outcome::Uncertain(message) => Answer::Uncertain { message },
+                    },
+                ),
+                None => self.ask(&admitted, &facts).await,
+            };
             let outcome = match answer {
                 Some(Answer::Done { result }) => {
                     tool_gate::note_result(&self.app, &store, &facts, &call).await;

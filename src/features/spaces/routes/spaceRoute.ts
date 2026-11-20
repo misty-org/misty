@@ -1,20 +1,13 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import { spaceKindsWithItemPath } from "@misty/ui";
 
 const validSections = new Set([
   "home",
   "social",
   "chat",
-  "notes",
-  "slides",
-  "data",
-  "drawings",
-  "planner",
-  "calendar",
   "lab",
   "explore",
-  "media",
+  "files",
   "app",
   "members",
   "settings",
@@ -22,8 +15,8 @@ const validSections = new Set([
 /** Old names for a page, still accepted in links. */
 const renamedSections: Record<string, string> = {
   agents: "explore",
-  files: "media",
-  library: "media",
+  media: "files",
+  library: "files",
 };
 const validSettingsSections = new Set(["general", "members", "connections", "suggestions"]);
 
@@ -33,7 +26,7 @@ interface SpaceRoute {
   settingsSection: string;
   libraryCollection: string;
   conversationId: string | null;
-  /** The whiteboard, deck or workbook open on its page (`/drawings/<id>`, `/slides/<id>`, …). */
+  /** The app open on its page (`/app/<id>`). */
   itemId: string;
 }
 
@@ -61,11 +54,8 @@ export function useSpaceRoute(): SpaceRoute {
       : "general",
     libraryCollection: search.get("collection") ?? "recent",
     conversationId: search.get("conversation"),
-    // A built-in app on the SDK opens at /app/<id>.
-    itemId:
-      spaceKindsWithItemPath.has(routeSection) || routeSection === "app"
-        ? decodeRouteSegment(routeParts[3] ?? "")
-        : "",
+    // An app opens at /app/<id>.
+    itemId: routeSection === "app" ? decodeRouteSegment(routeParts[3] ?? "") : "",
   };
 }
 

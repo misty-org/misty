@@ -242,6 +242,41 @@ pub async fn project_read_file(
     blocking(move || read_file_blocking(&file)).await
 }
 
+/// The most `project_read_bytes` hands back: a Media file's upload limit (`upload-limits.ts`).
+const MAX_BYTES: u64 = 100 * 1024 * 1024;
+
+fn read_bytes_blocking(file: &Path) -> Result<Vec<u8>, String> {
+    let name = file
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "That file".to_owned());
+    let meta =
+        file_access::fs::metadata(file).map_err(|_| format!("Misty couldn't open {name}."))?;
+    if meta.is_dir() {
+        return Err(format!("{name} is a folder."));
+    }
+    if meta.len() > MAX_BYTES {
+        return Err(format!("{name} is larger than 100 MB."));
+    }
+    file_access::fs::read(file).map_err(|_| format!("Misty couldn't read {name}."))
+}
+
+/// A file's bytes, whole, for the file picker to add it to a Space's Media. Only files in the
+/// account's linked folders, and none past the Media upload limit.
+#[tauri::command]
+pub async fn project_read_bytes(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+    account: String,
+    path: String,
+) -> Result<tauri::ipc::Response, String> {
+    person_window(&webview)?;
+    let file = linked_path(&app, &account, &path).await?;
+    blocking(move || read_bytes_blocking(&file))
+        .await
+        .map(tauri::ipc::Response::new)
+}
+
 /// Saves a file's text.
 #[tauri::command]
 pub async fn project_write_file(

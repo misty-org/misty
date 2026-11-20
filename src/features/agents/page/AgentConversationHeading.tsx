@@ -1,4 +1,4 @@
-import { BellOff, Pin } from "lucide-react";
+import { UserRound, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
 import { cn, IconButton, Skeleton, Surface, Text, windowToolbarClass } from "@misty/ui";
@@ -6,6 +6,8 @@ import { useTitlePending } from "../conversations/state/conversationTitles";
 import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
 import { AgentAvatar } from "../personal/AgentAvatar";
 import { AgentIdentity } from "../personal/AgentIdentity";
+import { useContextPanel } from "../context-panel/contextPanelStore";
+import { useRailShown } from "../context-panel/railLayoutStore";
 
 /**
  * The open chat's name, as its title call made it: a skeleton while that call runs, "New chat"
@@ -45,17 +47,31 @@ export function ChatTitle({
 }
 
 /**
- * The direct message's own buttons at the right of its header, as a Space's views have them. Neither has
- * anything behind it yet, so both stand disabled.
+ * The direct message's own buttons, at the end of the chat's own bar under the window's tabs, as
+ * Discord keeps a DM's. Profile opens the agent's card in the chat's side panel, where a channel
+ * would show its members; Tools shows or hides the rail of the agent's tools (its task, goal,
+ * memory, session, project views and browser), folded away by default so the page reads as a chat.
  */
 export function ChatHeaderButtons() {
+  const profileOpen = useContextPanel((state) => state.tab === "profile");
+  const railShown = useRailShown((state) => state.value);
   return (
     <div role="toolbar" aria-label="Chat actions" className="flex shrink-0 items-center gap-1">
-      <IconButton label="Notifications" variant="quiet" disabled>
-        <BellOff />
+      <IconButton
+        label="Profile"
+        variant="quiet"
+        aria-pressed={profileOpen}
+        onClick={() => useContextPanel.getState().toggle("profile")}
+      >
+        <UserRound />
       </IconButton>
-      <IconButton label="Pinned" variant="quiet" disabled>
-        <Pin />
+      <IconButton
+        label="Tools"
+        variant="quiet"
+        aria-pressed={railShown}
+        onClick={() => useRailShown.getState().set(!railShown)}
+      >
+        <Wrench />
       </IconButton>
     </div>
   );

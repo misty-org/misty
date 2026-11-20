@@ -60,13 +60,13 @@ describe("embodied Misty state", () => {
   it("keeps a live surface registration on its newest adapter", () => {
     const element = document.createElement("div");
     const first: AiSurfaceAdapter = {
-      surfaceId: "drawings",
-      label: "Canvas",
-      getContext: () => [{ kind: "drawing", id: "one", title: "Old", privacy: "shared" }],
+      surfaceId: "space.chat",
+      label: "Chat",
+      getContext: () => [{ kind: "message", id: "one", title: "Old", privacy: "shared" }],
     };
     const latest: AiSurfaceAdapter = {
       ...first,
-      getContext: () => [{ kind: "drawing", id: "one", title: "Live", privacy: "shared" }],
+      getContext: () => [{ kind: "message", id: "one", title: "Live", privacy: "shared" }],
     };
     useAiSurfaceStore
       .getState()

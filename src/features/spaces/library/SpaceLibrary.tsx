@@ -5,8 +5,6 @@ import { CollectionPage } from "@misty/ui";
 import { useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SpaceLibraryOverlays } from "./components/SpaceLibraryOverlays";
-import { openLibraryItem, SpaceLibraryItemViewer } from "./components/SpaceLibraryItemViewer";
-import { libraryItemOpensInEditor } from "./SpaceLibraryViewer";
 import { SpaceLibraryStatus } from "./components/SpaceLibraryStatus";
 import { LibraryEntryHeader } from "./components/LibraryEntryHeader";
 import { LibraryItemsRegion } from "./library-surfaces/LibraryItemsRegion";
@@ -16,14 +14,11 @@ import { useSpaceLibraryCollectionActions } from "./useSpaceLibraryCollectionAct
 import { useSpaceLibraryData } from "./useSpaceLibraryData";
 import { useSpaceLibraryItemActions } from "./useSpaceLibraryItemActions";
 import { useLibraryItemLink } from "./library-data/useLibraryItemLink";
-import { libraryItemMIME } from "./library-primitives/libraryMediaTypes";
-import { libraryMediaKind } from "./library-viewer/libraryMediaKind";
-import type { SpaceLibraryItem } from "../api/dto/entities";
+import { useOpenWith } from "./library-data/openWith";
 
-/** The most selected photos the agent is told about: as many as one image edit changes. */
-const selectedPhotosMost = 50;
 /**
- * The Media page of one Space: its files, with photos and videos opening in their editors.
+ * The Files page of one Space: its shared folders and everything its people, apps and agents
+ * saved there. A file opens in a preview here, or in an app the Space added.
  *
  * Every section below decides for itself whether the current collection
  * concerns it, so adding a collection means adding one component here rather
@@ -45,23 +40,11 @@ export function SpaceLibrary({
   useWorkspaceViewTitle(workspaceTabId, libraryWorkspaceTitle(data));
   const aiAdapter = useMemo<AiSurfaceAdapter>(() => {
     const selectedItems = data.selectedItems ?? [];
-    // The photos picked in the grid, by item id and name, so "brighten these" has a referent: the
-    // agent edits them together with image_edit's item_ids.
-    const allPhotos = selectedItems.filter(isPhoto);
-    const photos = allPhotos.slice(0, selectedPhotosMost);
-    const picked = photos.length
-      ? JSON.stringify({
-          selected_photos: photos.map((item) => ({ item_id: item.id, name: item.display_name })),
-          ...(allPhotos.length > photos.length
-            ? { more_selected: allPhotos.length - photos.length }
-            : {}),
-        })
-      : "";
     return {
-      surfaceId: "media",
+      surfaceId: "files",
       label: selectedItems.length
-        ? `${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"} in Media`
-        : "Media",
+        ? `${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"} in Files`
+        : "Files",
       getContext: () =>
         selectedItems.slice(0, 12).map((item) => ({
           kind: "library.item",
@@ -69,19 +52,9 @@ export function SpaceLibrary({
           title: item.display_name,
           privacy: "shared" as const,
           spaceId,
-          href: `/spaces/${encodeURIComponent(spaceId)}/media?item=${encodeURIComponent(item.id)}`,
+          href: `/spaces/${encodeURIComponent(spaceId)}/files?item=${encodeURIComponent(item.id)}`,
           revision: item.version,
         })),
-      getSelection: () =>
-        picked
-          ? {
-              kind: "objects",
-              content: picked,
-              object: { kind: "library.selection", id: `${spaceId}:photos`, spaceId },
-              anchors: { surface: "media", photos: photos.length },
-              contentHash: selectionHash(picked),
-            }
-          : null,
       getSuggestedActions: () => [
         {
           id: "library-synthesize",
@@ -98,9 +71,9 @@ export function SpaceLibrary({
   }, [data.selectedItems, spaceId]);
   useAiSurfaceAdapter(aiAdapter);
   useLibraryItemLink(data, itemActions.loadMore);
-  const opened = openLibraryItem(data);
-  const editorItem =
-    opened && libraryItemOpensInEditor(opened, data.canEditLibrary) ? opened : null;
+  const { dialog: openWithDialog, ...openWith } = useOpenWith(spaceId, (item) =>
+    data.setSelectedItemId(item.id),
+  );
   useEffect(() => {
     if (searchParams.get("upload") !== "1") {
       uploadQueryConsumedRef.current = false;
@@ -121,13 +94,11 @@ export function SpaceLibrary({
         data,
         itemActions,
         collectionActions,
+        openWith,
       }}
     >
       <LibraryCanEditContext.Provider value={data.canEditLibrary}>
-        {/* A photo or video opens in its editor here, in the page's place; the grid stays
-            mounted underneath so it comes back where it was. */}
-        {editorItem ? <SpaceLibraryItemViewer item={editorItem} /> : null}
-        <CollectionPage className={editorItem ? "hidden" : undefined}>
+        <CollectionPage>
           <>
             <LibraryEntryHeader />
             <SpaceLibraryStatus />
@@ -136,26 +107,14 @@ export function SpaceLibrary({
             </div>
           </>
           <SpaceLibraryOverlays />
+          {openWithDialog}
         </CollectionPage>
       </LibraryCanEditContext.Provider>
     </SpaceLibraryProvider>
   );
 }
-function isPhoto(item: SpaceLibraryItem) {
-  return libraryMediaKind(libraryItemMIME(item), item.file.intrinsic_metadata).isImage;
-}
-
-function selectionHash(value: string) {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `fnv1a-${(hash >>> 0).toString(16)}`;
-}
-
 const collectionTitles: Record<string, string> = {
-  recent: "Media",
+  recent: "Files",
   deleted: "Recently deleted",
 };
 function libraryWorkspaceTitle(data: ReturnType<typeof useSpaceLibraryData>): string {
@@ -166,5 +125,5 @@ function libraryWorkspaceTitle(data: ReturnType<typeof useSpaceLibraryData>): st
   if (selectedItems.length === 1 && selectedItems[0].display_name.trim()) {
     return selectedItems[0].display_name.trim();
   }
-  return collectionTitles[data.collection] || "Media";
+  return collectionTitles[data.collection] || "Files";
 }

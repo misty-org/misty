@@ -9,7 +9,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Panel, PanelGroup } from "react-resizable-panels";
 import { useWorkspaceViewFocused, useWorkspaceViewId } from "@/features/app-windows";
 import { useShortcutHandler } from "@/features/shortcuts";
 import {
@@ -19,6 +18,8 @@ import {
   SplitHandle,
   lazyTool,
   ToolSuspense,
+  SplitPane as Panel,
+  SplitPanes as PanelGroup,
 } from "@misty/ui";
 import { useChatFolder, useChatFolders } from "../shared-folders/chatFolder";
 import { ChatFolderPicker, ProjectPicker } from "../context-panel/ChatFolderPicker";

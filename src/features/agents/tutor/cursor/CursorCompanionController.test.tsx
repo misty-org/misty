@@ -9,6 +9,7 @@ import {
   mounted,
   presentations,
   saveCompanion,
+  opened,
 } from "./CompanionController.testFixtures";
 import { companionControl, useCompanionState } from "./companionState";
 import { CursorCompanionController } from "./CursorCompanionController";
@@ -369,6 +370,7 @@ describe("Clicky capture ordering and shared entry points", () => {
     mocks.speech.mockRejectedValue(new Error("The configured speech model is unavailable"));
     const view = await mounted();
     emit("shortcut", { turn: 2, held: true });
+    await opened();
     emit("recorded", { turn: 2, durationMs: 1000 });
     await act(async () => {
       await mocks.conversationOptions!.tool(

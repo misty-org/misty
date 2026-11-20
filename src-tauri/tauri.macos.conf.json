@@ -25,5 +25,16 @@
         "dragDropEnabled": true
       }
     ]
+  },
+  "build": {
+    "beforeBundleCommand": "node tasks/drive-extension.ts"
+  },
+  "bundle": {
+    "macOS": {
+      "entitlements": "target/drive-extension/Misty.entitlements",
+      "files": {
+        "PlugIns/MistyDrive.appex": "target/drive-extension/MistyDrive.appex"
+      }
+    }
   }
 }

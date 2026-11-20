@@ -16,7 +16,9 @@ pub struct ProfileStateSnapshot {
 /// Scopes only native code writes: what the person has granted. Windows reach `profile_state`, and a
 /// window must not be able to grant itself anything or read what it's been granted this way.
 pub fn is_protected_scope(scope: &str) -> bool {
-    scope.starts_with("grant:") || scope.starts_with("permission:")
+    // `drive:` holds this computer's Space drive id and the drive's device settings
+    // (`spaces_drive/device.rs`).
+    scope.starts_with("grant:") || scope.starts_with("permission:") || scope.starts_with("drive:")
 }
 
 pub fn profile_state(

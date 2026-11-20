@@ -99,21 +99,14 @@ export default defineConfig(({ command, mode }) => {
       exclude: ["@silvia-odwyer/photon", "@misty/ui"],
     },
     resolve: {
-      // @misty/ui is linked from ../misty-ui as source: its React and icons are this app's own.
-      dedupe: ["react", "react-dom", "lucide-react"],
+      // @misty/ui is linked from ../misty-ui as source: its React and icons are this app's own. @misty/sdk is
+      // read as source from ../misty-sdk too, for Code and Lab, with this app's one copy of Yjs.
+      dedupe: ["react", "react-dom", "lucide-react", "yjs", "y-protocols"],
       alias: [
         { find: "@", replacement: fileURLToPath(new URL("../src", import.meta.url)) },
-        // OpenCut's editor, vendored (vendor/opencut/README.md), under its own name.
         {
-          find: "@opencut",
-          replacement: fileURLToPath(new URL("../vendor/opencut/src", import.meta.url)),
-        },
-        // OpenCut's Rust core, loaded once before the editor opens (vendor/opencut/src/wasm/load.ts).
-        {
-          find: /^opencut-wasm$/,
-          replacement: fileURLToPath(
-            new URL("../vendor/opencut/src/wasm/load.ts", import.meta.url),
-          ),
+          find: /^@misty\/sdk$/,
+          replacement: fileURLToPath(new URL("../../misty-sdk/packages/sdk/src/index.ts", import.meta.url)),
         },
         // Midscene's planner runs in the app; its Node-only helpers get browser stubs.
         ...Object.entries(nodeShims).map(([name, file]) => ({
@@ -151,8 +144,12 @@ export default defineConfig(({ command, mode }) => {
     },
     server: {
       fs: {
-        // ../misty-ui, where @misty/ui is linked from during development.
-        allow: [process.cwd(), fileURLToPath(new URL("../../misty-ui", import.meta.url))],
+        // ../misty-ui and ../misty-sdk, where @misty/ui and @misty/sdk are linked from during development.
+        allow: [
+          process.cwd(),
+          fileURLToPath(new URL("../../misty-ui", import.meta.url)),
+          fileURLToPath(new URL("../../misty-sdk", import.meta.url)),
+        ],
       },
       host: tauriDevHost ?? "127.0.0.1",
       port: desktopDevPort,

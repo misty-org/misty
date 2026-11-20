@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play } from "lucide-react";
+import { Play, Shapes } from "lucide-react";
 import { openReading } from "@/features/voice";
-import { Button, SetupState, sketchInk, spaceMadeKind, Surface, Text } from "@misty/ui";
-import {
-  spacesSnapshot,
-  useWorkspaceStore,
-  windowSpace,
-  workspaceSurfaceFromRoute,
-} from "@/features/app-windows";
+import { Button, notify, SetupState, sketchInk, Surface, Text } from "@misty/ui";
+import { spacesSnapshot, windowSpace } from "@/features/app-windows";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { withPictures } from "./companionPictures";
 import { parseSketch, sketchSkeleton } from "./companionSketch";
@@ -17,8 +12,8 @@ import { renderSketch } from "./sketchRender";
 /**
  * A reply's drawing in the transcript (companionSketch.ts): the whiteboard itself, the
  * marks Misty drew over the screen without the screenshot under them, or a 3D model that
- * can be dragged around. Save as whiteboard makes a board or marks a Space whiteboard anyone in
- * the Space can keep editing.
+ * can be dragged around. Save to Files keeps a board or marks in the Space's Files as an
+ * `.excalidraw` file, which any whiteboard app the Space adds can open and keep editing.
  */
 export function SketchBlock({ source }: { source: string }) {
   const sketch = useMemo(() => parseSketch("```misty-sketch\n" + source + "\n```"), [source]);
@@ -133,26 +128,30 @@ export function SketchBlock({ source }: { source: string }) {
   const save = async () => {
     const spaceId = windowSpace(spacesSnapshot().spaces)?.id;
     if (!spaceId) {
-      setNotice("Open a Space in this window to save sketches there as whiteboards.");
+      setNotice("Open a Space in this window to save sketches to its Files.");
       return;
     }
     setSaving(true);
     setNotice("");
     try {
       const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
-      const drawing = await spacesGateway
-        .get()
-        .createDrawing(
-          spaceId,
-          sketch.header.title || "Sketch from Misty",
-          convertToExcalidrawElements(
-            sketchSkeleton(sketch.elements) as Parameters<typeof convertToExcalidrawElements>[0],
-          ),
-        );
-      const surface = workspaceSurfaceFromRoute(
-        `/spaces/${encodeURIComponent(spaceId)}/drawings/${encodeURIComponent(drawing.id)}`,
+      const elements = convertToExcalidrawElements(
+        sketchSkeleton(sketch.elements) as Parameters<typeof convertToExcalidrawElements>[0],
       );
-      if (surface) useWorkspaceStore.getState().openSurface({ ...surface, forceNew: true });
+      // Excalidraw's own file format, so a whiteboard app opens it as it is.
+      const file = JSON.stringify({
+        type: "excalidraw",
+        version: 2,
+        source: "misty",
+        elements,
+        appState: {},
+        files: {},
+      });
+      const name = `${(sketch.header.title || "Sketch from Misty").replace(/[\\/:*?"<>|]/g, " ").trim()}.excalidraw`;
+      await spacesGateway
+        .get()
+        .uploadLibraryBlob(spaceId, new Blob([file], { type: "application/json" }), name);
+      notify({ message: `Saved ${name} to Files` });
     } catch {
       setNotice("Misty couldn't save this sketch. Try again.");
     } finally {
@@ -199,11 +198,11 @@ export function SketchBlock({ source }: { source: string }) {
           ) : null}
           {!isModel && (
             <Button
-              icon={spaceMadeKind("drawing").icon}
+              icon={Shapes}
               disabled={!sketch.done || !count || saving}
               onClick={() => void save()}
             >
-              Save as whiteboard
+              Save to Files
             </Button>
           )}
           {notice && (

@@ -405,10 +405,10 @@ describe("Global Misty state", () => {
         spaceId: "space-1",
       },
       {
-        id: "route:/spaces/space-1/planner",
+        id: "route:/spaces/space-1/files",
         kind: "route",
         title: "Current Space view",
-        href: "/spaces/space-1/planner",
+        href: "/spaces/space-1/files",
         source: "current",
         spaceId: "space-1",
       },

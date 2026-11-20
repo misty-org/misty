@@ -74,7 +74,7 @@ mod tests {
         assert_eq!(refusal(run, "browser.steps"), Some(TAKEN_OVER));
         assert_eq!(refusal(run, "screen.open"), Some(TAKEN_OVER));
         // Space tools aren't the page: they go on.
-        assert_eq!(refusal(run, "note.read"), None);
+        assert_eq!(refusal(run, "file.read"), None);
         // Another run's page isn't held.
         assert_eq!(refusal("take_over_other_run", "browser.steps"), None);
         hold(run, false);

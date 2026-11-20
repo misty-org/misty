@@ -1,5 +1,4 @@
 import type { RefObject } from "react";
-import type { LibraryEditDefinition } from "../../api/dto/common";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 
 export type LibraryItemMetadataPatch = Partial<
@@ -15,14 +14,11 @@ export interface LibraryItemViewerProps {
   canEdit: boolean;
   canCopy: boolean;
   returnFocusRef: RefObject<HTMLElement | null>;
-  onCopyEdit: (definition: LibraryEditDefinition) => void;
   onClose: () => void;
   onSelect: (itemId: string) => void;
   onUpdate: (
     item: SpaceLibraryItem,
     patch: LibraryItemMetadataPatch,
   ) => Promise<SpaceLibraryItem | null>;
-  onReplaceItem: (item: SpaceLibraryItem) => void;
-  onRenditionReady: () => void;
   onTrash: (item: SpaceLibraryItem) => Promise<boolean>;
 }

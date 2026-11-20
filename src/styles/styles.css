@@ -3,6 +3,4 @@
 @import "@misty/ui/styles.css";
 /* JetBrains Mono, bundled, the code editor's default face (Settings › Appearance › Editor). */
 @import "@fontsource-variable/jetbrains-mono/index.css";
-/* OpenCut's color names, on Misty's theme, for the vendored video editor (vendor/opencut). */
-@import "../../vendor/opencut/src/opencut-theme.css";
 @import "./base.css";

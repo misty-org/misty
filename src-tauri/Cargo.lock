@@ -1355,6 +1355,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "diffy"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e3dc2f773b6aaa63b1a7684b8589f670a8a0146a510b74d23a401c882364b49"
+dependencies = [
+ "hashbrown 0.17.1",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1916,6 +1925,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "fuser"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53274f494609e77794b627b1a3cddfe45d675a6b2e9ba9c0fdc8d8eee2184369"
+dependencies = [
+ "libc",
+ "log",
+ "memchr",
+ "nix 0.29.0",
+ "page_size",
+ "smallvec",
+ "zerocopy",
+]
+
+[[package]]
 name = "futures-channel"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2421,6 +2445,9 @@ name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+dependencies = [
+ "foldhash",
+]
 
 [[package]]
 name = "hashlink"
@@ -3525,6 +3552,7 @@ dependencies = [
  "serde_yaml",
  "settings",
  "sha2 0.10.9",
+ "space_drive",
  "sysinfo",
  "tar",
  "tauri",
@@ -4083,6 +4111,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-file-provider"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e75524f6dcc079d5722a85797b2d29079ebecb0b88352f0ecb18011f7d84655"
+dependencies = [
+ "bitflags 2.13.0",
+ "block2",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-foundation",
+]
+
+[[package]]
 name = "objc2-foundation"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4341,6 +4382,16 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "page_size"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
@@ -5812,6 +5863,39 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps 6.2.2",
+]
+
+[[package]]
+name = "space_drive"
+version = "0.1.0"
+dependencies = [
+ "block2",
+ "bytes",
+ "chrono",
+ "core-foundation 0.10.1",
+ "core-foundation-sys",
+ "diffy",
+ "file_access",
+ "fuser",
+ "futures-util",
+ "hex",
+ "ignore",
+ "libc",
+ "objc2",
+ "objc2-file-provider",
+ "objc2-foundation",
+ "percent-encoding",
+ "rand 0.8.6",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "tokio",
+ "unicode-normalization",
+ "uuid",
+ "windows 0.61.3",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

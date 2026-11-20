@@ -21,8 +21,7 @@ export interface EngineInfo {
   modes?: Array<{ id: string; label: string; kind: "asks" | "edits" | "plans" | "no_asking" }>;
 }
 
-/** Misty's own runtime, which needs nothing installed. */
-export const mistyEngine = "misty";
+export { mistyEngine } from "./mistyEngine";
 
 /** Where the engine list is kept: one copy for every screen, saved on this computer. */
 const enginesKey = "engines/list";

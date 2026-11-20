@@ -16,6 +16,7 @@ export function selectAppearancePreferences(
       settingsNumber(source, "appearance", "app_zoom", appZoomStoredDefault),
     ),
     compactModeEnabled: settingsBoolean(source, "appearance", "compact_mode_enabled", false),
+    reduceMotion: settingsBoolean(source, "appearance", "reduce_motion", false),
     themeMode: themeMode(settingsString(source, "appearance", "theme_mode", "dark")),
     nightLightMode: nightLightMode(settingsString(source, "appearance", "night_light_mode", "off")),
     nightLightStart: settingsString(source, "appearance", "night_light_start", "21:00"),
@@ -32,6 +33,7 @@ function nightLightMode(value: string): NightLightMode {
 interface AppearancePreferences {
   appZoom: number;
   compactModeEnabled: boolean;
+  reduceMotion: boolean;
   themeMode: AppThemeMode;
   nightLightMode: NightLightMode;
   nightLightStart: string;

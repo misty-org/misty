@@ -36,7 +36,7 @@ describe("step sentences", () => {
         step("WebSearch"),
         step("Task"),
         step("TodoWrite"),
-        step("mcp__misty__note_create"),
+        step("mcp__misty__thread_post"),
         step("mcp__misty__app_run"),
         step("mcp__misty__browser_navigate", { target: "https://www.github.com/x", title: "" }),
       ],
@@ -51,7 +51,7 @@ describe("step sentences", () => {
       "Searched the web",
       "Handed part of the work to a sub-agent",
       "Updated its plan",
-      "Wrote a note",
+      "Posted in the Space chat",
       "Used a connected app",
       "Opened github.com",
     ]);

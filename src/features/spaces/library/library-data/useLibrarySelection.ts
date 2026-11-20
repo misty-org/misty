@@ -1,9 +1,8 @@
 import type { LibraryItemMenuState } from "../components/LibraryItemContextMenu";
-import type { LibraryEditDefinition } from "../../api/dto/common";
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Item selection, the context menu, and the copied-edit clipboard.
+ * Item selection and the context menu.
  *
  * Any change to what is being listed clears the selection, since the selected
  * ids would otherwise refer to items no longer on screen.
@@ -13,9 +12,6 @@ export function useLibrarySelection(listIdentity: string) {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [itemMenu, setItemMenu] = useState<LibraryItemMenuState | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
-  const [copiedEditDefinition, setCopiedEditDefinition] = useState<LibraryEditDefinition | null>(
-    null,
-  );
   const libraryViewerTriggerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -31,8 +27,6 @@ export function useLibrarySelection(listIdentity: string) {
     setItemMenu,
     bulkSaving,
     setBulkSaving,
-    copiedEditDefinition,
-    setCopiedEditDefinition,
     libraryViewerTriggerRef,
   };
 }

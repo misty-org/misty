@@ -8,7 +8,7 @@ export type ItemVisibility = "public" | "private";
 
 /** The Space items with a private/public toggle. Channels, threads and DMs have none. */
 export type VisibilityItemKind =
-  "note" | "drawing" | "deck" | "workbook" | "library_item" | "agent";
+  "note" | "library_item" | "agent";
 
 /** Only the item's owner can flip it. */
 export async function setItemVisibility(

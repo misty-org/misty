@@ -19,6 +19,8 @@ export { useNativeSessionStore } from "./native-session";
 
 export { AccountSection } from "./settings/AccountSection";
 export { ServerSection } from "./settings/ServerSection";
+export { StatusSection } from "./settings/StatusSection";
+export { RequestsSection } from "./settings/RequestsSection";
 export { DevicePreferencesBridge } from "./DevicePreferencesBridge";
 export { accountResets, deviceDataErasers } from "./accountSeams";
 

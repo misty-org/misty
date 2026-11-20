@@ -70,6 +70,87 @@ pub fn cursor() -> Option<(f64, f64)> {
         }
     }
 }
+/// Whether the system is drawing the pointer now. Apps hide it while the person types or a video
+/// plays full screen, and Misty beside it hides with it.
+#[cfg(target_os = "macos")]
+pub fn cursor_shown() -> bool {
+    extern "C" {
+        /// CoreGraphics (linked in build.rs): whether the cursor is visible, as a boolean_t.
+        fn CGCursorIsVisible() -> u32;
+    }
+    // SAFETY: a plain query with no arguments.
+    unsafe { CGCursorIsVisible() != 0 }
+}
+#[cfg(windows)]
+pub fn cursor_shown() -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetCursorInfo, CURSORINFO, CURSOR_SHOWING};
+    // SAFETY: CURSORINFO is plain data, valid all zeros.
+    let mut info: CURSORINFO = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
+    // SAFETY: `info` is a live CURSORINFO with its size set, as the call requires.
+    if unsafe { GetCursorInfo(&mut info) } == 0 {
+        return true;
+    }
+    info.flags & CURSOR_SHOWING != 0
+}
+#[cfg(target_os = "linux")]
+pub fn cursor_shown() -> bool {
+    true
+}
+
+/// Whether the main mouse button is held down now: the person is dragging something.
+#[cfg(target_os = "macos")]
+pub fn button_held() -> bool {
+    extern "C" {
+        /// CoreGraphics (linked in build.rs): whether a mouse button is down in an event state.
+        fn CGEventSourceButtonState(state: i32, button: u32) -> bool;
+    }
+    // kCGEventSourceStateCombinedSessionState and kCGMouseButtonLeft.
+    // SAFETY: a plain query with no pointers.
+    unsafe { CGEventSourceButtonState(0, 0) }
+}
+#[cfg(windows)]
+pub fn button_held() -> bool {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+    // SAFETY: a plain query; the top bit is set while the key is down.
+    ((unsafe { GetAsyncKeyState(VK_LBUTTON as i32) } as u16) & 0x8000) != 0
+}
+#[cfg(target_os = "linux")]
+pub fn button_held() -> bool {
+    false
+}
+
+/// Lets one overlay window take the pointer (`over`), so Misty there can be clicked or have a
+/// file dropped on her, or hands it back to the app underneath.
+#[cfg(target_os = "macos")]
+pub fn take_pointer(window: &tauri::Window, over: bool) -> Result<(), String> {
+    window.set_ignore_cursor_events(!over).map_err(|e| e.to_string())
+}
+#[cfg(windows)]
+pub fn take_pointer(window: &tauri::Window, over: bool) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::*;
+    // Only the click-through bit changes: the overlay keeps never taking focus (WS_EX_NOACTIVATE),
+    // so a click on Misty leaves the person's app in front.
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as _;
+    // SAFETY: a live window handle; only its extended style changes.
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let next = if over {
+            style & !(WS_EX_TRANSPARENT as isize)
+        } else {
+            style | WS_EX_TRANSPARENT as isize
+        };
+        if next != style {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, next);
+        }
+    }
+    Ok(())
+}
+#[cfg(target_os = "linux")]
+pub fn take_pointer(_window: &tauri::Window, _over: bool) -> Result<(), String> {
+    Err("Misty can't take the pointer here.".into())
+}
+
 /// Control+Option for the agent at your cursor, through the shared global
 /// hotkey hook so dictation's chord can run beside it.
 pub fn shortcut(tx: Sender<Shortcut>) {

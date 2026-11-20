@@ -32,14 +32,6 @@ export interface NewCodeSession {
   branch: string;
 }
 
-/** What opening the session's code room needs, for `createYjsProvider(…, "code-room", …)`. */
-export interface CodeSessionTicket {
-  ticket: string;
-  room: string;
-  url: string;
-  role: "editor" | "viewer";
-  expiresAt: string;
-}
 
 function codeSessionPath(spaceId: string, sessionId?: string): string {
   const base = `/spaces/${encodeURIComponent(spaceId)}/code-sessions`;
@@ -63,10 +55,5 @@ export const codeSessionsApi = {
     spaceRequest<CodeSession>(`${codeSessionPath(spaceId, sessionId)}/end`, {
       method: "POST",
       body: JSON.stringify({ outcome }),
-    }),
-  /** A single-use ticket for the session's code room; 404 once it has ended. */
-  collaborationTicket: (spaceId: string, sessionId: string) =>
-    spaceRequest<CodeSessionTicket>(`${codeSessionPath(spaceId, sessionId)}/collaboration-ticket`, {
-      method: "POST",
     }),
 };

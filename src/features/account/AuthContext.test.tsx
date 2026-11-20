@@ -83,7 +83,6 @@ const mocks = vi.hoisted(() => {
     signOut: vi.fn().mockResolvedValue(undefined),
     resetSpacesAccountState: vi.fn(),
     resetAgentAccountState: vi.fn(),
-    resetNotesAccountState: vi.fn(),
   };
 });
 vi.mock("./sessions/useAccountStore", () => ({
@@ -160,10 +159,6 @@ vi.mock("@/features/agents", async (importOriginal) => ({
     void mocks.agentRefresh();
   },
 }));
-vi.mock("@/features/spaces/journal/notes", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  resetNotesAccountState: mocks.resetNotesAccountState,
-}));
 describe("AuthProvider account switching", () => {
   let container: HTMLDivElement;
   let root: Root | undefined;
@@ -215,7 +210,6 @@ describe("AuthProvider account switching", () => {
     mocks.userStore.clear.mockClear();
     mocks.resetSpacesAccountState.mockClear();
     mocks.resetAgentAccountState.mockClear();
-    mocks.resetNotesAccountState.mockClear();
     auth = null;
     container = document.createElement("div");
     document.body.append(container);

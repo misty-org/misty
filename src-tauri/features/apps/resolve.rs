@@ -1,0 +1,592 @@
+//! A GitHub link pasted to add an app to a Space, turned into the app's pinned build. Misty looks, in order, for:
+//!
+//! 1. Misty's reviewed catalog (`misty-apps`, a copy of which Misty ships): an entry for that repository is the
+//!    listed app, already pinned and checked. `misty-apps` builds it from the maker's own `misty-app.json` when
+//!    the repository has one, so a maker's manifest wins there too.
+//! 2. The maker's own `misty-app.json` at the top of the repository: the maker did the integration. The app is
+//!    unlisted until it is reviewed into the catalog.
+//! 3. The basic check: an OSI open-source license and a web build (a `.zip` with "web" in its name) in the
+//!    repository's latest release. The app is added at level 0, wrapped by Misty with its Space-files shim.
+//!
+//! Whatever the path, the build is the maker's own release, pinned to the checksum GitHub reports for it; nothing of
+//! the maker's is hosted by Misty. Whether the page boots under the sandbox is the last part of the check, seen the
+//! first time the app opens.
+
+use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use super::manifest::{valid_id, valid_version, AppManifest};
+
+/// The licenses an app may carry, as GitHub names them (SPDX). All are approved by the Open Source Initiative;
+/// source-available licenses (BUSL, SSPL, Elastic, Commons Clause) aren't among them.
+const OPEN_SOURCE_LICENSES: &[&str] = &[
+    "0BSD",
+    "AFL-3.0",
+    "AGPL-3.0",
+    "Apache-2.0",
+    "Artistic-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSD-3-Clause-Clear",
+    "BSL-1.0",
+    "ECL-2.0",
+    "EPL-1.0",
+    "EPL-2.0",
+    "EUPL-1.1",
+    "EUPL-1.2",
+    "GPL-2.0",
+    "GPL-3.0",
+    "ISC",
+    "LGPL-2.1",
+    "LGPL-3.0",
+    "LPPL-1.3c",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "MS-PL",
+    "MS-RL",
+    "MulanPSL-2.0",
+    "NCSA",
+    "OFL-1.1",
+    "OSL-3.0",
+    "PostgreSQL",
+    "UPL-1.0",
+    "Unlicense",
+    "Zlib",
+];
+
+/// The catalog Misty carries with its release (a copy of misty-apps').
+const CATALOG: &str = include_str!("../../../src/features/spaces/apps/catalog.json");
+
+/// The most a maker's `misty-app.json` may be.
+const MAX_REPO_MANIFEST_BYTES: usize = 64 << 10;
+
+/// An app as a Space adds it: the same entry the catalog holds for a listed app, pinned to the maker's release.
+/// Fields Misty doesn't read are carried through as they are.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AppEntry {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub maker: String,
+    /// The maker's repository, `owner/name`.
+    pub upstream: String,
+    pub license: String,
+    pub version: String,
+    pub tag: String,
+    /// The maker's own release zip.
+    pub url: String,
+    /// The checksum of that zip as GitHub reports it.
+    pub sha256: String,
+    pub size: u64,
+    /// The maker's own icon, in their repository, or their GitHub picture when the app names none.
+    pub logo: String,
+    pub permissions: Vec<String>,
+    /// The manifest Misty writes around the release: everything but `id` and `version`.
+    pub manifest: Value,
+    #[serde(default)]
+    pub add_copies: Vec<Value>,
+    #[serde(default)]
+    pub strip_top: bool,
+    #[serde(default)]
+    pub auto_top: bool,
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, Value>,
+}
+
+/// Where an app's entry came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ManifestFrom {
+    /// Misty's reviewed catalog.
+    Reviewed,
+    /// The maker's own `misty-app.json`.
+    Maker,
+    /// Misty's basic check, with no manifest from anyone.
+    Basic,
+}
+
+/// What a pasted link resolved to.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "result", rename_all = "lowercase")]
+pub enum Resolved {
+    /// The app can be added. `listed` is whether it is in Misty's reviewed catalog.
+    App { repo: String, listed: bool, manifest_from: ManifestFrom, entry: AppEntry },
+    /// It can't, and why, in words for the mod.
+    Incompatible { repo: String, reason: String },
+}
+
+/// The maker's `misty-app.json`: the same shape as an app's file in misty-apps (`apps/<id>.json`).
+#[derive(Debug, Clone, Deserialize)]
+struct RepoManifest {
+    #[serde(default)]
+    id: Option<String>,
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    maker: Option<String>,
+    /// The release asset with the web build, `{version}` standing for the release's version.
+    web_asset: String,
+    /// The app's icon, a path in the repository.
+    #[serde(default)]
+    icon: Option<String>,
+    manifest: serde_json::Map<String, Value>,
+    #[serde(default)]
+    add_copies: Vec<Value>,
+    #[serde(default)]
+    strip_top: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct Catalog {
+    apps: Vec<AppEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Repo {
+    name: String,
+    owner: Owner,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    license: Option<RepoLicense>,
+    #[serde(default)]
+    archived: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct Owner {
+    login: String,
+    #[serde(default)]
+    avatar_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RepoLicense {
+    #[serde(default)]
+    spdx_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Release {
+    tag_name: String,
+    #[serde(default)]
+    draft: bool,
+    #[serde(default)]
+    prerelease: bool,
+    #[serde(default)]
+    assets: Vec<Asset>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct Asset {
+    name: String,
+    browser_download_url: String,
+    size: u64,
+    #[serde(default)]
+    digest: Option<String>,
+}
+
+/// `owner/name` from a pasted link: `https://github.com/owner/name`, with or without the scheme, `.git` or a
+/// path after it, or `owner/name` alone.
+pub fn repo_of(link: &str) -> Option<(String, String)> {
+    let trimmed = link.trim().trim_end_matches('/');
+    let rest = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))
+        .unwrap_or(trimmed);
+    let rest = rest.strip_prefix("www.").unwrap_or(rest);
+    let path = match rest.strip_prefix("github.com/") {
+        Some(path) => path,
+        None if !rest.contains('.') || rest.matches('/').count() == 1 => rest,
+        None => return None,
+    };
+    let mut parts = path.split('/');
+    let owner = parts.next()?.to_owned();
+    let name = parts.next()?.trim_end_matches(".git").to_owned();
+    let part_ok = |part: &str| {
+        !part.is_empty()
+            && part.len() <= 100
+            && part != "."
+            && part != ".."
+            && part.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+    };
+    (part_ok(&owner) && part_ok(&name)).then_some((owner, name))
+}
+
+/// The catalog's entry for a repository, matched without regard to case as GitHub does.
+fn reviewed_in(catalog: &str, repo: &str) -> Result<Option<AppEntry>, String> {
+    let catalog: Catalog =
+        serde_json::from_str(catalog).map_err(|error| format!("Misty's app catalog isn't valid: {error}"))?;
+    Ok(catalog.apps.into_iter().find(|app| app.upstream.eq_ignore_ascii_case(repo)))
+}
+
+/// An app id made from a repository's name: lowercase letters, digits and hyphens, starting with a letter.
+fn id_from(name: &str) -> String {
+    let mut id: String = name
+        .to_ascii_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    while id.contains("--") {
+        id = id.replace("--", "-");
+    }
+    let mut id = id.trim_matches('-').to_owned();
+    if !id.starts_with(|c: char| c.is_ascii_lowercase()) {
+        id = format!("app-{id}");
+    }
+    id.truncate(63);
+    let id = id.trim_end_matches('-').to_owned();
+    if id.len() < 2 { "app".to_owned() } else { id }
+}
+
+/// A release's version: its tag without a leading `v`.
+fn version_of(tag: &str) -> String {
+    tag.strip_prefix('v').unwrap_or(tag).to_owned()
+}
+
+/// The web build in a release when nothing names it: one `.zip` with "web" in its name.
+fn web_asset_of(assets: &[Asset]) -> Option<&Asset> {
+    let mut web = assets.iter().filter(|asset| {
+        let name = asset.name.to_ascii_lowercase();
+        name.ends_with(".zip") && name.contains("web")
+    });
+    let first = web.next()?;
+    web.next().is_none().then_some(first)
+}
+
+/// The SHA-256 GitHub reports for an asset, as 64 hex digits.
+fn sha256_of(asset: &Asset) -> Option<String> {
+    let digest = asset.digest.as_deref()?.strip_prefix("sha256:")?;
+    (digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit())).then(|| digest.to_ascii_lowercase())
+}
+
+fn open_source(spdx: Option<&str>) -> Option<String> {
+    let spdx = spdx?;
+    OPEN_SOURCE_LICENSES.iter().any(|known| known.eq_ignore_ascii_case(spdx)).then(|| spdx.to_owned())
+}
+
+/// The entry for an app from its repository, release and (optionally) its maker's manifest. The manifest Misty
+/// writes is checked here as the install would check it, so a link that can't install is said so at once.
+fn entry_from(
+    repo: &Repo,
+    release: &Release,
+    maker_manifest: Option<RepoManifest>,
+) -> Result<(AppEntry, ManifestFrom), String> {
+    let upstream = format!("{}/{}", repo.owner.login, repo.name);
+    let license = open_source(repo.license.as_ref().and_then(|license| license.spdx_id.as_deref())).ok_or_else(|| {
+        "Its license isn't an open-source one GitHub recognizes, so Misty can't add it.".to_owned()
+    })?;
+    if release.draft || release.prerelease {
+        return Err("Its latest release is a draft or a pre-release.".into());
+    }
+    let version = version_of(&release.tag_name);
+    if !valid_version(&version) {
+        return Err("Its latest release's tag isn't a version Misty can name a folder after.".into());
+    }
+    let raw = format!("https://raw.githubusercontent.com/{upstream}/{}", release.tag_name);
+    let picture = repo.owner.avatar_url.clone().unwrap_or_else(|| format!("https://github.com/{}.png", repo.owner.login));
+    let (from, id, name, description, maker, asset, logo, mut manifest, add_copies, strip_top, auto_top) =
+        match maker_manifest {
+            Some(theirs) => {
+                let file = theirs.web_asset.replace("{version}", &version);
+                let asset = release
+                    .assets
+                    .iter()
+                    .find(|asset| asset.name == file)
+                    .ok_or_else(|| format!("Its latest release has no {file}, which its misty-app.json names."))?;
+                let logo = theirs.icon.as_deref().map_or(picture, |icon| format!("{raw}/{icon}"));
+                (
+                    ManifestFrom::Maker,
+                    theirs.id.unwrap_or_else(|| id_from(&repo.name)),
+                    theirs.name,
+                    theirs.description,
+                    theirs.maker.unwrap_or_else(|| repo.owner.login.clone()),
+                    asset.clone(),
+                    logo,
+                    theirs.manifest,
+                    theirs.add_copies,
+                    theirs.strip_top,
+                    false,
+                )
+            }
+            None => {
+                let asset = web_asset_of(&release.assets).ok_or_else(|| {
+                    "There's no web build in its latest release: Misty looks for one .zip with \"web\" in its name."
+                        .to_owned()
+                })?;
+                // Level 0: Misty's wrapper only, the app on its own origin, its Open and Save reaching the Space's
+                // Files through the shim. It reaches no host: a manifest from its maker or a review says which.
+                let manifest = json!({
+                    "name": repo.name,
+                    "logo": "logo.png",
+                    "entry": "index.html",
+                    "own_origin": true,
+                    "shim": true,
+                    "permissions": ["files"],
+                })
+                .as_object()
+                .cloned()
+                .unwrap_or_default();
+                (
+                    ManifestFrom::Basic,
+                    id_from(&repo.name),
+                    repo.name.clone(),
+                    repo.description.clone(),
+                    repo.owner.login.clone(),
+                    asset.clone(),
+                    picture,
+                    manifest,
+                    Vec::new(),
+                    false,
+                    true,
+                )
+            }
+        };
+    if !valid_id(&id) {
+        return Err("The app's id isn't one Misty can use.".into());
+    }
+    let sha256 = sha256_of(&asset).ok_or_else(|| format!("GitHub reports no checksum for {}.", asset.name))?;
+    if !asset.browser_download_url.starts_with(&format!("https://github.com/{upstream}/releases/download/")) {
+        return Err("Its web build isn't one of its own release's files.".into());
+    }
+    manifest.insert("license".into(), Value::String(license.clone()));
+    // Checked as the install will check it: the manifest Misty writes, with this id and version.
+    let mut checked = manifest.clone();
+    checked.insert("id".into(), Value::String(id.clone()));
+    checked.insert("version".into(), Value::String(version.clone()));
+    let parsed = AppManifest::parse(Value::Object(checked).to_string().as_bytes())?;
+    let permissions = parsed
+        .permissions
+        .iter()
+        .map(|permission| {
+            serde_json::to_value(permission).ok().and_then(|value| value.as_str().map(str::to_owned)).unwrap_or_default()
+        })
+        .collect();
+    let entry = AppEntry {
+        id,
+        name,
+        description,
+        maker,
+        upstream,
+        license,
+        version,
+        tag: release.tag_name.clone(),
+        url: asset.browser_download_url,
+        sha256,
+        size: asset.size,
+        logo,
+        permissions,
+        manifest: Value::Object(manifest),
+        add_copies,
+        strip_top,
+        auto_top,
+        extra: serde_json::Map::new(),
+    };
+    Ok((entry, from))
+}
+
+fn client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("Misty")
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|error| error.to_string())
+}
+
+/// Reads one of GitHub's answers: `None` when there's nothing there.
+async fn get_json<T: serde::de::DeserializeOwned>(client: &reqwest::Client, url: &str) -> Result<Option<T>, String> {
+    let response = client
+        .get(url)
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|_| "Misty couldn't reach GitHub. Check your connection and try again.".to_owned())?;
+    match response.status().as_u16() {
+        404 => Ok(None),
+        403 | 429 => Err("GitHub is limiting how often Misty asks. Try again in a few minutes.".into()),
+        status if !(200..300).contains(&status) => Err(format!("GitHub answered {status}. Try again later.")),
+        _ => response
+            .json::<T>()
+            .await
+            .map(Some)
+            .map_err(|_| "GitHub's answer wasn't what Misty expected.".to_owned()),
+    }
+}
+
+/// The maker's `misty-app.json` at the top of the repository's default branch, if there is one.
+async fn maker_manifest(client: &reqwest::Client, upstream: &str) -> Result<Option<RepoManifest>, String> {
+    let url = format!("https://raw.githubusercontent.com/{upstream}/HEAD/misty-app.json");
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|_| "Misty couldn't reach GitHub. Check your connection and try again.".to_owned())?;
+    if response.status().as_u16() == 404 {
+        return Ok(None);
+    }
+    if !response.status().is_success() {
+        return Err(format!("GitHub answered {} for its misty-app.json. Try again later.", response.status().as_u16()));
+    }
+    let bytes = response.bytes().await.map_err(|_| "Misty couldn't read its misty-app.json.".to_owned())?;
+    if bytes.len() > MAX_REPO_MANIFEST_BYTES {
+        return Err("Its misty-app.json is too large.".into());
+    }
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .map_err(|error| format!("Its misty-app.json isn't valid: {error}"))
+}
+
+/// Resolves a pasted link (see the module's doc).
+pub async fn resolve(link: &str) -> Result<Resolved, String> {
+    let (owner, name) = repo_of(link).ok_or_else(|| "That isn't a link to a GitHub repository.".to_owned())?;
+    let asked = format!("{owner}/{name}");
+    if let Some(entry) = reviewed_in(CATALOG, &asked)? {
+        return Ok(Resolved::App { repo: entry.upstream.clone(), listed: true, manifest_from: ManifestFrom::Reviewed, entry });
+    }
+    let client = client()?;
+    let Some(repo) = get_json::<Repo>(&client, &format!("https://api.github.com/repos/{asked}")).await? else {
+        return Ok(Resolved::Incompatible { repo: asked, reason: "There's no public repository at that link.".into() });
+    };
+    let upstream = format!("{}/{}", repo.owner.login, repo.name);
+    // A link may use another case or an old name: the catalog is matched again under the repository's own.
+    if let Some(entry) = reviewed_in(CATALOG, &upstream)? {
+        return Ok(Resolved::App { repo: upstream, listed: true, manifest_from: ManifestFrom::Reviewed, entry });
+    }
+    if repo.archived {
+        return Ok(Resolved::Incompatible { repo: upstream, reason: "The repository is archived.".into() });
+    }
+    let theirs = match maker_manifest(&client, &upstream).await {
+        Ok(found) => found,
+        Err(reason) => return Ok(Resolved::Incompatible { repo: upstream, reason }),
+    };
+    let Some(release) =
+        get_json::<Release>(&client, &format!("https://api.github.com/repos/{upstream}/releases/latest")).await?
+    else {
+        return Ok(Resolved::Incompatible { repo: upstream, reason: "It has no release to add.".into() });
+    };
+    Ok(match entry_from(&repo, &release, theirs) {
+        Ok((entry, manifest_from)) => Resolved::App { repo: upstream, listed: false, manifest_from, entry },
+        Err(reason) => Resolved::Incompatible { repo: upstream, reason },
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn repo(license: &str) -> Repo {
+        serde_json::from_value(json!({
+            "name": "Sketch_Pad",
+            "owner": { "login": "maker", "avatar_url": "https://avatars.example/maker" },
+            "description": "Draw together",
+            "license": { "spdx_id": license },
+        }))
+        .unwrap()
+    }
+
+    fn release(assets: Value) -> Release {
+        serde_json::from_value(json!({ "tag_name": "v1.2.0", "assets": assets })).unwrap()
+    }
+
+    fn asset(name: &str) -> Value {
+        json!({
+            "name": name,
+            "browser_download_url": format!("https://github.com/maker/Sketch_Pad/releases/download/v1.2.0/{name}"),
+            "size": 10,
+            "digest": format!("sha256:{}", "a".repeat(64)),
+        })
+    }
+
+    #[test]
+    fn links_name_a_repository() {
+        for link in [
+            "https://github.com/maker/sketch",
+            "github.com/maker/sketch",
+            "https://github.com/maker/sketch.git",
+            "https://github.com/maker/sketch/tree/main/src",
+            "maker/sketch",
+            " https://www.github.com/maker/sketch/ ",
+        ] {
+            assert_eq!(repo_of(link), Some(("maker".into(), "sketch".into())), "{link}");
+        }
+        for link in ["https://gitlab.com/maker/sketch", "maker", "https://github.com/maker", "maker/../x", ""] {
+            assert_eq!(repo_of(link), None, "{link}");
+        }
+    }
+
+    #[test]
+    fn ids_are_made_from_the_repository_name() {
+        assert_eq!(id_from("Sketch_Pad"), "sketch-pad");
+        assert_eq!(id_from("3d-viewer"), "app-3d-viewer");
+        assert_eq!(id_from("--a--b--"), "a-b");
+        assert!(valid_id(&id_from(&"x".repeat(200))));
+    }
+
+    #[test]
+    fn the_basic_check_needs_an_open_source_license_and_one_web_build() {
+        let (entry, from) = entry_from(&repo("MIT"), &release(json!([asset("sketch-web-1.2.0.zip")])), None).unwrap();
+        assert_eq!(from, ManifestFrom::Basic);
+        assert_eq!((entry.id.as_str(), entry.version.as_str()), ("sketch-pad", "1.2.0"));
+        assert_eq!(entry.sha256, "a".repeat(64));
+        assert!(entry.auto_top && !entry.strip_top);
+        assert_eq!(entry.manifest["shim"], json!(true));
+        assert_eq!(entry.manifest["license"], json!("MIT"));
+        assert_eq!(entry.logo, "https://avatars.example/maker");
+
+        let refused = [
+            entry_from(&repo("BUSL-1.1"), &release(json!([asset("sketch-web.zip")])), None),
+            entry_from(&repo("NOASSERTION"), &release(json!([asset("sketch-web.zip")])), None),
+            entry_from(&repo("MIT"), &release(json!([asset("sketch-mac.dmg")])), None),
+            entry_from(&repo("MIT"), &release(json!([asset("a-web.zip"), asset("b-web.zip")])), None),
+            entry_from(&repo("MIT"), &release(json!([{ "name": "s-web.zip", "browser_download_url": "https://github.com/maker/Sketch_Pad/releases/download/v1.2.0/s-web.zip", "size": 1 }])), None),
+            entry_from(&repo("MIT"), &release(json!([{ "name": "s-web.zip", "browser_download_url": "https://evil.example/s-web.zip", "size": 1, "digest": format!("sha256:{}", "a".repeat(64)) }])), None),
+        ];
+        for result in refused {
+            assert!(result.is_err(), "{result:?}");
+        }
+    }
+
+    #[test]
+    fn a_makers_manifest_names_its_build_and_is_checked_as_the_install_would() {
+        let theirs: RepoManifest = serde_json::from_value(json!({
+            "name": "Sketch",
+            "web_asset": "sketch-web-{version}.zip",
+            "icon": "icons/sketch.png",
+            "manifest": {
+                "name": "Sketch", "logo": "logo.png", "entry": "index.html", "permissions": ["files", "rooms"],
+                "collab": "room", "network": [{ "host": "api.sketch.example", "paid": true }]
+            },
+        }))
+        .unwrap();
+        let (entry, from) =
+            entry_from(&repo("Apache-2.0"), &release(json!([asset("sketch-web-1.2.0.zip")])), Some(theirs.clone())).unwrap();
+        assert_eq!(from, ManifestFrom::Maker);
+        assert_eq!(entry.permissions, vec!["files".to_owned(), "rooms".to_owned()]);
+        assert_eq!(entry.logo, "https://raw.githubusercontent.com/maker/Sketch_Pad/v1.2.0/icons/sketch.png");
+        assert!(entry_from(&repo("MIT"), &release(json!([asset("other.zip")])), Some(theirs.clone())).is_err());
+        let mut broken = theirs;
+        broken.manifest.insert("entry".into(), json!("../index.html"));
+        assert!(entry_from(&repo("MIT"), &release(json!([asset("sketch-web-1.2.0.zip")])), Some(broken)).is_err());
+    }
+
+    #[test]
+    fn a_reviewed_app_is_found_by_its_repository() {
+        let catalog = json!({ "apps": [{
+            "id": "sketch", "name": "Sketch", "maker": "maker", "upstream": "Maker/Sketch", "license": "MIT",
+            "version": "1.0.0", "tag": "v1.0.0", "url": "https://github.com/Maker/Sketch/releases/download/v1.0.0/s.zip",
+            "sha256": "a".repeat(64), "size": 1, "logo": "x", "permissions": [], "manifest": {}, "mcp_program": { "program": "p" }
+        }] })
+        .to_string();
+        let found = reviewed_in(&catalog, "maker/sketch").unwrap().unwrap();
+        assert_eq!(found.id, "sketch");
+        // What Misty doesn't read is carried through.
+        assert!(found.extra.contains_key("mcp_program"));
+        assert!(reviewed_in(&catalog, "maker/other").unwrap().is_none());
+    }
+}

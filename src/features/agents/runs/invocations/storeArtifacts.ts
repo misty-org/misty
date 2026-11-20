@@ -41,7 +41,6 @@ export function artifactActions(
           artifact.id,
           "accept",
           artifact.idempotencyKey,
-          artifact.kind === "task_set" ? artifact.operations : undefined,
         );
         if (response.applyMode === "client") {
           if (!adapter.applyArtifact || adapter.canApply?.(artifact) === false) {

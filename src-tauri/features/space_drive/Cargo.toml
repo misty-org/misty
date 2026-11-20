@@ -1,0 +1,81 @@
+[package]
+name = "space_drive"
+version = "0.1.0"
+description = "Each Space mounted on the computer as a drive: the sync core, with no Tauri of its own"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "space_drive"
+path = "src/lib.rs"
+
+[dependencies]
+# Every file this crate touches goes through Misty's file gate.
+file_access = { path = "../file_access" }
+bytes = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Three-way merges of text files saved against an older version (MIT/Apache-2.0).
+diffy = "0.5.2"
+futures-util = { version = "0.3", features = ["sink"] }
+hex = "0.4"
+# ripgrep's walker and gitignore matcher (MIT/Unlicense), as spaces_folders uses it.
+ignore = "0.4"
+percent-encoding = "2"
+rand = "0.8"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "1"
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
+# Names are kept in NFC, as the server keeps them (MIT/Apache-2.0).
+unicode-normalization = "0.1"
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The Linux face: a FUSE file system in user space (MIT). Without libfuse it mounts through the
+# `fusermount3` helper that Misty's packages depend on (`fuse3`), so building needs no C headers.
+fuser = { version = "0.15", default-features = false }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# The Misty side of the File Provider extension: domains, signals and the user-visible folder
+# (MIT/Apache-2.0/Zlib), and the app group read from Misty's own entitlements.
+objc2 = "0.6.4"
+block2 = "0.6.2"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSError", "NSString", "NSURL", "NSObject"] }
+objc2-file-provider = "0.3.2"
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+# The open-file check through the Restart Manager, which needs no admin (MIT/Apache-2.0).
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_RestartManager"] }
+# The Windows face (MIT/Apache-2.0): Cloud Files placeholders and callbacks, and the WinRT
+# registration that gives each Space its place in Explorer. The same version the app already uses.
+windows = { version = "0.61", features = [
+    "Foundation",
+    "Security_Cryptography",
+    "Storage",
+    "Storage_Provider",
+    "Storage_Search",
+    "Storage_Streams",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_CloudFilters",
+    "Win32_Storage_FileSystem",
+    "Win32_System_CorrelationVector",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+file_access = { path = "../file_access", features = ["test-fixtures"] }
+# Randomized many-computer runs against a fake server (MIT/Apache-2.0).
+proptest = "1"
+tempfile = "3"
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "time", "test-util"] }

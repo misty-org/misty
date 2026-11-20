@@ -1,19 +1,13 @@
 import {
   Armchair,
   CodeXml,
-  CalendarDays,
-  CalendarPlus,
-  Clapperboard,
   GraduationCap,
-  KanbanSquare,
-  ListPlus,
   MessagesSquare,
   NotebookPen,
   FlaskConical,
   Galaxy,
   Plus,
   Settings,
-  SquarePen,
   TerminalSquare,
   type LucideIcon,
 } from "lucide-react";
@@ -36,15 +30,8 @@ import {
 } from "@/features/agents";
 import { useCommands } from "@/features/commands";
 import { openSettings, searchSettings } from "@/features/settings";
-import {
-  createSpaceEvent,
-  createSpaceNote,
-  createSpaceTask,
-  kindIcon,
-  useSpaceGallery,
-  useWindowSpace,
-} from "@/features/spaces";
-import { itemToneClass, spaceMadeKinds } from "@misty/ui";
+import { kindIcon, useSpaceGallery, useWindowSpace } from "@/features/spaces";
+import { itemToneClass, spaceIcons } from "@misty/ui";
 import { agentChatRoute } from "../spaceNavigation";
 import { excerpt, fieldScore, matchScore, rank } from "./searchRank";
 import { useSearchUses } from "./searchStore";
@@ -60,15 +47,7 @@ const pages: { label: string; icon: LucideIcon; route(base: string): string; spa
   { label: "Code", icon: CodeXml, route: () => "/agents?view=code" },
   { label: "Lab", icon: FlaskConical, route: (base) => `${base}/lab`, space: true },
   { label: "Chat", icon: MessagesSquare, route: (base) => `${base}/chat`, space: true },
-  ...spaceMadeKinds.map((made) => ({
-    label: made.page,
-    icon: made.pageIcon,
-    route: (base: string) => `${base}/${made.section}`,
-    space: true,
-  })),
-  { label: "Planner", icon: KanbanSquare, route: (base) => `${base}/planner`, space: true },
-  { label: "Calendar", icon: CalendarDays, route: (base) => `${base}/calendar`, space: true },
-  { label: "Media", icon: Clapperboard, route: (base) => `${base}/media`, space: true },
+  { label: "Files", icon: spaceIcons.files, route: (base) => `${base}/files`, space: true },
 ];
 
 /** How the order weighs a kind's match against the others'. */
@@ -77,13 +56,6 @@ const weights: Record<string, number> = {
   "Go to": 1.3,
   Chats: 1.2,
   Agents: 1.1,
-  Notes: 1.1,
-  Docs: 1.1,
-  Slides: 1.1,
-  Data: 1.1,
-  Whiteboards: 1.1,
-  Tasks: 1.1,
-  Events: 1,
   Space: 1,
   Files: 0.9,
   Settings: 0.9,
@@ -114,7 +86,7 @@ interface SearchResults {
 
 /**
  * Everything ⌘K search can find, for what was typed: the person's chats (by their text too),
- * agents, the Space's notes, messages, tasks, events and files, the notebooks and lessons,
+ * agents, the Space's messages, notebooks and files, the lessons,
  * apps to connect, settings, commands and pages. What lives on this computer is matched here;
  * Space content is searched by the server; engines' own histories by native code.
  */
@@ -186,7 +158,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
     }
 
     for (const chat of conversations) {
-      if (!chat.messages.length || chat.place === "studio") continue;
+      if (!chat.messages.length || chat.place) continue;
       if (lessons[chat.id] || tutorMade.has(chat.id)) continue;
       const agent = agentOf(chat.agentId);
       if (!agent) continue;
@@ -360,7 +332,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
   // What the typed text asks to do, above what it finds.
   const actions = useMemo(() => {
     const hits: SearchHit[] = [];
-    const { ask, create } = query;
+    const { ask } = query;
     const askAgent = ask ? agents.find((agent) => agent.id === ask.agentId) : undefined;
     const send = (agentId: string, prompt: string) => async () => {
       const id = await askInNewChat(agentId, prompt);
@@ -378,24 +350,6 @@ export function useSearchHits(context: SearchContext): SearchResults {
           ? send(askAgent.id, ask!.prompt)
           : () => openRoute(agentChatRoute(askAgent.id, undefined, true)),
       });
-      return hits;
-    }
-    const makers = {
-      note: { icon: SquarePen, label: "doc", make: createSpaceNote },
-      task: { icon: ListPlus, label: "task", make: createSpaceTask },
-      event: { icon: CalendarPlus, label: "event", make: createSpaceEvent },
-    } as const;
-    const make = (what: keyof typeof makers, title: string): SearchHit => ({
-      id: `action:new-${what}`,
-      kind: "space",
-      group: "Actions",
-      title: `New ${makers[what].label}: ${title}`,
-      icon: icon(makers[what].icon),
-      match: create ? 10 : 0.5,
-      open: async () => openRoute(await makers[what].make(spaceId, title)),
-    });
-    if (create && spaceId) {
-      hits.push(make(create.what, create.title));
       return hits;
     }
     if (!words) {
@@ -421,10 +375,8 @@ export function useSearchHits(context: SearchContext): SearchResults {
         match: 0.6,
         open: send(defaultAgent.id, words),
       });
-    if (spaceId)
-      for (const what of ["note", "task", "event"] as const) hits.push(make(what, words));
     return hits;
-  }, [query, words, agents, defaultAgent, spaceId, openRoute, context.onNewChat]);
+  }, [query, words, agents, defaultAgent, openRoute, context.onNewChat]);
 
   const hits = useMemo(() => {
     const now = Date.now();

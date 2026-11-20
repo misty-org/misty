@@ -156,5 +156,6 @@ midscene_run/
 
 # Tauri generates one permission file per app command at build.
 src-tauri/permissions/
-apps/*/node_modules
-apps/*/dist
+
+# Local HTML mockups: never pushed.
+mockups/

@@ -7,6 +7,7 @@ import {
   Pin,
   ScrollText,
   SquareTerminal,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -22,6 +23,7 @@ import {
 import { useContextPanel, type ContextPanelSurface } from "./contextPanelStore";
 import { chatKey } from "../conversations/state/draftChat";
 import { closeBrowserLog, useBrowserLog } from "../browser-log/browserLogStore";
+import { AgentProfileCard } from "./AgentProfileCard";
 
 const AgentContextPanel = lazyTool(async () => ({
   default: (await import("./AgentContextPanel")).AgentContextPanel,
@@ -37,6 +39,7 @@ const surfaces: Record<ContextPanelSurface | "browser", [name: string, icon: Luc
   changes: ["Changes", GitCompareArrows],
   files: ["Files", FolderTree],
   terminal: ["Terminal", SquareTerminal],
+  profile: ["Profile", UserRound],
 };
 
 /**
@@ -105,7 +108,10 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
     : ["", Globe];
   return (
     <>
-      {surface ? (
+      {surface === "profile" ? (
+        // The profile is a narrow card only as tall as it needs, as Discord's beside a DM.
+        <AgentProfileCard agent={props.agent} onClose={() => panel.close()} />
+      ) : surface ? (
         <SidePanel
           label={name}
           name={name}

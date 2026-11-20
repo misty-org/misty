@@ -10,7 +10,7 @@ describe("Misty activity phrases", () => {
       initialProps: { activity: undefined as string | undefined },
     });
     expect(result.current).toBe("Thinking");
-    rerender({ activity: "using_note.read" });
-    expect(result.current).toBe("Reading your notes");
+    rerender({ activity: "using_file.read" });
+    expect(result.current).toBe("Searching your files");
   });
 });

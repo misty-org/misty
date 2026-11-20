@@ -1,8 +1,7 @@
-import { MistyFilePicker } from "@/features/files";
+import { FilePickerDialog } from "../../apps/file-picker/FilePickerDialog";
 
 import { useSpaceLibraryContext } from "../SpaceLibraryContext";
 import { SpaceLibraryDialogs } from "../SpaceLibraryDialogs";
-import { libraryItemOpensInEditor } from "../SpaceLibraryViewer";
 import { openLibraryItem, SpaceLibraryItemViewer } from "./SpaceLibraryItemViewer";
 import { LibraryItemContextMenu } from "./LibraryItemContextMenu";
 import { useLibraryItemMenuActions } from "./useLibraryItemMenuActions";
@@ -11,7 +10,6 @@ export function SpaceLibraryOverlays() {
   const { data, itemActions, collectionActions } = useSpaceLibraryContext();
   const {
     canUploadLibrary,
-    canEditLibrary,
     items,
     visibleItems,
     itemMenu,
@@ -57,25 +55,22 @@ export function SpaceLibraryOverlays() {
         />
       ) : null}
       {filePickerOpen && canUploadLibrary ? (
-        <MistyFilePicker
-          mode="file"
+        <FilePickerDialog
+          purpose="upload"
+          spaceId={data.spaceId}
           multiple
-          title="Add files to this Space"
           onCancel={() => setFilePickerOpen(false)}
-          onSelect={(path) => {
+          // The upload tray shows each file's progress, so the picker closes at once.
+          onPick={({ projectFiles, otherFiles }) => {
             setFilePickerOpen(false);
-            void uploadFiles([path]);
-          }}
-          onSelectMany={(paths) => {
-            setFilePickerOpen(false);
-            void uploadFiles(paths);
+            void uploadFiles([
+              ...projectFiles.map((path) => ({ path, from: "project" as const })),
+              ...otherFiles.map((path) => ({ path, from: "picked" as const })),
+            ]);
           }}
         />
       ) : null}
-      {/* Photos and videos open in their editors in the page itself (SpaceLibrary). */}
-      {opened && !libraryItemOpensInEditor(opened, canEditLibrary) ? (
-        <SpaceLibraryItemViewer item={opened} />
-      ) : null}
+      {opened ? <SpaceLibraryItemViewer item={opened} /> : null}
       <SpaceLibraryDialogs
         metadata={{
           action: metadataDialogAction,

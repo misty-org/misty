@@ -6,10 +6,20 @@ export type Unsubscribe = () => void;
 /** What the host does for an app. A call that isn't supported throws `HostError("unsupported", …)`. */
 export interface HostHandlers {
   call(method: string, params: unknown): Promise<unknown>;
-  /** Starts a subscription. It sends the current value first, then each change, through `emit`. */
-  subscribe(topic: string, params: unknown, emit: (data: unknown) => void): Unsubscribe;
+  /**
+   * Starts a subscription. It sends the current value first, then each change, through `emit`, and calls `end`
+   * if it stops on its own (a room deleted or no longer reachable), with why.
+   */
+  subscribe(
+    topic: string,
+    params: unknown,
+    emit: (data: unknown) => void,
+    end: (error?: unknown) => void,
+  ): Unsubscribe;
   /** One JSON-RPC message the app's MCP server sent. */
   mcp?(message: unknown): void;
+  /** The app closed: let go of what it held (files it had open). */
+  dispose?(): void;
 }
 
 /** Native's check of a call before it runs. It rejects with the reason when the app may not. */
@@ -81,10 +91,36 @@ export function createHostChannel(options: {
         throw deny(error);
       });
       if (disposed || endedEarly.delete(id)) return;
-      const stop = handlers.subscribe(topic, params, (data) => {
-        if (subscriptions.has(id)) send({ t: "evt", id, data });
+      // Open from the start: a handler sends the current value first, before `subscribe` returns,
+      // so a check of `subscriptions` would drop it.
+      let open = true;
+      // The handler's own stop, called once: when the app unsubscribes, or after the handler ended it.
+      let stop: Unsubscribe | undefined;
+      const release = () => {
+        const run = stop;
+        stop = undefined;
+        run?.();
+      };
+      stop = handlers.subscribe(
+        topic,
+        params,
+        (data) => {
+          if (open) send({ t: "evt", id, data });
+        },
+        (error) => {
+          if (!open) return;
+          open = false;
+          subscriptions.delete(id);
+          send(error === undefined ? { t: "end", id } : { t: "end", id, error: toWireError(error) });
+          // Not from inside the handler's own callback; and if it ended before returning, once it has.
+          queueMicrotask(release);
+        },
+      );
+      if (!open) return;
+      subscriptions.set(id, () => {
+        open = false;
+        release();
       });
-      subscriptions.set(id, stop);
     } catch (error) {
       if (!endedEarly.delete(id)) send({ t: "end", id, error: toWireError(error) });
     } finally {
@@ -145,6 +181,7 @@ export function createHostChannel(options: {
       disposed = true;
       port.onmessage = null;
       port.close();
+      handlers.dispose?.();
     },
   };
 }

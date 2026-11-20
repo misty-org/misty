@@ -61,7 +61,7 @@ export function SpaceInvitationRedemption() {
     try {
       const space = await spacesApi.redeemInvitation(token);
       await loadSpaces();
-      navigate(`/spaces/${encodeURIComponent(space.id)}/notes`, { replace: true });
+      navigate(`/spaces/${encodeURIComponent(space.id)}`, { replace: true });
     } catch {
       setError(
         "Misty could not accept this invitation. Make sure you are signed in with the invited email.",

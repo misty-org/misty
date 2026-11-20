@@ -37,6 +37,8 @@ struct Data {
     task: String,
     presentation: Value,
     displays: Vec<Display>,
+    /// The overlay windows' own handles, so the window in front is never one of them.
+    overlays: Vec<isize>,
 }
 #[derive(Default)]
 pub struct CursorCompanionState {
@@ -46,6 +48,9 @@ pub struct CursorCompanionState {
     turn: AtomicU64,
     started: AtomicBool,
     capture: AtomicBool,
+    /// Whether the window in front fills its display (a full-screen app or video), read by the
+    /// sampler, so Misty steps out of the way there.
+    fullscreen: AtomicBool,
     /// Click positions leave the native hook only while a walkthrough step waits.
     watch_clicks: AtomicBool,
     click_turn: AtomicU64,
@@ -181,7 +186,7 @@ pub async fn cursor_companion_present(
         .lock()
         .map_err(|_| "Companion unavailable")?
         .presentation = presentation.clone();
-    let visible = presentation["visible"].as_bool().unwrap_or(false);
+    let visible = shown(&presentation);
     if visible && !OVERLAYS_WANTED.swap(true, Ordering::SeqCst) {
         rebuild(&app).await?;
     }
@@ -203,11 +208,8 @@ pub async fn cursor_companion_present(
                     let state = state.clone();
                     tauri::async_runtime::spawn(async move {
                         tokio::time::sleep(Duration::from_millis(400)).await;
-                        if current(&state, turn)
-                            && !state.data.lock().unwrap().presentation["visible"]
-                                .as_bool()
-                                .unwrap_or(false)
-                        {
+                        let still = shown(&state.data.lock().unwrap().presentation);
+                        if current(&state, turn) && !still {
                             if let Some(w) = app.get_webview_window(&label) {
                                 let _ = w.hide();
                             }
@@ -219,6 +221,48 @@ pub async fn cursor_companion_present(
         Ok(())
     })
     .await
+}
+/// Only an overlay window (one per display, `misty-cursor-<n>`) may ask for itself.
+fn require_overlay(webview: &Webview) -> Result<(), String> {
+    let overlay = webview
+        .label()
+        .strip_prefix(PREFIX)
+        .and_then(|id| id.parse::<u32>().ok())
+        .is_some();
+    if overlay {
+        Ok(())
+    } else {
+        Err("Only Tutor's overlay can ask for this.".into())
+    }
+}
+
+/// Lets this overlay take the pointer while the pointer is over Misty, so a click or a dropped
+/// file reaches her, or gives the pointer back to the app underneath (`over` false).
+#[tauri::command]
+pub fn cursor_companion_hit(webview: Webview, app: AppHandle, over: bool) -> Result<(), String> {
+    require_overlay(&webview)?;
+    if over {
+        ask::note_front(&app);
+    }
+    platform::take_pointer(&webview.window(), over)
+}
+
+/// Opens Tutor's text box beside the pointer, for a click on Misty.
+#[tauri::command]
+pub fn cursor_companion_ask_open(webview: Webview, app: AppHandle) -> Result<(), String> {
+    require_overlay(&webview)?;
+    let state = host_state(&app);
+    if state.enabled.load(Ordering::SeqCst) && !state.held.load(Ordering::SeqCst) {
+        ask::open(&app);
+    }
+    Ok(())
+}
+
+/// Whether the overlays are on screen: while Tutor shows something, and all the time while Misty
+/// sits beside the cursor (Settings › Tutor › Show Misty at the cursor). They never take clicks.
+pub(super) fn shown(presentation: &Value) -> bool {
+    presentation["visible"].as_bool().unwrap_or(false)
+        || presentation["sprite"].as_bool().unwrap_or(false)
 }
 #[tauri::command]
 pub fn cursor_companion_snapshot(webview: Webview, app: AppHandle) -> Result<Value, String> {

@@ -1,10 +1,8 @@
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use super::download::{checked, RemoteFile};
-use super::paths::{id, inside, relative, relative_text, sha256};
 use super::walk::{included_files, scan, sha256_file};
 
 fn write(root: &Path, path: &str, text: &str) {
@@ -106,76 +104,4 @@ fn hashes_a_file_in_chunks() {
         "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
     );
     assert_eq!((size, seen), (5, 5));
-}
-
-#[test]
-fn relative_paths_stay_inside() {
-    assert_eq!(relative("docs/notes.md").unwrap(), PathBuf::from("docs").join("notes.md"));
-    assert_eq!(relative(".env").unwrap(), PathBuf::from(".env"));
-    for bad in [
-        "",
-        "/etc/passwd",
-        "../up",
-        "docs/../../up",
-        "docs/./notes.md",
-        "docs//notes.md",
-        "docs/",
-        "back\\slash",
-        ".git/hooks/pre-commit",
-        "sub/.GIT/config",
-        "nul\0byte",
-    ] {
-        assert!(relative(bad).is_err(), "{bad:?} should be refused");
-    }
-    let root = Path::new("/cache/folder");
-    assert!(inside(root, "a/b.txt").unwrap().starts_with(root));
-}
-
-#[test]
-fn relative_text_writes_forward_slashes() {
-    let root = Path::new("/root");
-    assert_eq!(
-        relative_text(root, &root.join("a").join("b.txt")).as_deref(),
-        Some("a/b.txt")
-    );
-    assert_eq!(relative_text(root, root), None);
-    assert_eq!(relative_text(root, Path::new("/elsewhere/a")), None);
-}
-
-#[test]
-fn ids_are_one_folder_name() {
-    assert!(id("3f2b9c1e-aaaa-4bbb-8ccc-1234567890ab").is_ok());
-    assert!(id("folder_1").is_ok());
-    for bad in ["", "..", "a/b", "a\\b", "a.b", &"x".repeat(129)] {
-        assert!(id(bad).is_err(), "{bad:?} should be refused");
-    }
-}
-
-#[test]
-fn checksums_are_hex() {
-    let good = "A".repeat(64);
-    assert_eq!(sha256(&good).unwrap(), "a".repeat(64));
-    assert!(sha256("abc").is_err());
-    assert!(sha256(&"g".repeat(64)).is_err());
-}
-
-fn remote(path: &str) -> RemoteFile {
-    RemoteFile {
-        path: path.into(),
-        sha256: "0".repeat(64),
-        size: 1,
-        url: "https://storage.example/object".into(),
-        headers: Default::default(),
-    }
-}
-
-#[test]
-fn manifest_paths_are_checked() {
-    assert!(checked(vec![remote("a.txt"), remote("docs/b.txt")]).is_ok());
-    assert!(checked(vec![remote("a.txt"), remote("a.txt")]).is_err());
-    assert!(checked(vec![remote("docs"), remote("docs/b.txt")]).is_err());
-    assert!(checked(vec![remote("../escape")]).is_err());
-    let mut file = remote("a.txt");
-    file.url = "file:///etc/passwd".into();
-    assert!(checked(vec![file]).is_err());
 }

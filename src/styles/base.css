@@ -147,30 +147,5 @@
   }
 }
 
-/* Keyboard focus is one neutral ring in the muted text color, on :focus-visible only, so a click
-   never draws it. It sits outside the layers, so it shows on controls whose utilities say
-   `outline-none` (Button, Pressable, a list row's open target) and needs no class of its own. */
-:focus-visible {
-  outline: 0.125rem solid var(--misty-theme-text-muted);
-  outline-offset: 1px;
-}
-/* Where focus already shows itself: the caret and edge of a field, the highlight of a menu or
-   list row, and the containers that code focuses so the keyboard can start there. */
-:is(
-  input:not([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"]),
-  textarea,
-  select,
-  [contenteditable]:not([contenteditable="false"]),
-  [role="menu"],
-  [role="menuitem"],
-  [role="menuitemcheckbox"],
-  [role="menuitemradio"],
-  [role="option"],
-  [role="listbox"],
-  [role="dialog"],
-  [role="alertdialog"],
-  [cmdk-item],
-  [tabindex="-1"]
-):focus-visible {
-  outline: none;
-}
+/* Keyboard focus draws no ring or outline anywhere: @misty/ui's focus.css takes the browser's own
+   away, and a focused control shows its hover wash instead. Never add a focus ring back here. */

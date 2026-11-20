@@ -30,14 +30,14 @@ fn reads_the_pinned_workflow_agents_executed_receipt_separate_from_step_content(
     let steps = vec![vec![call.clone()]];
     assert_eq!(final_task_completion(&steps, std::slice::from_ref(&receipt)).unwrap().outcome, Outcome::Completed);
     let earlier = CompletionPart { tool_call_id: Some("earlier".to_owned()), ..receipt.clone() };
-    let other = CompletionPart { tool_name: Some("note.read".to_owned()), ..receipt.clone() };
+    let other = CompletionPart { tool_name: Some("file.read".to_owned()), ..receipt.clone() };
     let errored = CompletionPart { kind: "tool-error".to_owned(), ..receipt.clone() };
     let malformed = CompletionPart { output: parts_json(r#"{"outcome":"completed"}"#), ..receipt.clone() };
     let bad: [Vec<CompletionPart>; 6] = [vec![], vec![earlier], vec![other], vec![errored], vec![receipt.clone(), receipt.clone()], vec![malformed]];
     for receipts in &bad {
         assert_eq!(final_task_completion(&steps, receipts), None);
     }
-    let with_write = vec![vec![call.clone(), part("tool-call", "note.create", Some("write"), None)]];
+    let with_write = vec![vec![call.clone(), part("tool-call", "file.create", Some("write"), None)]];
     assert_eq!(final_task_completion(&with_write, std::slice::from_ref(&receipt)), None);
     let after_text = vec![vec![call], vec![text_part()]];
     assert_eq!(final_task_completion(&after_text, std::slice::from_ref(&receipt)), None);
@@ -47,7 +47,7 @@ fn reads_the_pinned_workflow_agents_executed_receipt_separate_from_step_content(
 fn keeps_earlier_reads_without_a_deliverable_blocked() {
     let reason = "No authorized browser or YouTube reader is available.";
     let value = report_json("blocked", &format!(r#"[{{"requirement":"Verified GothamChess weekly playlist manifest","reason":"{reason}"}}]"#));
-    let steps = vec![vec![part("tool-result", "note_search", None, parts_json(r#"{"results":[]}"#))], finish_step(&value)];
+    let steps = vec![vec![part("tool-result", "file_search", None, parts_json(r#"{"results":[]}"#))], finish_step(&value)];
     let completed = final_task_completion(&steps, &[]).unwrap();
     assert!(matches!(task_completion_outcome(Some(&completed)), TaskOutcome::Incomplete { error_code: "task_blocked", .. }));
     assert!(task_completion_text(&completed).contains(reason));
@@ -80,7 +80,7 @@ fn never_upgrades_plain_final_prose_a_missing_report_or_malformed_report_into_su
 #[test]
 fn requires_the_final_standalone_report_after_any_further_work_or_steering() {
     let earlier = finish_step(&report_json("completed", "[]"));
-    let later = vec![part("tool-result", "note.create", None, parts_json(r#"{"id":"note"}"#))];
+    let later = vec![part("tool-result", "file.create", None, parts_json(r#"{"id":"note"}"#))];
     assert_eq!(final_task_completion(&[earlier.clone(), later.clone()], &[]), None);
     assert_eq!(final_task_completion(&[[earlier.clone(), later.clone()].concat()], &[]), None);
     let partial = finish_step(&report_json("partial", "[]"));

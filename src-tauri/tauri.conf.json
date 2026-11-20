@@ -59,8 +59,7 @@
     ],
     "createUpdaterArtifacts": true,
     "resources": {
-      "resources/agent-catalogs": "agent-catalogs",
-      "resources/apps": "apps"
+      "resources/agent-catalogs": "agent-catalogs"
     }
   },
   "plugins": {

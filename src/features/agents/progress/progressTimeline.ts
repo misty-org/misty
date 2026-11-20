@@ -159,15 +159,12 @@ const verbs: Record<string, [running: string, done: string]> = {
  */
 const uiSubjects: Record<string, string> = {
   "log.work": "notebook",
-  file: "Media",
+  file: "Files",
   integration: "apps",
   folder: "shared folder",
   "space.member": "members",
   "browser.tab": "tabs",
-  note: "docs",
-  drawing: "whiteboards",
-  deck: "decks",
-  workbook: "workbooks",
+  note: "notebooks",
   message: "messages",
   thread: "threads",
   space: "Spaces",

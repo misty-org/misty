@@ -63,54 +63,6 @@
         "readOnly": true
       },
       {
-        "description": "Search Notes visible in a Space.",
-        "locality": "routed",
-        "name": "note.search",
-        "readOnly": true
-      },
-      {
-        "description": "Read one Note visible in a Space, including its Markdown body (empty means the Note has no text yet).",
-        "locality": "routed",
-        "name": "note.read",
-        "readOnly": true
-      },
-      {
-        "description": "Create a native Note in a Space from a title and Markdown body.",
-        "locality": "routed",
-        "name": "note.create",
-        "readOnly": false
-      },
-      {
-        "description": "Change an explicitly identified Note: a new title, a replacement Markdown body, or Markdown appended to the end of the body.",
-        "locality": "routed",
-        "name": "note.update",
-        "readOnly": false
-      },
-      {
-        "description": "List collaborative Excalidraw drawings visible in a Space.",
-        "locality": "routed",
-        "name": "drawing.list",
-        "readOnly": true
-      },
-      {
-        "description": "Read one live Excalidraw scene, including native element JSON, background state, revision, and content hash.",
-        "locality": "routed",
-        "name": "drawing.read",
-        "readOnly": true
-      },
-      {
-        "description": "Create an empty collaborative Excalidraw drawing in a Space. Call drawing_apply afterward to draw its scene.",
-        "locality": "routed",
-        "name": "drawing.create",
-        "readOnly": false
-      },
-      {
-        "description": "Draw or edit a live Excalidraw scene. Merge or replace native elements of any supported Excalidraw type; partial objects update existing IDs, new IDs require type, and delete_element_ids creates collaboration-safe tombstones. Common fields are defaulted; advanced native Excalidraw fields are preserved. Pass the latest drawing_read base_hash to reject conflicting edits. Image elements reference fileId values already uploaded through Misty's drawing asset pipeline.",
-        "locality": "routed",
-        "name": "drawing.apply",
-        "readOnly": false
-      },
-      {
         "description": "Read metadata, caption, tags, and file facts for one visible Library item in a Space.",
         "locality": "routed",
         "name": "file.read",
@@ -159,13 +111,7 @@
         "readOnly": false
       },
       {
-        "description": "Replace a note's shared tags in a Space. Pass the full list; an empty list clears them.",
-        "locality": "routed",
-        "name": "note.tag",
-        "readOnly": false
-      },
-      {
-        "description": "Search notes and messages at once, ranked by relevance. Use it when you do not know where something is; then read the item with its own tool.",
+        "description": "Search the Space's Lab notebooks and messages at once, ranked by relevance. Use it when you do not know where something is; then read the item with its own tool.",
         "locality": "server",
         "name": "search.all",
         "readOnly": true
@@ -237,13 +183,13 @@
         "readOnly": false
       },
       {
-        "description": "Delete a note, drawing or thread, or move a file to the trash. Use only when the user asked to delete that exact item; the user may see an approval card first. Every kind except notes and drawings also needs its Space.",
+        "description": "Delete a thread, or move a file or shared file to the trash. Use only when the user asked to delete that exact item; the user may see an approval card first. Every kind also needs its Space.",
         "locality": "server",
         "name": "item.delete",
         "readOnly": false
       },
       {
-        "description": "Rename a drawing or a thread. Threads also need their Space. Notes rename through their own update tool.",
+        "description": "Rename a thread. Threads also need their Space.",
         "locality": "server",
         "name": "item.rename",
         "readOnly": false

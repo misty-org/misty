@@ -54,6 +54,8 @@ file_access = { path = "features/file_access" }
 database = { path = "features/database" }
 settings = { path = "features/settings" }
 permissions = { path = "features/permissions" }
+# Each Space mounted on the computer as a drive: the sync core (features/space_drive).
+space_drive = { path = "features/space_drive" }
 documents = { path = "features/documents" }
 libc = "0.2"
 rand = "0.8"

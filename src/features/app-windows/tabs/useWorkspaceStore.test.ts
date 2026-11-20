@@ -49,12 +49,12 @@ describe("desktop dock store", () => {
 
   it("keeps a closed Space page recoverable without opening another page", () => {
     const store = useWorkspaceStore.getState();
-    const page = store.openSurface(workspaceSurfaceFromRoute("/spaces/family/notes")!);
+    const page = store.openSurface(workspaceSurfaceFromRoute("/spaces/family/files")!);
     expect(store.closeView(page.id)).toBe(true);
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual([]);
     expect(useWorkspaceStore.getState().closedItems[0].view).toMatchObject({
       id: page.id,
-      route: "/spaces/family/notes",
+      route: "/spaces/family/files",
       surfaceId: "space",
     });
   });
@@ -288,75 +288,68 @@ describe("desktop dock store", () => {
 
   it("keeps Space pages and other pages together in the global workspace", () => {
     const store = useWorkspaceStore.getState();
-    const first = store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!);
+    const first = store.openSurface(workspaceSurfaceFromRoute("/spaces/one/files")!);
     const browser = openPage(store, { url: "https://example.com" });
-    const second = store.openSurface(workspaceSurfaceFromRoute("/spaces/two/notes")!);
+    const second = store.openSurface(workspaceSurfaceFromRoute("/spaces/two/files")!);
     expect(allLayoutViews(useWorkspaceStore.getState().layout).map((view) => view.id)).toEqual([
       first.id,
       browser.id,
       second.id,
     ]);
-    expect(store.openSurface(workspaceSurfaceFromRoute("/spaces/one/notes")!).id).toBe(first.id);
+    expect(store.openSurface(workspaceSurfaceFromRoute("/spaces/one/files")!).id).toBe(first.id);
   });
 
-  it("opens Docs and Media as separate reusable tabs in one Space", () => {
-    const journalRequest = workspaceSurfaceFromRoute("/spaces/one/notes");
-    const plannerRequest = workspaceSurfaceFromRoute("/spaces/one/media");
-    expect(journalRequest).not.toBeNull();
-    expect(plannerRequest).not.toBeNull();
+  it("opens Lab and Files as separate reusable tabs in one Space", () => {
+    const labRequest = workspaceSurfaceFromRoute("/spaces/one/lab");
+    const filesRequest = workspaceSurfaceFromRoute("/spaces/one/files");
+    expect(labRequest).not.toBeNull();
+    expect(filesRequest).not.toBeNull();
 
-    const journal = useWorkspaceStore.getState().addSurface(journalRequest!);
-    const planner = useWorkspaceStore.getState().addSurface(plannerRequest!);
+    const lab = useWorkspaceStore.getState().addSurface(labRequest!);
+    const files = useWorkspaceStore.getState().addSurface(filesRequest!);
 
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: journal.id,
-          groupKey: "space:one:journal",
-          title: "Docs",
+          id: lab.id,
+          groupKey: "space:one:lab",
+          title: "Lab",
         }),
         expect.objectContaining({
-          id: planner.id,
-          groupKey: "space:one:media",
-          title: "Media",
+          id: files.id,
+          groupKey: "space:one:files",
+          title: "Files",
         }),
       ]),
     );
-    useWorkspaceStore.getState().focusView(journal.id);
-    const rememberedJournal = useWorkspaceStore
+    useWorkspaceStore.getState().focusView(files.id);
+    const rememberedFiles = useWorkspaceStore
       .getState()
-      .openSurface(workspaceSurfaceFromRoute("/spaces/one/notes?note=note-2")!);
-    expect(rememberedJournal.id).toBe(journal.id);
-    expect(rememberedJournal.route).toBe("/spaces/one/notes?note=note-2");
+      .openSurface(workspaceSurfaceFromRoute("/spaces/one/files?collection=deleted")!);
+    expect(rememberedFiles.id).toBe(files.id);
+    expect(rememberedFiles.route).toBe("/spaces/one/files?collection=deleted");
 
-    useWorkspaceStore.getState().focusView(planner.id);
-    useWorkspaceStore.getState().focusView(journal.id);
+    useWorkspaceStore.getState().focusView(lab.id);
+    useWorkspaceStore.getState().focusView(files.id);
     expect(
-      allLayoutViews(useWorkspaceStore.getState().layout).find((tab) => tab.id === journal.id)
+      allLayoutViews(useWorkspaceStore.getState().layout).find((tab) => tab.id === files.id)
         ?.route,
-    ).toBe("/spaces/one/notes?note=note-2");
-
-    // Whiteboards are a page of their own: a whiteboard opens in its own tab, not Docs'.
-    const board = useWorkspaceStore
-      .getState()
-      .openSurface(workspaceSurfaceFromRoute("/spaces/one/drawings/drawing-2")!);
-    expect(board.id).not.toBe(journal.id);
-    expect(board).toMatchObject({ groupKey: "space:one:whiteboards", title: "Whiteboards" });
+    ).toBe("/spaces/one/files?collection=deleted");
   });
 
   it("does not reuse a Space tool tab as the Space Home tab", () => {
-    const journalRequest = workspaceSurfaceFromRoute("/spaces/one/notes");
+    const filesRequest = workspaceSurfaceFromRoute("/spaces/one/files");
     const homeRequest = workspaceSurfaceFromRoute("/spaces/one/home");
-    if (!journalRequest || !homeRequest) throw new Error("Expected Space workspace surfaces");
-    const journal = useWorkspaceStore.getState().openSurface(journalRequest);
+    if (!filesRequest || !homeRequest) throw new Error("Expected Space workspace surfaces");
+    const files = useWorkspaceStore.getState().openSurface(filesRequest);
 
     const home = useWorkspaceStore.getState().addSurface(homeRequest);
     const tabs = allLayoutViews(useWorkspaceStore.getState().layout);
 
-    expect(home.id).not.toBe(journal.id);
-    expect(tabs.find((tab) => tab.id === journal.id)).toMatchObject({
-      groupKey: "space:one:journal",
-      route: "/spaces/one/notes",
+    expect(home.id).not.toBe(files.id);
+    expect(tabs.find((tab) => tab.id === files.id)).toMatchObject({
+      groupKey: "space:one:files",
+      route: "/spaces/one/files",
     });
     expect(tabs.find((tab) => tab.id === home.id)).toMatchObject({
       groupKey: "space:one:space",

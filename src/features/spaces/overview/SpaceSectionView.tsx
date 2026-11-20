@@ -1,46 +1,21 @@
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
-import { EmptyState, spaceKindsWithItemPath, spaceMadeKindForSection } from "@misty/ui";
+import { EmptyState } from "@misty/ui";
 import { lazy, Suspense, useEffect } from "react";
-import { useLocation } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { SpacePageLoadingPlaceholder } from "../components/SpacePageLoadingPlaceholder";
 import { useSpacesStore } from "../list/useSpacesStore";
 
-const Notes = lazy(() =>
-  import("@/features/spaces/journal/notes/SpaceNotes").then((m) => ({ default: m.SpaceNotes })),
-);
-const Drawings = lazy(() =>
-  import("@/features/spaces/journal/drawings/SpaceDrawings").then((m) => ({
-    default: m.SpaceDrawings,
-  })),
-);
-async function loadSlides() {
-  const { SpaceSlides } = await import("@/features/spaces/slides/SpaceSlides");
-  return { default: SpaceSlides };
-}
-const Slides = lazy(loadSlides);
-async function loadData() {
-  const { SpaceData } = await import("@/features/spaces/data/SpaceData");
-  return { default: SpaceData };
-}
-const Data = lazy(loadData);
-async function loadLibrary() {
+async function loadFiles() {
   const { SpaceLibrary } = await import("@/features/spaces/library/SpaceLibrary");
   return { default: SpaceLibrary };
 }
-const Library = lazy(loadLibrary);
+const Files = lazy(loadFiles);
 async function loadChat() {
   const { SpaceChatEntry } = await import("../chat/SpaceChatEntry");
   return { default: SpaceChatEntry };
 }
 const Chat = lazy(loadChat);
-const Planner = lazy(() =>
-  import("@/features/spaces/planner/SpacePlanner").then((m) => ({ default: m.SpacePlanner })),
-);
-const Calendar = lazy(() =>
-  import("@/features/spaces/calendar/SpaceCalendar").then((m) => ({ default: m.SpaceCalendar })),
-);
 async function loadLab() {
   const { SpaceLab } = await import("@/features/agents");
   return { default: SpaceLab };
@@ -51,46 +26,22 @@ async function loadExplore() {
   return { default: ExplorePage };
 }
 const Explore = lazy(loadExplore);
-async function loadHome() {
-  const { SpaceHome } = await import("../home/SpaceHome");
-  return { default: SpaceHome };
-}
-const Home = lazy(loadHome);
 async function loadApp() {
   const { SpaceAppPage } = await import("../apps/SpaceAppPage");
   return { default: SpaceAppPage };
 }
-const BuiltInApp = lazy(loadApp);
+const App = lazy(loadApp);
 
 export async function preloadSpaceSection(section: string) {
   switch (section) {
     case "home":
-      await loadHome();
-      break;
+    case "settings":
     case "social":
     case "chat":
       await loadChat();
       break;
-    case "notes":
-      await import("@/features/spaces/journal/notes/SpaceNotes");
-      break;
-    case "drawings":
-      await import("@/features/spaces/journal/drawings/SpaceDrawings");
-      break;
-    case "slides":
-      await loadSlides();
-      break;
-    case "data":
-      await loadData();
-      break;
-    case "media":
-      await loadLibrary();
-      break;
-    case "planner":
-      await import("@/features/spaces/planner/SpacePlanner");
-      break;
-    case "calendar":
-      await import("@/features/spaces/calendar/SpaceCalendar");
+    case "files":
+      await loadFiles();
       break;
     case "lab":
       await loadLab();
@@ -105,13 +56,9 @@ export async function preloadSpaceSection(section: string) {
   }
 }
 
-/** The tab's name for the pages that don't name it themselves (Docs, Slides, Data, Whiteboards,
- * Library and Chat do), so a tab that moves to one of them never keeps the last page's name. */
+/** The tab's name for the pages that don't name it themselves (Files and Chat do), so a tab
+ * that moves to one of them never keeps the last page's name. */
 const sectionTabTitles: Record<string, string> = {
-  home: "Space",
-  settings: "Space",
-  planner: "Planner",
-  calendar: "Calendar",
   lab: "Lab",
   explore: "Explore",
 };
@@ -128,14 +75,13 @@ const sectionTabTitles: Record<string, string> = {
 export function SpaceSectionView(props: {
   spaceId: string;
   section: string;
-  /** The whiteboard, deck or workbook open on its page. */
+  /** The app open on its page (`/app/<id>`). */
   itemId?: string;
   workspaceTabId?: string;
 }) {
   const { spaceId, itemId = "" } = props;
   const section = props.section || "home";
   const { user, transitioning } = useAuth();
-  const location = useLocation();
   const { spaces, snapshotReady, loading, error, load, loadSpace } = useSpacesStore(
     useShallow((state) => ({
       spaces: state.spaces,
@@ -170,12 +116,7 @@ export function SpaceSectionView(props: {
   }
 
   // The page this opens, for its first-load skeleton.
-  const shape = {
-    section,
-    item:
-      (section === "notes" && Boolean(new URLSearchParams(location.search).get("note"))) ||
-      (spaceKindsWithItemPath.has(section) && Boolean(itemId)),
-  };
+  const shape = { section };
   // The Space itself is read for the first time: the page it opens, in that page's shape.
   if (!snapshotReady || (!space && loading)) return <SpacePageLoadingPlaceholder shape={shape} />;
 
@@ -193,28 +134,8 @@ export function SpaceSectionView(props: {
       {/* The page's code is on its way just ahead of its data: the page's own first-load
           skeleton holds its place, so it never flashes blank. */}
       <Suspense fallback={<SpacePageLoadingPlaceholder shape={shape} />}>
-        {/* Docs, Slides, Data and Whiteboards without an item show their page: the home's
-            collection, narrowed to that kind. */}
-        {section === "home" ||
-        (section === "notes" && !new URLSearchParams(location.search).get("note")) ||
-        (spaceKindsWithItemPath.has(section) && !itemId) ||
-        // There is no settings page: its links land on the home, and the Space menu has the rest.
-        section === "settings" ? (
-          <Home space={space} page={spaceMadeKindForSection(section)?.kind} />
-        ) : section === "notes" ? (
-          <Notes spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
-        ) : section === "drawings" ? (
-          <Drawings spaceId={spaceId} drawingId={itemId} workspaceTabId={props.workspaceTabId} />
-        ) : section === "slides" ? (
-          <Slides spaceId={spaceId} deckId={itemId} workspaceTabId={props.workspaceTabId} />
-        ) : section === "data" ? (
-          <Data spaceId={spaceId} workbookId={itemId} workspaceTabId={props.workspaceTabId} />
-        ) : section === "media" ? (
-          <Library spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
-        ) : section === "planner" ? (
-          <Planner spaceId={spaceId} />
-        ) : section === "calendar" ? (
-          <Calendar spaceId={spaceId} />
+        {section === "files" ? (
+          <Files spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
         ) : section === "lab" ? (
           <Lab spaceId={spaceId} />
         ) : section === "explore" ? (
@@ -223,8 +144,12 @@ export function SpaceSectionView(props: {
             canManageApps={Boolean(space.permissions?.includes("apps.manage"))}
           />
         ) : section === "app" ? (
-          <BuiltInApp space={space} appId={itemId} workspaceTabId={props.workspaceTabId} />
-        ) : section === "social" || section === "chat" ? (
+          <App space={space} appId={itemId} workspaceTabId={props.workspaceTabId} />
+        ) : // A Space has no home page: its address, and the old settings links, open its chat.
+        section === "home" ||
+          section === "settings" ||
+          section === "social" ||
+          section === "chat" ? (
           <Chat spaceId={spaceId} spaceName={space.name} workspaceTabId={props.workspaceTabId} />
         ) : (
           <EmptyState

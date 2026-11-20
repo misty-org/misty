@@ -24,16 +24,13 @@ pub fn required(kind: Kind, name: &str) -> Need {
         (_, "hello") => None,
         (Kind::Call, "route.navigate") => None,
         (Kind::Subscribe, "theme" | "route") => None,
-        (Kind::Call, name) if name.starts_with("store.") => None,
         (Kind::Call, "members.list" | "members.mentionables") => Some(Members),
-        (Kind::Subscribe, "members.presence" | "agents.atWork") => Some(Members),
+        (Kind::Subscribe, "members.presence") => Some(Members),
         (Kind::Call, "chat.post" | "chat.open" | "chat.notify") => Some(ChatPost),
         (Kind::Call, name) if name.starts_with("files.") => Some(Files),
         (Kind::Subscribe, "files.watch") => Some(Files),
         (Kind::Call, "room.update" | "room.awareness") => Some(Rooms),
         (Kind::Subscribe, "room") => Some(Rooms),
-        (Kind::Call, name) if ["tasks.", "events.", "sources."].iter().any(|p| name.starts_with(p)) => Some(Records),
-        (Kind::Subscribe, "tasks" | "events") => Some(Records),
         _ => return Need::Unknown,
     };
     needed.map_or(Need::Nothing, Need::Permission)
@@ -51,6 +48,8 @@ struct Session {
     /// The webview the session belongs to, so another window can't use it.
     webview: String,
     allowed: HashSet<Permission>,
+    /// The app's manifest names a paid host it may reach.
+    paid: bool,
 }
 
 static SESSIONS: LazyLock<Mutex<HashMap<String, Session>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -81,6 +80,7 @@ pub fn open(
             space_id: space_id.to_owned(),
             webview: webview.to_owned(),
             allowed: approved.iter().copied().collect(),
+            paid: manifest.network.iter().any(|host| host.paid),
         },
     );
     Ok(id)
@@ -109,6 +109,11 @@ pub fn identity(session: &str, webview: &str) -> Option<(String, String)> {
         .map(|session| (session.app_id.clone(), session.space_id.clone()))
 }
 
+/// Whether the session's app may reach a host its manifest marks as paid.
+pub fn reaches_paid_host(session: &str, webview: &str) -> bool {
+    sessions().get(session).is_some_and(|found| found.webview == webview && found.paid)
+}
+
 pub fn close(session: &str, webview: &str) {
     let mut sessions = sessions();
     if sessions.get(session).is_some_and(|found| found.webview == webview) {
@@ -123,7 +128,7 @@ mod tests {
     fn manifest(permissions: &str) -> AppManifest {
         AppManifest::parse(
             format!(
-                r#"{{"id":"planner","name":"Planner","version":"1.0.0","logo":"l.svg","entry":"i.html","permissions":{permissions}}}"#
+                r#"{{"id":"sketch","name":"Sketch","version":"1.0.0","logo":"l.svg","entry":"i.html","permissions":{permissions}}}"#
             )
             .as_bytes(),
         )
@@ -132,29 +137,31 @@ mod tests {
 
     #[test]
     fn a_call_needs_the_permission_its_area_names() {
-        let session = open(&manifest(r#"["records","members"]"#), "space-1", "window-a", &[Permission::Records]).unwrap();
-        assert!(check(&session, "window-a", Kind::Call, "tasks.create").is_ok());
-        assert!(check(&session, "window-a", Kind::Subscribe, "tasks").is_ok());
+        let session = open(&manifest(r#"["files","members"]"#), "space-1", "window-a", &[Permission::Files]).unwrap();
+        assert!(check(&session, "window-a", Kind::Call, "files.save").is_ok());
+        assert!(check(&session, "window-a", Kind::Subscribe, "files.watch").is_ok());
         // Asked for in the manifest, but the mod didn't approve it.
         assert!(check(&session, "window-a", Kind::Call, "members.list").is_err());
-        assert!(check(&session, "window-a", Kind::Call, "files.save").is_err());
+        assert!(check(&session, "window-a", Kind::Call, "chat.post").is_err());
         // Open to every app.
-        assert!(check(&session, "window-a", Kind::Call, "store.set").is_ok());
+        assert!(check(&session, "window-a", Kind::Call, "route.navigate").is_ok());
         assert!(check(&session, "window-a", Kind::Subscribe, "theme").is_ok());
-        // Unknown names, and a call used as a subscription, fail closed.
+        // Unknown names (the old records and store calls among them), and a call used as a subscription, fail closed.
         assert!(check(&session, "window-a", Kind::Call, "shell.run").is_err());
-        assert!(check(&session, "window-a", Kind::Subscribe, "tasks.create").is_err());
+        assert!(check(&session, "window-a", Kind::Call, "tasks.create").is_err());
+        assert!(check(&session, "window-a", Kind::Call, "store.set").is_err());
+        assert!(check(&session, "window-a", Kind::Subscribe, "files.save").is_err());
         assert!(check(&session, "window-a", Kind::Call, "theme").is_err());
         close(&session, "window-a");
-        assert!(check(&session, "window-a", Kind::Call, "store.get").is_err());
+        assert!(check(&session, "window-a", Kind::Call, "files.list").is_err());
     }
 
     #[test]
     fn a_session_cannot_exceed_its_manifest_or_be_used_by_another_window() {
-        assert!(open(&manifest(r#"["records"]"#), "s", "window-a", &[Permission::Files]).is_err());
+        assert!(open(&manifest(r#"["members"]"#), "s", "window-a", &[Permission::Files]).is_err());
         let session = open(&manifest(r#"["files"]"#), "s", "window-a", &[Permission::Files]).unwrap();
         assert!(check(&session, "other", Kind::Call, "files.list").is_err());
-        assert_eq!(identity(&session, "window-a"), Some(("planner".into(), "s".into())));
+        assert_eq!(identity(&session, "window-a"), Some(("sketch".into(), "s".into())));
         assert_eq!(identity(&session, "other"), None);
         close(&session, "other");
         assert!(check(&session, "window-a", Kind::Call, "files.list").is_ok());
@@ -167,14 +174,12 @@ mod tests {
         let calls = [
             "hello", "members.list", "members.mentionables", "chat.post", "chat.open", "chat.notify",
             "files.pick", "files.open", "files.save", "files.list", "files.upload", "files.download",
-            "tasks.list", "tasks.create", "tasks.update", "tasks.remove", "events.list", "events.create",
-            "events.update", "events.remove", "sources.list", "store.get", "store.set", "store.list",
-            "store.remove", "route.navigate", "room.update", "room.awareness",
+            "route.navigate", "room.update", "room.awareness",
         ];
         for call in calls {
             assert_ne!(required(Kind::Call, call), Need::Unknown, "{call}");
         }
-        for topic in ["theme", "route", "members.presence", "files.watch", "agents.atWork", "tasks", "events", "room"] {
+        for topic in ["theme", "route", "members.presence", "files.watch", "room"] {
             assert_ne!(required(Kind::Subscribe, topic), Need::Unknown, "{topic}");
         }
     }

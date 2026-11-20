@@ -1,5 +1,4 @@
 import { TourInfoButton } from "@/features/onboarding";
-import { Command } from "cmdk";
 import { X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { shortAgo, usePersonalAgentsStore } from "@/features/agents";
@@ -7,6 +6,8 @@ import type { WorkspaceView } from "@/features/app-windows";
 import { ShortcutText, useShortcutHandler } from "@/features/shortcuts";
 import {
   Badge,
+  CommandPalette,
+  CommandPaletteGroup,
   CommandPaletteInput,
   CommandPaletteItem,
   CommandPaletteList,
@@ -47,9 +48,9 @@ function pageKind(path = ""): SearchKind | undefined {
 
 /**
  * ⌘K search: one box for everything in Misty. It finds chats (by what was said in them too),
- * agents, the Space's docs, messages, tasks, events and files, Tutor's notebooks and lessons,
- * apps to connect, settings, commands and pages, and does what the text asks: `@agent …` asks an
- * agent, `task: …` makes a task, ⌘↵ asks the usual agent. With nothing typed it shows what was
+ * agents, the Space's messages, notebooks and files, Tutor's lessons, apps to connect, settings,
+ * commands and pages, and does what the text asks: `@agent …` asks an agent, ⌘↵ asks the usual
+ * agent. With nothing typed it shows what was
  * opened last. A prefix narrows it to one kind (`/` commands, `#` the Space); there is no row of
  * types, and pages' own search fields only filter what the page shows. The page in front ranks
  * its own kind first, and a page can open it scoped to its items (⌘P on the Code page). Mounted
@@ -214,7 +215,7 @@ function SearchBody({
       close();
       return;
     }
-    // Asking an agent or making a task takes a moment; the box stays until it is done.
+    // Asking an agent takes a moment; the box stays until it is done.
     setRunning(hit.id);
     try {
       await result;
@@ -236,10 +237,10 @@ function SearchBody({
           (hit.match >= 10 || hit.id === "action:ask"),
       );
   return (
-    <Command
+    <CommandPalette
       // Search: an input, the list and a foot of hints, in one rounded panel. There is no row of
       // types: a prefix narrows the search (`/` commands, `#` the Space, `@` an agent).
-      className="flex max-h-[min(35rem,calc(100dvh_-_8rem))] flex-col"
+      className="max-h-[min(35rem,calc(100dvh_-_8rem))]"
       shouldFilter={false}
       loop
       onKeyDown={(event) => {
@@ -298,7 +299,7 @@ function SearchBody({
           </Text>
         ) : null}
         {groups.map(([heading, list]) => (
-          <Command.Group key={heading} heading={heading}>
+          <CommandPaletteGroup key={heading} heading={heading}>
             {list.map((hit) => (
               <CommandPaletteItem
                 key={hit.id}
@@ -343,7 +344,7 @@ function SearchBody({
                 ) : null}
               </CommandPaletteItem>
             ))}
-          </Command.Group>
+          </CommandPaletteGroup>
         ))}
         {waiting ? (
           <div className="flex flex-col gap-3.5 px-3 py-4" aria-hidden>
@@ -414,6 +415,6 @@ function SearchBody({
         </div>
         <TourInfoButton tour="search" />
       </footer>
-    </Command>
+    </CommandPalette>
   );
 }

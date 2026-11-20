@@ -73,9 +73,10 @@ export function prepareTauriDevelopment(args: string[]): string[] {
   );
 }
 
-export function signDevelopmentBinary(binary: string, identity: string): void {
+export function signDevelopmentBinary(binary: string, identity: string, entitlements?: string): void {
   // Sign the local dev executable or its app bundle. Do not modify Keychain ACLs, export keys,
-  // or use a permissive custom requirement to conceal identity changes.
+  // or use a permissive custom requirement to conceal identity changes. The bundle's entitlements
+  // carry the app group it shares with its Space drive extension (`drive-extension.ts`).
   execFileSync(
     "/usr/bin/codesign",
     [
@@ -84,6 +85,7 @@ export function signDevelopmentBinary(binary: string, identity: string): void {
       identity,
       "--identifier",
       DEV_SIGNING_IDENTIFIER,
+      ...(entitlements ? ["--entitlements", entitlements] : []),
       "--timestamp=none",
       binary,
     ],

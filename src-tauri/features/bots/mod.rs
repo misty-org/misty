@@ -510,7 +510,7 @@ mod tests {
             instructions: "Work carefully.".into(),
             capabilities: BotCapabilities {
                 skills: vec!["*".into(), "*".into()],
-                tools: vec![" note.read ".into()],
+                tools: vec![" file.read ".into()],
                 mcp_servers: vec![],
             },
             runtime: BotRuntime::default(),
@@ -525,7 +525,7 @@ mod tests {
         assert_eq!(clean.description, None);
         assert_eq!(clean.avatar.kind, "generated");
         assert_eq!(clean.capabilities.skills, vec!["*"]);
-        assert_eq!(clean.capabilities.tools, vec!["note.read"]);
+        assert_eq!(clean.capabilities.tools, vec!["file.read"]);
         assert!(validated(bundle("")).is_err());
     }
 

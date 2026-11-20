@@ -125,7 +125,7 @@ function WhatGoes() {
     <Text bare as="div" tone="default">
       <ul className="m-0 list-disc space-y-1 pl-5 text-sm">
         <li>Agent conversations in this Space</li>
-        <li>Private docs, whiteboards and files</li>
+        <li>Private notes, Lab notebooks and files</li>
         <li>The app accounts picked for this Space</li>
       </ul>
     </Text>

@@ -6,6 +6,7 @@ import type { PerformanceContext } from "./diagnostics";
 import { initializePerformancePreference } from "./preference";
 
 export { PerformanceSection } from "./PerformanceSection";
+export { DiagnosticsSection } from "./DiagnosticsSection";
 
 /** No session or message counts are wired in yet; non-finite counts mark the context as
  *  unavailable. */

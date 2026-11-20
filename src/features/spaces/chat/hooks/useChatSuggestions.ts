@@ -46,7 +46,7 @@ export function useChatSuggestions(options: {
       .then((result) => setLibraryItems(result.items))
       .catch((reason: unknown) => {
         setLibraryItems([]);
-        setError(reason instanceof Error ? reason.message : "Media could not be loaded.");
+        setError(reason instanceof Error ? reason.message : "Files could not be loaded.");
       })
       .finally(() => setLoading(false));
   }, [options.canReadLibrary, options.spaceId]);

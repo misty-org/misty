@@ -31,8 +31,13 @@ export function libraryItemMIME(item: SpaceLibraryItem): string {
     .split(";")[0]
     .toLocaleLowerCase();
   if (metadataMIME && metadataMIME !== "application/octet-stream") return metadataMIME;
+  return mimeFromFileName(item.file.original_filename);
+}
 
-  const extension = item.file.original_filename.split(".").pop()?.toLocaleLowerCase() ?? "";
+/** A file's MIME type from its name's extension alone, `application/octet-stream` when unknown. */
+export function mimeFromFileName(name: string): string {
+  const extension = name.includes(".") ? (name.split(".").pop()?.toLocaleLowerCase() ?? "") : "";
+  if (extension === "pdf") return "application/pdf";
   if (IMAGE_EXTENSIONS.includes(extension))
     return `image/${extension === "jpg" ? "jpeg" : extension === "tif" ? "tiff" : extension}`;
   if (VIDEO_EXTENSIONS.includes(extension))

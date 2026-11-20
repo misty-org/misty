@@ -2,6 +2,7 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { SpaceRequestError } from "../api/api";
 import { spaceAppsApi } from "./serverApps";
 import type { InstalledSpaceApp } from "./serverApps";
+import type { AppSource } from "./thirdPartyApps";
 
 /**
  * One list of a Space's installed third-party apps, shared by everything that shows it: the sidebar, the home and
@@ -49,8 +50,7 @@ async function load(spaceId: string): Promise<void> {
 }
 
 /**
- * The third-party apps a Space has installed, and a way to change that. Misty's own apps are built in and are not
- * in this list. Changing is for mods; the server says no to others.
+ * The apps a Space has added, and a way to change that. Changing is for mods; the server says no to others.
  */
 export function useSpaceApps(spaceId: string) {
   const entry = useSyncExternalStore(
@@ -64,8 +64,8 @@ export function useSpaceApps(spaceId: string) {
 
   const reload = useCallback(() => void load(spaceId), [spaceId]);
   const install = useCallback(
-    async (appId: string, version: string, permissions: string[]) => {
-      const saved = await spaceAppsApi.install(spaceId, appId, version, permissions);
+    async (appId: string, version: string, permissions: string[], source?: AppSource) => {
+      const saved = await spaceAppsApi.install(spaceId, appId, version, permissions, source);
       const now = read(spaceId);
       write(spaceId, {
         ...now,

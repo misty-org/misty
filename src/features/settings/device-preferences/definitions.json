@@ -101,6 +101,17 @@
     "max": 1
   },
   {
+    "id": "app.appearance.reduce_motion",
+    "label": "Reduce motion",
+    "page": "accessibility",
+    "section": "appearance",
+    "key": "reduce_motion",
+    "default": false,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "app.appearance.compact_mode_enabled",
     "label": "Compact mode",
     "page": "appearance",
@@ -231,7 +242,7 @@
   {
     "id": "agents.run_notifications",
     "label": "Notify when a chat finishes or needs you",
-    "page": "agents-defaults",
+    "page": "notifications",
     "section": "agent",
     "key": "run_notifications",
     "default": true,
@@ -348,6 +359,39 @@
     "platforms": ["desktop"]
   },
   {
+    "id": "agents.companion.sprite",
+    "label": "Show Misty at the cursor",
+    "page": "agents-companion",
+    "section": "companion",
+    "key": "sprite",
+    "default": true,
+    "type": "boolean",
+    "owner": "device",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "agents.companion.hintSince",
+    "label": "Tutor shortcut hint first shown",
+    "page": "agents-companion",
+    "section": "companion",
+    "key": "hintSince",
+    "default": "",
+    "type": "string",
+    "owner": "device",
+    "platforms": ["desktop"]
+  },
+  {
+    "id": "agents.companion.style",
+    "label": "How Tutor answers",
+    "page": "agents-companion",
+    "section": "companion",
+    "key": "style",
+    "default": "",
+    "type": "string",
+    "owner": "device",
+    "platforms": ["desktop"]
+  },
+  {
     "id": "agents.companion.toured",
     "label": "Tutor tour taken",
     "page": "agents-companion",
@@ -359,34 +403,8 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "collections.tabs.space",
-    "label": "Space tab order",
-    "page": "appearance",
-    "section": "collections",
-    "key": "space_tab_order",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
-    "platforms": ["desktop"]
-  },
-  {
-    "id": "collections.tabs.journal",
-    "label": "Journal tab order",
-    "page": "appearance",
-    "section": "collections",
-    "key": "journal_tab_order",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
-    "platforms": ["desktop"]
-  },
-  {
     "id": "collections.tabs.media",
-    "label": "Media tab order",
+    "label": "Files tab order",
     "page": "appearance",
     "section": "collections",
     "key": "library_tab_order",
@@ -570,19 +588,5 @@
     "owner": "device",
     "type": "boolean",
     "platforms": ["desktop"]
-  },
-  {
-    "id": "space.home.coming_up_days",
-    "label": "Coming up looks ahead",
-    "keywords": ["space", "tasks", "due", "upcoming", "calendar"],
-    "page": "space",
-    "section": "space",
-    "key": "coming_up_days",
-    "default": 14,
-    "owner": "device",
-    "type": "number",
-    "platforms": ["desktop"],
-    "min": 7,
-    "max": 30
   }
 ]

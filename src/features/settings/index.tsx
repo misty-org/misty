@@ -41,6 +41,7 @@ export { validClockTime } from "./preferences/nightLight";
 export { applyCachedAppTheme } from "./preferences/appTheme";
 export { useSettingsStore } from "./preferences/useSettingsStore";
 export { GeneralSection } from "./sections/GeneralSection";
+export { NotificationsSection } from "./sections/NotificationsSection";
 export { registerSettingsSections } from "./settingsRegistry";
 export type { SettingsContentProps } from "./settingsTypes";
 export { searchSettings } from "./components/SettingsSearchResults";

@@ -1,12 +1,12 @@
 import { SpaceRequestError, spacesApi } from "../api/api";
-import { plannerApi } from "../planner/api";
-import type { SpaceCalendarEventInput, SpaceTaskInput } from "../planner/api";
-import { subscribeToPlannerChanges } from "../planner/plannerEvents";
 import type { HostHandlers } from "./hostChannel";
 import { HostError } from "./protocol";
 import type { ErrorCode } from "./protocol";
-import { spaceAppsApi } from "./serverApps";
-import { createFileCalls, type FileHost } from "./spaceAppFiles";
+import { createDriveFileCalls } from "../drive/driveAppFiles";
+import type { FileHost } from "./spaceAppFiles";
+import { createAppRooms, type RoomSource } from "./appRooms";
+import { useSpacesStore } from "../list/useSpacesStore";
+import { memberAgentsIn, useMemberAgents } from "../list/memberAgents";
 
 /** A value that changes, which an app can follow. */
 export interface Source<T> {
@@ -16,6 +16,8 @@ export interface Source<T> {
 
 export interface AppHostContext {
   appId: string;
+  /** The app's name: its own folder in the Space's drive is `/<App name>/`. Its id when left out. */
+  appName?: string;
   space: { id: string; name: string; description?: string; isMod: boolean };
   me: { user_id: string; name: string; role: "owner" | "member"; avatar_version?: number };
   /** What the mod approved for this app. */
@@ -25,9 +27,53 @@ export interface AppHostContext {
   navigate(route: { path: string; params: Record<string, string> }, replace: boolean): void;
   /** What the file calls need of the person: a picker, and word that something was saved. */
   files: Pick<FileHost, "pickFiles" | "saved">;
+  /** The server rooms behind the app's room ids; an installed app's own rooms when left out. */
+  rooms?: RoomSource;
 }
 
-const calendarWindowMs = 180 * 24 * 60 * 60 * 1000;
+/** Each member's presence in the Space, as the SDK gives it: online while they have Misty open on it. */
+function spacePresence(spaceId: string, me: string) {
+  const { membersBySpace, presenceBySpace } = useSpacesStore.getState();
+  const here = new Set((presenceBySpace[spaceId] ?? []).map((viewer) => viewer.user_id));
+  here.add(me);
+  const working = new Set(
+    memberAgentsIn(useMemberAgents.getState(), spaceId)
+      .filter(({ agent }) => agent.state === "working")
+      .map(({ userId }) => userId),
+  );
+  return (membersBySpace[spaceId] ?? []).map((member) => ({
+    user_id: member.user_id,
+    state: here.has(member.user_id) ? ("online" as const) : ("offline" as const),
+    working: working.has(member.user_id),
+  }));
+}
+
+/** Calls back with the Space's presence now and whenever who is here, or whose agents work, changes. */
+function watchPresence(spaceId: string, me: string, emit: (data: unknown) => void): () => void {
+  let last = "";
+  const send = () => {
+    const presence = spacePresence(spaceId, me);
+    const key = JSON.stringify(presence);
+    if (key === last) return;
+    last = key;
+    emit(presence);
+  };
+  send();
+  const stopSpaces = useSpacesStore.subscribe((state, previous) => {
+    if (
+      state.presenceBySpace[spaceId] !== previous.presenceBySpace[spaceId] ||
+      state.membersBySpace[spaceId] !== previous.membersBySpace[spaceId]
+    )
+      send();
+  });
+  const stopAgents = useMemberAgents.subscribe((state, previous) => {
+    if (state.bySpace[spaceId] !== previous.bySpace[spaceId]) send();
+  });
+  return () => {
+    stopSpaces();
+    stopAgents();
+  };
+}
 
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
@@ -35,12 +81,6 @@ const record = (value: unknown): Record<string, unknown> =>
 function text(value: unknown, what: string): string {
   if (typeof value !== "string" || value === "")
     throw new HostError("invalid", `${what} is missing.`);
-  return value;
-}
-
-function version(value: unknown): number {
-  if (typeof value !== "number" || !Number.isSafeInteger(value))
-    throw new HostError("invalid", "The version is missing.");
   return value;
 }
 
@@ -74,6 +114,10 @@ const unsupported = (what: string) =>
 export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
   const spaceId = context.space.id;
   const { appId } = context;
+  // Its files are the Space drive's, saved into `/<App name>/` unless it names another folder.
+  const driveFiles = createDriveFileCalls(spaceId, context.appName || appId, appId, context.files);
+  // Its live documents (the SDK's `room()`), on the Space's live relay.
+  const rooms = createAppRooms(spaceId, appId, context.rooms);
 
   const calls: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {
     hello: async () => ({
@@ -99,10 +143,7 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
         replace === true,
       );
     },
-    ...createFileCalls(spaceId, {
-      openRoute: (path) => context.navigate({ path, params: {} }, false),
-      ...context.files,
-    }),
+    ...driveFiles.calls,
     "members.list": async () => {
       const { members } = await spacesApi.members(spaceId);
       return members.map((member) => ({
@@ -113,88 +154,7 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
         joined_at: member.joined_at,
       }));
     },
-    "tasks.list": async () => (await plannerApi.tasks(spaceId)).tasks,
-    "tasks.create": async (params) =>
-      plannerApi.createTask(spaceId, {
-        ...params,
-        title: text(params.title, "The title"),
-      } as SpaceTaskInput & {
-        title: string;
-      }),
-    "tasks.update": async ({ id, version: against, patch }) =>
-      plannerApi.updateTask(spaceId, text(id, "The task"), {
-        ...record(patch),
-        version: version(against),
-      } as SpaceTaskInput & { version: number }),
-    "tasks.remove": async ({ id }) => {
-      await plannerApi.archiveTask(spaceId, text(id, "The task"));
-    },
-    "events.list": async (params) => {
-      const [from, to] = eventRange(params);
-      return (await plannerApi.events(spaceId, from, to)).events;
-    },
-    "events.create": async (params) =>
-      plannerApi.createEvent(spaceId, params as SpaceCalendarEventInput),
-    "events.update": async ({ id, version: against, event }) =>
-      plannerApi.updateEvent(spaceId, text(id, "The event"), {
-        ...(record(event) as SpaceCalendarEventInput),
-        version: version(against),
-      }),
-    "events.remove": async ({ id }) => {
-      await plannerApi.deleteEvent(spaceId, text(id, "The event"));
-    },
-    "store.get": async ({ key }) => {
-      try {
-        return (await spaceAppsApi.storage.get(spaceId, appId, text(key, "The key"))).value;
-      } catch (error) {
-        if (error instanceof SpaceRequestError && error.status === 404) return undefined;
-        throw error;
-      }
-    },
-    "store.set": async ({ key, value }) => {
-      await spaceAppsApi.storage.set(spaceId, appId, text(key, "The key"), value);
-    },
-    "store.list": async ({ prefix }) =>
-      (
-        await spaceAppsApi.storage.list(spaceId, appId, typeof prefix === "string" ? prefix : "")
-      ).map(({ key, value }) => ({ key, value })),
-    "store.remove": async ({ key }) => {
-      await spaceAppsApi.storage.remove(spaceId, appId, text(key, "The key"));
-    },
-  };
-
-  /** Sends the value now and again whenever `watch` says it changed. */
-  const live = (
-    load: () => Promise<unknown>,
-    watch: (reload: () => void) => () => void,
-    emit: (data: unknown) => void,
-  ) => {
-    let stopped = false;
-    let running = false;
-    let again = false;
-    const reload = async () => {
-      if (running) {
-        again = true;
-        return;
-      }
-      running = true;
-      do {
-        again = false;
-        try {
-          const data = await load();
-          if (!stopped) emit(data);
-        } catch {
-          // A failed refresh leaves the last list in place; the next change tries again.
-        }
-      } while (again && !stopped);
-      running = false;
-    };
-    const unwatch = watch(() => void reload());
-    void reload();
-    return () => {
-      stopped = true;
-      unwatch();
-    };
+    ...rooms.calls,
   };
 
   return {
@@ -203,7 +163,7 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
       if (!handler) throw unsupported(method);
       return guarded(() => handler(record(params)));
     },
-    subscribe(topic, params, emit) {
+    subscribe(topic, params, emit, end) {
       switch (topic) {
         case "theme":
           emit(context.theme.get());
@@ -211,33 +171,18 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
         case "route":
           emit(context.route.get());
           return context.route.subscribe(emit);
-        case "tasks":
-          return live(
-            () => plannerApi.tasks(spaceId).then((result) => result.tasks),
-            (reload) => subscribeToPlannerChanges(spaceId, "task", reload),
-            emit,
-          );
-        case "events": {
-          const [from, to] = eventRange(record(params));
-          return live(
-            () => plannerApi.events(spaceId, from, to).then((result) => result.events),
-            (reload) => subscribeToPlannerChanges(spaceId, "calendar", reload),
-            emit,
-          );
-        }
+        case "files.watch":
+          return driveFiles.watch(params, emit);
+        case "members.presence":
+          return watchPresence(spaceId, context.me.user_id, emit);
+        case "room":
+          return rooms.subscribe(record(params), emit, end);
         default:
           throw unsupported(topic);
       }
     },
+    dispose() {
+      driveFiles.dispose();
+    },
   };
-}
-
-/** The range an app asked for, or six months either side of now. */
-function eventRange(params: Record<string, unknown>): [string, string] {
-  const now = Date.now();
-  const from =
-    typeof params.from === "string" ? params.from : new Date(now - calendarWindowMs).toISOString();
-  const to =
-    typeof params.to === "string" ? params.to : new Date(now + calendarWindowMs).toISOString();
-  return [from, to];
 }

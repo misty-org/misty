@@ -47,8 +47,13 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
             eprintln!("Could not reopen Misty: {error}");
         }
     }
-    if let RunEvent::ExitRequested { api, .. } = &event {
-        if must_ask() && crate::browser::app_windows::primary(app).is_some() {
+    if let RunEvent::ExitRequested { code, api, .. } = &event {
+        if code.is_none() {
+            // The last window closed (only that asks with no code). Misty stays in the tray or
+            // menu bar, where it keeps the Space drives in sync; Quit (`app.exit`) carries a code,
+            // and macOS's own Quit and logout end the app without asking here.
+            api.prevent_exit();
+        } else if must_ask() && crate::browser::app_windows::primary(app).is_some() {
             api.prevent_exit();
             ask(app, None);
         } else {
@@ -64,6 +69,8 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         crate::code::lsp::close_all();
         tauri::async_runtime::block_on(crate::engines::shutdown());
         crate::engine_config::shutdown();
+        // Space drives unmount; what they hold stays for the next launch.
+        crate::spaces_drive::shutdown();
     }
 }
 

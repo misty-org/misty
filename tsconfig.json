@@ -14,7 +14,6 @@
     "moduleResolution": "Bundler",
     "paths": {
       "@/*": ["./src/*"],
-      "@opencut/*": ["./vendor/opencut/src/*"],
       "react": ["./node_modules/@types/react"],
       "react/*": ["./node_modules/@types/react/*"],
       "react-dom": ["./node_modules/@types/react-dom"],
@@ -81,6 +80,7 @@
       "@tiptap/react": ["./node_modules/@tiptap/react/dist/index.d.ts"],
       "@tiptap/starter-kit": ["./node_modules/@tiptap/starter-kit/dist/index.d.ts"],
       "y-protocols/awareness": ["./node_modules/y-protocols/awareness.d.ts"],
+      "@misty/sdk": ["../misty-sdk/packages/sdk/src/index.ts"],
       "@tiptap/core": ["./node_modules/@tiptap/core/dist/index.d.ts"],
       "mammoth": ["./node_modules/mammoth/lib/index.d.ts"],
       "jszip": ["./node_modules/jszip/index.d.ts"],
@@ -92,7 +92,7 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "vendor/opencut/src/**/*.d.ts"],
+  "include": ["src"],
   "references": [],
   "compileOnSave": false
 }

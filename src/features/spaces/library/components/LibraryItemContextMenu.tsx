@@ -6,15 +6,19 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuTrigger,
+  AppLogoImage,
   MenuItem,
   MenuSeparator,
+  MenuSubmenu,
   OverflowFadeText,
 } from "@misty/ui";
 import {
   ArchiveRestore,
   AudioLines,
+  AppWindow,
   ClipboardCopy,
   Copy,
+  Eye,
   Pencil,
   Tags,
   Trash2,
@@ -39,6 +43,10 @@ export interface LibraryItemMenuActions {
   onRestore: () => void;
   /** Offered for audio and video when voice notes are on. */
   onTranscribe?: () => void;
+  /** The added apps that open this file, for Open with; empty when none do. */
+  openWith: { id: string; name: string; logo: string }[];
+  onOpenIn: (appId: string) => void;
+  onPreview: () => void;
 }
 
 /** Whether the item's menu has any rows: a viewer looking at Trash can do nothing with it. */
@@ -54,6 +62,23 @@ export function LibraryItemMenuRows(props: LibraryItemMenuActions) {
     ) : null;
   return (
     <>
+      {props.openWith.length ? (
+        <>
+          <MenuSubmenu icon={<AppWindow />} label="Open with">
+            {props.openWith.map((app) => (
+              <MenuItem
+                key={app.id}
+                icon={<AppLogoImage src={app.logo || undefined} name={app.name} size="row" />}
+                label={app.name}
+                onSelect={() => props.onOpenIn(app.id)}
+              />
+            ))}
+            <MenuSeparator />
+            <MenuItem icon={<Eye />} label="Preview" onSelect={props.onPreview} />
+          </MenuSubmenu>
+          <MenuSeparator />
+        </>
+      ) : null}
       {props.canCopy ? (
         <MenuItem icon={<ClipboardCopy />} label="Copy" onSelect={props.onCopy} />
       ) : null}

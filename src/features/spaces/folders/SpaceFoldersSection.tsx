@@ -1,71 +1,43 @@
-import { Download, FolderUp, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FolderOpen, FolderUp, Trash2 } from "lucide-react";
+import { useState } from "react";
 import {
   Button,
   EmptyState,
   ErrorState,
-  HomeSection,
   ListRow,
   ListRowSkeleton,
   MenuItem,
   MenuSeparator,
-  notify,
-  Text,
   useConfirmDelete,
   useNotice,
 } from "@misty/ui";
-import { formatBytes } from "../library/libraryFormat";
-import { ShareFolderDialog, errorText } from "./ShareFolderDialog";
-import { downloadFolder, folderSource, forgetFolderSource, pickFolderToShare } from "./shareFolder";
-import { spaceFoldersApi, type SpaceFolder } from "./spaceFoldersApi";
-
-function folderLine(folder: SpaceFolder): string {
-  const files = folder.fileCount === 1 ? "1 file" : `${folder.fileCount} files`;
-  return `${folder.uploadedBy.name} · ${formatBytes(folder.byteSize)} · ${files}`;
-}
+import { driveNative, type DriveEntry } from "../drive/driveNative";
+import { useDriveList } from "../drive/useDrive";
+import { CopyFolderDialog, errorText } from "./CopyFolderDialog";
+import { pickFolderToCopy } from "./shareFolder";
 
 /**
- * The folders members shared into the Space: each with who uploaded it and when, and its size.
- * Share a folder picks one on this computer and uploads it; a row's ⋯ uploads its changes,
- * downloads it to this computer, or deletes it.
+ * The folders at the top of the Space's drive, in the Space menu's Shared folders dialog: each with
+ * who last changed it and when. Copy into the Space picks a folder on this computer and copies it
+ * in; a row's ⋯ shows it in the drive or moves it to the Space's trash.
  */
 export function SpaceFoldersSection({ spaceId }: { spaceId: string }) {
-  const [folders, setFolders] = useState<SpaceFolder[] | null>(null);
-  const [loadError, setLoadError] = useState("");
-  const [attempt, setAttempt] = useState(0);
-  const [sharing, setSharing] = useState<{ localFolder: string; target?: SpaceFolder } | null>(
-    null,
-  );
+  const listing = useDriveList(spaceId, "/");
+  const [copying, setCopying] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [picking, setPicking] = useState(false);
-  /** Downloads under way, by folder id, as a share from 0 to 1. */
-  const [downloads, setDownloads] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
   const { confirm, dialog: confirmDialog } = useConfirmDelete();
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
 
-  useEffect(() => {
-    let live = true;
-    setFolders(null);
-    setLoadError("");
-    spaceFoldersApi
-      .list(spaceId)
-      .then((result) => live && setFolders(result.folders))
-      .catch((cause) => live && setLoadError(errorText(cause, "Try again in a moment.")));
-    return () => {
-      live = false;
-    };
-  }, [spaceId, attempt]);
-
-  const pick = async (target?: SpaceFolder) => {
+  const pick = async () => {
     if (picking) return;
     setPicking(true);
     setError("");
     try {
-      const start = target ? folderSource(spaceId, target.id) : undefined;
-      const localFolder = await pickFolderToShare(start);
+      const localFolder = await pickFolderToCopy();
       if (!localFolder) return;
-      setSharing({ localFolder, target });
+      setCopying(localFolder);
       setDialogOpen(true);
     } catch (cause) {
       setError(errorText(cause, "Misty couldn't open that folder."));
@@ -74,138 +46,95 @@ export function SpaceFoldersSection({ spaceId }: { spaceId: string }) {
     }
   };
 
-  const shared = (folder: SpaceFolder) =>
-    setFolders((current) => [folder, ...(current ?? []).filter((each) => each.id !== folder.id)]);
+  const reveal = (folder: DriveEntry) =>
+    void driveNative
+      .reveal(spaceId, folder.path)
+      .catch((cause) => setError(errorText(cause, `${folder.name} couldn't be shown. Try again.`)));
 
-  const download = async (folder: SpaceFolder) => {
-    if (folder.id in downloads) return;
-    setDownloads((current) => ({ ...current, [folder.id]: 0 }));
-    try {
-      await downloadFolder(spaceId, folder, (progress) =>
-        setDownloads((current) =>
-          folder.id in current
-            ? {
-                ...current,
-                [folder.id]:
-                  progress.bytesTotal > 0
-                    ? progress.bytesDone / progress.bytesTotal
-                    : progress.total > 0
-                      ? progress.done / progress.total
-                      : 1,
-              }
-            : current,
-        ),
-      );
-      notify({ message: `${folder.name} is on this computer.` });
-    } catch (cause) {
-      setError(errorText(cause, `${folder.name} couldn't be downloaded. Try again.`));
-    } finally {
-      setDownloads(({ [folder.id]: _done, ...rest }) => rest);
-    }
-  };
-
-  const remove = (folder: SpaceFolder) =>
+  const remove = (folder: DriveEntry) =>
     void confirm({
       title: `Delete "${folder.name}"?`,
-      what: "Its files are deleted from the Space for everyone. This can't be undone.",
-      onConfirm: async () => {
-        await spaceFoldersApi.remove(spaceId, folder.id);
-        forgetFolderSource(spaceId, folder.id);
-        setFolders((current) => (current ?? []).filter((each) => each.id !== folder.id));
-      },
+      what: "It moves to the Space's trash for everyone, and can be restored for 30 days.",
+      onConfirm: () => driveNative.trash(spaceId, folder.path),
     });
 
+  const folders =
+    listing.status === "ready" ? listing.entries.filter((entry) => entry.kind === "folder") : null;
   const hasFolders = Boolean(folders?.length);
-  const shareButton = hasFolders ? (
+  const copyButton = (
     <Button
       type="button"
-      variant="primary"
+      variant="secondary"
       icon={FolderUp}
       disabled={picking}
       onClick={() => void pick()}
     >
-      Share a folder
+      Copy into the Space
     </Button>
-  ) : undefined;
+  );
 
   return (
-    <HomeSection title="Folders" count={folders?.length} action={shareButton} panel>
-      {folders === null ? (
-        loadError ? (
-          <ErrorState
-            inline
-            title="Folders couldn't load"
-            line={loadError}
-            action={{ label: "Try again", onClick: () => setAttempt((count) => count + 1) }}
-          />
-        ) : (
-          <ListRowSkeleton label="Shared folders" rows={2} lines={2} state />
-        )
+    <div className="grid min-w-0 gap-3">
+      {listing.status === "failed" ? (
+        <ErrorState
+          inline
+          title="Shared folders couldn't load"
+          line={listing.message || "Try again in a moment."}
+          action={{ label: "Try again", onClick: listing.retry }}
+        />
+      ) : folders === null ? (
+        <ListRowSkeleton label="Shared folders" rows={2} lines={2} state />
       ) : hasFolders ? (
         <div className="grid min-w-0">
-          {folders.map((folder) => {
-            const share = downloads[folder.id];
-            const downloading = share !== undefined;
-            return (
-              <ListRow
-                key={folder.id}
-                label={folder.name}
-                description={folderLine(folder)}
-                state={downloading ? { kind: "none" } : { kind: "time", at: folder.uploadedAt }}
-                trailing={
-                  downloading ? (
-                    <Text size="meta" tone="muted">
-                      {`${Math.round(share * 100)}%`}
-                    </Text>
-                  ) : undefined
-                }
-                menuLabel={`Actions for ${folder.name}`}
-                menu={
-                  <>
-                    <MenuItem
-                      icon={FolderUp}
-                      label="Upload changes"
-                      disabled={picking}
-                      onSelect={() => void pick(folder)}
-                    />
-                    <MenuItem
-                      icon={Download}
-                      label="Download"
-                      disabled={downloading}
-                      onSelect={() => void download(folder)}
-                    />
-                    <MenuSeparator />
-                    <MenuItem icon={Trash2} label="Delete" danger onSelect={() => remove(folder)} />
-                  </>
-                }
-              />
-            );
-          })}
+          {folders.map((folder) => (
+            <ListRow
+              key={folder.id}
+              label={folder.name}
+              description={folder.modified_by_name || undefined}
+              state={{ kind: "time", at: folder.mtime_ms }}
+              menuLabel={`Actions for ${folder.name}`}
+              menu={
+                <>
+                  <MenuItem icon={FolderOpen} label="Show in drive" onSelect={() => reveal(folder)} />
+                  <MenuSeparator />
+                  <MenuItem icon={Trash2} label="Delete" danger onSelect={() => remove(folder)} />
+                </>
+              }
+            />
+          ))}
+          {listing.status === "ready" && listing.more ? (
+            <div className="flex justify-center pt-2">
+              <Button variant="secondary" disabled={listing.loadingMore} onClick={listing.more}>
+                Load more
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <EmptyState
           inline
-          title="No shared folders"
-          line="Share a folder so everyone in the Space can use its files."
+          title="Nothing shared yet"
+          line="Copy a folder into the Space so everyone in it can use its files."
           action={{
-            label: "Share a folder",
+            label: "Copy into the Space",
             icon: FolderUp,
             disabled: picking,
             onClick: () => void pick(),
           }}
         />
       )}
-      {sharing ? (
-        <ShareFolderDialog
+      {hasFolders ? <div className="flex justify-end">{copyButton}</div> : null}
+      {copying ? (
+        <CopyFolderDialog
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           spaceId={spaceId}
-          localFolder={sharing.localFolder}
-          target={sharing.target}
-          onShared={shared}
+          localFolder={copying}
+          // The copy shows in the list as the drive reports it.
+          onCopied={() => undefined}
         />
       ) : null}
       {confirmDialog}
-    </HomeSection>
+    </div>
   );
 }

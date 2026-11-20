@@ -4,6 +4,8 @@ export { CaptureBarStatus, CaptureMenu, CapturePanel, transcribeLibraryFile } fr
 
 // Public surface used by other features.
 export { VoiceSection } from "./settings/VoiceSection";
+export { DevicesSection } from "./settings/DevicesSection";
+export { savedInputDevice } from "./inputDevice";
 export { voiceCleanup, voiceDevice } from "./api";
 export {
   chosenVoice,

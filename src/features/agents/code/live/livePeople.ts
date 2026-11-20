@@ -13,7 +13,7 @@ export interface PresentPerson {
 /** The people in the session now, from awareness: one entry each however many windows they have. */
 export function presentPeople(room: LiveRoom, withMe: boolean): PresentPerson[] {
   const seen = new Map<string, PresentPerson>();
-  room.provider.awareness.getStates().forEach((raw, client) => {
+  room.awareness.getStates().forEach((raw, client) => {
     const state = raw as LiveAwareness;
     const user = state.user;
     if (!user?.id || (!withMe && user.id === room.me.id)) return;

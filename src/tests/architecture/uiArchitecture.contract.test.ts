@@ -94,11 +94,12 @@ describe("UI architecture contract", () => {
       const relative = repositoryPath(path);
       if (relative.endsWith(".test.ts") || relative.endsWith(".test.tsx")) continue;
       const text = readFileSync(path, "utf8");
-      if (
-        /from\s+["'](?:@radix-ui\/|radix-ui["'])/.test(text)
-      ) {
+      if (/from\s+["'](?:@radix-ui\/|radix-ui["'])/.test(text)) {
         failures.push(`${relative}: import Radix only inside @misty/ui`);
       }
+      // The libraries @misty/ui builds on stay behind it: the app uses its components.
+      const underneath = /from\s+["'](cmdk|react-resizable-panels|@twemoji\/[\w-]+)["']/.exec(text);
+      if (underneath) failures.push(`${relative}: use @misty/ui instead of ${underneath[1]}`);
       // Reading a token with var() inside a Tailwind class is fine; defining new custom
       // properties inline is where styling escapes the design system.
       if (

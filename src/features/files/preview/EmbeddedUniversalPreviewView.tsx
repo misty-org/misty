@@ -13,9 +13,8 @@ import {
 import { PreviewMessage } from "./PreviewPrimitives";
 import {
   cn,
+  PaneLoading,
   PlaceholderIcon,
-  Skeleton,
-  SkeletonDocument,
   Surface,
   Text,
   lazyTool,
@@ -62,9 +61,7 @@ export function EmbeddedUniversalPreviewView(props: {
   );
   if (props.loading || documentLoading)
     return (
-      <PreviewSkeleton
-        kind={isPdf ? "pdf" : isAudio ? "audio" : isImage || isVideo ? "media" : "document"}
-      />
+      <PaneLoading label="Loading preview" />
     );
   if (props.error || documentError)
     return (
@@ -237,36 +234,3 @@ interface EmbeddedPreviewRuntime {
   readBytes(url: string, signal: AbortSignal): Promise<ArrayBuffer>;
 }
 
-/**
- * The preview while its file loads, shaped like what it will show: a picture or video's frame,
- * the audio player's card, a PDF's first page, or a document's text.
- */
-function PreviewSkeleton({ kind }: { kind: "media" | "audio" | "pdf" | "document" }) {
-  if (kind === "document") return <SkeletonDocument label="Preview" />;
-  return (
-    <div
-      role="status"
-      aria-label="Preview"
-      aria-busy="true"
-      className="grid h-full w-full place-items-center"
-    >
-      <span className="sr-only">Preview</span>
-      {kind === "media" ? (
-        <Skeleton className="aspect-video max-h-full w-full max-w-3xl rounded-none" />
-      ) : kind === "audio" ? (
-        <Surface
-          tone="card"
-          edge="hairline"
-          radius="xl"
-          className="grid w-[min(32.5rem,90%)] justify-items-center gap-5 p-8"
-        >
-          <Skeleton className="size-12 rounded-full" />
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-14 w-full rounded-full" />
-        </Surface>
-      ) : (
-        <Skeleton className="aspect-[8.5/11] w-[min(100%,40rem)] self-start rounded-md" />
-      )}
-    </div>
-  );
-}

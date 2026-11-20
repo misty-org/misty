@@ -106,7 +106,10 @@ export function createLoadConversations(
         return;
       }
       const activeConversationId =
-        get().activeConversationId || (get().selectedAgentId ? "" : conversations[0]?.id) || "";
+        get().activeConversationId ||
+        // A chat kept by a place of its own (the studio's, Tutor's) is never the one opened.
+        (get().selectedAgentId ? "" : conversations.find((c) => !c.place)?.id) ||
+        "";
       set({
         conversations,
         pendingArtifact: conversations

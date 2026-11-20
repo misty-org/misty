@@ -1,20 +1,16 @@
 import {
   CodeXml,
-  EyeOff,
   Keyboard,
-  Mic,
   Palette,
   Search,
   Server,
   SlidersHorizontal,
-  SquareTerminal,
   UserCircle,
   Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
-import { spaceIcons } from "@misty/ui";
 import type { SettingOwnership } from "./device-preferences/registry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
@@ -29,15 +25,11 @@ type SettingsArea =
   | "general"
   | "server"
   | "appearance"
-  | "shortcuts"
-  | "voice"
-  | "privacy"
+  | "input"
   | "advanced"
   | "search"
-  | "space"
   | "code"
-  | "agents"
-  | "engines";
+  | "agents";
 
 interface SettingsAreaInfo {
   label: string;
@@ -49,30 +41,26 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   general: { label: "General", icon: SlidersHorizontal },
   server: { label: "Server", icon: Server },
   appearance: { label: "Interface", icon: Palette },
-  shortcuts: { label: "Shortcuts", icon: Keyboard },
-  voice: { label: "Voice", icon: Mic },
-  privacy: { label: "Privacy", icon: EyeOff },
+  input: { label: "Input", icon: Keyboard },
   advanced: { label: "Advanced", icon: Wrench },
   search: { label: "Search", icon: Search },
-  space: { label: "Space", icon: spaceIcons.space },
   code: { label: "Code", icon: CodeXml },
   agents: { label: "Agents", icon: Users },
-  engines: { label: "Engines", icon: SquareTerminal },
 };
 
 /**
  * Sidebar groups, named by feature, in sidebar order. Pages holds one page for each of the app's
  * places, with that place's name and icon, so what each can adjust is easy to find. Agents is one
- * page holding the person's team, engine, behavior, tutor and access. Engines is one
- * page for the engines' CLIs, channels, environment and usage.
+ * page holding the person's team, behavior, tutor and access, then the engines' own setup,
+ * channels, environment and usage. Pages hold many sections rather than there being many pages.
  */
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
   { label: "Account", areas: ["account", "server"] },
   {
     label: "App",
-    areas: ["general", "appearance", "shortcuts", "voice", "privacy", "advanced"],
+    areas: ["general", "appearance", "input", "advanced"],
   },
-  { label: "Pages", areas: ["search", "space", "code", "agents", "engines"] },
+  { label: "Pages", areas: ["search", "code", "agents"] },
 ];
 
 interface SettingsBlock {
@@ -98,31 +86,38 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("general", "general", "Startup"),
   block("general", "updates", "Updates"),
   block("account", "account", "Profile", "resource"),
+  block("account", "status", "Status", "resource"),
+  block("account", "requests", "Requests", "resource"),
+  block("account", "notifications", "Notifications"),
   block("server", "server", "Server"),
+  block("server", "drive", "Drive"),
+  block("server", "privacy", "Data"),
   block("appearance", "appearance", "Appearance"),
   block("appearance", "fonts", "Fonts"),
   block("appearance", "pets", "Pet"),
   block("appearance", "bottom-bar", "Bottom bar"),
-  block("shortcuts", "shortcuts", "Shortcuts"),
-  block("voice", "voice", "Voice"),
-  block("privacy", "privacy", "Privacy"),
-  block("privacy", "agent-activity", "Agent activity"),
+  block("appearance", "accessibility", "Accessibility"),
+  block("input", "shortcuts", "Shortcuts"),
+  block("input", "voice", "Voice"),
+  block("input", "devices", "Devices"),
   block("advanced", "advanced", "Advanced"),
   block("advanced", "network", "Network"),
   block("advanced", "performance", "Performance"),
+  block("advanced", "diagnostics", "Diagnostics"),
   block("search", "search", "Sources"),
-  block("space", "space", "Home"),
   block("code", "editor", "Editor"),
+  block("code", "collaboration", "Collaboration"),
   block("agents", "agents-list", "Team", "resource"),
-  block("agents", "models", "Engine"),
   block("agents", "agents-defaults", "Conversations"),
   block("agents", "agents-companion", "Tutor"),
   block("agents", "agents-permissions", "Access", "resource"),
   block("agents", "agents-computer-use", "Computer use"),
-  block("engines", "engines-clis", "Setup", "resource"),
-  block("engines", "engines-channels", "Channels", "resource"),
-  block("engines", "engines-environment", "Environment", "resource"),
-  block("engines", "engines-usage", "Usage", "resource"),
+  block("agents", "agent-activity", "Activity"),
+  block("agents", "models", "Engine"),
+  block("agents", "engines-clis", "Setup", "resource"),
+  block("agents", "engines-channels", "Channels", "resource"),
+  block("agents", "engines-environment", "Environment", "resource"),
+  block("agents", "engines-usage", "Usage", "resource"),
 ];
 
 /**

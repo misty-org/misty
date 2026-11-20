@@ -24,7 +24,7 @@ it("opens a Space beside Agents and keeps both pane identities while changing to
   expect(
     before.find((pane) => pane.id === spacePane)?.views.some((tab) => tab.id === space.id),
   ).toBe(true);
-  useWorkspaceStore.getState().updateViewRoute(space.id, "/spaces/project/planner");
+  useWorkspaceStore.getState().updateViewRoute(space.id, "/spaces/project/files");
   const after = dockLeaves(useWorkspaceStore.getState().layout.root);
   expect(after.map((pane) => pane.id)).toEqual(before.map((pane) => pane.id));
   expect(after.find((pane) => pane.id === browserPane)?.views).toEqual(

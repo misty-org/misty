@@ -1,6 +1,5 @@
 import { Play, Plus, RotateCw, Save, Square, SquareCode, Table2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Panel, PanelGroup } from "react-resizable-panels";
 import {
   ActionBar,
   ConfirmDeleteDialog,
@@ -10,6 +9,8 @@ import {
   TabStrip,
   Text,
   type ActionBarItem,
+  SplitPane as Panel,
+  SplitPanes as PanelGroup,
 } from "@misty/ui";
 import { useDbStore, primaryKeyOf, tableOf, type DbTab } from "./dbStore";
 import { ResultsGrid, ResultsSkeleton } from "./ResultsGrid";

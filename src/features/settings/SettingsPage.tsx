@@ -1,5 +1,5 @@
 import { useAppStore } from "@/app/shell";
-import { Button, ErrorState, SearchField } from "@misty/ui";
+import { Button, CollectionFilters, ErrorState, SearchField } from "@misty/ui";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -81,6 +81,15 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
   const entry = settingsRegistry.find((item) => item.id === section) ?? settingsRegistry[0];
   const pageEntries = settingsRegistry.filter((item) => item.area === entry.area);
   const results = useMemo(() => searchSettings(query), [query]);
+  // A long page (many sections) opens with its sections as tabs that jump down the page.
+  const [jumped, setJumped] = useState("");
+  const jumpTo = (id: string) => {
+    setJumped(id);
+    content.current
+      ?.querySelector(`[data-settings-page="${id}"]`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  useEffect(() => setJumped(""), [entry.area]);
 
   useEffect(() => {
     if (!settings) void load();
@@ -181,6 +190,15 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
             <DesktopSettingsRowSkeleton label={pageTitle} rows={4} control="switch" />
           </DesktopSettingsSection>
         )}
+        {settings && pageEntries.length > 4 ? (
+          <div className="mb-4">
+            <CollectionFilters
+              options={pageEntries.map((item) => ({ value: item.id, label: item.label }))}
+              value={jumped || pageEntries[0].id}
+              onChange={jumpTo}
+            />
+          </div>
+        ) : null}
         {settings &&
           pageEntries.map((item) => {
             const Block = item.Component;

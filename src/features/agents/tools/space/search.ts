@@ -10,8 +10,8 @@ const searchAll: LocalToolHandler = async (request) => {
   if (!query) throw refuse(BAD_SCHEMA);
   const kinds =
     textList(input, "kinds", {
-      max: 6,
-      allowed: ["note", "message", "drawing", "deck", "workbook"],
+      max: 2,
+      allowed: ["note", "message"],
     }) ?? [];
   const limit = integer(input, "limit", 1, 50) ?? 20;
   const reference = spaceArgument(input);

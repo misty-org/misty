@@ -1,15 +1,10 @@
-//! Shared Space folders, the app's side: a folder the person picks is walked (`.gitignore`, then
-//! `.mistyignore`), hashed and streamed to the presigned addresses the server hands out, and a
-//! shared folder is kept on this computer in Misty's data folder for agent runs to use.
-//!
-//! The page talks to the server (create, diff, commit); native code only reads the picked folder
-//! and moves bytes. A folder a window names is used only if the person picked it in the system's
-//! own dialog while Misty has been running (`space_folder_pick`).
+//! Picking a local folder to copy into a Space's drive ("Copy into the Space", `drive_copy_in`):
+//! the system's own folder dialog, the tree of what the folder's `.gitignore` and `.mistyignore`
+//! leave out, and editing its `.mistyignore`. A folder a window names is used only if the person
+//! picked it in that dialog while Misty has been running (`space_folder_pick`). Shared folders
+//! themselves became folders in the Space's drive (`space_drive`), so nothing here uploads or
+//! downloads any more.
 
-mod download;
-mod paths;
-mod progress;
-mod upload;
 mod walk;
 
 #[cfg(test)]
@@ -20,15 +15,12 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
-use serde::Serialize;
 use tauri::{AppHandle, State, Webview};
 
 use crate::agents::shared_folders::check_root;
 use crate::app::runtime::MistyRuntime;
 use crate::project::person_window;
 
-pub use download::RemoteFile;
-pub use upload::FolderUpload;
 pub use walk::Scan;
 
 /// Folders the person picked in the dialog since Misty started, by their real path.
@@ -42,8 +34,9 @@ fn picked() -> std::sync::MutexGuard<'static, HashSet<PathBuf>> {
     PICKED.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The real path of a folder the person picked, or a refusal.
-fn picked_folder(folder: &str) -> Result<PathBuf, String> {
+/// The real path of a folder the person picked, or a refusal. "Copy into the Space"
+/// (`drive_copy_in`) takes only these too.
+pub(crate) fn picked_folder(folder: &str) -> Result<PathBuf, String> {
     let asked = PathBuf::from(folder);
     if !asked.is_absolute() {
         return Err(NOT_PICKED.into());
@@ -71,7 +64,7 @@ async fn pick_dialog(app: &AppHandle, start: Option<&str>) -> Result<Option<Path
     let mut dialog = app
         .dialog()
         .file()
-        .set_title("Choose a folder to share")
+        .set_title("Choose a folder to copy into the Space")
         .set_can_create_directories(false);
     let start = start.map(PathBuf::from).filter(|path| path.is_absolute());
     if let Some(directory) = start.or_else(dirs::document_dir) {
@@ -179,121 +172,4 @@ pub async fn space_folder_ignore_write(
             .map_err(|error| format!("Misty couldn't save .mistyignore: {error}"))
     })
     .await
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ManifestFile {
-    path: String,
-    sha256: String,
-    size: u64,
-}
-
-/// Every shared file of a picked folder with its SHA-256 and size, sorted by path. Progress goes
-/// to the calling window as `misty://space-folder-progress`, with `folder` as given.
-#[tauri::command]
-pub async fn space_folder_manifest(
-    app: AppHandle,
-    webview: Webview,
-    folder: String,
-) -> Result<Vec<ManifestFile>, String> {
-    person_window(&webview)?;
-    let root = picked_folder(&folder)?;
-    let window = webview.label().to_string();
-    blocking(move || {
-        let files = walk::included_files(&root)?;
-        let progress = progress::Progress::new(
-            app,
-            window,
-            folder,
-            files.len(),
-            files.iter().map(|file| file.size).sum(),
-        );
-        progress.send(true);
-        let mut out = Vec::with_capacity(files.len());
-        for file in files {
-            let (sha256, size) = walk::sha256_file(&file.absolute, |count| progress.bytes(count))
-                .map_err(|error| format!("Misty couldn't read {}: {error}", file.path))?;
-            progress.file_done();
-            out.push(ManifestFile {
-                path: file.path,
-                sha256,
-                size,
-            });
-        }
-        progress.send(true);
-        Ok(out)
-    })
-    .await
-}
-
-/// Streams each listed file of a picked folder to its presigned address, a few at a time, with
-/// progress to the calling window.
-#[tauri::command]
-pub async fn space_folder_put(
-    app: AppHandle,
-    webview: Webview,
-    folder: String,
-    uploads: Vec<FolderUpload>,
-) -> Result<(), String> {
-    person_window(&webview)?;
-    let root = picked_folder(&folder)?;
-    let window = webview.label().to_string();
-    upload::put_all(&root, uploads, |total, bytes| {
-        progress::Progress::new(app, window, folder, total, bytes)
-    })
-    .await
-}
-
-/// Brings this computer's copy of a shared folder up to its manifest, and returns where it is.
-/// Progress goes to the calling window with `folder` set to `folder_id`.
-#[tauri::command]
-pub async fn space_folder_download(
-    app: AppHandle,
-    webview: Webview,
-    state: State<'_, MistyRuntime>,
-    space: String,
-    folder_id: String,
-    files: Vec<RemoteFile>,
-) -> Result<String, String> {
-    person_window(&webview)?;
-    let cache = download::cache_root(&state.environment.misty_dir(), &space, &folder_id)?;
-    let window = webview.label().to_string();
-    download::sync(cache.clone(), files, |total, bytes| {
-        progress::Progress::new(app, window, folder_id, total, bytes)
-    })
-    .await?;
-    Ok(cache.to_string_lossy().into_owned())
-}
-
-/// Where this computer keeps a shared folder, whether it was downloaded yet or not.
-#[tauri::command]
-pub async fn space_folder_cache_path(
-    webview: Webview,
-    state: State<'_, MistyRuntime>,
-    space: String,
-    folder_id: String,
-) -> Result<String, String> {
-    person_window(&webview)?;
-    let cache = download::cache_root(&state.environment.misty_dir(), &space, &folder_id)?;
-    Ok(cache.to_string_lossy().into_owned())
-}
-
-/// The shared folders of `space` this computer downloaded, for runs in that Space: their engine
-/// may read them beside its own folder (`engines::launch_dirs`). Folders still downloading
-/// (`.<id>.partial`) are left out.
-pub(crate) fn downloaded_folders(misty_dir: &std::path::Path, space: &str) -> Vec<std::path::PathBuf> {
-    let Ok(space) = paths::id(space) else {
-        return Vec::new();
-    };
-    let root = misty_dir.join("spaces").join(space).join("folders");
-    let Ok(entries) = file_access::fs::read_dir(&root) else {
-        return Vec::new();
-    };
-    entries
-        .flatten()
-        .filter(|entry| !entry.file_name().to_string_lossy().starts_with('.'))
-        .map(|entry| entry.path())
-        .filter(|path| file_access::fs::is_dir(path))
-        .collect()
 }

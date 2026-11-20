@@ -1,4 +1,4 @@
-import { Clapperboard, FolderOpen } from "lucide-react";
+import { Monitor } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import type { MistyPickerProps, MistyPickerSource } from "./mistyPickerOptions";
 import { LibraryPickerPanel } from "./LibraryPickerSeam";
@@ -9,6 +9,7 @@ import {
   DialogTitle,
   ChoiceGroup,
   Surface,
+  spaceIcons,
 } from "@misty/ui";
 import type { MistyFilePickerProps } from "./FilePicker";
 
@@ -63,8 +64,8 @@ export function MistyPickerShell({
       value={source}
       onChange={setSource}
       options={[
-        { value: "files", label: "Files", icon: FolderOpen },
-        { value: "library", label: "Media", icon: Clapperboard },
+        { value: "files", label: "This computer", icon: Monitor },
+        { value: "library", label: "Files", icon: spaceIcons.files },
       ]}
     />
   );
@@ -83,7 +84,7 @@ export function MistyPickerShell({
             <div className="min-w-0">
               <DialogTitle className="text-base">
                 {source === "library"
-                  ? "Choose from Media"
+                  ? "Choose from Files"
                   : title || (fileMode === "folder" ? "Choose a folder" : "Choose a file")}
               </DialogTitle>
             </div>

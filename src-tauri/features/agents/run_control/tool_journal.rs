@@ -236,7 +236,7 @@ mod tests {
     #[tokio::test]
     async fn receipts_keep_writes_and_say_how_each_ended() {
         let (_directory, journal) = journal();
-        journal.begin("r", "a", "note.update").await;
+        journal.begin("r", "a", "file.update").await;
         journal
             .finish(
                 "r",
@@ -244,7 +244,7 @@ mod tests {
                 &LocalToolOutcome::Result(json!({ "ok": true, "image": "x" })),
             )
             .await;
-        journal.begin("r", "b", "note.read").await;
+        journal.begin("r", "b", "file.read").await;
         journal
             .finish("r", "b", &LocalToolOutcome::Result(json!({ "text": "y" })))
             .await;
@@ -257,7 +257,7 @@ mod tests {
             .any(|row| row["tool"] == "message.send" && row["state"] == "started"));
         let done = rows
             .iter()
-            .find(|row| row["tool"] == "note.update")
+            .find(|row| row["tool"] == "file.update")
             .unwrap();
         assert_eq!(done["state"], "completed");
         assert!(!done["result"].as_str().unwrap().contains("image"));
@@ -304,7 +304,7 @@ mod tests {
                 )
                 .unwrap();
         }
-        journal.begin("new", "c", "note.read").await;
+        journal.begin("new", "c", "file.read").await;
         assert_eq!(
             journal.begin("kept", "c", "message.send").await,
             Begun::Interrupted

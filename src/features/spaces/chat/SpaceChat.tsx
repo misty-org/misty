@@ -1,12 +1,9 @@
 import type { MistyPickerSource } from "@/features/files";
-import { FluxerChatRoot } from "./fluxer/FluxerChatRoot";
-import { FluxerComposer } from "./fluxer/FluxerComposer";
-import { FluxerMemberList } from "./fluxer/FluxerMemberList";
-import { FluxerSearchResults } from "./fluxer/FluxerSearchResults";
-import { cx } from "./fluxer/cx";
-import indexPage from "./fluxer/css/ChannelIndexPage.module.css";
-import chatLayout from "./fluxer/css/ChannelChatLayout.module.css";
-import shell from "./fluxer/css/SpaceChatShell.module.css";
+import { Hash, Lock, User, Users } from "lucide-react";
+import { ChannelHeader, ChannelMain, type ActionBarItem } from "@misty/ui";
+import { SpaceChatComposer } from "./composer/SpaceChatComposer";
+import { ChatMemberList } from "./components/ChatMemberList";
+import { ChatSearchResults } from "./components/ChatSearchResults";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/useSpaceRoles";
 import { isPrivateChannel } from "./sidebar/conversationGroups";
@@ -17,7 +14,7 @@ import { useNativeSessionStore } from "@/features/account";
 import { useSpaceChatDraft } from "./composer/useSpaceChatDraft";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
@@ -49,6 +46,8 @@ export function SpaceChat({
   panel = false,
   onBack,
   searchedText = "",
+  actions: barActions,
+  search,
 }: {
   spaceId: string;
   spaceName: string;
@@ -59,8 +58,12 @@ export function SpaceChat({
   panel?: boolean;
   /** Where "Back to chat" goes when the open chat is gone; defaults to the chat page. */
   onBack?: () => void;
-  /** The message search run from the page's bar; its results take the member list's place. */
+  /** The message search run from the page's controls; its results take the member list's place. */
   searchedText?: string;
+  /** The chat's icon buttons in its bar under the tabs (the chat page's); none in the side panel. */
+  actions?: ReadonlyArray<ActionBarItem>;
+  /** The message search, last in the chat's bar. */
+  search?: ReactNode;
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -74,6 +77,11 @@ export function SpaceChat({
   const threadsListOpen = useChatSidePanel((panel) => panel.threadsListOpen);
   // Panels belong to the chat they were opened in.
   useEffect(() => useChatSidePanel.getState().reset(), [spaceId, conversationId]);
+  // A link to a thread (a file's, opened from the app it's open in) opens it beside the chat.
+  const threadParam = searchParams.get("thread") ?? "";
+  useEffect(() => {
+    if (threadParam) useChatSidePanel.getState().openThread(threadParam);
+  }, [spaceId, conversationId, threadParam]);
   const endRef = useRef<HTMLDivElement | null>(null);
   const store = useSpaceChatStore();
   const conversationChat = useSpaceConversationChat(spaceId, conversationId);
@@ -306,11 +314,7 @@ export function SpaceChat({
     (conversationChat.error || conversationChat.conversationsPending)
   )
     return (
-      <ConversationLoadState
-        error={conversationChat.error}
-        onRetry={conversationChat.reload}
-        bare
-      />
+      <ConversationLoadState error={conversationChat.error} onRetry={conversationChat.reload} />
     );
   if (!conversationAvailable)
     return (
@@ -338,7 +342,7 @@ export function SpaceChat({
     <ChatThreadsList spaceId={spaceId} conversationId={conversationId} />
   ) : null;
   const chat = (
-    <div ref={chatRootRef} className={chatLayout.container}>
+    <div ref={chatRootRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
       {!conversationId ? (
         <SpaceSetupCards
           spaceId={spaceId}
@@ -348,7 +352,7 @@ export function SpaceChat({
         />
       ) : null}
 
-      <div className={chatLayout.messagesArea}>
+      <div className="flex min-h-0 flex-1 flex-col">
         <SpaceChatThread
           spaceId={spaceId}
           access={access}
@@ -385,7 +389,7 @@ export function SpaceChat({
         />
       </div>
 
-      <FluxerComposer
+      <SpaceChatComposer
         spaceId={spaceId}
         canWrite={access.canWriteMessages}
         isConversation={Boolean(conversationId)}
@@ -393,10 +397,7 @@ export function SpaceChat({
         suggestions={suggestions}
         input={input}
         typing={typing}
-        members={scope.members}
-        agents={agents}
         messages={scope.messages}
-        memberColors={memberColors}
         pickerOpen={pickerOpen}
         pickerSource={pickerSource}
         onOpenPicker={openPicker}
@@ -432,7 +433,7 @@ export function SpaceChat({
   );
   const members =
     membersShown && space ? (
-      <FluxerMemberList
+      <ChatMemberList
         space={space}
         spaceId={spaceId}
         ownerUserId={space.owner_user_id}
@@ -447,7 +448,7 @@ export function SpaceChat({
       />
     ) : null;
   const searchResults = searchedText ? (
-    <FluxerSearchResults
+    <ChatSearchResults
       spaceId={spaceId}
       query={searchedText}
       whereSaid={(message) => {
@@ -469,25 +470,35 @@ export function SpaceChat({
       }}
     />
   ) : null;
-  // The side panel has no room for a header or a member list: the chat and its thread alone.
+  // The side panel has no room for the page's controls or a member list: the chat and its thread.
   if (panel)
     return (
-      <FluxerChatRoot
-        className={cx(indexPage.channelGrid)}
-        style={{ display: "flex", height: "100%" }}
-      >
+      <div className="flex h-full min-h-0 min-w-0">
         {chat}
         {thread}
-      </FluxerChatRoot>
+      </div>
     );
-  // Search results, then a thread, take the member list's place, as in Fluxer.
-  const side = searchResults ?? thread ?? members;
-  // The page's bar (SpaceChatEntry) names the chat and holds the members toggle and search.
+  // The chat's own bar, under the window's tabs, as Discord's: what the chat is, then its controls.
+  const header = (
+    <ChannelHeader
+      icon={
+        isDirect
+          ? conversation && isGroupDirectMessage(conversation, user?.id)
+            ? Users
+            : User
+          : privateChannel
+            ? Lock
+            : Hash
+      }
+      name={channelName}
+      actions={barActions}
+      end={search}
+    />
+  );
+  // Search results, then a thread, take the member list's place.
   return (
-    <div className={cx(indexPage.contentGrid, shell.channelBody)}>
-      {side === members && members ? <div className={indexPage.memberListDivider} /> : null}
-      <div className={indexPage.chatAreaSlot}>{chat}</div>
-      {side}
-    </div>
+    <ChannelMain header={header} side={searchResults ?? thread ?? members ?? undefined}>
+      {chat}
+    </ChannelMain>
   );
 }

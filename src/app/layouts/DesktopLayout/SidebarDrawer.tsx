@@ -13,7 +13,7 @@ import {
   setBrowserPointerTrackingEnabled,
   setBrowserWebviewsSuspended,
 } from "@/features/app-windows";
-import { cn, Surface } from "@misty/ui";
+import { cn, Separator, Surface } from "@misty/ui";
 import { designPx, uiPx } from "@misty/ui";
 import { dockingMetrics } from "./dockingGeometry";
 
@@ -202,6 +202,17 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
       >
         {props.children}
       </Surface>
+      {/* A hairline down the sidebar's edge with the page, so the two read apart. Collapsed, the
+          revealed drawer floats with its own edge instead. */}
+      {collapsed ? null : (
+        <Separator
+          orientation="vertical"
+          className={cn(
+            "pointer-events-none absolute top-0 bottom-0 z-[var(--stack-overlay-raised)]",
+            left ? "right-0" : "left-0",
+          )}
+        />
+      )}
       {collapsed ? null : (
         <div
           role="separator"

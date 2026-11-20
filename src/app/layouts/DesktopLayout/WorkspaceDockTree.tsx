@@ -7,9 +7,13 @@ import {
   type WorkspaceGroupKey,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { SplitHandle } from "@misty/ui";
+import {
+  SplitHandle,
+  SplitPane as Panel,
+  SplitPanes as PanelGroup,
+  type SplitPanesHandle as ImperativePanelGroupHandle,
+} from "@misty/ui";
 import { useEffect, useRef } from "react";
-import { Panel, PanelGroup, type ImperativePanelGroupHandle } from "react-resizable-panels";
 import { DockLeafView } from "./DockLeafView";
 
 export interface WorkspaceDockTreeProps {

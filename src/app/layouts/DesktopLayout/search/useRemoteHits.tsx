@@ -12,7 +12,7 @@ import {
   searchNotebooks,
   notebookRoute,
 } from "@/features/agents";
-import { searchSpaceText, spaceEvents, spaceTasks, type SpaceSearchHit } from "@/features/spaces";
+import { searchSpaceText, type SpaceSearchHit } from "@/features/spaces";
 import { useSettingsStore } from "@/features/settings";
 import { selectSearchSources } from "./searchSources";
 import type { AgentProfile } from "@/shared/schemas";
@@ -80,12 +80,6 @@ export function useRemoteHits({
           // The server ranks these; its order is kept, a little under a title match.
           spaceHit(hit, Math.max(fieldScore(words, hit.title, hit.text), 6 - index * 0.2)),
         ),
-      );
-      sources.push(async () =>
-        [...(await spaceTasks(spaceId)), ...(await spaceEvents(spaceId))].flatMap((hit) => {
-          const match = fieldScore(words, hit.title, hit.text);
-          return match ? [spaceHit(hit, match)] : [];
-        }),
       );
     }
     if (Object.keys(notebooks).length)

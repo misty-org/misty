@@ -64,7 +64,7 @@ export function ViewIcon({
   if (
     tab &&
     section &&
-    ["notes", "drawings", "explorer", "recent", "favorites", "collections", "deleted"].includes(
+    ["explorer", "recent", "favorites", "collections", "deleted"].includes(
       section,
     )
   )

@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ emit: mocks.emit }));
+vi.mock("@tauri-apps/api/webview", () => ({
+  getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }),
+}));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     label: "misty-cursor-1",
@@ -172,4 +175,51 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
   for (let time = 4_000; time <= 20_000; time += 500) tick(time);
   expect(marker.style.opacity).toBe("1");
   expect(mocks.emit).not.toHaveBeenCalledWith("misty://cursor-point-finished", expect.anything());
+});
+
+it("rests beside the pointer while it shows, and goes away with it", async () => {
+  let now = 0;
+  let frame: FrameRequestCallback = () => {};
+  vi.spyOn(performance, "now").mockImplementation(() => now);
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    frame = cb;
+    return 1;
+  });
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  mocks.invoke.mockResolvedValue({
+    generation: 1,
+    visible: false,
+    phase: "idle",
+    mode: "team",
+    sprite: true,
+  });
+  const { container } = render(<CursorCompanionRoot />);
+  await act(async () => {});
+  const group = container.querySelector<HTMLElement>(".cursor-group")!;
+  const sample = (time: number, extra: Record<string, unknown>) => {
+    now = time;
+    act(() => {
+      mocks.listeners.get(cursorEvent)!({
+        payload: {
+          x: 100,
+          y: 100,
+          displays: [{ id: 1, x: 0, y: 0, width: 1000, height: 800, scale: 1 }],
+          ...extra,
+        },
+      });
+      frame(now);
+    });
+  };
+  sample(0, { cursorShown: true });
+  expect(group.style.opacity).toBe("1");
+  // An app hid the pointer (typing, a video): Misty goes with it.
+  sample(16, { cursorShown: false });
+  expect(group.style.opacity).toBe("0");
+  sample(32, { cursorShown: true });
+  expect(group.style.opacity).toBe("1");
+  // Typing and a full-screen app send her away too.
+  sample(48, { cursorShown: true, typing: true });
+  expect(group.style.opacity).toBe("0");
+  sample(64, { cursorShown: true, fullscreen: true });
+  expect(group.style.opacity).toBe("0");
 });

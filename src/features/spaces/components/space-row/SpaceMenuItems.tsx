@@ -1,7 +1,8 @@
-import { LogOut, Pencil, Plus, Trash2, UserPlus, UsersRound } from "lucide-react";
+import { FolderOpen, HardDrive, LogOut, Pencil, Plus, Trash2, UserPlus, UsersRound } from "lucide-react";
 import type { Space } from "../../api/dto/entities";
 import { switchSpaceWindow } from "@/features/app-windows";
-import { DropdownMenuSeparator, MenuCheckItem, MenuItem } from "@misty/ui";
+import { DropdownMenuSeparator, MenuCheckItem, MenuItem, notify } from "@misty/ui";
+import { driveNative } from "../../drive/driveNative";
 import {
   canManageSpaceLifecycle,
   preferredDefaultSpace,
@@ -13,7 +14,8 @@ import type { SpaceDialog } from "./SpaceDialogs";
 
 /**
  * The Space menu: your Spaces, your own first (choosing one shows it in this window, with a
- * checkmark on the one it shows; tabs stay as they are), a new Space, and, for its owner, inviting people to it.
+ * checkmark on the one it shows; tabs stay as they are), a new Space, inviting people for its
+ * owner, then the Space itself: its people, its shared folders, renaming, leaving or deleting it.
  */
 export function SpaceMenuItems(props: {
   space: Space;
@@ -66,13 +68,15 @@ export function SpaceMenuItems(props: {
           />
         </>
       )}
+      <DropdownMenuSeparator />
+      <SpaceSettingsItems space={space} onDialog={onDialog} />
     </>
   );
 }
 
 /**
- * What can be done to the Space itself, from its Home: see its people, rename it, and leave or
- * delete it, each only for those allowed to.
+ * What can be done to the Space itself: see its people and its shared folders, rename it, and
+ * leave or delete it, each only for those allowed to.
  */
 export function SpaceSettingsItems(props: {
   space: Space;
@@ -84,6 +88,21 @@ export function SpaceSettingsItems(props: {
   return (
     <>
       <MenuItem icon={<UsersRound />} label="People" onSelect={later(() => onDialog("members"))} />
+      <MenuItem
+        icon={<FolderOpen />}
+        label="Shared folders"
+        onSelect={later(() => onDialog("folders"))}
+      />
+      {/* The Space's drive on this computer, in the system's file manager. */}
+      <MenuItem
+        icon={<HardDrive />}
+        label="Show drive"
+        onSelect={() =>
+          void driveNative
+            .reveal(space.id)
+            .catch(() => notify({ message: "The drive couldn't be shown. Try again.", tone: "error" }))
+        }
+      />
       {isOwner && canManageSpaceLifecycle(space, "rename") && (
         <MenuItem
           icon={<Pencil />}

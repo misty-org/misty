@@ -68,7 +68,7 @@ function SpaceLibraryFacetSuggestions({
     >
       {searchFacets.media_types.length > 0 ? (
         <LibraryFacetGroup
-          label="Media"
+          label="Files"
           facets={searchFacets.media_types}
           onSelect={(facet) => onAppendFacet("type", facet.value)}
         />

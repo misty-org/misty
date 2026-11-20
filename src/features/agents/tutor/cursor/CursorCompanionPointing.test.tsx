@@ -3,7 +3,7 @@
 import "./CompanionController.testFixtures";
 import { act, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { emit, mocks, mounted, presentations } from "./CompanionController.testFixtures";
+import { emit, mocks, mounted, opened, presentations } from "./CompanionController.testFixtures";
 import { useCompanionState } from "./companionState";
 import type { DisplayCapture } from "./protocol";
 
@@ -70,6 +70,7 @@ it("answers a spoken screen question from fresh captures, then points and reads 
   captureScreens();
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   emit("recorded", { turn: 2, durationMs: 1000 });
   admits("teach");
   let id: string | undefined;
@@ -89,7 +90,7 @@ it("answers a spoken screen question from fresh captures, then points and reads 
   expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", { turn: 2 });
   expect(mocks.submit.mock.calls[0][5]).toMatchObject({
     displayCaptures: [screen],
-    idempotencyKey: "voice-1:show",
+    idempotencyKey: "tutor-1:show",
   });
   expect(mocks.submit.mock.calls[0][5]).not.toHaveProperty("intent");
   act(() =>
@@ -118,6 +119,7 @@ it("answers a spoken screen question from fresh captures, then points and reads 
 it("reads the continuation, not the request, when a spoken task asks to see the screen", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   emit("recorded", { turn: 2, durationMs: 1000 });
   admits("asked");
   await act(async () => {

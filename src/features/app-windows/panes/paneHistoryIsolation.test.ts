@@ -16,12 +16,12 @@ it("keeps each tab's history to itself, so back in one tab never lands in anothe
   store().updateViewRoute(home.id, "/spaces/one/home?filter=drawings");
 
   store().newTab();
-  const chat = open("/spaces/one/library");
-  store().updateViewRoute(chat.id, "/spaces/one/library?collection=recent");
+  const chat = open("/spaces/one/files");
+  store().updateViewRoute(chat.id, "/spaces/one/files?collection=recent");
   expect(chat.id).not.toBe(home.id);
 
   // The second tab goes back through its own pages only.
-  expect(store().navigatePane(-1)).toMatchObject({ id: chat.id, route: "/spaces/one/library" });
+  expect(store().navigatePane(-1)).toMatchObject({ id: chat.id, route: "/spaces/one/files" });
   expect(store().navigatePane(-1)).toBeNull();
 
   // The first tab still has all of its own history.

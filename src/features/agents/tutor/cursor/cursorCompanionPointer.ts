@@ -44,8 +44,12 @@ export class CursorCompanionPointer {
     s.maybeHide();
   };
 
-  /** `voice` marks a spoken walkthrough, whose next steps are read aloud too. */
-  present = (text: string, invocationId?: string, voice = false) => {
+  /**
+   * `voice` marks a spoken walkthrough, whose next steps are read aloud too. `conversationId` is
+   * where its steps go on: Tutor's own conversation for a turn Tutor answered itself, else the
+   * chat that is open.
+   */
+  present = (text: string, invocationId?: string, voice = false, conversationId?: string) => {
     const s = this.s;
     const parsed = companionReply(text);
     const estimate = resolvePoint(parsed.point, s.captures);
@@ -63,7 +67,11 @@ export class CursorCompanionPointer {
     if (!estimate) return;
     const current = () => s.active(expected) && token === this.token;
     const show = (point: SharpenedPoint) =>
-      this.show({ ...point, ...(parsed.guide ? { guide: parsed.guide } : {}) }, voice);
+      this.show(
+        { ...point, ...(parsed.guide ? { guide: parsed.guide } : {}) },
+        voice,
+        conversationId,
+      );
     void (async () => {
       const snapped = await snapPoint(estimate);
       if (!current()) return;
@@ -82,7 +90,11 @@ export class CursorCompanionPointer {
     })();
   };
 
-  private show = (point: Omit<PresentedPoint, "awaitingClick">, voice: boolean) => {
+  private show = (
+    point: Omit<PresentedPoint, "awaitingClick">,
+    voice: boolean,
+    conversationId?: string,
+  ) => {
     const s = this.s;
     const awaiting = Boolean(point.guide && point.guide.step < point.guide.total && this.onStep);
     const presented: PresentedPoint = awaiting ? { ...point, awaitingClick: true } : point;
@@ -93,13 +105,15 @@ export class CursorCompanionPointer {
     s.change({ point: presented });
     const expected = s.turn;
     if (awaiting) {
-      const conversationId = useMistyStore.getState().activeConversationId;
+      // A walkthrough Tutor gave itself carries on in Tutor's own conversation; any other in the
+      // chat that is open.
+      const stepsIn = conversationId ?? useMistyStore.getState().activeConversationId;
       // A walkthrough's first step starts its log, with what the person asked as its goal.
-      if (point.guide?.step === 1) beginWalkthrough(conversationId, lastAsk(conversationId));
+      if (point.guide?.step === 1) beginWalkthrough(stepsIn, lastAsk(stepsIn));
       const step: CompanionGuideStep = new CompanionGuideStep(
         presented,
         expected,
-        conversationId,
+        stepsIn,
         voice,
         () => {
           if (this.step === step && s.active(expected)) this.clear();

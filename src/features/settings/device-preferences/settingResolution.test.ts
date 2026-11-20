@@ -119,10 +119,10 @@ describe("device settings", () => {
 });
 
 it("validates tab order preferences", () => {
-  const id = "collections.tabs.journal";
+  const id = "collections.tabs.media";
   const definition = definitionById.get(id)!;
   for (const invalid of ["{}", "[1]", '["all","all"]', '["bad id"]'])
     expect(validPreference(definition, invalid)).toBe(false);
-  const state = editPreference(initialPreferencesState({}), id, '["drawings","all","notes"]');
-  expect(resolveSetting(state, id).value).toBe('["drawings","all","notes"]');
+  const state = editPreference(initialPreferencesState({}), id, '["video","all","image"]');
+  expect(resolveSetting(state, id).value).toBe('["video","all","image"]');
 });

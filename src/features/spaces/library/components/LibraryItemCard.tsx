@@ -84,8 +84,9 @@ function LibraryItemPreview({
   onSelect: (event: ReactMouseEvent, id: string, onOpen: () => void) => void;
 }) {
   const {
-    data: { spaceId, libraryViewerTriggerRef, setSelectedItemId },
+    data: { spaceId, libraryViewerTriggerRef },
     itemActions: { toggleSelectedItem },
+    openWith,
   } = useSpaceLibraryContext();
   return (
     <div className="relative mt-2 w-full min-w-0 flex-1">
@@ -94,7 +95,7 @@ function LibraryItemPreview({
         onClick={(event) => {
           onSelect(event, item.id, () => {
             libraryViewerTriggerRef.current = event.currentTarget;
-            setSelectedItemId(item.id);
+            openWith.open(item);
           });
         }}
         aria-label={`Open ${item.display_name}`}

@@ -43,7 +43,20 @@ async function call<T>(command: string, args: Record<string, unknown>): Promise<
   }
 }
 
+/** A server to add with the engine's own `mcp add`. */
+export interface McpAddRequest {
+  engine: string;
+  name: string;
+  target: { transport: "stdio"; command: string; args: string[] } | { transport: "http"; url: string };
+  /** `KEY=value` pairs for a command's environment. */
+  env: [string, string][];
+  /** `Name: value` pairs sent to an address (Claude Code only). */
+  headers: [string, string][];
+}
+
 export const mcpApi = {
+  /** Adds a server with the engine's own `mcp add`; the values go only to that engine's CLI. */
+  add: (request: McpAddRequest): Promise<void> => call<void>("engine_mcp_add", { request }),
   inventory: (workspace: string | null): Promise<McpInventory> =>
     call<McpInventory>("engine_mcp_inventory", { workspace }),
   setEnabled: (

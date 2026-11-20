@@ -1,48 +1,20 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 /**
- * My skills: the installed list, local import, engine sync from the row or
- * the detail panel, updates and destructive confirmations.
- *
- * A row is a button that opens the detail panel; the engine icons next to it
- * are separate buttons, so opening the panel can never toggle a target by
- * accident and toggling one engine never opens the panel. Adopting a local
- * skill is deliberately not a row action: it lives in the detail panel and in
- * the target checkboxes, so the list keeps one action per row at most.
- *
- * The presentation is in `InstalledPane.parts.tsx`; this file keeps the state,
- * the actions and the composition.
+ * The installed skills' actions (sync to an engine, import, update, uninstall, restore and their
+ * confirmations), shared by Explore's Skills section (`agents/marketplace/SkillsSection.tsx`).
  */
-import { useMemo, useState } from "react";
+
 import type { Dispatch, SetStateAction } from "react";
-import { Button } from "@misty/ui";
 import { skillsHubApi } from "./api";
 import { t } from "./strings";
-import { FeedbackLine, type Feedback } from "./components";
-import { SkillDetailDialog } from "./SkillDetailDialog";
-import { SkillImportDialog } from "./SkillImportDialog";
-import {
-  EngineFilterChips,
-  InstalledCountLine,
-  InstalledListArea,
-  InstalledToolbar,
-  SkillConfirmDialog,
-  type BusyTarget,
-  type ConfirmState,
-  type UpdateMap,
-} from "./InstalledPane.parts";
-import { useInstalledSkills, type InstalledSkillsStore } from "./useInstalledSkills";
-import { useSkillUsage } from "./useSkillUsage";
+import type { Feedback } from "./components";
+import type { BusyTarget, ConfirmState, UpdateMap } from "./InstalledPane.parts";
+import type { InstalledSkillsStore } from "./useInstalledSkills";
 import type { SkillRow, SkillTargetId } from "./types";
-import {
-  filterSkills,
-  nextTargets,
-  summarizeTargetResults,
-  usageForSkill,
-  visibleEngines,
-} from "./utils";
+import { nextTargets, summarizeTargetResults } from "./utils";
 
-interface PaneActionDeps {
+export interface PaneActionDeps {
   store: InstalledSkillsStore;
   flash: (feedback: Feedback, ttlMs?: number) => void;
   targetLabel: (targetId: string) => string;
@@ -58,7 +30,7 @@ interface PaneActionDeps {
 /** Every async action the pane can run, gathered in one factory so the
  *  component stays a composition of header / list / dialogs instead of one
  *  long function mixing state transitions with markup. */
-function createInstalledPaneActions(deps: PaneActionDeps) {
+export function createInstalledPaneActions(deps: PaneActionDeps) {
   const {
     store,
     flash,
@@ -250,162 +222,4 @@ function createInstalledPaneActions(deps: PaneActionDeps) {
     onImportFromDialog,
     handleConfirm,
   };
-}
-
-export function InstalledPane({ onBrowse }: { onBrowse: () => void }) {
-  const store = useInstalledSkills(true);
-  const [query, setQuery] = useState("");
-  const [engine, setEngine] = useState<SkillTargetId | "">("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [busyTarget, setBusyTarget] = useState<BusyTarget | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
-  const [updates, setUpdates] = useState<UpdateMap>({});
-  const [feedback, setFeedback] = useState<Feedback>(null);
-  const [restoreId, setRestoreId] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-
-  // The selected row is derived from the refreshed list, never a stale copy:
-  // a toggle in the row (or in the detail panel) must reach the panel that is
-  // already open, and a removed skill closes it without a second state source.
-  const selected = useMemo(
-    () => store.skills.find((skill) => skill.id === selectedId) ?? null,
-    [store.skills, selectedId],
-  );
-  // Usage is only fetched once a detail panel is open (Claude Code transcripts,
-  // cached for 10 minutes server-side) — browsing hundreds of skills stays cheap.
-  const usageStore = useSkillUsage(selectedId !== null);
-
-  const engineChips = useMemo(
-    () => visibleEngines(store.skills, store.targets),
-    [store.skills, store.targets],
-  );
-
-  const targetLabel = (targetId: string) =>
-    store.targets.find((target) => target.id === targetId)?.label ?? targetId;
-
-  const filtered = useMemo(
-    () => filterSkills(store.skills, { query, target: engine }),
-    [store.skills, query, engine],
-  );
-
-  const updateCount = useMemo(() => Object.values(updates).filter(Boolean).length, [updates]);
-
-  const flash = (next: Feedback, ttlMs = 4000) => {
-    setFeedback(next);
-    if (ttlMs > 0) {
-      window.setTimeout(() => {
-        setFeedback((current) => (current === next ? null : current));
-      }, ttlMs);
-    }
-  };
-
-  const actions = createInstalledPaneActions({
-    store,
-    flash,
-    targetLabel,
-    selectedId,
-    setSelectedId,
-    setUpdates,
-    setConfirm,
-    setBusyTarget,
-    setRestoreId,
-    setImportOpen,
-  });
-
-  const handleRefresh = () => {
-    if (refreshing) return;
-    setRefreshing(true);
-    void actions
-      .handleRefresh()
-      .catch((error: unknown) => {
-        flash({ tone: "error", text: error instanceof Error ? error.message : String(error) }, 0);
-      })
-      .finally(() => setRefreshing(false));
-  };
-
-  return (
-    <div className="flex w-full flex-col gap-3">
-      <InstalledToolbar
-        query={query}
-        onQueryChange={setQuery}
-        loading={store.loading}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        onOpenImport={() => setImportOpen(true)}
-      />
-
-      <EngineFilterChips chips={engineChips} value={engine} onChange={setEngine} />
-
-      <InstalledCountLine
-        shown={filtered.length}
-        total={store.skills.length}
-        updateCount={updateCount}
-      />
-
-      <FeedbackLine feedback={feedback} />
-      {restoreId ? (
-        <Button size="sm" className="self-start" onClick={() => void actions.runRestore(restoreId)}>
-          {t("feedback.restoreNow")}
-        </Button>
-      ) : null}
-
-      <InstalledListArea
-        loading={store.loading && store.skills.length === 0}
-        error={store.error}
-        filtered={filtered}
-        totalSkills={store.skills.length}
-        updates={updates}
-        busySkillId={busyTarget?.skillId ?? null}
-        busyTargetId={busyTarget?.targetId ?? null}
-        pendingIds={store.pendingIds}
-        targets={store.targets}
-        onRefresh={() => void store.refresh()}
-        onBrowse={onBrowse}
-        onOpen={(skill) => setSelectedId(skill.id)}
-        onToggleTarget={(skill, targetId, enabled) =>
-          void actions.onToggleTarget(skill, targetId, enabled)
-        }
-        onUpdate={(skill) => void actions.runUpdate(skill, false)}
-      />
-
-      {selected ? (
-        <SkillDetailDialog
-          skill={selected}
-          targets={store.targets}
-          pending={store.pendingIds.has(selected.id) || store.pendingIds.has(selected.directory)}
-          busyTarget={busyTarget?.skillId === selected.id ? busyTarget.targetId : null}
-          usage={usageForSkill(usageStore.usage, selected)}
-          usageLoading={usageStore.usageLoading}
-          usageError={usageStore.usageError}
-          hasUpdate={Boolean(updates[selected.id])}
-          onClose={() => setSelectedId(null)}
-          onToggleTarget={(skill, targetId, enabled) =>
-            void actions.onToggleTarget(skill, targetId, enabled)
-          }
-          onTriggerUpdate={(skill) => void actions.runUpdate(skill, false)}
-          onUninstall={(skill) => setConfirm({ kind: "uninstall", skill })}
-          onDeleteLocal={(skill) => setConfirm({ kind: "deleteLocal", skill })}
-          onImport={(skill) => void actions.onImport(skill)}
-        />
-      ) : null}
-
-      {importOpen ? (
-        <SkillImportDialog
-          targets={store.targets}
-          busy={store.pendingIds.size > 0}
-          onClose={() => setImportOpen(false)}
-          onImport={(directory, targets) => void actions.onImportFromDialog(directory, targets)}
-        />
-      ) : null}
-
-      {confirm ? (
-        <SkillConfirmDialog
-          confirm={confirm}
-          onCancel={() => setConfirm(null)}
-          onConfirm={() => actions.handleConfirm(confirm)}
-        />
-      ) : null}
-    </div>
-  );
 }

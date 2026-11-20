@@ -183,7 +183,13 @@ pub(crate) async fn admit(
         Decision::Ask { kind, why } => {
             match ask(app, store, facts, &runs, call, kind, &why).await {
                 Some(refused) => Admission::Done(refused),
-                None => Admission::Run(input),
+                None => {
+                    // A yes to driving an app lasts for the chat; a paid host's ask is never remembered.
+                    if call.name.starts_with("app.") && !crate::apps::mcp::is_paid(&call.name) {
+                        crate::apps::mcp::approve_for(&super::tool_policy::chat_of(facts), &call.name);
+                    }
+                    Admission::Run(input)
+                }
             }
         }
     }

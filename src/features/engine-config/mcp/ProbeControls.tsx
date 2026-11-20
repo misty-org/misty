@@ -2,22 +2,20 @@
 // See NOTICE.
 
 /**
- * What a connection check shows: a status badge, the check button and the details.
+ * What a connection check shows: a status badge, the check in the details and its tools.
  *
- * The badge sits on the entry's row (to see everything at a glance); the details give the error,
- * the server's own name, its tools and how long it took. Results are kept in `useMcpProbeStore`.
+ * The badge sits beside the entry's action on its shelf (to see everything at a glance); the
+ * details give the error, the server's own name, its tools and how long it took. Results are kept
+ * in `useMcpProbeStore`.
  */
-import { Activity, AlertTriangle, Check, X } from "lucide-react";
+import { AlertTriangle, Check, X } from "lucide-react";
 import { useMemo } from "react";
-import { Badge, Button, IconButton, Spinner, Surface, Text, Tooltip } from "@misty/ui";
+import { Badge, Button, Spinner, Text, Tooltip } from "@misty/ui";
 import { copy } from "./copy";
 import { probeStateFor, useMcpProbeStore } from "./probe-store";
 import type { McpConfigEntry } from "./types";
 
-// A working connection is the one state that carries color; the rest stay neutral.
-const CONNECTED = "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
-
-/** The connection state on a row; takes no room without a result. */
+/** The connection state beside an entry's action; takes no room without a result. */
 export function ProbeStatusChip({ entry }: { entry: McpConfigEntry }) {
   const results = useMcpProbeStore((state) => state.results);
   const pending = useMcpProbeStore((state) => Boolean(state.pending[entry.id]));
@@ -33,9 +31,10 @@ export function ProbeStatusChip({ entry }: { entry: McpConfigEntry }) {
   if (!state) return null;
   const { result } = state;
   if (result.status === "connected") {
+    // A working connection is the one state that carries color; the rest stay neutral.
     return (
       <Tooltip content={result.serverName ?? ""}>
-        <Badge variant="outline" className={CONNECTED}>
+        <Badge tone="green">
           <Check aria-hidden />
           {result.toolCount > 0 ? copy.probeConnectedTools(result.toolCount) : copy.probeConnected}
         </Badge>
@@ -62,29 +61,7 @@ export function ProbeStatusChip({ entry }: { entry: McpConfigEntry }) {
   );
 }
 
-/** The check button on a row. */
-export function ProbeActionButton({
-  entry,
-  workspacePath,
-}: {
-  entry: McpConfigEntry;
-  workspacePath: string | null;
-}) {
-  const pending = useMcpProbeStore((state) => Boolean(state.pending[entry.id]));
-  const probe = useMcpProbeStore((state) => state.probe);
-  return (
-    <IconButton
-      label={copy.probeCheck(entry.name)}
-      hint={copy.probeHint}
-      disabled={pending}
-      onClick={() => void probe(entry, workspacePath)}
-    >
-      <Activity aria-hidden />
-    </IconButton>
-  );
-}
-
-/** The check area in the details dialog: the button and the latest result. */
+/** The check in the details: the latest result's state, the Check button, then what it found. */
 export function ProbeDetail({
   entry,
   workspacePath,
@@ -102,13 +79,17 @@ export function ProbeDetail({
     [],
   );
   const checkedAt = state ? timeFormat.format(new Date(state.checkedAt)) : "";
+  const about = state
+    ? [
+        state.result.serverName ? copy.probeServerName(state.result.serverName) : null,
+        state.result.protocolVersion ? copy.probeProtocol(state.result.protocolVersion) : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
   return (
-    <Surface tone="none" edge="hairline" radius="lg" className="grid gap-2 px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <Text bare tone="bright" weight="medium" className="min-w-0 flex-1 text-sm">
-          {copy.probeDetailTitle}
-        </Text>
-        <ProbeStatusChip entry={entry} />
+    <div className="grid min-w-0 gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <Tooltip content={copy.probeHint}>
           <Button
             type="button"
@@ -119,42 +100,33 @@ export function ProbeDetail({
             {copy.probeCheckLabel}
           </Button>
         </Tooltip>
+        <ProbeStatusChip entry={entry} />
       </div>
       {state ? (
-        <Text bare as="div" tone="muted" className="grid gap-1 text-xs leading-5">
+        <div className="grid min-w-0 gap-1">
           {state.result.message ? (
-            <Text bare as="p" tone="default">
+            <Text as="p" size="meta" tone="default" wrap className="m-0">
               {state.result.message}
             </Text>
           ) : null}
-          {state.result.serverName || state.result.protocolVersion ? (
-            <p>
-              {[
-                state.result.serverName ? copy.probeServerName(state.result.serverName) : null,
-                state.result.protocolVersion
-                  ? copy.probeProtocol(state.result.protocolVersion)
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
+          {about ? (
+            <Text as="p" size="meta" tone="muted" wrap className="m-0">
+              {about}
+            </Text>
           ) : null}
-          {state.result.tools.length > 0 ? (
-            // A server can have hundreds of tools: the list scrolls on its own so the dialog
-            // stays inside the window, and wraps after commas, never inside a name.
-            <p className="max-h-40 overflow-y-auto break-words pr-1">
-              {state.result.toolCount > state.result.tools.length
-                ? copy.probeToolListTruncated(
-                    state.result.tools.length,
-                    state.result.toolCount,
-                    state.result.tools.join(", "),
-                  )
-                : copy.probeToolList(state.result.tools.join(", "))}
-            </p>
-          ) : null}
-          <p>{copy.probeCheckedAt(checkedAt, state.result.elapsedMs)}</p>
-        </Text>
+          <Text as="p" size="meta" tone="muted" wrap className="m-0">
+            {copy.probeCheckedAt(checkedAt, state.result.elapsedMs)}
+          </Text>
+        </div>
       ) : null}
-    </Surface>
+    </div>
   );
+}
+
+/** The tools the latest check found, one name a line, or nothing before a check. */
+export function useProbeTools(entry: McpConfigEntry): { tools: string[]; total: number } | null {
+  const results = useMcpProbeStore((state) => state.results);
+  const state = probeStateFor(results, entry);
+  if (!state || state.result.tools.length === 0) return null;
+  return { tools: state.result.tools, total: state.result.toolCount };
 }

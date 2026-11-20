@@ -18,8 +18,8 @@ function transcribable(item: SpaceLibraryItem) {
 
 /** What one Library item's menu offers, wired to the Library's actions. */
 export function useLibraryItemMenuActions() {
-  const { data, itemActions } = useSpaceLibraryContext();
-  const { spaceId, canEditLibrary, collection, showTextDialog } = data;
+  const { data, itemActions, openWith } = useSpaceLibraryContext();
+  const { spaceId, canEditLibrary, collection, showTextDialog, setSelectedItemId } = data;
   const { copyItemsToClipboard, duplicateItems, trashItem, restoreItem } = itemActions;
   return (item: SpaceLibraryItem): LibraryItemMenuActions => ({
     item,
@@ -34,7 +34,7 @@ export function useLibraryItemMenuActions() {
     onRename: () =>
       showTextDialog({
         kind: "rename-item",
-        title: "Rename Library item",
+        title: "Rename file",
         primaryLabel: "Name",
         primaryValue: item.display_name,
         itemId: item.id,
@@ -49,5 +49,8 @@ export function useLibraryItemMenuActions() {
       }),
     onTrash: () => void trashItem(item),
     onRestore: () => void restoreItem(item),
+    openWith: collection === "deleted" ? [] : openWith.appsFor(item),
+    onOpenIn: (appId) => openWith.openIn(item, appId),
+    onPreview: () => setSelectedItemId(item.id),
   });
 }

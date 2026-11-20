@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import type { SpaceMessage } from "../../api/dto/entities";
-import { IconButton, Separator, Skeleton, Surface, Text, Textarea } from "@misty/ui";
+import { IconButton, PaneLoading, Separator, Surface, Text, Textarea } from "@misty/ui";
 import { formatChatMessageTime } from "./ChatDisplay";
 import { useChatSidePanel } from "../chatSidePanelStore";
 
@@ -111,7 +111,7 @@ export function ChatThreadColumn({
       as="aside"
       tone="page"
       aria-label="Thread"
-      className="flex w-[min(22.5rem,40%)] shrink-0 flex-col border-l"
+      className="flex w-[min(22.5rem,40%)] shrink-0 flex-col"
     >
       <header className="flex min-h-12 items-center gap-2 border-b px-3 py-1.5">
         {fromList ? (
@@ -160,15 +160,13 @@ export function ChatThreadColumn({
           </Text>
         )}
         {loadingOlder ? (
-          <li className="space-y-2 px-3 py-2" aria-label="Loading older replies">
-            <Skeleton className="h-3 w-1/4" />
-            <Skeleton className="h-3 w-3/4" />
+          <li>
+            <PaneLoading label="Loading older replies" inline />
           </li>
         ) : null}
         {loading && replies.length === 0 ? (
-          <li className="space-y-2 px-3 py-2" aria-label="Loading replies">
-            <Skeleton className="h-3 w-1/4" />
-            <Skeleton className="h-3 w-3/4" />
+          <li>
+            <PaneLoading label="Loading replies" inline />
           </li>
         ) : null}
         {replies.map((message) => entry(message))}

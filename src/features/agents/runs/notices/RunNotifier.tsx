@@ -3,6 +3,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveSetting, useDevicePreferences } from "@/features/settings";
+import { useDoNotDisturb } from "@/shared/lib/doNotDisturb";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { runtimeAiApi } from "../../AgentsRuntime";
 import { localDocuments } from "../../conversations/state/localChats";
@@ -17,6 +18,8 @@ const openEvent = "misty://agent-run-notice-open";
 
 function noticesOn(): boolean {
   const state = useDevicePreferences.getState().state;
+  // Do not disturb silences every notice, whatever the chat setting says.
+  if (useDoNotDisturb.getState().value) return false;
   // Before this computer's settings are read, the default holds.
   return state ? Boolean(resolveSetting(state, RUN_NOTICES_SETTING).value) : true;
 }

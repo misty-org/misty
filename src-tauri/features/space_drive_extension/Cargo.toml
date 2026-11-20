@@ -1,0 +1,29 @@
+# Misty's File Provider extension: each Space's drive in Finder. It is an app extension
+# (`MistyDrive.appex`) that macOS starts on its own; it only relays to Misty over a socket in the
+# app group, where `space_drive` does the syncing. Built, bundled and signed by
+# `tasks/drive-extension.ts`, never by Tauri.
+[package]
+name = "misty-drive-ext"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[[bin]]
+name = "misty-drive-ext"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
+objc2 = "0.6.4"
+# The framework crates enable every API by default; this binary is small either way.
+objc2-foundation = "0.3.2"
+objc2-file-provider = "0.3.2"
+objc2-uniform-type-identifiers = "0.3.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+lto = true
+codegen-units = 1

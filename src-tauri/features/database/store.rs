@@ -969,6 +969,20 @@ const MIGRATIONS: &[&str] = &[
          SELECT account, conversation, json_extract(document, '$.id'), recall_rowid
          FROM chat_recall_seed;
      DROP TABLE chat_recall_seed;",
+    // 45: what agents trashed, one table for Files and the Space drive. A local file waits in its
+    // holding folder; a drive item waits in its Space's trash on the server (held, so it never
+    // empties itself), and only which agent and chat did it is kept here. It never syncs.
+    "CREATE TABLE files_agent_trash (
+         id INTEGER PRIMARY KEY,
+         original_path TEXT NOT NULL,
+         holding_path TEXT,
+         agent_id TEXT NOT NULL,
+         chat_id TEXT,
+         trashed_at INTEGER NOT NULL,
+         space_id TEXT,
+         drive_item_id TEXT
+     );
+     CREATE INDEX files_agent_trash_drive ON files_agent_trash (space_id, drive_item_id);",
 ];
 
 #[derive(Debug, Clone)]

@@ -7,8 +7,8 @@ import { initialPreferencesState, editPreference } from "./device-preferences/se
 const initial = useDevicePreferences.getState();
 const options = [
   { value: "all", label: "All" },
-  { value: "notes", label: "Notes" },
-  { value: "drawings", label: "Drawings" },
+  { value: "image", label: "Photos" },
+  { value: "video", label: "Videos" },
 ];
 const edit = vi.fn(async (id: string, value: string) => {
   useDevicePreferences.setState((store) => ({
@@ -37,41 +37,41 @@ it("moves a tab without selecting it, persists across remounts, and isolates acc
   const select = vi.fn();
   const ui = render(
     <OrderedCollectionFilters
-      collectionId="journal"
+      collectionId="media"
       options={options}
       value="all"
       onChange={select}
     />,
   );
-  const drawings = screen.getByRole("button", { name: "Drawings" });
-  drawings.focus();
-  fireEvent.keyDown(drawings, { key: "ArrowLeft", altKey: true, shiftKey: true });
-  await waitFor(() => expect(tabNames()).toEqual(["All", "Drawings", "Notes"]));
-  expect(edit).toHaveBeenCalledWith("collections.tabs.journal", '["all","drawings","notes"]');
+  const videos = screen.getByRole("button", { name: "Videos" });
+  videos.focus();
+  fireEvent.keyDown(videos, { key: "ArrowLeft", altKey: true, shiftKey: true });
+  await waitFor(() => expect(tabNames()).toEqual(["All", "Videos", "Photos"]));
+  expect(edit).toHaveBeenCalledWith("collections.tabs.media", '["all","video","image"]');
   expect(select).not.toHaveBeenCalled();
-  expect(document.activeElement).toBe(drawings);
+  expect(document.activeElement).toBe(videos);
   ui.unmount();
   render(
     <OrderedCollectionFilters
-      collectionId="journal"
+      collectionId="media"
       options={options}
-      value="notes"
+      value="image"
       onChange={select}
     />,
   );
-  expect(tabNames()).toEqual(["All", "Drawings", "Notes"]);
+  expect(tabNames()).toEqual(["All", "Videos", "Photos"]);
   act(() => useDevicePreferences.setState({ state: initialPreferencesState({}) }));
-  expect(tabNames()).toEqual(["All", "Notes", "Drawings"]);
+  expect(tabNames()).toEqual(["All", "Photos", "Videos"]);
 });
 it("keeps new and temporarily hidden tabs without duplicates", () => {
-  expect(orderedTabs(options, '["drawings","hidden","drawings"]')).toEqual([
+  expect(orderedTabs(options, '["video","hidden","video"]')).toEqual([
     options[2],
     options[0],
     options[1],
   ]);
   expect(
-    mergeTabOrder('["all","hidden","notes","drawings"]', ["drawings", "all", "notes"]),
-  ).toEqual(["drawings", "hidden", "all", "notes"]);
+    mergeTabOrder('["all","hidden","image","video"]', ["video", "all", "image"]),
+  ).toEqual(["video", "hidden", "all", "image"]);
   expect(orderedTabs(options, "invalid")).toEqual(options);
 });
 it("reports a failed save and keeps the last saved order", async () => {
@@ -80,18 +80,18 @@ it("reports a failed save and keeps the last saved order", async () => {
     <>
       <NoticeViewport />
       <OrderedCollectionFilters
-        collectionId="journal"
+        collectionId="media"
         options={options}
         value="all"
         onChange={vi.fn()}
       />
     </>,
   );
-  fireEvent.keyDown(screen.getByRole("button", { name: "Notes" }), {
+  fireEvent.keyDown(screen.getByRole("button", { name: "Photos" }), {
     key: "ArrowLeft",
     altKey: true,
     shiftKey: true,
   });
   expect((await screen.findByRole("alert")).textContent).toContain("Tab order couldn’t be saved");
-  expect(tabNames()).toEqual(["All", "Notes", "Drawings"]);
+  expect(tabNames()).toEqual(["All", "Photos", "Videos"]);
 });

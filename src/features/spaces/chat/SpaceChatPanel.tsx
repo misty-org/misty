@@ -5,7 +5,7 @@ import { IconButton, Surface, lazyTool, ToolSuspense } from "@misty/ui";
 import { spaceNavigationName } from "../routes/defaultSpace";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { ChatPanelPicker } from "./ChatPanelPicker";
-import { ChatMessagesSkeleton } from "./components/ChatMessagesSkeleton";
+import { ChatMessagesLoading } from "./components/ChatMessagesLoading";
 import { useSpaceConversations } from "./sidebar/useSpaceConversations";
 import { homeChatSpace, useOpenSpaceChat } from "./useOpenSpaceChat";
 
@@ -21,7 +21,7 @@ const panelConversations = createDeviceSettingMap<string>({
 });
 
 // The panel's Space is still on its way: its messages' own shape stands in.
-const chatSkeleton = <ChatMessagesSkeleton framed />;
+const chatSkeleton = <ChatMessagesLoading framed />;
 
 /**
  * Your Space's chat in the side panel beside the page, the Chat button's view. One header

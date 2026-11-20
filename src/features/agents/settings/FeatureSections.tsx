@@ -14,6 +14,9 @@ import {
 import { definitionById, fromLegacy } from "@/features/settings";
 import { useDevicePreferences } from "@/features/settings";
 import { ChoiceControl, SwitchControl } from "../../settings/SettingsControls";
+import { useRailShown } from "../context-panel/railLayoutStore";
+import { useShowHiddenSteps } from "../activity/RunSteps";
+import { useComposerVim } from "../conversations/composer/controls/composerVim";
 import { useSettingsStore } from "@/features/settings";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
@@ -28,10 +31,44 @@ export function AgentDefaultsSection() {
         <CollaborationModeRow />
         <PreferenceRow id="agents.plan_deep_thinking" />
         <PanelSideRow />
-        <PreferenceRow id="agents.run_notifications" />
+        <ToolsPanelRow />
+        <ComposerVimRow />
+        <HiddenStepsRow />
       </Section>
       <ScreenLocationSection />
     </>
+  );
+}
+function ComposerVimRow() {
+  const on = useComposerVim((state) => state.on);
+  return (
+    <Row label="Vim keys in the message box">
+      <SwitchControl checked={on} disabled={false} onChange={(value) => useComposerVim.getState().toggle(value)} />
+    </Row>
+  );
+}
+function HiddenStepsRow() {
+  const shown = useShowHiddenSteps((state) => state.value);
+  return (
+    <Row label="Show housekeeping steps">
+      <SwitchControl
+        checked={shown}
+        disabled={false}
+        onChange={(value) => useShowHiddenSteps.getState().set(value)}
+      />
+    </Row>
+  );
+}
+function ToolsPanelRow() {
+  const shown = useRailShown((state) => state.value);
+  return (
+    <Row label="Show the Tools panel in chats">
+      <SwitchControl
+        checked={shown}
+        disabled={false}
+        onChange={(value) => useRailShown.getState().set(value)}
+      />
+    </Row>
   );
 }
 function PanelSideRow() {

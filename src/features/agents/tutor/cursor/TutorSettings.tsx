@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { GraduationCap, RotateCcw, Settings2 } from "lucide-react";
 import {
   DesktopSettingsRow as Row,
@@ -12,6 +12,7 @@ import {
   companionTints,
   EmptyState,
   IconButton,
+  ListRow,
   Slider,
   Switch,
   Text,
@@ -28,6 +29,64 @@ import {
 } from "./companionSize";
 import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
 import { useTutorSetup } from "./tutorSetup";
+import { useMistyStore } from "../../conversations/state/useMistyStore";
+import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
+import { tutorConversationOf, tutorTurns } from "./tutorConversation";
+import { openAgentThread } from "./tutorHandoff";
+import { forgetTutorStyle, useTutorStyle } from "./tutorStyle";
+
+/** How Tutor was asked to answer, with the way to go back; shown only once there is some. */
+function TutorStyleRow({ onError }: { onError(error: string): void }) {
+  const style = useTutorStyle();
+  if (!style.length) return null;
+  return (
+    <Row label="How Tutor answers" description={style.join(". ")}>
+      <Button
+        variant="quiet"
+        onClick={() => void forgetTutorStyle().catch((reason) => onError(String(reason)))}
+      >
+        Forget
+      </Button>
+    </Row>
+  );
+}
+
+/**
+ * What was asked of Tutor in the last day, newest first. A turn whose work went to an agent
+ * opens that agent's chat; Tutor keeps nothing older.
+ */
+function TutorRecent() {
+  const conversations = useMistyStore((state) => state.conversations);
+  const agents = usePersonalAgentsStore((state) => state.agents);
+  const turns = useMemo(() => tutorTurns(tutorConversationOf(conversations)), [conversations]);
+  if (!turns.length) return null;
+  return (
+    <Section title="Recent">
+      <ul>
+        {turns.map((turn) => {
+          const handoff = turn.handoff;
+          const agent = handoff && agents.find((item) => item.id === handoff.agentId);
+          return (
+            <li key={turn.id}>
+              <ListRow
+                label={turn.asked}
+                description={
+                  agent ? `Asked ${agent.name}` : turn.answered.split("\n")[0] || undefined
+                }
+                state={{ kind: "time", at: turn.createdAt }}
+                onOpen={
+                  handoff && agent
+                    ? () => openAgentThread(handoff.agentId, handoff.conversationId)
+                    : undefined
+                }
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </Section>
+  );
+}
 
 const talkKeys = () => (/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt");
 
@@ -143,6 +202,8 @@ export function TutorSettings() {
         </Row>
       </Section>
 
+      <TutorRecent />
+
       {setup.ready && on ? (
         <Section title="Tour">
           <Row label="Tutor tour" description="Try each thing Tutor does once, out loud.">
@@ -158,6 +219,18 @@ export function TutorSettings() {
       ) : null}
 
       <Section title="Behavior">
+        <Row
+          label="Show Misty at the cursor"
+          description="Misty rests beside your pointer. Off, Tutor shows only while you use it."
+        >
+          <Switch
+            aria-label="Show Misty at the cursor"
+            checked={presentation.sprite !== false}
+            disabled={!control}
+            onCheckedChange={(sprite) => act({ kind: "sprite", sprite })}
+          />
+        </Row>
+        <TutorStyleRow onError={setError} />
         <Row
           label="Teach mode"
           description="Shows one step at a time and checks your work, instead of doing it for you."

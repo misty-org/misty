@@ -49,7 +49,7 @@ describe("workspace route memory", () => {
 });
 
 it("remembers Space tool routes across reloads", async () => {
-  const route = "/spaces/project/planner/tasks/list";
+  const route = "/spaces/project/files";
   useAppRouteMemoryStore.getState().rememberAppRoute(route);
   await useAppRouteMemoryStore.persist.rehydrate();
   expect(useAppRouteMemoryStore.getState().lastAppRoute).toBe(route);

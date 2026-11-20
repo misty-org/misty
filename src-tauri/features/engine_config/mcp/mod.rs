@@ -22,6 +22,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub mod add;
 mod config;
 pub mod probe;
 pub mod runtime;

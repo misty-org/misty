@@ -287,9 +287,12 @@ pub fn subscribe(chord: Chord) -> Subscription {
 pub(crate) enum Input {
     Modifiers(Modifiers),
     Click(f64, f64),
-    /// Any key that isn't a modifier, or a scroll: only breaks a double tap.
+    /// Any key that isn't a modifier: breaks a double tap, and counts toward typing.
     #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
     Key,
+    /// A scroll: only breaks a double tap.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    Scroll,
     Error(String),
 }
 
@@ -318,12 +321,57 @@ fn dispatch(input: Input) {
                 broadcast(&state, HotkeyEvent::DoubleTap);
             }
         }
-        Input::Key => state.taps.interrupt(),
+        Input::Key => {
+            state.taps.interrupt();
+            typing::key();
+        }
+        Input::Scroll => state.taps.interrupt(),
         Input::Click(x, y) => {
             state.taps.interrupt();
             broadcast(&state, HotkeyEvent::Click(x, y))
         }
         Input::Error(message) => broadcast(&state, HotkeyEvent::Error(message)),
+    }
+}
+
+/// Whether the person is typing now: several keys in quick succession, seen by the same hook.
+/// Only the timing is kept, never which keys. Tutor's Misty steps out of the way while it holds.
+pub fn typing() -> bool {
+    typing::now()
+}
+
+mod typing {
+    use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+    use std::sync::OnceLock;
+    use std::time::Instant;
+
+    /// Keys closer together than this are one run of typing.
+    const RUN_MS: u64 = 700;
+    /// How many keys in a run before it counts as typing, so a shortcut doesn't.
+    const KEYS: u32 = 3;
+
+    static START: OnceLock<Instant> = OnceLock::new();
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    static RUN: AtomicU32 = AtomicU32::new(0);
+
+    fn now_ms() -> u64 {
+        // Starts at 1, so a key at the first instant still reads as one.
+        START.get_or_init(Instant::now).elapsed().as_millis() as u64 + 1
+    }
+
+    pub(super) fn key() {
+        let now = now_ms();
+        let last = LAST.swap(now, Ordering::SeqCst);
+        if last != 0 && now - last <= RUN_MS {
+            RUN.fetch_add(1, Ordering::SeqCst);
+        } else {
+            RUN.store(1, Ordering::SeqCst);
+        }
+    }
+
+    pub(super) fn now() -> bool {
+        let last = LAST.load(Ordering::SeqCst);
+        last != 0 && now_ms().saturating_sub(last) <= RUN_MS && RUN.load(Ordering::SeqCst) >= KEYS
     }
 }
 

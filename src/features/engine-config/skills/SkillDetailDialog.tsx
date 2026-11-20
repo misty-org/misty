@@ -17,8 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
   Pressable,
+  PaneLoading,
   Skeleton,
-  SkeletonDocument,
   Spinner,
   Surface,
   Text,
@@ -252,8 +252,7 @@ export function SkillMarkdown({
       className="min-h-[6rem] max-h-[20rem] shrink-0 overflow-y-auto p-3 text-sm"
     >
       {loading ? (
-        // Two paragraphs fit the panel's 20rem without a scrollbar of their own.
-        <SkeletonDocument label={loadingLabel} paragraphs={2} className="max-w-none gap-4 p-0" />
+        <PaneLoading label={loadingLabel} inline />
       ) : error ? (
         failed
       ) : content ? (

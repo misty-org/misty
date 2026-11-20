@@ -170,7 +170,8 @@ export async function personaInstructions(prompt: string): Promise<string> {
 
 /** Makes one of the person's own agents from a persona: its prompt becomes the agent's soul. */
 export async function makeAgentFromPersona(id: string): Promise<AgentProfile> {
-  const persona = await personaPrompt(id);
+  const [persona, catalog] = await Promise.all([personaPrompt(id), personaCatalog()]);
+  const division = catalog.agents.find((agent) => agent.id === id)?.divisionId ?? "";
   return personalAgentsApi.save({
     name: persona.name.slice(0, 80),
     role: persona.description.slice(0, 160),
@@ -178,7 +179,8 @@ export async function makeAgentFromPersona(id: string): Promise<AgentProfile> {
     instructions: "",
     soul: persona.prompt.slice(0, 100000),
     icon: "",
-    avatar: persona.icon ? { kind: "emoji", value: persona.icon } : {},
+    // It wears the persona's logo (`AgentAvatar`), never the catalog's emoji.
+    avatar: { kind: "persona", persona: id, division },
     model_mode: "automatic",
     model_id: "",
     reasoning_effort: "",

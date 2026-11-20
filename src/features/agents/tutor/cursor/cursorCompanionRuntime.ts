@@ -1,5 +1,6 @@
 import { currentLessonConversation } from "../lessons/lessonEntry";
 import { useDevicePreferences } from "@/features/settings/preferenceAccess";
+import { onCall } from "@/features/voice";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -13,7 +14,11 @@ import { CursorCompanionSession } from "./cursorCompanionSession";
 import { CursorCompanionTypedTurns } from "./cursorCompanionTyped";
 import { CursorCompanionVoice } from "./cursorCompanionVoice";
 import { nativeConfiguration } from "./nativeConfiguration";
+import { moreHanded, readHanded } from "./tutorHanded";
 import { controlEvent, type DisplayCapture } from "./protocol";
+
+/** How often the cloud at the cursor checks whether the person is on a call. */
+const callCheckMs = 5_000;
 
 /** Starts the cursor companion for one account. Returns its teardown. */
 export function startCursorCompanion(accountId: string) {
@@ -35,7 +40,16 @@ export function startCursorCompanion(accountId: string) {
   });
   const removers: Promise<() => void>[] = [];
   void listenToNative(s, voice, typed, removers).catch((e) => s.fail(s.turn, e));
+  // Misty beside the cursor steps away while a call or a recording has the microphone. Only at
+  // rest: while Tutor listens, the microphone is its own.
+  const away = setInterval(() => {
+    if (!s.nativeReady || !s.state.sprite || s.state.visible || s.state.phase !== "idle") return;
+    void onCall().then((busy) => {
+      if (!s.disposed && Boolean(s.state.spriteAway) !== busy) s.change({ spriteAway: busy });
+    });
+  }, callCheckMs);
   return () => {
+    clearInterval(away);
     s.disposed = true;
     s.pointer.cancel();
     stopPreferences();
@@ -110,11 +124,7 @@ async function listenToNative(
     if (payload.turn < s.turn) return;
     if (payload.held) {
       if (s.state.teach) currentLessonConversation();
-      const current = useMistyStore.getState();
-      s.recordingOrigin = {
-        conversationId: current.activeConversationId,
-        agentId: current.selectedAgentId,
-      };
+      s.recordingOrigin = s.turnOrigin();
       s.turn = payload.turn;
       s.captures = [];
       s.invocationId = undefined;
@@ -152,6 +162,19 @@ async function listenToNative(
     if (s.pointPending) s.pointer.clear();
   });
   listen<CompanionClick>("misty://cursor-click", (payload) => s.pointer.clicked(payload));
+  // Files dropped on Misty at the cursor wait for Tutor's next turn.
+  listen<{ paths: string[] }>("misty://cursor-drop", (payload) => {
+    if (!Array.isArray(payload.paths) || !payload.paths.length) return;
+    void readHanded(payload.paths.slice(0, 10))
+      .then(({ handed, names, failed }) => {
+        if (s.disposed) return;
+        if (names.length) {
+          s.handed = moreHanded(s.handed, handed);
+          s.notice(`Got ${names.join(", ")}. Ask me about it.`);
+        } else if (failed.length) s.notice(failed[0]!);
+      })
+      .catch((error: unknown) => s.notice(String(error)));
+  });
   // The tour's dictation step waits for a dictation to finish anywhere.
   listen<{ phase: string }>("misty://dictation", (payload) => {
     if (payload.phase === "finish") s.tour.dictated();
@@ -160,11 +183,7 @@ async function listenToNative(
   // spoken one, aloud and in captions.
   listen<{ turn: number; text: string }>("misty://cursor-ask", (payload) => {
     if (payload.turn < s.turn || !payload.text.trim()) return;
-    const current = useMistyStore.getState();
-    s.recordingOrigin = {
-      conversationId: current.activeConversationId,
-      agentId: current.selectedAgentId,
-    };
+    s.recordingOrigin = s.turnOrigin();
     s.turn = payload.turn;
     s.captures = [];
     s.invocationId = undefined;
@@ -228,4 +247,6 @@ async function listenToNative(
   if (s.disposed) return;
   s.nativeReady = true;
   s.change({});
+  // Once the overlays are up, Misty greets someone new to her.
+  s.greet();
 }

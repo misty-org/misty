@@ -2,7 +2,7 @@
 import "./CompanionController.testFixtures";
 import { act, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { emit, mocks, mounted } from "./CompanionController.testFixtures";
+import { emit, mocks, mounted, opened } from "./CompanionController.testFixtures";
 import { companionControl, useCompanionState } from "./companionState";
 import type { MistyImageAttachment } from "@/features/agents/conversations/state/conversationTypes";
 const attachment: MistyImageAttachment = {
@@ -31,54 +31,49 @@ it("does not let a delayed desktop Stop interrupt the next voice turn", async ()
   view.unmount();
 });
 
-it("routes a requested spoken follow-up through steering without restarting work", async () => {
+it("routes a spoken follow-up for the agent already on it through steering", async () => {
   const view = await mounted();
   mocks.state.working = true;
   mocks.state.invocationId = "active";
-  mocks.state.invocationConversationId = "conversation";
+  mocks.state.invocationConversationId = "thread";
+  mocks.state.conversations = [
+    { id: "conversation", messages: [] },
+    { id: "thread", agentId: "ada", messages: [] },
+  ];
   emit("shortcut", { turn: 2, held: true });
+  await opened();
+  let id: string | undefined;
   await act(async () => {
-    await mocks.conversationOptions!.tool(
+    id = await mocks.conversationOptions!.tool(
       {
-        name: "steer_task",
+        name: "start_task",
         callId: "one",
-        key: "stable",
+        key: "voice-1:one",
         instruction: "Only PDFs",
-        invocationId: "active",
+        invocationId: "",
       },
       "conversation",
     );
   });
-  expect(mocks.steer).toHaveBeenCalledWith("Only PDFs", "conversation");
+  expect(id).toBe("active");
+  expect(mocks.steer).toHaveBeenCalledWith("Only PDFs", "thread");
   expect(mocks.cancel).not.toHaveBeenCalled();
   expect(mocks.submit).not.toHaveBeenCalled();
   view.unmount();
 });
-it("closes voice and rejects a delayed action after the conversation changes", async () => {
+it("keeps Tutor's own conversation when the open chat changes", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
-  const options = mocks.conversationOptions!;
+  await opened();
   mocks.state.activeConversationId = "other";
   act(() => mocks.subscribers.forEach((notify) => notify()));
-  expect(mocks.conversationClose).toHaveBeenCalled();
-  await expect(
-    options.tool(
-      {
-        name: "start_task",
-        callId: "late",
-        key: "stable",
-        instruction: "Organize files",
-        invocationId: "",
-      },
-      "conversation",
-    ),
-  ).rejects.toThrow("changed");
-  expect(mocks.submit).not.toHaveBeenCalled();
+  expect(mocks.conversationClose).not.toHaveBeenCalled();
   view.unmount();
 });
 it("answers ordinary voice without screenshots or task admission and reuses the session", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   emit("recorded", { turn: 2, durationMs: 1000 });
   emit("recorded", { turn: 2, durationMs: 1000 });
   await waitFor(() => expect(mocks.conversationCommit).toHaveBeenCalledOnce());
@@ -109,17 +104,20 @@ it("voice failure preserves an admitted task and saved history", async () => {
   mocks.state.working = true;
   mocks.state.invocationId = "active";
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   act(() => mocks.conversationOptions!.onError(new Error("Voice disconnected")));
   expect(mocks.cancel).not.toHaveBeenCalled();
   expect(mocks.state.working).toBe(true);
   expect(mocks.state.invocationId).toBe("active");
-  expect(mocks.state.error).toBe("Voice: Voice disconnected");
+  // Tutor's failure shows at the cursor, not in whichever chat is open.
+  expect(mocks.state.error).toBeNull();
   expect(useCompanionState.getState().presentation.error).toBe("Voice disconnected");
   view.unmount();
 });
 it("delegates only on a tool request with its stable admission key", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   mocks.submit.mockImplementationOnce(async () => {
     mocks.state.invocationId = "admitted";
     mocks.state.working = true;
@@ -144,7 +142,7 @@ it("delegates only on a tool request with its stable admission key", async () =>
     undefined,
     [],
     { conversationId: "conversation", context: [] },
-    expect.objectContaining({ idempotencyKey: "voice-1:call", turn: 2 }),
+    expect.objectContaining({ idempotencyKey: "tutor-1:call", turn: 2 }),
   );
   expect(mocks.speech).not.toHaveBeenCalled();
   view.unmount();
@@ -153,6 +151,7 @@ it("delegates only on a tool request with its stable admission key", async () =>
 it("sends spoken screen questions with the screens", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   await act(async () => {
     await mocks.conversationOptions!.tool(
       {
@@ -173,7 +172,7 @@ it("sends spoken screen questions with the screens", async () => {
     undefined,
     [],
     { conversationId: "conversation", context: [] },
-    expect.objectContaining({ executionMode: "user", idempotencyKey: "voice-1:screen" }),
+    expect.objectContaining({ executionMode: "user", idempotencyKey: "tutor-1:screen" }),
   );
   expect(mocks.submit.mock.calls[0][5]).not.toHaveProperty("displayCaptures");
   view.unmount();
@@ -232,6 +231,7 @@ it("explicit Stop task still cancels an active task after audio stops", async ()
 it("speaks the saved result of delegated work without replaying the task", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   emit("recorded", { turn: 2, durationMs: 1000 });
   mocks.submit.mockImplementationOnce(async () => {
     mocks.state.invocationId = "task";
@@ -286,6 +286,7 @@ it.each(["user", "agent"] as const)(
     const view = await mounted();
     mocks.state.executionMode = previous;
     emit("shortcut", { turn: 2, held: true });
+    await opened();
     const instruction = "Find this week's videos and create the requested playlist.";
     await act(async () => {
       await mocks.conversationOptions!.tool(
@@ -306,7 +307,7 @@ it.each(["user", "agent"] as const)(
       undefined,
       [],
       { conversationId: "conversation", context: [] },
-      expect.objectContaining({ executionMode: "user", idempotencyKey: "voice-browser:call" }),
+      expect.objectContaining({ executionMode: "user", idempotencyKey: "tutor-browser:call" }),
     );
     view.unmount();
   },
@@ -340,6 +341,7 @@ it("refreshes a resumed worker invocation only in the matching account, agent an
 it("does not publish an old voice session error into a different conversation", async () => {
   const view = await mounted();
   emit("shortcut", { turn: 2, held: true });
+  await opened();
   mocks.state.activeConversationId = "other";
   act(() => mocks.conversationOptions!.onError(new Error("Model admission denied")));
   expect(mocks.state.error).toBeNull();

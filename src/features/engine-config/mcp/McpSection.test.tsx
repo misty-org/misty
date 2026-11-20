@@ -27,31 +27,6 @@ vi.mock("../EngineMark", () => ({ EngineMark: () => null, hasEngineMark: () => f
 
 import { engineConfigHost } from "../host";
 
-/** The tooltip an icon button shows on focus: its hint, which says why a switch is inert. */
-async function hintOf(button: HTMLElement | null | undefined) {
-  // Let the section settle first: a render while the tooltip opens would close it again.
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  });
-  // A later render may have replaced the button found before it.
-  const label = button?.getAttribute("aria-label");
-  const live = button?.isConnected
-    ? button
-    : document.querySelector<HTMLElement>(`button[aria-label="${label}"]`);
-  await act(async () => {
-    // Blurred first, so a button that already has focus gets the focus that opens its tooltip.
-    live?.blur();
-    live?.focus();
-    await new Promise((resolve) => setTimeout(resolve, 800));
-  });
-  const text = document.querySelector('[data-slot="tooltip-content"]')?.textContent ?? "";
-  // Closed again, so no test starts with a tooltip left open.
-  await act(async () => {
-    live?.blur();
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  });
-  return text;
-}
 import { setCachedResource } from "@/api/cache/cached-resource";
 import { useMcpProbeStore } from "./probe-store";
 import { McpSection } from "./McpSection";
@@ -268,15 +243,20 @@ describe("McpSection", () => {
     expect(document.body.textContent).toContain("No session is running");
   });
 
-  it("keeps a read-only entry's switch inert, with its reason", async () => {
+  it("offers no switch for a read-only entry, and says why in its details", async () => {
     await renderSection();
-    const toggle = row("alpha")?.querySelector<HTMLButtonElement>(
-      'button[aria-label="Enable alpha"]',
-    );
-    expect(toggle?.getAttribute("aria-pressed")).toBe("true");
-    expect(toggle?.getAttribute("aria-disabled")).toBe("true");
-    expect(await hintOf(toggle)).toContain("Read-only here");
-    await act(async () => toggle?.click());
+    // alpha is on and read-only: its shelf item shows it's on, with nothing to press.
+    expect(row("alpha")?.textContent).toContain("On");
+    expect(
+      [...(row("alpha")?.querySelectorAll("button") ?? [])].some((button) =>
+        button.textContent?.includes("Turn"),
+      ),
+    ).toBe(false);
+    const open = document.querySelector<HTMLButtonElement>('button[aria-label="alpha, details"]');
+    await act(async () => open?.click());
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain("Read-only here");
+    expect(dialog?.textContent).not.toContain("Turn off");
     expect(api.setEnabled).not.toHaveBeenCalled();
   });
 
@@ -296,22 +276,18 @@ describe("McpSection", () => {
       }),
     );
     await renderSection();
-    // The switch's hover says why; so do the entry's details, which this reads.
-    const open = document.querySelector<HTMLButtonElement>(
-      'button[aria-label="Details for alpha"]',
-    );
+    const open = document.querySelector<HTMLButtonElement>('button[aria-label="alpha, details"]');
     await act(async () => open?.click());
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Choose a folder");
   });
 
-  it("toggles a writable entry from its row, with the version it read", async () => {
+  it("turns on a writable entry from its shelf item, with the version it read", async () => {
     await renderSection();
-    const toggle = row("beta")?.querySelector<HTMLButtonElement>(
-      'button[aria-label="Enable beta"]',
+    const turnOn = [...(row("beta")?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find(
+      (button) => button.textContent?.trim() === "Turn on",
     );
-    expect(toggle?.getAttribute("aria-pressed")).toBe("false");
-    expect(toggle?.textContent).toBe("");
-    await act(async () => toggle?.click());
+    expect(turnOn).toBeDefined();
+    await act(async () => turnOn?.click());
     expect(api.setEnabled).toHaveBeenCalledWith(
       expect.objectContaining({ id: "claude_project:beta", version: "v2" }),
       true,
@@ -319,13 +295,12 @@ describe("McpSection", () => {
     );
   });
 
-  it("filters to the runtime list", async () => {
-    await renderSection();
+  it("filters by the search text it is given", async () => {
     await act(async () => {
-      document.querySelector<HTMLButtonElement>('[role="radio"][value="runtime"]')?.click();
+      root.render(<McpSection query="bet" />);
     });
+    expect(document.body.textContent).toContain("beta");
     expect(document.body.textContent).not.toContain("alpha");
-    expect(document.body.textContent).toContain("At runtime");
   });
 
   it("checks on open, reuses fresh results, and checks again only on request", async () => {
@@ -420,6 +395,6 @@ describe("McpSection", () => {
     api.inventory.mockResolvedValue(payload({ engines: [payload().engines[3]] }));
     await renderSection();
     expect(document.body.textContent).toContain("Pi has no MCP of its own");
-    expect(document.body.textContent).not.toContain("Configured");
+    expect(document.body.textContent).not.toContain("Added");
   });
 });

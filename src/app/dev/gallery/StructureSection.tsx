@@ -272,7 +272,7 @@ export function StructureSection() {
               />
             }
           >
-            <ListRow label="Planner" state={{ kind: "working" }} />
+            <ListRow label="Lab" state={{ kind: "working" }} />
             <ListRow label="Reviewer" state={{ kind: "waiting" }} />
           </FloatingPanel>
         </GalleryStage>

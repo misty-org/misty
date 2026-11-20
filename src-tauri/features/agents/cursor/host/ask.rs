@@ -21,6 +21,33 @@ thread_local! {
 #[cfg(windows)]
 static BEFORE: Mutex<isize> = Mutex::new(0);
 
+/// How long the app noted as the pointer reached Misty stands for the one in front: long enough
+/// for the click on her that opens the box.
+#[cfg(target_os = "macos")]
+const NOTED_FOR: Duration = Duration::from_secs(10);
+#[cfg(target_os = "macos")]
+thread_local! {
+    /// The app in front as the pointer reached Misty (main thread only). A click on her may bring
+    /// Misty forward before the box opens, so the box hands the keyboard back to this one.
+    static NOTED: std::cell::RefCell<Option<(objc2::rc::Retained<objc2_app_kit::NSRunningApplication>, Instant)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Notes the app in front now, as the pointer reaches Misty, for a box a click on her opens.
+pub(super) fn note_front(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.run_on_main_thread(|| {
+        let front = objc2_app_kit::NSWorkspace::sharedWorkspace()
+            .frontmostApplication()
+            .filter(|app| app.processIdentifier() != std::process::id() as i32);
+        if let Some(front) = front {
+            NOTED.with(|noted| *noted.borrow_mut() = Some((front, Instant::now())));
+        }
+    });
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
 /// Opens the box beside the pointer (on the main thread).
 pub(super) fn open(app: &AppHandle) {
     let handle = app.clone();
@@ -103,7 +130,17 @@ pub fn cursor_companion_ask_close(
 fn remember_front() {
     let front = objc2_app_kit::NSWorkspace::sharedWorkspace()
         .frontmostApplication()
-        .filter(|app| app.processIdentifier() != std::process::id() as i32);
+        .filter(|app| app.processIdentifier() != std::process::id() as i32)
+        // Misty itself is in front after a click on her: the app noted a moment before stands.
+        .or_else(|| {
+            NOTED.with(|noted| {
+                noted
+                    .borrow_mut()
+                    .take()
+                    .filter(|(_, at)| at.elapsed() <= NOTED_FOR)
+                    .map(|(app, _)| app)
+            })
+        });
     BEFORE.with(|before| *before.borrow_mut() = front);
 }
 

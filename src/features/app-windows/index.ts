@@ -89,6 +89,7 @@ export { useWorkspaceStore } from "./tabs/useWorkspaceStore";
 
 // What other features import from here.
 export { AdvancedSection } from "./settings/AdvancedSection";
+export { AccessibilitySection } from "./settings/AccessibilitySection";
 export { AppearanceSection } from "./settings/AppearanceSection";
 
 // What other features import from here.

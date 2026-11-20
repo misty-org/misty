@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn keeps_other_tools_as_text() {
         let output = json(r#"{"image":{"dataUrl":"data:image/png;base64,AAAA"}}"#);
-        assert!(matches!(visual_tool_output("note.search", Some(&output)), ToolOutput::Text { .. }));
+        assert!(matches!(visual_tool_output("file.search", Some(&output)), ToolOutput::Text { .. }));
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod tests {
             panic!("expected text");
         };
         assert_eq!(value, r#"{"b":1,"image":{"dataUrl":"https://example.com/a.png"}}"#);
-        let ToolOutput::Text { value } = visual_tool_output("note.search", None) else {
+        let ToolOutput::Text { value } = visual_tool_output("file.search", None) else {
             panic!("expected text");
         };
         assert_eq!(value, "null");
@@ -278,11 +278,11 @@ mod tests {
 
     #[test]
     fn unknown_names_read_as_themselves() {
-        let catalog = ModelCatalog::new(vec![tool("note.search")], &[]);
-        assert_eq!(catalog.misty_name("note_search"), "note.search");
+        let catalog = ModelCatalog::new(vec![tool("file.search")], &[]);
+        assert_eq!(catalog.misty_name("file_search"), "file.search");
         assert_eq!(catalog.misty_name("agent_finish"), "agent_finish");
-        assert_eq!(catalog.model_name("note.search"), Some("note_search"));
-        assert_eq!(catalog.model_name("note.update"), None);
+        assert_eq!(catalog.model_name("file.search"), Some("file_search"));
+        assert_eq!(catalog.model_name("file.update"), None);
         assert!(!catalog.read_only("agent_finish"));
     }
 }

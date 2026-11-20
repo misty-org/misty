@@ -176,7 +176,7 @@ export function liveEditorExtensions(options: {
     ),
     EditorView.updateListener.of((update) => {
       if (update.focusChanged && update.view.hasFocus)
-        room.provider.awareness.setLocalStateField("path", path);
+        room.awareness.setLocalStateField("path", path);
     }),
     authors,
     gutter({

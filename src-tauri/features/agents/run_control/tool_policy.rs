@@ -34,6 +34,8 @@ pub(crate) struct RunFacts {
     pub(crate) allowed_tools: Vec<String>,
     /// The person turned on screen and input control for this send.
     pub(crate) computer_use: bool,
+    /// The chat the run answers in, when it has one: what an approval to drive an app lasts for.
+    pub(crate) conversation_id: String,
 }
 
 impl RunFacts {
@@ -63,6 +65,7 @@ impl RunFacts {
                 text("prompt")
             },
             parent_run_id: text("parent_run_id"),
+            conversation_id: text("conversation_id"),
             engine: body["engine"]["id"]
                 .as_str()
                 .is_some_and(|id| !id.is_empty()),
@@ -91,36 +94,19 @@ const ASK_MODE_STOPS: &[&str] = &[
     "browser.skill",
     "browser.steps",
     "browser.upload",
-    "deck.apply",
-    "deck.create",
-    "drawing.apply",
-    "drawing.create",
-    "drawing.from_mermaid",
     "file.create",
     "file.promote_attachment",
     "file.update",
     "file.upload",
     "folder.send",
-    "image.cutout",
-    "image.edit",
-    "image.save",
     "item.delete",
     "item.rename",
     "media.fetch",
     "message.send",
-    "note.create",
-    "note.tag",
-    "note.update",
     "shell.run",
     "space.manage",
     "thread.create",
     "thread.post",
-    "video.duplicate",
-    "video.edit",
-    "video.export",
-    "workbook.apply",
-    "workbook.create",
-    "workbook.import",
 ];
 
 /// What a planning mode refuses whatever the catalog offered: tools that change something on this computer.
@@ -224,6 +210,11 @@ pub(crate) enum Decision {
     },
 }
 
+/// What an approval to drive an app lasts for: the run's chat, or the run alone when it has none.
+pub(crate) fn chat_of(facts: &RunFacts) -> String {
+    if facts.conversation_id.is_empty() { format!("run:{}", facts.run_id) } else { facts.conversation_id.clone() }
+}
+
 fn ask(why: &str) -> Decision {
     Decision::Ask {
         kind: "action",
@@ -269,8 +260,11 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             message: format!("This agent isn't allowed to use {name}. Nothing was done."),
         };
     }
-    // A tool of an app's own MCP server (`apps/mcp.rs`). Only what the app marks read-only runs without
-    // asking, a planning mode refuses the rest, and what it answers is data (`untrusted`).
+    // A tool of an app (`apps/mcp.rs`): its own MCP server's, or Misty's screen tools driving it in the
+    // person's window. What the app marks read-only runs without asking and a planning mode refuses the rest.
+    // An app that reaches a paid host (its manifest says so) always asks, whatever the mode. Otherwise the
+    // engine's no-asking modes act freely, and an asking mode asks the first time a chat drives the app; a
+    // yes lasts for that chat (`tool_gate`). What an app answers is data (`untrusted`).
     if name.starts_with("app.") {
         let read_only = crate::apps::mcp::is_read_only(name);
         if facts.planning && !read_only {
@@ -280,7 +274,16 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
                     .to_owned(),
             };
         }
-        return if facts.auto || read_only { Decision::Run } else { ask("") };
+        if read_only {
+            return Decision::Run;
+        }
+        if crate::apps::mcp::is_paid(name) {
+            return ask("This app can spend money or credits with a paid service.");
+        }
+        if facts.auto || crate::apps::mcp::approved_for(&chat_of(facts), name) {
+            return Decision::Run;
+        }
+        return ask("The agent asks once to work in this app for this chat.");
     }
     let computer = COMPUTER_ACTS.contains(&name) || COMPUTER_READS.contains(&name);
     if computer && !facts.computer_use {

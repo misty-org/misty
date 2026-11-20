@@ -26,14 +26,20 @@ const OWN_SOURCES: &str = if cfg!(windows) {
 };
 
 /// The policy every file is served with. `wasm-unsafe-eval` is for WebAssembly only; `unsafe-eval` is
-/// never allowed, and inline scripts only for an app whose manifest says it is one static page. The only way out
-/// of the frame is the SDK channel, which is not a network request.
-fn policy(frame_parent: &str, inline_scripts: bool) -> String {
+/// never allowed, and inline scripts only for an app whose manifest says it is one static page. The way out of the
+/// frame is the SDK channel, which is not a network request, and the hosts the app's manifest lists (`network`),
+/// over https only, which a mod saw before adding it.
+fn policy(frame_parent: &str, inline_scripts: bool, hosts: &[String]) -> String {
     let inline = if inline_scripts { " 'unsafe-inline'" } else { "" };
+    let network: String = hosts
+        .iter()
+        .filter(|host| super::manifest::valid_host(host))
+        .map(|host| format!(" https://{host} wss://{host}"))
+        .collect();
     format!(
         "default-src 'none'; script-src {own} 'wasm-unsafe-eval'{inline}; style-src {own} 'unsafe-inline'; \
-         img-src {own} data: blob:; font-src {own} data:; media-src {own} blob: data:; \
-         connect-src {own} data: blob:; worker-src {own} blob:; child-src blob:; frame-src 'none'; \
+         img-src {own} data: blob:{network}; font-src {own} data:; media-src {own} blob: data:{network}; \
+         connect-src {own} data: blob:{network}; worker-src {own} blob:; child-src blob:; frame-src 'none'; \
          object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors {frame_parent}",
         own = OWN_SOURCES
     )
@@ -44,18 +50,29 @@ const SHIM: &str = include_str!("shim.js");
 const SHIM_PATH: &str = "/__misty/shim.js";
 const SHIM_TAG: &str = r#"<script src="/__misty/shim.js"></script>"#;
 
+/// Misty's screen helper (`screen.js`), added to every app's entry page so an agent can work in the app the
+/// person has open, over a channel of its own. Served, like the shim, from a path no bundle can hold.
+const SCREEN: &str = include_str!("screen.js");
+const SCREEN_PATH: &str = "/__misty/screen.js";
+const SCREEN_TAG: &str = r#"<script src="/__misty/screen.js"></script>"#;
+
 /// The page with the shim's script first in its head, so it is in place before the app's own scripts run.
 /// The file on disk is untouched.
 pub(crate) fn with_shim(html: &[u8]) -> Vec<u8> {
+    with_tag(html, SHIM_TAG)
+}
+
+/// The page with a script of Misty's first in its head.
+fn with_tag(html: &[u8], tag: &str) -> Vec<u8> {
     let lower = html.to_ascii_lowercase();
     let at = lower
         .windows(5)
         .position(|window| window == b"<head")
         .and_then(|start| lower[start..].iter().position(|byte| *byte == b'>').map(|end| start + end + 1))
         .unwrap_or(0);
-    let mut out = Vec::with_capacity(html.len() + SHIM_TAG.len());
+    let mut out = Vec::with_capacity(html.len() + tag.len());
     out.extend_from_slice(&html[..at]);
-    out.extend_from_slice(SHIM_TAG.as_bytes());
+    out.extend_from_slice(tag.as_bytes());
     out.extend_from_slice(&html[at..]);
     out
 }
@@ -89,6 +106,7 @@ fn status(code: StatusCode) -> Response<Cow<'static, [u8]>> {
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Target {
     Shim,
+    Screen,
     App { id: String, version: String, file: String },
 }
 
@@ -96,6 +114,9 @@ pub(crate) fn requested(uri: &tauri::http::Uri) -> Option<Target> {
     let path = uri.path();
     if path == SHIM_PATH {
         return Some(Target::Shim);
+    }
+    if path == SCREEN_PATH {
+        return Some(Target::Screen);
     }
     let rest = path.strip_prefix('/')?;
     // An app's own origin names it in the host; the shared hosts (`localhost`, and Windows' one) name it first in the path.
@@ -141,10 +162,11 @@ pub(crate) fn mime_of(path: &str) -> &'static str {
 async fn serve(request: &Request<Vec<u8>>, frame_parent: &str) -> Result<Response<Cow<'static, [u8]>>, StatusCode> {
     let target = requested(request.uri()).ok_or(StatusCode::FORBIDDEN)?;
     let (id, version, requested_file) = match target {
-        Target::Shim => return reply(SHIM.as_bytes().to_vec(), "text/javascript; charset=utf-8", policy(frame_parent, false)),
+        Target::Shim => return reply(SHIM.as_bytes().to_vec(), "text/javascript; charset=utf-8", policy(frame_parent, false, &[])),
+        Target::Screen => return reply(SCREEN.as_bytes().to_vec(), "text/javascript; charset=utf-8", policy(frame_parent, false, &[])),
         Target::App { id, version, file } => (id, version, file),
     };
-    let (mime, body, inline_scripts) = tokio::task::spawn_blocking(move || {
+    let (mime, body, inline_scripts, hosts) = tokio::task::spawn_blocking(move || {
         let dir = bundle::locate(&id, &version).map_err(|_| StatusCode::NOT_FOUND)?;
         let manifest = bundle::manifest_in(&dir, &id, &version)
             .ok()
@@ -162,11 +184,21 @@ async fn serve(request: &Request<Vec<u8>>, frame_parent: &str) -> Result<Respons
         if manifest.shim && file == manifest.entry {
             body = with_shim(&body);
         }
-        Ok::<_, StatusCode>((mime_of(&file), body, manifest.inline_scripts))
+        // Every app's entry page gets the screen helper, so an agent can work in the app the person has open; an app
+        // whose tools come from an adapter (misty-apps') gets that script too, from inside its own bundle.
+        if file == manifest.entry {
+            if let (Some(super::manifest::McpKind::Adapter), Some(adapter)) = (manifest.mcp, manifest.adapter.as_deref()) {
+                let up = "../".repeat(manifest.entry.matches('/').count());
+                body = with_tag(&body, &format!(r#"<script src="{up}{adapter}"></script>"#));
+            }
+            body = with_tag(&body, SCREEN_TAG);
+        }
+        let hosts: Vec<String> = manifest.network.iter().map(|entry| entry.host.clone()).collect();
+        Ok::<_, StatusCode>((mime_of(&file), body, manifest.inline_scripts, hosts))
     })
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)??;
-    reply(body, mime, policy(frame_parent, inline_scripts))
+    reply(body, mime, policy(frame_parent, inline_scripts, &hosts))
 }
 
 fn reply(body: Vec<u8>, mime: &'static str, policy: String) -> Result<Response<Cow<'static, [u8]>>, StatusCode> {
@@ -200,7 +232,6 @@ mod tests {
         // An app's own origin names it in the host.
         assert_eq!(requested(&uri("misty-app://photocraft/1.2.0/assets/a%20b.wasm")), app("photocraft", "1.2.0", "assets/a b.wasm"));
         assert_eq!(requested(&uri("misty-app://docs/1.0.0/")), app("docs", "1.0.0", ""));
-        assert_eq!(requested(&uri("misty-app://docs/bundled")), app("docs", "bundled", ""));
         // The shared hosts name it in the path.
         assert_eq!(requested(&uri("misty-app://localhost/docs/1.0.0/a.js")), app("docs", "1.0.0", "a.js"));
         assert_eq!(requested(&uri("http://misty-app.localhost/docs/1.0.0/")), app("docs", "1.0.0", ""));
@@ -208,6 +239,7 @@ mod tests {
         assert_eq!(requested(&uri("misty-app://localhost/docs")), None);
         // The shim is Misty's, under any host.
         assert_eq!(requested(&uri("misty-app://photocraft/__misty/shim.js")), Some(Target::Shim));
+        assert_eq!(requested(&uri("misty-app://localhost/__misty/screen.js")), Some(Target::Screen));
     }
 
     #[test]
@@ -225,16 +257,20 @@ mod tests {
         assert_eq!(mime_of("a/app.wasm"), "application/wasm");
         assert_eq!(mime_of("x.MJS"), "text/javascript; charset=utf-8");
         assert_eq!(mime_of("noext"), "application/octet-stream");
-        let policy = policy("tauri://localhost", false);
+        let policy = policy("tauri://localhost", false, &[]);
         assert!(policy.contains("default-src 'none'") && policy.contains("frame-ancestors tauri://localhost"));
         assert!(!policy.contains("'unsafe-eval'") && !policy.contains("https:") && !policy.contains("unsafe-inline'; style"));
-        assert!(self::policy("x", true).contains("'wasm-unsafe-eval' 'unsafe-inline'"));
+        assert!(self::policy("x", true, &[]).contains("'wasm-unsafe-eval' 'unsafe-inline'"));
+        // Only the hosts the manifest names open, over https, and a bad one is left out.
+        let open = self::policy("x", false, &["api.example.com".into(), "http://evil".into()]);
+        assert!(open.contains(" https://api.example.com wss://api.example.com"));
+        assert!(!open.contains("evil"));
     }
 
     #[tokio::test]
-    async fn a_built_in_app_is_served_from_what_misty_ships_with_its_entry_and_policy() {
-        let shipped = std::env::temp_dir().join(format!("misty-apps-scheme-{}", uuid::Uuid::new_v4()));
-        let dir = shipped.join("demo");
+    async fn an_installed_app_is_served_with_its_entry_and_policy() {
+        let cache = std::env::temp_dir().join(format!("misty-apps-scheme-{}", uuid::Uuid::new_v4()));
+        let dir = cache.join("demo").join("1.0.0");
         std::fs::create_dir_all(dir.join("assets")).unwrap();
         std::fs::write(
             dir.join("misty-app.json"),
@@ -244,21 +280,21 @@ mod tests {
         std::fs::write(dir.join("index.html"), "<html>hi</html>").unwrap();
         std::fs::write(dir.join("logo.svg"), "<svg/>").unwrap();
         std::fs::write(dir.join("assets/app.js"), "1").unwrap();
-        bundle::set_shipped(vec![shipped.clone()]);
+        *bundle::TEST_CACHE.lock().unwrap() = Some(cache.clone());
 
         let get = |path: &str| Request::builder().uri(format!("misty-app://localhost{path}")).body(Vec::new()).unwrap();
         // The folder itself opens the manifest's entry page, under the policy that keeps the app in its frame.
-        let page = serve(&get("/demo/bundled/"), "tauri://localhost").await.unwrap();
-        assert_eq!(page.body().as_ref(), b"<html>hi</html>");
+        let page = serve(&get("/demo/1.0.0/"), "tauri://localhost").await.unwrap();
+        assert_eq!(page.body().as_ref(), format!("{SCREEN_TAG}<html>hi</html>").as_bytes());
         assert_eq!(page.headers()[header::CONTENT_TYPE], "text/html; charset=utf-8");
         let policy = page.headers()[header::CONTENT_SECURITY_POLICY].to_str().unwrap();
         assert!(policy.contains("default-src 'none'") && policy.contains("frame-ancestors tauri://localhost"));
-        let script = serve(&get("/demo/bundled/assets/app.js"), "tauri://localhost").await.unwrap();
+        let script = serve(&get("/demo/1.0.0/assets/app.js"), "tauri://localhost").await.unwrap();
         assert_eq!(script.headers()[header::CONTENT_TYPE], "text/javascript; charset=utf-8");
         assert_eq!(script.headers()[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*");
         // An app on its own origin that is one static page and wants the Space-files shim: the page comes
         // with the shim first in its head and a policy that allows its inline script, from the file as it is.
-        let own = shipped.join("pc");
+        let own = cache.join("pc").join("2.0.0");
         std::fs::create_dir_all(&own).unwrap();
         std::fs::write(
             own.join("misty-app.json"),
@@ -268,19 +304,24 @@ mod tests {
         std::fs::write(own.join("index.html"), "<html><head></head><body><script>1</script></body></html>").unwrap();
         std::fs::write(own.join("logo.svg"), "<svg/>").unwrap();
         let get_own = |path: &str| Request::builder().uri(format!("misty-app://pc{path}")).body(Vec::new()).unwrap();
-        let own_page = serve(&get_own("/bundled/"), "tauri://localhost").await.unwrap();
+        let own_page = serve(&get_own("/2.0.0/"), "tauri://localhost").await.unwrap();
         let html = String::from_utf8(own_page.body().to_vec()).unwrap();
-        assert!(html.starts_with("<html><head><script src=\"/__misty/shim.js\"></script></head>"));
+        assert!(html.starts_with(&format!("<html><head>{SCREEN_TAG}{SHIM_TAG}</head>")));
         assert!(own_page.headers()[header::CONTENT_SECURITY_POLICY].to_str().unwrap().contains("'unsafe-inline'; style-src"));
         // A page that didn't ask for it gets neither.
         assert!(!String::from_utf8(page.body().to_vec()).unwrap().contains("shim.js"));
         assert!(!page.headers()[header::CONTENT_SECURITY_POLICY].to_str().unwrap().contains("'unsafe-inline'; style-src"));
+        // Every entry page gets the screen helper, and it is served from Misty's own path.
+        assert!(String::from_utf8(page.body().to_vec()).unwrap().contains("/__misty/screen.js"));
+        let screen = serve(&get("/__misty/screen.js"), "tauri://localhost").await.unwrap();
+        assert!(String::from_utf8(screen.body().to_vec()).unwrap().contains("misty:screen"));
         let shim = serve(&get_own("/__misty/shim.js"), "tauri://localhost").await.unwrap();
         assert!(String::from_utf8(shim.body().to_vec()).unwrap().contains("files.pick"));
-        // What Misty doesn't ship, and a path that climbs out of the folder, are refused.
-        assert_eq!(serve(&get("/nothing/bundled/"), "x").await.unwrap_err(), StatusCode::NOT_FOUND);
-        assert_eq!(serve(&get("/demo/bundled/missing.js"), "x").await.unwrap_err(), StatusCode::NOT_FOUND);
-        assert_eq!(serve(&get("/demo/bundled/a/../../x"), "x").await.unwrap_err(), StatusCode::FORBIDDEN);
-        std::fs::remove_dir_all(&shipped).unwrap();
+        // An app that isn't here, and a path that climbs out of the folder, are refused.
+        assert_eq!(serve(&get("/nothing/1.0.0/"), "x").await.unwrap_err(), StatusCode::NOT_FOUND);
+        assert_eq!(serve(&get("/demo/1.0.0/missing.js"), "x").await.unwrap_err(), StatusCode::NOT_FOUND);
+        assert_eq!(serve(&get("/demo/1.0.0/a/../../x"), "x").await.unwrap_err(), StatusCode::FORBIDDEN);
+        *bundle::TEST_CACHE.lock().unwrap() = None;
+        std::fs::remove_dir_all(&cache).unwrap();
     }
 }

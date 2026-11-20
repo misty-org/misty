@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { itemDetails, matchItems, orderItems, unaddedSuggestions, type MarketItem } from "./api";
+import { matchItems, orderItems, unaddedSuggestions, type MarketItem } from "./api";
 
 const item = (patch: Partial<MarketItem>): MarketItem => ({
   id: "x@m",
@@ -52,9 +52,4 @@ describe("engine marketplace", () => {
     expect(unaddedSuggestions("codex", []).length).toBeGreaterThan(0);
   });
 
-  it("says where a plugin is from and when it signs in", () => {
-    expect(
-      itemDetails(item({ description: "Mail", installs: 1200, signIn: "on_install" })),
-    ).toMatch(/^Mail · m · 1\.2K installs · Signs in when installed$/);
-  });
 });

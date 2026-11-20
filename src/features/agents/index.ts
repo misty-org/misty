@@ -18,7 +18,6 @@ export {
   type AgentsHubPage,
 } from "./hub/agentsHubStore";
 export { HubAgentsPage } from "./hub/HubAgentsPage";
-export { EngineMarketplace, showSkillCatalog } from "./marketplace/EngineMarketplace";
 export { ExplorePage, type MarketTab } from "./marketplace/ExplorePage";
 
 export type { AppRequest } from "./connected-apps/api";
@@ -69,8 +68,8 @@ export {
 // Public surface used by other features.
 export { spaceAgentsApi, type SpaceAgent } from "./api/space-agents";
 export { spacesGateway } from "./spaces-gateway/spacesGateway";
-export type { ItemDocKind, SpaceItemTools } from "./spaces-gateway/spacesGateway";
 export { EditorSettings } from "./code/vim/EditorSettings";
+export { CollaborationSettings } from "./code/live/CollaborationSettings";
 export { openCodeChat } from "./code/sessions/CodeChatColumn";
 export { findVocative, routeToAgent } from "./tutor/cursor/vocativeRoute";
 
@@ -98,7 +97,16 @@ export type { MistyActivityEntry } from "./conversations/state/activity";
 export type { GlobalAiConversation } from "./conversations/state/conversationTypes";
 export { watchAllRunEvents } from "./runs/local-run/localRunEvents";
 export { currentSpaceKey, folderName, useEnginesList } from "./engines/enginesApi";
-export { isProjectChat, useLinkedFolders, useProjectChats } from "./shared-folders/chatFolder";
+export {
+  isProjectChat,
+  useChatFolders,
+  useLinkedFolders,
+  useProjectChats,
+  useProjectFolders,
+  type ProjectFolder,
+} from "./shared-folders/chatFolder";
+// The file picker browses the person's project folders on this computer.
+export { filesApi, imageFileUrl, type DirEntry } from "./context-panel/files/filesApi";
 export { useProjectsHome, useProjectsHomePath } from "./shared-folders/projectsHome";
 export { RunNotifier } from "./runs/notices/RunNotifier";
 // Personas from the bundled catalog, and their page in Settings.
@@ -172,12 +180,9 @@ export {
   CodeThemeStatus,
   CodeVimStatus,
 } from "./code/CodeBarStatus";
-export {
-  ImageAgentPanel,
-  VideoAgentPanel,
-  revertVideoTurn,
-  useMediaAgent,
-} from "./video/VideoAgentPanel";
+
+// The run a call belongs to: its agent and chat (`tools/runContexts.ts`).
+export { loadRunEntry } from "./tools/runContexts";
 
 // Tools that come and go while Misty runs, such as the ones an app's MCP server offers.
 export {

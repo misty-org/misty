@@ -106,7 +106,8 @@ async function readOne(invoke: typeof tauriInvoke, path: string): Promise<ArrayB
   }
 }
 
-async function readDropped(paths: string[]): Promise<{ files: File[]; failed: string[] }> {
+/** Reads back files the system just dropped on one of Misty's windows, by their paths. */
+export async function readDropped(paths: string[]): Promise<{ files: File[]; failed: string[] }> {
   const { invoke } = await import("@tauri-apps/api/core");
   const files: File[] = [];
   const failed: string[] = [];

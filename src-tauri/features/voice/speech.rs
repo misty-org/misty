@@ -355,6 +355,25 @@ pub async fn speech_on_call(webview: Webview) -> Result<bool, String> {
     Ok(false)
 }
 
+/// Opens the system's own page for getting better voices: Spoken Content on macOS, where the
+/// Premium and Enhanced voices download, and Speech on Windows. Only that one page can be opened.
+#[tauri::command]
+pub fn speech_open_voice_settings(webview: Webview) -> Result<(), String> {
+    require_person(&webview)?;
+    #[cfg(target_os = "macos")]
+    let opened = std::process::Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent")
+        .spawn();
+    #[cfg(windows)]
+    let opened = std::process::Command::new("explorer").arg("ms-settings:speech").spawn();
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let opened: std::io::Result<std::process::Child> =
+        Err(std::io::Error::other("this system has no voice settings Misty can open"));
+    opened
+        .map(|_| ())
+        .map_err(|error| format!("Couldn't open the system's voice settings: {error}"))
+}
+
 /// Puts an answer on the clipboard, for when it couldn't be heard.
 #[tauri::command]
 pub async fn speech_copy_answer(webview: Webview, text: String) -> Result<(), String> {

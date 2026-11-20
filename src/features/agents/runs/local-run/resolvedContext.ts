@@ -64,7 +64,8 @@ async function note(reference: AiContextReference, spaceId: string): Promise<Res
       id: note.id,
       kind: "note",
       title,
-      href: `/spaces/${encodeURIComponent(spaceId)}/notes?note=${encodeURIComponent(note.id)}`,
+      // A Space note is a Lab notebook, which opens in the Lab.
+      href: `/spaces/${encodeURIComponent(spaceId)}/lab?doc=${encodeURIComponent(note.id)}`,
       revision: note.revision as AiCitation["revision"],
       excerpt: excerpt(body),
     },
@@ -124,57 +125,9 @@ async function libraryItem(
       id: item.id,
       kind: "library.item",
       title: item.display_name,
-      href: `/spaces/${encodeURIComponent(spaceId)}/media?item=${encodeURIComponent(item.id)}`,
+      href: `/spaces/${encodeURIComponent(spaceId)}/files?item=${encodeURIComponent(item.id)}`,
       revision: item.version as AiCitation["revision"],
       excerpt: excerpt(item.caption ?? ""),
-    },
-  };
-}
-
-/** How each live-room item is named to the agent, where it opens, and the tool that reads it whole. */
-const madeItems = {
-  drawing: { part: "drawings", section: "drawings", noun: "Whiteboard", tool: "drawing_read" },
-  deck: { part: "decks", section: "slides", noun: "Deck", tool: "deck_read" },
-  workbook: { part: "workbooks", section: "data", noun: "Workbook", tool: "workbook_read" },
-} as const;
-
-/**
- * A whiteboard, deck or workbook: its title and the words the server keeps of it (a deck's slide
- * text, a workbook's sheet names and text cells, a whiteboard's labels), the part nearest the
- * reference's words. Its tool reads the rest, laid out.
- */
-async function madeItem(
-  kind: keyof typeof madeItems,
-  reference: AiContextReference,
-  spaceId: string,
-): Promise<ResolvedSource> {
-  const { part, section, noun, tool } = madeItems[kind];
-  const item = await apiRequest<{
-    id: string;
-    title: string;
-    role?: string;
-    collaboration_revision?: number;
-    plain_text?: string;
-  }>(spacePath(spaceId, `/${part}/${encodeURIComponent(reference.id)}`));
-  const text = item.plain_text ?? "";
-  return {
-    kind,
-    title: item.title,
-    content: [
-      `${noun}: ${item.title}`,
-      `Id: ${item.id} (read it whole with ${tool})`,
-      `Revision: ${item.collaboration_revision ?? 0}`,
-      text ? relevantChunk(text, reference.title) : "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    citation: {
-      id: item.id,
-      kind,
-      title: item.title,
-      href: `/spaces/${encodeURIComponent(spaceId)}/${section}/${encodeURIComponent(item.id)}`,
-      revision: item.collaboration_revision,
-      excerpt: excerpt(text || `${noun} ${item.title}`),
     },
   };
 }
@@ -206,12 +159,6 @@ async function resolveOne(reference: AiContextReference): Promise<ResolvedSource
       return spaceId ? chat(reference, spaceId) : null;
     case "library.item":
       return spaceId ? libraryItem(reference, spaceId) : null;
-    case "drawing":
-    case "deck":
-    case "workbook":
-      return spaceId
-        ? madeItem(reference.kind.trim().toLowerCase() as keyof typeof madeItems, reference, spaceId)
-        : null;
     case "workspace.scope":
       return workspaceScope(reference);
     // Labels are orientation, and device references are read by the tools bound to them.

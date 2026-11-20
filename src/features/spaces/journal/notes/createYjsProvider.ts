@@ -32,7 +32,7 @@ export interface CollaborationAccess {
 export function createYjsProvider(
   initial: CollaborationProviderTicket,
   doc: Y.Doc,
-  party: "note-room" | "drawing-room" | "image-room" | "code-room" | "deck-room" | "workbook-room",
+  party: "note-room" | "code-room" | "app-room",
   refresh: () => Promise<CollaborationProviderTicket>,
 ): { provider: YProvider; access: CollaborationAccess } {
   let unusedTicket = initial.ticket;

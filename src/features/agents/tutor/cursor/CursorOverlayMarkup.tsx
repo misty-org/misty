@@ -1,13 +1,19 @@
+import { invoke } from "@tauri-apps/api/core";
 import type { CSSProperties, RefObject } from "react";
 import {
   cn,
   companionTints,
+  Pressable,
   screenMarkClass,
+  StateMark,
   ViewportLayer,
   type CompanionTint,
 } from "@misty/ui";
+import type { AgentProfile } from "@/shared/schemas";
+import { agentCloudVariants } from "../../personal/agentCloudAvatars";
+import { AgentAvatar, AgentCloudImage } from "../../personal/AgentPicture";
 import { normalizeCompanionSize } from "./companionSize";
-import type { Presentation } from "./protocol";
+import type { PresentedHandoff, Presentation } from "./protocol";
 
 type CursorOverlayMarkupProps = {
   presentation: Presentation;
@@ -29,11 +35,25 @@ const bubbleClass = cn(
   "text-micro font-medium",
   screenMarkClass.fill,
 );
+/** What the bubble says about work handed to an agent. */
+function handoffLine({ agent, state }: PresentedHandoff) {
+  if (state === "waiting") return `${agent.name} needs you`;
+  if (state === "done") return `${agent.name} is done`;
+  if (state === "failed") return `${agent.name} couldn't finish`;
+  return `${agent.name} is on it`;
+}
+
 /** The meter and the spinner sit centered on the companion's point, at its size. */
 const centeredClass = cn(
   "absolute -translate-x-1/2 -translate-y-1/2 scale-[var(--companion-scale,1)] opacity-0",
   "transition-opacity duration-150 ease-[ease]",
+  // With Misty beside the pointer, they sit just under her.
+  "group-data-[sprite]/companion:top-[calc(var(--spacing)*6*var(--companion-scale,1))]",
 );
+/** A bubble beside the companion moves clear of Misty while she shows. */
+const besideSpriteClass = "group-data-[sprite]/companion:left-5";
+/** Misty's own picture: the Sky cloud, the one the companion has always worn. */
+const mistyCloud = agentCloudVariants[0];
 
 export function CursorOverlayMarkup({
   presentation,
@@ -78,13 +98,41 @@ export function CursorOverlayMarkup({
           "cursor-group group/companion absolute top-0 left-0 size-0 opacity-0",
           "transition-opacity duration-400 ease-[ease] motion-reduce:transition-none",
         )}
-        data-phase={presentation.phase}
+        // While an agent does the work, the bubble saying so takes the spinner's place.
+        data-phase={
+          presentation.phase === "processing" && presentation.handoff
+            ? "handoff"
+            : presentation.phase
+        }
+        data-sprite={presentation.sprite === true ? "" : undefined}
         style={
           {
             "--companion-scale": normalizeCompanionSize(presentation.size) / 100,
           } as CSSProperties
         }
       >
+        {presentation.sprite === true && (
+          // A click on Misty opens Tutor's text box. She takes the pointer only while it is on
+          // her (`data-on-misty`, set by the loop), so everywhere else stays the app's.
+          <Pressable
+            aria-label="Ask Misty"
+            tabIndex={-1}
+            className={cn(
+              "cursor-misty absolute size-8 -translate-x-1/2 -translate-y-1/2",
+              "scale-[var(--companion-scale,1)]",
+              "pointer-events-none group-data-[on-misty]/companion:pointer-events-auto",
+            )}
+            onClick={() => void invoke("cursor_companion_ask_open").catch(() => undefined)}
+          >
+            <div
+              className={cn("size-full", screenMarkClass.companion)}
+              data-phase={presentation.phase}
+              data-wave={presentation.wave ? "" : undefined}
+            >
+              <AgentCloudImage variant={mistyCloud} fill />
+            </div>
+          </Pressable>
+        )}
         <div
           ref={meter}
           className={cn(
@@ -142,9 +190,36 @@ export function CursorOverlayMarkup({
           ref={bubble}
           className={cn(
             "cursor-point-bubble left-2.5 opacity-0 transition-opacity duration-500 ease-out",
+            besideSpriteClass,
             bubbleClass,
           )}
         />
+        {presentation.hint && (
+          // Shown by the loop: as Misty first appears, and on a pointer that has rested a while.
+          <div
+            className={cn(
+              "cursor-hint-bubble left-2.5 opacity-0 transition-opacity duration-500 ease-out",
+              besideSpriteClass,
+              bubbleClass,
+            )}
+          >
+            {presentation.hint.text}
+          </div>
+        )}
+        {presentation.handoff && !presentation.point && !presentation.error && (
+          <div
+            className={cn(
+              "cursor-handoff-bubble left-2.5 flex items-center gap-1",
+              "animate-[misty-fade-in_0.25s_ease-out] motion-reduce:animate-none",
+              besideSpriteClass,
+              bubbleClass,
+            )}
+          >
+            <AgentAvatar agent={presentation.handoff.agent as AgentProfile} compact />
+            {handoffLine(presentation.handoff)}
+            <StateMark kind={presentation.handoff.state} />
+          </div>
+        )}
         {presentation.error && !presentation.point && (
           <div className={cn("cursor-error-bubble left-0", bubbleClass)}>
             {presentation.error.includes("Speech failed:")

@@ -13,17 +13,7 @@ export type TourId =
   | "lab"
   | "notebook"
   | "space-chat"
-  | "docs"
-  | "doc"
-  | "slides"
-  | "deck"
-  | "data"
-  | "workbook"
-  | "whiteboards"
-  | "drawing"
   | "library"
-  | "planner"
-  | "calendar"
   | "search"
   | "layout"
   | "add-sources"
@@ -110,23 +100,18 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "sidebar-space",
         title: "Your space",
-        body: "A shared place for a project, a class or friends. Its name opens the home; the arrow switches spaces or starts a new one.",
+        body: "A shared place for a project, a class or friends. Its name opens the Space menu: switch spaces, start one, see its people and its shared folders.",
       },
       {
-        target: "space-places",
+        target: "sidebar-apps",
         title: "Apps",
-        body: "Docs, whiteboards, tasks and files live in this Space's apps. Open one, or add more.",
-      },
-      {
-        target: "space-make",
-        title: "Make something together",
-        body: "Start a doc or a whiteboard that everyone here can edit at the same time.",
+        body: "Open-source apps this Space added open from here. A mod can add more from Explore.",
       },
       {
         target: "sidebar-space",
         title: "Invite friends",
         body:
-          "If you made this space, invite people with the button at the right of its name. " +
+          "If you made this space, invite people from its menu. " +
           "They see what you share and what your agents are doing, never your chats.",
       },
     ],
@@ -193,14 +178,14 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body: 'Group chats for everyone in this space. Everyone is in "everyone".',
       },
       {
-        target: "space-chat-dms",
+        target: "sidebar-dms",
         title: "Direct messages",
         body: "Talk one to one with someone in this space.",
       },
       {
         target: "space-chat-composer",
         title: "Say something",
-        body: "Write to everyone here and press return to send. Add files or things from Media too.",
+        body: "Write to everyone here and press return to send. Add files or things from Files too.",
       },
       {
         target: "space-chat-mention",
@@ -209,173 +194,8 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       },
     ],
   },
-  docs: {
-    label: "Docs tour",
-    steps: [
-      {
-        target: "space-make",
-        title: "Make a doc",
-        body: "Start a doc that everyone here can write in together.",
-      },
-      {
-        target: "space-search",
-        title: "Find one",
-        body: "Search by a doc's name or the words inside it.",
-      },
-      {
-        target: "space-filters",
-        title: "Choose what you see",
-        body: "Show everyone's docs or only yours, as pictures or as a list.",
-      },
-    ],
-  },
-  doc: {
-    label: "Doc tour",
-    steps: [
-      {
-        target: "doc-title",
-        title: "Name it",
-        body: "Give your doc a name everyone will recognize.",
-      },
-      {
-        target: "doc-toolbar",
-        title: "Make it look right",
-        body: "Headings, lists, bold, pictures and more.",
-      },
-      {
-        target: "doc-canvas",
-        title: "Write together",
-        body: "Everyone here can write at the same time. Select some text to ask Misty to change it.",
-      },
-      {
-        target: "doc-backlinks",
-        title: "Linked docs",
-        body: "See which docs link here. Type [[ to link to another doc.",
-      },
-    ],
-  },
-  slides: {
-    label: "Slides tour",
-    steps: [
-      {
-        target: "space-make",
-        title: "Make slides",
-        body: "Start a deck, or ask your agent to turn a doc into one.",
-      },
-      {
-        target: "space-search",
-        title: "Find one",
-        body: "Search by a deck's name or the words on its slides.",
-      },
-      {
-        target: "space-filters",
-        title: "Choose what you see",
-        body: "Show everyone's decks or only yours, as pictures or as a list.",
-      },
-    ],
-  },
-  deck: {
-    label: "Deck tour",
-    steps: [
-      {
-        target: "deck-rail",
-        title: "Your slides",
-        body: "Drag a slide to move it. Right-click one to copy, hide or delete it.",
-      },
-      {
-        target: "deck-layout",
-        title: "Pick a layout",
-        body: "Each slide is laid out for you. Change the layout and the words move with it.",
-      },
-      {
-        target: "deck-theme",
-        title: "Pick a look",
-        body: "A theme sets the colors and fonts of every slide at once.",
-      },
-      {
-        target: "deck-present",
-        title: "Present",
-        body: "Show your slides full screen, with your notes on your own screen.",
-      },
-    ],
-  },
-  data: {
-    label: "Data tour",
-    steps: [
-      {
-        target: "space-make",
-        title: "Make a workbook",
-        body: "Start one, or drop in a spreadsheet file to bring its sheets in.",
-      },
-      {
-        target: "space-search",
-        title: "Find one",
-        body: "Search by a workbook's name or the words in its cells.",
-      },
-      {
-        target: "space-filters",
-        title: "Choose what you see",
-        body: "Show everyone's workbooks or only yours, as pictures or as a list.",
-      },
-    ],
-  },
-  workbook: {
-    label: "Workbook tour",
-    steps: [
-      {
-        target: "workbook-grid",
-        title: "Your sheet",
-        body: "Type in any cell. Start with = to work something out, like =SUM(B2:B9).",
-      },
-      {
-        target: "workbook-sheets",
-        title: "More sheets",
-        body: "Keep related tables side by side as sheets of one workbook.",
-      },
-      {
-        target: "workbook-charts",
-        title: "Charts",
-        body: "Select some cells to chart them, then pin charts to the dashboard.",
-      },
-    ],
-  },
-  whiteboards: {
-    label: "Whiteboards tour",
-    steps: [
-      {
-        target: "space-make",
-        title: "Make a whiteboard",
-        body: "Start a board everyone here can draw on together.",
-      },
-      {
-        target: "space-search",
-        title: "Find one",
-        body: "Search by a whiteboard's name or the words on it.",
-      },
-      {
-        target: "space-filters",
-        title: "Choose what you see",
-        body: "Show everyone's whiteboards or only yours, as pictures or as a list.",
-      },
-    ],
-  },
-  drawing: {
-    label: "Whiteboard tour",
-    steps: [
-      {
-        target: "drawing-title",
-        title: "Name it",
-        body: "Give your whiteboard a name everyone will recognize.",
-      },
-      {
-        target: "drawing-canvas",
-        title: "Draw together",
-        body: "Draw, add shapes and text, and paste pictures. Everyone here sees changes as they happen.",
-      },
-    ],
-  },
   library: {
-    label: "Media tour",
+    label: "Files tour",
     steps: [
       {
         target: "library-upload",
@@ -391,51 +211,6 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         target: "library-filters",
         title: "Sort and filter",
         body: "Narrow by type, change the order, see deleted files, or switch between pictures and a list.",
-      },
-    ],
-  },
-  planner: {
-    label: "Planner tour",
-    steps: [
-      {
-        target: "planner-new",
-        title: "Add a task",
-        body: "Write down something to do and choose who does it, a person or an agent.",
-      },
-      {
-        target: "planner-board",
-        title: "Move it along",
-        body: "To do, in progress, done. Drag a card to the next column as work moves on.",
-      },
-      {
-        target: "planner-search",
-        title: "Find a task",
-        body: "Search every task in this space.",
-      },
-    ],
-  },
-  calendar: {
-    label: "Calendar tour",
-    steps: [
-      {
-        target: "calendar-new",
-        title: "Add an event",
-        body: "Add a meeting or a date everyone in this space can see.",
-      },
-      {
-        target: "calendar-grid",
-        title: "Your month",
-        body: "Tasks with dates and your events show here. Click a day to add something to it.",
-      },
-      {
-        target: "calendar-months",
-        title: "Move through time",
-        body: "Go to another month, or jump back to today.",
-      },
-      {
-        target: "calendar-view",
-        title: "Month or list",
-        body: "See the whole month, or a list of what's coming up.",
       },
     ],
   },

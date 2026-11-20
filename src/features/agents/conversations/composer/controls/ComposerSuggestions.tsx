@@ -187,7 +187,7 @@ const emptyText = {
   command: "No matching commands",
   skill: "No skills found for this engine",
   prompt: "No prompts yet",
-  persona: "No matching personas",
+  persona: "No matching templates",
 };
 
 /**
@@ -294,7 +294,7 @@ export function useComposerSuggestions(input: {
           command: "Commands",
           skill: "Skills",
           prompt: "Prompts",
-          persona: "Personas",
+          persona: "Templates",
         }[trigger.kind]
       }
     >

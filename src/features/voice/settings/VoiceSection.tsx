@@ -1,5 +1,16 @@
-import { AudioLines, Keyboard, Languages, Mic, MonitorSpeaker } from "lucide-react";
-import { useSpeechSupport } from "../systemSpeech";
+import {
+  AudioLines,
+  Download,
+  Keyboard,
+  Languages,
+  Mic,
+  MonitorSpeaker,
+  Volume2,
+} from "lucide-react";
+import { Button, IconButton, notify } from "@misty/ui";
+import { invoke } from "@/native/invoke";
+import { say, useSpeechSupport } from "../systemSpeech";
+import { hasNaturalVoice, voicesFor } from "./voiceChoices";
 import { voiceSettings } from "../voiceSettings";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -14,6 +25,9 @@ import {
 import type { SettingsContentProps } from "../../settings/settingsTypes";
 
 const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
+const isWindows = typeof navigator !== "undefined" && /Win/i.test(navigator.platform);
+/** What a voice says when it's tried out. */
+const preview = "Hi, I'm Misty. This is how I sound.";
 // The empty value is the platform's own dictation key.
 const shortcuts = [
   { value: "", label: isMac ? "Fn / Globe" : "Right Alt", icon: Keyboard },
@@ -60,10 +74,17 @@ const rates = [
 export function VoiceSection(props: SettingsContentProps) {
   const voice = voiceSettings(props.document);
   const speech = useSpeechSupport();
-  // The system's voices in its own order, each by name and language; empty is its default.
+  // The voices for the language Misty speaks in, Premium and Enhanced first; empty is the
+  // system's default.
+  const offered = voicesFor(
+    speech?.voices ?? [],
+    voice.language,
+    voice.systemVoice,
+    navigator.language,
+  );
   const voices = [
     { value: "", label: "System default" },
-    ...(speech?.voices ?? []).map((item) => ({
+    ...offered.map((item) => ({
       value: item.id,
       label: `${item.name} (${item.language})`,
     })),
@@ -165,7 +186,39 @@ export function VoiceSection(props: SettingsContentProps) {
             disabled={props.working || !speech}
             onValueChange={(value) => set("system_voice", value)}
           />
+          <IconButton
+            label="Hear this voice"
+            disabled={!speech}
+            onClick={() =>
+              void say(preview, chosenVoice).catch((reason: unknown) =>
+                notify({ message: String(reason), tone: "error" }),
+              )
+            }
+          >
+            <Volume2 />
+          </IconButton>
         </SettingsRow>
+        {speech && (isMac ? !hasNaturalVoice(offered) : isWindows) && (
+          <SettingsRow
+            label="More natural voices"
+            description={
+              isMac
+                ? "Premium and Enhanced voices download free in System Settings › Accessibility › Spoken Content."
+                : "More voices download free in Windows Settings › Time & language › Speech."
+            }
+          >
+            <Button
+              icon={Download}
+              onClick={() =>
+                void invoke("speech_open_voice_settings").catch((reason: unknown) =>
+                  notify({ message: String(reason), tone: "error" }),
+                )
+              }
+            >
+              Get voices
+            </Button>
+          </SettingsRow>
+        )}
         <SettingsRow label="Speaking rate">
           <ChoiceControl
             value={String(voice.speakingRate)}

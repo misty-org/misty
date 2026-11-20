@@ -11,7 +11,7 @@ export function keepsLayoutWhileHidden(view: WorkspaceView): boolean {
   // An idle pane is cheap to lay out again, and WebKit doesn't restart Misty's flight in a
   // subtree that `content-visibility: hidden` skipped, so it leaves the page instead.
   if (view.placeholder) return false;
-  return view.surfaceId === "space" || view.surfaceId === "agents";
+  return view.surfaceId === "space" || view.surfaceId === "agents" || view.surfaceId === "direct";
 }
 
 /** A tab strip tab keeps its layout only while every view in its panes does. */

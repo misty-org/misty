@@ -14,7 +14,7 @@ import { routedTool } from "./routing";
  * keeps both inside the chat's own folder (`engines/chat_media.rs`).
  */
 
-const UNAVAILABLE = "Media can't be reached from here.";
+const UNAVAILABLE = "Files can't be reached from here.";
 
 async function chatOf(request: LocalToolRequest) {
   const run = await loadRunEntry(request.runId).catch(() => null);

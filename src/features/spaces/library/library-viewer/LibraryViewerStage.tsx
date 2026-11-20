@@ -1,7 +1,6 @@
 import { EmbeddedUniversalPreview } from "@/features/files";
 import { Button, IconButton, Surface } from "@misty/ui";
 import { ChevronLeft, ChevronRight, ClipboardCopy } from "lucide-react";
-import type { CSSProperties, RefObject } from "react";
 
 interface LibraryViewerStageProps {
   displayName: string;
@@ -9,13 +8,9 @@ interface LibraryViewerStageProps {
   contentUrl: string;
   contentLoading: boolean;
   contentError: string;
-  mediaStyle: CSSProperties | undefined;
   canCopy: boolean;
   index: number;
   itemCount: number;
-  imageRef: RefObject<HTMLImageElement | null>;
-  videoRef: RefObject<HTMLVideoElement | null>;
-  onVideoTime: () => void;
   onCopy: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -34,11 +29,6 @@ export function LibraryViewerStage(props: LibraryViewerStageProps) {
           url={props.contentUrl}
           loading={props.contentLoading}
           error={props.contentError}
-          imageRef={props.imageRef}
-          videoRef={props.videoRef}
-          mediaStyle={props.mediaStyle}
-          onVideoMetadata={props.onVideoTime}
-          onVideoTime={props.onVideoTime}
           fallbackAction={
             props.canCopy ? (
               <Button variant="secondary" type="button" onClick={props.onCopy}>

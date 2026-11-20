@@ -1,5 +1,3 @@
-import { workspaceSurfaceFromRoute } from "@/features/app-windows";
-import { useWorkspaceStore } from "@/features/app-windows";
 import { createPort } from "@/shared/lib/seams";
 import { useCaptureStore } from "./useCaptureStore";
 
@@ -18,31 +16,15 @@ export const noteAsk = createPort<
   }) => Promise<void>
 >("asking Misty about a note");
 
-function noteRoute() {
-  const { noteId, noteSpaceId } = useCaptureStore.getState();
-  if (!noteId || !noteSpaceId) return null;
-  return `/spaces/${encodeURIComponent(noteSpaceId)}/notes?note=${encodeURIComponent(noteId)}&view=doc`;
-}
-
-/** Opens the Note made from the capture in a workspace tab. */
-export function openCapturedNote() {
-  const route = noteRoute();
-  const surface = route && workspaceSurfaceFromRoute(route);
-  if (!route || !surface) return;
-  const workspace = useWorkspaceStore.getState();
-  const view = workspace.openDestination(surface);
-  if (view.route !== route) workspace.updateViewRoute(view.id, route, true);
-}
-
-/** Opens Misty with the Note attached, ready for a question about it. */
+/**
+ * Opens Misty with the Note made from the capture attached, ready for a question about it. The
+ * Note is read from the Space; it has no page of its own to open.
+ */
 export async function askAboutCapturedNote() {
   const { noteId, noteSpaceId, title } = useCaptureStore.getState();
-  const route = noteRoute();
-  if (!noteId || !route) return;
+  if (!noteId || !noteSpaceId) return;
   await noteAsk.get()({
     spaceId: noteSpaceId,
-    context: [
-      { id: noteId, kind: "note", title, href: route, source: "server", spaceId: noteSpaceId },
-    ],
+    context: [{ id: noteId, kind: "note", title, href: "", source: "server", spaceId: noteSpaceId }],
   });
 }

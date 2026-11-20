@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { RefObject } from "react";
@@ -40,6 +41,25 @@ function paintWaveform(meter: HTMLDivElement | null, power: number) {
   });
 }
 
+/** Pointer speed, in points a second, past which Misty steps out of the way. */
+const FLING_SPEED = 2_400;
+/** How long she stays away once the pointer slows down again. */
+const FLING_REST_MS = 400;
+/** How long a word takes at the normal speaking rate: about 150 words a minute. */
+const WORD_MS = 400;
+/** How high Misty bobs with a word, at the default size. */
+const BOB = 3;
+/** How long the pointer rests before Misty stays put where she is. */
+const PARK_MS = 600;
+/** How far the pointer can wander from a parked Misty, at the default size, and keep her there. */
+const PARK_REACH = 72;
+/** Misty's own radius at the default size: half her 32-point picture. */
+const MISTY_RADIUS = 16;
+/** How long the shortcut hint stays as Misty first appears. */
+const HINT_FIRST_MS = 8_000;
+/** How long the pointer rests before Misty says her shortcuts again, in her first week. */
+const HINT_REST_MS = 60_000;
+
 // Drives the companion's position, flight and point bubble from requestAnimationFrame.
 // Returns the cleanup that stops the loop and removes the event listeners.
 export function startCursorOverlayLoop({
@@ -79,6 +99,15 @@ export function startCursorOverlayLoop({
     target = flightStart,
     returnMouse = flightStart;
   let navigation: "follow" | "out" | "hold" | "return" = "follow";
+  /** Where the pointer was last frame, and until when Misty stays away after a fling. */
+  let pointerAt: Point | undefined;
+  let flungUntil = 0;
+  /** Where Misty waits once the pointer rests, and whether this overlay holds the pointer. */
+  let parkedAt: Point | undefined;
+  let holding = false;
+  /** Until when the first hint shows, and when the pointer last moved. */
+  let hintFirstUntil = 0;
+  let movedAt = performance.now();
   let holdUntil = Infinity;
   // A walkthrough step stays until the person clicks it.
   let holdForClick = false;
@@ -190,6 +219,26 @@ export function startCursorOverlayLoop({
         nextChar = now;
       }
     }
+    // Misty rests beside the pointer while Tutor isn't in use, and steps out of the way while the
+    // pointer is flung across the screen, coming back once it slows down.
+    if (dt > 0 && pointerAt) {
+      const speed = Math.hypot(mouse.x - pointerAt.x, mouse.y - pointerAt.y) / dt;
+      if (speed > FLING_SPEED) flungUntil = now + FLING_REST_MS;
+    }
+    if (!pointerAt || Math.hypot(mouse.x - pointerAt.x, mouse.y - pointerAt.y) > 2) movedAt = now;
+    pointerAt = mouse;
+    const scale = normalizeCompanionSize(state.size) / 100;
+    // Once the pointer rests, Misty stays where she is, so it can be brought onto her to click
+    // her or drop a file on her; during a drag she waits where it began. She follows again once
+    // the pointer moves off somewhere else.
+    if (state.sprite === true && !state.visible && !state.point && navigation === "follow") {
+      if (sample.dragging || now - movedAt >= PARK_MS) parkedAt ??= { ...position };
+      else if (
+        parkedAt &&
+        Math.hypot(mouse.x - parkedAt.x, mouse.y - parkedAt.y) > PARK_REACH * scale
+      )
+        parkedAt = undefined;
+    } else parkedAt = undefined;
     if (navigation === "out" || navigation === "return") {
       if (
         navigation === "return" &&
@@ -221,10 +270,58 @@ export function startCursorOverlayLoop({
         target = follow;
         returnMouse = mouse;
       }
-    } else spring(position, velocity, follow, dt);
+    } else spring(position, velocity, parkedAt ?? follow, dt);
     const onScreen = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
     const visible = state.visible && (navigation !== "follow" || (!state.point && onScreen));
-    group.current.style.opacity = visible ? "1" : "0";
+    // Away while the person types, is in a full-screen app, or the system has hidden the pointer
+    // (an app hides it while typing or playing video): she goes where it goes, and comes back
+    // with it.
+    const away = Boolean(sample.typing || sample.fullscreen || sample.cursorShown === false);
+    const resting =
+      state.sprite === true &&
+      !state.spriteAway &&
+      !away &&
+      navigation === "follow" &&
+      !state.point &&
+      onScreen &&
+      now >= flungUntil;
+    // The pointer over a parked Misty: this overlay takes it, so the click or the drop is hers.
+    const onMisty =
+      resting &&
+      !visible &&
+      parkedAt !== undefined &&
+      Math.hypot(mouse.x - position.x, mouse.y - position.y) <= MISTY_RADIUS * scale + 4;
+    if (onMisty !== holding) {
+      holding = onMisty;
+      void invoke("cursor_companion_hit", { over: onMisty }).catch(() => undefined);
+    }
+    // During a drag she dims, out of the way, until the pointer brings it to her.
+    group.current.style.opacity =
+      visible || (resting && (!sample.dragging || onMisty)) ? "1" : resting ? "0.5" : "0";
+    group.current.toggleAttribute("data-on-misty", onMisty);
+    // While Tutor talks, Misty bobs once a word, at the voice's pace.
+    const misty = group.current.querySelector<HTMLElement>(".cursor-misty");
+    if (misty) {
+      const words = state.phase === "responding" ? state.words : undefined;
+      let bob = 0;
+      if (words) {
+        const perWord = WORD_MS / words.rate;
+        const into = Date.now() - words.at;
+        if (into >= 0 && into < words.count * perWord)
+          bob = Math.sin(((into % perWord) / perWord) * Math.PI) * BOB * scale;
+      }
+      misty.style.transform = bob ? `translateY(${(-bob).toFixed(2)}px)` : "";
+    }
+    const hint = group.current.querySelector<HTMLElement>(".cursor-hint-bubble");
+    if (hint) {
+      if (state.hint?.first && !hintFirstUntil) hintFirstUntil = now + HINT_FIRST_MS;
+      const say =
+        resting &&
+        !visible &&
+        !state.handoff &&
+        (now < hintFirstUntil || now - movedAt >= HINT_REST_MS);
+      hint.style.opacity = say ? "1" : "0";
+    }
     group.current.style.transform = `translate(${position.x}px, ${position.y}px)`;
     const errorBubble = group.current.querySelector<HTMLElement>(".cursor-error-bubble");
     if (errorBubble) {
@@ -270,6 +367,8 @@ export function startCursorOverlayLoop({
   return () => {
     disposed = true;
     cancelAnimationFrame(frame);
+    // Never leave the pointer held by an overlay that's going away.
+    if (holding) void invoke("cursor_companion_hit", { over: false }).catch(() => undefined);
     for (const remove of removers) void remove.then((fn) => fn());
   };
 }

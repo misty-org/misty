@@ -1,8 +1,9 @@
-import type YProvider from "y-partyserver/provider";
+import type { Room } from "@misty/sdk";
+import type { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
-import { spacesGateway, type RoomAccess } from "../../spaces-gateway/spacesGateway";
+import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { personColor } from "../../tutor/personTone";
-import { codeSessionsApi } from "./codeSessionsApi";
+import { useShowInLive } from "./liveVisibility";
 import {
   authorKey,
   mainAuthor,
@@ -12,9 +13,9 @@ import {
 } from "./liveTypes";
 
 /**
- * A session's shared doc and its connection to the Space's `code-room`, after
- * `noteCollaboration.ts`: one ticket to open it, a fresh one for each reconnect, and closed for
- * good once the session ends (the room drops it with `resource_deleted`).
+ * A session's shared doc, a room of misty-sdk's like any app's (`pageMisty(…, "code")`): the room id is the
+ * session's, the host opens the Space's `code-room` behind it, and the room stops for good once the session
+ * ends (`not_found`) or the person can no longer reach it (`permission_denied`).
  *
  * Attribution rides on Yjs's own client ids. The person's edits use the doc's client id; each of
  * their agents, main's conflicts and file seeds get client ids of their own, switched in only for
@@ -31,6 +32,12 @@ export class LiveOrigin {
   ) {}
 }
 
+/** Whether a session's room is still reachable; once lost, it stays closed. */
+export interface LiveAccess {
+  readonly lost: "deleted" | "revoked" | null;
+  subscribe(listener: () => void): () => void;
+}
+
 export interface LiveRoom {
   sessionId: string;
   spaceId: string;
@@ -41,8 +48,11 @@ export interface LiveRoom {
   /** Author key → who they are. */
   people: Y.Map<LivePerson>;
   users: Y.PermanentUserData;
-  provider: YProvider;
-  access: RoomAccess;
+  /** The SDK room the doc lives in. */
+  live: Room;
+  /** Everyone in the session now: their names, colors, files and carets. */
+  awareness: Awareness;
+  access: LiveAccess;
   me: StepAuthor;
   /**
    * Settles once the room has synced and this window's authors are mapped; fails when the room is
@@ -157,9 +167,8 @@ export function closeRoom(sessionId: string) {
   rooms.delete(sessionId);
   open.delete(sessionId);
   if (!room) return;
-  room.provider.awareness.setLocalState(null);
-  room.provider.destroy();
-  room.doc.destroy();
+  room.awareness.setLocalState(null);
+  room.live.destroy();
 }
 
 async function createRoom(
@@ -168,12 +177,10 @@ async function createRoom(
   me: StepAuthor,
   person: Omit<LivePerson, keyof StepAuthor>,
 ): Promise<LiveRoom> {
-  const ticket = await codeSessionsApi.collaborationTicket(spaceId, sessionId);
   // Undoing a step and attributing deletions both read deleted text, so nothing is collected.
-  const doc = new Y.Doc({ gc: false });
-  const { provider, access } = spacesGateway
-    .get()
-    .openCodeRoom(ticket, doc, () => codeSessionsApi.collaborationTicket(spaceId, sessionId));
+  const live = spacesGateway.get().pageMisty(spaceId, "code").room(sessionId, { gc: false });
+  const doc = live.doc;
+  const access = liveAccess(live);
   let ready = false;
   const room: LiveRoom = {
     sessionId,
@@ -183,21 +190,24 @@ async function createRoom(
     steps: doc.getArray<LiveStep>("steps"),
     people: doc.getMap<LivePerson>("people"),
     users: new Y.PermanentUserData(doc),
-    provider,
+    live,
+    awareness: live.awareness,
     access,
     me,
     ready: Promise.resolve(),
     isReady: () => ready,
   };
   const color = personColor(me.id);
-  provider.awareness.setLocalStateField("user", {
-    id: me.id,
-    name: me.name,
-    color,
-    // y-codemirror tints others' selections with this; the person's own color, faint.
-    colorLight: `color-mix(in srgb, ${color} 24%, transparent)`,
-  });
-  room.ready = synced(provider, access).then(() => {
+  // Left unpublished, others see neither this person's cursor nor their face in the session.
+  if (useShowInLive.getState().value)
+    live.awareness.setLocalStateField("user", {
+      id: me.id,
+      name: me.name,
+      color,
+      // y-codemirror tints others' selections with this; the person's own color, faint.
+      colorLight: `color-mix(in srgb, ${color} 24%, transparent)`,
+    });
+  room.ready = synced(live, access).then(() => {
     // Mapped only after sync, so an entry another member's copy already has isn't replaced.
     mapAuthor(room, doc.clientID, me);
     doc.transact(
@@ -209,41 +219,48 @@ async function createRoom(
   return room;
 }
 
+/** A room's loss as Code tells it: the session ended, or this person can no longer reach it. */
+function liveAccess(live: Room): LiveAccess {
+  return {
+    get lost() {
+      const code = live.lost?.code;
+      return code === "not_found" ? "deleted" : code === "permission_denied" ? "revoked" : null;
+    },
+    subscribe: (listener) => live.onLost(() => listener()),
+  };
+}
+
 /** How long a room has to sync before its join counts as failed, so a join never waits forever. */
 const joinTimeoutMs = 30_000;
 
 /**
  * Settles once the room's copy has arrived. Fails when the room is lost before then, or when it
- * hasn't synced in `joinTimeoutMs` (the provider retrying an unreachable server, a ticket refused).
+ * hasn't synced in `joinTimeoutMs` (the server out of reach, a ticket refused).
  */
-function synced(provider: YProvider, access: RoomAccess): Promise<void> {
+function synced(live: Room, access: LiveAccess): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (provider.synced) return resolve();
     const lostError = () =>
       new Error(
         access.lost === "deleted"
           ? "This session ended."
-          : "You no longer have access to this session.",
+          : access.lost === "revoked"
+            ? "You no longer have access to this session."
+            : "Couldn't reach the live session. Check your connection and try again.",
       );
-    if (access.lost) return reject(lostError());
-    const finish = (error?: Error) => {
-      provider.off("synced", done);
-      unsubscribe();
-      window.clearTimeout(timer);
-      if (error) reject(error);
-      else resolve();
-    };
-    const done = (state: boolean) => {
-      if (state) finish();
-    };
-    const unsubscribe = access.subscribe(() => {
-      if (access.lost) finish(lostError());
-    });
     const timer = window.setTimeout(
       () =>
-        finish(new Error("Couldn't reach the live session. Check your connection and try again.")),
+        reject(new Error("Couldn't reach the live session. Check your connection and try again.")),
       joinTimeoutMs,
     );
-    provider.on("synced", done);
+    live.synced.then(
+      () => {
+        window.clearTimeout(timer);
+        resolve();
+      },
+      () => {
+        window.clearTimeout(timer);
+        reject(lostError());
+      },
+    );
   });
 }

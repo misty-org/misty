@@ -41,17 +41,11 @@ const CATALOG: &str = include_str!("../agents/runs/local_prompt/catalog.json");
 /// The families of tools that work on a Space. An outside engine brings its own tools for files
 /// on disk, the shell and the web; these are what only Misty has. `integration.` is the person's
 /// connected apps (`agents/connected_apps`), signed in once in Misty for every engine.
-const SPACE_TOOLS: [&str; 14] = [
+const SPACE_TOOLS: [&str; 8] = [
     "space.",
-    "note.",
     "file.",
     "thread.",
     "message.",
-    "drawing.",
-    "deck.",
-    "workbook.",
-    "image.",
-    "video.",
     "media.",
     "search.",
     "item.",
@@ -90,6 +84,12 @@ earlier chat with this person. Use it before saying you don't remember.";
 const APPS_INSTRUCTIONS: &str = "The integration_* tools reach the apps the user connected in \
 Misty (such as Notion, Linear or Gmail), signed in as them: find a tool with integration_search, \
 then run it with integration_execute. Prefer them to the app's web page.";
+/// The tools of an app that runs on this computer (`apps/program.rs`, such as SoundCraft's): they work in the
+/// chat's folder, and what they make is kept by saving it to the Space.
+const APP_PROGRAM_INSTRUCTIONS: &str = "Some app_* tools belong to an app that runs on this computer, \
+such as SoundCraft: they work only in your working folder, so give them paths there, and their open \
+session stays from one call and turn to the next. To keep what one makes (a bounced mix, a saved \
+session), add the file to the Space with file_upload.";
 /// browser_run's file for an engine: the program's value is written in the run's folder, so page
 /// data reaches a file without the model typing it out again.
 const SAVE_AS: &str = "saveAs";
@@ -176,7 +176,10 @@ impl Caller {
         } else {
             INSTRUCTIONS
         };
-        let base = format!("{space} {APPS_INSTRUCTIONS} {RECALL_INSTRUCTIONS}");
+        let mut base = format!("{space} {APPS_INSTRUCTIONS} {RECALL_INSTRUCTIONS}");
+        if crate::apps::program::any_offered() {
+            base = format!("{base} {APP_PROGRAM_INSTRUCTIONS}");
+        }
         if self.computer() {
             format!("{base} {}", crate::computer_use::tools::INSTRUCTIONS)
         } else {

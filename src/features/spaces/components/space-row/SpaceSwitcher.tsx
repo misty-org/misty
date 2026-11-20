@@ -1,12 +1,6 @@
 import { useCallback, useState } from "react";
 import type { Space } from "../../api/dto/entities";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  MenuTrigger,
-  Popover,
-  PopoverAnchor,
-} from "@misty/ui";
+import { DropdownMenu, DropdownMenuContent, MenuTrigger, Popover, PopoverAnchor } from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../../create/GlobalCreateSpaceDialog";
 import { spaceNavigationName } from "../../routes/defaultSpace";
 import { SpaceAvatar } from "../SpaceAvatar";

@@ -238,6 +238,7 @@ fn grants_for(reach: Reach) -> &'static [&'static str] {
         | Reach::EditorConfig
         | Reach::BundledResources
         | Reach::WebsiteData
+        | Reach::SpaceDrive
         | Reach::TestFixtures => &[],
     }
 }
@@ -263,6 +264,7 @@ fn the_list_matches_grants_toml() {
         Reach::EngineConfig,
         Reach::EditorConfig,
         Reach::BenchmarkKeys,
+        Reach::SpaceDrive,
         Reach::TestFixtures,
     ]
     .into_iter()

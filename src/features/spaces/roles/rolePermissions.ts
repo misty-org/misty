@@ -66,17 +66,17 @@ export const permissionGroups: { title: string; permissions: PermissionInfo[] }[
   {
     title: "Space content",
     permissions: [
-      { permission: "library.view", label: "See Media", line: "Open the Space's Media." },
-      { permission: "library.add", label: "Add to Media", line: "Upload and save items." },
-      { permission: "library.edit", label: "Edit Media", line: "Rename, move and change items." },
+      { permission: "library.view", label: "See Files", line: "Open the Space's Files." },
+      { permission: "library.add", label: "Add to Files", line: "Upload and save items." },
+      { permission: "library.edit", label: "Edit Files", line: "Rename, move and change items." },
       {
         permission: "library.download",
-        label: "Download Media",
+        label: "Download Files",
         line: "Save items to this computer.",
       },
       {
         permission: "library.import",
-        label: "Import into Media",
+        label: "Import into Files",
         line: "Bring items in from elsewhere.",
       },
       {

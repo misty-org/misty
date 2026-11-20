@@ -1,6 +1,5 @@
-import type { VideoProjectDocument } from "@/features/files";
 import type { ComponentType } from "react";
-import type YProvider from "y-partyserver/provider";
+import type { Misty } from "@misty/sdk";
 import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
 import { createPort } from "@/shared/lib/seams";
@@ -19,50 +18,6 @@ export interface LiveDoc {
   /** Hands over Markdown the server wrote into the doc, in one open copy only. */
   followRewrites(apply: (markdown: string) => void): () => void;
   /** Lets go of the room; the connection closes once nothing holds it. */
-  close(): void;
-}
-
-/**
- * A Space Library image as an agent edits it: what it is, its live edit (the room everyone
- * editing it shares, held until `close`), and saving that edit into an image.
- */
-export interface LiveLibraryImage {
-  name: string;
-  /** The item's version: a save over it makes a new one. */
-  version: number;
-  mimeType: string;
-  /** Its size in pixels, when the Library knows it. */
-  width: number;
-  height: number;
-  doc: Y.Doc;
-  awareness: Awareness;
-  role: "creator" | "editor" | "viewer";
-  /** Settles once the room's copy of the edit has arrived. */
-  synced: Promise<void>;
-  /** The full-size original. */
-  original(): Promise<Blob>;
-  /** Saves an edited image over the item; answers with the version it now is. */
-  replace(blob: Blob): Promise<number>;
-  /** Adds an edited image to the Library as a new item. */
-  saveCopy(blob: Blob, filename: string): Promise<{ id: string } | undefined>;
-  close(): void;
-}
-
-/** A Lab note's shared body editor, with everyone's carets. */
-/**
- * A video project in a Space's Media as an agent edits it. A change is kept as a new version of
- * the project's file and put in its live room, so every editor with it open shows it at once.
- */
-export interface LiveLibraryVideo {
-  name: string;
-  /** Who the agent's person is in the project: only a viewer can't keep changes. */
-  role: "viewer" | "editor" | "creator";
-  /** The project as it is now: the newer of its kept file and its live room. */
-  read(): Promise<VideoProjectDocument>;
-  /** Keeps a changed project. */
-  keep(document: VideoProjectDocument): Promise<void>;
-  /** Reads one of the Media items the project uses. */
-  loadMedia(itemId: string): Promise<File>;
   close(): void;
 }
 
@@ -95,67 +50,6 @@ export interface AgentArtifactProvenance {
 
 type Uploaded = Promise<{ item?: { id: string } }>;
 
-/** A ticket into one of the Space server's live rooms. */
-export interface RoomTicket {
-  ticket: string;
-  room: string;
-  url: string;
-}
-
-/** Whether a live room is still reachable; once lost, its connection stays closed. */
-export interface RoomAccess {
-  readonly lost: "deleted" | "revoked" | null;
-  subscribe(listener: () => void): () => void;
-  lose(reason: "deleted" | "revoked"): void;
-  retry(): void;
-}
-
-/** The Space items whose content lives in a live room: a doc, a whiteboard, a deck, a workbook. */
-export type ItemDocKind = "note" | "drawing" | "deck" | "workbook";
-
-/**
- * What agent tools use to write into docs, decks, workbooks and whiteboards. Each item's content
- * is a live room, so a tool joins it as this computer, changes it as people do, and leaves once
- * the room has the change: what an agent makes is whole at once, opened or not (plan F3). The
- * shapes are the Spaces feature's own (`docs/plans/space-artifacts-contract.md`); agents pass the
- * model's arguments through and hand back what they return.
- */
-export interface SpaceItemTools {
-  /** Opens the item's room, runs `change` on its document, waits for the room to have it, leaves. */
-  edit<T>(
-    kind: ItemDocKind,
-    spaceId: string,
-    itemId: string,
-    change: (doc: Y.Doc) => T | Promise<T>,
-  ): Promise<T>;
-  /** Fills a doc's body from Markdown, as an opened editor would. */
-  writeNoteMarkdown(doc: Y.Doc, markdown: string): void;
-  createDeck(doc: Y.Doc, input: Record<string, unknown>): void;
-  readDeck(doc: Y.Doc): unknown;
-  applyDeckOps(doc: Y.Doc, ops: unknown[]): unknown;
-  /** Overflowing, empty and crowded slots, measured the way the deck draws them. */
-  lintDeck(doc: Y.Doc): Promise<unknown[]>;
-  /** A picture from the web, for a slide; refused when the address isn't a picture. */
-  fetchPicture(url: string, signal?: AbortSignal): Promise<File>;
-  /** Adds a picture to a deck's assets and says its id. */
-  uploadDeckImage(spaceId: string, deckId: string, file: File): Promise<string>;
-  createWorkbook(doc: Y.Doc, input: Record<string, unknown>): void;
-  readWorkbook(doc: Y.Doc, args: Record<string, unknown>): unknown;
-  applyWorkbookOps(doc: Y.Doc, ops: unknown[]): unknown;
-  importWorkbookFile(doc: Y.Doc, file: File): Promise<unknown>;
-  /**
-   * Why each `::embed{…}` in a doc's Markdown may not go into it: a private source in a shared doc,
-   * someone else's private item, or one that isn't there. Empty when every embed may go in.
-   */
-  embedRefusals(
-    spaceId: string,
-    host: { visibility: "public" | "private"; creatorId?: string },
-    markdown: string,
-  ): Promise<string[]>;
-  /** Draws a Mermaid diagram onto a whiteboard. */
-  mermaidToDrawing(spaceId: string, drawingId: string, mermaid: string): Promise<unknown>;
-}
-
 /** What agents ask of Spaces. Spaces sits above agents, so it fills this in once at startup. */
 interface SpacesGateway {
   uploadLibraryPath(
@@ -172,12 +66,6 @@ interface SpacesGateway {
     purpose?: "library" | "attachment",
     options?: { agent?: AgentArtifactProvenance; signal?: AbortSignal },
   ): Uploaded;
-  /** Makes a drawing in a Space and puts these Excalidraw elements on it. */
-  createDrawing(
-    spaceId: string,
-    title: string,
-    elements: readonly unknown[],
-  ): Promise<{ id: string }>;
   /** The window's Space when other people are in it, where a reply can be handed to one of them. */
   sharedWindowSpace(): { id: string; name: string } | undefined;
   /** The other people in a Space. */
@@ -214,12 +102,8 @@ interface SpacesGateway {
   /** The signed-in person, as others in a Space see them. */
   me(): { userId: string; name: string } | undefined;
   openLiveDoc(spaceId: string, docId: string): Promise<LiveDoc>;
-  /** A Library image's live edit, for an agent to read and change alongside the people in it. */
-  openLibraryImage(spaceId: string, itemId: string): Promise<LiveLibraryImage>;
-  /** One of a Space's Media files, read whole. */
+  /** One of a Space's files, read whole. */
   libraryFile(spaceId: string, itemId: string): Promise<File>;
-  /** A video project in Media, for an agent to read and change alongside the people editing it. */
-  openLibraryVideo(spaceId: string, itemId: string): Promise<LiveLibraryVideo>;
   /** Makes the Space doc a new notebook lives in. */
   createNotebookDoc(spaceId: string, title: string, markdown: string): Promise<{ id: string }>;
   /** Deletes a notebook's doc from its Space, for everyone in it. */
@@ -280,14 +164,11 @@ interface SpacesGateway {
   SpaceCrumb: ComponentType<{ spaceId: string; here: string }>;
   /** A call to the Space server's API, for records agents' pages keep there (live code sessions). */
   spaceRequest<T = void>(path: string, init?: RequestInit): Promise<T>;
-  /** Docs, decks, workbooks and whiteboards for agent tools, loaded on first use. */
-  itemTools(): Promise<SpaceItemTools>;
-  /** Opens a live code session's room for its shared doc, with a fresh ticket per reconnect. */
-  openCodeRoom(
-    ticket: RoomTicket,
-    doc: Y.Doc,
-    refresh: () => Promise<RoomTicket>,
-  ): { provider: YProvider; access: RoomAccess };
+  /**
+   * The misty-sdk client Code or Lab talks through in a Space, as any app does: its rooms are a live session's
+   * repository (Code, by session id) or a notebook's doc (Lab, by doc id).
+   */
+  pageMisty(spaceId: string, page: "code" | "lab"): Misty;
 }
 
 export const spacesGateway = createPort<SpacesGateway>("Spaces for agents");

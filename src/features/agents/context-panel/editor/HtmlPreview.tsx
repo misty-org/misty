@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useEffect, useState } from "react";
-import { SkeletonDocument, Surface, Text } from "@misty/ui";
+import { PaneLoading, Surface, Text } from "@misty/ui";
 import { filesApi } from "../files/filesApi";
 
 /** No `allow-same-origin`: the page gets an opaque origin, so it can't read storage or anything
@@ -56,7 +56,7 @@ export function HtmlPreview({
       </Text>
     );
   }
-  if (state.status === "loading") return <SkeletonDocument label={name} />;
+  if (state.status === "loading") return <PaneLoading label={`Loading ${name}`} />;
   return (
     // A page that sets no background reads on white, as a browser shows it.
     <Surface tone="board" className="flex min-h-0 w-full flex-1">

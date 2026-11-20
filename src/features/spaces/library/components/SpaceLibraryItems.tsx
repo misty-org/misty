@@ -39,7 +39,6 @@ export function SpaceLibraryItems() {
     data: {
       spaceId,
       collection,
-      setSelectedItemId,
       setSelectedItemIds,
       displayItems,
       sort,
@@ -53,6 +52,7 @@ export function SpaceLibraryItems() {
       reloadKey,
     },
     itemActions: { loadMore },
+    openWith,
   } = useSpaceLibraryContext();
   const menuActions = useLibraryItemMenuActions();
   const personName = useSpaceItemCreator(spaceId);
@@ -125,7 +125,7 @@ export function SpaceLibraryItems() {
             ].join(" · "),
             updatedAt: item.updated_at || item.added_at,
             updated: formatTime(item.updated_at || item.added_at),
-            onOpen: () => setSelectedItemId(item.id),
+            onOpen: () => openWith.open(item),
             selectable: true,
             ...(hasLibraryItemMenuRows(menuActions(item)) && {
               menu: <LibraryItemMenuRows {...menuActions(item)} />,

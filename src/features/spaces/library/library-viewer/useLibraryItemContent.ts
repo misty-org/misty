@@ -1,4 +1,3 @@
-import { preloadPhoto } from "@/features/files";
 import { spacesApi } from "../../api/api";
 import type { SpaceLibraryItem } from "../../api/dto/entities";
 import { useEffect, useState } from "react";
@@ -22,24 +21,16 @@ interface LibraryItemContent {
  * Loads the bytes for the item on screen, as an object URL, kept for the session so opening it
  * again shows it at once (libraryContentCache.ts).
  *
- * Editing needs the untouched original; plain viewing prefers the cheaper
- * server-side preview for images and falls back to the file itself.
+ * Images prefer the cheaper server-side preview and fall back to the file itself.
  */
 export function useLibraryItemContent(options: {
   spaceId: string;
   item: SpaceLibraryItem | null;
-  editing: boolean;
   itemIsImage: boolean;
-  renditionState: string | undefined;
 }): LibraryItemContent {
-  const { spaceId, item, editing, itemIsImage, renditionState } = options;
-  // What it is on screen: the file at this version, as the original (editing) or for viewing; a
-  // preview made since the last look is a new key, so it loads.
-  const key = !item
-    ? ""
-    : editing
-      ? [spaceId, item.id, item.version, "original"].join(":")
-      : libraryViewKey(spaceId, item.id, item.version, itemIsImage ? (renditionState ?? "") : "");
+  const { spaceId, item, itemIsImage } = options;
+  // What it is on screen: the file at this version.
+  const key = !item ? "" : libraryViewKey(spaceId, item.id, item.version);
   // Shown at once when it was loaded before this session.
   const [loaded, setLoaded] = useState(() => ({ key, url: key ? (cachedContent(key) ?? "") : "" }));
   const [contentError, setContentError] = useState("");
@@ -64,16 +55,10 @@ export function useLibraryItemContent(options: {
 
     const request = () =>
       itemIsImage
-        ? editing
-          ? spacesApi
-              .libraryOriginalPreview(spaceId, item.id, item.version)
-              .catch(() => spacesApi.libraryOriginalContent(spaceId, item.id))
-          : spacesApi
-              .libraryPreview(spaceId, item.id, item.version)
-              .catch(() => spacesApi.libraryContent(spaceId, item.id))
-        : editing
-          ? spacesApi.libraryOriginalContent(spaceId, item.id)
-          : spacesApi.libraryContent(spaceId, item.id);
+        ? spacesApi
+            .libraryPreview(spaceId, item.id, item.version)
+            .catch(() => spacesApi.libraryContent(spaceId, item.id))
+        : spacesApi.libraryContent(spaceId, item.id);
 
     void loadContent(key, request)
       .then((url) => current && setLoaded({ key, url }))
@@ -133,7 +118,8 @@ export function usePrefetchLibraryNeighbors(options: {
           .libraryPreview(spaceId, item.id, item.version)
           .catch(() => spacesApi.libraryContent(spaceId, item.id)),
       ).then((url) => {
-        if (current && url) preloadPhoto(url);
+        // Decoded ahead, so stepping to it shows it at once.
+        if (current && url) void Object.assign(new Image(), { src: url }).decode().catch(() => {});
       });
     return () => {
       current = false;

@@ -28,10 +28,6 @@ export const refuse = (message: string, code = "invalid_request") =>
 
 function refusalMessage(error: ApiRequestError): string {
   switch (error.code) {
-    case "drawing_conflict":
-      return "The drawing changed since it was read. Call drawing_read again, then retry with its latest base_hash.";
-    case "document_too_large":
-      return "The drawing would exceed the collaboration document size limit. Apply a smaller scene or delete unused elements first.";
     case "account_closing":
     case "not_authenticated":
     case "account_changed":

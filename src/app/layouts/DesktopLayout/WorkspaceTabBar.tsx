@@ -77,6 +77,7 @@ export function WorkspaceTabBar(props: {
             <Plus />
           </IconButton>
         }
+        // Only the window's own control: a page's tools sit in that page's own bar under the tabs.
         end={<LayoutButton />}
         windowEdge
       />

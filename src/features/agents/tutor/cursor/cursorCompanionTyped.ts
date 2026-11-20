@@ -144,7 +144,12 @@ export class CursorCompanionTypedTurns {
     if (voiceOwned && s.submittedConversationId) {
       // The voice conversation points at and reads this answer when it finishes.
       s.owned = false;
-      s.delegatedTask = { id: s.invocationId, conversationId: s.submittedConversationId };
+      // A hand-off's continuation stays that agent's: the bubble keeps saying who has it.
+      s.delegatedTask = {
+        id: s.invocationId,
+        conversationId: s.submittedConversationId,
+        handoff: s.delegatedTask?.handoff,
+      };
     }
     s.settle();
     this.voice.settleDelegatedTask();
@@ -156,6 +161,18 @@ export class CursorCompanionTypedTurns {
     // A click often opens a page or a menu: look again once it has had a moment to load.
     await new Promise((settled) => setTimeout(settled, GUIDE_SETTLE_MS));
     if (!this.s.active(generation)) return;
+    // A walkthrough Tutor gave itself (its steps in Tutor's own conversation) goes on as Tutor's
+    // next turn, with a fresh look.
+    const place = useMistyStore
+      .getState()
+      .conversations.find((c) => c.id === step.conversationId)?.place;
+    if (step.voice && place === "tutor") {
+      this.s.change({ visible: true, phase: "processing", error: undefined });
+      await this.voice
+        .start()
+        .submitText(nextStepPrompt(step.point, walkthroughFor(step.conversationId)));
+      return;
+    }
     return this.submit({
       prompt: nextStepPrompt(step.point, walkthroughFor(step.conversationId)),
       conversationId: step.conversationId,

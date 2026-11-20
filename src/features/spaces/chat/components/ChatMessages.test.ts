@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { buildChatDisplayRows, formatChatMessageTime } from "./ChatDisplay";
 import { messageReplyPreviewText } from "./messageText";
 import { mergeSpaceMessages } from "../useSpaceMessageSpansStore";
-import { FluxerMessages } from "@/features/spaces/chat/fluxer/FluxerMessages";
+import { ChatMessageList } from "@/features/spaces/chat/components/ChatMessageList";
 import type { SpaceMessage } from "@/features/spaces/api/dto/entities";
 
 function message(id: string, sender: string, createdAt: string): SpaceMessage {
@@ -66,7 +66,7 @@ describe("Space chat display rows", () => {
 
     const markup = renderMessages([longMessage]);
 
-    // Fluxer's markup wraps with break-spaces and breaks long words; the text is all there.
+    // The text wraps and breaks long words; it is all there.
     expect(markup).toContain('role="log"');
     expect(markup).toContain("x".repeat(500));
   });
@@ -86,7 +86,7 @@ describe("Space chat display rows", () => {
 
   function renderMessages(messages: SpaceMessage[], error = "") {
     return renderToStaticMarkup(
-      createElement(FluxerMessages, {
+      createElement(ChatMessageList, {
         error,
         loading: false,
         messages,

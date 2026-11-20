@@ -81,11 +81,11 @@ it("fills a fresh split and later restores the whole split without replacing occ
 
 it("treats each Space as one destination and resumes its last section", () => {
   const space = go("/spaces/family/chat");
-  store().updateViewRoute(space.id, "/spaces/family/planner?view=week");
+  store().updateViewRoute(space.id, "/spaces/family/files?collection=recent");
   go("/spaces/work/chat");
   expect(go("/spaces/family/chat")).toMatchObject({
     id: space.id,
-    route: "/spaces/family/planner?view=week",
+    route: "/spaces/family/files?collection=recent",
   });
 });
 

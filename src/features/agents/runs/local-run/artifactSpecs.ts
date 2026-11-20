@@ -10,11 +10,6 @@ interface ArtifactSpec {
 }
 
 export const artifactSpecs: Record<string, ArtifactSpec> = {
-  drawing_patch: {
-    title: "Review drawing changes",
-    risk: "draft",
-    approvalPolicy: "visible_apply",
-  },
   message_draft: { title: "Review message draft", risk: "draft", approvalPolicy: "visible_apply" },
   terminal_command: {
     title: "Review terminal command",
@@ -36,19 +31,9 @@ export const artifactSpecs: Record<string, ArtifactSpec> = {
     risk: "dangerous",
     approvalPolicy: "always_confirm",
   },
-  image_edit: { title: "Review image edit", risk: "draft", approvalPolicy: "visible_apply" },
 };
 
 const words: Record<string, { kind: string; needsSelection?: boolean; any: string[] }> = {
-  notes: {
-    kind: "text_patch",
-    needsSelection: true,
-    any: ["rewrite", "improve", "shorten", "expand", "fix", "change"],
-  },
-  drawings: {
-    kind: "drawing_patch",
-    any: ["add", "draw", "arrange", "cluster", "move", "diagram"],
-  },
   "space.chat": { kind: "message_draft", any: ["draft", "reply", "write message"] },
   terminal: { kind: "terminal_command", any: ["run", "execute", "command", "install"] },
   browser: {
@@ -57,21 +42,6 @@ const words: Record<string, { kind: string; needsSelection?: boolean; any: strin
   },
   transfers: { kind: "transfer_plan", any: ["retry", "resume", "cancel", "recover"] },
   extensions: { kind: "extension_action", any: ["install", "configure", "run", "enable"] },
-  "photo-editor": {
-    kind: "image_edit",
-    any: [
-      "edit",
-      "enhance",
-      "bright",
-      "contrast",
-      "filter",
-      "warm",
-      "cool",
-      "crop",
-      "rotate",
-      "straighten",
-    ],
-  },
 };
 
 /** A surface's own words ask for a reviewable change rather than an answer. */

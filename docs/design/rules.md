@@ -29,17 +29,18 @@ baseline only shrinks. Write code that never trips one, rather than code that wa
 - `tooltip-off`: every icon button has a tooltip: drop tooltip={false}; IconButton's label is it
 - `ragged-wrap`: nothing wraps into ragged rows: put the controls in an ActionBar, which turns labels into icons, fades its shrink item, then folds low-priority items into ⋯
 - `mono-outside-code`: monospace only inside code itself (the editor, diffs, the terminal, code blocks), never for paths, IDs, URLs, model names or shortcuts: use Text or OverflowFadeText
-- `loading-text`: never loading text: first loads use a Skeleton shaped like the content (ListRowSkeleton, SkeletonList), and work on a click disables its Button while progress shows where the work happens
+- `loading-text`: never loading text: first loads use a Skeleton shaped like the content (ListRowSkeleton, SkeletonList), or PaneLoading when its shape depends on the data, and work on a click disables its Button while progress shows where the work happens
 - `status-word`: no loose status words: changes save themselves, and a failure shows next to what failed (FieldError, or notify with tone danger)
-- `legacy-button-variant`: Button and IconButton variants are primary, secondary, quiet and danger (IconButton also overlay): default and outline → secondary, ghost, toolbar and link → quiet, destructive → danger, chip → ChoiceGroup or FilterChip. An old variant's size sm is 32: make it md
+- `legacy-button-variant`: Button and IconButton variants are primary, secondary, quiet and danger (IconButton also overlay; store actions get and get-filled): default and outline → secondary, ghost, toolbar and link → quiet, destructive → danger, chip → ChoiceGroup or FilterChip. An old variant's size sm is 32: make it md
 - `legacy-button-size`: Button sizes are sm 24, md 32 and lg 36 (xs → sm, default and chip → md); IconButton sizes are sm 24 and md 32 (2xs and xs → sm, lg → md)
 - `raw-menu-row`: every menu row is a MenuItem, MenuCheckItem, MenuRadioItem or MenuSubmenu; never a raw DropdownMenu or ContextMenu item
 - `repeated-menu-icon`: a list of like things (models, efforts, folders, agents, chats) is text alone: drop the icon every row repeats, and give rows an icon only when it tells them apart
 - `leading-icon-in-list-row`: list rows start with their text: use ListRow with label, state and menu, and no leading icon
 - `sparkles-icon`: never the sparkles star (it reads as AI filler): pick an icon for what the thing is, such as Cpu for a model, Globe for web research or ScrollText for a skill
-- `skeleton-fallback`: load a tool's code with lazyTool inside ToolSuspense, which says "Setting up the code editor" and offers Try again; never a skeleton fallback, which stands in for data only
+- `skeleton-fallback`: load a tool's code with lazyTool inside ToolSuspense, which says "Setting up the code editor" and offers Try again; never a skeleton or PaneLoading fallback, which stand in for data only
 - `duckduckgo`: the agent browser opens on a blank page and searches with Google, never DuckDuckGo
 - `half-pixel-edge`: an edge is never 0.5px: use var(--hairline) or the hairline-outline utility (1px below 2x screens, 0.5px on them); a half pixel fades out on Windows' scaled displays and rounded corners look cut off
+- `focus-ring`: focus never draws a ring, outline or glow: a focused control shows its hover wash (Pressable, Button and IconButton already do), a field its edge
 - `arbitrary-px`: spacing and sizes come from the 4px scale (w-80, h-8, gap-3), never one-off pixels; a size the shared set lacks is added to @misty/ui first
 - `icon-sizing`: icons take no size or stroke of their own: the control they sit in draws every glyph at one size and stroke, so leave off size, strokeWidth and size classes
 - `button-sizing`: a shared button's height, width and padding come from its size prop and the bar it sits in: drop the size, height, width and padding classes
@@ -55,6 +56,7 @@ baseline only shrinks. Write code that never trips one, rather than code that wa
 - `css-ellipsis`: long text fades, never an ellipsis: use OverflowFadeText
 - `css-mono`: monospace only inside code itself (the editor, diffs, the terminal, code blocks)
 - `css-half-pixel-edge`: an edge is never 0.5px: use var(--hairline) or the hairline-outline utility (1px below 2x screens, 0.5px on them); a half pixel fades out on Windows' scaled displays and rounded corners look cut off
+- `css-focus-ring`: focus never draws a ring, outline or glow: a focused control shows its hover wash, a field its edge
 - `css-z`: use a layer token (var(--layer-…)) instead of a z-index number
 - `feature-css-rule`: features add no CSS rules: compose shared components, and add a missing look to @misty/ui first
 - `css-shared-slot`: never style a shared component's parts from a feature: give the component the variant or prop it lacks in @misty/ui

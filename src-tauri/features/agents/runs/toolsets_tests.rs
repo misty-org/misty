@@ -28,7 +28,7 @@ fn call(tool_name: &str, input: &str) -> Message {
     }
 }
 
-const NAMES: [&str; 10] = ["web.search", "web.fetch", "note.search", "screen.open", "screen.look", "browser.workspace.focus", "integration.search", "integration.execute", "agent.delegate", "browser.tab.list"];
+const NAMES: [&str; 10] = ["web.search", "web.fetch", "file.search", "screen.open", "screen.look", "browser.workspace.focus", "integration.search", "integration.execute", "agent.delegate", "browser.tab.list"];
 
 fn every_name(catalog: &ModelCatalog, tools: &AgentTools<'_>) -> Vec<String> {
     catalog.tools.iter().map(|tool| tool.model_name.clone()).chain(tools.tools.iter().map(|tool| tool.name.clone())).collect()
@@ -43,7 +43,7 @@ fn starts_in_answer_with_its_own_tab_one_call_away_and_sub_agents_ready_and_hide
     for name in ["web_search", "web_fetch", "screen_look", "screen_open", "browser_tab_list", "agent_delegate", TOOL_USE_TOOL, TOOL_LOAD_TOOL] {
         assert!(shown.iter().any(|item| item == name), "{name}");
     }
-    for hidden in ["browser_workspace_focus", "integration_search", "integration_execute", "note_search"] {
+    for hidden in ["browser_workspace_focus", "integration_search", "integration_execute", "file_search"] {
         assert!(!shown.iter().any(|item| item == hidden), "{hidden}");
     }
 }
@@ -62,7 +62,7 @@ fn keeps_sub_agents_behind_a_load_when_the_run_cant_open_its_own_tabs() {
 fn starts_with_mistys_own_tools_loaded_when_the_request_is_about_them() {
     let catalog = catalog_of(&NAMES);
     let has = |tools: &AgentTools<'_>, messages: &[Message]| {
-        tools.visible(&every_name(&catalog, tools), &tool_state(messages, tools.initial)).iter().any(|item| item == "note_search")
+        tools.visible(&every_name(&catalog, tools), &tool_state(messages, tools.initial)).iter().any(|item| item == "file_search")
     };
     assert!(has(&agent_tools(&catalog, "Summarize my notes from last week"), &[]));
     let web = agent_tools(&catalog, "Find the cheapest Nike running shoes under $200");
@@ -118,5 +118,5 @@ fn the_runtimes_own_tools_answer_with_what_changed() {
     assert_eq!(run_toolset_tool(TOOL_USE_TOOL, &input).unwrap().stringify(), r#"{"toolset":"browse","note":"Now in agent.tool.browse."}"#);
     let input = JsValue::parse(r#"{"family":"misty"}"#).unwrap();
     assert_eq!(run_toolset_tool(TOOL_LOAD_TOOL, &input).unwrap().stringify(), r#"{"loaded":"misty"}"#);
-    assert_eq!(run_toolset_tool("note_search", &input), None);
+    assert_eq!(run_toolset_tool("file_search", &input), None);
 }

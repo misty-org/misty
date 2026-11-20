@@ -55,9 +55,9 @@ beforeEach(() => {
 
 describe("which proposal a turn asks for", () => {
   it("goes by the surface and its words", () => {
-    expect(inferredArtifactKind("notes", "Please rewrite this", true)).toBe("text_patch");
-    expect(inferredArtifactKind("notes", "Please rewrite this", false)).toBe("");
-    expect(inferredArtifactKind("drawings", "draw a diagram", false)).toBe("drawing_patch");
+    expect(inferredArtifactKind("space.chat", "Draft a reply", false)).toBe("message_draft");
+    expect(inferredArtifactKind("terminal", "Run the tests", false)).toBe("terminal_command");
+    expect(inferredArtifactKind("notes", "Please rewrite this", true)).toBe("");
     expect(inferredArtifactKind("global", "rewrite everything", true)).toBe("");
   });
 });
@@ -100,7 +100,7 @@ describe("a proposal", () => {
 
   it("fails the run when the answer can't be one", async () => {
     await rememberArtifactRequest(
-      request({ requestedKind: "drawing_patch", selection: undefined }),
+      request({ requestedKind: "message_draft", selection: undefined }),
     );
     await finishWithProposal("run", "no json here", "me");
     expect(published.map((event) => event.type)).toEqual(["invocation.failed"]);

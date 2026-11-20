@@ -32,12 +32,10 @@ import {
 } from "@/features/onboarding";
 import {
   arcadeGateway,
-  drawingsApi,
   handoffGateway,
-  createYjsProvider,
   liveGateway,
   MistyLibraryPicker,
-  resetNotesAccountState,
+  pageMisty,
   resetSpacesAccountState,
   spaceRequest,
   uploadLibraryBlob,
@@ -50,7 +48,6 @@ import {
 
 accountResets.listen((previousAccountId) => {
   resetSpacesAccountState();
-  resetNotesAccountState();
   resetAiSurfaceAccountState(previousAccountId);
 });
 
@@ -77,15 +74,7 @@ spacesGateway.provide({
   uploadLibraryPath,
   uploadLibraryBlob,
   spaceRequest,
-  openCodeRoom: (ticket, doc, refresh) => createYjsProvider(ticket, doc, "code-room", refresh),
-  itemTools: () => import("@/features/spaces/agentItemTools").then((m) => m.agentItemTools),
-  async createDrawing(spaceId, title, elements) {
-    const drawing = await drawingsApi.create(spaceId, title);
-    const { seedDrawing } =
-      await import("@/features/spaces/journal/drawings/components/useDrawingSeed");
-    seedDrawing(drawing.id, elements as Parameters<typeof seedDrawing>[1]);
-    return drawing;
-  },
+  pageMisty,
 });
 
 vocativeRouting.provide({ findVocative, routeToAgent });
@@ -108,7 +97,7 @@ function focusedShortcutScope(): ShortcutScope {
   const tab = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
   switch (tab?.surfaceId) {
     case "space":
-      return /\/(media|library)(\/|\?|#|$)/i.test(tab.route) ? "tool:library" : "tool:space";
+      return /\/(files|media|library)(\/|\?|#|$)/i.test(tab.route) ? "tool:library" : "tool:space";
     default:
       return "workspace";
   }

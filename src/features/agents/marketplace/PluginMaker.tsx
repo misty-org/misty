@@ -1,5 +1,4 @@
-import { brandIconAsset, LogoTile } from "@misty/ui";
-import { DirectAppLogo } from "../connected-apps/DirectAppLogo";
+import { AppLogoImage, BrandIcon, LogoTile, brandIconAsset } from "@misty/ui";
 
 /** A GitHub user or organization's name, as GitHub allows it. */
 const githubLogin = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
@@ -66,30 +65,25 @@ export function pluginMaker(item: { author?: string | null; link: string | null 
   const login = author && githubLogin.test(author) ? author : owner;
   return {
     name: author ?? owner,
-    avatar: login ? `https://github.com/${login}.png?size=80` : undefined,
+    avatar: login ? `https://github.com/${login}.png?size=160` : undefined,
   };
 }
 
-/** A plugin's or skill's logo: its maker's artwork standing bare, or their GitHub picture. */
-export function MakerLogo({
-  maker,
-  name,
-  size = "md",
-}: {
-  maker: PluginMaker;
-  /** What it's called, for the initial shown when there's no logo. */
-  name: string;
-  size?: "sm" | "md";
-}) {
-  const pixels = size === "md" ? 24 : 18;
+/**
+ * A plugin's or skill's logo on a store shelf, at the tile size: its maker's artwork, else their
+ * GitHub picture, else the initial.
+ */
+export function MakerTile({ maker, name }: { maker: PluginMaker; name: string }) {
+  if (maker.brand) {
+    return (
+      <LogoTile size="tile">
+        <BrandIcon brand={maker.brand} label={maker.name ?? name} size={40} />
+      </LogoTile>
+    );
+  }
   return (
-    <LogoTile size={size} cover={!maker.brand && Boolean(maker.avatar)}>
-      <DirectAppLogo
-        app={maker.brand ?? `github:${maker.name ?? name}`}
-        name={maker.name ?? name}
-        icon={maker.avatar}
-        size={pixels}
-      />
+    <LogoTile size="tile" cover={Boolean(maker.avatar)}>
+      <AppLogoImage src={maker.avatar} name={maker.name ?? name} size="tile" />
     </LogoTile>
   );
 }

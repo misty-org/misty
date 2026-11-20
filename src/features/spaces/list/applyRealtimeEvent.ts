@@ -5,11 +5,11 @@ import { writeRealtimeCursor } from "../api/realtime-cursor";
 import { errorText } from "@/shared/lib/format";
 import { mergeSpaceMessages, messageFromSpaceEvent, withThreadReply } from "../chat/useSpaceMessageSpansStore";
 import { coalescedReload } from "./coalescedReload";
+import { forwardDriveRealtimeEvent } from "../drive/driveRealtime";
 import {
   reloadSpaceConversations,
   reloadSpaceConversationsForMessage,
 } from "../chat/spaceConversationsResource";
-import { realtimePlannerEvent } from "../planner/plannerEvents";
 import type { SpacesStore } from "./spacesStoreTypes";
 
 type SpacesSet = (
@@ -24,9 +24,6 @@ interface RealtimeScope {
 const itemEventPages: Record<string, string> = {
   library_item: "misty:space-library-event",
   note: "misty:space-note-event",
-  deck: "misty:space-deck-event",
-  workbook: "misty:space-workbook-event",
-  drawing: "misty:space-drawing-event",
 };
 
 async function applyRealtimeEvent(
@@ -39,6 +36,8 @@ async function applyRealtimeEvent(
   if (accountId !== scope.currentAccountId()) return;
   const generation = scope.accountGeneration();
   writeRealtimeCursor(accountId, event.id);
+  // The drive's own events (`drive.changed`, `drive.in_use_check`…) are native's to act on.
+  if (event.type.startsWith("drive.")) return forwardDriveRealtimeEvent(event);
   if (event.type === "apps.changed")
     window.dispatchEvent(
       new CustomEvent("misty:space-apps-changed", {
@@ -96,6 +95,9 @@ async function applyRealtimeEvent(
       await coalescedReload(`messages:${event.space_id}`, () => get().loadMessages(event.space_id));
   } else if (event.type.startsWith("conversation."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
+  // A DM's own changes (people added or leaving); the DM list reads them (`features/direct`).
+  else if (event.type.startsWith("direct."))
+    window.dispatchEvent(new CustomEvent("misty:direct-event", { detail: event }));
   else if (event.type.startsWith("node."))
     await coalescedReload(`nodes:${event.space_id}`, () => get().loadNodes(event.space_id));
   else if (event.type.startsWith("role.") || event.type.startsWith("roles.")) {
@@ -125,14 +127,6 @@ async function applyRealtimeEvent(
     window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
   else if (event.type.startsWith("note."))
     window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
-  else if (event.type.startsWith("drawing."))
-    window.dispatchEvent(new CustomEvent("misty:space-drawing-event", { detail: event }));
-  else if (event.type.startsWith("deck."))
-    window.dispatchEvent(new CustomEvent("misty:space-deck-event", { detail: event }));
-  else if (event.type.startsWith("workbook."))
-    window.dispatchEvent(new CustomEvent("misty:space-workbook-event", { detail: event }));
-  else if (event.type.startsWith("task.") || event.type.startsWith("calendar."))
-    window.dispatchEvent(new CustomEvent(realtimePlannerEvent, { detail: event }));
   else if (event.type.startsWith("item.")) {
     // An item made private or public: the page that lists it reads again, so a private one leaves
     // other members' screens.

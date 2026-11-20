@@ -1,5 +1,6 @@
 // The wire protocol of the SDK channel, as the host speaks it. misty-sdk (MIT) owns the other end in
-// `packages/sdk/src/protocol.ts`; keep the two in step. The host never imports the SDK's code.
+// `packages/sdk/src/protocol.ts`; keep the two in step. The host's end never imports the SDK's code; only Misty's
+// own pages do, as the SDK's clients (`pageMisty.ts`).
 
 export const PROTOCOL_VERSION = 1;
 export const INIT_MESSAGE = "misty:init";

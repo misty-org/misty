@@ -5,7 +5,6 @@ import type { SkillRow, SkillTargetInfo, SkillUsageResult } from "./types";
 import {
   copiedTargets,
   daysSince,
-  filterSkills,
   formatTokens,
   nextTargets,
   relevantTargets,
@@ -13,7 +12,6 @@ import {
   sourceKindOf,
   summarizeTargetResults,
   usageForSkill,
-  visibleEngines,
 } from "./utils";
 
 function target(id: string, available: boolean): SkillTargetInfo {
@@ -45,23 +43,6 @@ describe("skills utils", () => {
   it("classifies legacy payloads without sourceKind", () => {
     expect(sourceKindOf({ managed: true, sourceKind: undefined as never })).toBe("managed");
     expect(sourceKindOf({ managed: false, sourceKind: undefined as never })).toBe("local");
-  });
-
-  it("filters by query and target state", () => {
-    const rows = [
-      skill({ id: "a", name: "Alpha", sourceKind: "managed", managed: true }),
-      skill({ id: "b", name: "Beta", sourceKind: "local" }),
-      skill({
-        id: "c",
-        name: "Gamma",
-        sourceKind: "builtin",
-        readonly: true,
-        targetStates: { claude: "off", codex: "off" },
-      }),
-    ];
-    expect(filterSkills(rows, { query: "bet", target: "" })).toHaveLength(1);
-    expect(filterSkills(rows, { query: "", target: "claude" })).toHaveLength(2);
-    expect(filterSkills(rows, { query: "gamma", target: "claude" })).toHaveLength(0);
   });
 
   it("sorts managed first, then by name", () => {
@@ -111,15 +92,6 @@ describe("skills utils", () => {
     ]);
     const other = skill({ targetStates: { claude: "off", hermes: "off" } });
     expect(relevantTargets(other, targets).map((item) => item.id)).toEqual(["claude", "grok"]);
-  });
-
-  it("derives engine filter chips from the whole list", () => {
-    const targets = [target("claude", true), target("codex", false), target("hermes", false)];
-    const skills = [
-      skill({ targetStates: { claude: "synced", codex: "off", hermes: "off" } }),
-      skill({ id: "b", targetStates: { claude: "off", codex: "orphan", hermes: "off" } }),
-    ];
-    expect(visibleEngines(skills, targets).map((item) => item.id)).toEqual(["claude", "codex"]);
   });
 
   it("computes the next target list per engine", () => {

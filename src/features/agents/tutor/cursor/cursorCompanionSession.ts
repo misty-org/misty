@@ -1,5 +1,9 @@
 import { defaultEngineAgent, savedDefaultEngine } from "../../engines/defaultEngine";
-import { effectiveValues, useDevicePreferences } from "@/features/settings/preferenceAccess";
+import {
+  effectiveValues,
+  useDevicePreferences,
+  writeDevicePreference,
+} from "@/features/settings/preferenceAccess";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { invoke } from "@tauri-apps/api/core";
 import type { CompanionConversation } from "./companionConversation";
@@ -9,9 +13,31 @@ import { captureScreens, savedPresentation, withLessonCloseUp } from "./cursorCo
 import { CursorCompanionPointer } from "./cursorCompanionPointer";
 import { CursorCompanionSketch } from "./cursorCompanionSketch";
 import type { DisplayCapture, Presentation, PresentedFocus } from "./protocol";
+import type { HandedFiles } from "./tutorHanded";
 import { TutorTour } from "./tutorTour";
+import { useSettingsStore } from "@/features/settings";
+import { voiceSettings } from "../../../voice/voiceSettings";
 
-export type CompanionOrigin = { conversationId: string; agentId?: string };
+/**
+ * Where a companion turn belongs. `tutor` is Tutor's own conversation (`tutorConversation.ts`),
+ * which stays current whatever chat the window shows; otherwise it is the open chat (a lesson,
+ * in Teach mode), and the turn is stale once another opens.
+ */
+export type CompanionOrigin = { conversationId: string; agentId?: string; tutor?: boolean };
+
+/** Tutor's own conversation, as an origin; its id is filled in once it is opened. */
+export const tutorOrigin = (): CompanionOrigin => ({ conversationId: "", tutor: true });
+
+/** How long Misty says her shortcuts beside the pointer: her first week. */
+const HINT_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** How long she waves hello before the tour's first step. */
+const WAVE_MS = 1_800;
+
+/** The shortcuts as Misty says them beside the pointer. */
+const hintText = () =>
+  /Mac/.test(navigator.platform)
+    ? "Hold ⌃ ⌥ to talk, or tap ⌃ twice to type"
+    : "Hold Ctrl + Alt to talk, or tap Ctrl twice to type";
 
 /** How long a failure stays at the cursor; Agents keeps it, with Retry. */
 const ERROR_HOLD_MS = 8000;
@@ -39,7 +65,15 @@ export class CursorCompanionSession {
    * A task the voice conversation started, read aloud when it finishes. While
    * it waits for a screen it asked for, its continuation is the answer to read.
    */
-  delegatedTask: { id: string; conversationId: string; awaitingContinuation?: boolean } | undefined;
+  delegatedTask:
+    | {
+        id: string;
+        conversationId: string;
+        awaitingContinuation?: boolean;
+        /** A hand-off's agent, its words and key, so "no, Ada" can give it to another agent. */
+        handoff?: { agentId: string; instruction: string; key: string };
+      }
+    | undefined;
   /** Pointing and walkthrough steps for finished replies. */
   readonly pointer: CursorCompanionPointer = new CursorCompanionPointer(this);
   /** A reply's drawing, drawn while it streams. */
@@ -60,13 +94,23 @@ export class CursorCompanionSession {
   submittedTurn = 0;
   invocationId: string | undefined;
   submittedConversationId: string | undefined;
+  /** Files dropped on Misty, waiting for the next turn (`tutorHanded.ts`). */
+  handed: HandedFiles | undefined;
 
   constructor(readonly accountId: string) {
     this.state = savedPresentation();
   }
 
+  /** Where a turn starting now belongs: Tutor's own conversation, or in Teach mode the open lesson. */
+  turnOrigin = (): CompanionOrigin => {
+    if (!this.state.teach) return tutorOrigin();
+    const current = useMistyStore.getState();
+    return { conversationId: current.activeConversationId, agentId: current.selectedAgentId };
+  };
+
   originIsCurrent = (origin: CompanionOrigin) => {
     const current = useMistyStore.getState();
+    if (origin.tutor) return current.accountId === this.accountId;
     return (
       current.accountId === this.accountId &&
       current.activeConversationId === origin.conversationId &&
@@ -123,8 +167,37 @@ export class CursorCompanionSession {
       teach: values["agents.companion.teach"] === true,
       captions: values["agents.companion.captions"] === true,
       tint: String(values["agents.companion.tint"] ?? "white"),
+      sprite: values["agents.companion.sprite"] !== false,
+      hint: hintFor(
+        values["agents.companion.sprite"] !== false,
+        String(values["agents.companion.hintSince"] ?? ""),
+      ),
     });
     this.toured = values["agents.companion.toured"] === true;
+    this.greet();
+  };
+
+  /**
+   * Misty's first appearance on this device: she says her shortcuts beside the pointer (and
+   * keeps saying them on a resting pointer for a week), and someone who hasn't taken the tour is
+   * waved at and walked through it.
+   */
+  greet = () => {
+    if (!this.nativeReady || this.disposed || !this.state.sprite) return;
+    const settings = useDevicePreferences.getState().state;
+    if (!settings) return;
+    if (!String(effectiveValues(settings)["agents.companion.hintSince"] ?? ""))
+      void writeDevicePreference("agents.companion.hintSince", new Date().toISOString()).catch(
+        () => undefined,
+      );
+    if (this.toured || !savedDefaultEngine()) return;
+    this.toured = true;
+    this.change({ wave: true });
+    setTimeout(() => {
+      if (this.disposed) return;
+      this.change({ wave: false });
+      if (!this.tour.running) this.tour.start(0);
+    }, WAVE_MS);
   };
 
   /**
@@ -188,6 +261,15 @@ export class CursorCompanionSession {
   setSpoken = (sentence?: string) => {
     this.spoken = this.state.captions || this.captionNextAnswer ? sentence : undefined;
     if (sentence === undefined) this.captionNextAnswer = false;
+    // Misty bobs with each word as it's said, at the voice's own pace.
+    const count = sentence?.trim().split(/\s+/).filter(Boolean).length ?? 0;
+    const rate = voiceSettings(useSettingsStore.getState().settings?.document).speakingRate;
+    this.state = {
+      ...this.state,
+      words: count
+        ? { count, rate: Number.isFinite(rate) && rate > 0 ? rate : 1, at: Date.now() }
+        : undefined,
+    };
     this.showCaption();
   };
 
@@ -335,4 +417,12 @@ export class CursorCompanionSession {
 /** No selection means the default engine's agent; a prompt fills it in when it starts work. */
 function orDefaultAgent(agentId: string | undefined) {
   return agentId || defaultEngineAgent(savedDefaultEngine());
+}
+
+/** The shortcut hint beside Misty: while she shows, from her first appearance for a week. */
+function hintFor(sprite: boolean, since: string): Presentation["hint"] {
+  if (!sprite) return undefined;
+  if (!since) return { text: hintText(), first: true };
+  const age = Date.now() - Date.parse(since);
+  return age >= 0 && age < HINT_WEEK_MS ? { text: hintText(), first: false } : undefined;
 }

@@ -6,8 +6,8 @@ describe("appBundleUrl", () => {
     expect(appBundleUrl("photocraft", "1.2.0")).toMatch(
       /^(misty-app:\/\/photocraft\/1\.2\.0\/|http:\/\/misty-app\.localhost\/photocraft\/1\.2\.0\/)$/,
     );
-    expect(appBundleUrl("docs", "bundled", "assets/a b.js")).toMatch(
-      /\/docs\/bundled\/assets\/a%20b\.js$/,
+    expect(appBundleUrl("deckcraft", "0.9.0", "assets/a b.js")).toMatch(
+      /\/deckcraft\/0\.9\.0\/assets\/a%20b\.js$/,
     );
   });
 

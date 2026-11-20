@@ -34,7 +34,7 @@ import { describeSteps, offsetLabel, type DescribedStep, type StepVerb } from ".
 import { useStepPicture } from "./useRunSteps";
 
 /** Whether housekeeping steps are shown, kept for this device in `misty.db`. */
-const useShowHiddenSteps = createDeviceSetting<boolean>({
+export const useShowHiddenSteps = createDeviceSetting<boolean>({
   scope: "run-steps-show-hidden",
   defaults: false,
   normalize: (stored) => stored === true,

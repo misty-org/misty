@@ -3,6 +3,7 @@ import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
 import { ContextRail } from "../context-panel/ContextRail";
+import { useRailShown } from "../context-panel/railLayoutStore";
 import { ChatSessionCard, ChatSidePanels } from "../context-panel/ChatSidePanels";
 import { isUnread, markConversationRead } from "./conversationReads";
 import { LabInSpace } from "../tutor/LabInSpace";
@@ -100,6 +101,8 @@ export function AgentWorkspaceFrame({
     if (scroll) scroll.scrollTop = scroll.scrollHeight;
   }, [page, conversationId]);
   useSessionGoalRunner(activeId ?? "");
+  // The rail folds away behind Tools in the window's corner until the person opens it.
+  const railShown = useRailShown((state) => state.value);
   return (
     // A main column (a body: the chat, under its floating bar, or another view and, when open, the
     // context panel at its right) beside the rail, which runs the page's full height. Bar, chat,
@@ -145,8 +148,9 @@ export function AgentWorkspaceFrame({
           ) : null}
         </div>
       </div>
-      {/* The rail runs the page's full height, so its first button sits on the bar's line. */}
-      {page === "task" ? (
+      {/* The rail runs the page's full height, so its first button sits on the bar's line. Tools in
+          the window's corner shows or hides it. */}
+      {page === "task" && railShown ? (
         <ContextRail conversationId={conversationId} disabled={disabled} onNewTask={onNewTask} />
       ) : null}
     </div>

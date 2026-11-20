@@ -12,21 +12,17 @@ import type { AnyExtension } from "@tiptap/core";
 import { Markdown } from "@tiptap/markdown";
 import { StarterKit } from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
-import { NoteEmbed } from "../embeds/noteEmbedNode";
 
 /** The languages a doc's code blocks highlight, highlight.js's common set. */
 export const noteLowlight = createLowlight(common);
 
 /**
- * Every extension that shapes a doc's schema and its markdown, shared by the editor and by the
- * headless conversions (tool sessions, export, import), so both build the same document. The
- * editor passes its own image and embed views and its collaboration extensions on top.
+ * Every extension that shapes a Lab note's schema and its markdown. The editor passes its own
+ * image view and its collaboration extensions on top.
  */
 export function noteSchemaExtensions(options: {
   /** The image node; the editor's resolves Space assets. */
   image?: AnyExtension;
-  /** The embed node; the editor's renders it live. */
-  embed?: AnyExtension;
   /** A collaborative copy leaves undo to Yjs. */
   collaborative?: boolean;
 }): AnyExtension[] {
@@ -67,7 +63,6 @@ export function noteSchemaExtensions(options: {
     TableRow,
     TableHeader,
     TableCell,
-    options.embed ?? NoteEmbed,
     UniqueID.configure({
       types: [
         "paragraph",
@@ -79,7 +74,6 @@ export function noteSchemaExtensions(options: {
         "taskList",
         "image",
         "table",
-        "mistyEmbed",
       ],
     }),
     Markdown.configure({

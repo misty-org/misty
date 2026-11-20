@@ -7,7 +7,7 @@ import {
 } from "@/features/agents";
 import { useNow } from "@/shared/hooks/useNow";
 import type { AgentProfile } from "@/shared/schemas";
-import { NavRow, NavRowLabel, Spinner, Text, Tooltip } from "@misty/ui";
+import { Badge, NavRow, NavRowLabel, Spinner, Text, Tooltip } from "@misty/ui";
 import { markSlotClass } from "./styles";
 import type { SidebarChat } from "./sidebarTypes";
 
@@ -65,12 +65,13 @@ export function SidebarAgentThreads({
             <span className={markSlotClass}>
               <AgentAvatar agent={agent} compact />
             </span>
-            <NavRowLabel
-              bright={here || status === "working" || unread}
-              className="flex-1"
-            >
+            {/* The name, then the same Agent tag its messages carry, so an agent never reads as a
+                person among the direct messages; people get no tag. */}
+            <NavRowLabel bright={here || status === "working" || unread} className="min-w-0">
               {agent.name}
             </NavRowLabel>
+            <Badge variant="secondary">Agent</Badge>
+            <span className="flex-1" />
             {status && stateLabel ? (
               <Tooltip content={stateLabel}>
                 <Text

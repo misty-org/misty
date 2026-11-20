@@ -3,7 +3,7 @@ import { CollectionFilters, useNotice } from "@misty/ui";
 import { useDevicePreferences } from "./device-preferences/store";
 import { resolveSetting } from "./device-preferences/settingResolution";
 
-type CollectionTabs = "space" | "journal" | "media";
+type CollectionTabs = "media";
 
 /** Append new tabs, ignore unavailable ones, and never duplicate a saved tab. */
 export function orderedTabs<T extends { value: string }>(options: T[], raw: string): T[] {

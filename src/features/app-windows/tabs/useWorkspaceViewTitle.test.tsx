@@ -27,19 +27,19 @@ describe("useWorkspaceViewTitle", () => {
   it("renames only the workspace tab rendering the content", () => {
     const first = useWorkspaceStore.getState().addSurface({
       surfaceId: "space",
-      groupKey: "space:family:planner",
-      title: "Planner",
-      route: "/spaces/family/planner/tasks/board",
-      instanceKey: "family:planner",
+      groupKey: "space:family:files",
+      title: "Files",
+      route: "/spaces/family/files",
+      instanceKey: "family:files",
       instancePolicy: "multiple",
       syncExistingRoute: false,
     });
     const second = useWorkspaceStore.getState().addSurface({
       surfaceId: "space",
-      groupKey: "space:family:journal",
-      title: "Journal",
-      route: "/spaces/family/notes",
-      instanceKey: "family:journal",
+      groupKey: "space:family:lab",
+      title: "Lab",
+      route: "/spaces/family/lab",
+      instanceKey: "family:lab",
       instancePolicy: "multiple",
       syncExistingRoute: false,
     });
@@ -53,7 +53,7 @@ describe("useWorkspaceViewTitle", () => {
     );
 
     const tabs = allLayoutViews(useWorkspaceStore.getState().layout);
-    expect(tabs.find((tab) => tab.id === first.id)?.title).toBe("Planner");
+    expect(tabs.find((tab) => tab.id === first.id)?.title).toBe("Files");
     expect(tabs.find((tab) => tab.id === second.id)?.title).toBe("Project brief");
   });
 });

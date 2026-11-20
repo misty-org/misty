@@ -221,8 +221,8 @@ mod row_tests {
 
     #[test]
     fn a_row_reads_as_a_tool_for_the_model() {
-        let row = JsValue::parse(r#"{"name":"note.read","title":"Read","inputSchema":{"type":"object","oneOf":[]},"annotations":{"readOnlyHint":true},"_meta":{"misty/locality":"server"}}"#).unwrap();
-        let described = catalog_tool("note.read", &row);
+        let row = JsValue::parse(r#"{"name":"file.read","title":"Read","inputSchema":{"type":"object","oneOf":[]},"annotations":{"readOnlyHint":true},"_meta":{"misty/locality":"server"}}"#).unwrap();
+        let described = catalog_tool("file.read", &row);
         assert_eq!(described.description, "Read");
         assert_eq!(described.input_schema.get(), r#"{"type":"object"}"#);
         assert!(described.read_only && described.concurrent);
