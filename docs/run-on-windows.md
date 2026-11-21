@@ -7,15 +7,29 @@ has calls on, and the steps for testing calls between two computers. Commands ar
 
 Know these before testing, so a gap isn't mistaken for a bug:
 
-- **Speech recognition.** Only macOS has a recognizer (`voice/speech_recognition`). On Windows, dictation, Tutor
-  listening and an agent in a call can't hear you ("The microphone couldn't listen for your agent."). Spoken
-  answers do work: the system voice runs through `System.Speech`.
 - **Engines' no-asking modes.** They're offered only where the engine's folder sandbox runs (macOS, and Linux
   with bwrap), so Windows shows only the asking modes.
 - **Space apps' own tools** (an app's program, `apps/program.rs`) don't run, since Misty can't confine them on
   Windows yet. Pictures of an app's window aren't taken either.
 - **Screen share in a call** goes through WebView2 and hasn't been tried on Windows.
 - **`misty doctor desktop`** checks Node, npm and Rust only, not Visual Studio or WebView2.
+
+## Speech on Windows
+
+Speech recognition uses Windows' own offline recognizer (System.Speech), run in PowerShell like the system voice
+(`voice/speech_recognition/src/windows.rs`). Nothing is sent anywhere. It hears the microphone, a capture's
+channel and recorded files, so dictation, Tutor, transcribing a file and an agent in a call all work. It is new
+and hasn't been tried on a Windows computer yet, so check it first:
+
+1. Add your language's speech recognition: Settings › Time & language › Speech, and under Language add the
+   language with its speech recognition. Windows' offline recognizer covers English (US and UK), French, German,
+   Spanish, Japanese and Chinese.
+2. Let desktop apps use the microphone: Settings › Privacy & security › Microphone.
+3. In Misty, dictate into a chat's message box, and talk to Tutor. If Misty says the language isn't available,
+   step 1 isn't done; if it can't open the microphone, step 2 isn't.
+
+Windows' recognizer is older and less accurate than macOS's, and a recorded file is recognized phrase by phrase
+rather than word by word, so captions are coarser.
 
 ## 1. Install the tools
 
@@ -126,11 +140,10 @@ is in `misty-sdk/docs/voice-calls.md`).
 
 **An agent in a call**
 
-Do this from the Mac, since Windows can't listen yet.
-
-1. In a call with the Windows computer, choose **Talk to an agent** on the Mac and pick one of your agents.
+1. In a call, choose **Talk to an agent** on one computer and pick one of your agents.
 2. Ask it something. Its answer is spoken on both computers, each in its own system voice.
-3. Check the Windows computer heard the answer, and that what you said is in the agent's own thread on the Mac.
+3. Check the other computer heard the answer, and that what you said is in the agent's own thread.
+4. Do it again from the other computer, so both the Mac and Windows are heard.
 
 **If a call won't connect**
 

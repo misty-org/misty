@@ -1,8 +1,9 @@
 //! Speech recognition on this computer, with no key and nothing sent anywhere by Misty: a
 //! recorded file, or the microphone live. On macOS through Apple's Speech framework, called from
-//! Rust through objc2, on-device wherever the language has an on-device model. Other systems
-//! have no recognizer here yet, and say so. On macOS it also reads sentences aloud in a system
-//! voice as they arrive ([`Speaker`]).
+//! Rust through objc2, on-device wherever the language has an on-device model. On Windows through
+//! Windows' own offline recognizer (System.Speech), run in PowerShell. Other systems have no
+//! recognizer here yet, and say so. On macOS it also reads sentences aloud in a system voice as
+//! they arrive ([`Speaker`]).
 //!
 //! The crate has no app framework coupling: callers own events and windows.
 
@@ -44,6 +45,18 @@ pub struct StreamHeard {
 }
 
 /// Why recognition couldn't run, in words for the person.
+#[cfg(windows)]
+pub fn reason(code: &str) -> String {
+    match code {
+        "unavailable" => "Speech recognition isn't available for this language on this computer. Add the language's speech recognition in Settings › Time & language › Speech.".into(),
+        "microphone" => "Misty couldn't open the microphone. Allow desktop apps to use it in Settings › Privacy & security › Microphone.".into(),
+        "unsupported" => "This computer has no speech recognition Misty can use.".into(),
+        _ => "Speech recognition stopped before it finished.".into(),
+    }
+}
+
+/// Why recognition couldn't run, in words for the person.
+#[cfg(not(windows))]
 pub fn reason(code: &str) -> String {
     match code {
         "denied" => "Misty isn't allowed to recognize speech. Allow it in System Settings › Privacy & Security › Speech Recognition.".into(),
@@ -62,9 +75,16 @@ pub use macos::{
     listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
 };
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+pub use windows::{
+    listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
+};
+
+#[cfg(not(any(target_os = "macos", windows)))]
 mod unsupported;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 pub use unsupported::{
     listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
 };
