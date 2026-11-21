@@ -1,8 +1,37 @@
 use serde::Serialize;
 use std::fmt;
 
-/// Every chunk this crate emits is mono PCM16 at this rate.
+/// Every speech chunk this crate emits is mono PCM16 at this rate.
 pub const SAMPLE_RATE: u32 = 16_000;
+
+/// A shared screen's sound is stereo PCM16 at this rate, interleaved.
+pub const SHARE_SAMPLE_RATE: u32 = 48_000;
+
+/// What the captured audio is for, which decides the format it comes out in.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Format {
+    /// 16 kHz mono PCM16, for speech recognition and recordings.
+    #[default]
+    Speech,
+    /// 48 kHz stereo PCM16, interleaved (left, right), for a shared screen's sound in a call.
+    Share,
+}
+
+impl Format {
+    pub fn sample_rate(self) -> u32 {
+        match self {
+            Format::Speech => SAMPLE_RATE,
+            Format::Share => SHARE_SAMPLE_RATE,
+        }
+    }
+
+    pub fn channels(self) -> u32 {
+        match self {
+            Format::Speech => 1,
+            Format::Share => 2,
+        }
+    }
+}
 
 /// What to capture.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -33,7 +33,7 @@ describe("ledger", () => {
     expect(prompt).toMatch(/to work now:\n- Open site B/);
     expect(prompt).toMatch(/leave alone for now:\n- Open site C/);
     expect(splitLedger(prompt).rows).toHaveLength(3);
-    expect(continuationEvent(prompt)).toBe("Resumed the open items · Misty continued");
+    expect(continuationEvent(prompt)).toBe("Resumed the open items, then Misty continued");
   });
 
   it("counts skipped rows as closed", () => {

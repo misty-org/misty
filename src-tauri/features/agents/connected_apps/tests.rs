@@ -194,7 +194,7 @@ fn the_card_names_what_is_being_approved() {
     let (title, summary) =
         policy::action_summary(&info, &json!({ "to": "a@example.com", "count": 2 }), "ca_1")
             .unwrap();
-    assert_eq!(title, "Gmail · Send email");
+    assert_eq!(title, "Send email in Gmail");
     assert_eq!(summary, "count: 2\nto: a@example.com\naccount: ca_1");
 }
 

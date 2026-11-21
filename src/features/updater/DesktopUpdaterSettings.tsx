@@ -124,7 +124,7 @@ export function DesktopUpdaterSettings() {
     <>
       <DesktopSettingsRow
         label="Version"
-        description={updateNote ? `${version} · ${updateNote}` : version}
+        description={updateNote ? `${version}, ${updateNote.charAt(0).toLowerCase()}${updateNote.slice(1)}` : version}
       >
         <div className="grid w-full max-w-sm justify-items-end gap-2 max-[836px]:justify-items-start">
           <div className="flex min-w-0 items-center justify-end gap-2">

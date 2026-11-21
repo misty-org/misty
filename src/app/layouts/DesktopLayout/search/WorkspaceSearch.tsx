@@ -240,7 +240,7 @@ function SearchBody({
     <CommandPalette
       // Search: an input, the list and a foot of hints, in one rounded panel. There is no row of
       // types: a prefix narrows the search (`/` commands, `#` the Space, `@` an agent).
-      className="max-h-[min(35rem,calc(100dvh_-_8rem))]"
+      className="max-h-[min(--spacing(140),calc(100dvh_-_var(--spacing)_*_32))]"
       shouldFilter={false}
       loop
       onKeyDown={(event) => {
@@ -336,11 +336,18 @@ function SearchBody({
                     <ShortcutText commandId={hit.shortcutId} className="flex-none text-caption" />
                   </Text>
                 ) : hit.detail || hit.updatedAt ? (
-                  <Text bare tone="muted" className="flex-none text-caption">
-                    {[hit.detail, hit.updatedAt ? shortAgo(hit.updatedAt, now) : ""]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
+                  <span className="flex flex-none items-center gap-2">
+                    {hit.detail ? (
+                      <Text bare tone="muted" className="text-caption">
+                        {hit.detail}
+                      </Text>
+                    ) : null}
+                    {hit.updatedAt ? (
+                      <Text bare tone="muted" className="text-caption">
+                        {shortAgo(hit.updatedAt, now)}
+                      </Text>
+                    ) : null}
+                  </span>
                 ) : null}
               </CommandPaletteItem>
             ))}

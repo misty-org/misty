@@ -12,6 +12,17 @@ export function chatStatusOf(state: string): ChatStatus {
   return state === "failed" ? "failed" : "done";
 }
 
+/**
+ * How long ago, in words for a line of text: "just now", "5m ago", then "on Nov 3". With `verb`
+ * it says what happened then: "updated 5m ago".
+ */
+export function agoWords(value: string, now: number, verb?: string): string {
+  const ago = shortAgo(value, now);
+  if (!ago) return "";
+  const words = ago === "now" ? "just now" : /^\d+[mhd]$/.test(ago) ? `${ago} ago` : `on ${ago}`;
+  return verb ? `${verb} ${words}` : words;
+}
+
 /** A short "how long ago" for a row with little room: now, 5m, 2h, 3d, then a date. */
 export function shortAgo(value: string, now: number): string {
   const then = new Date(value).getTime();

@@ -53,7 +53,7 @@ describe("usage formatting", () => {
   it("names windows", () => {
     const base = { id: "x", usedPercent: 1, resetsAt: null, windowSeconds: null, label: null };
     expect(windowName({ ...base, kind: "session" })).toBe("5-hour");
-    expect(windowName({ ...base, kind: "weekly", label: "Opus" })).toBe("Weekly · Opus");
+    expect(windowName({ ...base, kind: "weekly", label: "Opus" })).toBe("Weekly for Opus");
     expect(windowName({ ...base, kind: "other", windowSeconds: 86_400 })).toBe("Daily");
     expect(windowName({ ...base, kind: "other", windowSeconds: 720 * 3600 })).toBe("Monthly");
     expect(windowName({ ...base, kind: "other", windowSeconds: 3 * 86_400 })).toBe("3-day");

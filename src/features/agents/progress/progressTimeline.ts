@@ -361,10 +361,12 @@ export function turnSummary(tools: ProgressTool[]): string {
   if (other) parts.push(other === 1 ? "1 more step" : `${other} more steps`);
   if (!parts.length)
     return tools.length === 1 ? "Worked through 1 step" : `Worked through ${tools.length} steps`;
-  return [
+  const words = [
     lowerFirst(parts[0]).replace(/^./, (first) => first.toUpperCase()),
     ...parts.slice(1),
-  ].join(" · ");
+  ];
+  if (words.length === 1) return words[0]!;
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 }
 
 /** A step's duration as its row's end shows it: whole seconds, then minutes. */

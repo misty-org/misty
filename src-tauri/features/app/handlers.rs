@@ -122,6 +122,8 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::voice::commands::voice_capture_mute,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::voice::commands::voice_capture_stop,
+            crate::voice::commands::voice_share_audio_start,
+            crate::voice::commands::voice_share_audio_stop,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_interrupt,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]

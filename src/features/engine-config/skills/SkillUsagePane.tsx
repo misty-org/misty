@@ -119,7 +119,7 @@ function InvocationsBody({
       {failure}
       <Text bare as="p" tone="muted" className="text-xs">
         {t("usage.summary", { files: usage.scannedFiles, total: usage.totalInvocations })}
-        {usage.cached ? ` · ${t("discover.cached")}` : ""}
+        {usage.cached ? ` ${t("usage.cached")}` : ""}
       </Text>
       <table className="w-full table-fixed text-sm">
         <thead>

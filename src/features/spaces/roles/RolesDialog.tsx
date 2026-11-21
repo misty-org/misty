@@ -113,7 +113,7 @@ export function RolesDialog(props: {
         <DialogHeader>
           <DialogTitle>Roles</DialogTitle>
         </DialogHeader>
-        <div className="mt-4 flex h-[min(36rem,70vh)] min-h-0 gap-6">
+        <div className="mt-4 flex h-[min(--spacing(144),70vh)] min-h-0 gap-6">
           <nav aria-label="Roles" className="flex w-56 shrink-0 flex-col gap-0.5 overflow-y-auto">
             <SectionHeading
               title="Roles"

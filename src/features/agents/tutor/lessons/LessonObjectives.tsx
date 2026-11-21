@@ -67,8 +67,8 @@ export function LessonObjectives({ conversationId }: { conversationId: string })
       label={`Lesson: ${lesson.title}`}
       head={
         finished
-          ? `Lesson finished · ${progress}`
-          : `${lesson.goal || lesson.title} · ${progress}${lesson.status === "paused" ? " · Paused" : ""}`
+          ? `Lesson finished with ${progress} goals`
+          : `${lesson.goal || lesson.title}, ${progress} goals${lesson.status === "paused" ? ", paused" : ""}`
       }
       actions={
         next ? (

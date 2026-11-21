@@ -32,6 +32,6 @@ export async function captureMistyScreen() {
   if (result.error) throw new Error(result.error);
   return {
     capture: await captureAttachmentFromDataUrl(result.dataUrl, result.width, result.height),
-    label: `${result.appName} · ${result.title}`,
+    label: result.title ? `${result.title} in ${result.appName}` : result.appName,
   };
 }

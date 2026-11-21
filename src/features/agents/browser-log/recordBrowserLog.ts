@@ -112,7 +112,7 @@ export function entriesOf(
         step.atEnd === true ? "reached the end" : "",
       ]
         .filter(Boolean)
-        .join(" · "),
+        .join(", "),
     }));
     const stopped = text(output.stopped);
     if (stopped && rows.length) rows[rows.length - 1]!.note = stopped;

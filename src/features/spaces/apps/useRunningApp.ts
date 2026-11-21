@@ -101,6 +101,7 @@ export function useRunningApp(options: {
           version,
           url,
           sha256,
+          wrap: JSON.parse(wrapKey) as BundleSource["wrap"] | null,
         });
       }
       if (manifest.webview)

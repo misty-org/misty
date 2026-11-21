@@ -8,6 +8,7 @@ import {
   CircleDot,
   CircleGauge,
   CircleSlash,
+  Coins,
   DatabaseZap,
   Gauge,
   ListChecks,
@@ -216,16 +217,12 @@ export function SessionPanel(props: {
   const helpers = turn?.subagents.filter((subagent) => subagent.state === "running").length ?? 0;
   const context = usage.used && usage.window ? Math.min(1, usage.used / usage.window) : null;
   const engineName = outside ? (engine?.name ?? engineId) : "Misty";
-  const contextValue = [
+  const contextValue =
     context === null
       ? usage.used
         ? formatTokens(usage.used)
         : null
-      : `${(context * 100).toFixed(context < 0.1 ? 1 : 0)}%`,
-    usage.costUsd === undefined ? null : formatCost(usage.costUsd),
-  ]
-    .filter(Boolean)
-    .join(" · ");
+      : `${(context * 100).toFixed(context < 0.1 ? 1 : 0)}%`;
   const changed = git ? git.staged.length + git.unstaged.length + git.untracked.length : 0;
   // The plan windows the engine reports, its session window first.
   const plans = [...limits.windows].sort(
@@ -269,9 +266,12 @@ export function SessionPanel(props: {
           <Row
             icon={ArrowDownUp}
             label="Tokens"
-            value={`${formatTokens(usage.totalIn)} in · ${formatTokens(usage.totalOut)} out`}
+            value={`${formatTokens(usage.totalIn)} in, ${formatTokens(usage.totalOut)} out`}
           />
         ) : null}
+        {usage.costUsd === undefined ? null : (
+          <Row icon={Coins} label="Cost" value={formatCost(usage.costUsd)} />
+        )}
         {usage.cacheHit === undefined ? null : (
           <Row
             icon={DatabaseZap}

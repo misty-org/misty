@@ -50,7 +50,7 @@ export function SpaceChatPanel(props: { side: "left" | "right"; onClose: () => v
       radius="xl"
       className="flex h-full shrink-0 flex-col overflow-hidden"
       // The dock sets the width; it stays fixed while the dock slides, like the agent panel.
-      style={{ width: "var(--misty-panel-width, 400px)" }}
+      style={{ width: "var(--misty-panel-width, calc(var(--spacing) * 100))" }}
       aria-label="Chat"
       data-misty-panel={props.side}
       onKeyDown={(event) => {

@@ -14,5 +14,5 @@ export const paneScrollClass = "min-h-0 flex-1 overflow-y-auto px-2 pt-0.5 pb-3.
  * marked important because it is the column's to decide, over a child's own (a guide's).
  */
 export const middleScrollClass =
-  "flex min-h-0 flex-1 flex-col gap-5.5 overflow-y-auto px-[clamp(1.25rem,6%,4.5rem)] pt-8 pb-6 " +
+  "flex min-h-0 flex-1 flex-col gap-5.5 overflow-y-auto px-[clamp(--spacing(5),6%,--spacing(18))] pt-8 pb-6 " +
   "*:mx-auto *:w-full *:max-w-180!";

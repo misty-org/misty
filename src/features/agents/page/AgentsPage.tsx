@@ -181,7 +181,7 @@ function AgentsPageSkeleton({ chat }: { chat: boolean }) {
         </div>
       </Surface>
       <div
-        className="flex flex-none flex-col gap-1 px-3 pt-[calc((var(--ui-header)-2rem)/2)] pb-2"
+        className="flex flex-none flex-col gap-1 px-3 pt-[calc((var(--ui-header)-var(--spacing)*8)/2)] pb-2"
         aria-hidden="true"
       >
         {Array.from({ length: 4 }, (_, index) => (

@@ -133,6 +133,9 @@ tauri-plugin-notification = "2.3.3"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# The vendored copy (see [patch.crates-io]) Tauri already runs: Misty names its own page's origins to
+# it, so that page uses the microphone and camera with no WebKit panel (app/setup.rs).
+wry = { version = "=0.55.1", default-features = false }
 # System notices that open their chat when clicked (agents/run_control/run_notices.rs).
 mac-notification-sys = "0.6.15"
 block2 = "0.6.2"

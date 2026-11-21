@@ -90,7 +90,7 @@ function StatusLine({
   if (signedIn !== null)
     facts.push(
       <Tooltip key="sign-in" content={signInDetail ?? ""}>
-        <span>{signedIn ? "Signed in" : "Signed out"}</span>
+        <span>{signedIn ? "signed in" : "signed out"}</span>
       </Tooltip>,
     );
   if (status.updateAvailable && status.latestVersion)
@@ -99,7 +99,7 @@ function StatusLine({
     <>
       {facts.map((fact, index) => (
         <Fragment key={index}>
-          {index ? " · " : null}
+          {index ? ", " : null}
           {fact}
         </Fragment>
       ))}

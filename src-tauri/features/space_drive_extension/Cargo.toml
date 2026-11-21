@@ -1,5 +1,5 @@
-# Misty's File Provider extension: each Space's drive in Finder. It is an app extension
-# (`MistyDrive.appex`) that macOS starts on its own; it only relays to Misty over a socket in the
+# Misty's File Provider extension: the account's drive in Finder, a folder per Space. It is an app
+# extension (`MistyDrive.appex`) that macOS starts on its own; it only relays to Misty over a socket in the
 # app group, where `space_drive` does the syncing. Built, bundled and signed by
 # `tasks/drive-extension.ts`, never by Tauri.
 [package]

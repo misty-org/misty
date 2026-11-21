@@ -347,6 +347,22 @@ pub struct Restored {
     pub name: String,
 }
 
+/// Undo for the delete guard: puts back everything a run of deletes from the OS trashed in the
+/// Space before Misty stopped it. Answers how many came back.
+#[tauri::command]
+pub async fn drive_restore_burst(
+    webview: Webview,
+    space_id: String,
+    burst: String,
+) -> Result<u64, String> {
+    person_window(&webview)?;
+    let space = space_of(&space_id)?;
+    drive()?
+        .restore_burst(&space, &burst)
+        .await
+        .map_err(error_text)
+}
+
 /// Puts a trashed item back. An agent's trash record of it goes.
 #[tauri::command]
 pub async fn drive_restore(

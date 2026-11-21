@@ -83,7 +83,7 @@ export function AgentGrantsSection() {
             <Row
               key={grant.id}
               label={grant.label}
-              description={`${group.agentName} · ${lastUsedText(grant)}`}
+              description={`For ${group.agentName}, ${lastUsedText(grant).toLowerCase()}`}
             >
               <Button
                 disabled={Boolean(working)}

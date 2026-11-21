@@ -49,7 +49,7 @@ describe("pointBubbleText", () => {
   it("says what to do, with the step during a walkthrough", () => {
     expect(pointBubbleText(at(0, 0))).toBe("click Commit");
     expect(pointBubbleText(at(0, 0, { guide: { step: 2, total: 4 } }))).toBe(
-      "2 of 4 · click Commit",
+      "Step 2 of 4: click Commit",
     );
     expect(pointBubbleText(at(0, 0, { label: " " }), () => 0)).toBe("right here!");
   });

@@ -40,7 +40,7 @@ function useSpacePicture(spaceId: string, version: number) {
 const tones = ["blue", "teal", "violet", "orange", "pink", "green", "amber", "red"] as const;
 
 /** The same Space always gets the same color, on every device, from its id. */
-function spaceTone(id: string): (typeof tones)[number] {
+export function spaceTone(id: string): (typeof tones)[number] {
   let hash = 0;
   for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return tones[hash % tones.length];

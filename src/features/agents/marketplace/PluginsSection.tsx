@@ -273,7 +273,7 @@ function EnginePluginShelves({
       key={item.id}
       logo={<MakerTile maker={pluginMaker(item)} name={item.name} />}
       title={item.name}
-      line={item.installed && !item.enabled ? "Off · kept installed" : item.description}
+      line={item.installed && !item.enabled ? "Installed but turned off" : item.description}
       action={
         item.installed ? (
           <CatalogDone />

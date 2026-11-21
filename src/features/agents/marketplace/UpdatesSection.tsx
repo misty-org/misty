@@ -156,7 +156,7 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
           key={`app:${app.id}`}
           logo={<AppLogoImage src={catalogLogoUrl(app)} name={app.name} size="tile" />}
           title={app.name}
-          line={`App · ${from} → ${app.version}`}
+          line={`App, from ${from} to ${app.version}`}
           action={
             <Button
               variant="get"
@@ -184,7 +184,11 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
             />
           }
           title={skill.name}
-          line={`Skill · ${skill.repoOwner ?? ""}${skill.repoName ? `/${skill.repoName}` : ""}`}
+          line={
+            skill.repoOwner || skill.repoName
+              ? `Skill from ${skill.repoOwner ?? ""}${skill.repoName ? `/${skill.repoName}` : ""}`
+              : "Skill"
+          }
           action={
             <Button
               variant="get"

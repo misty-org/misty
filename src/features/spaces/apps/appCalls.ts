@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import { createPort } from "@/shared/lib/seams";
 import { spacesApi } from "../api/api";
 import { useVoicePresence, watchVoicePresence } from "../list/voicePresence";
@@ -22,8 +23,16 @@ export const appCallsHost = createPort<{
   setMuted(muted: boolean): void;
 }>("App calls");
 
+/** A Space voice channel's page, drawn by the calls feature above Spaces and filled in at startup. */
+export const voiceChannelPage =
+  createPort<ComponentType<{ spaceId: string; channelId: string; workspaceTabId?: string }>>(
+    "Voice channel page",
+  );
+
 const voiceChannelsOf = async (spaceId: string) =>
-  (await spacesApi.conversations(spaceId)).conversations.filter((conversation) => conversation.voice);
+  (await spacesApi.conversations(spaceId)).conversations.filter(
+    (conversation) => conversation.voice,
+  );
 
 /** misty-sdk's `calls.*` for one app in one Space. */
 export function createAppCalls(spaceId: string) {

@@ -154,7 +154,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       )}
       style={
         isAuthRoute
-          ? { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: "38px minmax(0, 1fr)" }
+          ? { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: "calc(var(--spacing) * 9.5) minmax(0, 1fr)" }
           : geometry.frame
       }
       data-misty-desktop-frame
@@ -175,7 +175,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     >
       <header
         className={cn(
-          "absolute inset-x-0 top-0 z-[var(--stack-pane-top)] h-[var(--shell-titlebar,2.375rem)]",
+          "absolute inset-x-0 top-0 z-[var(--stack-pane-top)] h-[var(--shell-titlebar,calc(var(--spacing)*9.5))]",
           isAuthRoute ? "pointer-events-auto border-b-0 bg-transparent" : "pointer-events-none",
         )}
         data-shared-chrome={!isAuthRoute}

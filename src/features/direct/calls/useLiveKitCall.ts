@@ -1,15 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  DisconnectReason,
   Room,
   RoomEvent,
   Track,
   isE2EESupported,
+  type LocalTrackPublication,
   type Participant,
+  type RemoteParticipant,
+  type RemoteTrackPublication,
 } from "livekit-client";
 import { notify } from "@misty/ui";
 import { directApi } from "../api";
 import { useCallStore, type ActiveCall } from "./callStore";
+import { playCallSound } from "./callSounds";
 import { CallKeyProvider, startKeyRotation } from "./keyRotation";
+import { shareScreenAudio } from "./screenAudio";
 
 /** One person in the call, as the panel draws them. */
 export interface CallPerson {
@@ -19,8 +25,17 @@ export interface CallPerson {
   self: boolean;
   speaking: boolean;
   micOn: boolean;
-  /** The screen they share, else their camera, when either is on. */
-  video?: Track;
+  /** Their camera, while it is on. */
+  camera?: Track;
+  /**
+   * The screen they share, once this computer watches it (always for this computer's own). A
+   * screen nobody watches is never received, so it costs nothing.
+   */
+  screen?: Track;
+  /** They are sharing their screen, watched or not. */
+  sharing: boolean;
+  /** This computer is watching their screen. */
+  watching: boolean;
   /** Their voice and their screen's sound; never this computer's own. */
   audio: Track[];
 }
@@ -35,8 +50,13 @@ export interface CallControls {
   toggleMic(): void;
   toggleCamera(): void;
   toggleScreen(): void;
+  /** Starts or stops receiving someone's shared screen (and its sound). */
+  watch(personId: string, on: boolean): void;
   leave(): void;
 }
+
+/** A screen and its sound: received only while this computer watches it. */
+const screenSources: Track.Source[] = [Track.Source.ScreenShare, Track.Source.ScreenShareAudio];
 
 /** Someone's track, only when it is end-to-end encrypted: an unencrypted one is never played. */
 function trackOf(participant: Participant, source: Track.Source, self: boolean) {
@@ -45,10 +65,8 @@ function trackOf(participant: Participant, source: Track.Source, self: boolean) 
   return self || publication.isEncrypted ? publication.track : undefined;
 }
 
-function personOf(participant: Participant, self: boolean): CallPerson {
-  const shown =
-    trackOf(participant, Track.Source.ScreenShare, self) ??
-    trackOf(participant, Track.Source.Camera, self);
+function personOf(participant: Participant, self: boolean, watching: boolean): CallPerson {
+  const shared = participant.getTrackPublication(Track.Source.ScreenShare);
   const audio = self
     ? []
     : [Track.Source.Microphone, Track.Source.ScreenShareAudio]
@@ -60,10 +78,25 @@ function personOf(participant: Participant, self: boolean): CallPerson {
     self,
     speaking: participant.isSpeaking,
     micOn: participant.isMicrophoneEnabled,
-    video: shown,
+    camera: trackOf(participant, Track.Source.Camera, self),
+    screen: trackOf(participant, Track.Source.ScreenShare, self),
+    sharing: Boolean(shared && !shared.isMuted),
+    watching: self || watching,
     audio,
   };
 }
+
+/** Receives a track that just appeared: a voice or a camera always, a screen only when watched. */
+function subscribe(publication: RemoteTrackPublication, watched: boolean) {
+  const screen = screenSources.includes(publication.source);
+  publication.setSubscribed(!screen || watched);
+}
+
+/**
+ * misty-server ends any call left with one person in it for five minutes (`livekit_rooms.go`), with
+ * no exceptions; the person hears about it a minute before.
+ */
+const ALONE_WARNING_MS = 4 * 60_000;
 
 /** Waits (up to 10 seconds) for LiveKit to say this computer's frames are encrypted. */
 function encryptionOn(room: Room): Promise<boolean> {
@@ -93,18 +126,44 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
   const [, setVersion] = useState(0);
   const bump = useCallback(() => setVersion((n) => n + 1), []);
   const { room: roomName, key, video } = call;
+  // Whose screens this computer watches, by their identity.
+  const watching = useRef(new Set<string>());
+  // Stops the sound of this computer's shared screen, while it is sent.
+  const screenAudio = useRef<Promise<(() => Promise<void>) | undefined> | undefined>(undefined);
+  const stopScreenAudio = useCallback(async () => {
+    const stopping = screenAudio.current;
+    screenAudio.current = undefined;
+    const stop = await stopping;
+    await stop?.();
+  }, []);
 
   useEffect(() => {
     if (!isE2EESupported()) {
       useCallStore.getState().leave();
       return;
     }
+    const watched = watching.current;
     let cancelled = false;
     const worker = new Worker(new URL("livekit-client/e2ee-worker", import.meta.url), {
       type: "module",
     });
     const keyProvider = new CallKeyProvider();
     let stopRotation: (() => void) | undefined;
+    let live = false;
+    let aloneTimer: ReturnType<typeof setTimeout> | undefined;
+    // While the call is live and nobody else is in it, a warning waits; anyone joining calls it off.
+    const watchAlone = () => {
+      const alone = live && room.remoteParticipants.size === 0;
+      if (!alone) {
+        clearTimeout(aloneTimer);
+        aloneTimer = undefined;
+      } else if (!aloneTimer) {
+        aloneTimer = setTimeout(() => {
+          if (!cancelled)
+            notify({ message: "You’re the only one here. The call ends in a minute." });
+        }, ALONE_WARNING_MS);
+      }
+    };
     const room = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -118,24 +177,56 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
     };
     const onJoined = () => {
       useCallStore.getState().setAnswered();
+      if (live) playCallSound("personJoined");
+      watchAlone();
+      bump();
+    };
+    const onLeft = () => {
+      if (live) playCallSound("personLeft");
+      watchAlone();
       bump();
     };
     room
       .on(RoomEvent.ParticipantConnected, onJoined)
-      .on(RoomEvent.ParticipantDisconnected, bump)
+      .on(RoomEvent.ParticipantDisconnected, onLeft)
+      .on(
+        RoomEvent.TrackPublished,
+        (publication: RemoteTrackPublication, person: RemoteParticipant) => {
+          subscribe(publication, watching.current.has(person.identity));
+          bump();
+        },
+      )
+      .on(
+        RoomEvent.TrackUnpublished,
+        (publication: RemoteTrackPublication, person: RemoteParticipant) => {
+          // A screen that stops being shared is no longer watched; sharing again asks again.
+          if (publication.source === Track.Source.ScreenShare)
+            watching.current.delete(person.identity);
+          bump();
+        },
+      )
       .on(RoomEvent.TrackSubscribed, bump)
       .on(RoomEvent.TrackUnsubscribed, bump)
       .on(RoomEvent.TrackMuted, bump)
       .on(RoomEvent.TrackUnmuted, bump)
       .on(RoomEvent.LocalTrackPublished, bump)
-      .on(RoomEvent.LocalTrackUnpublished, bump)
+      .on(RoomEvent.LocalTrackUnpublished, (publication: LocalTrackPublication) => {
+        // However the screen stops being shared (the button, the system's own menu), its sound
+        // stops with it.
+        if (publication.source === Track.Source.ScreenShare) void stopScreenAudio();
+        bump();
+      })
       .on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
         useCallStore.getState().setSpeaking(speakers.map((speaker) => speaker.identity).sort());
         bump();
       })
       .on(RoomEvent.EncryptionError, () => fail("The call’s encryption failed, so it ended."))
-      .on(RoomEvent.Disconnected, () => {
-        if (!cancelled) useCallStore.getState().leave();
+      .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+        if (cancelled) return;
+        if (reason === DisconnectReason.ROOM_DELETED) {
+          notify({ message: "The call ended because no one else was in it." });
+        }
+        useCallStore.getState().leave();
       });
 
     void (async () => {
@@ -144,8 +235,13 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         await room.setE2EEEnabled(true);
         const { token, url } = await directApi.callToken(roomName);
         if (cancelled) return;
-        await room.connect(url, token);
+        // Nothing is received until it is asked for: voices and cameras at once (below), a screen only
+        // once someone chooses to watch it.
+        await room.connect(url, token, { autoSubscribe: false });
         if (cancelled) return;
+        for (const person of room.remoteParticipants.values())
+          for (const publication of person.trackPublications.values())
+            subscribe(publication, watching.current.has(person.identity));
         // Nothing is sent until this computer's encryption is on.
         if (!(await encryptionOn(room)) || cancelled) {
           fail("The call couldn’t be encrypted, so it ended.");
@@ -161,6 +257,9 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         stopRotation = stop;
         if (room.remoteParticipants.size) useCallStore.getState().setAnswered();
         useCallStore.getState().setLive();
+        live = true;
+        playCallSound("join");
+        watchAlone();
         await room.localParticipant.setMicrophoneEnabled(true);
         if (video) await room.localParticipant.setCameraEnabled(true);
         bump();
@@ -173,16 +272,22 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
 
     return () => {
       cancelled = true;
+      if (live) playCallSound("leave");
+      watched.clear();
+      clearTimeout(aloneTimer);
       stopRotation?.();
+      void stopScreenAudio();
       setRoom(null);
       void room.disconnect().finally(() => worker.terminate());
     };
-  }, [roomName, key, video, maxPeople, bump]);
+  }, [roomName, key, video, maxPeople, bump, stopScreenAudio]);
 
   const people: CallPerson[] = room
     ? [
-        personOf(room.localParticipant, true),
-        ...[...room.remoteParticipants.values()].map((person) => personOf(person, false)),
+        personOf(room.localParticipant, true, true),
+        ...[...room.remoteParticipants.values()].map((person) =>
+          personOf(person, false, watching.current.has(person.identity)),
+        ),
       ]
     : [];
   const local = room?.localParticipant;
@@ -203,8 +308,13 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
           if (room.localParticipant.isMicrophoneEnabled === on) return;
           void room.localParticipant
             .setMicrophoneEnabled(on)
-            .then(bump)
-            .catch(() => notify({ message: "The microphone couldn’t be turned on.", tone: "error" }));
+            .then(() => {
+              playCallSound(on ? "unmute" : "mute");
+              bump();
+            })
+            .catch(() =>
+              notify({ message: "The microphone couldn’t be turned on.", tone: "error" }),
+            );
         },
       },
     });
@@ -216,24 +326,46 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
     cameraOn: Boolean(local?.isCameraEnabled),
     screenOn: Boolean(local?.isScreenShareEnabled),
     toggleMic: () =>
-      run(
-        (room) =>
-          room.localParticipant.setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled),
-        "The microphone couldn’t be turned on.",
-      ),
+      run(async (room) => {
+        const on = !room.localParticipant.isMicrophoneEnabled;
+        await room.localParticipant.setMicrophoneEnabled(on);
+        playCallSound(on ? "unmute" : "mute");
+      }, "The microphone couldn’t be turned on."),
     toggleCamera: () =>
       run(
         (room) => room.localParticipant.setCameraEnabled(!room.localParticipant.isCameraEnabled),
         "The camera couldn’t be turned on.",
       ),
     toggleScreen: () =>
-      run(
-        (room) =>
-          room.localParticipant.setScreenShareEnabled(!room.localParticipant.isScreenShareEnabled, {
-            audio: true,
-          }),
-        "The screen couldn’t be shared.",
-      ),
+      run(async (room) => {
+        if (room.localParticipant.isScreenShareEnabled) {
+          await stopScreenAudio();
+          await room.localParticipant.setScreenShareEnabled(false);
+          return;
+        }
+        // WebKit's capture brings no sound, so the screen's sound is sent on its own track.
+        await room.localParticipant.setScreenShareEnabled(true, { audio: false });
+        const sending = shareScreenAudio(room, () => {
+          if (screenAudio.current === sending) screenAudio.current = undefined;
+          notify({ message: "Your screen’s sound stopped.", tone: "error" });
+          bump();
+        }).catch((error: unknown) => {
+          console.error("The screen's sound couldn't be shared:", error);
+          if (screenAudio.current === sending) screenAudio.current = undefined;
+          notify({ message: "Your screen’s sound couldn’t be shared.", tone: "error" });
+          return undefined;
+        });
+        screenAudio.current = sending;
+        await sending;
+      }, "The screen couldn’t be shared."),
+    watch: (personId, on) => {
+      const person = room?.remoteParticipants.get(personId);
+      if (!person) return;
+      if (on) watching.current.add(personId);
+      else watching.current.delete(personId);
+      for (const source of screenSources) person.getTrackPublication(source)?.setSubscribed(on);
+      bump();
+    },
     leave: () => useCallStore.getState().leave(),
   };
 }

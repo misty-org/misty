@@ -42,12 +42,23 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       }
       if (!spaceId || !appId) return null;
       // The app's page names its tab once its catalog entry is read.
+      return request("space", `app:${spaceId}:${appId}`, appId, pathname, `${spaceId}:${appId}`);
+    }
+    // A voice channel's call has a page of its own, one per channel, named by the page.
+    if (parts[2] === "voice") {
+      let channelId = "";
+      try {
+        channelId = decodeURIComponent(parts[3] ?? "");
+      } catch {
+        return null;
+      }
+      if (!spaceId || !channelId) return null;
       return request(
         "space",
-        `app:${spaceId}:${appId}`,
-        appId,
+        `space:${spaceId}:voice:${channelId}`,
+        "Voice channel",
         pathname,
-        `${spaceId}:${appId}`,
+        `${spaceId}:voice:${channelId}`,
       );
     }
     const tool = spaceToolFromSection(parts[2]);

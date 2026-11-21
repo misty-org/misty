@@ -1,14 +1,12 @@
-import { Plus, Settings, Trash2, UserPlus } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { Settings, Trash2, UserPlus } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import {
   ConfirmDeleteDialog,
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
-  IconButton,
   MenuItem,
   MenuSeparator,
-  RowTools,
   notify,
 } from "@misty/ui";
 import { useAuth } from "@/features/account";

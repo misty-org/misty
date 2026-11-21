@@ -89,7 +89,7 @@ export function PluginStoreDetail({
       onOpenChange={(open) => !open && onClose()}
       logo={<MakerTile maker={maker} name={item.name} />}
       title={item.name}
-      line={item.installed && !item.enabled ? "Off · kept installed" : (maker.name ?? undefined)}
+      line={item.installed && !item.enabled ? "Installed but turned off" : (maker.name ?? undefined)}
       action={
         item.installed ? (
           canTurnOff(engine) && !item.enabled ? (
@@ -190,7 +190,7 @@ export function PluginStoreDetail({
             {added.map((kind) => (
               <div key={kind.key} className="grid gap-1.5">
                 <Text as="dt" size="meta" tone="muted">
-                  {kind.title} · {found[kind.key].length}
+                  {kind.title}
                 </Text>
                 <dd className="m-0">
                   <CatalogNames names={found[kind.key]} />

@@ -188,7 +188,7 @@ export function BrowserLog(props: { runId: string; callId?: string; openedAt?: n
           const selected = shown === row;
           // A tool call's actions sit together; the next call starts a little apart.
           const newCall = index > 0 && rows![index - 1]!.callId !== row.callId;
-          const detail = [siteOf(row.url), verdictWords(row)].filter(Boolean).join(" · ");
+          const detail = [siteOf(row.url), verdictWords(row)].filter(Boolean).join(", ");
           return (
             <Text
               as="li"
@@ -232,7 +232,7 @@ export function BrowserLog(props: { runId: string; callId?: string; openedAt?: n
                   ) : detail || row.note ? (
                     <OverflowFadeText>
                       <Text bare size="caption" tone="muted">
-                        {[detail, row.note].filter(Boolean).join(" · ")}
+                        {[detail, row.note].filter(Boolean).join(", ")}
                       </Text>
                     </OverflowFadeText>
                   ) : null}

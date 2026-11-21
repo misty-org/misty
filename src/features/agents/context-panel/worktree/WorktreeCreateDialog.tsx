@@ -149,14 +149,11 @@ function PrPreviewCard({
             ) : null}
           </Text>
           <Text wrap size="caption" tone="muted">
-            {[
-              preview.author && `${preview.author} into ${base ?? "main"}`,
-              typeof preview.additions === "number" &&
-                `+${preview.additions} −${preview.deletions ?? 0}`,
-              `Branch ${branch}`,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+            {`Branch ${branch}`}
+            {preview.author ? ` by ${preview.author} into ${base ?? "main"}` : ""}
+            {typeof preview.additions === "number"
+              ? `, +${preview.additions} −${preview.deletions ?? 0}`
+              : ""}
           </Text>
         </>
       )}
@@ -250,7 +247,7 @@ export function WorktreeCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-115 max-w-[calc(100%-2rem)]">
+      <DialogContent className="w-115 max-w-[calc(100%-var(--spacing)*8)]">
         <DialogHeader>
           <DialogTitle>New worktree</DialogTitle>
         </DialogHeader>

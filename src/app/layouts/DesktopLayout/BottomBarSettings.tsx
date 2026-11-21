@@ -120,7 +120,7 @@ function ZoneList(props: {
       className={cn(
         // The ends are the bar: one row that scrolls once it is full. The rest is a palette grid.
         zone === "hidden"
-          ? "grid min-h-10 grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-1"
+          ? "grid min-h-10 grid-cols-[repeat(auto-fill,minmax(--spacing(48),1fr))] gap-1"
           : "flex min-h-10 min-w-0 flex-1 items-center gap-1 overflow-x-auto",
         zone === "end" && "justify-end",
       )}

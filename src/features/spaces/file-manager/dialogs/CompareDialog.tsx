@@ -22,13 +22,21 @@ const stateText: Record<Exclude<CompareState, "same">, string> = {
   "only-right": "Only in the second",
 };
 
-const sizeText = (row: CompareRow) =>
-  row.folder
-    ? "Folder"
-    : [row.leftSize, row.rightSize]
-        .filter((size): size is number => size !== undefined)
-        .map(formatBytes)
-        .join(" · ");
+const folderText: Record<Exclude<CompareState, "same">, string> = {
+  changed: "A folder that differs",
+  "only-left": "A folder only in the first",
+  "only-right": "A folder only in the second",
+};
+
+/** What differs about a row, in words: its state, then its size in each folder that has it. */
+const differenceText = (row: CompareRow) => {
+  const state = row.state as Exclude<CompareState, "same">;
+  if (row.folder) return folderText[state];
+  const left = row.leftSize === undefined ? "" : formatBytes(row.leftSize);
+  const right = row.rightSize === undefined ? "" : formatBytes(row.rightSize);
+  if (left && right) return `${stateText[state]}, ${left} in the first and ${right} in the second`;
+  return left || right ? `${stateText[state]}, ${left || right}` : stateText[state];
+};
 
 /** Two folders side by side by content: what differs, and what only one of them has. */
 export function CompareDialog({ left, right, onClose }: { left: string; right: string; onClose(): void }) {
@@ -73,7 +81,7 @@ export function CompareDialog({ left, right, onClose }: { left: string; right: s
                 <li key={row.relative}>
                   <ListRow
                     label={row.relative}
-                    description={`${stateText[row.state as Exclude<CompareState, "same">]} · ${sizeText(row)}`}
+                    description={differenceText(row)}
                   />
                 </li>
               ))}

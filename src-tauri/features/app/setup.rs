@@ -22,6 +22,10 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     crate::app::macos_window_effects::mac_live_resize::install();
     #[cfg(target_os = "macos")]
     crate::app::macos_window_effects::mac_traffic_lights::install();
+    // Misty's own page may use the microphone and camera with no WebKit panel: the system asks the
+    // person once, and calls never ask again. Any other page (a website) is refused.
+    #[cfg(target_os = "macos")]
+    wry::set_trusted_media_origins(own_page_origins(app.handle()));
     // Debug-only: a bridge for the live acceptance specs when asked to;
     // see browser/agent_pages/eval_bridge/mod.rs.
     #[cfg(all(desktop, debug_assertions))]
@@ -65,6 +69,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(voice::DictationState::default());
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     app.manage(voice::CaptureState::default());
+    app.manage(voice::ShareAudioState::default());
     app.manage(voice::speech::SpeechState::default());
     #[cfg(desktop)]
     app.manage(BrowserExecutionState::default());
@@ -86,4 +91,18 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         crate::browser::app_windows::restore(app.handle())?;
     }
     Ok(())
+}
+
+/// The origins Misty's own page loads from: the bundled app's, and in a development build its
+/// development server's.
+#[cfg(target_os = "macos")]
+fn own_page_origins(app: &tauri::AppHandle) -> Vec<String> {
+    let mut origins = vec!["tauri://localhost".to_owned()];
+    #[cfg(debug_assertions)]
+    if let Some(url) = &app.config().build.dev_url {
+        origins.push(url.origin().ascii_serialization());
+    }
+    #[cfg(not(debug_assertions))]
+    let _ = app;
+    origins
 }

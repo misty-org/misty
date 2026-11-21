@@ -4,6 +4,7 @@ import { EmptyState } from "@misty/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { SpacePageLoadingPlaceholder } from "../components/SpacePageLoadingPlaceholder";
+import { voiceChannelPage } from "../apps/appCalls";
 import { useSpacesStore } from "../list/useSpacesStore";
 
 async function loadFiles() {
@@ -31,6 +32,11 @@ async function loadApp() {
   return { default: SpaceAppPage };
 }
 const App = lazy(loadApp);
+// The calls feature sits above Spaces, so it hands its page in at startup.
+async function loadVoice() {
+  return { default: voiceChannelPage.get() };
+}
+const Voice = lazy(loadVoice);
 
 export async function preloadSpaceSection(section: string) {
   switch (section) {
@@ -52,6 +58,9 @@ export async function preloadSpaceSection(section: string) {
       break;
     case "app":
       await loadApp();
+      break;
+    case "voice":
+      await loadVoice();
       break;
   }
 }
@@ -75,7 +84,7 @@ const sectionTabTitles: Record<string, string> = {
 export function SpaceSectionView(props: {
   spaceId: string;
   section: string;
-  /** The app open on its page (`/app/<id>`). */
+  /** The app open on its page (`/app/<id>`), or the voice channel (`/voice/<id>`). */
   itemId?: string;
   workspaceTabId?: string;
 }) {
@@ -145,6 +154,8 @@ export function SpaceSectionView(props: {
           />
         ) : section === "app" ? (
           <App space={space} appId={itemId} workspaceTabId={props.workspaceTabId} />
+        ) : section === "voice" ? (
+          <Voice spaceId={spaceId} channelId={itemId} workspaceTabId={props.workspaceTabId} />
         ) : // A Space has no home page: its address, and the old settings links, open its chat.
         section === "home" ||
           section === "settings" ||

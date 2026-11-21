@@ -167,24 +167,26 @@ function ConfigMenu({
 function runtimeStatus(section: McpRuntimeSection): string {
   const ready = section.status === "ready" || section.status === "session_ended";
   if (!ready) return section.reason ?? runtimeStatusText[section.status];
-  return [
-    section.entries.length === 0 ? copy.runtimeEmpty : runtimeStatusText[section.status],
-    section.sessionId ? copy.runtimeSession(section.sessionId) : null,
+  const base = section.entries.length === 0 ? copy.runtimeEmpty : runtimeStatusText[section.status];
+  const when = [
+    section.sessionId ? `from ${copy.runtimeSession(section.sessionId)}` : null,
     section.collectedAt
       ? copy.runtimeCollectedAt(timeFormat.format(new Date(section.collectedAt)))
       : null,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" ");
+  return when ? `${base.replace(/\.$/, "")}, read ${when}` : base;
 }
 
 /** A runtime server's one line: Misty's own, then its tools or its status. */
 function runtimeLine(entry: McpRuntimeEntry): string {
-  const what =
-    entry.toolNames.length > 0
-      ? copy.runtimeTools(entry.toolNames.length)
-      : (entry.status ?? copy.runtimeStatusUnknown);
-  return entry.builtin ? `${copy.builtin} · ${what}` : what;
+  if (entry.toolNames.length > 0) {
+    const tools = copy.runtimeTools(entry.toolNames.length);
+    return entry.builtin ? `${tools} from ${copy.builtin}` : tools;
+  }
+  const status = entry.status ?? copy.runtimeStatusUnknown;
+  return entry.builtin ? `${status}, from ${copy.builtin}` : status;
 }
 
 /** A server a session reported, in detail: its counts and the names of its tools. */

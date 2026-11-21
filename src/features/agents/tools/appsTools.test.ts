@@ -24,7 +24,7 @@ const card = (patch: Partial<AppRequest> = {}): AppRequest => ({
   id: "localapprq_1",
   kind: "approve",
   subject: "GMAIL_SEND_EMAIL",
-  title: "Gmail · Send email",
+  title: "Send email in Gmail",
   summary: "to: a@example.com",
   state: "pending",
   expiresAt: "2099-01-01T00:00:00Z",
@@ -119,7 +119,7 @@ describe("integration.execute", () => {
   it("shows the card, and runs the same call again once approved", async () => {
     answers({
       apps_tool_execute: [
-        { state: "waiting", title: "Gmail · Send email", request: card() },
+        { state: "waiting", title: "Send email in Gmail", request: card() },
         { state: "done", result: { ok: true } },
       ],
       apps_request_get: [{ request: card() }, { request: card({ state: "approved" }) }],
@@ -134,7 +134,7 @@ describe("integration.execute", () => {
 
   it("hands off after 40 seconds and leaves the card up", async () => {
     answers({
-      apps_tool_execute: [{ state: "waiting", title: "Gmail · Send email", request: card() }],
+      apps_tool_execute: [{ state: "waiting", title: "Send email in Gmail", request: card() }],
       apps_request_get: [{ request: card() }],
     });
     const running = call("integration.execute", send);
@@ -143,8 +143,8 @@ describe("integration.execute", () => {
       status: "awaiting_approval",
       request: "localapprq_1",
       message:
-        "An approval card for “Gmail · Send email” is showing in the chat. This run ends here and continues after the user decides.",
-      user_message: "“Gmail · Send email” is waiting for your approval above.",
+        "An approval card for “Send email in Gmail” is showing in the chat. This run ends here and continues after the user decides.",
+      user_message: "“Send email in Gmail” is waiting for your approval above.",
     });
     expect(commands("apps_tool_execute")).toHaveLength(1);
   });

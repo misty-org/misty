@@ -149,6 +149,7 @@ const strings = {
     noData: "No session transcripts to read yet",
     noInvocations: "No skill invocations in the transcripts",
     summary: "{{files}} transcripts read, {{total}} invocations.",
+    cached: "Read from the cache.",
     skill: "Skill",
     calls: "Calls",
     tokens: "Tokens",

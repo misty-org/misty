@@ -1,7 +1,10 @@
-//! The extension's principal class: one instance per domain (one Space), made by macOS with
-//! `initWithDomain:`. Every call is answered on a worker thread from Misty (`link`), never from state
-//! kept here. What each call means for the Space follows the drive's rules in Misty:
+//! The extension's principal class: one instance for the account's drive (its one domain), made by
+//! macOS with `initWithDomain:`. Every call is answered on a worker thread from Misty (`link`), never
+//! from state kept here. What each call means follows the drive's rules in Misty:
 //!
+//! - The drive's root holds a folder for each Space, and nothing else. A Space's folder stays where
+//!   it is: renaming, moving or deleting it is refused, and macOS puts it back as it was. So is
+//!   moving something from one Space to another.
 //! - Moving an item to the Trash, or deleting it (`rm`, Delete Immediately), is a trash move in the
 //!   Space: restorable there for 30 days, from Misty. The item then leaves the drive as macOS shows
 //!   it, so emptying the Finder Trash never deletes anything in the Space.
@@ -178,7 +181,7 @@ fn system_item(info: ItemInfo) -> Retained<ProtocolObject<dyn objc2_file_provide
 
 pub struct ExtensionIvars {
     link: Arc<Link>,
-    /// The Space's name, which is the root folder's name in Finder.
+    /// The domain's name (the person's), which is the root folder's name in Finder.
     name: String,
 }
 
@@ -208,9 +211,8 @@ define_class!(
         #[unsafe(method_id(initWithDomain:))]
         fn init_with_domain(this: Allocated<Self>, domain: &NSFileProviderDomain) -> Retained<Self> {
             // SAFETY: plain NSFileProviderDomain getters.
-            let (identifier, name): (Retained<NSString>, Retained<NSString>) =
-                unsafe { (msg_send![domain, identifier], msg_send![domain, displayName]) };
-            let link = Arc::new(Link::new(identifier.to_string()));
+            let name: Retained<NSString> = unsafe { msg_send![domain, displayName] };
+            let link = Arc::new(Link::new());
             link.sweep_staging();
             let this = this.set_ivars(ExtensionIvars {
                 link,
@@ -236,7 +238,7 @@ define_class!(
             let handler = send::block(handler);
             send::spawn(move || {
                 let handler = handler.into_inner();
-                // The root is the Space itself; it never changes and needs no question.
+                // The root is the drive itself; it never changes and needs no question.
                 let found = if id == "root" {
                     Ok(ItemInfo {
                         id: "root".into(),
@@ -438,6 +440,14 @@ define_class!(
                         let _ = link.used(&id, at);
                     }
                 }
+                // A change the drive's layout refuses (a Space's folder renamed or moved, a move
+                // between Spaces) is answered with the item as it is, so macOS puts it back.
+                let modified = match modified {
+                    Err(failure) if failure.code() == "forbidden" => {
+                        link.item(&id).map(|item| Changed { item, refetch: false })
+                    }
+                    other => other,
+                };
                 // The item answered is what macOS keeps, and Misty doesn't send last-used dates
                 // back, so the date macOS just set is kept rather than cleared.
                 let modified = modified.map(|mut changed| {
@@ -548,9 +558,10 @@ fn answer_change(
     }
 }
 
-/// Misty refused a trash move and kept the item: someone has it open.
+/// Misty refused a trash move and kept the item: someone has it open, it is a Space's folder, or
+/// the delete guard stopped a run of deletes that would take too much of a Space.
 fn refused_trash(failure: &LinkError) -> bool {
-    failure.code() == "in_use"
+    matches!(failure.code(), "in_use" | "forbidden" | "held")
 }
 
 /// A move to the Trash. If Misty keeps the item, it is answered as it now is, so macOS moves it

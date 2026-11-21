@@ -310,6 +310,8 @@ permissions = [
   "allow-voice-dictation-insert",
   "allow-voice-dictation-pill-hide",
   "allow-voice-dictation-stop",
+  "allow-voice-share-audio-start",
+  "allow-voice-share-audio-stop",
 ]
 
 [[set]]
@@ -584,6 +586,7 @@ permissions = [
   "allow-drive-remove-download",
   "allow-drive-rename",
   "allow-drive-restore",
+  "allow-drive-restore-burst",
   "allow-drive-reveal",
   "allow-drive-set-cache-limit",
   "allow-drive-set-paused",

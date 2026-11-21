@@ -51,18 +51,16 @@ interface PickUpOrigin {
 
 /** The note sent to the Space: the person's edited text, then where it came from. */
 export function pickUpMarkdown(text: string, origin: PickUpOrigin): string {
-  const from = [
+  const from = `${[
     // An agent named after its engine ("Codex") isn't said twice.
-    `From ${origin.agentName}${
-      origin.engine && origin.engine.toLowerCase() !== origin.agentName.toLowerCase()
-        ? ` on ${origin.engine}`
-        : ""
-    }`,
+    `From ${origin.agentName}`,
+    origin.engine && origin.engine.toLowerCase() !== origin.agentName.toLowerCase()
+      ? `on ${origin.engine}`
+      : "",
     origin.folder ? `in ${origin.folder}` : "",
-    origin.at.toISOString().slice(0, 16).replace("T", " "),
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" ")}, ${origin.at.toISOString().slice(0, 16).replace("T", " ")}`;
   const body = text.trim().slice(0, limit);
   return `${body}\n\n---\n\n${from}\n`;
 }

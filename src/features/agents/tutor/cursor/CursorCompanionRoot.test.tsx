@@ -166,7 +166,7 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
   expect(marker.style.transform).toBe("translate(389px, 289px)");
   expect(marker.style.opacity).toBe("1");
   expect(container.querySelector(".cursor-point-bubble")?.textContent).toBe(
-    "1 of 2 · click Commit",
+    "Step 1 of 2: click Commit",
   );
   // The bubble sits beside the ring instead of covering it.
   const group = container.querySelector<HTMLElement>(".cursor-group")!;

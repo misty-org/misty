@@ -41,12 +41,12 @@ export function ConnectorLogo({ name }: { name: string }) {
   );
 }
 
-/** How an entry connects, in one line: its transport, then its command or address. */
+/** How an entry connects, in one line: its command or address, then its transport. */
 export function connectorLine(entry: McpConfigEntry): string {
   const target = entry.command
     ? `${entry.command}${entry.argsCount > 0 ? ` +${entry.argsCount}` : ""}`
     : (entry.url ?? copy.transportUnknown);
-  return entry.transport ? `${entry.transport} · ${target}` : target;
+  return entry.transport ? `${target} over ${entry.transport}` : target;
 }
 
 export function McpDetailDialog({

@@ -49,7 +49,7 @@ export function ChatThreadsList({
       as="aside"
       tone="page"
       aria-label="Threads"
-      className="flex w-[min(22.5rem,40%)] shrink-0 flex-col"
+      className="flex w-[min(--spacing(90),40%)] shrink-0 flex-col"
     >
       <header className="flex min-h-12 items-center gap-2 border-b px-3 py-1.5">
         <Text bare as="h2" tone="bright" className="m-0 min-w-0 flex-1 text-sm font-medium">
@@ -77,7 +77,7 @@ export function ChatThreadsList({
             <ListRow
               key={thread.root.id}
               label={spansToText(thread.root.content) || "Message"}
-              description={`${thread.reply_count} ${thread.reply_count === 1 ? "reply" : "replies"} · ${thread.root.sender_name}`}
+              description={`${thread.reply_count} ${thread.reply_count === 1 ? "reply" : "replies"} to ${thread.root.sender_name}`}
               state={
                 thread.unread_count > 0
                   ? { kind: "unread" }

@@ -7,7 +7,7 @@ import { toolLabel } from "../progress/progressTimeline";
 /** The control island's placement; it is a card Surface with a hairline edge. */
 export const islandClass = cn(
   "pointer-events-auto fixed inset-x-0 bottom-4 layer-workspace-overlay mx-auto flex flex-col gap-2",
-  "w-[min(35rem,calc(100dvw-2rem))] rounded-2xl p-2",
+  "w-[min(--spacing(140),calc(100dvw-var(--spacing)*8))] rounded-2xl p-2",
 );
 
 export const settled = new Set(["completed", "failed", "canceled", "cancelled"]);

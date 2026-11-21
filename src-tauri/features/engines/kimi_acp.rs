@@ -219,7 +219,7 @@ fn fields(params: &Value) -> Result<Vec<Value>, String> {
             let question = if prompts.len() == required.len() {
                 prompts[index].to_string()
             } else {
-                format!("Q{} · {}", index + 1, header)
+                format!("Question {}: {}", index + 1, header)
             };
             Ok(json!({
                 "key": key, "question": question, "header": header,

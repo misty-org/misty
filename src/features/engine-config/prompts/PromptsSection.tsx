@@ -52,7 +52,7 @@ function useCurrentFolder(): string {
  * A prompt's logo: its file glyph on a tile, as a persona's is drawn, since a prompt has no maker
  * and no artwork of its own.
  */
-function PromptLogo({ entry }: { entry: CustomPromptEntry }) {
+function PromptLogo(_props: { entry: CustomPromptEntry }) {
   return <PersonaLogo icon={FileText} size="tile" />;
 }
 

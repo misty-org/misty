@@ -11,14 +11,20 @@
 //!   drive doesn't start, and the glue says "This build of Misty isn't signed, so Space drives
 //!   can't start".
 //! - **Container.** `~/Library/Group Containers/<group id>/`, with `drive.sock` and `staging/`.
-//! - **Domains.** One per Space: identifier `<account id>.<space id>`, display name the Space's
-//!   name. macOS puts its files at `~/Library/CloudStorage/Misty-<name>`; Misty links
-//!   `~/.misty/mnt/<Space>` to that folder (the user-visible URL of the domain's root).
-//! - **Signals.** When changes land, Misty signals the working set and the extension asks
-//!   `changes_since`.
+//! - **Domain.** One for the account, so Finder lists one place under Locations: identifier the
+//!   account's id, display name the person's name. Its root holds a folder for each Space, named
+//!   as its mount is (`crate::socket` describes the tree). macOS puts the domain at
+//!   `~/Library/CloudStorage/Misty-<name>`; Misty links `~/.misty/mnt/<Space>` to the Space's
+//!   folder in it.
+//! - **Before.** Each Space was a domain of its own, `<account id>.<space id>`. The first mount
+//!   removes those, keeping any edits macOS hadn't handed over yet
+//!   (`NSFileProviderDomainRemovalModePreserveDirtyUserData`). Misty already has everything else.
+//! - **Signals.** When changes land, or a Space comes or goes, Misty signals the working set and
+//!   the extension asks `changes_since`.
 //!
 //! Unmounting (Misty quitting, the account signing out) leaves the domain registered, so the
-//! files already on the Mac stay; `remove_domain` takes it away when the person leaves the Space.
+//! files already on the Mac stay; `forget_space` takes a Space's folder away when the person
+//! leaves it, which the extension hears of through `changes_since`.
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -29,10 +35,10 @@ use std::{
 use block2::RcBlock;
 use objc2::{rc::Retained, AllocAnyThread};
 use objc2_file_provider::{
-    NSFileProviderDomain, NSFileProviderManager, NSFileProviderRootContainerItemIdentifier,
-    NSFileProviderWorkingSetContainerItemIdentifier,
+    NSFileProviderDomain, NSFileProviderDomainRemovalMode, NSFileProviderManager,
+    NSFileProviderRootContainerItemIdentifier, NSFileProviderWorkingSetContainerItemIdentifier,
 };
-use objc2_foundation::{NSError, NSString, NSURL};
+use objc2_foundation::{NSArray, NSError, NSString, NSURL};
 
 use crate::{lock, Drive, DriveError, Item, ItemId, OsFace, SpaceId, SpaceMount};
 
@@ -166,7 +172,7 @@ fn manager(identifier: &str, name: &str) -> Result<Retained<NSFileProviderManage
     let domain = domain(identifier, name);
     // SAFETY: a valid domain object.
     unsafe { NSFileProviderManager::managerForDomain(&domain) }
-        .ok_or_else(|| DriveError::Face("macOS has no File Provider for this Space.".to_owned()))
+        .ok_or_else(|| DriveError::Face("macOS has no File Provider for Misty's drive.".to_owned()))
 }
 
 /// Calls `start` with a completion block and waits for it.
@@ -223,6 +229,55 @@ fn add_domain(identifier: &str, name: &str) -> Result<PathBuf, DriveError> {
     }
 }
 
+/// Every domain the extension has registered: its identifier and display name.
+fn registered_domains() -> Vec<(String, String)> {
+    let (send, receive) = mpsc::channel::<Vec<(String, String)>>();
+    let block = RcBlock::new(
+        move |domains: std::ptr::NonNull<NSArray<NSFileProviderDomain>>, _error: *mut NSError| {
+            // SAFETY: a non-null array the system handed to the block.
+            let domains = unsafe { domains.as_ref() };
+            let found = (0..domains.count())
+                .map(|index| {
+                    let domain = domains.objectAtIndex(index);
+                    // SAFETY: plain NSFileProviderDomain getters.
+                    unsafe { (domain.identifier().to_string(), domain.displayName().to_string()) }
+                })
+                .collect();
+            let _ = send.send(found);
+        },
+    );
+    // SAFETY: a completion block that outlives the call.
+    unsafe { NSFileProviderManager::getDomainsWithCompletionHandler(&block) };
+    receive.recv_timeout(WAIT).unwrap_or_default()
+}
+
+/// Removes the domains each Space had before the account's one drive (`<account id>.<space
+/// id>`). Edits macOS still held for one are kept where macOS puts them, never thrown away.
+fn remove_old_domains(account: &str) {
+    let prefix = format!("{account}.");
+    for (identifier, name) in registered_domains() {
+        if !identifier.starts_with(&prefix) {
+            continue;
+        }
+        let domain = domain(&identifier, &name);
+        let (send, receive) = mpsc::channel::<Option<String>>();
+        let block = RcBlock::new(move |_kept: *mut NSURL, error: *mut NSError| {
+            let _ = send.send(error_text(error));
+        });
+        // SAFETY: a valid domain and a block that outlives the call.
+        unsafe {
+            NSFileProviderManager::removeDomain_mode_completionHandler(
+                &domain,
+                NSFileProviderDomainRemovalMode::PreserveDirtyUserData,
+                &block,
+            )
+        };
+        if let Ok(Some(message)) = receive.recv_timeout(WAIT) {
+            eprintln!("[drive] couldn't remove a Space's old drive: {message}");
+        }
+    }
+}
+
 /// Replaces whatever link is at `link` with one to `target`. A real folder there is left alone.
 fn relink(link: &Path, target: &Path) -> Result<(), DriveError> {
     if let Some(parent) = link.parent() {
@@ -246,47 +301,76 @@ fn relink(link: &Path, target: &Path) -> Result<(), DriveError> {
     file_access::fs::symlink(target, link).map_err(DriveError::io)
 }
 
-/// One face for every Space of the account: each its own domain.
+/// The account's one domain, once registered: its root folder.
+struct Registered {
+    root: PathBuf,
+}
+
+/// One face for every Space of the account: one domain, a folder in it for each Space.
 pub struct FileProviderFace {
-    /// Domains this face registered, by Space: (identifier, display name, link, folder).
-    domains: Mutex<HashMap<SpaceId, (String, String, PathBuf, PathBuf)>>,
+    /// The domain's identifier (the account's id) and display name (the person's name).
+    identifier: String,
+    name: String,
+    registered: Mutex<Option<Registered>>,
+    /// Mounted Spaces: their `~/.misty/mnt` link and their folder in the domain.
+    spaces: Mutex<HashMap<SpaceId, (PathBuf, PathBuf)>>,
     drive: Drive,
 }
 
 impl FileProviderFace {
-    pub fn new(drive: Drive) -> Arc<Self> {
+    /// `name` is what Finder shows the drive as, after Misty's own name.
+    pub fn new(drive: Drive, name: &str) -> Arc<Self> {
         Arc::new(Self {
-            domains: Mutex::new(HashMap::new()),
+            identifier: drive.config().account_id.clone(),
+            name: name.to_owned(),
+            registered: Mutex::new(None),
+            spaces: Mutex::new(HashMap::new()),
             drive,
         })
     }
 
-    /// Takes a Space's domain away (the person left the Space): its files leave the Mac.
-    pub fn remove_domain(&self, mount: &SpaceMount) -> Result<(), DriveError> {
-        let known = lock(&self.domains).remove(&mount.space);
-        let domain = domain(&mount.domain, &mount.name);
-        let removed = wait_for(|block| {
-            // SAFETY: a valid domain and a block that outlives the call.
-            unsafe { NSFileProviderManager::removeDomain_completionHandler(&domain, block) }
-        });
-        if let Some((_, _, link, folder)) = known {
-            if file_access::fs::symlink_metadata(&link)
-                .is_ok_and(|meta| meta.file_type().is_symlink())
-            {
-                let _ = file_access::fs::remove_file(&link);
-            }
-            file_access::revoke_space_drive(&folder);
+    /// The domain's root folder, registering the domain the first time.
+    fn root(&self) -> Result<PathBuf, DriveError> {
+        let mut registered = lock(&self.registered);
+        if let Some(registered) = registered.as_ref() {
+            return Ok(registered.root.clone());
         }
-        removed
+        remove_old_domains(&self.identifier);
+        let root = add_domain(&self.identifier, &self.name)?;
+        file_access::allow_space_drive(&root);
+        *registered = Some(Registered { root: root.clone() });
+        Ok(root)
     }
 
-    fn with_manager(&self, space: &SpaceId, work: impl FnOnce(&NSFileProviderManager)) {
-        let Some((identifier, name, _, _)) = lock(&self.domains).get(space).cloned() else {
+    /// The person left a Space: its link goes, and its folder leaves the Mac once the extension
+    /// asks what changed (the Space is no longer among `Drive::space_folders`).
+    pub fn forget_space(&self, mount: &SpaceMount) {
+        let known = lock(&self.spaces).remove(&mount.space);
+        let link = known.map_or_else(|| mount.path.clone(), |(link, _)| link);
+        if file_access::fs::symlink_metadata(&link).is_ok_and(|meta| meta.file_type().is_symlink()) {
+            let _ = file_access::fs::remove_file(&link);
+        }
+        self.signal();
+    }
+
+    fn manager(&self) -> Option<Retained<NSFileProviderManager>> {
+        lock(&self.registered).as_ref()?;
+        manager(&self.identifier, &self.name).ok()
+    }
+
+    /// Sends the extension to ask what changed.
+    fn signal(&self) {
+        let Some(manager) = self.manager() else {
             return;
         };
-        if let Ok(manager) = manager(&identifier, &name) {
-            work(&manager);
-        }
+        let block = ignore_error();
+        // SAFETY: the working-set identifier is a static string the framework exports.
+        unsafe {
+            manager.signalEnumeratorForContainerItemIdentifier_completionHandler(
+                NSFileProviderWorkingSetContainerItemIdentifier,
+                &block,
+            )
+        };
     }
 }
 
@@ -296,49 +380,30 @@ fn ignore_error() -> RcBlock<dyn Fn(*mut NSError)> {
 
 impl OsFace for FileProviderFace {
     fn mount(&self, space: &SpaceMount) -> Result<(), DriveError> {
-        let folder = add_domain(&space.domain, &space.name)?;
-        file_access::allow_space_drive(&folder);
+        let folder = self.root()?.join(&space.mount_name);
         self.drive.set_os_root(&space.space, folder.clone());
         relink(&space.path, &folder)?;
-        lock(&self.domains).insert(
-            space.space.clone(),
-            (
-                space.domain.clone(),
-                space.name.clone(),
-                space.path.clone(),
-                folder,
-            ),
-        );
-        // The extension catches up from its anchor.
-        self.changed(&space.space, &[]);
+        lock(&self.spaces).insert(space.space.clone(), (space.path.clone(), folder));
+        // The extension catches up from its anchor, and finds the Space's folder if it's new.
+        self.signal();
         Ok(())
     }
 
     fn unmount(&self, space: &SpaceId) -> Result<(), DriveError> {
-        // The domain stays registered: what is on the Mac stays, and the extension answers
-        // "server unreachable" until Misty mounts it again.
-        lock(&self.domains).remove(space);
+        // The Space stays in the drive: what is on the Mac stays, and the extension answers
+        // "server unreachable" inside it until Misty mounts it again.
+        lock(&self.spaces).remove(space);
         Ok(())
     }
 
-    fn changed(&self, space: &SpaceId, _items: &[Item]) {
-        self.with_manager(space, |manager| {
-            let block = ignore_error();
-            // SAFETY: the working-set identifier is a static string the framework exports.
-            unsafe {
-                manager.signalEnumeratorForContainerItemIdentifier_completionHandler(
-                    NSFileProviderWorkingSetContainerItemIdentifier,
-                    &block,
-                )
-            };
-        });
+    fn changed(&self, _space: &SpaceId, _items: &[Item]) {
+        self.signal();
     }
 
-    fn evict(&self, space: &SpaceId, item: &ItemId) -> Result<(), DriveError> {
-        let Some((identifier, name, _, _)) = lock(&self.domains).get(space).cloned() else {
+    fn evict(&self, _space: &SpaceId, item: &ItemId) -> Result<(), DriveError> {
+        let Some(manager) = self.manager() else {
             return Ok(());
         };
-        let manager = manager(&identifier, &name)?;
         let id = NSString::from_str(item.as_str());
         wait_for(|block| {
             // SAFETY: a valid manager, identifier and block.

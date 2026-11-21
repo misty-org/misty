@@ -27,7 +27,7 @@ interface Row {
 function agentLine(agent: { name: string; state: string; doing: string; files?: string[] }) {
   const file = agent.files?.[0]?.split("/").pop();
   const doing = file ? `editing ${file}` : doingLabel(agent.doing, agent.state as never);
-  return doing ? `${agent.name} · ${doing}` : agent.name;
+  return doing ? `${agent.name} is ${doing.charAt(0).toLowerCase()}${doing.slice(1)}` : agent.name;
 }
 
 function topHoisted(member: SpaceMember, roles: SpaceRoleDef[] | undefined) {

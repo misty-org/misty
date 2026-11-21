@@ -148,8 +148,8 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
         // would pull away from the native page during a live resize, since AppKit holds the page's
         // left edge until the window settles, and the gap would show the host behind it. Only a
         // sidebar too wide to leave the page 240px gives way. It goes as narrow as the person drags
-        // it (sidebarWidth.ts).
-        "[--sidebar-w:max(12.5rem,min(var(--shell-side-tabs,17.5rem),calc(100vw_-_15rem)))]",
+        // it (sidebarWidth.ts): 70 spacing steps, so the floor grows with the step as the head does.
+        "[--sidebar-w:max(calc(var(--spacing)_*_70),min(var(--shell-side-tabs,calc(var(--spacing)*70)),calc(100vw_-_var(--spacing)_*_60)))]",
         "relative flex-none transition-[width]",
         motion,
         // Collapsed, the column animates shut and the panel waits off its edge.
@@ -170,7 +170,7 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
         tone="chrome"
         aria-hidden="true"
         className={cn(
-          "absolute top-0 z-[var(--stack-above)] h-[calc(var(--pane-seam-top,0.5rem)_-_1px)] w-screen",
+          "absolute top-0 z-[var(--stack-above)] h-[calc(var(--pane-seam-top,calc(var(--spacing)*2))_-_1px)] w-screen",
           left ? "left-0" : "right-0",
         )}
         data-misty-window-titlebar-region="true"
@@ -184,11 +184,11 @@ export function SidebarDrawer(props: { side: "left" | "right"; children: ReactNo
         ref={panel}
         className={cn(
           "absolute top-0 bottom-0 z-[var(--stack-overlay-raised)] flex w-[var(--sidebar-w)]",
-          "py-[var(--pane-frame,0.375rem)] transition-[transform,opacity]",
+          "py-[var(--pane-frame,calc(var(--spacing)*1.5))] transition-[transform,opacity]",
           motion,
           left
-            ? "left-0 pl-[var(--pane-frame,0.375rem)]"
-            : "right-0 pr-[var(--pane-frame,0.375rem)]",
+            ? "left-0 pl-[var(--pane-frame,calc(var(--spacing)*1.5))]"
+            : "right-0 pr-[var(--pane-frame,calc(var(--spacing)*1.5))]",
           hidden &&
             cn(
               "pointer-events-none opacity-0",

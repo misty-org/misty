@@ -147,7 +147,7 @@ export function LiveEndFlow({ join }: { join: LiveJoin }) {
                         ? `Together: ${commit.names.join(", ")}`
                         : commit.names.join(", ")
                     }
-                    description={`${commit.paths.join(", ")} · +${commit.plus} −${commit.minus}`}
+                    description={`+${commit.plus} −${commit.minus} in ${commit.paths.join(", ")}`}
                   />
                 ))
               ) : (

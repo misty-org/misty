@@ -236,7 +236,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
         "overflow-hidden focus:outline-none",
         // A pane at the window's top with no toolbar of its own gets a title band under the
         // window buttons (useMergedTitlebar marks it).
-        "data-[window-titlebar-fallback-active=true]:pt-[var(--shell-titlebar,2.375rem)]",
+        "data-[window-titlebar-fallback-active=true]:pt-[var(--shell-titlebar,calc(var(--spacing)*9.5))]",
       )}
       data-workspace-pane={pane.id}
       data-browser-corner-clip=""
@@ -269,9 +269,9 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
           "group-data-[window-titlebar-fallback-active=true]/pane:top-0",
           "group-data-[window-titlebar-fallback-active=true]/pane:flex",
           "group-data-[window-titlebar-fallback-active=true]/pane:items-center",
-          "group-data-[window-titlebar-fallback-active=true]/pane:h-[var(--shell-titlebar,2.375rem)]",
-          "group-data-[window-titlebar-fallback-active=true]/pane:pl-[max(0.75rem,var(--window-chrome-left,0px))]",
-          "group-data-[window-titlebar-fallback-active=true]/pane:pr-[max(0.75rem,var(--window-chrome-right,0px))]",
+          "group-data-[window-titlebar-fallback-active=true]/pane:h-[var(--shell-titlebar,calc(var(--spacing)*9.5))]",
+          "group-data-[window-titlebar-fallback-active=true]/pane:pl-[max(--spacing(3),var(--window-chrome-left,0px))]",
+          "group-data-[window-titlebar-fallback-active=true]/pane:pr-[max(--spacing(3),var(--window-chrome-right,0px))]",
         )}
       >
         <Text tone="muted">{activeTab?.title || "New tab"}</Text>

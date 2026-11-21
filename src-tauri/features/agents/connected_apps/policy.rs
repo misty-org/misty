@@ -268,7 +268,7 @@ pub fn action_summary(
         "" => info.slug.to_lowercase().replace('_', " "),
         name => name.to_owned(),
     };
-    let title = truncate(&format!("{} · {action}", app_name(info)), 200);
+    let title = truncate(&format!("{action} in {}", app_name(info)), 200);
     let mut lines = shown_fields(arguments);
     if !account.is_empty() {
         lines.push(format!("account: {account}"));

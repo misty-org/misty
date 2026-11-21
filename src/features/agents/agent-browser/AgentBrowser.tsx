@@ -139,7 +139,7 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
     // Its gaps and padding are the page's: the live page is placed over the stage's measured box.
     // The sidebar card's head starts after the window buttons; here it is far from them.
     <section
-      className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 p-1.5 [--shell-tab-height:1.875rem] [--window-chrome-left:0px]"
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 p-1.5 [--shell-tab-height:calc(var(--spacing)*7.5)] [--window-chrome-left:0px]"
       aria-label="Agent browser"
     >
       <AgentViewSwitcher chat={chat} />

@@ -26,7 +26,7 @@ import {
   Text,
   type Tint,
 } from "@misty/ui";
-import { shortAgo } from "../../page/useChatStatuses";
+import { agoWords } from "../../page/useChatStatuses";
 import { DeckView, ReviewSession } from "../TutorDecks";
 import { GuideView, OverviewView, QuizView } from "../TutorGuides";
 import type { TutorActions } from "../TutorPage";
@@ -292,7 +292,7 @@ export function StudioPanel({
       </header>
       <div className={paneScrollClass}>
         {/* Two tiles a row while each label fits whole, one when the pane is too narrow. */}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2 px-1">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(--spacing(38),1fr))] gap-2 px-1">
           {tiles.map((tile) => (
             <Surface
               key={tile.id}
@@ -390,6 +390,7 @@ export function StudioPanel({
                   ? (reports.find((item) => item.id === output.item.report)?.title ?? "Report")
                   : tile.label;
             const by = nameOf(output.item.by);
+            const ago = agoWords(output.item.createdAt, now);
             return (
               <Surface
                 key={output.item.id}
@@ -407,8 +408,9 @@ export function StudioPanel({
                 <Text bare size="meta" tone="default" className={outputTextClass}>
                   <Text full>{output.item.title}</Text>
                   <Text bare size="caption" tone="muted" className="flex-none">
-                    {meta} · {by ? `${by} · ` : ""}
-                    {shortAgo(output.item.createdAt, now)}
+                    {meta}
+                    {by ? ` by ${by}` : ""}
+                    {ago ? `, ${ago}` : ""}
                   </Text>
                 </Text>
                 <RowFaces spaceId={spaceId} people={people} itemId={output.item.id} />

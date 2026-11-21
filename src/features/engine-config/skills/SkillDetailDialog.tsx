@@ -176,7 +176,7 @@ function SkillTargetsSection({
       <Text bare as="p" tone="bright" weight="medium" className="text-sm">
         {t("detail.syncTo")}
       </Text>
-      <div className="flex max-h-[13rem] flex-col gap-0.5 overflow-y-auto pr-1">
+      <div className="flex max-h-52 flex-col gap-0.5 overflow-y-auto pr-1">
         {engineTargets.map((target) => {
           const state = skill.targetStates?.[target.id] ?? "off";
           const busy = busyTarget === target.id;
@@ -249,7 +249,7 @@ export function SkillMarkdown({
       tone="none"
       edge="hairline"
       radius="lg"
-      className="min-h-[6rem] max-h-[20rem] shrink-0 overflow-y-auto p-3 text-sm"
+      className="min-h-24 max-h-80 shrink-0 overflow-y-auto p-3 text-sm"
     >
       {loading ? (
         <PaneLoading label={loadingLabel} inline />

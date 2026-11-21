@@ -161,7 +161,7 @@ export function VideoView({ video, onClose }: { video: Guide; onClose(): void })
             ? `Saving ${clock(saving.done)} / ${clock(saving.total)}`
             : video.audio?.state === "making"
               ? "Speaking the narration"
-              : `Scene ${at + 1} of ${scenes.length} · ${clock(total)}`}
+              : `Scene ${at + 1} of ${scenes.length}, ${clock(total)} long`}
         </Text>
         <Button
           variant="quiet"

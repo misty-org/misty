@@ -1,5 +1,6 @@
-//! Misty's File Provider extension (`MistyDrive.appex`): each Space the person belongs to is one File
-//! Provider domain, shown in Finder under Locations and linked from `~/.misty/mnt/<Space>`.
+//! Misty's File Provider extension (`MistyDrive.appex`): the account's drive as one File Provider
+//! domain, one place in Finder under Locations, with a folder in it for each Space the person
+//! belongs to, each linked from `~/.misty/mnt/<Space>`.
 //!
 //! The extension holds no sign-in and no state of its own. Every call macOS makes into it is relayed
 //! to Misty over a socket in the app group (`link`), where the `space_drive` core answers from

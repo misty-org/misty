@@ -194,11 +194,11 @@ fn build_menu(app: &AppHandle<Wry>, state: &TrayMenuState) -> Result<BuiltMenu, 
             chat.title.trim()
         };
         let waiting = chat.status == "needs-you";
-        let text = format!(
-            "{title} — {}{}",
-            chat.agent_name,
-            if waiting { " · Needs you" } else { "" }
-        );
+        let text = if waiting {
+            format!("{} needs you in {title}", chat.agent_name)
+        } else {
+            format!("{title} with {}", chat.agent_name)
+        };
         // The chat's state as the system's own status dot: green while its agent works, amber
         // while it waits on the person.
         let dot = if waiting {

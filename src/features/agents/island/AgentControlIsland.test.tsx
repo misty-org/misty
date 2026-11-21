@@ -139,7 +139,7 @@ it("resumes a paused task and finishes a waiting one with Done", async () => {
       items: [{ runId: "invocation", action: "sign_in", targetLabel: "GitHub" }] as never,
     }),
   );
-  expect(screen.getByRole("status").textContent).toBe("Sign in so Misty can continue · GitHub");
+  expect(screen.getByRole("status").textContent).toBe("Sign in so Misty can continue in GitHub");
   expect(screen.queryByRole("textbox")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
   await waitFor(() => expect(mocks.release).toHaveBeenCalledWith("account", "invocation"));

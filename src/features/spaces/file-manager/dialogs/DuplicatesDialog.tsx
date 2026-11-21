@@ -89,7 +89,7 @@ export function DuplicatesDialog({
             <div className="flex flex-col gap-4">
               {groups.map((group) => (
                 <section key={group.hash} className="grid gap-1">
-                  <SectionHeading as="h3" title={`${countText(group.paths.length, "copy", "copies")} · ${formatBytes(group.size)}`} />
+                  <SectionHeading as="h3" title={`${countText(group.paths.length, "copy", "copies")} of ${formatBytes(group.size)} each`} />
                   <ul className="m-0 grid list-none gap-0.5 p-0">
                     {group.paths.map((path) => (
                       <li key={path}>

@@ -118,7 +118,7 @@ export function AddSourcesDialog({
     <Dialog open={open} onOpenChange={(next) => !next && close()}>
       <DialogContent
         aria-describedby={undefined}
-        className="w-180 max-w-[calc(100vw-3rem)] gap-4.5 p-7"
+        className="w-180 max-w-[calc(100vw-var(--spacing)*12)] gap-4.5 p-7"
         ref={dropZone.ref}
         data-dragging={dropZone.dragging ? "true" : undefined}
         {...dropZone.handlers}

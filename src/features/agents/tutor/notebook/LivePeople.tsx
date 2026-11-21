@@ -115,7 +115,10 @@ export function FacePile({
   return (
     <div className="mr-1 flex items-center -space-x-1.5" aria-label="People in this notebook">
       {shown.map((person) => (
-        <Tooltip key={person.id} content={`${person.name} · ${whereIs(person, notebook)}`}>
+        <Tooltip
+          key={person.id}
+          content={`${person.name} is ${whereIs(person, notebook).replace(/^./, (first) => first.toLowerCase())}`}
+        >
           <span className={cn("inline-flex", person.lab.asking && "misty-shimmer")}>
             <PersonAvatar spaceId={spaceId} person={person} />
           </span>

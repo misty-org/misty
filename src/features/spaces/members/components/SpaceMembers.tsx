@@ -57,7 +57,7 @@ export function SpaceMembers({
               </div>
             ) : counts.length ? (
               <Text as="p" tone="muted" className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs`}>
-                {counts.join(" · ")}
+                {counts.join(" and ")}
               </Text>
             ) : null}
           </div>

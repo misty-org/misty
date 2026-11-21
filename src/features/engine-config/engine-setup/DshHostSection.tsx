@@ -130,9 +130,9 @@ function HostCard({
   const page = status?.webUrl ?? origin;
   const openPage = () => void openUrl(page).catch(() => undefined);
   const describe = hostState === "connected" ? status?.describe : null;
-  const facts = [describe?.provider, describe?.model].filter(
-    (fact): fact is string => typeof fact === "string" && fact.length > 0,
-  );
+  const provider = typeof describe?.provider === "string" ? describe.provider : "";
+  const model = typeof describe?.model === "string" ? describe.model : "";
+  const runsOn = provider && model ? `${model} from ${provider}` : provider || model;
   const recheck = (
     <Button disabled={busy !== null} onClick={() => void probe.refresh(true)}>
       Check again
@@ -157,9 +157,9 @@ function HostCard({
         ) : null}
         {status?.ownership === "adopted" ? <Badge variant="outline">Already running</Badge> : null}
       </div>
-      {facts.length ? (
+      {runsOn ? (
         <Text as="p" tone="muted" className="text-xs">
-          {facts.join(" · ")}
+          {runsOn}
         </Text>
       ) : null}
       {hostState === "down" && status?.error ? (

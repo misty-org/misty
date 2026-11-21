@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::mem::size_of;
 use std::ptr::{self, NonNull};
 
-fn number(object: AudioObjectID, selector: AudioObjectPropertySelector) -> Option<u32> {
+pub(super) fn number(object: AudioObjectID, selector: AudioObjectPropertySelector) -> Option<u32> {
     let address = global(selector);
     let mut value: u32 = 0;
     let mut size = size_of::<u32>() as u32;
@@ -57,7 +57,7 @@ fn name(object: AudioObjectID) -> Option<String> {
 }
 
 /// The process objects Core Audio knows about (macOS 14.2+).
-fn process_objects() -> Vec<AudioObjectID> {
+pub(super) fn process_objects() -> Vec<AudioObjectID> {
     let address = global(kAudioHardwarePropertyProcessObjectList);
     let mut size: u32 = 0;
     // SAFETY: every pointer is to a live local.

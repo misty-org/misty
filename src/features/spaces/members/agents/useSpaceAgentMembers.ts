@@ -55,9 +55,9 @@ export function useSpaceAgentMembers(spaceId: string) {
 
 /** "Your agent", or whose agent it is. */
 export function agentOwnerLabel(agent: SpaceAgent, currentUserId: string | undefined) {
-  if (agent.owner_user_id === currentUserId) return "Your agent";
+  if (agent.owner_user_id === currentUserId) return "your agent";
   const owner = agent.owner_name.trim().split(/\s+/)[0];
-  return owner ? `${owner}’s agent` : "A member’s agent";
+  return owner ? `${owner}’s agent` : "a member’s agent";
 }
 
 /** The agents each person brought, keyed by their user id. */

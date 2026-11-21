@@ -30,7 +30,7 @@ export function ImageFileView({ name, src, size }: { name: string; src: string; 
   const current = loaded && loaded.url === src ? loaded : null;
   const meta = [current ? `${current.width} × ${current.height}` : null, sizeText(size)]
     .filter(Boolean)
-    .join(" · ");
+    .join(", ");
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ViewHeader name={name} meta={meta} />

@@ -25,7 +25,7 @@ export function FilesBottomBar({
     free ? `${formatBytes(free.free)} free` : "",
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(", ");
   return (
     <BottomBar
       aria-label="Folder"

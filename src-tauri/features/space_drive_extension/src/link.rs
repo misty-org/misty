@@ -3,7 +3,10 @@
 //!
 //! Each request opens a connection of its own, so a long download never holds up a listing. A
 //! frame is a 4-byte big-endian length, then that many bytes of one JSON object. A request is
-//! `{"id", "op", "domain", …}` and its reply `{"id", "ok", "error"?: {"code", "message"}, …}`.
+//! `{"id", "op", …}` and its reply `{"id", "ok", "error"?: {"code", "message"}, …}`.
+//!
+//! The domain is the account's whole drive. Its root holds a folder for each Space
+//! (`space:<space id>`), and every other item is named by its own id; Misty finds its Space.
 use std::{
     io::{Read, Write},
     os::unix::net::UnixStream,
@@ -66,9 +69,10 @@ struct WireItem {
     deleted: bool,
 }
 
-/// One item as the extension describes it to macOS. `parent` is `"root"`, `"trash"` or an item
-/// id. Its content version is the file's SHA-256, so a rename never makes macOS fetch the file
-/// again; its metadata version is the server's version, which every change bumps.
+/// One item as the extension describes it to macOS. `parent` is `"root"`, `"trash"`, a Space's
+/// folder (`space:…`) or an item id. Its content version is the file's SHA-256, so a rename never
+/// makes macOS fetch the file again; its metadata version is the server's version, which every
+/// change bumps, or for a Space's folder its name.
 #[derive(Debug, Clone)]
 pub struct ItemInfo {
     pub id: String,
@@ -87,12 +91,22 @@ impl ItemInfo {
         self.kind == "folder"
     }
 
+    /// A Space's folder at the drive's root, which stays where it is.
+    pub fn is_space(&self) -> bool {
+        is_space(&self.id)
+    }
+
     fn from_wire(item: WireItem) -> Self {
         let content_version = match (&item.sha256, item.kind.as_str()) {
             (_, "folder") => "folder".to_owned(),
             (Some(sha), _) => sha.clone(),
             // Not hashed yet (made on this Mac moments ago): the version Misty has is all there is.
             (None, _) => format!("local-{}-{}", item.size, item.mtime_ms),
+        };
+        let meta_version = if is_space(&item.id) {
+            format!("name:{}", item.name)
+        } else {
+            item.version.unwrap_or(0).to_string()
         };
         Self {
             id: item.id,
@@ -103,7 +117,7 @@ impl ItemInfo {
             mtime_ms: item.mtime_ms,
             last_used_ms: item.last_used_ms.filter(|ms| *ms > 0),
             content_version,
-            meta_version: item.version.unwrap_or(0).to_string(),
+            meta_version,
         }
     }
 
@@ -140,6 +154,11 @@ pub struct Changed {
     pub refetch: bool,
 }
 
+/// Whether an id is a Space's folder (`space:<space id>`).
+pub fn is_space(id: &str) -> bool {
+    id.starts_with("space:")
+}
+
 /// Misty's name for a parent: `null` is the root.
 fn parent_value(parent: &str) -> Value {
     if parent == "root" {
@@ -149,19 +168,17 @@ fn parent_value(parent: &str) -> Value {
     }
 }
 
-/// The link to Misty for one domain (one Space).
+/// The link to Misty for the account's drive.
 pub struct Link {
-    domain: String,
     socket: Option<PathBuf>,
     staging: Option<PathBuf>,
     next: AtomicU64,
 }
 
 impl Link {
-    pub fn new(domain: String) -> Self {
+    pub fn new() -> Self {
         let container = crate::group::container();
         Self {
-            domain,
             socket: container.as_deref().and_then(socket_path),
             staging: container.map(|c| c.join("staging")),
             next: AtomicU64::new(1),
@@ -180,7 +197,6 @@ impl Link {
         };
         request.insert("id".into(), id.into());
         request.insert("op".into(), op.into());
-        request.insert("domain".into(), self.domain.clone().into());
         let body = serde_json::to_vec(&Value::Object(request)).map_err(|error| refused("invalid", error))?;
         write_frame(&mut stream, &body).map_err(|_| LinkError::Unreachable)?;
         let reply = read_frame(&mut stream).map_err(|_| LinkError::Unreachable)?;
@@ -232,24 +248,14 @@ impl Link {
         })
     }
 
-    /// Changes after `since`, the anchor macOS keeps: Misty's `"<server seq>.<local seq>"`, the
-    /// server's changes and this computer's own (a last-used date).
+    /// Changes after `since`, the anchor macOS keeps. Misty keeps what it stands for (each
+    /// Space's place in its changes), and answers `anchor_expired` for one it no longer keeps.
     pub fn changes(&self, since: &str) -> Result<Changes, LinkError> {
-        let asked =
-            parse_anchor(since).ok_or_else(|| refused("anchor_expired", "not one of Misty's anchors"))?;
         let reply = self.call("changes_since", json!({ "since": since, "limit": PAGE }), false)?;
         let items: Vec<WireItem> = serde_json::from_value(
             reply.get("items").cloned().unwrap_or_else(|| Value::Array(Vec::new())),
         )
         .map_err(|error| refused("invalid", error))?;
-        if items.is_empty() {
-            // An anchor past Misty's newest change comes from records Misty no longer has (its
-            // drive was set up again): macOS has to list everything again.
-            let current = parse_anchor(&self.anchor()?).unwrap_or((0, 0));
-            if current.0 < asked.0 || current.1 < asked.1 {
-                return Err(refused("anchor_expired", "Misty's records were made again"));
-            }
-        }
         let mut updated = Vec::new();
         let mut deleted = Vec::new();
         for item in items {
@@ -262,7 +268,7 @@ impl Link {
         let next = reply
             .get("next_anchor")
             .and_then(Value::as_str)
-            .filter(|anchor| parse_anchor(anchor).is_some())
+            .filter(|anchor| !anchor.is_empty())
             .ok_or_else(|| refused("invalid", "no next_anchor"))?;
         Ok(Changes {
             updated,
@@ -277,7 +283,7 @@ impl Link {
         reply
             .get("anchor")
             .and_then(Value::as_str)
-            .filter(|anchor| parse_anchor(anchor).is_some())
+            .filter(|anchor| !anchor.is_empty())
             .map(str::to_owned)
             .ok_or_else(|| refused("invalid", "no anchor"))
     }
@@ -410,14 +416,6 @@ impl Link {
     pub fn used(&self, item: &str, at_ms: i64) -> Result<(), LinkError> {
         self.call("used", json!({ "item_id": item, "at_ms": at_ms }), false)
             .map(|_| ())
-    }
-}
-
-/// Misty's anchor, `"<server seq>.<local seq>"`; a bare number is a server seq.
-fn parse_anchor(anchor: &str) -> Option<(u64, u64)> {
-    match anchor.split_once('.') {
-        Some((server, local)) => Some((server.parse().ok()?, local.parse().ok()?)),
-        None => Some((anchor.parse().ok()?, 0)),
     }
 }
 

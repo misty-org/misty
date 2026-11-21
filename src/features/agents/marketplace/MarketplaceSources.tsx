@@ -114,7 +114,7 @@ export function SourcesDialog({
                   <li key={suggestion.source} className="list-none">
                     <ListRow
                       label={suggestion.name}
-                      description={`${suggestion.line} · ${suggestion.source}`}
+                      description={`${suggestion.line}, in ${suggestion.source}`}
                       trailing={
                         <Button
                           size="sm"

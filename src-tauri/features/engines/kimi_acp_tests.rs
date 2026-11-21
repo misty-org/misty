@@ -155,13 +155,13 @@ fn multiline_prompts_do_not_shift_questions_and_answer_fields() {
     params["message"] = json!("任务？\n请选择一项\n语言？\n继续？");
     params["requestedSchema"]["properties"]["q1"]["title"] = json!("任务");
     let questions = fields(&params).unwrap();
-    assert_eq!(questions[0]["question"], "Q1 · 任务");
-    assert_eq!(questions[1]["question"], "Q2 · 任务");
-    assert_eq!(questions[2]["question"], "Q3 · 继续");
+    assert_eq!(questions[0]["question"], "Question 1: 任务");
+    assert_eq!(questions[1]["question"], "Question 2: 任务");
+    assert_eq!(questions[2]["question"], "Question 3: 继续");
     let context = json!({"rpcId": 1, "fields": questions});
     let response = answer_frame(
         &context,
-        Some(&json!({"Q1 · 任务":"修复", "Q2 · 任务":["中文"], "Q3 · 继续":"否"})),
+        Some(&json!({"Question 1: 任务":"修复", "Question 2: 任务":["中文"], "Question 3: 继续":"否"})),
     )
     .unwrap();
     assert_eq!(

@@ -30,6 +30,7 @@ import type { SettingsContentProps } from "../../settings/settingsTypes";
 import { ShortcutCommandRow, type ShortcutConflict } from "./ShortcutCommandRow";
 import { findShortcutConflict, groupShortcutsByCategory } from "./shortcutSettingsModel";
 import { settingsDisabledControlClass } from "../../settings/settingsConstants";
+import { confirmAction } from "@/shared/lib/confirmAction";
 
 /** A recorded shortcut that another command already uses, waiting for Reassign. */
 interface PendingConflict {
@@ -240,10 +241,14 @@ export function ShortcutsSection(props: SettingsContentProps) {
             variant="secondary"
             className={settingsDisabledControlClass}
             disabled={props.working || !snapshot?.overrides?.length}
-            onClick={() => {
-              if (window.confirm("Restore every shortcut to its default?"))
-                void props.onResetShortcuts();
-            }}
+            onClick={() =>
+              void confirmAction(
+                "Every shortcut you changed goes back to its default.",
+                "Restore all shortcuts?",
+              ).then((yes) => {
+                if (yes) void props.onResetShortcuts();
+              })
+            }
           >
             Restore all
           </Button>

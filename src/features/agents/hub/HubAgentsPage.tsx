@@ -233,7 +233,7 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
       // keeps an agent that isn't ready from working.
       description={
         held
-          ? `${engineName} · ${state === "sign-in" ? "Not signed in" : "Not installed"}`
+          ? `${engineName} isn't ${state === "sign-in" ? "signed in" : "installed"}`
           : engineName
       }
       // Not ready yet (its engine isn't installed or signed in): shown dimmed beside its next step.

@@ -208,6 +208,7 @@
     "drive_remove_download",
     "drive_rename",
     "drive_restore",
+    "drive_restore_burst",
     "drive_reveal",
     "drive_set_cache_limit",
     "drive_set_paused",
@@ -529,6 +530,8 @@
     "voice_dictation_insert",
     "voice_dictation_pill_hide",
     "voice_dictation_stop",
+    "voice_share_audio_start",
+    "voice_share_audio_stop",
     "window_set_maximize_button",
     "window_show_snap_layouts",
 ]

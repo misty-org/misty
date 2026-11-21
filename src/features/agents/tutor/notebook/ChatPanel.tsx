@@ -128,7 +128,7 @@ export function ChatPanel({
             {notebook.title}
           </Text>
           <Text wrap size="meta" tone="muted">
-            {notebook.sources.length} {notebook.sources.length === 1 ? "source" : "sources"} ·{" "}
+            {notebook.sources.length} {notebook.sources.length === 1 ? "source" : "sources"}, made{" "}
             {dateOf(notebook.createdAt)}
           </Text>
           {notebook.brief ? (
@@ -263,7 +263,7 @@ export function ChatPanel({
         tone="card"
         edge="field"
         radius="xl"
-        className="mx-auto mb-3.5 flex w-[min(47.5rem,calc(100%-1.75rem))] items-end gap-2 py-2 pr-2 pl-4"
+        className="mx-auto mb-3.5 flex w-[min(--spacing(190),calc(100%-var(--spacing)*7))] items-end gap-2 py-2 pr-2 pl-4"
         onSubmit={submit}
         data-tour="notebook-ask"
       >

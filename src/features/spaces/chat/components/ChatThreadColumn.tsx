@@ -111,7 +111,7 @@ export function ChatThreadColumn({
       as="aside"
       tone="page"
       aria-label="Thread"
-      className="flex w-[min(22.5rem,40%)] shrink-0 flex-col"
+      className="flex w-[min(--spacing(90),40%)] shrink-0 flex-col"
     >
       <header className="flex min-h-12 items-center gap-2 border-b px-3 py-1.5">
         {fromList ? (

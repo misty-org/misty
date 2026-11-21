@@ -2,6 +2,7 @@
 //! taken out, the lid closed, another mic picked), the capture carries on with the new default.
 
 use super::{convert_and_send, output_format, Delivery, StartFailure};
+use crate::Format;
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, Bool, ProtocolObject};
@@ -129,7 +130,7 @@ fn tap_input(
     if rate.is_nan() || rate <= 0.0 || channels == 0 {
         return Err(StartFailure::Device);
     }
-    let output = output_format().ok_or(StartFailure::Device)?;
+    let output = output_format(Format::Speech).ok_or(StartFailure::Device)?;
     // SAFETY: a plain initialiser; nil comes back as None.
     let converter = unsafe {
         AVAudioConverter::initFromFormat_toFormat(AVAudioConverter::alloc(), &format, &output)

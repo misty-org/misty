@@ -1,6 +1,6 @@
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { Button, InlineLink } from "@misty/ui";
+import { Button, InlineLink, Text } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type FormEvent } from "react";
 import { parseServerAddress } from "./serverAddress";
@@ -53,12 +53,12 @@ export function OwnServerScreen(props: {
         disabled={busy}
         onChange={setAddress}
       />
-      <p className="-mt-2 text-caption text-cream-muted">
+      <Text size="caption" tone="muted" wrap className="-mt-2">
         New to this?{" "}
         <InlineLink type="button" onClick={() => void openUrl(selfHostingDocsUrl)}>
           Set up a server
         </InlineLink>
-      </p>
+      </Text>
       {error ? <AuthMessage tone="error" message={error} /> : null}
       <Button type="submit" variant="primary" size="lg" disabled={busy || !address.trim()}>
         Continue

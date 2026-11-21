@@ -195,7 +195,7 @@ export function AgentQuestionCard({
       <ErrorNotice message={error} onDismiss={() => setError("")} />
       <div className="flex items-center gap-1.5">
         <QuestionHint>
-          {question.multiSelect ? "Choose any that apply" : "Choose one"} · Esc to hide
+          {question.multiSelect ? "Choose any that apply" : "Choose one"}, or press Esc to hide
         </QuestionHint>
         {index > 0 && <BackButton onClick={() => setIndex(index - 1)} />}
         <Button

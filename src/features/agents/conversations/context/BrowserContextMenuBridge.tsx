@@ -88,7 +88,7 @@ export function BrowserContextMenuView({
         width="lg"
         // Stay within the space left in the window so the last items (Inspect
         // Page, Extensions) scroll into view instead of running off-screen.
-        className="max-h-[min(35rem,var(--radix-dropdown-menu-content-available-height))]"
+        className="max-h-[min(--spacing(140),var(--radix-dropdown-menu-content-available-height))]"
         onCloseAutoFocus={(event) => event.preventDefault()}
         onPointerDown={(event) => event.stopPropagation()}
       >

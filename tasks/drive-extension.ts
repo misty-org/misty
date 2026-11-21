@@ -260,7 +260,7 @@ export function prepareDevelopmentExtension(
 
 /**
  * Tells PlugInKit about a dev build's extension, which lives in a bundle LaunchServices may not have seen
- * yet, so the system finds it when Misty adds its first Space domain. Run after the bundle is signed.
+ * yet, so the system finds it when Misty adds the account's drive. Run after the bundle is signed.
  */
 export function registerDevelopmentExtension(appex: string) {
   execFileSync("/usr/bin/pluginkit", ["-a", appex], { stdio: "inherit" });

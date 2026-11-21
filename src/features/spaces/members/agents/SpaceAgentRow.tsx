@@ -52,8 +52,7 @@ export function SpaceAgentRow({
         >
           {agent.agent_name}
           <Text bare tone="muted" className="font-normal">
-            {" "}
-            · {agentOwnerLabel(agent, user?.id)}
+            {`, ${agentOwnerLabel(agent, user?.id)}`}
           </Text>
         </Text>
       </div>

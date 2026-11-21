@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import type { TabSide } from "@/app/shell/dockingLayout";
 import type { WorkspaceView } from "@/features/app-windows";
+import { spaceTone, useWindowSpace } from "@/features/spaces";
 import { cn, inwardSide, OverlaySideProvider, Surface } from "@misty/ui";
 import { PlaceToggle } from "./PlaceToggle";
+import { usePlace } from "./placeStore";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarToggleButton } from "./SidebarToggleButton";
 import { SpaceNavigator } from "./SpaceNavigator";
@@ -20,6 +22,11 @@ export function WorkspaceSidebar(props: {
   account?: ReactNode;
 }) {
   const position = props.position ?? "left";
+  // A shared Space's sidebar takes a faint wash of the Space's own color (the one its picture
+  // tile wears), so each Space reads as its own room. Personal stays neutral.
+  const space = useWindowSpace();
+  const place = usePlace();
+  const placeColor = place === "spaces" && space && !space.is_default ? spaceTone(space.id) : undefined;
   return (
     <OverlaySideProvider value={inwardSide[position]}>
       {/* `misty-workspace-tabs` and `misty-sidebar-head` are markers: useMergedTitlebar gives the
@@ -40,14 +47,17 @@ export function WorkspaceSidebar(props: {
             as the top rows sit level with the tabs. */}
         <Surface
           tone="sidebar"
+          place={placeColor}
           className="@container/misty-sidebar flex min-h-0 flex-1 flex-col px-3 pb-2.5"
         >
           {/* The toggle and back/forward share the window buttons' band, the shared 48px header
               row: the row starts where the native buttons end. */}
           <div
             className={cn(
-              "misty-sidebar-head flex h-(--ui-header) min-h-(--ui-header) shrink-0 items-center gap-0.5",
-              "pl-[max(0px,calc(var(--window-chrome-left,0px)_-_var(--pane-frame,0.375rem)_-_0.75rem))]",
+              // Never wider than the sidebar: the sidebar's narrowest width fits the whole row
+              // (sidebarWidth.ts), and anything past it is clipped rather than spilling over the tabs.
+              "misty-sidebar-head flex h-(--ui-header) min-h-(--ui-header) min-w-0 shrink-0 items-center gap-0.5 overflow-hidden",
+              "pl-[max(0px,calc(var(--window-chrome-left,0px)_-_var(--pane-frame,var(--spacing)_*_1.5)_-_var(--spacing)_*_3))]",
             )}
             data-misty-window-titlebar-region="true"
           >
@@ -57,7 +67,8 @@ export function WorkspaceSidebar(props: {
               <PlaceToggle />
             </div>
             {/* Back and forward close the row on its right edge, pulled out by their buttons' own
-                inset so the forward arrow lines up with the drawer's edge, 4px apart. */}
+                inset so the forward arrow lines up with the drawer's edge, 4px apart. The
+                sidebar never gets too narrow for them. */}
             <div
               className={cn(
                 "-mr-1 ml-auto flex items-center",

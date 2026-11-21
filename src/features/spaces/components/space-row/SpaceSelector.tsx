@@ -57,7 +57,7 @@ export function SpaceSelector({
                 <DropdownMenuContent
                   side="bottom"
                   align="start"
-                  className="w-60 max-w-[calc(100vw-1rem)]"
+                  className="w-60 max-w-[calc(100vw-var(--spacing)*4)]"
                 >
                   <SpaceMenuItems
                     space={space}

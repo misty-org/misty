@@ -307,7 +307,7 @@ describe("McpSection", () => {
     api.probe.mockResolvedValue(connectedProbe(["a", "b"]));
     await renderSection();
     // Only the current engine's entries that are on and checkable (beta is off in the fixture).
-    await vi.waitFor(() => expect(document.body.textContent).toContain("Connected · 2 tools"));
+    await vi.waitFor(() => expect(document.body.textContent).toContain("Connected with 2 tools"));
     expect(api.probe.mock.calls.map((call) => call[0].name)).toEqual(["alpha"]);
 
     // Mount again (opening quickly again): fresh results are reused and nothing starts.

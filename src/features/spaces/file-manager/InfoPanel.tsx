@@ -77,7 +77,7 @@ function diskRows(item: FileItem, info: FileInfo, size: FolderSize | null): Prop
     { label: "Kind", value: info.kindLabel || kindOf(item) },
     {
       label: "Size",
-      value: item.folder ? (size ? `${formatBytes(size.bytes)} · ${countText(size.items)}` : "—") : formatBytes(info.entry.size),
+      value: item.folder ? (size ? `${formatBytes(size.bytes)}, ${countText(size.items)}` : "—") : formatBytes(info.entry.size),
     },
     { label: "Where", value: info.parent },
     { label: "Created", value: formatDate(info.entry.createdMs) },

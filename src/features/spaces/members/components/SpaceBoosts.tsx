@@ -15,8 +15,8 @@ export interface SpaceBoostsState {
 export function spaceLevelLine(level: NonNullable<SpaceBoostsState["level"]>): string {
   const name = level.level === 0 ? "Base level" : `Level ${level.level}`;
   const boosts = `${level.boosts} ${level.boosts === 1 ? "Boost" : "Boosts"}`;
-  if (!level.next_level_boosts) return `${name} · ${boosts}`;
-  return `${name} · ${boosts} · ${level.next_level_boosts - level.boosts} more for Level ${level.level + 1}`;
+  if (!level.next_level_boosts) return `${name} with ${boosts}`;
+  return `${name} with ${boosts}, ${level.next_level_boosts - level.boosts} more for Level ${level.level + 1}`;
 }
 
 /**

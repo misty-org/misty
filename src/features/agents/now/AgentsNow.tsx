@@ -93,7 +93,7 @@ export function AgentsNow(props: {
     <section className={props.className} aria-label="Agents">
       {props.heading}
       {/* `agents-now` is the hook the Space home's stylesheet lays the cards out by. */}
-      <div className="agents-now grid grid-cols-[repeat(auto-fill,minmax(13.75rem,1fr))] gap-3">
+      <div className="agents-now grid grid-cols-[repeat(auto-fill,minmax(--spacing(55),1fr))] gap-3">
         {loading
           ? Array.from({ length: 3 }, (_, index) => (
               // The card's avatar is drawn at 36px here, then the name and what it is doing.
@@ -153,7 +153,7 @@ export function AgentsNow(props: {
             <AgentAvatar />
             <span className="grid min-w-0 gap-0.5 text-left">
               <Text tone="default" className="text-sm font-medium">
-                {mate.name} · {mate.owner}
+                {mate.name}, {mate.owner}'s agent
               </Text>
               <Doing state={mate.state} doing={mate.doing} />
               <Claim files={mate.files} teammates={[]} />

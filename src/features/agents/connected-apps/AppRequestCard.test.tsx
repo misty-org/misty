@@ -50,7 +50,7 @@ it("names the exact scope it would remember, from the server", async () => {
   const approval: AppRequest = {
     ...connect,
     kind: "approve",
-    title: "Gmail · Send email",
+    title: "Send email in Gmail",
     rememberable: true,
     rememberLabel: "act in Gmail (me@example.test)",
     permissionMode: "auto",

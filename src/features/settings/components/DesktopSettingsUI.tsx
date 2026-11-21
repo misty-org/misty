@@ -40,9 +40,9 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         overlay ? "h-full" : "h-screen",
         navigation
           ? [
-              "grid-cols-[15.5rem_1px_minmax(0,1fr)]",
-              "max-[990px]:grid-cols-[13rem_1px_minmax(0,1fr)]",
-              "max-[748px]:grid-cols-[10.5rem_1px_minmax(0,1fr)]",
+              "grid-cols-[--spacing(62)_1px_minmax(0,1fr)]",
+              "max-[990px]:grid-cols-[--spacing(52)_1px_minmax(0,1fr)]",
+              "max-[748px]:grid-cols-[--spacing(42)_1px_minmax(0,1fr)]",
             ]
           : "grid-cols-[minmax(0,1fr)]",
       )}

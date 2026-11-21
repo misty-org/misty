@@ -1,5 +1,5 @@
 .misty-tiptap-editor {
-  --tt-toolbar-height: 3rem;
+  --tt-toolbar-height: calc(var(--spacing) * 12);
   min-height: 100%;
   color: var(--color-cream);
 }
@@ -12,7 +12,7 @@
   min-height: var(--tt-toolbar-height);
   align-items: center;
   overflow-x: auto;
-  padding: 0.375rem 0.75rem;
+  padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 3);
   border-bottom: 1px solid var(--color-charcoal-border);
   background: color-mix(in srgb, var(--color-charcoal-bg) 96%, transparent);
   scrollbar-width: none;
@@ -25,13 +25,13 @@
 
 .misty-tiptap-canvas {
   position: relative;
-  max-width: 61.25rem;
-  min-height: 32.5rem;
+  max-width: calc(var(--spacing) * 245);
+  min-height: calc(var(--spacing) * 130);
   margin: 0 auto;
-  padding: 2.625rem 4.5rem 10rem;
+  padding: calc(var(--spacing) * 10.5) calc(var(--spacing) * 18) calc(var(--spacing) * 40);
 }
 .misty-tiptap-prosemirror {
-  min-height: 28.75rem;
+  min-height: calc(var(--spacing) * 115);
   outline: none;
   font-size: var(--text-page);
   line-height: 1.72;
@@ -58,18 +58,18 @@
 }
 .misty-tiptap-prosemirror blockquote {
   border-left: 1px solid var(--color-charcoal-border);
-  padding-left: 1rem;
+  padding-left: calc(var(--spacing) * 4);
   color: var(--color-cream-muted);
 }
 .misty-tiptap-prosemirror pre {
   overflow-x: auto;
   border: 1px solid var(--color-charcoal-border);
-  border-radius: 0.625rem;
+  border-radius: calc(var(--spacing) * 2.5);
   background: var(--color-charcoal-card);
-  padding: 0.875rem 1rem;
+  padding: calc(var(--spacing) * 3.5) calc(var(--spacing) * 4);
 }
 .misty-tiptap-prosemirror code {
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   background: var(--color-charcoal-card);
   padding: 0.15em 0.35em;
 }
@@ -79,7 +79,7 @@
 }
 .misty-tiptap-prosemirror ul,
 .misty-tiptap-prosemirror ol {
-  padding-left: 1.5rem;
+  padding-left: calc(var(--spacing) * 6);
 }
 .misty-tiptap-prosemirror ul[data-type="taskList"] {
   list-style: none;
@@ -87,7 +87,7 @@
 }
 .misty-tiptap-prosemirror ul[data-type="taskList"] li {
   display: flex;
-  gap: 0.55rem;
+  gap: calc(var(--spacing) * 2.2);
 }
 .misty-tiptap-prosemirror a {
   color: var(--color-cream-bright);
@@ -97,10 +97,10 @@
 }
 .misty-tiptap-prosemirror img {
   max-width: 100%;
-  border-radius: 0.625rem;
+  border-radius: calc(var(--spacing) * 2.5);
 }
 .misty-tiptap-prosemirror hr {
-  margin: 2rem 0;
+  margin: calc(var(--spacing) * 8) 0;
   border: 0;
   border-top: 1px solid var(--color-charcoal-border);
 }
@@ -112,7 +112,7 @@
   pointer-events: none;
 }
 .misty-tiptap-editor.is-readonly .misty-tiptap-canvas {
-  padding-top: 2rem;
+  padding-top: calc(var(--spacing) * 8);
 }
 
 /* Tables: hairline cells, a header row in the card's fill. */
@@ -128,9 +128,9 @@
 .misty-tiptap-prosemirror th,
 .misty-tiptap-prosemirror td {
   position: relative;
-  min-width: 4rem;
+  min-width: calc(var(--spacing) * 16);
   border: var(--hairline) solid var(--color-charcoal-border);
-  padding: 0.375rem 0.625rem;
+  padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 2.5);
   vertical-align: top;
   text-align: left;
 }
@@ -156,8 +156,8 @@
 }
 .misty-tiptap-prosemirror .misty-tiptap-embed[data-selected] {
   outline: var(--hairline) solid var(--color-charcoal-border-strong);
-  outline-offset: 0.25rem;
-  border-radius: 0.75rem;
+  outline-offset: var(--spacing);
+  border-radius: var(--radius-xl);
 }
 
 /* Code highlighting (lowlight, highlight.js classes), neutral like chat's code blocks. */
@@ -206,7 +206,7 @@
   display: flex;
   align-items: center;
   gap: 1px;
-  border-radius: 0.4375rem;
+  border-radius: var(--radius-md);
   background: var(--color-charcoal-bg);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-cream) 8%, transparent);
 }
@@ -226,8 +226,8 @@
   position: absolute;
   top: -1.4em;
   left: -1px;
-  border-radius: 0.25rem 0.25rem 0.25rem 0;
-  padding: 0.125rem 0.3125rem;
+  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-sm) 0;
+  padding: calc(var(--spacing) * 0.5) calc(var(--spacing) * 1.25);
   color: white;
   font-size: var(--text-micro);
   white-space: nowrap;
@@ -235,6 +235,6 @@
 
 @media (max-width: 836px) {
   .misty-tiptap-canvas {
-    padding: 1.875rem 1.625rem 7.5rem 2.625rem;
+    padding: calc(var(--spacing) * 7.5) calc(var(--spacing) * 6.5) calc(var(--spacing) * 30) calc(var(--spacing) * 10.5);
   }
 }

@@ -111,7 +111,7 @@ function RepoDialog({
             ))}
           </ul>
         )}
-        <div className="grid grid-cols-[1fr_1fr_6rem] gap-2">
+        <div className="grid grid-cols-[1fr_1fr_--spacing(24)] gap-2">
           {(
             [
               ["owner", owner, setOwner],

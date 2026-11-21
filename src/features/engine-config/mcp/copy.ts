@@ -115,7 +115,7 @@ export const copy = {
   sourceMissing: "Not created yet",
   transportUnknown: "No transport declared",
   notInstalled: "This CLI isn't installed. Its config still shows and applies once it runs.",
-  count: (config: number, runtime: number) => `${config} configured · ${runtime} at runtime`,
+  count: (config: number, runtime: number) => `${config} configured and ${runtime} at runtime`,
   tabCount: (count: number) => `${count} configured`,
   filterAll: "All",
   filterConfig: "Config",
@@ -170,7 +170,7 @@ export const copy = {
   probeLastChecked: (time: string) => `checked at ${time}`,
   probePending: "Checking",
   probeConnected: "Connected",
-  probeConnectedTools: (count: number) => `Connected · ${count} ${count === 1 ? "tool" : "tools"}`,
+  probeConnectedTools: (count: number) => `Connected with ${count} ${count === 1 ? "tool" : "tools"}`,
   probeNeedsAuth: "Needs sign-in",
   probeFailed: "Failed",
   probeDetailTitle: "Connection check",
@@ -179,6 +179,6 @@ export const copy = {
   probeToolList: (tools: string) => `Tools: ${tools}`,
   probeToolListTruncated: (count: number, total: number, tools: string) =>
     `Tools (${count} of ${total} shown): ${tools}`,
-  probeCheckedAt: (time: string, ms: number) => `Checked at ${time} · ${ms} ms`,
+  probeCheckedAt: (time: string, ms: number) => `Checked at ${time} in ${ms} ms`,
   unrecognizedProbe: "The MCP check returned a result Misty didn't recognize.",
 } as const;

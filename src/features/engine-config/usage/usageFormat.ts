@@ -67,7 +67,7 @@ export function windowName(window: LimitWindow): string {
         : window.windowSeconds
           ? windowLength(window.windowSeconds)
           : "Other";
-  return window.label ? `${base} · ${window.label}` : base;
+  return window.label ? `${base} for ${window.label}` : base;
 }
 
 const engineNames: Record<string, string> = {

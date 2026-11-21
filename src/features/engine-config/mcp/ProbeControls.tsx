@@ -83,10 +83,8 @@ export function ProbeDetail({
     ? [
         state.result.serverName ? copy.probeServerName(state.result.serverName) : null,
         state.result.protocolVersion ? copy.probeProtocol(state.result.protocolVersion) : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : "";
+      ].filter((fact): fact is string => Boolean(fact))
+    : [];
   return (
     <div className="grid min-w-0 gap-2">
       <div className="flex min-w-0 items-center gap-2">
@@ -109,11 +107,11 @@ export function ProbeDetail({
               {state.result.message}
             </Text>
           ) : null}
-          {about ? (
-            <Text as="p" size="meta" tone="muted" wrap className="m-0">
-              {about}
+          {about.map((fact) => (
+            <Text key={fact} as="p" size="meta" tone="muted" wrap className="m-0">
+              {fact}
             </Text>
-          ) : null}
+          ))}
           <Text as="p" size="meta" tone="muted" wrap className="m-0">
             {copy.probeCheckedAt(checkedAt, state.result.elapsedMs)}
           </Text>

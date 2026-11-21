@@ -23,7 +23,7 @@ export function continuationEvent(content: string, source?: string): string | un
   const rest = text.startsWith(prefix) ? text.slice(prefix.length).trim() : text;
   for (const [pattern, label] of events) {
     const match = rest.match(pattern);
-    if (match) return `${label(match)} · Misty continued`;
+    if (match) return `${label(match)}, then Misty continued`;
   }
   return "Misty continued";
 }

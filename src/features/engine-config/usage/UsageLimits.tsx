@@ -100,7 +100,7 @@ function ProviderRow(props: {
 }) {
   const { limits, now } = props;
   const status = limitsStatusText(limits);
-  const label = `${engineName(limits.id)}${limits.plan ? ` · ${limits.plan}` : ""}`;
+  const label = `${engineName(limits.id)}${limits.plan ? ` on ${limits.plan}` : ""}`;
   return (
     <DesktopSettingsRow label={label} description={status ?? undefined} stacked>
       <div className="grid w-full gap-3">
@@ -114,12 +114,12 @@ function ProviderRow(props: {
                   {windowName(window)}
                   {window.status === "rejected" ? (
                     <Text bare tone="bright">
-                      · Limit reached
+                      Limit reached
                     </Text>
                   ) : null}
                 </Text>
                 <Text bare tone="muted" className="tabular-nums">
-                  {Math.round(window.usedPercent)}% used{reset ? ` · ${reset}` : ""}
+                  {Math.round(window.usedPercent)}% used{reset ? `, ${reset.charAt(0).toLowerCase()}${reset.slice(1)}` : ""}
                 </Text>
               </div>
               <Progress value={window.usedPercent} aria-label={`${windowName(window)} used`} />

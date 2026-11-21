@@ -55,7 +55,7 @@ export function AgentControlIsland() {
   const name = agents.find((agent) => agent.id === execution?.agentId)?.name ?? "Misty";
   const running = execution?.state === "running";
   const waiting = wait
-    ? `${interventionLabels[wait.action]}${wait.targetLabel ? ` · ${wait.targetLabel}` : ""}`
+    ? `${interventionLabels[wait.action]}${wait.targetLabel ? ` in ${wait.targetLabel}` : ""}`
     : "";
   const status = questions
     ? `${name} is waiting for your OK`

@@ -247,10 +247,7 @@ function ReplyFacts({ message }: { message: GlobalAiMessage }) {
   return (
     <>
       {facts.map((fact, index) => (
-        <Fragment key={index}>
-          {index ? <span aria-hidden="true">·</span> : null}
-          {fact}
-        </Fragment>
+        <Fragment key={index}>{fact}</Fragment>
       ))}
     </>
   );
@@ -265,7 +262,7 @@ function tokenBreakdown(usage: NonNullable<GlobalAiMessage["usage"]>) {
     usage.cacheRead ? `${formatTokens(usage.cacheRead)} cached` : "",
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(", ");
 }
 
 /** Speech reads prose, not Markdown punctuation. */

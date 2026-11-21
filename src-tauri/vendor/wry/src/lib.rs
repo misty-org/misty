@@ -399,6 +399,8 @@ pub use webview2::download::{cancel_download, download_progress};
 pub use wkwebview::end_private_session;
 #[cfg(target_os = "macos")]
 pub use wkwebview::navigation::set_native_navigation_interceptor;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub use wkwebview::set_trusted_media_origins;
 
 #[cfg(target_os = "windows")]
 pub(crate) mod webview2;

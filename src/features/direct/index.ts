@@ -37,5 +37,7 @@ export {
   useCallSpeaking,
   type VoiceChannel,
 } from "./calls/voiceChannels";
+export { VoiceChannelPage } from "./calls/VoiceChannelPage";
+export { voicePath } from "./calls/callSessionStore";
 export { RequestsSection } from "./settings/RequestsSection";
 export { StatusSection } from "./settings/StatusSection";

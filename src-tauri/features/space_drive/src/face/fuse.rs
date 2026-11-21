@@ -26,7 +26,6 @@ use fuser::{
 
 use crate::{
     lock, Drive, DriveError, Item, ItemId, Kind, NewNode, Node, OsFace, SpaceId, SpaceMount,
-    TrashBy,
 };
 
 /// How long the kernel may keep names and attributes before asking again. Short, so changes from
@@ -270,10 +269,10 @@ impl DriveFs {
     /// `unlink` and `rmdir`: a trash move in the Space. It doesn't wait for the server, since
     /// `rm -r` unlinks every file one by one and each answer waits on every computer's in-use
     /// check: the item leaves at once, and if the server refuses (someone has it open) it comes
-    /// back with a notice that says why.
+    /// back with a notice that says why. Past the delete guard's limit it stays (`EPERM`).
     fn trash(&self, node: &Node) -> Result<(), i32> {
         self.drive
-            .trash(&self.space, &node.id, TrashBy::Person)
+            .trash_from_os(&self.space, &node.id)
             .map_err(|error| Self::errno(&error))
     }
 

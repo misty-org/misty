@@ -1,4 +1,4 @@
-//! One file or folder of a Space's drive, as macOS asks about it (`NSFileProviderItem`), made from
+//! One file or folder of the drive (a Space's folder, or something in one), as macOS asks about it (`NSFileProviderItem`), made from
 //! what Misty says (`link::ItemInfo`).
 use objc2::{define_class, msg_send, rc::Retained, AnyThread, DefinedClass, Message};
 use objc2_file_provider::{
@@ -125,9 +125,14 @@ impl DriveItem {
 
 /// What macOS may do with an item: everything, even with a file someone else is editing (saves
 /// merge or the last one wins). A trashed item can be put back (reparented) or forgotten here
-/// (deleted from this Mac's view; it stays in the Space's trash on the server).
+/// (deleted from this Mac's view; it stays in the Space's trash on the server). The drive's
+/// layout holds still: the root takes nothing but the Spaces' folders, and a Space's folder
+/// takes new items but is never renamed, moved or deleted.
 fn capabilities(info: &ItemInfo) -> usize {
     if info.id == "root" {
+        return READING;
+    }
+    if info.is_space() {
         return READING | WRITING;
     }
     if info.parent == "trash" {

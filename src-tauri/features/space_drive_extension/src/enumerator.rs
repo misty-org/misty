@@ -1,6 +1,7 @@
-//! Lists a folder of a Space's drive for macOS, and what changed since a sync anchor. Folders are
-//! listed a page at a time from Misty; changes are asked for on the working set, which macOS keeps
-//! for the whole domain, with Misty's change sequence as the anchor.
+//! Lists a folder of the drive for macOS (the root's are the Spaces' folders), and what changed
+//! since a sync anchor. Folders are listed a page at a time from Misty; changes are asked for on the
+//! working set, which macOS keeps for the whole domain, with an anchor Misty keeps (each Space's
+//! place in its changes).
 use std::sync::Arc;
 
 use objc2::{
@@ -27,7 +28,7 @@ const ANCHOR_EXPIRED: isize = -1002;
 
 pub struct EnumeratorIvars {
     link: Arc<Link>,
-    /// `"root"`, `"trash"`, `"working_set"` or an item id.
+    /// `"root"`, `"trash"`, `"working_set"`, a Space's folder (`space:…`) or an item id.
     container: String,
 }
 

@@ -68,12 +68,10 @@ function detailOf(entry: Entry, now: number): string {
   }
   const { lesson } = entry;
   const progress = lessonProgress(lesson);
-  const status =
-    lesson.status === "paused" ? "Paused" : lesson.status === "finished" ? "Finished" : "";
-  return (
-    [status, progress && `${progress} goals`].filter(Boolean).join(" · ") ||
-    shortAgo(lesson.updatedAt, now)
-  );
+  const goals = progress && `${progress} goals`;
+  if (lesson.status === "paused") return goals ? `Paused at ${goals}` : "Paused";
+  if (lesson.status === "finished") return goals ? `Finished with ${goals}` : "Finished";
+  return goals || shortAgo(lesson.updatedAt, now);
 }
 
 /**

@@ -46,7 +46,7 @@ export function nestChildren(items: ChecklistItem[], children: AgentChecklist[])
 export function checklistSummary(items: ChecklistItem[], activeLabel?: string) {
   const finished = items.filter((item) => item.status === "done" || item.status === "skipped");
   const active = items.find((item) => item.status === "in_progress");
-  const head = `${finished.length} of ${items.length}`;
-  if (active) return `${head} · ${activeLabel ? `${activeLabel}: ` : ""}${active.title}`;
-  return finished.length === items.length ? `${head} · Done` : head;
+  const head = `${finished.length} of ${items.length} done`;
+  if (active) return `${activeLabel ? `${activeLabel}: ` : ""}${active.title}, ${head}`;
+  return head;
 }

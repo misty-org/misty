@@ -24,6 +24,8 @@ import { DmMembers } from "./DmMembers";
 import { directApi, type DirectConversation } from "./api";
 import { AddPeopleDialog } from "./AddPeopleDialog";
 import { CallButtons } from "./calls/CallButtons";
+import { dmOf, useCallStore } from "./calls/callStore";
+import { CallStageView } from "./calls/CallView";
 import { useMissedCalls } from "./calls/missedCalls";
 import { dmName, dmOthers, friendsRoute, reloadDms, updateDms, useDms } from "./directData";
 
@@ -82,6 +84,7 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
   const [searchedText, setSearchedText] = useState("");
   useWorkspaceViewTitle(tab.id, name);
   const missed = useMissedCalls((state) => state.byDm[dm.id]);
+  const inCall = useCallStore((state) => dmOf(state.active) === dm.id);
 
   // Mentions and names in the chat resolve from the DM's members.
   useEffect(() => {
@@ -204,6 +207,26 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
     </>
   );
 
+  const chat = (
+    <ChannelPage className="min-h-0 flex-1">
+      <SpaceChat
+        spaceId={dm.id}
+        spaceName={name}
+        workspaceTabId={tab.id}
+        searchedText={searchedText}
+        actions={actions}
+        search={end}
+        dm={{
+          name,
+          group: dm.kind === "group",
+          readOnly: dm.read_only,
+          members: <DmMembers members={dm.members} me={myId ?? ""} />,
+        }}
+        stage={inCall ? <CallStageView /> : undefined}
+      />
+    </ChannelPage>
+  );
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
       {missed ? (
@@ -219,22 +242,7 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
           </Button>
         </div>
       ) : null}
-      <ChannelPage className="min-h-0 flex-1">
-        <SpaceChat
-          spaceId={dm.id}
-          spaceName={name}
-          workspaceTabId={tab.id}
-          searchedText={searchedText}
-          actions={actions}
-          search={end}
-          dm={{
-            name,
-            group: dm.kind === "group",
-            readOnly: dm.read_only,
-            members: <DmMembers members={dm.members} me={myId ?? ""} />,
-          }}
-        />
-      </ChannelPage>
+      {chat}
       {dm.read_only ? (
         <div className="flex shrink-0 items-center gap-3 px-4 pb-3">
           <Text tone="muted" className="min-w-0 flex-1">

@@ -75,8 +75,17 @@ fn expose_public_app_configuration() {
     let manifest_dir = env::var_os("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
-    let app_env_path = manifest_dir.parent().unwrap_or(Path::new(".")).join(".env");
-    println!("cargo:rerun-if-changed={}", app_env_path.display());
+    let app_folder = manifest_dir.parent().unwrap_or(Path::new("."));
+    let app_env_path = app_folder.join(".env");
+    // Cargo counts a watched file that doesn't exist as changed on every build, which reran this
+    // script and recompiled all of Misty each launch. No `.env` is ever committed, so watch it
+    // only while it exists, and otherwise the folder it would appear in.
+    let watched = if app_env_path.exists() {
+        app_env_path.as_path()
+    } else {
+        app_folder
+    };
+    println!("cargo:rerun-if-changed={}", watched.display());
     for key in ["MISTY_RELEASE_CHANNEL"] {
         println!("cargo:rerun-if-env-changed={key}");
         let value = env::var(key)

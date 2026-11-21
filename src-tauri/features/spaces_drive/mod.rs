@@ -4,8 +4,8 @@
 //!
 //! - The renderer hands over the server, the account and its Spaces with `drive_sync_spaces`;
 //!   native code mounts and unmounts drives to match, at `~/.misty/mnt/<Space>` (`mnt-dev` in
-//!   debug builds): FUSE on Linux, a File Provider domain linked there on macOS, a Cloud Files
-//!   sync root there on Windows.
+//!   debug builds): FUSE on Linux, a link there to the Space's folder in the account's one File
+//!   Provider domain on macOS, a Cloud Files sync root there on Windows.
 //! - Realtime lives in the renderer; it forwards `drive.*` events with `drive_realtime_event`.
 //! - Events: `misty://drive-status`, `misty://drive-changed`, `misty://drive-notice`.
 //! - Every command refuses anything but a person's own window.
@@ -202,7 +202,7 @@ fn open_host(
         name: device::computer_name(),
     };
     let mut config = DriveConfig::new(data_dir, account_id.to_owned(), device);
-    config.person_name = person_name.filter(|name| !name.trim().is_empty());
+    config.person_name = person_name.clone().filter(|name| !name.trim().is_empty());
     config.cache_limit_bytes = device::cache_limit(&store);
     let network = Arc::new(http::AccountHttp::new(base, account_id.to_owned())?);
     let events = Arc::new(AppEvents { app: app.clone() });
@@ -221,7 +221,15 @@ fn open_host(
             space_drive::socket::Server::start(drive.clone(), path, container.staging())
         });
         match started {
-            Ok(socket) => (Some(FileProviderFace::new(drive.clone())), Some(socket), None),
+            Ok(socket) => {
+                // Finder shows the drive as "Misty - <name>", one place for every Space.
+                let name = person_name
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .unwrap_or("Spaces");
+                (Some(FileProviderFace::new(drive.clone(), name)), Some(socket), None)
+            }
             Err(error) => (None, None, Some(error.to_string())),
         }
     };
@@ -275,7 +283,7 @@ impl Host {
             #[cfg(target_os = "macos")]
             if leaving {
                 if let Some(provider) = &self.provider {
-                    let _ = provider.remove_domain(mount);
+                    provider.forget_space(mount);
                 }
             }
             #[cfg(target_os = "windows")]
@@ -297,7 +305,7 @@ impl Host {
 }
 
 /// Mounts and unmounts so the account's drives match `spaces`. A Space that left the list is
-/// unmounted; its records and (on macOS) its domain go only once nothing waits to upload there,
+/// unmounted; its records and (on macOS) its folder go only once nothing waits to upload there,
 /// so a list given while the renderer is still loading never costs unsynced work.
 pub(crate) fn sync_spaces(
     app: &AppHandle,

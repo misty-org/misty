@@ -146,7 +146,7 @@ export function ContextRail(props: {
       // on the header band (`--ui-header`) the tab row centres its buttons in. 12px each side, as
       // the sidebar keeps at the window's other edge: with a button's own 8px around its glyph,
       // each glyph is 20px from the window's edge and from the chat, centred in the rail.
-      className="flex flex-none flex-col px-3 pt-[calc((var(--ui-header)-2rem)/2)] pb-2"
+      className="flex flex-none flex-col px-3 pt-[calc((var(--ui-header)-var(--spacing)*8)/2)] pb-2"
       aria-label="Panels"
       data-misty-window-drag-block="true"
       data-tour="chat-panels"

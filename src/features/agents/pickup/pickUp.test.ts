@@ -17,7 +17,7 @@ describe("pick-ups", () => {
       at: new Date("2026-11-11T18:30:00Z"),
     });
     expect(note).toContain("## Done\nThe form.");
-    expect(note).toContain("From Sol on Codex · in web · 2026-11-11 18:30");
+    expect(note).toContain("From Sol on Codex in web, 2026-11-11 18:30");
   });
 
   it("doesn't name the engine twice when the agent is named after it", () => {
@@ -27,7 +27,7 @@ describe("pick-ups", () => {
       folder: "",
       at: new Date("2026-11-11T18:30:00Z"),
     });
-    expect(note).toContain("From Codex · 2026-11-11 18:30");
+    expect(note).toContain("From Codex, 2026-11-11 18:30");
   });
 
   it("asks the next agent to carry on from the note", () => {

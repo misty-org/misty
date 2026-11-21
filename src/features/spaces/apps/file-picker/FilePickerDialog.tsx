@@ -117,7 +117,7 @@ export function FilePickerDialog({
         layout="scroll"
         tone="page"
         aria-describedby={undefined}
-        className="h-[min(40rem,calc(100dvh-4rem))] gap-0 p-0"
+        className="h-[min(--spacing(160),calc(100dvh-var(--spacing)*16))] gap-0 p-0"
       >
         <DialogTitle className="sr-only">{`Open in ${appName}`}</DialogTitle>
         {granted === null ? (

@@ -15,6 +15,6 @@ export function useSpaceItemCreator(spaceId: string) {
     // An agent's name is free text, so someone could call theirs "Alice's Misty": whose it really is
     // always shows beside it.
     const name = agentName || "Agent";
-    return userId ? `${name} · ${person(userId)}` : name;
+    return userId ? `${name} by ${person(userId)}` : name;
   };
 }

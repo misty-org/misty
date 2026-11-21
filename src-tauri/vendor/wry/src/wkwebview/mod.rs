@@ -17,6 +17,7 @@ mod ios;
 
 mod class;
 pub use class::wry_web_view::WryWebView;
+pub use class::wry_web_view_ui_delegate::set_trusted_media_origins;
 #[cfg(target_os = "macos")]
 use class::wry_web_view_parent::WryWebViewParent;
 use class::{

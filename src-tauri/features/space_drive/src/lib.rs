@@ -12,8 +12,9 @@
 //!   (`in_use`), the content cache (`cache`) and transfers (`transfer`). One per signed-in
 //!   account, inside Misty's own process. It has no Tauri in it; Misty's glue
 //!   (`features/spaces_drive`) hands it the network ([`api::Http`]) and hears its [`Events`].
-//! - [`OsFace`] is how one OS shows a Space: FUSE on Linux (`face::fuse`), File Provider on macOS
-//!   (`face::file_provider`, which talks to the extension over `socket`), Cloud Files on Windows.
+//! - [`OsFace`] is how one OS shows a Space: FUSE on Linux (`face::fuse`), a folder in the
+//!   account's one File Provider domain on macOS (`face::file_provider`, which talks to the
+//!   extension over `socket`), Cloud Files on Windows.
 //!   A face calls back into [`Drive`] through the methods under "The faces' calls" below.
 //!
 //! Every delete in a drive becomes a trash move on the server; nothing here deletes for good
@@ -26,6 +27,7 @@ pub mod api;
 pub mod bases;
 pub mod cache;
 pub mod face;
+pub mod guard;
 pub mod ignore;
 pub mod in_use;
 pub mod model;
@@ -73,6 +75,16 @@ pub enum DriveError {
     Changed,
     #[error("That Space's drive isn't on this computer.")]
     NotMounted,
+    /// Something the drive's own layout holds in place: a Space's folder can't be renamed,
+    /// moved or deleted, nothing goes beside them at the top, and nothing moves between Spaces.
+    #[error("{0}")]
+    Fixed(String),
+    /// A delete from the OS that the delete guard stopped (`guard`): the item stays.
+    #[error("{0}")]
+    Held(String),
+    /// The extension's sync anchor is one `drive.db` no longer keeps: macOS lists it all again.
+    #[error("Misty's drive records were made again.")]
+    AnchorExpired,
     #[error("Misty couldn't reach the server.")]
     Offline,
     #[error("The download didn't match what's on the server. Try again.")]
@@ -101,6 +113,8 @@ impl DriveError {
     pub fn errno(&self) -> i32 {
         match self {
             Self::NotFound | Self::NotMounted => libc::ENOENT,
+            Self::Fixed(_) | Self::Held(_) => libc::EPERM,
+            Self::AnchorExpired => libc::EIO,
             Self::Exists => libc::EEXIST,
             Self::NotEmpty => libc::ENOTEMPTY,
             Self::InUse(_) => libc::EBUSY,
@@ -130,6 +144,9 @@ impl DriveError {
             Self::InUse(_) => "in_use",
             Self::Changed => "changed",
             Self::NotMounted => "not_mounted",
+            Self::Fixed(_) => "forbidden",
+            Self::Held(_) => "held",
+            Self::AnchorExpired => "anchor_expired",
             Self::Offline => "server_unreachable",
             Self::Corrupt => "corrupt",
             Self::Invalid(_) => "invalid",
@@ -177,7 +194,8 @@ pub struct SpaceMount {
     pub mount_name: String,
     /// `~/.misty/mnt/<mount_name>` (`mnt-dev` in debug builds).
     pub path: PathBuf,
-    /// The File Provider domain's identifier, `<account id>.<space id>`.
+    /// `<account id>.<space id>`: the Space's own registration with the OS where it has one
+    /// (Windows' sync root). On macOS every Space shares the account's one domain.
     pub domain: String,
 }
 
@@ -329,6 +347,13 @@ pub(crate) struct Inner {
     /// Syncing is paused (Settings › Server › Drive): local changes wait, nothing goes up or down,
     /// until it is turned back on. Not kept across a restart.
     pub paused: AtomicBool,
+    /// The brake on deleting a lot at once from the OS.
+    pub guard: guard::Guard,
+}
+
+/// Why a delete from the OS was refused while the delete guard holds a Space.
+fn held_message(space: &str) -> String {
+    format!("Too much was deleted from {space} at once, so Misty kept the rest.")
 }
 
 /// One account's drives. Cheap to clone; every clone is the same drives.
@@ -385,6 +410,7 @@ impl Drive {
                 downloading: Mutex::new(HashSet::new()),
                 cache_limit,
                 paused: AtomicBool::new(false),
+                guard: guard::Guard::default(),
             }),
         })
     }
@@ -468,6 +494,12 @@ impl Drive {
             task: Mutex::new(None),
         });
         write(&self.inner.spaces).insert(space.clone(), mounted.clone());
+        // The drive shows the Space from now until the person leaves it, so its folder is there
+        // before the face asks the OS to look.
+        if let Err(error) = self.inner.store.set_space_folder(&space, &mount.mount_name) {
+            write(&self.inner.spaces).remove(&space);
+            return Err(error);
+        }
         if let Err(error) = face.mount(&mount) {
             write(&self.inner.spaces).remove(&space);
             return Err(error);
@@ -525,12 +557,25 @@ impl Drive {
             .map(|mounted| mounted.mount.clone())
     }
 
-    /// The Space a File Provider domain (`<account id>.<space id>`) names.
-    pub fn space_of_domain(&self, domain: &str) -> Option<SpaceId> {
-        read(&self.inner.spaces)
-            .values()
-            .find(|mounted| mounted.mount.domain == domain)
-            .map(|mounted| mounted.mount.space.clone())
+    /// Every Space the drive shows, mounted or not, with its folder's name, by name. A Space
+    /// stays shown from its first mount until the person leaves it.
+    pub fn space_folders(&self) -> Result<Vec<(SpaceId, String)>, DriveError> {
+        self.inner.store.space_folders()
+    }
+
+    /// The Space an item is in. Item ids are unique across Spaces.
+    pub fn space_of_item(&self, id: &ItemId) -> Result<Option<SpaceId>, DriveError> {
+        self.inner.store.space_of_item(id)
+    }
+
+    /// Keeps a sync anchor's text, answering its token (`socket`).
+    pub fn save_anchor(&self, spaces: &str) -> Result<i64, DriveError> {
+        self.inner.store.save_anchor(spaces)
+    }
+
+    /// A sync anchor's text, while `drive.db` still keeps it.
+    pub fn anchor(&self, token: i64) -> Result<Option<String>, DriveError> {
+        self.inner.store.anchor(token)
     }
 
     /// Where the OS shows a Space's files, when that isn't the mount itself (macOS).
@@ -871,6 +916,76 @@ impl Drive {
         sync::trash_local(&self.inner, space, id, &by)?;
         self.kick(space);
         Ok(())
+    }
+
+    /// A delete that came through the OS (Finder, the terminal, Explorer, any app): a trash move,
+    /// unless the delete guard stops it (`Held`), when the item stays and the OS puts it back.
+    pub fn trash_from_os(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
+        let files = self.guard_delete(space, id)?;
+        self.trash(space, id, TrashBy::Person)?;
+        self.inner.guard.record(space, id, files);
+        Ok(())
+    }
+
+    /// The same, waiting for the server's answer.
+    pub async fn trash_from_os_now(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
+        let files = self.guard_delete(space, id)?;
+        self.trash_now(space, id, TrashBy::Person).await?;
+        self.inner.guard.record(space, id, files);
+        Ok(())
+    }
+
+    /// Asks the delete guard about a delete from the OS, telling the person once when it stops a
+    /// burst. Answers how many files the delete takes.
+    fn guard_delete(&self, space: &SpaceId, id: &ItemId) -> Result<u64, DriveError> {
+        let subtree = self.inner.store.descendants(space, id)?;
+        let Some(top) = subtree.iter().find(|node| node.id == *id) else {
+            return Err(DriveError::NotFound);
+        };
+        if top.not_synced || top.created {
+            // Only on this computer: nothing in the Space to lose.
+            return Ok(0);
+        }
+        let files = guard::files_in(&subtree);
+        let space_files = guard::files_in(&self.inner.store.nodes(space)?);
+        let name = self
+            .mount_of(space)
+            .map(|mount| mount.mount_name)
+            .unwrap_or_default();
+        match self.inner.guard.check(space, files, space_files) {
+            guard::Verdict::Go => Ok(files),
+            guard::Verdict::Held => Err(DriveError::Held(held_message(&name))),
+            guard::Verdict::Stopped { files: taken, burst } => {
+                self.inner.events.notice(&Notice {
+                    kind: NoticeKind::DeletesHeld,
+                    space_id: space.clone(),
+                    name: name.clone(),
+                    by: None,
+                    item_id: None,
+                    path: None,
+                    device_name: None,
+                    count: Some(taken),
+                    burst: Some(burst),
+                });
+                Err(DriveError::Held(held_message(&name)))
+            }
+        }
+    }
+
+    /// Puts back everything a burst of deletes from the OS trashed (the delete guard's Undo),
+    /// newest first. Answers how many came back; one that can't is left in the trash.
+    pub async fn restore_burst(&self, space: &SpaceId, burst: &str) -> Result<u64, DriveError> {
+        let mut restored = 0;
+        for id in self.inner.guard.take(space, burst) {
+            match self.restore(space, &id).await {
+                Ok(_) => restored += 1,
+                // Already back, or never reached the server's trash.
+                Err(DriveError::NotFound) => {}
+                Err(DriveError::Offline) => return Err(DriveError::Offline),
+                Err(_) => {}
+            }
+        }
+        Ok(restored)
     }
 
     /// The same, waiting for the server's answer: `InUse` when it refused.

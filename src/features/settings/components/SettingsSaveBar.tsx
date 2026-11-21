@@ -30,7 +30,7 @@ export function SettingsSaveBar() {
       edge="hairline"
       radius="xl"
       className={cn(
-        "absolute bottom-4 right-6 z-20 flex max-w-[calc(100%-3rem)] items-center gap-4",
+        "absolute bottom-4 right-6 z-20 flex max-w-[calc(100%-var(--spacing)*12)] items-center gap-4",
         "py-2.5 pl-4 pr-2.5 shadow-2xl",
         "animate-in fade-in-0 slide-in-from-bottom-2 duration-200",
         warned && "misty-shake",

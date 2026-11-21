@@ -1,6 +1,8 @@
 //! System or per-process audio through a Core Audio process tap.
 
+use super::sources::{number, process_objects};
 use super::{convert_and_send, global, output_format, Delivery, StartFailure, SYSTEM};
+use crate::Format;
 use block2::RcBlock;
 use dispatch2::{DispatchQueue, DispatchRetained};
 use objc2::rc::Retained;
@@ -11,13 +13,15 @@ use objc2_core_audio::{
     kAudioAggregateDeviceIsPrivateKey, kAudioAggregateDeviceNameKey,
     kAudioAggregateDeviceTapAutoStartKey, kAudioAggregateDeviceTapListKey,
     kAudioAggregateDeviceUIDKey, kAudioHardwareIllegalOperationError,
-    kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyTranslatePIDToProcessObject,
-    kAudioSubTapDriftCompensationKey, kAudioSubTapUIDKey, kAudioTapPropertyFormat,
-    AudioDeviceCreateIOProcIDWithBlock, AudioDeviceDestroyIOProcID, AudioDeviceIOProcID,
-    AudioDeviceStart, AudioDeviceStop, AudioHardwareCreateAggregateDevice,
+    kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyProcessObjectList,
+    kAudioHardwarePropertyTranslatePIDToProcessObject, kAudioProcessPropertyPID,
+    kAudioSubTapDriftCompensationKey, kAudioSubTapUIDKey, kAudioTapPropertyDescription,
+    kAudioTapPropertyFormat, AudioDeviceCreateIOProcIDWithBlock, AudioDeviceDestroyIOProcID,
+    AudioDeviceIOProcID, AudioDeviceStart, AudioDeviceStop, AudioHardwareCreateAggregateDevice,
     AudioHardwareDestroyAggregateDevice, AudioObjectAddPropertyListenerBlock,
     AudioObjectGetPropertyData, AudioObjectID, AudioObjectPropertyAddress,
-    AudioObjectRemovePropertyListenerBlock, CATapDescription, CATapMuteBehavior,
+    AudioObjectPropertySelector, AudioObjectRemovePropertyListenerBlock,
+    AudioObjectSetPropertyData, CATapDescription, CATapMuteBehavior,
 };
 use objc2_core_audio_types::{AudioBufferList, AudioStreamBasicDescription, AudioTimeStamp};
 use objc2_core_foundation::CFDictionary;
@@ -25,7 +29,34 @@ use objc2_foundation::{ns_string, NSArray, NSDictionary, NSNumber, NSString, NSU
 use std::ffi::{c_void, CStr};
 use std::mem::{size_of, transmute};
 use std::ptr::{self, NonNull};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
+
+extern "C" {
+    /// The process macOS holds responsible for `pid`: the app itself for the
+    /// WebKit processes (pages, media) it starts. libSystem exports it.
+    fn responsibility_get_pid_responsible_for_pid(pid: libc::pid_t) -> libc::pid_t;
+}
+
+/// Core Audio's objects for Misty and every process it is responsible for.
+/// A page's sound (a call's voices, a video) plays from WebKit's own
+/// processes, not Misty's, so leaving out Misty's pid alone would let it in.
+fn own_processes() -> Vec<AudioObjectID> {
+    // SAFETY: getpid has no preconditions.
+    let own = unsafe { libc::getpid() };
+    let mut objects: Vec<AudioObjectID> = process_objects()
+        .into_iter()
+        .filter(|object| {
+            number(*object, kAudioProcessPropertyPID).is_some_and(|pid| {
+                let pid = pid as libc::pid_t;
+                // SAFETY: a lookup by pid with no other preconditions; a pid
+                // that has gone answers with an error value, never ours.
+                pid == own || unsafe { responsibility_get_pid_responsible_for_pid(pid) } == own
+            })
+        })
+        .collect();
+    objects.sort_unstable();
+    objects
+}
 
 type CreateProcessTap =
     unsafe extern "C-unwind" fn(*const CATapDescription, *mut AudioObjectID) -> i32;
@@ -114,7 +145,8 @@ pub(super) struct SystemAudioCapture {
     tap: AudioObjectID,
     device: AudioObjectID,
     io: AudioDeviceIOProcID,
-    listener: Option<ListenerBlock>,
+    /// Each listener with the system property it listens to.
+    listeners: Vec<(AudioObjectPropertySelector, ListenerBlock)>,
     delivery: Arc<Delivery>,
     queue: DispatchRetained<DispatchQueue>,
 }
@@ -126,38 +158,54 @@ impl SystemAudioCapture {
             tap: 0,
             device: 0,
             io: None,
-            listener: None,
+            listeners: Vec::new(),
             delivery,
             queue: DispatchQueue::new("misty.audio.system-audio", None),
         }
     }
 
-    fn start(&mut self, processes: &[AudioObjectID], exclude_self: bool) -> Result<(), Failure> {
-        let result = self.open(processes, exclude_self);
+    fn start(
+        &mut self,
+        processes: &[AudioObjectID],
+        exclude_self: bool,
+        format: Format,
+    ) -> Result<(), Failure> {
+        let result = self.open(processes, exclude_self, format);
         if result.is_err() {
             self.stop();
         }
         result
     }
 
-    fn open(&mut self, processes: &[AudioObjectID], exclude_self: bool) -> Result<(), Failure> {
+    fn open(
+        &mut self,
+        processes: &[AudioObjectID],
+        exclude_self: bool,
+        format: Format,
+    ) -> Result<(), Failure> {
+        let stereo = format.channels() == 2;
+        let global_tap = processes.is_empty();
+        let own = if global_tap && exclude_self {
+            own_processes()
+        } else {
+            Vec::new()
+        };
         // SAFETY: plain initialisers and setters on a fresh description.
         let description = unsafe {
-            let description = if processes.is_empty() {
-                let own = if exclude_self {
-                    process_object(libc::getpid())
-                } else {
-                    None
-                };
-                CATapDescription::initMonoGlobalTapButExcludeProcesses(
-                    CATapDescription::alloc(),
-                    &numbers(own.as_slice()),
-                )
-            } else {
-                CATapDescription::initMonoMixdownOfProcesses(
-                    CATapDescription::alloc(),
-                    &numbers(processes),
-                )
+            let alloc = CATapDescription::alloc();
+            let description = match (global_tap, stereo) {
+                (true, false) => {
+                    CATapDescription::initMonoGlobalTapButExcludeProcesses(alloc, &numbers(&own))
+                }
+                (true, true) => {
+                    CATapDescription::initStereoGlobalTapButExcludeProcesses(alloc, &numbers(&own))
+                }
+                (false, false) => {
+                    CATapDescription::initMonoMixdownOfProcesses(alloc, &numbers(processes))
+                }
+                (false, true) => {
+                    CATapDescription::initStereoMixdownOfProcesses(alloc, &numbers(processes))
+                }
             };
             description.setName(ns_string!("Misty capture"));
             description.setPrivate(true);
@@ -192,13 +240,17 @@ impl SystemAudioCapture {
             )
         })?;
         // SAFETY: plain initialisers; nil comes back as None.
-        let format = unsafe {
+        let tap_format = unsafe {
             AVAudioFormat::initWithStreamDescription(AVAudioFormat::alloc(), NonNull::from(&asbd))
         }
         .ok_or(Failure::Device)?;
-        let output = output_format().ok_or(Failure::Device)?;
+        let output = output_format(format).ok_or(Failure::Device)?;
         let converter = unsafe {
-            AVAudioConverter::initFromFormat_toFormat(AVAudioConverter::alloc(), &format, &output)
+            AVAudioConverter::initFromFormat_toFormat(
+                AVAudioConverter::alloc(),
+                &tap_format,
+                &output,
+            )
         }
         .ok_or(Failure::Device)?;
 
@@ -240,7 +292,7 @@ impl SystemAudioCapture {
         let delivery = Arc::clone(&self.delivery);
         let bytes_per_frame = asbd.mBytesPerFrame;
         // SAFETY: a plain property read.
-        let rate = unsafe { format.sampleRate() };
+        let rate = unsafe { tap_format.sampleRate() };
         let io_block: RcBlock<
             dyn Fn(
                 NonNull<AudioTimeStamp>,
@@ -273,7 +325,7 @@ impl SystemAudioCapture {
                 let Some(buffer) = (unsafe {
                     AVAudioPCMBuffer::initWithPCMFormat_bufferListNoCopy_deallocator(
                         AVAudioPCMBuffer::alloc(),
-                        &format,
+                        &tap_format,
                         input,
                         None,
                     )
@@ -300,20 +352,68 @@ impl SystemAudioCapture {
         let listener: ListenerBlock = RcBlock::new(
             move |_count: u32, _addresses: NonNull<AudioObjectPropertyAddress>| delivery.fail(),
         );
+        self.listen(kAudioHardwarePropertyDefaultOutputDevice, listener)?;
+
+        // WebKit starts its processes as pages need them, after the tap may
+        // have begun; each one Misty is responsible for is left out as it
+        // first appears, so its sound never reaches the tap.
+        if global_tap && exclude_self {
+            let tap = self.tap;
+            let excluded = Mutex::new(own);
+            let description = description.clone();
+            let listener: ListenerBlock = RcBlock::new(
+                move |_count: u32, _addresses: NonNull<AudioObjectPropertyAddress>| {
+                    let now = own_processes();
+                    let Ok(mut excluded) = excluded.lock() else {
+                        return;
+                    };
+                    if *excluded == now {
+                        return;
+                    }
+                    // SAFETY: a setter on the description this capture keeps
+                    // alive, then the tap property Core Audio documents as
+                    // settable, handed a pointer to that description.
+                    unsafe {
+                        description.setProcesses(&numbers(&now));
+                        let pointer = Retained::as_ptr(&description);
+                        let address = global(kAudioTapPropertyDescription);
+                        AudioObjectSetPropertyData(
+                            tap,
+                            NonNull::from(&address),
+                            0,
+                            ptr::null(),
+                            size_of::<*const CATapDescription>() as u32,
+                            NonNull::from(&pointer).cast(),
+                        );
+                    }
+                    *excluded = now;
+                },
+            );
+            self.listen(kAudioHardwarePropertyProcessObjectList, listener)?;
+        }
+        // SAFETY: the device and IO proc were created above.
+        check(unsafe { AudioDeviceStart(self.device, self.io) })
+    }
+
+    /// Listens to a system property on the capture's queue until `stop`.
+    fn listen(
+        &mut self,
+        selector: AudioObjectPropertySelector,
+        listener: ListenerBlock,
+    ) -> Result<(), Failure> {
+        let address = global(selector);
         let block = RcBlock::as_ptr(&listener);
-        self.listener = Some(listener);
-        let output_address = global(kAudioHardwarePropertyDefaultOutputDevice);
-        // SAFETY: the block is kept in `listener` until `stop` removes it.
+        // SAFETY: the block is kept in `listeners` until `stop` removes it.
         check(unsafe {
             AudioObjectAddPropertyListenerBlock(
                 SYSTEM,
-                NonNull::from(&output_address),
+                NonNull::from(&address),
                 Some(&*self.queue),
                 block,
             )
         })?;
-        // SAFETY: the device and IO proc were created above.
-        check(unsafe { AudioDeviceStart(self.device, self.io) })
+        self.listeners.push((selector, listener));
+        Ok(())
     }
 
     pub(super) fn stop(&mut self) {
@@ -321,11 +421,11 @@ impl SystemAudioCapture {
         // SAFETY: each call undoes one that succeeded in `open`, with the same
         // arguments, in reverse order.
         unsafe {
-            if let Some(listener) = self.listener.take() {
-                let output_address = global(kAudioHardwarePropertyDefaultOutputDevice);
+            for (selector, listener) in self.listeners.drain(..).rev() {
+                let address = global(selector);
                 AudioObjectRemovePropertyListenerBlock(
                     SYSTEM,
-                    NonNull::from(&output_address),
+                    NonNull::from(&address),
                     Some(&*self.queue),
                     RcBlock::as_ptr(&listener),
                 );
@@ -370,6 +470,7 @@ fn process_object(pid: libc::pid_t) -> Option<AudioObjectID> {
 pub(super) fn start(
     pids: &[i32],
     exclude_self: bool,
+    format: Format,
     delivery: Arc<Delivery>,
 ) -> Result<SystemAudioCapture, StartFailure> {
     let Some(api) = tap_api() else {
@@ -383,7 +484,7 @@ pub(super) fn start(
         }
     }
     let mut capture = SystemAudioCapture::new(api, delivery);
-    match capture.start(&processes, exclude_self) {
+    match capture.start(&processes, exclude_self, format) {
         Ok(()) => Ok(capture),
         // A refused tap means the user has not allowed audio capture.
         Err(Failure::CoreAudio(code)) if code == kAudioHardwareIllegalOperationError => {

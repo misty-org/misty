@@ -13,6 +13,7 @@ import {
   type Counter,
 } from "./uiRuleCounters.ts";
 import { classToken } from "./uiClassToken.ts";
+import { codeViews } from "./uiCodeViews.ts";
 
 /**
  * Every UI rule: what it catches, where it doesn't apply, and what to use instead. uiRules.ts
@@ -36,20 +37,6 @@ export interface UiRule {
 
 // ---------------------------------------------------------------------------------------------
 // Path allowlists, each with its reason.
-
-/** Monospace belongs to code itself: the editor, the terminal, diffs and markdown code blocks. */
-const codeViews = [
-  /^src\/features\/agents\/context-panel\/editor\//,
-  /^src\/features\/agents\/context-panel\/terminal\//,
-  /^src\/features\/agents\/context-panel\/git\/DiffView\.tsx$/,
-  /^src\/features\/agents\/runs\/markdown\//,
-  /^src\/shared\/lib\/terminal\//,
-  // The code editor's own theme, and the Code page's editors and SQL grid built on it.
-  /^src\/shared\/lib\/codemirror\//,
-  // A text file's own contents, shown as the file.
-  /^src\/features\/spaces\/library\/library-primitives\/LibraryTextPreview\.tsx$/,
-  /^src\/features\/files\/preview\/EmbeddedUniversalPreviewView\.tsx$/,
-] as const;
 
 /**
  * Sign-in and sign-up: the first screen a person sees sets its fields at 44px, beside 44px
@@ -79,10 +66,7 @@ const presentedMedia = [
  * Stylesheets that draw content rather than interface: code itself and presented media. They may
  * exist as feature stylesheets, since what they style is the content's own look, not Misty's.
  */
-const contentStylesheets = [
-  ...codeStylesheets,
-  ...presentedMedia,
-] as const;
+const contentStylesheets = [...codeStylesheets, ...presentedMedia] as const;
 
 /** Recognizing a search site's redirect links is reading them, not searching with them. */
 const searchSiteRecognizers = [/^src\/features\/agents\/programs\/searchRedirect\.ts$/] as const;
@@ -244,6 +228,13 @@ export const uiRules = {
     guidance:
       "no loose status words: changes save themselves, and a failure shows next to what " +
       "failed (FieldError, or notify with tone danger)",
+  },
+  "middle-dot": {
+    pattern: /·/g,
+    guidance:
+      'no middle dot between facts ("Sam made Harbor · just now"): give the time or state its own ' +
+      'place at the row\'s end, say it in plain words ("3 replies from Ana"), split it into a label ' +
+      "and a description, or use a comma; never another separator glyph",
   },
   "legacy-button-variant": {
     count: countLegacyVariants,

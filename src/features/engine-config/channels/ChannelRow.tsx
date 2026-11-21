@@ -69,9 +69,12 @@ export function ChannelRow({
   const fromCcSwitch = (entry.raw as Record<string, unknown> | null)?.source === "cc-switch";
   const subtitle = useMemo(
     () =>
-      [entry.remark, entry.baseUrl && hostOf(entry.baseUrl), entry.model]
+      [
+        entry.remark,
+        [entry.model, entry.baseUrl && hostOf(entry.baseUrl)].filter(Boolean).join(" on "),
+      ]
         .filter(Boolean)
-        .join(" · "),
+        .join(", "),
     [entry.remark, entry.baseUrl, entry.model],
   );
   return (

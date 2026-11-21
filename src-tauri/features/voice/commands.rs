@@ -31,6 +31,11 @@ pub(crate) use super::speech::{
     speech_sound_on, speech_stop, speech_stream_poll, speech_stream_push, speech_stream_start,
     speech_stream_stop, speech_support,
 };
+pub(crate) use super::{
+    __cmd__voice_share_audio_start, __cmd__voice_share_audio_stop,
+    __tauri_command_name_voice_share_audio_start, __tauri_command_name_voice_share_audio_stop,
+    voice_share_audio_start, voice_share_audio_stop,
+};
 pub(crate) use super::speech_words::{
     __cmd__speech_recognize_audio_words, __tauri_command_name_speech_recognize_audio_words,
     speech_recognize_audio_words,

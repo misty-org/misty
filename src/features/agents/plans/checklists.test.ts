@@ -40,7 +40,7 @@ it("finds a run's checklist and nests delegated runs under delegated steps", () 
 });
 
 it("summarizes progress in one line", () => {
-  expect(checklistSummary(list({}).items)).toBe("1 of 3 · Edit tests");
-  expect(checklistSummary(list({}).items, "Stopped")).toBe("1 of 3 · Stopped: Edit tests");
-  expect(checklistSummary([{ id: "a", title: "A", status: "done" }])).toBe("1 of 1 · Done");
+  expect(checklistSummary(list({}).items)).toBe("Edit tests, 1 of 3 done");
+  expect(checklistSummary(list({}).items, "Stopped")).toBe("Stopped: Edit tests, 1 of 3 done");
+  expect(checklistSummary([{ id: "a", title: "A", status: "done" }])).toBe("1 of 1 done");
 });

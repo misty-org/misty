@@ -30,7 +30,10 @@ vi.mock("../../conversations/state/localChats", () => ({
     tutor: () => Promise.resolve([]),
   },
 }));
-vi.mock("../../page/useChatStatuses", () => ({ shortAgo: () => "now" }));
+vi.mock("../../page/useChatStatuses", () => ({
+  shortAgo: () => "now",
+  agoWords: () => "just now",
+}));
 
 const { useMistyStore } = await import("../../conversations/state/useMistyStore");
 
@@ -300,9 +303,9 @@ describe("what was made", () => {
     const titles = ["Lava map", "Lava cards", "Lava FAQ"];
     const rows = titles.map((title) => screen.getByRole("button", { name: new RegExp(title) }));
     expect(rows.map((row) => row.textContent)).toEqual([
-      "Lava mapMind map · now",
-      "Lava cards2 cards · now",
-      "Lava FAQFAQ · now",
+      "Lava mapMind map, just now",
+      "Lava cards2 cards, just now",
+      "Lava FAQFAQ, just now",
     ]);
     expect(screen.queryByText("Not here")).toBeNull();
 

@@ -13,7 +13,12 @@ import {
   useProjectChats,
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
-import { joinVoiceChannel, useActiveVoiceChannel, useCallSpeaking } from "@/features/direct";
+import {
+  joinVoiceChannel,
+  useActiveVoiceChannel,
+  useCallSpeaking,
+  voicePath,
+} from "@/features/direct";
 import { personInitials } from "@/shared/lib/personInitials";
 import type { Space } from "@/features/spaces";
 import {
@@ -124,12 +129,14 @@ function SpaceSections({
   const speaking = useCallSpeaking();
   const members = useSpacesStore((state) => state.membersBySpace[space.id]);
 
-  // A voice channel's row drops into its call; who is in it is listed under it.
+  // A voice channel's row drops into its call and opens the call's page; who is in it is listed
+  // under it.
   const voiceRow = (conversation: (typeof conversations)[number]) => {
     const here = activeVoice?.spaceId === space.id && activeVoice.channelId === conversation.id;
     const people = inVoice?.[conversation.id] ?? [];
     const join = () => {
-      if (user?.id)
+      open(voicePath(space.id, conversation.id));
+      if (user?.id && !here)
         void joinVoiceChannel(
           { spaceId: space.id, channelId: conversation.id, name: conversation.title },
           user.id,
@@ -265,9 +272,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const { sessionExpired } = useAuth();
   // Skeletons only while the Spaces are on their way. Signed out, or once the read has failed,
   // nothing is coming, so the sidebar shows only its fixed rows.
-  const spacesPending = useSpacesStore(
-    (state) => !sessionExpired && state.loading && !state.error,
-  );
+  const spacesPending = useSpacesStore((state) => !sessionExpired && state.loading && !state.error);
   const agents = usePersonalAgentsStore((state) => state.agents);
   const conversations = useMistyStore((state) => state.conversations);
   const conversationsLoading = useMistyStore((state) => state.conversationsLoading);

@@ -22,7 +22,7 @@ it("opens straight into the agent's New task conversation without a directory", 
   // The window's sidebar opens the other pages; the chat's bar has no page tabs.
   expect(screen.queryByRole("navigation", { name: "Agent workspace pages" })).toBeNull();
   // The bar reads "Agent · chat title", as a direct message does, and it is not a switch.
-  expect(screen.getByRole("heading", { name: /· New chat$/ })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: /^Communications New chat$/ })).toBeTruthy();
   expect(screen.getByRole("heading", { name: /^Communications/ })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^Switch agent/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Back to agents" })).toBeNull();

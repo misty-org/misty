@@ -3,6 +3,7 @@ import { ChannelMain, type ActionBarItem } from "@misty/ui";
 import { SpaceChatHeader } from "./components/SpaceChatHeader";
 import { SpaceChatComposer } from "./composer/SpaceChatComposer";
 import { ChatMemberList } from "./components/ChatMemberList";
+import { ChatStageSplit } from "./components/ChatStageSplit";
 import { SpaceChatSearch } from "./components/SpaceChatSearch";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/useSpaceRoles";
@@ -49,6 +50,7 @@ export function SpaceChat({
   actions: barActions,
   search,
   dm,
+  stage,
 }: {
   spaceId: string;
   spaceName: string;
@@ -69,6 +71,9 @@ export function SpaceChat({
    * composer while it is read-only. Its page names the tab. */
   /** A DM, which brings its own member list (`members`) since it is no Space of the list. */
   dm?: { name: string; group: boolean; readOnly: boolean; members?: ReactNode };
+  /** What sits between the chat's bar and its messages, such as a DM's call: the bar stays on top,
+   * and a handle between the stage and the messages gives either more room. */
+  stage?: ReactNode;
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -133,7 +138,7 @@ export function SpaceChat({
     : spaceCan(space, "messages.manage");
   useWorkspaceViewTitle(
     dm ? undefined : workspaceTabId,
-    isDirect ? `@${channelName} · ${spaceName}` : `#${channelName} · ${spaceName}`,
+    isDirect ? `@${channelName} in ${spaceName}` : `#${channelName} in ${spaceName}`,
   );
   // Where the unread messages begin, as they were when the chat opened: reading them clears the
   // count, but the line stays until another chat opens.
@@ -438,20 +443,20 @@ export function SpaceChat({
   const members = !membersShown ? null : dm ? (
     (dm.members ?? null)
   ) : space ? (
-      <ChatMemberList
-        space={space}
-        spaceId={spaceId}
-        ownerUserId={space.owner_user_id}
-        currentUserId={user?.id}
-        visibleTo={
-          // A DM, or a private channel, lists only the people who can read it.
-          conversation && (isDirect || privateChannel)
-            ? (member) =>
-                conversation.participants.some((person) => person.user_id === member.user_id)
-            : undefined
-        }
-      />
-    ) : null;
+    <ChatMemberList
+      space={space}
+      spaceId={spaceId}
+      ownerUserId={space.owner_user_id}
+      currentUserId={user?.id}
+      visibleTo={
+        // A DM, or a private channel, lists only the people who can read it.
+        conversation && (isDirect || privateChannel)
+          ? (member) =>
+              conversation.participants.some((person) => person.user_id === member.user_id)
+          : undefined
+      }
+    />
+  ) : null;
   const searchResults = searchedText ? (
     <SpaceChatSearch
       spaceId={spaceId}
@@ -484,7 +489,7 @@ export function SpaceChat({
   // Search results, then a thread, take the member list's place.
   return (
     <ChannelMain header={header} side={searchResults ?? thread ?? members ?? undefined}>
-      {chat}
+      {stage ? <ChatStageSplit stage={stage}>{chat}</ChatStageSplit> : chat}
     </ChannelMain>
   );
 }

@@ -7,7 +7,7 @@ mod sources;
 mod system_audio;
 
 use crate::capture::{FailureSink, FrameCounter, Sink};
-use crate::{AudioSource, Capabilities, CaptureError, Channel, SAMPLE_RATE};
+use crate::{AudioSource, Capabilities, CaptureError, Channel, Format};
 use block2::RcBlock;
 use objc2::rc::Retained;
 use objc2::AnyThread;
@@ -117,15 +117,16 @@ fn global(selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
     }
 }
 
-/// 16 kHz mono interleaved PCM16, the format every chunk carries.
-fn output_format() -> Option<Retained<AVAudioFormat>> {
+/// Interleaved PCM16 at the format's rate and channel count, what every
+/// chunk carries.
+fn output_format(format: Format) -> Option<Retained<AVAudioFormat>> {
     // SAFETY: a plain initialiser with valid arguments; nil comes back as None.
     unsafe {
         AVAudioFormat::initWithCommonFormat_sampleRate_channels_interleaved(
             AVAudioFormat::alloc(),
             AVAudioCommonFormat::PCMFormatInt16,
-            SAMPLE_RATE as f64,
-            1,
+            format.sample_rate() as f64,
+            format.channels(),
             true,
         )
     }
@@ -143,7 +144,9 @@ fn convert_and_send(
     output: &AVAudioFormat,
     delivery: &Delivery,
 ) {
-    let capacity = ((frames as f64 * SAMPLE_RATE as f64 / input_rate).ceil() + 32.0) as u32;
+    // SAFETY: plain property reads on a live format.
+    let (output_rate, output_channels) = unsafe { (output.sampleRate(), output.channelCount()) };
+    let capacity = ((frames as f64 * output_rate / input_rate).ceil() + 32.0) as u32;
     // SAFETY: a plain initialiser; nil comes back as None.
     let Some(pcm) = (unsafe {
         AVAudioPCMBuffer::initWithPCMFormat_frameCapacity(
@@ -190,9 +193,14 @@ fn convert_and_send(
     if channels.is_null() || length == 0 {
         return;
     }
-    // SAFETY: a PCM16 buffer has one channel pointer per channel, here one,
-    // holding `frameLength` samples while `pcm` lives.
-    let samples = unsafe { std::slice::from_raw_parts((*channels).as_ptr(), length as usize) };
+    // SAFETY: an interleaved PCM16 buffer has one pointer, holding
+    // `frameLength` frames of every channel while `pcm` lives.
+    let samples = unsafe {
+        std::slice::from_raw_parts(
+            (*channels).as_ptr(),
+            length as usize * output_channels as usize,
+        )
+    };
     delivery.send(samples);
 }
 
@@ -228,15 +236,26 @@ pub(crate) fn start(
     let native = match &source {
         AudioSource::Mic => microphone::start(delivery).map(NativeCapture::Microphone),
         AudioSource::System { exclude_self } => {
-            system_audio::start(&[], *exclude_self, delivery).map(NativeCapture::System)
+            system_audio::start(&[], *exclude_self, Format::Speech, delivery)
+                .map(NativeCapture::System)
         }
         AudioSource::Processes(pids) => {
             let pids: Vec<i32> = pids.iter().map(|pid| *pid as i32).collect();
-            system_audio::start(&pids, false, delivery).map(NativeCapture::System)
+            system_audio::start(&pids, false, Format::Speech, delivery).map(NativeCapture::System)
         }
     }
     .map_err(StartFailure::into_error)?;
     Ok(Running { native })
+}
+
+/// Everything the computer plays except Misty, as 48 kHz stereo.
+pub(crate) fn start_share(sink: Sink, failure: FailureSink) -> Result<Running, CaptureError> {
+    let delivery = Arc::new(Delivery::new(Channel::System, sink, failure));
+    let capture = system_audio::start(&[], true, Format::Share, delivery)
+        .map_err(StartFailure::into_error)?;
+    Ok(Running {
+        native: NativeCapture::System(capture),
+    })
 }
 
 pub(crate) fn capabilities() -> Capabilities {

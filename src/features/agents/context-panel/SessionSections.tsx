@@ -105,7 +105,7 @@ export function ContextSources(props: { engine: string; folder: string; branch?:
     pr ? "1 PR" : null,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" and ");
   return (
     <Section
       title="Context sources"
@@ -118,18 +118,16 @@ export function ContextSources(props: { engine: string; folder: string; branch?:
         <Row
           key={issue.number}
           icon={CircleDot}
-          label={
-            `#${issue.number}` +
-            (issue.state ? ` · Issue ${issue.state === "OPEN" ? "open" : "closed"}` : "") +
-            (issue.title ? ` · ${issue.title}` : "")
-          }
+          label={issue.title ? `#${issue.number} ${issue.title}` : `Issue #${issue.number}`}
+          value={issue.state ? (issue.state === "OPEN" ? "Open" : "Closed") : undefined}
           onOpen={issue.url ? () => void openExternalLink(issue.url!) : undefined}
         />
       ))}
       {pr ? (
         <Row
           icon={pullRequestIcon(pr)}
-          label={`#${pr.number} · ${pullRequestStatus(pr)} · ${pr.title}`}
+          label={`#${pr.number} ${pr.title}`}
+          value={pullRequestStatus(pr)}
           onOpen={() => void openExternalLink(pr.url)}
         />
       ) : null}
@@ -224,7 +222,9 @@ export function TurnStats(props: { conversationId: string }) {
         icon={MessagesSquare}
         label="Replies"
         value={
-          stats.stopped ? `${stats.finished} · ${stats.stopped} stopped` : String(stats.finished)
+          stats.stopped
+            ? `${stats.finished} finished, ${stats.stopped} stopped`
+            : String(stats.finished)
         }
       />
       {stats.lastMs ? <Row icon={Clock} label="Last turn" value={tookText(stats.lastMs)} /> : null}
@@ -238,7 +238,7 @@ export function TurnStats(props: { conversationId: string }) {
         <Row
           icon={Coins}
           label="Last turn tokens"
-          value={`${formatTokens(stats.lastIn)} in · ${formatTokens(stats.lastOut ?? 0)} out`}
+          value={`${formatTokens(stats.lastIn)} in, ${formatTokens(stats.lastOut ?? 0)} out`}
         />
       ) : null}
       {stats.lastReasoning ? (

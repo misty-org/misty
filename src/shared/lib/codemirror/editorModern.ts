@@ -29,7 +29,7 @@ export const modernEditor: Extension = [
         WebkitFontSmoothing: "antialiased",
       },
       ".cm-content": { padding: "calc(var(--spacing) * 3) 0" },
-      ".cm-line": { padding: "0 calc(var(--spacing) * 6) 0 calc(var(--spacing) * 1)" },
+      ".cm-line": { padding: "0 calc(var(--spacing) * 6) 0 var(--spacing)" },
       // The numbers sit near the editor's left edge, as Neovim's do.
       ".cm-gutters": { paddingLeft: "var(--spacing)" },
       // Room for three digits, as Neovim keeps, so the code starts at the same place in every file
@@ -62,14 +62,14 @@ export const modernEditor: Extension = [
       },
       ".cm-selectionMatch": { backgroundColor: ink(10), borderRadius: "2px" },
       ".cm-foldPlaceholder": {
-        borderRadius: "calc(var(--spacing) * 1)",
+        borderRadius: "var(--spacing)",
         padding: "0 calc(var(--spacing) * 1.5)",
       },
       ".cm-tooltip-autocomplete > ul > li": {
         padding: "calc(var(--spacing) * 0.5) calc(var(--spacing) * 2)",
         borderRadius: "calc(var(--spacing) * 1.5)",
       },
-      ".cm-tooltip-autocomplete > ul": { padding: "calc(var(--spacing) * 1)" },
+      ".cm-tooltip-autocomplete > ul": { padding: "var(--spacing)" },
     }),
   ),
 ];

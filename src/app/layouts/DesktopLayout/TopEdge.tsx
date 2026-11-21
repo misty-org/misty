@@ -28,10 +28,10 @@ export function TopEdge(props: { gridColumn: number; side?: "left" | "right" }) 
             radius="lg"
             // The window edge above and on its outer side, the gap toward the sidebar.
             className={cn(
-              "mb-0 mt-[var(--shell-edge,0.375rem)] shrink-0 overflow-hidden",
+              "mb-0 mt-[var(--shell-edge,calc(var(--spacing)*1.5))] shrink-0 overflow-hidden",
               props.side === "right"
-                ? "ml-[var(--shell-edge,0.375rem)] mr-[var(--shell-gap,0.25rem)]"
-                : "ml-[var(--shell-gap,0.25rem)] mr-[var(--shell-edge,0.375rem)]",
+                ? "ml-[var(--shell-edge,calc(var(--spacing)*1.5))] mr-[var(--shell-gap,var(--spacing))]"
+                : "ml-[var(--shell-gap,var(--spacing))] mr-[var(--shell-edge,calc(var(--spacing)*1.5))]",
             )}
             style={{ height: barHeight }}
             data-misty-window-titlebar-region="true"
@@ -42,7 +42,7 @@ export function TopEdge(props: { gridColumn: number; side?: "left" | "right" }) 
                 windowToolbarClass,
                 // The bar's own padding and the card's margin already count toward the room the
                 // window buttons need.
-                "data-[window-chrome=true]:!pl-[max(0px,calc(var(--window-chrome-left,0px)_-_1rem))]",
+                "data-[window-chrome=true]:!pl-[max(0px,calc(var(--window-chrome-left,0px)_-_var(--spacing)_*_4))]",
               )}
               data-window-toolbar=""
             />

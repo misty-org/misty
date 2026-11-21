@@ -125,14 +125,23 @@ define_class!(
     fn request_media_capture_permission(
       &self,
       _webview: &WryWebView,
-      _origin: &WKSecurityOrigin,
-      _frame: &WKFrameInfo,
+      origin: &WKSecurityOrigin,
+      frame: &WKFrameInfo,
       _capture_type: WKMediaCaptureType,
       decision_handler: &Block<dyn Fn(WKPermissionDecision)>,
     ) {
       //https://developer.apple.com/documentation/webkit/wkpermissiondecision?language=objc
-      // Let WebKit ask the user. A website must never inherit an app-level grant.
-      (*decision_handler).call((WKPermissionDecision::Prompt,));
+      // Misty patch: WebKit's own "Allow … to use your microphone?" panel never shows. The app's
+      // own page (an origin the host named with `set_trusted_media_origins`, in its main frame) is
+      // granted, so the microphone and camera are asked for once, by the system, and never again;
+      // any other page, such as a website, is refused and never inherits that grant.
+      let trusted = unsafe { frame.isMainFrame() } && media_origin_trusted(origin);
+      let decision = if trusted {
+        WKPermissionDecision::Grant
+      } else {
+        WKPermissionDecision::Deny
+      };
+      (*decision_handler).call((decision,));
     }
 
     #[cfg(target_os = "macos")]
@@ -258,6 +267,27 @@ define_class!(
       }
     }
   }
+
+  // Not part of WKUIDelegate's public protocol, so it sits with the class's own methods: objc2
+  // checks every method in a protocol block against the protocol and refuses one it doesn't list.
+  impl WryWebViewUIDelegate {
+    // Misty patch: a page sharing its screen (getDisplayMedia) goes straight to the system's own
+    // screen picker on the app's own page, with no WebKit panel before it; any other page is
+    // refused. WebKit's private delegate; its decision is 0 deny, 1 screen, 2 window.
+    #[cfg(target_os = "macos")]
+    #[unsafe(method(_webView:requestDisplayCapturePermissionForOrigin:initiatedByFrame:withSystemAudio:decisionHandler:))]
+    fn request_display_capture_permission(
+      &self,
+      _webview: &WryWebView,
+      origin: &WKSecurityOrigin,
+      frame: &WKFrameInfo,
+      _system_audio: objc2::runtime::Bool,
+      decision_handler: &Block<dyn Fn(isize)>,
+    ) {
+      let trusted = unsafe { frame.isMainFrame() } && media_origin_trusted(origin);
+      (*decision_handler).call((if trusted { 1 } else { 0 },));
+    }
+  }
 );
 
 impl WryWebViewUIDelegate {
@@ -278,4 +308,31 @@ impl WryWebViewUIDelegate {
       });
     unsafe { msg_send![super(delegate), init] }
   }
+}
+
+/// The origins of the host app's own pages (`tauri://localhost`, a development server's
+/// `http://127.0.0.1:5173`), which may use the microphone and camera without WebKit asking.
+static TRUSTED_MEDIA_ORIGINS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+
+/// Names the host app's own origins, once at startup: those pages get the microphone and camera
+/// with no WebKit panel (the system still asks the person once), and every other page is refused.
+pub fn set_trusted_media_origins(origins: Vec<String>) {
+  let _ = TRUSTED_MEDIA_ORIGINS.set(
+    origins
+      .into_iter()
+      .map(|origin| origin.trim_end_matches('/').to_ascii_lowercase())
+      .collect(),
+  );
+}
+
+fn media_origin_trusted(origin: &WKSecurityOrigin) -> bool {
+  let Some(trusted) = TRUSTED_MEDIA_ORIGINS.get() else {
+    return false;
+  };
+  let (protocol, host, port) = unsafe { (origin.protocol(), origin.host(), origin.port()) };
+  let mut name = format!("{protocol}://{host}").to_ascii_lowercase();
+  if port != 0 {
+    name.push_str(&format!(":{port}"));
+  }
+  trusted.iter().any(|item| *item == name)
 }

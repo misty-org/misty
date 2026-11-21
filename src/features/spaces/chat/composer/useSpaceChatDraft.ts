@@ -107,7 +107,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       attachmentSlotsLeft,
       attachmentUploading,
       conversationId,
-      spaceId,
       setAttachmentUploading,
       setPendingAttachments,
     ],

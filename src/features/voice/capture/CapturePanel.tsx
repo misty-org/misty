@@ -21,6 +21,13 @@ const sourceLabel = {
   app: "An app",
 } as const;
 
+/** What it listens to, as the end of "Listening to …". */
+const listeningTo = {
+  mic: "the microphone",
+  system: "system audio",
+  app: "an app",
+} as const;
+
 /**
  * The live Note for a capture: what is being heard, by speaker, with the
  * person's own notes beside it. Mute and Stop stay visible while listening.
@@ -51,8 +58,15 @@ export function CapturePanel() {
             {store.title || "Listening"}
           </OverflowFadeText>
           <Text bare as="div" tone="muted" className="text-xs">
-            {store.source ? sourceLabel[store.source.kind] : "Transcript"}
-            {store.phase === "live" ? " · Listening" : store.phase === "saving" ? " · Saving" : ""}
+            {store.phase === "live"
+              ? store.source
+                ? `Listening to ${listeningTo[store.source.kind]}`
+                : "Listening"
+              : store.phase === "saving"
+                ? "Saving the transcript"
+                : store.source
+                  ? sourceLabel[store.source.kind]
+                  : "Transcript"}
           </Text>
         </div>
         {listening ? (

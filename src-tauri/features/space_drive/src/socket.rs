@@ -28,28 +28,45 @@
 //! of requests; Misty answers them in order, one reply per request. The extension may open several
 //! connections to ask in parallel.
 //!
+//! # The drive's tree
+//!
+//! macOS shows the account's drive as one File Provider domain (one place under Finder's
+//! Locations), with a folder for each Space at its top. The tree the protocol speaks of is that
+//! domain's:
+//!
+//! - The root (`null`) holds only the Spaces' folders. Nothing else goes there.
+//! - A Space's folder is `"space:<space id>"`, named as `~/.misty/mnt/<Space>` is. It can't be
+//!   renamed, moved or deleted from the drive: it comes when Misty first mounts the Space and goes
+//!   when the person leaves it. A Space Misty hasn't mounted now stays shown; asking inside it
+//!   answers `not_mounted`.
+//! - Everything else is a Space's item, by its id (`drv_<uuid>`). Item ids are unique across
+//!   Spaces, so Misty finds an item's Space from its id. An item at the top of a Space has its
+//!   folder as its parent. Nothing moves between Spaces.
+//!
 //! # Requests and replies
 //!
-//! Request: `{"id": <u64>, "op": "<op>", "domain": "<account id>.<space id>", …op fields}`.
-//! `id` is the extension's own and comes back unchanged. `domain` is the File Provider domain's
-//! identifier, as Misty registered it.
+//! Request: `{"id": <u64>, "op": "<op>", …op fields}`. `id` is the extension's own and comes back
+//! unchanged.
 //!
 //! Reply: `{"id": <u64>, "ok": true, …fields}`, or `{"id": <u64>, "ok": false, "error":
 //! {"code": "<code>", "message": "<a sentence a person can read>"}}`.
 //!
 //! Error codes: `not_found` (no such item: `noSuchItem`), `exists` (an item id already used:
 //! `create` with an `item_id` Misty already has for another item), `not_empty`,
-//! `in_use` (a delete refused because someone has it open; the message says who), `not_mounted` (no such domain
-//! now), `server_unreachable` (Misty is offline: `serverUnreachable`), `signed_out`
-//! (`notAuthenticated`), `forbidden` (the person may not change this Space's drive),
-//! `invalid` (a bad request or name), `corrupt` (a download didn't match its hash; try again),
-//! `unsupported`, `io`, `store`, `server`, `face`.
+//! `in_use` (a delete refused because someone has it open; the message says who), `not_mounted`
+//! (the Space isn't mounted now), `server_unreachable` (Misty is offline: `serverUnreachable`),
+//! `signed_out` (`notAuthenticated`), `forbidden` (the person may not change this Space's drive,
+//! or the change would break the drive's layout: a Space's folder renamed, moved or deleted,
+//! something put at the top, a move between Spaces), `held` (the delete guard stopped a run of
+//! deletes that would take too much of a Space; the item stays), `anchor_expired` (a sync anchor Misty no
+//! longer keeps: list everything again), `invalid` (a bad request or name), `corrupt` (a
+//! download didn't match its hash; try again), `unsupported`, `io`, `store`, `server`, `face`.
 //!
 //! An item, wherever one appears (`Item` below):
 //!
 //! ```json
-//! { "id": "drv_…",            // the item identifier to give the system
-//!   "parent_id": "drv_…" | null,   // null: the domain's root container
+//! { "id": "drv_…" | "space:…",     // the item identifier to give the system
+//!   "parent_id": "drv_…" | "space:…" | null,   // null: the drive's root (a Space's folder)
 //!   "name": "Report.pdf", "kind": "file" | "folder",
 //!   "size": 0, "mtime_ms": 0, "sha256": "<64 hex>" | null,
 //!   "version": 7 | null,      // the server version Misty agreed on; null until the server has it
@@ -63,18 +80,20 @@
 //!   "deleted": false }        // only in `changes_since`: purged, delete it too
 //! ```
 //!
-//! Ops (fields beyond `id`, `op` and `domain`):
+//! Ops (fields beyond `id` and `op`):
 //!
-//! - `hello` `{}` → `{"protocol": 1, "account_id", "domains": [{"domain", "space_id", "name"}]}`.
-//! - `list` `{"parent": "drv_…" | null, "cursor"?: string, "limit"?: u32}` → `{"items": [Item],
-//!   "next_cursor": string | null}`. A folder's children, without what waits to be trashed. Pages
-//!   of `limit` (default 500, at most 5000); pass `next_cursor` back as `cursor`.
+//! - `hello` `{}` → `{"protocol": 2, "account_id", "spaces": [{"space_id", "folder",
+//!   "mounted"}]}`.
+//! - `list` `{"parent": "drv_…" | "space:…" | null, "cursor"?: string, "limit"?: u32}` →
+//!   `{"items": [Item], "next_cursor": string | null}`. A folder's children, without what waits
+//!   to be trashed; the root's are the Spaces' folders. Pages of `limit` (default 500, at most
+//!   5000); pass `next_cursor` back as `cursor`.
 //! - `item` `{"item_id"}` → `{"item": Item}`.
 //! - `fetch` `{"item_id"}` → `{"item": Item, "path": "<container>/staging/<uuid>"}`. Misty
 //!   fetches the content if it hasn't it, checks its SHA-256, and writes it to a new staging
 //!   file. The extension owns that file from then on: it hands it to the system (which moves it)
 //!   or deletes it.
-//! - `create` `{"parent": "drv_…" | null, "name", "kind", "item_id"?: "drv_<uuid v4>",
+//! - `create` `{"parent": "drv_…" | "space:…", "name", "kind", "item_id"?: "drv_<uuid v4>",
 //!   "staged"?: "<container>/staging/…", "mtime_ms"?: i64, "may_exist"?: bool}` →
 //!   `{"item": Item}`. Makes an item on this computer at once, offline too; it uploads later.
 //!   `item_id` is the id the extension already gave the system, if it gave one; otherwise Misty
@@ -88,11 +107,12 @@
 //!   `"may_exist": true` (the system's "may already exist" after a reset) changes nothing: an
 //!   item already there is answered either way. An
 //!   item that an ignore rule, a junk name or a secret's name leaves out answers `"state":
-//!   "not_synced"`: it stays on this Mac alone.
-//! - `modify` `{"item_id", "base_version"?: i64, "name"?, "parent"?: "drv_…" | null,
+//!   "not_synced"`: it stays on this Mac alone. The root takes nothing: `forbidden`.
+//! - `modify` `{"item_id", "base_version"?: i64, "name"?, "parent"?: "drv_…" | "space:…",
 //!   "staged"?: path, "mtime_ms"?: i64}` → `{"item": Item, "refetch": bool}`. A rename or move
-//!   when `name` or the `parent` key is present (`"parent": null` is the root), new content
-//!   when `staged` is. `base_version` is the `version` the system's copy came from. It never
+//!   when `name` or the `parent` key is present, new content when `staged` is. A Space's folder,
+//!   a move to the root or into another Space is `forbidden`. `base_version` is the `version` the
+//!   system's copy came from. It never
 //!   fails for being out of date (macOS would only send it again): a rename or move is the
 //!   latest, and onto a name another item holds it trashes that item (both come back, with a
 //!   notice, if someone has that item open); new content goes up saying it came from
@@ -104,21 +124,21 @@
 //! - `trash` `{"item_id"}` → `{}`. Every delete is a trash move on the server that can be undone,
 //!   and it trashes the item as it is by then. Misty asks every online computer whether the item
 //!   is in use, waits for them, then moves it; the answer comes when the server has decided:
-//!   `in_use` means it stays (and comes back if the system removed it).
+//!   `in_use` means it stays (and comes back if the system removed it). A Space's folder is
+//!   `forbidden`. A delete past the delete guard's limit (`crate::guard`: much of a Space at
+//!   once) is `held`, and the item stays too.
 //! - `changes_since` `{"since": "<anchor>", "limit"?: u32}` → `{"items": [Item],
-//!   "next_anchor": "<anchor>", "next_seq": i64, "more": bool}`. The extension's sync anchor is
-//!   the text `"<server seq>.<local seq>"`, two decimal integers of at least 0 joined by one `.`,
-//!   such as `"42.7"` (`"0.0"` is everything; a bare `"42"` is read as `"42.0"`). The server seq
-//!   counts the server's changes Misty has applied, trashed and purged items included; the local
-//!   seq counts changes only this computer makes to what the extension shows: `last_used_ms`.
-//!   Listed are
-//!   the items the server changed after the first number and those changed locally after the
-//!   second, each once, as they are now; up to `limit` of each (default 500, at most 5000), so a
-//!   page holds at most twice `limit`. Store `next_anchor` and ask again while `more`.
-//!   The old form `{"seq": i64}` still works: only the server's changes, with `next_seq` and no
-//!   `next_anchor`. An item made on this Mac and not on the server yet comes only through its
-//!   local changes; `create` answered it.
-//! - `current_seq` `{}` → `{"seq": i64, "anchor": "<anchor>"}`: the anchor to start from.
+//!   "next_anchor": "<anchor>", "more": bool}`. The extension's sync anchor is `"v2.<token>"`,
+//!   a token for every shown Space's place in its two change feeds, which `drive.db` keeps (the
+//!   newest 64): the server's changes Misty has applied (trashed and purged items included), and
+//!   the changes only this computer makes to what the extension shows (`last_used_ms`). Listed
+//!   are, each once and as they are now: the items of each Space that changed after its place,
+//!   up to `limit` of each feed (default 500, at most 5000); the folder of a Space shown since
+//!   (its items come by listing it) or renamed since; and, `"deleted": true`, the folder of a
+//!   Space no longer shown (the person left it), so its files leave the Mac. Store `next_anchor`
+//!   and ask again while `more`. An anchor `drive.db` no longer keeps, or one ahead of what Misty
+//!   has (its records were made again), is `anchor_expired`.
+//! - `current_seq` `{}` → `{"anchor": "<anchor>"}`: the anchor to start from.
 //! - `used` `{"item_id", "at_ms": i64}` → `{}`: the item's last-used date
 //!   (`NSFileProviderItemLastUsedDate`), which macOS sets when a person opens it in an app.
 //!   Misty counts an item used in the last five minutes as in use when someone asks.
@@ -145,10 +165,10 @@ use tokio::{
 /// `refetch`. Offline it answers sooner, and the content goes up later.
 const SEND_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
 
-use crate::{Drive, DriveError, Item, ItemId, Kind, NewNode, Node, Seq, SpaceId, TrashBy};
+use crate::{Drive, DriveError, Item, ItemId, Kind, NewNode, Node, Seq, SpaceId};
 
 /// The protocol's version, answered by `hello`.
-pub const PROTOCOL: u32 = 1;
+pub const PROTOCOL: u32 = 2;
 const MAX_MESSAGE: u32 = 16 * 1024 * 1024;
 /// The longest socket path `sun_path` holds on macOS, less its NUL.
 pub const MAX_SOCKET_PATH: usize = 103;
@@ -283,15 +303,6 @@ fn item_id(request: &Value, field: &str) -> Result<ItemId, DriveError> {
     Ok(ItemId(id.to_owned()))
 }
 
-/// `"parent": null` or absent is the root; a string is a folder's id.
-fn parent_of(request: &Value) -> Result<Option<ItemId>, DriveError> {
-    match request.get("parent") {
-        None | Some(Value::Null) => Ok(None),
-        Some(Value::String(id)) if ItemId::is_valid(id) => Ok(Some(ItemId(id.clone()))),
-        Some(_) => Err(DriveError::Invalid("That isn't a folder's id.".to_owned())),
-    }
-}
-
 /// A staged file the extension named, which has to be in the staging folder.
 fn staged(request: &Value, staging: &Path) -> Result<Option<PathBuf>, DriveError> {
     let Some(path) = request.get("staged").and_then(Value::as_str) else {
@@ -309,10 +320,25 @@ fn staged(request: &Value, staging: &Path) -> Result<Option<PathBuf>, DriveError
     Ok(Some(real))
 }
 
-fn node_json(node: &Node, seq: i64, modified_by_name: &str) -> Value {
+/// A Space's folder's id: `space:<space id>`.
+fn folder_id(space: &SpaceId) -> String {
+    format!("{SPACE_PREFIX}{}", space.0)
+}
+
+const SPACE_PREFIX: &str = "space:";
+
+/// An item's parent as the extension sees it: a folder, or its Space's folder at the top.
+fn parent_json(space: &SpaceId, parent: Option<&ItemId>) -> Value {
+    match parent {
+        Some(parent) => json!(parent),
+        None => Value::String(folder_id(space)),
+    }
+}
+
+fn node_json(space: &SpaceId, node: &Node, seq: i64, modified_by_name: &str) -> Value {
     json!({
         "id": node.id,
-        "parent_id": node.parent,
+        "parent_id": parent_json(space, node.parent.as_ref()),
         "name": node.name,
         "kind": node.kind,
         "size": node.size,
@@ -327,41 +353,46 @@ fn node_json(node: &Node, seq: i64, modified_by_name: &str) -> Value {
     })
 }
 
+/// A Space's folder at the drive's root.
+fn folder_json(space: &SpaceId, folder: &str) -> Value {
+    json!({
+        "id": folder_id(space),
+        "parent_id": null,
+        "name": folder,
+        "kind": "folder",
+        "size": 0,
+        "mtime_ms": 0,
+        "sha256": null,
+        "version": null,
+        "seq": 0,
+        "modified_by_name": "",
+        "downloaded": true,
+        "state": "downloaded",
+        "last_used_ms": null,
+    })
+}
+
+/// Marks a value from `changes_since` as there or gone.
+fn with_gone(mut value: Value, trashed: bool, deleted: bool) -> Value {
+    if let Value::Object(fields) = &mut value {
+        fields.insert("trashed".into(), Value::Bool(trashed));
+        fields.insert("deleted".into(), Value::Bool(deleted));
+    }
+    value
+}
+
 /// An item that changed only here, as `changes_since` lists it.
 fn local_change_value(drive: &Drive, space: &SpaceId, node: &Node) -> Value {
     match drive.server_item(space, &node.id).ok().flatten() {
         Some(item) => change_value(drive, space, &item),
-        None => {
-            let mut value = node_json(node, 0, "");
-            if let Value::Object(fields) = &mut value {
-                fields.insert("trashed".into(), Value::Bool(false));
-                fields.insert("deleted".into(), Value::Bool(false));
-            }
-            value
-        }
+        None => with_gone(node_json(space, node, 0, ""), false, false),
     }
-}
-
-/// `"<server seq>.<local seq>"`, or a bare `"<server seq>"`.
-fn parse_anchor(text: &str) -> Result<(Seq, i64), DriveError> {
-    let bad = || DriveError::Invalid(format!("“{text}” isn't an anchor."));
-    let (server, local) = text.split_once('.').unwrap_or((text, "0"));
-    let number = |part: &str| {
-        if part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(bad());
-        }
-        part.parse::<i64>().map_err(|_| bad())
-    };
-    Ok((Seq(number(server)?), number(local)?))
-}
-
-fn anchor(seq: Seq, local: i64) -> String {
-    format!("{}.{}", seq.0, local)
 }
 
 fn node_value(drive: &Drive, space: &SpaceId, node: &Node) -> Value {
     let server = drive.server_item(space, &node.id).ok().flatten();
     node_json(
+        space,
         node,
         server.as_ref().map_or(0, |item| item.seq.0),
         server
@@ -372,11 +403,12 @@ fn node_value(drive: &Drive, space: &SpaceId, node: &Node) -> Value {
 
 /// A server item as `changes_since` lists it, with this computer's view where it has one.
 fn change_value(drive: &Drive, space: &SpaceId, item: &Item) -> Value {
-    let mut value = match drive.node(space, &item.id).ok().flatten() {
-        Some(node) => node_json(&node, item.seq.0, &item.modified_by_name),
+    let node = drive.node(space, &item.id).ok().flatten();
+    let value = match &node {
+        Some(node) => node_json(space, node, item.seq.0, &item.modified_by_name),
         None => json!({
             "id": item.id,
-            "parent_id": item.parent_id,
+            "parent_id": parent_json(space, item.parent_id.as_ref()),
             "name": item.name,
             "kind": item.kind,
             "size": item.size,
@@ -389,65 +421,274 @@ fn change_value(drive: &Drive, space: &SpaceId, item: &Item) -> Value {
             "state": "online",
         }),
     };
-    if let Value::Object(fields) = &mut value {
-        // Gone from what this computer shows (trashed, purged, or under a trashed folder).
-        let gone = item.trashed || item.deleted || drive.node(space, &item.id).ok().flatten().is_none();
-        fields.insert("trashed".into(), Value::Bool(item.trashed || (gone && !item.deleted)));
-        fields.insert("deleted".into(), Value::Bool(item.deleted));
+    // Gone from what this computer shows (trashed, purged, or under a trashed folder).
+    let gone = item.trashed || item.deleted || node.is_none();
+    with_gone(value, item.trashed || (gone && !item.deleted), item.deleted)
+}
+
+/// Where a request points in the drive's tree.
+enum Place {
+    /// The drive's root, which holds the Spaces' folders.
+    Root,
+    /// A Space's folder.
+    Space(SpaceId),
+    /// An item in a Space.
+    Item(SpaceId, ItemId),
+}
+
+/// The place a field names: absent or `null` is the root, `space:…` a Space's folder, `drv_…`
+/// an item, whose Space Misty finds.
+fn place_of(drive: &Drive, request: &Value, field: &str) -> Result<Place, DriveError> {
+    let text = match request.get(field) {
+        None | Some(Value::Null) => return Ok(Place::Root),
+        Some(Value::String(text)) => text,
+        Some(_) => return Err(DriveError::Invalid("That isn't an item's id.".to_owned())),
+    };
+    if let Some(space) = text.strip_prefix(SPACE_PREFIX) {
+        let space = SpaceId(space.to_owned());
+        let shown = drive
+            .space_folders()?
+            .into_iter()
+            .any(|(shown, _)| shown == space);
+        return if shown {
+            Ok(Place::Space(space))
+        } else {
+            Err(DriveError::NotFound)
+        };
     }
-    value
+    if !ItemId::is_valid(text) {
+        return Err(DriveError::Invalid("That isn't an item's id.".to_owned()));
+    }
+    let id = ItemId(text.clone());
+    let space = drive.space_of_item(&id)?.ok_or(DriveError::NotFound)?;
+    Ok(Place::Item(space, id))
+}
+
+/// A Space only Misty's mounted drive answers for.
+fn mounted(drive: &Drive, space: SpaceId) -> Result<SpaceId, DriveError> {
+    drive
+        .mount_of(&space)
+        .map(|_| space)
+        .ok_or(DriveError::NotMounted)
+}
+
+/// The item a request acts on, in a mounted Space. A Space's folder is held in place.
+fn item_of(drive: &Drive, request: &Value) -> Result<(SpaceId, ItemId), DriveError> {
+    match place_of(drive, request, "item_id")? {
+        Place::Item(space, id) => Ok((mounted(drive, space)?, id)),
+        Place::Space(_) => Err(DriveError::Fixed(FOLDER_FIXED.to_owned())),
+        Place::Root => Err(DriveError::Invalid("The request has no item_id.".to_owned())),
+    }
+}
+
+const FOLDER_FIXED: &str = "A Space's folder can't be renamed, moved or deleted.";
+const ROOT_FIXED: &str = "Only Spaces' folders go at the top of the drive.";
+const ACROSS_SPACES: &str = "Files can't move from one Space to another. Copy them instead.";
+
+/// Where a create or move puts something: a folder of `space`, `None` its top.
+fn destination(
+    drive: &Drive,
+    request: &Value,
+    space: Option<&SpaceId>,
+) -> Result<(SpaceId, Option<ItemId>), DriveError> {
+    let (to, parent) = match place_of(drive, request, "parent")? {
+        Place::Root => return Err(DriveError::Fixed(ROOT_FIXED.to_owned())),
+        Place::Space(to) => (to, None),
+        Place::Item(to, parent) => (to, Some(parent)),
+    };
+    if space.is_some_and(|space| *space != to) {
+        return Err(DriveError::Fixed(ACROSS_SPACES.to_owned()));
+    }
+    Ok((mounted(drive, to)?, parent))
+}
+
+/// One Space's place in an anchor.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct Mark {
+    space: String,
+    folder: String,
+    seq: i64,
+    local: i64,
+}
+
+/// Every shown Space's place now.
+fn marks_now(drive: &Drive) -> Result<Vec<Mark>, DriveError> {
+    drive
+        .space_folders()?
+        .into_iter()
+        .map(|(space, folder)| {
+            Ok(Mark {
+                seq: drive.current_seq(&space)?.0,
+                local: drive.current_local_seq(&space)?,
+                space: space.0,
+                folder,
+            })
+        })
+        .collect()
+}
+
+const ANCHOR_PREFIX: &str = "v2.";
+
+/// Keeps the marks and answers their anchor.
+fn save_anchor(drive: &Drive, marks: &[Mark]) -> Result<String, DriveError> {
+    let text = serde_json::to_string(marks).map_err(|error| DriveError::Store(error.to_string()))?;
+    Ok(format!("{ANCHOR_PREFIX}{}", drive.save_anchor(&text)?))
+}
+
+/// The marks an anchor names. Anything but a kept `v2.<token>` has expired.
+fn read_anchor(drive: &Drive, text: &str) -> Result<Vec<Mark>, DriveError> {
+    let token: i64 = text
+        .strip_prefix(ANCHOR_PREFIX)
+        .and_then(|token| token.parse().ok())
+        .ok_or(DriveError::AnchorExpired)?;
+    let kept = drive.anchor(token)?.ok_or(DriveError::AnchorExpired)?;
+    serde_json::from_str(&kept).map_err(|_| DriveError::AnchorExpired)
+}
+
+/// What changed in the drive since `since`: each Space's items, and the Spaces' folders.
+fn changes(drive: &Drive, since: &str, limit: usize) -> Result<Value, DriveError> {
+    let before = read_anchor(drive, since)?;
+    let mut values = Vec::new();
+    let mut marks = Vec::new();
+    let mut more = false;
+    for (space, folder) in drive.space_folders()? {
+        let current = (drive.current_seq(&space)?, drive.current_local_seq(&space)?);
+        let Some(mark) = before.iter().find(|mark| mark.space == space.0) else {
+            // Shown since: its folder, whose items come by listing it.
+            values.push(with_gone(folder_json(&space, &folder), false, false));
+            marks.push(Mark {
+                space: space.0.clone(),
+                folder,
+                seq: current.0 .0,
+                local: current.1,
+            });
+            continue;
+        };
+        if mark.seq > current.0 .0 || mark.local > current.1 {
+            // Misty's records of this Space were made again: macOS lists it all again.
+            return Err(DriveError::AnchorExpired);
+        }
+        if mark.folder != folder {
+            values.push(with_gone(folder_json(&space, &folder), false, false));
+        }
+        let (items, next, more_items) = drive.changes_since(&space, Seq(mark.seq), limit)?;
+        let listed: HashSet<&ItemId> = items.iter().map(|item| &item.id).collect();
+        values.extend(items.iter().map(|item| change_value(drive, &space, item)));
+        let (nodes, next_local, more_local) = drive.local_changes_since(&space, mark.local, limit)?;
+        values.extend(
+            nodes
+                .iter()
+                .filter(|node| !listed.contains(&node.id))
+                .map(|node| local_change_value(drive, &space, node)),
+        );
+        more |= more_items || more_local;
+        marks.push(Mark {
+            space: space.0.clone(),
+            folder,
+            seq: next.0,
+            local: next_local,
+        });
+    }
+    for mark in &before {
+        if !marks.iter().any(|now| now.space == mark.space) {
+            // The person left the Space: its folder leaves the Mac, and everything in it.
+            let space = SpaceId(mark.space.clone());
+            values.push(with_gone(folder_json(&space, &mark.folder), false, true));
+        }
+    }
+    let next_anchor = if marks == before {
+        since.to_owned()
+    } else {
+        save_anchor(drive, &marks)?
+    };
+    Ok(json!({ "items": values, "next_anchor": next_anchor, "more": more }))
+}
+
+/// One page of `entries`, from the request's `cursor`.
+fn page(request: &Value, entries: Vec<Value>) -> Value {
+    let start: usize = request
+        .get("cursor")
+        .and_then(Value::as_str)
+        .and_then(|cursor| cursor.parse().ok())
+        .unwrap_or(0);
+    let limit = request
+        .get("limit")
+        .and_then(Value::as_u64)
+        .unwrap_or(500)
+        .clamp(1, 5000) as usize;
+    let total = entries.len();
+    let page: Vec<Value> = entries.into_iter().skip(start).take(limit).collect();
+    let next = start + page.len();
+    json!({
+        "items": page,
+        "next_cursor": (next < total).then(|| next.to_string()),
+    })
 }
 
 async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value, DriveError> {
     let op = text(request, "op")?;
-    if op == "hello" {
-        let domains: Vec<Value> = drive
-            .mounted()
-            .into_iter()
-            .map(|mount| json!({ "domain": mount.domain, "space_id": mount.space, "name": mount.name }))
-            .collect();
-        return Ok(json!({
-            "protocol": PROTOCOL,
-            "account_id": drive.config().account_id,
-            "domains": domains,
-        }));
-    }
-    let domain = text(request, "domain")?;
-    let space = drive.space_of_domain(domain).ok_or(DriveError::NotMounted)?;
     match op {
-        "list" => {
-            let parent = parent_of(request)?;
-            let mut children = drive.list(&space, parent.as_ref())?;
-            children.sort_by(|a, b| a.name.cmp(&b.name));
-            let start: usize = request
-                .get("cursor")
-                .and_then(Value::as_str)
-                .and_then(|cursor| cursor.parse().ok())
-                .unwrap_or(0);
-            let limit = request
-                .get("limit")
-                .and_then(Value::as_u64)
-                .unwrap_or(500)
-                .clamp(1, 5000) as usize;
-            let page: Vec<Value> = children
-                .iter()
-                .skip(start)
-                .take(limit)
-                .map(|node| node_value(drive, &space, node))
+        "hello" => {
+            let spaces: Vec<Value> = drive
+                .space_folders()?
+                .into_iter()
+                .map(|(space, folder)| {
+                    json!({
+                        "space_id": space,
+                        "folder": folder,
+                        "mounted": drive.mount_of(&space).is_some(),
+                    })
+                })
                 .collect();
-            let next = start + page.len();
             Ok(json!({
-                "items": page,
-                "next_cursor": (next < children.len()).then(|| next.to_string()),
+                "protocol": PROTOCOL,
+                "account_id": drive.config().account_id,
+                "spaces": spaces,
             }))
         }
-        "item" => {
-            let id = item_id(request, "item_id")?;
-            let node = drive.node(&space, &id)?.ok_or(DriveError::NotFound)?;
-            Ok(json!({ "item": node_value(drive, &space, &node) }))
+        "list" => {
+            let entries = match place_of(drive, request, "parent")? {
+                Place::Root => drive
+                    .space_folders()?
+                    .iter()
+                    .map(|(space, folder)| folder_json(space, folder))
+                    .collect(),
+                Place::Space(space) => {
+                    let space = mounted(drive, space)?;
+                    sorted(drive.list(&space, None)?)
+                        .iter()
+                        .map(|node| node_value(drive, &space, node))
+                        .collect()
+                }
+                Place::Item(space, parent) => {
+                    let space = mounted(drive, space)?;
+                    sorted(drive.list(&space, Some(&parent))?)
+                        .iter()
+                        .map(|node| node_value(drive, &space, node))
+                        .collect()
+                }
+            };
+            Ok(page(request, entries))
         }
+        "item" => match place_of(drive, request, "item_id")? {
+            Place::Space(space) => {
+                let folder = drive
+                    .space_folders()?
+                    .into_iter()
+                    .find(|(shown, _)| *shown == space)
+                    .map(|(_, folder)| folder)
+                    .ok_or(DriveError::NotFound)?;
+                Ok(json!({ "item": folder_json(&space, &folder) }))
+            }
+            Place::Item(space, id) => {
+                let space = mounted(drive, space)?;
+                let node = drive.node(&space, &id)?.ok_or(DriveError::NotFound)?;
+                Ok(json!({ "item": node_value(drive, &space, &node) }))
+            }
+            Place::Root => Err(DriveError::Invalid("The request has no item_id.".to_owned())),
+        },
         "fetch" => {
-            let id = item_id(request, "item_id")?;
+            let (space, id) = item_of(drive, request)?;
             let to = staging.join(uuid::Uuid::new_v4().to_string());
             let node = drive.fetch_to(&space, &id, &to).await?;
             Ok(json!({ "item": node_value(drive, &space, &node), "path": to }))
@@ -458,6 +699,7 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
                 "file" => Kind::File,
                 _ => return Err(DriveError::Invalid("An item is a file or a folder.".to_owned())),
             };
+            let (space, parent) = destination(drive, request, None)?;
             let id = match request.get("item_id") {
                 None | Some(Value::Null) => None,
                 Some(_) => Some(item_id(request, "item_id")?),
@@ -466,7 +708,7 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
             let node = drive.create_resolving(
                 &space,
                 NewNode {
-                    parent: parent_of(request)?,
+                    parent,
                     name: text(request, "name")?.to_owned(),
                     kind,
                     content: staged(request, staging)?,
@@ -482,13 +724,13 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
             Ok(json!({ "item": node_value(drive, &space, &node) }))
         }
         "modify" => {
-            let id = item_id(request, "item_id")?;
+            let (space, id) = item_of(drive, request)?;
             let base = request
                 .get("base_version")
                 .and_then(Value::as_i64)
                 .map(crate::Version);
             let parent = if request.get("parent").is_some() {
-                Some(parent_of(request)?)
+                Some(destination(drive, request, Some(&space))?.1)
             } else {
                 None
             };
@@ -517,8 +759,8 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
             Ok(json!({ "item": node_value(drive, &space, &node), "refetch": refetch }))
         }
         "trash" => {
-            let id = item_id(request, "item_id")?;
-            drive.trash_now(&space, &id, TrashBy::Person).await?;
+            let (space, id) = item_of(drive, request)?;
+            drive.trash_from_os_now(&space, &id).await?;
             Ok(Value::Object(Map::new()))
         }
         "changes_since" => {
@@ -527,44 +769,11 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
                 .and_then(Value::as_u64)
                 .unwrap_or(500)
                 .clamp(1, 5000) as usize;
-            let since = match request.get("since").and_then(Value::as_str) {
-                Some(text) => Some(parse_anchor(text)?),
-                None => None,
-            };
-            let seq = match since {
-                Some((seq, _)) => seq,
-                None => Seq(request.get("seq").and_then(Value::as_i64).unwrap_or(0).max(0)),
-            };
-            let (items, next, more) = drive.changes_since(&space, seq, limit)?;
-            let listed: HashSet<&ItemId> = items.iter().map(|item| &item.id).collect();
-            let mut values: Vec<Value> = items
-                .iter()
-                .map(|item| change_value(drive, &space, item))
-                .collect();
-            let Some((_, local)) = since else {
-                return Ok(json!({ "items": values, "next_seq": next, "more": more }));
-            };
-            let (nodes, next_local, more_local) = drive.local_changes_since(&space, local, limit)?;
-            values.extend(
-                nodes
-                    .iter()
-                    .filter(|node| !listed.contains(&node.id))
-                    .map(|node| local_change_value(drive, &space, node)),
-            );
-            Ok(json!({
-                "items": values,
-                "next_anchor": anchor(next, next_local),
-                "next_seq": next,
-                "more": more || more_local,
-            }))
+            changes(drive, text(request, "since")?, limit)
         }
-        "current_seq" => {
-            let seq = drive.current_seq(&space)?;
-            let local = drive.current_local_seq(&space)?;
-            Ok(json!({ "seq": seq, "anchor": anchor(seq, local) }))
-        }
+        "current_seq" => Ok(json!({ "anchor": save_anchor(drive, &marks_now(drive)?)? })),
         "used" => {
-            let id = item_id(request, "item_id")?;
+            let (space, id) = item_of(drive, request)?;
             let at = request
                 .get("at_ms")
                 .and_then(Value::as_i64)
@@ -573,17 +782,22 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
             Ok(Value::Object(Map::new()))
         }
         "open" => {
-            let id = item_id(request, "item_id")?;
+            let (space, id) = item_of(drive, request)?;
             let editing = request.get("editing").and_then(Value::as_bool).unwrap_or(false);
             drive.open(&space, &id, editing).await?;
             Ok(Value::Object(Map::new()))
         }
         "close" => {
-            let id = item_id(request, "item_id")?;
+            let (space, id) = item_of(drive, request)?;
             let editing = request.get("editing").and_then(Value::as_bool).unwrap_or(false);
             drive.close(&space, &id, editing).await;
             Ok(Value::Object(Map::new()))
         }
         _ => Err(DriveError::Unsupported(format!("Misty doesn't know “{op}”."))),
     }
+}
+
+fn sorted(mut nodes: Vec<Node>) -> Vec<Node> {
+    nodes.sort_by(|a, b| a.name.cmp(&b.name));
+    nodes
 }

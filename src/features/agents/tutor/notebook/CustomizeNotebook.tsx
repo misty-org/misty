@@ -55,7 +55,7 @@ export function CustomizeNotebook({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent aria-describedby={undefined} className="w-140 max-w-[calc(100vw-3rem)]">
+      <DialogContent aria-describedby={undefined} className="w-140 max-w-[calc(100vw-var(--spacing)*12)]">
         <DialogTitle>Customize notebook</DialogTitle>
         {/* Mounted only while open, so it starts from the notebook as it is now. */}
         {open && <CustomizeForm notebook={notebook} onClose={onClose} />}

@@ -74,7 +74,7 @@ export function pointLayout(
 export function pointBubbleText(point: PresentedPoint, random = Math.random) {
   const label = point.label.trim();
   const said = label || POINTER_PHRASES[Math.floor(random() * POINTER_PHRASES.length)];
-  return point.guide ? `${point.guide.step} of ${point.guide.total} · ${said}` : said;
+  return point.guide ? `Step ${point.guide.step} of ${point.guide.total}: ${said}` : said;
 }
 
 const FOCUS_PADDING = 6;

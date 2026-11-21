@@ -26,7 +26,7 @@ export function ChatTitle({
     return (
       <span className="min-w-0 flex-1" aria-busy>
         {/* A new conversation's name while its separate title call runs. */}
-        <Skeleton className="inline-block h-[0.75em] w-[min(9rem,70%)] rounded-full align-middle" />
+        <Skeleton className="inline-block h-[0.75em] w-[min(--spacing(36),70%)] rounded-full align-middle" />
         <span className="sr-only">Naming this conversation</span>
       </span>
     );
@@ -35,7 +35,7 @@ export function ChatTitle({
       {agent?.name ? `${agent.name} ` : null}
       {agent?.name ? (
         <Text bare tone="muted" weight="regular">
-          {`· ${conversation ? conversation.title || "Untitled conversation" : "New chat"}`}
+          {conversation ? conversation.title || "Untitled conversation" : "New chat"}
         </Text>
       ) : conversation ? (
         conversation.title || "Untitled conversation"

@@ -19,7 +19,7 @@ export function TypeSection() {
   return (
     <GallerySection title="Type and long text">
       {sizes.map((item) => (
-        <GalleryRow key={item.size} label={`${item.size} · ${item.px}px`}>
+        <GalleryRow key={item.size} label={`${item.size} at ${item.px}px`}>
           <Text size={item.size}>{item.use}</Text>
         </GalleryRow>
       ))}

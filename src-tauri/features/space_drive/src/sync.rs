@@ -217,6 +217,8 @@ async fn pull(inner: &Inner, space: &SpaceId, touched: &mut Touched) -> Result<b
     for item in revived {
         let shown = inner.store.node(space, &item.id)?;
         inner.events.notice(&Notice {
+            count: None,
+            burst: None,
             kind: NoticeKind::Revived,
             space_id: space.clone(),
             name: shown.as_ref().map_or_else(|| item.name.clone(), |node| node.name.clone()),
@@ -257,6 +259,8 @@ fn save_replaced(inner: &Inner, space: &SpaceId, copy: &Item) {
             })
         });
     inner.events.notice(&Notice {
+        count: None,
+        burst: None,
         kind: NoticeKind::SaveReplaced,
         space_id: space.clone(),
         name,
@@ -1004,6 +1008,8 @@ async fn update_up(
                 undo_place(inner, space, &node, touched)?;
                 let wanted = node.name.clone();
                 inner.events.notice(&Notice {
+                    count: None,
+                    burst: None,
                     kind: NoticeKind::DeleteRefusedInUse,
                     space_id: space.clone(),
                     name: wanted,
@@ -1187,6 +1193,8 @@ fn remove_clean(
             if let Some(server) = server {
                 noticed = true;
                 inner.events.notice(&Notice {
+                    count: None,
+                    burst: None,
                     kind: NoticeKind::DeletedWhileOpen,
                     space_id: space.clone(),
                     name: row.name.clone(),
@@ -1270,6 +1278,8 @@ async fn trash_up(
                 lock(&mounted.trash_results).insert(id.clone(), Err(DriveError::InUse(line)));
                 let first = who.first();
                 inner.events.notice(&Notice {
+                    count: None,
+                    burst: None,
                     kind: NoticeKind::DeleteRefusedInUse,
                     space_id: space.clone(),
                     name: node.name.clone(),

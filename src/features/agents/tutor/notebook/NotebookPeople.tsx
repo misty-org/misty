@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNow } from "@/shared/hooks/useNow";
 import { Button, OverflowFadeText, Text } from "@misty/ui";
-import { shortAgo } from "../../page/useChatStatuses";
+import { agoWords } from "../../page/useChatStatuses";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { NOTEBOOK_DOC_PREFIX } from "../notebookMarkdown";
 import { liveNotebook } from "../notebookLive";
@@ -191,8 +191,8 @@ export function NotebookPeople({
       {activity ? (
         <Text bare size="caption" tone="muted" className="mr-2 min-w-0 max-w-60">
           <OverflowFadeText full>
-            {activityWords(doerName(activity.done, me, spaceId, gateway.memberName), activity)} ·{" "}
-            {shortAgo(activity.done.at, now)}
+            {activityWords(doerName(activity.done, me, spaceId, gateway.memberName), activity)}{" "}
+            {agoWords(activity.done.at, now)}
           </OverflowFadeText>
         </Text>
       ) : null}

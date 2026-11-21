@@ -9,6 +9,7 @@ const validSections = new Set([
   "explore",
   "files",
   "app",
+  "voice",
   "members",
   "settings",
 ]);
@@ -26,7 +27,7 @@ interface SpaceRoute {
   settingsSection: string;
   libraryCollection: string;
   conversationId: string | null;
-  /** The app open on its page (`/app/<id>`). */
+  /** The app open on its page (`/app/<id>`), or the voice channel (`/voice/<id>`). */
   itemId: string;
 }
 
@@ -54,8 +55,11 @@ export function useSpaceRoute(): SpaceRoute {
       : "general",
     libraryCollection: search.get("collection") ?? "recent",
     conversationId: search.get("conversation"),
-    // An app opens at /app/<id>.
-    itemId: routeSection === "app" ? decodeRouteSegment(routeParts[3] ?? "") : "",
+    // An app opens at /app/<id>, a voice channel's call at /voice/<id>.
+    itemId:
+      routeSection === "app" || routeSection === "voice"
+        ? decodeRouteSegment(routeParts[3] ?? "")
+        : "",
   };
 }
 

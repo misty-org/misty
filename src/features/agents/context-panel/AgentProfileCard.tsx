@@ -48,7 +48,7 @@ export function AgentProfileCard(props: { agent: AgentProfile; onClose(): void }
             <Badge variant="secondary">Agent</Badge>
           </div>
           <Text size="meta" tone="muted">
-            {homeSpace ? `${engine} · ${homeSpace.name}` : engine}
+            {homeSpace ? `${engine} in ${homeSpace.name}` : engine}
           </Text>
         </div>
         {about ? (

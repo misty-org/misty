@@ -65,7 +65,7 @@ export function WaitingForYouCard({
       <div className="flex items-center gap-2">
         <QuestionChip>Waiting for you</QuestionChip>
         <Text bare size="caption" tone="muted" className="flex-1">
-          {agentName} · {wait.targetLabel || "Misty"}
+          {wait.targetLabel ? `${agentName} in ${wait.targetLabel}` : agentName}
         </Text>
       </div>
       <QuestionText>{interventionLabels[wait.action]}</QuestionText>

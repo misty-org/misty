@@ -31,7 +31,7 @@ it("shows a skeleton first, then grants by agent, and revokes one", async () => 
   expect(screen.queryByText(/Loading/)).toBeNull();
   await act(async () => resolve({ grants: [push] }));
   expect(screen.getByText("Remove the weekly digest schedule")).toBeTruthy();
-  expect(screen.getByText(/Builder · Not used yet/)).toBeTruthy();
+  expect(screen.getByText(/For Builder, not used yet/)).toBeTruthy();
   mocks.revoke.mockResolvedValueOnce(undefined);
   mocks.list.mockResolvedValueOnce({ grants: [] });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Revoke" })));

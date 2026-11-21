@@ -42,6 +42,26 @@ export function driveNoticeOptions(notice: DriveNotice): Parameters<typeof notif
     }
     case "revived":
       return { message: `${by}'s edit brought ${name} back` };
+    case "deletes_held": {
+      const burst = notice.burst;
+      const count = notice.count ?? 0;
+      const files = count === 1 ? "1 file was" : `${count} files were`;
+      // Nothing went before the stop (one big folder): say what was kept.
+      if (count === 0) return { message: `That would delete too much of ${name}, so Misty kept it` };
+      return {
+        message: `${files} deleted from ${name} at once, so Misty kept the rest`,
+        action:
+          burst
+            ? {
+                label: "Undo",
+                onSelect: () =>
+                  void driveNative
+                    .restoreBurst(spaceId, burst)
+                    .catch(failed(`The deleted files in ${name} couldn't be put back. Try again.`)),
+              }
+            : undefined,
+      };
+    }
     default:
       return null;
   }
@@ -52,7 +72,7 @@ let stop: (() => void) | null = null;
 /**
  * Shows the drive's notices (`misty://drive-notice`) as Misty's own notices, each with at most one
  * action: Restore for a file deleted while open, and for a save someone else's save replaced (its
- * copy waits in the trash).
+ * copy waits in the trash); Undo for a run of deletes the delete guard stopped.
  * Started once for the window; calling it again does nothing. Returns the function that stops it.
  */
 export function startDriveNotices(): () => void {

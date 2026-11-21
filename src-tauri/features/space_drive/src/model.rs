@@ -219,6 +219,10 @@ pub enum NoticeKind {
     SaveReplaced,
     /// Someone's edit brought back an item the person trashed.
     Revived,
+    /// The delete guard stopped a burst of deletes from the OS (`crate::guard`): `name` is the
+    /// Space's folder, `count` how many files the burst deleted before it stopped, and `burst`
+    /// what Undo puts back.
+    DeletesHeld,
 }
 
 /// A notice for the person, sent as `misty://drive-notice {kind, space_id, name, by}`.
@@ -241,6 +245,12 @@ pub struct Notice {
     /// The computer of whoever has it open, for `delete_refused_in_use`.
     #[serde(default)]
     pub device_name: Option<String>,
+    /// How many files, for `deletes_held`.
+    #[serde(default)]
+    pub count: Option<u64>,
+    /// The burst of deletes Undo puts back, for `deletes_held`.
+    #[serde(default)]
+    pub burst: Option<String>,
 }
 
 /// Where a Space's sync stands, for `misty://drive-status`.

@@ -76,7 +76,6 @@ import {
   Rocket,
   Route,
   Scale,
-  ScrollText,
   Search,
   Server,
   Settings2,

@@ -110,7 +110,7 @@ export function EmbeddedUniversalPreviewView(props: {
         tone="card"
         edge="hairline"
         radius="xl"
-        className="grid w-[min(32.5rem,90%)] justify-items-center gap-5 p-8 text-center shadow-xs"
+        className="grid w-[min(--spacing(130),90%)] justify-items-center gap-5 p-8 text-center shadow-xs"
       >
         <Text bare tone="muted" className="text-5xl">
           ♫

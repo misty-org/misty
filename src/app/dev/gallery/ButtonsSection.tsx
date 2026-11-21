@@ -36,7 +36,7 @@ export function ButtonsSection() {
   return (
     <GallerySection title="Buttons">
       <GalleryMatrix
-        columns={buttonSizes.map((size) => `${size} · ${sizePx[size]}px`)}
+        columns={buttonSizes.map((size) => `${size} at ${sizePx[size]}px`)}
         rows={buttonVariants.map((variant) => ({
           label: variant,
           cells: buttonSizes.map((size) => (
@@ -47,7 +47,7 @@ export function ButtonsSection() {
         }))}
       />
       <GalleryMatrix
-        columns={buttonSizes.map((size) => `${size} · ${sizePx[size]}px`)}
+        columns={buttonSizes.map((size) => `${size} at ${sizePx[size]}px`)}
         rows={[
           ...buttonVariants.map((variant) => ({
             label: `${variant}, disabled`,
@@ -78,7 +78,7 @@ function IconButtonsRows() {
   return (
     <>
       <GalleryMatrix
-        columns={iconSizes.map((size) => `${size} · ${size === "sm" ? 24 : 32}px`)}
+        columns={iconSizes.map((size) => `${size} at ${size === "sm" ? 24 : 32}px`)}
         rows={iconVariants.map((variant) => ({
           label: `IconButton ${variant}`,
           cells: iconSizes.map((size) => (

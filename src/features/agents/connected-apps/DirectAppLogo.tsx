@@ -60,7 +60,7 @@ export function DirectAppLogo({
         alt=""
         width={size}
         height={size}
-        className="rounded-[0.25rem] object-contain"
+        className="rounded-sm object-contain"
         draggable={false}
       />
     );

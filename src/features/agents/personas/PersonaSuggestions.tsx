@@ -17,7 +17,7 @@ export async function personaSuggestions(query: string) {
     // Matched on the token and the persona's own name together.
     name: personaToken(persona.id),
     label: persona.name,
-    description: `${persona.icon ? `${persona.icon} ` : ""}${persona.name} · ${persona.description}`,
+    description: `${persona.icon ? `${persona.icon} ` : ""}${persona.description}`,
     insert: `#${personaToken(persona.id)} `,
     icon: "persona" as const,
     persona: persona.id,

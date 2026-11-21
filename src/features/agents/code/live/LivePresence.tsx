@@ -19,7 +19,7 @@ export function LivePresence() {
       {shown.map((person) => (
         <Tooltip
           key={person.id}
-          content={person.path ? `${person.name} · ${person.path}` : person.name}
+          content={person.path ? `${person.name} in ${person.path}` : person.name}
         >
           <span className="inline-flex">
             <PersonAvatar

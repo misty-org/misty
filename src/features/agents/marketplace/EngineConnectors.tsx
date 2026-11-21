@@ -17,9 +17,9 @@ const origins: Record<EngineConnector["origin"], string> = {
 
 /** What is wrong with a connector, in words; nothing when it works. */
 const problems: Partial<Record<EngineConnector["state"], string>> = {
-  needs_sign_in: "Needs sign-in in Claude Code",
-  failed: "Couldn’t connect",
-  pending: "Waiting for approval in Claude Code",
+  needs_sign_in: "needs sign-in in Claude Code",
+  failed: "couldn’t connect",
+  pending: "waiting for approval in Claude Code",
 };
 
 /** An app's key for Misty's brand artwork: "Google Drive" is `google-drive`. */
@@ -91,7 +91,7 @@ export function EngineConnectors() {
                   {origins[connector.origin]}
                   {problem ? (
                     <>
-                      {" · "}
+                      {", "}
                       <Text bare tone="waiting">
                         {problem}
                       </Text>

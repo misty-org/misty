@@ -2382,10 +2382,12 @@ fn trash(info: &CF_CALLBACK_INFO, request: Request, ack: fn(&Request, NTSTATUS))
         let root = task_root;
         let result = root
             .drive
-            .trash_now(&root.space, &identity.id, TrashBy::Person)
+            .trash_from_os_now(&root.space, &identity.id)
             .await;
         let status = match result {
             Err(DriveError::InUse(_)) => STATUS_CLOUD_FILE_IN_USE,
+            // The delete guard stopped a run of deletes: the file stays.
+            Err(DriveError::Held(_)) => STATUS_CLOUD_FILE_UNSUCCESSFUL,
             Err(DriveError::Changed) => STATUS_CLOUD_FILE_NOT_IN_SYNC,
             // The server refused for another reason and the item came back.
             Err(DriveError::Invalid(_)) => STATUS_CLOUD_FILE_UNSUCCESSFUL,

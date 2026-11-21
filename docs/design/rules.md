@@ -31,6 +31,7 @@ baseline only shrinks. Write code that never trips one, rather than code that wa
 - `mono-outside-code`: monospace only inside code itself (the editor, diffs, the terminal, code blocks), never for paths, IDs, URLs, model names or shortcuts: use Text or OverflowFadeText
 - `loading-text`: never loading text: first loads use a Skeleton shaped like the content (ListRowSkeleton, SkeletonList), or PaneLoading when its shape depends on the data, and work on a click disables its Button while progress shows where the work happens
 - `status-word`: no loose status words: changes save themselves, and a failure shows next to what failed (FieldError, or notify with tone danger)
+- `middle-dot`: no middle dot between facts ("Sam made Harbor · just now"): give the time or state its own place at the row's end, say it in plain words ("3 replies from Ana"), split it into a label and a description, or use a comma; never another separator glyph
 - `legacy-button-variant`: Button and IconButton variants are primary, secondary, quiet and danger (IconButton also overlay; store actions get and get-filled): default and outline → secondary, ghost, toolbar and link → quiet, destructive → danger, chip → ChoiceGroup or FilterChip. An old variant's size sm is 32: make it md
 - `legacy-button-size`: Button sizes are sm 24, md 32 and lg 36 (xs → sm, default and chip → md); IconButton sizes are sm 24 and md 32 (2xs and xs → sm, lg → md)
 - `raw-menu-row`: every menu row is a MenuItem, MenuCheckItem, MenuRadioItem or MenuSubmenu; never a raw DropdownMenu or ContextMenu item

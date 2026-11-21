@@ -34,10 +34,9 @@ export function LiveStatus({
     >
       <StepDot state="working" size="sm" />
       <OverflowFadeText className="misty-shimmer min-w-0">{phrase}</OverflowFadeText>
-      {elapsed >= 1000 ? <span className="shrink-0">· {tookText(elapsed)}</span> : null}
+      {elapsed >= 1000 ? <span className="shrink-0">{tookText(elapsed)}</span> : null}
       {tokens > 0 ? (
         <span className="inline-flex shrink-0 items-center gap-1">
-          ·
           <RollingStat value={tokens} />
           {tokens === 1 ? "token" : "tokens"}
         </span>

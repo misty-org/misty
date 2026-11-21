@@ -80,8 +80,8 @@ function ordered(notebooks: Notebook[], sort: Sort): Notebook[] {
 
 /** A notebook as a row: its mark, title over what's happening, its facts, who, its menu. */
 const rowGrid =
-  "grid w-full grid-cols-[1.75rem_minmax(0,1fr)_minmax(0,13.75rem)_4.5rem_2rem] items-center gap-3 px-2 " +
-  "@max-[38.75rem]:grid-cols-[1.75rem_minmax(0,1fr)_4.5rem_2rem] @max-[38.75rem]:[&>:nth-child(3)]:hidden";
+  "grid w-full grid-cols-[--spacing(7)_minmax(0,1fr)_minmax(0,--spacing(55))_--spacing(18)_--spacing(8)] items-center gap-3 px-2 " +
+  "@max-[38.75rem]:grid-cols-[--spacing(7)_minmax(0,1fr)_--spacing(18)_--spacing(8)] @max-[38.75rem]:[&>:nth-child(3)]:hidden";
 /** Each row stands on a hairline. */
 const rowEdge = "min-h-12 border-0 border-b text-left";
 
@@ -130,7 +130,7 @@ function LabFaces({ spaceId, members }: { spaceId: string; members: TeamMember[]
       {members.slice(0, 4).map((member) => (
         <Tooltip
           key={member.userId}
-          content={member.notebook ? `${member.name} · ${member.notebook}` : member.name}
+          content={member.notebook ? `${member.name} in ${member.notebook}` : member.name}
         >
           <span className="inline-flex">
             <PersonAvatar

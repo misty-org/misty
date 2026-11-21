@@ -65,8 +65,8 @@ export function AgentPlanCard({
         head={
           <>
             <span>
-              Plan · {payload.title} · version {plan.version}
-              {plan.author === "user" ? " · edited by you" : ""}
+              Plan: {payload.title}, version {plan.version}
+              {plan.author === "user" ? ", edited by you" : ""}
             </span>
             <span>Risk</span>
           </>
@@ -122,7 +122,7 @@ export function AgentPlanCard({
                 <span>Version {item.version}</span>
                 <span>{item.title}</span>
                 <Text as="small" bare tone="muted">
-                  {item.author === "user" ? "Edited by you" : "Proposed"} ·{" "}
+                  {item.author === "user" ? "Edited by you" : "Proposed"},{" "}
                   {item.state === "rejected" ? "dismissed" : item.state}
                 </Text>
               </Text>

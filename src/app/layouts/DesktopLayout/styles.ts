@@ -45,14 +45,14 @@ export function desktopTitlebarNavigationGeometry(
  * 46px wide each, the way Windows draws its own caption buttons. */
 export const windowsStandardControlsClass = [
   "misty-windows-standard-controls pointer-events-auto absolute right-0 top-0 z-[3] flex",
-  "h-[var(--shell-titlebar,2.375rem)] w-max flex-nowrap items-stretch",
+  "h-[var(--shell-titlebar,calc(var(--spacing)*9.5))] w-max flex-nowrap items-stretch",
 ].join(" ");
 export const windowsStandardControlButtonClass =
   "grid w-11.5 shrink-0 place-items-center rounded-none border-0 bg-transparent p-0 transition-colors";
 /** Close turns red with a white glyph under the pointer, as it does in every Windows app. */
 export const windowsCloseControlButtonClass = [
   windowsStandardControlButtonClass,
-  "hover:bg-[#c42b1c] hover:text-white active:bg-[#c42b1c]/90 active:text-white",
+  "hover:bg-window-close hover:text-white active:bg-window-close/90 active:text-white",
 ].join(" ");
 /** The same buttons seated at the tab row's end: as tall as its 32px buttons and on their line,
  * a little wider, as caption buttons are. */
@@ -61,11 +61,11 @@ export const windowsInlineControlButtonClass =
   "grid h-8 w-10 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 transition-colors";
 export const windowsInlineCloseButtonClass = [
   windowsInlineControlButtonClass,
-  "hover:bg-[#c42b1c] hover:text-white active:bg-[#c42b1c]/90 active:text-white",
+  "hover:bg-window-close hover:text-white active:bg-window-close/90 active:text-white",
 ].join(" ");
 /** Windows' own caption glyphs, at the size the system draws them. */
 export const windowsSystemGlyphClass =
-  "font-['Segoe_Fluent_Icons','Segoe_MDL2_Assets'] text-[10px] leading-none font-normal";
+  "font-['Segoe_Fluent_Icons','Segoe_MDL2_Assets'] text-window-glyph leading-none font-normal";
 
 export const frameOverlayBaseClass = [
   "pointer-events-none fixed right-3 top-10 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto]",

@@ -2,9 +2,10 @@ import { create } from "zustand";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 
 const sidebarWidthDefault = 320;
-/** The narrowest the sidebar goes: the window controls, the sidebar toggle, and back and forward
- * all still fit in its head. */
-export const sidebarWidthMin = 200;
+/** The narrowest the sidebar goes, in design pixels: its whole head still fits (the window
+ * controls, the sidebar toggle, Personal or Spaces, and back and forward). Keep in step with
+ * `--sidebar-w`'s floor in SidebarDrawer. */
+export const sidebarWidthMin = 280;
 const sidebarWidthMax = 480;
 
 const clamp = (value: number) =>

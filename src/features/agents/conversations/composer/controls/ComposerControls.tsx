@@ -292,7 +292,7 @@ export function modelEffortItem(props: {
   return {
     id: "model",
     icon: icon as ActionBarItem["icon"],
-    label: effort ? `${shown} · ${effortLabel(effort, current)}` : shown,
+    label: effort ? `${shown}, ${effortLabel(effort, current)}` : shown,
     priority: 6,
     shrink: true,
     disabled: props.disabled,

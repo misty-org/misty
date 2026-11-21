@@ -405,6 +405,7 @@ macro_rules! with_more_commands {
             crate::spaces_drive::commands::drive_trash,
             crate::spaces_drive::commands::drive_trash_list,
             crate::spaces_drive::commands::drive_restore,
+            crate::spaces_drive::commands::drive_restore_burst,
             crate::spaces_drive::commands::drive_purge,
             crate::spaces_drive::commands::drive_copy_in,
             crate::spaces_drive::commands::drive_reveal,

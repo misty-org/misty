@@ -88,7 +88,7 @@ export function RoleEditor(props: {
                 role="radiogroup"
                 aria-label="Role color"
                 // A palette: even columns of 20px swatches, as many as the width holds.
-                className="grid grid-cols-[repeat(auto-fill,1.25rem)] gap-2"
+                className="grid grid-cols-[repeat(auto-fill,--spacing(5))] gap-2"
               >
                 <ColorSwatch
                   radio

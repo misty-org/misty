@@ -57,6 +57,29 @@ pub fn start(
     })
 }
 
+/// Opens everything the computer plays except Misty (its own process and the
+/// WebKit processes that play its pages' sound, so a call's voices never go
+/// back into it), for the sound of a shared screen. `on_chunk` gets 48 kHz
+/// stereo PCM16, interleaved, in chunks whose `start_frame` and `samples`
+/// count single samples, not frames. macOS 14.2 or later only.
+pub fn start_share(
+    on_chunk: impl Fn(PcmChunk) + Send + Sync + 'static,
+    on_failure: impl Fn(CaptureError) + Send + Sync + 'static,
+) -> Result<Capture, CaptureError> {
+    #[cfg(target_os = "macos")]
+    {
+        let running = platform::start_share(Arc::new(on_chunk), Arc::new(on_failure))?;
+        Ok(Capture {
+            inner: Some(running),
+        })
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (on_chunk, on_failure);
+        Err(CaptureError::Unsupported("Sharing a screen's sound"))
+    }
+}
+
 /// The default microphone's name and the apps currently playing audio.
 pub fn capture_sources() -> Result<CaptureSources, CaptureError> {
     platform::capture_sources()

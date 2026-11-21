@@ -316,7 +316,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
         onDragOver={contained}
         onDrop={contained}
         className={cn(
-          "h-[min(35rem,calc(100dvh-8rem))] w-[min(56.25rem,calc(100vw-4rem))] max-w-none",
+          "h-[min(--spacing(140),calc(100dvh-var(--spacing)*32))] w-[min(--spacing(225),calc(100vw-var(--spacing)*16))] max-w-none",
           "gap-0 overflow-hidden rounded-xl p-0",
           "[&>[data-slot=dialog-close]]:hidden",
         )}

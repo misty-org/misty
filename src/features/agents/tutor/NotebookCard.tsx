@@ -11,7 +11,7 @@ import {
   Tooltip,
   cn,
 } from "@misty/ui";
-import { shortAgo } from "../page/useChatStatuses";
+import { agoWords } from "../page/useChatStatuses";
 import { spacesGateway } from "../spaces-gateway/spacesGateway";
 import { useTeamMembers } from "../now/teamMembers";
 import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
@@ -128,7 +128,12 @@ function useCardFacts(notebook: Notebook): CardFacts {
       ? `${made.length} ${made.length === 1 ? nouns[made[0]!.kind] : plural(nouns[made[0]!.kind])}`
       : `${made.length} made`;
   const sources = `${notebook.sources.length} ${notebook.sources.length === 1 ? "source" : "sources"}`;
-  const meta = [sources, madeWords, shortAgo(notebook.updatedAt, now)].filter(Boolean).join(" · ");
+  const meta = [
+    madeWords ? `${sources} and ${madeWords}` : sources,
+    agoWords(notebook.updatedAt, now, "updated"),
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   const maker = notebook.createdBy ?? me;
   const by =

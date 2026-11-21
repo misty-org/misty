@@ -19,7 +19,7 @@ export interface TeamMember {
 /** Where a member is, in a few words for their row. */
 export function placeWords(member: Pick<TeamMember, "place" | "notebook">): string {
   if (member.place === "lab")
-    return member.notebook ? `In the Lab · ${member.notebook}` : "In the Lab";
+    return member.notebook ? `In ${member.notebook} in the Lab` : "In the Lab";
   return "In the Space";
 }
 

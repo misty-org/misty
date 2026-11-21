@@ -24,7 +24,7 @@ import {
   tourCorner,
 } from "@/features/agents";
 import { browserLibrary } from "@/features/browser";
-import { callsForApps } from "@/features/direct";
+import { callsForApps, VoiceChannelPage } from "@/features/direct";
 import { noteAsk, vocativeRouting, voiceCleanup, voiceDevice, voiceEngine } from "@/features/voice";
 import {
   SetupStepBody,
@@ -42,6 +42,7 @@ import {
   handoffGateway,
   liveGateway,
   appCallsHost,
+  voiceChannelPage,
   pageMisty,
   resetSpacesAccountState,
   spaceRequest,
@@ -80,6 +81,7 @@ filesPage.provide(FilesPage);
 startFilesReveal();
 
 appCallsHost.provide(callsForApps);
+voiceChannelPage.provide(VoiceChannelPage);
 
 spacesGateway.provide({
   ...handoffGateway,

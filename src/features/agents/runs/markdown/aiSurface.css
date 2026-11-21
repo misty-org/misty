@@ -45,12 +45,12 @@
 .misty-markdown-message ol,
 .misty-markdown-message pre,
 .misty-markdown-message blockquote {
-  margin: 0.55rem 0;
+  margin: calc(var(--spacing) * 2.2) 0;
 }
 
 .misty-markdown-message ul,
 .misty-markdown-message ol {
-  padding-left: 1.25rem;
+  padding-left: calc(var(--spacing) * 5);
 }
 
 .misty-markdown-message ul {
@@ -62,17 +62,17 @@
 }
 
 .misty-markdown-message code {
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   background: rgb(255 255 255 / 7%);
-  padding: 0.08rem 0.25rem;
+  padding: calc(var(--spacing) * 0.32) var(--spacing);
   font-size: var(--text-meta);
 }
 
 .misty-markdown-message pre {
   overflow-x: auto;
-  border-radius: 0.5rem;
+  border-radius: calc(var(--spacing) * 2);
   background: rgb(0 0 0 / 28%);
-  padding: 0.75rem;
+  padding: calc(var(--spacing) * 3);
 }
 
 .misty-markdown-message pre code {

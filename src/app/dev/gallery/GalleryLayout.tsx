@@ -65,7 +65,7 @@ export function GalleryMatrix(props: {
   return (
     <div
       className="grid items-center gap-x-4 gap-y-3"
-      style={{ gridTemplateColumns: `160px repeat(${props.columns.length}, max-content)` }}
+      style={{ gridTemplateColumns: `calc(var(--spacing) * 40) repeat(${props.columns.length}, max-content)` }}
     >
       <span />
       {props.columns.map((column) => (

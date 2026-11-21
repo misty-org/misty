@@ -42,7 +42,7 @@ it("shows nothing, not a placeholder or loading text, until it knows whether a c
 it("summarizes, then lists steps with their status in words", async () => {
   useCollaborationStore.setState({ byConversation: { c1: state([checklist]) } });
   render(<AgentMessageChecklist conversationId="c1" invocationId="inv_1" running />);
-  const summary = screen.getByRole("button", { name: /1 of 3 · Edit tests/ });
+  const summary = screen.getByRole("button", { name: /Edit tests, 1 of 3 done/ });
   expect(summary.getAttribute("aria-expanded")).toBe("true");
   const table = screen.getByRole("region", { name: "Checklist" });
   expect(within(table).getByText("In progress")).toBeTruthy();
@@ -58,7 +58,7 @@ it("says Stopped for the active step of a run that ended, and Waiting for you on
   const { rerender } = render(
     <AgentMessageChecklist conversationId="c1" invocationId="inv_1" running={false} />,
   );
-  expect(screen.getByRole("button", { name: /1 of 3 · Edit tests/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /Edit tests, 1 of 3 done/ })).toBeTruthy();
   expect(screen.getByText("Stopped")).toBeTruthy();
   rerender(
     <AgentMessageChecklist

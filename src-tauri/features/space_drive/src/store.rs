@@ -140,7 +140,27 @@ const MIGRATIONS: &[&str] = &[
     "ALTER TABLE items ADD COLUMN replaced_of TEXT;
      ALTER TABLE nodes ADD COLUMN content_base INTEGER;
      ALTER TABLE nodes DROP COLUMN conflict;",
+    // 4: one drive for the account, a folder per Space. `space_folders` is every Space the
+    // drive shows and its folder's name there, kept until the person leaves the Space (an
+    // unmounted Space stays shown, waiting for Misty). `anchors` keeps the macOS extension's
+    // sync anchors, each every Space's place in its change feeds, which no longer fit in the
+    // anchor itself. An item's id is unique across Spaces, so the extension names items by id
+    // alone and Misty finds their Space (`nodes_by_id`).
+    "CREATE TABLE space_folders (
+        space TEXT PRIMARY KEY,
+        folder TEXT NOT NULL
+     );
+     CREATE TABLE anchors (
+        token INTEGER PRIMARY KEY AUTOINCREMENT,
+        spaces TEXT NOT NULL
+     );
+     CREATE INDEX nodes_by_id ON nodes(id);
+     CREATE INDEX items_by_id ON items(id);",
 ];
+
+/// How many sync anchors `drive.db` keeps. macOS asks from its newest one; an older one that's
+/// gone only makes it list the drive again.
+const KEPT_ANCHORS: i64 = 64;
 
 /// A subtree of `nodes` by its materialized path: `?1` is the space, `?2` the folder's path.
 const SUBTREE: &str =
@@ -614,6 +634,82 @@ impl Store {
         })
     }
 
+    // The Spaces the drive shows.
+
+    /// Shows a Space in the drive, in a folder of this name.
+    pub fn set_space_folder(&self, space: &SpaceId, folder: &str) -> Result<(), DriveError> {
+        self.lock()
+            .execute(
+                "INSERT INTO space_folders (space, folder) VALUES (?1, ?2)
+                 ON CONFLICT(space) DO UPDATE SET folder = excluded.folder",
+                params![space.as_str(), folder],
+            )
+            .map(|_| ())
+            .map_err(db)
+    }
+
+    /// Every Space the drive shows, with its folder's name, by name.
+    pub fn space_folders(&self) -> Result<Vec<(SpaceId, String)>, DriveError> {
+        let connection = self.lock();
+        let mut statement = connection
+            .prepare("SELECT space, folder FROM space_folders ORDER BY folder, space")
+            .map_err(db)?;
+        let rows = statement
+            .query_map([], |row| Ok((SpaceId(row.get(0)?), row.get(1)?)))
+            .map_err(db)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(db);
+        rows
+    }
+
+    /// The Space an item is in, from this computer's tree or the server's.
+    pub fn space_of_item(&self, id: &ItemId) -> Result<Option<SpaceId>, DriveError> {
+        let connection = self.lock();
+        let found = connection
+            .query_row("SELECT space FROM nodes WHERE id = ?1", [id.as_str()], |row| {
+                row.get::<_, String>(0)
+            })
+            .optional()
+            .map_err(db)?;
+        let found = match found {
+            Some(space) => Some(space),
+            None => connection
+                .query_row("SELECT space FROM items WHERE id = ?1", [id.as_str()], |row| {
+                    row.get::<_, String>(0)
+                })
+                .optional()
+                .map_err(db)?,
+        };
+        Ok(found.map(SpaceId))
+    }
+
+    // Sync anchors.
+
+    /// Keeps an anchor's text (every Space's place) and answers its token.
+    pub fn save_anchor(&self, spaces: &str) -> Result<i64, DriveError> {
+        self.transaction(|tx| {
+            tx.execute("INSERT INTO anchors (spaces) VALUES (?1)", [spaces])
+                .map_err(db)?;
+            let token = tx.last_insert_rowid();
+            tx.execute(
+                "DELETE FROM anchors WHERE token <= ?1",
+                [token - KEPT_ANCHORS],
+            )
+            .map_err(db)?;
+            Ok(token)
+        })
+    }
+
+    /// The text kept for an anchor's token, while it's still kept.
+    pub fn anchor(&self, token: i64) -> Result<Option<String>, DriveError> {
+        self.lock()
+            .query_row("SELECT spaces FROM anchors WHERE token = ?1", [token], |row| {
+                row.get(0)
+            })
+            .optional()
+            .map_err(db)
+    }
+
     // The cursor.
 
     pub fn cursor(&self, space: &SpaceId) -> Result<Seq, DriveError> {
@@ -887,7 +983,7 @@ impl Store {
                 tx.execute(&format!("DELETE FROM {table} WHERE space = ?1"), [space.as_str()])
                     .map_err(db)?;
             }
-            for table in ["cursor", "local_cursor"] {
+            for table in ["cursor", "local_cursor", "space_folders"] {
                 tx.execute(&format!("DELETE FROM {table} WHERE space = ?1"), [space.as_str()])
                     .map_err(db)?;
             }

@@ -87,7 +87,8 @@ export type DriveNoticeKind =
   | "deleted_while_open"
   | "delete_refused_in_use"
   | "save_replaced"
-  | "revived";
+  | "revived"
+  | "deletes_held";
 
 /** Something about the drive the person should hear. */
 export interface DriveNotice {
@@ -102,6 +103,10 @@ export interface DriveNotice {
    * person's save that someone else's replaced.
    */
   item_id?: string | null;
+  /** For `deletes_held`: how many files the run of deletes took before Misty stopped it. */
+  count?: number | null;
+  /** For `deletes_held`: the run of deletes Undo puts back. */
+  burst?: string | null;
 }
 
 export const DRIVE_STATUS_EVENT = "misty://drive-status";
@@ -194,6 +199,9 @@ export const driveNative = {
   trashList: (spaceId: string) => invoke<DriveTrashEntry[]>("drive_trash_list", { spaceId }),
   restore: (spaceId: string, itemId: string) =>
     invoke<void>("drive_restore", { spaceId, itemId }),
+  /** Puts back what a run of deletes from Finder or another app trashed before Misty stopped it. */
+  restoreBurst: (spaceId: string, burst: string) =>
+    invoke<number>("drive_restore_burst", { spaceId, burst }),
   /** Deletes a trashed item for good (needs `drive.purge`). */
   purge: (spaceId: string, itemId: string) => invoke<void>("drive_purge", { spaceId, itemId }),
   /** A new, empty folder named `name` in `folder` of the drive. */
