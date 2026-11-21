@@ -164,7 +164,9 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         await room.localParticipant.setMicrophoneEnabled(true);
         if (video) await room.localParticipant.setCameraEnabled(true);
         bump();
-      } catch {
+      } catch (error) {
+        // The notice stays one line; the step that failed is in the web inspector's console.
+        console.error("The call couldn't connect:", error);
         fail("The call couldn’t connect.");
       }
     })();

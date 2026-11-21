@@ -30,9 +30,7 @@ export async function apiRequest<T = void>(path: string, init: RequestInit = {})
 
     const promise = (async () => {
       const { response, accountGeneration } = await authenticatedResponse(path, init);
-      if (response.status === 204) return undefined as T;
-
-      const result = (await response.json()) as T;
+      const result = await responseBody<T>(response);
       assertStableApiSession(accountGeneration);
       return result;
     })().finally(() => {
@@ -51,11 +49,19 @@ export async function apiRequest<T = void>(path: string, init: RequestInit = {})
     const account = readApiAccountId();
     if (account) void deleteApiCachePrefix(account, mutationScope(path));
   }
-  if (response.status === 204) return undefined as T;
-
-  const result = (await response.json()) as T;
+  const result = await responseBody<T>(response);
   assertStableApiSession(accountGeneration);
   return result;
+}
+
+/**
+ * The answer's JSON, or nothing for an answer with no body: a 204, or a 202 that only says the
+ * server took the request (sending a friend request).
+ */
+async function responseBody<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T;
+  const text = await response.text();
+  return (text.trim() ? JSON.parse(text) : undefined) as T;
 }
 
 async function authenticatedResponse(

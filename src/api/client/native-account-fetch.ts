@@ -101,13 +101,28 @@ export async function nativeAccountFetch(
     ? null
     : new ReadableStream<Uint8Array>({
         async pull(controller) {
+          let chunk: number[] | null;
           try {
-            const chunk = await invoke<number[] | null>("auth_http_read", { requestId });
+            chunk = await invoke<number[] | null>("auth_http_read", { requestId });
             if (signal.aborted) throw new DOMException("Request aborted", "AbortError");
-            if (chunk === null) {
-              signal.removeEventListener("abort", onAbort);
+          } catch (error) {
+            cancel();
+            signal.removeEventListener("abort", onAbort);
+            controller.error(error);
+            return;
+          }
+          // The end of the body: closing a stream its reader already let go of changes nothing.
+          if (chunk === null) {
+            signal.removeEventListener("abort", onAbort);
+            try {
               controller.close();
-            } else controller.enqueue(new Uint8Array(chunk));
+            } catch {
+              /* already closed or cancelled */
+            }
+            return;
+          }
+          try {
+            controller.enqueue(new Uint8Array(chunk));
           } catch (error) {
             cancel();
             signal.removeEventListener("abort", onAbort);
