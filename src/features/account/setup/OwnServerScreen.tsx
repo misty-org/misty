@@ -1,7 +1,6 @@
-import { developmentServer } from "@/api/deployment/serverChoice";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { Button } from "@misty/ui";
+import { Button, InlineLink } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type FormEvent } from "react";
 import { parseServerAddress } from "./serverAddress";
@@ -10,13 +9,15 @@ import { useServerSwitch } from "./useServerSwitch";
 /** The docs' guide to running a Misty server. */
 const selfHostingDocsUrl = "https://docs.mistysys.com/self-hosting";
 
-/** A Misty server you run: its address first, then the usual sign-in on that server. */
+/** A Misty server you run: its address first, then the usual sign-in on that server. The field
+ * starts empty and shows an https address: an address without a scheme is taken as https, and
+ * only a development build takes plain http, typed by hand, on this computer. */
 export function OwnServerScreen(props: {
   onConnected: () => void;
   onBusy: (busy: boolean) => void;
 }) {
   const { switchTo } = useServerSwitch();
-  const [address, setAddress] = useState(() => developmentServer().replace(/\/v1$/, ""));
+  const [address, setAddress] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -47,20 +48,17 @@ export function OwnServerScreen(props: {
         id="setup-server"
         label="Server address"
         value={address}
-        placeholder="misty.example.com"
+        placeholder="https://misty.example.com"
         autoComplete="url"
         disabled={busy}
         onChange={setAddress}
       />
-      <Button
-        type="button"
-        variant="quiet"
-        size="sm"
-        className="self-start"
-        onClick={() => void openUrl(selfHostingDocsUrl)}
-      >
-        How to set up a server
-      </Button>
+      <p className="-mt-2 text-caption text-cream-muted">
+        New to this?{" "}
+        <InlineLink type="button" onClick={() => void openUrl(selfHostingDocsUrl)}>
+          Set up a server
+        </InlineLink>
+      </p>
       {error ? <AuthMessage tone="error" message={error} /> : null}
       <Button type="submit" variant="primary" size="lg" disabled={busy || !address.trim()}>
         Continue

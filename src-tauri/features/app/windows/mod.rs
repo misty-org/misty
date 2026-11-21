@@ -1,6 +1,7 @@
 //! Shared Win32 helpers for Misty's Windows integrations.
 pub mod automation;
 pub mod registry;
+pub mod window_icon;
 
 use std::{
     ffi::{OsStr, OsString},

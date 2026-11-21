@@ -41,18 +41,10 @@ function paintWaveform(meter: HTMLDivElement | null, power: number) {
   });
 }
 
-/** Pointer speed, in points a second, past which Misty steps out of the way. */
-const FLING_SPEED = 2_400;
-/** How long she stays away once the pointer slows down again. */
-const FLING_REST_MS = 400;
 /** How long a word takes at the normal speaking rate: about 150 words a minute. */
 const WORD_MS = 400;
 /** How high Misty bobs with a word, at the default size. */
 const BOB = 3;
-/** How long the pointer rests before Misty stays put where she is. */
-const PARK_MS = 600;
-/** How far the pointer can wander from a parked Misty, at the default size, and keep her there. */
-const PARK_REACH = 72;
 /** Misty's own radius at the default size: half her 32-point picture. */
 const MISTY_RADIUS = 16;
 /** How long the shortcut hint stays as Misty first appears. */
@@ -99,9 +91,8 @@ export function startCursorOverlayLoop({
     target = flightStart,
     returnMouse = flightStart;
   let navigation: "follow" | "out" | "hold" | "return" = "follow";
-  /** Where the pointer was last frame, and until when Misty stays away after a fling. */
+  /** Where the pointer was last frame. */
   let pointerAt: Point | undefined;
-  let flungUntil = 0;
   /** Where Misty waits once the pointer rests, and whether this overlay holds the pointer. */
   let parkedAt: Point | undefined;
   let holding = false;
@@ -221,24 +212,11 @@ export function startCursorOverlayLoop({
     }
     // Misty rests beside the pointer while Tutor isn't in use, and steps out of the way while the
     // pointer is flung across the screen, coming back once it slows down.
-    if (dt > 0 && pointerAt) {
-      const speed = Math.hypot(mouse.x - pointerAt.x, mouse.y - pointerAt.y) / dt;
-      if (speed > FLING_SPEED) flungUntil = now + FLING_REST_MS;
-    }
     if (!pointerAt || Math.hypot(mouse.x - pointerAt.x, mouse.y - pointerAt.y) > 2) movedAt = now;
     pointerAt = mouse;
     const scale = normalizeCompanionSize(state.size) / 100;
-    // Once the pointer rests, Misty stays where she is, so it can be brought onto her to click
-    // her or drop a file on her; during a drag she waits where it began. She follows again once
-    // the pointer moves off somewhere else.
-    if (state.sprite === true && !state.visible && !state.point && navigation === "follow") {
-      if (sample.dragging || now - movedAt >= PARK_MS) parkedAt ??= { ...position };
-      else if (
-        parkedAt &&
-        Math.hypot(mouse.x - parkedAt.x, mouse.y - parkedAt.y) > PARK_REACH * scale
-      )
-        parkedAt = undefined;
-    } else parkedAt = undefined;
+    // Misty stays attached to the pointer at all times, including while buttons are held.
+    parkedAt = undefined;
     if (navigation === "out" || navigation === "return") {
       if (
         navigation === "return" &&
@@ -270,7 +248,14 @@ export function startCursorOverlayLoop({
         target = follow;
         returnMouse = mouse;
       }
-    } else spring(position, velocity, parkedAt ?? follow, dt);
+    } else if (parkedAt) spring(position, velocity, parkedAt, dt);
+    else {
+      // Attached to the pointer: no easing lag while it moves.
+      position.x = follow.x;
+      position.y = follow.y;
+      velocity.x = 0;
+      velocity.y = 0;
+    }
     const onScreen = mouse.x >= 0 && mouse.y >= 0 && mouse.x < width && mouse.y < height;
     const visible = state.visible && (navigation !== "follow" || (!state.point && onScreen));
     // Away while the person types, is in a full-screen app, or the system has hidden the pointer
@@ -283,8 +268,7 @@ export function startCursorOverlayLoop({
       !away &&
       navigation === "follow" &&
       !state.point &&
-      onScreen &&
-      now >= flungUntil;
+      onScreen;
     // The pointer over a parked Misty: this overlay takes it, so the click or the drop is hers.
     const onMisty =
       resting &&
@@ -306,7 +290,7 @@ export function startCursorOverlayLoop({
     }
     // During a drag she dims, out of the way, until the pointer brings it to her.
     group.current.style.opacity =
-      visible || (resting && (!sample.dragging || onMisty)) ? "1" : resting ? "0.5" : "0";
+      visible || resting ? "1" : "0";
     group.current.toggleAttribute("data-on-misty", onMisty);
     // While Tutor talks, Misty bobs once a word, at the voice's pace.
     const misty = group.current.querySelector<HTMLElement>(".cursor-misty");

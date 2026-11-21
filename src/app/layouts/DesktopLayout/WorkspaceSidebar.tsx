@@ -6,7 +6,6 @@ import { PlaceToggle } from "./PlaceToggle";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarToggleButton } from "./SidebarToggleButton";
 import { SpaceNavigator } from "./SpaceNavigator";
-import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
 /**
  * The window's sidebar: Personal (friends and direct messages with people and the person's agents)
@@ -17,7 +16,6 @@ import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
  */
 export function WorkspaceSidebar(props: {
   position?: TabSide;
-  windowsTitlebarControls?: boolean;
   onOpen(view: WorkspaceView): void;
   account?: ReactNode;
 }) {
@@ -53,9 +51,6 @@ export function WorkspaceSidebar(props: {
             )}
             data-misty-window-titlebar-region="true"
           >
-            {props.windowsTitlebarControls ? (
-              <div id={windowsCaptionSlotId} className="flex shrink-0 items-center" />
-            ) : null}
             <SidebarToggleButton side={position} />
             {/* Personal or Spaces: which side the rows under the head belong to. */}
             <div className="ml-1 flex shrink-0 items-center">

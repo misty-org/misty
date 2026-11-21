@@ -32,7 +32,7 @@ afterEach(cleanup);
 it("keeps the sidebar for a lone Agents view", () => {
   render(
     <MemoryRouter initialEntries={["/apps/agents"]}>
-      <WorkspaceCanvas />
+      <WorkspaceCanvas windowsTitlebarControls />
     </MemoryRouter>,
   );
   expect(screen.getByRole("navigation", { name: "Sidebar" })).toBeTruthy();

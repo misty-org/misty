@@ -1,5 +1,5 @@
 import { useServerChoice } from "@/api/deployment/serverChoice";
-import { BackButton, Button } from "@misty/ui";
+import { Button, ChoiceGroup } from "@misty/ui";
 import { Cloud, Server } from "lucide-react";
 import { useState } from "react";
 import AuthMessage from "../components/AuthMessage";
@@ -8,23 +8,30 @@ import { useServerSwitch } from "./useServerSwitch";
 
 const ignoreConnected = () => undefined;
 
+type ServerKind = "cloud" | "custom";
+
+const serverKinds = [
+  { value: "cloud", label: "Misty Cloud", icon: Cloud },
+  { value: "custom", label: "Custom Server", icon: Server },
+] as const;
+
 /** Accounts live on a server and a device starts with none, so it may need one first. Only a
  * choice counts: a development build's default address fills in the form but doesn't choose. */
 export function useNeedsServer(): boolean {
   return useServerChoice((state) => state.loaded && state.choice?.mode !== "server");
 }
 
-/** Asks for the server on the sign-in pages. Misty Cloud is the one way on, in a single button,
- * since most people never need to know accounts live on a server; their own server is a quiet
- * second choice. Choosing brings the page's own form back. A sign-in link names its own server
+/** Asks for the server on the sign-in pages, as a switch between Misty Cloud, which most people
+ * want and is chosen at first, and a custom server's address. Either way Continue sits in the
+ * same place, and choosing brings the page's own form back. A sign-in link names its own server
  * and opens in the sign-in sheet. */
 export function ServerStep() {
   const { switchToMistyCloud } = useServerSwitch();
-  const [selfHosted, setSelfHosted] = useState(false);
+  const [kind, setKind] = useState<ServerKind>("cloud");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function chooseMistyPro() {
+  async function chooseMistyCloud() {
     setError("");
     setBusy(true);
     try {
@@ -36,36 +43,34 @@ export function ServerStep() {
     }
   }
 
-  if (selfHosted) {
-    return (
-      <div className="flex flex-col gap-3.5">
-        <BackButton className="self-start" disabled={busy} onClick={() => setSelfHosted(false)} />
-        <OwnServerScreen onBusy={setBusy} onConnected={ignoreConnected} />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-2.5">
-      <Button
-        variant="primary"
-        size="lg"
-        icon={Cloud}
+    <div className="flex flex-col gap-4">
+      <ChoiceGroup
+        label="Server"
+        value={kind}
+        options={serverKinds}
         disabled={busy}
-        onClick={() => void chooseMistyPro()}
-      >
-        Continue with Misty Cloud
-      </Button>
-      <Button
-        variant="quiet"
-        icon={Server}
-        disabled={busy}
-        className="self-center"
-        onClick={() => setSelfHosted(true)}
-      >
-        Use my own server
-      </Button>
-      {error ? <AuthMessage tone="error" message={error} /> : null}
+        fill
+        onChange={(next) => {
+          setError("");
+          setKind(next);
+        }}
+      />
+      {kind === "custom" ? (
+        <OwnServerScreen onBusy={setBusy} onConnected={ignoreConnected} />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {error ? <AuthMessage tone="error" message={error} /> : null}
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={busy}
+            onClick={() => void chooseMistyCloud()}
+          >
+            Continue
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

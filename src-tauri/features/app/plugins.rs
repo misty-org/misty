@@ -61,6 +61,10 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(crate::app::platform_info::plugin());
 
+    // Draws each window's title bar and taskbar icon at the size Windows shows it.
+    #[cfg(windows)]
+    let builder = builder.plugin(crate::app::windows::window_icon::plugin());
+
     // Run notices on Windows and Linux; macOS sends them through mac-notification-sys.
     #[cfg(not(target_os = "macos"))]
     let builder = builder.plugin(shell_plugins::ShellScriptPlugin(
@@ -87,6 +91,10 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
     builder.on_window_event(|window, event| {
         crate::app::lifecycle::window_event(window, event);
         crate::app::dropped_files::window_event(window, event);
+        #[cfg(windows)]
+        if let tauri::WindowEvent::ScaleFactorChanged { .. } = event {
+            crate::app::windows::window_icon::apply(window);
+        }
         #[cfg(desktop)]
         crate::browser::app_windows::window_event(window, event);
         #[cfg(all(desktop, not(target_os = "macos")))]

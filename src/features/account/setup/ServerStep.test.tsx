@@ -29,12 +29,24 @@ it.each<[string, boolean, ServerChoice | null, boolean]>([
   expect(renderHook(() => useNeedsServer()).result.current).toBe(expected);
 });
 
-it("fills in the development server, and Continue chooses it", async () => {
+it("starts on Misty Cloud, and Continue chooses it", async () => {
   useServerChoice.setState({ loaded: true, choice: null });
   render(<ServerStep />);
-  fireEvent.click(screen.getByRole("button", { name: "Use my own server" }));
-  const address = screen.getByLabelText<HTMLInputElement>("Server address");
-  expect(address.value).toBe("http://127.0.0.1:8081");
+  expect(screen.getByRole("radio", { name: "Misty Cloud" }).getAttribute("aria-checked")).toBe(
+    "true",
+  );
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  await waitFor(() => expect(mocks.switchTo).toHaveBeenCalledWith("http://127.0.0.1:8081/v1"));
+  await waitFor(() => expect(mocks.switchToMistyCloud).toHaveBeenCalled());
+});
+
+it("asks a custom server for an https address, and takes a bare host as https", async () => {
+  useServerChoice.setState({ loaded: true, choice: null });
+  render(<ServerStep />);
+  fireEvent.click(screen.getByRole("radio", { name: "Custom Server" }));
+  const address = screen.getByLabelText<HTMLInputElement>("Server address");
+  expect(address.value).toBe("");
+  expect(address.placeholder).toBe("https://misty.example.com");
+  fireEvent.change(address, { target: { value: "misty.example.com" } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  await waitFor(() => expect(mocks.switchTo).toHaveBeenCalledWith("https://misty.example.com/v1"));
 });

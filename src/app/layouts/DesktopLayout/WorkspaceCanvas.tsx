@@ -33,9 +33,10 @@ import { Surface } from "@misty/ui";
 export function WorkspaceCanvas(props: {
   /** The side of the window the sidebar sits on. */
   tabPosition?: TabSide;
-  windowsTitlebarControls?: boolean;
   /** Focus mode: pages fill the window without the sidebar. */
   hideTabStrip?: boolean;
+  /** Windows and Linux: the tab row keeps a slot at its end for the caption buttons. */
+  windowsTitlebarControls?: boolean;
   /** The vertical sidebar's closing row: the account and settings, inside its panel. */
   stripAccount?: ReactNode;
 }) {
@@ -178,7 +179,6 @@ export function WorkspaceCanvas(props: {
             <SidebarDrawer side={side}>
               <WorkspaceSidebar
                 position={side}
-                windowsTitlebarControls={props.windowsTitlebarControls}
                 onOpen={openTab}
                 account={props.stripAccount}
               />
@@ -186,13 +186,17 @@ export function WorkspaceCanvas(props: {
             <TopEdge gridColumn={contentColumn} side={side} />
             <WorkspaceTabBar
               gridColumn={contentColumn}
+              captionSlot={props.windowsTitlebarControls}
               onOpen={openTab}
               onClosed={navigateToActiveLayoutTab}
             />
           </>
         ) : null}
         <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
-        {!props.hideTabStrip ? (
+        {/* The bottom bar belongs to the Code page alone. */}
+        {!props.hideTabStrip &&
+        location.pathname === routes.agents &&
+        new URLSearchParams(location.search).get("view") === "code" ? (
           <WorkspaceBottomBar gridColumn={contentColumn} onOpen={openTab} />
         ) : null}
         <PaneSwapMode />

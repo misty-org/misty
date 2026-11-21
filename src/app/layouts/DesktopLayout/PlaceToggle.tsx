@@ -4,11 +4,11 @@ import { useAuth } from "@/features/account";
 import { useDms, useFriends } from "@/features/direct";
 import { useSpacesStore } from "@/features/spaces";
 import { ChoiceGroup, IndicatorDot, spaceIcons } from "@misty/ui";
-import { AccountAvatar } from "./NavRail";
 import { useSpaceInvitationWaiting } from "./SpaceInvitations";
 import { choosePlace, usePlace, useSpacesSideFollowsSpaces, type Place } from "./placeStore";
 
 const SpaceIcon = spaceIcons.space;
+const PersonalIcon = spaceIcons.personal;
 
 /** Something waits on the person in Personal: an unread DM, or a friend request. */
 function usePersonalWaiting(): boolean {
@@ -59,7 +59,7 @@ function useSpacesMentionWaiting(place: Place): boolean {
 }
 
 /**
- * The sidebar's switch between Personal (the person's own face) and Spaces (the galaxy), in its
+ * The sidebar's switch between Personal (the profile icon) and Spaces (the galaxy), in its
  * top row after the sidebar toggle. A dot marks Personal while something waits there (an unread
  * DM or a friend request), and Spaces after an @mention in a shared Space or while an invitation
  * to one waits.
@@ -74,6 +74,7 @@ export function PlaceToggle() {
   return (
     <ChoiceGroup<Place>
       label="Personal or Spaces"
+      track="well"
       value={place}
       onChange={choosePlace}
       options={[
@@ -83,7 +84,7 @@ export function PlaceToggle() {
           iconOnly: true,
           icon: (
             <span className="relative inline-flex">
-              <AccountAvatar size="xs" />
+              <PersonalIcon />
               {personalWaiting ? <IndicatorDot /> : null}
             </span>
           ),

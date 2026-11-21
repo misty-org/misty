@@ -262,6 +262,12 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const place = usePlace();
   const sharedSpaces = useSharedSpaces();
   const allSpaces = useSpacesStore((state) => state.spaces);
+  const { sessionExpired } = useAuth();
+  // Skeletons only while the Spaces are on their way. Signed out, or once the read has failed,
+  // nothing is coming, so the sidebar shows only its fixed rows.
+  const spacesPending = useSpacesStore(
+    (state) => !sessionExpired && state.loading && !state.error,
+  );
   const agents = usePersonalAgentsStore((state) => state.agents);
   const conversations = useMistyStore((state) => state.conversations);
   const conversationsLoading = useMistyStore((state) => state.conversationsLoading);
@@ -374,7 +380,11 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         data-tour="sidebar-space"
         data-misty-window-drag-block="true"
       >
-        {space ? <SpaceSelector space={space} place={place} /> : <Skeleton className="h-4 w-32" />}
+        {space ? (
+          <SpaceSelector space={space} place={place} />
+        ) : spacesPending ? (
+          <Skeleton className="h-4 w-32" />
+        ) : null}
         <Row
           label="Search"
           icon={<Search aria-hidden="true" />}
@@ -449,7 +459,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
             <SpaceSections space={space} route={route} onOpen={onOpen} />
           </>
         )}
-        {space ? null : <RowSkeletons count={6} />}
+        {!space && spacesPending ? <RowSkeletons count={6} /> : null}
       </nav>
     </>
   );

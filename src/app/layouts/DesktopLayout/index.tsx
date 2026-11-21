@@ -42,7 +42,6 @@ import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
 import { useSettingsOverlay } from "./useSettingsOverlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
 import { useCaptionSlot } from "./useCaptionSlot";
-import { useSidebarCollapsedStore } from "@/app/shell/sidebarCollapsed";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useStrayBrowserPages();
@@ -51,6 +50,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     getRouteId: props.getRouteId,
   });
   const {
+    desktopPlatform,
     shouldShowWindowsTitlebarControls,
     isWindowMaximized,
     handleDesktopTitlebarPointerDown,
@@ -95,11 +95,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   useDockingTransition(shellRef, `${docking.navigation}:${docking.tabs}:${focusMode}`);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
-  // The buttons belong to the sidebar's header, like the traffic lights on macOS: they slide
-  // away when the sidebar collapses and come back when it peeks out, and never float over the
-  // window's corner on their own.
+  // Seated at the tab row's end when there is one, so they share its height and line.
   const captionSlot = useCaptionSlot(shellRef, shouldShowWindowsControls);
-  const sidebarCollapsed = useSidebarCollapsedStore((state) => state.collapsed);
   const {
     isAuthRoute,
     standaloneRouteTitle,
@@ -116,9 +113,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     appZoom,
   });
   useSignedOutWindow(isAuthRoute);
-  // Over the window's corner only where no sidebar can hold them: sign-in, or a page that
-  // shows no sidebar. A collapsed sidebar takes them away with it.
-  const floatingCaption = isAuthRoute || !sidebarCollapsed;
   useOtherWindowsHiddenWhileAddingAccount(
     isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
@@ -187,9 +181,9 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
         data-shared-chrome={!isAuthRoute}
         onPointerDown={handleDesktopTitlebarPointerDown}
       >
-        {shouldShowWindowsControls && (captionSlot || floatingCaption) ? (
+        {shouldShowWindowsControls ? (
           <WindowsTitlebarControls
-            standard={isAuthRoute}
+            systemGlyphs={desktopPlatform === "windows"}
             slot={captionSlot}
             controlsRef={windowsTitlebarControlsRef}
             scale={titlebarNavigationGeometry.scale}

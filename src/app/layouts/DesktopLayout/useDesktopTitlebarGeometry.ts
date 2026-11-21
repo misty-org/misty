@@ -14,7 +14,7 @@ export function useDesktopTitlebarGeometry(options: {
   docking: ReturnType<typeof useWindowDockingLayout>;
   focusMode: boolean;
   shouldShowWindowsControls: boolean;
-  /** The caption buttons sit inside the sidebar, so the window's corner reserves nothing. */
+  /** The caption buttons sit in the tab row, so the window's corner reserves nothing. */
   captionInline: boolean;
   appZoom: number;
 }) {
@@ -40,17 +40,18 @@ export function useDesktopTitlebarGeometry(options: {
     const observer = new ResizeObserver(measure);
     if (windowsControls) observer.observe(windowsControls);
     return () => observer.disconnect();
-  }, [isAuthRoute, shouldShowWindowsControls]);
-  // The caption buttons sit on the left, where macOS puts its traffic lights, so both platforms
-  // share one layout.
+  }, [isAuthRoute, shouldShowWindowsControls, captionInline]);
+  // macOS keeps its traffic lights on the left; Windows and Linux keep their caption buttons in
+  // the top-right corner, so the toolbars under them make room on that side instead.
   const titlebarNavigationGeometry = styles.desktopTitlebarNavigationGeometry(
     appZoom,
-    shouldShowWindowsControls
-      ? captionInline
-        ? 0
-        : windowsTitlebarControlsWidth || styles.windowsTitlebarControlsFallbackWidth
-      : styles.desktopTitlebarNavigationInset,
+    shouldShowWindowsControls ? 0 : styles.desktopTitlebarNavigationInset,
   );
+  const captionRight =
+    shouldShowWindowsControls && !captionInline
+    ? (windowsTitlebarControlsWidth || styles.windowsTitlebarControlsFallbackWidth) /
+      (Number.isFinite(appZoom) && appZoom > 0 ? appZoom : 1)
+    : 0;
   const sideTabsWidth = useSidebarWidthStore((state) => state.width);
   const geometry = dockingGeometry({ sideTabsWidth, ...docking });
   useMergedTitlebar(
@@ -58,7 +59,7 @@ export function useDesktopTitlebarGeometry(options: {
     `${docking.navigation}:${docking.tabs}:${focusMode}`,
     !isAuthRoute,
     titlebarNavigationGeometry.left,
-    0,
+    captionRight,
   );
 
   return {

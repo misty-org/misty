@@ -7,10 +7,11 @@ import {
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { IconButton, TabStrip, type TabStripTab } from "@misty/ui";
+import { IconButton, TabStrip, windowToolbarClass, type TabStripTab } from "@misty/ui";
 import { LayoutButton } from "./LayoutButton";
 import { openNewTab } from "./spaceNavigation";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
+import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
 /**
  * The window's open pages as a row of tabs above the page. A tab selects its page, closes from its
@@ -21,6 +22,8 @@ import { ViewIcon } from "./WorkspaceViewGroupButton";
  */
 export function WorkspaceTabBar(props: {
   gridColumn: number;
+  /** Keeps a slot after the layout button for the Windows caption buttons. */
+  captionSlot?: boolean;
   onOpen(view: WorkspaceView): void;
   onClosed(): void;
 }) {
@@ -44,9 +47,12 @@ export function WorkspaceTabBar(props: {
   };
 
   return (
+    // A window toolbar, so on Windows and Linux the row ends short of the caption buttons in the
+    // window's top-right corner instead of running under them.
     <div
-      className="min-w-0"
+      className={`min-w-0 ${windowToolbarClass}`}
       style={{ gridColumn: props.gridColumn, gridRow: 2 }}
+      data-window-toolbar
       data-misty-window-titlebar-region="true"
     >
       <TabStrip
@@ -78,7 +84,16 @@ export function WorkspaceTabBar(props: {
           </IconButton>
         }
         // Only the window's own control: a page's tools sit in that page's own bar under the tabs.
-        end={<LayoutButton />}
+        end={
+          props.captionSlot ? (
+            <div className="flex items-center">
+              <LayoutButton />
+              <div id={windowsCaptionSlotId} className="flex items-center" />
+            </div>
+          ) : (
+            <LayoutButton />
+          )
+        }
         windowEdge
       />
     </div>

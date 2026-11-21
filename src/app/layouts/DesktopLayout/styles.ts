@@ -24,8 +24,8 @@ export const profileDockClass = [
 ].join(" ");
 
 export const desktopTitlebarNavigationInset = 84;
-/** Three 36px caption buttons, before they are measured. */
-export const windowsTitlebarControlsFallbackWidth = 108;
+/** Three 46px caption buttons, before they are measured. */
+export const windowsTitlebarControlsFallbackWidth = 138;
 
 export function desktopTitlebarNavigationGeometry(
   appZoom: number,
@@ -41,24 +41,31 @@ export function desktopTitlebarNavigationGeometry(
   };
 }
 
-/** Beside a vertical sidebar the caption buttons share its header row, which starts below the
- * pane margin and the card's border; they are centred on that row's 40px. */
-export const windowsTitlebarControlsClass = [
-  "misty-windows-caption-controls pointer-events-auto absolute left-0",
-  "top-[calc(var(--pane-frame,0.375rem)+1px)] z-[3] flex h-10 w-max flex-nowrap items-center",
+/** Minimize, maximize and close in the window's top-right corner, as tall as the titlebar and
+ * 46px wide each, the way Windows draws its own caption buttons. */
+export const windowsStandardControlsClass = [
+  "misty-windows-standard-controls pointer-events-auto absolute right-0 top-0 z-[3] flex",
+  "h-[var(--shell-titlebar,2.375rem)] w-max flex-nowrap items-stretch",
 ].join(" ");
-
-export const windowsTitlebarControlButtonClass =
-  "grid h-full w-9 shrink-0 place-items-center border-0 bg-transparent p-0 transition-colors";
-/** Signed-out pages have no sidebar: minimize, maximize and close sit in the usual top-right corner. */
-export const windowsStandardControlsClass =
-  "misty-windows-standard-controls pointer-events-auto absolute right-0 top-0 z-[3] flex h-9 w-max flex-nowrap items-center";
 export const windowsStandardControlButtonClass =
-  "grid h-9 w-12 shrink-0 place-items-center border-0 bg-transparent p-0 transition-colors";
-/** The same buttons seated in the sidebar's header row, sized like the icons beside them. */
-export const windowsInlineControlsClass = "mr-1 flex shrink-0 items-center gap-0.5";
+  "grid w-11.5 shrink-0 place-items-center rounded-none border-0 bg-transparent p-0 transition-colors";
+/** Close turns red with a white glyph under the pointer, as it does in every Windows app. */
+export const windowsCloseControlButtonClass = [
+  windowsStandardControlButtonClass,
+  "hover:bg-[#c42b1c] hover:text-white active:bg-[#c42b1c]/90 active:text-white",
+].join(" ");
+/** The same buttons seated at the tab row's end: as tall as its 32px buttons and on their line,
+ * a little wider, as caption buttons are. */
+export const windowsInlineControlsClass = "ml-1 flex shrink-0 items-center gap-0.5";
 export const windowsInlineControlButtonClass =
-  "grid size-7 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 transition-colors";
+  "grid h-8 w-10 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 transition-colors";
+export const windowsInlineCloseButtonClass = [
+  windowsInlineControlButtonClass,
+  "hover:bg-[#c42b1c] hover:text-white active:bg-[#c42b1c]/90 active:text-white",
+].join(" ");
+/** Windows' own caption glyphs, at the size the system draws them. */
+export const windowsSystemGlyphClass =
+  "font-['Segoe_Fluent_Icons','Segoe_MDL2_Assets'] text-[10px] leading-none font-normal";
 
 export const frameOverlayBaseClass = [
   "pointer-events-none fixed right-3 top-10 z-[90] grid min-w-36 grid-cols-[minmax(0,1fr)_auto]",

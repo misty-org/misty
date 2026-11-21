@@ -21,7 +21,6 @@ export interface WorkspaceDockTreeProps {
   node: WorkspaceDockNode;
   dockEdge?: { top: boolean; left: boolean; right: boolean };
   paneDirection?: DockSplitDirection;
-  windowsTitlebarControls?: boolean;
   focusedPaneId: string;
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   onOpen: (tab: WorkspaceView) => void;
