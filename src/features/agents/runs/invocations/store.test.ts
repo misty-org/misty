@@ -41,8 +41,8 @@ describe("embodied Misty state", () => {
     const element = document.createElement("div");
     document.body.appendChild(element);
     const adapter: AiSurfaceAdapter = {
-      surfaceId: "notes",
-      label: "Note",
+      surfaceId: "files",
+      label: "Files",
       getContext: () => [],
     };
     const stop = useAiSurfaceStore

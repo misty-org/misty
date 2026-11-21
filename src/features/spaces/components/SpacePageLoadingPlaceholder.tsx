@@ -1,7 +1,6 @@
-import { CollectionPage, ErrorState, PaneLoading, SetupState } from "@misty/ui";
+import { ErrorState, ListRowSkeleton, PaneLoading, SetupState } from "@misty/ui";
 import { SpaceLabSkeleton } from "@/features/agents";
 import { ConversationLoadState } from "../chat/components/ConversationStates";
-import { LibraryItemsSkeleton } from "../library/components/LibraryItemSkeletons";
 
 /** Which page of a Space is on its way, so its placeholder takes that page's shape. */
 export interface SpacePageShape {
@@ -41,10 +40,11 @@ function SpacePageSkeleton({ section }: SpacePageShape) {
     case "chat":
       return <ConversationLoadState error="" onRetry={() => undefined} />;
     case "files":
+      // The Space drives, as Files lists them.
       return (
-        <CollectionPage>
-          <LibraryItemsSkeleton view="grid" scale={1} />
-        </CollectionPage>
+        <div className="mx-auto grid w-full max-w-xl gap-4 p-6">
+          <ListRowSkeleton label="Files" rows={2} state />
+        </div>
       );
     case "lab":
       return <SpaceLabSkeleton />;

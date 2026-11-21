@@ -196,8 +196,8 @@ async fn what_the_monitor_says_when_it_pauses_or_stops() {
         ("ownTab", monitor_words("screen.open", true, UNCERTAIN, None, r#"{"url":"https://a.example"}"#, false).await),
         ("close", monitor_words("screen.close", false, None, Some("boom timeout"), "{}", false).await),
         ("nobody", monitor_words("browser.request_user_action", false, None, Some("boom"), "{}", false).await),
-        ("rejected", monitor_words("note.update", false, None, Some("tool_execution_failed: conflict here"), "{}", true).await),
-        ("uncertainWrite", monitor_words("note.update", true, UNCERTAIN, None, "{}", false).await),
+        ("rejected", monitor_words("message.update", false, None, Some("tool_execution_failed: conflict here"), "{}", true).await),
+        ("uncertainWrite", monitor_words("message.update", true, UNCERTAIN, None, "{}", false).await),
         ("pageLook", monitor_words("browser.steps", true, UNCERTAIN, None, "{}", false).await),
     ];
     for (name, got) in cases {

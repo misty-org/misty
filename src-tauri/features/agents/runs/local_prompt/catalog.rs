@@ -123,6 +123,9 @@ fn offered(row: &JsValue, request: &RunRequest, inputs: &CatalogInputs, grants: 
     let registered = match name {
         _ if is_screen_tool(name) => !request.window_label.is_empty(),
         _ if is_granted_browser_tool(name) => !grants.labels.is_empty() && grants.capabilities.iter().any(|capability| capability == name),
+        // Files' tools reach the whole disk: they are offered to engines over the local MCP server
+        // (`engines/mcp.rs`) while the person's disk grant is on, never to this runtime.
+        _ if name.starts_with("files.") => false,
         _ if name.starts_with("integration.") => inputs.apps_connected,
         _ if name.starts_with("folder.") => contexts.iter().any(|device| device.kind == "local_folder"),
         "shell.run" => contexts.iter().any(|device| device.kind == "workspace"),

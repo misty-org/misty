@@ -13,8 +13,18 @@ export interface ToolDefinition {
 }
 
 const point = {
-  x: { type: "number", minimum: 0, maximum: 1, description: "From the app's left edge (0) to its right (1)." },
-  y: { type: "number", minimum: 0, maximum: 1, description: "From the app's top edge (0) to its bottom (1)." },
+  x: {
+    type: "number",
+    minimum: 0,
+    maximum: 1,
+    description: "From the app's left edge (0) to its right (1).",
+  },
+  y: {
+    type: "number",
+    minimum: 0,
+    maximum: 1,
+    description: "From the app's top edge (0) to its bottom (1).",
+  },
 };
 
 const fraction = (value: unknown, what: string) => {
@@ -40,7 +50,10 @@ export function createScreenTools(options: {
   const definitions: ToolDefinition[] = [
     {
       name: "screen_read",
-      description: `Read what ${appName} shows now: its title, its text and its controls, each with where it is (fractions of the app's view). An app drawn on a canvas has little text; picture it with screen_look.`,
+      description:
+        `Read what ${appName} shows now: its title, its text and its controls, each with where it ` +
+        `is (fractions of the app's view). An app drawn on a canvas has little text; picture it ` +
+        `with screen_look.`,
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true },
     },
@@ -102,7 +115,9 @@ export function createScreenTools(options: {
   const agentOf = async (runId: string) => {
     const entry = await loadRunEntry(runId).catch(() => null);
     const agentId = entry?.agentId ?? runId;
-    const agent = usePersonalAgentsStore.getState().agents.find((candidate) => candidate.id === agentId);
+    const agent = usePersonalAgentsStore
+      .getState()
+      .agents.find((candidate) => candidate.id === agentId);
     return { agentId, name: agent?.name || "Agent" };
   };
   const inControl = () => {
@@ -113,7 +128,10 @@ export function createScreenTools(options: {
       );
   };
   const acting =
-    (run: (input: Record<string, unknown>) => Promise<unknown>, at?: (input: Record<string, unknown>) => [number, number]) =>
+    (
+      run: (input: Record<string, unknown>) => Promise<unknown>,
+      at?: (input: Record<string, unknown>) => [number, number],
+    ) =>
     async (input: Record<string, unknown>, runId: string) => {
       inControl();
       if (at) {
@@ -125,7 +143,10 @@ export function createScreenTools(options: {
         return await run(input);
       } catch (error) {
         if (error instanceof LocalToolRejected) throw error;
-        throw new LocalToolRejected("app_screen_failed", error instanceof Error ? error.message : String(error));
+        throw new LocalToolRejected(
+          "app_screen_failed",
+          error instanceof Error ? error.message : String(error),
+        );
       }
     };
   const pointAt = (input: Record<string, unknown>): [number, number] => [
@@ -138,28 +159,36 @@ export function createScreenTools(options: {
     if (frame) {
       const box = frame.getBoundingClientRect();
       try {
-        const image = await invoke<{ dataUrl: string; width: number; height: number }>("space_app_snapshot", {
-          x: box.left,
-          y: box.top,
-          width: box.width,
-          height: box.height,
-        });
+        const image = await invoke<{ dataUrl: string; width: number; height: number }>(
+          "space_app_snapshot",
+          {
+            x: box.left,
+            y: box.top,
+            width: box.width,
+            height: box.height,
+          },
+        );
         return { image };
       } catch {
         // Not on this computer: the app's own canvas, when it is drawn on one.
       }
     }
     const drawn = await screen.command<{ dataUrl: string | null }>("look");
-    if (!drawn.dataUrl) throw new Error(`Misty can't picture ${appName} here. Read it with screen_read instead.`);
+    if (!drawn.dataUrl)
+      throw new Error(`Misty can't picture ${appName} here. Read it with screen_read instead.`);
     return { image: { dataUrl: drawn.dataUrl } };
   };
 
   const run: Record<string, (input: Record<string, unknown>, runId: string) => Promise<unknown>> = {
     screen_read: acting(() => screen.command("read")),
     screen_look: acting(look),
-    screen_click: acting((input) => screen.command("click", { x: input.x, y: input.y, double: input.double === true }), pointAt),
+    screen_click: acting(
+      (input) => screen.command("click", { x: input.x, y: input.y, double: input.double === true }),
+      pointAt,
+    ),
     screen_type: acting((input) => {
-      if (typeof input.text !== "string") throw new LocalToolRejected("invalid_request", "text is required.");
+      if (typeof input.text !== "string")
+        throw new LocalToolRejected("invalid_request", "text is required.");
       return screen.command("type", { text: input.text });
     }),
     screen_key: acting((input) => {

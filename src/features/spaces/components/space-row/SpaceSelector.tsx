@@ -20,10 +20,20 @@ import { SpaceMenuItems } from "./SpaceMenuItems";
  * who can, then the Space's people, shared folders, name and leaving or deleting it). A Space has
  * no home page. The name is shown whole, never faded; a Space's name is at most 64 characters.
  */
-export function SpaceSelector({ space }: { space: Space }) {
+export function SpaceSelector({
+  space,
+  place = "spaces",
+}: {
+  space: Space;
+  /**
+   * The sidebar's side: Personal names the person's own Space "Personal" and switches nowhere;
+   * Spaces lists only the shared Spaces.
+   */
+  place?: "personal" | "spaces";
+}) {
   const [dialog, setDialog] = useState<SpaceDialog>(null);
   const close = useCallback(() => setDialog(null), []);
-  const name = spaceNavigationName(space);
+  const name = place === "personal" ? "Personal" : spaceNavigationName(space);
   return (
     <Popover open={isSpacePanel(dialog)} onOpenChange={(next) => !next && close()}>
       <PopoverAnchor asChild>
@@ -33,7 +43,7 @@ export function SpaceSelector({ space }: { space: Space }) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <NavTitleButton
-                    aria-label={`${name}, switch Space`}
+                    aria-label={place === "personal" ? name : `${name}, switch Space`}
                     name={name}
                     mark={
                       <SpaceAvatar
@@ -49,7 +59,12 @@ export function SpaceSelector({ space }: { space: Space }) {
                   align="start"
                   className="w-60 max-w-[calc(100vw-1rem)]"
                 >
-                  <SpaceMenuItems space={space} onDialog={setDialog} onCreate={create} />
+                  <SpaceMenuItems
+                    space={space}
+                    place={place}
+                    onDialog={setDialog}
+                    onCreate={create}
+                  />
                 </DropdownMenuContent>
               </DropdownMenu>
             )}

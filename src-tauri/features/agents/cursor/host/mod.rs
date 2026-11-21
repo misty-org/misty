@@ -1,3 +1,4 @@
+mod always_on;
 mod ask;
 mod audio;
 mod capture;
@@ -57,6 +58,10 @@ pub struct CursorCompanionState {
     /// Where the pointer went while the talk keys were held, in global units: the person can
     /// circle or scribble over what they mean while they ask (`cursor_companion_trail`).
     trail: Mutex<Vec<(f64, f64)>>,
+    /// Always On: Tutor listens without the talk keys (`always_on.rs`).
+    always_on: AtomicBool,
+    /// What the microphone heard just before Always On noticed a voice, for the turn it starts.
+    preroll: Mutex<Vec<i16>>,
 }
 
 /// The most of a trail kept: about a minute of the pointer moving.
@@ -66,6 +71,8 @@ pub enum Shortcut {
     Click(f64, f64),
     /// Control tapped twice: open the text box.
     Type,
+    /// Control tapped three times: Always On listening on or off.
+    AlwaysOn,
     Error(String),
 }
 fn require_main(webview: &Webview) -> Result<(), String> {
@@ -255,6 +262,31 @@ pub fn cursor_companion_ask_open(webview: Webview, app: AppHandle) -> Result<(),
     if state.enabled.load(Ordering::SeqCst) && !state.held.load(Ordering::SeqCst) {
         ask::open(&app);
     }
+    Ok(())
+}
+
+/// Asks Tutor about a part of the 3D model on the overlay's card, picked with a click: a typed
+/// question of its own turn, as the text box sends one (`ask.rs`).
+#[tauri::command]
+pub fn cursor_companion_ask_part(
+    webview: Webview,
+    app: AppHandle,
+    part: String,
+) -> Result<(), String> {
+    require_overlay(&webview)?;
+    let part: String = part.trim().chars().take(120).collect();
+    let state = host_state(&app);
+    if part.is_empty() || !state.enabled.load(Ordering::SeqCst) || state.held.load(Ordering::SeqCst)
+    {
+        return Ok(());
+    }
+    state.trail.lock().unwrap().clear();
+    let turn = state.turn.fetch_add(1, Ordering::SeqCst) + 1;
+    let _ = crate::browser::app_windows::emit_to_primary(
+        &app,
+        "misty://cursor-ask",
+        json!({"turn": turn, "text": format!("Tell me about the {part} in the model.")}),
+    );
     Ok(())
 }
 

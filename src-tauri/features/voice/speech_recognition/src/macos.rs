@@ -172,6 +172,38 @@ fn result_words(result: &AnyObject) -> (String, bool) {
     }
 }
 
+/// How sure the recognizer is of a result's words: its segments' confidence, averaged by length.
+/// The framework gives 0 until the result is final.
+fn result_confidence(result: &AnyObject) -> f32 {
+    // SAFETY: SFSpeechRecognitionResult's best transcription, its NSArray of
+    // SFTranscriptionSegment, and each segment's substring and confidence.
+    unsafe {
+        let best: Option<Retained<AnyObject>> = msg_send![result, bestTranscription];
+        let Some(best) = best else {
+            return 0.0;
+        };
+        let segments: Option<Retained<AnyObject>> = msg_send![&best, segments];
+        let Some(segments) = segments else {
+            return 0.0;
+        };
+        let count: usize = msg_send![&segments, count];
+        let (mut sum, mut weight) = (0.0f32, 0.0f32);
+        for index in 0..count {
+            let segment: Retained<AnyObject> = msg_send![&segments, objectAtIndex: index];
+            let text: Option<Retained<AnyObject>> = msg_send![&segment, substring];
+            let confidence: f32 = msg_send![&segment, confidence];
+            let length = rust_string(text.as_deref()).chars().count() as f32;
+            sum += confidence * length;
+            weight += length;
+        }
+        if weight > 0.0 {
+            sum / weight
+        } else {
+            0.0
+        }
+    }
+}
+
 /// What a recognition task's handler gets: a result, an error, or both.
 type TaskHandler = RcBlock<dyn Fn(*mut AnyObject, *mut AnyObject)>;
 
@@ -221,12 +253,14 @@ fn result_phrases(result: &AnyObject) -> (Vec<Phrase>, bool) {
             let text: Option<Retained<AnyObject>> = msg_send![&segment, substring];
             let start: f64 = msg_send![&segment, timestamp];
             let duration: f64 = msg_send![&segment, duration];
+            let confidence: f32 = msg_send![&segment, confidence];
             let text = rust_string(text.as_deref());
             if !text.trim().is_empty() {
                 phrases.push(Phrase {
                     text,
                     start,
                     end: start + duration,
+                    confidence,
                 });
             }
         }
@@ -481,6 +515,8 @@ struct StreamState {
     samples: usize,
     phrase_start: usize,
     current: String,
+    /// The current phrase's confidence (`result_confidence`).
+    confidence: f32,
     finished: Vec<Phrase>,
     stopping: bool,
 }
@@ -497,6 +533,7 @@ impl StreamState {
                 text: text.to_string(),
                 start: seconds(self.phrase_start),
                 end: seconds(self.samples),
+                confidence: self.confidence,
             });
         }
         self.current.clear();
@@ -509,6 +546,7 @@ impl StreamState {
                 text: self.current.clone(),
                 start: seconds(self.phrase_start),
                 end: seconds(self.samples),
+                confidence: self.confidence,
             }),
         }
     }
@@ -534,6 +572,7 @@ fn begin(inner: &Arc<StreamInner>, state: &mut StreamState) -> Option<()> {
     state.handler = Some(handler);
     state.phrase_start = state.samples;
     state.current.clear();
+    state.confidence = 0.0;
     Some(())
 }
 
@@ -557,6 +596,7 @@ fn on_phrase(
         if let Some(result) = unsafe { result.as_ref() } {
             let (text, last) = result_words(result);
             state.current = text;
+            state.confidence = result_confidence(result);
             done |= last;
         }
         if !done {
@@ -683,6 +723,7 @@ pub fn stream(locale: Option<&str>) -> Result<Streaming, String> {
                 samples: 0,
                 phrase_start: 0,
                 current: String::new(),
+                confidence: 0.0,
                 finished: Vec::new(),
                 stopping: false,
             }),

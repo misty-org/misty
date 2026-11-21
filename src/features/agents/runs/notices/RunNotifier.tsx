@@ -69,7 +69,10 @@ export function RunNotifier() {
   useEffect(() => {
     if (!hasTauriInternals()) return;
     const unlisten = getCurrentWebview().listen<{ route?: string }>(openEvent, ({ payload }) => {
-      if (typeof payload.route === "string" && payload.route.startsWith("/agents?"))
+      if (
+        typeof payload.route === "string" &&
+        ["/agents?", "/spaces/", "/dms/"].some((prefix) => payload.route!.startsWith(prefix))
+      )
         void navigate(payload.route);
     });
     return () => void unlisten.then((stop) => stop());

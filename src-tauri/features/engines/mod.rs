@@ -75,6 +75,7 @@ pub mod store;
 pub mod support;
 pub mod turn;
 mod warm;
+pub(crate) mod warm_up;
 
 pub(crate) use resolve::command_for_binary;
 
@@ -1226,6 +1227,10 @@ async fn deliver_to_idle_followup(
         bridge::redirect(&idle_run, next);
     }
     if registry.write_line(&idle_run, line).await.is_ok() {
+        // A warmed-up session has its first turn now (`warm_up.rs`).
+        if let Some(id) = session_id {
+            warm_up::born(id);
+        }
         return Ok(Some(idle_run));
     }
     bridge::unredirect(&idle_run);
@@ -1309,6 +1314,14 @@ async fn send_reserved(
         }
         return send_host_stream(state, launch, engine, run_id, killed, reader_abort, warm).await;
     }
+    // A warm-up launch (`warm_up.rs`): no prompt, and parked as warm for its session as soon as
+    // it runs.
+    let warm_up = (engine == "claude"
+        && launch.built.stdin_payload.is_none()
+        && launch.built.keep_stdin_open)
+        .then(|| launch.built.preassigned_session_id.clone())
+        .flatten()
+        .zip(followup.clone());
     let mut command = launch.built.command;
     let cleanup_files = launch.built.cleanup_files;
     command
@@ -1449,6 +1462,13 @@ async fn send_reserved(
     // Registration order is unchanged (entries land before the task can
     // settle); the OnceLock just hands kill()/kill_all() the handle.
     let _ = reader_abort.set(reader.abort_handle());
+    if let Some((session, prefs)) = warm_up {
+        let (since, evicted) = state.processes.set_warm_followup(&session, &run_id, prefs);
+        for run in evicted {
+            state.processes.close_stdin(&run);
+        }
+        registry::reap_when_idle(Arc::clone(&state.processes), session, run_id.clone(), since);
+    }
 
     Ok(SendResult {
         run_id,

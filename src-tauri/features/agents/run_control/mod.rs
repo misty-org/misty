@@ -24,7 +24,6 @@ pub(crate) mod run_ledger;
 pub mod run_notices;
 pub(crate) mod run_steps;
 pub(crate) mod run_taint;
-pub mod sessions;
 pub(crate) mod step_pictures;
 mod system_speech;
 pub(crate) mod take_over;
@@ -47,7 +46,7 @@ use std::{
 };
 
 use agent_runs::{
-    device::DeviceCalls, runtime_client_builder, AgentRuntime, AgentRuntimeOptions, Logger,
+    runtime_client_builder, AgentRuntime, AgentRuntimeOptions, Logger,
 };
 
 use crate::browser::page_text::host::ConfinedPageReader;
@@ -55,8 +54,6 @@ use file_access::{fs, fs_async};
 
 pub(crate) struct Running {
     pub(crate) runtime: AgentRuntime,
-    pub(crate) calls: DeviceCalls,
-    pub(crate) client: reqwest::Client,
 }
 
 static RUNNING: Mutex<Option<Arc<Running>>> = Mutex::new(None);
@@ -133,12 +130,7 @@ async fn start(app: &tauri::AppHandle) -> Result<Running, String> {
             error.kind()
         );
     }
-    let calls = DeviceCalls::new(runtime.device_models(), client.clone());
-    Ok(Running {
-        runtime,
-        calls,
-        client,
-    })
+    Ok(Running { runtime })
 }
 
 /// The running runtime, starting it when it isn't running.
@@ -230,7 +222,6 @@ pub fn models_changed() {
 /// launch.
 pub fn stop() {
     STOPPED.store(true, Ordering::SeqCst);
-    sessions::stop_all();
     let running = RUNNING
         .lock()
         .unwrap_or_else(PoisonError::into_inner)

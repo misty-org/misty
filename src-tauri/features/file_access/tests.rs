@@ -269,6 +269,9 @@ fn the_list_matches_grants_toml() {
     ]
     .into_iter()
     .flat_map(|reach| grants_for(reach).iter().copied())
+    // The disk grant isn't a place in the policy: it is its own switch (`disk.rs`), which only
+    // Files reaches through.
+    .chain(["grant-disk"])
     .collect();
     assert_eq!(listed, declared);
 }

@@ -8,7 +8,7 @@ import { savedTurns } from "./transcriptTurns";
 
 /** What to listen to. */
 interface CaptureSource {
-  kind: Exclude<VoiceSourceKind, "library_item" | "tab">;
+  kind: Exclude<VoiceSourceKind, "tab">;
   title: string;
   url?: string;
   /** Processes to hear, for kind "app". */

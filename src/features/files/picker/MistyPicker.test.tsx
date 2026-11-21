@@ -9,9 +9,9 @@ vi.mock("./FilePicker", () => ({
   ),
 }));
 
-vi.mock("@/features/spaces/library", () => ({
-  MistyLibraryPicker: ({ active }: { active?: boolean }) => (
-    <div data-testid="library-panel" data-active={active ? "true" : "false"} />
+vi.mock("@/features/spaces/drive/DrivePickerPanel", () => ({
+  DrivePickerPanel: ({ active }: { active?: boolean }) => (
+    <div data-testid="drive-panel" data-active={active ? "true" : "false"} />
   ),
 }));
 
@@ -42,24 +42,24 @@ describe("MistyPicker", () => {
           spaceId="space-1"
           onCancel={vi.fn()}
           onChooseFiles={vi.fn()}
-          onChooseLibraryItems={vi.fn()}
+          onChooseDriveFiles={vi.fn()}
         />,
       );
     });
 
     const dialog = document.body.querySelector<HTMLElement>('[data-slot="dialog-content"]');
-    const libraryButton = Array.from(
+    const driveButton = Array.from(
       document.body.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
     ).find((button) => button.textContent?.includes("Files"));
     expect(document.body.querySelectorAll('[data-slot="dialog-content"]')).toHaveLength(1);
     expect(document.body.querySelector('[data-testid="files-panel"]')).not.toBeNull();
-    expect(document.body.querySelector('[data-testid="library-panel"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-testid="drive-panel"]')).not.toBeNull();
 
-    await act(async () => libraryButton?.click());
+    await act(async () => driveButton?.click());
 
     expect(document.body.querySelector('[data-slot="dialog-content"]')).toBe(dialog);
     expect(
-      document.body.querySelector('[data-testid="library-panel"]')?.getAttribute("data-active"),
+      document.body.querySelector('[data-testid="drive-panel"]')?.getAttribute("data-active"),
     ).toBe("true");
   });
 });

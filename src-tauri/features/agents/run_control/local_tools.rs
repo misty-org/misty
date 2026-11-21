@@ -64,6 +64,21 @@ const LOCAL_TOOLS: &[&str] = &[
     "file.search",
     "file.update",
     "file.upload",
+    // Answered here in native code, never by a window (`files/agent_tools.rs`).
+    "files.copy",
+    "files.create_folder",
+    "files.delete",
+    "files.extract",
+    "files.info",
+    "files.list",
+    "files.move",
+    "files.read",
+    "files.rename",
+    "files.reveal",
+    "files.search",
+    "files.tag",
+    "files.trash",
+    "files.zip",
     "folder.list",
     "folder.read",
     "folder.send",
@@ -124,6 +139,11 @@ pub(super) const READ_ONLY: &[&str] = &[
     "space.member.resolve",
     "file.read",
     "file.search",
+    "files.info",
+    "files.list",
+    "files.read",
+    "files.reveal",
+    "files.search",
     "message.search",
     "search.all",
     "thread.list",
@@ -355,9 +375,16 @@ impl LocalToolHost for AppToolHost {
                 input,
                 ..call.clone()
             };
-            // An app whose server is its maker's own program is answered here, in the run's folder; every other
-            // tool by the window that runs agent jobs.
-            let answer = match crate::apps::mcp::served_by_program(&call.name) {
+            // Files' tools and an app whose server is its maker's own program are answered here (the program in the
+            // run's folder); every other tool by the window that runs agent jobs.
+            let files = call.name.starts_with("files.");
+            let answer = match crate::apps::mcp::served_by_program(&call.name).filter(|_| !files) {
+                None if files => Some(
+                    match crate::files::agent_paths::tools::call(&self.app, &facts.agent_id, &facts.conversation_id, &call.name, admitted.input.clone()).await {
+                        Ok(result) => Answer::Done { result },
+                        Err(refused) => Answer::Failed { code: refused.code.to_owned(), message: refused.message },
+                    },
+                ),
                 Some((app_id, tool)) => Some(
                     match crate::apps::program::call(&call.run_id, &app_id, &tool, admitted.input.clone()).await {
                         crate::apps::program::Outcome::Done(result) => Answer::Done { result },

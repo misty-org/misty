@@ -17,4 +17,4 @@ Rules:
 - `api/` imports no feature and no app code (`.config/eslint.config.js` enforces it).
 - Use `apiRequest` for the account server and `spaceRequest` (in `features/spaces/api`) for a Space.
 - A client for one feature's endpoints lives in that feature: `account/api`, `agents/api`,
-  `devices/api`, `files/api`, `spaces/api`, `spaces/library/api`, `spaces/journal/...`.
+  `devices/api`, `files/api`, `spaces/api`, `spaces/journal/...`.

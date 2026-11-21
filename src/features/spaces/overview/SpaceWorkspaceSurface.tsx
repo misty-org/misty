@@ -65,12 +65,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   if (!ready)
     return (
       <Surface tone="page" className="flex h-full min-h-0 flex-col overflow-hidden">
-        <SpacePageLoadingPlaceholder
-          shape={{
-            section: route.section || "home",
-            item: Boolean(route.itemId) || new URLSearchParams(location.search).has("note"),
-          }}
-        />
+        <SpacePageLoadingPlaceholder shape={{ section: route.section || "home" }} />
       </Surface>
     );
 

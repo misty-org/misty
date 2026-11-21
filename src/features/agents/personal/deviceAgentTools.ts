@@ -45,14 +45,12 @@ export async function runDeviceAgentOperation(
       const target = scopedPath(job);
       if (!target.relativePath) throw new Error("invalid_device_scope");
       if (!job.spaceId) throw new Error("no_space");
-      // The file is read natively under the job's grant and arrives in the
-      // conversation's Space Library as a new item.
+      // The file is read natively under the job's grant and saved at the top of the
+      // conversation's Space drive.
       const bytes = await devicesNative.readSharedFile(job.scopeId, job.input, job.config);
       const name = target.relativePath.split(/[\\/]/).filter(Boolean).pop() || "file";
-      const uploaded = await spacesGateway
-        .get()
-        .uploadLibraryBlob(job.spaceId, new Blob([bytes]), name);
-      return { name, size: bytes.byteLength, libraryItemId: uploaded.item?.id ?? null };
+      const saved = await spacesGateway.get().saveToDrive(job.spaceId, "/", name, bytes);
+      return { name, size: bytes.byteLength, path: saved.path, fileId: saved.id };
     }
     case "folder.list":
       return invoke<Record<string, unknown>>("agents_list_scoped_files", {

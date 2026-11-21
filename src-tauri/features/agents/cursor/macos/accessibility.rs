@@ -72,13 +72,41 @@ impl Element {
             .unwrap_or_default()
     }
 
+    /// A web address attribute (`AXURL`), which apps give as a URL or, now and then, a string.
+    pub(crate) fn url(&self, name: &str) -> String {
+        #[link(name = "CoreFoundation", kind = "framework")]
+        extern "C" {
+            fn CFURLGetString(url: *const c_void) -> *const CFString;
+        }
+        let Some(value) = self.attribute(name) else {
+            return String::new();
+        };
+        let value = match value.downcast::<CFString>() {
+            Ok(text) => return text.to_string(),
+            Err(value) => value,
+        };
+        let Ok(url) = value.downcast::<objc2_core_foundation::CFURL>() else {
+            return String::new();
+        };
+        // SAFETY: a live CFURL; the string follows the get rule and lives as long as the URL.
+        let text = unsafe { CFURLGetString((&*url as *const objc2_core_foundation::CFURL).cast()) };
+        // SAFETY: null or a CFString owned by `url`, which is alive here.
+        unsafe { text.as_ref() }.map(|text| text.to_string()).unwrap_or_default()
+    }
+
+    /// The element that has the keyboard focus in an application element.
+    pub(crate) fn focused_element(&self) -> Option<Element> {
+        self.attribute("AXFocusedUIElement")
+            .and_then(|value| value.downcast::<AXUIElement>().ok())
+            .map(Element)
+    }
+
     pub(crate) fn parent(&self) -> Option<Element> {
         self.attribute("AXParent")
             .and_then(|value| value.downcast::<AXUIElement>().ok())
             .map(Element)
     }
 
-    #[cfg(test)]
     pub(crate) fn children(&self) -> Vec<Element> {
         self.attribute("AXChildren")
             .and_then(|value| value.downcast::<CFArray>().ok())
@@ -197,7 +225,6 @@ impl Element {
     }
 }
 
-#[cfg(test)]
 fn elements(list: &CFArray) -> Vec<Element> {
     (0..list.len())
         .filter_map(|index| {

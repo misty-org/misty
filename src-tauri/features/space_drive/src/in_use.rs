@@ -176,6 +176,11 @@ impl Opens {
         lock(&self.answered).insert(key, Instant::now());
     }
 
+    /// Lets go of an answered mark: the item was closed here, so the next check asks afresh.
+    pub fn forget_answer(&self, key: &Key) {
+        lock(&self.answered).remove(key);
+    }
+
     /// Answered marks still within their lease.
     pub fn answered_live(&self) -> Vec<Key> {
         let mut answered = lock(&self.answered);

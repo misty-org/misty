@@ -21,6 +21,7 @@ import { useSettingsStore } from "@/features/settings";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
 import { PaymentsAskSection } from "./PaymentsAskSection";
+import { FilesAccessSection } from "./FilesAccessSection";
 import { SandboxPermissionsSection } from "./SandboxPermissionsSection";
 import { ScreenLocationSection } from "./ScreenLocationSection";
 import { PreferenceRow } from "@/features/settings";
@@ -121,6 +122,7 @@ export function AgentPermissionsSection() {
       <AgentGrantsSection />
       {hasTauriInternals() ? <AgentScopeList /> : null}
       {hasTauriInternals() ? <SandboxPermissionsSection /> : null}
+      {hasTauriInternals() ? <FilesAccessSection /> : null}
     </>
   );
 }

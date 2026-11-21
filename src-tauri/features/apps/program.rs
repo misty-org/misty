@@ -30,6 +30,14 @@ use tokio::sync::Mutex;
 use super::manifest::{valid_id, valid_version};
 use super::mcp;
 
+mod archive;
+mod server;
+#[cfg(test)]
+mod tests;
+
+use archive::{from_tar_gz, from_zip};
+use server::{Server, Trouble};
+
 /// The catalog Misty carries with its release: the only place a program's pin comes from.
 const CATALOG: &str = include_str!("../../../src/features/spaces/apps/catalog.json");
 #[cfg(target_os = "macos")]
@@ -266,66 +274,6 @@ fn install_in(
     Ok(program_path(&final_dir, program))
 }
 
-/// The one file named `name` anywhere in a zip.
-fn from_zip(archive: &[u8], name: &str) -> Result<Vec<u8>, String> {
-    let mut zip = zip::ZipArchive::new(Cursor::new(archive)).map_err(|_| "The app's tools aren't a zip file.".to_owned())?;
-    let mut found: Option<usize> = None;
-    for index in 0..zip.len() {
-        let entry = zip.by_index(index).map_err(|_| "The app's tools are damaged.".to_owned())?;
-        let last = entry.name().trim_end_matches('/').rsplit('/').next().unwrap_or("");
-        if last != name || entry.is_dir() {
-            continue;
-        }
-        if entry.is_symlink() {
-            return Err("The app's program is a link, which Misty doesn't run.".into());
-        }
-        if found.replace(index).is_some() {
-            return Err(format!("The app's release holds more than one {name}."));
-        }
-    }
-    let index = found.ok_or_else(|| format!("The app's release has no {name}."))?;
-    let entry = zip.by_index(index).map_err(|_| "The app's tools are damaged.".to_owned())?;
-    read_capped(entry)
-}
-
-/// The one regular file named `name` anywhere in a gzipped tar.
-fn from_tar_gz(archive: &[u8], name: &str) -> Result<Vec<u8>, String> {
-    let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(Cursor::new(archive)));
-    let mut found: Option<Vec<u8>> = None;
-    let entries = tar.entries().map_err(|_| "The app's tools are damaged.".to_owned())?;
-    for entry in entries {
-        let entry = entry.map_err(|_| "The app's tools are damaged.".to_owned())?;
-        let path = entry.path().map_err(|_| "The app's tools are damaged.".to_owned())?.into_owned();
-        if path.file_name().and_then(|file| file.to_str()) != Some(name) {
-            continue;
-        }
-        let kind = entry.header().entry_type();
-        if kind.is_symlink() || kind.is_hard_link() {
-            return Err("The app's program is a link, which Misty doesn't run.".into());
-        }
-        if !kind.is_file() {
-            continue;
-        }
-        if found.is_some() {
-            return Err(format!("The app's release holds more than one {name}."));
-        }
-        found = Some(read_capped(entry)?);
-    }
-    found.ok_or_else(|| format!("The app's release has no {name}."))
-}
-
-fn read_capped(reader: impl Read) -> Result<Vec<u8>, String> {
-    let mut data = Vec::new();
-    reader
-        .take(MAX_PROGRAM_BYTES + 1)
-        .read_to_end(&mut data)
-        .map_err(|_| "The app's tools are damaged.".to_owned())?;
-    if data.len() as u64 > MAX_PROGRAM_BYTES {
-        return Err("The app's program is larger than Misty runs.".into());
-    }
-    Ok(data)
-}
-
 /// The confined command that runs `program` kept to `work`, before its own arguments. What has to stay alive
 /// until the program has started comes with it.
 #[cfg(target_os = "macos")]
@@ -386,148 +334,6 @@ fn confined(program: &Path, work: &Path) -> Result<(tokio::process::Command, san
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
 fn confined(_: &Path, _: &Path) -> Result<(tokio::process::Command, ()), String> {
     Err("Misty can't confine the app's tools on this computer yet, so they don't run here.".into())
-}
-
-/// A running server, spoken to over its stdio, one message per line.
-struct Server {
-    _child: Child,
-    stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
-    next_id: u64,
-    last_used: Instant,
-}
-
-/// What went wrong talking to a server: `Refused` before it did anything, `Lost` once it may have.
-enum Trouble {
-    Refused(String),
-    Lost(String),
-}
-
-impl Server {
-    async fn start(program: &Path, spec: &McpProgram, work: &Path) -> Result<Self, String> {
-        let (mut command, keep) = confined(program, work)?;
-        let real_work = fs::canonicalize(work).map_err(|error| format!("Couldn't open the chat's folder: {error}"))?;
-        command
-            .args(&spec.args)
-            .arg(&spec.read_root_flag)
-            .arg(&real_work)
-            .arg(&spec.write_root_flag)
-            .arg(&real_work)
-            .current_dir(&real_work)
-            .env_clear()
-            .env("PATH", "/usr/bin:/bin")
-            .env("HOME", &real_work)
-            .env("TMPDIR", &real_work)
-            .env("LANG", "C.UTF-8")
-            .envs(&spec.env)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .kill_on_drop(true);
-        let mut child = command.spawn().map_err(|error| format!("Couldn't start the app's tools: {error}"))?;
-        drop(keep);
-        let stdin = child.stdin.take().ok_or_else(|| "Couldn't talk to the app's tools.".to_owned())?;
-        let stdout = child.stdout.take().ok_or_else(|| "Couldn't talk to the app's tools.".to_owned())?;
-        let mut server = Self { _child: child, stdin, stdout: BufReader::new(stdout), next_id: 1, last_used: Instant::now() };
-        let hello = json!({
-            "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": {},
-            "clientInfo": { "name": "misty", "version": env!("CARGO_PKG_VERSION") },
-        });
-        match tokio::time::timeout(START_LIMIT, server.request("initialize", hello)).await {
-            Ok(Ok(_)) => {}
-            Ok(Err(Trouble::Refused(message) | Trouble::Lost(message))) => {
-                return Err(format!("The app's tools didn't start: {message}"))
-            }
-            Err(_) => return Err("The app's tools took too long to start.".into()),
-        }
-        server
-            .send(&json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }))
-            .await
-            .map_err(|_| "The app's tools stopped as they started.".to_owned())?;
-        Ok(server)
-    }
-
-    async fn send(&mut self, message: &Value) -> std::io::Result<()> {
-        let mut line = message.to_string().into_bytes();
-        line.push(b'\n');
-        self.stdin.write_all(&line).await?;
-        self.stdin.flush().await
-    }
-
-    /// One request and its answer. Requests the server makes of Misty are answered on the way: a ping, and no
-    /// roots or sampling (Misty has no model of its own).
-    async fn request(&mut self, method: &str, params: Value) -> Result<Value, Trouble> {
-        let id = self.next_id;
-        self.next_id += 1;
-        let message = json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
-        self.send(&message)
-            .await
-            .map_err(|_| Trouble::Refused("The app's tools have stopped.".into()))?;
-        loop {
-            let mut line = Vec::new();
-            let read = (&mut self.stdout)
-                .take(MAX_LINE_BYTES)
-                .read_until(b'\n', &mut line)
-                .await
-                .map_err(|_| Trouble::Lost("The app's tools stopped while working.".into()))?;
-            if read == 0 {
-                return Err(Trouble::Lost("The app's tools stopped while working.".into()));
-            }
-            if line.last() != Some(&b'\n') && read as u64 >= MAX_LINE_BYTES {
-                return Err(Trouble::Lost("The app's tools answered with more than Misty reads.".into()));
-            }
-            let Ok(answer) = serde_json::from_slice::<Value>(&line) else {
-                continue;
-            };
-            if answer.get("method").is_some() {
-                if let Some(asked) = answer.get("id").filter(|asked| !asked.is_null()) {
-                    let reply = match answer["method"].as_str() {
-                        Some("ping") => json!({ "jsonrpc": "2.0", "id": asked, "result": {} }),
-                        Some("roots/list") => json!({ "jsonrpc": "2.0", "id": asked, "result": { "roots": [] } }),
-                        _ => json!({
-                            "jsonrpc": "2.0", "id": asked,
-                            "error": { "code": -32601, "message": "Misty doesn't offer that." },
-                        }),
-                    };
-                    self.send(&reply)
-                        .await
-                        .map_err(|_| Trouble::Lost("The app's tools stopped while working.".into()))?;
-                }
-                continue;
-            }
-            if answer["id"].as_u64() != Some(id) {
-                continue;
-            }
-            if let Some(error) = answer.get("error") {
-                let text = error["message"].as_str().unwrap_or("The app's tools refused the call.");
-                return Err(Trouble::Refused(text.chars().take(2_000).collect()));
-            }
-            return Ok(answer.get("result").cloned().unwrap_or(Value::Null));
-        }
-    }
-
-    async fn list_tools(&mut self) -> Result<Vec<Value>, String> {
-        let mut tools = Vec::new();
-        let mut cursor: Option<String> = None;
-        for _ in 0..MAX_PAGES {
-            let params = match &cursor {
-                Some(cursor) => json!({ "cursor": cursor }),
-                None => json!({}),
-            };
-            let page = match tokio::time::timeout(START_LIMIT, self.request("tools/list", params)).await {
-                Ok(Ok(page)) => page,
-                Ok(Err(Trouble::Refused(message) | Trouble::Lost(message))) => return Err(message),
-                Err(_) => return Err("The app's tools took too long to list themselves.".into()),
-            };
-            tools.extend(page["tools"].as_array().cloned().unwrap_or_default());
-            cursor = page["nextCursor"].as_str().filter(|next| !next.is_empty()).map(str::to_owned);
-            if cursor.is_none() {
-                return Ok(tools);
-            }
-        }
-        Ok(tools)
-    }
 }
 
 /// An app whose program's tools are on offer.
@@ -679,110 +485,5 @@ pub async fn call(run_id: &str, app_id: &str, tool: &str, input: Value) -> Outco
                     .to_owned(),
             )
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io::Write;
-
-    use super::*;
-
-    fn spec(url: &str, sha256: &str) -> (McpProgram, Build) {
-        let build = Build { url: url.to_owned(), sha256: sha256.to_owned(), size: 10 };
-        let program = McpProgram {
-            program: "demo-cli".into(),
-            args: vec!["mcp".into()],
-            read_root_flag: "--read-root".into(),
-            write_root_flag: "--write-root".into(),
-            env: HashMap::new(),
-            builds: HashMap::new(),
-        };
-        (program, build)
-    }
-
-    fn zip_of(files: &[(&str, &[u8])]) -> Vec<u8> {
-        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
-        for (name, data) in files {
-            writer.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
-            writer.write_all(data).unwrap();
-        }
-        writer.finish().unwrap().into_inner()
-    }
-
-    fn tar_gz_of(files: &[(&str, &[u8])]) -> Vec<u8> {
-        let mut builder = tar::Builder::new(flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast()));
-        for (name, data) in files {
-            let mut header = tar::Header::new_gnu();
-            header.set_size(data.len() as u64);
-            header.set_mode(0o755);
-            header.set_cksum();
-            builder.append_data(&mut header, name, *data).unwrap();
-        }
-        builder.into_inner().unwrap().finish().unwrap()
-    }
-
-    fn temp_root(name: &str) -> PathBuf {
-        let root = std::env::temp_dir().join(format!("misty-programs-{name}-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&root).unwrap();
-        root
-    }
-
-    #[test]
-    fn only_the_program_is_taken_out_of_a_matching_archive() {
-        let root = temp_root("install");
-        let archive = zip_of(&[("demo/demo-cli", b"#!program"), ("demo/README", b"r"), ("demo/demo", b"gui")]);
-        let sum = hex::encode(Sha256::digest(&archive));
-        let (program, build) = spec("https://github.com/maker/demo/releases/download/v1/demo-cli-1.zip", &sum);
-        let path = install_in(&root, "demo", "1.0.0", &program, &build, &archive).unwrap();
-        assert_eq!(std::fs::read(&path).unwrap(), b"#!program");
-        assert!(listing_dir(path.parent().unwrap().parent().unwrap()).is_dir());
-        assert!(!path.parent().unwrap().join("README").exists());
-        // A wrong checksum installs nothing.
-        let (program, bad) = spec(&build.url, &"0".repeat(64));
-        assert!(install_in(&root, "other", "1.0.0", &program, &bad, &archive).is_err());
-        assert!(!root.join("other").exists());
-        std::fs::remove_dir_all(&root).unwrap();
-    }
-
-    #[test]
-    fn a_tarball_gives_up_its_program_too_and_two_or_none_are_refused() {
-        let archive = tar_gz_of(&[("demo-1/bin/demo-cli", b"elf"), ("demo-1/share/x", b"x")]);
-        assert_eq!(from_tar_gz(&archive, "demo-cli").unwrap(), b"elf");
-        assert!(from_tar_gz(&tar_gz_of(&[("a/demo-cli", b"1"), ("b/demo-cli", b"2")]), "demo-cli").is_err());
-        assert!(from_tar_gz(&tar_gz_of(&[("a/other", b"1")]), "demo-cli").is_err());
-        assert!(from_zip(&zip_of(&[("a/demo-cli", b"1"), ("b/demo-cli", b"2")]), "demo-cli").is_err());
-        assert!(from_zip(&zip_of(&[("a/other", b"1")]), "demo-cli").is_err());
-    }
-
-    #[test]
-    fn the_pin_comes_from_the_catalog_and_must_be_the_makers_own() {
-        let Some(platform) = platform() else { return };
-        let catalog = |url: &str, extra: &str| -> String {
-            format!(
-                r#"{{"apps":[{{"id":"demo","upstream":"maker/demo","version":"1.0.0","mcp_program":{{"program":"demo-cli","args":["mcp"],"read_root_flag":"--read-root","write_root_flag":"--write-root"{extra},"builds":{{"{platform}":{{"url":"{url}","sha256":"{}","size":10}}}}}}}}]}}"#,
-                "a".repeat(64)
-            )
-        };
-        let good = catalog("https://github.com/maker/demo/releases/download/v1/demo-cli.zip", "");
-        let (program, build) = pinned_in(&good, "demo", "1.0.0").unwrap();
-        assert_eq!((program.program.as_str(), build.size), ("demo-cli", 10));
-        // Another maker's release, a variable that changes how it loads, or another version are refused.
-        assert!(pinned_in(&catalog("https://github.com/someone/else/releases/download/v1/x.zip", ""), "demo", "1.0.0").is_err());
-        assert!(pinned_in(&catalog("https://github.com/maker/demo/releases/download/v1/x.dmg", ""), "demo", "1.0.0").is_err());
-        let env = catalog(
-            "https://github.com/maker/demo/releases/download/v1/demo-cli.zip",
-            r#","env":{"DYLD_INSERT_LIBRARIES":"/x"}"#,
-        );
-        assert!(pinned_in(&env, "demo", "1.0.0").is_err());
-        assert!(pinned_in(&good, "demo", "2.0.0").is_err());
-        assert!(pinned_in(&good, "nothing", "1.0.0").is_err());
-    }
-
-    #[test]
-    fn flags_and_variables_are_checked() {
-        assert!(flag_ok("--automation-read-root") && !flag_ok("-r") && !flag_ok("--Root") && !flag_ok("--a b"));
-        assert!(env_ok("SOUNDCRAFT_NO_PREFS", "1"));
-        assert!(!env_ok("PATH", "/x") && !env_ok("LD_PRELOAD", "x") && !env_ok("DYLD_LIBRARY_PATH", "x") && !env_ok("lower", "x"));
     }
 }

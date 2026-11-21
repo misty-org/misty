@@ -145,9 +145,9 @@ export function AgentMemoryPage(props: {
       <Dialog open={Boolean(opened)} onOpenChange={(open) => !open && setOpened(undefined)}>
         <DialogContent size="lg" layout="scroll" aria-describedby={undefined}>
           <DialogTitle>{opened?.title}</DialogTitle>
-          <div className="mt-4 min-h-0 whitespace-pre-wrap break-words text-body leading-relaxed text-cream">
+          <Text as="div" size="body" wrap className="mt-4 min-h-0 whitespace-pre-wrap">
             {opened?.content}
-          </div>
+          </Text>
         </DialogContent>
       </Dialog>
       <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(undefined)}>

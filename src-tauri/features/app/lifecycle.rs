@@ -48,7 +48,7 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
         }
     }
     if let RunEvent::ExitRequested { code, api, .. } = &event {
-        if code.is_none() {
+        if code.is_none() && !crate::app::tray::hidden() {
             // The last window closed (only that asks with no code). Misty stays in the tray or
             // menu bar, where it keeps the Space drives in sync; Quit (`app.exit`) carries a code,
             // and macOS's own Quit and logout end the app without asking here.
@@ -76,9 +76,6 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
 
 /// Closing the main window would take its unsaved changes with it.
 pub fn window_event(window: &Window, event: &WindowEvent) {
-    if matches!(event, WindowEvent::Destroyed) {
-        crate::agents::run_control::sessions::close_for_window(window.label());
-    }
     if let WindowEvent::CloseRequested { api, .. } = event {
         if crate::browser::app_windows::is_person_window(window.label()) && must_ask() {
             api.prevent_close();

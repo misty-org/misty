@@ -275,3 +275,155 @@ proptest! {
         run(actions);
     }
 }
+
+// Cases the randomized runs found, kept as they were shrunk.
+
+/// Deleted and saved again under its name before the delete went up: the version it replaced
+/// waits in the trash.
+#[test]
+fn a_file_saved_again_after_its_delete_keeps_the_old_one_in_the_trash() {
+    run(vec![
+        Action::Save { computer: 0, folder: 1, file: 2 },
+        Action::Sync { computer: 0 },
+        Action::Trash { computer: 0, folder: 1, file: 2 },
+        Action::Save { computer: 0, folder: 1, file: 2 },
+    ]);
+}
+
+/// An edit goes up while someone else's rename is already there: the editor takes the new name.
+#[test]
+fn an_edit_takes_a_rename_that_went_up_first() {
+    run(vec![
+        Action::Save { computer: 1, folder: 0, file: 0 },
+        Action::Sync { computer: 1 },
+        Action::Sync { computer: 0 },
+        Action::Rename { computer: 0, folder: 0, file: 0, to: 1 },
+        Action::Save { computer: 1, folder: 0, file: 0 },
+    ]);
+}
+
+/// A rename goes up after someone else wrote into the file: the renamer takes their content.
+#[test]
+fn a_rename_takes_content_that_went_up_first() {
+    run(vec![
+        Action::Save { computer: 0, folder: 1, file: 0 },
+        Action::Sync { computer: 0 },
+        Action::Save { computer: 2, folder: 1, file: 0 },
+        Action::Rename { computer: 0, folder: 1, file: 0, to: 1 },
+        Action::Sync { computer: 2 },
+    ]);
+}
+
+/// A new file's create landed but its answer was lost, and it was saved again here: that save
+/// still goes up.
+#[test]
+fn a_save_after_a_lost_create_answer_still_goes_up() {
+    run(vec![
+        Action::Save { computer: 1, folder: 1, file: 0 },
+        Action::Sync { computer: 1 },
+        Action::Sync { computer: 2 },
+        Action::Save { computer: 2, folder: 1, file: 1 },
+        Action::LoseReply { computer: 2 },
+        Action::Sync { computer: 2 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Save { computer: 2, folder: 1, file: 1 },
+    ]);
+}
+
+/// A file in a folder deleted here is gone with it: nothing under the folder is found by its path,
+/// so a rename can't move it over another file.
+#[test]
+fn nothing_in_a_deleted_folder_is_found_by_its_path() {
+    run(vec![
+        Action::Save { computer: 0, folder: 0, file: 1 },
+        Action::Save { computer: 0, folder: 1, file: 0 },
+        Action::Sync { computer: 0 },
+        Action::Trash { computer: 0, folder: 1, file: 1 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::TrashFolder { computer: 0 },
+        Action::Rename { computer: 0, folder: 1, file: 0, to: 1 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+    ]);
+}
+
+/// A folder deleted and made again here (`rm -r`, then `mkdir`) comes back empty, and what was in
+/// it waits in the trash.
+#[test]
+fn a_folder_made_again_after_its_delete_comes_back_empty() {
+    run(vec![
+        Action::Save { computer: 0, folder: 1, file: 0 },
+        Action::Sync { computer: 0 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::TrashFolder { computer: 0 },
+        Action::Save { computer: 0, folder: 1, file: 0 },
+    ]);
+}
+
+/// A new file's create landed, its answer was lost, and someone's rename took its name meanwhile:
+/// once its creator learns of it, it is in the trash there too.
+#[test]
+fn a_file_trashed_before_its_lost_create_answer_is_learned_goes_here_too() {
+    run(vec![
+        Action::Save { computer: 2, folder: 0, file: 1 },
+        Action::Sync { computer: 2 },
+        Action::LoseReply { computer: 0 },
+        Action::Rename { computer: 2, folder: 0, file: 1, to: 0 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Sync { computer: 0 },
+        Action::Sync { computer: 2 },
+    ]);
+}
+
+/// A rename onto a taken name by a computer whose last create answer was lost, with a delete
+/// waiting to go up elsewhere at the end.
+#[test]
+fn a_delete_waiting_at_the_end_still_reaches_everyone() {
+    run(vec![
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::LoseReply { computer: 2 },
+        Action::Save { computer: 2, folder: 0, file: 1 },
+        Action::Sync { computer: 0 },
+        Action::Sync { computer: 2 },
+        Action::Offline { computer: 2, offline: true },
+        Action::Rename { computer: 2, folder: 0, file: 1, to: 0 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Sync { computer: 0 },
+        Action::Rename { computer: 0, folder: 0, file: 0, to: 0 },
+        Action::Trash { computer: 1, folder: 0, file: 0 },
+    ]);
+}
+
+/// An edit whose answer was lost, of a file someone's rename then trashed: sent again, the edit is
+/// already there, so the file goes to the trash here too.
+#[test]
+fn an_edit_sent_again_after_its_file_was_trashed_lets_it_go() {
+    run(vec![
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::LoseReply { computer: 2 },
+        Action::Save { computer: 2, folder: 0, file: 1 },
+        Action::Sync { computer: 0 },
+        Action::Sync { computer: 2 },
+        Action::LoseReply { computer: 0 },
+        Action::Rename { computer: 2, folder: 0, file: 1, to: 0 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Sync { computer: 0 },
+        Action::Sync { computer: 2 },
+        Action::Sync { computer: 2 },
+    ]);
+}
+
+/// A new file takes a name its creator's other file is moving away from (renamed here after its
+/// create answer was lost): it waits for the move, rather than writing into that file.
+#[test]
+fn a_new_file_waits_for_its_name_to_be_moved_off() {
+    run(vec![
+        Action::Save { computer: 1, folder: 0, file: 0 },
+        Action::LoseReply { computer: 1 },
+        Action::Sync { computer: 1 },
+        Action::Rename { computer: 1, folder: 0, file: 0, to: 2 },
+        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Save { computer: 1, folder: 0, file: 2 },
+        Action::Save { computer: 1, folder: 0, file: 0 },
+    ]);
+}

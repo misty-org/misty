@@ -91,6 +91,7 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("account", "notifications", "Notifications"),
   block("server", "server", "Server"),
   block("server", "drive", "Drive"),
+  block("server", "menu-bar", "Menu bar"),
   block("server", "privacy", "Data"),
   block("appearance", "appearance", "Appearance"),
   block("appearance", "fonts", "Fonts"),

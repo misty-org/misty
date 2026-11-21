@@ -150,7 +150,7 @@ export function SketchBlock({ source }: { source: string }) {
       const name = `${(sketch.header.title || "Sketch from Misty").replace(/[\\/:*?"<>|]/g, " ").trim()}.excalidraw`;
       await spacesGateway
         .get()
-        .uploadLibraryBlob(spaceId, new Blob([file], { type: "application/json" }), name);
+        .saveToDrive(spaceId, "/", name, new Blob([file], { type: "application/json" }));
       notify({ message: `Saved ${name} to Files` });
     } catch {
       setNotice("Misty couldn't save this sketch. Try again.");

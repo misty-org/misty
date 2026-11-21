@@ -146,7 +146,6 @@ export function useSpaceThread(options: {
         sender_kind: "person",
         content,
         file_node_ids: [],
-        library_item_ids: [],
         attachments: [],
         reactions: [],
         thread_root_id: rootId,
@@ -162,13 +161,12 @@ export function useSpaceThread(options: {
               content,
               [],
               [],
-              [],
               "",
               nonce,
               "text",
               rootId,
             )
-          : await spacesApi.sendMessage(spaceId, content, [], [], [], "", nonce, rootId);
+          : await spacesApi.sendMessage(spaceId, content, [], [], "", nonce, rootId);
         response.message.client_nonce ||= nonce;
         setReplies((list) => mergeSpaceMessages(list, [response.message]));
         runOwnMentions(response.message, current.agents, current.currentUser.id);

@@ -228,6 +228,23 @@ pub async fn agent_run_start(
     started
 }
 
+/// Warms up the engine for a Tutor spoken session's first turn while the person is still talking
+/// (`engines/warm_up.rs`). The body is the turn's own, with no prompt yet. It starts no run: nothing
+/// is noted for it, and a request it doesn't apply to does nothing.
+#[tauri::command]
+pub async fn agent_run_warm_up(
+    app: AppHandle,
+    webview: Webview,
+    run_id: String,
+    body: Value,
+) -> Result<(), String> {
+    person_window(&webview)?;
+    if !crate::engines::runs::wants(&body) {
+        return Ok(());
+    }
+    crate::engines::runs::warm_up(&app, run_id, body).await
+}
+
 #[allow(dead_code)]
 async fn start_on_runtime(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
     let running = super::ensure(app).await?;

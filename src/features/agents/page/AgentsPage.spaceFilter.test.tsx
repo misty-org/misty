@@ -8,8 +8,12 @@ import {
   typeDraft,
 } from "./AgentsPage.testFixtures";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
+import { useRailShown } from "../context-panel/railLayoutStore";
+
+// New task lives in the chat's rail, which is folded away behind Tools until the person opens it.
+beforeEach(() => useRailShown.setState({ value: true }));
 
 it("edits a global agent without requiring a work Space", async () => {
   renderAgentsPage();

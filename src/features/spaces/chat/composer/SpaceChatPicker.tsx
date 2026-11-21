@@ -1,47 +1,45 @@
-import type { MistyPickerSource } from "@/features/files";
+import type { MistyPickerSource, PickedDriveFile } from "@/features/files";
 import { MistyPicker } from "@/features/files";
 import { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
 
-/** The shared Files/Library picker, scoped to what this member may attach. */
+/** The shared picker (this computer or the Space's Files), scoped to what this member may attach. */
 export function SpaceChatPicker({
   spaceId,
   source,
-  selectedLibraryIds,
   pendingAttachmentCount,
-  canBrowseLibrary,
+  canBrowseDrive,
   canUploadAttachments,
   onClose,
   onChooseFiles,
-  onChooseLibraryItems,
+  onChooseDriveFiles,
 }: {
   spaceId: string;
   source: MistyPickerSource;
-  selectedLibraryIds: string[];
   pendingAttachmentCount: number;
-  canBrowseLibrary: boolean;
+  canBrowseDrive: boolean;
   canUploadAttachments: boolean;
   onClose: () => void;
   onChooseFiles: (paths: string[]) => void;
-  onChooseLibraryItems: (itemIds: string[]) => void;
+  /** Files of the Space's drive, each sent as an attachment. */
+  onChooseDriveFiles: (files: PickedDriveFile[]) => void;
 }) {
   return (
     <MistyPicker
-      spaceId={canBrowseLibrary ? spaceId : undefined}
+      spaceId={canBrowseDrive ? spaceId : undefined}
       initialSource={source}
       multiple
       title="Add to this chat"
-      librarySelectedIds={selectedLibraryIds}
-      libraryMaximum={Math.max(0, MAX_CHAT_ATTACHMENTS - pendingAttachmentCount)}
+      driveMaximum={Math.max(0, MAX_CHAT_ATTACHMENTS - pendingAttachmentCount)}
       onCancel={onClose}
       onChooseFiles={(paths) => {
         onClose();
         if (canUploadAttachments) onChooseFiles(paths);
       }}
-      onChooseLibraryItems={
-        canBrowseLibrary
-          ? (itemIds) => {
-              onChooseLibraryItems(itemIds);
+      onChooseDriveFiles={
+        canBrowseDrive && canUploadAttachments
+          ? (files) => {
               onClose();
+              onChooseDriveFiles(files);
             }
           : undefined
       }

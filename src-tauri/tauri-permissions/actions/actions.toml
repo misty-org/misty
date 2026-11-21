@@ -28,6 +28,7 @@ permissions = [
   "allow-agent-window-account",
   "allow-agent-run-receipts",
   "allow-agent-run-start",
+  "allow-agent-run-warm-up",
   "allow-agent-run-steer",
   "allow-agent-run-timeline",
   "allow-agent-run-steps",
@@ -101,6 +102,8 @@ description = "The app's own basics: its window, system info and links"
 permissions = [
   "allow-app-quit-confirmed",
   "allow-app-relaunch",
+  "allow-app-reveal-crash-log",
+  "allow-app-set-tray-hidden",
   "allow-app-snapshot",
   "allow-check-system",
   "allow-enable-modern-window-style",
@@ -183,13 +186,6 @@ permissions = [
 ]
 
 [[set]]
-identifier = "action-clipboard"
-description = "Read and write the clipboard"
-permissions = [
-  "allow-clipboard-write-file-bytes",
-]
-
-[[set]]
 identifier = "action-cursor-companion"
 description = "The cursor companion"
 permissions = [
@@ -207,6 +203,7 @@ permissions = [
   "allow-cursor-companion-trail",
   "allow-cursor-companion-ask-close",
   "allow-cursor-companion-ask-open",
+  "allow-cursor-companion-ask-part",
   "allow-cursor-companion-hit",
   "allow-cursor-companion-watch-clicks",
 ]
@@ -322,6 +319,7 @@ permissions = [
   "allow-chat-folder",
   "allow-chat-media-load",
   "allow-chat-media-save",
+  "allow-chat-message-notify",
   "allow-chat-folder-choose",
   "allow-chat-folder-forget",
   "allow-chat-folder-projects",
@@ -569,24 +567,92 @@ permissions = [
 
 [[set]]
 identifier = "action-drive"
-description = "Each Space's drive on this computer: listing, reading and writing its files, in-use marks, keep downloaded, the cache's limit, the Space's trash and copying a folder in"
+description = "Each Space's drive on this computer: listing, reading and writing its files, new folders, renaming and moving, in-use marks, keep downloaded, the cache's limit, pausing sync, the Space's trash and copying a folder in"
 permissions = [
   "allow-drive-close",
   "allow-drive-copy-in",
+  "allow-drive-create-folder",
   "allow-drive-entry",
   "allow-drive-keep-downloaded",
   "allow-drive-list",
+  "allow-drive-move",
   "allow-drive-open",
+  "allow-drive-paused",
   "allow-drive-purge",
   "allow-drive-read",
   "allow-drive-realtime-event",
   "allow-drive-remove-download",
+  "allow-drive-rename",
   "allow-drive-restore",
   "allow-drive-reveal",
   "allow-drive-set-cache-limit",
+  "allow-drive-set-paused",
   "allow-drive-status",
   "allow-drive-sync-spaces",
   "allow-drive-trash",
   "allow-drive-trash-list",
   "allow-drive-write",
+]
+
+[[set]]
+identifier = "action-files"
+description = "Files, the file manager: the whole disk behind the disk grant (listing, opening, copying, moving, the Trash, tags, starred and recent, search, archives and the power tools), Agent trash, and turning off agents' deleting"
+permissions = [
+  "allow-files-agent-delete-allow",
+  "allow-files-agent-delete-status",
+  "allow-files-agent-delete-stop",
+  "allow-files-agent-trash-delete",
+  "allow-files-agent-trash-empty",
+  "allow-files-agent-trash-list",
+  "allow-files-agent-trash-put-back",
+  "allow-files-agent-trash-usage",
+  "allow-files-apps-for",
+  "allow-files-cancel",
+  "allow-files-checksum",
+  "allow-files-clipboard",
+  "allow-files-clipboard-set",
+  "allow-files-compare",
+  "allow-files-compress",
+  "allow-files-conflicts",
+  "allow-files-create-file",
+  "allow-files-create-folder",
+  "allow-files-delete-forever",
+  "allow-files-duplicate",
+  "allow-files-duplicates",
+  "allow-files-extract",
+  "allow-files-folder-size",
+  "allow-files-free-space",
+  "allow-files-grant",
+  "allow-files-grant-revoke",
+  "allow-files-grant-status",
+  "allow-files-index-status",
+  "allow-files-info",
+  "allow-files-list",
+  "allow-files-make-link",
+  "allow-files-note-recent",
+  "allow-files-open",
+  "allow-files-open-with",
+  "allow-files-places",
+  "allow-files-put-back",
+  "allow-files-read-bytes",
+  "allow-files-read-text",
+  "allow-files-recent",
+  "allow-files-redo",
+  "allow-files-rename",
+  "allow-files-rename-many",
+  "allow-files-rename-preview",
+  "allow-files-reveal",
+  "allow-files-search",
+  "allow-files-set-tags",
+  "allow-files-star",
+  "allow-files-starred",
+  "allow-files-tagged",
+  "allow-files-tags",
+  "allow-files-transfer",
+  "allow-files-trash",
+  "allow-files-trashed",
+  "allow-files-undo",
+  "allow-files-undo-state",
+  "allow-files-unwatch",
+  "allow-files-watch",
 ]

@@ -110,8 +110,32 @@ export const directApi = {
   leaveDm: (dmId: string) => spaceRequest(`/dms/${id(dmId)}/members/me`, { method: "DELETE" }),
   /** Deletes a one-to-one DM for both people. */
   deleteDm: (dmId: string) => spaceRequest(`/dms/${id(dmId)}`, { method: "DELETE" }),
-  ringDm: (dmId: string, state: "ringing" | "ended", video: boolean) =>
-    spaceRequest(`/dms/${id(dmId)}/call`, { method: "POST", ...json({ state, video }) }),
+  /**
+   * Rings (or stops ringing) the DM's other people. `sealedKeys` is the call's end-to-end key sealed
+   * for each of their computers (by key id); the server passes it on unread.
+   */
+  ringDm: (
+    dmId: string,
+    state: "ringing" | "ended" | "declined",
+    video: boolean,
+    sealedKeys: Record<string, string> = {},
+    senderKeyId = "",
+  ) =>
+    spaceRequest(`/dms/${id(dmId)}/call`, {
+      method: "POST",
+      ...json({ state, video, sealed_keys: sealedKeys, sender_key_id: senderKeyId }),
+    }),
+  /** Publishes this computer's public key for calls. */
+  putCallKey: (keyId: string, publicKey: string) =>
+    spaceRequest(`/me/call-keys/${id(keyId)}`, {
+      method: "PUT",
+      ...json({ public_key: publicKey }),
+    }),
+  /** Every computer's public call key for the people in a DM. */
+  dmCallKeys: (dmId: string) =>
+    spaceRequest<{ keys: { user_id: string; key_id: string; public_key: string }[] }>(
+      `/dms/${id(dmId)}/call-keys`,
+    ).then((result) => result.keys),
 
   myStatus: () => spaceRequest<ChosenStatus>("/me/status"),
   setMyStatus: (status: ChosenStatus) =>

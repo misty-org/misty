@@ -1,0 +1,13 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc b3c3d29f080ced6c0fecac2e674145ef73551dc3c606191db0d191fb18380d53 # shrinks to actions = [Save { computer: 0, folder: 1, file: 2 }, Sync { computer: 0 }, Trash { computer: 0, folder: 1, file: 2 }, Save { computer: 0, folder: 1, file: 2 }]
+cc b29aeafaf04c90b08a7c3c2cbdcc2dcbe443bfb05df9a52a16d07ce77d8f0468 # shrinks to actions = [Save { computer: 1, folder: 0, file: 0 }, Sync { computer: 1 }, Sync { computer: 0 }, Rename { computer: 0, folder: 0, file: 0, to: 1 }, Save { computer: 1, folder: 0, file: 0 }]
+cc f8d65f26b3114d4a844c6cd6fcf0ac8b99851739f4d92d59b207473d2a56c89f # shrinks to actions = [Save { computer: 0, folder: 1, file: 0 }, Sync { computer: 0 }, Save { computer: 2, folder: 1, file: 0 }, Rename { computer: 0, folder: 1, file: 0, to: 1 }, Sync { computer: 2 }]
+cc 95873018491806784f688a086282f05beb0402d82faff776f96b9a7ad4d7b742 # shrinks to actions = [Save { computer: 1, folder: 1, file: 0 }, Sync { computer: 1 }, Sync { computer: 2 }, Save { computer: 2, folder: 1, file: 1 }, LoseReply { computer: 2 }, Sync { computer: 2 }, Save { computer: 0, folder: 0, file: 0 }, Save { computer: 2, folder: 1, file: 1 }]
+cc f2f5d446ce387347cbeb9827e40298328a8fe299e57ed7f11cb95a71b9653614 # shrinks to actions = [Save { computer: 0, folder: 0, file: 1 }, Save { computer: 0, folder: 1, file: 0 }, Sync { computer: 0 }, Trash { computer: 0, folder: 1, file: 1 }, Save { computer: 0, folder: 0, file: 0 }, TrashFolder { computer: 0 }, Rename { computer: 0, folder: 1, file: 0, to: 1 }, Save { computer: 0, folder: 0, file: 0 }, Save { computer: 0, folder: 0, file: 0 }]
+cc 69a2fc43c996b3744f6899a187adec516142a5e98d303ff62dcff4fc96ce5e5a # shrinks to actions = [Save { computer: 2, folder: 0, file: 1 }, Sync { computer: 2 }, LoseReply { computer: 0 }, Rename { computer: 2, folder: 0, file: 1, to: 0 }, Save { computer: 0, folder: 0, file: 0 }, Sync { computer: 0 }, Sync { computer: 2 }]
+cc bbbe899d3156a5220a39f30a5b319cbf1c79b00e1190a901cedea60cb904ca61 # shrinks to actions = [Save { computer: 1, folder: 0, file: 0 }, LoseReply { computer: 1 }, Sync { computer: 1 }, Rename { computer: 1, folder: 0, file: 0, to: 2 }, Save { computer: 0, folder: 0, file: 0 }, Save { computer: 1, folder: 0, file: 2 }, Save { computer: 1, folder: 0, file: 0 }]

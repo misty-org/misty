@@ -1,14 +1,16 @@
 import { accountResets, deviceDataErasers, setupFlow } from "@/features/account";
 import {
   cleanupOnEngine,
+  filesPage,
   MistyMarkdown,
+  provideExploreApps,
   resetAiSurfaceAccountState,
   runOnEngine,
   useLinkedFolders,
   watchAllRunEvents,
 } from "@/features/agents";
 import { engineConfigHost } from "@/features/engine-config/host";
-import { libraryPicker } from "@/features/files";
+import { drivePicker } from "@/features/files";
 import { dockLeaves, spacesDirectory, useWorkspaceStore } from "@/features/app-windows";
 import { shortcutScope } from "@/features/shortcuts";
 import type { ShortcutScope } from "@/shared/shortcuts/shortcutTypes";
@@ -22,6 +24,7 @@ import {
   tourCorner,
 } from "@/features/agents";
 import { browserLibrary } from "@/features/browser";
+import { callsForApps } from "@/features/direct";
 import { noteAsk, vocativeRouting, voiceCleanup, voiceDevice, voiceEngine } from "@/features/voice";
 import {
   SetupStepBody,
@@ -31,15 +34,19 @@ import {
   useSetupSteps,
 } from "@/features/onboarding";
 import {
-  arcadeGateway,
+  catalogLogoUrl,
+  DrivePickerPanel,
+  driveGateway,
+  ExploreAppsSection,
+  FilesPage,
   handoffGateway,
   liveGateway,
-  MistyLibraryPicker,
+  appCallsHost,
   pageMisty,
   resetSpacesAccountState,
   spaceRequest,
-  uploadLibraryBlob,
-  uploadLibraryPath,
+  startFilesReveal,
+  useAppUpdates,
   useSpacesStore,
 } from "@/features/spaces";
 
@@ -67,12 +74,17 @@ setupFlow.provide({
 
 spacesDirectory.provide(useSpacesStore);
 
+// The Files page lives in spaces (it needs the Space drives); agents shows it at /agents?view=files. An
+// agent's `files.reveal` opens it at the item, heard once for the window from here.
+filesPage.provide(FilesPage);
+startFilesReveal();
+
+appCallsHost.provide(callsForApps);
+
 spacesGateway.provide({
-  ...arcadeGateway,
   ...handoffGateway,
   ...liveGateway,
-  uploadLibraryPath,
-  uploadLibraryBlob,
+  ...driveGateway,
   spaceRequest,
   pageMisty,
 });
@@ -97,7 +109,7 @@ function focusedShortcutScope(): ShortcutScope {
   const tab = pane?.views.find((candidate) => candidate.id === pane.activeViewId);
   switch (tab?.surfaceId) {
     case "space":
-      return /\/(files|media|library)(\/|\?|#|$)/i.test(tab.route) ? "tool:library" : "tool:space";
+      return "tool:space";
     default:
       return "workspace";
   }
@@ -111,6 +123,9 @@ engineConfigHost.provide({
   watchRunEvents: watchAllRunEvents,
 });
 
-libraryPicker.provide(MistyLibraryPicker);
+drivePicker.provide(DrivePickerPanel);
 
 noteAsk.provide((input) => openMisty(input));
+
+// Explore (agents) shows a Space's apps, which belong to Spaces, which builds on agents.
+provideExploreApps({ useAppUpdates, ExploreAppsSection, catalogLogoUrl });

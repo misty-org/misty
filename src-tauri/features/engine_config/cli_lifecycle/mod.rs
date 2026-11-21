@@ -847,6 +847,10 @@ mod tests;
 mod install_tests;
 
 #[cfg(test)]
+#[path = "download_tests.rs"]
+mod download_tests;
+
+#[cfg(test)]
 #[path = "build_tests.rs"]
 mod build_tests;
 

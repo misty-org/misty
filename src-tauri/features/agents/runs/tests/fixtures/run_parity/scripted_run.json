@@ -7,7 +7,7 @@
   "turnLimit": 7,
   "catalog": [
    {
-    "name": "note.read",
+    "name": "message.read",
     "description": "Read a note.",
     "inputSchema": {
      "type": "object",
@@ -29,7 +29,7 @@
     "concurrent": true
    },
    {
-    "name": "note.create",
+    "name": "message.create",
     "description": "Create a note.",
     "inputSchema": {
      "type": "object",
@@ -89,7 +89,7 @@
      {
       "type": "tool-call",
       "toolCallId": "read-1",
-      "toolName": "note_read",
+      "toolName": "message_read",
       "input": "{ \"why\" : \"date\", \"id\" : \"launch\" }",
       "providerMetadata": {
        "google": {
@@ -103,19 +103,19 @@
      {
       "type": "tool-call",
       "toolCallId": "bad-json",
-      "toolName": "note_read",
+      "toolName": "message_read",
       "input": "{oops"
      },
      {
       "type": "tool-call",
       "toolCallId": "no-tool",
-      "toolName": "note_delete",
+      "toolName": "message_delete",
       "input": "{\"id\":\"x\"}"
      },
      {
       "type": "tool-call",
       "toolCallId": "bad-schema",
-      "toolName": "note_read",
+      "toolName": "message_read",
       "input": "{\"id\":5}"
      }
     ],
@@ -145,13 +145,13 @@
      {
       "type": "tool-call",
       "toolCallId": "create-1",
-      "toolName": "note_create",
+      "toolName": "message_create",
       "input": "{\"title\":\"Launch\"}"
      },
      {
       "type": "tool-call",
       "toolCallId": "create-skipped",
-      "toolName": "note_create",
+      "toolName": "message_create",
       "input": "{\"title\":\"Launch again\"}"
      }
     ],
@@ -163,7 +163,7 @@
      {
       "type": "tool-call",
       "toolCallId": "create-2",
-      "toolName": "note_create",
+      "toolName": "message_create",
       "input": "{\"title\":\"Launch date\"}"
      }
     ],
@@ -256,7 +256,7 @@
     },
     {
      "type": "function",
-     "name": "note_read",
+     "name": "message_read",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -277,7 +277,7 @@
     },
     {
      "type": "function",
-     "name": "note_create",
+     "name": "message_create",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -545,7 +545,7 @@
       {
        "type": "tool-call",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "why": "date",
         "id": "launch"
@@ -559,13 +559,13 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": "{oops"
       },
       {
        "type": "tool-call",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "input": {
         "id": "x"
        }
@@ -573,7 +573,7 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "id": 5
        }
@@ -586,7 +586,7 @@
       {
        "type": "tool-result",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "text",
         "value": "{\"z\":1,\"text\":\"The launch is on March 3.\",\"a\":[1,2]}"
@@ -595,28 +595,28 @@
       {
        "type": "tool-result",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "output": {
         "type": "error-text",
-        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'note_delete'. Available tools: web_fetch, note_read, note_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
+        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'message_delete'. Available tools: web_fetch, message_read, message_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
        }
       }
      ]
@@ -666,7 +666,7 @@
     },
     {
      "type": "function",
-     "name": "note_read",
+     "name": "message_read",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -687,7 +687,7 @@
     },
     {
      "type": "function",
-     "name": "note_create",
+     "name": "message_create",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -953,7 +953,7 @@
       {
        "type": "tool-call",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "why": "date",
         "id": "launch"
@@ -967,13 +967,13 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": "{oops"
       },
       {
        "type": "tool-call",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "input": {
         "id": "x"
        }
@@ -981,7 +981,7 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "id": 5
        }
@@ -994,7 +994,7 @@
       {
        "type": "tool-result",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "text",
         "value": "{\"z\":1,\"text\":\"The launch is on March 3.\",\"a\":[1,2]}"
@@ -1003,28 +1003,28 @@
       {
        "type": "tool-result",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "output": {
         "type": "error-text",
-        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'note_delete'. Available tools: web_fetch, note_read, note_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
+        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'message_delete'. Available tools: web_fetch, message_read, message_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
        }
       }
      ]
@@ -1149,7 +1149,7 @@
     },
     {
      "type": "function",
-     "name": "note_read",
+     "name": "message_read",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -1170,7 +1170,7 @@
     },
     {
      "type": "function",
-     "name": "note_create",
+     "name": "message_create",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -1438,7 +1438,7 @@
       {
        "type": "tool-call",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "why": "date",
         "id": "launch"
@@ -1452,13 +1452,13 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": "{oops"
       },
       {
        "type": "tool-call",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "input": {
         "id": "x"
        }
@@ -1466,7 +1466,7 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "id": 5
        }
@@ -1479,7 +1479,7 @@
       {
        "type": "tool-result",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "text",
         "value": "{\"z\":1,\"text\":\"The launch is on March 3.\",\"a\":[1,2]}"
@@ -1488,28 +1488,28 @@
       {
        "type": "tool-result",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "output": {
         "type": "error-text",
-        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'note_delete'. Available tools: web_fetch, note_read, note_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
+        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'message_delete'. Available tools: web_fetch, message_read, message_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
        }
       }
      ]
@@ -1604,7 +1604,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch"
        }
@@ -1612,7 +1612,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch again"
        }
@@ -1625,7 +1625,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "ToolRejectedError: tool_rejected: That title is taken."
@@ -1634,7 +1634,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "Error: tool_not_attempted: An earlier call in this response failed: The tool could not complete this action."
@@ -1678,7 +1678,7 @@
     },
     {
      "type": "function",
-     "name": "note_read",
+     "name": "message_read",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -1699,7 +1699,7 @@
     },
     {
      "type": "function",
-     "name": "note_create",
+     "name": "message_create",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -1969,7 +1969,7 @@
       {
        "type": "tool-call",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "why": "date",
         "id": "launch"
@@ -1983,13 +1983,13 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": "{oops"
       },
       {
        "type": "tool-call",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "input": {
         "id": "x"
        }
@@ -1997,7 +1997,7 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "id": 5
        }
@@ -2010,7 +2010,7 @@
       {
        "type": "tool-result",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "text",
         "value": "{\"z\":1,\"text\":\"The launch is on March 3.\",\"a\":[1,2]}"
@@ -2019,28 +2019,28 @@
       {
        "type": "tool-result",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "output": {
         "type": "error-text",
-        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'note_delete'. Available tools: web_fetch, note_read, note_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
+        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'message_delete'. Available tools: web_fetch, message_read, message_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
        }
       }
      ]
@@ -2128,7 +2128,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch"
        }
@@ -2136,7 +2136,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch again"
        }
@@ -2149,7 +2149,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "ToolRejectedError: tool_rejected: That title is taken."
@@ -2158,7 +2158,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "Error: tool_not_attempted: An earlier call in this response failed: The tool could not complete this action."
@@ -2179,7 +2179,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-2",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch date"
        }
@@ -2192,7 +2192,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-2",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "text",
         "value": "{\"id\":\"note-9\",\"ok\":true}"
@@ -2236,7 +2236,7 @@
     },
     {
      "type": "function",
-     "name": "note_read",
+     "name": "message_read",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -2257,7 +2257,7 @@
     },
     {
      "type": "function",
-     "name": "note_create",
+     "name": "message_create",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -2528,7 +2528,7 @@
       {
        "type": "tool-call",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "why": "date",
         "id": "launch"
@@ -2542,13 +2542,13 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": "{oops"
       },
       {
        "type": "tool-call",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "input": {
         "id": "x"
        }
@@ -2556,7 +2556,7 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "id": 5
        }
@@ -2569,7 +2569,7 @@
       {
        "type": "tool-result",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "text",
         "value": "{\"z\":1,\"text\":\"The launch is on March 3.\",\"a\":[1,2]}"
@@ -2578,28 +2578,28 @@
       {
        "type": "tool-result",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "output": {
         "type": "error-text",
-        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'note_delete'. Available tools: web_fetch, note_read, note_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
+        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'message_delete'. Available tools: web_fetch, message_read, message_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
        }
       }
      ]
@@ -2687,7 +2687,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch"
        }
@@ -2695,7 +2695,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch again"
        }
@@ -2708,7 +2708,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "ToolRejectedError: tool_rejected: That title is taken."
@@ -2717,7 +2717,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "Error: tool_not_attempted: An earlier call in this response failed: The tool could not complete this action."
@@ -2731,7 +2731,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-2",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch date"
        }
@@ -2744,7 +2744,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-2",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "text",
         "value": "{\"id\":\"note-9\",\"ok\":true}"
@@ -2822,7 +2822,7 @@
     },
     {
      "type": "function",
-     "name": "note_read",
+     "name": "message_read",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -2843,7 +2843,7 @@
     },
     {
      "type": "function",
-     "name": "note_create",
+     "name": "message_create",
      "inputSchema": {
       "type": "object",
       "required": [
@@ -3114,7 +3114,7 @@
       {
        "type": "tool-call",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "why": "date",
         "id": "launch"
@@ -3128,13 +3128,13 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": "{oops"
       },
       {
        "type": "tool-call",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "input": {
         "id": "x"
        }
@@ -3142,7 +3142,7 @@
       {
        "type": "tool-call",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "input": {
         "id": 5
        }
@@ -3155,7 +3155,7 @@
       {
        "type": "tool-result",
        "toolCallId": "read-1",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "text",
         "value": "{\"z\":1,\"text\":\"The launch is on March 3.\",\"a\":[1,2]}"
@@ -3164,28 +3164,28 @@
       {
        "type": "tool-result",
        "toolCallId": "bad-json",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_JSONParseError: JSON parsing failed: Text: {oops.\nError message: SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)"
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "no-tool",
-       "toolName": "note_delete",
+       "toolName": "message_delete",
        "output": {
         "type": "error-text",
-        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'note_delete'. Available tools: web_fetch, note_read, note_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
+        "value": "AI_NoSuchToolError: Model tried to call unavailable tool 'message_delete'. Available tools: web_fetch, message_read, message_create, browser_visual, agent_tool_use, agent_tool_load, agent_ledger, agent_finish."
        }
       },
       {
        "type": "tool-result",
        "toolCallId": "bad-schema",
-       "toolName": "note_read",
+       "toolName": "message_read",
        "output": {
         "type": "error-text",
-        "value": "AI_InvalidToolInputError: Invalid input for tool note_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
+        "value": "AI_InvalidToolInputError: Invalid input for tool message_read: AI_TypeValidationError: Type validation failed: Value: {\"id\":5}.\nError message: Error: data/id must be string"
        }
       }
      ]
@@ -3273,7 +3273,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch"
        }
@@ -3281,7 +3281,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch again"
        }
@@ -3294,7 +3294,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-1",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "ToolRejectedError: tool_rejected: That title is taken."
@@ -3303,7 +3303,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-skipped",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "error-text",
         "value": "Error: tool_not_attempted: An earlier call in this response failed: The tool could not complete this action."
@@ -3317,7 +3317,7 @@
       {
        "type": "tool-call",
        "toolCallId": "create-2",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "input": {
         "title": "Launch date"
        }
@@ -3330,7 +3330,7 @@
       {
        "type": "tool-result",
        "toolCallId": "create-2",
-       "toolName": "note_create",
+       "toolName": "message_create",
        "output": {
         "type": "text",
         "value": "{\"id\":\"note-9\",\"ok\":true}"
@@ -3558,7 +3558,7 @@
    "body": {
     "attempt": 1,
     "output": {
-     "tool": "note.read",
+     "tool": "message.read",
      "duration_ms": 1,
      "success": true
     },
@@ -3705,7 +3705,7 @@
     "output": {},
     "node_id": "tool:create-1",
     "state": "running",
-    "phase": "using_note_create",
+    "phase": "using_message_create",
     "progress": 40,
     "input": {
      "title": "Launch"
@@ -3725,7 +3725,7 @@
    "body": {
     "attempt": 1,
     "output": {
-     "tool": "note.create",
+     "tool": "message.create",
      "duration_ms": 0,
      "success": false
     },
@@ -3779,7 +3779,7 @@
     "output": {},
     "node_id": "tool:create-2",
     "state": "running",
-    "phase": "using_note_create",
+    "phase": "using_message_create",
     "progress": 40,
     "input": {
      "title": "Launch date"
@@ -3799,7 +3799,7 @@
    "body": {
     "attempt": 1,
     "output": {
-     "tool": "note.create",
+     "tool": "message.create",
      "duration_ms": 1,
      "success": true
     },
@@ -3990,7 +3990,7 @@
  "executed": [
   {
    "id": "read-1",
-   "name": "note.read",
+   "name": "message.read",
    "input": "{\"why\":\"date\",\"id\":\"launch\"}",
    "token": "misty-device:run_parity:read-1:wait:0"
   },
@@ -4002,13 +4002,13 @@
   },
   {
    "id": "create-1",
-   "name": "note.create",
+   "name": "message.create",
    "input": "{\"title\":\"Launch\"}",
    "token": "misty-device:run_parity:create-1:wait:0"
   },
   {
    "id": "create-2",
-   "name": "note.create",
+   "name": "message.create",
    "input": "{\"title\":\"Launch date\"}",
    "token": "misty-device:run_parity:create-2:wait:0"
   }

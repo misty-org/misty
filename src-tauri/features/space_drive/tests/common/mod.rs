@@ -997,10 +997,15 @@ pub async fn settle(server: &Arc<FakeServer>, drives: &[Drive]) {
                 && drive.current_seq(&space()).unwrap().0 >= server.head()
         });
         if quiet {
+            // One more pass; it may send what the tree doesn't show (a delete waiting to go up),
+            // so it is quiet only if that pass changed nothing on the server.
+            let head = server.head();
             for drive in drives {
                 let _ = drive.sync_now(&space()).await;
             }
-            return;
+            if server.head() == head {
+                return;
+            }
         }
     }
 }

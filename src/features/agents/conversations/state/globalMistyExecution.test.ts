@@ -29,6 +29,8 @@ it("authenticates worker resume hints against canonical history without admittin
       createdAt: "2026-09-22",
       updatedAt: "2026-09-22",
       remote: true,
+      messageBeforeSeq: undefined,
+      hasOlderMessages: false,
       messages: [
         {
           id: "reply",

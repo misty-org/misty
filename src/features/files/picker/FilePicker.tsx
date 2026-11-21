@@ -7,7 +7,7 @@ export type MistyFilePickerMode = "file" | "folder";
 
 export interface MistyFilePickerProps {
   mode: MistyFilePickerMode;
-  /** Inside the Files/Library picker: a button, since the system dialog opens on top of it. */
+  /** Inside the shared picker beside the Space's Files: a button, since the system dialog opens on top of it. */
   embedded?: boolean;
   active?: boolean;
   multiple?: boolean;
@@ -54,7 +54,7 @@ export function MistyFilePicker({
     const paths = chosen === null ? [] : Array.isArray(chosen) ? chosen : [chosen];
     if (paths.length && multiple && onSelectMany) onSelectMany(paths);
     else if (paths.length) onSelect(paths[0]);
-    // Inside the Files/Library picker, the person can still choose from the Library.
+    // Inside the shared picker, the person can still choose from the Space's Files.
     else if (!embedded) onCancel();
   };
 

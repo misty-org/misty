@@ -80,7 +80,6 @@ export interface SpaceMessage {
   sender?: SpaceMessageSender;
   content: MessageSpan[];
   file_node_ids: string[];
-  library_item_ids?: string[];
   attachments?: MessageAttachment[];
   reactions?: SpaceMessageReaction[];
   reply_to_message_id?: string;

@@ -1,9 +1,9 @@
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 
 /**
- * Whether the person's status is Do not disturb, mirrored for this device so native-bound notices
- * can stay quiet without asking the server. Settings › Profile › Status keeps it in step with the
- * status chosen on the account.
+ * Whether the person's chosen status is Do not disturb, kept for this device. A flag outside the
+ * features so the ones that notify (agent runs, messages) can stay quiet without importing the
+ * status code: the status store (`features/direct`) sets it whenever the chosen status changes.
  */
 export const useDoNotDisturb = createDeviceSetting<boolean>({
   scope: "do-not-disturb",

@@ -28,6 +28,10 @@ pub struct Phrase {
     pub start: f64,
     #[serde(default)]
     pub end: f64,
+    /// How sure the recognizer is of the words, 0 to 1; 0 when it didn't say (an unfinished
+    /// phrase). Comparing it tells which of two languages a person spoke.
+    #[serde(default)]
+    pub confidence: f32,
 }
 
 /// What a fed stream has been heard to say: finished phrases, and the one still being heard.

@@ -29,7 +29,7 @@ fn entry_guidance(request: &RunRequest) -> &'static str {
 // line here and nothing in the agent.
 const UI_LABELS: [(&str, &str); 5] = [
     ("space.", "Spaces are what the app calls a space (space_*)."),
-    ("file.", "The Library holds files (file_*)."),
+    ("file.", "The Space's Files are its drive, by path from its root (file_*)."),
     ("log.work.", "The Notebook card in the conversation shows log_work_*."),
     ("integration.", "Integrations are the person's connected apps (integration_*)."),
     ("folder.", "Shared folders are folders on the person's computer (folder_*)."),

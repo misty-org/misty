@@ -15,6 +15,9 @@ pub enum Permission {
     Rooms,
     #[serde(rename = "members")]
     Members,
+    /// The Space's voice channels: who is in them, and joining, leaving or muting this window's call.
+    #[serde(rename = "calls")]
+    Calls,
 }
 
 /// How an app's MCP server runs: `frame` in the app's own frame (the maker's own, over the SDK's frame

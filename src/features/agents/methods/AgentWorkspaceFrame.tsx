@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ComponentType, type ReactNode } from "react";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/sessionGoals";
@@ -10,6 +10,7 @@ import { LabInSpace } from "../tutor/LabInSpace";
 import { CodePage } from "../code/CodePage";
 import { cn, Surface } from "@misty/ui";
 import { AgentMemoryPage } from "../memory/AgentMemoryPage";
+import { createPort } from "@/shared/lib/seams";
 
 /**
  * A new chat in the workspace starts a little way down the canvas, its greeting over the composer
@@ -30,10 +31,22 @@ const emptyChatClass = cn(
   "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:p-0",
 );
 
+/**
+ * The Files page (`/agents?view=files`), Misty's file manager. It lives in `spaces/file-manager`, which agents
+ * can't import, so the app provides it once at startup (`src/app/featureSeams.ts`).
+ */
+export const filesPage = createPort<ComponentType>("the Files page");
+
+/** The Files page, as the seam has it. */
+function FilesPageSlot() {
+  const Page = filesPage.maybe();
+  return Page ? <Page /> : null;
+}
+
 /** Queued or working: read state doesn't apply yet. */
 const isRunInProgress = (state?: string) => state === "running" || state === "queued";
 
-export type AgentWorkspacePage = "task" | "lab" | "code" | "memory";
+export type AgentWorkspacePage = "task" | "lab" | "code" | "files" | "memory";
 type RecentConversation = {
   id: string;
   title?: string;
@@ -132,6 +145,7 @@ export function AgentWorkspaceFrame({
             {/* The Lab is a page of the agent's home Space; its tab goes there. */}
             {page === "lab" ? <LabInSpace agent={agent} /> : null}
             {page === "code" ? <CodePage /> : null}
+            {page === "files" ? <FilesPageSlot /> : null}
             {page === "memory" ? (
               <AgentMemoryPage
                 accountId={accountId}

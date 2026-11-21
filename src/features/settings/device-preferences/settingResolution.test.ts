@@ -117,12 +117,3 @@ describe("device settings", () => {
     expect(effectiveValues(JSON.parse(JSON.stringify(state)))).toEqual(effectiveValues(state));
   });
 });
-
-it("validates tab order preferences", () => {
-  const id = "collections.tabs.media";
-  const definition = definitionById.get(id)!;
-  for (const invalid of ["{}", "[1]", '["all","all"]', '["bad id"]'])
-    expect(validPreference(definition, invalid)).toBe(false);
-  const state = editPreference(initialPreferencesState({}), id, '["video","all","image"]');
-  expect(resolveSetting(state, id).value).toBe('["video","all","image"]');
-});

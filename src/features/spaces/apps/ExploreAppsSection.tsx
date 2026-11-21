@@ -18,7 +18,7 @@ import {
   StoreDetailSection,
   Text,
 } from "@misty/ui";
-import { AppsPage } from "@/features/agents/connected-apps/AppsPage";
+import { AppsPage } from "@/features/agents";
 import { AddFromGitHubDialog } from "./AddFromGitHubDialog";
 import { permissionLines } from "./appPermissions";
 import { RemoveAppDialog } from "./RemoveAppDialog";

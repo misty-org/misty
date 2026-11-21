@@ -224,8 +224,10 @@ pub fn claude_connectors(output: &str) -> Vec<Connector> {
 // ===== Codex =====
 
 /// `codex plugin list --json --available`: `{ installed: [...], available: [...] }`, with no
-/// descriptions; those come from each plugin's `.codex-plugin/plugin.json`.
-pub fn codex_items(listing: &Value, read_manifest: ReadManifest) -> Vec<MarketItem> {
+/// descriptions; those come from each plugin's `.codex-plugin/plugin.json`. A local plugin's is in
+/// its folder; an installed remote one's is in Codex's own copy of it,
+/// `<plugin_cache>/<marketplace>/<name>/<version>` (`plugin_cache` is `$CODEX_HOME/plugins/cache`).
+pub fn codex_items(listing: &Value, read_manifest: ReadManifest, plugin_cache: &Path) -> Vec<MarketItem> {
     let mut items = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let entries = listing["installed"]
@@ -242,10 +244,19 @@ pub fn codex_items(listing: &Value, read_manifest: ReadManifest) -> Vec<MarketIt
         }
         let (name, marketplace) = split_id(&id);
         // Only a local source's path is a folder here; a `git-subdir` one is inside its repo.
-        let manifest = text(&entry["source"], "path")
+        let local = text(&entry["source"], "path")
             .filter(|_| entry["source"]["source"].as_str() == Some("local"))
             .filter(|path| Path::new(path).is_absolute())
-            .and_then(|path| read_manifest(&Path::new(&path).join(".codex-plugin")))
+            .map(std::path::PathBuf::from);
+        let remote = || {
+            let installed = entry["installed"].as_bool() == Some(true);
+            let version = text(entry, "version").filter(|version| plain_segment(version))?;
+            (installed && entry["source"]["source"].as_str() == Some("remote") && plain_segment(&name) && plain_segment(&marketplace))
+                .then(|| plugin_cache.join(&marketplace).join(&name).join(version))
+        };
+        let manifest = local
+            .or_else(remote)
+            .and_then(|folder| read_manifest(&folder.join(".codex-plugin")))
             .unwrap_or(Value::Null);
         let interface = &manifest["interface"];
         let sign_in = match entry["authPolicy"].as_str() {
@@ -274,6 +285,11 @@ pub fn codex_items(listing: &Value, read_manifest: ReadManifest) -> Vec<MarketIt
         });
     }
     items
+}
+
+/// One path segment taken from the CLI's output, so a name can't reach outside Codex's cache.
+fn plain_segment(segment: &str) -> bool {
+    !segment.is_empty() && segment != "." && segment != ".." && !segment.contains(['/', '\\'])
 }
 
 /// `codex plugin marketplace list --json`: `{ marketplaces: [{ name, root, marketplaceSource }] }`.

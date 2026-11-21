@@ -135,6 +135,43 @@ pub fn agent_run_notify(
     Ok(true)
 }
 
+/// Shows a notice for a chat message in a Space or a DM, unless another window already asked or
+/// Misty is in front. The title is who wrote it and where; the body is a clipped line of the
+/// message. True when it went out.
+#[tauri::command]
+pub fn chat_message_notify(
+    app: AppHandle,
+    webview: Webview,
+    message_id: String,
+    title: String,
+    body: String,
+    route: String,
+) -> Result<bool, String> {
+    if !crate::browser::app_windows::is_person_window(webview.label()) {
+        return Err("Only the main workspace can send notices".into());
+    }
+    if !(route.starts_with("/spaces/") || route.starts_with("/dms/")) {
+        return Err("A notice opens a chat.".into());
+    }
+    let key = format!("{message_id}:message");
+    let first = first_ask(
+        &mut sent().lock().unwrap_or_else(PoisonError::into_inner),
+        &key,
+        Instant::now(),
+    );
+    if !first || misty_in_front(&app) {
+        return Ok(false);
+    }
+    show(
+        &app,
+        webview.label().to_owned(),
+        clip(&title, TITLE_CHARS),
+        clip(&body, BODY_CHARS),
+        route,
+    );
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

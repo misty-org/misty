@@ -1,7 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 /**
  * Explore › Templates: the bundled agency-agents personas, as shelves. The person sees them as
- * templates: ready-made instructions to start an agent from. Each can be made into one of the person's own agents, read in full, and offered or not in the composer's `#` menu;
+ * templates: ready-made instructions to start an agent from. Each can be made into one of the
+ * person's own agents, read in full, and offered or not in the composer's `#` menu;
  * a category can be offered or withdrawn at once. Personas work with every engine: their prompt
  * is added to whichever engine's run names them.
  */

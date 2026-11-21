@@ -4,6 +4,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 
 pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     let (tx, rx) = mpsc::channel();
+    always_on::start(app.clone(), state.clone(), tx.clone());
     std::thread::spawn(move || platform::shortcut(tx));
     let (audio_tx, audio_rx) = mpsc::channel();
     let events_app = app.clone();
@@ -20,6 +21,11 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                     ask::open(&events_app)
                 }
                 Shortcut::Type => {}
+                // The second tap opened the text box; the third turns listening on or off instead.
+                Shortcut::AlwaysOn => {
+                    ask::dismiss(&events_app);
+                    always_on::toggle(&events_app, &events_state);
+                }
                 Shortcut::Held(held) => {
                     if events_state.held.swap(held, Ordering::SeqCst) == held {
                         continue;
@@ -93,7 +99,8 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         );
                         continue;
                     }
-                    match audio::Recording::start(audio_app.clone(), turn) {
+                    let preroll = std::mem::take(&mut *audio_state.preroll.lock().unwrap());
+                    match audio::Recording::start(audio_app.clone(), turn, preroll) {
                         Ok(value)
                             if current(&audio_state, turn)
                                 && audio_state.held.load(Ordering::SeqCst) =>

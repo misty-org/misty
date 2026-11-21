@@ -50,19 +50,7 @@ import { useEngineQueue } from "./engine/engineQueue";
 import { syncChat } from "./engine/engineSessionImport";
 import { localChats, markStoredChats } from "../state/localChats";
 export type { AgentVoiceControl } from "./useConversationVoice";
-/**
- * The conversation's column, and the rhythm of the Markdown replies in it: only the person's
- * messages are bubbles, so replies sit on the canvas as plain text at the control size. The
- * paragraph margins win over the Markdown stylesheet's own, except a callout's title.
- */
-const conversationClass = [
-  "agent-conversation relative flex min-h-0 min-w-0 flex-1 flex-col",
-  "[&_.misty-markdown-message]:pt-1 [&_.misty-markdown-message]:text-control",
-  "[&_.misty-markdown-message]:leading-[1.6]",
-  "[&_.misty-markdown-message_p:not(.misty-markdown-callout-title)]:mt-0!",
-  "[&_.misty-markdown-message_p:not(.misty-markdown-callout-title)]:mb-2.5!",
-  "[&_.misty-markdown-message_p:not(.misty-markdown-callout-title):last-child]:mb-0!",
-].join(" ");
+import { conversationClass } from "./conversationClass";
 
 export function AgentWorkspaceConversation({
   agent,
@@ -147,13 +135,7 @@ export function AgentWorkspaceConversation({
       .getState()
       .conversations.find((item) => item.id === activeConversationId);
     const scroller = scrollRef.current;
-    if (
-      !current?.hasOlderMessages ||
-      loadingOlderRef.current ||
-      !scroller ||
-      !accountId
-    )
-      return;
+    if (!current?.hasOlderMessages || loadingOlderRef.current || !scroller || !accountId) return;
     loadingOlderRef.current = true;
     setLoadingOlder(true);
     const previousHeight = scroller.scrollHeight;
@@ -186,7 +168,10 @@ export function AgentWorkspaceConversation({
           anchorTop !== undefined
         ) {
           scroller.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
-        } else if (scrollRef.current === scroller && activeConversationIdRef.current === updated.id) {
+        } else if (
+          scrollRef.current === scroller &&
+          activeConversationIdRef.current === updated.id
+        ) {
           scroller.scrollTop = previousTop + (scroller.scrollHeight - previousHeight);
         }
       });
@@ -394,9 +379,7 @@ export function AgentWorkspaceConversation({
           if (event.currentTarget.scrollTop < 72) void loadOlderMessages();
         }}
       >
-        {loadingOlder ? (
-          <PaneLoading label="Loading older messages" inline />
-        ) : null}
+        {loadingOlder ? <PaneLoading label="Loading older messages" inline /> : null}
         <AgentConversationTranscript
           view={{
             conversation,

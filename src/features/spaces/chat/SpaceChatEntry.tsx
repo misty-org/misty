@@ -2,16 +2,16 @@ import { useEffect, useState } from "react";
 import {
   Bot,
   LogOut,
-  MessagesSquare,
   MoreHorizontal,
   ShieldCheck,
   UserPlus,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/account";
 import { useSpacesStore } from "../list/useSpacesStore";
+import { ChatBarButtons } from "./components/ChatBarButtons";
+import { chatMuteId } from "@/shared/lib/messageNotices";
 import { spaceChatPath } from "./chatRoute";
 import { AddPeopleDialog, ConversationAgentsDialog } from "./sidebar/GroupDirectDialogs";
 import { isGroupDirectMessage } from "./sidebar/conversationGroups";
@@ -19,8 +19,6 @@ import { useOwnMentionableAgents } from "./ownAgents";
 import { spacesApi } from "../api/api";
 import { SpaceDialogs, type SpaceDialog } from "../components/space-row/SpaceDialogs";
 import { RolesDialog } from "../roles/RolesDialog";
-import { useChatSidebarPreferences } from "./sidebar/chatSidebarPreferences";
-import { useChatSidePanel } from "./chatSidePanelStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,12 +88,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     setSearchText("");
     setSearchedText("");
   };
-  // Search results, then an open thread, take the member list's place.
-  const threadOpen = useChatSidePanel((panel) => Boolean(panel.threadRootId));
-  const threadsListOpen = useChatSidePanel((panel) => panel.threadsListOpen);
-  const preferences = useChatSidebarPreferences((state) => state.value);
-  const savePreferences = useChatSidebarPreferences((state) => state.set);
-  const membersShown = !preferences.hideMembers;
   useEffect(() => {
     if (!members) void loadMembers(spaceId).catch(() => {});
   }, [members, loadMembers, spaceId]);
@@ -104,31 +96,7 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     if (!nodesLoaded) void loadNodes(spaceId).catch(() => {});
   }, [nodesLoaded, loadNodes, spaceId]);
 
-  const actions: ChatAction[] = [
-    {
-      id: "members",
-      icon: Users,
-      label: "Members",
-      pressed: membersShown && !searchedText && !threadOpen && !threadsListOpen,
-      onSelect: () => {
-        closeSearch();
-        useChatSidePanel.getState().reset();
-        savePreferences((current) => ({ ...current, hideMembers: membersShown }));
-      },
-    },
-    {
-      id: "threads",
-      icon: MessagesSquare,
-      label: "Threads",
-      pressed: threadsListOpen || threadOpen,
-      onSelect: () => {
-        closeSearch();
-        const panel = useChatSidePanel.getState();
-        if (panel.threadsListOpen || panel.threadRootId) panel.reset();
-        else panel.openThreadsList();
-      },
-    },
-  ];
+  const actions: ChatAction[] = [];
   if (openGroup && !referenceOnly)
     actions.push({
       id: "add-people",
@@ -177,25 +145,13 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       onSelect: () => setRolesOpen(true),
     });
 
-  // The chat's controls sit at the end of its own bar under the tabs, as Discord keeps a
-  // channel's: Threads and Members as icons, the rest under ⋯, then search, which never folds.
-  const cornerIds = ["threads", "members"];
-  const corner = cornerIds.flatMap((id) => actions.filter((action) => action.id === id));
-  const more = actions.filter((action) => !cornerIds.includes(action.id));
-  const moreRows = more.map((action) => (
+  // The chat's own buttons stay in view at the end of its bar, beside the search, in Discord's
+  // order (ChatBarButtons); the rest are under ⋯.
+  const moreRows = actions.map((action) => (
     <MenuItem key={action.id} icon={action.icon} label={action.label} onSelect={action.onSelect} />
   ));
   const barActions: ActionBarItem[] = [
-    ...corner.map((action) => ({
-      id: action.id,
-      icon: action.icon,
-      label: action.label,
-      pressed: action.pressed,
-      onSelect: action.onSelect,
-      // Members stays longest, then Threads.
-      priority: action.id === "members" ? 3 : 2,
-    })),
-    ...(more.length
+    ...(actions.length
       ? [
           {
             id: "more",
@@ -221,23 +177,32 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       : []),
   ];
   const search = (
-    <SearchField
-      containerClassName="w-56"
-      aria-label="Search messages"
-      placeholder="Search messages"
-      value={searchText}
-      onChange={(event) => {
-        setSearchText(event.target.value);
-        if (!event.target.value) setSearchedText("");
-      }}
-      onClear={closeSearch}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          setSearchedText(searchText.trim());
-        }
-      }}
-    />
+    <>
+      <ChatBarButtons
+        spaceId={spaceId}
+        conversationId={conversationId}
+        muteId={chatMuteId(spaceId, conversationId)}
+        searching={Boolean(searchedText)}
+        onPanel={closeSearch}
+      />
+      <SearchField
+        containerClassName="w-56"
+        aria-label="Search messages"
+        placeholder="Search messages"
+        value={searchText}
+        onChange={(event) => {
+          setSearchText(event.target.value);
+          if (!event.target.value) setSearchedText("");
+        }}
+        onClear={closeSearch}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            setSearchedText(searchText.trim());
+          }
+        }}
+      />
+    </>
   );
 
   return (

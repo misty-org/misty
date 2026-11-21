@@ -40,32 +40,61 @@ export type DocVisibility = "public" | "private";
 /** Where in Misty a person is, for the Space's other members. */
 export type PersonPlace = { spaceId: string; place: "studio" | "lab"; itemId?: string };
 
-/** Who made a Library item, for the credit line on it. */
-export interface AgentArtifactProvenance {
-  agent_id: string;
-  conversation_id?: string;
-  run_id?: string;
-  kind: "download" | "file" | "image" | "document";
+/** A file or folder in a Space's drive, as agents see it: its stable id and its path from the root. */
+export interface SpaceDriveFile {
+  id: string;
+  space_id: string;
+  path: string;
+  name: string;
+  kind: "file" | "folder";
+  size: number;
+  mtime_ms: number;
+  modified_by_name: string;
+  version?: number;
 }
 
-type Uploaded = Promise<{ item?: { id: string } }>;
+/** Bytes to save into a drive, in any of the shapes callers hold them. */
+export type SpaceDriveBytes = ArrayBuffer | Uint8Array | Blob;
 
 /** What agents ask of Spaces. Spaces sits above agents, so it fills this in once at startup. */
 interface SpacesGateway {
-  uploadLibraryPath(
+  /** Saves a file named `name` into `folder` of a Space's drive and answers with what it became. */
+  saveToDrive(
     spaceId: string,
+    folder: string,
+    name: string,
+    bytes: SpaceDriveBytes,
+  ): Promise<SpaceDriveFile>;
+  /** The same for a file on this computer, read here and saved under its own name or `name`. */
+  saveFileToDrive(
+    spaceId: string,
+    folder: string,
     path: string,
-    purpose: "library" | "attachment",
-    options?: { agent?: AgentArtifactProvenance },
-  ): Uploaded;
-  /** Adds a file to a Space's Library as a new item; `agent` credits the agent that made it. */
-  uploadLibraryBlob(
+    name?: string,
+  ): Promise<SpaceDriveFile>;
+  /** What one folder of a Space's drive holds, a page at a time. */
+  driveList(
     spaceId: string,
-    blob: Blob,
-    filename: string,
-    purpose?: "library" | "attachment",
-    options?: { agent?: AgentArtifactProvenance; signal?: AbortSignal },
-  ): Uploaded;
+    folder: string,
+    options?: { cursor?: string; limit?: number },
+  ): Promise<{ entries: SpaceDriveFile[]; next_cursor?: string | null }>;
+  /** The entry at a path of a Space's drive; null when nothing is there. */
+  driveEntry(spaceId: string, path: string): Promise<SpaceDriveFile | null>;
+  /** A drive file's bytes, fetched first when it is online only. */
+  driveRead(spaceId: string, path: string): Promise<ArrayBuffer>;
+  /**
+   * Writes new content into a file already in the drive, made from the version given: native merges
+   * text with what others saved since, or the last save wins with the replaced one in the trash.
+   */
+  driveReplace(
+    spaceId: string,
+    file: Pick<SpaceDriveFile, "id" | "path" | "name" | "version">,
+    bytes: SpaceDriveBytes,
+  ): Promise<SpaceDriveFile>;
+  /** Moves a drive item to the Space's trash; refused while someone has it open. */
+  driveTrash(spaceId: string, path: string): Promise<void>;
+  /** A chat attachment's bytes, as the Space's server keeps them. */
+  attachmentContent(spaceId: string, attachmentId: string): Promise<Blob>;
   /** The window's Space when other people are in it, where a reply can be handed to one of them. */
   sharedWindowSpace(): { id: string; name: string } | undefined;
   /** The other people in a Space. */
@@ -92,18 +121,11 @@ interface SpacesGateway {
   /** One doc's body as Markdown. */
   readDoc(spaceId: string, docId: string): Promise<string>;
 
-  /** The Space's games for the studio's arcade: its Library's tagged HTML pages, newest first. */
-  spaceGames(spaceId: string): Promise<{ id: string; name: string; addedAt: string }[]>;
-  /** One game's page, to play in a sandboxed frame. */
-  gameHtml(spaceId: string, itemId: string): Promise<string>;
-  /** How many notes the Space has, for the studio's milestones. */
-  noteCount(spaceId: string): Promise<number>;
-
   /** The signed-in person, as others in a Space see them. */
   me(): { userId: string; name: string } | undefined;
   openLiveDoc(spaceId: string, docId: string): Promise<LiveDoc>;
-  /** One of a Space's files, read whole. */
-  libraryFile(spaceId: string, itemId: string): Promise<File>;
+  /** One of a Space's drive files, found by its stable id and read whole. */
+  driveFile(spaceId: string, itemId: string): Promise<File>;
   /** Makes the Space doc a new notebook lives in. */
   createNotebookDoc(spaceId: string, title: string, markdown: string): Promise<{ id: string }>;
   /** Deletes a notebook's doc from its Space, for everyone in it. */

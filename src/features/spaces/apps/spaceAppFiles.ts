@@ -1,14 +1,3 @@
-import { SpaceRequestError, spacesApi } from "../api/api";
-import type { SpaceLibraryItem } from "../api/dto/entities";
-import { replaceLibraryItemContent, uploadLibraryBlob } from "../api/library-upload";
-import { libraryItemMIME } from "../library";
-import { HostError } from "./protocol";
-
-type Call = (params: Record<string, unknown>) => Promise<unknown>;
-
-/** The most items one `files.list` page returns. */
-const MAX_PAGE = 200;
-
 /** What an app is shown of a Space's file. */
 export interface AppFileRef {
   id: string;
@@ -30,24 +19,6 @@ export interface FileHost {
   saved(file: AppFileRef, how?: "new" | "version" | "kept"): void;
 }
 
-/** "Plan (copy).png" from "Plan.png": where a save that would overwrite someone else's change goes instead. */
-export function copyName(name: string): string {
-  const dot = name.lastIndexOf(".");
-  return dot > 0 ? `${name.slice(0, dot)} (copy)${name.slice(dot)}` : `${name} (copy)`;
-}
-
-/** A Space's file as an app sees a file. */
-export function fileRef(item: SpaceLibraryItem): AppFileRef {
-  const size = Number(item.file.intrinsic_metadata.byte_size ?? 0);
-  return {
-    id: item.id,
-    name: item.display_name || item.file.original_filename || "Untitled file",
-    mime: libraryItemMIME(item),
-    size: Number.isFinite(size) ? size : 0,
-    updated_at: item.updated_at || item.added_at,
-  };
-}
-
 /** Whether a mime type matches what an app accepts: `image/*`, `.psd`, or an exact type. */
 export function acceptsFile(accept: readonly string[], mime: string, name: string): boolean {
   if (!accept.length) return true;
@@ -59,107 +30,4 @@ export function acceptsFile(accept: readonly string[], mime: string, name: strin
         ? lower.endsWith(kind.toLowerCase())
         : mime === kind,
   );
-}
-
-const blobOf = (value: unknown, mime: string): Blob => {
-  if (value instanceof Blob) return mime && !value.type ? new Blob([value], { type: mime }) : value;
-  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value))
-    return new Blob([value as BlobPart], { type: mime });
-  throw new HostError("invalid", "The file's bytes are missing.");
-};
-
-/**
- * The SDK's `files.*` calls the host answers: list, upload and save (into Files), pick (the person chooses from
- * Files), download, and open (which opens the item in the Space's Files page). Watching waits for its own support.
- *
- * A save under the name of a file the app opened here is a new version of that file, made against the version the
- * app opened: when someone else saved it since, nothing is lost, as the save is kept beside it as a copy.
- */
-export function createFileCalls(spaceId: string, host: FileHost): Record<string, Call> {
-  // The Space's files this app opened, by name, at the version it read.
-  const opened = new Map<string, SpaceLibraryItem>();
-  const remember = (item: SpaceLibraryItem) => opened.set(fileRef(item).name, item);
-  const upload: Call = async ({ name, mime, data }) => {
-    if (typeof name !== "string" || !name.trim())
-      throw new HostError("invalid", "The file needs a name.");
-    const type = typeof mime === "string" ? mime : "application/octet-stream";
-    const saved = await uploadLibraryBlob(spaceId, blobOf(data, type), name.trim());
-    if (!saved.item)
-      throw new HostError("internal", "The file was uploaded but not added to Files.");
-    return fileRef(saved.item);
-  };
-  return {
-    "files.list": async ({ accept, limit, cursor }) => {
-      const result = await spacesApi.libraryItems(spaceId, {
-        sort: "recently-added",
-        direction: "desc",
-        limit: Math.min(typeof limit === "number" && limit > 0 ? limit : 100, MAX_PAGE),
-        after: typeof cursor === "string" && cursor ? cursor : undefined,
-      });
-      const kinds = Array.isArray(accept)
-        ? accept.filter((kind): kind is string => typeof kind === "string")
-        : [];
-      const files = result.items
-        .map(fileRef)
-        .filter((file) => acceptsFile(kinds, file.mime, file.name));
-      return { files, next_cursor: result.next_after };
-    },
-    "files.upload": upload,
-    // An app's own Save goes into Files, and the person is told where it went.
-    "files.save": async (params) => {
-      const { name, mime, data } = params;
-      const base = typeof name === "string" ? opened.get(name.trim()) : undefined;
-      if (!base) {
-        const saved = (await upload(params)) as AppFileRef;
-        host.saved(saved, "new");
-        return saved;
-      }
-      const type = typeof mime === "string" ? mime : "application/octet-stream";
-      const blob = blobOf(data, type);
-      try {
-        const result = await replaceLibraryItemContent(spaceId, base, blob, fileRef(base).name);
-        const item = result.item ?? (await spacesApi.libraryItem(spaceId, base.id));
-        remember(item);
-        const saved = fileRef(item);
-        host.saved(saved, "version");
-        return saved;
-      } catch (error) {
-        // Someone else saved this file since the app opened it: theirs stays, and this one is kept as a copy.
-        if (!(error instanceof SpaceRequestError && error.status === 409)) throw error;
-        const saved = (await upload({ ...params, name: copyName(fileRef(base).name) })) as AppFileRef;
-        host.saved(saved, "kept");
-        return saved;
-      }
-    },
-    "files.pick": async ({ accept, multiple }) => {
-      const picked = await host.pickFiles({
-        accept: Array.isArray(accept)
-          ? accept.filter((kind): kind is string => typeof kind === "string")
-          : [],
-        multiple: multiple === true,
-      });
-      // Read at the version picked, so a save back is a version of what the app opened.
-      await Promise.all(
-        picked.map((file) =>
-          spacesApi.libraryItem(spaceId, file.id).then(remember, () => undefined),
-        ),
-      );
-      return picked;
-    },
-    "files.download": async ({ file_id: fileId }) => {
-      if (typeof fileId !== "string" || !fileId)
-        throw new HostError("invalid", "The file is missing.");
-      const item = await spacesApi.libraryItem(spaceId, fileId);
-      const content = await spacesApi.libraryOriginalContent(spaceId, fileId);
-      remember(item);
-      return { file: fileRef(item), data: await content.arrayBuffer() };
-    },
-    "files.open": async ({ file_id: fileId }) => {
-      if (typeof fileId !== "string" || !fileId)
-        throw new HostError("invalid", "The file is missing.");
-      host.openRoute(
-        `/spaces/${encodeURIComponent(spaceId)}/files?item=${encodeURIComponent(fileId)}`,
-      );
-    },
-  };
 }

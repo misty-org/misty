@@ -14,6 +14,8 @@ export interface SavedVoiceTurn {
   interrupted: boolean;
   /** The agent the turn's work was handed to, and the chat it went to. */
   handoff?: { agentId: string; conversationId: string };
+  /** What was on screen when it was asked (`screenNote`). */
+  seen?: string;
 }
 
 /** A promise with its resolve and reject at hand; an unawaited rejection is not reported. */

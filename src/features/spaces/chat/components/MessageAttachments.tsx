@@ -1,21 +1,16 @@
-import { copyLibraryItemsToClipboard } from "../../library";
 import { spacesApi } from "../../api/api";
-import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "../../api/dto/entities";
-import { Badge, Button, Surface, Tooltip } from "@misty/ui";
-import { LibraryBig, Paperclip } from "lucide-react";
+import type { SpaceMessage, SpaceNode } from "../../api/dto/entities";
+import { Button, Surface } from "@misty/ui";
+import { Paperclip } from "lucide-react";
 
 interface MessageAttachmentsProps {
   message: SpaceMessage;
   nodes: SpaceNode[];
-  libraryItems: SpaceLibraryItem[];
   spaceId: string;
   onOpenNode: (nodeId: string) => void;
-  onError: (message: string) => void;
-  onLibraryItem: (item: SpaceLibraryItem) => void;
-  onReload: () => void;
 }
 
-/** Drive links, Library picks and uploads carried by a message. */
+/** Shared-file links and uploads carried by a message. */
 export function MessageAttachments(props: MessageAttachmentsProps) {
   const { message } = props;
 
@@ -36,36 +31,6 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
               {props.nodes.find((item) => item.id === nodeId)?.display_name ?? "Drive file"}
             </Button>
           ))}
-        </div>
-      ) : null}
-
-      {(message.library_item_ids?.length ?? 0) > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {message.library_item_ids?.map((itemId) => {
-            const item = props.libraryItems.find((candidate) => candidate.id === itemId);
-            return (
-              <Tooltip key={itemId} content="Copy to clipboard">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="text-xs"
-                  type="button"
-                  disabled={!item}
-                  icon={LibraryBig}
-                  onClick={() => {
-                    if (!item) return;
-                    void copyLibraryItemsToClipboard(props.spaceId, [item]).catch((error) =>
-                      props.onError(
-                        error instanceof Error ? error.message : "The file could not be copied.",
-                      ),
-                    );
-                  }}
-                >
-                  {item?.display_name ?? "Unavailable file"}
-                </Button>
-              </Tooltip>
-            );
-          })}
         </div>
       ) : null}
 
@@ -94,26 +59,6 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
               >
                 {attachment.display_name}
               </Button>
-              {attachment.promoted_item_id ? (
-                <Badge variant="secondary" className="h-5 px-1.5 text-3xs">
-                  In Library
-                </Badge>
-              ) : (
-                <Button
-                  variant="quiet"
-                  size="sm"
-                  className="text-3xs"
-                  type="button"
-                  onClick={() =>
-                    void spacesApi.promoteAttachment(props.spaceId, attachment.id).then((item) => {
-                      props.onLibraryItem(item);
-                      props.onReload();
-                    })
-                  }
-                >
-                  Add to Library
-                </Button>
-              )}
             </Surface>
           ))}
         </div>

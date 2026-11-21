@@ -65,10 +65,6 @@ export function tourForPage(pathname: string, search: string): TourId | null {
       case "chat":
       case "social":
         return "space-chat";
-      case "media":
-      case "library":
-      case "files":
-        return "library";
       case "lab":
         return params.get("item")?.startsWith("notebook:") ? "notebook" : "lab";
     }

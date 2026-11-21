@@ -1,11 +1,9 @@
 import type { SpaceConversation } from "../api/dto/conversation-types";
-import type { SpaceLibraryItem } from "../api/dto/entities";
 import type { ItemVisibility, VisibilityItemKind } from "../api/visibility";
-import { libraryItemMIME } from "../library";
 import { conversationPath } from "../chat/chatRoute";
 
-/** One thing in a Space, as search finds it: a chat or one of its files. */
-export type GalleryKind = "chat" | "image" | "file";
+/** One thing in a Space, as search finds it: one of its chats. */
+export type GalleryKind = "chat";
 
 export interface GalleryItem {
   /** Unique across kinds, for React keys. */
@@ -18,7 +16,6 @@ export interface GalleryItem {
   /** Where opening it goes. */
   href: string;
   excerpt?: string;
-  libraryItem?: SpaceLibraryItem;
   /** Who a chat is with. */
   people?: string[];
   /** The item's layer; a private item shows a lock and the word "Private". */
@@ -32,9 +29,7 @@ export interface GalleryItem {
   removeLabel?: string;
 }
 
-const base = (spaceId: string) => `/spaces/${encodeURIComponent(spaceId)}`;
-
-/** A chat with people or an agent; it is one more thing in the Space, like a file. */
+/** A chat with people or an agent; it is one more thing in the Space. */
 export function chatItem(
   spaceId: string,
   conversation: SpaceConversation,
@@ -52,26 +47,6 @@ export function chatItem(
     creatorId: conversation.created_by_user_id,
     href: conversationPath(spaceId, conversation),
     people,
-  };
-}
-
-/** Pictures and videos are Images; everything else uploaded or made is a File. */
-export function libraryKind(item: SpaceLibraryItem): "image" | "file" {
-  const mime = libraryItemMIME(item);
-  return mime.startsWith("image/") || mime.startsWith("video/") ? "image" : "file";
-}
-
-export function libraryGalleryItem(spaceId: string, item: SpaceLibraryItem): GalleryItem {
-  return {
-    key: `file:${item.id}`,
-    kind: libraryKind(item),
-    title: item.display_name || item.file.original_filename || "Untitled file",
-    updatedAt: item.updated_at || item.added_at,
-    creatorId: item.added_by_user_id || item.contributing_user_id,
-    href: `${base(spaceId)}/files?item=${encodeURIComponent(item.id)}`,
-    libraryItem: item,
-    visibility: item.visibility,
-    toggle: { kind: "library_item", id: item.id },
   };
 }
 

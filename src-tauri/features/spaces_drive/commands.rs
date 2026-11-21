@@ -263,6 +263,23 @@ pub async fn drive_close(
     Ok(())
 }
 
+/// Pauses or resumes syncing for every Space's drive, from Settings. Not kept across a restart.
+/// Answers whether syncing is paused now.
+#[tauri::command]
+pub async fn drive_set_paused(webview: Webview, paused: bool) -> Result<bool, String> {
+    person_window(&webview)?;
+    let drive = drive()?;
+    drive.set_paused(paused);
+    Ok(drive.paused())
+}
+
+/// Whether syncing is paused now.
+#[tauri::command]
+pub async fn drive_paused(webview: Webview) -> Result<bool, String> {
+    person_window(&webview)?;
+    Ok(drive()?.paused())
+}
+
 #[tauri::command]
 pub async fn drive_keep_downloaded(
     webview: Webview,

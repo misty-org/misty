@@ -6,7 +6,7 @@
 // See NOTICE. Every path a window names passes `linked_path` first, and every read and write
 // goes through the file gate.
 
-mod clipboard;
+pub(crate) mod clipboard;
 mod copy;
 pub mod search;
 #[cfg(test)]

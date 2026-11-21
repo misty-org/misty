@@ -3,7 +3,12 @@ import * as accessErrors from "../api/access-errors";
 import type { SpaceEvent } from "../api/dto/entities";
 import { writeRealtimeCursor } from "../api/realtime-cursor";
 import { errorText } from "@/shared/lib/format";
-import { mergeSpaceMessages, messageFromSpaceEvent, withThreadReply } from "../chat/useSpaceMessageSpansStore";
+import {
+  mergeSpaceMessages,
+  messageFromSpaceEvent,
+  withThreadReply,
+  withoutThreadReply,
+} from "../chat/useSpaceMessageSpansStore";
 import { coalescedReload } from "./coalescedReload";
 import { forwardDriveRealtimeEvent } from "../drive/driveRealtime";
 import {
@@ -22,7 +27,6 @@ interface RealtimeScope {
 
 /** Where an item's visibility change goes, by the item's kind. */
 const itemEventPages: Record<string, string> = {
-  library_item: "misty:space-library-event",
   note: "misty:space-note-event",
 };
 
@@ -61,15 +65,20 @@ async function applyRealtimeEvent(
         ? event.payload.message_id
         : "";
     // Conversation threads load their own messages from the window event.
+    const deletedRootId =
+      deletedId && typeof event.payload.thread_root_id === "string" ? event.payload.thread_root_id : "";
     if (!conversationId && deletedId)
-      set((state) => ({
-        messagesBySpace: {
-          ...state.messagesBySpace,
-          [event.space_id]: (state.messagesBySpace[event.space_id] ?? []).filter(
-            (message) => message.id !== deletedId,
-          ),
-        },
-      }));
+      set((state) => {
+        const kept = (state.messagesBySpace[event.space_id] ?? []).filter(
+          (message) => message.id !== deletedId,
+        );
+        return {
+          messagesBySpace: {
+            ...state.messagesBySpace,
+            [event.space_id]: deletedRootId ? withoutThreadReply(kept, deletedRootId) : kept,
+          },
+        };
+      });
     else if (!conversationId && includedMessage?.thread_root_id) {
       // A thread reply belongs to its panel; in the list it only adds to its root's count.
       if (event.type === "message.created")
@@ -123,9 +132,7 @@ async function applyRealtimeEvent(
     } catch (error) {
       if (!accessErrors.isInaccessibleSpaceError(error)) throw error;
     }
-  } else if (event.type.startsWith("library."))
-    window.dispatchEvent(new CustomEvent("misty:space-library-event", { detail: event }));
-  else if (event.type.startsWith("note."))
+  } else if (event.type.startsWith("note."))
     window.dispatchEvent(new CustomEvent("misty:space-note-event", { detail: event }));
   else if (event.type.startsWith("item.")) {
     // An item made private or public: the page that lists it reads again, so a private one leaves

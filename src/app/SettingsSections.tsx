@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
-import { AccountSection, RequestsSection, ServerSection, StatusSection } from "@/features/account";
+import { AccountSection, ServerSection } from "@/features/account";
+import { RequestsSection, StatusSection } from "@/features/direct";
 import {
   AgentActivitySettings,
   AgentDefaultsSection,
@@ -9,7 +10,12 @@ import {
   EditorSettings,
   EngineSection,
 } from "@/features/agents";
-import { AccessibilitySection, AdvancedSection, AppearanceSection } from "@/features/app-windows";
+import {
+  AccessibilitySection,
+  AdvancedSection,
+  AppearanceSection,
+  MenuBarSection,
+} from "@/features/app-windows";
 import { PrivacySection } from "@/features/browser";
 import { FontsSection } from "@/features/engine-config/fonts";
 import { NetworkSection } from "@/features/engine-config/network";
@@ -44,6 +50,7 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   notifications: NotificationsSection,
   server: ServerSection,
   drive: DriveSettingsSection,
+  "menu-bar": MenuBarSection,
   appearance: AppearanceSection,
   fonts: FontsSection,
   accessibility: AccessibilitySection,

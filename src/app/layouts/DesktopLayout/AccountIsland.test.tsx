@@ -17,6 +17,8 @@ vi.mock("./NavRail", () => ({
   ),
 }));
 vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
+vi.mock("./StatusMenu", () => ({ StatusMenu: () => null, useMyCustomStatus: () => "" }));
+vi.mock("@/features/direct", () => ({ useMyPresence: () => "online" }));
 
 import { NoticeViewport } from "@misty/ui";
 import { AccountIsland } from "./AccountIsland";

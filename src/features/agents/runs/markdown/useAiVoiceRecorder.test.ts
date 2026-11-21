@@ -9,7 +9,11 @@ const db = await vi.hoisted(async () =>
 vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
 
 // Voice is recognized on this computer, through the voice feature.
-vi.mock("@/features/voice", () => ({ recognizeAudio }));
+vi.mock("@/features/voice", async () => ({
+  recognizeAudio,
+  // The real saved choice, kept in the fake device settings above.
+  savedInputDevice: (await import("@/features/voice/inputDevice")).savedInputDevice,
+}));
 
 import { microphoneSettingsHint } from "@/shared/platform/desktopOs";
 import { useAiVoiceRecorder } from "./useAiVoiceRecorder";

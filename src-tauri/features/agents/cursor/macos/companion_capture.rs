@@ -92,9 +92,77 @@ pub(crate) fn front_document() -> Option<String> {
     app.set_timeout(0.25);
     let window = app.focused_window()?;
     window.set_timeout(0.25);
-    let document = window.string("AXDocument");
+    let mut document = window.string("AXDocument");
+    // Chrome and the browsers built on it give no AXDocument: their page's address is the web
+    // area's AXURL, in a tree they only build once an assistive app asks for it.
+    if document.is_empty() && chromium(pid) {
+        document = chromium_page(&app, &window).unwrap_or_default();
+    }
     (document.starts_with("file://") || document.starts_with("http"))
         .then(|| document.chars().take(2_000).collect())
+}
+
+/// Whether the app is Chrome or a browser built on Chromium.
+fn chromium(pid: i32) -> bool {
+    const BROWSERS: &[&str] = &[
+        "com.google.Chrome",
+        "com.google.Chrome.beta",
+        "com.google.Chrome.dev",
+        "com.google.Chrome.canary",
+        "org.chromium.Chromium",
+        "com.microsoft.edgemac",
+        "com.microsoft.edgemac.Beta",
+        "com.microsoft.edgemac.Dev",
+        "com.brave.Browser",
+        "company.thebrowser.Browser",
+        "com.vivaldi.Vivaldi",
+        "com.operasoftware.Opera",
+    ];
+    objc2_app_kit::NSRunningApplication::runningApplicationWithProcessIdentifier(pid)
+        .and_then(|app| app.bundleIdentifier())
+        .is_some_and(|id| BROWSERS.contains(&id.to_string().as_str()))
+}
+
+/// The address of the page in a Chromium browser's window: its web area's AXURL, found from the
+/// keyboard focus upwards, or else in a short walk down the window.
+fn chromium_page(
+    app: &super::accessibility::Element,
+    window: &super::accessibility::Element,
+) -> Option<String> {
+    // Chromium builds its accessibility tree for an assistive app that asks this way.
+    app.set_bool("AXManualAccessibility", true);
+    let page = |element: &super::accessibility::Element| {
+        (element.string("AXRole") == "AXWebArea")
+            .then(|| element.url("AXURL"))
+            .filter(|url| !url.is_empty())
+    };
+    let mut at = app.focused_element();
+    for _ in 0..40 {
+        let Some(element) = at else { break };
+        if let Some(url) = page(&element) {
+            return Some(url);
+        }
+        if element.same(window) {
+            break;
+        }
+        at = element.parent();
+    }
+    // The focus is elsewhere (the address bar, a menu): the first web area under the window.
+    let mut queue = std::collections::VecDeque::from([(window.clone(), 0usize)]);
+    let mut seen = 0usize;
+    while let Some((element, depth)) = queue.pop_front() {
+        seen += 1;
+        if seen > 400 {
+            break;
+        }
+        if let Some(url) = page(&element) {
+            return Some(url);
+        }
+        if depth < 14 {
+            queue.extend(element.children().into_iter().map(|child| (child, depth + 1)));
+        }
+    }
+    None
 }
 
 pub(crate) fn foreground_window(ignored: &[i64]) -> Option<Value> {

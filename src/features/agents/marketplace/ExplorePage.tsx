@@ -13,16 +13,8 @@ import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { McpSection } from "@/features/engine-config/mcp";
 import { PromptsSection } from "@/features/engine-config/prompts";
-import { useAppUpdates } from "@/features/spaces/apps/appUpdates";
-import { ExploreAppsSection } from "@/features/spaces/apps/ExploreAppsSection";
-import {
-  NavList,
-  NavRow,
-  OverflowFadeText,
-  SearchField,
-  Separator,
-  Text,
-} from "@misty/ui";
+import { exploreApps } from "./exploreApps";
+import { NavList, NavRow, OverflowFadeText, SearchField, Separator, Text } from "@misty/ui";
 import { PersonaCatalogSection } from "../personas";
 import { PluginsSection } from "./PluginsSection";
 import { SkillsSection } from "./SkillsSection";
@@ -87,6 +79,7 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
   const tab: MarketTab = isMarketTab(asked) ? asked : "all";
   const open: Section = tab === "connections" ? "apps" : tab;
   const [query, setQuery] = useState("");
+  const { useAppUpdates, ExploreAppsSection } = exploreApps();
   const appUpdates = useAppUpdates(spaceId).updates.length;
   const skillUpdates = useSkillUpdates().rows?.length ?? 0;
   const updates = (canManageApps ? appUpdates : 0) + skillUpdates;
@@ -136,7 +129,10 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
 
   return (
     <div className="flex h-full min-h-0">
-      <nav aria-label="Explore" className="grid w-56 shrink-0 content-start gap-3 overflow-y-auto px-3 py-4">
+      <nav
+        aria-label="Explore"
+        className="grid w-56 shrink-0 content-start gap-3 overflow-y-auto px-3 py-4"
+      >
         <SearchField
           aria-label="Search Explore"
           placeholder="Search"
@@ -166,7 +162,9 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
         </NavList>
       </nav>
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid w-full max-w-6xl gap-8 px-8 pt-4 pb-10">{sections[open]()}</div>
+        <div className="mx-auto grid w-full max-w-6xl gap-8 px-8 pt-4 pb-10">
+          {sections[open]()}
+        </div>
       </main>
     </div>
   );

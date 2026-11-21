@@ -24,6 +24,8 @@ export interface SpaceConversation {
   id: string;
   /** standard is a group chat, public to the Space; dm is seen only by the people in it. */
   kind?: "standard" | "dm";
+  /** A voice channel: people drop into its call (`space:<space>:voice:<id>`) instead of writing. */
+  voice?: boolean;
   space_id: string;
   title: string;
   created_by_user_id: string;

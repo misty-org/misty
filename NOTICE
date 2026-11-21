@@ -278,6 +278,10 @@ Kura (https://github.com/kannachi323/kura)
   watcher and the retry with backoff and Retry-After of its HTTP layer
   (src-tauri/features/space_drive/src/store.rs, sync.rs and api.rs), and its FakeDrive test style
   (src-tauri/features/space_drive/tests).
+  Files, Misty's file manager (src-tauri/features/files and src/features/spaces/file-manager), is
+  adapted from Kura's file manager: its folder listing, folder watch, Get Info and folder sizes,
+  local changes, Trash with Put Back, Finder tags, names-only tantivy search, and its power tools
+  (archives, checksums, links, duplicates and folder compare), and its keyboard map and commands.
 
   MIT License
 

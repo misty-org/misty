@@ -1,11 +1,6 @@
-/* The main window's type, controls and rows read best a step up from the scale's sizes, so its
-   root is 110%: every size in the app is in rem and grows with it, and the page zoom at 100% is 1.
-   The overlay windows (pets, the cursor, the desktop overlay) don't load this file and stay at
-   the scale's own sizes. Lengths in JS that sit beside CSS sizes go through uiPx and remCss
-   (src/shared/lib/uiScale.ts). */
-html {
-  font-size: 110%;
-}
+/* The root font size is never set: it stays at the browser's 100% (16px) in every window, so a
+   size in rem is the size it says, and the page zoom is the only thing that scales the UI.
+   Lengths in JS that sit beside CSS sizes go through uiPx and remCss (src/shared/lib/uiScale.ts). */
 
 .app-pages-root {
   font-family: var(--font-sans);

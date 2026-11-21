@@ -19,39 +19,32 @@ const refusal = (error: unknown) => (error as LocalToolRejected).message;
 
 beforeEach(() => vi.clearAllMocks());
 
-const SEARCH = "/spaces/s1/library?limit=20&visibility=visible";
+const THREADS = "/spaces/s1/conversations";
 
 describe("the space argument", () => {
   it("works in the run's home Space when none is named", async () => {
     const calls = serve({
       ...SPACES,
-      [`GET ${SEARCH}`]: { items: [{ id: "i", display_name: "Plan" }] },
+      [`GET ${THREADS}`]: { conversations: [{ id: "t", title: "Plan" }] },
     });
-    await expect(call(tool("file.search"), {})).resolves.toEqual({
-      items: [{ id: "i", display_name: "Plan" }],
-      count: 1,
+    await expect(call(tool("thread.list"), {})).resolves.toMatchObject({
+      threads: [{ id: "t", title: "Plan" }],
     });
-    expect(calls.map((request) => request.path)).not.toContain(
-      "/spaces/s0/library?limit=20&visibility=visible",
-    );
+    expect(calls.map((request) => request.path)).not.toContain("/spaces/s0/conversations");
   });
 
   it("finds the home Space by id or by name in any case", async () => {
-    serve({ ...SPACES, [`GET ${SEARCH}`]: { items: [] } });
-    await expect(call(tool("file.search"), { space: "s1" })).resolves.toEqual({
-      items: [],
-      count: 0,
-    });
-    await expect(call(tool("file.search"), { space: " work " })).resolves.toEqual({
-      items: [],
-      count: 0,
+    serve({ ...SPACES, [`GET ${THREADS}`]: { conversations: [] } });
+    await expect(call(tool("thread.list"), { space: "s1" })).resolves.toEqual({ threads: [] });
+    await expect(call(tool("thread.list"), { space: " work " })).resolves.toEqual({
+      threads: [],
     });
   });
 
   it("refuses any other Space, by id or by name", async () => {
     const calls = serve(SPACES);
     for (const space of ["s0", "Home", "Nope"]) {
-      await expect(call(tool("file.search"), { space }).catch(refusal)).resolves.toBe(
+      await expect(call(tool("thread.list"), { space }).catch(refusal)).resolves.toBe(
         "I can only work in Work. Ask an agent in that Space.",
       );
     }
@@ -83,7 +76,7 @@ describe("the space argument", () => {
   it("asks for a new home Space once the run's is gone", async () => {
     vi.mocked(runSpaceId).mockResolvedValueOnce("gone");
     serve(SPACES);
-    await expect(call(tool("file.search"), {}).catch(refusal)).resolves.toBe(
+    await expect(call(tool("thread.list"), {}).catch(refusal)).resolves.toBe(
       "My home Space is gone: it was deleted, or the person left it. Ask them to pick a new home Space in my settings.",
     );
   });
@@ -91,7 +84,7 @@ describe("the space argument", () => {
   it("reaches no Space for a run nobody noted", async () => {
     vi.mocked(runSpaceId).mockResolvedValueOnce(null);
     serve(SPACES);
-    await expect(call(tool("file.search"), {}).catch(refusal)).resolves.toBe(
+    await expect(call(tool("thread.list"), {}).catch(refusal)).resolves.toBe(
       "This tool call is not allowed for the current run.",
     );
   });
@@ -104,20 +97,8 @@ describe("what a failed call tells the run", () => {
   beforeEach(() => registerLocalTools(spaceTools));
 
   it("lets the model correct what the server refused", async () => {
-    serve({
-      ...SPACES,
-      "GET /spaces/s1/library/items/i": {
-        id: "i",
-        version: 1,
-        display_name: "Plan",
-        caption: "",
-        tags: [],
-        favorite: false,
-        hidden: false,
-      },
-      "PATCH /spaces/s1/library/items/i": refusedWith(400, "invalid_request"),
-    });
-    await expect(ask("file.update", { space: "s1", id: "i", caption: "x" })).resolves.toEqual({
+    serve({ ...SPACES, [`GET ${THREADS}`]: refusedWith(400, "invalid_request") });
+    await expect(ask("thread.list", { space: "s1" })).resolves.toEqual({
       state: "failed",
       code: "invalid_request",
       message: "The tool arguments are invalid.",
@@ -132,8 +113,8 @@ describe("what a failed call tells the run", () => {
     [403, "account_closing", "server words"],
     [401, "not_authenticated", "server words"],
   ])("maps a %i %s", async (status, code, message) => {
-    serve({ ...SPACES, "GET /spaces/s1/library/items/i": refusedWith(status, code) });
-    await expect(ask("file.read", { space: "s1", id: "i" })).resolves.toEqual({
+    serve({ ...SPACES, [`GET ${THREADS}`]: refusedWith(status, code) });
+    await expect(ask("thread.list", { space: "s1" })).resolves.toEqual({
       state: "failed",
       code,
       message,
@@ -165,8 +146,8 @@ describe("what a failed call tells the run", () => {
   });
 
   it("knows a read with no answer changed nothing", async () => {
-    serve({ ...SPACES, "GET /spaces/s1/library/items/i": new Error("Load failed") });
-    await expect(ask("file.read", { space: "s1", id: "i" })).resolves.toEqual({
+    serve({ ...SPACES, [`GET ${THREADS}`]: new Error("Load failed") });
+    await expect(ask("thread.list", { space: "s1" })).resolves.toEqual({
       state: "failed",
       code: "request_failed",
       message: "Misty could not complete this tool call.",
@@ -174,8 +155,10 @@ describe("what a failed call tells the run", () => {
   });
 
   it("knows a change refused because of a failed read before it changed nothing", async () => {
-    serve({ ...SPACES, "GET /spaces/s1/library/items/i": refusedWith(502) });
-    await expect(ask("file.update", { space: "s1", id: "i" })).resolves.toMatchObject({
+    serve({ ...SPACES, [`GET ${THREADS}`]: refusedWith(502) });
+    await expect(
+      ask("item.rename", { space: "s1", kind: "thread", id: "t", name: "x" }),
+    ).resolves.toMatchObject({
       state: "failed",
     });
   });

@@ -66,11 +66,18 @@ beforeEach(() => {
   useSpacesStore.setState({ spaces: [] });
 });
 
-it("gives a new agent the Space the window shows", async () => {
+it("gives a new agent the person's Personal, whichever Space the window shows", async () => {
+  useSpaceWindowStore.setState({ personalSpaceId: "own", personalSpaceOwner: "acct" });
   window("team", "team");
   const made = await personalAgentsApi.save(input);
-  expect(made.space_id).toBe("team");
+  expect(made.space_id).toBe("own");
 });
+
+/** An agent the person moved to a shared Space in its settings. */
+const homedIn = async (spaceId: string) => {
+  const made = await personalAgentsApi.save(input);
+  return moveAgentHome("acct", made.id, spaceId);
+};
 
 /** An agent saved before agents had a home Space. */
 const unplaced = () =>
@@ -123,8 +130,7 @@ it("moves an agent's home only from its settings, keeping its version", async ()
 });
 
 it("runs in the agent's home Space, whichever Space the window shows", async () => {
-  window("team", "team");
-  const made = await personalAgentsApi.save(input);
+  const made = await homedIn("team");
   window("elsewhere", "elsewhere");
   await expect(runHomeSpace("acct", made.id)).resolves.toBe("team");
 });
@@ -136,8 +142,7 @@ it("runs Misty's own in her home Space when the run names no agent", async () =>
 });
 
 it("says so when the agent's home Space is gone", async () => {
-  window("team", "team");
-  const made = await personalAgentsApi.save(input);
+  const made = await homedIn("team");
   useSpaceWindowStore.setState({ personalSpaceId: "own", personalSpaceOwner: "acct" });
   useSpacesStore.setState({
     spaces: [{ id: "own", name: "Mine" } as never],

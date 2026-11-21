@@ -3,6 +3,7 @@ import { SystemErrorNotice } from "@/shared/platform/systemErrors";
 import type { SpaceConversation } from "../../api/dto/entities";
 import {
   Button,
+  ChoiceGroup,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -13,15 +14,15 @@ import {
   Switch,
   Text,
 } from "@misty/ui";
-import { Lock } from "lucide-react";
+import { Hash, Lock, Volume2 } from "lucide-react";
 import { useSpaceRoles } from "../../roles/useSpaceRoles";
 import { allowedRoleIds, withPrivacy } from "../../roles/channelPrivacy";
 import { isPrivateChannel } from "./conversationGroups";
 import { useEffect, useState, type FormEvent } from "react";
 
 /**
- * Creates or edits a channel: its name, and whether it is private, seen only by the roles picked
- * (and whoever may manage channels), as in Discord.
+ * Creates or edits a channel: text or voice (when creating), its name, and whether it is private, seen
+ * only by the roles picked (and whoever may manage channels), as in Discord.
  */
 export function CreateEditConversationDialog({
   spaceId,
@@ -38,6 +39,7 @@ export function CreateEditConversationDialog({
   onSaved: (conversation: SpaceConversation) => void;
 }) {
   const [title, setTitle] = useState("");
+  const [kind, setKind] = useState<"text" | "voice">("text");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const roles = useSpaceRoles(spaceId);
@@ -50,6 +52,7 @@ export function CreateEditConversationDialog({
     if (!open) return;
     setError("");
     setTitle(conversation?.title ?? "");
+    setKind("text");
     setPrivate(Boolean(conversation && isPrivateChannel(conversation, defaultRoleId)));
     setAllowed(allowedRoleIds(conversation));
   }, [open, conversation, defaultRoleId]);
@@ -70,7 +73,7 @@ export function CreateEditConversationDialog({
       const name = title.trim().slice(0, 80);
       let saved = conversation
         ? await spacesApi.updateConversation(spaceId, conversation.id, name)
-        : await spacesApi.createConversation(spaceId, name);
+        : await spacesApi.createConversation(spaceId, name, { voice: kind === "voice" });
       const wasPrivate = Boolean(conversation && isPrivateChannel(conversation, defaultRoleId));
       const before = allowedRoleIds(conversation).sort().join();
       if (
@@ -98,6 +101,19 @@ export function CreateEditConversationDialog({
           <DialogHeader>
             <DialogTitle>{conversation ? "Edit channel" : "New channel"}</DialogTitle>
           </DialogHeader>
+          {conversation ? null : (
+            <ChoiceGroup
+              className="mt-5"
+              label="Channel type"
+              fill
+              value={kind}
+              onChange={setKind}
+              options={[
+                { value: "text", label: "Text", icon: Hash },
+                { value: "voice", label: "Voice", icon: Volume2 },
+              ]}
+            />
+          )}
           <Text bare as="label" tone="muted" weight="medium" className="mt-5 grid gap-2 text-xs">
             Name
             <Input

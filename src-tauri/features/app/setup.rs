@@ -53,6 +53,8 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     permissions::restore(app.handle());
     #[cfg(desktop)]
+    crate::files::search::start_indexing(app.handle());
+    #[cfg(desktop)]
     app.manage(BrowserSessionState::default());
     app.manage(crate::agents::task_scopes::AgentWorkspaceState::default());
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]

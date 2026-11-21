@@ -146,6 +146,9 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::agents::commands::cursor_companion_ask_open,
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             crate::agents::commands::cursor_companion_hit,
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+            crate::agents::commands::cursor_companion_ask_part,
+            crate::agents::commands::agent_run_warm_up,
             crate::agents::commands::agent_foreground_queue,
             crate::agents::commands::agent_workspace_acquire,
             #[cfg(desktop)]

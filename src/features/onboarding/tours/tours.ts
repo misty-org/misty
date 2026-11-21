@@ -13,7 +13,6 @@ export type TourId =
   | "lab"
   | "notebook"
   | "space-chat"
-  | "library"
   | "search"
   | "layout"
   | "add-sources"
@@ -100,7 +99,9 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "sidebar-space",
         title: "Your space",
-        body: "A shared place for a project, a class or friends. Its name opens the Space menu: switch spaces, start one, see its people and its shared folders.",
+        body:
+          "A shared place for a project, a class or friends. Its name opens the Space menu: " +
+          "switch spaces, start one, see its people and its shared folders.",
       },
       {
         target: "sidebar-apps",
@@ -191,26 +192,6 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         target: "space-chat-mention",
         title: "Call someone in",
         body: "Type @ to bring in a person, or to ask an agent to do something.",
-      },
-    ],
-  },
-  library: {
-    label: "Files tour",
-    steps: [
-      {
-        target: "library-upload",
-        title: "Add files",
-        body: "Files you upload here are shared with everyone in this space and their agents.",
-      },
-      {
-        target: "library-search",
-        title: "Find a file",
-        body: "Search by a file's name.",
-      },
-      {
-        target: "library-filters",
-        title: "Sort and filter",
-        body: "Narrow by type, change the order, see deleted files, or switch between pictures and a list.",
       },
     ],
   },

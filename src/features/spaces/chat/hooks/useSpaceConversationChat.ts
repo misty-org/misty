@@ -17,6 +17,7 @@ import {
   messageFromSpaceEvent,
   oldestServerMessage,
   withThreadReply,
+  withoutThreadReply,
   type SpaceMessageHistory,
 } from "../useSpaceMessageSpansStore";
 import { spacesResyncEvent } from "../../list/spacesResync";
@@ -157,7 +158,11 @@ export function useSpaceConversationChat(spaceId: string, conversationId: string
           ? detail.event.payload.message_id
           : "";
       if (deletedId) {
-        setMessages((current) => current.filter((message) => message.id !== deletedId));
+        const rootId = detail.event?.payload.thread_root_id;
+        setMessages((current) => {
+          const kept = current.filter((message) => message.id !== deletedId);
+          return typeof rootId === "string" && rootId ? withoutThreadReply(kept, rootId) : kept;
+        });
         return;
       }
       const includedMessage = detail.event ? messageFromSpaceEvent(detail.event) : undefined;

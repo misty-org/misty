@@ -74,6 +74,11 @@ export interface GlobalAiMessage {
   model?: string;
   /** On a Tutor turn: the agent the work was handed to, and the chat it went to. */
   tutorHandoff?: { agentId: string; conversationId: string };
+  /**
+   * On a Tutor turn: what was on screen when it was asked (the app, its window and the page or
+   * document it had open), written in code from the turn's captures, so a later session knows.
+   */
+  tutorSeen?: string;
   /** How long the run took, set when it completes. */
   durationMs?: number;
   /** Folders the engine was refused during this reply, each offered to the person to allow. */

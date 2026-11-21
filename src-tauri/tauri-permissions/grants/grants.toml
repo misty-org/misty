@@ -21,3 +21,7 @@ description = "One file the person picks in the system file picker."
 [[permission]]
 identifier = "grant-linked-folder"
 description = "Work in a project folder the person links to a Space: the agent engines they chose run there, and the file panel reads and edits it."
+
+[[permission]]
+identifier = "grant-disk"
+description = "Files reaches the whole disk, as far as the person's own user can, asked the first time Files opens. Never Misty's own data, the keychains or writing into system folders; agents never reach secrets and change only what the person's user owns."

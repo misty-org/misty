@@ -66,24 +66,6 @@ export const permissionGroups: { title: string; permissions: PermissionInfo[] }[
   {
     title: "Space content",
     permissions: [
-      { permission: "library.view", label: "See Files", line: "Open the Space's Files." },
-      { permission: "library.add", label: "Add to Files", line: "Upload and save items." },
-      { permission: "library.edit", label: "Edit Files", line: "Rename, move and change items." },
-      {
-        permission: "library.download",
-        label: "Download Files",
-        line: "Save items to this computer.",
-      },
-      {
-        permission: "library.import",
-        label: "Import into Files",
-        line: "Bring items in from elsewhere.",
-      },
-      {
-        permission: "library.upload",
-        label: "Share folders",
-        line: "Upload project folders the Space shares.",
-      },
       { permission: "studio.view", label: "Enter the Studio", line: "See the Space's Studio." },
       {
         permission: "ask.run",

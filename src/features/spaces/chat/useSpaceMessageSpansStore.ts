@@ -30,6 +30,17 @@ export function withThreadReply(current: SpaceMessage[], reply: SpaceMessage): S
 }
 
 /**
+ * A deleted reply takes one from its root's count, if the root is in the list, before anything reloads.
+ */
+export function withoutThreadReply(current: SpaceMessage[], rootId: string): SpaceMessage[] {
+  return current.map((message) =>
+    message.id === rootId
+      ? { ...message, reply_count: Math.max(0, (message.reply_count ?? 0) - 1) }
+      : message,
+  );
+}
+
+/**
  * How far back a chat can still read: `more` while older pages may exist, `loading` while one is
  * read, `complete` once the first message is in.
  */

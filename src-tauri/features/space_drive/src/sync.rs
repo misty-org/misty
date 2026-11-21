@@ -66,7 +66,10 @@ pub(crate) async fn run(inner: Arc<Inner>, space: SpaceId) {
             return;
         }
         keep_marks(&inner, &space).await;
-        let _ = round(&inner, &space).await;
+        // Paused from Settings: nothing goes up or down until it is turned back on.
+        if !inner.paused.load(Ordering::SeqCst) {
+            let _ = round(&inner, &space).await;
+        }
         tokio::select! {
             _ = mounted.kick.notified() => tokio::time::sleep(QUIET).await,
             _ = tokio::time::sleep(RENEW_EVERY) => {}
@@ -441,8 +444,18 @@ async fn create_up(
             touched.changed.insert(node.id.clone());
             mounted.kick.notify_one();
         }
+        // The server already has this item from an earlier create whose answer never came, with
+        // what that create sent. A save made here since is still waiting: it goes up next, made
+        // against the version this computer created (the first), so a later save by someone else
+        // is kept by the server rather than merged away.
         CreateOutcome::Adopt => match inner.api.item(space, &node.id).await {
-            Ok(item) => commit(inner, space, &node, &item, SentContent::of(&node), true, touched)?,
+            Ok(item) => {
+                let sent = SentContent::of(&node).map(|_| SentContent {
+                    local_sha: item.sha256.clone(),
+                    merged_from: (item.version > Version(1)).then_some(Version(1)),
+                });
+                commit(inner, space, &node, &item, sent, true, touched)?
+            }
             Err(error) if error.is_transient() => return Err(DriveError::Offline),
             Err(error) => touched.problem = Some(error.to_string()),
         },
@@ -456,6 +469,34 @@ async fn create_up(
     Ok(())
 }
 
+/// An answer of the server's that is already in its trash: a change sent again after its answer was
+/// lost, of an item trashed since (a rename took its name). A file saved again here isn't gone:
+/// that save brings it back when it goes up.
+fn trashed_since(node: &NodeRow, item: &Item) -> bool {
+    (item.trashed || item.deleted) && !(node.kind == Kind::File && node.sha256 != item.sha256)
+}
+
+/// Such an item goes here too.
+fn gone_since(
+    inner: &Inner,
+    space: &SpaceId,
+    node: &NodeRow,
+    item: &Item,
+    touched: &mut Touched,
+) -> Result<(), DriveError> {
+    inner.store.put_item(item)?;
+    inner.store.put_base(space, &Base::of(item))?;
+    // The server has it, so it is no longer work waiting to go up.
+    let Some(mut now) = inner.store.node(space, &node.id)? else {
+        return Ok(());
+    };
+    now.created = false;
+    now.dirty_content = false;
+    now.dirty_place = false;
+    inner.store.update_node(&now)?;
+    remove_clean(inner, space, &now, Some(item), touched)
+}
+
 /// A new file whose name a file on the server has: its content is written into that file as the
 /// last save. It came from no version of that file, so it goes with no `base_version` and the
 /// server keeps the content it replaces in the trash. The new item here becomes that file.
@@ -467,6 +508,17 @@ async fn write_into(
     holder: &Item,
     touched: &mut Touched,
 ) -> Result<(), DriveError> {
+    // The file holding the name is this computer's own and is moving away from it here (a rename
+    // not gone up yet): it isn't the same file. Its move goes first, and the name is free next
+    // round.
+    if inner
+        .store
+        .node(space, &holder.id)?
+        .is_some_and(|shown| shown.parent != holder.parent_id || shown.server_name != holder.name)
+    {
+        mounted.kick.notify_one();
+        return Ok(());
+    }
     let (sha256, size, upload_id) = match send_content(inner, space, node).await {
         Ok(sent) => sent,
         Err(DriveError::Corrupt) => {
@@ -638,8 +690,16 @@ fn commit(
     sent_place: bool,
     touched: &mut Touched,
 ) -> Result<(), DriveError> {
+    // A change sent again after its answer was lost, of an item trashed there since.
+    if let Some(now) = inner.store.node(space, &sent.id)? {
+        if trashed_since(&now, item) {
+            return gone_since(inner, space, &now, item, touched);
+        }
+    }
+    let before = inner.store.base(space, &sent.id)?.map(|base| base.version);
+    let base = Base::of(item);
     inner.store.put_item(item)?;
-    inner.store.put_base(space, &Base::of(item))?;
+    inner.store.put_base(space, &base)?;
     if let Some(mut now) = inner.store.node(space, &sent.id)? {
         now.created = false;
         if let (Some(content), Kind::File) = (&content, now.kind) {
@@ -666,7 +726,27 @@ fn commit(
         if sent_place {
             now.dirty_place = now.parent != item.parent_id || now.server_name != item.name;
         }
+        let file = now.kind == Kind::File;
+        if content.is_none() && file && now.dirty_content {
+            // Only the place went up while a save here waits, and the answer is a newer version
+            // than that save was made against: it goes up saying so, and the server keeps what
+            // it replaces.
+            if let Some(from) = before.filter(|from| *from < base.version) {
+                now.content_base = Some(now.content_base.map_or(from, |at| at.min(from)));
+            }
+        }
         inner.store.update_node(&now)?;
+        // The answer is the base from now on, so what this didn't send and nothing here is
+        // changing (someone else's newer content, a move or rename) is taken here too, or no
+        // later pull would see it.
+        let take_content = content.is_none() && file && !now.dirty_content;
+        let take_place = !sent_place && !now.dirty_place;
+        if take_content || take_place {
+            take_server(inner, space, &now, item, take_content, take_place, touched)?;
+            if take_content {
+                keep_base(inner, item);
+            }
+        }
     }
     touched.changed.insert(sent.id.clone());
     touched.server.push(item.clone());
@@ -993,6 +1073,11 @@ fn take_theirs(
     server: &Item,
     touched: &mut Touched,
 ) -> Result<(), DriveError> {
+    if let Some(now) = inner.store.node(space, &node.id)? {
+        if trashed_since(&now, server) {
+            return gone_since(inner, space, &now, server, touched);
+        }
+    }
     inner.store.put_item(server)?;
     take_server(inner, space, node, server, true, !node.dirty_place, touched)?;
     inner.store.put_base(space, &Base::of(server))?;
@@ -1672,12 +1757,33 @@ fn create_node(
             .iter()
             .all(|other| other.trash_pending || names::fold(&other.name) != names::fold(&name))
         {
+            // A folder made again (`rm -r` then `mkdir`) comes back empty: what was in it was
+            // deleted with it and still goes to the trash, each item on its own.
+            if revived.kind == Kind::Folder {
+                for child in inner.store.children(space, Some(&revived.id))? {
+                    if child.trash_pending {
+                        continue;
+                    }
+                    if child.created || child.not_synced {
+                        inner.store.remove_subtree(space, &child.id)?;
+                        continue;
+                    }
+                    let mut gone = child;
+                    gone.trash_pending = true;
+                    gone.trash_held = revived.trash_held;
+                    gone.trash_agent = revived.trash_agent.clone();
+                    gone.trash_chat = revived.trash_chat.clone();
+                    inner.store.update_node(&gone)?;
+                }
+            }
             revived.trash_pending = false;
             revived.trash_held = false;
             revived.trash_agent = None;
             revived.trash_chat = None;
+            // Made from no version of the file it brings back: the server keeps what it replaces
+            // in the trash, so the delete can still be undone.
             if let Some((sha256, size)) = content {
-                set_content(inner, space, &mut revived, sha256, size, mtime_ms, None)?;
+                set_content(inner, space, &mut revived, sha256, size, mtime_ms, Some(Version(0)))?;
             }
             inner.store.update_node(&revived)?;
             return inner.store.node(space, &revived.id)?.ok_or(DriveError::NotFound);
@@ -1855,9 +1961,12 @@ pub(crate) fn rename_local(
     if let Some(mut target) = clash {
         if target.kind == Kind::File && node.kind == Kind::File {
             // A save over an existing file (write a temp file, rename it into place): the file
-            // keeps its identity and takes the new content.
+            // keeps its identity and takes the new content. A file of its own moved over it is
+            // no save of it: its content was made from no version of that file, so the server
+            // keeps what it replaces in the trash.
             let sha256 = node.sha256.clone().unwrap_or_else(|| EMPTY_SHA256.to_owned());
-            set_content(inner, space, &mut target, sha256, node.size, node.mtime_ms, None)?;
+            let came_from = (!node.created && !node.not_synced).then_some(Version(0));
+            set_content(inner, space, &mut target, sha256, node.size, node.mtime_ms, came_from)?;
             inner.store.update_node(&target)?;
             if node.created || node.not_synced {
                 inner.store.remove_subtree(space, &node.id)?;
@@ -2007,10 +2116,9 @@ pub(crate) async fn close(inner: &Arc<Inner>, space: &SpaceId, id: &ItemId, edit
         // The mark is renewed until the change is up.
         return;
     }
-    let answered = inner.opens.answered_live().contains(&key);
-    if answered {
-        return;
-    }
+    // A check answered while it was open marked it for being open; closed, it's let go, and a
+    // later check asks again (a recent use still counts then).
+    inner.opens.forget_answer(&key);
     if let Ok(mounted) = inner.mounted(space) {
         if lock(&mounted.marked).remove(id).is_some() {
             let _ = inner.api.clear_in_use(space, id).await;

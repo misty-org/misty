@@ -13,8 +13,8 @@ describe("tourForPage", () => {
     expect(tourForPage("/spaces/abc", "")).toBe("space");
     expect(tourForPage("/spaces/abc/home", "")).toBe("space");
     expect(tourForPage("/spaces/abc/chat", "")).toBe("space-chat");
-    expect(tourForPage("/spaces/abc/files", "")).toBe("library");
-    expect(tourForPage("/spaces/abc/library", "")).toBe("library");
+    expect(tourForPage("/spaces/abc/files", "")).toBeNull();
+    expect(tourForPage("/spaces/abc/library", "")).toBeNull();
     expect(tourForPage("/spaces/abc/notes", "")).toBeNull();
     expect(tourForPage("/spaces/abc/lab", "")).toBe("lab");
     expect(tourForPage("/spaces/abc/lab", "?item=notebook:n1")).toBe("notebook");

@@ -1,4 +1,4 @@
-import { spaceForNewItems, useSpaceWindowStore } from "@/features/app-windows";
+import { useSpaceWindowStore } from "@/features/app-windows";
 import type { AgentProfile } from "@/shared/schemas";
 import { localDocuments } from "../conversations/state/localChats";
 
@@ -20,11 +20,12 @@ export function ownSpaceOf(account: string): string {
 export const spacesKnownFor = (account: string) =>
   useSpaceWindowStore.getState().personalSpaceOwner === account;
 
-/** The Space a new agent made in this window calls home: the one the window shows. */
+/**
+ * The Space a new agent calls home: always the person's Personal, whichever Space the window
+ * shows. It comes with them into every Space they join, and works in the Space it is asked in.
+ */
 export function newAgentHomeSpace(account: string): string {
-  const { spaceId, personal } = spaceForNewItems();
-  if (personal) return ownSpaceOf(account);
-  return spaceId ?? "";
+  return ownSpaceOf(account);
 }
 
 /** The Space an agent works in: its own, or the person's own Space for one that has none yet. */

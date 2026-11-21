@@ -3,21 +3,35 @@ import { useUserStore } from "@/features/account/core";
 import { spacesApi } from "../api/api";
 import type { SpaceMessage } from "../api/dto/entities";
 import { useSpaceResource } from "../api/spaceResource";
-import { reloadSpaceConversations } from "../chat/spaceConversationsResource";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { useHandledHandoffs } from "./handledHandoffs";
 import { incomingHandoffs, pendingHandoffs, type IncomingHandoff } from "./spacePosts";
 
 const noMessages: SpaceMessage[] = [];
+/** The DMs last read for handoffs, so a message in one of them reloads the list. */
+const readDms = new Set<string>();
 
-/** The latest messages of every direct message this person has in a Space. */
-async function directMessages(spaceId: string): Promise<SpaceMessage[]> {
-  // The shared conversation list, so the chat sidebar and home page read it once with this.
-  const conversations = await reloadSpaceConversations(spaceId);
+/**
+ * The latest messages of the person's one-to-one DMs with this Space's members. DMs belong to the
+ * account, not a Space, so a handoff from a member shows in every Space the two of you share.
+ */
+async function directMessages(spaceId: string, me: string): Promise<SpaceMessage[]> {
+  const [{ dms }, { members }] = await Promise.all([
+    spacesApi.directMessages(),
+    spacesApi.members(spaceId),
+  ]);
+  const inSpace = new Set(members.map((member) => member.user_id));
   const loaded = await Promise.allSettled(
-    conversations
-      .filter((conversation) => conversation.kind === "dm")
-      .map((conversation) => spacesApi.conversationMessages(spaceId, conversation.id)),
+    dms
+      .filter(
+        (dm) =>
+          dm.kind === "direct" &&
+          dm.members.some((member) => member.user_id !== me && inSpace.has(member.user_id)),
+      )
+      .map((dm) => {
+        readDms.add(dm.id);
+        return spacesApi.messages(dm.id);
+      }),
   );
   return loaded.flatMap((result) => (result.status === "fulfilled" ? result.value.messages : []));
 }
@@ -37,7 +51,7 @@ export function useIncomingHandoffs(spaceId: string): {
   // The last copy paints at once on a revisit or relaunch, and a fresh read follows behind it.
   const direct = useSpaceResource(
     me && !referenceOnly ? `/spaces/${encodeURIComponent(spaceId)}/handoffs/direct-messages` : null,
-    () => directMessages(spaceId),
+    () => directMessages(spaceId, me),
   );
   const reloadDirect = direct.reload;
 
@@ -46,7 +60,8 @@ export function useIncomingHandoffs(spaceId: string): {
     let timer = 0;
     const changed = (event: Event) => {
       const detail = (event as CustomEvent<{ spaceId?: string; space_id?: string }>).detail;
-      if ((detail?.spaceId ?? detail?.space_id) !== spaceId) return;
+      const from = detail?.spaceId ?? detail?.space_id ?? "";
+      if (from !== spaceId && !readDms.has(from)) return;
       // A burst of messages is one reload.
       window.clearTimeout(timer);
       timer = window.setTimeout(() => void reloadDirect(), 500);

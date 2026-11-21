@@ -65,9 +65,3 @@ export function setTrafficLightsVisible(
 export function appSnapshot(): Promise<AppSnapshot> {
   return invoke("app_snapshot");
 }
-
-export function clipboardWriteFileBytes(
-  items: Array<{ name: string; bytes: number[] }>,
-): Promise<boolean> {
-  return invoke("clipboard_write_file_bytes", { items });
-}

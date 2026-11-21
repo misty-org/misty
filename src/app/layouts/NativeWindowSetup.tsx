@@ -36,7 +36,7 @@ export function NativeWindowSetup() {
       await document.fonts.load?.('1em "Inter Variable"').catch(() => undefined);
       await document.fonts.ready;
       // Child webview bounds use this same physical render scale (displayed
-      // 100% renders at 1; the UI's step up is in the CSS, App.css's 110% root).
+      // 100% renders at 1, and the root font size stays at 100% too).
       await getCurrentWebview().setZoom(getAppliedAppRenderScale());
       if (!disposed) window.dispatchEvent(new Event(appZoomChangedEvent));
       // A hidden webview may not deliver animation frames. Let the committed

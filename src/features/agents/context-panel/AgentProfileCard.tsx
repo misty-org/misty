@@ -52,7 +52,7 @@ export function AgentProfileCard(props: { agent: AgentProfile; onClose(): void }
           </Text>
         </div>
         {about ? (
-          <Text as="p" size="body" wrap className="line-clamp-3">
+          <Text as="p" size="body" lines={3} full>
             {about}
           </Text>
         ) : null}

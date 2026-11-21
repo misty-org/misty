@@ -124,16 +124,21 @@ pub enum HotkeyEvent {
     /// Control tapped twice on its own, quickly (opens Tutor's text box). Shortcuts like
     /// Control+C or Control and a click never count. macOS and Windows only.
     DoubleTap,
+    /// Control tapped three times the same way (turns Tutor's Always On listening on or off). The
+    /// second tap has already sent `DoubleTap`.
+    TripleTap,
     Error(String),
 }
 
-/// Two taps of Control on its own, each short, close together.
+/// Two taps of Control on its own, each short, close together; and a third.
 #[derive(Default)]
 pub(crate) struct DoubleTap {
     /// When Control went down alone, and whether nothing else has happened since.
     down: Option<(std::time::Instant, bool)>,
-    /// When the last clean tap ended.
-    last: Option<std::time::Instant>,
+    /// When the last clean tap ended, and how many clean taps the run has had.
+    last: Option<(std::time::Instant, u8)>,
+    /// A third tap completed the run (`take_triple`).
+    triple: bool,
 }
 
 impl DoubleTap {
@@ -168,12 +173,24 @@ impl DoubleTap {
             return false;
         }
         match self.last.take() {
-            Some(previous) if now.duration_since(previous) <= Self::BETWEEN => true,
+            Some((previous, taps)) if now.duration_since(previous) <= Self::BETWEEN => {
+                if taps + 1 >= 3 {
+                    self.triple = true;
+                    return false;
+                }
+                self.last = Some((now, taps + 1));
+                true
+            }
             _ => {
-                self.last = Some(now);
+                self.last = Some((now, 1));
                 false
             }
         }
+    }
+
+    /// Whether the last modifier change completed a triple tap; asking clears it.
+    pub fn take_triple(&mut self) -> bool {
+        std::mem::take(&mut self.triple)
     }
 
     /// Any other key, a click or a scroll: no tap is under way.
@@ -315,10 +332,13 @@ fn dispatch(input: Input) {
                 }
             }
             // Linux's hook sees only modifiers, so it can't tell Control+C from a tap.
-            if cfg!(any(target_os = "macos", windows))
-                && state.taps.modifiers(&modifiers, std::time::Instant::now())
-            {
-                broadcast(&state, HotkeyEvent::DoubleTap);
+            if cfg!(any(target_os = "macos", windows)) {
+                if state.taps.modifiers(&modifiers, std::time::Instant::now()) {
+                    broadcast(&state, HotkeyEvent::DoubleTap);
+                }
+                if state.taps.take_triple() {
+                    broadcast(&state, HotkeyEvent::TripleTap);
+                }
             }
         }
         Input::Key => {

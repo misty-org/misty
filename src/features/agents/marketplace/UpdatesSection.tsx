@@ -16,12 +16,7 @@ import {
   notify,
 } from "@misty/ui";
 import { skillsHubApi, type SkillRow, type SkillTargetId } from "@/features/engine-config/skills";
-import { useAppUpdates } from "@/features/spaces/apps/appUpdates";
-import {
-  catalogLogoUrl,
-  type AppSource,
-  type CatalogApp,
-} from "@/features/spaces/apps/thirdPartyApps";
+import { exploreApps, type ExploreCatalogApp } from "./exploreApps";
 import { MakerTile, pluginMaker } from "./PluginMaker";
 
 const failureText = (reason: unknown, fallback: string) =>
@@ -50,6 +45,7 @@ export function useSkillUpdates() {
 }
 
 export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canManage: boolean }) {
+  const { useAppUpdates, catalogLogoUrl } = exploreApps();
   const apps = useAppUpdates(spaceId);
   const skills = useSkillUpdates();
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
@@ -77,7 +73,7 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
     }
   };
 
-  const updateApp = (app: CatalogApp, source?: AppSource) =>
+  const updateApp = (app: ExploreCatalogApp, source?: unknown) =>
     run(
       `app:${app.id}`,
       () => apps.install(app.id, app.version, app.permissions, source),

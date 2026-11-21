@@ -48,7 +48,6 @@ export interface SpacesStore {
     text: string,
     fileNodeIds?: string[],
     attachmentIds?: string[],
-    libraryItemIds?: string[],
     replyToMessageId?: string,
     optimisticMessage?: SpaceMessage,
   ) => Promise<SpaceMessage | undefined>;

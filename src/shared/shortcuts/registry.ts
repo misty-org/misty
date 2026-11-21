@@ -7,7 +7,6 @@ import { chatCommands } from "./chatCommands";
 import { codeCommands } from "./codeCommands";
 import { command } from "./factory";
 import { focusModeCommands } from "./viewAndTabCommands";
-import { libraryCommands } from "./libraryCommands";
 import { workspaceCommands } from "./workspaceCommands";
 export type * from "./shortcutTypes";
 const shellCommands: ShortcutCommandDefinition[] = [
@@ -116,7 +115,6 @@ export const shortcutCommandRegistry: ShortcutCommandDefinition[] = [
   ...shellCommands,
   ...workspaceCommands,
   ...tabAndToolCommands,
-  ...libraryCommands,
   ...chatCommands,
   ...codeCommands,
 ];

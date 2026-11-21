@@ -151,8 +151,12 @@ fn a_delete_after_an_edit_trashes_the_edited_file() {
 
         save(&a, "/Report.pdf", b"v2");
         a.sync_now(&space()).await.unwrap();
-        // Ben hasn't heard of v2 and deletes his copy: the delete is the later change.
+        // Ben hasn't heard of v2 and deletes his copy: the delete is the later change. Ana's
+        // computer is away by then; while she's there, having just saved it counts as using it
+        // (`USED_LATELY`), which would refuse the delete.
+        ana.offline.store(true, Ordering::SeqCst);
         b.trash_now(&space(), &id, TrashBy::Person).await.unwrap();
+        ana.offline.store(false, Ordering::SeqCst);
         settle(&server, &[a.clone(), b.clone()]).await;
 
         assert!(!server.live_tree().contains_key("/Report.pdf"));
@@ -329,6 +333,32 @@ fn a_rename_onto_a_taken_name_takes_it_and_the_holder_waits_in_the_trash() {
         assert_eq!(tree.get("/Final.md").and_then(|(_, sha)| sha.clone()), Some(sha(b"draft")));
         assert!(server.trashed_ids().contains(final_md.as_str()), "Ana's file waits in the trash");
         assert!(local_tree(&a).get("/Final.md").is_some_and(|(_, held, _)| held == &Some(sha(b"draft"))));
+    });
+}
+
+#[test]
+fn a_file_moved_over_another_here_keeps_the_one_it_replaced_in_the_trash() {
+    let runtime = runtime();
+    runtime.block_on(async {
+        let server = FakeServer::new();
+        let dir = tempfile::tempdir().unwrap();
+        let ana = server.computer("ana", "Ana", "Ana's Mac");
+        let a = server.open_drive(&ana, dir.path().to_path_buf(), runtime.handle().clone());
+        save(&a, "/Notes.md", b"notes");
+        let old = save(&a, "/Old.md", b"old");
+        settle(&server, &[a.clone()]).await;
+
+        // Not a save (no temp file): a file of its own, moved over the other.
+        a.rename(&space(), &old, None, "Notes.md").unwrap();
+        settle(&server, &[a.clone()]).await;
+
+        let tree = server.live_tree();
+        assert_eq!(tree.get("/Notes.md").and_then(|(_, sha)| sha.clone()), Some(sha(b"old")), "{tree:?}");
+        assert!(!tree.contains_key("/Old.md"));
+        assert!(
+            server.all_contents().iter().any(|content| content == "notes"),
+            "what it replaced waits in the trash"
+        );
     });
 }
 

@@ -1,5 +1,6 @@
 import { CursorCompanionController, TutorTraySync } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
+import { DirectRoot } from "@/features/direct";
 import { type AppTab } from "@/app/shell";
 import {
   AccountClosingNotice,
@@ -247,6 +248,8 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       <AccountSuspendedNotice />
       <AccountClosingNotice />
       {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
+      {/* Status, notices and incoming calls for the account's own side: friends and DMs. */}
+      {!isAuthRoute ? <DirectRoot key={user?.id ?? "signed-out"} accountId={user?.id} /> : null}
       {!isAuthRoute ? <HelpDialog /> : null}
       {!isAuthRoute ? <TourHost /> : null}
       {!isAuthRoute ? (

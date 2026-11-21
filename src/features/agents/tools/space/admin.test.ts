@@ -19,25 +19,17 @@ const refusal = (error: unknown) => (error as LocalToolRejected).message;
 
 beforeEach(() => vi.clearAllMocks());
 
-const ITEM = "/spaces/s1/library/items/i";
+const NODES = "GET /spaces/s1/nodes";
+const NODE = "DELETE /spaces/s1/nodes/f";
 
 describe("item.delete", () => {
-  it("finds a Library item by id in the run's home Space, and no other", async () => {
-    serve({
-      ...SPACES,
-      [`GET ${ITEM}`]: { display_name: "Old" },
-      [`POST ${ITEM}/trash`]: { id: "i" },
-    });
+  it("finds a shared file by id in the run's home Space, and no other", async () => {
+    serve({ ...SPACES, [NODES]: { nodes: [{ id: "f", display_name: "Old" }] }, [NODE]: undefined });
     await expect(
-      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }),
-    ).resolves.toEqual({
-      deleted: "library_item",
-      id: "i",
-      title: "Old",
-      space_id: "s1",
-    });
+      call(tool("item.delete"), { kind: "shared_file", id: "f", space: "s1" }),
+    ).resolves.toEqual({ deleted: "shared_file", id: "f", title: "Old", space_id: "s1" });
     await expect(
-      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s0" }).catch(refusal),
+      call(tool("item.delete"), { kind: "shared_file", id: "f", space: "s0" }).catch(refusal),
     ).resolves.toBe("I can only work in Work. Ask an agent in that Space.");
   });
 
@@ -57,8 +49,8 @@ describe("item.delete", () => {
       ...SPACES,
       "GET /spaces/s1/conversations": { conversations: [{ id: "t", title: "Plan" }] },
       "DELETE /spaces/s1/conversations/t": undefined,
-      "GET /spaces/s1/nodes": { nodes: [{ id: "f", display_name: "a.pdf" }] },
-      "DELETE /spaces/s1/nodes/f": undefined,
+      [NODES]: { nodes: [{ id: "f", display_name: "a.pdf" }] },
+      [NODE]: undefined,
     });
     await expect(
       call(tool("item.delete"), { kind: "thread", id: "t", space: "s1" }),
@@ -71,48 +63,36 @@ describe("item.delete", () => {
     ).resolves.toBe("pass space; call space_list for names and ids");
   });
 
-  it("moves a Library item to the trash rather than deleting it", async () => {
-    const calls = serve({
-      ...SPACES,
-      [`GET ${ITEM}`]: { display_name: "a.png" },
-      [`POST ${ITEM}/trash`]: { id: "i" },
-    });
-    await expect(
-      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }),
-    ).resolves.toMatchObject({ deleted: "library_item", title: "a.png" });
-    expect(calls[calls.length - 1].method).toBe("POST");
-  });
-
   it("says what it couldn't find or may not delete", async () => {
-    serve({ ...SPACES, [`GET ${ITEM}`]: refusedWith(404) });
+    serve({ ...SPACES, [NODES]: { nodes: [] } });
     await expect(
-      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }).catch(refusal),
-    ).resolves.toBe("no library_item i that you can delete");
+      call(tool("item.delete"), { kind: "shared_file", id: "f", space: "s1" }).catch(refusal),
+    ).resolves.toBe("no shared_file f that you can delete");
     serve({ ...SPACES, "GET /spaces/s1/conversations": { conversations: [] } });
     await expect(
       call(tool("item.delete"), { kind: "thread", id: "t", space: "s1" }).catch(refusal),
     ).resolves.toBe("no thread t that you can delete");
     serve({
       ...SPACES,
-      [`GET ${ITEM}`]: { display_name: "T" },
-      [`POST ${ITEM}/trash`]: refusedWith(403, "forbidden"),
+      [NODES]: { nodes: [{ id: "f", display_name: "T" }] },
+      [NODE]: refusedWith(403, "forbidden"),
     });
     await expect(
-      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }).catch(refusal),
-    ).resolves.toBe("you do not have permission to delete that library_item");
+      call(tool("item.delete"), { kind: "shared_file", id: "f", space: "s1" }).catch(refusal),
+    ).resolves.toBe("you do not have permission to delete that shared_file");
     await expect(
-      call(tool("item.delete"), { kind: "note", id: "n", space: "s1" }).catch(refusal),
+      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }).catch(refusal),
     ).resolves.toBe("The arguments do not match this tool's input schema.");
   });
 
   it("doesn't call a failed delete a refusal when nobody answered", async () => {
     serve({
       ...SPACES,
-      [`GET ${ITEM}`]: { display_name: "T" },
-      [`POST ${ITEM}/trash`]: new Error("Load failed"),
+      [NODES]: { nodes: [{ id: "f", display_name: "T" }] },
+      [NODE]: new Error("Load failed"),
     });
     await expect(
-      call(tool("item.delete"), { kind: "library_item", id: "i", space: "s1" }),
+      call(tool("item.delete"), { kind: "shared_file", id: "f", space: "s1" }),
     ).rejects.toBeInstanceOf(LocalToolUncertain);
   });
 });

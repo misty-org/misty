@@ -12,6 +12,7 @@
 //! - What agents trash is recorded in `files_agent_trash` in `misty.db`, never on the server.
 
 pub mod commands;
+pub mod file_commands;
 mod device;
 mod http;
 

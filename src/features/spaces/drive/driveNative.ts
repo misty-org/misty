@@ -196,6 +196,15 @@ export const driveNative = {
     invoke<void>("drive_restore", { spaceId, itemId }),
   /** Deletes a trashed item for good (needs `drive.purge`). */
   purge: (spaceId: string, itemId: string) => invoke<void>("drive_purge", { spaceId, itemId }),
+  /** A new, empty folder named `name` in `folder` of the drive. */
+  createFolder: (spaceId: string, folder: string, name: string) =>
+    invoke<DriveEntry>("drive_create_folder", { spaceId, folder, name }),
+  /** Gives the item at `path` a new name in its folder. */
+  rename: (spaceId: string, path: string, name: string) =>
+    invoke<DriveEntry>("drive_rename", { spaceId, path, name }),
+  /** Moves items into `folder` of the same drive, keeping their names. */
+  move: (spaceId: string, paths: string[], folder: string) =>
+    invoke<DriveEntry[]>("drive_move", { spaceId, paths, folder }),
   /** Copies a folder on this computer into `folder` of the drive, following its ignore rules. */
   copyIn: (spaceId: string, source: string, folder: string) =>
     invoke<DriveEntry>("drive_copy_in", { spaceId, source, folder }),
@@ -205,6 +214,10 @@ export const driveNative = {
    */
   setCacheLimit: (bytes: number | null) =>
     invoke<number | null>("drive_set_cache_limit", { bytes }),
+  /** Pauses or resumes syncing for every Space until turned back on or Misty restarts. */
+  setPaused: (paused: boolean) => invoke<boolean>("drive_set_paused", { paused }),
+  /** Whether syncing is paused now. */
+  paused: () => invoke<boolean>("drive_paused"),
   /** Shows the Space's drive, or `path` inside it, in the system's file manager. */
   reveal: (spaceId: string, path?: string) =>
     invoke<void>("drive_reveal", { spaceId, path: path ?? null }),

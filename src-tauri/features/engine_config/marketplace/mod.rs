@@ -246,7 +246,7 @@ async fn list_engine(engine: &'static str) -> Result<(Vec<MarketItem>, Vec<Marke
             (items, claude_sources(&sources))
         }
         _ => (
-            codex_items(&plugins, &read_manifest),
+            codex_items(&plugins, &read_manifest, &crate::engine_config::support::codex_home().join("plugins").join("cache")),
             codex_sources(&sources),
         ),
     })

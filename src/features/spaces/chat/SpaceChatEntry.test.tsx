@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { SpaceChatEntry } from "./SpaceChatEntry";
@@ -7,61 +8,57 @@ vi.mock("@/features/account", () => ({ useAuth: () => ({ user: { id: "owner" } }
 vi.mock("./hooks/useSpaceChatAccess", () => ({
   useSpaceChatAccess: () => ({ isOwner: false, canWriteMessages: true }),
 }));
-vi.mock("./SpaceChat", () => ({ SpaceChat: () => null }));
-vi.mock("./sidebar/CreateEditConversationDialog", () => ({
-  CreateEditConversationDialog: () => null,
+// The chat itself draws the bar it is handed: its controls, then what sits at its end.
+vi.mock("./SpaceChat", () => ({
+  SpaceChat: (props: {
+    actions?: { id: string; label: string; onSelect?: () => void }[];
+    search?: ReactNode;
+    searchedText?: string;
+  }) => (
+    <div>
+      {props.actions?.map((action) => (
+        <button key={action.id} type="button" onClick={action.onSelect}>
+          {action.label}
+        </button>
+      ))}
+      {props.search}
+      <output data-testid="searched">{props.searchedText}</output>
+    </div>
+  ),
+}));
+vi.mock("./components/PinnedMessagesButton", () => ({
+  PinnedMessagesButton: () => <button type="button">Pinned</button>,
 }));
 vi.mock("./sidebar/useSpaceConversations", () => ({
-  useSpaceConversations: () => ({
-    conversations: [
-      {
-        id: "design",
-        title: "Design updates",
-        kind: "standard",
-        participants: [],
-        updated_at: "2026-09-30",
-        created_by_user_id: "owner",
-      },
-    ],
-    loading: false,
-    upsert: vi.fn(),
-  }),
+  useSpaceConversations: () => ({ conversations: [], loading: false, upsert: vi.fn() }),
 }));
-function Route() {
-  const l = useLocation();
-  return (
-    <output data-testid="route">
-      {l.pathname}
-      {l.search}
-    </output>
-  );
-}
 afterEach(cleanup);
-const mount = (path: string) => {
-  // The channel column shows once the Space itself is known.
+const mount = () => {
   useSpacesStore.setState({
     membersBySpace: { test: [] },
     nodesBySpace: { test: [] },
     spaces: [{ id: "test", name: "Test", owner_user_id: "owner" } as never],
   });
   render(
-    <MemoryRouter initialEntries={[path]}>
+    <MemoryRouter initialEntries={["/spaces/test/social/misty"]}>
       <SpaceChatEntry spaceId="test" spaceName="Test" />
-      <Route />
     </MemoryRouter>,
   );
 };
 
-it("lists channels in the sidebar and opens the conversation", () => {
-  mount("/spaces/test/social/misty");
-  fireEvent.click(screen.getByRole("button", { name: "Design updates" }));
-  expect(screen.getByTestId("route").textContent).toBe(
-    "/spaces/test/social/misty?conversation=design",
-  );
+it("puts the chat's controls in its own bar: Threads, Members, Pinned and search", () => {
+  mount();
+  expect(screen.getByRole("button", { name: "Threads" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Members" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Pinned" })).toBeTruthy();
+  expect(screen.getByRole("searchbox", { name: "Search messages" })).toBeTruthy();
 });
 
-it("returns to the Space-wide channel from a conversation", () => {
-  mount("/spaces/test/social/misty?conversation=design");
-  fireEvent.click(screen.getByRole("button", { name: "everyone" }));
-  expect(screen.getByTestId("route").textContent).toBe("/spaces/test/social/misty");
+it("searches the chat's messages when Enter is pressed in the search box", () => {
+  mount();
+  const search = screen.getByRole("searchbox", { name: "Search messages" });
+  fireEvent.change(search, { target: { value: "launch plan" } });
+  expect(screen.getByTestId("searched").textContent).toBe("");
+  fireEvent.keyDown(search, { key: "Enter" });
+  expect(screen.getByTestId("searched").textContent).toBe("launch plan");
 });

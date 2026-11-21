@@ -1,6 +1,6 @@
 import { useSettingsStore } from "@/features/settings";
 import { voiceSettings } from "../voiceSettings";
-import { captureApi } from "./captureApi";
+import { recognizeAudio } from "../systemSpeech";
 import { useCaptureStore } from "./useCaptureStore";
 
 function settings() {
@@ -22,19 +22,23 @@ export function captureSystemAudio(title = "System audio") {
     .start({ kind: "system", title, mic: withMic() }, settings().language);
 }
 
-/** Transcribes an audio or video file from a Library and shows the result. */
-export async function transcribeLibraryFile(spaceId: string, itemId: string, title: string) {
+/**
+ * Transcribes an audio or video file (such as one of a Space's drive files, read on this computer)
+ * with the computer's own speech recognition, and shows the words. Nothing of it goes to the server,
+ * so the transcript isn't saved; the recognizer doesn't tell speakers apart.
+ */
+export async function transcribeAudioFile(file: File, title = file.name) {
   const store = useCaptureStore.getState();
   store.show({ id: "", title, turns: [], speakers: {} });
   useCaptureStore.setState({ phase: "working" });
   try {
-    const language = settings().language;
-    const transcript = await captureApi.transcribe({
-      space_id: spaceId,
-      library_item_id: itemId,
-      language: language === "auto" ? undefined : language,
+    const text = (await recognizeAudio(file)).trim();
+    store.show({
+      id: "",
+      title,
+      turns: text ? [{ speaker: "1", start: 0, end: 0, text }] : [],
+      speakers: {},
     });
-    store.show(transcript);
   } catch (error) {
     useCaptureStore.setState({
       phase: "idle",

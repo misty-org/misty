@@ -33,6 +33,7 @@ export { tutorChatIds, useTutorChatIds, useTutorStore } from "./tutor/tutorStore
 export { BrowserContextMenuBridge } from "./conversations/context/BrowserContextMenuBridge";
 export { MistyContextBridgeHost } from "./conversations/context/MistyContextBridgeHost";
 export { useMistyStore } from "./conversations/state/useMistyStore";
+export { agentCallTurn, callAgents } from "./calls/agentCallTurn";
 export { AgentExecutionSurface } from "./island/AgentExecutionSurface";
 export { agentAccountId } from "./personal/agentAccount";
 export { desktopDeviceGrants } from "./personal/deviceGrants";
@@ -191,3 +192,8 @@ export {
   unregisterLocalTools,
   type LocalToolHandler,
 } from "./tools/host";
+
+export { provideExploreApps } from "./marketplace/exploreApps";
+
+// The Files page, which `spaces` provides at startup (`src/app/featureSeams.ts`).
+export { filesPage } from "./methods/AgentWorkspaceFrame";

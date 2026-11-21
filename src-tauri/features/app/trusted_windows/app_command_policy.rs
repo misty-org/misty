@@ -161,7 +161,8 @@ mod tests {
 
     #[test]
     /// An overlay reads what to show, and Misty there may take the pointer for her own window
-    /// (to be clicked or handed a file) and open Tutor's text box. Nothing else.
+    /// (to be clicked or handed a file, or a 3D model's card to be turned), open Tutor's text box
+    /// and ask about a part of the model. Nothing else.
     fn cursor_overlays_only_present_and_take_the_pointer_for_misty() {
         let permissions = capability("cursor-companion")["permissions"].clone();
         let app_commands: Vec<_> = permissions
@@ -178,7 +179,8 @@ mod tests {
             [
                 "allow-cursor-companion-snapshot",
                 "allow-cursor-companion-hit",
-                "allow-cursor-companion-ask-open"
+                "allow-cursor-companion-ask-open",
+                "allow-cursor-companion-ask-part"
             ]
         );
     }

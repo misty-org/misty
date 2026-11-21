@@ -45,6 +45,11 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
             crate::project::file_protocol::SCHEME,
             crate::project::file_protocol::handle,
         )
+        // Files' thumbnails and Quick Look's media, under the disk grant, to a person's window only.
+        .register_asynchronous_uri_scheme_protocol(
+            crate::files::protocol::SCHEME,
+            crate::files::protocol::handle,
+        )
         // A Space app's bundle for its sandboxed frame, from the installed copy only.
         .register_asynchronous_uri_scheme_protocol(
             crate::apps::scheme::SCHEME,

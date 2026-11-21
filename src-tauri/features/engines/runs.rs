@@ -20,7 +20,7 @@ use crate::agents::run_control::engine_modes;
 use crate::agents::run_control::tool_policy::RunFacts;
 use crate::app::runtime::MistyRuntime;
 
-use super::bridge::{self, RunNote};
+use super::bridge;
 use super::run_prompt::{
     save_files, save_images, with_attached_files, with_browser_hint, with_history, with_teammates,
 };
@@ -28,6 +28,9 @@ use super::{store, support};
 
 #[path = "runs_permission.rs"]
 mod permission;
+#[path = "runs_notes.rs"]
+mod notes;
+use notes::note;
 use permission::decide;
 #[cfg(test)]
 use permission::summarize;
@@ -170,87 +173,6 @@ fn tutor_voice(body: &Value) -> bool {
             .is_some_and(|id| id.starts_with("misty_tutor:"))
 }
 
-/// What the bridge reports about a run: its engine session, and its end.
-fn note(run_id: &str, note: RunNote) {
-    match note {
-        RunNote::Session(session) => {
-            // The cursor companion's turn keeps no session for the chat (`start`); Tutor's spoken
-            // conversation keeps its own.
-            let companion = |run: &LiveRun| {
-                run.body["mode"].as_str() == Some("companion") && !tutor_voice(&run.body)
-            };
-            let Some(run) = live().get(run_id).filter(|run| !companion(run)).map(|run| {
-                (
-                    run.account.clone(),
-                    run.conversation.clone(),
-                    run.engine.clone(),
-                    run.folder.clone(),
-                )
-            }) else {
-                return;
-            };
-            let Some(app) = APP.get() else {
-                return;
-            };
-            let db = app.state::<MistyRuntime>().environment.store();
-            tokio::task::spawn_blocking(move || {
-                let (account, conversation, engine, folder) = run;
-                if !conversation.is_empty() {
-                    let _ = store::keep_session(
-                        &db,
-                        &account,
-                        &conversation,
-                        &engine,
-                        &folder,
-                        &session,
-                    );
-                }
-            });
-        }
-        RunNote::Parked => {
-            if let Some(run) = live().get_mut(run_id) {
-                run.parked = true;
-            }
-        }
-        RunNote::Warm => {
-            if let Some(run) = live().get_mut(run_id) {
-                run.parked = true;
-                run.warm = true;
-            }
-        }
-        RunNote::Resumed => {
-            if let Some(run) = live().get_mut(run_id) {
-                run.parked = false;
-                run.warm = false;
-            }
-        }
-        RunNote::Ended => {
-            if let Some(run) = live().remove(run_id) {
-                for image in run.images {
-                    let _ = std::fs::remove_file(image);
-                }
-                // A run with no chat worked in a scratch folder of its own (`chat_folder.rs`).
-                if run.conversation.is_empty() {
-                    if let Some(app) = APP.get() {
-                        let db = app.state::<MistyRuntime>().environment.store();
-                        super::chat_folder::end_run(&db, run_id);
-                    }
-                }
-            }
-            STOPPED
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .remove(run_id);
-            super::mcp::forget(run_id);
-            SPACE_DIRS
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
-                .remove(run_id);
-            crate::agents::run_control::take_over::release(run_id);
-        }
-    }
-}
-
 static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 
 /// Each running turn's Space folders: its Space's drive where it is mounted on this computer
@@ -270,6 +192,18 @@ pub(super) fn space_dirs(run_id: &str) -> Vec<String> {
 
 /// Starts a turn on the engine the request names. Returns once it is running; its events follow.
 pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
+    launch(app, run_id, body, false).await
+}
+
+/// Warms up the engine for the first turn of a Tutor spoken session, while the person is still
+/// talking (`warm_up.rs`): the turn's request, with no prompt yet. Claude Code is launched under a
+/// session id of Misty's and waits, warm, for the turn. Nothing happens for another engine, for a
+/// session that has had a turn, or for any other run. Returns once the process is waiting.
+pub(crate) async fn warm_up(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
+    launch(app, run_id, body, true).await
+}
+
+async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> Result<(), String> {
     let engine = body["engine"]["id"]
         .as_str()
         .filter(|id| super::is_engine(id))
@@ -291,6 +225,9 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     // session of its own, which it carries on.
     let companion_turn = body["mode"].as_str() == Some("companion");
     let tutor_voice = tutor_voice(&body);
+    if warming && !(tutor_voice && engine == "claude") {
+        return Ok(());
+    }
     // Every chat works in its own folder, worked out here in native code (`chat_folder.rs`): the
     // project the person picked for it, or a scratch folder of its own. A page can't point an
     // engine at a folder the person didn't choose; a run with no chat gets a scratch folder too.
@@ -317,6 +254,32 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
         })
         .await
         .map_err(|error| error.to_string())??
+    };
+    // A warm-up names the session the turn will have, and keeps it for the conversation, so the
+    // turn finds it and the process waiting under it.
+    let session = if warming {
+        if session.is_some() {
+            return Ok(());
+        }
+        let named = uuid::Uuid::new_v4().to_string();
+        let (db, account, conversation, engine, folder_text, kept) = (
+            db.clone(),
+            facts.account.clone(),
+            conversation.clone(),
+            engine.clone(),
+            folder.to_string_lossy().into_owned(),
+            named.clone(),
+        );
+        tokio::task::spawn_blocking(move || {
+            store::keep_session(&db, &account, &conversation, &engine, &folder_text, &kept)
+        })
+        .await
+        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())?;
+        super::warm_up::begin(&named);
+        Some(named)
+    } else {
+        session
     };
     if let Some(space) = body["engine"]["space"].as_str().filter(|space| !space.is_empty()) {
         // The Space's drive, where it is mounted on this computer: the engine reads it, and
@@ -393,13 +356,17 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
             conversation,
             folder: folder_text.clone(),
             images: images.clone(),
-            parked: false,
-            warm: false,
+            // A warm-up only waits for the turn, which takes its process.
+            parked: warming,
+            warm: warming,
         },
     );
     // Claude Code in a chat may stay alive past its turn for a background task (bridge.rs), and
     // Claude Code or CodeBuddy stays warm for the chat's next message.
-    bridge::open(&run_id, matches!(engine.as_str(), "claude" | "codebuddy"));
+    // A warm-up shows nothing of its own: the turn that takes its process shows what it does.
+    if !warming {
+        bridge::open(&run_id, matches!(engine.as_str(), "claude" | "codebuddy"));
+    }
     let mut mcp_servers = super::mcp::servers_for(app, &run_id).await;
     // The agent's own MCP servers go in the same per-run config as Misty's Space server.
     if !agent_servers.is_empty() {
@@ -466,6 +433,11 @@ pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Resul
     )
     .await;
     if let Err(error) = sent {
+        if warming {
+            // Nothing waits under the session: the turn starts it itself.
+            live().remove(&run_id);
+            return Err(error);
+        }
         bridge::fail(&run_id, &error);
     }
     Ok(())

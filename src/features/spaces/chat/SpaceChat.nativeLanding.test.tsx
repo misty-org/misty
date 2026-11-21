@@ -42,7 +42,6 @@ it("shows existing Everyone messages when opening Misty without a conversation s
   const conversations = vi
     .spyOn(spacesApi, "conversations")
     .mockResolvedValue({ conversations: [] } as never);
-  vi.spyOn(spacesApi, "libraryItems").mockResolvedValue({ items: [] } as never);
   useSpacesStore.setState({
     spaces: [
       {

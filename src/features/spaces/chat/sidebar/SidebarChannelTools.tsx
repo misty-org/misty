@@ -18,7 +18,6 @@ import { SpaceDialogs, type SpaceDialog } from "../../components/space-row/Space
 import { useSpacesStore } from "../../list/useSpacesStore";
 import { spaceCan } from "../../roles/useSpaceRoles";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
-import { NewDirectMessageDialog } from "./NewDirectMessageDialog";
 import { conversationName } from "./conversationGroups";
 import { useSpaceConversations } from "./useSpaceConversations";
 
@@ -109,47 +108,6 @@ export function ChannelRowMenu(props: {
           />
         </>
       ) : null}
-    </>
-  );
-}
-
-/**
- * The + at the end of the sidebar's Direct messages heading (a `group/row`), shown while the
- * heading is hovered: it picks someone in the Space and opens the direct message with them.
- */
-export function NewDirectMessageButton(props: {
-  spaceId: string;
-  onOpened(conversation: SpaceConversation): void;
-}) {
-  const { user } = useAuth();
-  const rights = useChannelRights(props.spaceId);
-  const members = useSpacesStore((state) => state.membersBySpace[props.spaceId]);
-  const loadMembers = useSpacesStore((state) => state.loadMembers);
-  const { upsert } = useSpaceConversations(props.spaceId);
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (open && !members) void loadMembers(props.spaceId).catch(() => {});
-  }, [open, members, loadMembers, props.spaceId]);
-  if (!rights.write) return null;
-  return (
-    <>
-      <RowTools reveal="hover">
-        <IconButton label="New direct message" onClick={() => setOpen(true)}>
-          <Plus />
-        </IconButton>
-      </RowTools>
-      <NewDirectMessageDialog
-        spaceId={props.spaceId}
-        open={open}
-        onOpenChange={setOpen}
-        members={members ?? []}
-        currentUserId={user?.id}
-        onOpened={(opened) => {
-          upsert(opened);
-          setOpen(false);
-          props.onOpened(opened);
-        }}
-      />
     </>
   );
 }

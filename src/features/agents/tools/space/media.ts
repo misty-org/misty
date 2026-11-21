@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { ApiRequestError } from "@/api/client";
-import { spacesGateway, type AgentArtifactProvenance } from "../../spaces-gateway/spacesGateway";
+import { agentFolderOf } from "../../artifacts/agentArtifacts";
+import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import type { LocalToolHandler, LocalToolRequest } from "../host";
 import { loadRunEntry } from "../runContexts";
 import { refuse } from "./api";
@@ -8,10 +8,11 @@ import { text } from "./args";
 import { routedTool } from "./routing";
 
 /**
- * Media between a Space and the chat's folder. An agent brings its own tools for the heavy work
- * (splitting a voice from music, upscaling, making an image): `media.fetch` puts a Media file in
- * the chat's folder for them, and `file.upload` adds what they made back to Media. Native code
- * keeps both inside the chat's own folder (`engines/chat_media.rs`).
+ * Media between a Space's drive and the chat's folder. An agent brings its own tools for the heavy
+ * work (splitting a voice from music, upscaling, making an image): `media.fetch` puts one of the
+ * Space's files in the chat's folder for them, and `file.upload` saves what they made back into the
+ * agent's folder of the drive (`/Agents/<agent name>/`). Native code keeps both inside the chat's own
+ * folder (`engines/chat_media.rs`).
  */
 
 const UNAVAILABLE = "Files can't be reached from here.";
@@ -29,7 +30,7 @@ const fetchMedia = routedTool("read", async (request, space) => {
   const gateway = spacesGateway.maybe();
   if (!gateway) throw refuse(UNAVAILABLE, "unavailable");
   const run = await chatOf(request);
-  const file = await gateway.libraryFile(space.id, itemId);
+  const file = await gateway.driveFile(space.id, itemId);
   const path = await invoke<string>("chat_media_save", new Uint8Array(await file.arrayBuffer()), {
     headers: {
       "x-account": encodeURIComponent(run.account),
@@ -58,27 +59,8 @@ const upload = routedTool("change", async (request, space) => {
   }
   const name =
     text(request.input, "name", { max: 200 }).trim() || path.split(/[\\/]/).pop() || "file";
-  const credit: AgentArtifactProvenance | undefined =
-    run.agentId && run.spaceId === space.id
-      ? {
-          agent_id: run.agentId,
-          conversation_id: run.conversationId,
-          run_id: request.runId,
-          kind: "file",
-        }
-      : undefined;
-  const blob = new Blob([bytes]);
-  const send = (agent?: AgentArtifactProvenance) =>
-    gateway.uploadLibraryBlob(space.id, blob, name, "library", agent ? { agent } : undefined);
-  let result;
-  try {
-    result = await send(credit);
-  } catch (error) {
-    // A Space that doesn't list the agent refuses the credit before storing anything.
-    if (credit && error instanceof ApiRequestError && error.status === 403) result = await send();
-    else throw error;
-  }
-  return { saved: name, item_id: result.item?.id ?? null, bytes: blob.size };
+  const saved = await gateway.saveToDrive(space.id, agentFolderOf(run.agentId), name, bytes);
+  return { saved: saved.name, path: saved.path, item_id: saved.id, bytes: bytes.byteLength };
 });
 
 export const mediaTools: Record<string, LocalToolHandler> = {

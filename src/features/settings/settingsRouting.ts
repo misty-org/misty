@@ -24,5 +24,4 @@ export function preferenceSection(id: string, page: string): SettingsSection {
 export const preferencesWithoutRows: ReadonlySet<string> = new Set([
   "app.layout.presets",
   "app.shortcuts.bindings",
-  "collections.tabs.media",
 ]);

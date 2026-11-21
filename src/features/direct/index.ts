@@ -1,4 +1,6 @@
 // The account's own side of Misty, outside any Space: friends, DMs, status and calls.
+// The Space member list reads account status through shared/lib/accountPresence.
+import "./presenceMirror";
 export { DirectRoot } from "./DirectRoot";
 export { DirectSurface } from "./DirectSurface";
 export {
@@ -28,3 +30,12 @@ export {
   usePresence,
   useStatusStore,
 } from "./statusStore";
+export {
+  callsForApps,
+  joinVoiceChannel,
+  useActiveVoiceChannel,
+  useCallSpeaking,
+  type VoiceChannel,
+} from "./calls/voiceChannels";
+export { RequestsSection } from "./settings/RequestsSection";
+export { StatusSection } from "./settings/StatusSection";

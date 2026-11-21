@@ -3,11 +3,13 @@ import type { MessageAttachment } from "../../api/dto/entities";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { readApiSessionGeneration } from "@/api/client/session";
 import type { Dispatch, SetStateAction } from "react";
+import type { PickedDriveFile } from "@/features/files";
+import { driveFileOf } from "../../drive/driveFiles";
+import type { LibraryUploadResult } from "../../api/dto/entities";
 import { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
 type DraftState = {
   text: string;
   selectedFileIds: string[];
-  selectedLibraryIds: string[];
   pendingAttachments: MessageAttachment[];
   replyToMessageId: string;
   attachmentUploading: boolean;
@@ -15,7 +17,6 @@ type DraftState = {
 const emptyDraft = (): DraftState => ({
   text: "",
   selectedFileIds: [],
-  selectedLibraryIds: [],
   pendingAttachments: [],
   replyToMessageId: "",
   attachmentUploading: false,
@@ -57,7 +58,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
     return {
       setText: setter("text"),
       setSelectedFileIds: setter("selectedFileIds"),
-      setSelectedLibraryIds: setter("selectedLibraryIds"),
       setPendingAttachments: setter("pendingAttachments"),
       setReplyToMessageId: setter("replyToMessageId"),
       setAttachmentUploading: setter("attachmentUploading"),
@@ -66,7 +66,6 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
   const {
     text,
     selectedFileIds,
-    selectedLibraryIds,
     pendingAttachments,
     replyToMessageId,
     attachmentUploading,
@@ -74,39 +73,27 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
   const {
     setText,
     setSelectedFileIds,
-    setSelectedLibraryIds,
     setPendingAttachments,
     setReplyToMessageId,
     setAttachmentUploading,
   } = setters;
-  const attachmentSlotsLeft = Math.max(
-    0,
-    MAX_CHAT_ATTACHMENTS - pendingAttachments.length - selectedLibraryIds.length,
-  );
+  const attachmentSlotsLeft = Math.max(0, MAX_CHAT_ATTACHMENTS - pendingAttachments.length);
   const reset = useCallback(() => {
     setText("");
     setSelectedFileIds([]);
-    setSelectedLibraryIds([]);
     setPendingAttachments([]);
     setReplyToMessageId("");
-  }, [
-    setText,
-    setSelectedFileIds,
-    setSelectedLibraryIds,
-    setPendingAttachments,
-    setReplyToMessageId,
-  ]);
-  const uploadAttachments = useCallback(
-    async (paths: string[]) => {
-      if (paths.length === 0 || attachmentUploading || attachmentSlotsLeft === 0) return;
+  }, [setText, setSelectedFileIds, setPendingAttachments, setReplyToMessageId]);
+  /** Uploads each as an attachment, in turn, up to the slots left. */
+  const upload = useCallback(
+    async (sends: Array<(conversationId?: string) => Promise<LibraryUploadResult>>) => {
+      if (sends.length === 0 || attachmentUploading || attachmentSlotsLeft === 0) return;
       setAttachmentUploading(true);
       try {
         const uploaded: MessageAttachment[] = [];
-        for (const path of paths.slice(0, attachmentSlotsLeft)) {
+        for (const send of sends.slice(0, attachmentSlotsLeft)) {
           if (session !== readApiSessionGeneration()) return;
-          const result = await spacesApi.uploadLibraryPath(spaceId, path, "attachment", {
-            conversationId: conversationId || undefined,
-          });
+          const result = await send(conversationId || undefined);
           if (session !== readApiSessionGeneration()) return;
           if (result.attachment) uploaded.push(result.attachment);
         }
@@ -125,28 +112,51 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       setPendingAttachments,
     ],
   );
+  const uploadAttachments = useCallback(
+    (paths: string[]) =>
+      upload(
+        paths.map(
+          (path) => (conversation?: string) =>
+            spacesApi.uploadLibraryPath(spaceId, path, "attachment", {
+              conversationId: conversation,
+            }),
+        ),
+      ),
+    [spaceId, upload],
+  );
+  /** Files of the Space's drive, read from it on this computer and sent as attachments. */
+  const attachDriveFiles = useCallback(
+    (files: PickedDriveFile[]) =>
+      upload(
+        files.map((file) => async (conversation?: string) => {
+          const content = await driveFileOf(file);
+          return spacesApi.uploadLibraryBlob(spaceId, content, content.name, "attachment", {
+            conversationId: conversation,
+          });
+        }),
+      ),
+    [spaceId, upload],
+  );
   return useMemo(
     () => ({
       text,
       setText,
       selectedFileIds,
       setSelectedFileIds,
-      selectedLibraryIds,
-      setSelectedLibraryIds,
       pendingAttachments,
       setPendingAttachments,
       replyToMessageId,
       setReplyToMessageId,
       attachmentUploading,
       attachmentSlotsLeft,
-      isEmpty: !text.trim() && pendingAttachments.length === 0 && selectedLibraryIds.length === 0,
+      isEmpty: !text.trim() && pendingAttachments.length === 0,
       reset,
       uploadAttachments,
+      attachDriveFiles,
     }),
     [
       setText,
       setSelectedFileIds,
-      setSelectedLibraryIds,
       setPendingAttachments,
       setReplyToMessageId,
       attachmentSlotsLeft,
@@ -155,9 +165,9 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       replyToMessageId,
       reset,
       selectedFileIds,
-      selectedLibraryIds,
       text,
       uploadAttachments,
+      attachDriveFiles,
     ],
   );
 }

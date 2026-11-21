@@ -10,24 +10,22 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
       request<{ conversations: SpaceConversation[]; everyone_unread_count?: number }>(
         `/spaces/${encodeURIComponent(spaceId)}/conversations`,
       ),
-    /** A group chat: public to the Space, with everyone in the Space in it. */
-    createConversation: (spaceId: string, title: string) =>
+    /** A group chat, public to the Space with everyone in it; or, with `voice`, a voice channel. */
+    createConversation: (spaceId: string, title: string, options: { voice?: boolean } = {}) =>
       request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, {
         method: "POST",
-        body: JSON.stringify({ title }),
+        body: JSON.stringify(options.voice ? { title, voice: true } : { title }),
       }),
-    /** The DM with another person in the Space, visible only to the two of you. */
-    openDirectMessage: (spaceId: string, userId: string) =>
-      request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations/dm`, {
-        method: "POST",
-        body: JSON.stringify({ user_id: userId }),
-      }),
-    /** A DM with two or more other people. One is the one-to-one DM, found or made; more make a new group. */
-    openGroupDirectMessage: (spaceId: string, userIds: string[]) =>
-      request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations/dm`, {
-        method: "POST",
-        body: JSON.stringify({ user_ids: userIds }),
-      }),
+    /**
+     * The person's DM with a friend, found or made. DMs belong to the account, not a Space: each is a
+     * hidden Space of its own, whose messages are that Space's (`messages`, `sendMessage` by its id).
+     * Only friends can DM, so it is refused for anyone else.
+     */
+    openDirectMessage: (userId: string) =>
+      request<{ id: string }>("/dms", { method: "POST", body: JSON.stringify({ user_id: userId }) }),
+    /** The person's DMs: each one's id and who is in it. */
+    directMessages: () =>
+      request<{ dms: { id: string; kind: string; members: { user_id: string }[] }[] }>("/dms"),
     /** Adds people to a group DM of three or more. */
     addConversationMembers: (spaceId: string, conversationId: string, userIds: string[]) =>
       request<SpaceConversation>(
@@ -79,7 +77,6 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
       content: MessageSpan[],
       fileNodeIds: string[] = [],
       attachmentIds: string[] = [],
-      libraryItemIds: string[] = [],
       replyToMessageId = "",
       clientNonce = "",
       inputModality: "text" | "voice" = "text",
@@ -95,7 +92,6 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
             content,
             file_node_ids: fileNodeIds,
             attachment_ids: attachmentIds,
-            library_item_ids: libraryItemIds,
             reply_to_message_id: replyToMessageId,
             thread_root_id: threadRootId,
             client_nonce: clientNonce,

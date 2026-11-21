@@ -32,6 +32,11 @@ pub(super) struct Reading {
     started: Arc<AtomicU32>,
 }
 
+/// Whether a reading is still being read: its voice hasn't finished or been stopped.
+pub(super) fn reading_open(reading: &Reading) -> bool {
+    !*reading.done.borrow()
+}
+
 /// Opens a reading in a system voice at `rate` (1 is the voice's usual pace), stopping anything
 /// already being said. Sentences follow through `speech_reading_add`.
 #[tauri::command]

@@ -5,6 +5,7 @@ import type { ErrorCode } from "./protocol";
 import { createDriveFileCalls } from "../drive/driveAppFiles";
 import type { FileHost } from "./spaceAppFiles";
 import { createAppRooms, type RoomSource } from "./appRooms";
+import { createAppCalls } from "./appCalls";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { memberAgentsIn, useMemberAgents } from "../list/memberAgents";
 
@@ -118,6 +119,8 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
   const driveFiles = createDriveFileCalls(spaceId, context.appName || appId, appId, context.files);
   // Its live documents (the SDK's `room()`), on the Space's live relay.
   const rooms = createAppRooms(spaceId, appId, context.rooms);
+  // The Space's voice channels and this window's call, which the app may read and steer.
+  const appCalls = createAppCalls(spaceId);
 
   const calls: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {
     hello: async () => ({
@@ -155,6 +158,7 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
       }));
     },
     ...rooms.calls,
+    ...appCalls.calls,
   };
 
   return {
@@ -175,6 +179,10 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
           return driveFiles.watch(params, emit);
         case "members.presence":
           return watchPresence(spaceId, context.me.user_id, emit);
+        case "calls.channels":
+          return appCalls.watchChannels(emit);
+        case "calls.current":
+          return appCalls.watchCurrent(emit);
         case "room":
           return rooms.subscribe(record(params), emit, end);
         default:

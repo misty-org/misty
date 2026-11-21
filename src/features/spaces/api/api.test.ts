@@ -197,7 +197,7 @@ describe("spaceRequest account isolation", () => {
       headers: new Headers(),
       blob: () => new Promise<Blob>((resolve) => (releaseBlob = resolve)),
     } as Response);
-    const request = spacesApi.libraryContent("space-a", "item-a");
+    const request = spacesApi.attachmentContent("space-a", "attachment-a");
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
 
     accountSession.generation += 1;
@@ -216,8 +216,8 @@ describe("spaceRequest account isolation", () => {
     } as unknown as Response);
 
     await expect(
-      spacesApi.uploadLibraryPath("space-a", "/tmp/too-large.mov", "library"),
-    ).rejects.toThrow("limited to 100 MB");
+      spacesApi.uploadLibraryPath("space-a", "/tmp/too-large.mov", "attachment"),
+    ).rejects.toThrow("limited to 10 MB");
     expect(readBody).not.toHaveBeenCalled();
   });
 

@@ -4,9 +4,9 @@ import { useLocalExecution } from "../runs/local-execution/localExecution";
 import { saveAgentArtifact } from "./agentArtifacts";
 
 /**
- * Files an agent downloads while it works. Each finished download is saved to
- * the agent's Space as a Library item with the agent's provenance, so it shows
- * up there on every computer. This list only tracks this session's progress.
+ * Files an agent downloads while it works. Each finished download is saved into
+ * the agent's folder in its home Space's drive, so it shows up there on every
+ * computer. This list only tracks this session's progress.
  */
 interface TaskArtifact {
   id: string;
@@ -78,13 +78,7 @@ export async function trackTaskArtifacts(accountId: string) {
       };
       put(artifact);
       if (!finished) return;
-      const conversationId = execution?.conversationId;
-      void saveAgentArtifact({
-        agentId: artifact.agentId,
-        path: artifact.path,
-        kind: "download",
-        conversationId,
-      })
+      void saveAgentArtifact({ agentId: artifact.agentId, path: artifact.path })
         .then(({ space }) => patch(artifact.id, { state: "saved", spaceName: space.name }))
         .catch(() =>
           patch(artifact.id, {

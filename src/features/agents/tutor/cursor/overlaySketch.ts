@@ -1,4 +1,5 @@
 import { cn, screenMarkClass, sketchInk } from "@misty/ui";
+import { invoke } from "@tauri-apps/api/core";
 import { mapSketch } from "./companionSketch";
 import { createModelView, type ModelView } from "./modelView";
 import { boardCardBox } from "./pointLayout";
@@ -11,6 +12,10 @@ import { renderSketch, SKETCH_PADDING } from "./sketchRender";
  * pointer; a model is the same card holding a 3D model (modelView.ts). Screen marks are
  * drawn where they belong, in white with a shadow. Each new line of the drawing re-renders
  * it, so it builds up while Misty explains.
+ *
+ * A model's card is the one part of the overlay the pointer can use (`modelCard` gives its box,
+ * and the overlay loop takes the pointer over it): the model turns when it's dragged, and a click
+ * on a part asks Tutor about that part.
  */
 export function createSketchPainter(layer: HTMLDivElement) {
   let seen = "";
@@ -23,7 +28,7 @@ export function createSketchPainter(layer: HTMLDivElement) {
     void model?.view.then((view) => view?.dispose());
     model = undefined;
   };
-  return (
+  const paint = (
     sketch: PresentedSketch | undefined,
     display: Pick<DisplayFrame, "id" | "x" | "y" | "width" | "height">,
     factor: number,
@@ -84,9 +89,16 @@ export function createSketchPainter(layer: HTMLDivElement) {
           const stage = document.createElement("div");
           stage.className = "min-h-0 w-full flex-1";
           board.append(stage);
+          board.style.pointerEvents = "auto";
           model = {
             id: sketch.id,
-            view: createModelView(stage, { draggable: false }).catch(() => undefined),
+            view: createModelView(stage, {
+              draggable: true,
+              onPick: (part) =>
+                void invoke("cursor_companion_ask_part", { part: part.label || part.id }).catch(
+                  () => undefined,
+                ),
+            }).catch(() => undefined),
           };
         }
         const parts = sketch.elements;
@@ -128,4 +140,7 @@ export function createSketchPainter(layer: HTMLDivElement) {
       layer.replaceChildren(drawn.svg);
     });
   };
+  /** The model's card on this display, in the overlay's own units, while one is shown. */
+  const modelCard = () => (model && card && frame ? card : undefined);
+  return Object.assign(paint, { modelCard });
 }

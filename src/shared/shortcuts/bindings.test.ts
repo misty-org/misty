@@ -71,6 +71,6 @@ describe("shortcut bindings", () => {
   it("recognizes overlapping context hierarchies", () => {
     expect(scopesOverlap("global", "tool:space")).toBe(true);
     expect(scopesOverlap("workspace", "tool:space")).toBe(true);
-    expect(scopesOverlap("tool:space", "tool:library")).toBe(false);
+    expect(scopesOverlap("tool:space", "tool:space")).toBe(true);
   });
 });

@@ -403,19 +403,6 @@
     "platforms": ["desktop"]
   },
   {
-    "id": "collections.tabs.media",
-    "label": "Files tab order",
-    "page": "appearance",
-    "section": "collections",
-    "key": "library_tab_order",
-    "default": "[]",
-    "owner": "device",
-    "type": "string",
-    "format": "json",
-    "maxLength": 4096,
-    "platforms": ["desktop"]
-  },
-  {
     "id": "voice.dictation.enabled",
     "label": "Dictation",
     "page": "voice",

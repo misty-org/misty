@@ -180,7 +180,7 @@
    "names": [
     "web.search",
     "web.fetch",
-    "note.search",
+    "message.search",
     "screen.open",
     "screen.look",
     "browser.workspace.focus",
@@ -275,7 +275,7 @@
     "browser.run",
     "browser.snapshot",
     "browser.workspace.focus",
-    "note.search",
+    "message.search",
     "agent.wait"
    ],
    "request": "Check my calendar and my notes",
@@ -499,7 +499,7 @@
    "declined": "tool_sequence_stopped: The action may have happened, but its outcome could not be verified.",
    "failures": [
     {
-     "toolName": "note.update",
+     "toolName": "message.update",
      "error": "The action may have happened, but its outcome could not be verified."
     }
    ]

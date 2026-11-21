@@ -283,6 +283,8 @@ describe("Global Misty state", () => {
       updatedAt: "2026-09-22",
       messages: [],
       remote: true,
+      messageBeforeSeq: undefined,
+      hasOlderMessages: false,
     };
     vi.spyOn(localChats, "conversations").mockResolvedValue([conversation]);
     useMistyStore.setState({

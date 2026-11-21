@@ -135,6 +135,8 @@ pub(crate) use crate::agents::cursor::{
     __cmd__cursor_companion_bind_task, __cmd__cursor_companion_hit,
     __tauri_command_name_cursor_companion_ask_open, __tauri_command_name_cursor_companion_hit,
     cursor_companion_ask_open, cursor_companion_hit,
+    __cmd__cursor_companion_ask_part, __tauri_command_name_cursor_companion_ask_part,
+    cursor_companion_ask_part,
     __cmd__cursor_companion_capture, __cmd__cursor_companion_capture_region,
     __cmd__cursor_companion_configure, __cmd__cursor_companion_interrupt,
     __cmd__cursor_companion_present, __cmd__cursor_companion_snap,
@@ -187,7 +189,8 @@ pub(crate) use crate::agents::run_control::local_runs::{
     __tauri_command_name_agent_run_receipts, __tauri_command_name_agent_run_start,
     __tauri_command_name_agent_run_steer, agent_run_cancel, agent_run_contexts,
     agent_run_end_proposal, agent_run_follow, agent_run_pause, agent_run_publish,
-    agent_run_receipts, agent_run_start, agent_run_steer,
+    agent_run_receipts, agent_run_start, agent_run_steer, __cmd__agent_run_warm_up,
+    __tauri_command_name_agent_run_warm_up, agent_run_warm_up,
 };
 pub(crate) use crate::agents::run_control::local_tools::{
     __cmd__agent_tool_finish, __cmd__agent_tool_host_ready, __tauri_command_name_agent_tool_finish,
@@ -203,7 +206,8 @@ pub(crate) use crate::agents::run_control::run_ledger::{
     __cmd__agent_run_timeline, __tauri_command_name_agent_run_timeline, agent_run_timeline,
 };
 pub(crate) use crate::agents::run_control::run_notices::{
-    __cmd__agent_run_notify, __tauri_command_name_agent_run_notify, agent_run_notify,
+    __cmd__agent_run_notify, __cmd__chat_message_notify, __tauri_command_name_agent_run_notify,
+    __tauri_command_name_chat_message_notify, agent_run_notify, chat_message_notify,
 };
 pub(crate) use crate::agents::run_control::run_steps::{
     __cmd__agent_run_latest_steps, __cmd__agent_run_steps, __cmd__agent_run_steps_clear,

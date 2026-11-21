@@ -16,6 +16,46 @@ import { runHomeSpace } from "./runSpace";
  * written first: the run can call one the moment it starts.
  */
 export async function startLocalRun(input: AiInvocationRequest): Promise<AiInvocationCreated> {
+  const { account, runId, conversationId, deviceContexts, request, built } = await prepare(input);
+  const { body, sources, requestedKind, permissionMode, collaborationMode } = built;
+  const remembered = { ...request, permissionMode, collaborationMode };
+  await rememberRun(runId, conversationId, remembered, deviceContexts, {
+    account,
+    voice: Boolean(input.idempotencyKey.startsWith("voice-")),
+    parentRunId: input.parentRunId,
+    notebookKey: input.notebookKey,
+  });
+  if (requestedKind || (input.selection && input.surfaceId.startsWith("notes")))
+    await rememberArtifactRequest({
+      runId,
+      account,
+      requestedKind,
+      surfaceId: input.surfaceId,
+      selection: input.selection,
+      context: input.context,
+      sources: sources.map((source) => source.citation),
+    }).catch(() => undefined);
+  await invoke("agent_run_start", { runId, body });
+  return {
+    invocationId: runId,
+    conversationId,
+    state: "running",
+    eventsUrl: followAddress(runId),
+  };
+}
+
+/**
+ * Warms up the engine for a run that is about to start (Tutor's first spoken turn of a session,
+ * while the person is still talking): the same request, built the same way, so the engine's
+ * process is launched as that run would launch it and waits for it (`engines/warm_up.rs`). Nothing
+ * is remembered, since no run starts.
+ */
+export async function warmLocalRun(input: AiInvocationRequest): Promise<void> {
+  const { runId, built } = await prepare(input);
+  await invoke("agent_run_warm_up", { runId, body: built.body });
+}
+
+async function prepare(input: AiInvocationRequest) {
   if (!hasTauriInternals()) throw new Error("Agents run in the Misty app.");
   const account = agentAccountId();
   // Work asked for in a Space (an @mention in its chat, a Lab notebook, a Tutor job there) works
@@ -42,33 +82,6 @@ export async function startLocalRun(input: AiInvocationRequest): Promise<AiInvoc
     conversationId,
     spaceId,
   };
-  const { body, sources, requestedKind, permissionMode, collaborationMode } = await buildRunBody(
-    request,
-    runId,
-    conversationId,
-  );
-  const remembered = { ...request, permissionMode, collaborationMode };
-  await rememberRun(runId, conversationId, remembered, deviceContexts, {
-    account,
-    voice: Boolean(input.idempotencyKey.startsWith("voice-")),
-    parentRunId: input.parentRunId,
-    notebookKey: input.notebookKey,
-  });
-  if (requestedKind || (input.selection && input.surfaceId.startsWith("notes")))
-    await rememberArtifactRequest({
-      runId,
-      account,
-      requestedKind,
-      surfaceId: input.surfaceId,
-      selection: input.selection,
-      context: input.context,
-      sources: sources.map((source) => source.citation),
-    }).catch(() => undefined);
-  await invoke("agent_run_start", { runId, body });
-  return {
-    invocationId: runId,
-    conversationId,
-    state: "running",
-    eventsUrl: followAddress(runId),
-  };
+  const built = await buildRunBody(request, runId, conversationId);
+  return { account, runId, conversationId, deviceContexts, request, built };
 }

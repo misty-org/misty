@@ -61,8 +61,16 @@ pub(crate) fn active_call(id: &str) -> Option<ActiveCall> {
         .cloned()
 }
 
-/// The run as it was started, or Ask with nothing known when nobody can say.
+/// The run as it was started, or Ask with nothing known when nobody can say, with what this device
+/// says now about letting agents delete files.
 pub(crate) async fn facts_of_run(app: &AppHandle, run_id: &str) -> RunFacts {
+    RunFacts {
+        agent_delete: permissions::agent_delete_on(app),
+        ..facts_of_request(app, run_id).await
+    }
+}
+
+async fn facts_of_request(app: &AppHandle, run_id: &str) -> RunFacts {
     // A run on an outside engine is known to its adapter, not to Misty's runtime.
     if let Some(body) = crate::engines::runs::request_of(run_id) {
         return RunFacts::of_request(run_id, &body);

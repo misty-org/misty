@@ -101,6 +101,7 @@
     "jszip": "^3.10.1",
     "katex": "^0.16.47",
     "lib0": "^0.2.120",
+    "livekit-client": "^2.15.7",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.63.0",
     "mammoth": "^1.12.0",

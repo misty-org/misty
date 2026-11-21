@@ -1,5 +1,3 @@
-import type { GlobalImageEditDefinition } from "./image-editor";
-
 export type SpaceRole = "owner" | "member";
 
 export type MessageSpan =
@@ -9,21 +7,3 @@ export type MessageSpan =
   /** A Space role: everyone who holds it, and can read the channel, is mentioned. */
   | { type: "mention"; role_id: string; label: string }
   | { type: "link"; label: string; url: string };
-
-export type BulkLibraryItemAction =
-  | "favorite"
-  | "unfavorite"
-  | "hide"
-  | "unhide"
-  | "trash"
-  | "restore"
-  | "add_to_album"
-  | "remove_from_album"
-  | "add_tags"
-  | "remove_tags"
-  | "set_date"
-  | "clear_date"
-  | "set_location"
-  | "clear_location";
-
-export type LibraryEditDefinition = GlobalImageEditDefinition;

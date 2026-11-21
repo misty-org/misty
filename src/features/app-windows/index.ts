@@ -144,3 +144,5 @@ export {
   windowSpace,
   type SpaceSummary,
 } from "./space-directory/spaceDirectory";
+export { MenuBarSection } from "./settings/MenuBarSection";
+export { TrayVisibility } from "./TrayVisibility";

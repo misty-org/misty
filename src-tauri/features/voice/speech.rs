@@ -323,6 +323,28 @@ pub async fn speech_say(
     }
 }
 
+/// Whether Misty is reading something aloud now, for Tutor's Always On listening, which mustn't
+/// take Misty's own voice for the person's.
+pub fn speaking_now(app: &AppHandle) -> bool {
+    use tauri::Manager;
+    let state = app.state::<SpeechState>();
+    let saying = state.speaking.lock().is_ok_and(|slot| slot.is_some());
+    let reading = state
+        .reading
+        .lock()
+        .is_ok_and(|slot| slot.as_ref().is_some_and(aloud::reading_open));
+    saying || reading
+}
+
+/// Whether what Misty says is heard only in headphones or earbuds, so the microphone can't pick it
+/// up and the person may talk over it. Only macOS says.
+pub fn output_private() -> bool {
+    #[cfg(target_os = "macos")]
+    return core_audio::output_private();
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+
 /// Whether this computer's sound is off (muted, or the volume all the way down), so a spoken
 /// answer would go unheard. Only macOS says; elsewhere it's never muted.
 #[tauri::command]
@@ -344,13 +366,17 @@ pub async fn speech_sound_on(webview: Webview) -> Result<(), String> {
     Ok(())
 }
 
-/// Whether another app is using the microphone, as on a call or in a recording, so Misty keeps
-/// quiet about things nobody asked for just now. Only macOS says.
+/// Whether another app is using the microphone (a call, a recording) or the screen is being
+/// shared, so Misty keeps quiet about things nobody asked for just now. Only macOS says.
 #[tauri::command]
 pub async fn speech_on_call(webview: Webview) -> Result<bool, String> {
     require_person(&webview)?;
     #[cfg(target_os = "macos")]
-    return Ok(core_audio::microphone_busy());
+    return Ok(tokio::task::spawn_blocking(|| {
+        core_audio::microphone_busy() || screen_sharing::shared()
+    })
+    .await
+    .unwrap_or(false));
     #[cfg(not(target_os = "macos"))]
     Ok(false)
 }
@@ -388,105 +414,11 @@ pub async fn speech_copy_answer(webview: Webview, text: String) -> Result<(), St
     .map_err(|_| "Misty couldn't copy the answer.".to_string())?
 }
 
-/// The default sound devices, read straight from Core Audio.
 #[cfg(target_os = "macos")]
-mod core_audio {
-    use std::ffi::c_void;
+mod core_audio;
 
-    #[repr(C)]
-    struct Address {
-        selector: u32,
-        scope: u32,
-        element: u32,
-    }
-
-    #[link(name = "CoreAudio", kind = "framework")]
-    extern "C" {
-        fn AudioObjectGetPropertyData(
-            object: u32,
-            address: *const Address,
-            qualifier_size: u32,
-            qualifier: *const c_void,
-            data_size: *mut u32,
-            data: *mut c_void,
-        ) -> i32;
-        fn AudioObjectSetPropertyData(
-            object: u32,
-            address: *const Address,
-            qualifier_size: u32,
-            qualifier: *const c_void,
-            data_size: u32,
-            data: *const c_void,
-        ) -> i32;
-    }
-
-    const SYSTEM: u32 = 1;
-    const fn code(name: &[u8; 4]) -> u32 {
-        u32::from_be_bytes(*name)
-    }
-    const GLOBAL: u32 = code(b"glob");
-    const OUTPUT: u32 = code(b"outp");
-    const MAIN: u32 = 0;
-
-    fn read<T: Default>(object: u32, selector: u32, scope: u32) -> Option<T> {
-        let address = Address { selector, scope, element: MAIN };
-        let mut value = T::default();
-        let mut size = std::mem::size_of::<T>() as u32;
-        // SAFETY: `value` is a plain value of `size` bytes, written by the call.
-        let status = unsafe {
-            AudioObjectGetPropertyData(
-                object,
-                &address,
-                0,
-                std::ptr::null(),
-                &mut size,
-                (&mut value as *mut T).cast(),
-            )
-        };
-        (status == 0).then_some(value)
-    }
-
-    pub(super) fn output_muted() -> bool {
-        let Some(device) = read::<u32>(SYSTEM, code(b"dOut"), GLOBAL).filter(|id| *id != 0) else {
-            return false;
-        };
-        let muted = read::<u32>(device, code(b"mute"), OUTPUT).is_some_and(|mute| mute != 0);
-        let silent = read::<f32>(device, code(b"volm"), OUTPUT).is_some_and(|volume| volume < 0.01);
-        muted || silent
-    }
-
-    fn write<T>(object: u32, selector: u32, scope: u32, value: T) {
-        let address = Address { selector, scope, element: MAIN };
-        // SAFETY: `value` is a plain value of the size passed, read by the call.
-        unsafe {
-            AudioObjectSetPropertyData(
-                object,
-                &address,
-                0,
-                std::ptr::null(),
-                std::mem::size_of::<T>() as u32,
-                (&value as *const T).cast(),
-            );
-        }
-    }
-
-    pub(super) fn sound_on() {
-        let Some(device) = read::<u32>(SYSTEM, code(b"dOut"), GLOBAL).filter(|id| *id != 0) else {
-            return;
-        };
-        write::<u32>(device, code(b"mute"), OUTPUT, 0);
-        if read::<f32>(device, code(b"volm"), OUTPUT).is_some_and(|volume| volume < 0.05) {
-            write::<f32>(device, code(b"volm"), OUTPUT, 0.5);
-        }
-    }
-
-    pub(super) fn microphone_busy() -> bool {
-        read::<u32>(SYSTEM, code(b"dIn "), GLOBAL)
-            .filter(|id| *id != 0)
-            .and_then(|device| read::<u32>(device, code(b"gone"), GLOBAL))
-            .is_some_and(|running| running != 0)
-    }
-}
+#[cfg(target_os = "macos")]
+mod screen_sharing;
 
 mod aloud;
 pub use aloud::*;

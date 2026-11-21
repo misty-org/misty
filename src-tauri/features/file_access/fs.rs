@@ -74,6 +74,11 @@ pub fn copy_tree(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()>
     let (from, to) = (from.as_ref(), to.as_ref());
     check(from, Access::Read)?;
     check_link(to, Access::Write)?;
+    copy_tree_unchecked(from, to)
+}
+
+/// The copy itself, once the caller has checked both ends (here, or `disk::fs_disk::copy_tree`).
+pub(crate) fn copy_tree_unchecked(from: &Path, to: &Path) -> io::Result<()> {
     #[cfg(target_os = "macos")]
     if clone_tree(from, to).is_ok() {
         return Ok(());

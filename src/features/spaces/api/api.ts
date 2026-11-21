@@ -9,6 +9,7 @@ import { cachedRequest } from "@/api/cache/cached-request";
 import { accountLimitMessages } from "@/api/client/accountLimits";
 import { isSpaceReferenceOnly, isSpaceWriteRequest, setSpaceReferenceOnly } from "./connectivity";
 import { createSpaceConversationsApi } from "./conversations";
+import { createSpacePinsApi } from "./pins";
 import type {
   CreateSpaceRequest,
   CreateSpaceResult,
@@ -21,7 +22,7 @@ import type {
 import { createSpaceMembersApi } from "./members";
 import { createSpaceRolesApi } from "./roles";
 import { createSpaceChatApi } from "./chat";
-import { createSpaceLibraryItemsApi } from "./library-items";
+import { spaceAttachmentsApi } from "./attachments";
 import { fetchProtectedBlob } from "./protected-download";
 import type { SpaceRequestInit } from "./spaceRequestTypes";
 
@@ -203,6 +204,7 @@ export const spacesApi = {
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
   ...createSpaceRolesApi(spaceRequest),
   ...createSpaceConversationsApi(spaceRequest),
+  ...createSpacePinsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
   nodes: (spaceId: string, onCached?: (value: { nodes: SpaceNode[] }) => void) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`, {
@@ -219,5 +221,5 @@ export const spacesApi = {
       body: JSON.stringify({ after }),
       allowWhileReferenceOnly: true,
     }),
-  ...createSpaceLibraryItemsApi(spaceRequest),
+  ...spaceAttachmentsApi,
 };

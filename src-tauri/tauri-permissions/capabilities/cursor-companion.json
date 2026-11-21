@@ -1,6 +1,6 @@
 {
   "identifier": "cursor-companion",
-  "description": "Cursor overlays: presentation, and Misty there taking the pointer to be clicked or handed a file",
+  "description": "Cursor overlays: presentation, Misty there taking the pointer to be clicked or handed a file, and the 3D model card taking it to be turned or have a part asked about",
   "platforms": [
     "macOS",
     "windows"
@@ -12,7 +12,8 @@
     "core:event:default",
     "allow-cursor-companion-snapshot",
     "allow-cursor-companion-hit",
-    "allow-cursor-companion-ask-open"
+    "allow-cursor-companion-ask-open",
+    "allow-cursor-companion-ask-part"
   ],
   "$schema": "../../gen/schemas/desktop-schema.json"
 }

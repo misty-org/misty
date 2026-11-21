@@ -187,29 +187,6 @@ describe("Spaces realtime account lifecycle", () => {
     expect(String(FakeWebSocket.instances[1].url)).toContain("ticket=recovered-ticket");
   });
 
-  it.each(["library.upload.ready", "library.item.updated"])(
-    "announces %s events to the active Library view",
-    async (eventType) => {
-      const listener = vi.fn();
-      apiMocks.realtimeTicket.mockResolvedValue({ ticket: "library-ticket", expires_in: 60 });
-      useSpacesStore.setState({
-        spaces: [spaceFixture({ id: "space" })],
-      });
-      window.addEventListener("misty:space-library-event", listener);
-
-      await useSpacesStore.getState().connectRealtime("active-account");
-      FakeWebSocket.instances[0].open();
-      FakeWebSocket.instances[0].message({
-        type: "event",
-        event: spaceEventFixture({ type: eventType }),
-      });
-      await Promise.resolve();
-
-      expect(listener).toHaveBeenCalledOnce();
-      window.removeEventListener("misty:space-library-event", listener);
-    },
-  );
-
   it.each(["note.created", "note.projection.updated", "note.deleted"])(
     "announces %s events to the active Notes view",
     async (eventType) => {

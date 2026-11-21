@@ -1,7 +1,7 @@
 import type { FormEvent, RefObject, UIEventHandler } from "react";
-import type { SpaceLibraryItem, SpaceMessage, SpaceNode } from "../../api/dto/entities";
+import type { SpaceMessage, SpaceNode } from "../../api/dto/entities";
 
-export type SpaceChatStarter = "mention" | "files" | "library";
+export type SpaceChatStarter = "mention" | "files" | "space";
 
 export interface SpaceChatMessagesProps {
   onRetry?: (message: SpaceMessage) => void;
@@ -15,7 +15,6 @@ export interface SpaceChatMessagesProps {
   editingText: string;
   editSaving: boolean;
   nodes: SpaceNode[];
-  libraryItems: SpaceLibraryItem[];
   spaceId: string;
   endRef: RefObject<HTMLDivElement | null>;
   scrollRef: RefObject<HTMLDivElement | null>;
@@ -33,7 +32,6 @@ export interface SpaceChatMessagesProps {
   onDelete: (message: SpaceMessage) => void;
   onOpenNode: (nodeId: string) => void;
   onError: (message: string) => void;
-  onLibraryItem: (item: SpaceLibraryItem) => void;
   onReload: () => void;
   directRecipient?: { userId: string; name: string };
   onStarter?: (starter: SpaceChatStarter) => void;

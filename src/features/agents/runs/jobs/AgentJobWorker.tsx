@@ -7,6 +7,7 @@ import { startLocalRunWork } from "../../tools";
 import { watchLocalExecutionForKeepAwake } from "./keepAwake";
 import { useLocalExecution } from "../local-execution/localExecution";
 import { isHostWindow, onHostWindow } from "@/features/app-windows";
+import { useAgentTrashReminder } from "../../settings/agentTrashReminder";
 
 /** Whether this window runs the device's agent jobs: the oldest open window does, and the
  * next one takes over when it closes. */
@@ -55,6 +56,8 @@ export function AgentJobWorker() {
     if (!hasTauriInternals() || !host) return;
     return startLocalToolHost();
   }, [host]);
+  // Agent trash never empties itself: after 30 days, one notice a day suggests looking it over.
+  useAgentTrashReminder(host);
   // Sessions it hosts show in the control island.
   return null;
 }

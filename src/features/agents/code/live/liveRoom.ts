@@ -3,7 +3,7 @@ import type { Awareness } from "y-protocols/awareness";
 import * as Y from "yjs";
 import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { personColor } from "../../tutor/personTone";
-import { useShowInLive } from "./liveVisibility";
+import { useCursorTone, useShowInLive } from "./liveVisibility";
 import {
   authorKey,
   mainAuthor,
@@ -197,7 +197,8 @@ async function createRoom(
     ready: Promise.resolve(),
     isReady: () => ready,
   };
-  const color = personColor(me.id);
+  const tone = useCursorTone.getState().value;
+  const color = tone === "auto" ? personColor(me.id) : `var(--color-tone-${tone})`;
   // Left unpublished, others see neither this person's cursor nor their face in the session.
   if (useShowInLive.getState().value)
     live.awareness.setLocalStateField("user", {

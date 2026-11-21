@@ -3,15 +3,15 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
 const readSharedFile = vi.fn();
-const uploadLibraryBlob = vi.fn();
+const saveToDrive = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 vi.mock("@/features/devices/api/native-devices", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   devicesNative: { readSharedFile: (...args: unknown[]) => readSharedFile(...args) },
 }));
-vi.mock("@/features/spaces/api/library-upload", async (importOriginal) => ({
+vi.mock("@/features/spaces/drive/driveFiles", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  uploadLibraryBlob: (...args: unknown[]) => uploadLibraryBlob(...args),
+  saveToDrive: (...args: unknown[]) => saveToDrive(...args),
 }));
 vi.mock("./useAgentsStore", () => ({
   agentsPrepareScopedDocument: vi.fn(async () => ({
@@ -68,15 +68,15 @@ it("keeps folder jobs inside the granted folder", async () => {
   ).toMatchObject({ name: "q3.txt", text: "Revenue grew" });
 });
 
-it("sends a shared file to the conversation's Space Library", async () => {
+it("saves a shared file into the conversation's Space drive", async () => {
   const input = { scopeId: "scope_reports", relativePath: "Q3/report.pdf" };
   readSharedFile.mockResolvedValue(new Uint8Array([1, 2, 3]).buffer);
-  uploadLibraryBlob.mockResolvedValue({ item: { id: "item_1" } });
+  saveToDrive.mockResolvedValue({ id: "drv_1", path: "/report.pdf" });
   expect(
     await runDeviceAgentOperation(job("folder.send", input, "scope_reports", "space_1"), signal),
-  ).toEqual({ name: "report.pdf", size: 3, libraryItemId: "item_1" });
+  ).toEqual({ name: "report.pdf", size: 3, path: "/report.pdf", fileId: "drv_1" });
   expect(readSharedFile).toHaveBeenCalledWith("scope_reports", input, {});
-  expect(uploadLibraryBlob).toHaveBeenCalledWith("space_1", expect.any(Blob), "report.pdf");
+  expect(saveToDrive).toHaveBeenCalledWith("space_1", "/", "report.pdf", expect.any(ArrayBuffer));
 });
 
 it("needs a Space to send a file to", async () => {

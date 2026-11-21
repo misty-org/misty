@@ -33,7 +33,6 @@ export interface SpaceChatMessageActionsOptions {
     text: string,
     fileIds: string[],
     attachmentIds: string[],
-    libraryIds: string[],
     replyToMessageId: string,
     optimisticMessage?: SpaceMessage,
   ) => Promise<SpaceMessage | undefined | void>;
@@ -84,7 +83,6 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
       sender_kind: "person",
       content,
       file_node_ids: [...draft.selectedFileIds],
-      library_item_ids: [...draft.selectedLibraryIds],
       attachments: [...draft.pendingAttachments],
       reactions: [],
       reply_to_message_id: draft.replyToMessageId || undefined,
@@ -111,7 +109,6 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           message.content,
           message.file_node_ids,
           message.attachments?.map((item) => item.id) ?? [],
-          message.library_item_ids ?? [],
           message.reply_to_message_id ?? "",
           nonce,
         );
@@ -124,7 +121,6 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           value,
           message.file_node_ids,
           message.attachments?.map((item) => item.id) ?? [],
-          message.library_item_ids ?? [],
           message.reply_to_message_id ?? "",
           optimistic,
         );

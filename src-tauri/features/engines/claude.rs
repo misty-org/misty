@@ -314,17 +314,34 @@ impl Engine for ClaudeEngine {
             cmd.arg("--add-dir");
             cmd.arg(dir);
         }
+        // A session of Misty's that has had no turn yet is started under its id, not resumed;
+        // its warm-up launch writes no prompt and waits for the turn (`warm_up.rs`).
+        let mut warming = false;
+        let mut preassigned = None;
         if let Some(session_id) = req.session_id.as_deref() {
-            cmd.arg("--resume");
+            if super::warm_up::unborn(session_id) {
+                warming = super::warm_up::take_warming(session_id);
+                if !warming {
+                    super::warm_up::born(session_id);
+                }
+                cmd.arg("--session-id");
+                preassigned = Some(session_id.to_string());
+            } else {
+                cmd.arg("--resume");
+            }
             cmd.arg(session_id);
         }
-        let stdin_payload = images::claude_stdin_message(&req.prompt, &req.images, &req.workspace)?;
+        let stdin_payload = if warming {
+            None
+        } else {
+            Some(images::claude_stdin_message(&req.prompt, &req.images, &req.workspace)?)
+        };
         Ok(BuiltCommand {
             command: cmd,
-            stdin_payload: Some(stdin_payload),
+            stdin_payload,
             keep_stdin_open: true,
             cleanup_files,
-            preassigned_session_id: None,
+            preassigned_session_id: preassigned,
         })
     }
 

@@ -1,6 +1,6 @@
 export { DictationController } from "./DictationController";
 export { DictationPill } from "./pill/DictationPill";
-export { CaptureBarStatus, CaptureMenu, CapturePanel, transcribeLibraryFile } from "./capture";
+export { CaptureBarStatus, CaptureMenu, CapturePanel, transcribeAudioFile } from "./capture";
 
 // Public surface used by other features.
 export { VoiceSection } from "./settings/VoiceSection";
@@ -16,6 +16,7 @@ export {
   soundOn,
   openReading,
   recognitionLanguage,
+  recognitionLanguages,
   recognizeAudio,
   recognizeAudioWords,
   recognizeFile,

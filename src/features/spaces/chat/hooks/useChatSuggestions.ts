@@ -1,18 +1,13 @@
-import { spacesApi } from "../../api/api";
-import type { SpaceLibraryItem, SpaceMember } from "../../api/dto/entities";
+import type { SpaceMember } from "../../api/dto/entities";
 import type { ChatComposerSuggestion } from "../../api/dto/space-chat";
 import type { MentionableAgent } from "../useSpaceMessageSpansStore";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const MAX_SUGGESTIONS = 24;
 
 /**
- * The `@` autocomplete: people, then the roles the person may mention, then their own agents,
- * then unattached Library items. Mentioning one of your agents runs it on your computer; nobody
- * else's agents are offered.
- *
- * Library items are only offered while there is room left in the attachment
- * budget, so the list never suggests something that cannot be added.
+ * The `@` autocomplete: people, then the roles the person may mention, then their own agents.
+ * Mentioning one of your agents runs it on your computer; nobody else's agents are offered.
  */
 export function useChatSuggestions(options: {
   spaceId: string;
@@ -21,35 +16,11 @@ export function useChatSuggestions(options: {
   /** The roles the person may @mention here. */
   roles?: readonly { id: string; name: string; color: string }[];
   currentUserId: string | undefined;
-  canBrowseLibrary: boolean;
-  canReadLibrary: boolean;
-  selectedLibraryIds: string[];
-  attachmentSlotsLeft: number;
 }) {
-  const { members, currentUserId, canBrowseLibrary, selectedLibraryIds } = options;
-  const [libraryItems, setLibraryItems] = useState<SpaceLibraryItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { members, currentUserId } = options;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-
-  useEffect(() => {
-    if (!options.canReadLibrary) {
-      setLibraryItems([]);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    void spacesApi
-      .libraryItems(options.spaceId)
-      .then((result) => setLibraryItems(result.items))
-      .catch((reason: unknown) => {
-        setLibraryItems([]);
-        setError(reason instanceof Error ? reason.message : "Files could not be loaded.");
-      })
-      .finally(() => setLoading(false));
-  }, [options.canReadLibrary, options.spaceId]);
 
   const suggestions = useMemo<ChatComposerSuggestion[]>(() => {
     const needle = query.trim().toLocaleLowerCase();
@@ -74,41 +45,15 @@ export function useChatSuggestions(options: {
       detail: "Role",
       color: role.color,
     }));
-    const library: ChatComposerSuggestion[] =
-      canBrowseLibrary && options.attachmentSlotsLeft > 0
-        ? libraryItems
-            .filter((item) => !selectedLibraryIds.includes(item.id))
-            .map((item) => ({
-              kind: "library",
-              id: item.id,
-              label: item.display_name,
-              detail: item.file.original_filename,
-              item,
-            }))
-        : [];
-    return [...people, ...roles, ...agents, ...library]
+    return [...people, ...roles, ...agents]
       .filter(
         (item) => !needle || `${item.label} ${item.detail}`.toLocaleLowerCase().includes(needle),
       )
       .slice(0, MAX_SUGGESTIONS);
-  }, [
-    canBrowseLibrary,
-    currentUserId,
-    libraryItems,
-    members,
-    options.agents,
-    options.roles,
-    options.attachmentSlotsLeft,
-    query,
-    selectedLibraryIds,
-  ]);
+  }, [currentUserId, members, options.agents, options.roles, query]);
 
   return {
-    libraryItems,
-    setLibraryItems,
     suggestions,
-    loading,
-    error,
     open,
     setOpen,
     query,

@@ -10,7 +10,6 @@ fn main() {
     expose_public_app_configuration();
     build_builtin_workers();
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
-        println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
         for framework in [
             "AppKit",
             "AVFoundation",

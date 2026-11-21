@@ -20,6 +20,7 @@ export function mergeVoiceTurn(
     content: saved.prompt,
     state: "completed",
     createdAt,
+    ...((saved.seen ?? previous?.tutorSeen) ? { tutorSeen: saved.seen ?? previous?.tutorSeen } : {}),
   };
   const messages = conversation.messages
     .filter((m) => m.id !== assistantId)
@@ -44,10 +45,19 @@ export function mergeVoiceTurn(
   };
 }
 
-/** The last turns of a chat as JSON data for the voice: what was asked, answered and done. */
+/**
+ * The last turns of a chat as JSON data for the voice: what was asked, answered and done, and what
+ * was on screen each time, so a new session can still say what was on screen hours ago.
+ */
 export function voiceContext(conversation: GlobalAiConversation | undefined): string {
   if (!conversation) return "[]";
-  const rows: Array<{ user: string; assistant: string; state: string; invocation_id: string }> = [];
+  const rows: Array<{
+    user: string;
+    assistant: string;
+    state: string;
+    invocation_id: string;
+    on_screen?: string;
+  }> = [];
   for (const message of conversation.messages) {
     if (message.role === "user")
       rows.push({
@@ -55,6 +65,7 @@ export function voiceContext(conversation: GlobalAiConversation | undefined): st
         assistant: "",
         state: message.state ?? "",
         invocation_id: "",
+        ...(message.tutorSeen ? { on_screen: message.tutorSeen.slice(0, 400) } : {}),
       });
     else if (rows.length) {
       const row = rows[rows.length - 1]!;

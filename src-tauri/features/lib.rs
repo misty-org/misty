@@ -13,14 +13,13 @@ pub mod computer_use;
 pub mod devices;
 pub mod engine_config;
 pub mod engines;
+pub mod files;
 pub mod known_names;
 #[cfg(desktop)]
 pub mod pets;
 pub mod project;
 pub mod spaces_drive;
 pub mod spaces_folders;
-#[cfg(desktop)]
-pub mod sync;
 mod voice;
 
 pub fn run() {
@@ -77,9 +76,6 @@ pub fn run() {
     let _ = rustls::crypto::ring::default_provider().install_default();
     app::plugins::register(tauri::Builder::default())
         .setup(app::setup::setup)
-        .on_page_load(|webview, payload| {
-            agents::run_control::sessions::on_renderer_load(webview, payload);
-        })
         .invoke_handler(app::handlers::invoke_handler())
         .build(context)
         .expect("failed to build Misty Tauri app")

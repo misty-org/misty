@@ -9,21 +9,24 @@ import {
   Tooltip,
   useNotice,
 } from "@misty/ui";
+import { useMyPresence } from "@/features/direct";
 import { preloadSettingsWorkspace } from "@/features/settings";
 import { AccountNavButton } from "./NavRail";
 import { AccountMenu } from "./AccountMenu";
+import { StatusMenu, useMyCustomStatus } from "./StatusMenu";
 
 // As wide as the name needs, shrinking to truncate a long one. The padding keeps the avatar and the
 // name clear of the edges of the hover wash.
 const rowButtonClass = [
-  "flex h-8 min-w-0 shrink items-center gap-2 rounded-lg border-0 bg-transparent py-0 pr-2.5 pl-1",
+  "flex h-auto min-h-8 min-w-0 shrink items-center gap-2 rounded-lg border-0 bg-transparent py-0 pr-2.5 pl-1",
   "text-sm font-medium hover:bg-control-hover",
 ].join(" ");
 
 /**
- * The sidebar's closing row, inside its panel: the signed-in account, then Agents and Settings as
- * quiet buttons. When the session expires the account is a Sign in button, and a notice says why:
- * nothing on this computer is removed, and signing in brings the account back.
+ * The sidebar's closing row, inside its panel: the signed-in account (their face with their status,
+ * and their custom status under the name), then Status and Settings as quiet buttons. When the
+ * session expires the account is a Sign in button, and a notice says why: nothing on this computer
+ * is removed, and signing in brings the account back.
  */
 export function AccountIsland(props: {
   open: boolean;
@@ -37,6 +40,8 @@ export function AccountIsland(props: {
   onSignIn: (again: boolean) => void;
 }) {
   const expired = Boolean(props.sessionExpired);
+  const presence = useMyPresence();
+  const customStatus = useMyCustomStatus();
   const [noticeDismissed, setNoticeDismissed] = useState(false);
   useEffect(() => {
     if (!expired) setNoticeDismissed(false);
@@ -81,6 +86,8 @@ export function AccountIsland(props: {
               <AccountNavButton
                 open={props.open}
                 showAccountName
+                presence={presence}
+                line={customStatus || undefined}
                 avatarClassName="size-6"
                 className={rowButtonClass}
               />
@@ -92,9 +99,14 @@ export function AccountIsland(props: {
           />
         </DropdownMenu>
       )}
+      {expired ? null : (
+        <div className="ml-auto flex">
+          <StatusMenu />
+        </div>
+      )}
       <IconButton
         label="Settings"
-        className="ml-auto"
+        className={expired ? "ml-auto" : undefined}
         aria-pressed={props.settingsOpen}
         onPointerEnter={() => void preloadSettingsWorkspace().catch(() => undefined)}
         onFocus={() => void preloadSettingsWorkspace().catch(() => undefined)}

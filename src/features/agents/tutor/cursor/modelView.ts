@@ -7,8 +7,9 @@ import type { OrbitControls as OrbitControlsType } from "three/addons/controls/O
  * A drawing's 3D model (surface "model"), drawn with three.js, which loads with the first model.
  * Parts fly in as they arrive (for a spoken answer, as the voice begins each part's sentence),
  * every part has a dark outline like a sketch, and the part being talked about glows. Each named
- * part keeps its name pinned beside it. Over the screen the model turns slowly on its own, since
- * the overlay can't be touched; in the chat it can be dragged around.
+ * part keeps its name pinned beside it. It turns slowly on its own until it's dragged around,
+ * over the screen (the overlay takes the pointer over the model's card) and in the chat alike, and
+ * with `onPick` a click on a part says which part it was.
  */
 export interface ModelView {
   /** The parts to show now, and the one being talked about. */
@@ -35,7 +36,14 @@ const radians = (turn: Vector3 | undefined): Vector3 =>
 
 export async function createModelView(
   container: HTMLElement,
-  { draggable }: { draggable: boolean },
+  {
+    draggable,
+    onPick,
+  }: {
+    draggable: boolean;
+    /** A part clicked (pressed and let go without dragging), with its label or its id. */
+    onPick?: (part: SketchElement) => void;
+  },
 ): Promise<ModelView> {
   const THREE: Three = await import("three");
   const width = () => Math.max(1, container.clientWidth);
@@ -71,7 +79,7 @@ export async function createModelView(
     controls.addEventListener("start", () => (touched = true));
   }
 
-  const shown = new Map<string, Shown>();
+  const shown = new Map<string, Shown & { part: SketchElement }>();
   let current: string | undefined;
   let fitted = 0;
 
@@ -220,6 +228,36 @@ export async function createModelView(
   };
   frame = requestAnimationFrame(tick);
 
+  // A press that comes up where it went down, not a drag, picks the part under it.
+  const pointer = new THREE.Vector2();
+  const ray = new THREE.Raycaster();
+  let pressed: { x: number; y: number } | undefined;
+  const press = (event: PointerEvent) => {
+    pressed = { x: event.clientX, y: event.clientY };
+  };
+  const release = (event: PointerEvent) => {
+    const from = pressed;
+    pressed = undefined;
+    if (!onPick || !from || Math.hypot(event.clientX - from.x, event.clientY - from.y) > 4) return;
+    const box = renderer.domElement.getBoundingClientRect();
+    pointer.set(
+      ((event.clientX - box.left) / box.width) * 2 - 1,
+      -((event.clientY - box.top) / box.height) * 2 + 1,
+    );
+    ray.setFromCamera(pointer, camera);
+    const [hit] = ray.intersectObject(model, true);
+    if (!hit) return;
+    for (const entry of shown.values()) {
+      let object: ThreeModule.Object3D | null = hit.object;
+      while (object && object !== entry.object) object = object.parent;
+      if (object) return onPick(entry.part);
+    }
+  };
+  if (onPick) {
+    renderer.domElement.addEventListener("pointerdown", press);
+    renderer.domElement.addEventListener("pointerup", release);
+  }
+
   const resized = new ResizeObserver(() => {
     renderer.setSize(width(), height(), false);
     camera.aspect = width() / height();
@@ -237,12 +275,15 @@ export async function createModelView(
         part.label?.remove();
         shown.delete(id);
       }
-      for (const part of parts) if (!shown.has(part.id)) shown.set(part.id, build(part));
+      for (const part of parts)
+        if (!shown.has(part.id)) shown.set(part.id, { ...build(part), part });
       fit();
     },
     dispose() {
       cancelAnimationFrame(frame);
       resized.disconnect();
+      renderer.domElement.removeEventListener("pointerdown", press);
+      renderer.domElement.removeEventListener("pointerup", release);
       controls?.dispose();
       model.traverse((object) => {
         const mesh = object as ThreeModule.Mesh;

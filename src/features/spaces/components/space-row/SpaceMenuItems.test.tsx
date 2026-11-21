@@ -49,7 +49,11 @@ it("lists the person's own Space first in the switcher", () => {
   spaces.splice(0, spaces.length, team, theirs, own);
   open(<SpaceMenuItems space={team} onDialog={vi.fn()} onCreate={vi.fn()} />);
   // Each row's text is its avatar's initials, then its name.
-  const rows = screen.getAllByRole("menuitemcheckbox").map((item) => item.textContent ?? "");
+  // The Space rows come first; the menu's own check items (Mute notifications) follow them.
+  const rows = screen
+    .getAllByRole("menuitemcheckbox")
+    .map((item) => item.textContent ?? "")
+    .slice(0, 3);
   expect(rows.map((text, index) => text.endsWith(["Personal", "Team", "Theirs"][index]!))).toEqual([
     true,
     true,

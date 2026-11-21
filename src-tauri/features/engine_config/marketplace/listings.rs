@@ -105,7 +105,11 @@ fn codebuddy_catalogs() -> Vec<Value> {
             .as_str()
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| plugins.join("marketplaces").join(&marketplace));
-        let Some(catalog) = read_json(&folder.join(".claude-plugin").join("marketplace.json"))
+        // CodeBuddy keeps the catalog in `.codebuddy-plugin`; one copied from Claude Code's form
+        // keeps `.claude-plugin`.
+        let Some(catalog) = [".codebuddy-plugin", ".claude-plugin"]
+            .iter()
+            .find_map(|dir| read_json(&folder.join(dir).join("marketplace.json")))
         else {
             continue;
         };

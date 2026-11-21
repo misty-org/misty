@@ -1,8 +1,9 @@
-import { FolderOpen, HardDrive, LogOut, Pencil, Plus, Trash2, UserPlus, UsersRound } from "lucide-react";
+import { BellOff, FolderOpen, HardDrive, LogOut, Pencil, Plus, Trash2, UserPlus, UsersRound } from "lucide-react";
 import type { Space } from "../../api/dto/entities";
 import { switchSpaceWindow } from "@/features/app-windows";
 import { DropdownMenuSeparator, MenuCheckItem, MenuItem, notify } from "@misty/ui";
 import { driveNative } from "../../drive/driveNative";
+import { setMuted, useMessageNotices } from "@/shared/lib/messageNotices";
 import {
   canManageSpaceLifecycle,
   preferredDefaultSpace,
@@ -19,13 +20,28 @@ import type { SpaceDialog } from "./SpaceDialogs";
  */
 export function SpaceMenuItems(props: {
   space: Space;
+  /**
+   * The sidebar's side: Personal lists only the person's own Space, Spaces only the shared ones.
+   * Without it, every Space, the person's own first.
+   */
+  place?: "personal" | "spaces";
   onDialog: (dialog: SpaceDialog) => void;
   onCreate: () => void;
 }) {
   const { space, onDialog } = props;
+  const place = props.place;
   const spaces = useSpacesStore((state) => state.spaces);
   const personal = preferredDefaultSpace(spaces);
-  const ordered = personal ? [personal, ...spaces.filter((item) => item !== personal)] : spaces;
+  const ordered =
+    place === "personal"
+      ? personal
+        ? [personal]
+        : []
+      : place === "spaces"
+        ? spaces.filter((item) => !item.is_default)
+        : personal
+          ? [personal, ...spaces.filter((item) => item !== personal)]
+          : spaces;
   const later = (run: () => void) => () => window.setTimeout(run, 0);
   const spaceList = (
     <>
@@ -47,7 +63,7 @@ export function SpaceMenuItems(props: {
                 fallbackClassName="text-3xs font-semibold"
               />
             }
-            label={spaceNavigationName(item)}
+            label={isPersonal && place ? "Personal" : spaceNavigationName(item)}
           />
         );
       })}
@@ -57,8 +73,8 @@ export function SpaceMenuItems(props: {
     <>
       {spaceList}
       <MenuItem icon={<Plus />} label="New Space" onSelect={later(props.onCreate)} />
-      {/* Only the owner can invite, so the menu offers it to no one else. */}
-      {space.role === "owner" && (
+      {/* Only the owner can invite, so the menu offers it to no one else; Personal is private. */}
+      {space.role === "owner" && !space.is_default && (
         <>
           <DropdownMenuSeparator />
           <MenuItem
@@ -84,6 +100,7 @@ export function SpaceSettingsItems(props: {
 }) {
   const { space, onDialog } = props;
   const isOwner = space.role === "owner";
+  const muted = useMessageNotices((state) => state.value.muted.includes(space.id));
   const later = (run: () => void) => () => window.setTimeout(run, 0);
   return (
     <>
@@ -102,6 +119,12 @@ export function SpaceSettingsItems(props: {
             .reveal(space.id)
             .catch(() => notify({ message: "The drive couldn't be shown. Try again.", tone: "error" }))
         }
+      />
+      <MenuCheckItem
+        icon={<BellOff />}
+        label="Mute notifications"
+        checked={muted}
+        onSelect={() => setMuted(space.id, !muted)}
       />
       {isOwner && canManageSpaceLifecycle(space, "rename") && (
         <MenuItem

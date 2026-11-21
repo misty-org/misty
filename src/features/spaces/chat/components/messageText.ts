@@ -27,7 +27,6 @@ export function hasAnyAttachment(message: SpaceMessage | undefined) {
   return Boolean(
     message &&
     (message.file_node_ids.length > 0 ||
-      (message.library_item_ids?.length ?? 0) > 0 ||
       (message.attachments?.length ?? 0) > 0),
   );
 }

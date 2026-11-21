@@ -93,17 +93,15 @@ const send = routedTool("change", async (request, space) => {
   let conversationId = "";
   if (audience === "private") {
     if (!recipient) throw refuse("a private message requires one resolved recipient");
-    // Opening a DM returns the same one every time, so a failure here changes nothing worth doubting.
-    const direct = await readRoute<{ id: string }>(
-      request,
-      spacePath(space.id, "/conversations/dm"),
-      "POST",
-      { user_id: recipient.user_id },
-    );
+    // DMs are the account's, each a hidden Space of its own, and only friends have one. Opening it
+    // returns the same one every time, so a failure here changes nothing worth doubting.
+    const direct = await readRoute<{ id: string }>(request, "/dms", "POST", {
+      user_id: recipient.user_id,
+    });
     conversationId = direct.id;
   }
   const path = conversationId
-    ? spacePath(space.id, `/conversations/${segment(conversationId)}/messages`)
+    ? spacePath(conversationId, "/messages")
     : spacePath(space.id, "/messages");
   const sent = await writeRoute<{ message: SpaceMessage }>(request, path, "POST", {
     content: messageSpans(message, recipient),

@@ -7,8 +7,8 @@ import { SpacePageLoadingPlaceholder } from "../components/SpacePageLoadingPlace
 import { useSpacesStore } from "../list/useSpacesStore";
 
 async function loadFiles() {
-  const { SpaceLibrary } = await import("@/features/spaces/library/SpaceLibrary");
-  return { default: SpaceLibrary };
+  const { FilesPage } = await import("../file-manager/FilesPage");
+  return { default: FilesPage };
 }
 const Files = lazy(loadFiles);
 async function loadChat() {
@@ -135,7 +135,7 @@ export function SpaceSectionView(props: {
           skeleton holds its place, so it never flashes blank. */}
       <Suspense fallback={<SpacePageLoadingPlaceholder shape={shape} />}>
         {section === "files" ? (
-          <Files spaceId={spaceId} workspaceTabId={props.workspaceTabId} />
+          <Files />
         ) : section === "lab" ? (
           <Lab spaceId={spaceId} />
         ) : section === "explore" ? (

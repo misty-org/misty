@@ -29,6 +29,7 @@ export const settingsSections = [
   "privacy",
   "server",
   "drive",
+  "menu-bar",
   "updates",
   "advanced",
   "fonts",

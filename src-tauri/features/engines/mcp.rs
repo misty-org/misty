@@ -41,9 +41,11 @@ const CATALOG: &str = include_str!("../agents/runs/local_prompt/catalog.json");
 /// The families of tools that work on a Space. An outside engine brings its own tools for files
 /// on disk, the shell and the web; these are what only Misty has. `integration.` is the person's
 /// connected apps (`agents/connected_apps`), signed in once in Misty for every engine.
-const SPACE_TOOLS: [&str; 8] = [
+const SPACE_TOOLS: [&str; 9] = [
     "space.",
     "file.",
+    // The person's own disk, behind the disk grant (`files/agent_tools.rs`).
+    "files.",
     "thread.",
     "message.",
     "media.",
@@ -180,6 +182,9 @@ impl Caller {
         if crate::apps::program::any_offered() {
             base = format!("{base} {APP_PROGRAM_INSTRUCTIONS}");
         }
+        if crate::files::agent_paths::tools::disk_on() {
+            base = format!("{base} {}", crate::files::agent_paths::tools::INSTRUCTIONS);
+        }
         if self.computer() {
             format!("{base} {}", crate::computer_use::tools::INSTRUCTIONS)
         } else {
@@ -300,7 +305,7 @@ project goes and confirm it; until then, carry on in this chat and don't move an
             }),
         };
     }
-    let offered = caller.offers(&json!({ "name": name }));
+    let offered = caller.offers(&json!({ "name": name })) && files_offered(app, name);
     let found = offered
         .then(|| misty_call(name, params["arguments"].clone()))
         .flatten();
@@ -389,7 +394,7 @@ async fn serve(AxumState(app): AxumState<AppHandle>, headers: HeaderMap, body: B
         "tools/list" => {
             let mut tools: Vec<Value> = space_tools()
                 .iter()
-                .filter(|tool| caller.offers(tool))
+                .filter(|tool| caller.offers(tool) && files_offered(&app, tool["name"].as_str().unwrap_or("")))
                 .cloned()
                 .collect();
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]

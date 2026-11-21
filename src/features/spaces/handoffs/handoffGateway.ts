@@ -49,10 +49,8 @@ export const handoffGateway = {
     return (await notesApi.get(spaceId, docId)).markdown ?? "";
   },
   /** Sends the text as the person's direct message to one member, marked as a handoff. */
-  async sendHandoff(spaceId: string, userId: string, text: string): Promise<void> {
-    const conversation = await spacesApi.openDirectMessage(spaceId, userId);
-    await spacesApi.sendConversationMessage(spaceId, conversation.id, [
-      { type: "text", text: handoffBody(text) },
-    ]);
+  async sendHandoff(_spaceId: string, userId: string, text: string): Promise<void> {
+    const dm = await spacesApi.openDirectMessage(userId);
+    await spacesApi.sendMessage(dm.id, [{ type: "text", text: handoffBody(text) }]);
   },
 };

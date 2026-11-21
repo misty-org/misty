@@ -8,6 +8,7 @@ import { useShortcutHandler } from "@/features/shortcuts";
 import { ShortcutRuntime } from "../ShortcutRuntime";
 import { PetRuntime } from "@/features/pets";
 import { RunNotifier } from "@/features/agents";
+import { TrayVisibility } from "@/features/app-windows";
 import { useAppZoom } from "@/shared/hooks/useAppZoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { platform as osPlatform } from "@/shared/platform/os";
@@ -61,6 +62,7 @@ export function RootLayout(props: {
         <ShortcutRuntime />
         <PetRuntime />
         <RunNotifier />
+        <TrayVisibility />
         <RenderErrorBoundary>
           <AuthenticatedTreeOutlet />
         </RenderErrorBoundary>

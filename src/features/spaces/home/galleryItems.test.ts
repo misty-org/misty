@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SpaceLibraryItem } from "@/features/spaces/api/dto/entities";
-import { chatItem, editedLabel, libraryKind } from "./galleryItems";
+import { chatItem, editedLabel } from "./galleryItems";
 
 describe("Space gallery", () => {
   it("lists chats as one more kind, named after who they're with", () => {
@@ -22,15 +21,6 @@ describe("Space gallery", () => {
     );
     expect(chat).toMatchObject({ kind: "chat", title: "Ada", people: ["Ada"] });
     expect(chat.href).toBe("/spaces/s1/social/misty?conversation=c1");
-  });
-  it("puts pictures and videos under Images and the rest under Files", () => {
-    const file = (name: string) =>
-      ({
-        file: { original_filename: name, intrinsic_metadata: {} },
-      }) as unknown as SpaceLibraryItem;
-    expect(libraryKind(file("venue.jpg"))).toBe("image");
-    expect(libraryKind(file("tour.mp4"))).toBe("image");
-    expect(libraryKind(file("budget.csv"))).toBe("file");
   });
   it("says when something was edited", () => {
     const now = Date.parse("2026-10-16T12:00:00Z");

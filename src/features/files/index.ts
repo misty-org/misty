@@ -9,4 +9,10 @@ export {
   type MistyPickerSource,
 } from "./picker";
 export { EmbeddedUniversalPreview } from "./preview/EmbeddedUniversalPreview";
-export { libraryPicker, type LibraryPickerProps } from "./picker/LibraryPickerSeam";
+export {
+  drivePicker,
+  type DrivePickerProps,
+  type PickedDriveFile,
+} from "./picker/DrivePickerSeam";
+// The person's whole disk behind the disk grant (`src-tauri/features/files/`), for the Files page.
+export * from "./api/disk";

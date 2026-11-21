@@ -192,7 +192,15 @@ it("restores a pending review and keeps it bound to its saved conversation", asy
     },
     { ...base, id: "other", messages: [] },
   ] as GlobalAiConversation[];
-  const request = vi.spyOn(localChats, "conversations").mockResolvedValue(conversations);
+  const request = vi
+    .spyOn(localChats, "conversations")
+    .mockResolvedValue(
+      conversations.map((item) => ({
+        ...item,
+        messageBeforeSeq: undefined,
+        hasOlderMessages: false,
+      })),
+    );
   useMistyStore.setState({
     accountId: "owner",
     activeConversationId: "files",

@@ -140,8 +140,6 @@ describe("SettingsWorkspace", () => {
       "Account",
       "App",
       "Pages",
-      "Agents",
-      "Engines",
     ]);
     const entries = [...container.querySelectorAll("[data-settings-nav-entry]")];
     expect(entries.map((entry) => entry.getAttribute("data-settings-nav-entry"))).toEqual(PAGES);

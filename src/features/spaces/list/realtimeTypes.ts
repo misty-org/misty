@@ -1,14 +1,14 @@
 import type { SpaceEvent } from "../api/dto/entities";
 import type { MemberAgentStatus } from "./memberAgents";
 
-/** Where in Misty a member is: the Studio, or the Lab (with the notebook's doc id). */
-export type PresencePlace = "studio" | "lab";
+/** Where in Misty a member is: the Studio, the Lab (with the notebook's doc id), or an app (its id). */
+export type PresencePlace = "studio" | "lab" | "app";
 
 export type SpacePresenceViewer = {
   user_id: string;
   active: boolean;
   place?: PresencePlace;
-  /** The Lab notebook they have open, when `place` is "lab". */
+  /** The Lab notebook they have open when `place` is "lab"; the app's id when it is "app". */
   item_id?: string;
 };
 

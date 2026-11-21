@@ -47,7 +47,7 @@ const pages: { label: string; icon: LucideIcon; route(base: string): string; spa
   { label: "Code", icon: CodeXml, route: () => "/agents?view=code" },
   { label: "Lab", icon: FlaskConical, route: (base) => `${base}/lab`, space: true },
   { label: "Chat", icon: MessagesSquare, route: (base) => `${base}/chat`, space: true },
-  { label: "Files", icon: spaceIcons.files, route: (base) => `${base}/files`, space: true },
+  { label: "Files", icon: spaceIcons.files, route: () => "/agents?view=files" },
 ];
 
 /** How the order weighs a kind's match against the others'. */
@@ -86,7 +86,7 @@ interface SearchResults {
 
 /**
  * Everything ⌘K search can find, for what was typed: the person's chats (by their text too),
- * agents, the Space's messages, notebooks and files, the lessons,
+ * agents, the Space's chats and messages, notebooks, the lessons,
  * apps to connect, settings, commands and pages. What lives on this computer is matched here;
  * Space content is searched by the server; engines' own histories by native code.
  */
@@ -103,7 +103,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
   const lessons = useLessonStore((state) => state.lessons);
   const tutorJobs = useTutorStore((state) => state.jobs);
   const notebooks = useTutorStore((state) => state.notebooks);
-  const gallery = useSpaceGallery(spaceId, user?.id ?? "", false);
+  const gallery = useSpaceGallery(spaceId, user?.id ?? "");
   const commands = useCommands();
   const uses = useSearchUses((state) => state.uses);
 

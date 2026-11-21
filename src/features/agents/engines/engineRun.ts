@@ -1,6 +1,7 @@
 import { agentAccountId } from "../personal/agentAccount";
 import { desktopDeviceGrants } from "../personal/deviceGrants";
 import { aiSurfaceApi, subscribeToAiInvocation } from "../runs/invocations/api";
+import { warmLocalRun } from "../runs/local-run/startRun";
 import type { AiInvocationRequest } from "../runs/invocations/invocationTypes";
 import { followAddress } from "../runs/local-run/localRunParts";
 import { defaultEngineAgent, resolveDefaultEngine } from "./defaultEngine";
@@ -63,8 +64,25 @@ export async function defaultEngineId(): Promise<string> {
 
 /** Starts the work and follows it to its end. Resolves once it has ended, however it ended. */
 export async function runOnEngine(input: EngineRunInput): Promise<EngineRunResult> {
+  const created = await aiSurfaceApi.createInvocation(await engineRequest(input));
+  input.onStarted?.(created.invocationId);
+  return followEngineRun(created.invocationId, input);
+}
+
+/**
+ * Gets the engine ready for a run that is about to start on `input.session`, before its prompt is
+ * known: Tutor calls it as the talk keys go down on a session with no turn yet, so the engine's
+ * start-up happens while the person talks (`engines/warm_up.rs`). Only the session and what
+ * decides how the engine is launched count; `key` names the warm-up. Resolves once it's ready, or
+ * once it's clear there is nothing to warm.
+ */
+export async function warmEngine(input: Omit<EngineRunInput, "prompt">): Promise<void> {
+  await warmLocalRun(await engineRequest({ ...input, prompt: "" }));
+}
+
+async function engineRequest(input: EngineRunInput): Promise<AiInvocationRequest> {
   const engineId = await defaultEngineId();
-  const created = await aiSurfaceApi.createInvocation({
+  return {
     mode: input.companion ? "companion" : "quick",
     surfaceId: "global",
     trigger: "message",
@@ -87,9 +105,7 @@ export async function runOnEngine(input: EngineRunInput): Promise<EngineRunResul
     deviceContexts: await desktopDeviceGrants().catch(() => []),
     idempotencyKey: `misty:${input.key}:${agentAccountId()}`,
     ...input.companion,
-  });
-  input.onStarted?.(created.invocationId);
-  return followEngineRun(created.invocationId, input);
+  };
 }
 
 /** Follows a run already started, as after a restart, to its end. */

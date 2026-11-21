@@ -10,7 +10,7 @@ import {
 import { onlyFields, text } from "./args";
 import { namedSpace, type SpaceRow } from "./routing";
 
-const DELETE_KINDS = ["thread", "library_item", "shared_file"] as const;
+const DELETE_KINDS = ["thread", "shared_file"] as const;
 const RENAME_KINDS = ["thread"] as const;
 
 const threadPath = (space: SpaceRow, id: string) =>
@@ -45,25 +45,16 @@ async function findDoomed(
       remove: () => writeRoute(request, threadPath(space, id), "DELETE"),
     };
   }
-  if (kind === "shared_file") {
-    const { nodes } = await readRoute<{ nodes: { id: string; display_name: string }[] }>(
-      request,
-      spacePath(space.id, "/nodes"),
-    );
-    const node = nodes.find((candidate) => candidate.id === id);
-    if (!node) return undefined;
-    return {
-      spaceId: space.id,
-      title: node.display_name,
-      remove: () => writeRoute(request, spacePath(space.id, `/nodes/${segment(id)}`), "DELETE"),
-    };
-  }
-  const path = spacePath(space.id, `/library/items/${segment(id)}`);
-  const item = await readRoute<{ display_name: string }>(request, path);
+  const { nodes } = await readRoute<{ nodes: { id: string; display_name: string }[] }>(
+    request,
+    spacePath(space.id, "/nodes"),
+  );
+  const node = nodes.find((candidate) => candidate.id === id);
+  if (!node) return undefined;
   return {
     spaceId: space.id,
-    title: item.display_name,
-    remove: () => writeRoute(request, `${path}/trash`, "POST"),
+    title: node.display_name,
+    remove: () => writeRoute(request, spacePath(space.id, `/nodes/${segment(id)}`), "DELETE"),
   };
 }
 

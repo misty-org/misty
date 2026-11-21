@@ -98,40 +98,6 @@ async function chat(reference: AiContextReference, spaceId: string): Promise<Res
   };
 }
 
-async function libraryItem(
-  reference: AiContextReference,
-  spaceId: string,
-): Promise<ResolvedSource> {
-  const item = await apiRequest<{
-    id: string;
-    display_name: string;
-    caption: string;
-    tags: string[];
-    version?: unknown;
-    file?: { original_filename?: string; intrinsic_metadata?: unknown };
-  }>(spacePath(spaceId, `/library/items/${encodeURIComponent(reference.id)}`));
-  const content = [
-    item.display_name,
-    `Caption: ${item.caption ?? ""}`,
-    `Tags: ${(item.tags ?? []).join(", ")}`,
-    `Original filename: ${item.file?.original_filename ?? ""}`,
-    `Intrinsic metadata: ${JSON.stringify(item.file?.intrinsic_metadata ?? null)}`,
-  ].join("\n");
-  return {
-    kind: "library.item",
-    title: item.display_name,
-    content: relevantChunk(content, reference.title),
-    citation: {
-      id: item.id,
-      kind: "library.item",
-      title: item.display_name,
-      href: `/spaces/${encodeURIComponent(spaceId)}/files?item=${encodeURIComponent(item.id)}`,
-      revision: item.version as AiCitation["revision"],
-      excerpt: excerpt(item.caption ?? ""),
-    },
-  };
-}
-
 /** A container is a list of sources, not an eager read: each is checked when a tool reads it. */
 function workspaceScope(reference: AiContextReference): ResolvedSource | null {
   const members = reference.metadata?.members;
@@ -157,8 +123,6 @@ async function resolveOne(reference: AiContextReference): Promise<ResolvedSource
       return spaceId ? note(reference, spaceId) : null;
     case "space.chat":
       return spaceId ? chat(reference, spaceId) : null;
-    case "library.item":
-      return spaceId ? libraryItem(reference, spaceId) : null;
     case "workspace.scope":
       return workspaceScope(reference);
     // Labels are orientation, and device references are read by the tools bound to them.

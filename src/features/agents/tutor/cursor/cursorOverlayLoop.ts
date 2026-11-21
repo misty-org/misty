@@ -291,9 +291,18 @@ export function startCursorOverlayLoop({
       !visible &&
       parkedAt !== undefined &&
       Math.hypot(mouse.x - position.x, mouse.y - position.y) <= MISTY_RADIUS * scale + 4;
-    if (onMisty !== holding) {
-      holding = onMisty;
-      void invoke("cursor_companion_hit", { over: onMisty }).catch(() => undefined);
+    // Over a 3D model's card it takes it too, so the model can be turned and its parts clicked.
+    const card = paintSketch?.modelCard();
+    const onModel =
+      card !== undefined &&
+      mouse.x >= card.x &&
+      mouse.y >= card.y &&
+      mouse.x < card.x + card.width &&
+      mouse.y < card.y + card.height;
+    const over = onMisty || onModel;
+    if (over !== holding) {
+      holding = over;
+      void invoke("cursor_companion_hit", { over }).catch(() => undefined);
     }
     // During a drag she dims, out of the way, until the pointer brings it to her.
     group.current.style.opacity =

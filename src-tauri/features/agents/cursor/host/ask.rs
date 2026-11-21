@@ -93,6 +93,20 @@ fn show(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Closes the text box without asking anything, as a third tap of Control does (the second had
+/// opened it), handing the keyboard back to the app that had it.
+pub(super) fn dismiss(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_webview_window(ASK_LABEL) {
+            if window.is_visible().unwrap_or(false) {
+                let _ = window.hide();
+                restore_front();
+            }
+        }
+    });
+}
+
 /// Closes the text box. With words, they go to Tutor as a typed question; empty, it only closes.
 #[tauri::command]
 pub fn cursor_companion_ask_close(

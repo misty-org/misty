@@ -1,15 +1,18 @@
 import { Download, ExternalLink, FolderInput, RefreshCw, Trash2 } from "lucide-react";
 import { useCachedResource } from "@/api/cache/cached-resource";
-import { skillsHubApi, type SkillTargetId } from "@/features/engine-config/skills";
-import { EngineGlyph } from "@/features/engine-config/skills/components";
-import { SkillMarkdown } from "@/features/engine-config/skills/SkillDetailDialog";
-import { t } from "@/features/engine-config/skills/strings";
-import type {
-  SkillRow,
-  SkillTargetInfo,
-  SkillUsageEntry,
-} from "@/features/engine-config/skills/types";
-import { daysSince, relevantTargets, sourceKindOf } from "@/features/engine-config/skills/utils";
+import {
+  daysSince,
+  EngineGlyph,
+  relevantTargets,
+  SkillMarkdown,
+  skillsHubApi,
+  skillsText as t,
+  sourceKindOf,
+  type SkillRow,
+  type SkillTargetId,
+  type SkillTargetInfo,
+  type SkillUsageEntry,
+} from "@/features/engine-config/skills";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,

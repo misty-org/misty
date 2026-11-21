@@ -16,7 +16,7 @@ pub struct ClipboardFileSnapshot {
 }
 
 /// Reads the clipboard on the main thread, where AppKit wants it, and hands the answer back.
-pub(super) async fn snapshot_on_main_thread(
+pub(crate) async fn snapshot_on_main_thread(
     app: &tauri::AppHandle,
 ) -> Result<ClipboardFileSnapshot, String> {
     let (sender, receiver) = tokio::sync::oneshot::channel();
@@ -65,6 +65,23 @@ pub(super) async fn set_files_on_main_thread(
     receiver
         .await
         .map_err(|_| "The clipboard write was dropped.".to_string())
+}
+
+/// Writes paths its caller has already checked (Files, through the disk gate) and returns the
+/// clipboard's change count afterwards, written or not.
+pub(crate) async fn write_checked_paths_on_main_thread(
+    app: &tauri::AppHandle,
+    paths: Vec<String>,
+) -> Result<Option<u64>, String> {
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        let written = if paths.is_empty() { Ok(()) } else { platform::set_file_paths(&paths) };
+        let _ = sender.send(written.map(|()| platform::change_count()));
+    })
+    .map_err(|error| format!("Couldn't reach the main thread: {error}"))?;
+    receiver
+        .await
+        .map_err(|_| "The clipboard write was dropped.".to_string())?
 }
 
 /// Missing paths are dropped quietly; the answer must not say whether some path exists.

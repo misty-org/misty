@@ -4,7 +4,8 @@ import {
 } from "@/features/settings";
 import { notify } from "@misty/ui";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
-import { DropdownControl } from "@/features/settings/SettingsControls";
+import { useEffect, useState } from "react";
+import { DropdownControl, SwitchControl } from "@/features/settings/SettingsControls";
 import type { SettingsContentProps } from "@/features/settings/settingsTypes";
 import { driveNative } from "./driveNative";
 
@@ -27,8 +28,30 @@ const savedCacheChoice = createDeviceSetting<string>({
 /** Settings › Server › Drive: how much of the Spaces' files this computer keeps downloaded. */
 export function DriveSettingsSection(props: SettingsContentProps) {
   const chosen = savedCacheChoice((state) => state.value);
+  const [paused, setPaused] = useState<boolean | null>(null);
+  useEffect(() => {
+    driveNative
+      .paused()
+      .then(setPaused)
+      .catch(() => setPaused(null));
+  }, []);
   return (
     <SettingsSectionBlock title="Drive">
+      <SettingsRow
+        label="Pause syncing"
+        description="Changes wait on this computer until you turn it back on or restart Misty."
+      >
+        <SwitchControl
+          checked={paused === true}
+          disabled={props.working || paused === null}
+          onChange={(value) =>
+            driveNative
+              .setPaused(value)
+              .then(setPaused)
+              .catch(() => notify({ message: "Syncing couldn't be changed. Try again.", tone: "error" }))
+          }
+        />
+      </SettingsRow>
       <SettingsRow
         label="Keep up to"
         description="Files past this are removed from this computer and come back when opened."

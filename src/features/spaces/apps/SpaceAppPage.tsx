@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { leaveViewingPlace, setViewingPlace } from "../list/createSpacesRealtimeActions";
 import { useLocation, useNavigate } from "react-router-dom";
 import { driveEntryById } from "../drive";
 import { driveFileRef } from "../drive/driveAppFiles";
@@ -6,7 +7,6 @@ import { useAuth } from "@/features/account";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { EmptyState, notify, Skeleton } from "@misty/ui";
 import type { Space } from "../api/dto/entities";
-import { appFilesFor } from "./file-picker/chosenFiles";
 import { FilePickerDialog } from "./file-picker/FilePickerDialog";
 import { SpaceAppFrame } from "./SpaceAppFrame";
 import type { AppFileRef } from "./spaceAppFiles";
@@ -48,6 +48,11 @@ export function SpaceAppPage({
   // only its own Open, it is the answer to the first time it asks for a file.
   const openedWith = new URLSearchParams(location.search).get("file") ?? "";
   const handed = useRef("");
+  // The Space's members see which app the person is in ("In DeckCraft"), and nothing more about it.
+  useEffect(() => {
+    setViewingPlace({ spaceId: space.id, place: "app", itemId: appId });
+    return () => leaveViewingPlace("app", appId);
+  }, [space.id, appId]);
   const { apps } = useSpaceApps(space.id);
   const [pick, setPick] = useState<PickRequest | null>(null);
   // The latest picker request, so a second one answers the first with nothing instead of leaving it waiting.
@@ -142,11 +147,11 @@ export function SpaceAppPage({
       />
       {pick ? (
         <FilePickerDialog
-          purpose="open"
           spaceId={space.id}
+          appName={name}
           accept={pick.accept}
           multiple={pick.multiple}
-          onPick={async (picked) => finish(await appFilesFor(space.id, picked, name))}
+          onPick={finish}
           onCancel={() => finish([])}
         />
       ) : null}

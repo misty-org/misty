@@ -14,9 +14,9 @@ export const markSlotClass = [
   "[&>.agent-avatar]:!size-4 [&>.agent-avatar]:!bg-transparent [&>.agent-avatar]:!text-caption",
 ].join(" ");
 
-/** A group of the sidebar's chats: its heading, then its rows, which keep a visible gap so a
- * hovered row never runs into the current one. */
-export const chatSectionClass = "flex flex-none flex-col gap-1";
+/** A group of the sidebar's chats: its heading, then its rows, 6px apart like the places above
+ * (NavList's gap), so a hovered row never runs into the current one. */
+export const chatSectionClass = "flex flex-none flex-col gap-1.5";
 
 export const profileDockClass = [
   "group/profile relative grid size-12 shrink-0 place-items-center rounded-full border-0 bg-transparent p-0",

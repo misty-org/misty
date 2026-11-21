@@ -16,8 +16,9 @@ vi.mock("@/features/account", () => ({
 vi.mock("../list/useSpacesStore", () => ({
   useSpacesStore: (selector: (value: typeof state) => unknown) => selector(state),
 }));
-vi.mock("@/features/spaces/library/SpaceLibrary", () => ({
-  SpaceLibrary: ({ spaceId }: { spaceId: string }) => <div>Files in {spaceId}</div>,
+// Files is the same page in every Space, so it takes no Space of its own.
+vi.mock("../file-manager/FilesPage", () => ({
+  FilesPage: () => <div>Files in family</div>,
 }));
 vi.mock("../chat/SpaceChatEntry", () => ({
   SpaceChatEntry: ({ spaceId }: { spaceId: string }) => <div>Chat in {spaceId}</div>,

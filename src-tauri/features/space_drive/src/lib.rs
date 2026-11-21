@@ -326,6 +326,9 @@ pub(crate) struct Inner {
     pub downloading: Mutex<HashSet<Key>>,
     /// The content cache's limit now, from the config and then `Drive::set_cache_limit`.
     pub cache_limit: AtomicU64,
+    /// Syncing is paused (Settings › Server › Drive): local changes wait, nothing goes up or down,
+    /// until it is turned back on. Not kept across a restart.
+    pub paused: AtomicBool,
 }
 
 /// One account's drives. Cheap to clone; every clone is the same drives.
@@ -381,6 +384,7 @@ impl Drive {
                 fetching: Mutex::new(HashMap::new()),
                 downloading: Mutex::new(HashSet::new()),
                 cache_limit,
+                paused: AtomicBool::new(false),
             }),
         })
     }
@@ -406,6 +410,22 @@ impl Drive {
         for space in spaces {
             self.kick(&space);
         }
+    }
+
+    /// Pauses or resumes syncing for every Space. Resuming asks each Space for a round at once.
+    pub fn set_paused(&self, paused: bool) {
+        self.inner.paused.store(paused, Ordering::SeqCst);
+        if !paused {
+            let spaces: Vec<SpaceId> = read(&self.inner.spaces).keys().cloned().collect();
+            for space in spaces {
+                self.kick(&space);
+            }
+        }
+    }
+
+    /// Whether syncing is paused now.
+    pub fn paused(&self) -> bool {
+        self.inner.paused.load(Ordering::SeqCst)
     }
 
     /// The content cache's limit now.
@@ -613,8 +633,24 @@ impl Drive {
             .inner
             .store
             .node(space, id)?
-            .filter(|node| !node.trash_pending)
+            .filter(|node| self.shown(node))
             .map(|node| self.inner.node_view(&node)))
+    }
+
+    /// Whether an item shows: neither it nor a folder it is in waits to go to the trash.
+    fn shown(&self, node: &NodeRow) -> bool {
+        if node.trash_pending {
+            return false;
+        }
+        let mut parent = node.parent.clone();
+        while let Some(at) = parent {
+            match self.inner.store.node(&node.space, &at) {
+                Ok(Some(folder)) if folder.trash_pending => return false,
+                Ok(Some(folder)) => parent = folder.parent,
+                _ => break,
+            }
+        }
+        true
     }
 
     /// One item by its inode less one (FUSE).
@@ -623,7 +659,7 @@ impl Drive {
             .inner
             .store
             .node_by_ino(ino as i64)?
-            .filter(|node| !node.trash_pending)
+            .filter(|node| self.shown(node))
             .map(|node| self.inner.node_view(&node)))
     }
 
@@ -634,7 +670,7 @@ impl Drive {
             .inner
             .store
             .node_at(space, &path)?
-            .filter(|node| !node.trash_pending)
+            .filter(|node| self.shown(node))
             .map(|node| self.inner.node_view(&node)))
     }
 

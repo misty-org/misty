@@ -35,7 +35,6 @@ const groupTitles: Record<ChatComposerSuggestion["kind"], string> = {
   member: "Members",
   role: "Roles",
   agent: "Agents",
-  library: "Files",
 };
 
 /**
@@ -138,7 +137,7 @@ export function SpaceChatComposer(props: {
         icon={Image}
         label="Add from Files"
         disabled={noSlots}
-        onSelect={() => props.onOpenPicker("library")}
+        onSelect={() => props.onOpenPicker("space")}
       />
     </>
   );
@@ -162,7 +161,7 @@ export function SpaceChatComposer(props: {
     ),
     menu: addRows,
   };
-  const hasAttachments = draft.pendingAttachments.length > 0 || draft.selectedLibraryIds.length > 0;
+  const hasAttachments = draft.pendingAttachments.length > 0;
   let lastKind = "";
   const popup = listed ? (
     <SuggestionList
@@ -191,8 +190,6 @@ export function SpaceChatComposer(props: {
                   <ChatAvatar id={suggestion.id} name={suggestion.label} size="xs" />
                 ) : suggestion.kind === "agent" ? (
                   <AgentMark agentId={suggestion.id} />
-                ) : suggestion.kind === "library" ? (
-                  Image
                 ) : (
                   <RoleDot color={suggestion.color} />
                 )
@@ -265,21 +262,6 @@ export function SpaceChatComposer(props: {
                     }
                   />
                 ))}
-                {draft.selectedLibraryIds.map((id) => (
-                  <ComposerAttachment
-                    key={id}
-                    icon={Image}
-                    name={
-                      suggestions.libraryItems.find((item) => item.id === id)?.display_name ??
-                      "File"
-                    }
-                    onRemove={() =>
-                      draft.setSelectedLibraryIds((current) =>
-                        current.filter((item) => item !== id),
-                      )
-                    }
-                  />
-                ))}
               </>
             ) : undefined
           }
@@ -331,13 +313,12 @@ export function SpaceChatComposer(props: {
         <SpaceChatPicker
           spaceId={props.spaceId}
           source={props.pickerSource}
-          selectedLibraryIds={draft.selectedLibraryIds}
           pendingAttachmentCount={draft.pendingAttachments.length}
-          canBrowseLibrary={props.canWrite}
+          canBrowseDrive={props.canWrite}
           canUploadAttachments={props.canWrite}
           onClose={props.onClosePicker}
           onChooseFiles={(paths) => void draft.uploadAttachments(paths)}
-          onChooseLibraryItems={draft.setSelectedLibraryIds}
+          onChooseDriveFiles={(files) => void draft.attachDriveFiles(files)}
         />
       ) : null}
     </section>

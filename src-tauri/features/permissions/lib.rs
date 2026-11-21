@@ -4,6 +4,7 @@
 //!
 //! [`ensure`] asks, so it's for a person's action in a window. Anything else, such as a background
 //! job, uses [`is_on`], which refuses without asking.
+mod disk;
 mod downloads;
 mod store;
 
@@ -12,6 +13,10 @@ use std::{
     sync::{LazyLock, Mutex},
 };
 
+pub use disk::{
+    agent_delete_on, allow_agent_delete, allow_agent_delete_async, disk_granted, ensure_disk_grant,
+    ensure_disk_grant_async, restore_disk_grant, revoke_disk_grant, stop_agent_delete,
+};
 use downloads::restore_downloads_grant;
 pub use downloads::{
     downloads_granted, ensure_downloads_folder, ensure_downloads_folder_async,
@@ -132,6 +137,7 @@ pub async fn ensure_async(app: &AppHandle, permission: Permission) -> bool {
 /// Reconnects what was allowed before to the file gate, when Misty starts.
 pub fn restore(app: &AppHandle) {
     restore_downloads_grant(app);
+    restore_disk_grant(app);
 }
 
 /// Shows the prompt and waits. Anything but a clear yes is a no.

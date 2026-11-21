@@ -1,4 +1,5 @@
-//! The default input device through AVAudioEngine.
+//! The default input device through AVAudioEngine. When the device changes mid-capture (AirPods
+//! taken out, the lid closed, another mic picked), the capture carries on with the new default.
 
 use super::{convert_and_send, output_format, Delivery, StartFailure};
 use block2::RcBlock;
@@ -13,8 +14,8 @@ use objc2_avf_audio::{
 use objc2_foundation::{NSNotification, NSNotificationCenter, NSObjectProtocol, NSThread};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
-use std::time::Duration;
+use std::sync::{mpsc, Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 /// The default input device as 16 kHz mono PCM16, delivered
 /// straight to the caller rather than the main queue.
@@ -35,19 +36,37 @@ impl MicrophoneCapture {
         let block = {
             let installed = Arc::clone(&installed);
             let delivery = Arc::clone(&delivery);
+            let engine = engine.clone();
+            let reopened = Mutex::new(Vec::<Instant>::new());
             RcBlock::new(move |_notification: NonNull<NSNotification>| {
-                // The input device changed under us. Report it; the caller decides
-                // whether to reopen.
-                if !installed.load(Ordering::Acquire) {
+                // The input device changed under us: AirPods went away, the lid closed, another
+                // mic was picked. The engine has stopped, so it is opened again on whatever
+                // input is the default now (macOS falls back to the built-in mic by itself), and
+                // only a device that can't be opened, or one that keeps changing, ends the capture.
+                if !installed.swap(false, Ordering::AcqRel) {
                     return;
                 }
-                delivery.fail();
+                // SAFETY: untapping this engine, as AVAudioEngine allows from any thread.
+                unsafe {
+                    engine.stop();
+                    engine.inputNode().removeTapOnBus(0);
+                }
+                let settled = {
+                    let mut times = reopened.lock().unwrap_or_else(PoisonError::into_inner);
+                    let now = Instant::now();
+                    times.retain(|at| now.duration_since(*at) < REOPEN_WINDOW);
+                    times.push(now);
+                    times.len() <= REOPEN_MOST
+                };
+                if !settled || tap_input(&engine, &delivery, &installed).is_err() {
+                    delivery.fail();
+                }
             })
         };
         let object: &AnyObject = &engine;
         // SAFETY: the name is AVFAudio's own constant, the object is this
-        // engine, and the block only touches thread-safe state, so any queue
-        // may run it.
+        // engine, and the block only touches the engine and thread-safe state,
+        // which AVAudioEngine allows from the queue that posts the change.
         let observer = unsafe {
             NSNotificationCenter::defaultCenter().addObserverForName_object_queue_usingBlock(
                 Some(AVAudioEngineConfigurationChangeNotification),
@@ -68,49 +87,11 @@ impl MicrophoneCapture {
     // observer holds the delivery itself rather than a weak reference to the
     // capture, so it has to be removed even when the format check fails.
     fn start(&mut self) -> Result<(), StartFailure> {
-        let result = self.open();
+        let result = tap_input(&self.engine, &self.delivery, &self.installed);
         if result.is_err() {
             self.stop();
         }
         result
-    }
-
-    fn open(&mut self) -> Result<(), StartFailure> {
-        // SAFETY: plain property reads on this engine's input node.
-        let input = unsafe { self.engine.inputNode() };
-        let format = unsafe { input.outputFormatForBus(0) };
-        let (rate, channels) = unsafe { (format.sampleRate(), format.channelCount()) };
-        if rate.is_nan() || rate <= 0.0 || channels == 0 {
-            return Err(StartFailure::Device);
-        }
-        let output = output_format().ok_or(StartFailure::Device)?;
-        // SAFETY: a plain initialiser; nil comes back as None.
-        let converter = unsafe {
-            AVAudioConverter::initFromFormat_toFormat(AVAudioConverter::alloc(), &format, &output)
-        }
-        .ok_or(StartFailure::Device)?;
-        let delivery = Arc::clone(&self.delivery);
-        let tap: RcBlock<dyn Fn(NonNull<AVAudioPCMBuffer>, NonNull<AVAudioTime>)> = RcBlock::new(
-            move |buffer: NonNull<AVAudioPCMBuffer>, _when: NonNull<AVAudioTime>| {
-                // SAFETY: the engine passes a live buffer for the duration of the call.
-                let buffer = unsafe { buffer.as_ref() };
-                let frames = unsafe { buffer.frameLength() };
-                convert_and_send(&converter, buffer, frames, rate, &output, &delivery);
-            },
-        );
-        // SAFETY: the format is the node's own output format, and the engine
-        // copies the block before this returns.
-        unsafe {
-            input.installTapOnBus_bufferSize_format_block(
-                0,
-                1024,
-                Some(&*format),
-                RcBlock::as_ptr(&tap),
-            );
-        }
-        self.installed.store(true, Ordering::Release);
-        // SAFETY: starting an engine whose only graph is the tapped input.
-        unsafe { self.engine.startAndReturnError() }.map_err(|_| StartFailure::Device)
     }
 
     pub(super) fn stop(&mut self) {
@@ -128,6 +109,49 @@ impl MicrophoneCapture {
             unsafe { NSNotificationCenter::defaultCenter().removeObserver(observer) };
         }
     }
+}
+
+/// How many times a capture reopens on a changed device within [`REOPEN_WINDOW`] before it gives
+/// up: a device that keeps coming and going ends the capture instead of looping.
+const REOPEN_MOST: usize = 4;
+const REOPEN_WINDOW: Duration = Duration::from_secs(10);
+
+/// Taps the engine's input node, the default input device as it is now, and starts the engine.
+fn tap_input(
+    engine: &AVAudioEngine,
+    delivery: &Arc<Delivery>,
+    installed: &AtomicBool,
+) -> Result<(), StartFailure> {
+    // SAFETY: plain property reads on this engine's input node.
+    let input = unsafe { engine.inputNode() };
+    let format = unsafe { input.outputFormatForBus(0) };
+    let (rate, channels) = unsafe { (format.sampleRate(), format.channelCount()) };
+    if rate.is_nan() || rate <= 0.0 || channels == 0 {
+        return Err(StartFailure::Device);
+    }
+    let output = output_format().ok_or(StartFailure::Device)?;
+    // SAFETY: a plain initialiser; nil comes back as None.
+    let converter = unsafe {
+        AVAudioConverter::initFromFormat_toFormat(AVAudioConverter::alloc(), &format, &output)
+    }
+    .ok_or(StartFailure::Device)?;
+    let delivery = Arc::clone(delivery);
+    let tap: RcBlock<dyn Fn(NonNull<AVAudioPCMBuffer>, NonNull<AVAudioTime>)> = RcBlock::new(
+        move |buffer: NonNull<AVAudioPCMBuffer>, _when: NonNull<AVAudioTime>| {
+            // SAFETY: the engine passes a live buffer for the duration of the call.
+            let buffer = unsafe { buffer.as_ref() };
+            let frames = unsafe { buffer.frameLength() };
+            convert_and_send(&converter, buffer, frames, rate, &output, &delivery);
+        },
+    );
+    // SAFETY: the format is the node's own output format, and the engine
+    // copies the block before this returns.
+    unsafe {
+        input.installTapOnBus_bufferSize_format_block(0, 1024, Some(&*format), RcBlock::as_ptr(&tap));
+    }
+    installed.store(true, Ordering::Release);
+    // SAFETY: starting an engine whose only graph is the tapped input.
+    unsafe { engine.startAndReturnError() }.map_err(|_| StartFailure::Device)
 }
 
 /// Asks for microphone access when needed. Off the main thread this waits

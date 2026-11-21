@@ -70,6 +70,17 @@ export function recognitionLanguage(): string | undefined {
   return language === "auto" ? undefined : (regions[language] ?? language);
 }
 
+/**
+ * The languages Tutor listens in: the recognition language, then the second one from Settings ›
+ * Voice when it's set and differs. Each is a region, or undefined for the system's own.
+ */
+export function recognitionLanguages(): (string | undefined)[] {
+  const first = recognitionLanguage();
+  const second = chosen().secondLanguage;
+  const extra = second === "none" ? undefined : (regions[second] ?? second);
+  return extra && extra !== first ? [first, extra] : [first];
+}
+
 /** Recognizes a recorded audio file on this computer. */
 export function recognizeFile(path: string): Promise<string> {
   return invoke<string>("speech_recognize_file", { path, language: recognitionLanguage() });

@@ -69,7 +69,7 @@ fn codex_listing_takes_names_and_sign_in_from_the_plugin() {
             })
         })
     };
-    let items = codex_items(&listing, &manifest);
+    let items = codex_items(&listing, &manifest, Path::new("/codex/plugins/cache"));
     assert_eq!(
         items.len(),
         2,
@@ -307,7 +307,7 @@ fn market_samples() {
         ),
         (
             "codex",
-            codex_items(&json("codex", "codex-plugins.json"), &manifest),
+            codex_items(&json("codex", "codex-plugins.json"), &manifest, Path::new("/codex/plugins/cache")),
             codex_sources(&json("codex", "codex-sources.json")),
         ),
     ] {
@@ -342,6 +342,32 @@ fn market_samples() {
 }
 
 #[test]
+fn an_installed_remote_codex_plugin_reads_codexs_own_copy() {
+    let listing = json!({
+        "installed": [
+            { "pluginId": "work-pets@openai-curated-remote", "name": "work-pets",
+              "marketplaceName": "openai-curated-remote", "version": "0.1.6", "installed": true,
+              "source": { "source": "remote", "id": "plugin_1" } },
+            { "pluginId": "sneaky@openai-curated-remote", "marketplaceName": "openai-curated-remote",
+              "version": "../../..", "installed": true, "source": { "source": "remote", "id": "plugin_2" } }
+        ]
+    });
+    let read = std::cell::RefCell::new(Vec::new());
+    let manifest = |folder: &Path| {
+        read.borrow_mut().push(folder.to_path_buf());
+        Some(json!({ "description": "Animated companion pets." }))
+    };
+    let items = codex_items(&listing, &manifest, Path::new("/codex/plugins/cache"));
+    assert_eq!(
+        *read.borrow(),
+        vec![Path::new("/codex/plugins/cache/openai-curated-remote/work-pets/0.1.6/.codex-plugin")],
+        "a version that isn't one folder is never read"
+    );
+    assert_eq!(items[0].description, "Animated companion pets.");
+    assert_eq!(items[1].description, "");
+}
+
+#[test]
 fn codex_reads_manifests_only_from_local_folders() {
     let listing = json!({
         "available": [
@@ -357,7 +383,7 @@ fn codex_reads_manifests_only_from_local_folders() {
         read.borrow_mut().push(folder.to_path_buf());
         None
     };
-    let items = codex_items(&listing, &manifest);
+    let items = codex_items(&listing, &manifest, Path::new("/codex/plugins/cache"));
     assert_eq!(items.len(), 2);
     assert_eq!(
         *read.borrow(),

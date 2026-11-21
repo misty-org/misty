@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalToolRejected } from "../host";
+import { spacesGateway } from "../../spaces-gateway/spacesGateway";
 import { spaceTools } from "../spaceTools";
 import { SPACES, call, serve } from "./testRoutes";
 
@@ -18,62 +19,77 @@ const refusal = (error: unknown) => (error as LocalToolRejected).message;
 
 beforeEach(() => vi.clearAllMocks());
 
+const entry = (path: string, kind: "file" | "folder" = "file") => ({
+  id: `drv_${path}`,
+  space_id: "s1",
+  path,
+  name: path.split("/").pop() ?? "",
+  kind,
+  size: 4,
+  mtime_ms: 0,
+  modified_by_name: "Ana",
+});
+
+const drive = vi.hoisted(() => ({
+  driveList: vi.fn(),
+  driveEntry: vi.fn(),
+  driveRead: vi.fn(),
+  driveReplace: vi.fn(),
+  saveToDrive: vi.fn(),
+  attachmentContent: vi.fn(),
+}));
+spacesGateway.provide(drive as never);
+
 describe("files", () => {
-  it("searches what's visible in the Library", async () => {
-    serve({
-      ...SPACES,
-      "GET /spaces/s1/library?limit=20&visibility=visible&q=tax%20form": {
-        items: [{ id: "i" }],
-        next_after: "",
-      },
-    });
+  it("searches the Space's Files by name, folder by folder", async () => {
+    serve(SPACES);
+    drive.driveList.mockImplementation(async (_space: string, folder: string) => ({
+      entries:
+        folder === "/"
+          ? [entry("/Tax", "folder"), entry("/notes.md")]
+          : [entry("/Tax/tax form.pdf")],
+    }));
     await expect(
       call(tool("file.search"), { space: "s1", query: "tax form", limit: 99 }),
-    ).resolves.toEqual({
-      items: [{ id: "i" }],
-      count: 1,
-    });
+    ).resolves.toMatchObject({ files: [{ path: "/Tax/tax form.pdf" }], count: 1 });
   });
 
-  it("reads an item", async () => {
-    serve({ ...SPACES, "GET /spaces/s1/library/items/i": { id: "i" } });
-    await expect(call(tool("file.read"), { space: "s1", id: "i" })).resolves.toEqual({ id: "i" });
-    await expect(call(tool("file.read"), { space: "s1", id: " " }).catch(refusal)).resolves.toBe(
-      "Library item id is required",
-    );
-  });
-
-  it("merges an update over the current item at its version", async () => {
-    const current = {
-      id: "i",
-      version: 7,
-      display_name: "a.png",
-      caption: "old",
-      tags: ["x"],
-      favorite: true,
-      hidden: false,
-    };
-    const calls = serve({
-      ...SPACES,
-      "GET /spaces/s1/library/items/i": current,
-      "PATCH /spaces/s1/library/items/i": { id: "i" },
+  it("reads a file's facts, and a text file's text", async () => {
+    serve(SPACES);
+    drive.driveEntry.mockResolvedValue(entry("/notes.md"));
+    drive.driveRead.mockResolvedValue(new TextEncoder().encode("hi").buffer);
+    await expect(call(tool("file.read"), { space: "s1", path: "notes.md" })).resolves.toMatchObject({
+      path: "/notes.md",
+      text: "hi",
     });
-    await call(tool("file.update"), { space: "s1", id: "i", caption: "", hidden: true });
-    expect(calls[2].body).toEqual({
-      version: 7,
-      display_name: "a.png",
-      caption: "",
-      tags: ["x"],
-      favorite: true,
-      hidden: true,
-    });
-  });
-
-  it("promotes an attachment", async () => {
-    serve({ ...SPACES, "POST /spaces/s1/attachments/a/promote": { id: "i" } });
+    expect(drive.driveEntry).toHaveBeenCalledWith("s1", "/notes.md");
     await expect(
-      call(tool("file.promote_attachment"), { space: "s1", attachmentId: "a" }),
-    ).resolves.toEqual({ id: "i" });
+      call(tool("file.read"), { space: "s1", path: "../x" }).catch(refusal),
+    ).resolves.toMatch(/path in the Space's Files/);
+  });
+
+  it("writes new text into a file at the version it has now", async () => {
+    serve(SPACES);
+    const current = { ...entry("/a.md"), version: 7 };
+    drive.driveEntry.mockResolvedValue(current);
+    drive.driveReplace.mockResolvedValue(current);
+    await call(tool("file.update"), { space: "s1", path: "/a.md", content: "new" });
+    expect(drive.driveReplace).toHaveBeenCalledWith("s1", current, expect.any(Blob));
+  });
+
+  it("saves an attachment into the Space's Files", async () => {
+    serve(SPACES);
+    drive.attachmentContent.mockResolvedValue(new Blob(["x"]));
+    drive.saveToDrive.mockResolvedValue(entry("/Inbox/a.pdf"));
+    await expect(
+      call(tool("file.promote_attachment"), {
+        space: "s1",
+        attachmentId: "a",
+        name: "a.pdf",
+        folder: "Inbox",
+      }),
+    ).resolves.toMatchObject({ path: "/Inbox/a.pdf" });
+    expect(drive.saveToDrive).toHaveBeenCalledWith("s1", "/Inbox", "a.pdf", expect.any(Blob));
     await expect(
       call(tool("file.promote_attachment"), { space: "s1" }).catch(refusal),
     ).resolves.toBe("attachment id is required");

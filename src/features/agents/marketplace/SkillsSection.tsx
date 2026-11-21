@@ -1,25 +1,23 @@
 import { ExternalLink, FolderGit2, FolderInput, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  skillsHubApi,
-  useInstalledSkills,
-  type SkillRow,
-  type SkillTargetId,
-} from "@/features/engine-config/skills";
-import { createInstalledPaneActions } from "@/features/engine-config/skills/InstalledPane";
-import {
+  createInstalledPaneActions,
   SkillConfirmDialog,
+  SkillImportDialog,
+  SkillReposDialog,
+  skillsHubApi,
+  skillsText as t,
+  SkillUsagePane,
+  usageForSkill,
+  useInstalledSkills,
+  useSkillUsage,
   type BusyTarget,
   type ConfirmState,
+  type Feedback,
+  type SkillRow,
+  type SkillTargetId,
   type UpdateMap,
-} from "@/features/engine-config/skills/InstalledPane.parts";
-import type { Feedback } from "@/features/engine-config/skills/components";
-import { SkillImportDialog } from "@/features/engine-config/skills/SkillImportDialog";
-import { SkillReposDialog } from "@/features/engine-config/skills/SkillReposDialog";
-import { SkillUsagePane } from "@/features/engine-config/skills/SkillUsagePane";
-import { t } from "@/features/engine-config/skills/strings";
-import { useSkillUsage } from "@/features/engine-config/skills/useSkillUsage";
-import { usageForSkill } from "@/features/engine-config/skills/utils";
+} from "@/features/engine-config/skills";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,

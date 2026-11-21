@@ -1,7 +1,14 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { onRealtimeMessage, onRealtimeOpen, sendRealtimeMessage } from "@/features/spaces";
+import { useDoNotDisturb } from "@/shared/lib/doNotDisturb";
 import { directApi, type AccountStatus, type ChosenStatus, type PresenceStatus } from "./api";
+
+/** Mirrors Do not disturb for features that can't import this one (agents' run notices). */
+function mirrorDoNotDisturb(status: ChosenStatus) {
+  const dnd = status.chosen === "dnd";
+  if (useDoNotDisturb.getState().value !== dnd) useDoNotDisturb.getState().set(dnd);
+}
 
 /** Ten minutes with no input on this computer is Idle. */
 const idleAfterMs = 10 * 60 * 1000;
@@ -28,6 +35,7 @@ export const useStatusStore = create<StatusState>((set, get) => ({
       byUser: Object.fromEntries(statuses.map((status) => [status.user_id, status])),
       mine,
     });
+    mirrorDoNotDisturb(mine);
   },
   receive(status) {
     set((state) => ({ byUser: { ...state.byUser, [status.user_id]: status } }));
@@ -35,10 +43,14 @@ export const useStatusStore = create<StatusState>((set, get) => ({
   async setMine(status) {
     const previous = get().mine;
     set({ mine: status });
+    mirrorDoNotDisturb(status);
     try {
-      set({ mine: await directApi.setMyStatus(status) });
+      const saved = await directApi.setMyStatus(status);
+      set({ mine: saved });
+      mirrorDoNotDisturb(saved);
     } catch (error) {
       set({ mine: previous });
+      mirrorDoNotDisturb(previous);
       throw error;
     }
   },

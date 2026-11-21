@@ -60,12 +60,12 @@ describe("messages", () => {
     expect(calls[calls.length - 1].body).toEqual({ content: [{ type: "text", text: "Hello" }] });
   });
 
-  it("sends privately through the person's DM, with @names as mentions", async () => {
+  it("sends privately through the person's DM with a friend, with @names as mentions", async () => {
     const calls = serve({
       ...SPACES,
       ...people,
-      "POST /spaces/s1/conversations/dm": { id: "dm" },
-      "POST /spaces/s1/conversations/dm/messages": { message: { id: "m" } },
+      "POST /dms": { id: "dm" },
+      "POST /spaces/dm/messages": { message: { id: "m" } },
     });
     await expect(
       call(tool("message.send"), { space: "s1", message: "Hi @Bob Lee!", recipientUserId: "u2" }),
@@ -75,7 +75,7 @@ describe("messages", () => {
       conversation_id: "dm",
       audience: "private",
     });
-    expect(calls.find((request) => request.path.endsWith("/dm"))?.body).toEqual({ user_id: "u2" });
+    expect(calls.find((request) => request.path === "/dms")?.body).toEqual({ user_id: "u2" });
     expect(calls[calls.length - 1].body).toEqual({
       content: [
         { type: "text", text: "Hi " },
@@ -89,8 +89,8 @@ describe("messages", () => {
     serve({
       ...SPACES,
       ...people,
-      "POST /spaces/s1/conversations/dm": { id: "dm" },
-      "POST /spaces/s1/conversations/dm/messages": { message: { id: "m" } },
+      "POST /dms": { id: "dm" },
+      "POST /spaces/dm/messages": { message: { id: "m" } },
     });
     await expect(
       call(tool("message.send"), { space: "s1", message: "Thanks, bob lee." }),

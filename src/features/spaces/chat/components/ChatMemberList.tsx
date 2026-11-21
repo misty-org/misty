@@ -11,6 +11,11 @@ import { doingLabel, memberAgentsIn, useMemberAgents } from "../../list/memberAg
 import { spaceAgentStatuses } from "../../list/SpaceAgentsBroadcast";
 import { memberColor, memberRoles, useSpaceRoles } from "../../roles/useSpaceRoles";
 import { useMemberPicture } from "../../members/memberPictures";
+import { useAccountPresence } from "@/shared/lib/accountPresence";
+import { useVoicePresence } from "../../list/voicePresence";
+import { useSpaceConversations } from "../sidebar/useSpaceConversations";
+import { useSpaceApps } from "../../apps/useSpaceApps";
+import { appEntry } from "../../apps/thirdPartyApps";
 import { ChatAvatar } from "./ChatAvatar";
 
 interface Row {
@@ -40,17 +45,37 @@ export function ChatMemberList(props: {
   const now = useNow();
   const people = useSpacesStore((state) => state.membersBySpace[spaceId]);
   const viewers = useSpacesStore((state) => state.presenceBySpace[spaceId]);
+  const accounts = useAccountPresence((state) => state.byUser);
+  const voice = useVoicePresence((state) => state.bySpace[spaceId]);
+  // Channel names only matter while someone is in a voice channel, so they are read only then.
+  const inVoice = Object.values(voice ?? {}).some((people) => people.length > 0);
+  const { conversations } = useSpaceConversations(inVoice ? spaceId : "");
+  const { apps } = useSpaceApps(spaceId);
   const heard = useMemberAgents((state) => state.bySpace[spaceId]);
   const roles = useSpaceRoles(spaceId);
   const { agents } = useStudioAgents();
-  const conversations = useMistyStore((state) => state.conversations);
+  const agentChats = useMistyStore((state) => state.conversations);
   const mine = useMemo(
-    () => spaceAgentStatuses(agents, spaceId, conversations),
-    [agents, spaceId, conversations],
+    () => spaceAgentStatuses(agents, spaceId, agentChats),
+    [agents, spaceId, agentChats],
   );
   const groups = useMemo(() => {
     const here = new Set((viewers ?? []).map((viewer) => viewer.user_id));
     if (props.currentUserId) here.add(props.currentUserId);
+    // What each person is doing in this Space, said only here: a voice channel, then an app, then the Lab.
+    const activity = new Map<string, string>();
+    for (const [channelId, people] of Object.entries(voice ?? {})) {
+      const channel = conversations.find((conversation) => conversation.id === channelId);
+      for (const userId of people) if (channel) activity.set(userId, `In ${channel.title}`);
+    }
+    for (const viewer of viewers ?? []) {
+      if (activity.has(viewer.user_id)) continue;
+      if (viewer.place === "app" && viewer.item_id) {
+        const app = apps?.find((candidate) => candidate.app_id === viewer.item_id);
+        const name = (app && appEntry(app)?.name) ?? app?.app_id;
+        if (name) activity.set(viewer.user_id, `In ${name}`);
+      } else if (viewer.place === "lab") activity.set(viewer.user_id, "In the Lab");
+    }
     const working = new Map<string, { state: string; line: string }>();
     const remember = (userId: string, agent: Parameters<typeof agentLine>[0]) => {
       if (agent.state === "resting" || working.get(userId)?.state === "working") return;
@@ -67,15 +92,21 @@ export function ChatMemberList(props: {
       .filter((member) => !props.visibleTo || props.visibleTo(member))
       .map((member) => {
         const agent = working.get(member.user_id);
-        // An agent waiting on its person shows as waiting; at work, as working; here, online.
+        // An agent waiting on its person shows as waiting; at work, as working. Otherwise the
+        // person's account status (online, idle, do not disturb) where the server has one, else
+        // online while they have this Space open.
+        const account = accounts[member.user_id];
         const presence: MemberPresence = agent
           ? agent.state === "needs-you"
             ? "waiting"
             : "working"
-          : here.has(member.user_id)
-            ? "online"
-            : "offline";
-        return { member, presence, line: agent?.line ?? "", working: Boolean(agent) };
+          : account
+            ? account
+            : here.has(member.user_id)
+              ? "online"
+              : "offline";
+        const line = agent?.line ?? (presence === "offline" ? "" : (activity.get(member.user_id) ?? ""));
+        return { member, presence, line, working: Boolean(agent) };
       })
       .sort((left, right) => left.member.name.localeCompare(right.member.name));
     const out: { title: string; rows: Row[] }[] = [];
@@ -98,7 +129,7 @@ export function ChatMemberList(props: {
     rest = take("Online", (item) => item.presence !== "offline", rest);
     take("Offline", () => true, rest);
     return out;
-  }, [heard, people, mine, now, props, roles, spaceId, viewers]);
+  }, [heard, people, mine, now, props, roles, spaceId, viewers, accounts, voice, conversations, apps]);
 
   return (
     <MemberList label="Members">

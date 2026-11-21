@@ -40,7 +40,7 @@ export interface SpaceChatThreadProps extends Pick<
 
 /** The scrolling message list, wired to the Space's data and message actions. */
 export function SpaceChatThread(props: SpaceChatThreadProps) {
-  const { spaceId, access, scope, store, editing, actions, suggestions } = props;
+  const { spaceId, access, scope, store, editing, actions } = props;
 
   return (
     <ChatMessageList
@@ -54,7 +54,6 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       editingText={editing.editingText}
       editSaving={editing.editSaving}
       nodes={scope.nodes}
-      libraryItems={suggestions.libraryItems}
       spaceId={spaceId}
       directRecipient={scope.directRecipient}
       memberColors={props.memberColors}
@@ -63,7 +62,7 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       firstUnreadId={props.firstUnreadId}
       channel={props.channel}
       onStarter={(starter) => {
-        if (starter === "files" || starter === "library") return props.onOpenPicker(starter);
+        if (starter === "files" || starter === "space") return props.onOpenPicker(starter);
         props.onBeginMention();
       }}
       endRef={props.endRef}
@@ -87,12 +86,6 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
         });
       }}
       onError={props.setError}
-      onLibraryItem={(item) =>
-        suggestions.setLibraryItems((current) => [
-          ...current.filter((candidate) => candidate.id !== item.id),
-          item,
-        ])
-      }
       onReload={props.onReload}
     />
   );

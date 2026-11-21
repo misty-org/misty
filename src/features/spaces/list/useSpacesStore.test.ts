@@ -300,13 +300,13 @@ describe("Spaces mutations", () => {
 
     const send = useSpacesStore
       .getState()
-      .sendMessage(optimistic.space_id, "Fast hello", [], [], [], "", optimistic);
+      .sendMessage(optimistic.space_id, "Fast hello", [], [], "", optimistic);
 
     expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([optimistic]);
     request.resolve({ message: confirmed, triggered_runs: [] });
     await send;
 
-    expect(apiMocks.sendMessage.mock.calls[0]?.[6]).toBe("client-1");
+    expect(apiMocks.sendMessage.mock.calls[0]?.[5]).toBe("client-1");
     expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([confirmed]);
   });
 
@@ -323,7 +323,7 @@ describe("Spaces mutations", () => {
     await expect(
       useSpacesStore
         .getState()
-        .sendMessage(optimistic.space_id, "Please send", [], [], [], "", optimistic),
+        .sendMessage(optimistic.space_id, "Please send", [], [], "", optimistic),
     ).rejects.toThrow("network unavailable");
 
     expect(useSpacesStore.getState().messagesBySpace[optimistic.space_id]).toEqual([

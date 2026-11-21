@@ -9,7 +9,7 @@ afterEach(() => {
   api.session++;
   vi.clearAllMocks();
 });
-it("restores text, reply and attachment selections per conversation and clears across accounts", () => {
+it("restores text and reply per conversation and clears across accounts", () => {
   const { result, rerender } = renderHook(
     ({ conversation }) => useSpaceChatDraft("s", conversation),
     { initialProps: { conversation: "a" } },
@@ -17,7 +17,6 @@ it("restores text, reply and attachment selections per conversation and clears a
   act(() => {
     result.current.setText("Unsent in A");
     result.current.setReplyToMessageId("m");
-    result.current.setSelectedLibraryIds(["f"]);
   });
   rerender({ conversation: "b" });
   expect(result.current.text).toBe("");
@@ -26,8 +25,7 @@ it("restores text, reply and attachment selections per conversation and clears a
   expect([
     result.current.text,
     result.current.replyToMessageId,
-    result.current.selectedLibraryIds,
-  ]).toEqual(["Unsent in A", "m", ["f"]]);
+  ]).toEqual(["Unsent in A", "m"]);
   const reset = result.current.reset;
   rerender({ conversation: "a" });
   expect(result.current.reset).toBe(reset);

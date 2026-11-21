@@ -53,6 +53,13 @@ const languages = [
   { value: "hi", label: "Hindi", icon: Languages },
   { value: "ru", label: "Russian", icon: Languages },
 ];
+// Text alone: every row would repeat the same icon.
+const secondLanguages = [
+  { value: "none", label: "None" },
+  ...languages
+    .filter((language) => language.value !== "auto")
+    .map(({ value, label }) => ({ value, label })),
+];
 const sources = [
   { value: "mic", label: "Microphone", icon: Mic },
   { value: "mic-system", label: "Microphone and system audio", icon: AudioLines },
@@ -162,6 +169,17 @@ export function VoiceSection(props: SettingsContentProps) {
             options={languages}
             disabled={props.working}
             onValueChange={(value) => set("language", value)}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Second language"
+          description="Tutor also listens for this one and answers in whichever you speak."
+        >
+          <DropdownControl
+            value={voice.secondLanguage}
+            options={secondLanguages}
+            disabled={props.working}
+            onValueChange={(value) => set("second_language", value)}
           />
         </SettingsRow>
         <SettingsRow

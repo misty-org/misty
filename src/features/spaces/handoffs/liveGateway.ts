@@ -15,7 +15,7 @@ import { handoffBody } from "./spacePosts";
 import { SpaceCrumb } from "../components/space-row/SpaceCrumb";
 import { VisibilityMenu } from "../components/VisibilityMenu";
 import { setItemVisibility, type ItemVisibility } from "../api/visibility";
-import { libraryFileById } from "../library/library-data/libraryFile";
+import { driveFileById } from "../drive/driveFiles";
 
 const noteChanged = (spaceId: string) =>
   window.dispatchEvent(
@@ -83,8 +83,8 @@ export const liveGateway = {
     };
   },
 
-  /** One of a Space's files, read whole. */
-  libraryFile: (spaceId: string, itemId: string) => libraryFileById(spaceId, itemId),
+  /** One of a Space's drive files, found by its stable id and read whole. */
+  driveFile: (spaceId: string, itemId: string) => driveFileById(spaceId, itemId),
 
   /** Makes the Space doc a new notebook lives in. */
   async createNotebookDoc(spaceId: string, title: string, markdown: string) {
@@ -158,11 +158,12 @@ export const liveGateway = {
   },
 
   /** The last few messages between the person and one member, oldest first. */
-  async directMessages(spaceId: string, userId: string, limit = 6) {
-    const conversation = await spacesApi.openDirectMessage(spaceId, userId);
-    const { messages } = await spacesApi.conversationMessages(spaceId, conversation.id);
+  async directMessages(_spaceId: string, userId: string, limit = 6) {
+    // DMs are the account's, not the Space's: the Space only says who the member is.
+    const dm = await spacesApi.openDirectMessage(userId);
+    const { messages } = await spacesApi.messages(dm.id);
     return {
-      conversationId: conversation.id,
+      conversationId: dm.id,
       messages: messages.slice(-limit).map((message) => ({
         id: message.id,
         mine: message.sender_user_id === useUserStore.getState().me?.id,
@@ -175,10 +176,10 @@ export const liveGateway = {
   },
 
   /** Sends the person's own words to one member as a direct message. */
-  async sendDirectMessage(spaceId: string, userId: string, text: string) {
-    const conversation = await spacesApi.openDirectMessage(spaceId, userId);
-    await spacesApi.sendConversationMessage(spaceId, conversation.id, [{ type: "text", text }]);
-    return { conversationId: conversation.id };
+  async sendDirectMessage(_spaceId: string, userId: string, text: string) {
+    const dm = await spacesApi.openDirectMessage(userId);
+    await spacesApi.sendMessage(dm.id, [{ type: "text", text }]);
+    return { conversationId: dm.id };
   },
 
   /**
@@ -186,13 +187,13 @@ export const liveGateway = {
    * member decides whether to give it to the agent; it never reaches the agent on its own.
    */
   async askMembersAgent(
-    spaceId: string,
+    _spaceId: string,
     userId: string,
     agent: { id: string; name: string },
     text: string,
   ) {
-    const conversation = await spacesApi.openDirectMessage(spaceId, userId);
-    await spacesApi.sendConversationMessage(spaceId, conversation.id, [
+    const dm = await spacesApi.openDirectMessage(userId);
+    await spacesApi.sendMessage(dm.id, [
       { type: "text", text: `${handoffBody(text)}\n` },
       { type: "mention", agent_id: agent.id, label: agent.name },
     ]);

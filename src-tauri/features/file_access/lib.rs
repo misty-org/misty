@@ -12,6 +12,7 @@
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 pub mod autostart_entry;
+pub mod disk;
 pub mod fs;
 pub mod fs_async;
 mod fs_handles;

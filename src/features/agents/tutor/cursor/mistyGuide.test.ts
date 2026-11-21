@@ -3,12 +3,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The companion's Misty guide (embedded by the server) names controls in
+ * The companion's Misty guide (embedded in the local prompt) names controls in
  * quotes and shortcuts as Cmd+…. Each must still exist in the app, so the guide
- * cannot silently drift from the interface it describes. The guide lives in
- * misty-server, so this runs only with that checkout beside this one.
+ * cannot silently drift from the interface it describes.
  */
-const guidePath = `${process.cwd()}/../misty-server/internal/platform/httpapi/companion_misty_guide.md`;
+const guidePath = `${process.cwd()}/src-tauri/features/agents/runs/local_prompt/companion_misty_guide.md`;
 const hasGuide = existsSync(guidePath);
 const guide = hasGuide ? readFileSync(guidePath, "utf8") : "";
 
@@ -34,13 +33,8 @@ describe.skipIf(!hasGuide)("the companion's Misty guide", () => {
   });
 
   it("lists only shortcuts that are bound", () => {
-    const registry = [
-      "registry.ts",
-      "workspaceCommands.ts",
-      "browserCommands.ts",
-      "browserFeatureCommands.ts",
-    ]
-      .map((file) => readFileSync(`${process.cwd()}/src/features/shortcuts/${file}`, "utf8"))
+    const registry = sources(`${process.cwd()}/src/shared/shortcuts`)
+      .map((path) => readFileSync(path, "utf8"))
       .join("\n");
     const keyName: Record<string, string> = { ",": "Comma", "`": "Grave" };
     const shortcuts = [...guide.matchAll(/Cmd\+(?:[A-Z][a-z]*\+)*[^\s.,)]+|Cmd\+[,`]/g)].map(

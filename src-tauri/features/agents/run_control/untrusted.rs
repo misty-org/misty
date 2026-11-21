@@ -8,6 +8,9 @@ const NOTE: &str =
 const MARKED: &[&str] = &[
     "file.read",
     "file.search",
+    "files.list",
+    "files.read",
+    "files.search",
     "integration.execute",
     "message.search",
     "search.all",

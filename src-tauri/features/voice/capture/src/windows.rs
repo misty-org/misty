@@ -9,7 +9,7 @@ use crate::{AudioSource, Capabilities, CaptureError, Resampler};
 use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use wasapi::{
     AudioCaptureClient, AudioClient, DeviceEnumerator, Direction, SampleType, StreamMode,
     WaveFormat,
@@ -145,6 +145,11 @@ fn open_streams(source: &AudioSource) -> Result<Vec<Stream>, CaptureError> {
     Ok(streams)
 }
 
+/// How many times a microphone capture reopens on a changed device within [`REOPEN_WINDOW`]
+/// before it gives up.
+const REOPEN_MOST: usize = 4;
+const REOPEN_WINDOW: Duration = Duration::from_secs(10);
+
 fn capture_loop(
     source: &AudioSource,
     stop: &mpsc::Receiver<()>,
@@ -161,12 +166,14 @@ fn capture_loop(
         let channel = source.channel();
         let mut frames = FrameCounter::new();
         let mut floats = Vec::new();
+        let mut reopened: Vec<Instant> = Vec::new();
         while stop.try_recv().is_err() {
+            let mut lost = None;
             for stream in &mut streams {
-                stream
-                    .capture
-                    .read_from_device_to_deque(&mut stream.bytes)
-                    .map_err(device_error)?;
+                if let Err(error) = stream.capture.read_from_device_to_deque(&mut stream.bytes) {
+                    lost = Some(error);
+                    break;
+                }
                 let frame_bytes = 4 * stream.channels;
                 let whole = stream.bytes.len() / frame_bytes * frame_bytes;
                 floats.clear();
@@ -179,6 +186,25 @@ fn capture_loop(
                         .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]])),
                 );
                 stream.resampler.push_f32(&floats, &mut stream.pcm);
+            }
+            if let Some(error) = lost {
+                // The microphone went away (a headset unplugged, Bluetooth dropped): carry on
+                // with whatever input is the default now, unless it keeps changing.
+                let now = Instant::now();
+                reopened.retain(|at| now.duration_since(*at) < REOPEN_WINDOW);
+                if !matches!(source, AudioSource::Mic) || reopened.len() >= REOPEN_MOST {
+                    return Err(device_error(error));
+                }
+                reopened.push(now);
+                for stream in &streams {
+                    let _ = stream.client.stop_stream();
+                }
+                thread::sleep(Duration::from_millis(200));
+                streams = open_streams(source)?;
+                for stream in &streams {
+                    stream.client.start_stream().map_err(device_error)?;
+                }
+                continue;
             }
             let mixed = mix(&mut streams);
             if !mixed.is_empty() {

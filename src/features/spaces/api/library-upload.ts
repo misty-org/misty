@@ -1,4 +1,4 @@
-import type { LibraryUploadResult, SpaceLibraryItem } from "./dto/entities";
+import type { LibraryUploadResult } from "./dto/entities";
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
 import { assertUploadLimit } from "./upload-limits";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
@@ -7,7 +7,7 @@ import { assertStableSpaceAccount, spaceRequest, SpaceRequestError } from "./api
 export async function uploadLibraryPath(
   spaceId: string,
   path: string,
-  purpose: "library" | "attachment",
+  purpose: "attachment",
   options?: LibraryUploadOptions,
 ): Promise<LibraryUploadResult> {
   const accountGeneration = readApiSessionGeneration();
@@ -30,12 +30,12 @@ export async function uploadLibraryPath(
   return uploadLibraryFile(spaceId, file, purpose, accountGeneration, options);
 }
 
-/** Uploads a client-produced Blob as a NEW library item (used for "Save as a copy"). */
+/** Uploads a client-produced Blob as a chat attachment. */
 export async function uploadLibraryBlob(
   spaceId: string,
   blob: Blob,
   filename: string,
-  purpose: "library" | "attachment" = "library",
+  purpose: "attachment" = "attachment",
   options?: LibraryUploadOptions,
 ): Promise<LibraryUploadResult> {
   const accountGeneration = readApiSessionGeneration();
@@ -46,40 +46,6 @@ export async function uploadLibraryBlob(
     lastModified: Date.now(),
   });
   return uploadLibraryFile(spaceId, file, purpose, accountGeneration, options);
-}
-
-/**
- * Replaces an existing library item's content in place with a client-rendered
- * Blob, keeping the same item id (used for "Save"). The server checks the item
- * is still at `item.version`; when someone changed it meanwhile it refuses, and
- * the editor says so and can save a copy instead.
- */
-export async function replaceLibraryItemContent(
-  spaceId: string,
-  item: SpaceLibraryItem,
-  blob: Blob,
-  filename: string,
-  options?: LibraryUploadOptions,
-): Promise<LibraryUploadResult> {
-  const accountGeneration = readApiSessionGeneration();
-  assertStableSpaceAccount(accountGeneration);
-  if (blob.size > maxWebviewUploadBytes) throw webviewUploadSizeError();
-  const file = new File([blob], filename, {
-    type: blob.type || "application/octet-stream",
-    lastModified: Date.now(),
-  });
-  try {
-    return await uploadLibraryFile(spaceId, file, "library", accountGeneration, options, {
-      itemId: item.id,
-      itemVersion: item.version,
-    });
-  } catch (error) {
-    if (error instanceof SpaceRequestError && error.status === 409)
-      throw new Error(
-        "This photo changed since you opened it. Save as a copy, or reopen it to edit the latest version.",
-      );
-    throw error;
-  }
 }
 
 export function fileNameFromPath(path: string): string {
@@ -94,10 +60,9 @@ export function fileNameFromPath(path: string): string {
 async function uploadLibraryFile(
   spaceId: string,
   file: File,
-  purpose: "library" | "attachment",
+  purpose: "attachment",
   accountGeneration: number,
   options?: LibraryUploadOptions,
-  replace?: { itemId: string; itemVersion: number },
 ): Promise<LibraryUploadResult> {
   assertStableSpaceAccount(accountGeneration);
   if (file.size === 0) throw new Error(`${file.name || "That file"} is empty.`);
@@ -120,12 +85,6 @@ async function uploadLibraryFile(
       sha256,
       purpose,
       ...(options?.conversationId ? { conversation_id: options.conversationId } : {}),
-      // An agent made this file: it saves to the agent's Space with provenance.
-      ...(options?.agent ? { agent: options.agent } : {}),
-      // In-place replace: the upload becomes `replace_item_id`'s new content.
-      ...(replace
-        ? { replace_item_id: replace.itemId, replace_item_version: replace.itemVersion }
-        : {}),
     }),
   });
   const finalizeHeaders = initiated.finalize?.headers ?? {
@@ -224,18 +183,9 @@ export function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-/** Which of the uploader's agents made a file, and in which chat and run. */
-export interface AgentArtifactProvenance {
-  agent_id: string;
-  conversation_id?: string;
-  run_id?: string;
-  kind: "download" | "file" | "image" | "document";
-}
-
 export interface LibraryUploadOptions {
   signal?: AbortSignal;
   conversationId?: string;
-  agent?: AgentArtifactProvenance;
   onProgress?: (progress: number) => void;
   onStage?: (stage: "reading" | "hashing" | "uploading" | "finalizing") => void;
 }

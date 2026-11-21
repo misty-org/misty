@@ -9,7 +9,7 @@
 //! (`tray_update`), built in code from the person's own runs; computer use is read where it runs.
 //! The menu is built again whenever any of it changes. Nothing here leaves the device.
 
-use std::sync::{Mutex, OnceLock};
+use std::sync::{atomic::{AtomicBool, Ordering}, Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -19,6 +19,14 @@ use tauri::{
 };
 
 const TRAY_ID: &str = "misty";
+
+/// The person hid the icon (Settings › Server › Menu bar). While it is hidden, closing the last
+/// window ends Misty, since nothing would be left to bring it back.
+static HIDDEN: AtomicBool = AtomicBool::new(false);
+
+pub fn hidden() -> bool {
+    HIDDEN.load(Ordering::SeqCst)
+}
 const OPEN: &str = "tray_open";
 const RESTART: &str = "tray_restart";
 const QUIT: &str = "tray_quit";
@@ -87,6 +95,10 @@ static APP: OnceLock<AppHandle<Wry>> = OnceLock::new();
 #[path = "tray_glyphs.rs"]
 mod glyphs;
 use glyphs::{set_glyphs, Glyph};
+#[path = "tray_windows.rs"]
+mod windows;
+pub(crate) use windows::{show_main_window, tutor_settings, tutor_toggle};
+use windows::{open_chat, to_main_window};
 
 /// The menu and, item by item in the same order (separators included), the glyph each shows.
 struct BuiltMenu {
@@ -337,56 +349,6 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, id: &str) {
     }
 }
 
-/// Opens a chat the menu listed in the main window.
-fn open_chat(app: &AppHandle<Wry>, id: &str) {
-    let found = app.try_state::<MistyTrayState>().and_then(|tray_state| {
-        tray_state
-            .menu
-            .lock()
-            .ok()
-            .and_then(|state| state.chats.iter().find(|chat| chat.id == id).cloned())
-    });
-    let Some(found) = found else {
-        return;
-    };
-    let _ = show_main_window(app);
-    if let Some(label) = crate::browser::app_windows::primary_label(app) {
-        let _ = app.emit_to(label.as_str(), OPEN_CHAT_EVENT, found);
-    }
-}
-
-/// Brings the main window forward, opening one when none is, and tells it what was chosen.
-fn to_main_window(app: &AppHandle<Wry>, event: &str, payload: impl Serialize + Clone) {
-    let _ = show_main_window(app);
-    if let Some(label) = crate::browser::app_windows::primary_label(app) {
-        let _ = app.emit_to(label.as_str(), event, payload);
-    }
-}
-
-/// Turns Tutor on or off, or opens its setup when it isn't set up.
-pub(crate) fn tutor_toggle(app: &AppHandle<Wry>) {
-    tutor_to_main_window(app, TUTOR_TOGGLE_EVENT);
-}
-
-pub(crate) fn tutor_settings(app: &AppHandle<Wry>) {
-    let _ = show_main_window(app);
-    tutor_to_main_window(app, TUTOR_SETTINGS_EVENT);
-}
-
-/// Tells the main window, which runs Tutor, what the person chose in the menu bar. With no window
-/// open, Misty opens one first: Tutor runs only while a main window does.
-fn tutor_to_main_window(app: &AppHandle<Wry>, event: &str) {
-    let label = crate::browser::app_windows::primary_label(app);
-    match label {
-        Some(label) => {
-            let _ = app.emit_to(label.as_str(), event, ());
-        }
-        None => {
-            let _ = show_main_window(app);
-        }
-    }
-}
-
 /// The main window tells the menu bar what Tutor is: on or off, and whether it's set up. Not set
 /// up, the item says so, and choosing it opens setup.
 #[tauri::command]
@@ -456,23 +418,19 @@ pub fn tray_update(
     Ok(())
 }
 
-pub(crate) fn show_main_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    // Startup owns the first reveal, including native traffic-light layout.
-    if !crate::app::macos_window_effects::mac_rounded_corners::main_window_ready() {
-        return Ok(());
+/// Shows or hides the menu bar (tray) icon, from Settings.
+#[tauri::command]
+pub fn app_set_tray_hidden(
+    webview: tauri::Webview,
+    app: AppHandle<Wry>,
+    hidden: bool,
+) -> Result<(), String> {
+    if !crate::browser::app_windows::is_person_window(webview.label()) {
+        return Err("Only the main workspace can change the icon".into());
     }
-    let Some(window) = crate::browser::app_windows::primary(app) else {
-        // Every window was closed: reopen the windows that were open, or the first profile's.
-        return crate::browser::app_windows::restore(app);
-    };
-    window
-        .show()
-        .map_err(|error| format!("Could not show Misty: {error}"))?;
-    window
-        .unminimize()
-        .map_err(|error| format!("Could not unminimize Misty: {error}"))?;
-    window
-        .set_focus()
-        .map_err(|error| format!("Could not focus Misty: {error}"))?;
+    HIDDEN.store(hidden, Ordering::SeqCst);
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        tray.set_visible(!hidden).map_err(|error| error.to_string())?;
+    }
     Ok(())
 }

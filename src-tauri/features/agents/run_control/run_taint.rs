@@ -24,7 +24,7 @@ pub(crate) struct Taint {
 /// Whether this call read the person's private data.
 pub(crate) fn reads_private(name: &str, input: &Value) -> bool {
     match name {
-        "folder.read" | "shell.run" | "file.read" | "file.search" | "message.search"
+        "folder.read" | "shell.run" | "file.read" | "file.search" | "files.read" | "message.search"
         | "thread.read" | "thread.list"
         | "search.all" => true,
         "integration.execute" => {

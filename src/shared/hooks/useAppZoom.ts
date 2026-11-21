@@ -4,9 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const APP_ZOOM_STORAGE_KEY = "misty.app.zoom";
 export const appZoomDefault = 1;
 /**
- * 100% renders at 1: the page zoom is the person's own and nothing else. The step up the type,
- * controls and rows read best at (once a hidden 1.1× page zoom) is in the CSS now: the main
- * window's root is 110% (src/styles/App.css) and every size is in rem, so it grows with it.
+ * 100% renders at 1: the page zoom is the person's own and nothing else. The root font size is
+ * never scaled either (src/styles/App.css), so a size in rem is the size it says.
  */
 export const appZoomBaseline = 1;
 /** The render scale for a zoom, the factor the webview's page zoom is set to. */

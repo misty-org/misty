@@ -983,6 +983,25 @@ const MIGRATIONS: &[&str] = &[
          drive_item_id TEXT
      );
      CREATE INDEX files_agent_trash_drive ON files_agent_trash (space_id, drive_item_id);",
+    // 46: Files' Starred and Recent, and what Files moved to the system Trash, so Put Back knows
+    // where each item came from. They stay on this device and never sync.
+    "CREATE TABLE files_starred (
+         path TEXT PRIMARY KEY,
+         starred_at INTEGER NOT NULL
+     ) WITHOUT ROWID;
+     CREATE TABLE files_recent (
+         path TEXT PRIMARY KEY,
+         opened_at INTEGER NOT NULL
+     ) WITHOUT ROWID;
+     CREATE INDEX files_recent_opened ON files_recent (opened_at DESC);
+     CREATE TABLE files_trash_ledger (
+         id TEXT PRIMARY KEY,
+         original_path TEXT NOT NULL,
+         trashed_path TEXT NOT NULL,
+         trashed_at INTEGER NOT NULL,
+         kind TEXT NOT NULL,
+         size INTEGER NOT NULL
+     ) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, Clone)]

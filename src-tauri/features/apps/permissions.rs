@@ -31,6 +31,8 @@ pub fn required(kind: Kind, name: &str) -> Need {
         (Kind::Subscribe, "files.watch") => Some(Files),
         (Kind::Call, "room.update" | "room.awareness") => Some(Rooms),
         (Kind::Subscribe, "room") => Some(Rooms),
+        (Kind::Call, "calls.join" | "calls.leave" | "calls.mute") => Some(Calls),
+        (Kind::Subscribe, "calls.channels" | "calls.current") => Some(Calls),
         _ => return Need::Unknown,
     };
     needed.map_or(Need::Nothing, Need::Permission)
@@ -174,12 +176,12 @@ mod tests {
         let calls = [
             "hello", "members.list", "members.mentionables", "chat.post", "chat.open", "chat.notify",
             "files.pick", "files.open", "files.save", "files.list", "files.upload", "files.download",
-            "route.navigate", "room.update", "room.awareness",
+            "route.navigate", "room.update", "room.awareness", "calls.join", "calls.leave", "calls.mute",
         ];
         for call in calls {
             assert_ne!(required(Kind::Call, call), Need::Unknown, "{call}");
         }
-        for topic in ["theme", "route", "members.presence", "files.watch", "room"] {
+        for topic in ["theme", "route", "members.presence", "files.watch", "room", "calls.channels", "calls.current"] {
             assert_ne!(required(Kind::Subscribe, topic), Need::Unknown, "{topic}");
         }
     }

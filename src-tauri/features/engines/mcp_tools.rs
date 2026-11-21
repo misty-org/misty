@@ -12,6 +12,12 @@ pub(super) fn is_space_tool(name: &str) -> bool {
     SPACE_TOOLS.iter().any(|family| name.starts_with(family))
 }
 
+/// Files' tools are offered only while the person's disk grant is on, and `files_delete` only
+/// while they let agents delete files. Native code checks both again on every call.
+pub(super) fn files_offered(app: &AppHandle, name: &str) -> bool {
+    crate::files::agent_paths::tools::offered(app, name)
+}
+
 pub(super) fn is_browser_tool(name: &str) -> bool {
     BROWSER_TOOLS.contains(&name)
 }

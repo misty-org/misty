@@ -1,3 +1,5 @@
+// @vitest-environment node
+// It reads files from disk by their file URL, which only Node gives.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 

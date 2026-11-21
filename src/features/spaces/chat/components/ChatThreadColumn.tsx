@@ -117,7 +117,6 @@ export function ChatThreadColumn({
         {fromList ? (
           <IconButton
             label="Back to threads"
-            size="sm"
             onClick={() => useChatSidePanel.getState().openThreadsList()}
           >
             <ArrowLeft />

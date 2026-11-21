@@ -204,9 +204,8 @@ export function ShortcutText(props: { commandId: string; className?: string }) {
   return <span className={props.className}>{label}</span>;
 }
 
-/** Files is a Space page too, so Space shortcuts stay on there. */
 function inScope(scope: ShortcutScope, activeScope: ShortcutScope): boolean {
-  return scope === activeScope || (scope === "tool:space" && activeScope === "tool:library");
+  return scope === activeScope;
 }
 
 function scopeIsActive(scope: ShortcutScope, activeScope: ShortcutScope): boolean {

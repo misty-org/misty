@@ -39,7 +39,10 @@ const replies = (messages: GlobalAiMessage[]) =>
 
 /** What the agent is asked just before `/clear` drops its context. */
 const saveMemoryPrompt =
-  "I'm about to clear your context. Before I do, save anything worth keeping to your memory, using your own memory system: what you learned about me, decisions we made, preferences, and work still in progress. Update notes that already exist instead of adding duplicates. Reply with just \"Saved.\" when you're done.";
+  "I'm about to clear your context. Before I do, save anything worth keeping to your memory, " +
+  "using your own memory system: what you learned about me, decisions we made, preferences, and " +
+  "work still in progress. Update notes that already exist instead of adding duplicates. Reply " +
+  'with just "Saved." when you\'re done.';
 
 const tokens = (count: number) => count.toLocaleString();
 

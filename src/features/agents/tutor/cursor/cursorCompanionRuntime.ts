@@ -175,6 +175,14 @@ async function listenToNative(
       })
       .catch((error: unknown) => s.notice(String(error)));
   });
+  // Tapping Control three times turns Always On listening on or off (`always_on.rs`).
+  listen<{ on: boolean }>("misty://cursor-always-on", (payload) => {
+    s.notice(
+      payload.on
+        ? "Listening. Just talk, or tap Control three times to stop."
+        : "Stopped listening.",
+    );
+  });
   // The tour's dictation step waits for a dictation to finish anywhere.
   listen<{ phase: string }>("misty://dictation", (payload) => {
     if (payload.phase === "finish") s.tour.dictated();

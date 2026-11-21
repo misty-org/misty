@@ -2,14 +2,15 @@ import type { ReactNode } from "react";
 import type { TabSide } from "@/app/shell/dockingLayout";
 import type { WorkspaceView } from "@/features/app-windows";
 import { cn, inwardSide, OverlaySideProvider, Surface } from "@misty/ui";
+import { PlaceToggle } from "./PlaceToggle";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarToggleButton } from "./SidebarToggleButton";
 import { SpaceNavigator } from "./SpaceNavigator";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
 /**
- * The window's sidebar, which is the Space: its selector, search, apps, channels and direct messages
- * (people and the person's agents), with the account at the foot. The layout button sits at the end of the tab row above
+ * The window's sidebar: Personal (friends and direct messages with people and the person's agents)
+ * or a shared Space (its channels), switched in its top row, with the account at the foot. The layout button sits at the end of the tab row above
  * the page; there is no agents side panel, since the chats are right here. It lists no tabs (they are the row above
  * the page) and has no address field; web pages belong to agents, and every row opens in the
  * focused pane.
@@ -56,6 +57,10 @@ export function WorkspaceSidebar(props: {
               <div id={windowsCaptionSlotId} className="flex shrink-0 items-center" />
             ) : null}
             <SidebarToggleButton side={position} />
+            {/* Personal or Spaces: which side the rows under the head belong to. */}
+            <div className="ml-1 flex shrink-0 items-center">
+              <PlaceToggle />
+            </div>
             {/* Back and forward close the row on its right edge, pulled out by their buttons' own
                 inset so the forward arrow lines up with the drawer's edge, 4px apart. */}
             <div

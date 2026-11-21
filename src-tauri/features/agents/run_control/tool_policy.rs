@@ -36,6 +36,9 @@ pub(crate) struct RunFacts {
     pub(crate) computer_use: bool,
     /// The chat the run answers in, when it has one: what an approval to drive an app lasts for.
     pub(crate) conversation_id: String,
+    /// The person let agents delete files (Settings › Agents › Access), read from this device when
+    /// the call comes (`tool_gate::facts_of_run`), never from the run's request.
+    pub(crate) agent_delete: bool,
 }
 
 impl RunFacts {
@@ -80,6 +83,7 @@ impl RunFacts {
                 })
                 .unwrap_or_default(),
             computer_use: body["computer_use"].as_bool() == Some(true),
+            agent_delete: false,
         }
     }
 }
@@ -98,6 +102,15 @@ const ASK_MODE_STOPS: &[&str] = &[
     "file.promote_attachment",
     "file.update",
     "file.upload",
+    "files.copy",
+    "files.create_folder",
+    "files.delete",
+    "files.extract",
+    "files.move",
+    "files.rename",
+    "files.tag",
+    "files.trash",
+    "files.zip",
     "folder.send",
     "item.delete",
     "item.rename",
@@ -119,11 +132,67 @@ const PLAN_REFUSES: &[&str] = &[
     "browser.skill",
     "browser.steps",
     "browser.upload",
+    "files.copy",
+    "files.create_folder",
+    "files.delete",
+    "files.extract",
+    "files.move",
+    "files.rename",
+    "files.tag",
+    "files.trash",
+    "files.zip",
     "folder.send",
     "media.fetch",
     "screen.open",
     "shell.run",
 ];
+
+/// Words in a tool's name that mean it deletes something.
+const DELETE_WORDS: &[&str] = &[
+    "delete", "remove", "purge", "unlink", "rm", "rmdir", "erase", "destroy", "wipe", "shred",
+];
+
+/// Tools named for deleting that delete no file on this computer: `item.delete` takes a Space's
+/// thread, file or shared file away on the server, where its trash keeps what it took.
+const DELETES_NO_FILE: &[&str] = &["item.delete"];
+
+/// The one tool that deletes files for good, and only while the person allows it.
+const FILES_DELETE: &str = "files.delete";
+
+/// Whether a tool deletes, by its name's words (`files.delete`, `folder_remove`, `notes.purge`).
+/// An app's own tools are judged by its manifest instead, and those named in [`DELETES_NO_FILE`]
+/// keep what they take.
+pub(crate) fn deletes(name: &str) -> bool {
+    !name.starts_with("app.")
+        && !DELETES_NO_FILE.contains(&name)
+        && name
+            .split(['.', '_', '-'])
+            .any(|word| DELETE_WORDS.iter().any(|delete| word.eq_ignore_ascii_case(delete)))
+}
+
+/// Deleting is refused unless it is `files.delete` and the person turned it on; then it asks
+/// every time, the no-asking mode included, and a planning mode refuses it like any change.
+fn delete_decision(facts: &RunFacts, name: &str) -> Decision {
+    if name != FILES_DELETE || !facts.agent_delete {
+        return Decision::Refuse {
+            code: "delete_off",
+            message: "Agents don't delete files. Move what should go into Agent trash with the files \
+trash tool: the person looks it over there and deletes it themselves. Nothing was deleted."
+                .to_owned(),
+        };
+    }
+    if facts.planning {
+        return Decision::Refuse {
+            code: "plan_mode",
+            message: "Plan mode is read-only. Put this action in the plan as a step instead."
+                .to_owned(),
+        };
+    }
+    Decision::Ask {
+        kind: "delete",
+        why: "A deleted file can't be recovered.".to_owned(),
+    }
+}
 
 /// Screen and input control (`features/computer_use`): what only looks.
 pub(crate) const COMPUTER_READS: &[&str] = &[
@@ -285,6 +354,9 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
         }
         return ask("The agent asks once to work in this app for this chat.");
     }
+    if deletes(name) {
+        return delete_decision(facts, name);
+    }
     let computer = COMPUTER_ACTS.contains(&name) || COMPUTER_READS.contains(&name);
     if computer && !facts.computer_use {
         return Decision::Refuse {
@@ -351,6 +423,11 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             why: String::new(),
         };
     }
+    // Files' changes reach the whole disk, so they ask unless the person chose the engine's
+    // no-asking mode, not only an edits mode.
+    if name.starts_with("files.") && ASK_MODE_STOPS.contains(&name) && !facts.bypass {
+        return ask("");
+    }
     // An engine opens and reads pages freely and asks before it acts on one; where it may go is
     // still settled above, by the address.
     let opens_page = name == "browser.navigate" || name == "screen.open";
@@ -366,3 +443,7 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
 #[cfg(test)]
 #[path = "tool_policy_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tool_policy_files_tests.rs"]
+mod files_tests;

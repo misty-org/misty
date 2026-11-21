@@ -7,6 +7,7 @@ import { aiSurfaceApi, subscribeToAiInvocation } from "@/features/agents";
 import { followAddress } from "@/features/agents";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { MentionableAgent } from "./useSpaceMessageSpansStore";
+import { noticeAgentMemoryOnce } from "./agentMemoryNotice";
 
 /**
  * An `@mention` of your own agent runs on your computer, and its reply posts as an ordinary message
@@ -122,12 +123,12 @@ export function runOwnMentions(
           content,
           [],
           [],
-          [],
           message.id,
           nonce,
         )
-      : spacesApi.sendMessage(message.space_id, content, [], [], [], message.id, nonce);
+      : spacesApi.sendMessage(message.space_id, content, [], [], message.id, nonce);
   };
-  for (const agent of ownMentions(message.content, agents, senderId))
-    void answerOne(message, agent, text, post);
+  const mentioned = ownMentions(message.content, agents, senderId);
+  if (mentioned.length) void noticeAgentMemoryOnce(message.space_id).catch(() => undefined);
+  for (const agent of mentioned) void answerOne(message, agent, text, post);
 }

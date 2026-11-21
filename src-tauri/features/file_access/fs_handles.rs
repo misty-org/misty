@@ -36,6 +36,11 @@ impl File {
         check(path.as_ref(), Access::Write)?;
         fs::File::create(path).map(Self)
     }
+
+    /// A file the disk gate (`disk::fs_disk`) has already checked and opened.
+    pub(crate) fn from_std(file: fs::File) -> Self {
+        Self(file)
+    }
 }
 
 impl Deref for File {

@@ -50,7 +50,7 @@ fn turns(case: &Value) -> Vec<Turn> {
 }
 
 fn harness(case: &Value) -> Harness {
-    let context = serde_json::json!({ "model_id": case["modelId"], "system": case["system"], "prompt": case["prompt"], "allowed_tools": ["note.read", "note.create", "browser.visual"], "model_turn_limit": case["turnLimit"] });
+    let context = serde_json::json!({ "model_id": case["modelId"], "system": case["system"], "prompt": case["prompt"], "allowed_tools": ["message.read", "message.create", "browser.visual"], "model_turn_limit": case["turnLimit"] });
     let harness = Harness::new(&context.to_string());
     let whole = JsValue::parse(&fixture_text()).unwrap();
     let outputs = whole.get("case").unwrap().get("toolOutputs").unwrap().clone();

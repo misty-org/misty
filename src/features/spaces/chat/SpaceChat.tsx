@@ -1,9 +1,9 @@
 import type { MistyPickerSource } from "@/features/files";
-import { Hash, Lock, User, Users } from "lucide-react";
-import { ChannelHeader, ChannelMain, type ActionBarItem } from "@misty/ui";
+import { ChannelMain, type ActionBarItem } from "@misty/ui";
+import { SpaceChatHeader } from "./components/SpaceChatHeader";
 import { SpaceChatComposer } from "./composer/SpaceChatComposer";
 import { ChatMemberList } from "./components/ChatMemberList";
-import { ChatSearchResults } from "./components/ChatSearchResults";
+import { SpaceChatSearch } from "./components/SpaceChatSearch";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/useSpaceRoles";
 import { isPrivateChannel } from "./sidebar/conversationGroups";
@@ -16,7 +16,7 @@ import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { spaceChatConversationPath, spaceChatPath } from "./chatRoute";
+import { spaceChatPath } from "./chatRoute";
 import { DeleteMessageDialog } from "./components/ChatMessages";
 import { conversationName, isGroupDirectMessage } from "./sidebar/conversationGroups";
 import { SpaceChatThread } from "./components/SpaceChatThread";
@@ -48,6 +48,7 @@ export function SpaceChat({
   searchedText = "",
   actions: barActions,
   search,
+  dm,
 }: {
   spaceId: string;
   spaceName: string;
@@ -64,6 +65,10 @@ export function SpaceChat({
   actions?: ReadonlyArray<ActionBarItem>;
   /** The message search, last in the chat's bar. */
   search?: ReactNode;
+  /** The chat is a DM (a Space of kind "direct"): named for its people, no setup cards, and no
+   * composer while it is read-only. Its page names the tab. */
+  /** A DM, which brings its own member list (`members`) since it is no Space of the list. */
+  dm?: { name: string; group: boolean; readOnly: boolean; members?: ReactNode };
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -127,7 +132,7 @@ export function SpaceChat({
       space?.role === "owner"
     : spaceCan(space, "messages.manage");
   useWorkspaceViewTitle(
-    workspaceTabId,
+    dm ? undefined : workspaceTabId,
     isDirect ? `@${channelName} · ${spaceName}` : `#${channelName} · ${spaceName}`,
   );
   // Where the unread messages begin, as they were when the chat opened: reading them clears the
@@ -170,11 +175,7 @@ export function SpaceChat({
     members: scope.members,
     agents,
     currentUserId: user?.id,
-    canBrowseLibrary: access.canWriteMessages,
-    canReadLibrary: true,
-    selectedLibraryIds: draft.selectedLibraryIds,
     roles: mentionableRoles,
-    attachmentSlotsLeft: draft.attachmentSlotsLeft,
   });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSource, setPickerSource] = useState<MistyPickerSource>("files");
@@ -202,7 +203,6 @@ export function SpaceChat({
     suggestions,
     canWriteMessages: access.canWriteMessages,
     canUploadAttachments: access.canWriteMessages,
-    canBrowseLibrary: access.canWriteMessages,
     openPicker,
   });
   const actions = useSpaceChatMessageActions({
@@ -343,7 +343,7 @@ export function SpaceChat({
   ) : null;
   const chat = (
     <div ref={chatRootRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {!conversationId ? (
+      {!conversationId && !dm ? (
         <SpaceSetupCards
           spaceId={spaceId}
           isOwner={access.isOwner}
@@ -389,33 +389,37 @@ export function SpaceChat({
         />
       </div>
 
-      <SpaceChatComposer
-        spaceId={spaceId}
-        canWrite={access.canWriteMessages}
-        isConversation={Boolean(conversationId)}
-        draft={draft}
-        suggestions={suggestions}
-        input={input}
-        typing={typing}
-        messages={scope.messages}
-        pickerOpen={pickerOpen}
-        pickerSource={pickerSource}
-        onOpenPicker={openPicker}
-        onClosePicker={() => setPickerOpen(false)}
-        onSubmit={(event) => void actions.submit(event)}
-        onEditLast={() => {
-          const mine = [...scope.messages]
-            .reverse()
-            .find(
-              (message) =>
-                message.sender_kind === "person" &&
-                message.sender_user_id === user?.id &&
-                !message.local_delivery_state,
-            );
-          if (mine) editing.begin(mine);
-        }}
-        placeholder={isDirect ? `Message @${channelName}` : `Message #${channelName}`}
-      />
+      {dm?.readOnly ? null : (
+        <SpaceChatComposer
+          spaceId={spaceId}
+          canWrite={access.canWriteMessages}
+          isConversation={Boolean(conversationId)}
+          draft={draft}
+          suggestions={suggestions}
+          input={input}
+          typing={typing}
+          messages={scope.messages}
+          pickerOpen={pickerOpen}
+          pickerSource={pickerSource}
+          onOpenPicker={openPicker}
+          onClosePicker={() => setPickerOpen(false)}
+          onSubmit={(event) => void actions.submit(event)}
+          onEditLast={() => {
+            const mine = [...scope.messages]
+              .reverse()
+              .find(
+                (message) =>
+                  message.sender_kind === "person" &&
+                  message.sender_user_id === user?.id &&
+                  !message.local_delivery_state,
+              );
+            if (mine) editing.begin(mine);
+          }}
+          placeholder={
+            dm || isDirect ? `Message @${dm?.name ?? channelName}` : `Message #${channelName}`
+          }
+        />
+      )}
 
       <DeleteMessageDialog
         open={Boolean(messageToDelete)}
@@ -431,8 +435,9 @@ export function SpaceChat({
       />
     </div>
   );
-  const members =
-    membersShown && space ? (
+  const members = !membersShown ? null : dm ? (
+    (dm.members ?? null)
+  ) : space ? (
       <ChatMemberList
         space={space}
         spaceId={spaceId}
@@ -448,26 +453,13 @@ export function SpaceChat({
       />
     ) : null;
   const searchResults = searchedText ? (
-    <ChatSearchResults
+    <SpaceChatSearch
       spaceId={spaceId}
       query={searchedText}
-      whereSaid={(message) => {
-        const said = conversationChat.conversations.find(
-          (item) => item.id === message.conversation_id,
-        );
-        return said
-          ? { name: conversationName(said, user?.id), direct: said.kind === "dm" }
-          : { name: "everyone", direct: false };
-      }}
-      colorOf={(message) => memberColors?.get(message.sender_user_id)}
-      onOpen={(message) => {
-        const path = message.conversation_id
-          ? spaceChatConversationPath(spaceId, message.conversation_id)
-          : spaceChatPath(spaceId);
-        navigate(
-          `${path}${path.includes("?") ? "&" : "?"}message=${encodeURIComponent(message.id)}`,
-        );
-      }}
+      conversations={conversationChat.conversations}
+      currentUserId={user?.id}
+      memberColors={memberColors}
+      dm={Boolean(dm)}
     />
   ) : null;
   // The side panel has no room for the page's controls or a member list: the chat and its thread.
@@ -480,17 +472,11 @@ export function SpaceChat({
     );
   // The chat's own bar, under the window's tabs, as Discord's: what the chat is, then its controls.
   const header = (
-    <ChannelHeader
-      icon={
-        isDirect
-          ? conversation && isGroupDirectMessage(conversation, user?.id)
-            ? Users
-            : User
-          : privateChannel
-            ? Lock
-            : Hash
-      }
-      name={channelName}
+    <SpaceChatHeader
+      direct={Boolean(dm) || isDirect}
+      group={dm ? dm.group : Boolean(conversation && isGroupDirectMessage(conversation, user?.id))}
+      locked={privateChannel}
+      name={dm?.name ?? channelName}
       actions={barActions}
       end={search}
     />

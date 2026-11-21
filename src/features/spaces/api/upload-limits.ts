@@ -5,16 +5,14 @@
  * instead of waiting for a large transfer to be rejected. The server enforces
  * the same limits independently and is the only authority.
  */
-type UploadPurpose = "library" | "attachment" | "note_attachment";
+type UploadPurpose = "attachment" | "note_attachment";
 
 export const UPLOAD_LIMIT_BYTES: Record<UploadPurpose, number> = {
-  library: 100 * 1024 * 1024,
   attachment: 10 * 1024 * 1024,
   note_attachment: 15 * 1024 * 1024,
 };
 
 const PURPOSE_LABEL: Record<UploadPurpose, string> = {
-  library: "File",
   attachment: "Chat attachment",
   note_attachment: "Doc attachment",
 };

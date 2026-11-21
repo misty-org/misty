@@ -27,6 +27,8 @@ export function workspaceAiAdapter(tab: WorkspaceView | undefined): AiSurfaceAda
 }
 
 function aiSurfaceForView(tab: WorkspaceView): AiSurfaceId {
+  // DMs and Friends have no surface of their own for Misty's AI: it works as it does anywhere.
+  if (tab.surfaceId === "direct") return "global";
   if (tab.surfaceId !== "space") return tab.surfaceId;
   const parts = tab.route.split("?")[0].split("/").filter(Boolean);
   const section = parts[2] ?? "";

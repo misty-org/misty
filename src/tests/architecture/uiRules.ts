@@ -83,7 +83,7 @@ function countRule(rule: UiRule, text: string, path: string): number {
 export function uiViolationCounts(path: string, text: string): UiViolationCounts {
   const scope = uiRuleScope(path);
   if (!scope) return {};
-  const source = withoutComments(text, scope === "css" || scope === "shared-css");
+  const source = withoutComments(text, scope === "css");
   const counts: UiViolationCounts = {};
   for (const id of rulesFor(scope)) {
     const count = countRule(allRules[id], source, path);

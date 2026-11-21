@@ -13,6 +13,8 @@ export interface VoiceSettings {
   style: DictationStyle;
   /** "auto" or a language code. */
   language: string;
+  /** A second language Tutor also listens for, or "none". */
+  secondLanguage: string;
   /** One term per line. */
   dictionary: string[];
   agentHandoff: boolean;
@@ -42,6 +44,7 @@ export function voiceSettings(document: Record<string, unknown> | undefined): Vo
     cleanup: booleanSetting(doc, "voice", "dictation_cleanup", true),
     style: styles.includes(style) ? style : "plain",
     language: stringSetting(doc, "voice", "language", "auto") || "auto",
+    secondLanguage: stringSetting(doc, "voice", "second_language", "none") || "none",
     dictionary: stringSetting(doc, "voice", "dictionary", "")
       .split("\n")
       .map((term) => term.trim())

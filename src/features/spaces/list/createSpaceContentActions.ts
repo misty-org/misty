@@ -24,7 +24,6 @@ export function createSpaceContentActions(
       text,
       fileNodeIds = [],
       attachmentIds = [],
-      libraryItemIds = [],
       replyToMessageId = "",
       optimisticMessage,
     ) => {
@@ -32,7 +31,6 @@ export function createSpaceContentActions(
       if (
         !trimmed &&
         attachmentIds.length === 0 &&
-        libraryItemIds.length === 0 &&
         fileNodeIds.length === 0
       )
         return;
@@ -57,7 +55,6 @@ export function createSpaceContentActions(
           spans,
           fileNodeIds,
           attachmentIds,
-          libraryItemIds,
           replyToMessageId,
           optimisticMessage?.client_nonce,
         );

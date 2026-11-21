@@ -106,6 +106,12 @@ flate2 = "1"
 tar = "0.4"
 zip = { version = "4", default-features = false, features = ["deflate"] }
 tokio-postgres = { version = "0.7", default-features = false, features = ["runtime", "with-chrono-0_4", "with-serde_json-1"] }
+# Files (features/files): a names-only search index of the home folder, typo-tolerant (MIT), the
+# live refresh of open folders (CC0-1.0) and walking a folder for its size and duplicates
+# (MIT/Unlicense), as Kura used them.
+tantivy = "0.26.2"
+notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
+walkdir = "2.5"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 # Confined helpers: Seatbelt on macOS, an AppContainer and Job object on Windows, Landlock,
@@ -171,7 +177,7 @@ winreg = "0.55"
 dunce = "1"
 # Confined helpers and agent commands (AppContainer and Job objects).
 webview2-com = "0.38.2"
-windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Power", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [features]

@@ -97,7 +97,6 @@ describe("Space chat display rows", () => {
         editingText: "",
         editSaving: false,
         nodes: [],
-        libraryItems: [],
         spaceId: "space-1",
         endRef: createRef<HTMLDivElement>(),
         scrollRef: createRef<HTMLDivElement>(),
@@ -111,7 +110,6 @@ describe("Space chat display rows", () => {
         onDelete: () => {},
         onOpenNode: () => {},
         onError: () => {},
-        onLibraryItem: () => {},
         onReload: () => {},
       }),
     );

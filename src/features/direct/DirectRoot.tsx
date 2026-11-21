@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { notify } from "@misty/ui";
 import { directApi } from "./api";
 import { useStatusUpdates } from "./statusStore";
+import { useDirectAccount } from "./directAccount";
 import { IncomingCallHost } from "./calls/IncomingCallHost";
+import { MessageNotifier } from "./MessageNotifier";
 
 /**
  * What the account's own side of Misty keeps running while signed in, mounted once at the
@@ -10,6 +12,9 @@ import { IncomingCallHost } from "./calls/IncomingCallHost";
  * server, and incoming calls.
  */
 export function DirectRoot({ accountId }: { accountId: string | undefined }) {
+  useEffect(() => {
+    useDirectAccount.setState({ userId: accountId });
+  }, [accountId]);
   useStatusUpdates(accountId);
   useEffect(() => {
     if (!accountId) return;
@@ -33,5 +38,10 @@ export function DirectRoot({ accountId }: { accountId: string | undefined }) {
       cancelled = true;
     };
   }, [accountId]);
-  return accountId ? <IncomingCallHost /> : null;
+  return accountId ? (
+    <>
+      <IncomingCallHost />
+      <MessageNotifier accountId={accountId} />
+    </>
+  ) : null;
 }

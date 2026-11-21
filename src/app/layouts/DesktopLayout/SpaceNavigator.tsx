@@ -1,5 +1,5 @@
-import { Hash, LayoutGrid, Search, Users } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Hash, LayoutGrid, Search, Volume2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/account";
 import {
   useChatStatuses,
@@ -13,24 +13,31 @@ import {
   useProjectChats,
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
+import { joinVoiceChannel, useActiveVoiceChannel, useCallSpeaking } from "@/features/direct";
+import { personInitials } from "@/shared/lib/personInitials";
 import type { Space } from "@/features/spaces";
 import {
   ChannelRowMenu,
   conversationName,
   conversationPath,
-  NewDirectMessageButton,
+  GlobalCreateSpaceDialog,
   spaceChatPath,
   useSpaceEveryoneUnread,
   groupConversations,
-  isGroupDirectMessage,
   NewChannelButton,
   SpaceAppsLauncher,
   SpaceSelector,
   useAppLauncher,
+  useSpacesStore,
   useSpaceConversations,
+  useVoicePresence,
   useWindowSpace,
+  watchVoicePresence,
 } from "@/features/spaces";
 import {
+  Avatar,
+  AvatarFallback,
+  EmptyState,
   ErrorState,
   NavGroupHeading,
   NavRow,
@@ -38,8 +45,12 @@ import {
   Skeleton,
   spaceIcons,
   Text,
+  VoicePerson,
 } from "@misty/ui";
 import { toggleSection, useCollapsedSections } from "./collapsedSections";
+import { FriendsRow, PersonalSections } from "./PersonalSections";
+import { usePlace, useSharedSpaces } from "./placeStore";
+import { JoinWithLink } from "./JoinWithLink";
 import { SidebarAgentThreads } from "./SidebarAgentThreads";
 import { SidebarMore, SidebarPinnedPlaces, type SidebarPlace } from "./SidebarPins";
 import { useSidebarPins, type SidebarPlaceId } from "./sidebarPinsStore";
@@ -77,30 +88,27 @@ function RowSkeletons({ count }: { count: number }) {
 }
 
 /**
- * The Space's own part of the sidebar, under Explore: its channels and the people the person has
- * direct messages with. Each row opens in the focused pane, and unread messages show at the right.
+ * A shared Space's own part of the sidebar, under Explore: its channels. Direct messages are
+ * Personal's, never a Space's. Each row opens in the focused pane, and unread messages show at the
+ * right.
  */
 function SpaceSections({
   space,
   route,
   onOpen,
-  children,
 }: {
   space: Space;
   route: string;
   onOpen(view: WorkspaceView): void;
-  /** The person's agents with their chats, listed in Direct messages under the people. */
-  children?: ReactNode;
 }) {
   const { user } = useAuth();
   const { conversations, error, retry } = useSpaceConversations(space.id);
   const collapsed = useCollapsedSections((state) => state.value);
   const channelsOpen = !collapsed.includes("channels");
-  const dmsOpen = !collapsed.includes("dms");
-  const [channels, dms] = useMemo(() => {
-    const [channelGroup, dmGroup] = groupConversations(conversations);
-    return [channelGroup?.conversations ?? [], dmGroup?.conversations ?? []];
-  }, [conversations]);
+  const channels = useMemo(
+    () => groupConversations(conversations)[0]?.conversations ?? [],
+    [conversations],
+  );
   const [path, query = ""] = route.split("?");
   const inChat = path.includes("/social/misty");
   const openConversation = inChat ? new URLSearchParams(query).get("conversation") : null;
@@ -108,8 +116,61 @@ function SpaceSections({
   // `everyone`, the Space's own channel, is its chat with no conversation picked.
   const everyoneUnread = useSpaceEveryoneUnread(space.id);
   const everyoneOpen = inChat && !openConversation;
+  // Who is in each voice channel, asked for while the Space's sidebar shows.
+  useEffect(() => watchVoicePresence(space.id), [space.id]);
+  const inVoice = useVoicePresence((state) => state.bySpace[space.id]);
+  const activeVoice = useActiveVoiceChannel();
+  const speaking = useCallSpeaking();
+  const members = useSpacesStore((state) => state.membersBySpace[space.id]);
+
+  // A voice channel's row drops into its call; who is in it is listed under it.
+  const voiceRow = (conversation: (typeof conversations)[number]) => {
+    const here = activeVoice?.spaceId === space.id && activeVoice.channelId === conversation.id;
+    const people = inVoice?.[conversation.id] ?? [];
+    const join = () => {
+      if (user?.id)
+        void joinVoiceChannel(
+          { spaceId: space.id, channelId: conversation.id, name: conversation.title },
+          user.id,
+        );
+    };
+    return (
+      <div key={conversation.id}>
+        <ChannelRowMenu
+          spaceId={space.id}
+          conversation={conversation}
+          onDeleted={() => undefined}
+        >
+          <NavRow current={here} onClick={join}>
+            <span className={markSlotClass}>
+              <Volume2 aria-hidden="true" />
+            </span>
+            <NavRowLabel bright={here} className="flex-1">
+              {conversation.title}
+            </NavRowLabel>
+          </NavRow>
+        </ChannelRowMenu>
+        {people.map((userId) => {
+          const name = members?.find((member) => member.user_id === userId)?.name ?? "Someone";
+          return (
+            <VoicePerson
+              key={userId}
+              name={name}
+              speaking={here && speaking.includes(userId)}
+              avatar={
+                <Avatar size="xs">
+                  <AvatarFallback>{personInitials(name)}</AvatarFallback>
+                </Avatar>
+              }
+            />
+          );
+        })}
+      </div>
+    );
+  };
 
   const conversationRow = (conversation: (typeof conversations)[number]) => {
+    if (conversation.voice) return voiceRow(conversation);
     const unread = conversation.unread_count ?? 0;
     const here = openConversation === conversation.id;
     const row = (
@@ -119,11 +180,7 @@ function SpaceSections({
         onClick={() => open(conversationPath(space.id, conversation))}
       >
         <span className={markSlotClass}>
-          {conversation.kind !== "dm" ? (
-            <Hash aria-hidden="true" />
-          ) : isGroupDirectMessage(conversation, user?.id) ? (
-            <Users aria-hidden="true" />
-          ) : null}
+          <Hash aria-hidden="true" />
         </span>
         <NavRowLabel bright={unread > 0} className="flex-1">
           {conversationName(conversation, user?.id)}
@@ -136,9 +193,7 @@ function SpaceSections({
       </NavRow>
     );
     // A channel's actions are its right-click menu: invite, and edit or delete for its managers.
-    return conversation.kind === "dm" ? (
-      row
-    ) : (
+    return (
       <ChannelRowMenu
         key={conversation.id}
         spaceId={space.id}
@@ -191,40 +246,25 @@ function SpaceSections({
           </>
         )}
       </section>
-      <section className={chatSectionClass} aria-label="Direct messages" data-tour="sidebar-dms">
-        <NavGroupHeading
-          name="Direct messages"
-          collapsible={{ open: dmsOpen, onToggle: () => toggleSection("dms") }}
-          className="group/row"
-        >
-          <NewDirectMessageButton
-            spaceId={space.id}
-            onOpened={(opened) => open(conversationPath(space.id, opened))}
-          />
-        </NavGroupHeading>
-        {dmsOpen ? (
-          <>
-            {dms.map(conversationRow)}
-            {children}
-          </>
-        ) : null}
-      </section>
     </>
   );
 }
 
 /**
- * What the sidebar holds, top to bottom: the Space's selector, Search, Explore, Misty's own
- * places (Files, Lab and Code, in the person's order), Apps (a launcher over the window), More (the
- * places they unpinned), then the Space's channels and direct messages. A Space has no home
- * page: its address opens its chat. The person's agent chats are listed under Direct messages
- * beside the people.
+ * What the sidebar holds, top to bottom: the selector, Search, Explore, Misty's own places
+ * (Files, Lab and Code, in the person's order), Apps (a launcher over the window), More (the
+ * places they unpinned), then, on the Personal side, Friends and Direct messages (people, then the
+ * person's agents, each as one thread), or on the Spaces side the Space's channels. A Space has
+ * no home page: its address opens its chat.
  * There is no New row: starting a direct message starts a chat. Lesson chats, and the chats Tutor's runs make,
  * live under Tutor instead.
  */
 export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }) {
   const accountId = useAgentAccountId();
   const space = useWindowSpace();
+  const place = usePlace();
+  const sharedSpaces = useSharedSpaces();
+  const allSpaces = useSpacesStore((state) => state.spaces);
   const agents = usePersonalAgentsStore((state) => state.agents);
   const conversations = useMistyStore((state) => state.conversations);
   const conversationsLoading = useMistyStore((state) => state.conversationsLoading);
@@ -282,7 +322,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
   useEffect(() => void useSidebarPins.getState().load(), []);
   const placeRoutes: Record<SidebarPlaceId, string> = {
-    files: `${base}/files`,
+    files: "/agents?view=files",
     lab: `${base}/lab`,
     code: "/agents?view=code",
   };
@@ -293,14 +333,33 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         label: placeLabels[id],
         icon: spaceIcons[id],
         current:
-          id === "code"
-            ? view === "code"
+          id === "code" || id === "files"
+            ? view === id
             : Boolean(space) &&
               (path === placeRoutes[id] || path.startsWith(`${placeRoutes[id]}/`)),
         open: () => open(placeRoutes[id]),
       } satisfies SidebarPlace,
     ]),
   ) as Record<SidebarPlaceId, SidebarPlace>;
+
+  // The Spaces side with no shared Space yet: nothing to list but the way to make one.
+  if (place === "spaces" && allSpaces.length > 0 && !sharedSpaces.length)
+    return (
+      <GlobalCreateSpaceDialog>
+        {(create) => (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
+            <EmptyState
+              inline
+              title="No Spaces yet"
+              line="Spaces are where you work with other people."
+              action={{ label: "Create a Space", onClick: create }}
+            />
+            {/* Or an invite someone sent, by its link. */}
+            <JoinWithLink />
+          </div>
+        )}
+      </GlobalCreateSpaceDialog>
+    );
 
   return (
     <>
@@ -312,7 +371,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         data-tour="sidebar-space"
         data-misty-window-drag-block="true"
       >
-        {space ? <SpaceSelector space={space} /> : <Skeleton className="h-4 w-32" />}
+        {space ? <SpaceSelector space={space} place={place} /> : <Skeleton className="h-4 w-32" />}
         <Row
           label="Search"
           icon={<Search aria-hidden="true" />}
@@ -342,19 +401,21 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
               isMod={Boolean(space.permissions?.includes("apps.manage"))}
               onOpen={open}
             />
+            {place === "personal" ? <FriendsRow route={route} onOpen={onOpen} /> : null}
             {/* More comes last: the places the person unpinned, and reordering the pins. */}
             <SidebarMore places={places} />
           </>
         ) : null}
       </nav>
-      {/* The rest takes the room that is left and scrolls inside it. */}
+      {/* The rest takes the room that is left and scrolls inside it, a step below the places so
+          its groups read as their own. */}
       <nav
-        className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         aria-label="Space conversations"
         data-misty-window-drag-block="true"
       >
-        {space ? (
-          <SpaceSections space={space} route={route} onOpen={onOpen}>
+        {!space ? null : place === "personal" ? (
+          <PersonalSections route={route} onOpen={onOpen}>
             {conversationsError && !conversations.length ? (
               // The reads go on behind this; the first that works brings the list.
               <ErrorState
@@ -378,10 +439,11 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
                 onOpen={(agent, chatId) => open(agentChatRoute(agent.id, chatId))}
               />
             )}
-          </SpaceSections>
+          </PersonalSections>
         ) : (
-          <RowSkeletons count={6} />
+          <SpaceSections space={space} route={route} onOpen={onOpen} />
         )}
+        {space ? null : <RowSkeletons count={6} />}
       </nav>
     </>
   );

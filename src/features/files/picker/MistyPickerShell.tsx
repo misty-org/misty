@@ -1,7 +1,7 @@
 import { Monitor } from "lucide-react";
 import { useState, type ComponentType } from "react";
 import type { MistyPickerProps, MistyPickerSource } from "./mistyPickerOptions";
-import { LibraryPickerPanel } from "./LibraryPickerSeam";
+import { DrivePickerPanel } from "./DrivePickerSeam";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +21,7 @@ const sharedPickerDialogClassName = [
 
 /**
  * One picker for both sources. Callers open this rather than choosing between a file
- * picker and a Library picker up front — the person picking decides where to look.
+ * picker and the Space's Files up front — the person picking decides where to look.
  */
 export function MistyPickerShell({
   FilePickerComponent: MistyFilePicker,
@@ -31,19 +31,18 @@ export function MistyPickerShell({
   multiple = false,
   title,
   allowedExtensions,
-  librarySelectedIds = [],
-  libraryMaximum = 5,
+  driveMaximum = 5,
   onCancel,
   onChooseFiles,
-  onChooseLibraryItems,
+  onChooseDriveFiles,
 }: MistyPickerProps & { FilePickerComponent: ComponentType<MistyFilePickerProps> }) {
-  const libraryAvailable = Boolean(spaceId && onChooseLibraryItems);
+  const driveAvailable = Boolean(spaceId && onChooseDriveFiles);
   const [source, setSource] = useState<MistyPickerSource>(
-    libraryAvailable ? initialSource : "files",
+    driveAvailable ? initialSource : "files",
   );
 
   // With nothing else to offer, there's no reason to show a dialog before the system's own.
-  if (!libraryAvailable) {
+  if (!driveAvailable) {
     return (
       <MistyFilePicker
         mode={fileMode}
@@ -65,7 +64,7 @@ export function MistyPickerShell({
       onChange={setSource}
       options={[
         { value: "files", label: "This computer", icon: Monitor },
-        { value: "library", label: "Files", icon: spaceIcons.files },
+        { value: "space", label: "Files", icon: spaceIcons.files },
       ]}
     />
   );
@@ -83,7 +82,7 @@ export function MistyPickerShell({
           <DialogHeader className="flex-row items-center justify-between gap-4 border-b px-5 py-3 pr-14 text-left">
             <div className="min-w-0">
               <DialogTitle className="text-base">
-                {source === "library"
+                {source === "space"
                   ? "Choose from Files"
                   : title || (fileMode === "folder" ? "Choose a folder" : "Choose a file")}
               </DialogTitle>
@@ -105,20 +104,18 @@ export function MistyPickerShell({
             />
           </div>
 
-          {spaceId && onChooseLibraryItems ? (
+          {spaceId && onChooseDriveFiles ? (
             // Its search bar, grid and footer are three rows of their own inside the body row.
             <div
               className="min-h-0 grid-rows-[auto_minmax(0,1fr)_auto]"
-              style={{ display: source === "library" ? "grid" : "none" }}
+              style={{ display: source === "space" ? "grid" : "none" }}
             >
-              <LibraryPickerPanel
-                embedded
-                active={source === "library"}
+              <DrivePickerPanel
+                active={source === "space"}
                 spaceId={spaceId}
-                selectedIds={librarySelectedIds}
-                maximumSelected={libraryMaximum}
+                maximumSelected={driveMaximum}
                 onCancel={onCancel}
-                onChoose={onChooseLibraryItems}
+                onChoose={onChooseDriveFiles}
               />
             </div>
           ) : null}
