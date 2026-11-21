@@ -90,6 +90,7 @@ pub(in crate::browser) fn position_windows_webview(
     reveal: bool,
     below_renderer: bool,
 ) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
     use windows_sys::Win32::{
         Foundation::{GetLastError, HWND},
         UI::WindowsAndMessaging::{

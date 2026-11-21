@@ -33,6 +33,7 @@ artifacts/
 **/sessions
 # Source folders whose names match the rules above.
 !src/features/account/sessions/
+!src/features/agents/code/sessions/
 !src/features/agents/artifacts/
 
 # Images and large binary artifacts

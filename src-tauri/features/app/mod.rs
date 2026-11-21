@@ -35,7 +35,6 @@ pub(crate) mod plugin_routes;
 pub mod tray;
 #[cfg(target_os = "macos")]
 mod tray_mark;
-#[cfg(target_os = "macos")]
 pub mod trusted_windows;
 #[cfg(windows)]
 pub mod windows;

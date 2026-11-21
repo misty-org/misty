@@ -90,6 +90,34 @@ If a build fails with "extern location for … does not exist", the build folder
 cd src-tauri; cargo clean; cargo build; cd ..
 ```
 
+If the app opens on Vite's error overlay with "Failed to resolve import", the file it names is missing from the repo,
+not just from this computer. `.gitignore` leaves out folders by name (`**/sessions`, `**/config/`, `**/bin/`), so
+a source folder with one of those names never gets pushed unless `.gitignore` has a `!` exception for it. The computer
+it was written on still has it, so it works there and breaks everywhere else. Fix it on that computer, as below.
+
+### On the Mac: push `src/features/agents/code/sessions/`
+
+The Code page's chat column and its sidebar (`CodeChatColumn.tsx`, `SessionsSidebar.tsx`) live in
+`src/features/agents/code/sessions/`. `**/sessions` kept that folder out of the repo, so the Mac is the only
+computer that has it. `src/features/agents/index.ts` re-exports `openCodeChat` from that folder, so without it the
+whole app fails on Windows, not just the Code page.
+
+`.gitignore` now has `!src/features/agents/code/sessions/`, next to `!src/features/account/sessions/`. On the Mac:
+
+```sh
+cd ~/misty-org/misty
+git pull
+git status --short src/features/agents/code/sessions   # the folder's files now show as untracked
+git add src/features/agents/code/sessions
+git commit -m "chore(code): add the Code page's sessions folder, which .gitignore left out"
+git push
+```
+
+Then pull on Windows, and Vite reloads with the page. Once that's pushed, remove this section.
+
+When you add a source folder named `sessions`, `config` or `bin`, add its `!` exception to `.gitignore` in the same
+commit, under "Source folders whose names match the rules above."
+
 ## 4. A server with calls on
 
 Both computers have to use the same server, with calls on. The local dev stack (`misty server up`) has no
