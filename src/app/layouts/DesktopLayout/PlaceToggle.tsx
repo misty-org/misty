@@ -5,6 +5,7 @@ import { useDms, useFriends } from "@/features/direct";
 import { useSpacesStore } from "@/features/spaces";
 import { ChoiceGroup, IndicatorDot, spaceIcons } from "@misty/ui";
 import { AccountAvatar } from "./NavRail";
+import { useSpaceInvitationWaiting } from "./SpaceInvitations";
 import { choosePlace, usePlace, useSpacesSideFollowsSpaces, type Place } from "./placeStore";
 
 const SpaceIcon = spaceIcons.space;
@@ -60,13 +61,16 @@ function useSpacesMentionWaiting(place: Place): boolean {
 /**
  * The sidebar's switch between Personal (the person's own face) and Spaces (the galaxy), in its
  * top row after the sidebar toggle. A dot marks Personal while something waits there (an unread
- * DM or a friend request), and Spaces after an @mention in a shared Space.
+ * DM or a friend request), and Spaces after an @mention in a shared Space or while an invitation
+ * to one waits.
  */
 export function PlaceToggle() {
   const place = usePlace();
   useSpacesSideFollowsSpaces();
   const personalWaiting = usePersonalWaiting();
-  const spacesWaiting = useSpacesMentionWaiting(place);
+  const mentioned = useSpacesMentionWaiting(place);
+  const invited = useSpaceInvitationWaiting();
+  const spacesWaiting = mentioned || invited;
   return (
     <ChoiceGroup<Place>
       label="Personal or Spaces"
@@ -88,7 +92,8 @@ export function PlaceToggle() {
           value: "spaces",
           label: "Spaces",
           iconOnly: true,
-          // A dot while someone @mentioned the person in a shared Space they haven't gone to.
+          // A dot while someone @mentioned the person in a shared Space they haven't gone to, or
+          // while an invitation to a shared Space waits.
           icon: (
             <span className="relative inline-flex">
               <SpaceIcon />

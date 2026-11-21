@@ -52,6 +52,7 @@ import { FriendsRow, PersonalSections } from "./PersonalSections";
 import { usePlace, useSharedSpaces } from "./placeStore";
 import { JoinWithLink } from "./JoinWithLink";
 import { SidebarAgentThreads } from "./SidebarAgentThreads";
+import { SpaceInvitations } from "./SpaceInvitations";
 import { SidebarMore, SidebarPinnedPlaces, type SidebarPlace } from "./SidebarPins";
 import { useSidebarPins, type SidebarPlaceId } from "./sidebarPinsStore";
 import { SidebarRow as Row } from "./SidebarRow";
@@ -136,11 +137,7 @@ function SpaceSections({
     };
     return (
       <div key={conversation.id}>
-        <ChannelRowMenu
-          spaceId={space.id}
-          conversation={conversation}
-          onDeleted={() => undefined}
-        >
+        <ChannelRowMenu spaceId={space.id} conversation={conversation} onDeleted={() => undefined}>
           <NavRow current={here} onClick={join}>
             <span className={markSlotClass}>
               <Volume2 aria-hidden="true" />
@@ -347,15 +344,21 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
     return (
       <GlobalCreateSpaceDialog>
         {(create) => (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
-            <EmptyState
-              inline
-              title="No Spaces yet"
-              line="Spaces are where you work with other people."
-              action={{ label: "Create a Space", onClick: create }}
-            />
-            {/* Or an invite someone sent, by its link. */}
-            <JoinWithLink />
+          <div className="flex min-h-0 flex-1 flex-col">
+            {/* Invitations to a shared Space wait above the empty state. */}
+            <div className="mt-1.5 flex-none">
+              <SpaceInvitations />
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
+              <EmptyState
+                inline
+                title="No Spaces yet"
+                line="Spaces are where you work with other people."
+                action={{ label: "Create a Space", onClick: create }}
+              />
+              {/* Or an invite someone sent, by its link. */}
+              <JoinWithLink />
+            </div>
           </div>
         )}
       </GlobalCreateSpaceDialog>
@@ -441,7 +444,10 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
             )}
           </PersonalSections>
         ) : (
-          <SpaceSections space={space} route={route} onOpen={onOpen} />
+          <>
+            <SpaceInvitations />
+            <SpaceSections space={space} route={route} onOpen={onOpen} />
+          </>
         )}
         {space ? null : <RowSkeletons count={6} />}
       </nav>

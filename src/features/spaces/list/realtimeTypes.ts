@@ -17,7 +17,7 @@ export type RealtimeEnvelope =
   | { type: "event"; event: SpaceEvent }
   | {
       type: "control";
-      action: "member.removed" | "member.left" | "space.deleted";
+      action: "member.removed" | "member.left" | "space.deleted" | "invitation.changed";
       space_id: string;
     }
   | { type: "presence"; space_id: string; viewers: SpacePresenceViewer[] }

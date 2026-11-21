@@ -13,20 +13,26 @@ vi.mock("@/features/direct", () => ({
   useDms: () => ({ data: [] }),
   useFriends: () => ({ data: { incoming: [] } }),
 }));
+const spacesState = vi.hoisted(() => ({
+  spaces: [
+    { id: "own", is_default: true },
+    { id: "team", is_default: false },
+  ],
+  invitations: [] as { id: string }[],
+}));
 vi.mock("@/features/spaces", () => ({
-  useSpacesStore: {
-    getState: () => ({
-      spaces: [
-        { id: "own", is_default: true },
-        { id: "team", is_default: false },
-      ],
-    }),
-  },
+  useSpacesStore: Object.assign(
+    (select: (state: typeof spacesState) => unknown) => select(spacesState),
+    { getState: () => spacesState },
+  ),
 }));
 
 import { PlaceToggle } from "./PlaceToggle";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  spacesState.invitations = [];
+});
 
 const message = (spaceId: string, mentioned: string, sender = "ana") =>
   window.dispatchEvent(
@@ -41,7 +47,8 @@ const message = (spaceId: string, mentioned: string, sender = "ana") =>
     }),
   );
 
-const dots = (container: HTMLElement) => container.querySelectorAll('[data-slot="indicator-dot"]').length;
+const dots = (container: HTMLElement) =>
+  container.querySelectorAll('[data-slot="indicator-dot"]').length;
 
 it("marks Spaces after an @mention in a shared Space, never for Personal or someone else", () => {
   const { container } = render(<PlaceToggle />);
@@ -51,5 +58,11 @@ it("marks Spaces after an @mention in a shared Space, never for Personal or some
   act(() => message("team", "me", "me"));
   expect(dots(container)).toBe(0);
   act(() => message("team", "me"));
+  expect(dots(container)).toBe(1);
+});
+
+it("marks Spaces while an invitation to a shared Space waits", () => {
+  spacesState.invitations = [{ id: "invite" }];
+  const { container } = render(<PlaceToggle />);
   expect(dots(container)).toBe(1);
 });
