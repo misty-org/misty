@@ -7,7 +7,6 @@ pub mod apps;
 pub mod bots;
 #[cfg(desktop)]
 pub mod browser;
-pub mod code;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub mod computer_use;
 pub mod devices;
@@ -18,6 +17,7 @@ pub mod known_names;
 #[cfg(desktop)]
 pub mod pets;
 pub mod project;
+pub mod registry;
 pub mod spaces_drive;
 pub mod spaces_folders;
 mod voice;

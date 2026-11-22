@@ -1,7 +1,7 @@
 import { apiRequest } from "@/api/client";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import { useMistyStore } from "../conversations/state/useMistyStore";
-import { startRun } from "../tutor/tutorRuns";
+import { startRun } from "../conversations/startRun";
 
 /**
  * Pick-ups: where an agent left off, so the next one, on any engine, starts there. The agent drafts

@@ -2,15 +2,9 @@ import { create } from "zustand";
 import { readDeviceState, updateDeviceState } from "@/features/agents";
 import { announceDeviceSetting, onDeviceSettingChange } from "@/shared/lib/deviceSetting";
 
-/**
- * Misty's own places in the sidebar: the Space's Files, and the Lab and Code pages. Each is
- * pinned by default; whatever the person unpins waits under More, and Reorder pins sets their
- * order.
- */
-export const sidebarPlaceIds = ["files", "lab", "code"] as const;
+export const sidebarPlaceIds = ["files"] as const;
 export type SidebarPlaceId = (typeof sidebarPlaceIds)[number];
 
-/** Every place in the person's order, and which of them are pinned. */
 interface SidebarPins {
   order: SidebarPlaceId[];
   pinned: SidebarPlaceId[];
@@ -24,10 +18,6 @@ export const sidebarPinDefaults: SidebarPins = {
 
 const known = (id: unknown): id is SidebarPlaceId => sidebarPlaceIds.includes(id as SidebarPlaceId);
 
-/**
- * Drops places that no longer exist (an older Misty's Docs, Planner and the rest) and adds new
- * ones at the end, pinned.
- */
 function normalize(stored: Partial<SidebarPins> | null): SidebarPins {
   if (!stored) return sidebarPinDefaults;
   const order = [...new Set((stored.order ?? []).filter(known))];
@@ -40,7 +30,6 @@ function normalize(stored: Partial<SidebarPins> | null): SidebarPins {
   return { order, pinned: order.filter((id) => pinned.has(id)) };
 }
 
-/** Which places are pinned and in what order, kept for this device in `misty.db`. */
 export const useSidebarPins = create<
   SidebarPins & {
     load(): Promise<void>;
@@ -52,7 +41,6 @@ export const useSidebarPins = create<
     try {
       set(normalize(await readDeviceState<SidebarPins>(scope)));
     } catch {
-      // The defaults stay.
     }
   },
   set(next) {
@@ -63,8 +51,6 @@ export const useSidebarPins = create<
       () => sidebarPinDefaults,
       () => value,
     )
-      // Every other window reads the new layout, so one still showing the old one can't save
-      // it back over this change.
       .then(() => announceDeviceSetting(scope))
       .catch(() => get().load());
   },

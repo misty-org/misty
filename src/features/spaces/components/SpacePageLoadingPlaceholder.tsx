@@ -1,5 +1,4 @@
 import { ErrorState, ListRowSkeleton, PaneLoading, SetupState } from "@misty/ui";
-import { SpaceLabSkeleton } from "@/features/agents";
 import { ConversationLoadState } from "../chat/components/ConversationStates";
 
 /** Which page of a Space is on its way, so its placeholder takes that page's shape. */
@@ -46,8 +45,6 @@ function SpacePageSkeleton({ section }: SpacePageShape) {
           <ListRowSkeleton label="Files" rows={2} state />
         </div>
       );
-    case "lab":
-      return <SpaceLabSkeleton />;
     default:
       // Any other page: its shape isn't known here, so one spinner in its middle.
       return <PaneLoading label="Loading page" />;

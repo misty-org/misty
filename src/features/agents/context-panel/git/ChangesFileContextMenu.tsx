@@ -17,7 +17,6 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@misty/ui";
-import { isCodePageShown } from "../../code/codePageStore";
 import { useContextPanel } from "../contextPanelStore";
 import { filesApi } from "../files/filesApi";
 import { useFilesStore } from "../files/filesStore";
@@ -40,7 +39,7 @@ const revealLabel = () =>
 /** Opens a changed file in the Code page's editor while it shows, else the files panel's. */
 export function openChangedFile(path: string) {
   void useFilesStore.getState().openFile(path);
-  if (!isCodePageShown()) useContextPanel.getState().show("files");
+  useContextPanel.getState().show("files");
 }
 
 /**

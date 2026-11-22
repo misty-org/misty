@@ -1,7 +1,5 @@
 import {
   defaultAgentOf,
-  isProjectChat,
-  openCodeChat,
   usePersonalAgentsStore,
 } from "@/features/agents";
 import {
@@ -63,9 +61,7 @@ export function openWorkspaceRouteAt(
  * any other on its agent's chat page.
  */
 export function openChatRoute(agentId: string, conversationId: string) {
-  if (!isProjectChat(conversationId)) return agentChatRoute(agentId, conversationId);
-  openCodeChat(conversationId);
-  return "/agents?view=code";
+  return agentChatRoute(agentId, conversationId);
 }
 
 export function agentChatRoute(agentId: string, conversationId?: string, fresh = false) {

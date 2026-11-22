@@ -299,21 +299,21 @@ describe("desktop dock store", () => {
     expect(store.openSurface(workspaceSurfaceFromRoute("/spaces/one/files")!).id).toBe(first.id);
   });
 
-  it("opens Lab and Files as separate reusable tabs in one Space", () => {
-    const labRequest = workspaceSurfaceFromRoute("/spaces/one/lab");
+  it("opens Chat and Files as separate reusable tabs in one Space", () => {
+    const chatRequest = workspaceSurfaceFromRoute("/spaces/one/chat");
     const filesRequest = workspaceSurfaceFromRoute("/spaces/one/files");
-    expect(labRequest).not.toBeNull();
+    expect(chatRequest).not.toBeNull();
     expect(filesRequest).not.toBeNull();
 
-    const lab = useWorkspaceStore.getState().addSurface(labRequest!);
+    const chat = useWorkspaceStore.getState().addSurface(chatRequest!);
     const files = useWorkspaceStore.getState().addSurface(filesRequest!);
 
     expect(allLayoutViews(useWorkspaceStore.getState().layout)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: lab.id,
-          groupKey: "space:one:lab",
-          title: "Lab",
+          id: chat.id,
+          groupKey: "space:one:social",
+          title: "Chat",
         }),
         expect.objectContaining({
           id: files.id,
@@ -329,7 +329,7 @@ describe("desktop dock store", () => {
     expect(rememberedFiles.id).toBe(files.id);
     expect(rememberedFiles.route).toBe("/spaces/one/files?collection=deleted");
 
-    useWorkspaceStore.getState().focusView(lab.id);
+    useWorkspaceStore.getState().focusView(chat.id);
     useWorkspaceStore.getState().focusView(files.id);
     expect(
       allLayoutViews(useWorkspaceStore.getState().layout).find((tab) => tab.id === files.id)

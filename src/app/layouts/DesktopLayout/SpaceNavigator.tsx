@@ -7,10 +7,7 @@ import {
   useChatSectionsStore,
   useLessonStore,
   useMistyStore,
-  tutorChatIds,
-  useTutorStore,
   usePersonalAgentsStore,
-  useProjectChats,
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
 import {
@@ -67,10 +64,8 @@ import { agentChatRoute, openWorkspaceRoute } from "./spaceNavigation";
 
 const ExploreIcon = spaceIcons.explore;
 
-/** Misty's own places: the Space's Files, then the Lab and Code pages. */
-const placeLabels: Record<SidebarPlaceId, string> = { files: "Files", lab: "Lab", code: "Code" };
+const placeLabels: Record<SidebarPlaceId, string> = { files: "Files" };
 
-/** The route of the page the person is looking at: the focused pane's open view. */
 function useFocusedRoute(): string {
   return useWorkspaceStore((state) => {
     const pane = dockLeaves(state.layout.root).find(
@@ -93,11 +88,6 @@ function RowSkeletons({ count }: { count: number }) {
   );
 }
 
-/**
- * A shared Space's own part of the sidebar, under Explore: its channels. Direct messages are
- * Personal's, never a Space's. Each row opens in the focused pane, and unread messages show at the
- * right.
- */
 function SpaceSections({
   space,
   route,
@@ -119,18 +109,14 @@ function SpaceSections({
   const inChat = path.includes("/social/misty");
   const openConversation = inChat ? new URLSearchParams(query).get("conversation") : null;
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
-  // `everyone`, the Space's own channel, is its chat with no conversation picked.
   const everyoneUnread = useSpaceEveryoneUnread(space.id);
   const everyoneOpen = inChat && !openConversation;
-  // Who is in each voice channel, asked for while the Space's sidebar shows.
   useEffect(() => watchVoicePresence(space.id), [space.id]);
   const inVoice = useVoicePresence((state) => state.bySpace[space.id]);
   const activeVoice = useActiveVoiceChannel();
   const speaking = useCallSpeaking();
   const members = useSpacesStore((state) => state.membersBySpace[space.id]);
 
-  // A voice channel's row drops into its call and opens the call's page; who is in it is listed
-  // under it.
   const voiceRow = (conversation: (typeof conversations)[number]) => {
     const here = activeVoice?.spaceId === space.id && activeVoice.channelId === conversation.id;
     const people = inVoice?.[conversation.id] ?? [];
@@ -196,7 +182,6 @@ function SpaceSections({
         ) : null}
       </NavRow>
     );
-    // A channel's actions are its right-click menu: invite, and edit or delete for its managers.
     return (
       <ChannelRowMenu
         key={conversation.id}
@@ -254,15 +239,6 @@ function SpaceSections({
   );
 }
 
-/**
- * What the sidebar holds, top to bottom: the selector, Search, Explore, Misty's own places
- * (Files, Lab and Code, in the person's order), Apps (a launcher over the window), More (the
- * places they unpinned), then, on the Personal side, Friends and Direct messages (people, then the
- * person's agents, each as one thread), or on the Spaces side the Space's channels. A Space has
- * no home page: its address opens its chat.
- * There is no New row: starting a direct message starts a chat. Lesson chats, and the chats Tutor's runs make,
- * live under Tutor instead.
- */
 export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }) {
   const accountId = useAgentAccountId();
   const space = useWindowSpace();
@@ -270,27 +246,18 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const sharedSpaces = useSharedSpaces();
   const allSpaces = useSpacesStore((state) => state.spaces);
   const { sessionExpired } = useAuth();
-  // Skeletons only while the Spaces are on their way. Signed out, or once the read has failed,
-  // nothing is coming, so the sidebar shows only its fixed rows.
   const spacesPending = useSpacesStore((state) => !sessionExpired && state.loading && !state.error);
   const agents = usePersonalAgentsStore((state) => state.agents);
   const conversations = useMistyStore((state) => state.conversations);
   const conversationsLoading = useMistyStore((state) => state.conversationsLoading);
   const conversationsError = useMistyStore((state) => state.conversationsError);
-  // The account whose chats have been read once, so the skeleton covers only the first read: a
-  // later reload keeps the list on screen.
   const [chatsReadFor, setChatsReadFor] = useState<string | null>(null);
   const lessons = useLessonStore((state) => state.lessons);
-  const tutorJobs = useTutorStore((state) => state.jobs);
-  const tutorNotebooks = useTutorStore((state) => state.notebooks);
   const route = useFocusedRoute();
   const statuses = useChatStatuses();
-  // Chats that work in a project are Code's: the Code page lists them, by project.
-  const projectChats = useProjectChats();
   useEffect(() => {
     void usePersonalAgentsStore.getState().load(accountId);
     void useLessonStore.getState().load(accountId);
-    void useTutorStore.getState().load(accountId);
     void useChatSectionsStore
       .getState()
       .load(accountId)
@@ -303,25 +270,20 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
       .finally(() => setChatsReadFor(accountId));
   }, [accountId]);
   const chatsPending =
-    (!conversations.length && (conversationsLoading || chatsReadFor !== accountId)) ||
-    projectChats === null;
+    !conversations.length && (conversationsLoading || chatsReadFor !== accountId);
 
   const chats = useMemo(() => {
-    const made = tutorChatIds(tutorJobs, tutorNotebooks);
     return (
       conversations
-        // Studio talks are the studio's own, never listed with the chats.
         .filter(
           (chat) =>
             chat.messages.length > 0 &&
             !chat.place &&
-            !projectChats?.[chat.id] &&
-            !lessons[chat.id] &&
-            !made.has(chat.id),
+            !lessons[chat.id],
         )
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     );
-  }, [conversations, projectChats, lessons, tutorJobs, tutorNotebooks]);
+  }, [conversations, lessons]);
   const [path, query = ""] = route.split("?");
   const params = new URLSearchParams(query);
   const view = path === "/agents" ? params.get("view") : null;
@@ -331,8 +293,6 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   useEffect(() => void useSidebarPins.getState().load(), []);
   const placeRoutes: Record<SidebarPlaceId, string> = {
     files: "/agents?view=files",
-    lab: `${base}/lab`,
-    code: "/agents?view=code",
   };
   const places = Object.fromEntries(
     (Object.keys(placeLabels) as SidebarPlaceId[]).map((id) => [
@@ -340,23 +300,17 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
       {
         label: placeLabels[id],
         icon: spaceIcons[id],
-        current:
-          id === "code" || id === "files"
-            ? view === id
-            : Boolean(space) &&
-              (path === placeRoutes[id] || path.startsWith(`${placeRoutes[id]}/`)),
+        current: view === id,
         open: () => open(placeRoutes[id]),
       } satisfies SidebarPlace,
     ]),
   ) as Record<SidebarPlaceId, SidebarPlace>;
 
-  // The Spaces side with no shared Space yet: nothing to list but the way to make one.
   if (place === "spaces" && allSpaces.length > 0 && !sharedSpaces.length)
     return (
       <GlobalCreateSpaceDialog>
         {(create) => (
           <div className="flex min-h-0 flex-1 flex-col">
-            {/* Invitations to a shared Space wait above the empty state. */}
             <div className="mt-1.5 flex-none">
               <SpaceInvitations />
             </div>
@@ -367,7 +321,6 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
                 line="Spaces are where you work with other people."
                 action={{ label: "Create a Space", onClick: create }}
               />
-              {/* Or an invite someone sent, by its link. */}
               <JoinWithLink />
             </div>
           </div>
@@ -377,8 +330,6 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
 
   return (
     <>
-      {/* The selector and Search; the rows keep a visible gap, so a hovered row never runs into the
-          current one. */}
       <nav
         className="mt-1.5 flex flex-none flex-col gap-1.5"
         aria-label="Space"
@@ -405,7 +356,6 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
           data-tour="sidebar-explore"
         />
         {space ? <SidebarPinnedPlaces places={places} /> : null}
-        {/* The Space's apps, in a launcher over the window rather than a page. */}
         <Row
           label="Apps"
           icon={<LayoutGrid aria-hidden="true" />}
@@ -420,13 +370,10 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
               onOpen={open}
             />
             {place === "personal" ? <FriendsRow route={route} onOpen={onOpen} /> : null}
-            {/* More comes last: the places the person unpinned, and reordering the pins. */}
             <SidebarMore places={places} />
           </>
         ) : null}
       </nav>
-      {/* The rest takes the room that is left and scrolls inside it, a step below the places so
-          its groups read as their own. */}
       <nav
         className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         aria-label="Space conversations"
@@ -435,7 +382,6 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         {!space ? null : place === "personal" ? (
           <PersonalSections route={route} onOpen={onOpen}>
             {conversationsError && !conversations.length ? (
-              // The reads go on behind this; the first that works brings the list.
               <ErrorState
                 inline
                 title="Agent chats couldn't load"

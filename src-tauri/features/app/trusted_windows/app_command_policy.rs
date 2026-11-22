@@ -1,7 +1,3 @@
-//! What's left after the sandbox's actions. `src-tauri/tauri-permissions/` decides which window can call which
-//! command, and Tauri refuses anything no capability allows. Tauri's
-//! window patterns are prefixes, though, so this also holds each kind of window to its exact label:
-//! `window-1-spoof` or a cursor window with a name instead of a number gets nothing.
 use crate::browser::app_windows;
 
 pub fn allows(label: &str) -> bool {
@@ -11,10 +7,7 @@ pub fn allows(label: &str) -> bool {
         || label == TUTOR_ASK_WINDOW
 }
 
-/// The desktop pet's own window (`pets/overlay.rs`), held to its few commands by `pet-overlay.json`.
 const PET_WINDOW: &str = "misty-pet";
-/// Tutor's text box beside the pointer (`cursor/host/ask.rs`), held to closing itself by
-/// `tutor-ask.json`.
 const TUTOR_ASK_WINDOW: &str = "misty-tutor-ask";
 
 fn is_cursor_overlay(label: &str) -> bool {
@@ -55,7 +48,6 @@ mod tests {
             .unwrap_or_else(|| panic!("no capability {identifier}"))
     }
 
-    /// Each action set's Tauri permissions, by name, as `actions.toml` lists them.
     fn action_sets() -> BTreeMap<String, Vec<String>> {
         let mut sets = BTreeMap::new();
         let mut current = String::new();
@@ -71,7 +63,6 @@ mod tests {
         sets
     }
 
-    /// The commands a capability's action sets allow.
     fn commands_for(identifier: &str) -> BTreeSet<String> {
         let sets = action_sets();
         capability(identifier)["permissions"]
@@ -104,8 +95,6 @@ mod tests {
         commands
     }
 
-    /// A new command fails here until it's listed and given to an action set, so nothing can be
-    /// callable without someone deciding which windows get it.
     #[test]
     fn every_command_is_listed_and_in_exactly_one_action_set() {
         let listed: BTreeSet<String> = APP_COMMANDS.iter().map(|name| (*name).to_owned()).collect();
@@ -160,9 +149,6 @@ mod tests {
     }
 
     #[test]
-    /// An overlay reads what to show, and Misty there may take the pointer for her own window
-    /// (to be clicked or handed a file, or a 3D model's card to be turned), open Tutor's text box
-    /// and ask about a part of the model. Nothing else.
     fn cursor_overlays_only_present_and_take_the_pointer_for_misty() {
         let permissions = capability("cursor-companion")["permissions"].clone();
         let app_commands: Vec<_> = permissions
@@ -180,14 +166,13 @@ mod tests {
                 "allow-cursor-companion-snapshot",
                 "allow-cursor-companion-hit",
                 "allow-cursor-companion-ask-open",
+                "allow-cursor-companion-ask-dismiss",
+                "allow-cursor-companion-ask-shot",
                 "allow-cursor-companion-ask-part"
             ]
         );
     }
 
-    /// Capabilities scoped by window would also cover website views attached to that window, and one
-    /// with remote URLs would grant commands to websites. Only Kiri's single entry point may reach
-    /// them.
     #[test]
     fn capabilities_never_reach_website_views() {
         let website_labels = [
@@ -195,7 +180,6 @@ mod tests {
             "misty-browser-storage-1",
             "misty-browser-capture-1",
             "render-control",
-            // The small window an extension's popup page moves into.
             "misty-popup-01951d32-40ac-7000-8000-000000000001",
         ];
         for raw in CAPABILITIES {
@@ -210,8 +194,6 @@ mod tests {
                     capability["permissions"],
                     serde_json::json!(["kiri:default"])
                 );
-                // Extension pages sit in the same views, but under their own schemes, which
-                // this list has to leave out for them to reach no command at all.
                 assert_eq!(
                     capability["remote"]["urls"],
                     serde_json::json!(["https://*:*", "http://*:*"])

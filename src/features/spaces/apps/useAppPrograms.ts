@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { invoke } from "@/native";
-import { catalogApps } from "./thirdPartyApps";
+import { useRegistryApps } from "./thirdPartyApps";
 import { useSpaceApps } from "./useSpaceApps";
 
 /**
@@ -13,8 +13,9 @@ import { useSpaceApps } from "./useSpaceApps";
  */
 export function useAppPrograms(spaceId: string | undefined) {
   const { apps } = useSpaceApps(spaceId ?? "");
+  const listedApps = useRegistryApps();
   const key = (apps ?? [])
-    .filter((app) => catalogApps.some((entry) => entry.id === app.app_id && entry.mcp_program))
+    .filter((app) => listedApps.some((entry) => entry.id === app.app_id && entry.mcp_program))
     .map((app) => `${app.app_id}@${app.version}`)
     .sort()
     .join(",");

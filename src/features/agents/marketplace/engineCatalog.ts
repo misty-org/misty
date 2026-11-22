@@ -1,4 +1,5 @@
-import catalog from "./engines.json";
+import { useMemo } from "react";
+import { useRegistry } from "@/native/registry";
 
 /**
  * The engines Misty's catalog knows (`misty-catalog`'s engines.json, carried with each release by
@@ -19,10 +20,13 @@ export interface CatalogEngine {
   install: { route: EngineInstallRoute; npm?: string; windows?: string };
 }
 
-export const catalogEngines: readonly CatalogEngine[] = (catalog as { engines: CatalogEngine[] })
-  .engines;
+export const useRegistryEngines = (): readonly CatalogEngine[] =>
+  useRegistry((state) => state.engines.engines) as readonly CatalogEngine[];
 
-export const catalogEngineIds: readonly string[] = catalogEngines.map((engine) => engine.id);
+export function useRegistryEngineIds(): readonly string[] {
+  const engines = useRegistryEngines();
+  return useMemo(() => engines.map((engine) => engine.id), [engines]);
+}
 
 /** How it installs, as the details say it. */
 export function installRouteText(route: EngineInstallRoute): string {

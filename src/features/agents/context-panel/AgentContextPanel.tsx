@@ -6,7 +6,6 @@ import { ErrorState, SidePanelHeader, Text, lazyTool, ToolSuspense } from "@mist
 import type { ContextPanelSurface } from "./contextPanelStore";
 import { FilesBreadcrumbs } from "./files/FilesBreadcrumbs";
 import { FilesPanel } from "./files/FilesPanel";
-import { OpenInCodeButton } from "../code/OpenInCodeDialog";
 import { useChatFolder } from "../shared-folders/chatFolder";
 import { ChatFolderPicker } from "./ChatFolderPicker";
 import { ChangesPanel } from "./git/ChangesPanel";
@@ -55,7 +54,6 @@ export function AgentContextPanel(props: {
             />
           ) : null}
           <div className="flex flex-none items-center gap-0.5" data-side-panel-trailing="">
-            {scratch ? <OpenInCodeButton conversationId={props.conversationId} /> : null}
             <WorktreesButton folder={folder} conversationId={props.conversationId} />
             <LaunchScriptButton chat={chat} folder={folder} />
             <OpenInMenu folder={folder} />

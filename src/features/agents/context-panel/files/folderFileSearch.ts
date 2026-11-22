@@ -1,4 +1,3 @@
-import { fileRoute, isCodePageShown } from "../../code/codePageStore";
 import { useContextPanel } from "../contextPanelStore";
 import { useChatFolders } from "../../shared-folders/chatFolder";
 import { useFileIndex, type IndexEntry } from "./fileIndex";
@@ -73,7 +72,7 @@ export async function searchFolderFiles(
  * tab beside the chat. Returns the route that shows it.
  */
 export function openFolderFile(path: string): string {
-  if (!isCodePageShown()) useContextPanel.getState().show("files");
+  useContextPanel.getState().show("files");
   void useFilesStore.getState().openFile(path);
-  return fileRoute();
+  return "/agents";
 }

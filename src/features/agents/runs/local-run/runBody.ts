@@ -116,7 +116,7 @@ export async function buildRunBody(
   ]);
   // A chat in a project is Code's: its agent works quietly there, with its rules and no persona.
   const multirunFolder = await multirunFolderOf(conversationId);
-  const inCode =
+  const inProject =
     Boolean(conversationId) && (multirunFolder !== undefined || isProjectChat(conversationId));
   // A turn that chooses nothing takes the chat's choice, then its agent's default, read as one of
   // the engine's own modes (an older Ask, Auto, Plan or Bypass maps to the engine's own here).
@@ -171,9 +171,9 @@ export async function buildRunBody(
             // The agent's soul and rules (`agents/bots`), only its rules in Code, then any `#`
             // personas, then where a chat works.
             instructions: [
-              agent ? assembleAgentPrompt({ agent, quiet: inCode }).text : "",
+              agent ? assembleAgentPrompt({ agent }).text : "",
               personas,
-              conversationId && !inCode && engineId ? SCRATCH_CHAT_NOTE : "",
+              conversationId && !inProject && engineId ? SCRATCH_CHAT_NOTE : "",
             ]
               .filter(Boolean)
               .join("\n\n"),

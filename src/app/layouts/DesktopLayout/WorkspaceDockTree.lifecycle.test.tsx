@@ -20,8 +20,8 @@ afterEach(cleanup);
 describe("WorkspaceDockTree tab lifecycle", () => {
   it("keeps every open surface mounted while only exposing the active one", () => {
     const files = tab("files", "/spaces/family/files");
-    const lab = tab("lab", "/spaces/family/lab");
-    const pane = createDockLeaf([files, lab]);
+    const chat = tab("chat", "/spaces/family/chat");
+    const pane = createDockLeaf([files, chat]);
     pane.activeViewId = files.id;
     const props = {
       node: pane,
@@ -39,10 +39,10 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     const view = render(<WorkspaceDockTree {...props} />);
     expect(view.container.querySelectorAll("[data-workspace-surface]")).toHaveLength(2);
     expect(view.container.querySelector(`[data-workspace-surface="${files.id}"]`)).not.toBeNull();
-    expect(view.container.querySelector(`[data-workspace-surface="${lab.id}"]`)).not.toBeNull();
+    expect(view.container.querySelector(`[data-workspace-surface="${chat.id}"]`)).not.toBeNull();
 
     const filesElement = view.container.querySelector(`[data-workspace-surface="${files.id}"]`);
-    const labElement = view.container.querySelector(`[data-workspace-surface="${lab.id}"]`);
+    const chatElement = view.container.querySelector(`[data-workspace-surface="${chat.id}"]`);
     const otherPane = createDockLeaf([]);
     const split = insertDockSplit(pane, pane.id, otherPane, "right");
     view.rerender(<WorkspaceDockTree {...props} node={split} />);
@@ -69,7 +69,7 @@ describe("WorkspaceDockTree tab lifecycle", () => {
       filesElement,
     );
 
-    const nextPane = { ...pane, views: [lab, files], activeViewId: lab.id };
+    const nextPane = { ...pane, views: [chat, files], activeViewId: chat.id };
     act(() => {
       view.rerender(<WorkspaceDockTree {...props} node={nextPane} />);
     });
@@ -78,8 +78,8 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     expect(view.container.querySelector(`[data-workspace-surface="${files.id}"]`)).toBe(
       filesElement,
     );
-    expect(view.container.querySelector(`[data-workspace-surface="${lab.id}"]`)).toBe(
-      labElement,
+    expect(view.container.querySelector(`[data-workspace-surface="${chat.id}"]`)).toBe(
+      chatElement,
     );
     expect(
       view.container
@@ -88,19 +88,19 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     ).not.toBeNull();
     expect(
       view.container
-        .querySelector(`[data-workspace-surface="${lab.id}"]`)
+        .querySelector(`[data-workspace-surface="${chat.id}"]`)
         ?.closest('[aria-hidden="false"]'),
     ).not.toBeNull();
   });
 });
 
-function tab(tool: "files" | "lab", route: string): WorkspaceView {
+function tab(tool: "files" | "chat", route: string): WorkspaceView {
   return {
     id: `tab-${tool}`,
     surfaceId: "space",
     groupKey: `space:family:${tool}`,
     instanceKey: `family:${tool}`,
-    title: tool === "files" ? "Files" : "Lab",
+    title: tool === "files" ? "Files" : "Chat",
     route,
     sidebarVisible: true,
     state: {},

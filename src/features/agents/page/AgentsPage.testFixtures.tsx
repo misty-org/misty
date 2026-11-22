@@ -23,7 +23,6 @@ const fixture = vi.hoisted(() => ({
     model_mode: "automatic",
     model_id: "",
     enabled: true,
-    /** Its home Space; empty for one made before agents had one. */
     space_id: "",
   },
 }));
@@ -32,7 +31,6 @@ vi.mock("../personal/agentAccount", async (original) => ({
   ...(await original<typeof Actual1>()),
   useAgentAccountId: () => "owner",
 }));
-// A chat's load reads misty.db, which holds what the test put in the store.
 vi.mock("@/features/agents/conversations/state/localChats", async (original) => {
   const actual = await original<typeof Actual2>();
   return {
@@ -72,8 +70,6 @@ vi.mock("@/features/agents/personal/personalAgentsApi", () => ({
   },
 }));
 vi.mock("@/features/agents/conversations/ask/handoff", () => ({ openMisty: async () => {} }));
-// The Code page is its own editor; these tests only need to tell which page shows.
-vi.mock("../code/CodePage", () => ({ CodePage: () => <div>Code page</div> }));
 
 beforeEach(() => {
   fixture.includeSecond = false;
@@ -105,7 +101,6 @@ function NavigationProbe() {
   return null;
 }
 
-/** Where the page's router is now: its path and query. */
 export const currentLocation = () => location;
 
 export function renderAgentsPage(entry = "/agents") {
@@ -117,22 +112,16 @@ export function renderAgentsPage(entry = "/agents") {
   );
 }
 
-/** Follows a link to the page, as the window's sidebar does. */
-export function openPage(page: "lab" | "code") {
+export function openPage(page: "files" | "memory") {
   act(() => void navigateTo?.(`/agents?view=${page}`));
 }
 
-/** Follows a link back to an agent's chat, as a chat row in the sidebar does. */
 export function openChat(agentId = "communications", conversationId?: string) {
   const params = new URLSearchParams({ agent: agentId });
   if (conversationId) params.set("conversation", conversationId);
   act(() => void navigateTo?.(`/agents?${params}`));
 }
 
-/**
- * An agent's settings open by a link that keeps the page where it is and names the agent, never
- * from the chat.
- */
 export function openAgentSettings(agent = "Communications") {
   const id = agent === "Research" ? "research" : fixture.agent.id;
   const [path, query = ""] = location.split("?");
@@ -141,7 +130,6 @@ export function openAgentSettings(agent = "Communications") {
   act(() => void navigateTo?.(`${path}?${params}`));
 }
 
-/** Opens the ⋯ menu in the conversation header (Recents has its own) and chooses an action. */
 export const composer = () => screen.getByLabelText("Message") as HTMLTextAreaElement;
 
 export function typeDraft(value: string) {

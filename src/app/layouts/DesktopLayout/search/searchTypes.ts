@@ -11,7 +11,7 @@ export const searchKinds: { id: SearchKind; label: string; placeholder: string }
   { id: "all", label: "All", placeholder: "Search" },
   { id: "chats", label: "Chats", placeholder: "Search chats" },
   { id: "space", label: "Space", placeholder: "Search this Space" },
-  { id: "learn", label: "Lab", placeholder: "Search the Lab" },
+  { id: "learn", label: "Lessons", placeholder: "Search lessons" },
   { id: "apps", label: "Apps", placeholder: "Search apps" },
   { id: "settings", label: "Settings", placeholder: "Search settings" },
   { id: "commands", label: "Commands", placeholder: "Search commands" },

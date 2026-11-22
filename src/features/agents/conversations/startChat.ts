@@ -1,4 +1,4 @@
-import { startRun } from "../tutor/tutorRuns";
+import { startRun } from "./startRun";
 import { newLocalConversation } from "./state/localConversation";
 import { useMistyStore } from "./state/useMistyStore";
 import { resumeEngineSession } from "./view/engine/engineHistory";

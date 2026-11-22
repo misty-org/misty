@@ -34,8 +34,6 @@ export const settingsSections = [
   "advanced",
   "fonts",
   "accessibility",
-  "editor",
-  "collaboration",
   "network",
   "performance",
   "diagnostics",

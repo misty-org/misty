@@ -240,8 +240,6 @@ export function useAgentsPageState() {
 export type AgentsPageState = ReturnType<typeof useAgentsPageState>;
 
 const workspacePageTitles: Record<Exclude<AgentWorkspacePage, "task">, string> = {
-  lab: "Lab",
-  code: "Code",
   files: "Files",
   memory: "Memory",
 };
@@ -250,8 +248,7 @@ const workspacePageTitles: Record<Exclude<AgentWorkspacePage, "task">, string> =
  * The page a link's ?view= opens; tutor or notebooks open the Lab.
  */
 function pageFromView(view: string): AgentWorkspacePage | undefined {
-  if (view === "tutor" || view === "notebooks") return "lab";
-  if (view === "lab" || view === "code" || view === "files" || view === "memory") return view;
+  if (view === "files" || view === "memory") return view;
   return undefined;
 }
 

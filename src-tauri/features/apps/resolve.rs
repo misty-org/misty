@@ -1,17 +1,3 @@
-//! A GitHub link pasted to add an app to a Space, turned into the app's pinned build. Misty looks, in order, for:
-//!
-//! 1. Misty's reviewed catalog (`misty-apps`, a copy of which Misty ships): an entry for that repository is the
-//!    listed app, already pinned and checked. `misty-apps` builds it from the maker's own `misty-app.json` when
-//!    the repository has one, so a maker's manifest wins there too.
-//! 2. The maker's own `misty-app.json` at the top of the repository: the maker did the integration. The app is
-//!    unlisted until it is reviewed into the catalog.
-//! 3. The basic check: an OSI open-source license and a web build (a `.zip` with "web" in its name) in the
-//!    repository's latest release. The app is added at level 0, wrapped by Misty with its Space-files shim.
-//!
-//! Whatever the path, the build is the maker's own release, pinned to the checksum GitHub reports for it; nothing of
-//! the maker's is hosted by Misty. Whether the page boots under the sandbox is the last part of the check, seen the
-//! first time the app opens.
-
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -57,14 +43,8 @@ const OPEN_SOURCE_LICENSES: &[&str] = &[
     "Zlib",
 ];
 
-/// The catalog Misty carries with its release (a copy of misty-apps').
-const CATALOG: &str = include_str!("../../../src/features/spaces/apps/catalog.json");
-
-/// The most a maker's `misty-app.json` may be.
 const MAX_REPO_MANIFEST_BYTES: usize = 64 << 10;
 
-/// An app as a Space adds it: the same entry the catalog holds for a listed app, pinned to the maker's release.
-/// Fields Misty doesn't read are carried through as they are.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppEntry {
     pub id: String,
@@ -72,20 +52,15 @@ pub struct AppEntry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub maker: String,
-    /// The maker's repository, `owner/name`.
     pub upstream: String,
     pub license: String,
     pub version: String,
     pub tag: String,
-    /// The maker's own release zip.
     pub url: String,
-    /// The checksum of that zip as GitHub reports it.
     pub sha256: String,
     pub size: u64,
-    /// The maker's own icon, in their repository, or their GitHub picture when the app names none.
     pub logo: String,
     pub permissions: Vec<String>,
-    /// The manifest Misty writes around the release: everything but `id` and `version`.
     pub manifest: Value,
     #[serde(default)]
     pub add_copies: Vec<Value>,
@@ -97,29 +72,21 @@ pub struct AppEntry {
     pub extra: serde_json::Map<String, Value>,
 }
 
-/// Where an app's entry came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ManifestFrom {
-    /// Misty's reviewed catalog.
     Reviewed,
-    /// The maker's own `misty-app.json`.
     Maker,
-    /// Misty's basic check, with no manifest from anyone.
     Basic,
 }
 
-/// What a pasted link resolved to.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "result", rename_all = "lowercase")]
 pub enum Resolved {
-    /// The app can be added. `listed` is whether it is in Misty's reviewed catalog.
     App { repo: String, listed: bool, manifest_from: ManifestFrom, entry: AppEntry },
-    /// It can't, and why, in words for the mod.
     Incompatible { repo: String, reason: String },
 }
 
-/// The maker's `misty-app.json`: the same shape as an app's file in misty-apps (`apps/<id>.json`).
 #[derive(Debug, Clone, Deserialize)]
 struct RepoManifest {
     #[serde(default)]
@@ -129,9 +96,7 @@ struct RepoManifest {
     description: Option<String>,
     #[serde(default)]
     maker: Option<String>,
-    /// The release asset with the web build, `{version}` standing for the release's version.
     web_asset: String,
-    /// The app's icon, a path in the repository.
     #[serde(default)]
     icon: Option<String>,
     manifest: serde_json::Map<String, Value>,
@@ -191,8 +156,6 @@ struct Asset {
     digest: Option<String>,
 }
 
-/// `owner/name` from a pasted link: `https://github.com/owner/name`, with or without the scheme, `.git` or a
-/// path after it, or `owner/name` alone.
 pub fn repo_of(link: &str) -> Option<(String, String)> {
     let trimmed = link.trim().trim_end_matches('/');
     let rest = trimmed
@@ -218,14 +181,12 @@ pub fn repo_of(link: &str) -> Option<(String, String)> {
     (part_ok(&owner) && part_ok(&name)).then_some((owner, name))
 }
 
-/// The catalog's entry for a repository, matched without regard to case as GitHub does.
 fn reviewed_in(catalog: &str, repo: &str) -> Result<Option<AppEntry>, String> {
     let catalog: Catalog =
         serde_json::from_str(catalog).map_err(|error| format!("Misty's app catalog isn't valid: {error}"))?;
     Ok(catalog.apps.into_iter().find(|app| app.upstream.eq_ignore_ascii_case(repo)))
 }
 
-/// An app id made from a repository's name: lowercase letters, digits and hyphens, starting with a letter.
 fn id_from(name: &str) -> String {
     let mut id: String = name
         .to_ascii_lowercase()
@@ -244,12 +205,10 @@ fn id_from(name: &str) -> String {
     if id.len() < 2 { "app".to_owned() } else { id }
 }
 
-/// A release's version: its tag without a leading `v`.
 fn version_of(tag: &str) -> String {
     tag.strip_prefix('v').unwrap_or(tag).to_owned()
 }
 
-/// The web build in a release when nothing names it: one `.zip` with "web" in its name.
 fn web_asset_of(assets: &[Asset]) -> Option<&Asset> {
     let mut web = assets.iter().filter(|asset| {
         let name = asset.name.to_ascii_lowercase();
@@ -259,7 +218,6 @@ fn web_asset_of(assets: &[Asset]) -> Option<&Asset> {
     web.next().is_none().then_some(first)
 }
 
-/// The SHA-256 GitHub reports for an asset, as 64 hex digits.
 fn sha256_of(asset: &Asset) -> Option<String> {
     let digest = asset.digest.as_deref()?.strip_prefix("sha256:")?;
     (digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit())).then(|| digest.to_ascii_lowercase())
@@ -270,8 +228,6 @@ fn open_source(spdx: Option<&str>) -> Option<String> {
     OPEN_SOURCE_LICENSES.iter().any(|known| known.eq_ignore_ascii_case(spdx)).then(|| spdx.to_owned())
 }
 
-/// The entry for an app from its repository, release and (optionally) its maker's manifest. The manifest Misty
-/// writes is checked here as the install would check it, so a link that can't install is said so at once.
 fn entry_from(
     repo: &Repo,
     release: &Release,
@@ -319,8 +275,6 @@ fn entry_from(
                     "There's no web build in its latest release: Misty looks for one .zip with \"web\" in its name."
                         .to_owned()
                 })?;
-                // Level 0: Misty's wrapper only, the app on its own origin, its Open and Save reaching the Space's
-                // Files through the shim. It reaches no host: a manifest from its maker or a review says which.
                 let manifest = json!({
                     "name": repo.name,
                     "logo": "logo.png",
@@ -355,7 +309,6 @@ fn entry_from(
         return Err("Its web build isn't one of its own release's files.".into());
     }
     manifest.insert("license".into(), Value::String(license.clone()));
-    // Checked as the install will check it: the manifest Misty writes, with this id and version.
     let mut checked = manifest.clone();
     checked.insert("id".into(), Value::String(id.clone()));
     checked.insert("version".into(), Value::String(version.clone()));
@@ -399,7 +352,6 @@ fn client() -> Result<reqwest::Client, String> {
         .map_err(|error| error.to_string())
 }
 
-/// Reads one of GitHub's answers: `None` when there's nothing there.
 async fn get_json<T: serde::de::DeserializeOwned>(client: &reqwest::Client, url: &str) -> Result<Option<T>, String> {
     let response = client
         .get(url)
@@ -419,7 +371,6 @@ async fn get_json<T: serde::de::DeserializeOwned>(client: &reqwest::Client, url:
     }
 }
 
-/// The maker's `misty-app.json` at the top of the repository's default branch, if there is one.
 async fn maker_manifest(client: &reqwest::Client, upstream: &str) -> Result<Option<RepoManifest>, String> {
     let url = format!("https://raw.githubusercontent.com/{upstream}/HEAD/misty-app.json");
     let response = client
@@ -442,11 +393,11 @@ async fn maker_manifest(client: &reqwest::Client, upstream: &str) -> Result<Opti
         .map_err(|error| format!("Its misty-app.json isn't valid: {error}"))
 }
 
-/// Resolves a pasted link (see the module's doc).
 pub async fn resolve(link: &str) -> Result<Resolved, String> {
     let (owner, name) = repo_of(link).ok_or_else(|| "That isn't a link to a GitHub repository.".to_owned())?;
     let asked = format!("{owner}/{name}");
-    if let Some(entry) = reviewed_in(CATALOG, &asked)? {
+    let listed_apps = crate::registry::current().apps_json();
+    if let Some(entry) = reviewed_in(&listed_apps, &asked)? {
         return Ok(Resolved::App { repo: entry.upstream.clone(), listed: true, manifest_from: ManifestFrom::Reviewed, entry });
     }
     let client = client()?;
@@ -454,8 +405,7 @@ pub async fn resolve(link: &str) -> Result<Resolved, String> {
         return Ok(Resolved::Incompatible { repo: asked, reason: "There's no public repository at that link.".into() });
     };
     let upstream = format!("{}/{}", repo.owner.login, repo.name);
-    // A link may use another case or an old name: the catalog is matched again under the repository's own.
-    if let Some(entry) = reviewed_in(CATALOG, &upstream)? {
+    if let Some(entry) = reviewed_in(&listed_apps, &upstream)? {
         return Ok(Resolved::App { repo: upstream, listed: true, manifest_from: ManifestFrom::Reviewed, entry });
     }
     if repo.archived {

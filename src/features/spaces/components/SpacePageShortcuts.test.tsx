@@ -88,11 +88,10 @@ it("opens the Space's chat in the owning tab after loading it", async () => {
   expect(activeLayoutView(useWorkspaceStore.getState().layout)?.id).toBe(before);
 });
 
-it("opens the Lab and Files with the other section shortcuts", async () => {
+it("opens Files with the second section shortcut", async () => {
   mount();
-  await press("space.section_3");
-  await waitFor(() => expect(route()).toBe("/spaces/family/lab"));
-  expect(preload).toHaveBeenCalledWith("lab");
+  await press("space.section_1");
+  await waitFor(() => expect(route()).toBe("/spaces/family/chat"));
   await press("space.section_2");
   await waitFor(() => expect(route()).toBe("/spaces/family/files"));
   expect(preload).toHaveBeenCalledWith("files");

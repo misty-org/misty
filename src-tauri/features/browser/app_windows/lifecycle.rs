@@ -190,7 +190,6 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
             crate::app::macos_window_effects::mac_rounded_corners::forget_window(label);
             crate::browser::forget_closed_pages(window.app_handle());
             crate::project::terminal::close_window(label);
-            crate::code::lsp::close_window(label);
             crate::voice::speech::close_window(window.app_handle(), label);
             if QUITTING.load(Ordering::SeqCst) {
                 return;

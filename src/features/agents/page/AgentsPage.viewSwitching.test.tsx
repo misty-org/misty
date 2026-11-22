@@ -69,12 +69,12 @@ it("opens a page from the sidebar while a chat is open, and the chat again after
   );
   expect(page()).toBe("task");
 
-  follow("/agents?view=lab");
-  expect(page()).toBe("lab");
-  expect(route()).toBe("/agents?view=lab");
+  follow("/agents?view=files");
+  expect(page()).toBe("files");
+  expect(route()).toBe("/agents?view=files");
 
-  follow("/agents?view=code");
-  expect(page()).toBe("code");
+  follow("/agents?view=memory");
+  expect(page()).toBe("memory");
 
   follow(agentChatRoute("research", "second"));
   expect(page()).toBe("task");
@@ -130,8 +130,8 @@ it("sends the sidebar's links to the focused pane of a split, and leaves the oth
   follow(agentChatRoute("research", "second"));
   expect(routeIn(right)).toBe(agentChatRoute("research", "second"));
   expect(routeIn(left)).toBe(agentChatRoute("communications", "first"));
-  follow("/agents?view=lab");
-  expect(pageIn(right)).toBe("lab");
+  follow("/agents?view=files");
+  expect(pageIn(right)).toBe("files");
   expect(pageIn(left)).toBe("task");
 
   // Focusing the first pane sends the next link there.
@@ -141,10 +141,10 @@ it("sends the sidebar's links to the focused pane of a split, and leaves the oth
         .getState()
         .focusView(viewIn(useWorkspaceStore.getState().layout, left)!.id),
   );
-  follow("/agents?view=code");
-  expect(pageIn(left)).toBe("code");
-  expect(pageIn(right)).toBe("lab");
-  expect(routeIn(right)).toBe("/agents?view=lab");
+  follow("/agents?view=memory");
+  expect(pageIn(left)).toBe("memory");
+  expect(pageIn(right)).toBe("files");
+  expect(routeIn(right)).toBe("/agents?view=files");
 });
 
 it("starts a new chat from the sidebar's New, from a chat and from another agent's chat", () => {

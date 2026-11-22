@@ -88,14 +88,13 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
   return null;
 }
 
-type SpaceWorkspaceTool = "explore" | "social" | "files" | "lab" | "space";
+type SpaceWorkspaceTool = "explore" | "social" | "files" | "space";
 
 /** A Space tab's name, by the tool it shows. */
 const spaceToolTitles: Record<SpaceWorkspaceTool, string> = {
   explore: "Explore",
   social: "Chat",
   files: "Files",
-  lab: "Lab",
   space: "Space",
 };
 
@@ -129,6 +128,5 @@ function spaceToolFromSection(section: string | undefined): SpaceWorkspaceTool {
   if (section === "chat" || section === "social") return "social";
   // The Library became Media, then Files; a tab saved under an old name opens Files.
   if (section === "files" || section === "media" || section === "library") return "files";
-  if (section === "lab") return section;
   return "space";
 }

@@ -76,9 +76,7 @@ const shellCommands: ShortcutCommandDefinition[] = [
   }),
 ];
 
-/** A Space's chat, its Files and its Lab, on ⌘1 to ⌘3 while a Space is focused (window tabs
- * elsewhere). */
-const spaceSections = ["Chat", "Files", "Lab"] as const;
+const spaceSections = ["Chat", "Files"] as const;
 
 const tabAndToolCommands = [
   ...spaceSections.map((label, index) =>

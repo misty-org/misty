@@ -45,7 +45,7 @@ export { useAppPrograms } from "./apps/useAppPrograms";
 export { useAppStandby } from "./apps/useAppStandby";
 export { appRoute } from "./apps/appRoutes";
 export { SpaceAppsLauncher, useAppLauncher } from "./apps/SpaceAppsLauncher";
-export { catalogApps, catalogLogoUrl } from "./apps/thirdPartyApps";
+export { registryApps, useRegistryApps, catalogLogoUrl } from "./apps/thirdPartyApps";
 // Explore (in agents) takes these through the shell's seam (`src/app/featureSeams.ts`).
 export { useAppUpdates } from "./apps/appUpdates";
 export { ExploreAppsSection } from "./apps/ExploreAppsSection";

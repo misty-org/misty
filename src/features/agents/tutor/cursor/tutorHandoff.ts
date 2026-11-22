@@ -11,9 +11,7 @@ import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { homeSpaceOf, ownSpaceOf } from "../../personal/agentHomeSpace";
 import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
 import { useLocalExecution } from "../../runs/local-execution/localExecutionState";
-import { useChatFolders } from "../../shared-folders/chatFolder";
 import { useLessonStore } from "../lessons/lessonStore";
-import { tutorChatIds, useTutorStore } from "../tutorStore";
 import type { DisplayCapture } from "./protocol";
 
 /**
@@ -47,10 +45,7 @@ export function agentNamed(name: string | undefined): AgentProfile | undefined {
  * the hand-off starts it.
  */
 export function agentThreadId(agentId: string): string | undefined {
-  const projectChats = useChatFolders.getState().projectChats ?? {};
   const lessons = useLessonStore.getState().lessons;
-  const { jobs, notebooks } = useTutorStore.getState();
-  const made = tutorChatIds(jobs, notebooks);
   let thread: { id: string; updatedAt: string } | undefined;
   for (const chat of useMistyStore.getState().conversations)
     if (
@@ -58,9 +53,7 @@ export function agentThreadId(agentId: string): string | undefined {
       !chat.archivedAt &&
       !chat.place &&
       chat.messages.length > 0 &&
-      !projectChats[chat.id] &&
       !lessons[chat.id] &&
-      !made.has(chat.id) &&
       (!thread || chat.updatedAt > thread.updatedAt)
     )
       thread = chat;

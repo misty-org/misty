@@ -26,9 +26,7 @@ export { AppLogo } from "./connected-apps/ConnectedAppRows";
 export { DirectApps } from "./connected-apps/DirectApps";
 export { AgentAvatar, AgentMark } from "./personal/AgentAvatar";
 export { useLessonStore } from "./tutor/lessons/lessonStore";
-export { tutorChatIds, useTutorChatIds, useTutorStore } from "./tutor/tutorStore";
 
-// Public surface used by other features.
 export { BrowserContextMenuBridge } from "./conversations/context/BrowserContextMenuBridge";
 export { MistyContextBridgeHost } from "./conversations/context/MistyContextBridgeHost";
 export { useMistyStore } from "./conversations/state/useMistyStore";
@@ -58,22 +56,16 @@ export {
 export { AiSelectionMenu } from "./runs/markdown/AiSelectionMenu";
 export { MistyMarkdown } from "./runs/markdown/MistyMarkdown";
 
-// Public surface used by other features.
 export {
   AgentDefaultsSection,
   AgentPermissionsSection,
   CompanionSection,
 } from "./settings/FeatureSections";
 
-// Public surface used by other features.
 export { spaceAgentsApi, type SpaceAgent } from "./api/space-agents";
 export { spacesGateway } from "./spaces-gateway/spacesGateway";
-export { EditorSettings } from "./code/vim/EditorSettings";
-export { CollaborationSettings } from "./code/live/CollaborationSettings";
-export { openCodeChat } from "./code/sessions/CodeChatColumn";
 export { findVocative, routeToAgent } from "./tutor/cursor/vocativeRoute";
 
-// Public surface used by other features.
 export { openMisty } from "./conversations/ask/handoff";
 export { draftRequestForAgent } from "./conversations/ask/draftRequest";
 export { conversationInSpace } from "./conversations/state/conversationSpace";
@@ -91,7 +83,6 @@ export {
   type EngineSetupState,
 } from "./engines/engineReadiness";
 export { EngineNextStep } from "./engines/EngineNextStep";
-// The Space home's overview reads runs and linked folders.
 export { runtimeAiApi } from "./AgentsRuntime";
 export type { MistyActivityEntry } from "./conversations/state/activity";
 export type { GlobalAiConversation } from "./conversations/state/conversationTypes";
@@ -105,11 +96,9 @@ export {
   useProjectFolders,
   type ProjectFolder,
 } from "./shared-folders/chatFolder";
-// The file picker browses the person's project folders on this computer.
 export { filesApi, imageFileUrl, type DirEntry } from "./context-panel/files/filesApi";
 export { useProjectsHome, useProjectsHomePath } from "./shared-folders/projectsHome";
 export { RunNotifier } from "./runs/notices/RunNotifier";
-// Personas from the bundled catalog, and their page in Settings.
 export { PersonaCatalogSection } from "./personas";
 export { projectApi, type GitStatus } from "./context-panel/projectApi";
 export { useContextPanel } from "./context-panel/contextPanelStore";
@@ -130,8 +119,6 @@ export {
 export { PickUpDialog } from "./pickup/PickUpDialog";
 export { pickUpRequest, pickUpTopic } from "./pickup/pickUp";
 export { HappeningNow } from "./activity/HappeningNow";
-export { LabDoing } from "./tutor/LabDoing";
-export { SpaceLab, SpaceLabSkeleton } from "./tutor/SpaceLab";
 export { runOnEngine } from "./engines/engineRun";
 export { cleanupOnEngine } from "./engines/mistyCalls";
 export { EngineSection } from "./engines/EngineSection";
@@ -141,19 +128,15 @@ export {
   setDefaultEngine,
   useDefaultEngine,
 } from "./engines/defaultEngine";
-export { notebookRoute } from "./tutor/notebookSpace";
-export { PersonAvatar } from "./tutor/notebook/LivePeople";
-export { personColor, personTone } from "./tutor/personTone";
+export { personColor, personTone } from "@/shared/lib/personTone";
 export { useSpaceRuns } from "./activity/useSpaceRuns";
 export { AgentActivitySettings } from "./activity/AgentActivitySettings";
 
-// What ⌘K search reads and starts.
 export { askInNewChat, resumeInNewChat } from "./conversations/startChat";
 export { requestChatFind } from "./conversations/view/navigation/chatFind";
 export { messageSearchText } from "./conversations/view/navigation/timelineSearch";
 export { searchEngineSessions } from "./conversations/view/engine/engineHistory";
 export { defaultEngineAgent } from "./engines/defaultEngine";
-export { searchNotebooks } from "./tutor/tutorSearch";
 export { directAppsApi } from "./connected-apps/directApi";
 export { openFolderFile, searchFolderFiles } from "./context-panel/files/folderFileSearch";
 export { tourCorner, type AgentSurfaceTour } from "./TourCorner";
@@ -169,22 +152,8 @@ export {
   TutorStatus,
   UnreadStatus,
 } from "./BottomBarStatus";
-export {
-  CodeBranchStatus,
-  CodeCursorStatus,
-  CodeLanguageStatus,
-  CodeLiveStatus,
-  CodeProblemsStatus,
-  CodeServerStatus,
-  CodeTerminalButton,
-  CodeThemeStatus,
-  CodeVimStatus,
-} from "./code/CodeBarStatus";
-
-// The run a call belongs to: its agent and chat (`tools/runContexts.ts`).
 export { loadRunEntry } from "./tools/runContexts";
 
-// Tools that come and go while Misty runs, such as the ones an app's MCP server offers.
 export {
   LocalToolRejected,
   registerLocalTools,
@@ -194,5 +163,4 @@ export {
 
 export { provideExploreApps } from "./marketplace/exploreApps";
 
-// The Files page, which `spaces` provides at startup (`src/app/featureSeams.ts`).
 export { filesPage } from "./methods/AgentWorkspaceFrame";

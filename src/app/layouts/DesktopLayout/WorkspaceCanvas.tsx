@@ -16,7 +16,6 @@ import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { useClearTabsShortcut } from "./useClearTabsShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
-import { WorkspaceBottomBar } from "./WorkspaceBottomBar";
 import { TopEdge } from "./TopEdge";
 import { LayoutPopup } from "./LayoutPopup";
 import { WorkspaceTabBar } from "./WorkspaceTabBar";
@@ -31,11 +30,8 @@ import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle
 import { Surface } from "@misty/ui";
 
 export function WorkspaceCanvas(props: {
-  /** The side of the window the sidebar sits on. */
   tabPosition?: TabSide;
-  /** Windows and Linux: the tab row keeps a slot at its end for the caption buttons. */
   windowsTitlebarControls?: boolean;
-  /** The vertical sidebar's closing row: the account and settings, inside its panel. */
   stripAccount?: ReactNode;
 }) {
   const location = useLocation();
@@ -69,16 +65,11 @@ export function WorkspaceCanvas(props: {
       dockLeaves(state.layout.root)[0];
     const tab =
       pane?.views.find((candidate) => candidate.id === pane.activeViewId) ?? pane?.views[0];
-    // With no tabs left, leave the address bar on a route that maps to no tab so
-    // the closed one is not reopened from the URL.
     const route = tab?.route ?? (allLayoutViews(state.layout).length ? null : routes.newTab);
     if (route && `${location.pathname}${location.search}` !== route)
       navigate(route, { replace: true });
   }, [location.pathname, location.search, navigate]);
 
-  // Once per window: a saved window loads without the web pages it held, so the address may
-  // name one. With pages left, the address follows the one now in front. With none, a window
-  // that was on a web page opens Agents; any other address opens its own page.
   const followedSavedPages = useRef(false);
   useEffect(() => {
     if (followedSavedPages.current) return;
@@ -111,10 +102,7 @@ export function WorkspaceCanvas(props: {
     [focusTab, location.pathname, location.search, navigate],
   );
 
-  // Opening Explore from anywhere (a command, a link in a chat) lands on the window's Space,
-  // in the focused pane.
   const windowSpace = useWindowSpace();
-  // Agents can use the window Space's apps that run as their maker's own program, such as SoundCraft.
   useAppPrograms(windowSpace?.id);
   useAppStandby(windowSpace?.id);
   useEffect(() => {
@@ -163,8 +151,6 @@ export function WorkspaceCanvas(props: {
 
   return (
     <>
-      {/* Clipped, not hidden: a collapsed right sidebar waits past this edge, and scrolling its
-          active tab into view must not scroll the page sideways. */}
       <Surface
         tone="chrome"
         className={`grid h-full min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-clip ${
@@ -183,11 +169,6 @@ export function WorkspaceCanvas(props: {
           onClosed={navigateToActiveLayoutTab}
         />
         <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
-        {/* The bottom bar belongs to the Code page alone. */}
-        {location.pathname === routes.agents &&
-        new URLSearchParams(location.search).get("view") === "code" ? (
-          <WorkspaceBottomBar gridColumn={contentColumn} onOpen={openTab} />
-        ) : null}
         <PaneSwapMode />
         <LayoutPopup onApplied={navigateToActiveLayoutTab} />
         <WorkspaceSearch onOpen={openTab} path={location.pathname} />

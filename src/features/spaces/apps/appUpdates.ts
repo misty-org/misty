@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
-import { catalogApps, type AppSource, type CatalogApp, type ResolvedLink } from "./thirdPartyApps";
+import { useRegistryApps, type AppSource, type CatalogApp, type ResolvedLink } from "./thirdPartyApps";
 import { useSpaceApps } from "./useSpaceApps";
 
 interface AppUpdate {
@@ -17,12 +17,13 @@ interface AppUpdate {
  */
 export function useAppUpdates(spaceId: string) {
   const { apps, error, reload, install } = useSpaceApps(spaceId);
+  const listedApps = useRegistryApps();
   const [linked, setLinked] = useState<AppUpdate[]>([]);
   const unlisted = (apps ?? []).filter(
     (installed) =>
       installed.source &&
       !installed.source.listed &&
-      !catalogApps.some((entry) => entry.id === installed.app_id),
+      !listedApps.some((entry) => entry.id === installed.app_id),
   );
   const unlistedKey = unlisted.map((app) => `${app.app_id}@${app.version}`).join(",");
   useEffect(() => {
@@ -50,7 +51,7 @@ export function useAppUpdates(spaceId: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spaceId, unlistedKey]);
   const listed = (apps ?? []).flatMap((installed): AppUpdate[] => {
-    const app = catalogApps.find((entry) => entry.id === installed.app_id);
+    const app = listedApps.find((entry) => entry.id === installed.app_id);
     return app && app.version !== installed.version ? [{ app, from: installed.version }] : [];
   });
   return { updates: [...listed, ...linked], loaded: Boolean(apps), error, reload, install };

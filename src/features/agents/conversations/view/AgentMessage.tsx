@@ -19,7 +19,6 @@ import { AgentMessageActions } from "./AgentMessageActions";
 import { AgentNotebookCard } from "./AgentNotebookCard";
 import { AgentRunOutcome } from "./AgentRunOutcome";
 import { GrantCards } from "./grants/GrantCard";
-import { OpenInCodeCard } from "../../code/OpenInCodeDialog";
 import { AgentSubagents } from "./AgentSubagents";
 import { EngineThinking } from "./engine/EngineThinking";
 import { EngineTurnParts } from "./engine/EngineTurnParts";
@@ -253,9 +252,6 @@ function AgentMessageView(props: AgentMessageProps) {
             retryFrom={props.retryFrom}
             onRetry={props.onRetry}
           />
-        ) : null}
-        {props.conversationId ? (
-          <OpenInCodeCard conversationId={props.conversationId} message={message} />
         ) : null}
         {props.conversationId ? (
           <AgentAnsweredQuestions

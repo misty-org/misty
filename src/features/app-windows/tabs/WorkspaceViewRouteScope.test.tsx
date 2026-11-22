@@ -22,8 +22,8 @@ function PaneProbe() {
       <button type="button" onClick={() => setParams({ mine: "0", status: "open" })}>
         Filter
       </button>
-      <button type="button" onClick={() => navigate("/spaces/team/lab")}>
-        Lab
+      <button type="button" onClick={() => navigate("/spaces/team/chat")}>
+        Chat
       </button>
       <button type="button" onClick={() => navigate(-1)}>
         Back
@@ -105,11 +105,11 @@ describe("WorkspaceTabRouteScope", () => {
 
     await act(async () => {
       [...container.querySelectorAll<HTMLButtonElement>("button")]
-        .find((button) => button.textContent === "Lab")
+        .find((button) => button.textContent === "Chat")
         ?.click();
     });
     expect(container.querySelector('[data-testid="pane-route"]')?.textContent).toBe(
-      "/spaces/team/lab",
+      "/spaces/team/chat",
     );
 
     await act(async () => {

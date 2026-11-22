@@ -148,7 +148,7 @@ describe("AppFrameLayout", () => {
     expect(container.querySelector('[data-testid="desktop-layout"]')).toBeNull();
   });
 
-  it.each(["/agents", "/new", "/spaces/one/lab", "/agents?view=studio", "/spaces/one/home"])(
+  it.each(["/agents", "/new", "/spaces/one/files", "/agents?view=studio", "/spaces/one/home"])(
     "sends signed-out people from %s to sign in, to come back after",
     async (path) => {
       mocks.user = null;

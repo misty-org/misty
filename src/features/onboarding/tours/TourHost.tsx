@@ -5,20 +5,11 @@ import { shownOnScreen, Tour, tourTargetShown, useSplashShowing, type TourStep }
 import { startTourEvent, useTours } from "./tourStore";
 import { tours, type TourId } from "./tours";
 
-/** After the splash has gone, long enough for the page to lay out before its tour looks. */
 const SETTLE_MS = 900;
-/** A tour the person asked for looks once the menu or popover that asked has closed. */
 const ASKED_SETTLE_MS = 200;
-/** How often, and for how long, a tour waits for its page's controls to be drawn. */
 const LOOK_EVERY_MS = 400;
 const LOOK_FOR_MS = 15_000;
 
-/**
- * The tour has something to point at: at least one of its controls is on screen. A tour that
- * opens by itself also waits for the page to finish loading, with no skeleton a person can see.
- * One the person asked for (the "i", Help) doesn't: a placeholder elsewhere in the window, or in
- * the page behind a dialog, is no reason to keep them waiting.
- */
 function pageReady(steps: readonly TourStep[], asked: boolean): boolean {
   const targets = steps.flatMap((step) => (step.target ? [step.target] : []));
   const pointable = targets.length === 0 || targets.some(tourTargetShown);
@@ -29,11 +20,6 @@ function pageReady(steps: readonly TourStep[], asked: boolean): boolean {
   return !loading && pointable;
 }
 
-/**
- * Opens `id` once the window is ready for it: the splash gone, the page settled and its controls
- * drawn. Gives up quietly when they never are, so a tour is never shown over a blank window.
- * Returns a cancel.
- */
 function openWhenReady(id: TourId, open: (id: TourId) => void, asked = false): () => void {
   let timer = 0;
   const started = Date.now();
@@ -45,14 +31,8 @@ function openWhenReady(id: TourId, open: (id: TourId) => void, asked = false): (
   return () => window.clearTimeout(timer);
 }
 
-/** The tour for the page at `pathname` and `search`, if it has one. */
-export function tourForPage(pathname: string, search: string): TourId | null {
-  const params = new URLSearchParams(search);
+export function tourForPage(pathname: string, _search: string): TourId | null {
   if (pathname === "/agents") {
-    const view = params.get("view");
-    if (view === "lab" || view === "tutor" || view === "notebooks")
-      return params.get("item")?.startsWith("notebook:") ? "notebook" : "lab";
-    // No view, a retired one or an unknown one: the chat.
     return "welcome";
   }
   const space = /^\/spaces\/[^/]+(?:\/([^/]+)(?:\/([^/]+))?)?/.exec(pathname);
@@ -65,36 +45,25 @@ export function tourForPage(pathname: string, search: string): TourId | null {
       case "chat":
       case "social":
         return "space-chat";
-      case "lab":
-        return params.get("item")?.startsWith("notebook:") ? "notebook" : "lab";
     }
   }
   return null;
 }
 
-/** The tour for a workspace tab's route, such as `/spaces/:id/lab`, if its page has one. */
 export function tourForRoute(route: string): TourId | null {
   const url = new URL(route, "misty://app");
   return tourForPage(url.pathname, url.search);
 }
 
-/**
- * Shows Misty's tours in the main window. Once setup is done, the welcome tour opens by itself the
- * first time the chat is in view, and each page's own tour the first time that page opens after
- * it. "Show me around" in Help, or the "i" button (`TourInfoButton`) in the window's bottom bar
- * (for the focused pane) or a popup's corner, asks for a tour again. Each opens by itself once per device.
- */
 export function TourHost() {
   const location = useLocation();
   const welcomed = useSetupStore((state) => state.welcomed);
   const { loaded, seen, active, open, close } = useTours();
-  // Nothing pops up while Misty's loading splash is on screen.
   const splash = useSplashShowing();
   const page = tourForPage(location.pathname, location.search);
 
   useEffect(() => void useTours.getState().load(), []);
 
-  // Only after the welcome tour does a page's own tour open by itself.
   const due =
     !splash &&
     loaded &&
@@ -112,7 +81,6 @@ export function TourHost() {
     const onStart = (event: Event) => {
       const asked = (event as CustomEvent<TourId | "here">).detail;
       const id = asked === "here" ? (page ?? "welcome") : asked;
-      // After the Help dialog or menu that asked has closed.
       openWhenReady(id, (ready) => useTours.getState().open(ready), true);
     };
     window.addEventListener(startTourEvent, onStart);

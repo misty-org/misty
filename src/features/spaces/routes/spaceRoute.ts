@@ -5,7 +5,6 @@ const validSections = new Set([
   "home",
   "social",
   "chat",
-  "lab",
   "explore",
   "files",
   "app",

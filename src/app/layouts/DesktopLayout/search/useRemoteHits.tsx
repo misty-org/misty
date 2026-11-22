@@ -1,4 +1,4 @@
-import { FileCode, FileText, History, Plug } from "lucide-react";
+import { FileCode, History, Plug } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   defaultEngineAgent,
@@ -9,8 +9,6 @@ import {
   resumeInNewChat,
   searchEngineSessions,
   searchFolderFiles,
-  searchNotebooks,
-  notebookRoute,
 } from "@/features/agents";
 import { searchSpaceText, type SpaceSearchHit } from "@/features/spaces";
 import { useSettingsStore } from "@/features/settings";
@@ -32,14 +30,12 @@ export function useRemoteHits({
   spaceId,
   words,
   asking,
-  notebooks,
   agents,
   openRoute,
 }: {
   spaceId: string;
   words: string;
   asking: boolean;
-  notebooks: Record<string, { id: string; title: string }>;
   agents: AgentProfile[];
   openRoute(route: string): void;
 }) {
@@ -82,29 +78,6 @@ export function useRemoteHits({
         ),
       );
     }
-    if (Object.keys(notebooks).length)
-      sources.push(async () => {
-        const { hits } = await searchNotebooks(words, signal);
-        return hits.flatMap((hit) => {
-          const notebook = notebooks[hit.notebookId];
-          if (!notebook) return [];
-          const match = Math.max(matchScore(hit.text, words), hit.score > 0.3 ? 3 : 0);
-          if (!match) return [];
-          return [
-            {
-              id: `passage:${hit.notebookId}:${hit.itemId}`,
-              kind: "learn" as const,
-              group: "In notebooks",
-              title: hit.title || notebook.title,
-              detail: notebook.title,
-              excerpt: excerpt(hit.text, words),
-              icon: icon(FileText),
-              match,
-              open: () => openRoute(notebookRoute(notebook)),
-            },
-          ];
-        });
-      });
     if (include.files)
       sources.push(async () =>
         (await searchFolderFiles((name, rel) => fieldScore(words, name, rel))).map((file) => ({
@@ -202,7 +175,7 @@ export function useRemoteHits({
       window.clearTimeout(timer);
       controller.abort();
     };
-    // `notebooks` and `agents` are read when the words change; a new search follows them.
+    // `agents` is read when the words change; a new search follows them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteKey, openRoute]);
 

@@ -10,8 +10,6 @@ export type TourId =
   | "welcome"
   | "agents"
   | "space"
-  | "lab"
-  | "notebook"
   | "space-chat"
   | "search"
   | "layout"
@@ -114,59 +112,6 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
         body:
           "If you made this space, invite people from its menu. " +
           "They see what you share and what your agents are doing, never your chats.",
-      },
-    ],
-  },
-  lab: {
-    label: "Lab tour",
-    steps: [
-      {
-        target: "lab-start",
-        title: "What do you want to learn?",
-        body: "Type a topic or pick one, and your AI finds good sources to start a notebook.",
-      },
-      {
-        target: "lab-new",
-        title: "Your notebooks",
-        body: "Add your own files, links and notes, then ask questions. Answers show where they came from.",
-      },
-      {
-        title: "Study tools",
-        body: "Turn a notebook into a summary, a mind map, flashcards, a quiz or something to listen to.",
-      },
-      {
-        title: "Learn together",
-        body: "Share a notebook with your space. Friends can read it, add their own notes at the end and save a copy to their own lab.",
-      },
-    ],
-  },
-  notebook: {
-    label: "Notebook tour",
-    steps: [
-      {
-        target: "notebook-sources",
-        title: "Your sources",
-        body: "The files, links and notes this notebook learns from. Tick the ones you want it to use.",
-      },
-      {
-        target: "notebook-add",
-        title: "Add more",
-        body: "Add a file, a link or a note of your own.",
-      },
-      {
-        target: "notebook-ask",
-        title: "Ask about them",
-        body: "Ask a question. Answers point to where in your sources they came from.",
-      },
-      {
-        target: "notebook-create",
-        title: "Make something to study",
-        body: "Turn the notebook into a summary, a mind map, flashcards, a quiz or something to listen to.",
-      },
-      {
-        target: "notebook-share",
-        title: "Work on it together",
-        body: "Everyone in this Space can open this notebook. See who's here, talk it over, or change how it looks and behaves.",
       },
     ],
   },

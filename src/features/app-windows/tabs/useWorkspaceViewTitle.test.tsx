@@ -36,10 +36,10 @@ describe("useWorkspaceViewTitle", () => {
     });
     const second = useWorkspaceStore.getState().addSurface({
       surfaceId: "space",
-      groupKey: "space:family:lab",
-      title: "Lab",
-      route: "/spaces/family/lab",
-      instanceKey: "family:lab",
+      groupKey: "space:family:social",
+      title: "Chat",
+      route: "/spaces/family/chat",
+      instanceKey: "family:social",
       instancePolicy: "multiple",
       syncExistingRoute: false,
     });

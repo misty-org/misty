@@ -33,10 +33,10 @@ import {
 } from "@misty/ui";
 import { listEngines } from "../engines/enginesApi";
 import {
-  catalogEngineIds,
-  catalogEngines,
   engineMatches,
   installRouteText,
+  useRegistryEngineIds,
+  useRegistryEngines,
   type CatalogEngine,
 } from "./engineCatalog";
 import { MarketShelf, MarketShelvesSkeleton } from "./MarketShelf";
@@ -45,8 +45,9 @@ import { sourceLabel } from "./PluginMaker";
 const isEngineId = (id: string): id is EngineId => ENGINE_IDS.some((engine) => engine === id);
 
 export function EnginesSection({ query }: { query: string }) {
-  const { statuses, settled } = useCliStatuses(catalogEngineIds);
-  const shown = catalogEngines.filter((engine) => engineMatches(engine, query));
+  const engines = useRegistryEngines();
+  const { statuses, settled } = useCliStatuses(useRegistryEngineIds());
+  const shown = engines.filter((engine) => engineMatches(engine, query));
   if (!shown.length) return <EmptyState inline title="No engines found" line="Try other words." />;
   // Until every engine has answered once, the shelves can't say which are installed.
   if (!settled && shown.every((engine) => statuses[engine.id] === null))

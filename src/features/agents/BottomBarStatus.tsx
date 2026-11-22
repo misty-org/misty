@@ -35,7 +35,6 @@ import { useChatFolder } from "./shared-folders/chatFolder";
 import { setCompanionOn, useCompanionOn } from "./tutor/cursor/companionOn";
 import { useCompanionState } from "./tutor/cursor/companionState";
 import { useLessonStore } from "./tutor/lessons/lessonStore";
-import { tutorChatIds, useTutorStore } from "./tutor/tutorStore";
 
 /*
  * The agents' items for the window's bottom bar (Settings › Interface › Bottom bar). Each draws
@@ -137,17 +136,14 @@ export function AgentBrowsingStatus({ onOpenChat }: { onOpenChat: OpenChat }) {
 export function UnreadStatus({ onOpenChat }: { onOpenChat: OpenChat }) {
   const conversations = useMistyStore((state) => state.conversations);
   const lessons = useLessonStore((state) => state.lessons);
-  const jobs = useTutorStore((state) => state.jobs);
-  const notebooks = useTutorStore((state) => state.notebooks);
   const unread = useMemo(() => {
-    const made = tutorChatIds(jobs, notebooks);
     return conversations
       .filter(
         (chat) =>
-          chat.messages.length > 0 && !lessons[chat.id] && !made.has(chat.id) && isChatUnread(chat),
+          chat.messages.length > 0 && !lessons[chat.id] && isChatUnread(chat),
       )
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [conversations, lessons, jobs, notebooks]);
+  }, [conversations, lessons]);
   if (!unread.length) return null;
   return (
     <Button

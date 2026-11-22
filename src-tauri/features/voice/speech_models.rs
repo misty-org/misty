@@ -1,10 +1,3 @@
-//! Misty's speech models and voices: the catalog it carries with its release (`speech.json` from
-//! `misty-catalog`, copied here by `npm run sync:catalog`), what is installed in
-//! `~/.misty/shared/models`, installing (each package downloaded from the maker's release as
-//! sherpa-onnx publishes it, checked against its pinned SHA-256, then unpacked) and removing, and
-//! what this computer can run, for picking. Misty picks the hearing model for the person in the
-//! renderer (`src/features/voice/speechModels.ts`); native code only carries out the pick.
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
@@ -15,11 +8,7 @@ use tauri::{State, Webview};
 
 use super::speech::require_person;
 
-/// The catalog, as carried with this release.
-const CATALOG_JSON: &str = include_str!("speech_catalog.json");
-/// How a download's progress reaches the window that asked.
 const INSTALL_EVENT: &str = "misty://speech-install";
-/// The marker an unpacked package leaves once it is whole.
 const COMPLETE: &str = ".complete";
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(20);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(3600);
@@ -29,13 +18,11 @@ pub struct Package {
     pub url: String,
     pub sha256: String,
     pub size: u64,
-    /// `tar.bz2`, unpacked to `folder`, or `file`, kept as it is.
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folder: Option<String>,
 }
 
-/// A speech recognition model, as the catalog lists it.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HearingEntry {
     pub id: String,
@@ -58,7 +45,6 @@ pub struct HearingEntry {
     pub words: bool,
 }
 
-/// A voice, as the catalog lists it.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct VoiceEntry {
     pub id: String,
@@ -78,7 +64,6 @@ pub struct VoiceEntry {
     pub memory_mb: u64,
 }
 
-/// What every hearing model needs beside it (the voice activity detector).
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SupportEntry {
     pub id: String,
@@ -102,7 +87,7 @@ struct Catalog {
 }
 
 static CATALOG: LazyLock<Catalog> =
-    LazyLock::new(|| serde_json::from_str(CATALOG_JSON).unwrap_or_default());
+    LazyLock::new(|| serde_json::from_value(crate::registry::current().speech()).unwrap_or_default());
 
 pub fn hearing(id: &str) -> Option<&'static HearingEntry> {
     CATALOG.hearing.iter().find(|entry| entry.id == id)
@@ -112,7 +97,6 @@ pub fn voice(id: &str) -> Option<&'static VoiceEntry> {
     CATALOG.voices.iter().find(|entry| entry.id == id)
 }
 
-/// The voices on this computer, as the catalog lists them.
 pub fn installed_voices() -> Vec<&'static VoiceEntry> {
     CATALOG
         .voices
@@ -125,18 +109,15 @@ fn vad_entry() -> Option<&'static SupportEntry> {
     CATALOG.support.iter().find(|entry| entry.role == "vad")
 }
 
-/// Where packages are kept: `~/.misty/shared/models`, one copy for every build.
 fn models_dir() -> Option<PathBuf> {
     file_access::paths::misty_shared_dir("models")
 }
 
-/// A package's own folder, named after its checksum, so a new pin never mixes with an old one.
 fn package_dir(package: &Package) -> Option<PathBuf> {
     let key: String = package.sha256.chars().take(16).collect();
     models_dir().map(|dir| dir.join(key))
 }
 
-/// Where a package's files are once it is unpacked.
 fn files_dir(package: &Package) -> Option<PathBuf> {
     let dir = package_dir(package)?;
     Some(match package.folder.as_deref() {
@@ -149,8 +130,6 @@ fn installed(package: &Package) -> bool {
     package_dir(package).is_some_and(|dir| dir.join(COMPLETE).is_file())
 }
 
-/// Which pin each entry was installed from (`models/installed.json`, entry id to SHA-256), so a
-/// newer pin in the catalog shows as an update while the older one is still here.
 fn pins() -> HashMap<String, String> {
     models_dir()
         .and_then(|dir| file_access::fs::read_to_string(dir.join("installed.json")).ok())
@@ -174,7 +153,6 @@ fn set_pin(id: &str, sha256: Option<&str>) {
     }
 }
 
-/// An older pin of this entry is still on this computer, and the catalog has a newer one.
 fn outdated(id: &str, package: &Package, pins: &HashMap<String, String>) -> bool {
     let Some(pinned) = pins.get(id) else {
         return false;
@@ -189,7 +167,6 @@ fn outdated(id: &str, package: &Package, pins: &HashMap<String, String>) -> bool
     installed(&old)
 }
 
-/// The voice activity detector's model, when it is installed.
 pub fn vad_spec() -> Option<voice_speech::VadSpec> {
     let entry = vad_entry()?;
     if !installed(&entry.package) {
@@ -199,7 +176,6 @@ pub fn vad_spec() -> Option<voice_speech::VadSpec> {
     Some(voice_speech::VadSpec { model })
 }
 
-/// A hearing model's files, when it is installed.
 pub fn hearing_spec(id: &str) -> Option<voice_speech::HearingSpec> {
     let entry = hearing(id)?;
     if !installed(&entry.package) {
@@ -213,7 +189,6 @@ pub fn hearing_spec(id: &str) -> Option<voice_speech::HearingSpec> {
     })
 }
 
-/// A voice's files, installed or not, for forgetting its opened model as it is removed.
 pub fn voice_spec_any(id: &str) -> Option<voice_speech::VoiceSpec> {
     let entry = voice(id)?;
     Some(voice_speech::VoiceSpec {
@@ -223,7 +198,6 @@ pub fn voice_spec_any(id: &str) -> Option<voice_speech::VoiceSpec> {
     })
 }
 
-/// A voice's files, when it is installed.
 pub fn voice_spec(id: &str) -> Option<voice_speech::VoiceSpec> {
     let entry = voice(id)?;
     if !installed(&entry.package) {
@@ -236,15 +210,12 @@ pub fn voice_spec(id: &str) -> Option<voice_speech::VoiceSpec> {
     })
 }
 
-/// What this computer has, for picking a model it runs well.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Machine {
     pub memory_mb: u64,
     pub cores: u32,
-    /// Apple silicon, whose CPU runs these models quickly.
     pub apple_silicon: bool,
-    /// Free space where models are kept; null when the system doesn't say.
     pub disk_free_mb: Option<u64>,
 }
 
@@ -277,9 +248,7 @@ struct Listed<T: Serialize> {
     #[serde(flatten)]
     entry: T,
     installed: bool,
-    /// An older pin is here and the catalog has a newer one: an update.
     outdated: bool,
-    /// Which download brings it: voices that share one model share it.
     package_key: String,
 }
 
@@ -288,10 +257,8 @@ struct Listed<T: Serialize> {
 pub struct SpeechCatalog {
     hearing: Vec<Listed<HearingEntry>>,
     voices: Vec<Listed<VoiceEntry>>,
-    /// Whether the voice activity detector every hearing model needs is installed.
     support_installed: bool,
     machine: Machine,
-    /// Installs running now, by entry id.
     installing: Vec<String>,
 }
 
@@ -299,7 +266,6 @@ fn package_key(package: &Package) -> String {
     package.sha256.chars().take(16).collect()
 }
 
-/// The catalog, with what is installed here, and this computer's measure.
 #[tauri::command]
 pub async fn speech_catalog(
     webview: Webview,
@@ -344,11 +310,9 @@ pub async fn speech_catalog(
 
 #[derive(Default)]
 pub struct SpeechModelsState {
-    /// Installs running now: entry id to the download it brings.
     installing: Mutex<HashMap<String, String>>,
 }
 
-/// The ids of every hearing model and voice installed from `package`.
 fn entries_sharing(package: &Package) -> Vec<String> {
     let key = package_key(package);
     CATALOG
@@ -366,15 +330,12 @@ fn entries_sharing(package: &Package) -> Vec<String> {
         .collect()
 }
 
-/// The package an entry is installed from: a hearing model's or a voice's.
 fn package_of(id: &str) -> Option<Package> {
     hearing(id)
         .map(|entry| entry.package.clone())
         .or_else(|| voice(id).map(|entry| entry.package.clone()))
 }
 
-/// Removes a hearing model or a voice from this computer. Voices that share its package go with
-/// it; the renderer offers Remove only when none of them is in use.
 #[tauri::command]
 pub async fn speech_remove(
     webview: Webview,
@@ -383,12 +344,10 @@ pub async fn speech_remove(
 ) -> Result<(), String> {
     require_person(&webview)?;
     let package = package_of(&id).ok_or_else(|| "Misty doesn't know that model.".to_string())?;
-    // The opened models of every entry this download brings are let go.
     for other in entries_sharing(&package) {
         super::speech::forget_model(&state, &other);
     }
     super::speech::forget_model(&state, &id);
-    // Every entry pinned to this package loses it, and an older pin of this entry goes too.
     let pins = pins();
     let mut gone = vec![package.clone()];
     if let Some(pinned) = pins.get(&id) {
@@ -413,8 +372,6 @@ pub async fn speech_remove(
     Ok(())
 }
 
-/// How fast a hearing model runs here: the seconds it takes per second of speech, measured on a
-/// recording the model ships with (its `test_wavs`). Below 1 runs faster than real time.
 #[tauri::command]
 pub async fn speech_measure(webview: Webview, id: String) -> Result<f64, String> {
     require_person(&webview)?;
@@ -422,7 +379,6 @@ pub async fn speech_measure(webview: Webview, id: String) -> Result<f64, String>
     tokio::task::spawn_blocking(move || {
         let sample = sample_recording(&spec.dir).ok_or_else(|| voice_speech::reason("model"))?;
         let samples = voice_speech::decode_file(&sample)?;
-        // A few seconds is enough to tell.
         let samples = &samples[..samples.len().min(8 * voice_speech::SAMPLE_RATE as usize)];
         if samples.is_empty() {
             return Err(voice_speech::reason("model"));
@@ -437,7 +393,6 @@ pub async fn speech_measure(webview: Webview, id: String) -> Result<f64, String>
     .map_err(|_| voice_speech::reason("failed"))?
 }
 
-/// The first WAV recording in a model's `test_wavs` folder, preferring English.
 fn sample_recording(dir: &Path) -> Option<PathBuf> {
     let folder = dir.join("test_wavs");
     let mut wavs: Vec<PathBuf> = file_access::fs::read_dir(&folder)

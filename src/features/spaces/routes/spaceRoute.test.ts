@@ -12,7 +12,7 @@ describe("the Library, then Media, became Files", () => {
     expect(renamedSectionPath(old)).toBe(current);
   });
 
-  it.each(["/spaces/s1/files", "/spaces/s1/lab", "/spaces/s1", "/agents/library"])(
+  it.each(["/spaces/s1/files", "/spaces/s1/chat", "/spaces/s1", "/agents/library"])(
     "%s is left as it is",
     (path) => {
       expect(renamedSectionPath(path)).toBeNull();

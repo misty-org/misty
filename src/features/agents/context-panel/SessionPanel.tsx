@@ -39,8 +39,7 @@ import { useAgentHomeSpace } from "../personal/AgentSpaceField";
 import { ChatFolderMenu } from "../plans/AgentFolderMenu";
 import { useContextPanel } from "./contextPanelStore";
 import { chatKey } from "../conversations/state/draftChat";
-import { useChatFolder, isDraftChat } from "../shared-folders/chatFolder";
-import { OpenInCodeButton } from "../code/OpenInCodeDialog";
+import { useChatFolder } from "../shared-folders/chatFolder";
 import { ChatFolderPicker } from "./ChatFolderPicker";
 import { gitApi, type GitStatus } from "./git/gitApi";
 import { LineCounts } from "./git/LineCounts";
@@ -336,10 +335,8 @@ export function SessionPanel(props: {
             // between projects.
             kind === "project" ? (
               <ChatFolderPicker conversationId={props.conversationId} compact />
-            ) : isDraftChat(props.conversationId) ? (
-              "Scratch"
             ) : (
-              <OpenInCodeButton conversationId={props.conversationId} />
+              "Scratch"
             )
           }
         />

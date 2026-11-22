@@ -2,21 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { conversationInSpace } from "../conversations/state/conversationSpace";
 import type { GlobalAiConversation } from "../conversations/state/conversationTypes";
 import { useMistyStore } from "../conversations/state/useMistyStore";
-import { useTutorChatIds } from "../tutor/tutorStore";
 import { activityApi, type RunRow } from "./activityApi";
 import { useRunEvents } from "./useRunSteps";
 
 /** The chats of the window's Space that hold the person's own work: Tutor's live in Tutor. */
 function useSpaceChats(): GlobalAiConversation[] {
   const conversations = useMistyStore((state) => state.conversations);
-  const tutorChats = useTutorChatIds();
-  return useMemo(
-    () =>
-      conversations.filter(
-        (conversation) => conversationInSpace(conversation) && !tutorChats.has(conversation.id),
-      ),
-    [conversations, tutorChats],
-  );
+  return useMemo(() => conversations.filter((conversation) => conversationInSpace(conversation)), [conversations]);
 }
 
 /**

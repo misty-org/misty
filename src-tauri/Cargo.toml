@@ -100,12 +100,9 @@ toml_edit = "0.25"
 serde_yaml = "0.9"
 sysinfo = "0.36.1"
 which = "7"
-tokio-postgres-rustls = "0.13"
-rustls-native-certs = "0.8"
 flate2 = "1"
 tar = "0.4"
 zip = { version = "4", default-features = false, features = ["deflate"] }
-tokio-postgres = { version = "0.7", default-features = false, features = ["runtime", "with-chrono-0_4", "with-serde_json-1"] }
 # Files (features/files): a names-only search index of the home folder, typo-tolerant (MIT), the
 # live refresh of open folders (CC0-1.0) and walking a folder for its size and duplicates
 # (MIT/Unlicense), as Kura used them.

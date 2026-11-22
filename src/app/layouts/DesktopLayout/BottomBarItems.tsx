@@ -2,11 +2,9 @@ import {
   Activity,
   AudioLines,
   CircleHelp,
-  CircleX,
   Clock,
   Coins,
   Cpu,
-  FileCode,
   FolderOpen,
   Gauge,
   GitBranch,
@@ -14,23 +12,17 @@ import {
   Info,
   Keyboard,
   LayoutDashboard,
-  Locate,
   MessageSquareDot,
   MousePointer2,
   Orbit,
-  Palette,
   PanelLeft,
   PanelRight,
   Plus,
-  RadioTower,
   Search,
   Server,
-  ServerCog,
   ShieldCheck,
   SquarePen,
-  SquareTerminal,
   SunMoon,
-  TextCursorInput,
   UsersRound,
   WifiOff,
   ZoomIn,
@@ -43,15 +35,6 @@ import {
   ApprovalsStatus,
   BranchStatus,
   ChatModelStatus,
-  CodeBranchStatus,
-  CodeCursorStatus,
-  CodeLanguageStatus,
-  CodeLiveStatus,
-  CodeProblemsStatus,
-  CodeServerStatus,
-  CodeTerminalButton,
-  CodeThemeStatus,
-  CodeVimStatus,
   ContextStatus,
   CostStatus,
   FolderStatus,
@@ -86,19 +69,12 @@ export { BottomBarOpenContext } from "./bottomBarOpenContext";
 
 type BarItem = {
   label: string;
-  /** One line for its tile in Settings. */
   description: string;
   icon: LucideIcon;
-  /** Where it goes when added: window-wide status on the left, the page in view on the right. */
   side: "start" | "end";
   Item: ComponentType;
 };
 
-/**
- * Everything the window's bottom bar can show (Settings › Interface › Bottom bar), in the order
- * the setting lists them. Most draw nothing until they have something to say, so a calm window
- * shows a calm bar; the chat items read the focused pane's chat.
- */
 export const bottomBarItems: Record<BottomBarItemId, BarItem> = {
   agents: {
     label: "Agent activity",
@@ -193,10 +169,10 @@ export const bottomBarItems: Record<BottomBarItemId, BarItem> = {
   },
   branch: {
     label: "Branch",
-    description: "The branch of the focused chat or Code page, with its uncommitted lines.",
+    description: "The branch of the focused chat, with its uncommitted lines.",
     icon: GitBranch,
     side: "end",
-    Item: Branch,
+    Item: forChat(BranchStatus),
   },
   folder: {
     label: "Folder",
@@ -211,62 +187,6 @@ export const bottomBarItems: Record<BottomBarItemId, BarItem> = {
     icon: Clock,
     side: "end",
     Item: forChat(RunTimeStatus),
-  },
-  codeVim: {
-    label: "Vim mode",
-    description: "On the Code page with vim on: normal, insert or visual.",
-    icon: TextCursorInput,
-    side: "end",
-    Item: forCode(CodeVimStatus),
-  },
-  codeLive: {
-    label: "Live session",
-    description: "On the Code page: the live session it's in, and who else is there.",
-    icon: RadioTower,
-    side: "end",
-    Item: forCode(CodeLiveStatus),
-  },
-  codeProblems: {
-    label: "Problems",
-    description: "On the Code page: the open file's errors and warnings.",
-    icon: CircleX,
-    side: "end",
-    Item: forCode(CodeProblemsStatus),
-  },
-  codeCursor: {
-    label: "Cursor position",
-    description: "On the Code page: the cursor's line and column.",
-    icon: Locate,
-    side: "end",
-    Item: forCode(CodeCursorStatus),
-  },
-  codeLanguage: {
-    label: "Language",
-    description: "On the Code page: the open file's language.",
-    icon: FileCode,
-    side: "end",
-    Item: forCode(CodeLanguageStatus),
-  },
-  codeServer: {
-    label: "Language server",
-    description: "On the Code page: the open file's language server, and its install.",
-    icon: ServerCog,
-    side: "end",
-    Item: forCode(CodeServerStatus),
-  },
-  codeTheme: {
-    label: "Editor theme",
-    description: "On the Code page: the editor's theme, to switch it in place.",
-    icon: Palette,
-    side: "end",
-    Item: forCode(CodeThemeStatus),
-  },
-  codeTerminal: {
-    label: "Terminal",
-    description: "On the Code page: shows or hides its terminal.",
-    icon: SquareTerminal,
-    side: "end",
-    Item: forCode(CodeTerminalButton),
   },
   newChat: {
     label: "New chat",
@@ -359,14 +279,12 @@ function Browsing() {
   return <AgentBrowsingStatus onOpenChat={useOpenChat()} />;
 }
 
-/** Opens an agent's chat in this window, as the sidebar does. */
 function useOpenChat() {
   const open = useOpen();
   return (agentId: string, conversationId: string) =>
     openWorkspaceRoute(openChatRoute(agentId, conversationId), open);
 }
 
-/** The focused pane's view, unless it is an unused new tab. */
 function useFocusedView() {
   return useWorkspaceStore((state) => {
     const pane = dockLeaves(state.layout.root).find(
@@ -377,7 +295,6 @@ function useFocusedView() {
   });
 }
 
-/** A chat item, drawn only while the focused pane shows a chat. */
 function forChat(Status: ComponentType<{ conversationId: string }>): ComponentType {
   return function ChatItem() {
     const route = useFocusedView()?.route ?? "";
@@ -389,32 +306,6 @@ function forChat(Status: ComponentType<{ conversationId: string }>): ComponentTy
   };
 }
 
-/** The focused Code page's view id, or null while the focused pane shows something else. */
-function useFocusedCodeView(): string | null {
-  const view = useFocusedView();
-  const [path, query = ""] = (view?.route ?? "").split("?");
-  return view && path === "/agents" && new URLSearchParams(query).get("view") === "code"
-    ? view.id
-    : null;
-}
-
-/** A Code item, drawn only while the focused pane shows the Code page. */
-function forCode(Status: ComponentType<{ viewId: string }>): ComponentType {
-  return function CodeItem() {
-    const viewId = useFocusedCodeView();
-    return viewId ? <Status viewId={viewId} /> : null;
-  };
-}
-
-const ChatBranch = forChat(BranchStatus);
-
-/** The focused Code page's branch there, else the focused chat's. */
-function Branch() {
-  const codeView = useFocusedCodeView();
-  return codeView ? <CodeBranchStatus viewId={codeView} /> : <ChatBranch />;
-}
-
-/** How many agents are working and how many wait on the person, while any do. */
 function AgentActivity() {
   const statuses = Object.values(useChatStatuses());
   const working = statuses.filter((status) => status === "working").length;
@@ -436,7 +327,6 @@ function AgentActivity() {
   );
 }
 
-/** The "i" for the focused pane's page: its tour. A page with no tour leaves it out. */
 function PageInfo() {
   const view = useFocusedView();
   const tour = view ? tourForRoute(view.route) : null;

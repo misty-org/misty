@@ -22,6 +22,7 @@ pub fn is_protected_scope(scope: &str) -> bool {
         || scope.starts_with("permission:")
         || scope.starts_with("drive:")
         || scope.starts_with("files:")
+        || scope.starts_with("registry:")
 }
 
 pub fn profile_state(

@@ -2,7 +2,7 @@
 //! (voice activity detection, then a speech recognition model), recorded files, and speaking in
 //! a voice. Every model runs through sherpa-onnx (Apache-2.0) on the CPU, the same on macOS,
 //! Windows and Linux. Which models there are, and where they come from, is Misty's catalog
-//! (`misty-catalog`); the app downloads them and hands this crate their files.
+//! (`misty-registry`); the app downloads them and hands this crate their files.
 //!
 //! The crate has no app framework coupling: callers own events, windows and model files.
 

@@ -1,10 +1,7 @@
 import {
   Armchair,
-  CodeXml,
   GraduationCap,
   MessagesSquare,
-  NotebookPen,
-  FlaskConical,
   Galaxy,
   Plus,
   Settings,
@@ -18,15 +15,10 @@ import {
   askInNewChat,
   messageSearchText,
   requestChatFind,
-  tutorChatIds,
   useLessonStore,
   useMistyStore,
   defaultAgentOf,
   usePersonalAgentsStore,
-  useTutorStore,
-  notebookRoute,
-  openCodeChat,
-  useProjectChats,
 } from "@/features/agents";
 import { useCommands } from "@/features/commands";
 import { openSettings, searchSettings } from "@/features/settings";
@@ -40,17 +32,13 @@ import { useRemoteHits } from "./useRemoteHits";
 import type { SearchQuery } from "./searchQuery";
 import type { SearchHit, SearchKind } from "./searchTypes";
 
-/** The pages search goes to; the Space's need a Space. */
 const pages: { label: string; icon: LucideIcon; route(base: string): string; space?: boolean }[] = [
   { label: "Space", icon: Galaxy, route: (base) => base, space: true },
   { label: "Studio", icon: Armchair, route: () => "/agents?view=studio" },
-  { label: "Code", icon: CodeXml, route: () => "/agents?view=code" },
-  { label: "Lab", icon: FlaskConical, route: (base) => `${base}/lab`, space: true },
   { label: "Chat", icon: MessagesSquare, route: (base) => `${base}/chat`, space: true },
   { label: "Files", icon: spaceIcons.files, route: () => "/agents?view=files" },
 ];
 
-/** How the order weighs a kind's match against the others'. */
 const weights: Record<string, number> = {
   Actions: 3,
   "Go to": 1.3,
@@ -61,7 +49,6 @@ const weights: Record<string, number> = {
   Settings: 0.9,
   Commands: 0.9,
   Notebooks: 1,
-  "In notebooks": 0.8,
   Messages: 0.8,
   "Engine history": 0.7,
   Apps: 0.7,
@@ -70,26 +57,16 @@ const weights: Record<string, number> = {
 interface SearchContext {
   query: SearchQuery;
   kind: SearchKind;
-  /** The kind the page in front holds; its hits rank a step higher while typing. */
   here?: SearchKind;
-  /** Opens a page of the window in the focused pane. */
   openRoute(route: string): void;
   onNewChat(): void;
 }
 
 interface SearchResults {
-  /** Ranked, best first. */
   hits: SearchHit[];
-  /** Sources still answering, so the list can show where more is coming. */
   waiting: boolean;
 }
 
-/**
- * Everything ⌘K search can find, for what was typed: the person's chats (by their text too),
- * agents, the Space's chats and messages, notebooks, the lessons,
- * apps to connect, settings, commands and pages. What lives on this computer is matched here;
- * Space content is searched by the server; engines' own histories by native code.
- */
 export function useSearchHits(context: SearchContext): SearchResults {
   const { query, kind, openRoute } = context;
   const words = query.text;
@@ -99,10 +76,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
   const base = spaceId ? `/spaces/${encodeURIComponent(spaceId)}` : "";
   const agents = usePersonalAgentsStore((state) => state.agents);
   const conversations = useMistyStore((state) => state.conversations);
-  const projectChats = useProjectChats();
   const lessons = useLessonStore((state) => state.lessons);
-  const tutorJobs = useTutorStore((state) => state.jobs);
-  const notebooks = useTutorStore((state) => state.notebooks);
   const gallery = useSpaceGallery(spaceId, user?.id ?? "");
   const commands = useCommands();
   const uses = useSearchUses((state) => state.uses);
@@ -115,11 +89,9 @@ export function useSearchHits(context: SearchContext): SearchResults {
   );
   const defaultAgent = useMemo(() => defaultAgentOf(agents) ?? agents[0], [agents]);
 
-  // What lives here: matched on every keystroke.
   const local = useMemo(() => {
     const hits: SearchHit[] = [];
     const typed = words.length > 0;
-    const tutorMade = tutorChatIds(tutorJobs, notebooks);
 
     for (const page of pages) {
       if (page.space && !base) continue;
@@ -159,24 +131,18 @@ export function useSearchHits(context: SearchContext): SearchResults {
 
     for (const chat of conversations) {
       if (!chat.messages.length || chat.place) continue;
-      if (lessons[chat.id] || tutorMade.has(chat.id)) continue;
+      if (lessons[chat.id]) continue;
       const agent = agentOf(chat.agentId);
       if (!agent) continue;
       const title = chat.title || "New conversation";
-      // A chat in a project is Code's: it opens beside the Code page's editor.
-      const inCode = Boolean(projectChats?.[chat.id]);
-      const route = inCode ? "/agents?view=code" : agentChatRoute(agent.id, chat.id);
-      const go = () => {
-        if (inCode) openCodeChat(chat.id);
-        openRoute(route);
-      };
+      const go = () => openRoute(agentChatRoute(agent.id, chat.id));
       if (!typed) {
         hits.push({
           id: `chat:${chat.id}`,
           kind: "chats",
           group: "Chats",
           title,
-          detail: inCode ? "Code" : agent.name,
+          detail: agent.name,
           icon: <AgentAvatar agent={agent} compact />,
           updatedAt: chat.updatedAt,
           match: 0,
@@ -185,7 +151,6 @@ export function useSearchHits(context: SearchContext): SearchResults {
         continue;
       }
       const head = matchScore(title, words);
-      // The best message it has, for the words around the match and the chat's find.
       let body = 0;
       let said = "";
       for (const message of chat.messages) {
@@ -204,7 +169,7 @@ export function useSearchHits(context: SearchContext): SearchResults {
         kind: "chats",
         group: "Chats",
         title,
-        detail: inCode ? "Code" : agent.name,
+        detail: agent.name,
         excerpt: inside ? excerpt(said, words) : undefined,
         icon: <AgentAvatar agent={agent} compact />,
         updatedAt: chat.updatedAt,
@@ -251,22 +216,6 @@ export function useSearchHits(context: SearchContext): SearchResults {
       });
     }
 
-    for (const notebook of Object.values(notebooks)) {
-      const match = typed ? matchScore(notebook.title, words) : 0;
-      if (typed && !match) continue;
-      hits.push({
-        id: `notebook:${notebook.id}`,
-        kind: "learn",
-        group: "Notebooks",
-        title: notebook.title || "Untitled notebook",
-        detail: "Notebook",
-        icon: notebook.emoji ? <span aria-hidden>{notebook.emoji}</span> : icon(NotebookPen),
-        updatedAt: notebook.updatedAt,
-        match,
-        open: () => openRoute(notebookRoute(notebook)),
-      });
-    }
-
     for (const item of gallery.items) {
       const match = typed ? fieldScore(words, item.title, item.excerpt) : 0;
       if (typed && !match) continue;
@@ -308,28 +257,22 @@ export function useSearchHits(context: SearchContext): SearchResults {
     base,
     commands,
     conversations,
-    projectChats,
     lessons,
-    tutorJobs,
-    notebooks,
     gallery.items,
     agents,
     agentOf,
     openRoute,
   ]);
 
-  // What other places answer: the server, native code, the notebooks' index.
   const asking = Boolean(query.ask);
   const { remote, remoteKey } = useRemoteHits({
     spaceId,
     words,
     asking,
-    notebooks,
     agents,
     openRoute,
   });
 
-  // What the typed text asks to do, above what it finds.
   const actions = useMemo(() => {
     const hits: SearchHit[] = [];
     const { ask } = query;
@@ -381,7 +324,6 @@ export function useSearchHits(context: SearchContext): SearchResults {
   const hits = useMemo(() => {
     const now = Date.now();
     const found = [...local, ...(remote.key === remoteKey ? remote.hits : [])];
-    // The same thing from two sources (a note by title and by text) shows once, at its best.
     const best = new Map<string, SearchHit>();
     for (const hit of found) {
       const known = best.get(hit.id);
@@ -410,7 +352,6 @@ export function useSearchHits(context: SearchContext): SearchResults {
       .sort((a, b) => b.score - a.score)
       .map(({ hit }) => hit);
     const doing = actions.filter((hit) => kind === "all" || hit.kind === kind || hit.match >= 10);
-    // Something the text asks for outright goes first; the rest of the actions go last.
     return [
       ...doing.filter((hit) => hit.match >= 10),
       ...ranked,

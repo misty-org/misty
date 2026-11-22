@@ -21,7 +21,7 @@ import { AddFromGitHubDialog } from "./AddFromGitHubDialog";
 import { permissionLines } from "./appPermissions";
 import { RemoveAppDialog } from "./RemoveAppDialog";
 import { appRoute } from "./appRoutes";
-import { catalogApps, catalogLogoUrl, type CatalogApp } from "./thirdPartyApps";
+import { catalogLogoUrl, useRegistryApps, type CatalogApp } from "./thirdPartyApps";
 import { useSpaceApps } from "./useSpaceApps";
 
 const matches = (query: string, ...texts: (string | undefined)[]) => {
@@ -56,6 +56,7 @@ export function ExploreAppsSection({
 }) {
   const navigate = useNavigate();
   const { apps, error, reload, install, remove } = useSpaceApps(spaceId);
+  const listedApps = useRegistryApps();
   const [removing, setRemoving] = useState<CatalogApp | null>(null);
   const [picked, setPicked] = useState<CatalogApp | null>(null);
   const [saving, setSaving] = useState(false);
@@ -80,7 +81,7 @@ export function ExploreAppsSection({
     navigate(route);
   };
 
-  const listed = catalogApps.filter((app) => matches(query, app.name, app.description, app.maker));
+  const listed = listedApps.filter((app) => matches(query, app.name, app.description, app.maker));
   const cut = <T,>(items: readonly T[]) => (limit ? items.slice(0, limit) : items);
   const seeAll = onSeeAll ? (
     <Button variant="quiet" size="sm" onClick={onSeeAll}>
@@ -116,7 +117,7 @@ export function ExploreAppsSection({
 
   return (
     <>
-      {featured && !query.trim() ? <FeaturedApps apps={catalogApps} onOpen={setPicked} /> : null}
+      {featured && !query.trim() ? <FeaturedApps apps={listedApps} onOpen={setPicked} /> : null}
       {error ? (
         <ErrorState
           inline

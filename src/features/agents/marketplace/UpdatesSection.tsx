@@ -27,7 +27,7 @@ import {
 } from "@misty/ui";
 import { skillsHubApi, type SkillRow, type SkillTargetId } from "@/features/engine-config/skills";
 import { exploreApps, type ExploreCatalogApp } from "./exploreApps";
-import { catalogEngineIds, catalogEngines, type CatalogEngine } from "./engineCatalog";
+import { useRegistryEngineIds, useRegistryEngines, type CatalogEngine } from "./engineCatalog";
 import { EngineTile } from "./EnginesSection";
 import { MakerTile, pluginMaker } from "./PluginMaker";
 import { progressLine, type SpeechEntry } from "./SpeechSection";
@@ -62,8 +62,9 @@ export function useSkillUpdates() {
  * screen opens; without, only what is already known counts (the rail's number).
  */
 export function useEngineUpdates(options: { probe?: boolean } = {}) {
-  const { statuses, settled } = useCliStatuses(catalogEngineIds, options);
-  const rows = catalogEngines
+  const engines = useRegistryEngines();
+  const { statuses, settled } = useCliStatuses(useRegistryEngineIds(), options);
+  const rows = engines
     .filter((engine) => hasCliUpdate(statuses[engine.id]))
     .map((engine) => ({ engine, status: statuses[engine.id] as CliVersionStatus }));
   return { rows, settled };

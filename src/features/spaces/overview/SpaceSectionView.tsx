@@ -17,11 +17,6 @@ async function loadChat() {
   return { default: SpaceChatEntry };
 }
 const Chat = lazy(loadChat);
-async function loadLab() {
-  const { SpaceLab } = await import("@/features/agents");
-  return { default: SpaceLab };
-}
-const Lab = lazy(loadLab);
 async function loadExplore() {
   const { ExplorePage } = await import("@/features/agents");
   return { default: ExplorePage };
@@ -49,9 +44,6 @@ export async function preloadSpaceSection(section: string) {
     case "files":
       await loadFiles();
       break;
-    case "lab":
-      await loadLab();
-      break;
     case "agents":
     case "explore":
       await loadExplore();
@@ -68,7 +60,6 @@ export async function preloadSpaceSection(section: string) {
 /** The tab's name for the pages that don't name it themselves (Files and Chat do), so a tab
  * that moves to one of them never keeps the last page's name. */
 const sectionTabTitles: Record<string, string> = {
-  lab: "Lab",
   explore: "Explore",
 };
 
@@ -145,8 +136,6 @@ export function SpaceSectionView(props: {
       <Suspense fallback={<SpacePageLoadingPlaceholder shape={shape} />}>
         {section === "files" ? (
           <Files />
-        ) : section === "lab" ? (
-          <Lab spaceId={spaceId} />
         ) : section === "explore" ? (
           <Explore
             spaceId={spaceId}

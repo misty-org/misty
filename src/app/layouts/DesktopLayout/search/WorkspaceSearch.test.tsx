@@ -22,7 +22,6 @@ vi.mock("@/features/commands", () => ({
 vi.mock("@/features/settings", () => ({
   openSettings: vi.fn(),
   searchSettings: () => [],
-  // No search preferences saved: every source keeps its default.
   useSettingsStore: (select: (state: { settings: null }) => unknown) => select({ settings: null }),
 }));
 vi.mock("../spaceNavigation", () => ({
@@ -52,11 +51,7 @@ vi.mock("@/features/agents", () => {
     defaultAgentOf: (list: typeof agents) => list.find((agent) => agent.engine),
     defaultEngineAgent: () => undefined,
     folderName: (path: string) => path,
-    notebookRoute: () => "/lab",
     openAgentsHub: vi.fn(),
-    openCodeChat: vi.fn(),
-    // No chat here works in a project, so every chat is the sidebar's.
-    useProjectChats: () => ({}),
     AgentAvatar: () => <span />,
     askInNewChat: async (agent: string, prompt: string) => {
       calls.asked.push([agent, prompt]);
@@ -84,14 +79,11 @@ vi.mock("@/features/agents", () => {
     resumeInNewChat: vi.fn(),
     searchEngineSessions: async () => ({ hits: [], hasMore: false }),
     searchFolderFiles: async () => [],
-    searchNotebooks: async () => ({ hits: [], byMeaning: false }),
     shortAgo: () => "1d",
-    tutorChatIds: () => new Set(),
     updateDeviceState: async () => ({}),
     useLessonStore: store({ lessons: {} }),
     useMistyStore: store({ conversations }),
     usePersonalAgentsStore: store({ agents }),
-    useTutorStore: store({ jobs: {}, notebooks: {} }),
   };
 });
 vi.mock("@/features/spaces", () => {
@@ -124,14 +116,12 @@ const type = (text: string) =>
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input(), text);
     input().dispatchEvent(new Event("input", { bubbles: true }));
   });
-/** Past the pause that keeps typing from asking every source on each key. */
 const settle = () =>
   act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 250));
   });
 
 beforeEach(() => {
-  // cmdk keeps the selected row in view; jsdom draws nothing to scroll.
   Element.prototype.scrollIntoView ??= () => undefined;
   calls.routes.length = 0;
   calls.asked.length = 0;

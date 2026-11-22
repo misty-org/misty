@@ -11,10 +11,9 @@ import { EditorSkeleton } from "../PanelSkeletons";
 import { errorText } from "../projectApi";
 import { imageFileUrl, type FileContent } from "../files/filesApi";
 import { fileName, useFilesStore } from "../files/filesStore";
-import { editorCommands } from "../../code/editorCommands";
-import type { EditorAddon, EditorAppearance } from "../../code/editorAddons";
-import { useEditorAddons } from "../../code/useEditorAddons";
-import { useEditorWordWrap } from "../../code/vim/editorVimSettings";
+import { editorCommands } from "./editorCommands";
+import { useEditorAddons, type EditorAddon, type EditorAppearance } from "./editorAddons";
+import { useEditorWordWrap } from "./editorSettings";
 import { BinaryFileView, ImageFileView } from "./EditorFallbackViews";
 import {
   EditorSearchPanel,

@@ -14,18 +14,17 @@ import { AppErrorBoundary } from "./AppErrorBoundary";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { applyCachedAppTheme } from "@/features/settings";
 import { installUiStorage } from "@/shared/lib/uiStorage";
-// A link a person clicks opens in their own browser: Misty shows web pages only to agents.
+import { followRegistry } from "@/native/registry";
 configureMistyBrowserLinkOpener(async (url) => {
   if (!hasTauriInternals()) throw new Error("Links open only from the desktop app.");
   await openUrl(url);
 });
 installExternalLinkRouting();
 initializeHostAgentsRuntime();
-// The theme chosen last time, so a light-theme window doesn't open dark before settings load.
 applyCachedAppTheme();
 installUiStorage();
-// The interface and code fonts chosen in Settings, and the performance panel's recording when on.
 void applySavedFonts();
+followRegistry();
 if (hasTauriInternals()) startPerformanceRecording();
 if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
   void import("@/shared/platform/clientDebug").then(({ installClientDebugging }) => {
@@ -34,10 +33,6 @@ if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
 }
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 export const startup = bootstrap();
-/**
- * What removed features left behind: marks from when an account's password also derived its vault
- * keys, and each chat's project and coding tool. Nothing reads them now.
- */
 function removeRetiredStorage() {
   try {
     for (const key of [
@@ -48,16 +43,12 @@ function removeRetiredStorage() {
     ])
       localStorage.removeItem(key);
   } catch {
-    // Without storage there is nothing to remove.
   }
 }
 async function bootstrap() {
   removeRetiredStorage();
-  // The app and its styles load while the session is prepared, not after it. The shell
-  // loads beside them too, instead of when the first route renders.
   const appModules = Promise.all([import("./App"), import("@/styles/styles.css")]);
   void import("./layouts/DesktopLayout").catch(() => undefined);
-  // Every request goes to the server this device chose, so the choice is read first.
   await (await import("@/api/deployment/serverChoice")).loadServerChoice();
   const [{ App }] = await appModules;
   root.render(

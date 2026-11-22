@@ -45,6 +45,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     runtime.agents.restore_folder_grants();
     crate::engines::commands::allow_linked_folders(&runtime.environment.store());
     crate::engine_config::setup(app.handle());
+    crate::registry::start(app.handle());
     app.manage(permissions::Backing(runtime.environment.store()));
     app.manage(runtime);
     // Once: the folders Misty used to make for agents become projects or go to the Trash.

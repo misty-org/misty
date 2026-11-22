@@ -2,7 +2,7 @@
 import { ChevronRight, RotateCw, Save, Search, WrapText } from "lucide-react";
 import { Fragment } from "react";
 import { Button, ChoiceGroup, cn, IconButton, Surface, Text, Tooltip } from "@misty/ui";
-import type { EditorAppearance } from "../../code/editorAddons";
+import type { EditorAppearance } from "./editorAddons";
 import { getFileTreeIconSvg } from "../files/fileIcons";
 import { useFilesStore } from "../files/filesStore";
 import type { EditorViewMode } from "./editorViewMode";

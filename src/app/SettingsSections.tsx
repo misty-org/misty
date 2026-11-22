@@ -5,9 +5,7 @@ import {
   AgentActivitySettings,
   AgentDefaultsSection,
   AgentPermissionsSection,
-  CollaborationSettings,
   CompanionSection,
-  EditorSettings,
   EngineSection,
 } from "@/features/agents";
 import {
@@ -55,8 +53,6 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   appearance: AppearanceSection,
   fonts: FontsSection,
   accessibility: AccessibilitySection,
-  editor: EditorSettings,
-  collaboration: CollaborationSettings,
   shortcuts: ShortcutsSection,
   voice: VoiceSection,
   devices: DevicesSection,

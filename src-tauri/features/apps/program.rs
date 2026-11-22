@@ -1,18 +1,3 @@
-//! An app's MCP server as a program its maker ships (`mcp: binary`), such as SoundCraft's `soundcraft-cli mcp`.
-//!
-//! Which program, from which release and with which checksum, comes only from the catalog Misty carries
-//! (`src/features/spaces/apps/catalog.json`, a copy of misty-catalog's), never from a page: the page only says which
-//! installed app and version a Space has. The maker's archive for this platform is downloaded, checked against that
-//! checksum, and only the one program file is taken out of it.
-//!
-//! Its tools are listed once and offered to engines like any app's (`mcp.rs`), through the same gate. The first call
-//! from a chat starts a server for that chat's folder, over stdio, and later calls and turns of the chat reuse it, so
-//! the session the agent is building stays open. Each server is confined by the OS (Seatbelt on macOS, Landlock on
-//! Linux): it reads and writes only that folder, reads its own files and the system's libraries, and has no network.
-//! It is also handed the maker's own root flags, so a path outside the folder comes back as an error the agent can
-//! read. Where Misty can't confine it (Windows, for now), nothing is offered. A server idle for a while is stopped;
-//! what it made is in the folder.
-
 use std::collections::HashMap;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
@@ -38,25 +23,18 @@ mod tests;
 use archive::{from_tar_gz, from_zip};
 use server::{Server, Trouble};
 
-/// The catalog Misty carries with its release: the only place a program's pin comes from.
-const CATALOG: &str = include_str!("../../../src/features/spaces/apps/catalog.json");
 #[cfg(target_os = "macos")]
 const PROFILE: &str = include_str!("../../tauri-permissions/permissions/app-mcp-program.sb");
 
-/// The most an archive may be, and the most the program in it may be.
 pub const MAX_ARCHIVE_BYTES: u64 = 256 << 20;
 const MAX_PROGRAM_BYTES: u64 = 256 << 20;
-/// The most one message from the program may be: a screenshot or a session report is large.
 const MAX_LINE_BYTES: u64 = 32 << 20;
-/// Long enough for a bounce of a long session.
 const CALL_LIMIT: Duration = Duration::from_secs(10 * 60);
 const START_LIMIT: Duration = Duration::from_secs(30);
-/// A chat's server that hasn't been called for this long is stopped.
 const IDLE_LIMIT: Duration = Duration::from_secs(20 * 60);
 const MAX_PAGES: usize = 20;
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
-/// One platform's release archive that holds the program, as the catalog pins it.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Build {
     pub url: String,
@@ -64,8 +42,6 @@ pub struct Build {
     pub size: u64,
 }
 
-/// How an app's program runs: its file name, its arguments, the maker's own flags that keep it to a folder, and
-/// the archive per platform.
 #[derive(Debug, Clone, Deserialize)]
 pub struct McpProgram {
     pub program: String,
@@ -73,7 +49,6 @@ pub struct McpProgram {
     pub args: Vec<String>,
     pub read_root_flag: String,
     pub write_root_flag: String,
-    /// Variables the maker documents for running headless (SoundCraft's `SOUNDCRAFT_NO_PREFS`).
     #[serde(default)]
     pub env: HashMap<String, String>,
     pub builds: HashMap<String, Build>,
@@ -82,7 +57,6 @@ pub struct McpProgram {
 #[derive(Deserialize)]
 struct CatalogApp {
     id: String,
-    /// The maker's repository, `owner/name`: the program must be one of its own release assets.
     upstream: String,
     version: String,
     #[serde(default)]
@@ -94,7 +68,6 @@ struct Catalog {
     apps: Vec<CatalogApp>,
 }
 
-/// The platform's name in the catalog, where Misty can confine a program. `None` offers nothing.
 pub fn platform() -> Option<&'static str> {
     if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
         Some("macos-aarch64")
@@ -117,7 +90,6 @@ fn flag_ok(flag: &str) -> bool {
         })
 }
 
-/// Variables that would change how a program is loaded or where it reads and writes are Misty's to set.
 fn env_ok(key: &str, value: &str) -> bool {
     let reserved = ["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "IFS"];
     !key.is_empty()
@@ -151,7 +123,6 @@ impl McpProgram {
         Ok(())
     }
 
-    /// This platform's archive, which must be the maker's own release asset.
     fn build(&self, upstream_prefix: &str) -> Result<&Build, String> {
         let platform = platform().ok_or_else(|| "Misty can't run this app's tools on this computer yet.".to_owned())?;
         let build = self
@@ -166,14 +137,13 @@ impl McpProgram {
     }
 }
 
-/// The program the catalog pins for this app and version, with the archive for this platform.
 pub fn pinned(app_id: &str, version: &str) -> Result<(McpProgram, Build), String> {
-    pinned_in(CATALOG, app_id, version)
+    pinned_in(&crate::registry::current().apps_json(), app_id, version)
 }
 
 fn pinned_in(catalog: &str, app_id: &str, version: &str) -> Result<(McpProgram, Build), String> {
     let catalog: Catalog =
-        serde_json::from_str(catalog).map_err(|error| format!("Misty's app catalog isn't valid: {error}"))?;
+        serde_json::from_str(catalog).map_err(|error| format!("Misty's app registry isn't valid: {error}"))?;
     let app = catalog
         .apps
         .into_iter()
@@ -195,7 +165,6 @@ fn pinned_in(catalog: &str, app_id: &str, version: &str) -> Result<(McpProgram, 
     Ok((program, build))
 }
 
-/// Misty's folder for apps' programs, apart from their web bundles so reinstalling one leaves the other.
 fn programs_root() -> Result<PathBuf, String> {
     file_access::paths::misty_home_dir()
         .map(|home| home.join("app-programs"))
@@ -209,24 +178,20 @@ fn program_dir_in(root: &Path, app_id: &str, version: &str) -> Result<PathBuf, S
     Ok(root.join(app_id).join(version))
 }
 
-/// The program's file once it's on this computer.
 fn program_path(dir: &Path, program: &McpProgram) -> PathBuf {
     dir.join("bin").join(&program.program)
 }
 
-/// An empty folder the program is kept to while it only lists its tools.
 fn listing_dir(dir: &Path) -> PathBuf {
     dir.join("listing")
 }
 
-/// Whether this version's program is here already.
 pub fn installed(app_id: &str, version: &str, program: &McpProgram) -> Result<Option<PathBuf>, String> {
     let dir = program_dir_in(&programs_root()?, app_id, version)?;
     let path = program_path(&dir, program);
     Ok(fs::is_file(&path).then_some(path))
 }
 
-/// Takes the program out of the maker's archive, only if the archive matches the catalog's checksum, and keeps it.
 pub fn install(app_id: &str, version: &str, program: &McpProgram, build: &Build, archive: &[u8]) -> Result<PathBuf, String> {
     install_in(&programs_root()?, app_id, version, program, build, archive)
 }
@@ -274,8 +239,6 @@ fn install_in(
     Ok(program_path(&final_dir, program))
 }
 
-/// The confined command that runs `program` kept to `work`, before its own arguments. What has to stay alive
-/// until the program has started comes with it.
 #[cfg(target_os = "macos")]
 fn confined(program: &Path, work: &Path) -> Result<(tokio::process::Command, ()), String> {
     let failed = |_| "Misty couldn't confine the app's tools, so they weren't started.".to_owned();
@@ -290,7 +253,6 @@ fn confined(program: &Path, work: &Path) -> Result<(tokio::process::Command, ())
         ))
         .arg(&program);
     command.process_group(0);
-    // Only async-signal-safe resource-limit calls run between fork and exec.
     unsafe {
         command.pre_exec(|| {
             sandbox::macos::set_limits(&[
@@ -324,7 +286,6 @@ fn confined(program: &Path, work: &Path) -> Result<(tokio::process::Command, san
         ],
     })?;
     let mut command = tokio::process::Command::new(&program);
-    // The hook starts the program's own session, which is its process group too.
     unsafe {
         command.pre_exec(confinement.hook());
     }
@@ -336,7 +297,6 @@ fn confined(_: &Path, _: &Path) -> Result<(tokio::process::Command, ()), String>
     Err("Misty can't confine the app's tools on this computer yet, so they don't run here.".into())
 }
 
-/// An app whose program's tools are on offer.
 #[derive(Clone)]
 struct Offered {
     version: String,
@@ -345,7 +305,6 @@ struct Offered {
 }
 
 static OFFERED: LazyLock<StdMutex<HashMap<String, Offered>>> = LazyLock::new(|| StdMutex::new(HashMap::new()));
-/// The running servers, one per app and chat folder.
 type Slot = Arc<Mutex<Option<Server>>>;
 static SERVERS: LazyLock<StdMutex<HashMap<(String, PathBuf), Slot>>> = LazyLock::new(|| StdMutex::new(HashMap::new()));
 
@@ -357,13 +316,10 @@ fn servers() -> MutexGuard<'static, HashMap<(String, PathBuf), Slot>> {
     SERVERS.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Whether any app's program is on offer, so an engine is told how those tools work.
 pub fn any_offered() -> bool {
     !offered().is_empty()
 }
 
-/// Lists the program's tools, kept to an empty folder, and offers them to engines. Offering the same version again
-/// changes nothing.
 pub async fn offer(app_id: &str, version: &str, spec: &McpProgram, path: &Path) -> Result<usize, String> {
     if offered().get(app_id).is_some_and(|known| known.version == version && known.path == path) {
         return Ok(0);
@@ -378,20 +334,17 @@ pub async fn offer(app_id: &str, version: &str, spec: &McpProgram, path: &Path) 
     let tools = lister.list_tools().await?;
     drop(lister);
     let count = mcp::register_program(app_id, &tools)?;
-    // A new version's servers start afresh.
     servers().retain(|(app, _), _| app != app_id);
     offered().insert(app_id.to_owned(), Offered { version: version.to_owned(), path: path.to_owned(), spec: spec.clone() });
     Ok(count)
 }
 
-/// Takes an app's program tools down and stops its servers.
 pub fn withdraw(app_id: &str) {
     offered().remove(app_id);
     mcp::unregister_program(app_id);
     servers().retain(|(app, _), _| app != app_id);
 }
 
-/// Stops servers nobody has called for a while, and those of apps no longer offered.
 fn reap() {
     let still: Vec<String> = offered().keys().cloned().collect();
     servers().retain(|(app, _), slot| {
@@ -400,13 +353,11 @@ fn reap() {
         }
         match slot.try_lock() {
             Ok(guard) => guard.as_ref().is_some_and(|server| server.last_used.elapsed() < IDLE_LIMIT),
-            // In use right now.
             Err(_) => true,
         }
     });
 }
 
-/// What a call came to: done, refused with nothing changed, or cut off when it may have changed something.
 pub enum Outcome {
     Done(Value),
     Failed { code: String, message: String },
@@ -424,7 +375,6 @@ fn text_of(result: &Value) -> String {
         .unwrap_or_default()
 }
 
-/// Calls a tool of an app's program for a run, in the run's own folder. The gate has already let the call through.
 pub async fn call(run_id: &str, app_id: &str, tool: &str, input: Value) -> Outcome {
     let Some(folder) = crate::engines::runs::folder_of(run_id) else {
         return failed(
