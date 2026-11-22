@@ -2,17 +2,7 @@ import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import type { SpacePerson } from "../api/dto/entities";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
-import {
-  Avatar,
-  AvatarFallback,
-  Button,
-  FilterChip,
-  IconButton,
-  Input,
-  Text,
-  Tooltip,
-  cn,
-} from "@misty/ui";
+import { Avatar, AvatarFallback, Checkbox, IconButton, Input, ListRow, Text, cn } from "@misty/ui";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -37,8 +27,8 @@ function PersonAvatar({ label }: { label: string }) {
 }
 
 /**
- * People the person already shares a Space with are one-click toggle buttons;
- * anyone else is added by email and shown as a button that removes them.
+ * People the person already shares a Space with are rows to tick; anyone else is added by email
+ * and listed as a row with its own remove button.
  */
 export function CreateSpaceInvitePeople({
   people,
@@ -71,44 +61,48 @@ export function CreateSpaceInvitePeople({
     <Text bare as="div" tone="muted" className="grid gap-2 text-xs font-medium">
       <span id="create-space-invite-label">Invite people</span>
       {people.length || extra.length ? (
-        <div
-          className="flex min-w-0 gap-1.5 overflow-x-auto"
-          role="group"
-          aria-labelledby="create-space-invite-label"
-        >
+        <ul className="m-0 grid list-none p-0" aria-labelledby="create-space-invite-label">
           {people.map((person) => {
             const email = person.email.toLowerCase();
-            const picked = invites.includes(email);
+            const label = person.name || person.email;
             return (
-              <Tooltip key={person.user_id} content={person.email}>
-                <FilterChip
-                  pressed={picked}
-                  label={(person.name || person.email).split(" ")[0]}
-                  icon={<PersonAvatar label={person.name || person.email} />}
-                  disabled={disabled}
-                  className="pl-1 font-normal"
-                  onPressedChange={() => toggle(email)}
+              <li key={person.user_id}>
+                <ListRow
+                  label={label}
+                  description={person.name ? person.email : undefined}
+                  leading={<PersonAvatar label={label} />}
+                  trailing={
+                    <Checkbox
+                      aria-label={`Invite ${label}`}
+                      checked={invites.includes(email)}
+                      disabled={disabled}
+                      onCheckedChange={() => toggle(email)}
+                    />
+                  }
+                  onOpen={disabled ? undefined : () => toggle(email)}
                 />
-              </Tooltip>
+              </li>
             );
           })}
           {extra.map((email) => (
-            <Button
-              key={email}
-              type="button"
-              variant="secondary"
-              aria-pressed
-              aria-label={`Remove ${email}`}
-              disabled={disabled}
-              icon={<PersonAvatar label={email} />}
-              iconEnd={X}
-              className="font-normal"
-              onClick={() => toggle(email)}
-            >
-              {email}
-            </Button>
+            <li key={email}>
+              <ListRow
+                label={email}
+                leading={<PersonAvatar label={email} />}
+                trailing={
+                  <IconButton
+                    size="sm"
+                    label={`Remove ${email}`}
+                    disabled={disabled}
+                    onClick={() => toggle(email)}
+                  >
+                    <X />
+                  </IconButton>
+                }
+              />
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
       <div className="flex gap-1.5">
         <Input

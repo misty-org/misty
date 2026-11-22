@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { folderName, useLinkedFolders } from "../host";
 import {
   Button,
-  CollectionFilters,
+  CollectionControls,
   ConfirmDeleteDialog,
   EmptyState,
   ErrorState,
@@ -32,8 +32,6 @@ import {
   updatePrompt,
   usePromptStore,
 } from "./promptStore";
-
-type ScopeFilter = "all" | PromptScope;
 
 const NO_PROMPTS: CustomPromptEntry[] = [];
 
@@ -106,7 +104,6 @@ function PromptMenu({
 export function PromptsSection({ query = "" }: { query?: string } = {}) {
   const root = useCurrentFolder();
   const cache = usePromptStore((s) => s.byRoot[root]);
-  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("all");
   const [editing, setEditing] = useState<CustomPromptEntry | "new" | null>(null);
   const [deleting, setDeleting] = useState<CustomPromptEntry | null>(null);
   const [openPath, setOpenPath] = useState<string | null>(null);
@@ -117,10 +114,7 @@ export function PromptsSection({ query = "" }: { query?: string } = {}) {
   }, [root]);
 
   const all = cache?.entries ?? NO_PROMPTS;
-  const entries = useMemo(() => {
-    const matched = matchPrompts(all, query);
-    return scopeFilter === "all" ? matched : matched.filter((entry) => entry.scope === scopeFilter);
-  }, [all, query, scopeFilter]);
+  const entries = useMemo(() => matchPrompts(all, query), [all, query]);
   const folderPrompts = entries.filter((entry) => entry.scope === "workspace");
   const globalPrompts = entries.filter((entry) => entry.scope === "global");
   // The details follow the list as read back, so an edit shows at once.
@@ -227,26 +221,10 @@ export function PromptsSection({ query = "" }: { query?: string } = {}) {
 
   return (
     <>
-      <CollectionFilters
-        value={scopeFilter}
-        onChange={(value) =>
-          setScopeFilter(value === "workspace" || value === "global" ? value : "all")
-        }
-        options={
-          folderAvailable
-            ? [
-                { value: "all", label: "All" },
-                { value: "workspace", label: "This folder", icon: Folder },
-                { value: "global", label: "Everywhere", icon: Globe },
-              ]
-            : []
-        }
+      <CollectionControls
         actions={
           <div className="flex items-center gap-1">
-            <Button
-              icon={FolderOpen}
-              onClick={() => reveal(scopeFilter === "global" ? "global" : "workspace")}
-            >
+            <Button icon={FolderOpen} onClick={() => reveal("workspace")}>
               Open folder
             </Button>
             {/* The empty state carries New prompt while it shows. */}
@@ -290,7 +268,7 @@ export function PromptsSection({ query = "" }: { query?: string } = {}) {
       {editing ? (
         <PromptEditorDialog
           initial={editing === "new" ? undefined : editing}
-          initialScope={scopeFilter === "global" ? "global" : "workspace"}
+          initialScope="workspace"
           folderAvailable={folderAvailable}
           onSubmit={submitEditor}
           onCancel={() => setEditing(null)}

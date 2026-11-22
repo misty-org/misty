@@ -1,36 +1,63 @@
-//! Speech on this computer, with no key: recognizing what the person says (a recorded file, or
-//! the microphone live, through `voice_speech`) and speaking aloud in a system voice (`say` on
-//! macOS, the built-in speech engine on Windows, `espeak-ng` on Linux). The chat microphone,
-//! dictation, recordings and Tutor all hear and speak through here.
-use serde::Serialize;
-use serde_json::json;
-use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
-    Arc, Mutex,
-};
-use std::time::Duration;
-use tauri::{AppHandle, Emitter, State, Webview};
+//! Speech on this computer through open models from Misty's catalog (`speech_models.rs`), with no
+//! key: hearing (sessions over named inputs, such as the person's microphone or each person in a
+//! call, whose events are pushed as `misty://speech`), recognizing a recording, and speaking in a
+//! voice (one text, or a reading handed over a sentence at a time, whose progress is pushed as
+//! `misty://speech-said`). The chat microphone, dictation, recordings, captions, Tutor and agents
+//! in calls all hear and speak through here.
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::mpsc::Sender;
+use std::sync::{Arc, Mutex};
 
-/// A live listen's partial and final words, sent to the window that started it.
-const HEARD_EVENT: &str = "misty://speech-heard";
-/// How often a live listen reports what it has heard.
-const POLL: Duration = Duration::from_millis(120);
+use serde::Serialize;
+use tauri::{State, Webview};
+use voice_speech::{Hearing, Recognizer, Voice};
+
+use super::speech_models;
+
+/// What hearing sessions tell their window.
+const SPEECH_EVENT: &str = "misty://speech";
+/// How a reading tells its window which sentence it has begun, and when it is over.
+const SAID_EVENT: &str = "misty://speech-said";
+
+/// The hearing model and voice in use, as the renderer picked them (`speechModels.ts`).
+#[derive(Default)]
+struct Chosen {
+    hearing: Option<String>,
+    voice: Option<String>,
+    /// Narrows a model that takes a language (Whisper); none lets it detect.
+    language: Option<String>,
+    rate: Option<f32>,
+}
+
+struct Session {
+    hearing: Arc<Hearing>,
+    owner: String,
+    /// The microphone, when this session hears it directly.
+    mic: Option<voice_capture::Capture>,
+}
+
+/// A reading: sentences handed over one at a time, spoken in order.
+struct Reading {
+    id: u64,
+    sentences: Sender<Option<String>>,
+    stopped: Arc<AtomicBool>,
+    finished: Arc<(Mutex<bool>, std::sync::Condvar)>,
+}
 
 #[derive(Default)]
 pub struct SpeechState {
-    session: AtomicU64,
-    listening: Mutex<Option<Listen>>,
-    speaking: Mutex<Option<tokio::process::Child>>,
-    /// Sentences being read aloud as they're handed over (`speech_reading_*`).
+    next: AtomicU64,
+    chosen: Mutex<Chosen>,
+    /// The hearing model, opened once, with the id and language it was opened for.
+    recognizer: Mutex<Option<(String, Option<String>, Arc<Recognizer>)>>,
+    /// Voice models opened so far, by their folder and files: the voices that share one model
+    /// (Kokoro's speakers) share it.
+    voices: Mutex<HashMap<String, Arc<Voice>>>,
+    sessions: Mutex<HashMap<u64, Session>>,
+    /// Stops for whatever is being said now.
+    playing: Mutex<Vec<Arc<AtomicBool>>>,
     reading: Mutex<Option<Reading>>,
-    /// Fed streams (a capture's channels), by id.
-    streams: Mutex<std::collections::HashMap<u64, voice_speech::Streaming>>,
-}
-
-struct Listen {
-    id: u64,
-    stop: Arc<AtomicBool>,
-    done: std::sync::mpsc::Receiver<voice_speech::Heard>,
 }
 
 pub(super) fn require_person(webview: &Webview) -> Result<(), String> {
@@ -39,302 +66,147 @@ pub(super) fn require_person(webview: &Webview) -> Result<(), String> {
         .ok_or_else(|| "Only Misty's own windows can use speech.".into())
 }
 
-/// A system voice the person can pick in Settings › Voice.
-#[derive(Clone, Debug, Serialize)]
-pub struct SystemVoice {
-    pub id: String,
-    pub name: String,
-    pub language: String,
+/// Sets the hearing model and voice Misty uses, its language and its pace. The renderer calls it
+/// at start and whenever the pick changes.
+#[tauri::command]
+pub fn speech_use(
+    webview: Webview,
+    state: State<'_, SpeechState>,
+    hearing: Option<String>,
+    voice: Option<String>,
+    language: Option<String>,
+    rate: Option<f32>,
+) -> Result<(), String> {
+    require_person(&webview)?;
+    let mut chosen = state.chosen.lock().map_err(|_| voice_speech::reason("failed"))?;
+    *chosen = Chosen {
+        hearing,
+        voice,
+        language: language.map(|code| base_language(&code)),
+        rate,
+    };
+    Ok(())
+}
+
+/// "en-US" as "en": the models take a language, not a region.
+fn base_language(code: &str) -> String {
+    code.split(['-', '_']).next().unwrap_or(code).to_ascii_lowercase()
 }
 
 #[derive(Debug, Serialize)]
 pub struct SpeechSupport {
-    /// Whether this computer can recognize speech: the microphone and dictation show only then.
+    /// The hearing model in use is on this computer: microphones and dictation show only then.
     pub recognition: bool,
-    pub voices: Vec<SystemVoice>,
+    /// The voice in use is on this computer.
+    pub speaking: bool,
 }
 
-/// What this computer can do with speech, and the voices it has.
+/// Whether Misty can hear and speak here now.
 #[tauri::command]
-pub async fn speech_support(webview: Webview) -> Result<SpeechSupport, String> {
+pub fn speech_support(webview: Webview, state: State<'_, SpeechState>) -> Result<SpeechSupport, String> {
     require_person(&webview)?;
-    let recognition = tokio::task::spawn_blocking(voice_speech::supported)
-        .await
-        .unwrap_or(false);
+    let chosen = state.chosen.lock().map_err(|_| voice_speech::reason("failed"))?;
+    let recognition = speech_models::vad_spec().is_some()
+        && chosen
+            .hearing
+            .as_deref()
+            .is_some_and(|id| speech_models::hearing_spec(id).is_some());
+    let speaking = chosen
+        .voice
+        .as_deref()
+        .is_some_and(|id| speech_models::voice_spec(id).is_some());
     Ok(SpeechSupport {
         recognition,
-        voices: system_voices().await,
+        speaking,
     })
 }
 
-/// Recognizes a recorded audio file in `language` (the system's when unset).
-#[tauri::command]
-pub async fn speech_recognize_file(
-    webview: Webview,
-    path: String,
-    language: Option<String>,
-) -> Result<String, String> {
-    require_person(&webview)?;
-    tokio::task::spawn_blocking(move || voice_speech::recognize_file(&path, language.as_deref()))
-        .await
-        .map_err(|_| voice_speech::reason("failed"))?
-}
-
-/// Recognizes a short recording held by the window (the chat microphone's), sent as base64 with
-/// its type. It's written to a temporary file for the recognizer and removed after.
-#[tauri::command]
-pub async fn speech_recognize_audio(
-    webview: Webview,
-    audio: String,
-    mime: String,
-    language: Option<String>,
-) -> Result<String, String> {
-    use base64::{engine::general_purpose::STANDARD, Engine};
-    require_person(&webview)?;
-    // A minute of compressed speech is well under this.
-    if audio.len() > 40 * 1024 * 1024 {
-        return Err("That recording is too long to recognize.".into());
-    }
-    let bytes = STANDARD
-        .decode(audio.as_bytes())
-        .map_err(|_| voice_speech::reason("failed"))?;
-    let extension = match mime.split(';').next().unwrap_or("").trim() {
-        "audio/mp4" | "audio/x-m4a" | "audio/aac" => "m4a",
-        "audio/wav" | "audio/x-wav" | "audio/wave" => "wav",
-        "audio/mpeg" => "mp3",
-        "audio/webm" => "webm",
-        "audio/ogg" => "ogg",
-        _ => "audio",
-    };
-    let path =
-        std::env::temp_dir().join(format!("misty-speech-{}.{extension}", uuid::Uuid::new_v4()));
-    tokio::fs::write(&path, bytes)
-        .await
-        .map_err(|_| voice_speech::reason("failed"))?;
-    let file = path.to_string_lossy().into_owned();
-    let heard = tokio::task::spawn_blocking(move || {
-        voice_speech::recognize_file(&file, language.as_deref())
-    })
-    .await
-    .map_err(|_| voice_speech::reason("failed"));
-    let _ = tokio::fs::remove_file(&path).await;
-    heard?
-}
-
-/// Starts recognizing the microphone. What's heard arrives as `misty://speech-heard` events
-/// (`{session, text, final}`) until `speech_listen_stop`. A new listen ends the one before.
-#[tauri::command]
-pub async fn speech_listen_start(
-    app: AppHandle,
-    webview: Webview,
-    state: State<'_, SpeechState>,
-    language: Option<String>,
-) -> Result<u64, String> {
-    require_person(&webview)?;
-    let id = state.session.fetch_add(1, Ordering::SeqCst) + 1;
-    if let Some(previous) = state.listening.lock().unwrap().take() {
-        previous.stop.store(true, Ordering::SeqCst);
-    }
-    let owner = webview.label().to_string();
-    let stop = Arc::new(AtomicBool::new(false));
-    let (done_tx, done_rx) = std::sync::mpsc::channel();
-    let (started_tx, started_rx) = std::sync::mpsc::channel();
-    let thread_stop = stop.clone();
-    // The recognizer lives on one thread of its own, from start to stop.
-    std::thread::spawn(move || {
-        let listening = match voice_speech::listen(language.as_deref()) {
-            Ok(listening) => {
-                let _ = started_tx.send(Ok(()));
-                listening
-            }
-            Err(error) => {
-                let _ = started_tx.send(Err(error));
-                return;
-            }
-        };
-        let mut last = String::new();
-        while !thread_stop.load(Ordering::SeqCst) {
-            let heard = listening.heard();
-            if heard.text != last {
-                last = heard.text.clone();
-                let _ = app.emit_to(
-                    owner.as_str(),
-                    HEARD_EVENT,
-                    json!({ "session": id, "text": heard.text, "final": false }),
-                );
-            }
-            if heard.done {
-                break;
-            }
-            std::thread::sleep(POLL);
-        }
-        let heard = listening.stop();
-        let _ = app.emit_to(
-            owner.as_str(),
-            HEARD_EVENT,
-            json!({ "session": id, "text": heard.text, "final": true, "error": heard.error }),
-        );
-        let _ = done_tx.send(heard);
-    });
-    tokio::task::spawn_blocking(move || started_rx.recv())
-        .await
-        .map_err(|_| voice_speech::reason("failed"))?
-        .map_err(|_| voice_speech::reason("failed"))??;
-    *state.listening.lock().unwrap() = Some(Listen {
-        id,
-        stop,
-        done: done_rx,
-    });
-    Ok(id)
-}
-
-/// Stops the live listen and answers everything heard.
-#[tauri::command]
-pub async fn speech_listen_stop(
-    webview: Webview,
-    state: State<'_, SpeechState>,
-    session: u64,
-) -> Result<String, String> {
-    require_person(&webview)?;
-    let listen = {
-        let mut slot = state.listening.lock().unwrap();
-        match slot.as_ref() {
-            Some(current) if current.id == session => slot.take(),
-            _ => None,
-        }
-    };
-    let Some(listen) = listen else {
-        return Ok(String::new());
-    };
-    listen.stop.store(true, Ordering::SeqCst);
-    let heard =
-        tokio::task::spawn_blocking(move || listen.done.recv_timeout(Duration::from_secs(5)))
-            .await
-            .map_err(|_| voice_speech::reason("failed"))?
-            .unwrap_or_default();
-    Ok(heard.text)
-}
-
-/// Starts recognizing audio the window feeds in (a capture's channel, 16 kHz mono PCM16).
-#[tauri::command]
-pub async fn speech_stream_start(
-    webview: Webview,
-    state: State<'_, SpeechState>,
-    language: Option<String>,
-) -> Result<u64, String> {
-    require_person(&webview)?;
-    let streaming = tokio::task::spawn_blocking(move || voice_speech::stream(language.as_deref()))
-        .await
-        .map_err(|_| voice_speech::reason("failed"))??;
-    let id = state.session.fetch_add(1, Ordering::SeqCst) + 1;
-    state.streams.lock().unwrap().insert(id, streaming);
-    Ok(id)
-}
-
-/// Feeds a stream base64 PCM16 little-endian samples.
-#[tauri::command]
-pub async fn speech_stream_push(
-    webview: Webview,
-    state: State<'_, SpeechState>,
-    stream: u64,
-    pcm: String,
-) -> Result<(), String> {
-    use base64::{engine::general_purpose::STANDARD, Engine};
-    require_person(&webview)?;
-    let bytes = STANDARD
-        .decode(pcm.as_bytes())
-        .map_err(|_| voice_speech::reason("failed"))?;
-    let samples: Vec<i16> = bytes
-        .chunks_exact(2)
-        .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
-        .collect();
-    if let Some(streaming) = state.streams.lock().unwrap().get(&stream) {
-        streaming.push(&samples);
-    }
-    Ok(())
-}
-
-/// What a stream has heard so far.
-#[tauri::command]
-pub async fn speech_stream_poll(
-    webview: Webview,
-    state: State<'_, SpeechState>,
-    stream: u64,
-) -> Result<voice_speech::StreamHeard, String> {
-    require_person(&webview)?;
-    Ok(state
-        .streams
-        .lock()
-        .unwrap()
-        .get(&stream)
-        .map(voice_speech::Streaming::heard)
-        .unwrap_or_default())
-}
-
-/// Ends a stream and answers everything it heard.
-#[tauri::command]
-pub async fn speech_stream_stop(
-    webview: Webview,
-    state: State<'_, SpeechState>,
-    stream: u64,
-) -> Result<voice_speech::StreamHeard, String> {
-    require_person(&webview)?;
-    let Some(streaming) = state.streams.lock().unwrap().remove(&stream) else {
-        return Ok(voice_speech::StreamHeard::default());
-    };
-    tokio::task::spawn_blocking(move || streaming.stop())
-        .await
-        .map_err(|_| voice_speech::reason("failed"))
-}
-
-/// Says `text` aloud in a system voice, at `rate` (1 is the voice's usual pace). Stops anything
-/// already being said. Answers once it's done or stopped.
-#[tauri::command]
-pub async fn speech_say(
-    webview: Webview,
-    state: State<'_, SpeechState>,
-    text: String,
-    voice: Option<String>,
-    rate: Option<f64>,
-) -> Result<(), String> {
-    require_person(&webview)?;
-    let text: String = text.chars().take(20_000).collect();
-    if text.trim().is_empty() {
-        return Ok(());
-    }
-    stop_speaking(&state);
-    let mut command = say_command(&text, voice.as_deref(), rate.unwrap_or(1.0))?;
-    command.kill_on_drop(true);
-    let child = command
-        .spawn()
-        .map_err(|_| "This computer's voice couldn't read it.".to_string())?;
-    *state.speaking.lock().unwrap() = Some(child);
-    // Waits without holding the lock, so `speech_stop` can end it.
-    loop {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        let mut slot = state.speaking.lock().unwrap();
-        let Some(child) = slot.as_mut() else {
-            return Ok(());
-        };
-        if !matches!(child.try_wait(), Ok(None)) {
+/// Forgets an opened model or voice, as it is removed from this computer.
+pub(super) fn forget_model(state: &SpeechState, id: &str) {
+    if let Ok(mut slot) = state.recognizer.lock() {
+        if slot.as_ref().is_some_and(|(open, _, _)| open == id) {
             slot.take();
-            return Ok(());
+        }
+    }
+    if let Some(spec) = speech_models::voice_spec_any(id) {
+        if let Ok(mut voices) = state.voices.lock() {
+            voices.remove(&voice_key(&spec));
         }
     }
 }
 
-/// Whether Misty is reading something aloud now, for Tutor's Always On listening, which mustn't
-/// take Misty's own voice for the person's.
-pub fn speaking_now(app: &AppHandle) -> bool {
-    use tauri::Manager;
-    let state = app.state::<SpeechState>();
-    let saying = state.speaking.lock().is_ok_and(|slot| slot.is_some());
-    let reading = state
-        .reading
-        .lock()
-        .is_ok_and(|slot| slot.as_ref().is_some_and(aloud::reading_open));
-    saying || reading
+/// Which opened model a voice uses: its folder and its files.
+fn voice_key(spec: &voice_speech::VoiceSpec) -> String {
+    let mut files: Vec<String> = spec
+        .files
+        .iter()
+        .map(|(role, name)| format!("{role}={name}"))
+        .collect();
+    files.sort();
+    format!("{}|{}", spec.dir.display(), files.join(";"))
 }
+
+/// The hearing model in use, opened once. Blocking: call it off the async runtime. The model
+/// opens outside the lock, which only guards the swap.
+fn recognizer(state: &SpeechState) -> Result<Arc<Recognizer>, String> {
+    let (id, language) = {
+        let chosen = state.chosen.lock().map_err(|_| voice_speech::reason("failed"))?;
+        (
+            chosen.hearing.clone().ok_or_else(|| voice_speech::reason("no_model"))?,
+            chosen.language.clone(),
+        )
+    };
+    {
+        let slot = state.recognizer.lock().map_err(|_| voice_speech::reason("failed"))?;
+        if let Some((open, open_language, recognizer)) = slot.as_ref() {
+            if *open == id && *open_language == language {
+                return Ok(recognizer.clone());
+            }
+        }
+    }
+    let spec = speech_models::hearing_spec(&id).ok_or_else(|| voice_speech::reason("no_model"))?;
+    let recognizer = Arc::new(Recognizer::open(&spec, language.as_deref())?);
+    let mut slot = state.recognizer.lock().map_err(|_| voice_speech::reason("failed"))?;
+    *slot = Some((id, language, recognizer.clone()));
+    Ok(recognizer)
+}
+
+/// A voice: its opened model (one per model, shared by its speakers) and its speaker; `id`,
+/// else the one in use. Blocking.
+fn voice(state: &SpeechState, id: Option<&str>) -> Result<(Arc<Voice>, i32), String> {
+    let id = match id {
+        Some(id) if !id.is_empty() => id.to_string(),
+        _ => state
+            .chosen
+            .lock()
+            .ok()
+            .and_then(|chosen| chosen.voice.clone())
+            .ok_or_else(|| voice_speech::reason("voice"))?,
+    };
+    let spec = speech_models::voice_spec(&id).ok_or_else(|| voice_speech::reason("voice"))?;
+    let key = voice_key(&spec);
+    if let Some(open) = state.voices.lock().ok().and_then(|voices| voices.get(&key).cloned()) {
+        return Ok((open, spec.speaker));
+    }
+    let opened = Arc::new(Voice::open(&spec)?);
+    if let Ok(mut voices) = state.voices.lock() {
+        voices.insert(key, opened.clone());
+    }
+    Ok((opened, spec.speaker))
+}
+
+fn rate(state: &SpeechState, asked: Option<f32>) -> f32 {
+    asked
+        .or_else(|| state.chosen.lock().ok().and_then(|chosen| chosen.rate))
+        .unwrap_or(1.0)
+}
+
+mod hearing;
+mod recording;
+mod speaking;
+pub use hearing::*;
+pub use recording::*;
+pub use speaking::*;
 
 /// Whether what Misty says is heard only in headphones or earbuds, so the microphone can't pick it
 /// up and the person may talk over it. Only macOS says.
@@ -354,6 +226,14 @@ pub async fn speech_output_muted(webview: Webview) -> Result<bool, String> {
     return Ok(core_audio::output_muted());
     #[cfg(not(target_os = "macos"))]
     Ok(false)
+}
+
+/// Whether what Misty says is heard only in headphones, so the microphone can't pick it up and
+/// the person may talk over it (an agent in a call stops when they do).
+#[tauri::command]
+pub async fn speech_output_private(webview: Webview) -> Result<bool, String> {
+    require_person(&webview)?;
+    Ok(output_private())
 }
 
 /// Turns the sound back on: unmutes the output, and raises it to half if it was all the way down.
@@ -381,25 +261,6 @@ pub async fn speech_on_call(webview: Webview) -> Result<bool, String> {
     Ok(false)
 }
 
-/// Opens the system's own page for getting better voices: Spoken Content on macOS, where the
-/// Premium and Enhanced voices download, and Speech on Windows. Only that one page can be opened.
-#[tauri::command]
-pub fn speech_open_voice_settings(webview: Webview) -> Result<(), String> {
-    require_person(&webview)?;
-    #[cfg(target_os = "macos")]
-    let opened = std::process::Command::new("open")
-        .arg("x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent")
-        .spawn();
-    #[cfg(windows)]
-    let opened = std::process::Command::new("explorer").arg("ms-settings:speech").spawn();
-    #[cfg(not(any(target_os = "macos", windows)))]
-    let opened: std::io::Result<std::process::Child> =
-        Err(std::io::Error::other("this system has no voice settings Misty can open"));
-    opened
-        .map(|_| ())
-        .map_err(|error| format!("Couldn't open the system's voice settings: {error}"))
-}
-
 /// Puts an answer on the clipboard, for when it couldn't be heard.
 #[tauri::command]
 pub async fn speech_copy_answer(webview: Webview, text: String) -> Result<(), String> {
@@ -419,6 +280,3 @@ mod core_audio;
 
 #[cfg(target_os = "macos")]
 mod screen_sharing;
-
-mod aloud;
-pub use aloud::*;

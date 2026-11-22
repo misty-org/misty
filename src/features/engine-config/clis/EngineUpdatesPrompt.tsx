@@ -23,6 +23,7 @@ import {
 import { ENGINE_IDS, ENGINE_NAMES, type EngineId } from "../channels/engines";
 import { EngineMark } from "../EngineMark";
 import { cliApi, type CliVersionStatus } from "./api";
+import { hasCliUpdate, noteCliStatus } from "./useCliVersionStatus";
 
 /** Wait after launch, so the check never competes with the window coming up. */
 const startDelayMs = 15_000;
@@ -60,11 +61,9 @@ export function EngineUpdatesPrompt({ accountScope }: { accountScope: string }) 
       void Promise.all(ENGINE_IDS.map((engine) => cliApi.status(engine).catch(() => null))).then(
         (statuses) => {
           if (closed) return;
-          setBehind(
-            statuses.filter((status): status is CliVersionStatus =>
-              Boolean(status?.installed && status.updateAvailable && status.updateKind),
-            ),
-          );
+          // Explore's Updates counts from these too, without checking again.
+          for (const status of statuses) if (status) noteCliStatus(status);
+          setBehind(statuses.filter((status): status is CliVersionStatus => hasCliUpdate(status)));
         },
       );
     }, startDelayMs);
@@ -127,7 +126,9 @@ export function EngineUpdatesPrompt({ accountScope }: { accountScope: string }) 
             );
           })}
           {failed ? (
-            <Text tone="muted">Settings › Agents › Setup shows what went wrong and can try again.</Text>
+            <Text tone="muted">
+              Settings › Agents › Setup shows what went wrong and can try again.
+            </Text>
           ) : null}
         </DialogBody>
         <DialogFooter>

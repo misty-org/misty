@@ -1,19 +1,41 @@
 import {
   AudioLines,
-  Download,
   Keyboard,
-  Languages,
   Mic,
   MonitorSpeaker,
+  MoreHorizontal,
+  Trash2,
   Volume2,
 } from "lucide-react";
-import { Button, IconButton, notify } from "@misty/ui";
-import { invoke } from "@/native/invoke";
-import { say, useSpeechSupport } from "../systemSpeech";
-import { hasNaturalVoice, voicesFor } from "./voiceChoices";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  IconButton,
+  MenuItem,
+  notify,
+  useConfirmDelete,
+} from "@misty/ui";
+import { useEffect } from "react";
+import { previewVoice } from "../speech";
+import {
+  chooseHearing,
+  chooseMistyVoice,
+  ensureSpeech,
+  personLanguages,
+  rankHearing,
+  useSpeechModels,
+  voicesFor,
+  type HearingModelView,
+  type InstallProgress,
+  type VoiceView,
+} from "../speechModels";
 import { voiceSettings } from "../voiceSettings";
+import { speechLanguages, voiceLabel, voiceSample } from "./speechChoices";
 import {
   DesktopSettingsRow as SettingsRow,
+  DesktopSettingsRowSkeleton,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/features/settings";
 import {
@@ -25,9 +47,6 @@ import {
 import type { SettingsContentProps } from "../../settings/settingsTypes";
 
 const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
-const isWindows = typeof navigator !== "undefined" && /Win/i.test(navigator.platform);
-/** What a voice says when it's tried out. */
-const preview = "Hi, I'm Misty. This is how I sound.";
 // The empty value is the platform's own dictation key.
 const shortcuts = [
   { value: "", label: isMac ? "Fn / Globe" : "Right Alt", icon: Keyboard },
@@ -38,25 +57,10 @@ const shortcuts = [
       ]
     : [{ value: "RightControl", label: "Right Ctrl", icon: Keyboard }]),
 ];
-const languages = [
-  { value: "auto", label: "System language", icon: Languages },
-  { value: "en", label: "English", icon: Languages },
-  { value: "es", label: "Spanish", icon: Languages },
-  { value: "fr", label: "French", icon: Languages },
-  { value: "de", label: "German", icon: Languages },
-  { value: "it", label: "Italian", icon: Languages },
-  { value: "pt", label: "Portuguese", icon: Languages },
-  { value: "nl", label: "Dutch", icon: Languages },
-  { value: "ja", label: "Japanese", icon: Languages },
-  { value: "ko", label: "Korean", icon: Languages },
-  { value: "zh", label: "Chinese", icon: Languages },
-  { value: "hi", label: "Hindi", icon: Languages },
-  { value: "ru", label: "Russian", icon: Languages },
-];
 // Text alone: every row would repeat the same icon.
 const secondLanguages = [
   { value: "none", label: "None" },
-  ...languages
+  ...speechLanguages
     .filter((language) => language.value !== "auto")
     .map(({ value, label }) => ({ value, label })),
 ];
@@ -73,32 +77,81 @@ const rates = [
   { value: "1.5", label: "Fastest" },
 ];
 
+const megabytes = (entry: { disk_mb: number }) =>
+  entry.disk_mb >= 1000 ? `${(entry.disk_mb / 1000).toFixed(1)} GB` : `${entry.disk_mb} MB`;
+
+/** Where a model or voice is when it isn't on this computer yet, for its row's line. */
+function arrivalLine(
+  entry: { id: string; installed: boolean } | undefined,
+  progress: Record<string, InstallProgress>,
+  installing: readonly string[],
+  failures: Record<string, string>,
+): string | undefined {
+  if (!entry || entry.installed) return undefined;
+  const install = progress[entry.id];
+  if (install?.phase === "unpacking") return "Unpacking on this computer.";
+  if (install || installing.includes(entry.id))
+    return install?.total
+      ? `Downloading, ${Math.round((install.received / install.total) * 100)}%.`
+      : "Downloading.";
+  if (failures[entry.id]) return `Couldn't download: ${failures[entry.id]}`;
+  return "Not on this computer yet.";
+}
+
 /**
- * Settings › Voice: dictation everywhere, voice captures, and the computer's own voice that
- * speaks for Misty (Tutor, read aloud, audio overviews). Speech is recognized and spoken on this
- * computer, with no key. Device-only.
+ * Settings › Voice: dictation everywhere, voice captures, and speech on this computer through open
+ * models from Misty's catalog: the speech model Misty picked for hearing (with Change), Misty's
+ * own voice (Tutor, read-alouds outside an agent), and the models and voices on this computer
+ * that aren't in use, each with Remove. Speech is recognized and spoken on this computer, with no
+ * key. Device-only.
  */
 export function VoiceSection(props: SettingsContentProps) {
   const voice = voiceSettings(props.document);
-  const speech = useSpeechSupport();
-  // The voices for the language Misty speaks in, Premium and Enhanced first; empty is the
-  // system's default.
-  const offered = voicesFor(
-    speech?.voices ?? [],
-    voice.language,
-    voice.systemVoice,
-    navigator.language,
-  );
-  const voices = [
-    { value: "", label: "System default" },
-    ...offered.map((item) => ({
-      value: item.id,
-      label: `${item.name} (${item.language})`,
-    })),
-  ];
-  const chosenVoice = voices.some((item) => item.value === voice.systemVoice)
-    ? voice.systemVoice
-    : "";
+  const catalog = useSpeechModels((state) => state.catalog);
+  const loadError = useSpeechModels((state) => state.error);
+  const progress = useSpeechModels((state) => state.progress);
+  const failures = useSpeechModels((state) => state.failures);
+  const { confirm, dialog } = useConfirmDelete();
+  useEffect(() => {
+    void useSpeechModels.getState().load();
+  }, []);
+  // Read here so a change of language on this page offers that language's models and voices.
+  const languages = catalog ? personLanguages() : [];
+  const hearing = catalog?.hearing.find((model) => model.id === voice.hearingModel);
+  const ranked = catalog ? rankHearing(catalog.hearing, languages, catalog.machine) : [];
+  const hearingChoices: HearingModelView[] =
+    hearing && !ranked.some((model) => model.id === hearing.id) ? [hearing, ...ranked] : ranked;
+  const mistyVoice = catalog?.voices.find((entry) => entry.id === voice.voice);
+  const offeredVoices = catalog ? voicesFor(catalog.voices, languages) : [];
+  const voiceChoices =
+    mistyVoice && !offeredVoices.some((entry) => entry.id === mistyVoice.id)
+      ? [mistyVoice, ...offeredVoices]
+      : offeredVoices;
+  // What's on this computer but not in use, one row per download: voices that share one model
+  // go together, and one that shares Misty's voice's download is in use.
+  const inUse = new Set([hearing?.packageKey, mistyVoice?.packageKey].filter(Boolean));
+  const spare = new Map<string, (HearingModelView | VoiceView)[]>();
+  for (const entry of [...(catalog?.hearing ?? []), ...(catalog?.voices ?? [])]) {
+    if (!entry.installed || inUse.has(entry.packageKey)) continue;
+    spare.set(entry.packageKey, [...(spare.get(entry.packageKey) ?? []), entry]);
+  }
+  const installing = catalog?.installing ?? [];
+  // A model under CC-BY carries its credit wherever it's named.
+  const hearingLine = [arrivalLine(hearing, progress, installing, failures), hearing?.credit]
+    .filter(Boolean)
+    .join(" ");
+  const voiceLine = arrivalLine(mistyVoice, progress, installing, failures);
+  const failed = (entry: { id: string } | undefined) =>
+    Boolean(entry && failures[entry.id] && !progress[entry.id]);
+  const remove = (entries: (HearingModelView | VoiceView)[]) => {
+    const name = entries.map((entry) => entry.name).join(", ");
+    void confirm({
+      title: `Remove ${name}?`,
+      what: "It's deleted from this computer. You can download it again later.",
+      confirmLabel: "Remove",
+      onConfirm: () => useSpeechModels.getState().remove(entries[0]!.id),
+    });
+  };
   const set = (key: string, value: string | boolean) => props.onSettingChange("voice", key, value);
   const dictationOff = props.working || !voice.dictation;
   return (
@@ -166,7 +219,7 @@ export function VoiceSection(props: SettingsContentProps) {
         <SettingsRow label="Language">
           <DropdownControl
             value={voice.language}
-            options={languages}
+            options={speechLanguages}
             disabled={props.working}
             onValueChange={(value) => set("language", value)}
           />
@@ -182,6 +235,31 @@ export function VoiceSection(props: SettingsContentProps) {
             onValueChange={(value) => set("second_language", value)}
           />
         </SettingsRow>
+        {catalog ? (
+          <SettingsRow label="Speech model" description={hearingLine || undefined}>
+            {failed(hearing) ? (
+              <Button onClick={() => void ensureSpeech()}>Try again</Button>
+            ) : null}
+            <DropdownControl
+              value={hearing?.id ?? ""}
+              options={hearingChoices.map((model) => ({ value: model.id, label: model.name }))}
+              disabled={props.working || !hearingChoices.length}
+              onValueChange={(value) => {
+                chooseHearing(value);
+                void ensureSpeech();
+              }}
+            />
+          </SettingsRow>
+        ) : loadError ? (
+          <SettingsRow label="Speech model" description={loadError}>
+            <Button onClick={() => void useSpeechModels.getState().load()}>Try again</Button>
+          </SettingsRow>
+        ) : (
+          <DesktopSettingsRowSkeleton
+            label="Speech model"
+            control={{ kind: "select", className: "w-50" }}
+          />
+        )}
         <SettingsRow
           label="Personal dictionary"
           description="Names and terms, one per line."
@@ -197,45 +275,38 @@ export function VoiceSection(props: SettingsContentProps) {
         </SettingsRow>
       </SettingsSectionBlock>
       <SettingsSectionBlock title="Speaking">
-        <SettingsRow label="Voice">
-          <DropdownControl
-            value={chosenVoice}
-            options={voices}
-            disabled={props.working || !speech}
-            onValueChange={(value) => set("system_voice", value)}
-          />
-          <IconButton
-            label="Hear this voice"
-            disabled={!speech}
-            onClick={() =>
-              void say(preview, chosenVoice).catch((reason: unknown) =>
-                notify({ message: String(reason), tone: "error" }),
-              )
-            }
-          >
-            <Volume2 />
-          </IconButton>
-        </SettingsRow>
-        {speech && (isMac ? !hasNaturalVoice(offered) : isWindows) && (
-          <SettingsRow
-            label="More natural voices"
-            description={
-              isMac
-                ? "Premium and Enhanced voices download free in System Settings › Accessibility › Spoken Content."
-                : "More voices download free in Windows Settings › Time & language › Speech."
-            }
-          >
-            <Button
-              icon={Download}
+        {catalog ? (
+          <SettingsRow label="Voice" description={voiceLine}>
+            {failed(mistyVoice) ? (
+              <Button onClick={() => void ensureSpeech()}>Try again</Button>
+            ) : null}
+            <DropdownControl
+              value={mistyVoice?.id ?? ""}
+              options={voiceChoices.map((entry) => ({ value: entry.id, label: voiceLabel(entry) }))}
+              disabled={props.working || !voiceChoices.length}
+              onValueChange={(value) => {
+                chooseMistyVoice(value);
+                void ensureSpeech();
+              }}
+            />
+            <IconButton
+              label="Hear this voice"
+              disabled={!mistyVoice}
               onClick={() =>
-                void invoke("speech_open_voice_settings").catch((reason: unknown) =>
+                mistyVoice &&
+                void previewVoice(mistyVoice.id, voiceSample).catch((reason: unknown) =>
                   notify({ message: String(reason), tone: "error" }),
                 )
               }
             >
-              Get voices
-            </Button>
+              <Volume2 />
+            </IconButton>
           </SettingsRow>
+        ) : loadError ? null : (
+          <DesktopSettingsRowSkeleton
+            label="Voice"
+            control={[{ kind: "select", className: "w-50" }, "icon"]}
+          />
         )}
         <SettingsRow label="Speaking rate">
           <ChoiceControl
@@ -246,6 +317,28 @@ export function VoiceSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
+      {spare.size ? (
+        <SettingsSectionBlock title="On this computer">
+          {[...spare.entries()].map(([key, entries]) => (
+            <SettingsRow
+              key={key}
+              label={entries.map((entry) => entry.name).join(", ")}
+              description={megabytes(entries[0]!)}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <IconButton label={`Actions for ${entries[0]!.name}`} variant="quiet">
+                    <MoreHorizontal />
+                  </IconButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <MenuItem icon={Trash2} label="Remove" danger onSelect={() => remove(entries)} />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SettingsRow>
+          ))}
+        </SettingsSectionBlock>
+      ) : null}
       <SettingsSectionBlock title="Listening">
         <SettingsRow label="Default sources">
           <DropdownControl
@@ -256,6 +349,7 @@ export function VoiceSection(props: SettingsContentProps) {
           />
         </SettingsRow>
       </SettingsSectionBlock>
+      {dialog}
     </>
   );
 }

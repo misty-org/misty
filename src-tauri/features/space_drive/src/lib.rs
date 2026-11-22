@@ -1118,6 +1118,19 @@ impl Drive {
         file_access::fs::read(cached).map_err(DriveError::io)
     }
 
+    /// Where this computer already holds a file's content, without fetching it: what Files draws
+    /// a picture of (its grid's thumbnails, its preview). None while the file is only on the
+    /// server, so looking at a folder never downloads it.
+    pub fn local_content(&self, space: &SpaceId, path: &str) -> Result<Option<PathBuf>, DriveError> {
+        let Some(node) = self.node_at(space, path)? else {
+            return Ok(None);
+        };
+        let Some(sha256) = node.sha256.filter(|_| node.kind == Kind::File) else {
+            return Ok(None);
+        };
+        Ok(self.inner.cache.has(&sha256).then(|| self.inner.cache.blob_path(&sha256)))
+    }
+
     /// Writes `bytes` as a file `name` in the folder at `folder`. With `replace`, it is new content
     /// for that item, made against `version`: a text save merges with what came since it,
     /// anything else is the last save, the replaced content kept in the trash.

@@ -14,6 +14,7 @@ import {
   MenuSeparator,
   type CollectionDrag,
   type CollectionItem,
+  type CollectionZoom,
 } from "@misty/ui";
 import type { FilesView } from "./FilesToolbar";
 import { fileColumns } from "./FileItems";
@@ -21,23 +22,23 @@ import { keys } from "./keyLabels";
 import type { FilesPlace } from "./model";
 import type { ListingState } from "./useListing";
 
-/** What an empty place says, by what it is. */
-function emptyCopy(place: FilesPlace, searching: boolean): { title: string; line?: string } {
-  if (searching) return { title: "No matches", line: "Try another name." };
+/** What an empty place says, by what it is: one quiet line in the list's middle, as Kura's. */
+function emptyCopy(place: FilesPlace, searching: boolean): { line: string } {
+  if (searching) return { line: "No items match this filter." };
   switch (place.kind) {
     case "recent":
-      return { title: "Nothing opened yet", line: "Files you open show up here." };
+      return { line: "Files you open show up here." };
     case "starred":
-      return { title: "Nothing starred", line: "Star a file or folder to find it here." };
+      return { line: "Star a file or folder to find it here." };
     case "tag":
-      return { title: `Nothing tagged ${place.name}` };
+      return { line: `Nothing is tagged ${place.name}.` };
     case "trash":
     case "space-drive-trash":
-      return { title: "The Trash is empty" };
+      return { line: "The Trash is empty." };
     case "agent-trash":
-      return { title: "Agent trash is empty", line: "What agents clean up waits here for you to look over." };
+      return { line: "What agents clean up waits here for you to look over." };
     default:
-      return { title: "This folder is empty" };
+      return { line: "This folder is empty." };
   }
 }
 
@@ -93,6 +94,9 @@ function BackgroundRows({ menu }: { menu: BackgroundMenu }) {
 export function FilesMain({
   place,
   view,
+  zoom,
+  sort,
+  onSort,
   listing,
   items,
   searching,
@@ -106,6 +110,11 @@ export function FilesMain({
 }: {
   place: FilesPlace;
   view: FilesView;
+  /** How big the icon view draws its items. */
+  zoom: CollectionZoom;
+  /** Kura's sort, shared by the ⋯ menu and the list's headers; none keeps folders first. */
+  sort: { key: string; descending: boolean } | null;
+  onSort(sort: { key: string; descending: boolean } | null): void;
   listing: ListingState & { retry(): void };
   items: CollectionItem[];
   searching: boolean;
@@ -139,7 +148,11 @@ export function FilesMain({
           columnSetId="files"
           remember="files"
           sortResetKey={searching ? "search" : "folder"}
-          gridLayout="preview"
+          gridLayout="icons"
+          listIcons="inline"
+          sort={sort}
+          onSortChange={onSort}
+          zoom={zoom}
           items={items}
           selectedIds={selected}
           onSelect={onSelect}
@@ -163,7 +176,14 @@ export function FilesMain({
       aria-label="Items"
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className={columns && !searching ? "flex min-h-0 flex-1" : "min-h-0 flex-1 overflow-y-auto px-4 pb-4"}
+      className={
+        columns && !searching
+          ? "flex min-h-0 flex-1"
+          : view === "grid"
+            ? "min-h-0 flex-1 overflow-y-auto px-2 pt-1"
+            : // The list sits flush, so its header's hairline and seams meet the pane's edges.
+              "min-h-0 flex-1 overflow-y-auto"
+      }
     >
       {body}
     </div>

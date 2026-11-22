@@ -18,7 +18,11 @@ import {
 import { X } from "lucide-react";
 import { Children, createContext, isValidElement, useContext, type ReactNode } from "react";
 import { useSettingReset } from "../device-preferences/SettingScope";
-import { type DesktopSettingsNavGroup, SettingsNavigation } from "./SettingsNavigation";
+import {
+  type DesktopSettingsNavGroup,
+  type DesktopSettingsPageSection,
+  SettingsNavigation,
+} from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
 /** The page's title, as the frame's top bar shows it; a section named the same doesn't repeat it. */
 const SettingsPageTitleContext = createContext("");
@@ -71,6 +75,9 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               activeId={props.activeId}
               label={props.navigationLabel}
               onSelect={props.onSelect}
+              sections={props.sections}
+              activeSection={props.activeSection}
+              onSection={props.onSection}
             />
           )}
           {props.navigationFooter ? (
@@ -82,30 +89,33 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       {navigation ? <Separator orientation="vertical" /> : null}
 
       <Surface as="main" tone="page" className="relative flex min-h-0 min-w-0 flex-col">
-        {/* An overlay's close button has a bar of its own along the top, on the page's color, and
-            the page scrolls beneath it. The bar names the page at its start, lined up with the
-            content's own edge (its px-6 / px-4) under the bar's px-3. */}
+        {/* An overlay's close button has a bar of its own along the top, a FramedPage toolbar row
+            on the frame's color closed by its hairline, and the page scrolls beneath it. The bar
+            names the page at its start, lined up with the content's own edge (its px-6 / px-4)
+            under the bar's px-3. */}
         {overlay ? (
-          <TopBar
-            divider
-            start={
-              props.title ? (
-                <Text
-                  as="h1"
-                  size="title"
-                  weight="semibold"
-                  tone="bright"
-                  className="min-w-0 pl-3 max-[792px]:pl-1"
-                >
-                  {props.title}
-                </Text>
-              ) : undefined
-            }
-          >
-            <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
-              <X />
-            </IconButton>
-          </TopBar>
+          <Surface tone="sidebar" className="shrink-0">
+            <TopBar
+              divider
+              start={
+                props.title ? (
+                  <Text
+                    as="h1"
+                    size="title"
+                    weight="semibold"
+                    tone="bright"
+                    className="min-w-0 pl-3 max-[792px]:pl-1"
+                  >
+                    {props.title}
+                  </Text>
+                ) : undefined
+              }
+            >
+              <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
+                <X />
+              </IconButton>
+            </TopBar>
+          </Surface>
         ) : null}
         {/* The scrollbar floats inset from the panel edge, clear of the rounded corners. */}
         <div
@@ -377,6 +387,10 @@ interface DesktopSettingsFrameProps<Id extends string> {
   /** The `data-tour` name of the navigation column, for a tour to point at. */
   navigationTour?: string;
   onSelect: (id: Id) => void;
+  /** The open page's sections, listed under its row in the sidebar (a long page only). */
+  sections?: readonly DesktopSettingsPageSection[];
+  activeSection?: string;
+  onSection?: (id: string) => void;
   presentation?: "page" | "overlay";
   /** The page we're on, in the header over the content. */
   title: ReactNode;

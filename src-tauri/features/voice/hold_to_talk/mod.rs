@@ -124,21 +124,19 @@ pub enum HotkeyEvent {
     /// Control tapped twice on its own, quickly (opens Tutor's text box). Shortcuts like
     /// Control+C or Control and a click never count. macOS and Windows only.
     DoubleTap,
-    /// Control tapped three times the same way (turns Tutor's Always On listening on or off). The
-    /// second tap has already sent `DoubleTap`.
-    TripleTap,
+    /// Escape pressed anywhere (macOS only): what Tutor shows at the cursor, such as its tour,
+    /// gives way. The key still reaches the app in front.
+    Escape,
     Error(String),
 }
 
-/// Two taps of Control on its own, each short, close together; and a third.
+/// Two taps of Control on its own, each short, close together. A third tap starts a new pair.
 #[derive(Default)]
 pub(crate) struct DoubleTap {
     /// When Control went down alone, and whether nothing else has happened since.
     down: Option<(std::time::Instant, bool)>,
-    /// When the last clean tap ended, and how many clean taps the run has had.
-    last: Option<(std::time::Instant, u8)>,
-    /// A third tap completed the run (`take_triple`).
-    triple: bool,
+    /// When the last clean tap ended, if it was the first of a pair.
+    last: Option<std::time::Instant>,
 }
 
 impl DoubleTap {
@@ -173,24 +171,13 @@ impl DoubleTap {
             return false;
         }
         match self.last.take() {
-            Some((previous, taps)) if now.duration_since(previous) <= Self::BETWEEN => {
-                if taps + 1 >= 3 {
-                    self.triple = true;
-                    return false;
-                }
-                self.last = Some((now, taps + 1));
-                true
-            }
+            // The pair is complete; the next tap starts another.
+            Some(previous) if now.duration_since(previous) <= Self::BETWEEN => true,
             _ => {
-                self.last = Some((now, 1));
+                self.last = Some(now);
                 false
             }
         }
-    }
-
-    /// Whether the last modifier change completed a triple tap; asking clears it.
-    pub fn take_triple(&mut self) -> bool {
-        std::mem::take(&mut self.triple)
     }
 
     /// Any other key, a click or a scroll: no tap is under way.
@@ -307,6 +294,9 @@ pub(crate) enum Input {
     /// Any key that isn't a modifier: breaks a double tap, and counts toward typing.
     #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
     Key,
+    /// Escape: like any other key, and Tutor's tour gives way.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    Escape,
     /// A scroll: only breaks a double tap.
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     Scroll,
@@ -336,14 +326,16 @@ fn dispatch(input: Input) {
                 if state.taps.modifiers(&modifiers, std::time::Instant::now()) {
                     broadcast(&state, HotkeyEvent::DoubleTap);
                 }
-                if state.taps.take_triple() {
-                    broadcast(&state, HotkeyEvent::TripleTap);
-                }
             }
         }
         Input::Key => {
             state.taps.interrupt();
             typing::key();
+        }
+        Input::Escape => {
+            state.taps.interrupt();
+            typing::key();
+            broadcast(&state, HotkeyEvent::Escape);
         }
         Input::Scroll => state.taps.interrupt(),
         Input::Click(x, y) => {

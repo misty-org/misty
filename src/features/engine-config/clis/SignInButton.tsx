@@ -48,18 +48,27 @@ export function SignInButton({
   engine,
   label,
   disabled,
+  size,
   onSignIn,
 }: {
   engine: string;
   /** The button's accessible name, when "Sign in" alone doesn't say what for. */
   label?: string;
   disabled?: boolean;
+  /** The button's size where its row sets one (a store shelf's sm); md otherwise. */
+  size?: "sm" | "md";
   onSignIn: (request: { provider?: string }) => void;
 }) {
   const choices = signInChoices(engine);
   if (!choices) {
     return (
-      <Button icon={LogIn} aria-label={label} disabled={disabled} onClick={() => onSignIn({})}>
+      <Button
+        icon={LogIn}
+        size={size}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onSignIn({})}
+      >
         Sign in
       </Button>
     );
@@ -67,7 +76,7 @@ export function SignInButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button icon={LogIn} aria-label={label} disabled={disabled}>
+        <Button icon={LogIn} size={size} aria-label={label} disabled={disabled}>
           Sign in
         </Button>
       </DropdownMenuTrigger>

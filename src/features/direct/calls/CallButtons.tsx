@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Phone, Video } from "lucide-react";
-import { IconButton } from "@misty/ui";
+import { Button, IconButton } from "@misty/ui";
 import { useCallStore, useCallsAvailable } from "./callStore";
 
 /**
@@ -22,5 +22,21 @@ export function CallButtons({ dmId }: { dmId: string }) {
         <Video />
       </IconButton>
     </>
+  );
+}
+
+/** Call, as a button under a DM's opening: a voice call, shown only where calls can be made. */
+export function CallButton({ dmId }: { dmId: string }) {
+  const available = useCallsAvailable();
+  const inCall = useCallStore((state) => Boolean(state.active));
+  if (!available) return null;
+  return (
+    <Button
+      icon={Phone}
+      disabled={inCall}
+      onClick={() => void useCallStore.getState().start(dmId, false)}
+    >
+      Call
+    </Button>
   );
 }

@@ -290,6 +290,77 @@ export function useCachedResource<T>(
   };
 }
 
+/** One resource as `useCachedResources` reads it. */
+export interface CachedResourceRead<T> {
+  data: T | undefined;
+  error: unknown;
+}
+
+/**
+ * Several resources of one kind at once, such as every engine's CLI status, for a list that reads
+ * the same keys single screens read with `useCachedResource`, so they share one answer. With
+ * `load` (the default) each one loads as the screen opens, joining a load already in flight; with
+ * `load: false` it only reads what is known (this session's answer, else the saved copy), for a
+ * count that shouldn't start any work of its own.
+ */
+export function useCachedResources<T>(
+  keys: readonly string[],
+  loader: (key: string) => Promise<T>,
+  options: { persist?: CachePersistence; load?: boolean } = {},
+): Readonly<Record<string, CachedResourceRead<T>>> {
+  const persist = options.persist ?? false;
+  const loadNow = options.load ?? true;
+  const id = keys.join("\n");
+  const last = useRef<{
+    id: string;
+    seen: (Entry | undefined)[];
+    value: Record<string, CachedResourceRead<T>>;
+  }>({ id: "", seen: [], value: {} });
+  const snapshot = useSyncExternalStore(
+    useCallback(
+      (listener: () => void) => {
+        const watched = id ? id.split("\n") : [];
+        for (const key of watched) {
+          let set = listeners.get(key);
+          if (!set) listeners.set(key, (set = new Set()));
+          set.add(listener);
+        }
+        return () => {
+          for (const key of watched) listeners.get(key)?.delete(listener);
+        };
+      },
+      [id],
+    ),
+    () => {
+      const watched = id ? id.split("\n") : [];
+      const seen = watched.map((key) => entries.get(key));
+      const previous = last.current;
+      if (previous.id === id && seen.every((found, index) => found === previous.seen[index]))
+        return previous.value;
+      const value: Record<string, CachedResourceRead<T>> = {};
+      watched.forEach((key, index) => {
+        value[key] = { data: seen[index]?.value as T | undefined, error: seen[index]?.error };
+      });
+      last.current = { id, seen, value };
+      return value;
+    },
+  );
+
+  const latestLoader = useLatest(loader);
+  useEffect(() => {
+    const watched = id ? id.split("\n") : [];
+    for (const key of watched) {
+      void restore(key, persist);
+      if (loadNow)
+        load(key, () => latestLoader.current(key), persist, true).catch(() => {
+          /* kept on the entry */
+        });
+    }
+  }, [id, persist, loadNow, latestLoader]);
+
+  return snapshot;
+}
+
 /** The newest `value`, readable from effects and callbacks without restarting them. */
 function useLatest<T>(value: T) {
   const ref = useRef(value);

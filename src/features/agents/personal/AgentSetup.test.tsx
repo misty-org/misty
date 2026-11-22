@@ -4,6 +4,39 @@ import { NoticeViewport, resetNotices } from "@misty/ui";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const save = vi.hoisted(() => vi.fn());
 vi.mock("@/features/agents/personal/personalAgentsApi", () => ({ personalAgentsApi: { save } }));
+const speech = vi.hoisted(() => {
+  const state = {
+    catalog: {
+      voices: [
+        {
+          id: "kokoro-heart",
+          name: "Heart",
+          languages: ["en"],
+          accent: "US",
+          installed: true,
+          packageKey: "kokoro",
+        },
+      ],
+      installing: [] as string[],
+    },
+    error: null,
+    progress: {},
+    failures: {},
+    load: async () => {},
+    install: async () => {},
+  };
+  const useSpeechModels = Object.assign(
+    (pick: (value: typeof state) => unknown) => pick(state),
+    { getState: () => state },
+  );
+  return { useSpeechModels };
+});
+vi.mock("@/features/voice", () => ({
+  useSpeechModels: speech.useSpeechModels,
+  personLanguages: () => ["en"],
+  previewVoice: async () => {},
+  voicesFor: (voices: unknown[]) => voices,
+}));
 import { AgentSetup } from "./AgentSetup";
 const access = {
   accountId: "owner",
@@ -34,6 +67,8 @@ const start = (onSaved = vi.fn(async () => {})) => {
   );
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Research partner" } });
   fireEvent.change(screen.getByLabelText("Purpose"), { target: { value: "Compare sources" } });
+  // Its voice is the person's pick, part of making it.
+  fireEvent.click(screen.getByRole("button", { name: "Heart" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   return onSaved;
 };
@@ -57,6 +92,7 @@ it("preserves identity across steps and saves an account-wide profile without in
   expect(save.mock.calls[0][0]).toMatchObject({
     name: "Research partner",
     description: "Compare sources",
+    voice: "kokoro-heart",
     model_mode: "automatic",
     enabled: true,
   });

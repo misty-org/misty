@@ -13,13 +13,14 @@
  * server is listed by the session but never offered for editing.
  */
 import { Activity, Info, Plus, Power, PowerOff, FolderOpen, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EngineMark } from "../EngineMark";
 import { folderName } from "../host";
 import {
   Button,
   CatalogDone,
-  CollectionFilters,
+  CollectionControls,
+  OptionSelect,
   EmptyState,
   ErrorState,
   IconButton,
@@ -163,6 +164,17 @@ function ConfigMenu({
   );
 }
 
+/** One quiet line across a shelf, in place of items: why it has none, or where they came from. */
+function ShelfLine({ children }: { children: ReactNode }) {
+  return (
+    <li className="pt-2 lg:col-span-2">
+      <Text as="p" size="meta" tone="muted" wrap className="m-0">
+        {children}
+      </Text>
+    </li>
+  );
+}
+
 /** What a session said about its servers, in one line for the runtime shelf's heading. */
 function runtimeStatus(section: McpRuntimeSection): string {
   const ready = section.status === "ready" || section.status === "session_ended";
@@ -224,9 +236,19 @@ function RuntimeDetail({ entry, onClose }: { entry: McpRuntimeEntry; onClose: ()
 
 /**
  * The Connectors section. `query` is the Explore rail's search text; the rail owns the field, so
- * the section draws none of its own.
+ * the section draws none of its own. `lead` adds the picked engine's own apps above its servers
+ * (Claude Code's claude.ai connectors), and `after` closes the page with what every engine shares
+ * (the apps Misty connects directly).
  */
-export function McpSection({ query = "" }: { query?: string } = {}) {
+export function McpSection({
+  query = "",
+  lead,
+  after,
+}: {
+  query?: string;
+  lead?: (engine: McpEngineId) => ReactNode;
+  after?: ReactNode;
+} = {}) {
   const [folders, workspace, setWorkspace] = useMcpFolder();
   const store = useMcpInventory(workspace);
   const [engineId, setEngineId] = useState<McpEngineId>("claude");
@@ -287,52 +309,64 @@ export function McpSection({ query = "" }: { query?: string } = {}) {
         : store.error.message
       : null;
 
+  // One bar, as Plugins has: what the page shows (the engine, the folder) at its start, the
+  // page's actions at its end, every one of them bare but the one create action.
   const controls = (
-    <CollectionFilters
-      value={engine?.id ?? ""}
-      onChange={(id) => {
-        setEngineId(id as McpEngineId);
-        setSelectedId(null);
-        setRuntimeName(null);
-      }}
-      options={engines.map((item) => ({
-        value: item.id,
-        label: engineLabel(item.id),
-        icon: <EngineMark engine={item.id} />,
-      }))}
-      utilities={
-        folders.length > 0 ? (
-          <FolderChoice folders={folders} value={workspace} onChange={setWorkspace} />
-        ) : undefined
-      }
-      actions={
-        <div className="flex items-center gap-1">
-          <Tooltip content={copy.probeHint}>
-            <Button
-              icon={Activity}
-              disabled={store.loading || probingAll || probeableCount === 0}
-              onClick={() =>
-                void probeAll(engine?.config.entries ?? [], workspace, { force: true })
-              }
-            >
-              {copy.probeCheckAll}
-            </Button>
-          </Tooltip>
-          <IconButton
-            label={copy.refresh}
-            disabled={store.loading || refreshing}
-            onClick={handleRefresh}
-          >
-            <RefreshCw />
-          </IconButton>
-          {engine && enginesThatAdd.includes(engine.id) ? (
-            <Button variant="primary" icon={Plus} onClick={() => setAdding(true)}>
-              Add server
-            </Button>
-          ) : null}
-        </div>
-      }
-    />
+    <div className="flex min-w-0 items-center gap-2">
+      {engines.length ? (
+        <OptionSelect
+          aria-label="Engine"
+          className="w-48 shrink-0"
+          value={engine?.id ?? ""}
+          onValueChange={(id) => {
+            setEngineId(id as McpEngineId);
+            setSelectedId(null);
+            setRuntimeName(null);
+          }}
+          options={engines.map((item) => ({
+            value: item.id,
+            label: engineLabel(item.id),
+            icon: <EngineMark engine={item.id} />,
+          }))}
+        />
+      ) : null}
+      {folders.length > 0 ? (
+        <FolderChoice folders={folders} value={workspace} onChange={setWorkspace} />
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <CollectionControls
+          utilities={
+            <>
+              <Tooltip content={copy.probeHint}>
+                <IconButton
+                  label={copy.probeCheckAll}
+                  disabled={store.loading || probingAll || probeableCount === 0}
+                  onClick={() =>
+                    void probeAll(engine?.config.entries ?? [], workspace, { force: true })
+                  }
+                >
+                  <Activity />
+                </IconButton>
+              </Tooltip>
+              <IconButton
+                label={copy.refresh}
+                disabled={store.loading || refreshing}
+                onClick={handleRefresh}
+              >
+                <RefreshCw />
+              </IconButton>
+            </>
+          }
+          actions={
+            engine && enginesThatAdd.includes(engine.id) ? (
+              <Button variant="primary" icon={Plus} onClick={() => setAdding(true)}>
+                Add server
+              </Button>
+            ) : undefined
+          }
+        />
+      </div>
+    </div>
   );
 
   const body = () => {
@@ -359,16 +393,18 @@ export function McpSection({ query = "" }: { query?: string } = {}) {
       return (
         <>
           <EngineNotices engine={engine} />
-          <EmptyState inline title="No connectors found" line="Try another word." />
+          {lead?.(engine.id)}
+          <EmptyState inline title="No servers found" line="Try another word." />
         </>
       );
     }
     return (
       <>
         <EngineNotices engine={engine} />
-        {configEntries.length > 0 ? (
-          <Shelf title="Added">
-            {configEntries.map((entry) => {
+        {lead?.(engine.id)}
+        <Shelf title="Added">
+          {configEntries.length > 0 ? (
+            configEntries.map((entry) => {
               const pending = store.pendingId === entry.id;
               return (
                 <ShelfItem
@@ -395,27 +431,18 @@ export function McpSection({ query = "" }: { query?: string } = {}) {
                   onOpen={() => setSelectedId(entry.id)}
                 />
               );
-            })}
-          </Shelf>
-        ) : noEntries ? (
-          <>
-            <EmptyState
-              inline
-              title="No servers added"
-              line={`${engineLabel(engine.id)} has none in its config.`}
-            />
-            <McpSourceHint sources={engine.sources} workspacePath={workspace} />
-          </>
-        ) : null}
+            })
+          ) : (
+            <ShelfLine>
+              {noEntries
+                ? `${engineLabel(engine.id)} has no servers in its config.`
+                : "No server matches."}
+            </ShelfLine>
+          )}
+        </Shelf>
         {needle && runtimeEntries.length === 0 ? null : (
-          <Shelf
-            title={copy.runtimeTitle}
-            action={
-              <Text size="meta" tone="muted" full>
-                {runtimeStatus(engine.runtime)}
-              </Text>
-            }
-          >
+          <Shelf title={copy.runtimeTitle}>
+            <ShelfLine>{runtimeStatus(engine.runtime)}</ShelfLine>
             {runtimeEntries.map((entry) => (
               <ShelfItem
                 key={entry.name}
@@ -427,6 +454,7 @@ export function McpSection({ query = "" }: { query?: string } = {}) {
             ))}
           </Shelf>
         )}
+        {noEntries ? <McpSourceHint sources={engine.sources} workspacePath={workspace} /> : null}
       </>
     );
   };
@@ -435,6 +463,7 @@ export function McpSection({ query = "" }: { query?: string } = {}) {
     <>
       {controls}
       {body()}
+      {after}
       {selected ? (
         <McpDetailDialog
           entry={selected}

@@ -40,7 +40,8 @@ export function CallSession({ call, maxPeople }: { call: ActiveCall; maxPeople: 
     spaceMembers?.find((member) => member.user_id === userId)?.name ??
     controls.people.find((person) => person.id === userId)?.name ??
     "Someone";
-  const agent = useCallAgent({ room: controls.room, call, nameOf });
+  const others = controls.people.filter((person) => !person.self).length;
+  const agent = useCallAgent({ room: controls.room, call, others, nameOf });
 
   // After every render: the controls carry the call's live people and tracks.
   useEffect(() => {

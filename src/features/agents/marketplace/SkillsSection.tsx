@@ -1,4 +1,12 @@
-import { ExternalLink, FolderGit2, FolderInput, Plus, RefreshCw, Trash2 } from "lucide-react";
+import {
+  ChartColumn,
+  ExternalLink,
+  FolderGit2,
+  FolderInput,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import {
   createInstalledPaneActions,
@@ -22,7 +30,7 @@ import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,
   CatalogDone,
-  CollectionFilters,
+  CollectionControls,
   EmptyState,
   ErrorState,
   IconButton,
@@ -35,9 +43,8 @@ import { openAgentsHub } from "../hub/agentsHubStore";
 import { failureText, skillTargetOf } from "./api";
 import { EnginePicker, MarketShelf, MarketShelvesSkeleton, MarketSkeleton } from "./MarketShelf";
 import { useMarketEngines } from "./marketView";
-import { MakerTile } from "./PluginMaker";
 import { entryMatches, skillEntries, useSkillCatalog, type SkillEntry } from "./skillCatalog";
-import { SkillStoreDetail, skillMaker } from "./SkillStoreDetail";
+import { SkillStoreDetail } from "./SkillStoreDetail";
 
 /** How long the trash keeps an uninstalled skill (native `skills` trash): Undo lasts as long. */
 const TRASH_KEEPS_MS = 5 * 60 * 1000;
@@ -65,7 +72,7 @@ export function SkillsSection({ query }: { query: string }) {
         action={{ label: "Try again", icon: RefreshCw, onClick: reload }}
       />
     ) : (
-      <MarketSkeleton label="Skills" />
+      <MarketSkeleton label="Skills" logos={false} />
     );
   if (!engines.length || !target)
     return (
@@ -258,12 +265,16 @@ function EngineSkillShelves({
     return (
       <ShelfItem
         key={entry.key}
-        logo={<MakerTile maker={skillMaker(entry)} name={entry.name} />}
         title={entry.name}
         line={state === "orphan" ? t("orphanHint") : entry.description || row?.directory}
         action={
           row && updates[row.id] ? (
-            <Button variant="get" size="sm" disabled={pending} onClick={() => void actions.runUpdate(row, false)}>
+            <Button
+              variant="get"
+              size="sm"
+              disabled={pending}
+              onClick={() => void actions.runUpdate(row, false)}
+            >
               {t("actions.update")}
             </Button>
           ) : state === "synced" ? (
@@ -309,15 +320,16 @@ function EngineSkillShelves({
       <div className="flex min-w-0 items-center gap-2">
         {picker}
         <div className="min-w-0 flex-1">
-          <CollectionFilters
-            options={[
-              { value: "all", label: "All" },
-              { value: "usage", label: t("tabs.usage") },
-            ]}
-            value={tab}
-            onChange={(next) => setTab(next === "usage" ? "usage" : "all")}
+          <CollectionControls
             utilities={
               <>
+                <IconButton
+                  label={t("tabs.usage")}
+                  aria-pressed={tab === "usage"}
+                  onClick={() => setTab(tab === "usage" ? "all" : "usage")}
+                >
+                  <ChartColumn />
+                </IconButton>
                 <IconButton label={t("refresh")} disabled={checking} onClick={checkForUpdates}>
                   <RefreshCw />
                 </IconButton>
@@ -340,7 +352,7 @@ function EngineSkillShelves({
       {tab === "usage" ? (
         <SkillUsagePane />
       ) : installedFirstLoad ? (
-        <MarketShelvesSkeleton label={`${name} skills`} />
+        <MarketShelvesSkeleton label={`${name} skills`} logos={false} />
       ) : store.error && !store.skills.length && !catalog.found?.length ? (
         <ErrorState
           inline
@@ -368,7 +380,7 @@ function EngineSkillShelves({
             />
           ) : null}
           {!catalog.found ? (
-            <MarketShelvesSkeleton label={`${name} skills`} />
+            <MarketShelvesSkeleton label={`${name} skills`} logos={false} />
           ) : catalog.error && !shelves.size ? (
             <ErrorState
               inline

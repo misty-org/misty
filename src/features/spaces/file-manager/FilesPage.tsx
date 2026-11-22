@@ -3,7 +3,7 @@ import { EmptyState, SetupState } from "@misty/ui";
 import { disk } from "@/features/files";
 import { useSpacesStore } from "../list/useSpacesStore";
 import { preferredDefaultSpace } from "../routes/defaultSpace";
-import { FilesBrowser } from "./FilesBrowser";
+import { FilesWindow } from "./FilesWindow";
 import { messageOf } from "./format";
 import type { FilesPlace } from "./model";
 
@@ -64,5 +64,5 @@ export function FilesPage() {
       ? { kind: "space-drive", spaceId: personal.id, path: "/" }
       : undefined;
   if (!start) return <EmptyState title="No places to open" line="Join or make a Space, or add a project, to see its files here." />;
-  return <FilesBrowser granted={granted} start={start} />;
+  return <FilesWindow granted={granted} start={start} />;
 }

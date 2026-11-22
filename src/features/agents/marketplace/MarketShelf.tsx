@@ -75,28 +75,26 @@ export function EnginePicker({
 }
 
 /** A section's first load: its control row, then shelves in their own shape. */
-export function MarketSkeleton({ label }: { label: string }) {
+export function MarketSkeleton({ label, logos = true }: { label: string; logos?: boolean }) {
   return (
     <>
       <div aria-hidden="true" className="flex min-w-0 items-center gap-2">
         <SkeletonControl kind="select" className="w-48" />
-        <SkeletonControl kind="button-sm" />
-        <SkeletonControl kind="button-sm" />
         <span className="flex-1" />
         <SkeletonControl kind="icon" />
         <SkeletonControl kind="icon" />
       </div>
-      <MarketShelvesSkeleton label={label} />
+      <MarketShelvesSkeleton label={label} logos={logos} />
     </>
   );
 }
 
-/** Shelves before their items are listed. */
-export function MarketShelvesSkeleton({ label }: { label: string }) {
+/** Shelves before their items are listed; `logos={false}` for items that have none (skills). */
+export function MarketShelvesSkeleton({ label, logos = true }: { label: string; logos?: boolean }) {
   return (
     <>
-      <ShelfSkeleton label={label} />
-      <ShelfSkeleton label={label} />
+      <ShelfSkeleton label={label} logos={logos} />
+      <ShelfSkeleton label={label} logos={logos} />
     </>
   );
 }

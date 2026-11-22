@@ -4,6 +4,7 @@ import type { Track } from "livekit-client";
 import {
   Eye,
   EyeOff,
+  LogOut,
   Maximize,
   Maximize2,
   Mic,
@@ -31,11 +32,13 @@ import {
   ViewHeader,
   ViewportLayer,
 } from "@misty/ui";
+import { AgentAvatar } from "@/features/agents";
 import { personTone } from "@/shared/lib/personTone";
 import { personInitials } from "@/shared/lib/personInitials";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useCallStore, type ActiveCall } from "./callStore";
 import { callPath, useCallSession } from "./callSessionStore";
+import type { CallAgentView } from "./callAgents";
 import type { CallPerson } from "./useLiveKitCall";
 
 /** Every video playing now, by its track, so the call's featured one can go picture in picture. */
@@ -130,6 +133,41 @@ export function CallStageView() {
     />
   );
 
+  // An agent's tile: its own picture for this person's agents, else its initials, ringed while it
+  // speaks. Only this person's own agents can be sent away from here.
+  const remove = agent?.remove;
+  const agentTile = (agent: CallAgentView) => {
+    const name = agent.mine ? agent.name : `${agent.name}, ${nameOf(agent.owner)}’s agent`;
+    return (
+      <CallTile
+        key={agent.key}
+        name={name}
+        speaking={agent.state === "speaking"}
+        muted={agent.state === "working"}
+        deafened={agent.state === "working"}
+        face={
+          agent.profile ? (
+            <AgentAvatar agent={agent.profile} large />
+          ) : (
+            <Avatar size="lg" tone={personTone(agent.key)}>
+              <AvatarFallback>{personInitials(agent.name)}</AvatarFallback>
+            </Avatar>
+          )
+        }
+        actions={
+          agent.profile ? (
+            <IconButton
+              label={`Send ${agent.name} away`}
+              onClick={() => agent.profile && remove?.(agent.profile.id)}
+            >
+              <LogOut />
+            </IconButton>
+          ) : undefined
+        }
+      />
+    );
+  };
+
   // Someone else's screen comes first; the person picked replaces it.
   const sharer = people.find((person) => !person.self && person.sharing);
   const picked = people.find((person) => person.id === pinned);
@@ -172,7 +210,10 @@ export function CallStageView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">
-      <CallStage focus={focus}>{rest.map((person) => tile(person, false))}</CallStage>
+      <CallStage focus={focus}>
+        {rest.map((person) => tile(person, false))}
+        {(agent?.agents ?? []).map(agentTile)}
+      </CallStage>
       {agent?.rows}
       <CallBar>
         <IconButton

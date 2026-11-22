@@ -1,8 +1,7 @@
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { useCachedResource } from "@/api/cache/cached-resource";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
-import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
-import { Button, EmptyState, ListRowSkeleton, Text } from "@misty/ui";
+import { Button, LogoTile, Shelf, ShelfItem, ShelfSkeleton, Text } from "@misty/ui";
 import { DirectAppLogo } from "../connected-apps/DirectAppLogo";
 import { failureText, marketApi, type EngineConnector } from "./api";
 
@@ -27,8 +26,8 @@ const appKey = (name: string) => name.trim().toLowerCase().replace(/\s+/g, "-");
 
 /**
  * The apps Claude Code already reaches under the person's own sign-in: claude.ai connectors and
- * the servers its plugins bring, one settings row each with the app's logo, where it comes from
- * and, in words, anything wrong with it. Each engine keeps its own: connecting one in Claude
+ * the servers its plugins bring, a shelf of them with each app's logo, where it comes from and, in
+ * words, anything wrong with it. Each engine keeps its own: connecting one in Claude
  * doesn't connect it for Codex, whose apps come with its plugins.
  */
 export function EngineConnectors() {
@@ -45,77 +44,59 @@ export function EngineConnectors() {
       : null;
   const load = listing.reload;
 
-  const connected = connectors?.filter((connector) => connector.state !== "off") ?? [];
+  const title = "Apps in Claude Code";
+  if (connectors === null) return <ShelfSkeleton label={title} items={2} />;
+  const connected = connectors.filter((connector) => connector.state !== "off");
   return (
-    <Section title="Claude Code">
-      {connectors === null ? (
-        <ListRowSkeleton label="Claude Code apps" rows={4} lines={2} />
-      ) : error ? (
-        <EmptyState
-          inline
-          title="Claude Code didn't list its apps"
-          line={error}
-          action={{
-            label: "Try again",
-            icon: RefreshCw,
-            onClick: () => void load(),
-            variant: "secondary",
-          }}
-        />
-      ) : connected.length === 0 ? (
-        <EmptyState
-          inline
-          title="No apps in Claude Code yet"
-          line="Connect Gmail, Drive and more on claude.ai, and Claude Code uses them here."
-          action={{
-            label: "Open claude.ai",
-            icon: ExternalLink,
-            onClick: () => openExternalLink(CLAUDE_CONNECTORS),
-            variant: "secondary",
-          }}
-        />
+    <Shelf
+      title={title}
+      action={
+        error ? (
+          <Button variant="quiet" size="sm" icon={RefreshCw} onClick={() => void load()}>
+            Try again
+          </Button>
+        ) : (
+          <Button
+            variant="quiet"
+            size="sm"
+            icon={ExternalLink}
+            onClick={() => openExternalLink(CLAUDE_CONNECTORS)}
+          >
+            {connected.length ? "Manage on claude.ai" : "Open claude.ai"}
+          </Button>
+        )
+      }
+    >
+      {error || connected.length === 0 ? (
+        <li className="pt-2 lg:col-span-2">
+          <Text as="p" size="meta" tone="muted" wrap className="m-0">
+            {error ?? "Connect Gmail, Drive and more on claude.ai, and Claude Code uses them here."}
+          </Text>
+        </li>
       ) : (
         connected.map((connector) => {
           const problem = problems[connector.state];
           return (
-            <DesktopSettingsRow
+            <ShelfItem
               key={`${connector.origin}:${connector.name}`}
-              label={connector.name}
-              leading={
-                <span className="flex size-8 shrink-0 items-center justify-center">
-                  <DirectAppLogo app={appKey(connector.name)} name={connector.name} size={20} />
-                </span>
+              logo={
+                <LogoTile size="tile">
+                  <DirectAppLogo app={appKey(connector.name)} name={connector.name} size={40} />
+                </LogoTile>
               }
-              description={
-                <>
-                  {origins[connector.origin]}
-                  {problem ? (
-                    <>
-                      {", "}
-                      <Text bare tone="waiting">
-                        {problem}
-                      </Text>
-                    </>
-                  ) : null}
-                </>
+              title={connector.name}
+              line={origins[connector.origin]}
+              action={
+                problem ? (
+                  <Text size="meta" tone="waiting">
+                    {problem.charAt(0).toUpperCase() + problem.slice(1)}
+                  </Text>
+                ) : undefined
               }
-            >
-              {null}
-            </DesktopSettingsRow>
+            />
           );
         })
       )}
-      {connected.length ? (
-        <div className="flex">
-          <Button
-            variant="quiet"
-            icon={ExternalLink}
-            onClick={() => openExternalLink(CLAUDE_CONNECTORS)}
-          >
-            Manage on claude.ai
-          </Button>
-        </div>
-      ) : null}
-    </Section>
+    </Shelf>
   );
 }

@@ -24,7 +24,7 @@ export { useVoicePresence, voiceChannelOf, watchVoicePresence } from "./list/voi
 // A DM is a Space of kind "direct": its view draws the Space chat for the DM's id.
 export { SpaceChat } from "./chat/SpaceChat";
 export { PinnedMessagesButton } from "./chat/components/PinnedMessagesButton";
-export { ChatBarButtons } from "./chat/components/ChatBarButtons";
+export { ChatBarButtons, useChatBarMenu } from "./chat/components/ChatBarButtons";
 export { createYjsProvider } from "./journal/notes/createYjsProvider";
 export { pageMisty } from "./apps/pageMisty";
 export { appCallsHost, voiceChannelPage } from "./apps/appCalls";

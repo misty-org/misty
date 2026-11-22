@@ -1,5 +1,5 @@
-//! Voice: dictation into any app, captures, and speech on this computer (recognizing and speaking,
-//! with no key).
+//! Voice: dictation into any app, captures, and speech on this computer through open models from
+//! Misty's catalog (hearing and speaking, with no key).
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod audio_capture;
 mod share_audio;
@@ -12,6 +12,7 @@ pub(crate) mod linux;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
 pub mod speech;
+pub mod speech_models;
 pub mod speech_words;
 
 // Glob re-exports carry the `__cmd__*` macros that #[tauri::command] generates

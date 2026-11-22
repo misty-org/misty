@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createUiMemory } from "@misty/ui";
+import { createUiMemory, type CollectionZoom } from "@misty/ui";
 import { mimeFromName } from "../drive";
 import { acceptsFile } from "../apps/spaceAppFiles";
 import { useSpacesStore } from "../list/useSpacesStore";
@@ -16,8 +16,29 @@ import { useNavigation } from "./useNavigation";
 import { useFilesOperation, useUndoState } from "./useOperations";
 import { useSelection } from "./useSelection";
 
-/** What the person chose for Files on this device: its view and whether hidden names show. */
-const filesMemory = createUiMemory<{ view?: FilesView; hidden?: boolean }>({
+/**
+ * What the person chose for Files on this device: its view, whether hidden names show, whether the
+ * sidebar and the inspector are open, how big the icon view draws, and which sidebar sections are folded.
+ */
+interface FilesChoices {
+  view?: FilesView;
+  hidden?: boolean;
+  sidebar?: boolean;
+  inspector?: boolean;
+  zoom?: CollectionZoom;
+  folded?: string[];
+  /** Kura's ⋯ › Sort: a column and its direction; none keeps Finder's order (folders, then names). */
+  sort?: FilesSort;
+}
+
+export interface FilesSort {
+  key: "name" | "modified" | "size" | "kind";
+  descending: boolean;
+}
+
+const sortKeys = new Set(["name", "modified", "size", "kind"]);
+
+const filesMemory = createUiMemory<FilesChoices>({
   scope: "files-browser",
   normalize: (stored) => {
     if (!stored || typeof stored !== "object") return undefined;
@@ -25,6 +46,14 @@ const filesMemory = createUiMemory<{ view?: FilesView; hidden?: boolean }>({
     return {
       view: saved.view === "grid" || saved.view === "list" || saved.view === "columns" ? saved.view : undefined,
       hidden: saved.hidden === true,
+      sidebar: typeof saved.sidebar === "boolean" ? saved.sidebar : undefined,
+      inspector: typeof saved.inspector === "boolean" ? saved.inspector : undefined,
+      zoom: saved.zoom === 0 || saved.zoom === 1 || saved.zoom === 2 ? saved.zoom : undefined,
+      folded: Array.isArray(saved.folded) ? saved.folded.filter((key): key is string => typeof key === "string") : undefined,
+      sort:
+        saved.sort && typeof saved.sort === "object" && sortKeys.has((saved.sort as FilesSort).key)
+          ? { key: (saved.sort as FilesSort).key, descending: (saved.sort as FilesSort).descending === true }
+          : undefined,
     };
   },
 });
@@ -36,9 +65,14 @@ export interface FilesPick {
   onPick(items: FileItem[]): void;
 }
 
-/** Everything the browser holds and does, apart from drawing it. */
-export function useFilesBrowser({ granted, start, pick }: { granted: boolean; start: FilesPlace; pick?: FilesPick }) {
-  const memoryKey = pick ? "picker" : "page";
+/**
+ * What the person chose for Files on this device, shared by the window and every pane of it: the
+ * view, hidden names, the sidebar and the preview, the icon size, the folded sidebar sections and
+ * the sort. `picking` keeps the picker's choices apart.
+ */
+export function useFilesChoices(picking: boolean) {
+  const memoryKey = picking ? "picker" : "page";
+  const pick = picking;
   const remembered = filesMemory.useEntry(memoryKey);
   const view: FilesView = remembered?.view ?? "list";
   const hidden = remembered?.hidden === true;
@@ -50,7 +84,73 @@ export function useFilesBrowser({ granted, start, pick }: { granted: boolean; st
     () => filesMemory.set(memoryKey, (now) => ({ ...now, hidden: !now?.hidden })),
     [memoryKey],
   );
+  // As Kura opens: the sidebar and the inspector both showing, the icons at their middle size.
+  const sidebar = remembered?.sidebar ?? true;
+  const info = remembered?.inspector ?? !pick;
+  const zoom: CollectionZoom = remembered?.zoom ?? 1;
+  const folded = remembered?.folded ?? [];
+  const setSidebar = useCallback(
+    (on: boolean) => filesMemory.set(memoryKey, (now) => ({ ...now, sidebar: on })),
+    [memoryKey],
+  );
+  const setInfo = useCallback(
+    (next: boolean | ((on: boolean) => boolean)) =>
+      filesMemory.set(memoryKey, (now) => {
+        const was = now?.inspector ?? !pick;
+        return { ...now, inspector: typeof next === "function" ? next(was) : next };
+      }),
+    [memoryKey, pick],
+  );
+  const setZoom = useCallback(
+    (next: CollectionZoom) => filesMemory.set(memoryKey, (now) => ({ ...now, zoom: next })),
+    [memoryKey],
+  );
+  const setFolded = useCallback(
+    (section: string, fold: boolean) =>
+      filesMemory.set(memoryKey, (now) => {
+        const rest = (now?.folded ?? []).filter((key) => key !== section);
+        return { ...now, folded: fold ? [...rest, section] : rest };
+      }),
+    [memoryKey],
+  );
 
+  const setSort = useCallback(
+    (next: FilesSort | undefined) => filesMemory.set(memoryKey, (now) => ({ ...now, sort: next })),
+    [memoryKey],
+  );
+  return {
+    view,
+    setView,
+    hidden,
+    toggleHidden,
+    sidebar,
+    setSidebar,
+    info,
+    setInfo,
+    zoom,
+    setZoom,
+    folded,
+    setFolded,
+    sort: remembered?.sort,
+    setSort,
+  };
+}
+
+/** Everything one pane of the browser holds and does, apart from drawing it. */
+export function useFilesBrowser({
+  granted,
+  start,
+  pick,
+  revealHere = true,
+}: {
+  granted: boolean;
+  start: FilesPlace;
+  pick?: FilesPick;
+  /** An agent's reveal lands in this pane (the active one, when a tab is split). */
+  revealHere?: boolean;
+}) {
+  const choices = useFilesChoices(Boolean(pick));
+  const { view, setView, hidden, toggleHidden, sidebar, setSidebar, info, setInfo, zoom, setZoom, folded, setFolded } = choices;
   const nav = useNavigation(start);
   const { place } = nav;
   // The columns start where the person last went from the sidebar.
@@ -58,7 +158,6 @@ export function useFilesBrowser({ granted, start, pick }: { granted: boolean; st
   const selection = useSelection(pick ? pick.multiple : true);
   const pending = useRef<string[] | null>(null);
   const [query, setQuery] = useState("");
-  const [info, setInfo] = useState(false);
   const [quick, setQuick] = useState<FileItem | null>(null);
   const [revision, setRevision] = useState(0);
   const [cut, setCut] = useState<ReadonlySet<string>>(new Set());
@@ -96,11 +195,11 @@ export function useFilesBrowser({ granted, start, pick }: { granted: boolean; st
   // An agent's `files.reveal`: its folder, with it picked.
   const reveal = useFilesReveal();
   useEffect(() => {
-    if (!reveal.path || !granted || pick) return;
+    if (!reveal.path || !granted || pick || !revealHere) return;
     const folder: FilesPlace = { kind: "disk", path: parentOf(reveal.path) };
     go(folder, { select: [reveal.path], root: true });
     useFilesReveal.setState({ path: null });
-  }, [reveal.path, reveal.at, granted, pick, go]);
+  }, [reveal.path, reveal.at, granted, pick, go, revealHere]);
 
   const needle = query.trim().toLocaleLowerCase();
   const shown = searched ?? listing;
@@ -184,6 +283,14 @@ export function useFilesBrowser({ granted, start, pick }: { granted: boolean; st
     setQuery,
     info,
     setInfo,
+    sidebar,
+    setSidebar,
+    zoom,
+    setZoom,
+    folded,
+    setFolded,
+    sort: choices.sort,
+    setSort: choices.setSort,
     quick,
     setQuick,
     revision,

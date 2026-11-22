@@ -71,6 +71,12 @@ export interface FolderSize {
   items: number;
 }
 
+/** Files' thumbnail cache: the most it may hold and what it holds now, in bytes. */
+export interface ThumbnailCacheStatus {
+  limit: number;
+  used: number;
+}
+
 export interface FreeSpace {
   free: number;
   total: number;
@@ -281,6 +287,8 @@ export const disk = {
   openWith: (path: string, app: string) => invoke<void>("files_open_with", { path, app }),
   /** Shows it in Finder or Explorer. */
   reveal: (path: string) => invoke<void>("files_reveal", { path }),
+  /** Opens the system terminal in a folder (Kura's terminal button). */
+  openTerminal: (path: string) => invoke<void>("files_open_terminal", { path }),
 
   // Starred, Recent, Tags
   starred: () => invoke<FileEntry[]>("files_starred"),
@@ -302,6 +310,12 @@ export const disk = {
   compress: (paths: string[]) => invoke<string>("files_compress", { paths }),
   extract: (path: string) => invoke<string>("files_extract", { path }),
   checksum: (path: string) => invoke<string>("files_checksum", { path }),
+
+  // The thumbnail cache (`src-tauri/features/files/thumbnail_cache.rs`): its limit is a device
+  // setting native code keeps, and setting it trims the cache at once.
+  thumbnailCache: () => invoke<ThumbnailCacheStatus>("files_thumbnail_cache"),
+  setThumbnailCacheLimit: (bytes: number) =>
+    invoke<ThumbnailCacheStatus>("files_set_thumbnail_cache_limit", { bytes }),
   makeLink: (path: string) => invoke<string>("files_make_link", { path }),
   renamePreview: (paths: string[], rule: RenameRule) =>
     invoke<RenamePreview[]>("files_rename_preview", { paths, rule }),
@@ -337,6 +351,19 @@ export function thumbnailUrl(path: string, modifiedMs: number, size: number): st
 /** The file itself, for Quick Look's image, video, audio and PDF views. */
 export function fileUrl(path: string, modifiedMs: number): string {
   const query = new URLSearchParams({ kind: "file", v: String(modifiedMs) });
+  return `${safeTauriAssetUrl(path, "misty-disk")}?${query.toString()}`;
+}
+
+/** The same picture of a file in a Space's drive (`path` from the drive's root), from the content this
+ * computer already holds: a file only on the server isn't served, so a grid never downloads it. */
+export function driveThumbnailUrl(spaceId: string, path: string, modifiedMs: number, size: number): string {
+  const query = new URLSearchParams({ kind: "thumbnail", size: String(size), v: String(modifiedMs), space: spaceId });
+  return `${safeTauriAssetUrl(path, "misty-disk")}?${query.toString()}`;
+}
+
+/** A Space drive's file itself, streamed from this computer's copy, for the preview. */
+export function driveFileUrl(spaceId: string, path: string, modifiedMs: number): string {
+  const query = new URLSearchParams({ kind: "file", v: String(modifiedMs), space: spaceId });
   return `${safeTauriAssetUrl(path, "misty-disk")}?${query.toString()}`;
 }
 

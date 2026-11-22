@@ -1,27 +1,31 @@
-//! Speech recognition on this computer, with no key and nothing sent anywhere by Misty: a
-//! recorded file, or the microphone live. On macOS through Apple's Speech framework, called from
-//! Rust through objc2, on-device wherever the language has an on-device model. On Windows through
-//! Windows' own offline recognizer (System.Speech), run in PowerShell. Other systems have no
-//! recognizer here yet, and say so. On macOS it also reads sentences aloud in a system voice as
-//! they arrive ([`Speaker`]).
+//! Speech on this computer through open models, with no key and nothing sent anywhere: hearing
+//! (voice activity detection, then a speech recognition model), recorded files, and speaking in
+//! a voice. Every model runs through sherpa-onnx (Apache-2.0) on the CPU, the same on macOS,
+//! Windows and Linux. Which models there are, and where they come from, is Misty's catalog
+//! (`misty-catalog`); the app downloads them and hands this crate their files.
 //!
-//! The crate has no app framework coupling: callers own events and windows.
+//! The crate has no app framework coupling: callers own events, windows and model files.
 
 use serde::{Deserialize, Serialize};
 
-/// What the microphone has been heard to say so far.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
-pub struct Heard {
-    #[serde(default)]
-    pub text: String,
-    /// The recognizer is done: nothing more will come.
-    #[serde(default, rename = "final")]
-    pub done: bool,
-    #[serde(default)]
-    pub error: Option<String>,
-}
+mod decode;
+mod file;
+mod hearing;
+mod model;
+mod player;
+mod recognizer;
+mod voice;
 
-/// A phrase recognized from fed audio, with its time in seconds from the stream's start.
+pub use decode::{decode_file, resample, SAMPLE_RATE};
+pub use file::{recognize_file, recognize_samples};
+pub use hearing::{Hearing, HearingEvent};
+pub use model::{HearingFamily, HearingSpec, VadSpec, VoiceSpec};
+pub use player::{play, Playback};
+pub use recognizer::Recognizer;
+pub use voice::{Speech, Voice};
+
+/// A phrase recognized from audio, with its time in seconds from the audio's start, and its
+/// words with theirs when the model times its tokens.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct Phrase {
     pub text: String,
@@ -29,62 +33,26 @@ pub struct Phrase {
     pub start: f64,
     #[serde(default)]
     pub end: f64,
-    /// How sure the recognizer is of the words, 0 to 1; 0 when it didn't say (an unfinished
-    /// phrase). Comparing it tells which of two languages a person spoke.
-    #[serde(default)]
-    pub confidence: f32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub words: Vec<Word>,
 }
 
-/// What a fed stream has been heard to say: finished phrases, and the one still being heard.
+/// One word and when it was said, in seconds from the audio's start.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-pub struct StreamHeard {
-    #[serde(default)]
-    pub segments: Vec<Phrase>,
-    #[serde(default)]
-    pub current: Option<Phrase>,
+pub struct Word {
+    pub text: String,
+    pub start: f64,
+    pub end: f64,
 }
 
-/// Why recognition couldn't run, in words for the person.
-#[cfg(windows)]
+/// Why speech couldn't run, in words for the person.
 pub fn reason(code: &str) -> String {
     match code {
-        "unavailable" => "Speech recognition isn't available for this language on this computer. Add the language's speech recognition in Settings › Time & language › Speech.".into(),
-        "microphone" => "Misty couldn't open the microphone. Allow desktop apps to use it in Settings › Privacy & security › Microphone.".into(),
-        "unsupported" => "This computer has no speech recognition Misty can use.".into(),
-        _ => "Speech recognition stopped before it finished.".into(),
+        "no_model" => "Speech isn't set up on this computer yet.".into(),
+        "model" => "The speech model couldn't be opened. Set it up again in Settings › Voice.".into(),
+        "voice" => "The voice couldn't be opened. Set it up again in Settings › Voice.".into(),
+        "file" => "That recording couldn't be read.".into(),
+        "output" => "Misty couldn't play sound on this computer.".into(),
+        _ => "Speech stopped before it finished.".into(),
     }
 }
-
-/// Why recognition couldn't run, in words for the person.
-#[cfg(not(windows))]
-pub fn reason(code: &str) -> String {
-    match code {
-        "denied" => "Misty isn't allowed to recognize speech. Allow it in System Settings › Privacy & Security › Speech Recognition.".into(),
-        "unavailable" => "Speech recognition isn't available for this language on this computer.".into(),
-        "microphone" => "Misty couldn't open the microphone.".into(),
-        "microphone_denied" => "Misty isn't allowed to use the microphone. Allow it in System Settings › Privacy & Security › Microphone.".into(),
-        "unsupported" => "This computer has no speech recognition Misty can use.".into(),
-        _ => "Speech recognition stopped before it finished.".into(),
-    }
-}
-
-#[cfg(target_os = "macos")]
-mod macos;
-#[cfg(target_os = "macos")]
-pub use macos::{
-    listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
-};
-
-#[cfg(windows)]
-mod windows;
-#[cfg(windows)]
-pub use windows::{
-    listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
-};
-
-#[cfg(not(any(target_os = "macos", windows)))]
-mod unsupported;
-#[cfg(not(any(target_os = "macos", windows)))]
-pub use unsupported::{
-    listen, recognize_file, recognize_file_phrases, stream, supported, Listening, Speaker, Streaming,
-};

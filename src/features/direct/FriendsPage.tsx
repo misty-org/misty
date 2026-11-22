@@ -5,7 +5,6 @@ import {
   Avatar,
   AvatarFallback,
   Button,
-  CollectionFilters,
   CollectionHeading,
   CollectionPage,
   EmptyState,
@@ -18,6 +17,7 @@ import {
   ListRowSkeleton,
   MenuItem,
   PresenceFace,
+  SectionHeading,
   notify,
   useConfirmDelete,
   type ActionBarItem,
@@ -28,8 +28,6 @@ import { personInitials } from "@/shared/lib/personInitials";
 import { directApi, type Person, type PresenceStatus } from "./api";
 import { dmPath, reloadDms, reloadFriends, useFriends } from "./directData";
 import { useCustomStatus, usePresence, useStatusStore } from "./statusStore";
-
-type Section = "online" | "all" | "pending" | "blocked";
 
 const statusWords: Record<PresenceStatus, string> = {
   online: "Online",
@@ -146,14 +144,13 @@ function AddFriendRow() {
 }
 
 /**
- * The person's friends, as Discord's Friends page: Online, All, Pending and Blocked, and Add
- * friend, which sends a request by username.
+ * The person's friends, grouped one under another: pending requests, then who is online, offline
+ * and blocked, each under its heading with its count. Add friend sends a request by username.
  */
 export function FriendsPage() {
   const navigate = useNavigate();
   const friends = useFriends();
   const statuses = useStatusStore((state) => state.byUser);
-  const [section, setSection] = useState<Section>("online");
   const [adding, setAdding] = useState(false);
   const { confirm, dialog } = useConfirmDelete();
   const list = friends.data;
@@ -208,24 +205,18 @@ export function FriendsPage() {
       onSelect: () => setAdding((open) => !open),
     },
   ];
-  if (section === "pending" && incoming.length)
-    actions.unshift({
-      id: "clear-incoming",
-      icon: X,
-      label: "Clear all",
-      variant: "quiet",
-      priority: 2,
-      onSelect: () =>
-        void act(() => directApi.clearIncomingRequests(), "The requests couldn't be cleared."),
-    });
 
-  const options = [
-    { value: "online", label: "Online" },
-    { value: "all", label: "All" },
-    { value: "pending", label: incoming.length ? `Pending ${incoming.length}` : "Pending" },
-    { value: "blocked", label: "Blocked" },
-  ];
+  const friendRow = (person: Person) => (
+    <FriendRow
+      key={person.user_id}
+      person={person}
+      onMessage={(who) => void message(who)}
+      onRemove={remove}
+      onBlock={block}
+    />
+  );
 
+  // Every group stacks under its heading, pending first, as Discord's friends list: no tabs.
   const body = () => {
     if (!list && friends.loading)
       return <ListRowSkeleton label="Loading friends" leading lines={2} trailing="icon" />;
@@ -234,126 +225,142 @@ export function FriendsPage() {
         <ErrorState
           inline
           title="Your friends couldn't be loaded"
-          action={{ label: "Try again", onClick: () => void reloadFriends().catch(() => undefined) }}
+          action={{
+            label: "Try again",
+            onClick: () => void reloadFriends().catch(() => undefined),
+          }}
         />
       );
-    if (section === "online" || section === "all") {
-      const shown =
-        section === "all"
-          ? list.friends
-          : list.friends.filter(
-              (person) => (statuses[person.user_id]?.status ?? "offline") !== "offline",
-            );
-      if (!shown.length)
-        return list.friends.length ? (
-          <EmptyState inline title="No one is online" line="Friends who are online show here." />
-        ) : (
-          <EmptyState inline title="No friends yet" line="Add a friend by their username." />
-        );
-      return shown.map((person) => (
-        <FriendRow
-          key={person.user_id}
-          person={person}
-          onMessage={(who) => void message(who)}
-          onRemove={remove}
-          onBlock={block}
-        />
-      ));
-    }
-    if (section === "pending") {
-      if (!incoming.length && !list.outgoing.length)
-        return <EmptyState inline title="No pending requests" line="Requests to and from you show here." />;
-      return (
-        <>
-          {incoming.map((person) => (
-            <ListRow
-              key={`in-${person.user_id}`}
-              label={person.username}
-              leading={<PersonFace person={person} />}
-              description="Incoming friend request"
-              trailing={
-                <>
-                  <IconButton
-                    label="Accept"
-                    onClick={() =>
-                      void act(async () => {
-                        await directApi.acceptFriendRequest(person.user_id);
-                        void reloadDms().catch(() => undefined);
-                      }, "The request couldn't be accepted.")
+    const pending = incoming.length + list.outgoing.length;
+    if (!list.friends.length && !pending && !list.blocked.length)
+      return <EmptyState inline title="No friends yet" line="Add a friend by their username." />;
+    const online = list.friends.filter(
+      (person) => (statuses[person.user_id]?.status ?? "offline") !== "offline",
+    );
+    const offline = list.friends.filter((person) => !online.includes(person));
+    return (
+      <>
+        {pending ? (
+          <section aria-label="Pending">
+            <SectionHeading
+              title="Pending"
+              count={pending}
+              action={
+                incoming.length
+                  ? {
+                      label: "Clear all",
+                      onSelect: () =>
+                        void act(
+                          () => directApi.clearIncomingRequests(),
+                          "The requests couldn't be cleared.",
+                        ),
                     }
-                  >
-                    <Check />
-                  </IconButton>
+                  : undefined
+              }
+            />
+            {incoming.map((person) => (
+              <ListRow
+                key={`in-${person.user_id}`}
+                label={person.username}
+                leading={<PersonFace person={person} />}
+                description="Incoming friend request"
+                trailing={
+                  <>
+                    <IconButton
+                      label="Accept"
+                      onClick={() =>
+                        void act(async () => {
+                          await directApi.acceptFriendRequest(person.user_id);
+                          void reloadDms().catch(() => undefined);
+                        }, "The request couldn't be accepted.")
+                      }
+                    >
+                      <Check />
+                    </IconButton>
+                    <IconButton
+                      label="Ignore"
+                      onClick={() =>
+                        void act(
+                          () => directApi.removeFriendRequest(person.user_id),
+                          "The request couldn't be ignored.",
+                        )
+                      }
+                    >
+                      <X />
+                    </IconButton>
+                  </>
+                }
+              />
+            ))}
+            {list.outgoing.map((person) => (
+              <ListRow
+                key={`out-${person.user_id}`}
+                label={person.username}
+                leading={<PersonFace person={person} />}
+                description="Outgoing friend request"
+                trailing={
                   <IconButton
-                    label="Ignore"
+                    label="Cancel request"
                     onClick={() =>
                       void act(
                         () => directApi.removeFriendRequest(person.user_id),
-                        "The request couldn't be ignored.",
+                        "The request couldn't be cancelled.",
                       )
                     }
                   >
                     <X />
                   </IconButton>
-                </>
-              }
-            />
-          ))}
-          {list.outgoing.map((person) => (
-            <ListRow
-              key={`out-${person.user_id}`}
-              label={person.username}
-              leading={<PersonFace person={person} />}
-              description="Outgoing friend request"
-              trailing={
-                <IconButton
-                  label="Cancel request"
-                  onClick={() =>
-                    void act(
-                      () => directApi.removeFriendRequest(person.user_id),
-                      "The request couldn't be cancelled.",
-                    )
-                  }
-                >
-                  <X />
-                </IconButton>
-              }
-            />
-          ))}
-        </>
-      );
-    }
-    if (!list.blocked.length)
-      return <EmptyState inline title="No one is blocked" line="People you block show here." />;
-    return list.blocked.map((person) => (
-      <ListRow
-        key={person.user_id}
-        label={person.username}
-        leading={<PersonFace person={person} />}
-        trailing={
-          <IconButton
-            label="Unblock"
-            onClick={() =>
-              void act(() => directApi.unblock(person.user_id), "They couldn't be unblocked.")
-            }
-          >
-            <ShieldOff />
-          </IconButton>
-        }
-      />
-    ));
+                }
+              />
+            ))}
+          </section>
+        ) : null}
+        {online.length ? (
+          <section aria-label="Online">
+            <SectionHeading title="Online" count={online.length} />
+            {online.map(friendRow)}
+          </section>
+        ) : null}
+        {offline.length ? (
+          <section aria-label="Offline">
+            <SectionHeading title="Offline" count={offline.length} />
+            {offline.map(friendRow)}
+          </section>
+        ) : null}
+        {list.blocked.length ? (
+          <section aria-label="Blocked">
+            <SectionHeading title="Blocked" count={list.blocked.length} />
+            {list.blocked.map((person) => (
+              <ListRow
+                key={person.user_id}
+                label={person.username}
+                leading={<PersonFace person={person} />}
+                trailing={
+                  <IconButton
+                    label="Unblock"
+                    onClick={() =>
+                      void act(
+                        () => directApi.unblock(person.user_id),
+                        "They couldn't be unblocked.",
+                      )
+                    }
+                  >
+                    <ShieldOff />
+                  </IconButton>
+                }
+              />
+            ))}
+          </section>
+        ) : null}
+      </>
+    );
   };
 
   return (
     <CollectionPage>
       <CollectionHeading actions={actions} actionsLabel="Friends actions" />
-      <CollectionFilters
-        options={options}
-        value={section}
-        onChange={(value) => setSection(value as Section)}
-      />
       {adding ? <AddFriendRow /> : null}
-      <div className="flex w-full max-w-3xl flex-col">{body()}</div>
+      <div className="flex w-full max-w-3xl flex-col gap-4">{body()}</div>
       {dialog}
     </CollectionPage>
   );

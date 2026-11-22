@@ -1,21 +1,27 @@
-import { X } from "lucide-react";
+// Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
+import { FileSearch, Files } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Button,
   CopyButton,
+  EmptyState,
   ErrorState,
-  IconButton,
+  ListRowSkeleton,
   PaneLoading,
   PropertyList,
-  SideCard,
+  Separator,
+  Surface,
   TagDots,
   Text,
+  TreeRow,
   type PropertyListItem,
 } from "@misty/ui";
 import { disk, type FileInfo, type FolderSize } from "@/features/files";
 import { FilePreview } from "./FilePreview";
 import { countText, formatBytes, formatDate, kindOf, messageOf } from "./format";
-import { localPath, parentOf, type FileItem } from "./model";
+import { itemIcon } from "./FileItems";
+import { listPlace } from "./listFolder";
+import { localPath, parentOf, placeInside, type FileItem, type FilesPlace } from "./model";
 
 type Loaded = { status: "loading" } | { status: "failed"; message: string } | { status: "ready"; info: FileInfo };
 
@@ -74,14 +80,16 @@ function Checksum({ path }: { path: string }) {
 
 function diskRows(item: FileItem, info: FileInfo, size: FolderSize | null): PropertyListItem[] {
   const rows: PropertyListItem[] = [
+    { label: "Name", value: item.name },
     { label: "Kind", value: info.kindLabel || kindOf(item) },
     {
       label: "Size",
       value: item.folder ? (size ? `${formatBytes(size.bytes)}, ${countText(size.items)}` : "—") : formatBytes(info.entry.size),
     },
-    { label: "Where", value: info.parent },
-    { label: "Created", value: formatDate(info.entry.createdMs) },
+    { label: "Path", value: info.entry.path },
+    ...(item.folder && size ? [{ label: "Items", value: countText(size.items) }] : []),
     { label: "Modified", value: formatDate(info.entry.modifiedMs) },
+    { label: "Created", value: formatDate(info.entry.createdMs) },
   ];
   if (info.dimensions) rows.push({ label: "Dimensions", value: `${info.dimensions.width} × ${info.dimensions.height}` });
   if (info.defaultApp) rows.push({ label: "Opens with", value: info.defaultApp });
@@ -97,6 +105,7 @@ function diskRows(item: FileItem, info: FileInfo, size: FolderSize | null): Prop
 function otherRows(item: FileItem): PropertyListItem[] {
   const source = item.source;
   const rows: PropertyListItem[] = [
+    { label: "Name", value: item.name },
     { label: "Kind", value: kindOf(item) },
     { label: "Size", value: item.folder ? "—" : formatBytes(item.size) },
   ];
@@ -114,43 +123,107 @@ function otherRows(item: FileItem): PropertyListItem[] {
   return rows;
 }
 
-/**
- * Get Info as a card floating over the open folder's top right: the file's preview, then its facts. It
- * takes none of the folder's width.
- */
-export function InfoPanel({ item, onClose }: { item: FileItem; onClose(): void }) {
+/** What a folder holds, read once for its preview. */
+function useFolderItems(place: FilesPlace | undefined) {
+  const [items, setItems] = useState<FileItem[] | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => {
+    if (!place) return;
+    let live = true;
+    setItems(null);
+    setFailed(null);
+    void listPlace(place, false).then(
+      (next) => live && setItems(next),
+      (cause) => live && setFailed(messageOf(cause, "This folder couldn't be read.")),
+    );
+    return () => {
+      live = false;
+    };
+  }, [place]);
+  return { items, failed };
+}
+
+/** A folder's preview, as Kura's: the first things in it, each with its icon, name and size; one opens it. */
+function FolderPreview({ item, from, onOpen }: { item: FileItem; from: FilesPlace; onOpen(item: FileItem): void }) {
+  const [place] = useState(() => placeInside(item, from));
+  const { items, failed } = useFolderItems(place);
+  if (failed) return <ErrorState inline title="This folder couldn't be read" line={failed} />;
+  if (items === null) return <ListRowSkeleton label="What the folder holds" rows={5} />;
+  if (!items.length) return <EmptyState inline line="This folder is empty." />;
+  return (
+    <div role="list" aria-label={`In ${item.name}`} className="grid content-start p-1">
+      {items.slice(0, 60).map((inside) => (
+        <TreeRow
+          key={inside.id}
+          label={inside.name}
+          icon={itemIcon(inside)}
+          end={
+            inside.folder ? undefined : (
+              <Text size="meta" tone="muted">
+                {formatBytes(inside.size)}
+              </Text>
+            )
+          }
+          onOpen={() => onOpen(inside)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** One item's preview card and its details, Kura's inspector for a single pick. */
+function ItemDetails({ item, from, onOpen }: { item: FileItem; from: FilesPlace; onOpen(item: FileItem): void }) {
   const disked = item.source.kind === "disk" ? localPath(item) : undefined;
   const { state, size } = useInfo(disked, item.folder);
   const previewed = !item.folder && (item.source.kind === "disk" || item.source.kind === "project");
+  const folderPreview = item.folder && placeInside(item, from) !== undefined;
   return (
-    <SideCard
-      floating
-      label={`Info for ${item.name}`}
-      corner={
-        <IconButton label="Close" size="sm" onClick={onClose}>
-          <X />
-        </IconButton>
-      }
-    >
-      <div className="flex flex-col gap-3 p-3">
-        <Text size="title" weight="semibold" tone="bright" full>
-          {item.name}
-        </Text>
-        {previewed ? (
-          <div className="relative h-48 min-h-0 overflow-hidden">
-            <FilePreview key={item.id} item={item} />
-          </div>
-        ) : null}
+    <div className="flex flex-col">
+      {previewed || folderPreview ? (
+        <Surface tone="card" radius="lg" className="relative h-52 min-h-0 overflow-y-auto">
+          {previewed ? <FilePreview key={item.id} item={item} /> : <FolderPreview item={item} from={from} onOpen={onOpen} />}
+        </Surface>
+      ) : null}
+      <Separator className="mt-3" />
+      <div className="px-3 pt-3">
         {!disked ? (
-          <PropertyList label="Info" items={otherRows(item)} />
+          <PropertyList layout="info" label="Details" items={otherRows(item)} />
         ) : state.status === "loading" ? (
           <PaneLoading inline label="Reading its details" />
         ) : state.status === "failed" ? (
           <ErrorState inline title="Its details couldn't be read" line={state.message} />
         ) : (
-          <PropertyList label="Info" items={diskRows(item, state.info, size)} />
+          <PropertyList layout="info" label="Details" items={diskRows(item, state.info, size)} />
         )}
       </div>
-    </SideCard>
+    </div>
+  );
+}
+
+/**
+ * The inspector docked at the right of Files, as Kura's: with nothing picked, a quiet note in the
+ * pane's middle; one item shows its preview card (a folder's lists what it holds) over its details;
+ * several say how many are picked. It scrolls on its own.
+ */
+export function FileInspector({
+  items,
+  from,
+  onOpen,
+}: {
+  items: FileItem[];
+  /** The open place, where the picked items are. */
+  from: FilesPlace;
+  onOpen(item: FileItem): void;
+}) {
+  let body;
+  if (items.length === 0) body = <EmptyState icon={FileSearch} line="Select a file to preview it and view its details." />;
+  else if (items.length > 1) {
+    const bytes = items.reduce((sum, item) => sum + (item.folder ? 0 : item.size), 0);
+    body = <EmptyState icon={Files} title="Multiple items" line={`${countText(items.length)} selected, ${formatBytes(bytes)}`} />;
+  } else body = <ItemDetails key={items[0].id} item={items[0]} from={from} onOpen={onOpen} />;
+  return (
+    <aside aria-label="Preview" className="flex size-full min-h-0 flex-col overflow-y-auto p-3">
+      {body}
+    </aside>
   );
 }

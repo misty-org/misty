@@ -1,7 +1,7 @@
 [package]
 name = "voice_speech"
 version = "0.1.0"
-description = "Speech recognition on this computer: a recorded file or the microphone, live, with no key."
+description = "Speech on this computer through open models (sherpa-onnx): hearing with voice activity detection, recorded files, and speaking in a voice. No key, nothing sent anywhere."
 edition = "2021"
 license = "AGPL-3.0-or-later"
 publish = false
@@ -12,13 +12,9 @@ name = "voice_speech"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-# Apple's Speech and AVFAudio frameworks, called from Rust; the same versions as the app's.
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6.4"
-block2 = "0.6.2"
-
-# Media Foundation decodes a recorded file for Windows' recognizer; the same version as the app's.
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Media_MediaFoundation", "Win32_System_Com"] }
+# sherpa-onnx (Apache-2.0): links its prebuilt static libraries, onnxruntime included.
+sherpa-onnx = "2.0.2"
+# Reading recorded files (MPL-2.0): the chat microphone's AAC in MP4, WAV, MP3, FLAC and Ogg.
+symphonia = { version = "0.5.4", features = ["aac", "alac", "isomp4", "mp3"] }
+# Playing a voice through the computer's output (Apache-2.0).
+cpal = "0.15.3"

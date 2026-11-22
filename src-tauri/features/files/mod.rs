@@ -22,6 +22,10 @@ pub mod ops;
 pub mod places;
 pub mod progress;
 pub mod protocol;
+#[cfg(target_os = "macos")]
+mod system_thumbnail;
+pub mod terminal;
+pub mod thumbnail_cache;
 pub mod transfer;
 pub mod trash;
 pub mod undo;

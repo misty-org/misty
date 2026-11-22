@@ -29,6 +29,11 @@ export function EmbeddedUniversalPreviewView(props: {
   name: string;
   mimeType: string;
   url: string;
+  /**
+   * A small picture of an image already at hand (the grid's thumbnail), shown filling the pane at once
+   * until the full image has loaded and decoded, so a picture never waits on a blank pane.
+   */
+  placeholder?: string;
   loading?: boolean;
   error?: string;
   imageRef?: React.RefObject<HTMLImageElement | null>;
@@ -78,6 +83,17 @@ export function EmbeddedUniversalPreviewView(props: {
           action={props.fallbackAction}
         />
       </>
+    );
+  if (isImage && props.placeholder)
+    return (
+      <PreviewImage
+        key={`${props.url}:${props.placeholder}`}
+        name={props.name}
+        url={props.url}
+        placeholder={props.placeholder}
+        imageRef={props.imageRef}
+        mediaStyle={props.mediaStyle}
+      />
     );
   if (isImage && props.url)
     return (
@@ -166,6 +182,52 @@ export function EmbeddedUniversalPreviewView(props: {
       detail="Misty can inspect this file and make the original available to you."
       action={props.fallbackAction}
     />
+  );
+}
+
+/** An image over its small picture: the picture fills the pane until the image is ready to draw. */
+function PreviewImage(props: {
+  name: string;
+  url: string;
+  placeholder: string;
+  imageRef?: React.RefObject<HTMLImageElement | null>;
+  mediaStyle?: React.CSSProperties;
+}) {
+  const [ready, setReady] = useState(false);
+  const [placeholderShown, setPlaceholderShown] = useState(true);
+  return (
+    <div className="grid h-full w-full place-items-center">
+      {!ready && placeholderShown ? (
+        <img
+          aria-hidden="true"
+          alt=""
+          src={props.placeholder}
+          className="col-start-1 row-start-1 block h-full w-full object-contain"
+          onError={() => setPlaceholderShown(false)}
+        />
+      ) : null}
+      {props.url ? (
+        <img
+          ref={props.imageRef}
+          className={cn(
+            "col-start-1 row-start-1 block max-h-full max-w-full object-contain transition-[filter,transform]",
+            !ready && "invisible",
+          )}
+          style={props.mediaStyle}
+          src={props.url}
+          alt={props.name}
+          decoding="async"
+          // Swapped in once decoded, so the pane never shows a blank frame between the two.
+          onLoad={(event) => {
+            void event.currentTarget
+              .decode()
+              .catch(() => undefined)
+              .finally(() => setReady(true));
+          }}
+          onError={() => setReady(true)}
+        />
+      ) : null}
+    </div>
   );
 }
 

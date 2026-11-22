@@ -16,10 +16,10 @@ export async function saveAgent(
   return saved;
 }
 
-/** Changes one of the person's agents' name or role, keeping everything else about it. */
+/** Changes one of the person's agents' name, role or voice, keeping everything else about it. */
 export function updateAgent(
   agent: AgentProfile,
-  change: { name?: string; role?: string },
+  change: { name?: string; role?: string; voice?: string },
 ): Promise<AgentProfile> {
   const {
     name,
@@ -28,6 +28,7 @@ export function updateAgent(
     instructions,
     icon,
     avatar,
+    voice,
     model_mode,
     model_id,
     reasoning_effort,
@@ -45,6 +46,7 @@ export function updateAgent(
       instructions,
       icon,
       avatar,
+      voice: change.voice ?? voice,
       model_mode,
       model_id,
       reasoning_effort,

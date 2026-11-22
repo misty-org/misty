@@ -4,7 +4,6 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 
 pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     let (tx, rx) = mpsc::channel();
-    always_on::start(app.clone(), state.clone(), tx.clone());
     std::thread::spawn(move || platform::shortcut(tx));
     let (audio_tx, audio_rx) = mpsc::channel();
     let events_app = app.clone();
@@ -21,10 +20,19 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                     ask::open(&events_app)
                 }
                 Shortcut::Type => {}
-                // The second tap opened the text box; the third turns listening on or off instead.
-                Shortcut::AlwaysOn => {
-                    ask::dismiss(&events_app);
-                    always_on::toggle(&events_app, &events_state);
+                // Only while a tour line is on screen, so not every Escape anywhere wakes the window.
+                Shortcut::Escape => {
+                    let tip = events_state
+                        .data
+                        .lock()
+                        .is_ok_and(|data| data.presentation["caption"]["tip"].as_bool() == Some(true));
+                    if tip {
+                        let _ = crate::browser::app_windows::emit_to_primary(
+                            &events_app,
+                            "misty://cursor-escape",
+                            json!({}),
+                        );
+                    }
                 }
                 Shortcut::Held(held) => {
                     if events_state.held.swap(held, Ordering::SeqCst) == held {
@@ -99,8 +107,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         );
                         continue;
                     }
-                    let preroll = std::mem::take(&mut *audio_state.preroll.lock().unwrap());
-                    match audio::Recording::start(audio_app.clone(), turn, preroll) {
+                    match audio::Recording::start(audio_app.clone(), turn) {
                         Ok(value)
                             if current(&audio_state, turn)
                                 && audio_state.held.load(Ordering::SeqCst) =>

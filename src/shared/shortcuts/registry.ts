@@ -6,7 +6,6 @@ import type {
 import { chatCommands } from "./chatCommands";
 import { codeCommands } from "./codeCommands";
 import { command } from "./factory";
-import { focusModeCommands } from "./viewAndTabCommands";
 import { workspaceCommands } from "./workspaceCommands";
 export type * from "./shortcutTypes";
 const shellCommands: ShortcutCommandDefinition[] = [
@@ -43,13 +42,13 @@ const shellCommands: ShortcutCommandDefinition[] = [
     allowInEditable: true,
     nativeMenu: true,
   }),
-  ...focusModeCommands,
   command("app.zoom_in", "Scale app up", {
     description: "Make Misty's own interface larger.",
     category: "View",
-    mac: "Cmd+Shift+Plus",
+    mac: "Cmd+Plus",
     macAlternate: "Ctrl+Shift+Plus",
-    windows: "Ctrl+Shift+Plus",
+    windows: "Ctrl+Plus",
+    windowsAlternate: "Ctrl+Shift+Plus",
     allowInEditable: true,
     repeatable: true,
     nativeMenu: true,
@@ -57,9 +56,10 @@ const shellCommands: ShortcutCommandDefinition[] = [
   command("app.zoom_out", "Scale app down", {
     description: "Make Misty's own interface smaller.",
     category: "View",
-    mac: "Cmd+Shift+Minus",
-    macAlternate: "Ctrl+Shift+Minus",
-    windows: "Ctrl+Shift+Minus",
+    mac: "Cmd+Minus",
+    macAlternate: "Cmd+Shift+Minus",
+    windows: "Ctrl+Minus",
+    windowsAlternate: "Ctrl+Shift+Minus",
     allowInEditable: true,
     repeatable: true,
     nativeMenu: true,
@@ -67,9 +67,10 @@ const shellCommands: ShortcutCommandDefinition[] = [
   command("app.zoom_reset", "Reset app scale", {
     description: "Return Misty's own interface to its default scale.",
     category: "View",
-    mac: "Cmd+Shift+0",
-    macAlternate: "Ctrl+Shift+0",
-    windows: "Ctrl+Shift+0",
+    mac: "Cmd+0",
+    macAlternate: "Cmd+Shift+0",
+    windows: "Ctrl+0",
+    windowsAlternate: "Ctrl+Shift+0",
     allowInEditable: true,
     nativeMenu: true,
   }),

@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use file_access::disk::fs_disk;
+use file_access::disk::{fs_disk, DiskFolder};
 use serde::Serialize;
 
 use super::entry::{extension, is_package_name, millis, FileEntry, FileKind};
@@ -70,7 +70,12 @@ fn hidden_by_system(_meta: &std::fs::Metadata) -> bool {
 
 /// One item from its directory entry, whose metadata is the item's own (a link isn't followed).
 /// A link to a folder lists as a folder, as `entry_for` does, so it opens like one.
-fn entry_from(item: &std::fs::DirEntry, name: String, path: PathBuf) -> Option<FileEntry> {
+fn entry_from(
+    gate: &DiskFolder,
+    item: &std::fs::DirEntry,
+    name: String,
+    path: PathBuf,
+) -> Option<FileEntry> {
     let own = item.metadata().ok()?;
     let (meta, kind, link_target) = if own.file_type().is_symlink() {
         let target = fs_disk::read_link(&path).ok().map(|target| target.display().to_string());
@@ -92,7 +97,7 @@ fn entry_from(item: &std::fs::DirEntry, name: String, path: PathBuf) -> Option<F
         size: if folder { 0 } else { meta.len() },
         modified_ms: millis(meta.modified()),
         created_ms: millis(meta.created()),
-        tags: super::tags::read_tags(&path),
+        tags: super::tags::read_tags_in(gate, &name, &path),
         path: path.display().to_string(),
         link_target,
         kind,
@@ -120,9 +125,11 @@ pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>
         .filter(|(_, name)| !is_os_junk(name))
         .filter(|(_, name)| hidden || !name.starts_with('.'))
         .collect();
+    // Each item's tags pass the gate too; the folder is resolved for it once, not per item.
+    let folder = DiskFolder::open(dir)?;
     let read = |(item, name): (std::fs::DirEntry, String)| {
         let path = dir.join(&name);
-        entry_from(&item, name, path)
+        entry_from(&folder, &item, name, path)
     };
     let threads = std::thread::available_parallelism()
         .map_or(1, |count| count.get())

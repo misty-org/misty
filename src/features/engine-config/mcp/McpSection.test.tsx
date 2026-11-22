@@ -321,7 +321,9 @@ describe("McpSection", () => {
     expect(api.probe).not.toHaveBeenCalled();
 
     // Check all forces a new run (still only for entries that are on).
-    await act(async () => buttonExact("Check all").click());
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('button[aria-label="Check all"]')!.click(),
+    );
     await vi.waitFor(() => {
       expect(api.probe).toHaveBeenCalledTimes(1);
       expect(api.probe.mock.calls[0][0].name).toBe("alpha");

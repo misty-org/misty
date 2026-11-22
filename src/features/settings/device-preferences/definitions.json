@@ -477,16 +477,29 @@
     "maxLength": 16
   },
   {
-    "id": "voice.system_voice",
+    "id": "voice.speaking_voice",
     "label": "Voice",
     "page": "voice",
     "section": "voice",
-    "key": "system_voice",
+    "key": "speaking_voice",
     "default": "",
     "owner": "device",
     "type": "string",
     "platforms": ["desktop"],
     "keywords": ["voice", "speech", "read aloud", "Tutor"],
+    "maxLength": 120
+  },
+  {
+    "id": "voice.hearing_model",
+    "label": "Speech model",
+    "page": "voice",
+    "section": "voice",
+    "key": "hearing_model",
+    "default": "",
+    "owner": "device",
+    "type": "string",
+    "platforms": ["desktop"],
+    "keywords": ["speech recognition", "transcription", "dictation", "model"],
     "maxLength": 120
   },
   {

@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "engines": [
+    {
+      "id": "agy",
+      "name": "Antigravity",
+      "maker": "Google",
+      "source": "https://antigravity.google",
+      "install": {
+        "route": "maker-build"
+      }
+    },
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "maker": "Anthropic",
+      "source": "https://github.com/anthropics/claude-code",
+      "install": {
+        "route": "maker-build",
+        "npm": "@anthropic-ai/claude-code"
+      }
+    },
+    {
+      "id": "codebuddy",
+      "name": "CodeBuddy",
+      "maker": "Tencent",
+      "install": {
+        "route": "none"
+      }
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "maker": "OpenAI",
+      "source": "https://github.com/openai/codex",
+      "install": {
+        "route": "maker-build",
+        "npm": "@openai/codex"
+      }
+    },
+    {
+      "id": "dsh",
+      "name": "DeepSeek Harness",
+      "maker": "DeepSeek",
+      "source": "https://www.npmjs.com/package/@deepseek-ai/dsh",
+      "install": {
+        "route": "npm",
+        "npm": "@deepseek-ai/dsh"
+      }
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini CLI",
+      "maker": "Google",
+      "source": "https://www.npmjs.com/package/@google/gemini-cli",
+      "install": {
+        "route": "npm",
+        "npm": "@google/gemini-cli"
+      }
+    },
+    {
+      "id": "grok",
+      "name": "Grok CLI",
+      "install": {
+        "route": "none"
+      }
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes Agent",
+      "maker": "Nous Research",
+      "source": "https://github.com/NousResearch/hermes-agent",
+      "install": {
+        "route": "script"
+      }
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi CLI",
+      "maker": "Moonshot AI",
+      "source": "https://www.npmjs.com/package/@moonshot-ai/kimi-code",
+      "install": {
+        "route": "npm",
+        "npm": "@moonshot-ai/kimi-code"
+      }
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax Code",
+      "maker": "MiniMax",
+      "install": {
+        "route": "none"
+      }
+    },
+    {
+      "id": "omp",
+      "name": "Oh My Pi",
+      "maker": "Oh My Pi",
+      "source": "https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent",
+      "install": {
+        "route": "npm",
+        "npm": "@oh-my-pi/pi-coding-agent"
+      }
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "maker": "SST",
+      "source": "https://github.com/sst/opencode",
+      "install": {
+        "route": "maker-build",
+        "npm": "opencode-ai",
+        "windows": "npm"
+      }
+    },
+    {
+      "id": "pi",
+      "name": "Pi",
+      "maker": "Earendil",
+      "source": "https://www.npmjs.com/package/@earendil-works/pi-coding-agent",
+      "install": {
+        "route": "npm",
+        "npm": "@earendil-works/pi-coding-agent"
+      }
+    },
+    {
+      "id": "qoder-cn",
+      "name": "Qoder CLI (China)",
+      "maker": "Qoder",
+      "install": {
+        "route": "none"
+      }
+    },
+    {
+      "id": "qoder",
+      "name": "Qoder CLI",
+      "maker": "Qoder",
+      "install": {
+        "route": "none"
+      }
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen Code",
+      "maker": "Qwen",
+      "source": "https://www.npmjs.com/package/@qwen-code/qwen-code",
+      "install": {
+        "route": "npm",
+        "npm": "@qwen-code/qwen-code"
+      }
+    }
+  ]
+}

@@ -14,7 +14,8 @@ import {
   Button,
   CatalogDone,
   CodeBlock,
-  CollectionFilters,
+  CollectionControls,
+  CollectionFilterMenu,
   CollectionSortMenu,
   Dialog,
   DialogBody,
@@ -61,9 +62,7 @@ const sortOptions = [
   { value: "name", label: "Name", icon: ArrowDownAZ },
 ] as const satisfies readonly { value: MarketSort; label: string; icon: typeof Flame }[];
 
-/** Category chips past this many fold into All. */
-const CATEGORY_CHIPS = 8;
-/** The All chip's value among the category chips. */
+/** The filter menu's All, among the categories. */
 const allCategories = "all";
 
 /**
@@ -158,7 +157,7 @@ function EnginePluginShelves({
       ? [...found].sort((a, b) => a.name.localeCompare(b.name))
       : orderItems(found);
   }, [market, query, sort]);
-  const categories = useMemo(() => categoriesOf(matches).slice(0, CATEGORY_CHIPS), [matches]);
+  const categories = useMemo(() => categoriesOf(matches), [matches]);
   const shown = useMemo(
     () => (category ? matches.filter((item) => item.category === category) : matches),
     [matches, category],
@@ -299,13 +298,27 @@ function EnginePluginShelves({
       <div className="flex min-w-0 items-center gap-2">
         {picker}
         <div className="min-w-0 flex-1">
-          <CollectionFilters
-            options={[
-              { value: allCategories, label: "All" },
-              ...categories.map(([value]) => ({ value, label: categoryLabel(value) })),
-            ]}
-            value={category ?? allCategories}
-            onChange={(value) => setCategory(value === allCategories ? null : value)}
+          <CollectionControls
+            filterControl={
+              categories.length ? (
+                <CollectionFilterMenu
+                  label="Filter"
+                  active={category !== null}
+                  onReset={() => setCategory(null)}
+                  groups={[
+                    {
+                      label: "Category",
+                      value: category ?? allCategories,
+                      options: [
+                        { value: allCategories, label: "All" },
+                        ...categories.map(([value]) => ({ value, label: categoryLabel(value) })),
+                      ],
+                      onChange: (value) => setCategory(value === allCategories ? null : value),
+                    },
+                  ]}
+                />
+              ) : undefined
+            }
             utilities={
               <>
                 <CollectionSortMenu value={sort} options={sortOptions} onChange={setMarketSort} />

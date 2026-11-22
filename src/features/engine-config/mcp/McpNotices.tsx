@@ -1,11 +1,11 @@
 import { FolderOpen } from "lucide-react";
-import { IconButton, Surface, Text } from "@misty/ui";
+import { MenuItem, notify, Shelf, ShelfItem, Surface, Text } from "@misty/ui";
 import { mcpApi } from "./api";
 import { copy, engineLabel, sourceLabel } from "./copy";
 import type { McpEngineInventory, McpSourceInfo } from "./types";
 
-/** Where Misty looks for the engine's config. Missing files still show, so an empty list never
- *  reads as "this CLI has no MCP". */
+/** Where Misty looks for the engine's config, a shelf of its files. Missing files still show, so
+ *  an empty list never reads as "this CLI has no MCP". */
 export function McpSourceHint({
   sources,
   workspacePath = null,
@@ -15,30 +15,31 @@ export function McpSourceHint({
 }) {
   if (sources.length === 0) return null;
   return (
-    <div className="grid gap-1 pb-3">
-      <Text bare tone="default" weight="medium" className="text-sm">
-        {copy.sourcesTitle}
-      </Text>
+    <Shelf title={copy.sourcesTitle}>
       {sources.map((info) => (
-        <Text
-          bare
+        <ShelfItem
           key={`${info.source}:${info.path}`}
-          tone="muted"
-          className="flex min-w-0 items-baseline gap-2 text-xs"
-        >
-          <span className="shrink-0">{sourceLabel(info.source)}</span>
-          <span className="min-w-0 break-all">{info.path}</span>
-          {!info.exists ? <span className="shrink-0">({copy.sourceMissing})</span> : null}
-          <IconButton
-            label={copy.reveal}
-            className="self-center"
-            onClick={() => void mcpApi.reveal(info.path, workspacePath).catch(() => undefined)}
-          >
-            <FolderOpen aria-hidden />
-          </IconButton>
-        </Text>
+          title={sourceLabel(info.source)}
+          line={info.exists ? info.path : `${copy.sourceMissing}, ${info.path}`}
+          menu={
+            <MenuItem
+              icon={FolderOpen}
+              label={copy.reveal}
+              onSelect={() =>
+                void mcpApi
+                  .reveal(info.path, workspacePath)
+                  .catch((error: unknown) =>
+                    notify({
+                      message: error instanceof Error ? error.message : String(error),
+                      tone: "error",
+                    }),
+                  )
+              }
+            />
+          }
+        />
       ))}
-    </div>
+    </Shelf>
   );
 }
 
@@ -52,8 +53,8 @@ export function EngineNotices({ engine }: { engine: McpEngineInventory }) {
   return (
     <div className="grid gap-2">
       {notes.map((note) => (
-        <Surface as="p" key={note} tone="well" radius="lg" className="px-3 py-2 text-sm">
-          <Text bare tone="default">
+        <Surface as="p" key={note} tone="well" radius="lg" className="m-0 px-3 py-2">
+          <Text tone="default" wrap>
             {note}
           </Text>
         </Surface>
@@ -66,12 +67,12 @@ export function EngineNotices({ engine }: { engine: McpEngineInventory }) {
           tone="none"
           edge="hairline"
           radius="lg"
-          className="px-3 py-2 text-sm"
+          className="m-0 grid gap-0.5 px-3 py-2"
         >
-          <Text bare tone="bright">
+          <Text tone="bright" wrap>
             {error.message}
           </Text>
-          <Text bare tone="muted" className="ml-2 break-all text-xs">
+          <Text size="meta" tone="muted">
             {error.path}
           </Text>
         </Surface>

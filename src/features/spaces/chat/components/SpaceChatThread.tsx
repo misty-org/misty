@@ -11,7 +11,7 @@ import { ChatMessageList } from "./ChatMessageList";
 
 export interface SpaceChatThreadProps extends Pick<
   SpaceChatMessagesProps,
-  "memberColors" | "myRoleIds" | "canManageMessages" | "firstUnreadId" | "channel"
+  "memberColors" | "myRoleIds" | "canManageMessages" | "firstUnreadId" | "channel" | "welcome"
 > {
   spaceId: string;
   access: SpaceChatAccess;
@@ -61,6 +61,7 @@ export function SpaceChatThread(props: SpaceChatThreadProps) {
       canManageMessages={props.canManageMessages}
       firstUnreadId={props.firstUnreadId}
       channel={props.channel}
+      welcome={props.welcome}
       onStarter={(starter) => {
         if (starter === "files" || starter === "space") return props.onOpenPicker(starter);
         props.onBeginMention();

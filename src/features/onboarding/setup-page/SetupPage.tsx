@@ -13,27 +13,40 @@ import {
   type EngineSetupState,
 } from "@/features/agents";
 import type { EngineId } from "@/features/engine-config/channels";
+import { useSettingsStore } from "@/features/settings";
+import {
+  chooseMistyVoice,
+  ensureSpeech,
+  personLanguages,
+  useSpeechModels,
+  voicesFor,
+  voiceSettings,
+} from "@/features/voice";
 import { Button, StepPage } from "@misty/ui";
 import { AppsStep } from "./AppsStep";
 import { HowMistyWorksStep } from "./HowMistyWorksStep";
+import { VoiceStep } from "./VoiceStep";
 
-type Step = "how" | "engines" | "apps";
+type Step = "how" | "engines" | "voice" | "apps";
 
 const steps: { id: Step; title: string }[] = [
   { id: "how", title: "How Misty works" },
   { id: "engines", title: "Pick your default engine" },
+  { id: "voice", title: "Pick Misty's voice" },
   { id: "apps", title: "Which apps should agents use?" },
 ];
 
 /**
  * First-run setup, after the first sign-in and from Help › Run setup again: how Misty works, then
- * the person's own AI, installed and signed in without a terminal command to type, then the apps
- * agents may use. An engine can't be left for later: Misty has no model of its own, so one that
- * can run Misty's own work (images, Misty's tools, web search) must be ready, and the person picks
- * which is the default. It ends on the page that sent the person here, or on Agents.
+ * the person's own AI, installed and signed in without a terminal command to type, then their
+ * language and Misty's own voice, then the apps agents may use. An engine can't be left for
+ * later: Misty has no model of its own, so one that can run Misty's own work (images, Misty's
+ * tools, web search) must be ready, and the person picks which is the default. It ends on the page that sent the person here, or on Agents.
  *
- * Finishing saves the default engine, makes an agent for each engine now installed (as listing the
- * agents always does) and starts new chats with the default engine's agent.
+ * Moving on from the voice step saves the language and the voice and starts speech setting itself
+ * up in the background (`ensureSpeech` picks the hearing model and downloads both); nothing waits
+ * on it. Finishing saves the default engine, makes an agent for each engine now installed (as
+ * listing the agents always does) and starts new chats with the default engine's agent.
  */
 export function SetupPage() {
   const navigate = useNavigate();
@@ -68,6 +81,24 @@ export function SetupPage() {
   const capable = ready.filter((engine) => !unfit(engine));
   const [picked, setPicked] = useState<EngineId>();
   const chosen = picked && capable.includes(picked) ? picked : capable[0];
+
+  // The language and Misty's voice, picked on the voice step and saved as the person moves on.
+  const [language, setLanguage] = useState(
+    () => voiceSettings(useSettingsStore.getState().settings?.document).language,
+  );
+  const [voice, setVoice] = useState(
+    () => voiceSettings(useSettingsStore.getState().settings?.document).voice,
+  );
+  const catalog = useSpeechModels((state) => state.catalog);
+  const catalogFailed = useSpeechModels((state) => Boolean(state.error));
+  const voices = catalog ? voicesFor(catalog.voices, personLanguages(language)) : [];
+  const voicePicked = voices.some((item) => item.id === voice);
+  const saveSpeech = () => {
+    useSettingsStore.getState().updateSetting("voice", "language", language);
+    if (voicePicked) chooseMistyVoice(voice);
+    void ensureSpeech();
+    setStep("apps");
+  };
 
   const finish = async () => {
     if (finishing) return;
@@ -105,12 +136,23 @@ export function SetupPage() {
             <Button
               variant="primary"
               disabled={!chosen}
-              onClick={() => (engineOnly ? void finish() : setStep("apps"))}
+              onClick={() => (engineOnly ? void finish() : setStep("voice"))}
             >
               Continue
               <ArrowRight />
             </Button>
           </>
+        ) : step === "voice" ? (
+          // A voice is the person's to pick; only a catalog that couldn't be read lets them on
+          // without one, since nothing in setup waits on speech.
+          <Button
+            variant="primary"
+            disabled={catalogFailed ? false : !catalog || (voices.length > 0 && !voicePicked)}
+            onClick={saveSpeech}
+          >
+            Continue
+            <ArrowRight />
+          </Button>
         ) : (
           <Button variant="primary" disabled={finishing} onClick={() => void finish()}>
             Start using Misty
@@ -125,6 +167,9 @@ export function SetupPage() {
       <div hidden={step !== "engines"}>
         <EnginesStep onState={onState} chosen={chosen} onChoose={setPicked} unfit={unfit} />
       </div>
+      {step === "voice" ? (
+        <VoiceStep language={language} voice={voice} onLanguage={setLanguage} onVoice={setVoice} />
+      ) : null}
       {step === "apps" ? <AppsStep /> : null}
     </StepPage>
   );

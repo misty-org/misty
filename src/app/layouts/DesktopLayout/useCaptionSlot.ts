@@ -3,7 +3,7 @@ import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
 /**
  * The tab row's slot for the Windows caption buttons, while it is on screen. Without one (sign-in,
- * focus mode, tabs beside the page) the buttons sit over the window's top-right corner instead.
+ * tabs beside the page) the buttons sit over the window's top-right corner instead.
  */
 export function useCaptionSlot(shellRef: RefObject<HTMLElement | null>, wanted: boolean) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);

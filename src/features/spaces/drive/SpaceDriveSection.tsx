@@ -33,7 +33,6 @@ export function SpaceDriveTrashRow({
 }) {
   return (
     <NavRow
-      tone="page"
       current={current}
       onClick={() => onGo({ kind: "space-drive-trash", spaceId })}
     >
@@ -53,7 +52,12 @@ export function SpaceDriveSection({
   current,
   onGo,
   onGoTrash,
+  open,
+  onOpenChange,
 }: {
+  /** Folds the section under its heading, as Files' sidebar does; pass both. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /** The open place, when it is a Space drive's folder or trash. */
   current?: SpaceDrivePlace | SpaceDriveTrashPlace;
   onGo: (place: SpaceDrivePlace) => void;
@@ -70,8 +74,8 @@ export function SpaceDriveSection({
 
   return (
     <div className="grid gap-1">
-      <SectionHeading as="h3" title="Spaces" />
-      {loading ? (
+      <SectionHeading as="h3" title="Spaces" strong={open !== undefined} open={open} onOpenChange={onOpenChange} />
+      {open === false ? null : loading ? (
         <div className="grid gap-1.5" aria-label="Spaces" aria-busy="true">
           {[0, 1].map((row) => (
             <Skeleton key={row} className="h-8 w-full rounded-md" />
@@ -85,7 +89,6 @@ export function SpaceDriveSection({
             return (
               <div key={space.id} className="contents">
                 <NavRow
-                  tone="page"
                   current={here && current?.kind === "space-drive"}
                   onClick={() => onGo({ kind: "space-drive", spaceId: space.id, path: "/" })}
                 >

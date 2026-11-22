@@ -55,7 +55,9 @@ pub const SHARED_FOLDER: &str = "shared";
 /// - `multirun`: git worktrees, which their repositories know by path.
 /// - `drive`: each account's Space drive records and content cache (`drive/<account id>/`), which
 ///   an update must not clone or leave behind.
-pub const SHARED_ENTRIES: &[&str] = &["engines", "projects", "multirun", "drive"];
+/// - `models`: the speech models and voices Misty installs from its catalog, one copy for every
+///   build (`voice/speech_models.rs`).
+pub const SHARED_ENTRIES: &[&str] = &["engines", "projects", "multirun", "drive", "models"];
 /// The release folder of a process with no version to go by (helper binaries).
 const UNVERSIONED: &str = "unversioned";
 

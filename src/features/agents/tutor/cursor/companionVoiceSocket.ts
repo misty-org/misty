@@ -32,10 +32,10 @@ export function deferred() {
 
 /** Bytes of one second of the companion's recording: 24 kHz mono PCM16. */
 export const recordedRate = 24_000;
-/** What the computer's recognizer takes: 16 kHz mono PCM16. */
+/** What the hearing model takes: 16 kHz mono PCM16. */
 export const recognizedRate = 16_000;
 
-/** Base64 PCM16 at the recording's rate, as base64 PCM16 at the recognizer's. */
+/** Base64 PCM16 at the recording's rate, as base64 PCM16 at the hearing model's. */
 export function toRecognizerRate(audio: string): string {
   const raw = atob(audio);
   const count = Math.floor(raw.length / 2);

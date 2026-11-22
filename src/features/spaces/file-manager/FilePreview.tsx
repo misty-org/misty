@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { ErrorState, PaneLoading } from "@misty/ui";
 import { filesApi } from "@/features/agents";
-import { disk, EmbeddedUniversalPreview, fileUrl } from "@/features/files";
+import { disk, driveFileUrl, EmbeddedUniversalPreview, fileUrl } from "@/features/files";
 import { driveNative, mimeFromName } from "../drive";
+import { driveHasContent, thumbnailFor } from "./FileItems";
 import { messageOf } from "./format";
 import type { FileItem } from "./model";
 
@@ -14,7 +15,7 @@ type Source = { status: "loading" } | { status: "failed"; message: string } | { 
 
 /**
  * Where the preview reads the file from: the `misty-disk:` protocol for pictures, films, sound and PDFs on
- * the disk, otherwise the file's bytes read once (a project's own read, the disk's, or a drive's, which
+ * the disk or already on this computer from a Space's drive, otherwise the file's bytes read once (a project's own read, the disk's, or a drive's, which
  * downloads it first) as a blob URL let go of when the preview closes.
  */
 function useSource(item: FileItem, mime: string): Source {
@@ -24,6 +25,10 @@ function useSource(item: FileItem, mime: string): Source {
     const from = item.source;
     if (from.kind === "disk" && streamed(mime)) {
       setSource({ status: "ready", url: fileUrl(from.entry.path, item.modifiedMs) });
+      return;
+    }
+    if (from.kind === "drive" && streamed(mime) && driveHasContent(from.entry.state)) {
+      setSource({ status: "ready", url: driveFileUrl(from.entry.space_id, from.entry.path, item.modifiedMs) });
       return;
     }
     const read =
@@ -60,8 +65,16 @@ function useSource(item: FileItem, mime: string): Source {
 export function FilePreview({ item }: { item: FileItem }) {
   const mime = mimeFromName(item.name);
   const source = useSource(item, mime);
-  if (source.status === "loading") return <PaneLoading label={`Opening ${item.name}`} />;
+  // The grid's picture of it, already made and usually already shown: it stands in at once while the
+  // full picture loads and decodes.
+  const placeholder = mime.startsWith("image/") ? thumbnailFor(item) : undefined;
+  if (source.status === "loading")
+    return placeholder ? (
+      <EmbeddedUniversalPreview name={item.name} mimeType={mime} url="" placeholder={placeholder} />
+    ) : (
+      <PaneLoading label={`Opening ${item.name}`} />
+    );
   if (source.status === "failed")
     return <ErrorState inline title="This file couldn't be previewed" line={source.message} />;
-  return <EmbeddedUniversalPreview name={item.name} mimeType={mime} url={source.url} />;
+  return <EmbeddedUniversalPreview name={item.name} mimeType={mime} url={source.url} placeholder={placeholder} />;
 }

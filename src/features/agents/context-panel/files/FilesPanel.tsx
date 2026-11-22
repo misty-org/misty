@@ -49,7 +49,7 @@ export function FileTabs({
 }: {
   onClose(path: string): void;
   withTree?: boolean;
-  /** Square, ruled-off tabs on the window's chrome, for the Code page's editor. */
+  /** Square, ruled-off tabs on the sidebar's color, for the Code page's editor. */
   blocks?: boolean;
 }) {
   const openFiles = useFilesStore((state) => state.openFiles);
@@ -166,10 +166,10 @@ export function FileTabs({
       {blocks ? <div aria-hidden className="min-w-0 flex-1 border-b" /> : null}
     </Text>
   );
-  // On the Code page the strip sits on the window's chrome, so the open block in the page's fill
-  // stands out from the rest.
+  // On the Code page the strip is a toolbar row on the sidebar's color, so the open block in the
+  // page's fill runs on into the editor and stands out from the rest.
   return blocks ? (
-    <Surface tone="chrome" className="flex-none">
+    <Surface tone="sidebar" className="flex-none">
       {strip}
     </Surface>
   ) : (

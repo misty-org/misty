@@ -43,16 +43,20 @@ define_class!(
   impl WryWebView {
     #[unsafe(method(performKeyEquivalent:))]
     fn perform_key_equivalent(&self, event: &NSEvent) -> Bool {
-      // This is a temporary workaround for https://github.com/tauri-apps/tauri/issues/9426
-      // FIXME: When the webview is a child webview, performKeyEquivalent always return YES
-      // and stop propagating the event to the window, hence the menu shortcut won't be
-      // triggered. However, overriding this method also means the cmd+key event won't be
-      // handled in webview, which means the key cannot be listened by JavaScript.
+      // A workaround for https://github.com/tauri-apps/tauri/issues/9426: a child webview's
+      // performKeyEquivalent always returns YES, so the menu never saw its shortcuts. Upstream
+      // answers NO, which also kept every ⌘ key from the page's JavaScript; with Tauri's
+      // `unstable` feature the app's own webview is a child too, so none of its ⌘ shortcuts
+      // reached the page. Misty asks the menu first, then lets the focused webview take the key.
+      #[cfg(target_os = "macos")]
       if self.ivars().is_child {
-        Bool::NO
-      } else {
-        unsafe { objc2::msg_send![super(self), performKeyEquivalent: event] }
+        return Bool::new(self.child_key_equivalent(event));
       }
+      #[cfg(target_os = "ios")]
+      if self.ivars().is_child {
+        return Bool::NO;
+      }
+      unsafe { objc2::msg_send![super(self), performKeyEquivalent: event] }
     }
 
     #[cfg(target_os = "macos")]
@@ -120,6 +124,38 @@ define_class!(
     }
   }
 );
+
+/// A ⌘ key aimed at a child webview: the main menu takes it first, as it would in a window
+/// with one webview, and otherwise it goes to WebKit only when this webview holds the window's
+/// focus, so the page's JavaScript sees it and a webview in the background never answers for
+/// the one the person is using.
+#[cfg(target_os = "macos")]
+impl WryWebView {
+  fn child_key_equivalent(&self, event: &NSEvent) -> bool {
+    use objc2_app_kit::{NSApplication, NSView};
+    use objc2_foundation::MainThreadMarker;
+
+    let Some(mtm) = MainThreadMarker::new() else {
+      return false;
+    };
+    if let Some(menu) = NSApplication::sharedApplication(mtm).mainMenu() {
+      if menu.performKeyEquivalent(event) {
+        return true;
+      }
+    }
+    let view: &NSView = self;
+    let focused = view
+      .window()
+      .and_then(|window| window.firstResponder())
+      .and_then(|responder| responder.downcast::<NSView>().ok())
+      .is_some_and(|responder| responder.isDescendantOf(view));
+    if !focused {
+      return false;
+    }
+    let handled: Bool = unsafe { objc2::msg_send![super(self), performKeyEquivalent: event] };
+    handled.as_bool()
+  }
+}
 
 // Custom Protocol Task Checker
 impl WryWebView {

@@ -1,6 +1,5 @@
 import {
   CircleHelp,
-  Focus,
   Keyboard,
   LayoutDashboard,
   Moon,
@@ -12,8 +11,8 @@ import {
   Sun,
   ZoomIn,
 } from "lucide-react";
-import { useFocusModeStore, useSidebarCollapsedStore } from "@/app/shell";
-import { setBrowserWebviewsSuspended, useLayoutEditor } from "@/features/app-windows";
+import { useSidebarCollapsedStore } from "@/app/shell";
+import { useLayoutEditor } from "@/features/app-windows";
 import { useMistyPanelStore } from "@/features/agents";
 import { openSettings, useAppThemeStore, useSettingsStore } from "@/features/settings";
 import { appZoomDefault, setAppZoom, useAppZoomValue } from "@/shared/hooks/useAppZoom";
@@ -25,7 +24,7 @@ import { openNewChat, openNewTab } from "./spaceNavigation";
 
 /*
  * The bottom bar's one-click buttons: zoom, shortcuts, new chat and tab, search, layout, the
- * Misty panel, the sidebar, focus mode, theme and help.
+ * Misty panel, the sidebar, theme and help.
  */
 
 /** The app's zoom, only while it isn't 100%. Resets it. */
@@ -110,23 +109,6 @@ export function SidebarButton() {
       onClick={() => useSidebarCollapsedStore.getState().toggle()}
     >
       <PanelLeft />
-    </IconButton>
-  );
-}
-
-/** Turns focus mode on; the bar hides with the rest of the chrome, and its shortcut brings it back. */
-export function FocusButton() {
-  return (
-    <IconButton
-      label="Focus mode"
-      onClick={() => {
-        // Native pages hide while the chrome animates, as the shortcut does.
-        setBrowserWebviewsSuspended(true, "focus-mode");
-        useFocusModeStore.getState().toggle();
-        window.setTimeout(() => setBrowserWebviewsSuspended(false, "focus-mode"), 320);
-      }}
-    >
-      <Focus />
     </IconButton>
   );
 }

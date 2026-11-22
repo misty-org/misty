@@ -8,6 +8,7 @@ import {
   ErrorState,
   HomeSection,
   spaceHomeClass,
+  Surface,
 } from "@misty/ui";
 import { defaultEngineAgent, useDefaultEngine } from "../engines/defaultEngine";
 import { NotebookCardsSkeleton } from "./TutorHome";
@@ -18,17 +19,23 @@ import { TutorPage } from "./TutorPage";
  * work runs on the default engine, with no agent chat behind it. Until there's a default engine,
  * it says where to pick one.
  */
-/** The Lab in its first-load shape: its bar over the notebooks' cards. */
+/** The Lab in its first-load shape, framed as its home is: its bar over the notebooks' cards. */
 export function SpaceLabSkeleton() {
   return (
-    <CollectionPage className="flex-1" aria-busy="true">
-      <CollectionHeading title="Lab" />
-      <div className={spaceHomeClass}>
-        <HomeSection title="Notebooks">
-          <NotebookCardsSkeleton />
-        </HomeSection>
-      </div>
-    </CollectionPage>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" aria-busy="true">
+      <Surface tone="sidebar" className="shrink-0">
+        <CollectionHeading title="Lab" />
+      </Surface>
+      <Surface tone="page" className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <CollectionPage className="flex-1">
+          <div className={spaceHomeClass}>
+            <HomeSection title="Notebooks">
+              <NotebookCardsSkeleton />
+            </HomeSection>
+          </div>
+        </CollectionPage>
+      </Surface>
+    </div>
   );
 }
 

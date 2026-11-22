@@ -144,7 +144,7 @@ export const uiRules = {
     // Fields, selects, search boxes, chips and segmented tracks wear the shared control frame
     // (controlFrame.ts), so a row of them lines up. A bare Input sits in a frame of its own.
     pattern: new RegExp(
-      "<(?:Input|SearchField|SelectTrigger|OptionSelect|FilterChip|ChoiceGroup|SecretField" +
+      "<(?:Input|SearchField|SelectTrigger|OptionSelect|ChoiceGroup|SecretField" +
         '|ShortcutField)\\b(?![^<>]*variant="bare")(?:[^<>]|=>)*?(?:className|containerClassName)=' +
         '(?:"|\\{[^}]*")[^"]*(?<![\\w[-])(?:[a-z-]+:)*(?:h-\\d|rounded)',
       "g",
@@ -241,7 +241,7 @@ export const uiRules = {
     guidance:
       "Button and IconButton variants are primary, secondary, quiet and danger (IconButton also " +
       "overlay; store actions get and get-filled): default and outline → secondary, ghost, toolbar and link → quiet, destructive " +
-      "→ danger, chip → ChoiceGroup or FilterChip. An old variant's size sm is 32: make it md",
+      "→ danger, chip → ChoiceGroup. An old variant's size sm is 32: make it md",
   },
   "legacy-button-size": {
     count: countLegacySizes,
@@ -270,6 +270,15 @@ export const uiRules = {
     guidance:
       "list rows start with their text: use ListRow with label, state and menu, and no " +
       "leading icon",
+  },
+  "chip-row": {
+    // The row of category chips over a list (and its jump-to-section twin in Settings) is gone
+    // for good: the person never wanted it. Its components were removed from @misty/ui.
+    pattern: /\b(?:FilterChip|CollectionFilters|SectionChip)\b/g,
+    guidance:
+      "never a row of category chips or section buttons: stack a list's groups as Shelfs or under " +
+      "SectionHeadings, put a page's sections in its rail or sidebar as nested NavRows, filter " +
+      "with CollectionFilterMenu, and put a bar's controls in CollectionControls",
   },
   "sparkles-icon": {
     pattern: /\b\w*Sparkles?\w*\b/g,

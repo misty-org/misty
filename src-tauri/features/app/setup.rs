@@ -71,6 +71,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(voice::CaptureState::default());
     app.manage(voice::ShareAudioState::default());
     app.manage(voice::speech::SpeechState::default());
+    app.manage(voice::speech_models::SpeechModelsState::default());
     #[cfg(desktop)]
     app.manage(BrowserExecutionState::default());
     // The floating Misty window is intentionally not created during

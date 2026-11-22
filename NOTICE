@@ -67,15 +67,6 @@ desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Fluxer (https://github.com/fluxerapp/fluxer)
-  Space chat's emoji (src/features/spaces/chat/emoji) uses Fluxer's emoji data
-  (emojis.json, from Unicode emoji-test and CLDR annotations), its category order and its emoji
-  search order, from its app source.
-
-  GNU Affero General Public License, version 3 or later (the license Misty is under).
-
-  Copyright Fluxer Platform AB and contributors.
-
 lobe-icons (https://github.com/lobehub/lobe-icons)
   The engines' marks in src/features/engine-config/engineMarks.json and the providers' marks in
   src/features/engine-config/brands/brandMarks.json are generated from
@@ -169,16 +160,6 @@ agency-agents (https://github.com/msitarzewski/agency-agents)
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
-
-BrowserOS (https://github.com/browseros-ai/BrowserOS)
-  The agent activity view follows its cockpit, History and task page: the cards for runs going on
-  now, runs grouped by day, and a run's steps as plain sentences with repeated steps and an
-  agent's checks of its own work folded together and housekeeping calls hidden behind a count
-  (src/features/agents/activity).
-
-  GNU Affero General Public License, version 3 or (at your option) any later version
-
-  Copyright 2026 BrowserOS
 
 Engram (https://github.com/Gentleman-Programming/engram)
   Misty's memory, since removed, was a port of its store. Migration 33 in
@@ -281,7 +262,8 @@ Kura (https://github.com/kannachi323/kura)
   Files, Misty's file manager (src-tauri/features/files and src/features/spaces/file-manager), is
   adapted from Kura's file manager: its folder listing, folder watch, Get Info and folder sizes,
   local changes, Trash with Put Back, Finder tags, names-only tantivy search, and its power tools
-  (archives, checksums, links, duplicates and folder compare), and its keyboard map and commands.
+  (archives, checksums, links, duplicates and folder compare), its keyboard map and commands, and
+  its grid thumbnails: a few made at a time, on-screen ones first, kept on disk once made.
 
   MIT License
 

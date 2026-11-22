@@ -92,7 +92,9 @@ async function engineRequest(input: EngineRunInput): Promise<AiInvocationRequest
     agentId: defaultEngineAgent(engineId),
     spaceId: input.spaceId,
     // A conversation of its own that is never saved as a chat: the run's work is the caller's.
-    conversationId: `misty_${input.session ?? input.key}`,
+    // Its id names the run's scratch folder, which takes only letters, digits, `-` and `_`
+    // (`chat_folder.rs`), so a session such as Tutor's `tutor:<chat>:<time>` is spelled to fit.
+    conversationId: `misty_${(input.session ?? input.key).replace(/[^A-Za-z0-9_-]/g, "_")}`,
     executionMode: "user",
     collaborationMode: "act",
     permissionMode: "auto",

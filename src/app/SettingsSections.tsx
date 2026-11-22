@@ -28,6 +28,7 @@ import {
   type SettingsSection,
 } from "@/features/settings";
 import { DriveSettingsSection } from "@/features/spaces/drive";
+import { FilesSettingsSection } from "@/features/spaces/file-manager";
 import { ShortcutsSection } from "@/features/shortcuts";
 import { UpdatesSection } from "@/features/updater";
 import { DevicesSection, VoiceSection } from "@/features/voice";
@@ -73,6 +74,7 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   pets: PetsSection,
   "bottom-bar": BottomBarSettings,
   search: SearchSettings,
+  thumbnails: FilesSettingsSection,
   ...agentsSettingsSections,
 };
 

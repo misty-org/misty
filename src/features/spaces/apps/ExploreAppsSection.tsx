@@ -5,7 +5,6 @@ import {
   AppLogoImage,
   Button,
   CatalogDone,
-  CollectionFilters,
   EmptyState,
   ErrorState,
   FeatureCard,
@@ -18,22 +17,12 @@ import {
   StoreDetailSection,
   Text,
 } from "@misty/ui";
-import { AppsPage } from "@/features/agents";
 import { AddFromGitHubDialog } from "./AddFromGitHubDialog";
 import { permissionLines } from "./appPermissions";
 import { RemoveAppDialog } from "./RemoveAppDialog";
 import { appRoute } from "./appRoutes";
 import { catalogApps, catalogLogoUrl, type CatalogApp } from "./thirdPartyApps";
 import { useSpaceApps } from "./useSpaceApps";
-
-/** Which apps Explore's Apps section shows. */
-export type AppsGroup = "all" | "open" | "connected";
-
-const groups: { value: AppsGroup; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "open", label: "Open-source apps" },
-  { value: "connected", label: "Connected apps" },
-];
 
 const matches = (query: string, ...texts: (string | undefined)[]) => {
   const words = query.trim().toLowerCase();
@@ -43,44 +32,36 @@ const matches = (query: string, ...texts: (string | undefined)[]) => {
 const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(1);
 
 /**
- * The apps of a Space, as shelves: the open-source apps a mod can add, and the apps agents sign in
- * to. Picking one opens its details, where Get shows what the app may do and adds it.
+ * The apps of a Space: the open-source apps a mod can add, on one shelf. Picking one opens its
+ * details, where Get shows what the app may do and adds it. The apps agents sign in to are
+ * connectors, in Explore's Connectors.
  */
 export function ExploreAppsSection({
   spaceId,
   canManage,
   query = "",
   limit,
-  only,
   onSeeAll,
   featured = false,
-  startGroup = "all",
 }: {
   spaceId: string;
   canManage: boolean;
   query?: string;
   /** On All, each shelf shows this many, with See all opening the section. */
   limit?: number;
-  /** Shown on All instead of the group chips: which shelves to draw. */
-  only?: readonly "open"[];
   /** On All: the shelves' See all, which opens the Apps section. */
   onSeeAll?: () => void;
   /** On All: the apps that export a banner, as featured cards above the shelves. */
   featured?: boolean;
-  /** The group chip open at first, such as Connected apps when Explore opens there. */
-  startGroup?: AppsGroup;
 }) {
   const navigate = useNavigate();
   const { apps, error, reload, install, remove } = useSpaceApps(spaceId);
   const [removing, setRemoving] = useState<CatalogApp | null>(null);
-  const [group, setGroup] = useState<AppsGroup>(startGroup);
   const [picked, setPicked] = useState<CatalogApp | null>(null);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState("");
   const [adding, setAdding] = useState(false);
   const installed = new Set((apps ?? []).map((app) => app.app_id));
-  const shows = (name: "open" | "connected") =>
-    only ? only.includes(name as "open") : group === "all" || group === name;
 
   const get = async (app: CatalogApp) => {
     if (saving) return;
@@ -135,53 +116,41 @@ export function ExploreAppsSection({
 
   return (
     <>
-      {only ? null : (
-        <CollectionFilters
-          value={group}
-          onChange={(next) => setGroup(next as AppsGroup)}
-          options={groups}
+      {featured && !query.trim() ? <FeaturedApps apps={catalogApps} onOpen={setPicked} /> : null}
+      {error ? (
+        <ErrorState
+          inline
+          title="Apps couldn't load"
+          line={error}
+          action={{ label: "Try again", variant: "secondary", onClick: reload }}
         />
-      )}
-      {featured && !query.trim() ? (
-        <FeaturedApps apps={catalogApps} onOpen={setPicked} />
+      ) : !apps ? (
+        <ShelfSkeleton label="Open-source apps" />
+      ) : listed.length ? (
+        <Shelf title="Open-source apps" action={seeAll}>
+          {cut(listed).map((app) => (
+            <ShelfItem
+              key={app.id}
+              logo={<AppLogoImage src={catalogLogoUrl(app)} name={app.name} size="tile" />}
+              title={app.name}
+              line={app.description ?? `by ${app.maker}`}
+              action={appAction(app)}
+              menu={
+                canManage && installed.has(app.id) ? (
+                  <MenuItem
+                    icon={Trash2}
+                    label="Remove from this Space"
+                    danger
+                    onSelect={() => setRemoving(app)}
+                  />
+                ) : undefined
+              }
+              onOpen={() => setPicked(app)}
+            />
+          ))}
+        </Shelf>
       ) : null}
-      {shows("open") ? (
-        error ? (
-          <ErrorState
-            inline
-            title="Apps couldn't load"
-            line={error}
-            action={{ label: "Try again", variant: "secondary", onClick: reload }}
-          />
-        ) : !apps ? (
-          <ShelfSkeleton label="Open-source apps" />
-        ) : listed.length ? (
-          <Shelf title="Open-source apps" action={seeAll}>
-            {cut(listed).map((app) => (
-              <ShelfItem
-                key={app.id}
-                logo={<AppLogoImage src={catalogLogoUrl(app)} name={app.name} size="tile" />}
-                title={app.name}
-                line={app.description ?? `by ${app.maker}`}
-                action={appAction(app)}
-                menu={
-                  canManage && installed.has(app.id) ? (
-                    <MenuItem
-                      icon={Trash2}
-                      label="Remove from this Space"
-                      danger
-                      onSelect={() => setRemoving(app)}
-                    />
-                  ) : undefined
-                }
-                onOpen={() => setPicked(app)}
-              />
-            ))}
-          </Shelf>
-        ) : null
-      ) : null}
-      {!only && group === "connected" ? <AppsPage /> : null}
-      {query.trim() && !listed.length && group !== "connected" ? (
+      {query.trim() && !listed.length ? (
         <EmptyState inline title="No apps found" line="Try another word." />
       ) : null}
 
@@ -272,7 +241,9 @@ function FeaturedApps({
   apps: readonly CatalogApp[];
   onOpen: (app: CatalogApp) => void;
 }) {
-  const withBanner = apps.filter((app): app is CatalogApp & { banner: string } => Boolean(app.banner));
+  const withBanner = apps.filter((app): app is CatalogApp & { banner: string } =>
+    Boolean(app.banner),
+  );
   if (!withBanner.length) return null;
   return (
     <FeatureRow>

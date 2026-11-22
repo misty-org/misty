@@ -31,16 +31,16 @@ describe("shortcut platform defaults", () => {
     for (const id of ["search.toggle", "tool.browser", "workspace.search_tabs"])
       expect(shortcutCommandsById.get(id)).toBeUndefined();
     expect(shortcutCommandsById.get("app.zoom_in")?.defaults.macos).toEqual({
-      primary: "Cmd+Shift+Plus",
+      primary: "Cmd+Plus",
       alternate: "Ctrl+Shift+Plus",
     });
     expect(shortcutCommandsById.get("app.zoom_out")?.defaults.macos).toEqual({
-      primary: "Cmd+Shift+Minus",
-      alternate: "Ctrl+Shift+Minus",
+      primary: "Cmd+Minus",
+      alternate: "Cmd+Shift+Minus",
     });
     expect(shortcutCommandsById.get("app.zoom_reset")?.defaults.macos).toEqual({
-      primary: "Cmd+Shift+0",
-      alternate: "Ctrl+Shift+0",
+      primary: "Cmd+0",
+      alternate: "Cmd+Shift+0",
     });
   });
 

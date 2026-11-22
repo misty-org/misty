@@ -40,6 +40,7 @@ export const settingsSections = [
   "performance",
   "diagnostics",
   "search",
+  "thumbnails",
   // What was the Agents window: the person's agents and their engines.
   "agents-list",
   "engines-clis",

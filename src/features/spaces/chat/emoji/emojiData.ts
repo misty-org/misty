@@ -1,9 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// The emoji Space chat offers, from Fluxer's emoji data (https://github.com/fluxerapp/fluxer):
-// src/media/data/emojis.json (Unicode 17 emoji-test + CLDR keywords, Discord-style names), with the
-// category order of features/expressions/utils/UnicodeEmojis.ts and the search order of
-// features/emoji/state/Emoji.ts. The data loads the first time a picker opens; the picker itself
-// is @misty/ui's EmojiPicker.
 import { useEffect, useState } from "react";
 import { createDeviceSetting } from "@/shared/lib/deviceSetting";
 
@@ -56,8 +50,7 @@ export function useEmojiData(): EmojiData | null {
   return loaded;
 }
 
-/** Up to 42 emoji shown under "Frequently used" (getFrecentEmojis(all, 42)). */
-const FREQUENT_LIMIT = 42;
+const FREQUENT_LIMIT = 36;
 
 /** The emoji this device picked, most recent first. */
 export const useFrequentEmoji = createDeviceSetting<string[]>({
@@ -77,7 +70,6 @@ export function rememberEmoji(emoji: string) {
     );
 }
 
-/** 0 is the default yellow; 1 to 5 the Fitzpatrick tones, as Fluxer's one saved skin tone. */
 export const useSkinTone = createDeviceSetting<number>({
   scope: "spaces.chat.skin-tone",
   defaults: 0,
@@ -105,42 +97,45 @@ export function allNames(emoji: ChatEmoji): string {
   return emoji.names.map((name) => `:${name}:`).join(" ");
 }
 
-/**
- * Search as Fluxer ranks it: colons stripped and spaces as `_`; an exact name first, then a name
- * that starts with the words, a whole word of a name, a name that has them, then a keyword. Ties
- * go to the emoji used more recently.
- */
+function matchRank(emoji: ChatEmoji, query: string): number | undefined {
+  const ranks = emoji.names.map((name) =>
+    name === query
+      ? 0
+      : name.startsWith(query)
+        ? 1
+        : name.split("_").some((word) => word.startsWith(query))
+          ? 2
+          : name.includes(query)
+            ? 3
+            : undefined,
+  );
+  const best = Math.min(...ranks.filter((rank): rank is number => rank !== undefined));
+  if (Number.isFinite(best)) return best;
+  return emoji.keywords?.some((keyword) => keyword.startsWith(query.replace(/_/g, " ")))
+    ? 4
+    : undefined;
+}
+
 export function searchEmoji(all: EmojiData, query: string, frequent: string[]): ChatEmoji[] {
-  const words = query
-    .trim()
-    .toLowerCase()
-    .replace(/^:+|:+$/g, "")
-    .replace(/\s+/g, "_");
-  if (!words) return [];
-  const used = new Map(frequent.map((emoji, index) => [emoji, index]));
-  const scored: { emoji: ChatEmoji; rank: number; order: number }[] = [];
-  let order = 0;
-  for (const list of Object.values(all))
-    for (const emoji of list) {
-      order++;
-      let rank = 99;
-      for (const name of emoji.names) {
-        if (name === words) rank = Math.min(rank, 0);
-        else if (name.startsWith(words)) rank = Math.min(rank, 1);
-        else if (name.split("_").includes(words)) rank = Math.min(rank, 2);
-        else if (name.includes(words)) rank = Math.min(rank, 3);
-      }
-      if (rank === 99 && emoji.keywords?.some((keyword) => keyword.startsWith(words))) rank = 4;
-      if (rank < 99) scored.push({ emoji, rank, order });
-    }
-  return scored
+  const wanted = query.trim().toLowerCase().replace(/:/g, "").replace(/\s+/g, "_");
+  if (!wanted) return [];
+  const recency = (emoji: ChatEmoji) => {
+    const index = frequent.indexOf(emoji.surrogates);
+    return index < 0 ? frequent.length : index;
+  };
+  return Object.values(all)
+    .flat()
+    .flatMap((emoji, position) => {
+      const rank = matchRank(emoji, wanted);
+      return rank === undefined ? [] : [{ emoji, rank, position }];
+    })
     .sort(
       (left, right) =>
         left.rank - right.rank ||
-        (used.get(left.emoji.surrogates) ?? 999) - (used.get(right.emoji.surrogates) ?? 999) ||
-        left.order - right.order,
+        recency(left.emoji) - recency(right.emoji) ||
+        left.position - right.position,
     )
-    .map((entry) => entry.emoji);
+    .map((match) => match.emoji);
 }
 
 /** Finds the data entry for an emoji character, for its names. */

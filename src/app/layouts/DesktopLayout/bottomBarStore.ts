@@ -34,7 +34,6 @@ export const bottomBarItemIds = [
   "layout",
   "mistyPanel",
   "sidebar",
-  "focus",
   "theme",
   "help",
   "zoom",

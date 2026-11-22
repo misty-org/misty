@@ -8,7 +8,7 @@ import { ChatSessionCard, ChatSidePanels } from "../context-panel/ChatSidePanels
 import { isUnread, markConversationRead } from "./conversationReads";
 import { LabInSpace } from "../tutor/LabInSpace";
 import { CodePage } from "../code/CodePage";
-import { cn, Surface } from "@misty/ui";
+import { cn, Separator, Surface } from "@misty/ui";
 import { AgentMemoryPage } from "../memory/AgentMemoryPage";
 import { createPort } from "@/shared/lib/seams";
 
@@ -117,10 +117,11 @@ export function AgentWorkspaceFrame({
   // The rail folds away behind Tools in the window's corner until the person opens it.
   const railShown = useRailShown((state) => state.value);
   return (
-    // A main column (a body: the chat, under its floating bar, or another view and, when open, the
-    // context panel at its right) beside the rail, which runs the page's full height. Bar, chat,
-    // panel and rail are one flat sheet: no line parts them. `agent-studio` names the container
-    // the page's narrow layouts measure, and stays as the page's hook.
+    // A FramedPage's layout, as every page's: a main column (a body: the chat, under its bar, or
+    // another view and, when open, the context panel at its right) beside the rail, which runs the
+    // page's full height. The bar, the panel and the rail are the frame, on the sidebar's color; the
+    // chat is the work, on the page's; hairlines part them. `agent-studio` names the container the
+    // page's narrow layouts measure, and stays as the page's hook.
     <div
       className={cn(
         "agent-studio @container/agent-studio flex h-full min-h-0 min-w-0 flex-1 flex-row",
@@ -165,7 +166,12 @@ export function AgentWorkspaceFrame({
       {/* The rail runs the page's full height, so its first button sits on the bar's line. Tools in
           the window's corner shows or hides it. */}
       {page === "task" && railShown ? (
-        <ContextRail conversationId={conversationId} disabled={disabled} onNewTask={onNewTask} />
+        <>
+          <Separator orientation="vertical" />
+          <Surface tone="sidebar" className="flex min-h-0 flex-none">
+            <ContextRail conversationId={conversationId} disabled={disabled} onNewTask={onNewTask} />
+          </Surface>
+        </>
       ) : null}
     </div>
   );

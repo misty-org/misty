@@ -7,7 +7,6 @@ import {
   Coins,
   Cpu,
   FileCode,
-  Focus,
   FolderOpen,
   Gauge,
   GitBranch,
@@ -67,7 +66,6 @@ import { SpaceBarMenu, SpacePresence } from "@/features/spaces";
 import { CaptureBarStatus } from "@/features/voice";
 import { Button, StateMark } from "@misty/ui";
 import {
-  FocusButton,
   HelpButton,
   LayoutButton,
   MistyPanelButton,
@@ -311,13 +309,6 @@ export const bottomBarItems: Record<BottomBarItemId, BarItem> = {
     icon: PanelLeft,
     side: "end",
     Item: SidebarButton,
-  },
-  focus: {
-    label: "Focus mode",
-    description: "Hides the window's chrome around the page.",
-    icon: Focus,
-    side: "end",
-    Item: FocusButton,
   },
   theme: {
     label: "Theme",

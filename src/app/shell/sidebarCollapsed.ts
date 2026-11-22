@@ -10,9 +10,8 @@ const savedCollapsed = createDeviceSetting<boolean>({
 });
 
 /**
- * Whether the sidebar is tucked away. Unlike focus mode it leaves navigation
- * alone; a browser page then shows its own toolbar, which holds the button to bring it back.
- * The choice stays on this device.
+ * Whether the sidebar is tucked away. It leaves navigation alone; a browser page then shows its
+ * own toolbar, which holds the button to bring it back. The choice stays on this device.
  */
 export const useSidebarCollapsedStore = create<{ collapsed: boolean; toggle(): void }>(
   (set, get) => ({

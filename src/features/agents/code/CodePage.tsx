@@ -20,6 +20,7 @@ import {
   ToolSuspense,
   SplitPane as Panel,
   SplitPanes as PanelGroup,
+  Surface,
 } from "@misty/ui";
 import { useChatFolder, useChatFolders } from "../shared-folders/chatFolder";
 import { ChatFolderPicker, ProjectPicker } from "../context-panel/ChatFolderPicker";
@@ -148,9 +149,14 @@ function CodeStart() {
           minSize={12}
           maxSize={50}
         >
-          <aside className="flex h-full min-h-0 min-w-0 flex-col" aria-label="Sessions">
+          <Surface
+            as="aside"
+            tone="sidebar"
+            className="flex h-full min-h-0 min-w-0 flex-col"
+            aria-label="Sessions"
+          >
             <SessionsSidebar />
-          </aside>
+          </Surface>
         </Panel>
         <SplitHandle direction="horizontal" label="Resize sidebar" seam />
         <Panel id="code-main" order={2} minSize={30} style={clipped}>
@@ -294,7 +300,9 @@ function CodeWorkbench({ spaceFolder, chat }: { spaceFolder: string; chat: strin
       {/* No top bar: the rail picks the sidebar's view (the open one's icon hides the sidebar,
           as ⌘B does), the sidebar names the folder, and the terminal's switch sits in the foot. */}
       <div className="flex min-h-0 flex-1 overflow-clip">
-        <nav
+        <Surface
+          as="nav"
+          tone="sidebar"
           className="flex w-12 flex-none flex-col items-center gap-1 border-r pt-2"
           aria-label="Sidebar views"
         >
@@ -316,7 +324,7 @@ function CodeWorkbench({ spaceFolder, chat }: { spaceFolder: string; chat: strin
               <Icon />
             </IconButton>
           ))}
-        </nav>
+        </Surface>
         <PanelGroup
           direction="horizontal"
           className="min-h-0 min-w-0 flex-1"
@@ -339,7 +347,9 @@ function CodeWorkbench({ spaceFolder, chat }: { spaceFolder: string; chat: strin
                 minSize={12}
                 maxSize={50}
               >
-                <aside
+                <Surface
+                  as="aside"
+                  tone="sidebar"
                   className="relative flex h-full min-h-0 min-w-0 flex-col"
                   aria-label="Sidebar"
                 >
@@ -369,7 +379,7 @@ function CodeWorkbench({ spaceFolder, chat }: { spaceFolder: string; chat: strin
                   ) : (
                     <DatabaseSidebar />
                   )}
-                </aside>
+                </Surface>
               </Panel>
               <SplitHandle direction="horizontal" label="Resize sidebar" seam />
             </>

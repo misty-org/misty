@@ -209,7 +209,7 @@ export function StudioPanel({
     return (
       <Surface
         as="aside"
-        tone="none"
+        tone="sidebar"
         edge="hairline"
         className={`${railClass} border-0 border-l`}
         aria-label="Create"
@@ -234,7 +234,7 @@ export function StudioPanel({
     return (
       <Surface
         as="aside"
-        tone="none"
+        tone="sidebar"
         edge="hairline"
         className={`${paneClass} tutor-studio-pane border-0 border-l`}
         data-viewing="true"
@@ -274,7 +274,7 @@ export function StudioPanel({
   return (
     <Surface
       as="aside"
-      tone="none"
+      tone="sidebar"
       edge="hairline"
       className={`${paneClass} tutor-studio-pane border-0 border-l`}
       aria-label="Create"

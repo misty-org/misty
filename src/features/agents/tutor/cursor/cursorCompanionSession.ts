@@ -41,6 +41,8 @@ const hintText = () =>
 
 /** How long a failure stays at the cursor; Agents keeps it, with Retry. */
 const ERROR_HOLD_MS = 8000;
+/** How long a new turn waits for the last one's task to be canceled. */
+const CANCEL_WAIT_MS = 5000;
 
 /**
  * One signed-in account's cursor companion: its presentation, turn ownership,
@@ -326,13 +328,31 @@ export class CursorCompanionSession {
       error: this.nativeReady ? undefined : this.state.error,
     });
     // Serialize cancellation with the next admission; never cancel an unrelated drawer turn.
+    // A cancel that never settles is waited for only so long, so it can't hold every later turn.
     this.barrier = this.barrier
       .catch(() => {})
       .then(async () => {
         if (shouldCancel && !this.disposed && useMistyStore.getState().accountId === this.accountId)
-          await useMistyStore.getState().cancelResponse?.();
+          await Promise.race([
+            useMistyStore.getState().cancelResponse?.(),
+            new Promise((settled) => setTimeout(settled, CANCEL_WAIT_MS)),
+          ]);
       });
     return this.barrier;
+  };
+
+  /**
+   * Ends the native turn this window knows. When the native side has moved on without this window
+   * hearing of it (a question from the text box sent to another window), the current turn is ended
+   * instead: the person is starting something new, and a refusal here would refuse every try
+   * after it.
+   */
+  endNativeTurn = async (expected: number) => {
+    try {
+      return await invoke<number>("cursor_companion_interrupt", { expectedTurn: expected });
+    } catch {
+      return await invoke<number>("cursor_companion_interrupt", {});
+    }
   };
 
   fail = (generation: number, reason: unknown) => {
@@ -361,11 +381,7 @@ export class CursorCompanionSession {
 
   interruptNative = async (cancelTask = true) => {
     const previous = this.turn;
-    const next = this.nativeReady
-      ? await invoke<number>("cursor_companion_interrupt", {
-          expectedTurn: previous,
-        })
-      : previous;
+    const next = this.nativeReady ? await this.endNativeTurn(previous) : previous;
     if (!this.active(previous)) return false;
     this.turn = next;
     await this.interrupt(cancelTask);

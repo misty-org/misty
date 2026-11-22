@@ -17,8 +17,11 @@ pub struct ProfileStateSnapshot {
 /// window must not be able to grant itself anything or read what it's been granted this way.
 pub fn is_protected_scope(scope: &str) -> bool {
     // `drive:` holds this computer's Space drive id and the drive's device settings
-    // (`spaces_drive/device.rs`).
-    scope.starts_with("grant:") || scope.starts_with("permission:") || scope.starts_with("drive:")
+    // (`spaces_drive/device.rs`); `files:` holds Files' (`files/thumbnail_cache.rs`).
+    scope.starts_with("grant:")
+        || scope.starts_with("permission:")
+        || scope.starts_with("drive:")
+        || scope.starts_with("files:")
 }
 
 pub fn profile_state(

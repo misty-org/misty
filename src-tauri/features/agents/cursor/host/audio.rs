@@ -15,10 +15,10 @@ pub struct Recording {
     sequence: usize,
 }
 impl Recording {
-    /// Starts recording; `preroll` is audio already heard, which the turn begins with.
-    pub fn start(app: AppHandle, turn: u64, preroll: Vec<i16>) -> Result<Self, String> {
+    /// Starts recording.
+    pub fn start(app: AppHandle, turn: u64) -> Result<Self, String> {
         super::platform::microphone_access()?;
-        let samples = Arc::new(Mutex::new(preroll));
+        let samples = Arc::new(Mutex::new(Vec::new()));
         let target = samples.clone();
         let meter_app = app.clone();
         let capture = voice_capture::start(

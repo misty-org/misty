@@ -1,6 +1,6 @@
 import { useSettingsStore } from "@/features/settings";
 import { voiceSettings } from "../voiceSettings";
-import { recognizeAudio } from "../systemSpeech";
+import { recognizeAudio } from "../speech";
 import { useCaptureStore } from "./useCaptureStore";
 
 function settings() {

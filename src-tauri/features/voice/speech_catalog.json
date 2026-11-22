@@ -1,0 +1,776 @@
+{
+  "schema": 1,
+  "hearing": [
+    {
+      "id": "moonshine-base-en",
+      "name": "Moonshine Base",
+      "maker": "Moonshine AI",
+      "source": "https://github.com/moonshine-ai/moonshine",
+      "license": "MIT",
+      "description": "Small and quick, English only",
+      "languages": [
+        "en"
+      ],
+      "detects_language": false,
+      "family": "moonshine",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-en-quantized-2026-02-27.tar.bz2",
+        "sha256": "43232c1d13013d37317163baec3135bd771a186a4356f28c889bab453bb0e891",
+        "size": 111266225,
+        "kind": "tar.bz2",
+        "folder": "sherpa-onnx-moonshine-base-en-quantized-2026-02-27"
+      },
+      "files": {
+        "encoder": "encoder_model.ort",
+        "merged_decoder": "decoder_model_merged.ort",
+        "tokens": "tokens.txt"
+      },
+      "disk_mb": 141,
+      "memory_mb": 500,
+      "accuracy": 2,
+      "speed": 3,
+      "words": false
+    },
+    {
+      "id": "omnilingual-asr-300m",
+      "name": "Omnilingual ASR 300M",
+      "maker": "Meta",
+      "source": "https://github.com/facebookresearch/omnilingual-asr",
+      "license": "Apache-2.0",
+      "description": "Over 1,600 languages, for those nothing else covers",
+      "languages": [
+        "*"
+      ],
+      "detects_language": true,
+      "family": "omnilingual_ctc",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-v2-int8-2026-02-05.tar.bz2",
+        "sha256": "951b32409aade32bd525310bb39e9666773ba3fc611a39e817f620936d76c631",
+        "size": 292313120,
+        "kind": "tar.bz2",
+        "folder": "sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-v2-int8-2026-02-05"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "tokens": "tokens.txt"
+      },
+      "disk_mb": 366,
+      "memory_mb": 900,
+      "accuracy": 1,
+      "speed": 2,
+      "words": false
+    },
+    {
+      "id": "parakeet-tdt-0-6b-v3",
+      "name": "Parakeet TDT 0.6B v3",
+      "maker": "NVIDIA",
+      "source": "https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3",
+      "license": "CC-BY-4.0",
+      "credit": "Parakeet TDT 0.6B v3 by NVIDIA, CC BY 4.0",
+      "description": "Fast and accurate in 25 European languages",
+      "languages": [
+        "bg",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "en",
+        "et",
+        "fi",
+        "fr",
+        "de",
+        "el",
+        "hu",
+        "it",
+        "lv",
+        "lt",
+        "mt",
+        "pl",
+        "pt",
+        "ro",
+        "sk",
+        "sl",
+        "es",
+        "sv",
+        "ru",
+        "uk"
+      ],
+      "detects_language": true,
+      "family": "nemo_transducer",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+        "sha256": "1495e91b59d7fc53ddca91f3431758ec99f8fa253fdb0e1e851be0f72b14b0f9",
+        "size": 487211443,
+        "kind": "tar.bz2",
+        "folder": "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+      },
+      "files": {
+        "encoder": "encoder.int8.onnx",
+        "decoder": "decoder.int8.onnx",
+        "joiner": "joiner.int8.onnx",
+        "tokens": "tokens.txt"
+      },
+      "disk_mb": 671,
+      "memory_mb": 1600,
+      "accuracy": 3,
+      "speed": 3,
+      "words": true
+    },
+    {
+      "id": "qwen3-asr-0-6b",
+      "name": "Qwen3-ASR 0.6B",
+      "maker": "Qwen",
+      "source": "https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
+      "license": "Apache-2.0",
+      "description": "30 languages and 22 Chinese dialects, Asian and European",
+      "languages": [
+        "zh",
+        "en",
+        "yue",
+        "ar",
+        "de",
+        "fr",
+        "es",
+        "pt",
+        "id",
+        "it",
+        "ko",
+        "ru",
+        "th",
+        "vi",
+        "ja",
+        "tr",
+        "hi",
+        "ms",
+        "nl",
+        "sv",
+        "da",
+        "fi",
+        "pl",
+        "cs",
+        "fil",
+        "fa",
+        "el",
+        "hu",
+        "mk",
+        "ro"
+      ],
+      "detects_language": true,
+      "family": "qwen3_asr",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2",
+        "sha256": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96",
+        "size": 878702423,
+        "kind": "tar.bz2",
+        "folder": "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25"
+      },
+      "files": {
+        "conv_frontend": "conv_frontend.onnx",
+        "encoder": "encoder.int8.onnx",
+        "decoder": "decoder.int8.onnx",
+        "tokenizer": "tokenizer"
+      },
+      "disk_mb": 987,
+      "memory_mb": 2200,
+      "accuracy": 3,
+      "speed": 2,
+      "words": false
+    },
+    {
+      "id": "whisper-large-v3-turbo",
+      "name": "Whisper large-v3-turbo",
+      "maker": "OpenAI",
+      "source": "https://huggingface.co/openai/whisper-large-v3-turbo",
+      "license": "MIT",
+      "description": "About 100 languages, the widest cover",
+      "languages": [
+        "en",
+        "zh",
+        "de",
+        "es",
+        "ru",
+        "ko",
+        "fr",
+        "ja",
+        "pt",
+        "tr",
+        "pl",
+        "ca",
+        "nl",
+        "ar",
+        "sv",
+        "it",
+        "id",
+        "hi",
+        "fi",
+        "vi",
+        "he",
+        "uk",
+        "el",
+        "ms",
+        "cs",
+        "ro",
+        "da",
+        "hu",
+        "ta",
+        "no",
+        "th",
+        "ur",
+        "hr",
+        "bg",
+        "lt",
+        "la",
+        "mi",
+        "ml",
+        "cy",
+        "sk",
+        "te",
+        "fa",
+        "lv",
+        "bn",
+        "sr",
+        "az",
+        "sl",
+        "kn",
+        "et",
+        "mk",
+        "br",
+        "eu",
+        "is",
+        "hy",
+        "ne",
+        "mn",
+        "bs",
+        "kk",
+        "sq",
+        "sw",
+        "gl",
+        "mr",
+        "pa",
+        "si",
+        "km",
+        "sn",
+        "yo",
+        "so",
+        "af",
+        "oc",
+        "ka",
+        "be",
+        "tg",
+        "sd",
+        "gu",
+        "am",
+        "yi",
+        "lo",
+        "uz",
+        "fo",
+        "ht",
+        "ps",
+        "tk",
+        "nn",
+        "mt",
+        "sa",
+        "lb",
+        "my",
+        "bo",
+        "tl",
+        "mg",
+        "as",
+        "tt",
+        "haw",
+        "ln",
+        "ha",
+        "ba",
+        "jw",
+        "su",
+        "yue"
+      ],
+      "detects_language": true,
+      "family": "whisper",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-turbo.tar.bz2",
+        "sha256": "b11acbbcd660b44a8e0df33724feb5aaa709cf65668f2823d59f656312544f22",
+        "size": 563790207,
+        "kind": "tar.bz2",
+        "folder": "sherpa-onnx-whisper-turbo"
+      },
+      "files": {
+        "encoder": "turbo-encoder.int8.onnx",
+        "decoder": "turbo-decoder.int8.onnx",
+        "tokens": "turbo-tokens.txt"
+      },
+      "disk_mb": 1037,
+      "memory_mb": 2400,
+      "accuracy": 3,
+      "speed": 1,
+      "words": false
+    }
+  ],
+  "voices": [
+    {
+      "id": "kokoro-bella",
+      "name": "Bella",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "US",
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 2,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-emma",
+      "name": "Emma",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "UK",
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-gb-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 21,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-fable",
+      "name": "Fable",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "UK",
+      "gender": "male",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-gb-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 25,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-fenrir",
+      "name": "Fenrir",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "US",
+      "gender": "male",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 14,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-george",
+      "name": "George",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "UK",
+      "gender": "male",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-gb-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 26,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-heart",
+      "name": "Heart",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "US",
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 3,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-isabella",
+      "name": "Isabella",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "UK",
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-gb-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 22,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-michael",
+      "name": "Michael",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "US",
+      "gender": "male",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 16,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-nicole",
+      "name": "Nicole",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "US",
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 6,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-puck",
+      "name": "Puck",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "US",
+      "gender": "male",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 18,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-sarah",
+      "name": "Sarah",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "en"
+      ],
+      "accent": "US",
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 9,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-xiaoxiao",
+      "name": "Xiaoxiao",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "zh"
+      ],
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 47,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-xiaoyi",
+      "name": "Xiaoyi",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "zh"
+      ],
+      "gender": "female",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 48,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-yunjian",
+      "name": "Yunjian",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "zh"
+      ],
+      "gender": "male",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 49,
+      "disk_mb": 190,
+      "memory_mb": 700
+    },
+    {
+      "id": "kokoro-yunxi",
+      "name": "Yunxi",
+      "maker": "hexgrad (Kokoro)",
+      "source": "https://huggingface.co/hexgrad/Kokoro-82M",
+      "license": "Apache-2.0",
+      "languages": [
+        "zh"
+      ],
+      "gender": "male",
+      "family": "kokoro",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2",
+        "sha256": "72c347230107ef8a31098ec4d468a605244beef5f1ed00db97efa13518800653",
+        "size": 132353410,
+        "kind": "tar.bz2",
+        "folder": "kokoro-int8-multi-lang-v1_0"
+      },
+      "files": {
+        "model": "model.int8.onnx",
+        "voices": "voices.bin",
+        "tokens": "tokens.txt",
+        "lexicon": "lexicon-us-en.txt,lexicon-zh.txt",
+        "dict": "dict"
+      },
+      "speaker": 50,
+      "disk_mb": 190,
+      "memory_mb": 700
+    }
+  ],
+  "support": [
+    {
+      "id": "silero-vad",
+      "name": "Silero VAD",
+      "maker": "Silero",
+      "source": "https://github.com/snakers4/silero-vad",
+      "license": "MIT",
+      "role": "vad",
+      "package": {
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+        "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+        "size": 643854,
+        "kind": "file"
+      },
+      "files": {
+        "model": "silero_vad.onnx"
+      }
+    }
+  ]
+}

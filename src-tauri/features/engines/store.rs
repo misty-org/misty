@@ -44,11 +44,34 @@ pub fn is_linked(store: &Store, account: &str, folder: &Path) -> Result<bool, St
         .query_map([account], |row| row.get::<_, String>(0))
         .map_err(text)?;
     for row in rows {
-        if folder.starts_with(row.map_err(text)?) {
+        if within(folder, Path::new(&row.map_err(text)?)) {
             return Ok(true);
         }
     }
     Ok(false)
+}
+
+/// Whether `path` is `root` or lies inside it. On Windows one folder has several spellings: a
+/// canonical path starts `\\?\C:\` where the folder picker and Misty's data folder give `C:\`,
+/// either may use `/`, and letter case doesn't matter. Both are compared in one form there, or a
+/// linked folder never matches itself. Elsewhere paths compare as they are.
+pub(crate) fn within(path: &Path, root: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        let form = |path: &Path| {
+            let mut text = dunce::simplified(path).to_string_lossy().replace('/', "\\").to_lowercase();
+            while text.ends_with('\\') {
+                text.pop();
+            }
+            text
+        };
+        let (path, root) = (form(path), form(root));
+        !root.is_empty() && (path == root || path.starts_with(&format!("{root}\\")))
+    }
+    #[cfg(not(windows))]
+    {
+        path.starts_with(root)
+    }
 }
 
 /// Adds a project folder, or marks one already there as just used.

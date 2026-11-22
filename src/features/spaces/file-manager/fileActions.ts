@@ -6,8 +6,9 @@ import type { FilesDialogs } from "./dialogs/useFilesDialogs";
 import { copyIntoDrive } from "./driveCopy";
 import { countText, messageOf } from "./format";
 import { childOf, localPath, nameOf, parentOf, placeFolder, placeInside, type FileItem, type FilesPlace } from "./model";
+import type { TransferWhere } from "./transfers";
 
-type Run = <T>(label: string, work: (opId: string) => Promise<T>) => Promise<T>;
+type Run = <T>(label: string, work: (opId: string) => Promise<T>, where?: TransferWhere) => Promise<T>;
 
 export interface ActionContext {
   place: FilesPlace;
@@ -75,8 +76,10 @@ export function createFileActions(ctx: ActionContext) {
         if (!answers) return;
         resolutions = answers;
       }
-      const result = await ctx.run(op === "copy" ? "Copying" : "Moving", (opId) =>
-        disk.transfer(op, moving, dir, resolutions, opId),
+      const result = await ctx.run(
+        op === "copy" ? "Copying" : "Moving",
+        (opId) => disk.transfer(op, moving, dir, resolutions, opId),
+        { from: moving.length === 1 ? moving[0] : parentOf(moving[0]), to: dir, items: moving.length },
       );
       failures(result.failed, op === "copy" ? "be copied" : "be moved");
       if (dir === folder) ctx.select(result.created);
@@ -188,12 +191,17 @@ export function createFileActions(ctx: ActionContext) {
 
     compress(items: FileItem[]) {
       const paths = pathsOf(items);
-      void guard(async () => ctx.select([await ctx.run("Compressing", () => disk.compress(paths))]), "Couldn't zip.");
+      const where = { from: paths.length === 1 ? paths[0] : parentOf(paths[0]), to: parentOf(paths[0]), items: paths.length };
+      void guard(async () => ctx.select([await ctx.run("Compressing", () => disk.compress(paths), where)]), "Couldn't zip.");
     },
 
     extract(item: FileItem) {
       const path = localPath(item);
-      if (path) void guard(async () => ctx.select([await ctx.run("Expanding", () => disk.extract(path))]), "Couldn't expand.");
+      if (path)
+        void guard(
+          async () => ctx.select([await ctx.run("Expanding", () => disk.extract(path), { from: path, to: parentOf(path), items: 1 })]),
+          "Couldn't expand.",
+        );
     },
 
     makeAlias(item: FileItem) {
@@ -354,7 +362,12 @@ export function createFileActions(ctx: ActionContext) {
       if ("dir" in target) return transfer(copy ? "copy" : "move", paths, target.dir);
       // Into a Space's drive, a file from this computer is always a copy: the drive keeps its own.
       await guard(
-        () => ctx.run("Copying", () => copyIntoDrive(target.spaceId, target.path, items)),
+        () =>
+          ctx.run("Copying", () => copyIntoDrive(target.spaceId, target.path, items), {
+            from: paths.length === 1 ? paths[0] : parentOf(paths[0]),
+            to: target.path,
+            items: items.length,
+          }),
         "Couldn't copy it into the Space.",
       );
     },

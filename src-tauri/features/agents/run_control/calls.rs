@@ -25,8 +25,6 @@ fn media_type(path: &std::path::Path) -> Option<&'static str> {
         "wav" => "audio/wav",
         "flac" => "audio/flac",
         "ogg" | "oga" => "audio/ogg",
-        "opus" => "audio/opus",
-        "webm" => "video/webm",
         "mp4" | "m4v" => "video/mp4",
         "mov" => "video/quicktime",
         _ => return None,
@@ -34,8 +32,8 @@ fn media_type(path: &std::path::Path) -> Option<&'static str> {
 }
 
 /// Tutor's audio and video sources: the person picks recordings in the system dialog, and each is
-/// transcribed by this computer's own speech recognition (no key; speakers aren't told apart).
-/// The window never names a path. `language` is the one chosen in Settings › Voice.
+/// transcribed by Misty's hearing model on this computer (no key; speakers aren't told apart).
+/// The window never names a path. `language` is kept for older windows; the model in use decides.
 #[tauri::command]
 pub async fn tutor_transcribe_sources(
     app: tauri::AppHandle,
@@ -43,6 +41,7 @@ pub async fn tutor_transcribe_sources(
     language: Option<String>,
 ) -> Result<Vec<TranscribedSource>, String> {
     use tauri_plugin_dialog::DialogExt;
+    let _ = language;
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only Misty's own windows can add sources.".into());
     }
@@ -53,8 +52,7 @@ pub async fn tutor_transcribe_sources(
         .add_filter(
             "Audio and video",
             &[
-                "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "webm", "mp4", "m4v",
-                "mov",
+                "mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "mp4", "m4v", "mov",
             ],
         )
         .pick_files(move |files| {
@@ -89,13 +87,7 @@ pub async fn tutor_transcribe_sources(
             ));
             continue;
         }
-        let file = path.to_string_lossy().into_owned();
-        let language = language.clone();
-        let heard = tokio::task::spawn_blocking(move || {
-            voice_speech::recognize_file(&file, language.as_deref())
-        })
-        .await
-        .unwrap_or_else(|_| Err(voice_speech::reason("failed")));
+        let heard = crate::voice::speech::transcribe_path(&app, path.clone()).await;
         sources.push(match heard {
             Ok(text) => TranscribedSource {
                 name,
@@ -132,8 +124,8 @@ fn overview_path(app: &tauri::AppHandle, id: &str) -> Result<std::path::PathBuf,
         .join(format!("{id}.wav")))
 }
 
-/// Speaks an audio overview's script in this computer's own voices and keeps the audio: Misty
-/// holds no speech key. `voice` is the person's chosen system voice, for the first speaker.
+/// Speaks an audio overview's script in Misty's voices and keeps the audio: Misty holds no speech
+/// key. `voice` is the person's chosen voice (a catalog id), for the first speaker.
 /// Answers how many seconds it runs.
 #[tauri::command]
 pub async fn tutor_overview_make(
@@ -152,7 +144,7 @@ pub async fn tutor_overview_make(
         .take(120)
         .map(|line| (line.speaker.min(1), line.text.chars().take(3000).collect()))
         .collect();
-    let audio = super::system_speech::speak_dialogue(&lines, voice.as_deref()).await?;
+    let audio = super::system_speech::speak_dialogue(&app, &lines, voice.as_deref()).await?;
     if let Some(folder) = path.parent() {
         tokio::fs::create_dir_all(folder)
             .await

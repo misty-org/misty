@@ -6,7 +6,10 @@
 //! there are no tags: every list is empty and setting them does nothing.
 use std::path::{Path, PathBuf};
 
-use file_access::{disk::check_disk_link, Access};
+use file_access::{
+    disk::{check_disk_link, DiskFolder},
+    Access,
+};
 
 use super::entry::{entry_for, FileEntry, FinderTag};
 use super::{asked_path, blocking, failed, person_window};
@@ -36,6 +39,19 @@ pub fn read_tags(path: &Path) -> Vec<FinderTag> {
     if check_disk_link(path, Access::Read).is_err() {
         return Vec::new();
     }
+    parse_attribute(path)
+}
+
+/// The tags on the item called `name` in `folder`, at `path`: the same as [`read_tags`], with the
+/// gate's folder resolved once for a whole listing rather than once per item.
+pub fn read_tags_in(folder: &DiskFolder, name: &str, path: &Path) -> Vec<FinderTag> {
+    if !folder.allows(name, Access::Read) {
+        return Vec::new();
+    }
+    parse_attribute(path)
+}
+
+fn parse_attribute(path: &Path) -> Vec<FinderTag> {
     read_attribute(path)
         .and_then(|data| plist::parse_strings(&data))
         .unwrap_or_default()

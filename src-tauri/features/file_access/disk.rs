@@ -38,48 +38,75 @@ pub fn disk_allowed() -> bool {
 
 /// Why a path is closed whatever the grant says, or None. `real` is a real path already.
 fn always_closed(real: &Path, access: Access) -> Option<&'static str> {
-    if is_misty_data(real) {
-        return Some("That folder holds Misty's own data.");
-    }
-    if is_keychain(real) {
-        return Some("Keychains can't be opened here.");
-    }
-    if access == Access::Write && is_system_folder(real) {
-        return Some("System folders can't be changed.");
-    }
-    None
+    ClosedPlaces::resolve().why(real, access)
 }
 
-/// Inside `~/.misty` or Misty's own app folders, and not inside a Space drive's mount.
+/// The places that stay closed whatever the grant says, as real paths. Finding each one's real
+/// path is a system call, so a check over a whole folder's items ([`DiskFolder`]) finds them once.
+struct ClosedPlaces {
+    /// `~/.misty`'s real path.
+    misty_root: Option<PathBuf>,
+    keychains: Vec<PathBuf>,
+}
+
+impl ClosedPlaces {
+    fn resolve() -> Self {
+        Self {
+            misty_root: super::paths::misty_root_dir()
+                .and_then(|root| real_path::resolve(&root).ok()),
+            keychains: keychain_folders()
+                .into_iter()
+                .map(|folder| real_path::resolve(&folder).unwrap_or(folder))
+                .collect(),
+        }
+    }
+
+    fn why(&self, real: &Path, access: Access) -> Option<&'static str> {
+        if self.is_misty_data(real) {
+            return Some("That folder holds Misty's own data.");
+        }
+        if self.keychains.iter().any(|folder| real.starts_with(folder)) {
+            return Some("Keychains can't be opened here.");
+        }
+        if access == Access::Write && is_system_folder(real) {
+            return Some("System folders can't be changed.");
+        }
+        None
+    }
+
+    /// Inside `~/.misty` or Misty's own app folders, and not inside a Space drive's mount.
+    fn is_misty_data(&self, real: &Path) -> bool {
+        if self.is_drive_mount(real) {
+            return false;
+        }
+        let policy = POLICY.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if policy.reach_covers(Reach::SpaceDrive, real) {
+            return false;
+        }
+        [Reach::MistyHome, Reach::AppFolders, Reach::WebsiteData]
+            .into_iter()
+            .any(|reach| policy.reach_covers(reach, real))
+            || self.misty_root.as_ref().is_some_and(|root| real.starts_with(root))
+    }
+
+    /// `~/.misty/mnt*/…`: where the Space drives are mounted.
+    fn is_drive_mount(&self, real: &Path) -> bool {
+        let Some(root) = &self.misty_root else {
+            return false;
+        };
+        real.strip_prefix(root)
+            .ok()
+            .and_then(|inside| inside.components().next())
+            .is_some_and(|first| first.as_os_str().to_string_lossy().starts_with("mnt"))
+    }
+}
+
+#[cfg(test)]
 fn is_misty_data(real: &Path) -> bool {
-    if is_drive_mount(real) {
-        return false;
-    }
-    let policy = POLICY.read().unwrap_or_else(|poisoned| poisoned.into_inner());
-    if policy.reach_covers(Reach::SpaceDrive, real) {
-        return false;
-    }
-    [Reach::MistyHome, Reach::AppFolders, Reach::WebsiteData]
-        .into_iter()
-        .any(|reach| policy.reach_covers(reach, real))
-        || super::paths::misty_root_dir()
-            .and_then(|root| real_path::resolve(&root).ok())
-            .is_some_and(|root| real.starts_with(root))
+    ClosedPlaces::resolve().is_misty_data(real)
 }
 
-/// `~/.misty/mnt*/…`: where the Space drives are mounted.
-fn is_drive_mount(real: &Path) -> bool {
-    let Some(root) = super::paths::misty_root_dir().and_then(|root| real_path::resolve(&root).ok())
-    else {
-        return false;
-    };
-    real.strip_prefix(&root)
-        .ok()
-        .and_then(|inside| inside.components().next())
-        .is_some_and(|first| first.as_os_str().to_string_lossy().starts_with("mnt"))
-}
-
-fn is_keychain(real: &Path) -> bool {
+fn keychain_folders() -> Vec<PathBuf> {
     let mut folders: Vec<PathBuf> = Vec::new();
     #[cfg(target_os = "macos")]
     {
@@ -106,9 +133,6 @@ fn is_keychain(real: &Path) -> bool {
         folders.push(home.join(".local").join("share").join("keyrings"));
     }
     folders
-        .iter()
-        .map(|folder| real_path::resolve(folder).unwrap_or_else(|_| folder.clone()))
-        .any(|folder| real.starts_with(folder))
 }
 
 /// The system's own folders, which no one changes without an administrator. The temp folder is
@@ -184,6 +208,37 @@ fn gate(path: &Path, real: &Path, access: Access, link: bool) -> io::Result<()> 
     // mounted Space drive, Downloads once granted).
     let normal = if link { check_link(path, access) } else { check(path, access) };
     normal.map_err(|_| refused(path, access))
+}
+
+/// One folder's items checked against the gate as [`check_disk_link`] checks each, for a call
+/// that acts on the items themselves (their own metadata, their tags), never through a link. The
+/// folder and the always-closed places are resolved once here instead of once per item, which a
+/// listing would otherwise pay for every item it shows.
+pub struct DiskFolder {
+    dir: PathBuf,
+    real: PathBuf,
+    closed: ClosedPlaces,
+}
+
+impl DiskFolder {
+    pub fn open(dir: &Path) -> io::Result<Self> {
+        Ok(Self {
+            dir: dir.to_path_buf(),
+            real: real_path::resolve(dir)?,
+            closed: ClosedPlaces::resolve(),
+        })
+    }
+
+    /// Whether the item called `name` in this folder may be reached for `access`.
+    pub fn allows(&self, name: &str, access: Access) -> bool {
+        let real = self.real.join(name);
+        if self.closed.why(&real, access).is_some() {
+            return false;
+        }
+        // Without the grant, the normal policy decides, as `gate` does; that path is uncommon
+        // enough to resolve on its own.
+        disk_allowed() || check_link(&self.dir.join(name), access).is_ok()
+    }
 }
 
 /// What an agent may reach on the disk: the disk grant has to be on (agents never reach further

@@ -1,6 +1,6 @@
 {
   "identifier": "cursor-companion",
-  "description": "Cursor overlays: presentation, Misty there taking the pointer to be clicked or handed a file, and the 3D model card taking it to be turned or have a part asked about",
+  "description": "Cursor overlays: presentation, Misty there taking the pointer to be clicked or handed a file, the 3D model card taking it to be turned or have a part asked about, and, while Tutor's text box is open, a drag capturing part of the screen for it or a click closing it",
   "platforms": [
     "macOS",
     "windows"
@@ -13,6 +13,8 @@
     "allow-cursor-companion-snapshot",
     "allow-cursor-companion-hit",
     "allow-cursor-companion-ask-open",
+    "allow-cursor-companion-ask-dismiss",
+    "allow-cursor-companion-ask-shot",
     "allow-cursor-companion-ask-part"
   ],
   "$schema": "../../gen/schemas/desktop-schema.json"

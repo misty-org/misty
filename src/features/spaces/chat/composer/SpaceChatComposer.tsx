@@ -203,7 +203,8 @@ export function SpaceChatComposer(props: {
     </SuggestionList>
   ) : null;
   return (
-    <section aria-label="Message composer" className="shrink-0 px-4">
+    <section aria-label="Message composer" className="shrink-0 px-4 pb-4">
+      <TypingLine label={props.typing.label || undefined} />
       <form
         ref={form}
         onSubmit={(event) => {
@@ -308,7 +309,6 @@ export function SpaceChatComposer(props: {
           }
         />
       </form>
-      <TypingLine label={props.typing.label || undefined} />
       {props.pickerOpen ? (
         <SpaceChatPicker
           spaceId={props.spaceId}

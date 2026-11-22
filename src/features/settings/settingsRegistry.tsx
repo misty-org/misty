@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { spaceIcons } from "@misty/ui";
 import type { SettingOwnership } from "./device-preferences/registry";
 import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
 
@@ -28,6 +29,7 @@ type SettingsArea =
   | "input"
   | "advanced"
   | "search"
+  | "files"
   | "code"
   | "agents";
 
@@ -44,6 +46,7 @@ export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
   input: { label: "Input", icon: Keyboard },
   advanced: { label: "Advanced", icon: Wrench },
   search: { label: "Search", icon: Search },
+  files: { label: "Files", icon: spaceIcons.files },
   code: { label: "Code", icon: CodeXml },
   agents: { label: "Agents", icon: Users },
 };
@@ -60,7 +63,7 @@ export const settingsGroups: readonly { label: string; areas: readonly SettingsA
     label: "App",
     areas: ["general", "appearance", "input", "advanced"],
   },
-  { label: "Pages", areas: ["search", "code", "agents"] },
+  { label: "Pages", areas: ["search", "files", "code", "agents"] },
 ];
 
 interface SettingsBlock {
@@ -106,6 +109,7 @@ const settingsBlocks: readonly SettingsBlock[] = [
   block("advanced", "performance", "Performance"),
   block("advanced", "diagnostics", "Diagnostics"),
   block("search", "search", "Sources"),
+  block("files", "thumbnails", "Thumbnails"),
   block("code", "editor", "Editor"),
   block("code", "collaboration", "Collaboration"),
   block("agents", "agents-list", "Team", "resource"),

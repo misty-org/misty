@@ -62,7 +62,7 @@ pub(crate) fn is_scratch(db: &Store, folder: &Path) -> bool {
     [scratch_root(db), runs_root(db)]
         .into_iter()
         .flatten()
-        .any(|root| folder.starts_with(&root) && folder != root)
+        .any(|root| store::within(folder, &root) && !store::within(&root, folder))
 }
 
 /// Makes a scratch folder, readable by this person alone.

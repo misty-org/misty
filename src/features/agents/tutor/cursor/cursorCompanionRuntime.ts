@@ -175,13 +175,9 @@ async function listenToNative(
       })
       .catch((error: unknown) => s.notice(String(error)));
   });
-  // Tapping Control three times turns Always On listening on or off (`always_on.rs`).
-  listen<{ on: boolean }>("misty://cursor-always-on", (payload) => {
-    s.notice(
-      payload.on
-        ? "Listening. Just talk, or tap Control three times to stop."
-        : "Stopped listening.",
-    );
+  // Escape anywhere, while the tour's line is on screen, ends the tour (`loops.rs`).
+  listen("misty://cursor-escape", () => {
+    if (s.tour.running) s.tour.stop();
   });
   // The tour's dictation step waits for a dictation to finish anywhere.
   listen<{ phase: string }>("misty://dictation", (payload) => {
@@ -189,8 +185,13 @@ async function listenToNative(
   });
   // A question typed in the text box beside the pointer (tap Control twice): answered like a
   // spoken one, aloud and in captions.
-  listen<{ turn: number; text: string }>("misty://cursor-ask", (payload) => {
+  listen<{ turn: number; text: string; images?: string[] }>("misty://cursor-ask", (payload) => {
     if (payload.turn < s.turn || !payload.text.trim()) return;
+    // Pictures dragged out while the box was open go with this question, as dropped files do.
+    const images = (payload.images ?? [])
+      .filter((url) => url.startsWith("data:image/"))
+      .map((dataUrl) => ({ mimeType: dataUrl.slice(5, dataUrl.indexOf(";")), dataUrl }));
+    if (images.length) s.handed = moreHanded(s.handed, { images, texts: [], others: [] });
     s.recordingOrigin = s.turnOrigin();
     s.turn = payload.turn;
     s.captures = [];

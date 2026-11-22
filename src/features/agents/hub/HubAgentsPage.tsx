@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { AudioLines, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
@@ -6,6 +6,12 @@ import type { AgentProfile } from "@/shared/schemas";
 import {
   Button,
   ConfirmDeleteDialog,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
@@ -31,6 +37,7 @@ import { AgentAvatar } from "../personal/AgentAvatar";
 import { freshAgentName } from "../personal/agentNames";
 import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
 import { saveAgent, updateAgent } from "../personal/saveAgent";
+import { AgentVoicePicker } from "../personal/AgentVoicePicker";
 import { openAgentsHub } from "./agentsHubStore";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -108,6 +115,7 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
   const suggested = useMemo(() => freshAgentName(agents.map((agent) => agent.name)), [agents]);
   const [engine, setEngine] = useState("");
   const [name, setName] = useState("");
+  const [voice, setVoice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -115,7 +123,7 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
   }, [engine, engines]);
   const picked = engines?.find((item) => item.id === engine);
   const create = async () => {
-    if (busy || !picked) return;
+    if (busy || !picked || !voice) return;
     setBusy(true);
     setError("");
     try {
@@ -126,6 +134,7 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
         instructions: "",
         icon: "",
         avatar: {},
+        voice,
         model_mode: "automatic",
         model_id: "",
         reasoning_effort: "",
@@ -134,6 +143,7 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
         engine: picked.id,
       });
       setName("");
+      setVoice("");
       onMade(agent);
     } catch (failure) {
       setError(message(failure));
@@ -181,12 +191,21 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
           }}
         />
       </DesktopSettingsRow>
+      {/* Its own voice, picked by the person as part of making it. */}
+      <DesktopSettingsRow label="Voice" density="compact" stacked>
+        <AgentVoicePicker
+          name={name.trim() || suggested}
+          voice={voice}
+          disabled={busy}
+          onChange={setVoice}
+        />
+      </DesktopSettingsRow>
       <div className="flex items-center justify-between gap-3">
         <FieldError message={error} />
         <Button
           variant="primary"
           className="ml-auto"
-          disabled={!picked?.installed || busy}
+          disabled={!picked?.installed || !voice || busy}
           onClick={() => void create()}
         >
           <Plus />
@@ -194,6 +213,38 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
         </Button>
       </div>
     </Section>
+  );
+}
+
+/**
+ * Changes an agent's own voice: the same list it was picked from when it was made. The pick saves
+ * at once; a voice not on this computer yet starts downloading, and the agent says "Setting up
+ * Ada's voice" where it would speak until it's here.
+ */
+function AgentVoiceDialog({ agent, onClose }: { agent: AgentProfile; onClose(): void }) {
+  const [error, setError] = useState("");
+  return (
+    <DialogContent size="sm">
+      <DialogHeader>
+        <DialogTitle>{`${agent.name}’s voice`}</DialogTitle>
+      </DialogHeader>
+      <DialogBody>
+        <AgentVoicePicker
+          name={agent.name}
+          voice={agent.voice}
+          onChange={(voice) => {
+            setError("");
+            void updateAgent(agent, { voice }).catch((failure) => setError(message(failure)));
+          }}
+        />
+        <FieldError message={error} />
+      </DialogBody>
+      <DialogFooter>
+        <Button size="lg" variant="primary" onClick={onClose}>
+          Done
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -222,6 +273,7 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
   const { view, state } = useEngineReadiness(engine);
   const held = blocksAgent(state);
   const [renaming, setRenaming] = useState(false);
+  const [voicing, setVoicing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const chatCount = useMistyStore(
     (state) => state.conversations.filter((chat) => chat.agentId === agent.id).length,
@@ -248,6 +300,7 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
         <MenuTrigger label={`${agent.name} actions`} iconOnly icon={MoreHorizontal} />
         <DropdownMenuContent align="end">
           <MenuItem icon={Pencil} label="Rename" onSelect={() => setRenaming(true)} />
+          <MenuItem icon={AudioLines} label="Voice" onSelect={() => setVoicing(true)} />
           <DropdownMenuSeparator />
           <MenuItem icon={Trash2} label="Delete" danger onSelect={() => setDeleting(true)} />
         </DropdownMenuContent>
@@ -261,6 +314,9 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
           onClose={() => setRenaming(false)}
         />
       ) : null}
+      <Dialog open={voicing} onOpenChange={setVoicing}>
+        {voicing ? <AgentVoiceDialog agent={agent} onClose={() => setVoicing(false)} /> : null}
+      </Dialog>
       <ConfirmDeleteDialog
         open={deleting}
         onOpenChange={setDeleting}

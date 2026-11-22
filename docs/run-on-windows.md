@@ -149,7 +149,7 @@ is in `misty-sdk/docs/voice-calls.md`).
 
 **An agent in a call**
 
-1. In a call, choose **Talk to an agent** on one computer and pick one of your agents.
+1. In a call, choose **Agents** on one computer and pick one of your agents.
 2. Ask it something. Its answer is spoken on both computers, each in its own system voice.
 3. Check the other computer heard the answer, and that what you said is in the agent's own thread.
 4. Do it again from the other computer, so both the Mac and Windows are heard.

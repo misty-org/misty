@@ -14,20 +14,41 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { McpSection } from "@/features/engine-config/mcp";
 import { PromptsSection } from "@/features/engine-config/prompts";
 import { exploreApps } from "./exploreApps";
-import { NavList, NavRow, OverflowFadeText, SearchField, Separator, Text } from "@misty/ui";
+import {
+  appIcons,
+  FramedPage,
+  NavList,
+  NavRow,
+  OverflowFadeText,
+  SearchField,
+  Separator,
+  Text,
+} from "@misty/ui";
+import { DirectApps } from "../connected-apps/DirectApps";
+import { EngineConnectors } from "./EngineConnectors";
 import { PersonaCatalogSection } from "../personas";
+import { EnginesSection } from "./EnginesSection";
 import { PluginsSection } from "./PluginsSection";
 import { SkillsSection } from "./SkillsSection";
-import { UpdatesSection, useSkillUpdates } from "./UpdatesSection";
+import { SpeechSection } from "./SpeechSection";
+import {
+  UpdatesSection,
+  useEngineUpdates,
+  useSkillUpdates,
+  useSpeechUpdates,
+} from "./UpdatesSection";
 
 /**
- * What Explore offers, as the `?tab=` it opens on. `agents` is the templates (the persona pack), `mcp` the
- * connectors, and `connections` opens Apps on the apps agents sign in to.
+ * What Explore offers, as the `?tab=` it opens on. `agents` is the templates (the persona pack),
+ * `engines` the catalog's engines, `speech` its hearing models and voices, `mcp` the connectors, and
+ * `connections` opens Connectors (the apps agents sign in to are connectors).
  */
 export const marketTabs = [
   "all",
   "apps",
   "agents",
+  "engines",
+  "speech",
   "plugins",
   "skills",
   "prompts",
@@ -43,6 +64,8 @@ const rail: { value: Section; label: string; icon: LucideIcon }[] = [
   { value: "all", label: "All", icon: Compass },
   { value: "apps", label: "Apps", icon: LayoutGrid },
   { value: "agents", label: "Templates", icon: Users },
+  { value: "engines", label: "Engines", icon: appIcons.engines },
+  { value: "speech", label: "Speech", icon: appIcons.speech },
   { value: "plugins", label: "Plugins", icon: Blocks },
   { value: "skills", label: "Skills", icon: ScrollText },
   { value: "prompts", label: "Prompts", icon: FileText },
@@ -68,8 +91,9 @@ const isMarketTab = (value: string | null): value is MarketTab =>
   marketTabs.some((tab) => tab === value);
 
 /**
- * The Space's store, after the App Store: a rail of sections on the left (search, All, the kinds
- * of thing, then Updates), and the open section's shelves beside it. Apps come first, as Misty's
+ * The Space's store, after the App Store, in a FramedPage: a rail of sections on the left on the
+ * frame's color (search, All, the kinds of thing, then Updates), and the open section's shelves
+ * beside it on the page's. Apps come first, as Misty's
  * backbone; agents and what they use follow.
  */
 export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
@@ -77,12 +101,15 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
   const navigate = useNavigate();
   const asked = new URLSearchParams(location.search).get("tab");
   const tab: MarketTab = isMarketTab(asked) ? asked : "all";
-  const open: Section = tab === "connections" ? "apps" : tab;
+  const open: Section = tab === "connections" ? "mcp" : tab;
   const [query, setQuery] = useState("");
   const { useAppUpdates, ExploreAppsSection } = exploreApps();
   const appUpdates = useAppUpdates(spaceId).updates.length;
   const skillUpdates = useSkillUpdates().rows?.length ?? 0;
-  const updates = (canManageApps ? appUpdates : 0) + skillUpdates;
+  // Engines count from what their last check said; this rail starts no check of its own.
+  const engineUpdates = useEngineUpdates({ probe: false }).rows.length;
+  const speechUpdates = useSpeechUpdates()?.length ?? 0;
+  const updates = (canManageApps ? appUpdates : 0) + skillUpdates + engineUpdates + speechUpdates;
 
   const go = (next: MarketTab) => {
     const params = new URLSearchParams(location.search);
@@ -97,7 +124,6 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
           spaceId={spaceId}
           canManage={canManageApps}
           query={query}
-          only={["open"]}
           limit={6}
           featured
           onSeeAll={() => go("apps")}
@@ -110,62 +136,68 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
         />
       </>
     ),
-    apps: () => (
-      <ExploreAppsSection
-        key={tab}
-        spaceId={spaceId}
-        canManage={canManageApps}
-        query={query}
-        startGroup={tab === "connections" ? "connected" : "all"}
-      />
-    ),
+    apps: () => <ExploreAppsSection spaceId={spaceId} canManage={canManageApps} query={query} />,
     agents: () => <PersonaCatalogSection query={query} />,
+    engines: () => <EnginesSection query={query} />,
+    speech: () => <SpeechSection query={query} />,
     plugins: () => <PluginsSection query={query} />,
     skills: () => <SkillsSection query={query} />,
     prompts: () => <PromptsSection query={query} />,
-    mcp: () => <McpSection query={query} />,
+    // What agents use, for the picked engine: its own apps, then its MCP servers; last, the apps
+    // Misty connects directly, which every engine shares.
+    mcp: () => (
+      <McpSection
+        query={query}
+        lead={(engine) => (engine === "claude" ? <EngineConnectors /> : null)}
+        after={<DirectApps query={query} />}
+      />
+    ),
     updates: () => <UpdatesSection spaceId={spaceId} canManage={canManageApps} />,
   };
 
-  return (
-    <div className="flex h-full min-h-0">
-      <nav
-        aria-label="Explore"
-        className="grid w-56 shrink-0 content-start gap-3 overflow-y-auto px-3 py-4"
-      >
-        <SearchField
-          aria-label="Search Explore"
-          placeholder="Search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onClear={() => setQuery("")}
-        />
-        <NavList>
-          {rail.map(({ value, label, icon: Icon }) => (
-            <NavRow key={value} tone="page" current={open === value} onClick={() => go(value)}>
-              <Icon />
-              <OverflowFadeText>{label}</OverflowFadeText>
-            </NavRow>
-          ))}
-        </NavList>
-        <Separator />
-        <NavList>
-          <NavRow tone="page" current={open === "updates"} onClick={() => go("updates")}>
-            <CircleArrowDown />
-            <OverflowFadeText>Updates</OverflowFadeText>
-            {updates ? (
-              <Text size="caption" tone="muted" className="ml-auto tabular-nums">
-                {updates}
-              </Text>
-            ) : null}
+  const railColumn = (
+    <nav aria-label="Explore" className="grid size-full content-start gap-3 overflow-y-auto px-3 py-4">
+      <SearchField
+        aria-label="Search Explore"
+        placeholder="Search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onClear={() => setQuery("")}
+      />
+      <NavList>
+        {rail.map(({ value, label, icon: Icon }) => (
+          <NavRow key={value} current={open === value} onClick={() => go(value)}>
+            <Icon />
+            <OverflowFadeText>{label}</OverflowFadeText>
           </NavRow>
-        </NavList>
-      </nav>
+        ))}
+      </NavList>
+      <Separator />
+      <NavList>
+        <NavRow current={open === "updates"} onClick={() => go("updates")}>
+          <CircleArrowDown />
+          <OverflowFadeText>Updates</OverflowFadeText>
+          {updates ? (
+            <Text size="caption" tone="muted" className="ml-auto tabular-nums">
+              {updates}
+            </Text>
+          ) : null}
+        </NavRow>
+      </NavList>
+    </nav>
+  );
+
+  // A FramedPage, as every page is: the rail on the frame's color, the shelves on the page's.
+  return (
+    <FramedPage
+      autoSaveId="explore"
+      start={{ id: "explore-rail", label: "Resize the rail", defaultSize: 18, minSize: 14, maxSize: 30, content: railColumn }}
+    >
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-8 pt-4 pb-10">
           {sections[open]()}
         </div>
       </main>
-    </div>
+    </FramedPage>
   );
 }

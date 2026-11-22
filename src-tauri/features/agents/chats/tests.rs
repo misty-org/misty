@@ -190,3 +190,27 @@ async fn bad_documents_and_kinds_are_refused() {
         .await
         .is_err());
 }
+
+#[tokio::test]
+async fn an_agents_voice_is_a_short_catalog_id() {
+    let directory = tempfile::tempdir().unwrap();
+    let service = AgentChatsService::new(Store::at(directory.path().join("misty.db")));
+    let put = |voice: &str| {
+        service.put(
+            "a".into(),
+            "agent".into(),
+            "agent1".into(),
+            format!(r#"{{"name":"Ada","voice":{voice}}}"#),
+        )
+    };
+    assert!(put(r#""kokoro-heart""#).await.is_ok());
+    assert!(put(r#""""#).await.is_ok());
+    assert!(put("null").await.is_ok());
+    assert!(put(r#""Kokoro Heart""#).await.is_err());
+    assert!(put(&format!(r#""{}""#, "a".repeat(65))).await.is_err());
+    assert!(put("3").await.is_err());
+    assert!(service
+        .put("a".into(), "agent".into(), "agent2".into(), r#"{"name":"Old"}"#.into())
+        .await
+        .is_ok());
+}

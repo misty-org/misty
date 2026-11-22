@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import "@/styles/styles.css";
 import { CursorOverlayMarkup } from "./CursorOverlayMarkup";
 import { startCursorOverlayLoop } from "./cursorOverlayLoop";
+import { TutorShotLayer } from "./TutorShotLayer";
 import { usePresentation } from "./usePresentation";
 
 export function CursorCompanionRoot() {
@@ -49,16 +50,20 @@ function CursorOverlay() {
     [],
   );
   return (
-    <CursorOverlayMarkup
-      presentation={presentation}
-      marker={marker}
-      focus={focus}
-      sketch={sketch}
-      trail={trail}
-      caption={caption}
-      group={group}
-      bubble={bubble}
-      meter={meter}
-    />
+    <>
+      <CursorOverlayMarkup
+        presentation={presentation}
+        marker={marker}
+        focus={focus}
+        sketch={sketch}
+        trail={trail}
+        caption={caption}
+        group={group}
+        bubble={bubble}
+        meter={meter}
+      />
+      {/* Over the rest while Tutor's text box is open: a drag there takes a picture for it. */}
+      <TutorShotLayer />
+    </>
   );
 }

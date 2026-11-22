@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-/** A call that rang during Do not disturb: shown quietly in its DM instead of ringing. */
+/** A call that rang during Do not disturb, or rang out unanswered: shown quietly in its DM. */
 export interface MissedCall {
   from: string;
   video: boolean;

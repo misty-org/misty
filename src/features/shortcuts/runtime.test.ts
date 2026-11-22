@@ -143,7 +143,7 @@ describe("shortcut dispatcher", () => {
     remove();
   });
 
-  it("dispatches Cmd+Shift+Minus to app zoom out on macOS, and Cmd+Minus never", () => {
+  it("dispatches Cmd+Minus, and Cmd+Shift+Minus, to app zoom out on macOS", () => {
     useSettingsStore.setState({
       shortcuts: {
         detectedPlatform: "macos",
@@ -156,8 +156,10 @@ describe("shortcut dispatcher", () => {
     const handler = vi.fn();
     const remove = registerShortcutHandler("app.zoom_out", handler);
 
-    dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "-", code: "Minus", metaKey: true }));
-    expect(handler).not.toHaveBeenCalled();
+    expect(
+      dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "-", code: "Minus", metaKey: true })),
+    ).toBe(true);
+    expect(handler).toHaveBeenCalledOnce();
     expect(
       dispatchShortcutEvent(
         new KeyboardEvent("keydown", {
@@ -168,7 +170,7 @@ describe("shortcut dispatcher", () => {
         }),
       ),
     ).toBe(true);
-    expect(handler).toHaveBeenCalledOnce();
+    expect(handler).toHaveBeenCalledTimes(2);
     remove();
   });
 

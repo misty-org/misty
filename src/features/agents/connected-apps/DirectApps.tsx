@@ -1,21 +1,20 @@
-import { Check, ChevronDown, Plus, Unplug } from "lucide-react";
+import { Unplug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useCachedResource } from "@/api/cache/cached-resource";
 import { openExternalLink } from "@/shared/platform/openExternalLink";
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
+  CatalogDone,
+  DisclosureButton,
   ErrorState,
-  IconButton,
+  LogoTile,
   MenuItem,
   SearchField,
-  Skeleton,
-  SkeletonControl,
+  Shelf,
+  ShelfItem,
+  ShelfSkeleton,
   useNotice,
   Text,
-  Tooltip,
 } from "@misty/ui";
 import { DirectAppLogo } from "./DirectAppLogo";
 import {
@@ -26,8 +25,6 @@ import {
   type DirectConnection,
 } from "./directApi";
 
-const tileClass = "flex min-h-10 items-center gap-2.5 rounded-md px-2 py-1";
-
 const message = (reason: unknown, fallback: string) =>
   reason instanceof Error ? reason.message : fallback;
 
@@ -35,10 +32,20 @@ const message = (reason: unknown, fallback: string) =>
  * The apps a person can connect directly: each one signs in on the app maker's own page, and every
  * engine can then use it. Only apps whose sign-in needs no key of Misty's are shown: the shipped
  * catalog was checked when it was built, and anything newer is checked before it appears. Apps
- * load a page at a time; `limit` shows that many until the person asks for more.
+ * load a page at a time; `limit` shows that many until the person asks for more. They are one
+ * store shelf; with `query` the page's own search finds them and the shelf draws no field.
  */
-export function DirectApps({ limit, find = "" }: { limit?: number; find?: string }) {
-  const [query, setQuery] = useState(find);
+export function DirectApps({
+  limit,
+  find = "",
+  query: outside,
+}: {
+  limit?: number;
+  find?: string;
+  query?: string;
+}) {
+  const [typed, setQuery] = useState(find);
+  const query = outside ?? typed;
   // A new link's search replaces what was typed.
   useEffect(() => {
     if (find) setQuery(find);
@@ -200,21 +207,26 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
   const loading = catalog === null || connections === null;
 
   useNotice(Boolean(error), { message: error, tone: "error" });
+  const title = "Connect an app";
+  const line = (text: string) => (
+    <li className="pt-2 lg:col-span-2">
+      <Text as="p" size="meta" tone="muted" wrap className="m-0">
+        {text}
+      </Text>
+    </li>
+  );
   return (
     <div className="grid gap-2">
-      <SearchField
-        value={query}
-        maxLength={100}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder={
-          total > 100 && !needle ? `Find among ${total.toLocaleString()} apps` : "Find an app"
-        }
-        aria-label="Find an app"
-      />
-      {pending ? (
-        <Text bare as="p" tone="muted" role="status" className="text-sm">
-          Finish signing in to {pending.name} in your browser, then come back here.
-        </Text>
+      {outside === undefined ? (
+        <SearchField
+          value={query}
+          maxLength={100}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={
+            total > 100 && !needle ? `Find among ${total.toLocaleString()} apps` : "Find an app"
+          }
+          aria-label="Find an app"
+        />
       ) : null}
       {loadError ? (
         <ErrorState
@@ -223,89 +235,70 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
           line={loadError}
           action={{ label: "Try again", variant: "secondary", onClick: retryLoad }}
         />
+      ) : loading ? (
+        <ShelfSkeleton label={title} />
       ) : (
-        <ul
-          aria-label="Apps"
-          aria-busy={loading || checking > 0}
-          className="grid grid-cols-2 gap-x-4 gap-y-0.5"
-        >
+        <Shelf title={title}>
+          {pending
+            ? line(`Finish signing in to ${pending.name} in your browser, then come back here.`)
+            : null}
           {own.map((connection) => (
-            <li key={connection.id} className={tileClass}>
-              <AppTileLogo
-                app={connection.app}
-                name={connection.name}
-                icon={byUrl.get(connection.url)?.icon}
-              />
-              <Text as="p" full tone="bright" className="min-w-0 flex-1 text-sm font-medium">
-                {connection.name}
-              </Text>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton label={`${connection.name} connected`}>
-                    <Check />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <MenuItem
-                    icon={Unplug}
-                    label="Disconnect"
-                    onSelect={() => void disconnect(connection)}
-                  />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </li>
+            <ShelfItem
+              key={connection.id}
+              logo={
+                <AppTileLogo
+                  app={connection.app}
+                  name={connection.name}
+                  icon={byUrl.get(connection.url)?.icon}
+                />
+              }
+              title={connection.name}
+              line={byUrl.get(connection.url)?.description}
+              action={<CatalogDone label="Connected" />}
+              menu={
+                <MenuItem
+                  icon={Unplug}
+                  label="Disconnect"
+                  onSelect={() => void disconnect(connection)}
+                />
+              }
+            />
           ))}
           {shown.map((app) => (
-            <Tooltip key={app.url} content={app.description ?? ""}>
-              <li className={tileClass}>
-                <AppTileLogo app={app.app} name={app.name} icon={app.icon} />
-                <Text as="p" full tone="bright" className="min-w-0 flex-1 text-sm font-medium">
-                  {app.name}
-                </Text>
-                <IconButton
-                  label={`Connect ${app.name}`}
+            <ShelfItem
+              key={app.url}
+              logo={<AppTileLogo app={app.app} name={app.name} icon={app.icon} />}
+              title={app.name}
+              line={app.description}
+              action={
+                <Button
+                  variant="get"
+                  size="sm"
+                  aria-label={`Connect ${app.name}`}
                   disabled={pending?.url === app.url}
                   onClick={() => void connect(app)}
                 >
-                  <Plus />
-                </IconButton>
-              </li>
-            </Tooltip>
+                  Connect
+                </Button>
+              }
+            />
           ))}
-          {loading || checking > 0 || loadingMore
-            ? Array.from(
-                { length: loading ? 6 : loadingMore ? 4 : Math.min(checking, 4) },
-                (_, index) => (
-                  <li key={`skeleton-${index}`} className={tileClass} aria-hidden="true">
-                    <Skeleton className="size-7 shrink-0 rounded-md" />
-                    <div className="min-w-0 flex-1">
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                    <SkeletonControl kind="icon" />
-                  </li>
-                ),
-              )
+          {!checking && !own.length && !offered.length
+            ? line("No app by that name takes a direct sign-in yet.")
             : null}
-        </ul>
+        </Shelf>
       )}
-      {!loading && !checking && !own.length && !offered.length ? (
-        <Text bare as="p" tone="muted" className="text-sm">
-          No app by that name takes a direct sign-in yet.
-        </Text>
-      ) : null}
       {notShown > 0 && !loading ? (
-        <Button
-          variant="quiet"
-          className="justify-self-start"
+        <DisclosureButton
+          open={false}
           disabled={loadingMore}
           onClick={() => {
             if (folded) setOpened(true);
             else void loadMore();
           }}
         >
-          <ChevronDown />
           {folded ? `${notShown.toLocaleString()} more apps` : "Show more"}
-        </Button>
+        </DisclosureButton>
       ) : null}
     </div>
   );
@@ -313,8 +306,8 @@ export function DirectApps({ limit, find = "" }: { limit?: number; find?: string
 
 function AppTileLogo({ app, name, icon }: { app: string; name: string; icon?: string }) {
   return (
-    <span className="flex size-7 shrink-0 items-center justify-center">
-      <DirectAppLogo app={app} name={name} icon={icon} size={20} />
-    </span>
+    <LogoTile size="tile">
+      <DirectAppLogo app={app} name={name} icon={icon} size={40} />
+    </LogoTile>
   );
 }

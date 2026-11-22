@@ -19,8 +19,12 @@ export interface VoiceSettings {
   dictionary: string[];
   agentHandoff: boolean;
   captureSources: CaptureSources;
-  /** The system voice that speaks for Misty; empty is the system's own default. */
-  systemVoice: string;
+  /** The voice Misty's own speech uses (Tutor, read-alouds outside an agent), a catalog id;
+   * empty until the person picks one in setup or Settings › Voice. */
+  voice: string;
+  /** The hearing model Misty picked for the person (`speechModels.ts`), a catalog id; empty until
+   * it has picked one. The person may change it in Settings › Voice. */
+  hearingModel: string;
   /** How fast it speaks: 1 is the voice's usual pace. */
   speakingRate: number;
 }
@@ -52,7 +56,8 @@ export function voiceSettings(document: Record<string, unknown> | undefined): Vo
       .slice(0, 200),
     agentHandoff: booleanSetting(doc, "voice", "agent_handoff", true),
     captureSources: sources.includes(capture) ? capture : "mic-system",
-    systemVoice: stringSetting(doc, "voice", "system_voice", ""),
+    voice: stringSetting(doc, "voice", "speaking_voice", ""),
+    hearingModel: stringSetting(doc, "voice", "hearing_model", ""),
     speakingRate: Number(
       rates.find((rate) => rate === stringSetting(doc, "voice", "speaking_rate", "1")) ?? "1",
     ),

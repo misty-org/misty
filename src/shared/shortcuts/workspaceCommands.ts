@@ -40,6 +40,8 @@ export const workspaceCommands: ShortcutCommandDefinition[] = [
     category: "Tabs",
     scope: "workspace",
     aliases: ["add tab", "tool picker"],
+    mac: "Cmd+T",
+    windows: "Ctrl+T",
     allowInEditable: true,
   }),
   command("workspace.close_tab", "Close tab", {

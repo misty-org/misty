@@ -5,8 +5,9 @@ import { BatchRenameDialog } from "./BatchRenameDialog";
 import { CompareDialog } from "./CompareDialog";
 import { ConflictDialog } from "./ConflictDialog";
 import { DuplicatesDialog } from "./DuplicatesDialog";
+import type { TransferWhere } from "../transfers";
 
-type Run = <T>(label: string, work: (opId: string) => Promise<T>) => Promise<T>;
+type Run = <T>(label: string, work: (opId: string) => Promise<T>, where?: TransferWhere) => Promise<T>;
 
 /** A name to ask for: a rename, or a new folder or file. */
 export type NameAsk = {

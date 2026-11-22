@@ -114,14 +114,12 @@ export function SketchBlock({ source }: { source: string }) {
       sentenceOf.push(Math.max(said, 0));
     }
     setReplay(0);
-    let readingDone = false;
-    const ended = reading.end().finally(() => (readingDone = true));
-    while (!readingDone) {
-      const started = await reading.started();
-      setReplay(sentenceOf.filter((sentence) => sentence < started).length);
-      await new Promise((wait) => setTimeout(wait, 100));
-    }
-    await ended.catch(() => undefined);
+    // Each part comes in as the voice begins its sentence.
+    const unfollow = reading.onBegin((started) =>
+      setReplay(sentenceOf.filter((sentence) => sentence < started).length),
+    );
+    await reading.end().catch(() => undefined);
+    unfollow();
     setReplay(undefined);
   };
 

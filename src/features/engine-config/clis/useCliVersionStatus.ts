@@ -2,7 +2,12 @@
 // See NOTICE.
 
 import { useCallback, useSyncExternalStore } from "react";
-import { refreshCachedResource, useCachedResource } from "@/api/cache/cached-resource";
+import {
+  refreshCachedResource,
+  setCachedResource,
+  useCachedResource,
+  useCachedResources,
+} from "@/api/cache/cached-resource";
 import { cliApi, type CliSignInStatus, type CliVersionStatus } from "./api";
 
 /**
@@ -66,6 +71,23 @@ export function refreshCliStatus(engine: string): Promise<void> {
   );
 }
 
+/**
+ * Keeps a status read elsewhere (the launch check for engine updates) as the engine's last
+ * answer, so Explore's Updates knows of it without probing again. The sign-in stays as it was.
+ */
+export function noteCliStatus(status: CliVersionStatus) {
+  setCachedResource<Probe>(
+    keyOf(status.engine),
+    (previous) => ({ status, signIn: previous?.signIn ?? null }),
+    "device",
+  );
+}
+
+/** Installs or updates an engine, then probes again. `runId` scopes the streamed output. */
+export async function updateCli(engine: string, runId: string): Promise<void> {
+  return update(engine, runId);
+}
+
 /** Installs or updates an engine, then probes again. `runId` scopes the streamed output. */
 async function update(engine: string, runId: string): Promise<void> {
   patch(engine, { updating: true, error: null });
@@ -106,6 +128,39 @@ export function useCliVersionStatus(engine: string): CliVersionStatusView {
     update: useCallback((runId: string) => update(engine, runId), [engine]),
   };
 }
+
+/**
+ * Several engines' statuses at once, by engine id, sharing each one's answer with
+ * `useCliVersionStatus`. With `probe` (the default) each is checked as the screen opens, as a
+ * single row would be; `probe: false` only reads what is already known, for a count that
+ * shouldn't start any checks.
+ */
+export function useCliStatuses(
+  engines: readonly string[],
+  options: { probe?: boolean } = {},
+): {
+  statuses: Record<string, CliVersionStatus | null>;
+  /** Every engine has answered, or failed to: nothing is still waiting on its first check. */
+  settled: boolean;
+} {
+  const keys = engines.map(keyOf);
+  const read = useCachedResources<Probe>(keys, (key) => probe(engines[keys.indexOf(key)] ?? key), {
+    persist: "device",
+    load: options.probe ?? true,
+  });
+  const statuses: Record<string, CliVersionStatus | null> = {};
+  let settled = true;
+  engines.forEach((engine, index) => {
+    const entry = read[keys[index]];
+    statuses[engine] = entry?.data?.status ?? null;
+    if (!entry?.data && !entry?.error) settled = false;
+  });
+  return { statuses, settled };
+}
+
+/** Whether a status is an update Misty can run: installed, behind, and installable here. */
+export const hasCliUpdate = (status: CliVersionStatus | null | undefined) =>
+  Boolean(status?.installed && status.updateAvailable && status.updateKind);
 
 /** Starts over with nothing cached; tests only. */
 export function resetCliStatusForTests() {

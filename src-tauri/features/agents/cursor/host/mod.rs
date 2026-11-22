@@ -1,4 +1,3 @@
-mod always_on;
 mod ask;
 mod audio;
 mod capture;
@@ -55,13 +54,11 @@ pub struct CursorCompanionState {
     /// Click positions leave the native hook only while a walkthrough step waits.
     watch_clicks: AtomicBool,
     click_turn: AtomicU64,
+    /// Tutor's text box is open, so the overlays hold the pointer for pictures (`ask.rs`).
+    asking: AtomicBool,
     /// Where the pointer went while the talk keys were held, in global units: the person can
     /// circle or scribble over what they mean while they ask (`cursor_companion_trail`).
     trail: Mutex<Vec<(f64, f64)>>,
-    /// Always On: Tutor listens without the talk keys (`always_on.rs`).
-    always_on: AtomicBool,
-    /// What the microphone heard just before Always On noticed a voice, for the turn it starts.
-    preroll: Mutex<Vec<i16>>,
 }
 
 /// The most of a trail kept: about a minute of the pointer moving.
@@ -71,8 +68,8 @@ pub enum Shortcut {
     Click(f64, f64),
     /// Control tapped twice: open the text box.
     Type,
-    /// Control tapped three times: Always On listening on or off.
-    AlwaysOn,
+    /// Escape pressed: Tutor's tour gives way, while its line is on screen.
+    Escape,
     Error(String),
 }
 fn require_main(webview: &Webview) -> Result<(), String> {
@@ -132,6 +129,7 @@ pub fn stop(app: &AppHandle) {
     state.enabled.store(false, Ordering::SeqCst);
     state.held.store(false, Ordering::SeqCst);
     state.watch_clicks.store(false, Ordering::SeqCst);
+    state.asking.store(false, Ordering::SeqCst);
     let turn = state.turn.fetch_add(1, Ordering::SeqCst) + 1;
     let cleared = serde_json::json!({
         "generation": turn, "enabled": false, "visible": false,
@@ -215,7 +213,9 @@ pub async fn cursor_companion_present(
                     let state = state.clone();
                     tauri::async_runtime::spawn(async move {
                         tokio::time::sleep(Duration::from_millis(400)).await;
-                        let still = shown(&state.data.lock().unwrap().presentation);
+                        // Tutor's text box keeps them up, for dragging out pictures.
+                        let still = shown(&state.data.lock().unwrap().presentation)
+                            || state.asking.load(Ordering::SeqCst);
                         if current(&state, turn) && !still {
                             if let Some(w) = app.get_webview_window(&label) {
                                 let _ = w.hide();
@@ -251,7 +251,9 @@ pub fn cursor_companion_hit(webview: Webview, app: AppHandle, over: bool) -> Res
     if over {
         ask::note_front(&app);
     }
-    platform::take_pointer(&webview.window(), over)
+    // While the text box is open the overlays keep the pointer, for dragging out pictures.
+    let asking = host_state(&app).asking.load(Ordering::SeqCst);
+    platform::take_pointer(&webview.window(), over || asking)
 }
 
 /// Opens Tutor's text box beside the pointer, for a click on Misty.

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";
 import { AgentBotFields, ExportBotButton } from "../bots/AgentBotFields";
 import { AgentSpaceField } from "./AgentSpaceField";
+import { AgentVoicePicker } from "./AgentVoicePicker";
 
 const emptyProfile: AgentProfileInput = {
   name: "",
@@ -67,6 +68,7 @@ export function AgentEditor({
         instructions,
         icon,
         avatar,
+        voice,
         model_mode,
         model_id,
         reasoning_effort,
@@ -89,6 +91,7 @@ export function AgentEditor({
           instructions,
           icon,
           avatar,
+          voice,
           model_mode,
           model_id,
           reasoning_effort,
@@ -141,6 +144,18 @@ export function AgentEditor({
           onChange={(e) => update("name", e.target.value)}
         />
       </Field>
+      {/* Its own voice: picked when it was made, changed here. An agent made before voices has
+          none and speaks in Misty's voice until one is picked. */}
+      {profile?.system_managed ? null : (
+        <Field label="Voice">
+          <AgentVoicePicker
+            name={draft.name}
+            voice={draft.voice}
+            disabled={busy}
+            onChange={(voice) => update("voice", voice)}
+          />
+        </Field>
+      )}
       {/* What it does, in a few words: the studio and the @ menu tell agents apart by it. */}
       <span data-tour="agent-role" className="contents">
         <Field label="Role">
@@ -198,7 +213,10 @@ export function AgentEditor({
       </details>
       <div className="flex flex-wrap gap-3 empty:hidden">
         {(!profile || dirty) && (
-          <Button disabled={!draft.name.trim() || busy} type="submit">
+          <Button
+            disabled={!draft.name.trim() || (!profile && !draft.voice) || busy}
+            type="submit"
+          >
             {profile ? "Save changes" : "Create agent"}
           </Button>
         )}

@@ -1,5 +1,5 @@
 import { useAppStore } from "@/app/shell";
-import { Button, CollectionFilters, ErrorState, SearchField } from "@misty/ui";
+import { Button, ErrorState, SearchField } from "@misty/ui";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -81,7 +81,8 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
   const entry = settingsRegistry.find((item) => item.id === section) ?? settingsRegistry[0];
   const pageEntries = settingsRegistry.filter((item) => item.area === entry.area);
   const results = useMemo(() => searchSettings(query), [query]);
-  // A long page (many sections) opens with its sections as tabs that jump down the page.
+  // A long page (many sections) lists its sections under its row in the sidebar; picking one
+  // scrolls there.
   const [jumped, setJumped] = useState("");
   const jumpTo = (id: string) => {
     setJumped(id);
@@ -138,7 +139,17 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
         if (!blockIfUnsaved()) props.onClose?.();
       }}
       saveBar={<SettingsSaveBar />}
-      onSelect={(id) => select(id)}
+      onSelect={(id) => {
+        setJumped("");
+        select(id);
+      }}
+      sections={
+        settings && pageEntries.length > 4
+          ? pageEntries.map((item) => ({ id: item.id, label: item.label }))
+          : undefined
+      }
+      activeSection={jumped || undefined}
+      onSection={jumpTo}
       presentation={props.presentation}
       title={pageTitle}
       navigationHeader={
@@ -190,15 +201,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
             <DesktopSettingsRowSkeleton label={pageTitle} rows={4} control="switch" />
           </DesktopSettingsSection>
         )}
-        {settings && pageEntries.length > 4 ? (
-          <div className="mb-4">
-            <CollectionFilters
-              options={pageEntries.map((item) => ({ value: item.id, label: item.label }))}
-              value={jumped || pageEntries[0].id}
-              onChange={jumpTo}
-            />
-          </div>
-        ) : null}
         {settings &&
           pageEntries.map((item) => {
             const Block = item.Component;

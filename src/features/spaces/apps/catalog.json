@@ -14,7 +14,9 @@
       "sha256": "300e870c50b66d371055915ba95e3ddbfd4c45431466d5214743b5dcab95a0e1",
       "size": 11420690,
       "logo": "https://raw.githubusercontent.com/storytold/cadcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.cadcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "CADCraft",
         "logo": "logo.png",
@@ -23,7 +25,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -46,7 +50,9 @@
       "sha256": "e87273b5c0181785ce9059f5348353be44e18b4ba6485203babc26ef17f71d84",
       "size": 2667952,
       "logo": "https://raw.githubusercontent.com/storytold/craft-anything/v0.6.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.craft-anything.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "Craft Anything",
         "logo": "logo.png",
@@ -55,7 +61,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -78,7 +86,9 @@
       "sha256": "3196e537fcfab538aaa2e88584bc74e29bb584459b916ab584ac22fbafe32db5",
       "size": 11910503,
       "logo": "https://raw.githubusercontent.com/storytold/deckcraft/v0.18.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.deckcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "DeckCraft",
         "logo": "logo.png",
@@ -87,7 +97,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -110,7 +122,9 @@
       "sha256": "50fb2bebce1f48065318953393626b84b25cd1736c556e523275dadc46ae6906",
       "size": 27265672,
       "logo": "https://raw.githubusercontent.com/storytold/designcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.designcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "DesignCraft",
         "logo": "logo.png",
@@ -119,7 +133,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -142,16 +158,22 @@
       "sha256": "8adc985f345d73207abc69a27938905aba1729b63c6c9b332d0244a7567424f1",
       "size": 22524556,
       "logo": "https://raw.githubusercontent.com/storytold/effectcraft/v0.24.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.effectcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "EffectCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["video/*"],
+        "opens": [
+          "video/*"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -174,7 +196,9 @@
       "sha256": "2fbeb93f5022b0a7cc9d8528f1ed7e2b54c94d213ef79e65128aa898c399f02b",
       "size": 10534024,
       "logo": "https://raw.githubusercontent.com/storytold/figcraft/v0.18.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.figcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "FigCraft",
         "logo": "logo.png",
@@ -183,7 +207,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -206,16 +232,22 @@
       "sha256": "1cf3072e3f3b6535fcd024d6f6ab2a16cf7776345d868037dc630de0ad0dbbb8",
       "size": 15630847,
       "logo": "https://raw.githubusercontent.com/storytold/filmcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.filmcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "FilmCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["video/*"],
+        "opens": [
+          "video/*"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -238,7 +270,9 @@
       "sha256": "48c5d1b101befebb3c5ba3b7a14914f01c3207934813ed07dc4251b7ae116a78",
       "size": 9679862,
       "logo": "https://raw.githubusercontent.com/storytold/gridcraft/v0.19.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.gridcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "GridCraft",
         "logo": "logo.png",
@@ -247,7 +281,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -270,16 +306,22 @@
       "sha256": "57147383a46eaab3b0cc036acf9443b221450c6a19f5dc303ae165bb9678b8cb",
       "size": 74569049,
       "logo": "https://raw.githubusercontent.com/storytold/lightcraft/v0.21.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.lightcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "LightCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["image/*"],
+        "opens": [
+          "image/*"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -302,7 +344,9 @@
       "sha256": "73b8c319881fd7218737d30b5eeb033801a17427bcf3d31920da32a1fbb1ffec",
       "size": 5245824,
       "logo": "https://raw.githubusercontent.com/storytold/materialcraft/v0.4.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.materialcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "MaterialCraft",
         "logo": "logo.png",
@@ -311,7 +355,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -334,16 +380,22 @@
       "sha256": "fe9708d46af191aebb56f70eb32cf8b112b0b9452d17ae6ba3a8c4a8665fe748",
       "size": 34367297,
       "logo": "https://raw.githubusercontent.com/storytold/pdfcraft/v0.21.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.pdfcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "PdfCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["application/pdf"],
+        "opens": [
+          "application/pdf"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -366,16 +418,23 @@
       "sha256": "3a498eb517bca6cec89f9c6b1fc6448269a05428c8a3a4637c16817da157f03c",
       "size": 16064050,
       "logo": "https://raw.githubusercontent.com/storytold/photocraft/v0.23.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.photocraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "PhotoCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["image/*", ".psd"],
+        "opens": [
+          "image/*",
+          ".psd"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -398,21 +457,29 @@
       "sha256": "ca7c03c53cf4b7ec9ae26ef2cbde5d86566d006127040fe694fb95f9773a34e4",
       "size": 7179733,
       "logo": "https://raw.githubusercontent.com/storytold/soundcraft/v0.20.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.soundcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "SoundCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["audio/*"],
+        "opens": [
+          "audio/*"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"],
+        "permissions": [
+          "files"
+        ],
         "mcp": "binary"
       },
       "mcp_program": {
         "program": "soundcraft-cli",
-        "args": ["mcp"],
+        "args": [
+          "mcp"
+        ],
         "read_root_flag": "--automation-read-root",
         "write_root_flag": "--automation-write-root",
         "env": {
@@ -462,16 +529,22 @@
       "sha256": "6dea6a9f77a161cba3258ab4c6db591bdb4dd32b7385d16a7db997ab671a5f3b",
       "size": 9488618,
       "logo": "https://raw.githubusercontent.com/storytold/texturecraft/v0.6.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.texturecraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "TextureCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["image/*"],
+        "opens": [
+          "image/*"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -494,16 +567,22 @@
       "sha256": "de31befd175476f252e3563b4b1fdc6c887d5842b33fb7d1f5fdf007dc7633aa",
       "size": 38342892,
       "logo": "https://raw.githubusercontent.com/storytold/vectorcraft/v0.24.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.vectorcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "VectorCraft",
         "logo": "logo.png",
         "entry": "index.html",
-        "opens": ["image/svg+xml"],
+        "opens": [
+          "image/svg+xml"
+        ],
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"]
+        "permissions": [
+          "files"
+        ]
       },
       "add_copies": [
         {
@@ -526,7 +605,9 @@
       "sha256": "3daa7c2d1f209a7eeb2527fcefa3fe31e875848fb1970d68f54edae55fe0bc9f",
       "size": 22536015,
       "logo": "https://raw.githubusercontent.com/storytold/wordcraft/v0.18.1/assets/app-icon/hicolor/256x256/apps/ai.storyteller.wordcraft.png",
-      "permissions": ["files"],
+      "permissions": [
+        "files"
+      ],
       "manifest": {
         "name": "WordCraft",
         "logo": "logo.png",
@@ -535,7 +616,9 @@
         "own_origin": true,
         "inline_scripts": true,
         "shim": true,
-        "permissions": ["files"],
+        "permissions": [
+          "files"
+        ],
         "mcp": "adapter",
         "adapter": "misty/adapter.js"
       },

@@ -36,7 +36,7 @@ export interface CallPerson {
   sharing: boolean;
   /** This computer is watching their screen. */
   watching: boolean;
-  /** Their voice and their screen's sound; never this computer's own. */
+  /** Their voice, their screen's sound and their agents' voices; never this computer's own. */
   audio: Track[];
 }
 
@@ -65,13 +65,33 @@ function trackOf(participant: Participant, source: Track.Source, self: boolean) 
   return self || publication.isEncrypted ? publication.track : undefined;
 }
 
+/** The track name an agent's voice is published under, by its person (`callAgents.ts`). */
+export const AGENT_VOICE_PREFIX = "agent-voice:";
+
+/** Someone's agents' voices, each its own encrypted audio track. */
+function agentVoices(participant: Participant): Track[] {
+  return [...participant.trackPublications.values()]
+    .filter(
+      (publication) =>
+        publication.kind === Track.Kind.Audio &&
+        publication.trackName.startsWith(AGENT_VOICE_PREFIX) &&
+        !publication.isMuted &&
+        publication.isEncrypted,
+    )
+    .map((publication) => publication.track)
+    .filter((track): track is Track => Boolean(track));
+}
+
 function personOf(participant: Participant, self: boolean, watching: boolean): CallPerson {
   const shared = participant.getTrackPublication(Track.Source.ScreenShare);
   const audio = self
     ? []
-    : [Track.Source.Microphone, Track.Source.ScreenShareAudio]
-        .map((source) => trackOf(participant, source, false))
-        .filter((track): track is Track => Boolean(track));
+    : [
+        ...[Track.Source.Microphone, Track.Source.ScreenShareAudio]
+          .map((source) => trackOf(participant, source, false))
+          .filter((track): track is Track => Boolean(track)),
+        ...agentVoices(participant),
+      ];
   return {
     id: participant.identity,
     name: participant.name || participant.identity,

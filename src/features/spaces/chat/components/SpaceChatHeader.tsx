@@ -13,9 +13,19 @@ export function SpaceChatHeader(props: {
   /** A private channel. */
   locked: boolean;
   name: string;
+  /** A DM's face (the other person's, with their status) in place of the icon. */
+  face?: ReactNode;
   actions?: ReadonlyArray<ActionBarItem>;
   end?: ReactNode;
 }) {
   const icon = props.direct ? (props.group ? Users : User) : props.locked ? Lock : Hash;
-  return <ChannelHeader icon={icon} name={props.name} actions={props.actions} end={props.end} />;
+  return (
+    <ChannelHeader
+      icon={icon}
+      leading={props.face}
+      name={props.name}
+      actions={props.actions}
+      end={props.end}
+    />
+  );
 }

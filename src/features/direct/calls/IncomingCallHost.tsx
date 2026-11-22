@@ -14,6 +14,9 @@ import { CallFullscreen, CallMiniPlayer } from "./CallView";
 import { dmOf, useCallStore } from "./callStore";
 import { useMissedCalls } from "./missedCalls";
 
+/** How long a call rings with nobody answering before it is given up, as a phone's does. */
+const RING_SECONDS = 30;
+
 function readSealedKeys(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object") return {};
   return Object.fromEntries(
@@ -89,6 +92,33 @@ export function IncomingCallHost() {
   const waiting = Boolean(active?.caller && !active.answered);
   useEffect(() => (ringing ? loopCallSound("ring") : undefined), [ringing]);
   useEffect(() => (waiting ? loopCallSound("ringback") : undefined), [waiting]);
+
+  // Nobody answered: the caller's side gives up, which stops it ringing for the others. The ring
+  // here gives up a little later too, in case the caller's end never arrives.
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = window.setTimeout(() => {
+      const call = useCallStore.getState().active;
+      if (!call?.caller || call.answered) return;
+      useCallStore.getState().leave();
+      notify({ message: "No one answered." });
+    }, RING_SECONDS * 1_000);
+    return () => window.clearTimeout(timer);
+  }, [waiting]);
+  useEffect(() => {
+    if (!incoming) return;
+    const timer = window.setTimeout(
+      () => {
+        if (useCallStore.getState().incoming !== incoming) return;
+        useCallStore.getState().ring(null);
+        useMissedCalls
+          .getState()
+          .miss(incoming.dmId, { from: incoming.from, video: incoming.video, at: Date.now() });
+      },
+      (RING_SECONDS + 5) * 1_000,
+    );
+    return () => window.clearTimeout(timer);
+  }, [incoming]);
 
   const callerName = incoming
     ? (dms

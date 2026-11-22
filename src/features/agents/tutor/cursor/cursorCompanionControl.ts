@@ -1,6 +1,5 @@
 import { writeDevicePreference } from "@/features/settings/preferenceAccess";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
-import { invoke } from "@tauri-apps/api/core";
 import { lessonConversation } from "../lessons/lessonEntry";
 import { normalizeCompanionSize } from "./companionSize";
 import type { CompanionControl } from "./companionState";
@@ -43,9 +42,7 @@ export function createCompanionControl(s: CursorCompanionSession, voice: CursorC
       else s.tour.stop();
     } else if (control.kind === "stop_audio") {
       const previous = s.turn;
-      const next = s.nativeReady
-        ? await invoke<number>("cursor_companion_interrupt", { expectedTurn: previous })
-        : previous;
+      const next = s.nativeReady ? await s.endNativeTurn(previous) : previous;
       if (!s.active(previous)) return;
       s.turn = next;
       await s.interrupt(false);

@@ -377,6 +377,8 @@ export const personalAgentsApi = {
     const next: AgentProfile = {
       ...current,
       ...profile,
+      // A save that doesn't name the voice keeps the one the person picked.
+      voice: profile.voice === undefined ? current.voice : profile.voice,
       // Misty keeps being Misty: only how she works can change.
       ...(current.system_managed ? { name: current.name, enabled: true } : {}),
       // Its home Space moves only in its settings (`moveAgentHome`).

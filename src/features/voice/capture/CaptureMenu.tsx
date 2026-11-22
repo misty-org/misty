@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
   MenuItem,
 } from "@misty/ui";
-import { useSpeechSupport } from "../systemSpeech";
+import { useSpeechSupport } from "../speech";
 import { captureMicrophone, captureSystemAudio } from "./startCapture";
 import { useCaptureStore } from "./useCaptureStore";
 

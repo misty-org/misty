@@ -162,7 +162,7 @@ pub fn shortcut(tx: Sender<Shortcut>) {
             HotkeyEvent::Up => Shortcut::Held(false),
             HotkeyEvent::Click(x, y) => Shortcut::Click(x, y),
             HotkeyEvent::DoubleTap => Shortcut::Type,
-            HotkeyEvent::TripleTap => Shortcut::AlwaysOn,
+            HotkeyEvent::Escape => Shortcut::Escape,
             HotkeyEvent::Error(message) => Shortcut::Error(message),
         };
         if tx.send(shortcut).is_err() {

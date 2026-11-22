@@ -1,19 +1,20 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { InUseMark, TagDots, type CollectionColumn, type CollectionItem, type ColumnBrowserRow } from "@misty/ui";
 import { personTone } from "@/features/agents";
-import { FileNameIcon, thumbnailUrl } from "@/features/files";
+import { driveThumbnailUrl, FileNameIcon, thumbnailUrl } from "@/features/files";
 import { driveInUsePeople, driveSyncMark } from "../drive";
 import { formatBytes, formatDate, isPictured, kindOf } from "./format";
 import { itemShape, type FileItem } from "./model";
+import { thumbnailState, wantThumbnail } from "./thumbnails";
 
 /** The grid's picture size, in pixels, as the protocol makes it. */
 const THUMBNAIL_PX = 256;
 
-/** Finder's list columns after the name: Date modified, Size and Kind, each sorted by its own value. */
+/** Kura's list columns after the name: Modified, Size and Kind, each sorted by its own value. */
 export const fileColumns: CollectionColumn[] = [
   {
     key: "modified",
-    label: "Date modified",
+    label: "Modified",
     render: (item) => item.updated,
     sortValue: (item) => item.sortValues?.modified,
   },
@@ -37,10 +38,52 @@ export const itemIcon = (item: FileItem) => <FileNameIcon name={item.name} kind=
 /** The item's Finder tags, after its name. */
 const tagMarks = (item: FileItem) => (item.tags.length ? <TagDots tags={item.tags} /> : undefined);
 
-/** A picture of the file itself, for an image on the disk; drive files may not be on this computer yet. */
+/** Whether this computer holds a drive file's content, so a picture of it can be drawn without
+ * downloading it. */
+export const driveHasContent = (state: string) => state !== "online" && state !== "downloading";
+
+/** Where the grid's picture of the item comes from: an image on the disk, or one in a Space's drive
+ * that this computer already holds (a file only on the server shows its icon until it is opened). */
+export function thumbnailFor(item: FileItem): string | undefined {
+  if (item.folder || !isPictured(item.name)) return undefined;
+  const from = item.source;
+  if (from.kind === "disk") return thumbnailUrl(from.entry.path, item.modifiedMs, THUMBNAIL_PX);
+  if (from.kind === "drive" && from.entry.kind === "file" && driveHasContent(from.entry.state))
+    return driveThumbnailUrl(from.entry.space_id, from.entry.path, item.modifiedMs, THUMBNAIL_PX);
+  return undefined;
+}
+
+/** A grid picture that waits its turn in the thumbnail queue once it comes near the screen, and
+ * shows at once when it was fetched before. One that couldn't be made stays empty. */
+function Thumbnail({ url }: { url: string }) {
+  const picture = useRef<HTMLImageElement>(null);
+  const [state, setState] = useState(() => thumbnailState(url));
+  useEffect(() => {
+    const now = thumbnailState(url);
+    setState(now);
+    const shown = picture.current;
+    if (now !== "waiting" || !shown) return;
+    let drop: (() => void) | undefined;
+    const near = new IntersectionObserver(
+      (seen) => {
+        if (drop || !seen.some((entry) => entry.isIntersecting)) return;
+        drop = wantThumbnail(url, setState);
+      },
+      { rootMargin: "200px" },
+    );
+    near.observe(shown);
+    return () => {
+      near.disconnect();
+      drop?.();
+    };
+  }, [url]);
+  return <img ref={picture} alt="" src={state === "ready" ? url : undefined} />;
+}
+
+/** A picture of the file itself, where the grid shows one. */
 function preview(item: FileItem): ReactNode {
-  if (item.source.kind !== "disk" || item.folder || !isPictured(item.name)) return undefined;
-  return <img alt="" loading="lazy" src={thumbnailUrl(item.source.entry.path, item.modifiedMs, THUMBNAIL_PX)} />;
+  const url = thumbnailFor(item);
+  return url ? <Thumbnail url={url} /> : undefined;
 }
 
 const sizeText = (item: FileItem) => (itemShape(item) === "folder" ? "—" : formatBytes(item.size));

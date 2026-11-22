@@ -82,8 +82,15 @@ pub(crate) fn run(dispatch: fn(Input)) {
                         let p = event.location();
                         dispatch(Input::Click(p.x, p.y));
                     }
-                    // Control+C or Control and a scroll is a shortcut, not a tap.
-                    CGEventType::KeyDown => dispatch(Input::Key),
+                    // Control+C or Control and a scroll is a shortcut, not a tap. Escape (key code
+                    // 53) is told apart, so Tutor's tour can give way to it.
+                    CGEventType::KeyDown => dispatch(
+                        if event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) == 53 {
+                            Input::Escape
+                        } else {
+                            Input::Key
+                        },
+                    ),
                     CGEventType::ScrollWheel => dispatch(Input::Scroll),
                     // Only modifier changes move chords: arrow keys also carry
                     // the Fn flag, but on KeyDown, never on FlagsChanged.

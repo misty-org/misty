@@ -150,6 +150,8 @@ export async function handOff(input: {
   turn: number;
   interactionMode: "team" | "auto";
   screens: DisplayCapture[];
+  /** The engine's asking mode for this turn whatever the chat's choice, such as a turn someone else asked for. */
+  permissionMode?: "ask";
 }): Promise<{ invocationId: string; conversationId: string }> {
   let conversationId = agentThreadId(input.agent.id);
   if (!conversationId) {
@@ -173,6 +175,7 @@ export async function handOff(input: {
         turn: input.turn,
         executionMode: "user",
         interactionMode: input.interactionMode,
+        ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
         idempotencyKey: input.key,
         ...(input.screens.length ? { displayCaptures: input.screens } : {}),
       },

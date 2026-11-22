@@ -1,4 +1,4 @@
-import type { FormEvent, RefObject, UIEventHandler } from "react";
+import type { FormEvent, ReactNode, RefObject, UIEventHandler } from "react";
 import type { SpaceMessage, SpaceNode } from "../../api/dto/entities";
 
 export type SpaceChatStarter = "mention" | "files" | "space";
@@ -45,6 +45,9 @@ export interface SpaceChatMessagesProps {
   firstUnreadId?: string;
   /** The open channel, for its welcome at the top of its history; none for a direct message. */
   channel?: { name: string; private: boolean };
+  /** What a DM opens with at the top of its history (its people, not a channel), in place of
+   * the channel's welcome. */
+  welcome?: ReactNode;
 }
 
 export { DeleteMessageDialog } from "./DeleteMessageDialog";

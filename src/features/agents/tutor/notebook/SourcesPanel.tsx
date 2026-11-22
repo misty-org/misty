@@ -160,7 +160,7 @@ export function SourcesPanel({
     return (
       <Surface
         as="aside"
-        tone="none"
+        tone="sidebar"
         edge="hairline"
         className={`${railClass} border-0 border-r`}
         aria-label="Sources"
@@ -177,7 +177,7 @@ export function SourcesPanel({
   return (
     <Surface
       as="aside"
-      tone="none"
+      tone="sidebar"
       edge="hairline"
       className={`${paneClass} tutor-sources-pane border-0 border-r`}
       aria-label="Sources"

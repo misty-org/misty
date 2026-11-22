@@ -83,3 +83,6 @@ class ScreenAudioProcessor extends AudioWorkletProcessor {
 }
 
 registerProcessor("misty-screen-audio", ScreenAudioProcessor);
+
+// A module of its own, so its declarations stay out of the global scope.
+export {};

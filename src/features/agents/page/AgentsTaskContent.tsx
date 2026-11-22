@@ -8,7 +8,7 @@ import type { AgentsPageState } from "./useAgentsPageState";
 import { AgentBrowserPip } from "../agent-browser/AgentBrowserPip";
 import { setBrowserExpanded } from "../agent-browser/agentBrowserStore";
 import { chatKey } from "../conversations/state/draftChat";
-import { cn, Surface, windowToolbarClass } from "@misty/ui";
+import { cn, Separator, Surface, windowToolbarClass } from "@misty/ui";
 
 /**
  * The chat's header (the heading, or the studio bar in the workspace) floats over the top of the
@@ -93,11 +93,12 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                 disabled={disabled}
               />
             ) : state.workspacePage === "task" ? (
-              // The page's one top band, as tall as the sidebar's head, with plain buttons on it.
-              // On the page's own fill, so the conversation scrolls under it unseen.
+              // The page's one top band, as tall as the sidebar's head, with plain buttons on it: a
+              // FramedPage toolbar row on the frame's color, closed by a hairline, so the
+              // conversation scrolls under it unseen.
               <Surface
                 as="header"
-                tone="page"
+                tone="sidebar"
                 className={cn(
                   "agent-studio-bar",
                   floatingHeaderClass,
@@ -108,6 +109,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
               >
                 <ChatTitle conversation={conversation} agent={profile} />
                 <ChatHeaderButtons />
+                <Separator className="absolute inset-x-0 bottom-0" />
               </Surface>
             ) : null}
             {/* The agent browser as a picture-in-picture floating over the chat; opening it puts

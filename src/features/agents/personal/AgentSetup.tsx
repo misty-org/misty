@@ -22,6 +22,7 @@ import { AgentAvatar, AgentCloudImage } from "./AgentAvatar";
 import { agentCloudVariants } from "./agentCloudAvatars";
 import { AgentAccess, type AgentAccessState } from "./AgentAccess";
 import { hasTauriInternals } from "@/shared/platform/tauri";
+import { AgentVoicePicker } from "./AgentVoicePicker";
 
 export function AgentSetup(props: {
   access: AgentAccessState;
@@ -58,6 +59,7 @@ export function AgentSetup(props: {
   const { onStatusChange } = props;
   const dirty = Boolean(
     draft.name ||
+    draft.voice ||
     draft.description ||
     draft.instructions ||
     step ||
@@ -72,7 +74,7 @@ export function AgentSetup(props: {
   }, [step]);
   const desktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
   const finish = async () => {
-    if (busy || !draft.name.trim()) return;
+    if (busy || !draft.name.trim() || !draft.voice) return;
     setBusy(true);
     setError("");
     try {
@@ -94,6 +96,7 @@ export function AgentSetup(props: {
       className="grid gap-6"
       onSubmit={(event) => {
         event.preventDefault();
+        if (!draft.name.trim() || !draft.voice) return;
         if (step < 2) setStep(step + 1);
         else void finish();
       }}
@@ -119,8 +122,12 @@ export function AgentSetup(props: {
         options={["Identity", "Context", "Start"].map((label, index) => ({
           value: String(index),
           label,
-          disabled: busy || (index > 0 && !draft.name.trim()),
-          reason: busy ? undefined : "Name your agent first",
+          disabled: busy || (index > 0 && (!draft.name.trim() || !draft.voice)),
+          reason: busy
+            ? undefined
+            : !draft.name.trim()
+              ? "Name your agent first"
+              : "Pick its voice first",
         }))}
       />
       <fieldset disabled={busy} className="grid min-w-0 gap-4">
@@ -162,6 +169,15 @@ export function AgentSetup(props: {
                 value={draft.name}
                 placeholder="Research partner"
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              />
+            </Field>
+            {/* Its own voice, picked by the person: part of making it, like its picture. */}
+            <Field label="Voice">
+              <AgentVoicePicker
+                name={draft.name}
+                voice={draft.voice}
+                disabled={busy}
+                onChange={(voice) => setDraft({ ...draft, voice })}
               />
             </Field>
             <Field label="Purpose">
@@ -224,7 +240,12 @@ export function AgentSetup(props: {
         ) : (
           <span />
         )}
-        <Button type="submit" variant="primary" size="lg" disabled={!draft.name.trim() || busy}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          disabled={!draft.name.trim() || !draft.voice || busy}
+        >
           {step === 2 ? "Create agent" : "Continue"}
         </Button>
       </div>

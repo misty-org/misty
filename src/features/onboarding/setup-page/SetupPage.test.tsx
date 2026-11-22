@@ -60,6 +60,34 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
         };
       case "direct_apps_list":
         return [];
+      // Misty's speech catalog: one voice for the person's language.
+      case "speech_catalog":
+        return {
+          hearing: [],
+          voices: [
+            {
+              id: "amy",
+              name: "Amy",
+              maker: "",
+              source: "",
+              license: "MIT",
+              languages: ["en"],
+              package: { url: "", sha256: "", size: 0 },
+              disk_mb: 60,
+              memory_mb: 100,
+              installed: false,
+              outdated: false,
+              packageKey: "amy",
+              accent: "British English",
+              gender: "female",
+              family: "piper",
+              speaker: 0,
+            },
+          ],
+          supportInstalled: false,
+          machine: { memoryMb: 16_000, cores: 8, appleSilicon: true, diskFreeMb: null },
+          installing: [],
+        };
       // What each engine can do: only one with images, Misty's tools and web search can be the
       // default engine (OpenCode, here, has no web search).
       case "engines_list":
@@ -163,7 +191,7 @@ it("explains how Misty works before the engines, and comes back to it", async ()
   expect(screen.getByRole("heading", { name: "How Misty works" })).toBeTruthy();
   expect(screen.getByText(/doesn't control how it behaves/)).toBeTruthy();
   expect(screen.getByText(/An AI does the work/)).toBeTruthy();
-  expect(screen.getAllByRole("listitem", { name: /^Step \d of 3$/ }).length).toBe(3);
+  expect(screen.getAllByRole("listitem", { name: /^Step \d of 4$/ }).length).toBe(4);
   expect(screen.queryByRole("button", { name: "Install Claude Code" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(await screen.findByRole("heading", { name: "Pick your default engine" })).toBeTruthy();
@@ -235,6 +263,15 @@ it("offers only the direct sign-ins, which need no key, then ends the welcome", 
   mocks.installed.add("claude");
   mocks.signedIn.set("claude", true);
   renderSetup();
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  // Misty's voice is the person's to pick before moving on.
+  expect(await screen.findByRole("heading", { name: "Pick Misty's voice" })).toBeTruthy();
+  const amy = await screen.findByRole("button", { name: "Amy (British English)" });
+  expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
+  fireEvent.click(amy);
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
   );

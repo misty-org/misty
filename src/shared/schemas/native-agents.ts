@@ -7,6 +7,15 @@ export const AgentProfileInputSchema = z.strictObject({
   instructions: z.string().max(16000).default(""),
   icon: z.string().max(128).default(""),
   avatar: z.record(z.string(), z.json()).default({}),
+  /**
+   * The agent's own voice, a speech catalog voice id ("kokoro-heart"), picked by the person when
+   * they made it. Absent on agents made before voices: they speak in Misty's voice until one is picked.
+   */
+  voice: z
+    .string()
+    .max(64)
+    .regex(/^[a-z0-9-]*$/)
+    .optional(),
   model_mode: z.enum(["automatic", "pinned"]).default("automatic"),
   model_id: z.string().max(200).default(""),
   reasoning_effort: z.string().max(32).default(""),

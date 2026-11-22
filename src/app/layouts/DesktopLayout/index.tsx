@@ -38,7 +38,6 @@ import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
 import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
 import { useOtherWindowsHiddenWhileAddingAccount, useSignedOutWindow } from "./useSignedOutWindow";
 import { useStrayBrowserPages } from "./useStrayBrowserPages";
-import { useFocusModeShortcuts } from "./useFocusModeShortcuts";
 import { useSettingsOverlay } from "./useSettingsOverlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
 import { useCaptionSlot } from "./useCaptionSlot";
@@ -68,7 +67,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const docking = useWindowDockingLayout();
-  const focusMode = useFocusModeShortcuts();
   const {
     settingsOpen,
     setSettingsOpen,
@@ -92,7 +90,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
 
   useEffect(() => setAccountMenuOpen(false), [docking]);
   const shellRef = useRef<HTMLElement>(null);
-  useDockingTransition(shellRef, `${docking.navigation}:${docking.tabs}:${focusMode}`);
+  useDockingTransition(shellRef, `${docking.navigation}:${docking.tabs}`);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
   // Seated at the tab row's end when there is one, so they share its height and line.
@@ -107,7 +105,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     shellRef,
     pathname: location.pathname,
     docking,
-    focusMode,
     shouldShowWindowsControls,
     captionInline: Boolean(captionSlot),
     appZoom,
@@ -220,7 +217,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
             <WorkspaceCanvas
               windowsTitlebarControls={shouldShowWindowsControls}
               tabPosition={docking.tabs}
-              hideTabStrip={focusMode}
               stripAccount={stripAccount}
             />
           )}

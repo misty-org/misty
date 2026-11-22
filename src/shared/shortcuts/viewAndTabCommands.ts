@@ -1,18 +1,6 @@
 import { command } from "./factory";
 
-// Focus mode and tab commands.
-export const focusModeCommands = [
-  command("app.toggle_focus_mode", "Toggle focus mode", {
-    description: "Hide the sidebar so pages fill the window.",
-    category: "View",
-    aliases: ["hide sidebar", "hide tabs", "distraction free", "fullscreen"],
-    mac: "Cmd+Shift+S",
-    windows: "Ctrl+Shift+S",
-    allowInEditable: true,
-    nativeMenu: true,
-  }),
-];
-
+// Tab commands.
 export const tabFeatureCommands = [
   command("workspace.clear_tabs", "Clear tabs", {
     description: "Close every tab except the one you are on.",

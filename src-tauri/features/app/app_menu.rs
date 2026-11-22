@@ -111,13 +111,6 @@ fn build_menu<R: Runtime>(
             &command_item(
                 manager,
                 snapshot,
-                "app.toggle_focus_mode",
-                "Toggle Focus Mode",
-                "Cmd+Shift+S",
-            )?,
-            &command_item(
-                manager,
-                snapshot,
                 "navigation.refresh",
                 "Refresh Focused Tool",
                 "Cmd+R",
@@ -128,21 +121,21 @@ fn build_menu<R: Runtime>(
                 snapshot,
                 "app.zoom_in",
                 "Scale App Up",
-                "Cmd+Shift+Plus",
+                "Cmd+Plus",
             )?,
             &command_item(
                 manager,
                 snapshot,
                 "app.zoom_out",
                 "Scale App Down",
-                "Cmd+Shift+Minus",
+                "Cmd+Minus",
             )?,
             &command_item(
                 manager,
                 snapshot,
                 "app.zoom_reset",
                 "Reset App Scale",
-                "Cmd+Shift+0",
+                "Cmd+0",
             )?,
         ],
     )?;

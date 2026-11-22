@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { voiceApi } from "./api";
 import { insertIntoFocusedField } from "./insertText";
-import { listen as listenToSpeech, type Listening } from "./systemSpeech";
+import { hear, type HearingSession } from "./speech";
 import type { VoiceSettings } from "./voiceSettings";
 import { findVocative, routeToAgent } from "./vocativeRoute";
 
@@ -23,14 +23,21 @@ const PILL = "misty-dictation-pill";
 /** Cleanup is skipped for a word or two: nothing to tidy. */
 const CLEANUP_MIN_WORDS = 3;
 
+/** Words heard in a dictation, kept as they arrive. */
+interface Live {
+  session: HearingSession;
+  said: string[];
+}
+
 /**
- * Runs dictation in the main window: the native side reports the shortcut and the microphone's
- * level; this listens through the computer's own speech recognition (no key), keeps the pill
- * current, then cleans up, routes or inserts the words.
+ * Runs dictation in the main window: the native side reports the shortcut and sends the
+ * microphone's audio and level; the audio goes into a hearing session (Misty's speech model on
+ * this computer, no key), whose words keep the pill current, then this cleans up, routes or
+ * inserts them.
  */
 export class DictationController {
   private turn = 0;
-  private live?: Promise<Listening | undefined>;
+  private live?: Promise<Live | undefined>;
   private pill: PillState = {
     phase: "listening",
     text: "",
@@ -48,13 +55,16 @@ export class DictationController {
         "misty://dictation",
         ({ payload }) => void this.onPhase(payload.turn, payload.phase, payload.message),
       ),
-      // The native side's microphone only drives the pill's level now; the words come from the
-      // system's recognizer.
+      // The native side's microphone: its level drives the pill, and its audio is heard.
       listen<{ turn: number; pcm: string; power: number }>(
         "misty://dictation-audio",
         ({ payload }) => {
           if (payload.turn !== this.turn) return;
           this.show({ power: payload.power });
+          const turn = payload.turn;
+          void this.live?.then((live) => {
+            if (live && turn === this.turn) live.session.push("mic", payload.pcm);
+          });
         },
       ),
       listen(
@@ -112,7 +122,7 @@ export class DictationController {
   private drop() {
     const live = this.live;
     this.live = undefined;
-    void live?.then((listening) => listening?.stop()).catch(() => undefined);
+    void live?.then((heard) => heard?.session.stop()).catch(() => undefined);
   }
 
   private async begin(turn: number) {
@@ -126,21 +136,28 @@ export class DictationController {
       locked: false,
       note: undefined,
     });
-    const live = listenToSpeech((heard) => {
+    const said: string[] = [];
+    const live = hear((event) => {
       if (turn !== this.turn) return;
-      if (heard.error) return this.show({ phase: "notice", note: "Dictation stopped." });
-      // The recognizer revises the whole utterance as it goes: it's all provisional until done.
-      this.show(heard.final ? { text: heard.text, provisional: "" } : { provisional: heard.text });
-    }).catch((error: unknown) => {
-      if (turn === this.turn) {
-        this.show({
-          phase: "notice",
-          note: error instanceof Error ? error.message : "Dictation couldn't start.",
-        });
-        void invoke("voice_dictation_stop").catch(() => {});
+      if (event.kind === "failed")
+        return this.show({ phase: "notice", note: "Dictation stopped." });
+      // Each pause brings what was said before it; while they speak, the level shows it.
+      if (event.kind === "heard" && event.text.trim()) {
+        said.push(event.text.trim());
+        this.show({ text: said.join(" "), provisional: "" });
       }
-      return undefined;
-    });
+    })
+      .then((session): Live => ({ session, said }))
+      .catch((error: unknown) => {
+        if (turn === this.turn) {
+          this.show({
+            phase: "notice",
+            note: error instanceof Error ? error.message : "Dictation couldn't start.",
+          });
+          void invoke("voice_dictation_stop").catch(() => {});
+        }
+        return undefined;
+      });
     this.live = live;
   }
 
@@ -149,7 +166,13 @@ export class DictationController {
     this.live = undefined;
     if (!live) return;
     this.show({ phase: "finishing" });
-    const heard = ((await (await live)?.stop().catch(() => "")) ?? "").trim();
+    const heard = await live
+      .then(async (found) => {
+        if (!found) return "";
+        await found.session.stop().catch(() => undefined);
+        return found.said.join(" ").trim();
+      })
+      .catch(() => "");
     if (turn !== this.turn) return;
     if (!heard) return this.show({ phase: "notice", note: "Didn't catch anything." });
     const vocative = this.settings.agentHandoff ? findVocative(heard) : null;

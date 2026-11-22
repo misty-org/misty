@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, IconButton, Surface } from "@misty/ui";
+import { cn, IconButton, Separator, Surface } from "@misty/ui";
 import { useMistyStore } from "../../conversations/state/useMistyStore";
 import { AgentWorkspaceConversation } from "../../conversations/view/AgentWorkspaceConversation";
 import { openAgentsHub } from "../../hub/agentsHubStore";
@@ -72,11 +72,13 @@ export function CodeChatColumn({
       });
   };
   return (
-    // Files dropped on the column go to its message box, as on the task page.
+    // Files dropped on the column go to its message box, as on the task page. Its bar is one of
+    // the page's toolbar rows, on the sidebar's color with a hairline under it; the messages sit
+    // on the page's.
     <div className={chatColumnClass} data-file-drop-area="">
       <Surface
         as="header"
-        tone="page"
+        tone="sidebar"
         className={cn("agent-studio-bar", floatingHeaderClass, studioBarClass)}
       >
         {/* In Code the agent works quietly: its small mark, no persona. */}
@@ -89,6 +91,7 @@ export function CodeChatColumn({
         <IconButton label="Close chat" onClick={onClose}>
           <X />
         </IconButton>
+        <Separator className="absolute inset-x-0 bottom-0" />
       </Surface>
       <AgentWorkspaceConversation
         key={`${accountId}:${conversationId}`}

@@ -34,8 +34,13 @@ export function dataUrl(bytes: ArrayBuffer, mimeType: string): string {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
+/** The webview's own base64 decoder where it has one (Safari 18.2 and later), many times faster than a loop. */
+const fromBase64 = (Uint8Array as unknown as { fromBase64?: (text: string) => Uint8Array }).fromBase64;
+
 function blobOfDataUrl(url: string, mimeType: string): Blob {
-  const binary = atob(url.slice(url.indexOf(",") + 1));
+  const base64 = url.slice(url.indexOf(",") + 1);
+  if (fromBase64) return new Blob([fromBase64.call(Uint8Array, base64)], { type: mimeType });
+  const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
   return new Blob([bytes], { type: mimeType });

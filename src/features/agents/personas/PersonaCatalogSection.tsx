@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Button,
   CatalogDone,
-  CollectionFilters,
+  BackButton,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -252,16 +252,11 @@ export function PersonaCatalogSection({
 
   return (
     <>
-      {picks ? null : (
-        <CollectionFilters
-          value={division}
-          onChange={setDivision}
-          options={[
-            { value: "all", label: "All" },
-            ...divisions.map((entry) => ({ value: entry.id, label: entry.label })),
-          ]}
-        />
-      )}
+      {!picks && division !== "all" ? (
+        <BackButton className="justify-self-start" onClick={() => setDivision("all")}>
+          All templates
+        </BackButton>
+      ) : null}
       {shelves}
       {query.trim() && !shown.length && !picks ? (
         <EmptyState inline title="No agents found" line="Try another word or category." />

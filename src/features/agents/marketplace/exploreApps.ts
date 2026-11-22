@@ -40,10 +40,8 @@ export interface ExploreAppsSectionProps {
   canManage: boolean;
   query?: string;
   limit?: number;
-  only?: readonly "open"[];
   onSeeAll?: () => void;
   featured?: boolean;
-  startGroup?: "all" | "connected";
 }
 
 export interface ExploreAppsParts {

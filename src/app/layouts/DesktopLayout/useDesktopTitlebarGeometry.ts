@@ -12,7 +12,6 @@ export function useDesktopTitlebarGeometry(options: {
   shellRef: RefObject<HTMLElement | null>;
   pathname: string;
   docking: ReturnType<typeof useWindowDockingLayout>;
-  focusMode: boolean;
   shouldShowWindowsControls: boolean;
   /** The caption buttons sit in the tab row, so the window's corner reserves nothing. */
   captionInline: boolean;
@@ -22,7 +21,6 @@ export function useDesktopTitlebarGeometry(options: {
     shellRef,
     pathname,
     docking,
-    focusMode,
     shouldShowWindowsControls,
     captionInline,
     appZoom,
@@ -56,7 +54,7 @@ export function useDesktopTitlebarGeometry(options: {
   const geometry = dockingGeometry({ sideTabsWidth, ...docking });
   useMergedTitlebar(
     shellRef,
-    `${docking.navigation}:${docking.tabs}:${focusMode}`,
+    `${docking.navigation}:${docking.tabs}`,
     !isAuthRoute,
     titlebarNavigationGeometry.left,
     captionRight,

@@ -157,34 +157,20 @@ export function CursorOverlayMarkup({
             "group-data-[phase=processing]/companion:opacity-100",
             screenMarkClass.halo,
           )}
-          viewBox="-2 -2 18 18"
+          viewBox="0 0 18 18"
         >
-          <defs>
-            <mask
-              id="cursor-processing-arc"
-              maskUnits="userSpaceOnUse"
-              x="-2"
-              y="-2"
-              width="18"
-              height="18"
-            >
-              <circle
-                cx="7"
-                cy="7"
-                r="7"
-                pathLength="100"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeDasharray="70 30"
-                strokeDashoffset="-15"
-              />
-            </mask>
-          </defs>
-          <foreignObject x="-2" y="-2" width="18" height="18" mask="url(#cursor-processing-arc)">
-            <div className={cn("size-full", screenMarkClass.sweep)} />
-          </foreignObject>
+          {/* Plain strokes only: WebKit draws a masked foreignObject blurred and out of place
+              while it turns. */}
+          <circle cx="9" cy="9" r="7" strokeWidth="2.5" className={screenMarkClass.spinnerTrack} />
+          <circle
+            cx="9"
+            cy="9"
+            r="7"
+            pathLength="100"
+            strokeWidth="2.5"
+            strokeDasharray="28 72"
+            className={screenMarkClass.spinnerArc}
+          />
         </svg>
         <div
           ref={bubble}
@@ -221,12 +207,11 @@ export function CursorOverlayMarkup({
           </div>
         )}
         {presentation.error && !presentation.point && (
-          <div className={cn("cursor-error-bubble left-0", bubbleClass)}>
+          // What went wrong, said plainly; holding the talk keys again is the retry.
+          <div className={cn("cursor-error-bubble left-0 max-w-72", bubbleClass)}>
             {presentation.error.includes("Speech failed:")
               ? "Speech unavailable"
-              : "Companion needs attention"}
-            <br />
-            Open Agents to retry.
+              : presentation.error}
           </div>
         )}
       </div>

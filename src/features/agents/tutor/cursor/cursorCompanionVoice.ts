@@ -17,6 +17,7 @@ import type { CompanionOrigin, CursorCompanionSession } from "./cursorCompanionS
 import { keptTutorTurns, tutorConversation } from "./tutorConversation";
 import { CursorCompanionTasks, taskReply } from "./cursorCompanionTasks";
 import { handoffAgents, openAgentThread } from "./tutorHandoff";
+import { taskVoice } from "./tutorTaskVoice";
 import { forgetTutorStyle, rememberTutorStyle, tutorStyle } from "./tutorStyle";
 
 const mutedNotice = /Mac/.test(navigator.platform)
@@ -36,9 +37,9 @@ const everyMonitor =
   /\b(?:all|both|every)\s+(?:of\s+)?(?:my\s+|the\s+)?(?:monitors|screens|displays)\b/i;
 
 /**
- * The spoken conversation: one voice session per Misty conversation, heard by this computer's
- * recognizer and answered on the default engine, the tasks it hands to the person's agent, and
- * reading finished results aloud in the system voice.
+ * The spoken conversation: one voice session per Misty conversation, heard by Misty's hearing
+ * model and answered on the default engine, the tasks it hands to the person's agent, and
+ * reading finished results aloud in Misty's voice.
  */
 export class CursorCompanionVoice {
   /** Tasks whose work was read out as it happened, so their answer isn't read again at the end. */
@@ -74,7 +75,10 @@ export class CursorCompanionVoice {
     const s = this.s;
     const turn = s.turn;
     this.narrated.add(invocationId);
-    const reading = openReading();
+    // The agent doing the task reads its steps in its own voice.
+    const voice = taskVoice(s, invocationId);
+    if (voice === null) return;
+    const reading = openReading(voice);
     const sentences = new SpokenSentences((sentence) => reading.add(sentence));
     let stop = () => {};
     const finished = () => {
@@ -118,7 +122,11 @@ export class CursorCompanionVoice {
       // While the character flies to a point, keep it visible instead of a spinner.
       if (!s.pointPending) s.change({ phase: "processing" });
       // A finished task isn't read out over a call; its answer is in the chat.
-      if (!(await onCall())) await this.start().readResult(id);
+      if (!(await onCall())) {
+        // Read in the voice of the agent who did the task; nothing while its voice sets up.
+        const voice = taskVoice(s, id);
+        if (voice !== null) await this.start().readResult(id, voice);
+      }
       if (!s.active(generation)) return;
       s.voicePending = false;
       s.clearFocus();

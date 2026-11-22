@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
 import { create } from "zustand";
 import type { PipCorner } from "@misty/ui";
 import { dmPath } from "../directData";
 import type { ActiveCall } from "./callStore";
 import type { CallControls } from "./useLiveKitCall";
+import type { CallAgentPart } from "./useCallAgent";
 
 /**
  * The call this window is in, as everything that draws it reads it: the room is joined once, by
@@ -13,8 +13,8 @@ import type { CallControls } from "./useLiveKitCall";
  */
 interface CallSessionState {
   controls: CallControls | null;
-  /** A talk-to-an-agent's rows and its trigger (`useCallAgent`), drawn by whatever shows the call. */
-  agent: { rows: ReactNode; trigger: ReactNode } | null;
+  /** The call's agents: their tiles, rows and menu (`useCallAgent`), drawn by whatever shows the call. */
+  agent: CallAgentPart | null;
   /** The name a person in the call goes by here: the DM's or the Space's. */
   nameOf: (userId: string) => string;
   /** The call fills the window (and the window fills the screen). */

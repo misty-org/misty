@@ -9,7 +9,7 @@
     "build": "tsc && vite build --mode desktop --config .config/vite.config.ts",
     "preview": "vite preview --mode desktop --config .config/vite.config.ts",
     "tauri": "node tasks/tauri.ts",
-    "sync:apps": "node tasks/sync-apps-catalog.ts",
+    "sync:catalog": "node tasks/sync-catalog.ts",
     "design:rules": "node tasks/design-rules.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --config .config/eslint.config.js",

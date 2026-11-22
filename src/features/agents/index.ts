@@ -24,7 +24,6 @@ export type { AppRequest } from "./connected-apps/api";
 export { appsApi } from "./connected-apps/api";
 export { AppLogo } from "./connected-apps/ConnectedAppRows";
 export { DirectApps } from "./connected-apps/DirectApps";
-export { AppsPage } from "./connected-apps/AppsPage";
 export { AgentAvatar, AgentMark } from "./personal/AgentAvatar";
 export { useLessonStore } from "./tutor/lessons/lessonStore";
 export { tutorChatIds, useTutorChatIds, useTutorStore } from "./tutor/tutorStore";
@@ -33,7 +32,7 @@ export { tutorChatIds, useTutorChatIds, useTutorStore } from "./tutor/tutorStore
 export { BrowserContextMenuBridge } from "./conversations/context/BrowserContextMenuBridge";
 export { MistyContextBridgeHost } from "./conversations/context/MistyContextBridgeHost";
 export { useMistyStore } from "./conversations/state/useMistyStore";
-export { agentCallTurn, callAgents } from "./calls/agentCallTurn";
+export { agentCallTurn, callAgents, type CallTurn } from "./calls/agentCallTurn";
 export { AgentExecutionSurface } from "./island/AgentExecutionSurface";
 export { agentAccountId } from "./personal/agentAccount";
 export { desktopDeviceGrants } from "./personal/deviceGrants";

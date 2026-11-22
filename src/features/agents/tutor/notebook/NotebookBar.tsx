@@ -62,7 +62,7 @@ export function NotebookBar({
   return (
     <Surface
       as="header"
-      tone="none"
+      tone="sidebar"
       edge="hairline"
       className="flex min-h-13 flex-none items-center gap-1.5 border-0 border-b px-3 py-2"
     >

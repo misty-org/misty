@@ -68,9 +68,17 @@ export function SpaceChat({
   /** The message search, last in the chat's bar. */
   search?: ReactNode;
   /** The chat is a DM (a Space of kind "direct"): named for its people, no setup cards, and no
-   * composer while it is read-only. Its page names the tab. */
-  /** A DM, which brings its own member list (`members`) since it is no Space of the list. */
-  dm?: { name: string; group: boolean; readOnly: boolean; members?: ReactNode };
+   * composer while it is read-only. Its page names the tab. It brings what a Space can't know
+   * about its people: the face in its bar (`face`), the opening of its history (`welcome`) and
+   * what sits beside the messages (`members`: the other person's profile, or a group's people). */
+  dm?: {
+    name: string;
+    group: boolean;
+    readOnly: boolean;
+    face?: ReactNode;
+    welcome?: ReactNode;
+    members?: ReactNode;
+  };
   /** What sits between the chat's bar and its messages, such as a DM's call: the bar stays on top,
    * and a handle between the stage and the messages gives either more room. */
   stage?: ReactNode;
@@ -126,8 +134,10 @@ export function SpaceChat({
   const preferences = useChatSidebarPreferences((state) => state.value);
   const membersShown = !preferences.hideMembers;
   const conversation = scope.activeConversation;
-  const isDirect = conversation?.kind === "dm";
-  const channelName = conversation ? conversationName(conversation, user?.id) : "everyone";
+  // A DM is a Space of its own whose chat has no conversation of kind "dm", so its page says so.
+  const isDirect = Boolean(dm) || conversation?.kind === "dm";
+  const channelName =
+    dm?.name ?? (conversation ? conversationName(conversation, user?.id) : "everyone");
   const defaultRoleId = roles?.find((role) => role.is_default)?.id;
   const privateChannel = Boolean(conversation && isPrivateChannel(conversation, defaultRoleId));
   // In a channel the server says what the person may do there; elsewhere the Space's word holds.
@@ -380,6 +390,7 @@ export function SpaceChat({
           canManageMessages={canManageMessages}
           firstUnreadId={firstUnreadId}
           channel={isDirect ? undefined : { name: channelName, private: privateChannel }}
+          welcome={dm?.welcome}
           onOpenPicker={openPicker}
           onBeginMention={input.beginMention}
           onReply={(id) => {
@@ -421,7 +432,11 @@ export function SpaceChat({
             if (mine) editing.begin(mine);
           }}
           placeholder={
-            dm || isDirect ? `Message @${dm?.name ?? channelName}` : `Message #${channelName}`
+            dm?.group
+              ? `Message ${channelName}`
+              : isDirect
+                ? `Message @${channelName}`
+                : `Message #${channelName}`
           }
         />
       )}
@@ -478,7 +493,8 @@ export function SpaceChat({
   // The chat's own bar, under the window's tabs, as Discord's: what the chat is, then its controls.
   const header = (
     <SpaceChatHeader
-      direct={Boolean(dm) || isDirect}
+      direct={isDirect}
+      face={dm?.face}
       group={dm ? dm.group : Boolean(conversation && isGroupDirectMessage(conversation, user?.id))}
       locked={privateChannel}
       name={dm?.name ?? channelName}

@@ -1,7 +1,7 @@
 //! An app's MCP server as a program its maker ships (`mcp: binary`), such as SoundCraft's `soundcraft-cli mcp`.
 //!
 //! Which program, from which release and with which checksum, comes only from the catalog Misty carries
-//! (`src/features/spaces/apps/catalog.json`, a copy of misty-apps'), never from a page: the page only says which
+//! (`src/features/spaces/apps/catalog.json`, a copy of misty-catalog's), never from a page: the page only says which
 //! installed app and version a Space has. The maker's archive for this platform is downloaded, checked against that
 //! checksum, and only the one program file is taken out of it.
 //!

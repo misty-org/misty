@@ -1,9 +1,11 @@
+import { Clock, Download, FileText, HardDrive, House, Monitor, Star, Trash2 } from "lucide-react";
 import type { PathLineSegment } from "@misty/ui";
 import type { Places } from "@/features/files";
 import type { Space } from "../api/dto/entities";
 import { driveParent } from "../drive";
 import { spaceNavigationName } from "../routes/defaultSpace";
 import type { FilesKeyCommands } from "./filesKeys";
+import type { SearchLocation } from "./FilesSearch";
 import { foldersAbove, foldersBetween, nameOf, parentOf, type FilesPlace } from "./model";
 import type { FilesBrowserState } from "./useFilesBrowser";
 
@@ -15,9 +17,9 @@ const listNames: Partial<Record<FilesPlace["kind"], string>> = {
   "agent-trash": "Agent trash",
 };
 
-/** A folder's name in the path: a drive's own name at its root, Home for the home folder. */
+/** A folder's name in the path: a drive's own name at its root, "/" for the disk's top. */
 function folderLabel(path: string, places: Places | null): string {
-  if (places?.home === path) return "Home";
+  if (path === "/") return "/";
   const drive = places?.drives.find((each) => each.path === path);
   if (drive) return drive.name;
   return nameOf(path) || path;
@@ -32,12 +34,12 @@ export function pathSegments(
 ): PathLineSegment[] {
   switch (place.kind) {
     case "disk": {
-      // From the home folder when it is inside it, as Finder's path bar does; otherwise from the disk's top.
-      const home = places?.home;
-      const chain = home && (place.path === home || place.path.startsWith(`${home}/`) || place.path.startsWith(`${home}\\`))
-        ? foldersBetween(home, place.path)
-        : foldersAbove(place.path);
-      return chain.map((path) => ({ id: path, label: folderLabel(path, places), onSelect: () => go({ kind: "disk", path }) }));
+      // The whole path from the disk's top, as Kura's path bar shows it.
+      return foldersAbove(place.path).map((path) => ({
+        id: path,
+        label: folderLabel(path, places),
+        onSelect: () => go({ kind: "disk", path }),
+      }));
     }
     case "project":
       return foldersBetween(place.root, place.path).map((path) => ({
@@ -65,6 +67,42 @@ export function pathSegments(
     default:
       return [{ id: place.kind, label: listNames[place.kind] ?? "Files" }];
   }
+}
+
+/** The open place as a path to type over in the path bar; empty where it isn't a folder on this computer. */
+export function typedPath(place: FilesPlace): string {
+  return place.kind === "disk" || place.kind === "project" ? place.path : "";
+}
+
+/** Every place the search's Locations can offer: the sidebar's places, the drives and the Space drives. */
+export function searchLocations(places: Places | null, spaces: Space[], granted: boolean): SearchLocation[] {
+  const list: SearchLocation[] = [];
+  if (granted && places) {
+    const fixed: [string | undefined, string, SearchLocation["icon"]][] = [
+      [places.home, "Home", House],
+      [places.desktop, "Desktop", Monitor],
+      [places.documents, "Documents", FileText],
+      [places.downloads, "Downloads", Download],
+    ];
+    for (const [path, label, icon] of fixed)
+      if (path) list.push({ id: path, label, detail: path, icon, place: { kind: "disk", path } });
+    for (const drive of places.drives)
+      list.push({ id: drive.path, label: drive.name, detail: drive.path, icon: HardDrive, place: { kind: "disk", path: drive.path } });
+    list.push(
+      { id: "recent", label: "Recent", detail: "Files you opened", icon: Clock, place: { kind: "recent" } },
+      { id: "starred", label: "Starred", detail: "Starred items", icon: Star, place: { kind: "starred" } },
+      { id: "trash", label: "Trash", detail: "Moved to the Trash", icon: Trash2, place: { kind: "trash" } },
+    );
+  }
+  for (const space of spaces)
+    list.push({
+      id: `space:${space.id}`,
+      label: spaceNavigationName(space),
+      detail: "Space",
+      icon: HardDrive,
+      place: { kind: "space-drive", spaceId: space.id, path: "/" },
+    });
+  return list;
 }
 
 /** The folder above the open one, when there is one to go to. */

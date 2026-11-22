@@ -78,7 +78,9 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
           <ChatMessagesLoading />
         ) : props.error && !props.messages.length ? null : (
           <>
-            {!atStart ? null : props.directRecipient ? (
+            {!atStart ? null : props.welcome ? (
+              <div className="px-4">{props.welcome}</div>
+            ) : props.directRecipient ? (
               <div className="px-4">
                 <DirectMessageIntro spaceId={props.spaceId} recipient={props.directRecipient} />
               </div>

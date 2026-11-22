@@ -17,8 +17,9 @@ import {
 import { disk, type DuplicateGroup } from "@/features/files";
 import { countText, formatBytes, messageOf } from "../format";
 import { nameOf, parentOf } from "../model";
+import type { TransferWhere } from "../transfers";
 
-type Run = <T>(label: string, work: (opId: string) => Promise<T>) => Promise<T>;
+type Run = <T>(label: string, work: (opId: string) => Promise<T>, where?: TransferWhere) => Promise<T>;
 
 /**
  * Files in a folder whose content is the same, in groups. The person ticks the copies to let go of and
@@ -46,7 +47,7 @@ export function DuplicatesDialog({
     let live = true;
     setGroups(null);
     setError("");
-    void run("Finding duplicates", (opId) => disk.duplicates(dir, opId)).then(
+    void run("Finding duplicates", (opId) => disk.duplicates(dir, opId), { from: dir }).then(
       (found) => live && setGroups(found),
       (cause) => live && setError(messageOf(cause, "Duplicates couldn't be found.")),
     );

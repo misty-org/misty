@@ -73,13 +73,23 @@ async fn have_commit(repo: &Path, base: git2::Oid) -> Result<(), String> {
     let sha = base.to_string();
     // Most hosts serve a reachable commit by its id; fetching everything is the fallback.
     let by_id = git(repo, &["fetch", "--quiet", "origin", &sha], 120).await?;
+    let mut reached = by_id.success;
+    let mut words = String::new();
     if !by_id.success {
-        let _ = git(repo, &["fetch", "--quiet", "origin"], 180).await?;
+        let all = git(repo, &["fetch", "--quiet", "origin"], 180).await?;
+        reached = all.success;
+        words = git_words(&all.stderr).trim_end_matches('.').to_string();
     }
     if present(repo.to_path_buf()).await? {
         Ok(())
-    } else {
+    } else if reached {
         Err("The session's starting commit isn't on origin, so it can't be fetched. Ask whoever started it to push it.".into())
+    } else {
+        // Git never got an answer from origin, usually a sign-in this computer's Git lacks: saying
+        // the commit is missing would send the person after the wrong thing.
+        Err(format!(
+            "Git on this computer couldn't fetch from origin: {words}. Sign in to it with Git or the GitHub CLI, or ask for access to the repository."
+        ))
     }
 }
 

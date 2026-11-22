@@ -1,11 +1,3 @@
-/**
- * Turns a run's recorded steps into short, plain sentences ("Opened GitHub", "Edited src/app.ts"),
- * and decides which calls are housekeeping that a person needn't see as steps. Every sentence is
- * built here from what native code recorded; nothing a model wrote is shown.
- *
- * The folding rules follow BrowserOS's `lib/step-sentences.ts`
- * (https://github.com/browseros-ai/BrowserOS, AGPL-3.0-or-later; see NOTICE).
- */
 import type { RunStep } from "./activityApi";
 
 export type StepVerb =
@@ -337,66 +329,55 @@ export function describeLive(
   return past;
 }
 
-/**
- * A run's steps as sentences, oldest first. A browser step that names no page is on the page the
- * run was last on. A step repeating the one before folds into it, and so does reading the page or
- * file the step before just worked on: that's the agent checking its own work.
- */
+function foldsInto(previous: DescribedStep | undefined, next: DescribedStep): boolean {
+  if (!previous || previous.hidden !== next.hidden) return false;
+  if (previous.sentence === next.sentence) return previous.failed === next.failed;
+  return (
+    !next.hidden &&
+    !next.failed &&
+    next.verb === "read" &&
+    previous.verb !== "read" &&
+    next.place !== "" &&
+    next.place === previous.place
+  );
+}
+
 export function describeSteps(
   steps: readonly RunStep[],
   options: { folder?: string; includeHidden?: boolean } = {},
 ): { steps: DescribedStep[]; hiddenCount: number } {
-  const described: DescribedStep[] = [];
-  let hiddenCount = 0;
   let page = "";
-  for (const step of steps) {
-    const key = toolKey(step.tool);
-    const label = pageLabel(step);
-    if (key.startsWith("browser.") && label) page = label;
-    const hidden = isHousekeeping(step.tool);
-    if (hidden) {
-      hiddenCount += 1;
-      if (!options.includeHidden) continue;
-    }
-    const sentence = describeStep(step, { folder: options.folder, page });
-    const verb = verbOf(step.tool);
-    const place = key.startsWith("browser.") ? page : step.target;
-    const failed = step.state === "failed";
-    const previous = described[described.length - 1];
-    const repeats =
-      previous?.sentence === sentence && previous.hidden === hidden && previous.failed === failed;
-    const checks =
-      verb === "read" &&
-      !hidden &&
-      !failed &&
-      previous !== undefined &&
-      !previous.hidden &&
-      previous.verb !== "read" &&
-      place !== "" &&
-      previous.place === place;
-    if (previous && (repeats || checks)) {
-      previous.seqs.push(step.seq);
-      if (step.callId) previous.calls.push(step.callId);
-      if (step.picture) previous.picture = step.picture;
-      previous.running = step.state === "running";
-      continue;
-    }
-    described.push({
-      sentence,
-      verb,
+  const entries = steps.map((step) => {
+    const browser = toolKey(step.tool).startsWith("browser.");
+    page = (browser && pageLabel(step)) || page;
+    const entry: DescribedStep = {
+      sentence: describeStep(step, { folder: options.folder, page }),
+      verb: verbOf(step.tool),
       seqs: [step.seq],
       at: step.at,
       picture: step.picture,
-      failed,
+      failed: step.state === "failed",
       running: step.state === "running",
-      hidden,
+      hidden: isHousekeeping(step.tool),
       nested: step.nested,
-      place,
-      browser: key.startsWith("browser."),
+      place: browser ? page : step.target,
+      browser,
       calls: step.callId ? [step.callId] : [],
-    });
-  }
-  return { steps: described, hiddenCount };
+    };
+    return entry;
+  });
+  const hiddenCount = entries.filter((entry) => entry.hidden).length;
+  const shown = options.includeHidden ? entries : entries.filter((entry) => !entry.hidden);
+  const folded = shown.reduce<DescribedStep[]>((list, entry) => {
+    const previous = list.at(-1);
+    if (!previous || !foldsInto(previous, entry)) return [...list, entry];
+    previous.seqs.push(...entry.seqs);
+    previous.calls.push(...entry.calls);
+    previous.picture = entry.picture || previous.picture;
+    previous.running = entry.running;
+    return list;
+  }, []);
+  return { steps: folded, hiddenCount };
 }
 
 /** The page a run was last on, for the live line of a browser step that names none. */

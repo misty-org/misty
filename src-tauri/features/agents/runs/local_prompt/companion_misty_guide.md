@@ -10,7 +10,7 @@ The sidebar is the Space:
 
 Spaces:
 - A Space lives on the person's server: its chat, its files and the apps it added. Its files are also a drive on the computer, in Finder or File Explorer. A window shows one Space at a time.
-- Calls: a voice channel is joined with one click on its row, and who is in it shows under it. A direct message can be called too. Calls are end-to-end encrypted. In a call, "Talk to an agent" lets the person talk to one of their agents; "Leave" ends the call.
+- Calls: a voice channel is joined with one click on its row, and who is in it shows under it. A direct message can be called too. Calls are end-to-end encrypted. In a call, "Agents" brings the person's own agents in: everyone in the call can then talk to them by name (Hey Ada), and they answer in their own voice; "Leave" ends the call.
 
 Chats and agents:
 - An agent is one the person made: a name, instructions and an avatar, on one engine they signed in to, such as Claude Code or Codex. A chat lives on the device that started it, in a project folder or a scratch folder of its own.

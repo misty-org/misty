@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { notify } from "@misty/ui";
 import { disk, fileEvents, onFilesEvent, type Progress as FilesProgress, type UndoState } from "@/features/files";
 import { messageOf } from "./format";
+import { cancelTransfer, endTurn, useTransfers, waitTurn, type TransferWhere } from "./transfers";
 
 const newOpId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -10,8 +11,8 @@ const newOpId = () =>
 
 /**
  * The one long operation that may run at a time (a copy, a move, a compress, a search for duplicates),
- * with its progress from `files://progress` for the bottom bar and Cancel. It isn't a queue: a second one
- * waits for the first to end.
+ * with its progress from `files://progress` for the list's foot and Cancel. Each is also kept in
+ * Transfers, with what became of it and a way to run it again.
  */
 export function useFilesOperation() {
   const [progress, setProgress] = useState<FilesProgress | null>(null);
@@ -21,27 +22,48 @@ export function useFilesOperation() {
     () =>
       onFilesEvent<FilesProgress>(fileEvents.progress, (next) => {
         if (next.opId === current.current) setProgress(next);
+        useTransfers.getState().update(next.opId, { doneBytes: next.doneBytes, totalBytes: next.totalBytes, item: next.item });
       }),
     [],
   );
 
-  const run = useCallback(async <T,>(label: string, work: (opId: string) => Promise<T>): Promise<T> => {
-    const opId = newOpId();
-    current.current = opId;
-    setProgress({ opId, label, doneBytes: 0, totalBytes: 0 });
-    try {
-      return await work(opId);
-    } finally {
-      if (current.current === opId) {
-        current.current = null;
-        setProgress(null);
+  const run = useCallback(
+    async <T,>(label: string, work: (opId: string) => Promise<T>, where?: TransferWhere): Promise<T> => {
+      const opId = newOpId();
+      current.current = opId;
+      setProgress({ opId, label, doneBytes: 0, totalBytes: 0 });
+      useTransfers.getState().add({ opId, label, ...where, queuedAt: Date.now(), state: "queued", doneBytes: 0, totalBytes: 0 });
+      const retry = () => void run(label, work, where).catch(() => undefined);
+      try {
+        // Kura's queue: one transfer at a time, and none starts while the queue is paused.
+        await waitTurn(opId);
+        const result = await work(opId);
+        const stopped = useTransfers.getState().list.some((each) => each.opId === opId && each.cancelling);
+        useTransfers.getState().update(opId, { state: stopped ? "cancelled" : "done", endedAt: Date.now(), item: undefined, retry });
+        return result;
+      } catch (cause) {
+        const stopped = useTransfers.getState().list.some((each) => each.opId === opId && each.cancelling);
+        useTransfers.getState().update(opId, {
+          state: stopped ? "cancelled" : "failed",
+          endedAt: Date.now(),
+          error: stopped ? undefined : messageOf(cause, `${label} didn't finish.`),
+          retry,
+        });
+        throw cause;
+      } finally {
+        endTurn(opId);
+        if (current.current === opId) {
+          current.current = null;
+          setProgress(null);
+        }
       }
-    }
-  }, []);
+    },
+    [],
+  );
 
   const cancel = useCallback(() => {
     const opId = current.current;
-    if (opId) void disk.cancel(opId).catch(() => undefined);
+    if (opId) cancelTransfer(opId);
   }, []);
 
   return { progress, busy: progress !== null, run, cancel };

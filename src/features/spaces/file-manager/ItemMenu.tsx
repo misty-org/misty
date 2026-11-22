@@ -20,6 +20,7 @@ import {
   Tag,
   Trash2,
   Undo2,
+  SquarePlus,
 } from "lucide-react";
 import { MenuCheckItem, MenuItem, MenuSeparator, MenuSubmenu, TagDot, tagToneName } from "@misty/ui";
 import type { FinderTag } from "@/features/files";
@@ -49,6 +50,8 @@ export interface MenuContext {
   openDriveIn(entry: DriveEntry, appId: string): void;
   /** The person may delete a drive's trashed items for good (`drive.purge`). */
   canPurge(spaceId: string): boolean;
+  /** Kura's Open in new tab, for a folder; left out where there are no tabs (the picker). */
+  openInNewTab?: (item: FileItem) => void;
 }
 
 /** The Tags submenu: every tag, checked when every item has it. */
@@ -113,6 +116,9 @@ export function ItemMenu({ items, ctx }: { items: FileItem[]; ctx: MenuContext }
   return (
     <>
       <MenuItem icon={SquareArrowOutUpRight} label="Open" shortcut={keys.open} onSelect={() => actions.open(item)} />
+      {one && item.folder && ctx.openInNewTab ? (
+        <MenuItem icon={SquarePlus} label="Open in new tab" onSelect={() => ctx.openInNewTab?.(item)} />
+      ) : null}
       {one && opensOutside && !ctx.picking ? (
         <MenuSubmenu icon={AppWindow} label="Open with">
           {drive ? (

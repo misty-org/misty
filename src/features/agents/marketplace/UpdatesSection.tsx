@@ -1,10 +1,20 @@
 /**
  * Explore › Updates: everything with a newer version, in one place. The Space's apps whose
- * pin moved on (a mod updates them), and the skills whose repository changed since they were
- * installed (skills hub's own check). Plugins update through their engine's own CLI, which keeps
- * them current itself, so they don't show here.
+ * pin moved on (a mod updates them), the skills whose repository changed since they were
+ * installed (skills hub's own check), the engines whose CLI has a newer release (the same check
+ * as Settings › Agents › Setup and the launch prompt, run as this opens), and the speech models
+ * and voices whose catalog pin is newer than the one on this computer. Plugins update through
+ * their engine's own CLI, which keeps them current itself, so they don't show here.
  */
 import { useEffect, useState } from "react";
+import {
+  hasCliUpdate,
+  updateCli,
+  useCliStatuses,
+  versionText,
+  type CliVersionStatus,
+} from "@/features/engine-config/clis";
+import { useSpeechModels } from "@/features/voice";
 import {
   AppLogoImage,
   Button,
@@ -17,7 +27,10 @@ import {
 } from "@misty/ui";
 import { skillsHubApi, type SkillRow, type SkillTargetId } from "@/features/engine-config/skills";
 import { exploreApps, type ExploreCatalogApp } from "./exploreApps";
+import { catalogEngineIds, catalogEngines, type CatalogEngine } from "./engineCatalog";
+import { EngineTile } from "./EnginesSection";
 import { MakerTile, pluginMaker } from "./PluginMaker";
+import { progressLine, type SpeechEntry } from "./SpeechSection";
 
 const failureText = (reason: unknown, fallback: string) =>
   reason instanceof Error && reason.message ? reason.message : fallback;
@@ -44,10 +57,43 @@ export function useSkillUpdates() {
   return { rows, error, reload: () => setRound((value) => value + 1) };
 }
 
+/**
+ * The installed engines that have a newer release. With `probe` each engine is checked as the
+ * screen opens; without, only what is already known counts (the rail's number).
+ */
+export function useEngineUpdates(options: { probe?: boolean } = {}) {
+  const { statuses, settled } = useCliStatuses(catalogEngineIds, options);
+  const rows = catalogEngines
+    .filter((engine) => hasCliUpdate(statuses[engine.id]))
+    .map((engine) => ({ engine, status: statuses[engine.id] as CliVersionStatus }));
+  return { rows, settled };
+}
+
+/** An engine update's line: "Engine, from v1.2.0 to v1.3.0". */
+function engineLine(status: CliVersionStatus) {
+  const from = status.localVersion ? versionText(status.localVersion) : "the version here";
+  const to = status.latestVersion ? versionText(status.latestVersion) : "the latest";
+  return `Engine, from ${from} to ${to}`;
+}
+
+/** The speech models and voices with a newer pin in the catalog than the one here. */
+export function useSpeechUpdates(): SpeechEntry[] | null {
+  const catalog = useSpeechModels((state) => state.catalog);
+  useEffect(() => {
+    if (!useSpeechModels.getState().catalog) void useSpeechModels.getState().load();
+  }, []);
+  if (!catalog) return null;
+  return [...catalog.hearing, ...catalog.voices].filter((entry) => entry.outdated);
+}
+
 export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canManage: boolean }) {
   const { useAppUpdates, catalogLogoUrl } = exploreApps();
   const apps = useAppUpdates(spaceId);
   const skills = useSkillUpdates();
+  const engines = useEngineUpdates();
+  const speech = useSpeechUpdates();
+  const speechError = useSpeechModels((state) => state.error);
+  const speechProgress = useSpeechModels((state) => state.progress);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
 
   const run = async (key: string, work: () => Promise<unknown>, done: string, failed: string) => {
@@ -105,10 +151,35 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
       `${skill.name} couldn't be updated`,
     );
 
-  const loading = !apps.loaded || skills.rows === null;
+  const updateEngine = (engine: CatalogEngine) =>
+    run(
+      `engine:${engine.id}`,
+      () => updateCli(engine.id, `explore-${engine.id}-${Date.now()}`),
+      `${engine.name} is up to date.`,
+      `${engine.name} couldn't be updated`,
+    );
+  const updateSpeech = (entry: SpeechEntry) =>
+    run(
+      `speech:${entry.id}`,
+      async () => {
+        await useSpeechModels.getState().install(entry.id);
+        const failure = useSpeechModels.getState().failures[entry.id];
+        if (failure) throw new Error(failure);
+      },
+      `${entry.name} is up to date.`,
+      `${entry.name} couldn't be updated`,
+    );
+
+  const loading =
+    !apps.loaded ||
+    skills.rows === null ||
+    (speech === null && !speechError) ||
+    (!engines.settled && !engines.rows.length);
   const appRows = canManage ? apps.updates : [];
   const skillRows = skills.rows ?? [];
-  const count = appRows.length + skillRows.length;
+  const engineRows = engines.rows;
+  const speechRows = speech ?? [];
+  const count = appRows.length + skillRows.length + engineRows.length + speechRows.length;
 
   if (apps.error && skills.error) {
     return (
@@ -144,6 +215,17 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
             onClick={() => {
               for (const { app } of appRows) void updateApp(app);
               for (const skill of skillRows) void updateSkill(skill);
+              void (async () => {
+                // Engines one after another, as the launch prompt runs them.
+                for (const { engine } of engineRows) await updateEngine(engine);
+              })();
+              // Voices that share a download update together.
+              const packages = new Set<string>();
+              for (const entry of speechRows) {
+                if (packages.has(entry.packageKey)) continue;
+                packages.add(entry.packageKey);
+                void updateSpeech(entry);
+              }
             }}
           >
             Update all
@@ -201,6 +283,59 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
           }
         />
       ))}
+      {engineRows.map(({ engine, status }) => (
+        <ShelfItem
+          key={`engine:${engine.id}`}
+          logo={<EngineTile engine={engine} />}
+          title={engine.name}
+          line={busy.has(`engine:${engine.id}`) ? "Updating" : engineLine(status)}
+          action={
+            <Button
+              variant="get"
+              size="sm"
+              disabled={busy.has(`engine:${engine.id}`)}
+              onClick={() => void updateEngine(engine)}
+            >
+              Update
+            </Button>
+          }
+        />
+      ))}
+      {speechRows.map((entry) => {
+        const coming = speechProgress[entry.id] ?? speechProgress[entry.packageKey];
+        const hearing = "description" in entry;
+        return (
+          <ShelfItem
+            key={`speech:${entry.id}`}
+            logo={
+              hearing ? (
+                <MakerTile
+                  maker={pluginMaker({ author: entry.maker, link: entry.source })}
+                  name={entry.name}
+                />
+              ) : undefined
+            }
+            title={entry.name}
+            line={
+              coming
+                ? progressLine(coming)
+                : hearing
+                  ? "Hearing model, a newer version"
+                  : "Voice, a newer version"
+            }
+            action={
+              <Button
+                variant="get"
+                size="sm"
+                disabled={busy.has(`speech:${entry.id}`) || Boolean(coming)}
+                onClick={() => void updateSpeech(entry)}
+              >
+                Update
+              </Button>
+            }
+          />
+        );
+      })}
     </Shelf>
   );
 }

@@ -70,6 +70,31 @@ fn check_document(document: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The longest catalog voice id an agent's profile may name.
+const MAX_VOICE_ID: usize = 64;
+
+/// An agent's voice is a catalog voice id ("kokoro-heart"): lowercase letters, digits and dashes,
+/// at most 64 of them. Absent or empty means it has none yet and speaks in Misty's voice.
+fn valid_voice(voice: &str) -> bool {
+    voice.len() <= MAX_VOICE_ID
+        && voice
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+/// What a kind's document must hold beyond being JSON: an agent's profile names its voice by id.
+fn check_kind_document(kind: &str, document: &str) -> Result<(), String> {
+    check_document(document)?;
+    if kind != "agent" {
+        return Ok(());
+    }
+    let parsed: Value = serde_json::from_str(document).map_err(|_| "invalid_agent_chat")?;
+    match parsed.get("voice") {
+        None | Some(Value::Null) => Ok(()),
+        Some(Value::String(voice)) if valid_voice(voice) => Ok(()),
+        Some(_) => Err("invalid_agent_voice".into()),
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -293,7 +318,7 @@ impl AgentChatsService {
         document: String,
     ) -> Result<bool, String> {
         check(&account, &kind, &id)?;
-        check_document(&document)?;
+        check_kind_document(&kind, &document)?;
         let store = self.store.clone();
         tokio::task::spawn_blocking(move || {
             let connection = store.connect().map_err(|e| e.to_string())?;
@@ -326,7 +351,7 @@ impl AgentChatsService {
         document: String,
     ) -> Result<(), String> {
         check(&account, &kind, &id)?;
-        check_document(&document)?;
+        check_kind_document(&kind, &document)?;
         let store = self.store.clone();
         tokio::task::spawn_blocking(move || {
             let connection = store.connect().map_err(|e| e.to_string())?;

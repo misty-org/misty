@@ -1,6 +1,6 @@
 import { getChunks, rejectChunk } from "@codemirror/merge";
 import { useFilesStore } from "../../context-panel/files/filesStore";
-import { Button, Text } from "@misty/ui";
+import { Button, Surface, Text } from "@misty/ui";
 import { editorCommandsOf } from "../editorCommands";
 import { reviewViews, useGitReview } from "./gitReviewStore";
 
@@ -23,7 +23,8 @@ function saveIfChanged(path: string) {
  * The bar over a file on the Code page while its changes are shown inline: an agent's edits as
  * they landed, or everything since the last commit. Each change keeps or undoes on its own in the
  * code; here they all go at once, and Done puts the file back to plain editing. A change on disk
- * to a file with unsaved edits waits here too, until the person picks which to keep.
+ * to a file with unsaved edits waits here too, until the person picks which to keep. It is one of
+ * the page's toolbar rows, on the sidebar's color with a hairline under it.
  */
 export function GitReviewBar({ path }: { path: string }) {
   const review = useGitReview((state) => state.reviews[path]);
@@ -33,7 +34,7 @@ export function GitReviewBar({ path }: { path: string }) {
 
   if (clash !== undefined) {
     return (
-      <div className="flex h-10 flex-none items-center gap-2 border-b pr-2 pl-3 text-meta">
+      <Surface tone="sidebar" className="flex h-10 flex-none items-center gap-2 border-b pr-2 pl-3 text-meta">
         <Text tone="default" className="min-w-0 flex-1">
           This file changed on disk while you were editing it
         </Text>
@@ -55,7 +56,7 @@ export function GitReviewBar({ path }: { path: string }) {
         >
           Load theirs
         </Button>
-      </div>
+      </Surface>
     );
   }
 
@@ -72,7 +73,7 @@ export function GitReviewBar({ path }: { path: string }) {
       : "This file changed on disk"
     : "Changes since the last commit";
   return (
-    <div className="flex h-10 flex-none items-center gap-2 border-b pr-2 pl-3 text-meta">
+    <Surface tone="sidebar" className="flex h-10 flex-none items-center gap-2 border-b pr-2 pl-3 text-meta">
       <Text tone="default" className="min-w-0 flex-1">
         {title}
       </Text>
@@ -89,6 +90,6 @@ export function GitReviewBar({ path }: { path: string }) {
       <Button variant="secondary" onClick={done}>
         Done
       </Button>
-    </div>
+    </Surface>
   );
 }
