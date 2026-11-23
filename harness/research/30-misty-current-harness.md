@@ -31,7 +31,7 @@ An engine call such as `browser_steps` goes through these layers:
    - emits `misty://agent-tool-call` to the person's app window and waits up to 20 min, checking every 2 s that
      the window is still alive (`ask`, 274-315).
 3. **Renderer job.** The app window (TypeScript) runs the call as a "device job":
-   `src/features/agents/runs/jobs/browserJobRun.ts:44-158`. It wakes a sleeping tab, registers a grant for that
+   `src/features/agents/runs/jobs/browser_job_run.ts:44-158`. It wakes a sleeping tab, registers a grant for that
    one operation, calls `invoke("browser_agent_execute_bounded")`, and revokes the grant afterwards (147-153). For
    a `browser.snapshot` or `browser.find` that comes back `about:blank` on a tab that last showed a real page, it
    retries after 1.5 s, then re-navigates to the remembered URL (51-67).
@@ -88,10 +88,10 @@ each tool's `_meta`.
 | `browser.skill` | yes | Runs a pattern skill or app skill that the snapshot listed (§8). Up to 4 phases. |
 | `browser.visual` | yes | The legacy inspection plus a viewport image: a 640 px JPEG via `takeSnapshot` (`agent/operations.rs:7-57`, `pages/macos/capture.rs`). Points are normalized to 0..1. |
 | `browser.downloads.list` | yes | The session's download records, filtered by task (`agent.rs:158-182`). |
-| `browser.run` | yes | A JavaScript program in a QuickJS-WASM sandbox in the renderer (`src/features/agents/programs/sandbox.ts`, 64 MB memory, deadline interrupt). It drives the run's tabs with `openTab`, `read`, `text`, `find`, `click`, `type`, `fill`, `select`, `check`, `hover`, `press`, `scroll`, `scrollTo`, `waitFor`, `keep`, `close`, `note`, with a 2 min limit and 80 page calls (`programs/pageHost.ts:31`). A target can be a ref, a `{role,name}` locator, or words looked up with `find` (`programs/pageTarget.ts`). A failure from a stale ref is retried once after a re-read (`pageHost.ts:151-164`). |
+| `browser.run` | yes | A JavaScript program in a QuickJS-WASM sandbox in the renderer (`src/features/agents/programs/sandbox.ts`, 64 MB memory, deadline interrupt). It drives the run's tabs with `openTab`, `read`, `text`, `find`, `click`, `type`, `fill`, `select`, `check`, `hover`, `press`, `scroll`, `scrollTo`, `waitFor`, `keep`, `close`, `note`, with a 2 min limit and 80 page calls (`programs/page_host.ts:31`). A target can be a ref, a `{role,name}` locator, or words looked up with `find` (`programs/page_target.ts`). A failure from a stale ref is retried once after a re-read (`page_host.ts:151-164`). |
 | `browser.request_user_action` | yes | Hands control to the person for `sign_in`, `account_confirmation`, `challenge`, `open_target` or `review`, and resumes when they continue. |
 | `browser.act` | **no** | Misty's own on-device screen agent works toward a visual goal from screenshots for about 4 minutes. Not offered to engines. |
-| `browser.extract` | **no** | Page markdown (120k chars) plus an instruction and a JSON schema, sent to the *device model* (`browserJobRun.ts:73-94`). Engines lose this tool and get the markdown only indirectly, through `browser.run`'s `text()`. |
+| `browser.extract` | **no** | Page markdown (120k chars) plus an instruction and a JSON schema, sent to the *device model* (`browser_job_run.ts:73-94`). Engines lose this tool and get the markdown only indirectly, through `browser.run`'s `text()`. |
 | `browser.inspect`, `browser.upload`, `browser.workspace.visual` | no | The legacy inspect, a file upload by ref (attachment or download id), and desktop capture. |
 
 Engines therefore cannot upload files (`browser.upload` is not in `BROWSER_TOOLS`). That is a gap for benchmark
@@ -296,7 +296,7 @@ No action is followed by a check that it took effect, except `retained` for fill
   `WKNavigationDelegate` `didFinish` is what Tauri's `on_page_load` uses (`create/events.rs`), but the waits do
   not consult it; they poll the page **(inferred)**.
 - Agent tabs **sleep** when idle: the webview is closed and its address remembered, then it is woken on the next
-  job (`src/features/agents/tabs/agentTabs.ts:19-30`, `browserJobRun.ts:101-103`). In-page state (form contents,
+  job (`src/features/agents/tabs/agent_tabs.ts:19-30`, `browser_job_run.ts:101-103`). In-page state (form contents,
   SPA state, sessionStorage tied to the view) is therefore lost between idle periods **(inferred)**.
 
 ---
@@ -431,7 +431,7 @@ the point counts as payment (`page_consequence.js:151-158`). The page's verdict 
   `~/.misty/data/run-pictures/<run>/<uuid>.jpg` and linked to the step row. They are **macOS only**
   (`run_picture.rs:56-59`).
 - The renderer separately pictures the tab after each job for the PiP and the tab strip
-  (`browserJobRun.ts:146`, `pictureAgentTab`).
+  (`browser_job_run.ts:146`, `pictureAgentTab`).
 - `browser.visual` returns the same 640 px JPEG with the inspection. The BU Bench runner records screenshot timing
   as "after_tool_event" (`benchmarks/bu-bench/misty_eval.py:466`).
 - **Agent cursor and ring**: an in-page overlay cursor (`kiri_link/scripts/agent_cursor.js`) glides 320 ms
@@ -478,7 +478,7 @@ this ("Windows is open").
 **Cases where it does not, or where it differs:**
 
 1. **A different profile window.** The tab gets the store of whichever profile's window the run is attached to
-   (`entry.windowLabel`, `src/features/agents/tools/screenTools.ts:178`). A run started from a non-personal
+   (`entry.windowLabel`, `src/features/agents/tools/screen_tools.ts:178`). A run started from a non-personal
    profile window sees that profile's sign-ins, not the personal ones.
 2. **Dev and named builds have their own stores.** `for_profile` mixes the build profile into the identifier for
    non-release builds (`profile_store.rs:51-63`). On first use, `link_store_data` *copies* the shared store once
@@ -532,7 +532,7 @@ These are the trust and handle boundary:
   model-supplied JS (`page_agent/mod.rs:116-118`). A primitive `eval(js)` exposed to a sidecar would give it
   arbitrary script execution in the person's signed-in pages: reading non-HttpOnly cookies, issuing same-origin
   fetches as the person, submitting forms. That would be a large privilege escalation. `browser.run` programs run
-  in QuickJS and reach pages only through named operations (`pageHost.ts`), which is the right model.
+  in QuickJS and reach pages only through named operations (`page_host.ts`), which is the right model.
 
 ### Could move to a sidecar
 
@@ -545,7 +545,7 @@ The sidecar would own orchestration and judgement:
   loops (`skill.rs`).
 - Frame tree splicing, ref-slot bookkeeping (`frames.rs:49-113`) and Markdown assembly.
 - The `browser.run` program sandbox (QuickJS), which today runs in the renderer.
-- Recovery heuristics: the blank-tab retry (`browserJobRun.ts:51-67`), stale-ref re-read (`pageHost.ts:151-164`),
+- Recovery heuristics: the blank-tab retry (`browser_job_run.ts:51-67`), stale-ref re-read (`page_host.ts:151-164`),
   dismiss-and-retry on cover, link fallback, and the native re-type when a fill is not retained.
 - Extraction calls to an engine or model, step-picture selection, trace and benchmark evidence, and self-healing
   stores (locators, per-site notes).
@@ -559,7 +559,7 @@ The sidecar needs these from Misty (JSON-RPC over a local socket; every call car
 
 | Primitive | Returns / notes | Exists today as |
 |---|---|---|
-| `tabs.open {url?}`, `tabs.close`, `tabs.list` | `scopeId`, url, title | `screen.open/close`, `agentTabs.ts` |
+| `tabs.open {url?}`, `tabs.close`, `tabs.list` | `scopeId`, url, title | `screen.open/close`, `agent_tabs.ts` |
 | `page.state` | `{url, title, origin, loading, loadGeneration, documentMark, viewport{w,h,zoom}, visible}` | `view.url()`, `snapshot_generation`, `waitCheck` |
 | `page.navigate {url}` | navigation id; URL policy (private host, taint) checked by Misty | `browser.navigate` before `landed` |
 | `page.op {frame?, op, args}` | Runs a **named runtime operation** (`snapshot`, `find`, `markdown`, `prepare`, `observe`, `waitCheck`, `settle`, `mark`, `locate`, `locatorFor`, `skill`, `declineConsent`, `dismissPopup`, `consequenceAt`, `consequenceOfKey`, `describeRef`) in the agent world. No raw JS | `call_at` + `P.call` operations map (`page_read.js:189-199`) |

@@ -942,7 +942,7 @@ I counted from `skyvern/evaluation/datasets/odysseys_tasks.json` (200 tasks):
 
 Two parts of Misty's current behaviour work against this:
 
-- **Tabs sleep.** "Only the page an agent is acting on stays rendered; a tab it moved on from sleeps" (`misty/src/features/agents/tabs/agentTabs.ts`, header comment). Waking a tab reloads it, which loses SPA state and results.
+- **Tabs sleep.** "Only the page an agent is acting on stays rendered; a tab it moved on from sleeps" (`misty/src/features/agents/tabs/agent_tabs.ts`, header comment). Waking a tab reloads it, which loses SPA state and results.
 - **Tabs are deduplicated.** "A repeated URL returns the existing tab" (report 30, line 79).
 
 The synthesis does not mention either. **Fix:**
