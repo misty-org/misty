@@ -46,6 +46,13 @@ export async function uploadLibraryBlob(
   return uploadLibraryFile(spaceId, file, purpose, accountGeneration, options);
 }
 
+export function discardUnsentAttachment(spaceId: string, uploadId: string): Promise<void> {
+  return spaceRequest(
+    `/spaces/${encodeURIComponent(spaceId)}/library/uploads/${encodeURIComponent(uploadId)}/abort`,
+    { method: "POST" },
+  );
+}
+
 export function fileNameFromPath(path: string): string {
   return (
     path

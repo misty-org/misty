@@ -1,8 +1,11 @@
 import { create } from "zustand";
-import { isE2EESupported } from "livekit-client";
+import { callEncryptionSupported } from "./call_support";
 import { notify } from "@misty/ui";
 import { directApi, type CallConfig } from "../api";
-import { openRingKey, sealForDm } from "./call_keys";
+import { newCallKey, openRingKey, sealForDm } from "./call_keys";
+import { checkCallRoom } from "./call_room";
+import { useMissedCalls } from "./missed_calls";
+import { peekDm } from "../direct_data";
 
 export type CallPlace =
   | { kind: "dm"; dmId: string }
@@ -17,6 +20,7 @@ export interface ActiveCall {
   state: "connecting" | "live";
   caller: boolean;
   answered: boolean;
+  ringFrom?: string;
 }
 
 export interface IncomingRing {
@@ -57,6 +61,8 @@ interface CallState {
   accept(): Promise<void>;
   decline(): void;
   ring(ring: IncomingRing | null): void;
+  ringEnded(dmId: string, from: string): void;
+  answeredElsewhere(dmId: string): void;
   setLive(): void;
   setAnswered(): void;
   leave(): void;
@@ -71,6 +77,26 @@ export const dmOf = (call: ActiveCall | null | undefined) =>
   call?.place.kind === "dm" ? call.place.dmId : undefined;
 
 let configRequested = false;
+let accepting: IncomingRing | null = null;
+const starting = new Map<string, Promise<void>>();
+
+const missRing = (ring: IncomingRing) =>
+  useMissedCalls
+    .getState()
+    .miss(ring.dmId, { from: ring.from, video: ring.video, at: Date.now() });
+
+const isGroupDm = (dmId: string) => peekDm(dmId)?.kind === "group";
+
+const tellAnswered = (dmId: string, video: boolean) =>
+  void directApi.ringDm(dmId, "answered", video).catch(() => undefined);
+
+function busyForWaiting() {
+  const { active, incoming } = useCallStore.getState();
+  if (!active || !incoming || dmOf(active) === incoming.dmId) return;
+  useCallStore.setState({ incoming: null });
+  void directApi.ringDm(incoming.dmId, "busy", incoming.video).catch(() => undefined);
+  missRing(incoming);
+}
 
 export const useCallStore = create<CallState>((set, get) => ({
   config: null,
@@ -95,35 +121,42 @@ export const useCallStore = create<CallState>((set, get) => ({
         configRequested = false;
       });
   },
-  async start(dmId, video) {
-    if (get().active || !isE2EESupported()) return;
-    try {
-      const { callKey, sealedKeys, senderKeyId } = await sealForDm(dmId);
-      await directApi.ringDm(dmId, "ringing", video, sealedKeys, senderKeyId);
-      set({
-        active: {
-          place: { kind: "dm", dmId },
-          room: dmRoom(dmId),
-          video,
-          key: callKey,
-          state: "connecting",
-          caller: true,
-          answered: false,
-        },
-      });
-    } catch {
-      notify({ message: "The call couldn’t start.", tone: "error" });
-    }
+  start(dmId, video) {
+    const running = starting.get(dmId);
+    if (running) return running;
+    const run = startCall(dmId, video).finally(() => {
+      if (starting.get(dmId) === run) starting.delete(dmId);
+    });
+    starting.set(dmId, run);
+    return run;
   },
   async accept() {
     const ring = get().incoming;
-    if (!ring || !isE2EESupported()) return;
+    if (!ring || get().active || !callEncryptionSupported()) return;
     set({ incoming: null });
-    const key = await openRingKey(ring.sealedKeys).catch(() => undefined);
-    if (!key) {
-      notify({ message: "This call can’t be opened on this computer.", tone: "error" });
+    accepting = ring;
+    const key = await openRingKey(ring.sealedKeys).then(
+      (opened) => opened ?? null,
+      () => undefined,
+    );
+    const ended = accepting !== ring;
+    if (accepting === ring) accepting = null;
+    if (ended) {
+      notify({ message: "The call ended before you joined." });
       return;
     }
+    if (!key) {
+      notify({
+        message:
+          key === null
+            ? "This call can’t be opened on this computer."
+            : "The call’s key couldn’t be opened.",
+        tone: "error",
+      });
+      return;
+    }
+    if (get().active) return;
+    tellAnswered(ring.dmId, ring.video);
     set({
       active: {
         place: { kind: "dm", dmId: ring.dmId },
@@ -133,11 +166,13 @@ export const useCallStore = create<CallState>((set, get) => ({
         state: "connecting",
         caller: false,
         answered: true,
+        ringFrom: ring.from,
       },
     });
+    busyForWaiting();
   },
   join(place, room, key, video = false, muted = false) {
-    if (get().active || !isE2EESupported()) return;
+    if (get().active || !callEncryptionSupported()) return;
     set({
       active: {
         place,
@@ -158,8 +193,32 @@ export const useCallStore = create<CallState>((set, get) => ({
       void directApi.ringDm(incoming.dmId, "declined", incoming.video).catch(() => undefined);
   },
   ring(ring) {
-    if (ring && dmOf(get().active) === ring.dmId) return;
+    const active = get().active;
+    if (ring && dmOf(active) === ring.dmId) return;
+    if (ring && active) {
+      void directApi.ringDm(ring.dmId, "busy", ring.video).catch(() => undefined);
+      missRing(ring);
+      return;
+    }
+    const replaced = get().incoming;
+    if (ring && replaced && replaced.dmId !== ring.dmId) missRing(replaced);
     set({ incoming: ring });
+  },
+  ringEnded(dmId, from) {
+    if (accepting?.dmId === dmId && accepting.from === from) accepting = null;
+    const active = get().active;
+    if (dmOf(active) === dmId && active?.ringFrom === from && active.state === "connecting") {
+      get().leave();
+      notify({ message: "The call ended." });
+      return;
+    }
+    const incoming = get().incoming;
+    if (incoming?.dmId !== dmId || incoming.from !== from) return;
+    set({ incoming: null });
+    missRing(incoming);
+  },
+  answeredElsewhere(dmId) {
+    if (get().incoming?.dmId === dmId) set({ incoming: null });
   },
   setLive() {
     const active = get().active;
@@ -179,7 +238,68 @@ export const useCallStore = create<CallState>((set, get) => ({
   },
 }));
 
+async function startCall(dmId: string, video: boolean): Promise<void> {
+  const get = useCallStore.getState;
+  const set = useCallStore.setState;
+  if (get().active || !callEncryptionSupported()) return;
+  if (get().incoming?.dmId === dmId) return get().accept();
+  const room = dmRoom(dmId);
+  try {
+    const check = await checkCallRoom(room);
+    if (check.full) {
+      notify({ message: "This call is full." });
+      return;
+    }
+    if (get().active) return;
+    if (get().incoming?.dmId === dmId) return get().accept();
+    if (check.people?.length && isGroupDm(dmId)) {
+      set({
+        active: {
+          place: { kind: "dm", dmId },
+          room,
+          video,
+          key: newCallKey(),
+          state: "connecting",
+          caller: false,
+          answered: true,
+        },
+      });
+      tellAnswered(dmId, video);
+      busyForWaiting();
+      return;
+    }
+    const { callKey, sealedKeys, senderKeyId } = await sealForDm(dmId);
+    if (get().active) return;
+    if (get().incoming?.dmId === dmId) return get().accept();
+    await directApi.ringDm(dmId, "ringing", video, sealedKeys, senderKeyId);
+    const now = get().active;
+    if (now) {
+      if (!(dmOf(now) === dmId && now.caller && !now.answered))
+        void directApi.ringDm(dmId, "ended", false).catch(() => undefined);
+      return;
+    }
+    const incoming = get().incoming;
+    const glare = incoming?.dmId === dmId;
+    set({
+      incoming: glare ? null : incoming,
+      active: {
+        place: { kind: "dm", dmId },
+        room,
+        video,
+        key: callKey,
+        state: "connecting",
+        caller: true,
+        answered: false,
+      },
+    });
+    if (glare) tellAnswered(dmId, video);
+    busyForWaiting();
+  } catch {
+    notify({ message: "The call couldn’t start.", tone: "error" });
+  }
+}
+
 export function useCallsAvailable(): boolean {
   const enabled = useCallStore((state) => Boolean(state.config?.enabled));
-  return enabled && isE2EESupported();
+  return enabled && callEncryptionSupported();
 }

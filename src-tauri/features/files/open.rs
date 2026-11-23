@@ -1,12 +1,12 @@
 use std::path::Path;
 
-use file_access::disk::check_disk;
+use file_access::disk::{check_disk, fs_disk};
 use file_access::Access;
 use serde::Serialize;
 use tauri_plugin_opener::OpenerExt;
 
 use super::listing::io_text;
-use super::{asked_path, blocking, failed, person_window};
+use super::{asked_path, asked_paths, blocking, failed, gated, person_window};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -110,20 +110,76 @@ fn readable(path: &Path) -> Result<(), String> {
     check_disk(path, Access::Read).map_err(|error| failed(path, io_text(&error)))
 }
 
+const RUNS: &[(&str, &str)] = &[
+    ("app", "app"),
+    ("command", "script"),
+    ("terminal", "script"),
+    ("tool", "script"),
+    ("sh", "script"),
+    ("bash", "script"),
+    ("zsh", "script"),
+    ("workflow", "workflow"),
+    ("pkg", "installer"),
+    ("mpkg", "installer"),
+];
+
+fn runs_by_name(path: &Path) -> Option<&'static str> {
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    RUNS.iter()
+        .find(|(ending, _)| *ending == ext)
+        .map(|(_, kind)| *kind)
+}
+
+#[cfg(unix)]
+fn executable(meta: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    meta.is_file() && meta.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn executable(_meta: &std::fs::Metadata) -> bool {
+    false
+}
+
+pub(crate) fn runs_something(path: &Path) -> Option<&'static str> {
+    if let Some(kind) = runs_by_name(path) {
+        return Some(kind);
+    }
+    let real = fs_disk::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    if let Some(kind) = runs_by_name(&real) {
+        return Some(kind);
+    }
+    let meta = gated::stat(&real)
+        .or_else(|_| fs_disk::metadata(path))
+        .ok()?;
+    executable(&meta).then_some("executable")
+}
+
+fn ask_first(path: &Path, confirmed: Option<bool>) -> Result<(), String> {
+    if confirmed == Some(true) {
+        return Ok(());
+    }
+    match runs_something(path) {
+        Some(kind) => Err(format!("needs-confirm:{kind}")),
+        None => Ok(()),
+    }
+}
+
 #[tauri::command]
 pub async fn files_open(
     app: tauri::AppHandle,
     webview: tauri::Webview,
     paths: Vec<String>,
+    confirmed: Option<bool>,
 ) -> Result<(), String> {
     person_window(&webview)?;
-    let paths = paths
-        .iter()
-        .map(|path| asked_path(path))
-        .collect::<Result<Vec<_>, _>>()?;
+    let paths = asked_paths(&paths)?;
     blocking(move || {
         for path in &paths {
             readable(path)?;
+            ask_first(path, confirmed)?;
+        }
+        for path in &paths {
             app.opener()
                 .open_path(path.display().to_string(), None::<&str>)
                 .map_err(|error| failed(path, error))?;
@@ -154,11 +210,13 @@ pub async fn files_open_with(
     webview: tauri::Webview,
     path: String,
     app: String,
+    confirmed: Option<bool>,
 ) -> Result<(), String> {
     person_window(&webview)?;
     let path = asked_path(&path)?;
     blocking(move || {
         readable(&path)?;
+        ask_first(&path, confirmed)?;
         if !apps_for(&path).iter().any(|choice| choice.path == app) {
             return Err(failed(&path, "That app can't open it."));
         }
@@ -467,4 +525,45 @@ pub async fn files_reveal(
             .map_err(|error| failed(&path, error))
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opening_what_runs_asks_first() {
+        let root = tempfile::tempdir().expect("temp folder");
+        let script = root.path().join("setup.command");
+        let notes = root.path().join("notes.txt");
+        let tool = root.path().join("tool");
+        for file in [&script, &notes, &tool] {
+            file_access::fs::write(file, b"x").expect("write");
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            file_access::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755))
+                .expect("mode");
+            assert_eq!(
+                ask_first(&tool, None),
+                Err("needs-confirm:executable".to_owned())
+            );
+        }
+        assert_eq!(
+            ask_first(&script, None),
+            Err("needs-confirm:script".to_owned())
+        );
+        assert_eq!(
+            ask_first(&script, Some(false)),
+            Err("needs-confirm:script".to_owned())
+        );
+        assert_eq!(ask_first(&script, Some(true)), Ok(()));
+        assert_eq!(ask_first(&notes, None), Ok(()));
+        assert_eq!(
+            runs_by_name(Path::new("/Applications/Safari.app")),
+            Some("app")
+        );
+        assert_eq!(runs_by_name(Path::new("/a/Install.PKG")), Some("installer"));
+    }
 }

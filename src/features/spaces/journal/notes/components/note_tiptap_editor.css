@@ -158,45 +158,21 @@
   border-radius: var(--radius-xl);
 }
 
-.misty-tiptap-prosemirror pre code .hljs-keyword,
-.misty-tiptap-prosemirror pre code .hljs-selector-tag,
-.misty-tiptap-prosemirror pre code .hljs-built_in,
-.misty-tiptap-prosemirror pre code .hljs-type {
-  color: var(--color-cream-bright);
-  font-weight: 600;
-}
-.misty-tiptap-prosemirror pre code :is(.hljs-title, .hljs-section, .hljs-name, .hljs-selector-id) {
-  color: var(--color-cream-bright);
-}
-.misty-tiptap-prosemirror
-  pre
-  code
-  :is(
-    .hljs-string,
-    .hljs-regexp,
-    .hljs-attr,
-    .hljs-attribute,
-    .hljs-symbol,
-    .hljs-template-variable
-  ) {
-  color: color-mix(in srgb, var(--color-cream) 82%, var(--color-cream-muted));
-}
-.misty-tiptap-prosemirror pre code :is(.hljs-number, .hljs-literal, .hljs-variable, .hljs-params) {
-  color: var(--color-cream-bright);
-}
-.misty-tiptap-prosemirror pre code :is(.hljs-comment, .hljs-quote, .hljs-meta, .hljs-doctag) {
-  color: var(--color-cream-muted);
-  font-style: italic;
-}
-.misty-tiptap-prosemirror pre code .hljs-deletion {
-  color: var(--color-cream-muted);
-  text-decoration: line-through;
-}
-.misty-tiptap-prosemirror pre code :is(.hljs-addition, .hljs-strong) {
-  font-weight: 600;
-}
-.misty-tiptap-prosemirror pre code .hljs-emphasis {
-  font-style: italic;
+.misty-tiptap-prosemirror pre {
+  --shiki-token-keyword: var(--color-cream-bright);
+  --shiki-token-function: var(--color-cream-bright);
+  --shiki-token-constant: var(--color-cream-bright);
+  --shiki-token-parameter: var(--color-cream-bright);
+  --shiki-token-string: color-mix(in srgb, var(--color-cream) 82%, var(--color-cream-muted));
+  --shiki-token-string-expression: color-mix(
+    in srgb,
+    var(--color-cream) 82%,
+    var(--color-cream-muted)
+  );
+  --shiki-token-comment: var(--color-cream-muted);
+  --shiki-token-punctuation: var(--color-cream);
+  --shiki-token-link: var(--color-cream-bright);
+  --shiki-foreground: var(--color-cream);
 }
 
 .misty-tiptap-block-handle {

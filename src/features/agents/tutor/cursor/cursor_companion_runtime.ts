@@ -101,7 +101,7 @@ async function listenToNative(
   );
   listen<{ taskId: string; reason: string }>("misty://desktop-control-stopped", (event) => {
     const stoppedTurn = s.turn;
-    void import("../../runs/local-execution/local_execution").then(
+    void import("../../runs/local-execution/local_execution_state").then(
       ({ useLocalExecution, pauseLocalExecution }) => {
         if (useLocalExecution.getState().execution?.taskId !== event.taskId) return;
         if (!s.disposed) s.fail(stoppedTurn, event.reason);

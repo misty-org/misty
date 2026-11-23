@@ -35,7 +35,7 @@ export function SpaceAgentRow({
             {
               id: agent.agent_id,
               name: agent.agent_name,
-              avatar: {},
+              avatar: agent.avatar,
               system_managed: false,
             } as AgentProfile
           }
@@ -59,7 +59,7 @@ export function SpaceAgentRow({
         />
       ) : null}
       {onRemove ? (
-        <IconButton label={`Remove ${agent.agent_name} from this Space`} onClick={onRemove}>
+        <IconButton label={`Delete ${agent.agent_name} from this Space`} onClick={onRemove}>
           <X />
         </IconButton>
       ) : null}

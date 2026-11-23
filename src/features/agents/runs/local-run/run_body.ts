@@ -6,11 +6,14 @@ import { personaInstructions } from "../../personas/catalog_api";
 import { assembleAgentPrompt } from "../../bots/bot_prompt";
 import { takeComputerUseAttachment } from "@/features/computer-use/computer_use_attachment";
 import { multirunFolderOf } from "../../multirun/multirun_folders";
+import { continuationNote } from "../../threads/continuation";
 import { chatProjectOf, isProjectChat } from "../../shared-folders/chat_folder";
 import { agentAccountId, isSignedIn } from "../../personal/agent_account";
 import { blankConversationState, collaborationOf, readConversationState } from "../../local_run";
 import { computerName } from "../../local_run";
 import { personalAgentFor } from "../../personal/personal_agents_store";
+import { homeSpaceOf } from "../../personal/agent_home_space";
+import { useUserStore } from "@/features/account/core";
 import { invoke } from "@/native/invoke";
 import { localAttachmentsForRun } from "../../conversations/composer/local_attachments";
 import {
@@ -103,6 +106,7 @@ export async function buildRunBody(
     personaInstructions(input.prompt).catch(() => ""),
   ]);
   const multirunFolder = await multirunFolderOf(conversationId);
+  const continued = conversationId ? await continuationNote(conversationId).catch(() => "") : "";
   const inProject =
     Boolean(conversationId) && (multirunFolder !== undefined || isProjectChat(conversationId));
   const saved = input.permissionMode ?? (state.permissionMode || agent?.default_run_mode || "ask");
@@ -122,6 +126,8 @@ export async function buildRunBody(
     chosenCollaboration === "plan",
   );
   const permissionMode = mode?.id ?? saved;
+  const memorySpace = agent && !agent.system_managed ? homeSpaceOf(account, agent) : "";
+  const inThread = Boolean(conversationId && !inProject && engineId && input.spaceId);
   const collaborationMode: AiInvocationRequest["collaborationMode"] =
     chosenCollaboration === "teach" ? "teach" : mode?.kind === "plans" ? "plan" : "act";
   const body: Record<string, unknown> = {
@@ -147,11 +153,16 @@ export async function buildRunBody(
             instructions: [
               agent ? assembleAgentPrompt({ agent }).text : "",
               personas,
-              conversationId && !inProject && engineId ? SCRATCH_CHAT_NOTE : "",
+              continued,
+              conversationId && !inProject && engineId && !inThread ? SCRATCH_CHAT_NOTE : "",
             ]
               .filter(Boolean)
               .join("\n\n"),
           }
+        : undefined,
+    agent_memory:
+      memorySpace && engineId && onEngine
+        ? { space_id: memorySpace, by: useUserStore.getState().me?.username?.trim() || "" }
         : undefined,
     allowed_tools: agent?.tools?.length ? agent.tools : undefined,
     computer_use: input.computerUse || takeComputerUseAttachment(conversationId) || undefined,
@@ -170,6 +181,13 @@ export async function buildRunBody(
             }),
             folder: multirunFolder ?? chatProjectOf(conversationId),
             space: input.spaceId || undefined,
+            thread: inThread
+              ? {
+                  agent_id: agentId,
+                  agent: agent?.name ?? "",
+                  title: chat.title || input.prompt.slice(0, 48),
+                }
+              : undefined,
             args: agent?.runtime_args?.length ? agent.runtime_args : undefined,
             mcp_servers: agent?.mcp_servers?.length ? agent.mcp_servers : undefined,
             teammates: teammateClaimsNote() || undefined,

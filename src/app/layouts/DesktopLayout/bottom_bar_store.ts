@@ -22,7 +22,6 @@ export const bottomBarItemIds = [
   "newChat",
   "newTab",
   "search",
-  "layout",
   "mistyPanel",
   "sidebar",
   "theme",

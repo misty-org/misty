@@ -2,11 +2,16 @@ pub mod commands;
 mod device;
 pub mod file_commands;
 mod http;
+mod realtime;
 
 use std::{
     collections::HashMap,
     path::PathBuf,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, LazyLock, Mutex,
+    },
+    time::Duration,
 };
 
 use serde::{Deserialize, Serialize};
@@ -15,6 +20,8 @@ use space_drive::{
     SpaceId, SpaceMount, StatusKind,
 };
 use tauri::{AppHandle, Emitter, Manager};
+
+const CHANGED_QUIET: Duration = Duration::from_millis(60);
 
 use crate::app::runtime::MistyRuntime;
 
@@ -42,6 +49,8 @@ struct Host {
     provider: Option<Arc<space_drive::face::file_provider::FileProviderFace>>,
     #[cfg(target_os = "macos")]
     _socket: Option<space_drive::socket::Server>,
+    link: Arc<realtime::NativeLink>,
+    listening: tokio::task::JoinHandle<()>,
 }
 
 static HOST: LazyLock<Mutex<Option<Host>>> = LazyLock::new(|| Mutex::new(None));
@@ -64,6 +73,10 @@ pub(crate) fn drive() -> Result<Drive, String> {
         .ok_or_else(|| "Space drives aren't set up yet.".to_string())
 }
 
+pub(crate) fn native_link_up() -> bool {
+    host().as_ref().is_some_and(|host| host.link.up())
+}
+
 pub(crate) fn run_folder(space: &str) -> Option<PathBuf> {
     mounts().get(space).cloned()
 }
@@ -79,38 +92,101 @@ fn folder_name(id: &str) -> Option<&str> {
 
 struct AppEvents {
     app: AppHandle,
+    pending: Arc<Mutex<Vec<(SpaceId, ChangedEntry)>>>,
+    waiting: Arc<AtomicBool>,
 }
 
 #[derive(Clone, Serialize)]
-struct ChangedPayload<'a> {
-    space_id: &'a SpaceId,
-    items: &'a [ChangedEntry],
-    removed: Vec<&'a space_drive::ItemId>,
+struct ChangedPayload {
+    space_id: SpaceId,
+    items: Vec<ChangedEntry>,
+    removed: Vec<space_drive::ItemId>,
 }
 
-impl Events for AppEvents {
-    fn status(&self, status: &DriveStatus) {
-        let _ = self.app.emit(STATUS_EVENT, status);
+fn to_people<S: Serialize + Clone>(app: &AppHandle, event: &str, payload: S) {
+    for window in crate::browser::app_windows::person_windows(app) {
+        let _ = app.emit_to(window.label(), event, payload.clone());
     }
+}
 
-    fn changed(&self, space: &SpaceId, entries: &[ChangedEntry]) {
-        let removed = entries
+fn send_changed(app: &AppHandle, pending: Vec<(SpaceId, ChangedEntry)>) {
+    let mut latest: HashMap<(SpaceId, space_drive::ItemId), ChangedEntry> = HashMap::new();
+    let mut order: Vec<(SpaceId, space_drive::ItemId)> = Vec::new();
+    for (space, entry) in pending {
+        let key = (space, entry.entry.id.clone());
+        if latest.insert(key.clone(), entry).is_none() {
+            order.push(key);
+        }
+    }
+    let mut folders: Vec<((SpaceId, String), Vec<ChangedEntry>)> = Vec::new();
+    for key in order {
+        let Some(entry) = latest.remove(&key) else {
+            continue;
+        };
+        let folder = (key.0, space_drive::names::parent(&entry.entry.path));
+        match folders.iter_mut().find(|(at, _)| *at == folder) {
+            Some((_, list)) => list.push(entry),
+            None => folders.push((folder, vec![entry])),
+        }
+    }
+    for ((space, _), items) in folders {
+        let removed = items
             .iter()
             .filter(|entry| entry.removed)
-            .map(|entry| &entry.entry.id)
+            .map(|entry| entry.entry.id.clone())
             .collect();
-        let _ = self.app.emit(
+        to_people(
+            app,
             CHANGED_EVENT,
             ChangedPayload {
                 space_id: space,
-                items: entries,
+                items,
                 removed,
             },
         );
     }
+}
+
+impl Events for AppEvents {
+    fn status(&self, status: &DriveStatus) {
+        to_people(&self.app, STATUS_EVENT, status.clone());
+        if matches!(status.status, space_drive::StatusKind::Idle) && status.pending_downloads == 0 {
+            crate::engines::thread_work::drive_settled(&self.app, status.space_id.as_str());
+        }
+    }
+
+    fn changed(&self, space: &SpaceId, entries: &[ChangedEntry]) {
+        if entries.is_empty() {
+            return;
+        }
+        crate::engines::agent_memory::index::drive_changed(
+            &self.app,
+            space.as_str(),
+            entries.iter().map(|entry| entry.entry.path.as_str()),
+        );
+        self.pending
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .extend(entries.iter().map(|entry| (space.clone(), entry.clone())));
+        if self.waiting.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let (app, pending, waiting) =
+            (self.app.clone(), self.pending.clone(), self.waiting.clone());
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(CHANGED_QUIET).await;
+            waiting.store(false, Ordering::SeqCst);
+            let taken = std::mem::take(
+                &mut *pending
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            );
+            send_changed(&app, taken);
+        });
+    }
 
     fn notice(&self, notice: &Notice) {
-        let _ = self.app.emit(NOTICE_EVENT, notice);
+        to_people(&self.app, NOTICE_EVENT, notice.clone());
     }
 
     fn agent_trashed(&self, record: &AgentTrash) {
@@ -183,8 +259,13 @@ fn open_host(
     let mut config = DriveConfig::new(data_dir, account_id.to_owned(), device);
     config.person_name = person_name.clone().filter(|name| !name.trim().is_empty());
     config.cache_limit_bytes = device::cache_limit(&store);
-    let network = Arc::new(http::AccountHttp::new(base, account_id.to_owned())?);
-    let events = Arc::new(AppEvents { app: app.clone() });
+    config.large_file_bytes = device::large_file_limit(&store);
+    let network = Arc::new(http::AccountHttp::new(base.clone(), account_id.to_owned())?);
+    let events = Arc::new(AppEvents {
+        app: app.clone(),
+        pending: Arc::default(),
+        waiting: Arc::default(),
+    });
     let handle = tauri::async_runtime::handle().inner().clone();
     let drive = Drive::start(config, network, events, handle).map_err(|error| error.to_string())?;
     #[cfg(target_os = "macos")]
@@ -211,7 +292,10 @@ fn open_host(
             Err(error) => (None, None, Some(error.to_string())),
         }
     };
+    let (link, listening) = realtime::start(drive.clone(), base);
     Ok(Host {
+        link,
+        listening,
         server: server.to_owned(),
         account_id: account_id.to_owned(),
         failed: HashMap::new(),
@@ -274,6 +358,7 @@ impl Host {
     }
 
     fn shutdown(&mut self) {
+        self.listening.abort();
         for mount in self.drive.mounted() {
             self.unmount(&mount.space, false);
         }

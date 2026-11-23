@@ -49,12 +49,33 @@ export function useDmListUpdates() {
       const detail = (event as CustomEvent<{ spaceId?: string }>).detail;
       if (detail?.spaceId && isDmId(detail.spaceId)) soon();
     };
+    const onRead = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{
+          spaceId?: string;
+          conversationId?: string;
+          caughtUp?: boolean;
+          event?: { payload?: Record<string, unknown> };
+        }>
+      ).detail;
+      const spaceId = detail?.spaceId;
+      if (!spaceId || detail.conversationId || !isDmId(spaceId)) return;
+      if (detail.event?.payload?.thread_root_id) return;
+      if (!detail.caughtUp) return soon();
+      updateDms((current) =>
+        current.some((dm) => dm.id === spaceId && dm.unread_count)
+          ? current.map((dm) => (dm.id === spaceId ? { ...dm, unread_count: 0 } : dm))
+          : current,
+      );
+    };
     window.addEventListener("misty:direct-event", soon);
     window.addEventListener("misty:space-message-event", onMessage);
+    window.addEventListener("misty:space-read-event", onRead);
     return () => {
       clearTimeout(timer);
       window.removeEventListener("misty:direct-event", soon);
       window.removeEventListener("misty:space-message-event", onMessage);
+      window.removeEventListener("misty:space-read-event", onRead);
     };
   }, []);
 }

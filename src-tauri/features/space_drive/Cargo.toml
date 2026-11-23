@@ -22,12 +22,12 @@ hex = "0.4"
 # ripgrep's walker and gitignore matcher (MIT/Unlicense), as spaces_folders uses it.
 ignore = "0.4"
 percent-encoding = "2"
-rand = "0.8"
+rand = "0.10"
 rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-thiserror = "1"
+thiserror = "2"
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 # Names are kept in NFC, as the server keeps them (MIT/Apache-2.0).
 unicode-normalization = "0.1"

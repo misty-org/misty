@@ -263,15 +263,17 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
       {engine ? (
         <EngineNextStep engine={engine as EngineId} view={view} state={held ? state : "ready"} />
       ) : null}
-      <DropdownMenu>
-        <MenuTrigger label={`${agent.name} actions`} iconOnly icon={MoreHorizontal} />
-        <DropdownMenuContent align="end">
-          <MenuItem icon={Pencil} label="Rename" onSelect={() => setRenaming(true)} />
-          <MenuItem icon={AudioLines} label="Voice" onSelect={() => setVoicing(true)} />
-          <DropdownMenuSeparator />
-          <MenuItem icon={Trash2} label="Delete" danger onSelect={() => setDeleting(true)} />
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {agent.can_edit === false ? null : (
+        <DropdownMenu>
+          <MenuTrigger label={`${agent.name} actions`} iconOnly icon={MoreHorizontal} />
+          <DropdownMenuContent align="end">
+            <MenuItem icon={Pencil} label="Rename" onSelect={() => setRenaming(true)} />
+            <MenuItem icon={AudioLines} label="Voice" onSelect={() => setVoicing(true)} />
+            <DropdownMenuSeparator />
+            <MenuItem icon={Trash2} label="Delete" danger onSelect={() => setDeleting(true)} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {renaming ? (
         <RenameItemDialog
           key={agent.id}

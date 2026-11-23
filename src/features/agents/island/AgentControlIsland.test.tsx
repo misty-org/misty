@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { NoticeViewport } from "@misty/ui";
+import type * as LocalExecutionState from "../runs/local-execution/local_execution_state";
 const mocks = vi.hoisted(() => ({
   pause: vi.fn(),
   watch: vi.fn(() => vi.fn()),
@@ -26,17 +27,20 @@ vi.mock("../runs/jobs/workspace_autopilot", () => ({
   watchWorkspaceAutopilot: mocks.watch,
   autopilotStopShortcut: () => "Cmd+Shift+Escape",
 }));
-vi.mock("../runs/local-execution/local_execution", async () => {
+vi.mock("../runs/local-execution/local_execution_state", async (importOriginal) => {
   const { create } = await import("zustand");
   return {
+    ...(await importOriginal<typeof LocalExecutionState>()),
     useLocalExecution: create(() => ({ execution: null as unknown })),
     pauseLocalExecution: mocks.pause,
     finishLocalExecution: mocks.finish,
-    steerLocalExecution: mocks.steer,
-    routeLocalFollowup: mocks.route,
-    queueLocalFollowup: mocks.queue,
   };
 });
+vi.mock("../runs/local-execution/local_execution_followups", () => ({
+  steerLocalExecution: mocks.steer,
+  routeLocalFollowup: mocks.route,
+  queueLocalFollowup: mocks.queue,
+}));
 vi.mock("@/features/agents/conversations/state/use_misty_store", async () => {
   const { create } = await import("zustand");
   return {
@@ -71,7 +75,7 @@ import { useAgentInterventions } from "@/features/agents/interventions/store";
 import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
 import { AgentControlIsland } from "./AgentControlIsland";
 import { useHostedSessions } from "../runs/hosted-sessions/hosted_sessions_state";
-import { useLocalExecution, type Execution } from "../runs/local-execution/local_execution";
+import { useLocalExecution, type Execution } from "../runs/local-execution/local_execution_state";
 
 const execution: Execution = {
   taskId: "task",

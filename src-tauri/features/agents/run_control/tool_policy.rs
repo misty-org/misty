@@ -133,6 +133,10 @@ const DELETES_NO_FILE: &[&str] = &["item.delete"];
 
 const FILES_DELETE: &str = "files.delete";
 
+const MEMORY_READS: &[&str] = &["memory.read", "space.claims"];
+
+const MEMORY_WRITES: &[&str] = &["memory.write", "memory.edit", "memory.forget"];
+
 pub(crate) fn deletes(name: &str) -> bool {
     !name.starts_with("app.")
         && !DELETES_NO_FILE.contains(&name)
@@ -189,7 +193,15 @@ pub(crate) const COMPUTER_ACTS: &[&str] = &[
 ];
 
 fn allowed_by_list(facts: &RunFacts, name: &str) -> bool {
-    const ALWAYS: &[&str] = &["conversation.ask_user", "log.work.write"];
+    const ALWAYS: &[&str] = &[
+        "conversation.ask_user",
+        "log.work.write",
+        "memory.read",
+        "memory.write",
+        "memory.edit",
+        "memory.forget",
+        "space.claims",
+    ];
     facts.allowed_tools.is_empty()
         || ALWAYS.contains(&name)
         || facts.allowed_tools.iter().any(|allowed| {
@@ -304,6 +316,20 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             return Decision::Run;
         }
         return ask("The agent asks once to work in this app for this chat.");
+    }
+    if MEMORY_READS.contains(&name) {
+        return Decision::Run;
+    }
+    if MEMORY_WRITES.contains(&name) {
+        return if facts.planning {
+            Decision::Refuse {
+                code: "plan_mode",
+                message: "Plan mode is read-only. Put what to remember in the plan instead."
+                    .to_owned(),
+            }
+        } else {
+            Decision::Run
+        };
     }
     if deletes(name) {
         return delete_decision(facts, name);

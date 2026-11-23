@@ -23,9 +23,11 @@ const listOf = (text: string) => [
 export function AgentBotFields({
   draft,
   onChange,
+  soulLocked = false,
 }: {
   draft: AgentProfileInput;
   onChange<K extends keyof AgentProfileInput>(key: K, value: AgentProfileInput[K]): void;
+  soulLocked?: boolean;
 }) {
   const [tools, setTools] = useState(listText(draft.tools));
   const [servers, setServers] = useState(listText(draft.mcp_servers));
@@ -40,6 +42,7 @@ export function AgentBotFields({
           maxLength={100000}
           placeholder="Who this agent is: its voice, values and way of thinking"
           value={draft.soul ?? ""}
+          disabled={soulLocked}
           onChange={(event) => onChange("soul", event.target.value)}
         />
       </Field>

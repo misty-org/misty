@@ -1,6 +1,7 @@
 import type { MarkRender } from "@misty/ui";
 import { desktopOs } from "@/shared/platform/desktop_os";
 import { useRegistry } from "@/native/registry";
+import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
 export interface AppWrap {
   manifest: Record<string, unknown>;
@@ -47,7 +48,10 @@ export const useRegistryApps = (): readonly CatalogApp[] =>
   useRegistry((state) => state.apps.apps) as readonly CatalogApp[];
 
 export function catalogLogoUrl(app: Pick<CatalogApp, "logo">): string {
-  return app.logo;
+  if (!app.logo.startsWith("https://")) return app.logo;
+  const local = safeTauriAssetUrl("logo", "misty-logo");
+  if (local === "logo") return app.logo;
+  return `${local}?${new URLSearchParams({ u: app.logo }).toString()}`;
 }
 
 export function catalogSource(app: CatalogApp) {

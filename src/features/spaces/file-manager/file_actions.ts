@@ -1,10 +1,17 @@
 import { notify } from "@misty/ui";
 import { filesApi } from "@/features/agents";
-import { disk, type FinderTag, type Resolution } from "@/features/files";
+import {
+  disk,
+  needsConfirm,
+  type Failure,
+  type FinderTag,
+  type Resolution,
+} from "@/features/files";
 import { driveNative } from "../drive";
 import type { FilesDialogs } from "./dialogs/UseFilesDialogs";
 import { copyIntoDrive } from "./drive_copy";
 import { countText, messageOf } from "./format";
+import { createIn } from "./list_folder";
 import {
   childOf,
   localPath,
@@ -15,49 +22,61 @@ import {
   type FileItem,
   type FilesPlace,
 } from "./model";
-import type { TransferWhere } from "./transfers";
+import { bySource, sourceOf, type FileSourceAdapter } from "./sources";
+import { diskSource } from "./sources/disk_source";
+import type { BrowserStore } from "./store/browser_store";
+import type { Run } from "./use_operations";
 
-type Run = <T>(
-  label: string,
-  work: (opId: string) => Promise<T>,
-  where?: TransferWhere,
-) => Promise<T>;
-
-export interface ActionContext {
-  place: FilesPlace;
+export interface ActionDeps {
+  store: BrowserStore;
   granted: boolean;
-  changed(): void;
   run: Run;
-  ask: FilesDialogs;
-  select(ids: string[]): void;
-  go(place: FilesPlace): void;
-  quickLook(item: FileItem): void;
+  ask(): FilesDialogs | null;
   openDrive(item: FileItem): void;
+  changed(): void;
   pick?(items: FileItem[]): void;
 }
 
 export const fail = (cause: unknown, fallback: string) =>
   notify({ message: messageOf(cause, fallback), tone: "error" });
 
-const failures = (failed: { path: string; error: string }[], verb: string) => {
+const failures = (failed: Failure[], verb: string) => {
   if (!failed.length) return;
   notify({
     message:
       failed.length === 1
-        ? `${nameOf(failed[0].path)} couldn't ${verb}: ${failed[0].error}`
+        ? `${nameOf(failed[0].path) || "An item"} couldn't ${verb}: ${failed[0].error}`
         : `${countText(failed.length)} couldn't ${verb}.`,
     tone: "error",
   });
+};
+
+const existing = (cause: unknown) => {
+  const message = messageOf(cause, "");
+  return message.startsWith("exists:") ? message.slice("exists:".length) || "an item" : null;
 };
 
 const pathsOf = (items: FileItem[]) => items.flatMap((item) => localPath(item) ?? []);
 const titleFor = (items: FileItem[]) =>
   items.length === 1 ? `“${items[0].name}”` : countText(items.length);
 
-export function createFileActions(ctx: ActionContext) {
-  const { place, granted } = ctx;
-  const folder = placeFolder(place);
-  const project = place.kind === "project";
+export const canPasteIn = (place: FilesPlace, granted: boolean) =>
+  Boolean(placeFolder(place)) && (granted || place.kind === "project");
+
+export const canCreateIn = (place: FilesPlace, granted: boolean) =>
+  canPasteIn(place, granted) || place.kind === "space-drive";
+
+export function createFileActions(deps: ActionDeps) {
+  const { store, granted } = deps;
+  const here = () => store.getState().place;
+  const select = (ids: string[]) => store.getState().select(ids);
+  const ask = () => {
+    const dialogs = deps.ask();
+    if (!dialogs) throw new Error("Files isn't open.");
+    return dialogs;
+  };
+  const adapterFor = (item: FileItem): FileSourceAdapter =>
+    granted && item.source.kind === "project" ? diskSource : sourceOf(item);
 
   const guard = async (work: () => Promise<unknown>, fallback: string) => {
     try {
@@ -65,9 +84,20 @@ export function createFileActions(ctx: ActionContext) {
     } catch (cause) {
       fail(cause, fallback);
     } finally {
-      ctx.changed();
+      deps.changed();
     }
   };
+
+  const opened = (item: FileItem, attempt: (confirmed: boolean) => Promise<void>) =>
+    void attempt(false).catch((cause: unknown) => {
+      if (!needsConfirm(cause)) return fail(cause, `${item.name} couldn't open.`);
+      void ask().confirm({
+        title: `Open “${item.name}”?`,
+        what: "It's an app or script that can run on this Mac.",
+        confirmLabel: "Open",
+        onConfirm: () => attempt(true),
+      });
+    });
 
   const transfer = async (op: "copy" | "move", sources: string[], dir: string) => {
     const moving = sources.filter((source) => !(op === "move" && parentOf(source) === dir));
@@ -75,17 +105,17 @@ export function createFileActions(ctx: ActionContext) {
     if (!granted) {
       for (const source of moving)
         await filesApi.paste(source, dir).catch((cause) => fail(cause, "Couldn't paste."));
-      return ctx.changed();
+      return deps.changed();
     }
     try {
       const conflicts = await disk.conflicts(moving, dir);
       let resolutions: Record<string, Resolution> = {};
       if (conflicts.length) {
-        const answers = await ctx.ask.conflicts(conflicts, op);
+        const answers = await ask().conflicts(conflicts, op);
         if (!answers) return;
         resolutions = answers;
       }
-      const result = await ctx.run(
+      const result = await deps.run(
         op === "copy" ? "Copying" : "Moving",
         (opId) => disk.transfer(op, moving, dir, resolutions, opId),
         {
@@ -95,11 +125,35 @@ export function createFileActions(ctx: ActionContext) {
         },
       );
       failures(result.failed, op === "copy" ? "be copied" : "be moved");
-      if (dir === folder) ctx.select(result.created);
+      if (dir === placeFolder(here())) select(result.created);
     } catch (cause) {
       fail(cause, op === "copy" ? "Couldn't copy." : "Couldn't move.");
     } finally {
-      ctx.changed();
+      deps.changed();
+    }
+  };
+
+  const moveInDrive = async (spaceId: string, paths: string[], folder: string) => {
+    const done = async (replace: boolean) => {
+      const moved = await driveNative.move(spaceId, paths, folder, replace);
+      if (moved.length < paths.length)
+        notify({
+          message: `${countText(paths.length - moved.length)} couldn't be moved.`,
+          tone: "error",
+        });
+      deps.changed();
+    };
+    try {
+      await done(false);
+    } catch (cause) {
+      const name = existing(cause);
+      if (!name) return fail(cause, "Couldn't move it.");
+      void ask().confirm({
+        title: `Replace “${name}”?`,
+        what: "The one already in that folder moves to the Trash.",
+        confirmLabel: "Replace",
+        onConfirm: () => done(true),
+      });
     }
   };
 
@@ -107,94 +161,67 @@ export function createFileActions(ctx: ActionContext) {
     transfer,
 
     open(item: FileItem) {
-      const inside = placeInside(item, place);
-      if (inside) return ctx.go(inside);
-      if (ctx.pick) return ctx.pick([item]);
+      const inside = placeInside(item, here());
+      if (inside) return store.getState().go(inside);
+      if (deps.pick) return deps.pick([item]);
       const source = item.source;
-      if (source.kind === "drive") return ctx.openDrive(item);
+      if (source.kind === "drive") return deps.openDrive(item);
       if (source.kind === "disk") {
-        void disk.open([source.entry.path]).then(
-          () => void disk.noteRecent(source.entry.path).catch(() => undefined),
-          (cause) => fail(cause, `${item.name} couldn't open.`),
-        );
-        return;
+        const path = source.entry.path;
+        return opened(item, async (confirmed) => {
+          await disk.open([path], confirmed);
+          void disk.noteRecent(path).catch(() => undefined);
+        });
       }
-      if (source.kind === "project") ctx.quickLook(item);
+      if (source.kind === "project") store.getState().setQuick(item);
     },
 
     openWith(item: FileItem, app: string) {
       const path = localPath(item);
-      if (path)
-        void disk.openWith(path, app).catch((cause) => fail(cause, `${item.name} couldn't open.`));
+      if (path) opened(item, (confirmed) => disk.openWith(path, app, confirmed));
     },
 
     rename(item: FileItem) {
-      const source = item.source;
-      if (source.kind === "drive") {
-        ctx.ask.name({
-          title: `Rename ${item.folder ? "folder" : "file"}`,
-          initial: item.name,
-          onConfirm: async (name) => {
-            if (name === item.name) return;
-            const renamed = await driveNative.rename(
-              source.entry.space_id,
-              source.entry.path,
-              name,
-            );
-            ctx.changed();
-            ctx.select([`drive:${renamed.id}`]);
-          },
-        });
-        return;
-      }
-      const path = localPath(item);
-      if (!path) return;
-      ctx.ask.name({
+      const adapter = adapterFor(item);
+      if (!adapter.canRename || !adapter.rename) return;
+      const rename = adapter.rename;
+      ask().name({
         title: `Rename ${item.folder ? "folder" : "file"}`,
         initial: item.name,
         onConfirm: async (name) => {
           if (name === item.name) return;
-          let renamed = childOf(parentOf(path), name);
-          if (granted) renamed = (await disk.rename(path, name)).path;
-          else await filesApi.rename(path, renamed);
-          ctx.changed();
-          ctx.select([renamed]);
+          const done = async (replace: boolean) => {
+            const renamed = await rename(item, name, replace);
+            deps.changed();
+            select([renamed]);
+          };
+          try {
+            await done(false);
+          } catch (cause) {
+            const taken = existing(cause);
+            if (!taken) throw cause;
+            void ask().confirm({
+              title: `Replace “${taken}”?`,
+              what: "The one already in this folder moves to the Trash.",
+              confirmLabel: "Replace",
+              onConfirm: () => done(true),
+            });
+          }
         },
       });
     },
 
     create(kind: "folder" | "file") {
-      if (place.kind === "space-drive") {
-        const { spaceId, path: inside } = place;
-        ctx.ask.name({
-          title: kind === "folder" ? "New folder" : "New file",
-          initial: kind === "folder" ? "untitled folder" : "untitled.txt",
-          confirmLabel: "Create",
-          onConfirm: async (name) => {
-            const made =
-              kind === "folder"
-                ? await driveNative.createFolder(spaceId, inside, name)
-                : await driveNative.write(spaceId, inside, name, new Uint8Array());
-            ctx.changed();
-            ctx.select([`drive:${made.id}`]);
-          },
-        });
-        return;
-      }
-      if (!folder) return;
-      ctx.ask.name({
+      const place = here();
+      if (!canCreateIn(place, granted)) return;
+      ask().name({
         title: kind === "folder" ? "New folder" : "New file",
         initial: kind === "folder" ? "untitled folder" : "untitled.txt",
         confirmLabel: "Create",
         onConfirm: async (name) => {
-          const path = childOf(folder, name);
-          if (granted)
-            await (kind === "folder"
-              ? disk.createFolder(folder, name)
-              : disk.createFile(folder, name));
-          else await (kind === "folder" ? filesApi.createDir(path) : filesApi.createFile(path));
-          ctx.changed();
-          ctx.select([path]);
+          const made = await createIn(place, kind, name, granted);
+          deps.changed();
+          select([made]);
         },
       });
     },
@@ -205,19 +232,21 @@ export function createFileActions(ctx: ActionContext) {
         const made = granted
           ? await disk.duplicate(paths)
           : await Promise.all(paths.map(async (path) => (await filesApi.duplicate(path)).path));
-        ctx.select(made);
+        select(made);
       }, "Couldn't duplicate.");
     },
 
     compress(items: FileItem[]) {
       const paths = pathsOf(items);
+      if (!paths.length) return;
       const where = {
         from: paths.length === 1 ? paths[0] : parentOf(paths[0]),
         to: parentOf(paths[0]),
         items: paths.length,
       };
       void guard(
-        async () => ctx.select([await ctx.run("Compressing", () => disk.compress(paths), where)]),
+        async () =>
+          select([await deps.run("Compressing", (opId) => disk.compress(paths, opId), where)]),
         "Couldn't zip.",
       );
     },
@@ -227,8 +256,8 @@ export function createFileActions(ctx: ActionContext) {
       if (path)
         void guard(
           async () =>
-            ctx.select([
-              await ctx.run("Expanding", () => disk.extract(path), {
+            select([
+              await deps.run("Expanding", (opId) => disk.extract(path, opId), {
                 from: path,
                 to: parentOf(path),
                 items: 1,
@@ -241,7 +270,7 @@ export function createFileActions(ctx: ActionContext) {
     makeAlias(item: FileItem) {
       const path = localPath(item);
       if (path)
-        void guard(async () => ctx.select([await disk.makeLink(path)]), "Couldn't make an alias.");
+        void guard(async () => select([await disk.makeLink(path)]), "Couldn't make an alias.");
     },
 
     tag(items: FileItem[], tag: FinderTag, on: boolean) {
@@ -266,16 +295,18 @@ export function createFileActions(ctx: ActionContext) {
     clip(items: FileItem[], cut: boolean) {
       const paths = pathsOf(items);
       if (!paths.length) return;
+      store.getState().setCut(cut ? items.map((item) => item.id) : []);
       const done = granted ? disk.copyToClipboard(paths, cut) : filesApi.clipboardSetFiles(paths);
       void done.catch((cause) => fail(cause, "Couldn't copy."));
     },
 
     async paste() {
-      if (!folder) return;
+      const folder = placeFolder(here());
+      if (!folder || !canPasteIn(here(), granted)) return;
       if (!granted) {
         await filesApi.pasteClipboard(folder).then(
           (result) => {
-            ctx.select(result.created.map((made) => made.path));
+            select(result.created.map((made) => made.path));
             if (result.failed.length)
               notify({
                 message: `${countText(result.failed.length)} couldn't be pasted.`,
@@ -284,114 +315,94 @@ export function createFileActions(ctx: ActionContext) {
           },
           (cause) => fail(cause, "Couldn't paste."),
         );
-        return ctx.changed();
+        return deps.changed();
       }
       const clip = await disk.clipboard().catch(() => null);
       if (clip?.paths.length) await transfer(clip.cut ? "move" : "copy", clip.paths, folder);
+      if (clip?.cut) store.getState().setCut([]);
     },
 
     copyPath(items: FileItem[]) {
       const pathOf = (item: FileItem) =>
         localPath(item) ?? (item.source.kind === "drive" ? item.source.entry.path : item.name);
-      const text = items.map(pathOf).join("\n");
       void navigator.clipboard
-        .writeText(text)
+        .writeText(items.map(pathOf).join("\n"))
         .catch((cause) => fail(cause, "Couldn't copy the path."));
     },
 
     reveal(item: FileItem) {
-      const source = item.source;
-      const done =
-        source.kind === "drive"
-          ? driveNative.reveal(source.entry.space_id, source.entry.path)
-          : source.kind === "disk"
-            ? disk.reveal(source.entry.path)
-            : source.kind === "project"
-              ? filesApi.reveal(source.path)
-              : null;
-      void done?.catch((cause) => fail(cause, "Couldn't show it."));
+      void adapterFor(item)
+        .reveal?.(item)
+        .catch((cause) => fail(cause, "Couldn't show it."));
     },
 
     async trash(items: FileItem[]) {
       await guard(async () => {
-        const drive = items.flatMap((item) =>
-          item.source.kind === "drive" ? [item.source.entry] : [],
-        );
-        for (const entry of drive) await driveNative.trash(entry.space_id, entry.path);
-        const paths = pathsOf(items);
-        if (!paths.length) return;
-        if (granted) await disk.trash(paths);
-        else for (const path of paths) await filesApi.trash(path);
+        const failed: Failure[] = [];
+        const groups = new Map<FileSourceAdapter, FileItem[]>();
+        for (const item of items) {
+          const adapter = adapterFor(item);
+          if (adapter.canTrash) groups.set(adapter, [...(groups.get(adapter) ?? []), item]);
+        }
+        for (const [adapter, group] of groups)
+          if (adapter.trash) failed.push(...(await adapter.trash(group)));
+        failures(failed, "be moved to the Trash");
       }, "Couldn't move it to the Trash.");
     },
 
     deleteNow(items: FileItem[]) {
       const paths = pathsOf(items);
       if (!paths.length || !granted) return;
-      void ctx.ask.confirm({
+      void ask().confirm({
         title: `Delete ${titleFor(items)} immediately?`,
         what: "It skips the Trash. You can't undo this.",
         onConfirm: async () => {
-          const failed = await disk.deleteForever(paths);
-          ctx.changed();
-          if (failed.length) throw new Error(failed[0].error);
+          try {
+            const failed = await deps.run("Deleting", (opId) => disk.deleteNow(paths, opId), {
+              from: paths.length === 1 ? paths[0] : parentOf(paths[0]),
+              items: paths.length,
+            });
+            if (failed.length) throw new Error(failed[0].error);
+          } finally {
+            deps.changed();
+          }
         },
       });
     },
 
     putBack(items: FileItem[]) {
       void guard(async () => {
-        const trashed = items.flatMap((item) =>
-          item.source.kind === "trash" ? [item.source.item.id] : [],
-        );
-        const agent = items.flatMap((item) =>
-          item.source.kind === "agent-trash" ? [item.source.item.id] : [],
-        );
-        const drive = items.flatMap((item) =>
-          item.source.kind === "drive-trash" ? [item.source.entry] : [],
-        );
-        if (trashed.length) failures((await disk.putBack(trashed)).failed, "be put back");
-        if (agent.length)
-          failures((await disk.agentTrashPutBack(agent, "keep-both")).failed, "be put back");
-        for (const entry of drive) await driveNative.restore(entry.space_id, entry.id);
+        const failed: Failure[] = [];
+        for (const [adapter, group] of bySource(items))
+          if (adapter.restore) failed.push(...(await adapter.restore(group)));
+        failures(failed, "be put back");
       }, "Couldn't put it back.");
     },
 
     deleteFromTrash(items: FileItem[]) {
-      void ctx.ask.confirm({
+      void ask().confirm({
         title: `Delete ${titleFor(items)}?`,
         what: "It is deleted for good. You can't undo this.",
         onConfirm: async () => {
           try {
-            const trashed = items.flatMap((item) =>
-              item.source.kind === "trash" ? [item.source.item.trashedPath] : [],
-            );
-            const agent = items.flatMap((item) =>
-              item.source.kind === "agent-trash" ? [item.source.item.id] : [],
-            );
-            const drive = items.flatMap((item) =>
-              item.source.kind === "drive-trash" ? [item.source.entry] : [],
-            );
-            const failed = [
-              ...(trashed.length ? await disk.deleteForever(trashed) : []),
-              ...(agent.length ? await disk.agentTrashDelete(agent) : []),
-            ];
-            for (const entry of drive) await driveNative.purge(entry.space_id, entry.id);
+            const failed: Failure[] = [];
+            for (const [adapter, group] of bySource(items))
+              if (adapter.purge) failed.push(...(await adapter.purge(group)));
             if (failed.length) throw new Error(failed[0].error);
           } finally {
-            ctx.changed();
+            deps.changed();
           }
         },
       });
     },
 
     emptyAgentTrash() {
-      void ctx.ask.confirm({
+      void ask().confirm({
         title: "Empty agent trash?",
         what: "Everything agents moved there is deleted for good. You can't undo this.",
         confirmLabel: "Empty",
         onConfirm: async () => {
-          const failed = await disk.agentTrashEmpty().finally(ctx.changed);
+          const failed = await disk.agentTrashEmpty().finally(deps.changed);
           if (failed.length) throw new Error(failed[0].error);
         },
       });
@@ -403,63 +414,59 @@ export function createFileActions(ctx: ActionContext) {
       copy: boolean,
     ) {
       if (!("dir" in target)) {
-        const own = items.flatMap((item) =>
-          item.source.kind === "drive" && item.source.entry.space_id === target.spaceId
-            ? [item.source.entry]
+        const moving = items.flatMap((item) =>
+          item.source.kind === "drive" &&
+          item.source.entry.space_id === target.spaceId &&
+          parentOf(item.source.entry.path) !== target.path &&
+          item.source.entry.path !== target.path
+            ? [item.source.entry.path]
             : [],
         );
-        const moving = own.filter(
-          (entry) => parentOf(entry.path) !== target.path && entry.path !== target.path,
-        );
-        if (moving.length)
-          await guard(async () => {
-            const moved = await driveNative.move(
-              target.spaceId,
-              moving.map((entry) => entry.path),
-              target.path,
-            );
-            if (moved.length < moving.length)
-              notify({
-                message: `${countText(moving.length - moved.length)} couldn't be moved.`,
-                tone: "error",
-              });
-          }, "Couldn't move it.");
+        if (moving.length) await moveInDrive(target.spaceId, moving, target.path);
       }
       const paths = pathsOf(items);
       if (!paths.length) return;
       if ("dir" in target) return transfer(copy ? "copy" : "move", paths, target.dir);
       await guard(
         () =>
-          ctx.run("Copying", () => copyIntoDrive(target.spaceId, target.path, items), {
+          deps.run("Copying", () => copyIntoDrive(target.spaceId, target.path, items), {
             from: paths.length === 1 ? paths[0] : parentOf(paths[0]),
             to: target.path,
             items: items.length,
+            stoppable: false,
           }),
         "Couldn't copy it into the Space.",
       );
     },
 
+    dropInto(folder: FilesPlace, dropped: FileItem[], copy: boolean) {
+      if (folder.kind === "disk" || folder.kind === "project")
+        void actions.drop(dropped, { dir: folder.path }, copy);
+      else if (folder.kind === "space-drive")
+        void actions.drop(dropped, { spaceId: folder.spaceId, path: folder.path }, copy);
+    },
+
     batchRename(items: FileItem[]) {
-      ctx.ask.batchRename(pathsOf(items), (created) => {
-        ctx.changed();
-        ctx.select(created);
+      ask().batchRename(pathsOf(items), (created) => {
+        deps.changed();
+        select(created);
       });
     },
 
     compare(items: FileItem[]) {
       const [left, right] = pathsOf(items);
-      if (left && right) ctx.ask.compare(left, right);
+      if (left && right) ask().compare(left, right);
     },
 
     duplicates(dir: string) {
-      ctx.ask.duplicates(dir);
+      ask().duplicates(dir);
     },
 
     goToFolder(home: string | undefined) {
       if (!granted) return;
-      ctx.ask.name({
+      ask().name({
         title: "Go to folder",
-        initial: folder ?? home ?? "",
+        initial: placeFolder(here()) ?? home ?? "",
         confirmLabel: "Go",
         fieldLabel: "Folder",
         onConfirm: async (typed) => {
@@ -473,16 +480,12 @@ export function createFileActions(ctx: ActionContext) {
           const info = await disk.info(path).catch(() => null);
           if (!info) throw new Error("There's no folder there.");
           if (info.entry.kind !== "folder") throw new Error(`${info.entry.name} isn't a folder.`);
-          ctx.go({ kind: "disk", path: info.entry.path });
+          store.getState().go({ kind: "disk", path: info.entry.path });
         },
       });
     },
   };
-  return {
-    ...actions,
-    canPaste: Boolean(folder) && (granted || project),
-    canCreate: (Boolean(folder) && (granted || project)) || place.kind === "space-drive",
-  };
+  return actions;
 }
 
 export type FileActions = ReturnType<typeof createFileActions>;

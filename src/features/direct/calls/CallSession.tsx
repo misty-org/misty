@@ -32,14 +32,26 @@ export function CallSession({ call, maxPeople }: { call: ActiveCall; maxPeople: 
   const nameOf = (userId: string) =>
     dmMembers?.find((member) => member.user_id === userId)?.username ??
     spaceMembers?.find((member) => member.user_id === userId)?.name ??
-    controls.people.find((person) => person.id === userId)?.name ??
     "Someone";
   const others = controls.people.filter((person) => !person.self).length;
-  const agent = useCallAgent({ room: controls.room, call, others, nameOf });
+  const agent = useCallAgent({
+    room: controls.room,
+    call,
+    key: controls.baseKey,
+    others,
+    nameOf,
+  });
   useCallShortcuts(controls);
 
   useEffect(() => {
-    useCallSession.getState().publish({ controls, agent, nameOf });
+    useCallSession.getState().publish({
+      controls: {
+        ...controls,
+        people: controls.people.map((person) => ({ ...person, name: nameOf(person.id) })),
+      },
+      agent,
+      nameOf,
+    });
   });
   useEffect(() => () => useCallSession.getState().clear(), []);
   useNotice(controls.reconnecting, {

@@ -1,7 +1,7 @@
 import type { SpaceConversation, SpaceMessage } from "./dto/entities";
 import type { MessageSpan } from "./dto/common";
 import type { SpaceRequest } from "./space_request_types";
-import { spaceMessagePageSize } from "./chat";
+import { spaceMessagePageSize, spaceMessageSendTimeoutMs } from "./chat";
 
 export function createSpaceConversationsApi(request: SpaceRequest) {
   return {
@@ -85,6 +85,7 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/messages`,
         {
           method: "POST",
+          signal: AbortSignal.timeout(spaceMessageSendTimeoutMs),
           body: JSON.stringify({
             content,
             file_node_ids: fileNodeIds,

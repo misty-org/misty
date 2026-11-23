@@ -7,7 +7,7 @@ import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AgentAvatarPicker } from "./AgentAvatarPicker";
 import { AgentBotFields, ExportBotButton } from "../bots/AgentBotFields";
-import { AgentSpaceField } from "./AgentSpaceField";
+import { AgentSpaceField, CopyAgentToSpace, useAgentHomeSpace } from "./AgentSpaceField";
 import { AgentVoicePicker } from "./AgentVoicePicker";
 
 const emptyProfile: AgentProfileInput = {
@@ -40,6 +40,9 @@ export function AgentEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const home = useAgentHomeSpace(profile);
+  const readOnly = profile?.can_edit === false;
+  const sharedSpace = home?.space && !home.personal ? home.space.name : "";
   const dirty = JSON.stringify(draft) !== JSON.stringify(baselineDraft);
   useEffect(() => {
     onStatusChange({
@@ -126,63 +129,68 @@ export function AgentEditor({
         void save();
       }}
     >
-      <span data-tour="agent-avatar" className="contents">
-        <AgentAvatarPicker
-          profile={profile}
-          name={draft.name}
-          avatar={draft.avatar}
-          busy={busy}
-          onChange={(avatar) => update("avatar", avatar)}
-        />
-      </span>
-      <Field label="Name">
-        <Input
-          required
-          maxLength={80}
-          value={draft.name}
-          readOnly={profile?.system_managed}
-          onChange={(e) => update("name", e.target.value)}
-        />
-      </Field>
-      {profile?.system_managed ? null : (
-        <Field label="Voice">
-          <AgentVoicePicker
+      <fieldset disabled={readOnly} className="contents">
+        <span data-tour="agent-avatar" className="contents">
+          <AgentAvatarPicker
+            profile={profile}
             name={draft.name}
-            voice={draft.voice}
-            disabled={busy}
-            onChange={(voice) => update("voice", voice)}
+            avatar={draft.avatar}
+            busy={busy || readOnly}
+            onChange={(avatar) => update("avatar", avatar)}
           />
-        </Field>
-      )}
-      <span data-tour="agent-role" className="contents">
-        <Field label="Role">
+        </span>
+        <Field label="Name">
           <Input
-            maxLength={160}
-            placeholder="Reviews pull requests"
-            value={draft.role}
-            onChange={(e) => update("role", e.target.value)}
+            required
+            maxLength={80}
+            value={draft.name}
+            readOnly={profile?.system_managed || readOnly}
+            onChange={(e) => update("name", e.target.value)}
           />
         </Field>
-      </span>
-      <Field label="Description">
-        <Textarea
-          className="min-h-20 resize-y"
-          maxLength={2000}
-          placeholder="What this agent helps you with"
-          value={draft.description}
-          onChange={(e) => update("description", e.target.value)}
-        />
-      </Field>
-      <span data-tour="agent-engine" className="contents">
-        <AgentEngineField
-          engine={draft.engine ?? ""}
-          model={draft.engine_model ?? ""}
-          locked={profile?.system_managed}
-          onEngine={(engine) => update("engine", engine)}
-          onModel={(model) => update("engine_model", model)}
-        />
-      </span>
+        {profile?.system_managed ? null : (
+          <Field label="Voice">
+            <AgentVoicePicker
+              name={draft.name}
+              voice={draft.voice}
+              disabled={busy || readOnly}
+              onChange={(voice) => update("voice", voice)}
+            />
+          </Field>
+        )}
+        <span data-tour="agent-role" className="contents">
+          <Field label="Role">
+            <Input
+              maxLength={160}
+              placeholder="Reviews pull requests"
+              value={draft.role}
+              readOnly={readOnly}
+              onChange={(e) => update("role", e.target.value)}
+            />
+          </Field>
+        </span>
+        <Field label="Description">
+          <Textarea
+            className="min-h-20 resize-y"
+            maxLength={2000}
+            placeholder="What this agent helps you with"
+            value={draft.description}
+            readOnly={readOnly}
+            onChange={(e) => update("description", e.target.value)}
+          />
+        </Field>
+        <span data-tour="agent-engine" className="contents">
+          <AgentEngineField
+            engine={draft.engine ?? ""}
+            model={draft.engine_model ?? ""}
+            locked={profile?.system_managed || readOnly}
+            onEngine={(engine) => update("engine", engine)}
+            onModel={(model) => update("engine_model", model)}
+          />
+        </span>
+      </fieldset>
       {profile ? <AgentSpaceField agent={profile} /> : null}
+      {profile ? <CopyAgentToSpace agent={profile} /> : null}
       <span data-tour="agent-permissions" className="contents">
         <AgentPermissionsField
           engine={draft.engine}
@@ -201,10 +209,11 @@ export function AgentEditor({
               maxLength={16000}
               placeholder="What should this agent know about how you work?"
               value={draft.instructions}
+              disabled={readOnly}
               onChange={(e) => update("instructions", e.target.value)}
             />
           </Field>
-          <AgentBotFields draft={draft} onChange={update} />
+          <AgentBotFields draft={draft} onChange={update} soulLocked={readOnly} />
         </div>
       </details>
       <div className="flex flex-wrap gap-3 empty:hidden">
@@ -214,7 +223,7 @@ export function AgentEditor({
           </Button>
         )}
         {profile && !dirty ? <ExportBotButton agent={profile} /> : null}
-        {profile && !profile.system_managed && (
+        {profile && !profile.system_managed && !readOnly && (
           <Button
             type="button"
             className="ml-auto"
@@ -229,8 +238,9 @@ export function AgentEditor({
       {confirmDelete && (
         <div role="alert" className="space-y-3 text-control">
           <p>
-            Delete {profile?.name}? Active work will stop. Existing conversation history is
-            retained.
+            {sharedSpace
+              ? `Delete ${profile?.name}? It leaves ${sharedSpace} for everyone there, and active work will stop. Existing conversation history is retained.`
+              : `Delete ${profile?.name}? Active work will stop. Existing conversation history is retained.`}
           </p>
           <Button type="button" onClick={() => setConfirmDelete(false)}>
             Keep agent

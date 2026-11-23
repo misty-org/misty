@@ -3,9 +3,10 @@ import { Bot, LogOut, MoreHorizontal, ShieldCheck, UserPlus, type LucideIcon } f
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/account";
 import { useSpacesStore } from "../list/use_spaces_store";
-import { ChatBarButtons } from "./components/ChatBarButtons";
+import { useChatBarActions } from "./components/ChatBarButtons";
 import { chatMuteId } from "@/shared/lib/message_notices";
 import { spaceChatPath } from "./chat_route";
+import { loadSpaceMembers } from "./load_space_members";
 import { AddPeopleDialog, ConversationAgentsDialog } from "./sidebar/GroupDirectDialogs";
 import { isGroupDirectMessage } from "./sidebar/conversation_groups";
 import { useOwnMentionableAgents } from "./own_agents";
@@ -20,7 +21,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-  ChannelPage,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -51,7 +51,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const data = useSpaceConversations(spaceId);
   const referenceOnly = useSpacesStore((s) => s.referenceOnly);
   const members = useSpacesStore((s) => s.membersBySpace[spaceId]);
-  const loadMembers = useSpacesStore((s) => s.loadMembers);
   const nodesLoaded = useSpacesStore((s) => Boolean(s.nodesBySpace[spaceId]));
   const loadNodes = useSpacesStore((s) => s.loadNodes);
   const space = useSpacesStore((s) => s.spaces.find((item) => item.id === spaceId));
@@ -73,8 +72,8 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     setSearchedText("");
   };
   useEffect(() => {
-    if (!members) void loadMembers(spaceId).catch(() => {});
-  }, [members, loadMembers, spaceId]);
+    if (!members) void loadSpaceMembers(spaceId).catch(() => {});
+  }, [members, spaceId]);
   useEffect(() => {
     if (!nodesLoaded) void loadNodes(spaceId).catch(() => {});
   }, [nodesLoaded, loadNodes, spaceId]);
@@ -128,10 +127,18 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       onSelect: () => setRolesOpen(true),
     });
 
+  const sideActions = useChatBarActions({
+    spaceId,
+    conversationId,
+    muteId: chatMuteId(spaceId, conversationId),
+    searching: Boolean(searchedText),
+    onPanel: closeSearch,
+  });
   const moreRows = actions.map((action) => (
     <MenuItem key={action.id} icon={action.icon} label={action.label} onSelect={action.onSelect} />
   ));
   const barActions: ActionBarItem[] = [
+    ...sideActions,
     ...(actions.length
       ? [
           {
@@ -157,43 +164,40 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       : []),
   ];
   const search = (
-    <>
-      <ChatBarButtons
-        spaceId={spaceId}
-        conversationId={conversationId}
-        muteId={chatMuteId(spaceId, conversationId)}
-        searching={Boolean(searchedText)}
-        onPanel={closeSearch}
-      />
-      <SearchField
-        containerClassName="w-56"
-        aria-label="Search messages"
-        placeholder="Search messages"
-        value={searchText}
-        onChange={(event) => {
-          setSearchText(event.target.value);
-          if (!event.target.value) setSearchedText("");
-        }}
-        onClear={closeSearch}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            setSearchedText(searchText.trim());
-          }
-        }}
-      />
-    </>
+    <SearchField
+      containerClassName="w-56"
+      aria-label="Search messages"
+      placeholder="Search messages"
+      value={searchText}
+      onChange={(event) => {
+        setSearchText(event.target.value);
+        if (!event.target.value) setSearchedText("");
+      }}
+      onClear={closeSearch}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          setSearchedText(searchText.trim());
+        }
+      }}
+    />
   );
 
   return (
-    <ChannelPage>
+    <>
       {space ? (
         <>
           <SpaceDialogs space={space} open={spaceDialog} onClose={() => setSpaceDialog(null)} />
           <RolesDialog space={space} open={rolesOpen} onOpenChange={setRolesOpen} />
         </>
       ) : null}
-      <SpaceChat {...props} searchedText={searchedText} actions={barActions} search={search} />
+      <SpaceChat
+        {...props}
+        searchedText={searchedText}
+        onCloseSearch={closeSearch}
+        actions={barActions}
+        search={search}
+      />
       {openGroup ? (
         <AddPeopleDialog
           spaceId={spaceId}
@@ -235,6 +239,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </ChannelPage>
+    </>
   );
 }

@@ -46,6 +46,8 @@ const centeredClass = cn(
 );
 const besideSpriteClass = "group-data-[sprite]/companion:left-5";
 const mistyCloud = agentCloudVariants[0];
+if (typeof Image !== "undefined")
+  for (const source of [mistyCloud.src, mistyCloud.poster]) new Image().src = source;
 
 export function CursorOverlayMarkup({
   presentation,

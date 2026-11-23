@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { isE2EESupported } from "livekit-client";
+import { callEncryptionSupported } from "./call_support";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { Button, SideCard, Text, ViewportLayer, notify } from "@misty/ui";
 import { useDirectUserId } from "../direct_account";
@@ -8,12 +8,15 @@ import { onRealtimeMessage } from "@/features/spaces";
 import { dmPath, peekDm, useDms, useFriends } from "../direct_data";
 import { isDoNotDisturb } from "../status_store";
 import { deviceCallKey } from "./call_keys";
-import { CallSession } from "./CallSession";
 import { loopCallSound } from "./call_sounds";
 import { CallFullscreen, CallMiniPlayer } from "./CallView";
 import { watchSpeakerForSpeech } from "./call_devices";
 import { dmOf, useCallStore } from "./call_store";
 import { useMissedCalls } from "./missed_calls";
+
+const CallSession = lazy(() =>
+  import("./CallSession").then((module) => ({ default: module.CallSession })),
+);
 
 const RING_SECONDS = 30;
 
@@ -38,7 +41,7 @@ export function IncomingCallHost() {
 
   useEffect(() => {
     useCallStore.getState().loadConfig();
-    if (isE2EESupported()) void deviceCallKey().catch(() => undefined);
+    if (callEncryptionSupported()) void deviceCallKey().catch(() => undefined);
   }, []);
 
   useEffect(
@@ -49,7 +52,21 @@ export function IncomingCallHost() {
         if (!dmId) return;
         const store = useCallStore.getState();
         if (message.state === "ended") {
-          if (store.incoming?.dmId === dmId) store.ring(null);
+          store.ringEnded(dmId, from);
+          return;
+        }
+        if (message.state === "answered") {
+          if (from && from === myId) store.answeredElsewhere(dmId);
+          return;
+        }
+        if (message.state === "busy") {
+          const active = store.active;
+          if (!active || dmOf(active) !== dmId || !active.caller || active.answered) return;
+          const dm = peekDm(dmId);
+          if (dm?.kind === "group") return;
+          const name = dm?.members.find((member) => member.user_id === from)?.username ?? "They";
+          notify({ message: `${name} is in another call.` });
+          store.leave();
           return;
         }
         if (message.state === "declined") {
@@ -62,7 +79,7 @@ export function IncomingCallHost() {
           return;
         }
         if (message.state !== "ringing" || !from || from === myId) return;
-        if (!isE2EESupported()) return;
+        if (!callEncryptionSupported()) return;
         if (isDoNotDisturb()) {
           useMissedCalls
             .getState()
@@ -120,7 +137,11 @@ export function IncomingCallHost() {
   if (!incoming && !active) return null;
   return (
     <>
-      {active ? <CallSession key={active.room} call={active} maxPeople={maxPeople} /> : null}
+      {active ? (
+        <Suspense fallback={null}>
+          <CallSession key={active.room} call={active} maxPeople={maxPeople} />
+        </Suspense>
+      ) : null}
       <CallFullscreen />
       <ViewportLayer layer="chrome" passthrough>
         <CallMiniPlayer />

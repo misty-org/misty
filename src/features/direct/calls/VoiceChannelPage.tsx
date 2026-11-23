@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, Volume2 } from "lucide-react";
-import { createLocalVideoTrack, type LocalVideoTrack } from "livekit-client";
+import type { LocalVideoTrack } from "livekit-client";
 import {
   Avatar,
   AvatarFallback,
@@ -8,8 +8,8 @@ import {
   CallControl,
   CallLobby,
   CallTile,
-  Surface,
-  ViewHeader,
+  ChannelHeader,
+  FramedPage,
   notify,
 } from "@misty/ui";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
@@ -30,7 +30,10 @@ function CameraPreview({ deviceId }: { deviceId: string }) {
     const video = ref.current;
     let track: LocalVideoTrack | undefined;
     let cancelled = false;
-    void createLocalVideoTrack({ deviceId: deviceId || undefined })
+    void import("livekit-client")
+      .then(({ createLocalVideoTrack }) =>
+        createLocalVideoTrack({ deviceId: deviceId || undefined }),
+      )
       .then((made) => {
         if (cancelled) {
           made.stop();
@@ -174,13 +177,12 @@ export function VoiceChannelPage({
   useWorkspaceViewTitle(workspaceTabId, name);
 
   return (
-    <Surface tone="page" className="flex h-full min-h-0 flex-col">
-      <ViewHeader lead={Volume2} title={name} />
+    <FramedPage header={<ChannelHeader icon={Volume2} name={name} />}>
       {here ? (
         <CallStageView />
       ) : (
         <Lobby spaceId={spaceId} channelId={channelId} name={name} people={people} />
       )}
-    </Surface>
+    </FramedPage>
   );
 }

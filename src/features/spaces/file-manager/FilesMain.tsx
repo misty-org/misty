@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import type { KeyboardEvent, MouseEvent, ReactNode, RefObject } from "react";
 import {
-  Button,
   CollectionItems,
   CollectionSkeleton,
   ContextMenu,
@@ -28,7 +27,12 @@ import type { FilesView } from "./FilesToolbar";
 import { fileColumns } from "./FileItems";
 import { keys } from "./key_labels";
 import type { FilesPlace } from "./model";
-import type { ListingState } from "./use_listing";
+
+export interface MainListing {
+  status: "loading" | "failed" | "ready";
+  message?: string;
+  retry(): void;
+}
 
 function emptyCopy(place: FilesPlace, searching: boolean): { line: string } {
   if (searching) return { line: "No items match this filter." };
@@ -121,6 +125,8 @@ export function FilesMain({
   items,
   searching,
   selected,
+  reveal,
+  onShownOrder,
   onSelect,
   drag,
   background,
@@ -133,10 +139,12 @@ export function FilesMain({
   zoom: CollectionZoom;
   sort: { key: string; descending: boolean } | null;
   onSort(sort: { key: string; descending: boolean } | null): void;
-  listing: ListingState & { retry(): void };
+  listing: MainListing;
   items: CollectionItem[];
   searching: boolean;
   selected: string[];
+  reveal?: string;
+  onShownOrder(ids: string[], perRow: number): void;
   onSelect(event: MouseEvent, id: string, onOpen: () => void): void;
   drag?: CollectionDrag;
   background: BackgroundMenu;
@@ -153,7 +161,7 @@ export function FilesMain({
     body = (
       <ErrorState
         title="This folder couldn't open"
-        line={listing.message}
+        line={listing.message ?? "This folder couldn't open."}
         action={{ label: "Try again", variant: "secondary", onClick: listing.retry }}
       />
     );
@@ -161,36 +169,25 @@ export function FilesMain({
   else if (!items.length) body = <EmptyState {...emptyCopy(place, searching)} />;
   else
     body = (
-      <>
-        <CollectionItems
-          view={view === "grid" ? "grid" : "list"}
-          columns={fileColumns}
-          columnSetId="files"
-          remember="files"
-          sortResetKey={searching ? "search" : "folder"}
-          gridLayout="icons"
-          listIcons="inline"
-          sort={sort}
-          onSortChange={onSort}
-          zoom={zoom}
-          items={items}
-          selectedIds={selected}
-          onSelect={onSelect}
-          drag={drag}
-        />
-        {listing.status === "ready" && listing.more ? (
-          <div className="flex justify-center py-4">
-            <Button
-              variant="secondary"
-              size="md"
-              disabled={listing.loadingMore}
-              onClick={listing.more}
-            >
-              Show more
-            </Button>
-          </div>
-        ) : null}
-      </>
+      <CollectionItems
+        view={view === "grid" ? "grid" : "list"}
+        columns={fileColumns}
+        columnSetId="files"
+        remember="files"
+        sortResetKey={searching ? "search" : "folder"}
+        gridLayout="icons"
+        listIcons="inline"
+        ordered
+        sort={sort}
+        onSortChange={onSort}
+        onShownOrder={onShownOrder}
+        reveal={reveal}
+        zoom={zoom}
+        items={items}
+        selectedIds={selected}
+        onSelect={onSelect}
+        drag={drag}
+      />
     );
 
   const hasMenu = Boolean(

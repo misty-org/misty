@@ -116,7 +116,7 @@ pub async fn files_places(
 }
 
 #[cfg(unix)]
-fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
+pub(crate) fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
     let name = CString::new(path.as_os_str().as_bytes())
         .map_err(|_| std::io::Error::other("The path holds a NUL byte."))?;
@@ -138,7 +138,7 @@ fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
 }
 
 #[cfg(windows)]
-fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
+pub(crate) fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
     let text = path.display().to_string().to_lowercase();
     let text = text.trim_start_matches(r"\\?\");
     let disks = sysinfo::Disks::new_with_refreshed_list();

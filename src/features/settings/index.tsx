@@ -1,4 +1,6 @@
-import * as SettingsPageModule from "./SettingsPage";
+import { lazy, Suspense } from "react";
+import type * as SettingsPageModule from "./SettingsPage";
+import { preloadSettingsSections } from "./SettingsRegistry";
 export * from "./components/DesktopSettingsUI";
 export * from "./hooks/use_document_app_appearance";
 export type { SettingsSection } from "./settings_types";
@@ -9,15 +11,21 @@ export { onSettingsApplied } from "./preferences/settings_side_effects";
 export { PreferenceRow } from "./sections/PreferenceRow";
 export * from "./preferences/use_app_theme_store";
 export * from "./preferences/use_settings_store";
+const loadSettingsPage = () => import("./SettingsPage");
 export function preloadSettingsWorkspace(): Promise<typeof SettingsPageModule> {
-  return Promise.resolve(SettingsPageModule);
+  return Promise.all([loadSettingsPage(), preloadSettingsSections()]).then(([page]) => page);
 }
+const Workspace = lazy(async () => ({ default: (await loadSettingsPage()).SettingsWorkspace }));
 type SettingsWorkspaceProps = {
   presentation?: "page" | "overlay";
   onClose?: () => void;
 };
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
-  return <SettingsPageModule.SettingsWorkspace {...props} />;
+  return (
+    <Suspense fallback={null}>
+      <Workspace {...props} />
+    </Suspense>
+  );
 }
 export { blockIfUnsaved, useDevicePreferences } from "./device-preferences/store";
 export { resolveSetting } from "./device-preferences/setting_resolution";
@@ -40,6 +48,6 @@ export { applyCachedAppTheme } from "./preferences/app_theme";
 export { useSettingsStore } from "./preferences/use_settings_store";
 export { GeneralSection } from "./sections/GeneralSection";
 export { NotificationsSection } from "./sections/NotificationsSection";
-export { registerSettingsSections } from "./SettingsRegistry";
+export { preloadSettingsSections, registerSettingsSections } from "./SettingsRegistry";
 export type { SettingsContentProps } from "./settings_types";
 export { searchSettings } from "./components/SettingsSearchResults";

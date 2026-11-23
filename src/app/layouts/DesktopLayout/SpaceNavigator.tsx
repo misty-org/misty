@@ -2,6 +2,7 @@ import { Hash, LayoutGrid, Search, Volume2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/account";
 import {
+  homeSpaceOf,
   useChatStatuses,
   useAgentAccountId,
   useChatSectionsStore,
@@ -282,7 +283,11 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const [path, query = ""] = route.split("?");
   const params = new URLSearchParams(query);
   const view = path === "/agents" ? params.get("view") : null;
-  const openChat = path === "/agents" && !view ? params.get("conversation") : null;
+  const openAgent = path === "/agents" && !view ? params.get("agent") : null;
+  const spaceAgents = useMemo(
+    () => (space ? agents.filter((agent) => homeSpaceOf(accountId, agent) === space.id) : []),
+    [agents, accountId, space],
+  );
   const base = space ? `/spaces/${encodeURIComponent(space.id)}` : "";
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
   useEffect(() => void useSidebarPins.getState().load(), []);
@@ -386,7 +391,21 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         data-misty-window-drag-block="true"
       >
         {!space ? null : place === "personal" ? (
-          <PersonalSections route={route} onOpen={onOpen}>
+          <PersonalSections route={route} onOpen={onOpen} />
+        ) : (
+          <>
+            <SpaceInvitations />
+            <SpaceSections space={space} route={route} onOpen={onOpen} />
+          </>
+        )}
+        {space ? (
+          <SidebarAgentThreads
+            agents={spaceAgents}
+            chats={chats}
+            statuses={statuses}
+            openAgent={openAgent}
+            onOpen={(agent) => open(agentChatRoute(agent.id))}
+          >
             {conversationsError && !conversations.length ? (
               <ErrorState
                 inline
@@ -400,22 +419,9 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
               />
             ) : chatsPending ? (
               <RowSkeletons count={3} />
-            ) : (
-              <SidebarAgentThreads
-                agents={agents}
-                chats={chats}
-                statuses={statuses}
-                openChat={openChat}
-                onOpen={(agent, chatId) => open(agentChatRoute(agent.id, chatId))}
-              />
-            )}
-          </PersonalSections>
-        ) : (
-          <>
-            <SpaceInvitations />
-            <SpaceSections space={space} route={route} onOpen={onOpen} />
-          </>
-        )}
+            ) : undefined}
+          </SidebarAgentThreads>
+        ) : null}
         {!space && spacesPending ? <RowSkeletons count={6} /> : null}
       </nav>
     </>

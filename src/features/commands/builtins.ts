@@ -20,4 +20,15 @@ export function registerBuiltinCommands() {
       run: () => requestAnimationFrame(() => void invokeShortcutCommand(definition.id)),
     });
   }
+  if (import.meta.env.DEV) {
+    commandRegistry.register({
+      id: "dev:try-every-engine",
+      title: () => "Try the engine test on every engine",
+      keywords: () => ["engines", "test", "compare", "chess"],
+      run: () =>
+        void import("@/features/agents")
+          .then((agents) => agents.tryEveryEngine())
+          .catch(() => undefined),
+    });
+  }
 }

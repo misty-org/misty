@@ -32,6 +32,8 @@ export const AgentProfileSchema = AgentProfileInputSchema.extend({
   owner_user_id: z.string(),
   system_managed: z.boolean(),
   space_id: z.string().default(""),
+  revision: z.number().int().nonnegative().optional(),
+  can_edit: z.boolean().optional(),
   version: z.number().int().positive(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -40,3 +42,33 @@ export const AgentProfileSchema = AgentProfileInputSchema.extend({
 export type AgentProfileInput = z.infer<typeof AgentProfileInputSchema>;
 
 export type AgentProfile = z.infer<typeof AgentProfileSchema>;
+
+export const agentDefinitionKeys = [
+  "name",
+  "role",
+  "description",
+  "instructions",
+  "soul",
+  "icon",
+  "avatar",
+  "voice",
+  "engine",
+  "engine_model",
+  "reasoning_effort",
+  "origin",
+] as const satisfies readonly (keyof AgentProfileInput)[];
+
+export const agentPersonalKeys = [
+  "enabled",
+  "default_run_mode",
+  "tools",
+  "mcp_servers",
+  "runtime_cwd",
+  "runtime_args",
+  "model_mode",
+  "model_id",
+] as const satisfies readonly (keyof AgentProfileInput)[];
+
+export type AgentDefinition = Pick<AgentProfileInput, (typeof agentDefinitionKeys)[number]>;
+
+export type AgentPersonal = Pick<AgentProfileInput, (typeof agentPersonalKeys)[number]>;

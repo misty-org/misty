@@ -38,7 +38,7 @@ pub async fn agents_prepare_scoped_document(
         ));
     }
     let target = state.agents.scoped_document_path(request).await?;
-    documents::prepare_document(target, crate::app::embedded_workers::builtin_worker)
+    documents::prepare_document(target, crate::app::workers::program)
         .await
         .map_err(crate::app::error::ApiError::Message)
 }
@@ -80,8 +80,7 @@ pub async fn tutor_pick_sources(
         if too_big {
             continue;
         }
-        if let Ok(document) =
-            documents::prepare_document(path, crate::app::embedded_workers::builtin_worker).await
+        if let Ok(document) = documents::prepare_document(path, crate::app::workers::program).await
         {
             prepared.push(document);
         }

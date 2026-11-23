@@ -115,6 +115,8 @@ pub struct Item {
     pub deleted: bool,
     #[serde(default)]
     pub replaced_of: Option<ItemId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_version: Option<Version>,
 }
 
 impl Item {
@@ -132,6 +134,7 @@ pub struct Base {
     pub mtime_ms: i64,
     pub parent: Option<ItemId>,
     pub name: String,
+    pub content_version: Option<Version>,
 }
 
 impl Base {
@@ -144,6 +147,7 @@ impl Base {
             mtime_ms: item.mtime_ms,
             parent: item.parent_id.clone(),
             name: item.name.clone(),
+            content_version: item.content_version,
         }
     }
 }
@@ -244,6 +248,12 @@ pub struct DriveEntry {
     pub in_use: Vec<InUse>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<Version>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_version: Option<Version>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha: Option<String>,
+    #[serde(default)]
+    pub waits_large: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

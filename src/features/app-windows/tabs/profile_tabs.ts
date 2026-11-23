@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { registerRecoveryFlush } from "../recovery/recovery_storage";
 import { isUntouched } from "./adopt_window_tabs";
 import { activateTab, emptyTab, layoutTabs } from "../panes/layout_tabs";
-import type { WorkspaceTab } from "./workspace_views";
+import type { WorkspaceLayout, WorkspaceTab } from "./workspace_views";
 import {
   encodedFields,
   tabFields,
@@ -11,7 +11,8 @@ import {
   usableFields,
   type TabFields,
 } from "./profile_tab_record";
-import { useWorkspaceStore } from "./use_workspace_store";
+import { useWorkspaceStore, type WorkspaceStore } from "./use_workspace_store";
+import { emptyAsideWorkspace, otherSide, type WorkspaceSide } from "./workspace_sides";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
 import { knownWorkspaceTab } from "../recovery/known_workspace_views";
 
@@ -23,10 +24,56 @@ interface TabsForWindow {
 }
 
 function ownTabs(): { tab: WorkspaceTab; fields: TabFields }[] {
-  const { layout } = useWorkspaceStore.getState();
-  return layoutTabs(layout)
-    .filter((tab) => !tabStaysHere(tab))
-    .map((tab, order) => ({ tab, fields: tabFields(tab, order) }));
+  const { layout, side, aside } = useWorkspaceStore.getState();
+  const sides: [WorkspaceLayout, WorkspaceSide | undefined][] = [[layout, side]];
+  if (aside && side) sides.push([aside.layout, otherSide(side)]);
+  return sides.flatMap(([held, heldSide]) =>
+    layoutTabs(held)
+      .filter((tab) => !tabStaysHere(tab))
+      .map((tab, order) => ({ tab, fields: tabFields(tab, order, heldSide) })),
+  );
+}
+
+function localTabIds(): string[] {
+  const { layout, aside } = useWorkspaceStore.getState();
+  return [...layoutTabs(layout), ...(aside ? layoutTabs(aside.layout) : [])].map((tab) => tab.id);
+}
+
+function mergeTabs(
+  layout: WorkspaceLayout,
+  incoming: { id: string; fields: TabFields }[],
+  removed: Set<string>,
+): WorkspaceLayout {
+  const held = layoutTabs(layout);
+  if (!incoming.length && !held.some((tab) => removed.has(tab.id))) return layout;
+  const order = new Map<string, number>();
+  let tabs = held.filter((tab) => !removed.has(tab.id));
+  tabs.forEach((tab, index) => order.set(tab.id, index));
+  const arrived: string[] = [];
+  for (const { id, fields } of incoming) {
+    order.set(id, fields.order);
+    const previous = tabs.find((tab) => tab.id === id);
+    const next = knownWorkspaceTab(tabFromFields(id, fields, previous));
+    if (!next) {
+      tabs = tabs.filter((tab) => tab.id !== id);
+      continue;
+    }
+    if (previous) {
+      tabs = tabs.map((tab) => (tab.id === id ? next : tab));
+    } else {
+      tabs.push(next);
+      arrived.push(id);
+    }
+  }
+  const untouched = arrived.length > 0 && isUntouched(layout);
+  if (untouched) tabs = tabs.filter((tab) => !tabStaysHere(tab));
+  if (!tabs.length) tabs = [emptyTab()];
+  const end = tabs.length;
+  tabs = [...tabs].sort((a, b) => (order.get(a.id) ?? end) - (order.get(b.id) ?? end));
+  const kept = tabs.find((tab) => tab.id === layout.activeTabId);
+  const first = untouched ? tabs.find((tab) => arrived.includes(tab.id)) : undefined;
+  const active = kept ?? first ?? tabs[0];
+  return normalizeWorkspaceLayout(activateTab({ ...layout, tabs }, active.id));
 }
 
 export function startProfileTabs(): () => void {
@@ -64,38 +111,23 @@ export function startProfileTabs(): () => void {
     const removed = new Set(result.removed);
     for (const id of removed) baseline.delete(id);
     if (!incoming.length && !removed.size) return;
+    for (const { id, fields } of incoming) baseline.set(id, encodedFields(fields));
     const state = useWorkspaceStore.getState();
-    const order = new Map<string, number>();
-    let tabs = layoutTabs(state.layout).filter((tab) => !removed.has(tab.id));
-    tabs.forEach((tab, index) => order.set(tab.id, index));
-    const arrived: string[] = [];
-    for (const { id, fields } of incoming) {
-      baseline.set(id, encodedFields(fields));
-      order.set(id, fields.order);
-      const previous = tabs.find((tab) => tab.id === id);
-      const next = knownWorkspaceTab(tabFromFields(id, fields, previous));
-      if (!next) {
-        tabs = tabs.filter((tab) => tab.id !== id);
-        continue;
-      }
-      if (previous) {
-        tabs = tabs.map((tab) => (tab.id === id ? next : tab));
-      } else {
-        tabs.push(next);
-        arrived.push(id);
-      }
+    const here = incoming.filter(
+      ({ fields }) => !state.side || !fields.side || fields.side === state.side,
+    );
+    const away = incoming.filter((tab) => !here.includes(tab));
+    const leaving = (moved: typeof incoming) =>
+      new Set([...removed, ...moved.map(({ id }) => id)]);
+    const update: Partial<WorkspaceStore> = {
+      layout: mergeTabs(state.layout, here, leaving(away)),
+    };
+    if (state.aside || away.length) {
+      const aside = state.aside ?? emptyAsideWorkspace();
+      const layout = mergeTabs(aside.layout, away, leaving(here));
+      if (layout !== aside.layout) update.aside = { ...aside, layout };
     }
-    const untouched = arrived.length > 0 && isUntouched(state.layout);
-    if (untouched) tabs = tabs.filter((tab) => !tabStaysHere(tab));
-    if (!tabs.length) tabs = [emptyTab()];
-    const end = tabs.length;
-    tabs = [...tabs].sort((a, b) => (order.get(a.id) ?? end) - (order.get(b.id) ?? end));
-    const held = tabs.find((tab) => tab.id === state.layout.activeTabId);
-    const first = untouched ? tabs.find((tab) => arrived.includes(tab.id)) : undefined;
-    const active = held ?? first ?? tabs[0];
-    useWorkspaceStore.setState({
-      layout: normalizeWorkspaceLayout(activateTab({ ...state.layout, tabs }, active.id)),
-    });
+    useWorkspaceStore.setState(update);
   };
 
   const sync = () =>
@@ -103,8 +135,7 @@ export function startProfileTabs(): () => void {
       if (stopped) return;
       clearTimeout(timer);
       if (started) await publish();
-      const local = layoutTabs(useWorkspaceStore.getState().layout).map((tab) => tab.id);
-      const result = await invoke<TabsForWindow>("profile_tabs_sync", { local });
+      const result = await invoke<TabsForWindow>("profile_tabs_sync", { local: localTabIds() });
       if (stopped) return;
       apply(result);
       started = true;
@@ -112,7 +143,7 @@ export function startProfileTabs(): () => void {
     });
 
   const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
-    if (state.layout === previous.layout) return;
+    if (state.layout === previous.layout && state.aside === previous.aside) return;
     clearTimeout(timer);
     timer = setTimeout(() => void inOrder(publish), publishDelayMs);
   });

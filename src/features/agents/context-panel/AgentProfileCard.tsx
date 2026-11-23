@@ -1,6 +1,5 @@
-import { X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import { Badge, Button, IconButton, SideCard, Text } from "@misty/ui";
+import { Badge, Button, Text } from "@misty/ui";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSpacesDirectory } from "@/features/app-windows";
 import { AgentAvatar } from "../personal/AgentAvatar";
@@ -8,7 +7,7 @@ import { mistyEngine, useEnginesList } from "../engines/engines_api";
 
 const madeOn = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
-export function AgentProfileCard(props: { agent: AgentProfile; onClose(): void }) {
+export function AgentProfileCard(props: { agent: AgentProfile }) {
   const { agent } = props;
   const [, setParams] = useSearchParams();
   const { data: engines } = useEnginesList();
@@ -23,15 +22,7 @@ export function AgentProfileCard(props: { agent: AgentProfile; onClose(): void }
   const about = agent.description || agent.role;
   const made = new Date(agent.created_at);
   return (
-    <SideCard
-      label={`${agent.name}'s profile`}
-      corner={
-        <IconButton label="Close profile" onClick={props.onClose}>
-          <X />
-        </IconButton>
-      }
-      className="context-panel"
-    >
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="grid gap-4 p-4">
         <AgentAvatar agent={agent} large />
         <div className="grid min-w-0 gap-1">
@@ -70,6 +61,6 @@ export function AgentProfileCard(props: { agent: AgentProfile; onClose(): void }
           Edit agent
         </Button>
       </div>
-    </SideCard>
+    </div>
   );
 }

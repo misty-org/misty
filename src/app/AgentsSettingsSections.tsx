@@ -15,12 +15,10 @@ function TeamPage() {
   return <HubAgentsPage />;
 }
 
-export const agentsSettingsSections: Partial<
-  Record<SettingsSection, ComponentType<SettingsContentProps>>
-> = {
+export const agentsSettingsSections = {
   "agents-list": TeamPage,
   "engines-clis": () => <ClisSection />,
   "engines-channels": () => <ChannelsSection />,
   "engines-environment": () => <EnvironmentSection />,
   "engines-usage": () => <UsageSection />,
-};
+} satisfies Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>>;

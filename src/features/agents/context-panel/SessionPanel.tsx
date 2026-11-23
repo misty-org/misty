@@ -45,6 +45,8 @@ import { LineCounts } from "./git/LineCounts";
 import { chatUsage, formatCost, type ChatUsage } from "./chat_usage";
 import { formatTokens } from "../conversations/view/meta/format";
 import { Row, Section } from "./SessionRows";
+import { ThreadOutputs } from "./ThreadOutputs";
+import { ThreadLaneRows } from "./ThreadLaneRows";
 import { ContextSources, McpServers, StartCommandRows, TurnStats } from "./SessionSections";
 import {
   useEngineTurnStore,
@@ -194,6 +196,9 @@ export function SessionPanel(props: {
   const usage = useChatUsage(props.conversationId);
   const limits = useEngineLimits(outside ? engineId : "");
   const turn = useLatestTurn(props.conversationId);
+  const working = useMistyStore(
+    (state) => state.working && state.invocationConversationId === props.conversationId,
+  );
   const helpers = turn?.subagents.filter((subagent) => subagent.state === "running").length ?? 0;
   const context = usage.used && usage.window ? Math.min(1, usage.used / usage.window) : null;
   const engineName = outside ? (engine?.name ?? engineId) : "Misty";
@@ -312,6 +317,10 @@ export function SessionPanel(props: {
           value={
             kind === "project" ? (
               <ChatFolderPicker conversationId={props.conversationId} compact />
+            ) : kind === "thread" ? (
+              <OverflowFadeText>
+                {folder.split(/[\\/]/).filter(Boolean).pop() ?? folder}
+              </OverflowFadeText>
             ) : (
               "Scratch"
             )
@@ -324,6 +333,9 @@ export function SessionPanel(props: {
             value={<ChatFolderMenu conversationId={props.conversationId} />}
           />
         )}
+        {kind === "project" ? (
+          <ThreadLaneRows conversationId={props.conversationId} working={working} />
+        ) : null}
         {!folder ? null : git ? (
           <>
             <Row
@@ -360,6 +372,8 @@ export function SessionPanel(props: {
         ) : null}
         {folder ? <StartCommandRows conversationId={props.conversationId} folder={folder} /> : null}
       </Section>
+
+      <ThreadOutputs conversationId={props.conversationId} />
 
       <ContextSources engine={engineId} folder={folder} branch={git?.branch} />
 

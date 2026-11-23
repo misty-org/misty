@@ -2,6 +2,7 @@ import { spacesApi } from "../../api/api";
 import type { SpaceMessage } from "../../api/dto/entities";
 import { useEffect, useRef } from "react";
 import { markSpaceChatReadLocally, spaceChatReadSaved } from "../space_conversations_resource";
+import { useWindowViewing } from "./window_viewing";
 
 export function useChatReadReceipts(options: {
   spaceId: string;
@@ -12,8 +13,9 @@ export function useChatReadReceipts(options: {
 }) {
   const { spaceId, conversationId, enabled, messages, markSpaceRead } = options;
   const lastReadReceiptRef = useRef("");
+  const viewing = useWindowViewing();
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !viewing) return;
     const last = [...messages].reverse().find((message) => !message.local_delivery_state);
     if (!last) return;
     const receiptKey = `${spaceId}:${conversationId || "everyone"}:${last.seq}`;
@@ -29,5 +31,5 @@ export function useChatReadReceipts(options: {
         if (lastReadReceiptRef.current === receiptKey) lastReadReceiptRef.current = "";
       },
     );
-  }, [enabled, conversationId, markSpaceRead, messages, spaceId]);
+  }, [enabled, viewing, conversationId, markSpaceRead, messages, spaceId]);
 }

@@ -1,4 +1,3 @@
-import { House, Layers } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   preferredDefaultSpace,
@@ -8,19 +7,21 @@ import {
 } from "@/features/app-windows";
 import type { AgentProfile } from "@/shared/schemas";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
   Field,
-  PathLine,
+  MenuItem,
+  MenuTrigger,
+  notify,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Skeleton,
-  useNotice,
 } from "@misty/ui";
-import { useAgentAccountId } from "./agent_account";
-import { moveAgentHome } from "./agent_home_space";
 import { usePersonalAgentsStore } from "./personal_agents_store";
+import { copyAgent } from "./save_agent";
 
 export function useAgentHomeSpace(agent: Pick<AgentProfile, "id" | "space_id"> | undefined) {
   const spaces = useSpacesDirectory((state) => state.spaces);
@@ -44,33 +45,18 @@ export function useAgentHomeSpace(agent: Pick<AgentProfile, "id" | "space_id"> |
 }
 
 export function AgentSpaceField({ agent }: { agent: AgentProfile }) {
-  const account = useAgentAccountId();
   const home = useAgentHomeSpace(agent);
-  const [error, setError] = useState("");
-  useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
-  const move = (spaceId: string) => {
-    if (!home || spaceId === home.id) return;
-    void moveAgentHome(account, agent.id, spaceId)
-      .then((moved) =>
-        usePersonalAgentsStore.setState((state) => ({
-          agents: state.agents.map((item) =>
-            item.id === moved.id ? { ...item, space_id: moved.space_id } : item,
-          ),
-        })),
-      )
-      .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)));
-  };
   return (
     <Field label="Space">
       {home ? (
-        <Select value={home.space ? home.id : ""} onValueChange={move}>
+        <Select value={home.space ? home.id : ""} disabled>
           <SelectTrigger aria-label={`${agent.name}'s Space`} className="w-full">
-            <SelectValue placeholder="Pick a Space" />
+            <SelectValue placeholder="No Space" />
           </SelectTrigger>
           <SelectContent>
-            {home.spaces.map((space) => (
-              <SelectItem key={space.id} value={space.id} label={space.name} />
-            ))}
+            {home.space ? (
+              <SelectItem key={home.space.id} value={home.space.id} label={home.space.name} />
+            ) : null}
           </SelectContent>
         </Select>
       ) : (
@@ -80,21 +66,33 @@ export function AgentSpaceField({ agent }: { agent: AgentProfile }) {
   );
 }
 
-export function AgentHomeSpaceLine({ agent }: { agent: AgentProfile | undefined }) {
+export function CopyAgentToSpace({ agent }: { agent: AgentProfile }) {
   const home = useAgentHomeSpace(agent);
-  const here = useSpaceWindowStore((state) => state.identity);
-  if (!home) return null;
-  if (here.personal ? home.personal : home.space && home.id === here.spaceId) return null;
+  const [busy, setBusy] = useState(false);
+  const shared = (home?.spaces ?? []).filter(
+    (space) => !space.is_default && space.id !== home?.id,
+  );
+  if (!home || !shared.length || agent.system_managed) return null;
+  const copy = (spaceId: string, name: string) => {
+    setBusy(true);
+    void copyAgent(agent, spaceId)
+      .then(() => notify({ message: `${agent.name} was copied to ${name}` }))
+      .catch((reason: unknown) =>
+        notify({
+          message: reason instanceof Error ? reason.message : String(reason),
+          tone: "error",
+        }),
+      )
+      .finally(() => setBusy(false));
+  };
   return (
-    <PathLine
-      label="Where this agent works"
-      segments={[
-        {
-          id: "space",
-          icon: home.personal ? House : Layers,
-          label: home.space?.name ?? "No Space",
-        },
-      ]}
-    />
+    <DropdownMenu>
+      <MenuTrigger label="Copy to a Space" variant="secondary" disabled={busy} />
+      <DropdownMenuContent align="start">
+        {shared.map((space) => (
+          <MenuItem key={space.id} label={space.name} onSelect={() => copy(space.id, space.name)} />
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

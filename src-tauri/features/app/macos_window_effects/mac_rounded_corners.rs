@@ -153,7 +153,11 @@ pub fn main_window_ready() -> bool {
 #[tauri::command]
 pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Result<(), String> {
     let label = webview.label().to_owned();
-    if !crate::browser::app_windows::is_app_window(&label) || window_revealed(&label) {
+    if !crate::browser::app_windows::is_app_window(&label) {
+        return Ok(());
+    }
+    if window_revealed(&label) {
+        crate::app::first_draw::drawn();
         return Ok(());
     }
     #[cfg(target_os = "macos")]
@@ -191,6 +195,7 @@ pub async fn reveal_main_window<R: Runtime>(webview: tauri::Webview<R>) -> Resul
         window.show().map_err(|error| error.to_string())?;
         window.set_focus().map_err(|error| error.to_string())?;
     }
+    crate::app::first_draw::drawn();
     Ok(())
 }
 

@@ -47,13 +47,6 @@ import { ChatEmojiPicker, isJumbo, useQuickEmoji } from "../emoji/ChatEmojiPicke
 import { messageTextForLinks, Span, ReplyLine, EditBox } from "./ChatMessageParts";
 
 const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const shortDateTime = new Intl.DateTimeFormat(undefined, {
-  month: "numeric",
-  day: "numeric",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
 const fullDateTime = new Intl.DateTimeFormat(undefined, {
   weekday: "long",
   month: "long",
@@ -63,18 +56,6 @@ const fullDateTime = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
   second: "2-digit",
 });
-
-const sameDay = (left: Date, right: Date) => left.toDateString() === right.toDateString();
-
-function relativeStamp(value: string): string {
-  const date = new Date(value);
-  const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (sameDay(date, now)) return `Today at ${time.format(date)}`;
-  if (sameDay(date, yesterday)) return `Yesterday at ${time.format(date)}`;
-  return shortDateTime.format(date);
-}
 
 export interface RowProps {
   message: SpaceMessage;
@@ -327,9 +308,8 @@ function MessageRowView({
           <Badge variant="secondary">Agent</Badge>
         ) : undefined
       }
-      time={relativeStamp(message.created_at)}
+      time={time.format(new Date(message.created_at))}
       timeFull={fullDateTime.format(new Date(message.created_at))}
-      shortTime={time.format(new Date(message.created_at))}
       dateTime={message.created_at}
       mentioned={mentionsMe}
       editing={editingThis}

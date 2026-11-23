@@ -1,24 +1,30 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 //! Bringing the catalog in step with the disk: a walk of the whole home folder, or an update of
-//! just the paths that changed. Walked entries are compared with the manifest read-only, and a
-//! writer opens only once the first change appears, so an unchanged tree costs reads alone.
+//! just the paths that changed. The walk is the disk gate's own (`walk`), over checked folder
+//! handles that never follow a link and skip closed places. Walked entries are compared with the
+//! manifest read-only, and the index's one writer is touched only once a change appears, so an
+//! unchanged tree costs reads alone.
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
+    ffi::OsString,
     hash::{BuildHasher, BuildHasherDefault, DefaultHasher},
+    io,
     path::{Path, PathBuf},
 };
 
 use file_access::{
-    disk::{check_disk, fs_disk},
+    disk::{
+        walk::{walk as walk_checked, WalkFlow, WalkFor},
+        CheckedDir, ItemKind,
+    },
     Access,
 };
-use tantivy::IndexWriter;
-use walkdir::WalkDir;
 
 use super::catalog::{self, Catalog, Signature};
 use super::filter::{Pacer, ScanFilter, MAX_DEPTH};
 
 const COMMIT_EVERY: u64 = 25_000;
+const STOPPED: &str = "Indexing was stopped.";
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Changes {
@@ -28,37 +34,38 @@ pub(super) struct Changes {
     pub unchanged: u64,
 }
 
+impl Changes {
+    pub(super) fn any(&self) -> bool {
+        self.added + self.updated + self.removed > 0
+    }
+}
+
 fn key_hash(path: &str) -> u64 {
     BuildHasherDefault::<DefaultHasher>::default().hash_one(path)
 }
 
 pub(super) struct Sink<'a> {
-    catalog: &'a Catalog,
-    writer: Option<IndexWriter>,
+    catalog: &'a mut Catalog,
+    publish: &'a dyn Fn(),
     open: bool,
     pending: u64,
     seen: HashSet<u64>,
     pub changes: Changes,
-    pub committed: bool,
 }
 
 impl<'a> Sink<'a> {
-    pub(super) fn new(catalog: &'a Catalog) -> Self {
+    pub(super) fn new(catalog: &'a mut Catalog, publish: &'a dyn Fn()) -> Self {
         Self {
             catalog,
-            writer: None,
+            publish,
             open: false,
             pending: 0,
             seen: HashSet::new(),
             changes: Changes::default(),
-            committed: false,
         }
     }
 
     fn begin(&mut self) -> Result<(), String> {
-        if self.writer.is_none() {
-            self.writer = Some(catalog::writer(&self.catalog.index)?);
-        }
         if !self.open {
             self.catalog
                 .manifest
@@ -89,9 +96,7 @@ impl<'a> Sink<'a> {
             return Ok(());
         }
         self.begin()?;
-        if let Some(writer) = &self.writer {
-            catalog::put_doc(writer, &self.catalog.fields, &doc)?;
-        }
+        catalog::put_doc(&self.catalog.writer, &self.catalog.fields, &doc)?;
         catalog::persist(&self.catalog.manifest, &doc)?;
         if existing.is_some() {
             self.changes.updated += 1;
@@ -104,14 +109,16 @@ impl<'a> Sink<'a> {
     fn remove(&mut self, paths: Vec<String>) -> Result<(), String> {
         for path in paths {
             self.begin()?;
-            if let Some(writer) = &self.writer {
-                catalog::delete_doc(writer, &self.catalog.fields, &path);
-            }
+            catalog::delete_doc(&self.catalog.writer, &self.catalog.fields, &path);
             catalog::forget(&self.catalog.manifest, &path)?;
             self.changes.removed += 1;
             self.changed()?;
         }
         Ok(())
+    }
+
+    fn keep(&mut self, path: &str) {
+        self.seen.insert(key_hash(path));
     }
 
     pub(super) fn remove_missing(&mut self, root: &str) -> Result<(), String> {
@@ -136,8 +143,9 @@ impl<'a> Sink<'a> {
     }
 
     fn commit(&mut self) -> Result<(), String> {
-        if let Some(writer) = self.writer.as_mut() {
-            writer
+        if self.pending > 0 {
+            self.catalog
+                .writer
                 .commit()
                 .map_err(|error| format!("The search index couldn't be saved: {error}"))?;
         }
@@ -149,7 +157,7 @@ impl<'a> Sink<'a> {
             self.open = false;
         }
         if self.pending > 0 {
-            self.committed = true;
+            (self.publish)();
         }
         self.pending = 0;
         Ok(())
@@ -157,11 +165,6 @@ impl<'a> Sink<'a> {
 
     pub(super) fn finish(mut self) -> Result<Changes, String> {
         self.commit()?;
-        if let Some(writer) = self.writer.take() {
-            writer
-                .wait_merging_threads()
-                .map_err(|error| format!("The search index couldn't be saved: {error}"))?;
-        }
         Ok(self.changes)
     }
 }
@@ -170,7 +173,22 @@ impl Drop for Sink<'_> {
     fn drop(&mut self) {
         if self.open {
             let _ = self.catalog.manifest.execute_batch("ROLLBACK");
+            let _ = self.catalog.writer.rollback();
         }
+    }
+}
+
+fn kind_doc(
+    path: &Path,
+    kind: ItemKind,
+    len: u64,
+    modified: Option<std::time::SystemTime>,
+) -> Option<catalog::Doc> {
+    match kind {
+        ItemKind::File => catalog::doc_at(path, true, false, len, modified),
+        ItemKind::Dir => catalog::doc_at(path, false, true, len, modified),
+        ItemKind::Other => catalog::doc_at(path, false, false, len, modified),
+        ItemKind::Link => None,
     }
 }
 
@@ -181,43 +199,44 @@ fn walk(
     sink: &mut Sink<'_>,
     pacer: &mut Pacer,
     keep_going: &dyn Fn() -> bool,
-) -> Result<u64, String> {
-    check_disk(start, Access::Read).map_err(|error| super::super::failed(start, error))?;
-    let mut count = 0u64;
-    let walker = WalkDir::new(start)
-        .follow_links(false)
-        .max_depth(MAX_DEPTH.saturating_sub(depth))
-        .into_iter()
-        .filter_entry(|entry| entry.depth() == 0 || !filter.excludes(entry.path()));
-    for entry in walker {
+) -> Result<(), String> {
+    let mut failure: Option<String> = None;
+    let mut visit = |step: file_access::disk::WalkStep<'_>| -> io::Result<WalkFlow> {
         if !keep_going() {
-            return Err("Indexing was stopped.".to_owned());
+            failure = Some(STOPPED.to_owned());
+            return Ok(WalkFlow::Stop);
         }
         pacer.pace();
-        let Ok(entry) = entry else { continue };
-        if (entry.depth() == 0 && depth == 0) || entry.file_type().is_symlink() {
-            continue;
+        let path = step.dir.path().join(&step.item.name);
+        let reach = depth + step.depth + 1;
+        let folder = step.item.kind == ItemKind::Dir;
+        if folder && (reach >= MAX_DEPTH || filter.excludes(&path)) {
+            return Ok(WalkFlow::SkipDir);
         }
-        let Ok(meta) = entry.metadata() else { continue };
-        if let Some(doc) = catalog::local_doc(entry.path(), &meta) {
-            sink.accept(doc)?;
-            count += 1;
+        let Some(doc) = kind_doc(&path, step.item.kind, step.item.len, step.item.modified) else {
+            return Ok(WalkFlow::Continue);
+        };
+        if let Err(error) = sink.accept(doc) {
+            failure = Some(error);
+            return Ok(WalkFlow::Stop);
         }
-        if sink.committed {
-            sink.committed = false;
-            super::published();
-        }
+        Ok(WalkFlow::Continue)
+    };
+    let walked = walk_checked(start, Access::Read, WalkFor::Person, &mut visit);
+    if let Some(failure) = failure {
+        return Err(failure);
     }
-    Ok(count)
+    walked.map_err(|error| super::super::failed(start, error))
 }
 
 pub(super) fn scan(
-    catalog: &Catalog,
+    catalog: &mut Catalog,
     home: &Path,
     keep_going: &dyn Fn() -> bool,
+    publish: &dyn Fn(),
 ) -> Result<Changes, String> {
     let filter = ScanFilter::new(home);
-    let mut sink = Sink::new(catalog);
+    let mut sink = Sink::new(catalog, publish);
     let mut pacer = Pacer::default();
     walk(home, 0, &filter, &mut sink, &mut pacer, keep_going)?;
     sink.remove_missing(&home.to_string_lossy())?;
@@ -225,49 +244,85 @@ pub(super) fn scan(
 }
 
 pub(super) fn apply(
-    catalog: &Catalog,
+    catalog: &mut Catalog,
     home: &Path,
-    changed: &[PathBuf],
-    rescan: &[PathBuf],
+    changed: &BTreeSet<PathBuf>,
+    rescan: &BTreeSet<PathBuf>,
     keep_going: &dyn Fn() -> bool,
+    publish: &dyn Fn(),
 ) -> Result<Changes, String> {
     let filter = ScanFilter::new(home);
-    let mut sink = Sink::new(catalog);
+    let mut sink = Sink::new(catalog, publish);
     let mut pacer = Pacer::default();
-    let changed: BTreeSet<&PathBuf> = changed.iter().collect();
+    let mut by_folder: BTreeMap<PathBuf, Vec<(OsString, usize)>> = BTreeMap::new();
     for path in changed {
         let Some(depth) = filter.reach(path).filter(|depth| *depth > 0) else {
             continue;
         };
-        let text = path.to_string_lossy().into_owned();
-        match fs_disk::symlink_metadata(path) {
-            Ok(meta) if !meta.file_type().is_symlink() => {
-                let Some(doc) = catalog::local_doc(path, &meta) else {
-                    continue;
-                };
-                if meta.is_dir() && sink.lookup(&doc.path)?.is_none() {
-                    walk(path, depth, &filter, &mut sink, &mut pacer, keep_going)?;
+        let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+            continue;
+        };
+        by_folder
+            .entry(parent.to_path_buf())
+            .or_default()
+            .push((name.to_owned(), depth));
+    }
+    for (parent, names) in by_folder {
+        if !keep_going() {
+            return Err(STOPPED.to_owned());
+        }
+        let folder = match CheckedDir::open(&parent, Access::Read) {
+            Ok(folder) => Some(folder),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(_) => continue,
+        };
+        for (name, depth) in names {
+            let path = parent.join(&name);
+            let text = path.to_string_lossy().into_owned();
+            let meta = match folder.as_ref().map(|folder| folder.metadata(&name)) {
+                Some(Ok(meta)) => meta,
+                Some(Err(error)) if error.kind() != io::ErrorKind::NotFound => continue,
+                _ => {
                     sink.remove_unseen(&text)?;
-                } else {
-                    sink.accept(doc)?;
+                    continue;
                 }
+            };
+            let kind = if meta.file_type().is_symlink() {
+                ItemKind::Link
+            } else if meta.is_dir() {
+                ItemKind::Dir
+            } else if meta.is_file() {
+                ItemKind::File
+            } else {
+                ItemKind::Other
+            };
+            let Some(doc) = kind_doc(&path, kind, meta.len(), meta.modified().ok()) else {
+                sink.remove_unseen(&text)?;
+                continue;
+            };
+            if kind == ItemKind::Dir && sink.lookup(&doc.path)?.is_none() {
+                sink.accept(doc)?;
+                walk(&path, depth, &filter, &mut sink, &mut pacer, keep_going)?;
+                sink.remove_unseen(&text)?;
+            } else {
+                sink.accept(doc)?;
             }
-            Ok(_) => sink.remove_unseen(&text)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                sink.remove_unseen(&text)?
-            }
-            Err(_) => {}
         }
     }
-    let rescan: BTreeSet<&PathBuf> = rescan.iter().collect();
     for path in rescan {
         let Some(depth) = filter.reach(path) else {
             continue;
         };
-        if fs_disk::is_dir(path) {
-            walk(path, depth, &filter, &mut sink, &mut pacer, keep_going)?;
+        let text = path.to_string_lossy().into_owned();
+        match CheckedDir::open(path, Access::Read) {
+            Ok(_) => {
+                sink.keep(&text);
+                walk(path, depth, &filter, &mut sink, &mut pacer, keep_going)?
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(_) => continue,
         }
-        sink.remove_unseen(&path.to_string_lossy())?;
+        sink.remove_unseen(&text)?;
     }
     sink.finish()
 }

@@ -1,3 +1,4 @@
+import { abortAny } from "@/api/client/abort_any";
 import { nativeAccountFetch } from "@/api/client/native_account_fetch";
 import { invoke } from "@/native/invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -14,10 +15,8 @@ export async function probeServer(apiBase: string, signal?: AbortSignal): Promis
   await refusePrivateServer(apiBase);
   const url = `${apiBase}/health`;
   const timeout = AbortSignal.timeout(10_000);
-  const init: RequestInit = {
-    method: "GET",
-    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-  };
+  const combined = abortAny(signal ? [signal, timeout] : [timeout]);
+  const init: RequestInit = { method: "GET", signal: combined.signal };
   try {
     const response = hasTauriInternals()
       ? await nativeAccountFetch(url, init)
@@ -26,5 +25,7 @@ export async function probeServer(apiBase: string, signal?: AbortSignal): Promis
     return response.ok;
   } catch {
     return false;
+  } finally {
+    combined.dispose();
   }
 }

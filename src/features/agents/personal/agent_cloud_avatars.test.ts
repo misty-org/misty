@@ -1,17 +1,24 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { agentCloudVariants } from "./agent_cloud_avatars";
-describe("bundled cloud sprite transport", () => {
+
+const repositoryRoot = resolve(import.meta.dirname, "../../../..");
+const bytesOf = (source: string) =>
+  readFileSync(resolve(repositoryRoot, source.replace(/^\//, ""))).toString("latin1");
+
+describe("bundled cloud sprites", () => {
   it.each(agentCloudVariants)(
-    "embeds $name animation and reduced-motion poster without a separate asset request",
+    "ships the $name animation and its reduced-motion poster as files of their own",
     (variant) => {
       for (const source of [variant.src, variant.poster]) {
-        expect(source).toMatch(/^data:image\/webp;base64,/);
-        const bytes = atob(source.split(",")[1]);
+        expect(source).not.toMatch(/^data:/);
+        const bytes = bytesOf(source);
         expect(bytes.slice(0, 4)).toBe("RIFF");
         expect(bytes.slice(8, 12)).toBe("WEBP");
       }
-      expect(atob(variant.src.split(",")[1])).toContain("ANIM");
-      expect(atob(variant.poster.split(",")[1])).not.toContain("ANIM");
+      expect(bytesOf(variant.src)).toContain("ANIM");
+      expect(bytesOf(variant.poster)).not.toContain("ANIM");
     },
   );
 });

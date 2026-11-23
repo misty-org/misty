@@ -76,7 +76,7 @@ describe("the space argument", () => {
     vi.mocked(runSpaceId).mockResolvedValueOnce("gone");
     serve(SPACES);
     await expect(call(tool("thread.list"), {}).catch(refusal)).resolves.toBe(
-      "My home Space is gone: it was deleted, or the person left it. Ask them to pick a new home Space in my settings.",
+      "The Space I live in is gone: it was deleted, or the person left it. Ask them to copy me into a Space they're in.",
     );
   });
 

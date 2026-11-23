@@ -1,6 +1,10 @@
 use std::{
     collections::HashMap,
-    sync::{Mutex, OnceLock},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex, OnceLock,
+    },
+    time::{Duration, Instant},
 };
 
 use serde::{Deserialize, Serialize};
@@ -38,6 +42,8 @@ struct Mount {
     world: bool,
     lowered: bool,
     site: Option<SiteGate>,
+    posting: HashMap<u64, Instant>,
+    space: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -140,6 +146,8 @@ pub fn register(
                 world,
                 lowered: false,
                 site,
+                posting: HashMap::new(),
+                space: None,
             },
         );
     Ok(token)
@@ -183,12 +191,53 @@ pub fn site_address(mount: &str) -> Option<FrameOrigin> {
 }
 
 pub fn document_left(app: &AppHandle, mount: &str) {
-    if with_mount(mount, |entry| entry.doc.take())
+    if with_mount(mount, |entry| {
+        entry.posting.clear();
+        entry.doc.take()
+    })
         .flatten()
         .is_some()
     {
         emit_page(app, mount, "opened", None);
     }
+}
+
+pub fn set_space(mount: &str, space: Option<String>) {
+    with_mount(mount, |entry| entry.space = space);
+}
+
+pub fn space_of(mount: &str) -> Option<String> {
+    with_mount(mount, |entry| entry.space.clone()).flatten()
+}
+
+pub fn current_doc(mount: &str) -> Option<String> {
+    with_mount(mount, |entry| entry.doc.clone()).flatten()
+}
+
+pub fn on_doc(mount: &str, doc: &str) -> bool {
+    with_mount(mount, |entry| entry.doc.as_deref() == Some(doc)).unwrap_or(false)
+}
+
+static POSTS: AtomicU64 = AtomicU64::new(0);
+
+pub fn begin_post(mount: &str, most: usize, bound: Duration) -> Option<u64> {
+    let now = Instant::now();
+    with_mount(mount, |entry| {
+        entry
+            .posting
+            .retain(|_, began| now.duration_since(*began) < bound);
+        if entry.posting.len() >= most {
+            return None;
+        }
+        let post = POSTS.fetch_add(1, Ordering::Relaxed);
+        entry.posting.insert(post, now);
+        Some(post)
+    })
+    .flatten()
+}
+
+pub fn end_post(mount: &str, post: u64) {
+    with_mount(mount, |entry| entry.posting.remove(&post));
 }
 
 pub fn is_world(mount: &str) -> bool {
@@ -427,7 +476,7 @@ pub fn receive(
         }
         Accepted::Ready if is_world(mount) => return Heard::Ready(adapter),
         Accepted::Ready => {
-            emit("ready", None);
+            emit("ready", Some(message.doc.clone()));
             return Heard::Nothing;
         }
         Accepted::Current => {}

@@ -1,8 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import type rehypeHighlight from "rehype-highlight";
-type Transform = ReturnType<typeof rehypeHighlight>;
-type Tree = Parameters<Transform>[0];
-type Element = Extract<Tree["children"][number], { type: "element" }>;
+import type { Element, Root as Tree } from "hast";
+type Transform = (tree: Tree, file?: unknown) => void;
 
 export function createRevealPlan(
   options: { base?: () => number; onText?: (text: string) => void } = {},

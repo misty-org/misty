@@ -45,7 +45,7 @@ const mocks = vi.hoisted(() => ({
   },
   subscribers: new Set<() => void>(),
 }));
-vi.mock("../../runs/local-execution/local_execution", () => ({
+vi.mock("../../runs/local-execution/local_execution_state", () => ({
   useLocalExecution: { getState: () => ({ execution: { taskId: mocks.taskId } }) },
   pauseLocalExecution: mocks.pause,
 }));

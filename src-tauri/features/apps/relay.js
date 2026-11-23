@@ -123,15 +123,38 @@
     return result;
   };
   const load = (ref) =>
-    own.fetch(bytesPath + ref, { headers: { [tokenHeader]: token }, cache: "no-store" }).then((response) => {
-      if (!response.ok) throw new Error("The bytes from Misty didn't arrive.");
-      return response.arrayBuffer().then((buffer) => new Uint8Array(buffer));
-    });
+    world
+      ? Promise.reject(new Error("A website app takes no bytes from Misty this way."))
+      : own.fetch(bytesPath + ref, { headers: { [tokenHeader]: token }, cache: "no-store" }).then((response) => {
+          if (!response.ok) throw new Error("The bytes from Misty didn't arrive.");
+          return response.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+        });
   const upload = (ref, bytes) =>
-    own.fetch(bytesPath + ref, { method: "POST", headers: { [tokenHeader]: token }, body: bytes, cache: "no-store" })
-      .then((response) => {
-        if (!response.ok) throw new Error("Misty couldn't take the app's bytes.");
-      });
+    world
+      ? Promise.reject(new Error("That's too big to send to Misty from a website app."))
+      : own.fetch(bytesPath + ref, { method: "POST", headers: { [tokenHeader]: token }, body: bytes, cache: "no-store" })
+          .then((response) => {
+            if (!response.ok) throw new Error("Misty couldn't take the app's bytes.");
+          });
+  const free = (refs) => {
+    if (world) return;
+    refs.forEach((ref) =>
+      own.fetch(bytesPath + ref, { method: "DELETE", headers: { [tokenHeader]: token }, cache: "no-store" }).catch(() => undefined),
+    );
+  };
+  const refsIn = (value, found, depth) => {
+    if (value === null || typeof value !== "object" || depth > 64) return found;
+    if (own.isArray(value)) {
+      value.forEach((item) => refsIn(item, found, depth + 1));
+      return found;
+    }
+    if (own.has.call(value, mark)) {
+      if (typeof value.r === "string") found.push(value.r);
+      return found;
+    }
+    own.keys(value).forEach((name) => refsIn(value[name], found, depth + 1));
+    return found;
+  };
   const utf8Length = (text) => (text.length * 3 <= limit ? text.length : new own.Encoder().encode(text).length);
 
   const readAwareness = (bytes) => {
@@ -193,14 +216,21 @@
       : null;
 
   const aliases = new Map();
+  const subscribing = (lane, frame) => lane === sdkLane && frame && (frame.t === "sub" || frame.t === "unsub");
   const coalesce = (batch) => {
     const groups = new Map();
+    let lap = 0;
     batch.forEach((item, index) => {
+      if (subscribing(item.lane, item.frame)) {
+        lap += 1;
+        return;
+      }
       const room = awarenessRoom(item.lane, item.frame);
       if (room === null) return;
-      const group = groups.get(room) || [];
+      const key = lap + ":" + room;
+      const group = groups.get(key) || [];
       group.push(index);
-      groups.set(room, group);
+      groups.set(key, group);
     });
     const dropped = new Set();
     groups.forEach((indexes) => {
@@ -221,15 +251,18 @@
   };
 
   const ports = new Map();
+  const spares = new Map();
+  const heard = new Set();
   const deliverLocal = (lane, frame) => {
     const port = ports.get(lane);
     if (!port) return;
+    const targets = heard.has(lane) ? [port] : [port].concat(spares.get(lane) || []);
     if (lane === sdkLane && frame && frame.t === "res" && aliases.has(frame.id)) {
       const others = aliases.get(frame.id);
       aliases.delete(frame.id);
-      others.forEach((id) => port.postMessage(Object.assign({}, frame, { id: id })));
+      others.forEach((id) => targets.forEach((target) => target.postMessage(Object.assign({}, frame, { id: id }))));
     }
-    port.postMessage(frame);
+    targets.forEach((target) => target.postMessage(frame));
   };
   const refuse = (item, error) => {
     const message = "Misty couldn't take this from the app: " + (error && error.message ? error.message : String(error));
@@ -245,29 +278,44 @@
   let scheduled = false;
   let sending = Promise.resolve();
   const flush = async (batch) => {
-    const ready = [];
-    const uploads = [];
+    const encoded = [];
     coalesce(batch).forEach((item) => {
       try {
         const out = [];
         const wire = [item.lane, encode(item.frame, out, 0)];
-        ready.push({ item: item, wire: wire });
-        out.forEach((entry) => uploads.push(upload(entry.ref, entry.bytes)));
+        encoded.push({ item: item, wire: wire, out: out });
       } catch (error) {
         refuse(item, error);
       }
     });
+    if (!encoded.length) return;
+    const settled = await Promise.all(
+      encoded.map((entry) => Promise.allSettled(entry.out.map((part) => upload(part.ref, part.bytes)))),
+    );
+    const ready = [];
+    encoded.forEach((entry, index) => {
+      const results = settled[index];
+      const failed = results.find((result) => result.status === "rejected");
+      const refs = entry.out.map((part) => part.ref);
+      if (!failed) return ready.push({ item: entry.item, wire: entry.wire, refs: refs });
+      free(refs.filter((_, position) => results[position].status === "fulfilled"));
+      refuse(entry.item, failed.reason);
+    });
     if (!ready.length) return;
+    const sent = [];
+    ready.forEach((entry) => entry.refs.forEach((ref) => sent.push(ref)));
     try {
-      await Promise.all(uploads);
       let text = own.stringify({ token: token, doc: doc, frames: ready.map((entry) => entry.wire) });
       if (utf8Length(text) > limit) {
+        if (world) throw new Error("That's too big to send to Misty from a website app.");
         const ref = newId();
         await upload(ref, new own.Encoder().encode(own.stringify({ frames: ready.map((entry) => entry.wire) })));
+        sent.push(ref);
         text = own.stringify({ token: token, doc: doc, json: ref });
       }
       if (!sendText(text)) throw new Error("Misty isn't listening.");
     } catch (error) {
+      free(sent);
       ready.forEach((entry) => refuse(entry.item, error));
     }
   };
@@ -330,25 +378,55 @@
       configurable: false,
       enumerable: false,
     });
-  const start = (lane, message) => {
-    if (typeof lane !== "string" || !message || typeof message !== "object") return;
-    const old = ports.get(lane);
-    if (old) {
-      old.onmessage = null;
-      old.close();
-    }
-    const channel = new own.Channel();
-    ports.set(lane, channel.port1);
-    channel.port1.onmessage = (event) => queueOut(lane, event.data);
-    if (world) return handOver(lane, channel.port2, message);
-    own.post(Object.assign({}, message, { type: lane }), "*", [channel.port2]);
+  const started = new Map();
+  const closePort = (port) => {
+    port.onmessage = null;
+    port.close();
+  };
+  const choose = (lane, port) => {
+    if (heard.has(lane) && ports.get(lane) === port) return;
+    heard.add(lane);
+    const chosen = ports.get(lane);
+    if (chosen && chosen !== port) closePort(chosen);
+    (spares.get(lane) || []).forEach((spare) => {
+      if (spare !== port) closePort(spare);
+    });
+    spares.delete(lane);
+    ports.set(lane, port);
+  };
+  const listenOn = (lane, port) => {
+    port.onmessage = (event) => {
+      choose(lane, port);
+      queueOut(lane, event.data);
+    };
   };
   const stop = (lane) => {
     const port = ports.get(lane);
+    (spares.get(lane) || []).forEach(closePort);
+    spares.delete(lane);
+    heard.delete(lane);
+    started.delete(lane);
     if (!port) return;
     ports.delete(lane);
-    port.onmessage = null;
-    port.close();
+    closePort(port);
+  };
+  const start = (lane, message) => {
+    if (typeof lane !== "string" || !message || typeof message !== "object") return;
+    stop(lane);
+    const channel = new own.Channel();
+    ports.set(lane, channel.port1);
+    started.set(lane, message);
+    listenOn(lane, channel.port1);
+    if (world) return handOver(lane, channel.port2, message);
+    own.post(Object.assign({}, message, { type: lane }), "*", [channel.port2]);
+  };
+  const offerAgain = () => {
+    const message = started.get(sdkLane);
+    if (world || !message || heard.has(sdkLane) || !ports.has(sdkLane)) return;
+    const channel = new own.Channel();
+    spares.set(sdkLane, (spares.get(sdkLane) || []).concat([channel.port1]));
+    listenOn(sdkLane, channel.port1);
+    own.post(Object.assign({}, message, { type: sdkLane }), "*", [channel.port2]);
   };
   const unreachable = (lane, wire, error) => {
     const message = "Misty's message didn't reach the app: " + (error && error.message ? error.message : String(error));
@@ -380,10 +458,14 @@
       const entry = message.frames[index];
       if (!own.isArray(entry) || typeof entry[0] !== "string") continue;
       const lane = entry[0];
-      if (!ports.has(lane)) continue;
+      if (!ports.has(lane)) {
+        free(refsIn(entry[1], [], 0));
+        continue;
+      }
       try {
         deliverLocal(lane, await decode(entry[1], load));
       } catch (error) {
+        free(refsIn(entry[1], [], 0));
         unreachable(lane, entry[1], error);
       }
     }
@@ -442,6 +524,12 @@
 
   send({ open: true });
   const announce = () => send({ ready: true });
-  if (document.readyState === "complete") own.timeout(announce, 0);
-  else window.addEventListener("load", announce, { once: true });
+  if (world) {
+    if (document.readyState === "complete") own.timeout(announce, 0);
+    else window.addEventListener("load", announce, { once: true });
+  } else {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", announce, { once: true });
+    else own.timeout(announce, 0);
+    if (document.readyState !== "complete") window.addEventListener("load", offerAgain, { once: true });
+  }
 })();

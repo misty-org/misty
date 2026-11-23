@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { spacesApi } from "../../api/api";
+import type { SpaceEvent } from "../../api/dto/entities";
+import { spaceReadEvent, spacesResyncEvent } from "../../list/spaces_resync";
 
 export function useThreadsUnread(spaceId: string, conversationId: string): number {
   const [unread, setUnread] = useState(0);
@@ -18,11 +20,25 @@ export function useThreadsUnread(spaceId: string, conversationId: string): numbe
         })
         .catch(() => undefined);
     void load();
-    const onEvent = () => void load();
+    const onEvent = (event: Event) => {
+      const detail = (event as CustomEvent<{ spaceId?: string; event?: SpaceEvent }>).detail;
+      if (detail?.spaceId !== spaceId) return;
+      const type = detail.event?.type ?? "";
+      if (type === "message.created" && !detail.event?.payload.thread_root_id) return;
+      if (type.startsWith("read.") && !detail.event?.payload.thread_root_id) return;
+      if (type !== "message.created" && type !== "message.deleted" && !type.startsWith("read."))
+        return;
+      void load();
+    };
+    const resync = () => void load();
     window.addEventListener("misty:space-message-event", onEvent);
+    window.addEventListener(spaceReadEvent, onEvent);
+    window.addEventListener(spacesResyncEvent, resync);
     return () => {
       active = false;
       window.removeEventListener("misty:space-message-event", onEvent);
+      window.removeEventListener(spaceReadEvent, onEvent);
+      window.removeEventListener(spacesResyncEvent, resync);
     };
   }, [spaceId, conversationId]);
   return unread;

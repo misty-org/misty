@@ -890,6 +890,32 @@ const MIGRATIONS: &[&str] = &[
          kind TEXT NOT NULL,
          size INTEGER NOT NULL
      ) WITHOUT ROWID;",
+    "CREATE TABLE thread_work (
+         account TEXT NOT NULL,
+         conversation_id TEXT NOT NULL,
+         space_id TEXT NOT NULL,
+         agent_id TEXT NOT NULL DEFAULT '',
+         folder TEXT NOT NULL,
+         state TEXT NOT NULL DEFAULT 'idle'
+             CHECK (state IN ('idle', 'working', 'landing', 'held', 'clashed')),
+         started INTEGER NOT NULL DEFAULT 0,
+         clashes TEXT NOT NULL DEFAULT '[]',
+         note TEXT NOT NULL DEFAULT '',
+         updated_at INTEGER NOT NULL,
+         PRIMARY KEY (account, conversation_id)
+     ) WITHOUT ROWID;
+     CREATE UNIQUE INDEX thread_work_folder ON thread_work (space_id, folder);
+     CREATE TABLE thread_outputs (
+         account TEXT NOT NULL,
+         conversation_id TEXT NOT NULL,
+         path TEXT NOT NULL,
+         landed_at INTEGER NOT NULL,
+         PRIMARY KEY (account, conversation_id, path)
+     ) WITHOUT ROWID;",
+    "CREATE VIRTUAL TABLE agent_memory_recall USING fts5(
+         text, title UNINDEXED, space_id UNINDEXED, agent_id UNINDEXED,
+         file UNINDEXED, stamp UNINDEXED, tokenize = 'trigram'
+     );",
 ];
 
 #[derive(Debug, Clone)]

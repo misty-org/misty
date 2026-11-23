@@ -1,7 +1,7 @@
 import { clientDebugEnabled } from "@/shared/platform/client_debug";
 import { turnModes } from "../../plans/agent_collaboration";
 import { loadLocalModes } from "@/features/agents/local_run";
-import { settleLocalExecution } from "../../runs/local-execution/local_execution";
+import { settleLocalExecution } from "../../runs/local-execution/local_execution_state";
 import { thinkingEffort, thinkingMode } from "../../runs/jobs/thinking_mode";
 import { awaitConversationTitle, openTurn } from "./conversation_turn";
 import { globalMistyError } from "../state/global_misty_actions";

@@ -18,9 +18,10 @@ export const driveGateway = {
   ) {
     const folder = file.path.split("/").slice(0, -1).join("/") || "/";
     const content = bytes instanceof Blob ? await bytes.arrayBuffer() : bytes;
+    const version = file.version ?? (await driveNative.entryById(spaceId, file.id))?.version ?? 0;
     return driveNative.write(spaceId, folder, file.name, content, {
       item_id: file.id,
-      version: file.version ?? 0,
+      version,
     });
   },
   driveTrash: (spaceId: string, path: string) => driveNative.trash(spaceId, path),

@@ -64,60 +64,28 @@ pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<u64> {
 }
 
 pub fn copy_tree(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
-    let (from, to) = (from.as_ref(), to.as_ref());
-    check(from, Access::Read)?;
-    check_link(to, Access::Write)?;
-    copy_tree_unchecked(from, to)
-}
-
-pub(crate) fn copy_tree_unchecked(from: &Path, to: &Path) -> io::Result<()> {
-    #[cfg(target_os = "macos")]
-    if clone_tree(from, to).is_ok() {
-        return Ok(());
-    }
-    copy_tree_by_file(from, to)
-}
-
-#[cfg(target_os = "macos")]
-fn clone_tree(from: &Path, to: &Path) -> io::Result<()> {
-    use std::{ffi::CString, os::unix::ffi::OsStrExt};
-    const CLONE_NOFOLLOW: u32 = 0x0001;
-    let source = CString::new(from.as_os_str().as_bytes())?;
-    let target = CString::new(to.as_os_str().as_bytes())?;
-    // SAFETY: both are NUL-terminated paths that outlive the call. `CLONE_NOFOLLOW` clones links
-    // as links.
-    let status = unsafe { libc::clonefile(source.as_ptr(), target.as_ptr(), CLONE_NOFOLLOW) };
-    if status == 0 {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
-fn copy_tree_by_file(from: &Path, to: &Path) -> io::Result<()> {
-    fs::create_dir(to)?;
-    fs::set_permissions(to, fs::metadata(from)?.permissions())?;
-    for entry in fs::read_dir(from)? {
-        let entry = entry?;
-        let (source, target) = (entry.path(), to.join(entry.file_name()));
-        let kind = entry.file_type()?;
-        if kind.is_symlink() {
-            let link = fs::read_link(&source)?;
-            #[cfg(unix)]
-            std::os::unix::fs::symlink(&link, &target)?;
-            #[cfg(windows)]
-            if fs::metadata(&source).is_ok_and(|meta| meta.is_dir()) {
-                std::os::windows::fs::symlink_dir(&link, &target)?;
-            } else {
-                std::os::windows::fs::symlink_file(&link, &target)?;
-            }
-        } else if kind.is_dir() {
-            copy_tree_by_file(&source, &target)?;
-        } else if kind.is_file() {
-            fs::copy(&source, &target)?;
+    let absolute = |path: &Path| -> io::Result<PathBuf> {
+        if path.is_absolute() {
+            Ok(path.to_path_buf())
+        } else {
+            Ok(std::env::current_dir()?.join(path))
         }
-    }
-    Ok(())
+    };
+    let (from, to) = (absolute(from.as_ref())?, absolute(to.as_ref())?);
+    let (Some(folder), Some(name)) = (to.parent(), to.file_name()) else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "A whole drive can't be used here.",
+        ));
+    };
+    crate::disk::walk::copy_tree_with(
+        &from,
+        folder,
+        name,
+        crate::disk::checked::Gate::App,
+        &mut |_, _| true,
+    )
+    .map(drop)
 }
 
 pub fn metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {

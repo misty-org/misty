@@ -78,12 +78,29 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
     setPendingAttachments([]);
     setReplyToMessageId("");
   }, [setText, setSelectedFileIds, setPendingAttachments, setReplyToMessageId]);
+  const discard = useCallback(
+    (attachments: MessageAttachment[]) => {
+      if (session !== readApiSessionGeneration()) return;
+      for (const attachment of attachments)
+        void spacesApi
+          .discardUnsentAttachment(spaceId, attachment.upload_id)
+          .catch(() => undefined);
+    },
+    [session, spaceId],
+  );
+  const removeAttachment = useCallback(
+    (attachment: MessageAttachment) => {
+      setPendingAttachments((current) => current.filter((item) => item.id !== attachment.id));
+      discard([attachment]);
+    },
+    [discard, setPendingAttachments],
+  );
   const upload = useCallback(
     async (sends: Array<(conversationId?: string) => Promise<LibraryUploadResult>>) => {
       if (sends.length === 0 || attachmentUploading || attachmentSlotsLeft === 0) return;
       setAttachmentUploading(true);
+      const uploaded: MessageAttachment[] = [];
       try {
-        const uploaded: MessageAttachment[] = [];
         for (const send of sends.slice(0, attachmentSlotsLeft)) {
           if (session !== readApiSessionGeneration()) return;
           const result = await send(conversationId || undefined);
@@ -91,6 +108,9 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
           if (result.attachment) uploaded.push(result.attachment);
         }
         setPendingAttachments((current) => [...current, ...uploaded]);
+      } catch (error) {
+        discard(uploaded);
+        throw error;
       } finally {
         setAttachmentUploading(false);
       }
@@ -100,6 +120,7 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       attachmentSlotsLeft,
       attachmentUploading,
       conversationId,
+      discard,
       setAttachmentUploading,
       setPendingAttachments,
     ],
@@ -136,6 +157,7 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       setSelectedFileIds,
       pendingAttachments,
       setPendingAttachments,
+      removeAttachment,
       replyToMessageId,
       setReplyToMessageId,
       attachmentUploading,
@@ -153,6 +175,7 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       attachmentSlotsLeft,
       attachmentUploading,
       pendingAttachments,
+      removeAttachment,
       replyToMessageId,
       reset,
       selectedFileIds,

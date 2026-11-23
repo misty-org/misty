@@ -9,7 +9,7 @@ use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit, Nonce,
 };
-use rand::RngCore;
+use rand::Rng;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use tauri::State;
@@ -50,7 +50,7 @@ fn cipher() -> Result<Aes256Gcm, String> {
         Some(bytes) if bytes.len() == 32 => bytes,
         _ => {
             let mut bytes = vec![0u8; 32];
-            rand::thread_rng().fill_bytes(&mut bytes);
+            rand::rng().fill_bytes(&mut bytes);
             credential_store::store(KEY_SERVICE, KEY_ACCOUNT, &hex::encode(&bytes))
                 .map_err(|e| e.to_string())?;
             bytes
@@ -140,7 +140,7 @@ fn put(cache: &Cache, account: &str, key: &str, body: &str) -> Result<(), String
         return Ok(());
     }
     let mut nonce = [0u8; NONCE_LEN];
-    rand::thread_rng().fill_bytes(&mut nonce);
+    rand::rng().fill_bytes(&mut nonce);
     let sealed = cache
         .cipher
         .encrypt(

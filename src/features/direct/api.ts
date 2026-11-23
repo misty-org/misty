@@ -32,6 +32,7 @@ export interface AccountStatus {
   status: PresenceStatus;
   custom_text?: string;
   custom_emoji?: string;
+  custom_expires_at?: string | null;
 }
 
 export interface ChosenStatus {
@@ -92,7 +93,7 @@ export const directApi = {
   deleteDm: (dmId: string) => spaceRequest(`/dms/${id(dmId)}`, { method: "DELETE" }),
   ringDm: (
     dmId: string,
-    state: "ringing" | "ended" | "declined",
+    state: "ringing" | "ended" | "declined" | "answered" | "busy",
     video: boolean,
     sealedKeys: Record<string, string> = {},
     senderKeyId = "",
@@ -112,8 +113,13 @@ export const directApi = {
     ).then((result) => result.keys),
 
   myStatus: () => spaceRequest<ChosenStatus>("/me/status"),
-  setMyStatus: (status: ChosenStatus) =>
-    spaceRequest<ChosenStatus>("/me/status", { method: "PUT", ...json(status) }),
+  setMyStatus: (status: ChosenStatus, fields: readonly string[] = []) =>
+    spaceRequest<ChosenStatus>(
+      fields.length
+        ? `/me/status?fields=${encodeURIComponent(fields.join(","))}`
+        : "/me/status",
+      { method: "PUT", ...json(status) },
+    ),
   statuses: () =>
     spaceRequest<{ statuses: AccountStatus[] }>("/statuses").then((result) => result.statuses),
 
@@ -124,9 +130,12 @@ export const directApi = {
 
   callConfig: () => spaceRequest<CallConfig>("/calls/config"),
   callToken: (room: string) =>
-    spaceRequest<{ token: string; url: string; room: string }>(`/calls/${id(room)}/token`, {
-      method: "POST",
-    }),
+    spaceRequest<{ token: string; url: string; room: string; people?: string[] }>(
+      `/calls/${id(room)}/token`,
+      {
+        method: "POST",
+      },
+    ),
   moderateCall: (room: string, action: "mute" | "remove", person: string) =>
     spaceRequest<void>(`/calls/${id(room)}/moderate`, {
       method: "POST",

@@ -11,7 +11,7 @@ export type SpacePresenceViewer = {
 };
 
 export type RealtimeEnvelope =
-  | { type: "replay"; events: SpaceEvent[]; resync_required: boolean }
+  | { type: "replay"; events: SpaceEvent[]; resync_required: boolean; newest_event_id?: number }
   | { type: "event"; event: SpaceEvent }
   | {
       type: "control";

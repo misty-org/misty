@@ -1,7 +1,12 @@
 import { resolveSpacesApiBase, spacesApi } from "../api/api";
 import { errorText } from "@/shared/lib/format";
 import { openExternalLink } from "@/shared/platform/open_external_link";
-import { buildMessageSpans, mergeSpaceMessages } from "../chat/use_space_message_spans_store";
+import {
+  buildMessageSpans,
+  mergeSavedSpaceMessage,
+  mergeSpaceMessages,
+  noteDeletedSpaceMessage,
+} from "../chat/use_space_message_spans_store";
 import type { SpacesStore } from "./spaces_store_types";
 type SpacesSet = (
   partial: Partial<SpacesStore> | ((state: SpacesStore) => Partial<SpacesStore>),
@@ -87,17 +92,17 @@ export function createSpaceContentActions(
         throw error;
       }
     },
-    updateMessage: async (spaceId, messageId, text, fileNodeIds = []) => {
+    updateMessage: async (spaceId, messageId, text, fileNodeIds = [], content) => {
       set({
         error: null,
       });
       try {
-        const spans = buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? []);
+        const spans = content ?? buildMessageSpans(text.trim(), get().membersBySpace[spaceId] ?? []);
         const saved = await spacesApi.updateMessage(spaceId, messageId, spans, fileNodeIds);
         set((state) => ({
           messagesBySpace: {
             ...state.messagesBySpace,
-            [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [saved]),
+            [spaceId]: mergeSavedSpaceMessage(state.messagesBySpace[spaceId] ?? [], saved),
           },
         }));
       } catch (error) {
@@ -113,6 +118,7 @@ export function createSpaceContentActions(
       });
       try {
         await spacesApi.deleteMessage(spaceId, messageId);
+        noteDeletedSpaceMessage(messageId);
         set((state) => ({
           messagesBySpace: {
             ...state.messagesBySpace,
@@ -139,7 +145,7 @@ export function createSpaceContentActions(
         set((state) => ({
           messagesBySpace: {
             ...state.messagesBySpace,
-            [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [saved]),
+            [spaceId]: mergeSavedSpaceMessage(state.messagesBySpace[spaceId] ?? [], saved),
           },
         }));
       } catch (error) {

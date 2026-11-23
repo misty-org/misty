@@ -149,7 +149,7 @@ extern "C" fn receive(
             let view: *mut Object = msg_send![message, webView];
             run_adapter(app, view, adapter.as_deref());
             if let Some(mount) = frames::mount_of(&label) {
-                frames::emit_page(app, mount, "ready", None);
+                frames::emit_page(app, mount, "ready", frames::current_doc(mount));
             }
         }
     }

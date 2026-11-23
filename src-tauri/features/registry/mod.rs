@@ -211,8 +211,10 @@ pub fn start(app: &AppHandle) {
         return;
     }
     let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        let _ = refresh(&app, cached).await;
+    crate::app::first_draw::after_first_draw(move || {
+        tauri::async_runtime::spawn(async move {
+            let _ = refresh(&app, cached).await;
+        });
     });
 }
 
@@ -263,6 +265,7 @@ async fn refresh(app: &AppHandle, mut cached: Cached) -> Result<(), String> {
 pub struct RegistryView {
     apps: Value,
     engines: Value,
+    ignore: Value,
     published_at: String,
 }
 
@@ -272,6 +275,7 @@ pub fn registry_get() -> RegistryView {
     RegistryView {
         apps: registry.section("apps"),
         engines: registry.section("engines"),
+        ignore: registry.section("ignore"),
         published_at: registry.published_at().to_string(),
     }
 }
@@ -314,5 +318,6 @@ mod tests {
         assert!(registry.section("apps").get("apps").is_some());
         assert!(registry.speech().get("voices").is_some());
         assert!(registry.section("engines").get("engines").is_some());
+        assert!(registry.section("ignore").get("templates").is_some());
     }
 }

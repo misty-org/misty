@@ -87,10 +87,11 @@ impl Permission {
 }
 
 #[cfg(test)]
-const PROCESS_PERMISSIONS: [&str; 3] = [
+const PROCESS_PERMISSIONS: [&str; 4] = [
     "permission-agent-shell",
     "permission-document-worker",
     "permission-page-reader",
+    "permission-speech-helper",
 ];
 
 pub fn is_on(app: &AppHandle, permission: Permission) -> bool {

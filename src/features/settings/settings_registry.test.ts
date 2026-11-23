@@ -1,4 +1,4 @@
-import "@/app/SettingsSections";
+import "@/app/settings_sections";
 import { describe, expect, it } from "vitest";
 import { settingDefinitions } from "./device-preferences/registry";
 import {

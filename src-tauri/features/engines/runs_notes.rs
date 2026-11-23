@@ -64,6 +64,12 @@ pub(super) fn note(run_id: &str, note: RunNote) {
                         let db = app.state::<MistyRuntime>().environment.store();
                         crate::engines::chat_folder::end_run(&db, run_id);
                     }
+                } else if let Some(app) = APP.get() {
+                    crate::engines::thread_work::after_run(
+                        app,
+                        run.account.clone(),
+                        run.conversation.clone(),
+                    );
                 }
             }
             STOPPED

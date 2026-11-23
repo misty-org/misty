@@ -1,4 +1,5 @@
 import { useSettingsStore } from "@/features/settings";
+import { agentAccountId } from "../personal/agent_account";
 import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import { useEnginesList, type EngineInfo } from "./engines_api";
 
@@ -60,7 +61,10 @@ export function useDefaultEngine() {
 }
 
 export function defaultEngineAgent(engineId: string): string | undefined {
-  const agents = usePersonalAgentsStore.getState().agents;
-  const own = agents.find((agent) => agent.id === `personal_engine_${engineId}` && agent.enabled);
-  return (own ?? agents.find((agent) => agent.engine === engineId && agent.enabled))?.id;
+  const account = agentAccountId();
+  const all = usePersonalAgentsStore.getState().agents;
+  const own = all.filter((agent) => !agent.owner_user_id || agent.owner_user_id === account);
+  const agents = own.length ? own : all;
+  const named = agents.find((agent) => agent.id === `personal_engine_${engineId}` && agent.enabled);
+  return (named ?? agents.find((agent) => agent.engine === engineId && agent.enabled))?.id;
 }

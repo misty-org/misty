@@ -32,8 +32,6 @@ export { liftPanePresentation } from "./panes/pane_drag_presentation";
 export { MAX_PANE_DIM, selectPaneFocusPreferences } from "./panes/pane_focus";
 export { panePlacement } from "./panes/pane_placement";
 export { usePaneSwapMode, type PaneSwapDirection } from "./panes/pane_swap_mode";
-export { useLayoutEditor } from "./panes/layout_editor";
-export { draftAdd, draftPlace, draftRemove } from "./panes/layout_draft";
 export {
   closeWindow,
   currentProfile,
@@ -72,8 +70,10 @@ export {
   type WorkspaceDockNode,
   type WorkspaceLayout,
   type WorkspaceTab,
+  type WorkspaceTabGroup,
   type WorkspaceView,
 } from "./tabs/workspace_views";
+export { canShowSideBySide } from "./panes/tab_groups";
 export { isRetiredWebRoute, workspaceSurfaceFromRoute } from "./tabs/route_surface";
 export {
   onSpaceWindowSwitch,
@@ -83,6 +83,7 @@ export {
   type SpaceWindowIdentity,
 } from "./tabs/space_window";
 export { useWorkspaceStore } from "./tabs/use_workspace_store";
+export { startWorkspaceSides } from "./tabs/workspace_sides";
 
 export { AdvancedSection } from "./settings/AdvancedSection";
 export { AccessibilitySection } from "./settings/AccessibilitySection";

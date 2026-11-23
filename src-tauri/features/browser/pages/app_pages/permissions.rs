@@ -20,9 +20,16 @@ type Answer = Box<dyn FnOnce(bool) + Send>;
 
 struct Pending {
     mount: String,
-    app_id: String,
+    key: String,
     kinds: Vec<&'static str>,
     answer: Answer,
+}
+
+fn key_of(mount: &str) -> Option<String> {
+    let app_id = frames::app_of(mount)?;
+    let space = frames::space_of(mount).unwrap_or_default();
+    let scope = crate::browser::app_windows::current_scope();
+    Some(json!([scope, space, app_id]).to_string())
 }
 
 fn pending() -> &'static Mutex<HashMap<String, Pending>> {
@@ -68,9 +75,9 @@ fn write_all(app: &AppHandle, document: &Map<String, Value>) -> Result<(), Strin
         .map_err(|error| error.to_string())
 }
 
-fn decided(app: &AppHandle, app_id: &str, kinds: &[&'static str]) -> Option<bool> {
+fn decided(app: &AppHandle, key: &str, kinds: &[&'static str]) -> Option<bool> {
     let all = read_all(app);
-    let choices = all.get(app_id)?.as_object()?;
+    let choices = all.get(key)?.as_object()?;
     let mut allowed = true;
     for kind in kinds {
         match choices.get(*kind).and_then(Value::as_bool) {
@@ -82,10 +89,10 @@ fn decided(app: &AppHandle, app_id: &str, kinds: &[&'static str]) -> Option<bool
     allowed.then_some(true)
 }
 
-fn remember(app: &AppHandle, app_id: &str, kinds: &[&'static str], allow: bool) {
+fn remember(app: &AppHandle, key: &str, kinds: &[&'static str], allow: bool) {
     let mut all = read_all(app);
     let entry = all
-        .entry(app_id.to_owned())
+        .entry(key.to_owned())
         .or_insert_with(|| Value::Object(Map::new()));
     if let Some(choices) = entry.as_object_mut() {
         for kind in kinds {
@@ -96,10 +103,10 @@ fn remember(app: &AppHandle, app_id: &str, kinds: &[&'static str], allow: bool) 
 }
 
 pub(super) fn ask(app: &AppHandle, mount: &str, kinds: Vec<&'static str>, answer: Answer) {
-    let Some(app_id) = frames::app_of(mount) else {
+    let Some(key) = key_of(mount) else {
         return answer(false);
     };
-    if let Some(known) = decided(app, &app_id, &kinds) {
+    if let Some(known) = decided(app, &key, &kinds) {
         return answer(known);
     }
     let id = uuid::Uuid::new_v4().simple().to_string();
@@ -109,7 +116,7 @@ pub(super) fn ask(app: &AppHandle, mount: &str, kinds: Vec<&'static str>, answer
             id,
             Pending {
                 mount: mount.to_owned(),
-                app_id,
+                key,
                 kinds,
                 answer,
             },
@@ -157,7 +164,7 @@ pub fn space_app_page_permission_answer(
         .remove(&id)
         .filter(|entry| entry.mount == mount)
         .ok_or("That question was already answered.")?;
-    remember(&app, &entry.app_id, &entry.kinds, allow);
+    remember(&app, &entry.key, &entry.kinds, allow);
     (entry.answer)(allow);
     Ok(())
 }

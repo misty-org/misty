@@ -23,7 +23,7 @@ vi.mock("../conversations/state/local_chats", () => ({
 }));
 const engines = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("../engines/engines_api", () => ({ listEngines: engines.list, mistyEngine: "misty" }));
-vi.mock("./agent_account", () => ({ agentAccountId: () => "acct" }));
+vi.mock("./agent_account", () => ({ agentAccountId: () => "acct", isSignedIn: () => false }));
 const notes = new Map<string, { revision: number; state: unknown }>();
 vi.mock("@/shared/platform/native_invoke", () => ({
   invoke: async (

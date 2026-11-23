@@ -2,6 +2,9 @@ use rusqlite::{params, OptionalExtension};
 
 const DEVICE_SCOPE: &str = "drive:device";
 const CACHE_LIMIT_SCOPE: &str = "drive:cache-limit";
+const LARGE_FILE_SCOPE: &str = "drive:large-file-limit";
+const DEFAULT_LARGE_FILE: u64 = 1024 * 1024 * 1024;
+const MIN_LARGE_FILE: u64 = 1024 * 1024;
 const DEFAULT_CACHE_LIMIT: u64 = 10 * 1024 * 1024 * 1024;
 pub(crate) const MIN_CACHE_LIMIT: u64 = 64 * 1024 * 1024;
 pub(crate) const NO_CACHE_LIMIT: u64 = u64::MAX;
@@ -77,6 +80,29 @@ pub(crate) fn set_cache_limit(
     let value = bytes.map_or(serde_json::Value::Null, serde_json::Value::from);
     write(store, CACHE_LIMIT_SCOPE, &value)?;
     Ok(bytes.unwrap_or(NO_CACHE_LIMIT))
+}
+
+pub(crate) fn large_file_limit(store: &database::store::Store) -> u64 {
+    match read(store, LARGE_FILE_SCOPE) {
+        Some(serde_json::Value::Null) => u64::MAX,
+        Some(value) => value
+            .as_u64()
+            .filter(|limit| *limit >= MIN_LARGE_FILE)
+            .unwrap_or(DEFAULT_LARGE_FILE),
+        None => DEFAULT_LARGE_FILE,
+    }
+}
+
+pub(crate) fn set_large_file_limit(
+    store: &database::store::Store,
+    bytes: Option<u64>,
+) -> Result<u64, String> {
+    if bytes.is_some_and(|bytes| bytes < MIN_LARGE_FILE) {
+        return Err("The size has to be at least 1 MB.".into());
+    }
+    let value = bytes.map_or(serde_json::Value::Null, serde_json::Value::from);
+    write(store, LARGE_FILE_SCOPE, &value)?;
+    Ok(bytes.unwrap_or(u64::MAX))
 }
 
 pub(crate) fn computer_name() -> String {

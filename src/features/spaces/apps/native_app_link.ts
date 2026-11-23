@@ -9,6 +9,7 @@ export const SDK_LANE = "misty:init";
 const INLINE_BYTES = 16_384;
 const MAX_POST_CHARS = 250_000;
 const MARK = "$mistyBytes";
+const ANSWER_RETRIES = [1_000, 5_000, 15_000];
 
 type Wire = unknown;
 type Entry = [lane: string, frame: Wire];
@@ -191,33 +192,63 @@ export function coalesceAwareness(batch: Entry[]): Entry[] {
 const failure = (error: unknown, prefix: string) =>
   `${prefix}: ${error instanceof Error ? error.message : String(error)}`;
 
+export function refsIn(value: Wire, found: string[] = [], depth = 0): string[] {
+  if (!isRecord(value) || depth > 64) return found;
+  if (Array.isArray(value)) {
+    for (const item of value) refsIn(item, found, depth + 1);
+    return found;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, MARK)) {
+    if (typeof value.r === "string") found.push(value.r);
+    return found;
+  }
+  for (const item of Object.values(value)) refsIn(item, found, depth + 1);
+  return found;
+}
+
 export interface AppPageLink {
   readonly mount: string;
   readonly frame: FrameTarget;
   onReady(listener: () => void): () => void;
+  onLeft(listener: () => void): () => void;
   onPageEvent(listener: (kind: string, body: unknown) => void): () => void;
   takeBytes(reference: string): Promise<Uint8Array>;
   dispose(): void;
 }
+
+type Outgoing = { start: { lane: string; message: unknown } } | { frame: Entry };
+type Queued = Outgoing & { lap: number };
 
 export function createAppPageLink(mount: string, options: { world?: boolean } = {}): AppPageLink {
   const inline = options.world ? Number.POSITIVE_INFINITY : INLINE_BYTES;
   const postLimit = options.world ? Number.POSITIVE_INFINITY : MAX_POST_CHARS;
   const ports = new Map<string, MessagePort>();
   const readyListeners = new Set<() => void>();
+  const leftListeners = new Set<() => void>();
   const pageListeners = new Set<(kind: string, body: unknown) => void>();
+  const ending = new Set<string>();
+  const retried = new Map<string, number>();
   let disposed = false;
-  let outgoing: ({ start: { lane: string; message: unknown } } | { frame: Entry })[] = [];
+  let lap = 0;
+  let doc: string | undefined;
+  let outgoing: Queued[] = [];
   let scheduled = false;
   let sending = Promise.resolve();
   let receiving = Promise.resolve();
 
+  const current = (at: number) => !disposed && at === lap;
   const post = (body: unknown) =>
-    invoke<void>("space_app_page_post", { mount, body: JSON.stringify(body) });
+    invoke<void>("space_app_page_post", { mount, body: JSON.stringify(body), doc });
   const load = async (reference: string) =>
     new Uint8Array(
       await tauriInvoke<ArrayBuffer>("space_app_page_take_bytes", { mount, reference }),
     );
+  const free = (references: string[]) => {
+    for (const reference of references)
+      void tauriInvoke("space_app_page_take_bytes", { mount, reference, discard: true }).catch(
+        () => undefined,
+      );
+  };
   const upload = (item: Upload) =>
     tauriInvoke<void>("space_app_page_put_bytes", item.bytes, {
       headers: { "x-misty-mount": mount, "x-misty-ref": item.reference },
@@ -226,46 +257,76 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
   const toHost = (lane: string, frame: unknown) => {
     if (!disposed) ports.get(lane)?.postMessage(frame);
   };
-  const queue = (entry: (typeof outgoing)[number]) => {
-    if (disposed) return;
-    outgoing.push(entry);
+  const queue = (entry: Outgoing, at = lap) => {
+    if (!current(at)) return;
+    outgoing.push({ ...entry, lap: at });
     schedule();
   };
 
-  const undeliverable = ([lane, frame]: Entry, error: unknown, reachable: boolean) => {
-    if (!isRecord(frame) || typeof frame.id !== "number") return;
+  const answerLater = (entry: Entry, at: number) => {
+    const [lane, frame] = entry;
+    if (!isRecord(frame)) return;
+    const key = `${lane}:${String(frame.t)}:${String(frame.id)}`;
+    const tries = retried.get(key) ?? 0;
+    const delay = ANSWER_RETRIES[tries];
+    if (delay === undefined) {
+      retried.delete(key);
+      return console.warn("Misty couldn't tell the app that its message didn't arrive.");
+    }
+    retried.set(key, tries + 1);
+    window.setTimeout(() => queue({ frame: entry }, at), delay);
+  };
+
+  const undeliverable = ([lane, frame]: Entry, error: unknown, reachable: boolean, at: number) => {
+    if (!current(at) || !isRecord(frame) || typeof frame.id !== "number") return;
     const message = failure(error, "Misty's message didn't reach the app");
-    if (lane === SDK_LANE && frame.t === "res" && reachable)
-      return queue({
-        frame: [lane, { t: "res", id: frame.id, ok: false, error: { code: "internal", message } }],
-      });
+    if (lane === SDK_LANE && frame.t === "res") {
+      const answer: Entry = [
+        lane,
+        { t: "res", id: frame.id, ok: false, error: { code: "internal", message } },
+      ];
+      return reachable ? queue({ frame: answer }, at) : answerLater(answer, at);
+    }
+    if (lane === SDK_LANE && frame.t === "end" && !reachable) return answerLater([lane, frame], at);
     if (lane === SDK_LANE && frame.t === "evt") {
-      if (reachable)
-        queue({ frame: [lane, { t: "end", id: frame.id, error: { code: "internal", message } }] });
+      const key = `${lane}:${frame.id}`;
+      if (ending.has(key)) return;
+      ending.add(key);
+      const end: Entry = [lane, { t: "end", id: frame.id, error: { code: "internal", message } }];
+      if (reachable) queue({ frame: end }, at);
+      else answerLater(end, at);
       return toHost(lane, { t: "unsub", id: frame.id });
     }
     if (frame.t === "cmd") toHost(lane, { t: "cmd-res", id: frame.id, ok: false, error: message });
   };
 
-  const sendFrames = async (entries: Entry[]) => {
-    const ready: { entry: Entry; wire: Entry }[] = [];
-    const uploads: Upload[] = [];
+  const sendFrames = async (entries: Entry[], at: number) => {
+    const encoded: { entry: Entry; wire: Entry; uploads: Upload[] }[] = [];
     for (const entry of coalesceAwareness(entries)) {
-      const mine: Upload[] = [];
+      const uploads: Upload[] = [];
       try {
-        ready.push({ entry, wire: [entry[0], encode(entry[1], mine, inline)] });
-        uploads.push(...mine);
+        encoded.push({ entry, wire: [entry[0], encode(entry[1], uploads, inline)], uploads });
       } catch (error) {
-        undeliverable(entry, error, true);
+        undeliverable(entry, error, true, at);
       }
     }
-    if (!ready.length) return;
-    try {
-      await Promise.all(uploads.map(upload));
-    } catch (error) {
-      ready.forEach(({ entry }) => undeliverable(entry, error, true));
-      return;
-    }
+    if (!encoded.length) return;
+    const settled = await Promise.all(
+      encoded.map((item) => Promise.allSettled(item.uploads.map(upload))),
+    );
+    const ready: { entry: Entry; wire: Entry; refs: string[] }[] = [];
+    encoded.forEach((item, index) => {
+      const results = settled[index]!;
+      const refs = item.uploads.map((upload) => upload.reference);
+      const failed = results.find((result) => result.status === "rejected");
+      if (!failed) {
+        ready.push({ entry: item.entry, wire: item.wire, refs });
+        return;
+      }
+      free(refs.filter((_, position) => results[position]!.status === "fulfilled"));
+      undeliverable(item.entry, (failed as PromiseRejectedResult).reason, true, at);
+    });
+    if (!current(at)) return free(ready.flatMap((item) => item.refs));
     let chunk: typeof ready = [];
     let size = 0;
     const flushChunk = async () => {
@@ -273,10 +334,12 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
       const sent = chunk;
       chunk = [];
       size = 0;
+      if (!current(at)) return free(sent.flatMap((item) => item.refs));
       try {
         await post({ frames: sent.map(({ wire }) => wire) });
       } catch (error) {
-        sent.forEach(({ entry }) => undeliverable(entry, error, false));
+        free(sent.flatMap((item) => item.refs));
+        sent.forEach(({ entry }) => undeliverable(entry, error, false, at));
       }
     };
     for (const item of ready) {
@@ -288,20 +351,24 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
     await flushChunk();
   };
 
-  const flush = async (batch: typeof outgoing) => {
+  const flush = async (batch: Queued[]) => {
     let frames: Entry[] = [];
+    let framesLap = lap;
     for (const item of batch) {
+      if (!current(item.lap)) continue;
       if ("frame" in item) {
         frames.push(item.frame);
+        framesLap = item.lap;
         continue;
       }
-      await sendFrames(frames);
+      await sendFrames(frames, framesLap);
       frames = [];
-      await post(item).catch((error: unknown) =>
+      if (!current(item.lap)) continue;
+      await post({ start: item.start }).catch((error: unknown) =>
         console.warn(failure(error, "The app didn't start")),
       );
     }
-    await sendFrames(frames);
+    await sendFrames(frames, framesLap);
   };
 
   function schedule() {
@@ -320,22 +387,26 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
     window.setTimeout(run, 16);
   }
 
-  const unreadable = ([lane, frame]: Entry, error: unknown) => {
-    if (!isRecord(frame) || typeof frame.id !== "number") return;
+  const unreadable = ([lane, frame]: Entry, error: unknown, at: number) => {
+    if (!current(at) || !isRecord(frame) || typeof frame.id !== "number") return;
     const message = failure(error, "Misty couldn't take this from the app");
     if (lane === SDK_LANE && frame.t === "req")
-      return queue({
-        frame: [lane, { t: "res", id: frame.id, ok: false, error: { code: "internal", message } }],
-      });
+      return queue(
+        {
+          frame: [lane, { t: "res", id: frame.id, ok: false, error: { code: "internal", message } }],
+        },
+        at,
+      );
     if (lane === SDK_LANE && frame.t === "sub")
-      return queue({
-        frame: [lane, { t: "end", id: frame.id, error: { code: "internal", message } }],
-      });
+      return queue(
+        { frame: [lane, { t: "end", id: frame.id, error: { code: "internal", message } }] },
+        at,
+      );
     if (frame.t === "cmd-res")
       toHost(lane, { t: "cmd-res", id: frame.id, ok: false, error: message });
   };
 
-  const receive = async (body: string) => {
+  const receive = async (body: string, at: number) => {
     let entries: unknown;
     try {
       entries = JSON.parse(body);
@@ -344,37 +415,53 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
     }
     if (!Array.isArray(entries)) return;
     for (const entry of entries) {
-      if (!Array.isArray(entry) || typeof entry[0] !== "string" || !ports.has(entry[0])) continue;
+      if (!Array.isArray(entry) || typeof entry[0] !== "string") continue;
       const pair = entry as Entry;
+      if (!current(at) || !ports.has(pair[0])) {
+        free(refsIn(pair[1]));
+        continue;
+      }
       try {
-        toHost(pair[0], await decode(pair[1], load));
+        const decoded = await decode(pair[1], load);
+        if (current(at)) toHost(pair[0], decoded);
       } catch (error) {
-        unreadable(pair, error);
+        free(refsIn(pair[1]));
+        unreadable(pair, error, at);
       }
     }
   };
 
   const closeLanes = () => {
+    lap += 1;
     for (const port of ports.values()) {
       port.onmessage = null;
       port.close();
     }
     ports.clear();
-    outgoing = outgoing.filter((item) => !("frame" in item));
+    ending.clear();
+    retried.clear();
+    outgoing = [];
   };
 
   const stopListening = listen<PageEvent>("misty://app-page", ({ payload }) => {
     if (disposed || payload.mount !== mount) return;
-    if (payload.kind === "opened") return closeLanes();
+    if (payload.kind === "opened") {
+      closeLanes();
+      doc = undefined;
+      leftListeners.forEach((listener) => listener());
+      return;
+    }
     if (payload.kind === "ready") {
       closeLanes();
+      doc = payload.body || undefined;
       readyListeners.forEach((listener) => listener());
       return;
     }
     if (payload.kind === "lost") return console.warn("A message from the app didn't reach Misty.");
     if (payload.kind === "frames") {
       const body = payload.body;
-      if (body) receiving = receiving.then(() => receive(body)).catch(() => undefined);
+      const at = lap;
+      if (body) receiving = receiving.then(() => receive(body, at)).catch(() => undefined);
       return;
     }
     let body: unknown = null;
@@ -397,15 +484,16 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
       )
         return;
       const lane = message.type;
+      const at = lap;
       const old = ports.get(lane);
       if (old) {
         old.onmessage = null;
         old.close();
       }
       ports.set(lane, port);
-      port.onmessage = (event: MessageEvent) => queue({ frame: [lane, event.data] });
+      port.onmessage = (event: MessageEvent) => queue({ frame: [lane, event.data] }, at);
       const { type: _type, ...rest } = message;
-      queue({ start: { lane, message: rest } });
+      queue({ start: { lane, message: rest } }, at);
     },
   };
 
@@ -415,6 +503,10 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
     onReady(listener) {
       readyListeners.add(listener);
       return () => readyListeners.delete(listener);
+    },
+    onLeft(listener) {
+      leftListeners.add(listener);
+      return () => leftListeners.delete(listener);
     },
     onPageEvent(listener) {
       pageListeners.add(listener);
@@ -426,6 +518,7 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
       disposed = true;
       closeLanes();
       readyListeners.clear();
+      leftListeners.clear();
       pageListeners.clear();
       void stopListening.then((stop) => stop()).catch(() => undefined);
     },

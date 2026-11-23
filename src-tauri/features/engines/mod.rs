@@ -11,6 +11,7 @@
 //! may do is decided by the run's mode in native code (`agents/run_control/engine_modes.rs`), with
 //! every permission ask answered by Misty's own gate (`gate.rs`). See NOTICE.
 
+pub(crate) mod agent_memory;
 pub mod agy;
 mod bridge;
 pub mod catalog;
@@ -73,6 +74,7 @@ mod shell_env;
 pub mod slash;
 pub mod store;
 pub mod support;
+pub mod thread_work;
 pub mod turn;
 mod warm;
 pub(crate) mod warm_up;
@@ -540,22 +542,25 @@ pub fn start(app: &tauri::App) {
     let store = tauri::Manager::state::<crate::app::runtime::MistyRuntime>(app)
         .environment
         .store();
-    tauri::async_runtime::spawn_blocking(move || {
-        sweep_staging_dirs();
-        images::sweep_pasted_images();
-        run_prompt::sweep_attached_files();
-        for folder in store::all_folders(&store).unwrap_or_default() {
-            folder_linked(&folder.to_string_lossy());
-        }
-        history::scanner::spawn_scan(Arc::clone(&state.db), Arc::clone(&state.sink));
-        tauri::async_runtime::spawn(async move {
-            let settings = support::settings::read_settings().unwrap_or_default();
-            if support::dsh_host::autostart_allowed(&settings) {
-                if let Err(error) = support::dsh_host::ensure_host(&state.dsh_host, &settings).await
-                {
-                    eprintln!("[dsh] autostart failed: {error}");
-                }
+    crate::app::first_draw::after_first_draw(move || {
+        tauri::async_runtime::spawn_blocking(move || {
+            sweep_staging_dirs();
+            images::sweep_pasted_images();
+            run_prompt::sweep_attached_files();
+            for folder in store::all_folders(&store).unwrap_or_default() {
+                folder_linked(&folder.to_string_lossy());
             }
+            history::scanner::spawn_scan(Arc::clone(&state.db), Arc::clone(&state.sink));
+            tauri::async_runtime::spawn(async move {
+                let settings = support::settings::read_settings().unwrap_or_default();
+                if support::dsh_host::autostart_allowed(&settings) {
+                    if let Err(error) =
+                        support::dsh_host::ensure_host(&state.dsh_host, &settings).await
+                    {
+                        eprintln!("[dsh] autostart failed: {error}");
+                    }
+                }
+            });
         });
     });
 }
@@ -972,6 +977,7 @@ fn launch_dirs(state: &crate::engines::support::EngineState, run_id: Option<&str
     let mut dirs = state.db.granted_roots().unwrap_or_default();
     if let Some(run_id) = run_id {
         dirs.extend(runs::space_dirs(run_id));
+        dirs.extend(agent_memory::run_dirs(run_id));
     }
     if let Some(run_id) = run_id {
         let attached = run_prompt::attached_files_dir(run_id);

@@ -5,7 +5,7 @@ import { driveEntryById } from "../drive";
 import { driveFileRef } from "../drive/drive_app_files";
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
-import { EmptyState, notify, Skeleton } from "@misty/ui";
+import { EmptyState, FramedPage, notify, Skeleton } from "@misty/ui";
 import type { Space } from "../api/dto/entities";
 import { FilePickerDialog } from "./file-picker/FilePickerDialog";
 import { SpaceAppFrame } from "./SpaceAppFrame";
@@ -53,24 +53,35 @@ export function SpaceAppPage({
   const name = catalog?.name ?? appId;
   useWorkspaceViewTitle(workspaceTabId, name);
   const isMod = Boolean(space.permissions?.includes("apps.manage"));
-  const spaceKey = `${space.id}:${space.name}:${isMod}:${user?.id}:${installed?.version ?? ""}:${openedWith}`;
+  const spaceNow = useRef({ name: space.name, isMod });
+  spaceNow.current = { name: space.name, isMod };
+  const spaceKey = `${space.id}:${user?.id}:${installed?.version ?? ""}:${JSON.stringify(installed?.permissions ?? [])}:${openedWith}`;
 
   if (!user) return null;
-  if (!apps) return <Skeleton className="m-4 h-8 w-48" />;
+  if (!apps)
+    return (
+      <FramedPage>
+        <Skeleton className="m-4 h-8 w-48" />
+      </FramedPage>
+    );
   if (!installed)
     return (
-      <EmptyState
-        title="This app isn’t added to the Space"
-        line="A mod can add it from the Apps list."
-      />
+      <FramedPage>
+        <EmptyState
+          title="This app isn’t added to the Space"
+          line="A mod can add it from the Apps list."
+        />
+      </FramedPage>
     );
 
   if (catalog && !runsHere(catalog))
     return (
-      <EmptyState
-        title="Not on this computer"
-        line={`${name} isn't made for this computer. It opens on the others it lists.`}
-      />
+      <FramedPage>
+        <EmptyState
+          title="Not on this computer"
+          line={`${name} isn't made for this computer. It opens on the others it lists.`}
+        />
+      </FramedPage>
     );
 
   const finish = (files: AppFileRef[]) => {
@@ -80,7 +91,7 @@ export function SpaceAppPage({
   };
 
   return (
-    <div className="flex size-full min-h-0 flex-col">
+    <FramedPage>
       <SpaceAppFrame
         key={spaceKey}
         spaceId={space.id}
@@ -94,7 +105,15 @@ export function SpaceAppPage({
           createSpaceAppHandlers({
             appId,
             appName: name,
-            space: { id: space.id, name: space.name, isMod },
+            space: {
+              id: space.id,
+              get name() {
+                return spaceNow.current.name;
+              },
+              get isMod() {
+                return spaceNow.current.isMod;
+              },
+            },
             me: {
               user_id: user.id,
               name: user.username,
@@ -143,6 +162,6 @@ export function SpaceAppPage({
           onCancel={() => finish([])}
         />
       ) : null}
-    </div>
+    </FramedPage>
   );
 }

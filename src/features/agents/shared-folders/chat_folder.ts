@@ -4,7 +4,7 @@ import { useUserStore } from "@/features/account/core";
 import { invoke } from "@/native/invoke";
 import { agentAccountId, useAgentAccountId } from "../personal/agent_account";
 
-export type ChatFolderKind = "project" | "scratch";
+export type ChatFolderKind = "project" | "scratch" | "thread";
 
 export interface ChatFolder {
   path: string;

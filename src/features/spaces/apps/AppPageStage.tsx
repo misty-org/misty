@@ -12,6 +12,7 @@ import {
   Pressable,
   SetupState,
 } from "@misty/ui";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   browserRuntimeResumeEvent,
@@ -56,6 +57,20 @@ interface Question {
   kinds: string[];
 }
 
+const REFUSAL_NOTICES = 3;
+
+function outsideAddress(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" || url.protocol === "mailto:"
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function asked(kinds: string[]): string {
   const names = kinds.map((kind) =>
     kind === "camera" ? "camera" : kind === "microphone" ? "microphone" : "location",
@@ -64,19 +79,25 @@ function asked(kinds: string[]): string {
 }
 
 export function AppPageStage({
+  spaceId,
   appId,
   version,
   appName,
   site = false,
+  instance,
   start,
+  leave,
   save,
   onChannel,
 }: {
+  spaceId: string;
   appId: string;
   version: string;
   appName: string;
   site?: boolean;
+  instance: string;
   start: (frame: FrameTarget, element: HTMLElement, page: AppPageView) => void;
+  leave: () => void;
   save: (file: SavedDownload) => Promise<void>;
   onChannel?: (channel: boolean) => void;
 }) {
@@ -90,12 +111,16 @@ export function AppPageStage({
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const startRef = useRef(start);
   startRef.current = start;
+  const leaveRef = useRef(leave);
+  leaveRef.current = leave;
   const saveRef = useRef(save);
   saveRef.current = save;
   const channelRef = useRef(onChannel);
   channelRef.current = onChannel;
-  const agent = useAppControl((state) => state.agents[appId]);
-  const held = useAppControl((state) => Boolean(state.held[appId]));
+  const nameRef = useRef(appName);
+  nameRef.current = appName;
+  const agent = useAppControl((state) => state.agents[instance]);
+  const held = useAppControl((state) => Boolean(state.held[instance]));
   const lowered = Boolean(agent && !held);
   usePresentedPageHost(`app-page:${mount}`, presented);
 
@@ -110,8 +135,27 @@ export function AppPageStage({
     const stopReady = link.onReady(() => {
       if (host.current) startRef.current(link.frame, host.current, page);
     });
+    const stopLeft = link.onLeft(() => leaveRef.current());
+    const refused = new Set<string>();
     const stopEvents = link.onPageEvent((kind, body) => {
       if (!isRecord(body)) return;
+      if (kind === "navigation-refused") {
+        const address = outsideAddress(body.url);
+        const place = typeof body.host === "string" && body.host ? body.host : null;
+        if (!address || !place || refused.has(place) || refused.size >= REFUSAL_NOTICES) return;
+        refused.add(place);
+        notify({
+          message: `${nameRef.current} tried to open ${place}.`,
+          action: {
+            label: "Open",
+            onSelect: () =>
+              void openUrl(address).catch((error: unknown) =>
+                notify({ message: `${place} didn't open: ${messageOf(error)}`, tone: "error" }),
+              ),
+          },
+        });
+        return;
+      }
       if (kind === "permission" && typeof body.id === "string" && Array.isArray(body.kinds)) {
         const question = { id: body.id, kinds: body.kinds.map(String) };
         setQuestions((waiting) => [...waiting, question]);
@@ -140,6 +184,7 @@ export function AppPageStage({
     });
     return () => {
       stopReady();
+      stopLeft();
       stopEvents();
       link.dispose();
       setQuestions([]);
@@ -174,7 +219,7 @@ export function AppPageStage({
       if (phase === "shown" && sent && sameBounds(sent, bounds)) return;
       if (phase === "closed") {
         const result = await invoke<{ channel: boolean }>("space_app_page_open", {
-          request: { mount, appId, version, ...bounds },
+          request: { mount, appId, version, spaceId, ...bounds },
         });
         if (disposed) return;
         channelRef.current?.(result.channel);
@@ -247,7 +292,7 @@ export function AppPageStage({
       window.visualViewport?.removeEventListener("resize", schedule);
       document.removeEventListener("visibilitychange", schedule);
     };
-  }, [mount, appId, version, appName]);
+  }, [mount, spaceId, appId, version, appName]);
 
   const question = questions[0];
   const answer = (allow: boolean) => {
@@ -281,7 +326,7 @@ export function AppPageStage({
         <Pressable
           aria-label={`Take control of ${appName}`}
           className="absolute inset-0"
-          onPointerDown={() => useAppControl.getState().takeBack(appId)}
+          onPointerDown={() => useAppControl.getState().takeBack(instance)}
         />
       ) : null}
       {agent && size && presented ? (

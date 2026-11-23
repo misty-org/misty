@@ -1,6 +1,7 @@
 pub mod api;
 pub mod bases;
 pub mod cache;
+pub mod copy_source;
 pub mod face;
 pub mod guard;
 pub mod ignore;
@@ -30,6 +31,7 @@ use std::{
 use tokio::{runtime::Handle, sync::Notify};
 
 pub use api::{Api, ApiError, Device, Http, HttpError};
+pub use copy_source::{CopyFlow, CopyFolder, CopyKind, CopySource, CopyStep};
 pub use model::*;
 use store::{NodeRow, Store};
 
@@ -165,6 +167,10 @@ pub trait OsFace: Send + Sync {
     fn evict(&self, space: &SpaceId, item: &ItemId) -> Result<(), DriveError>;
 }
 
+pub trait Link: Send + Sync {
+    fn send(&self, message: serde_json::Value) -> bool;
+}
+
 pub trait Events: Send + Sync {
     fn status(&self, status: &DriveStatus);
     fn changed(&self, space: &SpaceId, entries: &[ChangedEntry]);
@@ -179,6 +185,7 @@ pub struct DriveConfig {
     pub device: Device,
     pub person_name: Option<String>,
     pub cache_limit_bytes: u64,
+    pub large_file_bytes: u64,
     pub content_in_cache: bool,
     pub patient: bool,
     pub in_use_wait_cap: Duration,
@@ -193,6 +200,7 @@ impl DriveConfig {
             device,
             person_name: None,
             cache_limit_bytes: 10 * 1024 * 1024 * 1024,
+            large_file_bytes: 1024 * 1024 * 1024,
             content_in_cache: cfg!(target_os = "linux"),
             patient: true,
             in_use_wait_cap: Duration::from_secs(5),
@@ -230,6 +238,8 @@ pub struct Node {
     pub last_used_ms: i64,
 }
 
+pub const CONFLICTED_MARK: &str = "(conflicted copy ";
+
 pub(crate) type Key = (SpaceId, ItemId);
 
 pub(crate) struct Mounted {
@@ -240,9 +250,9 @@ pub(crate) struct Mounted {
     pub stop: AtomicBool,
     pub round: tokio::sync::Mutex<()>,
     pub status: Mutex<DriveStatus>,
-    pub marked: Mutex<HashMap<ItemId, std::time::Instant>>,
+    pub held: Mutex<HashMap<ItemId, bool>>,
     pub marks_pending: AtomicBool,
-    pub trash_results: Mutex<HashMap<ItemId, Result<(), DriveError>>>,
+    pub trashing: Mutex<HashSet<ItemId>>,
     pub task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
@@ -261,8 +271,10 @@ pub(crate) struct Inner {
     pub fetching: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub downloading: Mutex<HashSet<Key>>,
     pub cache_limit: AtomicU64,
+    pub large_limit: AtomicU64,
     pub paused: AtomicBool,
     pub guard: guard::Guard,
+    pub link: RwLock<Option<Arc<dyn Link>>>,
 }
 
 fn held_message(space: &str) -> String {
@@ -306,6 +318,7 @@ impl Drive {
         api.patient = config.patient;
         let person = config.person_name.clone();
         let cache_limit = AtomicU64::new(config.cache_limit_bytes);
+        let large_limit = AtomicU64::new(config.large_file_bytes);
         Ok(Self {
             inner: Arc::new(Inner {
                 config,
@@ -322,8 +335,10 @@ impl Drive {
                 fetching: Mutex::new(HashMap::new()),
                 downloading: Mutex::new(HashSet::new()),
                 cache_limit,
+                large_limit,
                 paused: AtomicBool::new(false),
                 guard: guard::Guard::default(),
+                link: RwLock::new(None),
             }),
         })
     }
@@ -346,6 +361,44 @@ impl Drive {
         for space in spaces {
             self.kick(&space);
         }
+    }
+
+    pub fn set_large_file_limit(&self, bytes: u64) {
+        self.inner.large_limit.store(bytes, Ordering::SeqCst);
+        let spaces: Vec<SpaceId> = read(&self.inner.spaces).keys().cloned().collect();
+        for space in spaces {
+            let waiting: Vec<ItemId> = self
+                .inner
+                .store
+                .dirty_nodes(&space)
+                .into_iter()
+                .filter(|node| node.kind == Kind::File)
+                .map(|node| node.id)
+                .collect();
+            self.emit_now(&space, &waiting, Vec::new());
+            self.kick(&space);
+        }
+    }
+
+    pub fn large_file_limit(&self) -> u64 {
+        self.inner.large_limit.load(Ordering::SeqCst)
+    }
+
+    pub fn sync_large(&self, space: &SpaceId, path: &str) -> Result<DriveEntry, DriveError> {
+        let path = names::drive_path(path).map_err(DriveError::Invalid)?;
+        let node = self
+            .inner
+            .store
+            .node_at(space, &path)?
+            .filter(|node| !node.trash_pending)
+            .ok_or(DriveError::NotFound)?;
+        if node.kind != Kind::File {
+            return Err(DriveError::Invalid("That's a folder.".to_owned()));
+        }
+        self.inner.store.allow_large(space, &node.id)?;
+        self.emit_now(space, std::slice::from_ref(&node.id), Vec::new());
+        self.kick(space);
+        Ok(self.inner.entry(&node))
     }
 
     pub fn set_paused(&self, paused: bool) {
@@ -391,9 +444,9 @@ impl Drive {
                 pending_uploads: 0,
                 pending_downloads: 0,
             }),
-            marked: Mutex::new(HashMap::new()),
+            held: Mutex::new(HashMap::new()),
             marks_pending: AtomicBool::new(false),
-            trash_results: Mutex::new(HashMap::new()),
+            trashing: Mutex::new(HashSet::new()),
             task: Mutex::new(None),
         });
         write(&self.inner.spaces).insert(space.clone(), mounted.clone());
@@ -482,6 +535,53 @@ impl Drive {
         for space in spaces {
             let _ = self.unmount(&space, false);
         }
+        *write(&self.inner.link) = None;
+        self.inner.store.flush();
+    }
+
+    pub fn set_link(&self, link: Option<Arc<dyn Link>>) {
+        *write(&self.inner.link) = link;
+    }
+
+    pub fn linked(&self) -> bool {
+        read(&self.inner.link).is_some()
+    }
+
+    pub async fn link_up(&self) {
+        sync::resend_holds(&self.inner);
+        let spaces: Vec<SpaceId> = read(&self.inner.spaces).keys().cloned().collect();
+        for space in spaces {
+            sync::refresh_marks(&self.inner, &space).await;
+            self.kick(&space);
+        }
+    }
+
+    pub async fn realtime_ticket(&self) -> Result<String, DriveError> {
+        Ok(self.inner.api.realtime_ticket().await?)
+    }
+
+    fn emit_now(&self, space: &SpaceId, ids: &[ItemId], gone: Vec<DriveEntry>) {
+        let mut entries: Vec<ChangedEntry> = gone
+            .into_iter()
+            .map(|entry| ChangedEntry {
+                entry,
+                removed: true,
+            })
+            .collect();
+        for id in ids {
+            if entries.iter().any(|known| &known.entry.id == id) {
+                continue;
+            }
+            if let Ok(Some(node)) = self.inner.store.node(space, id) {
+                entries.push(ChangedEntry {
+                    entry: self.inner.entry(&node),
+                    removed: node.trash_pending,
+                });
+            }
+        }
+        if !entries.is_empty() {
+            self.inner.events.changed(space, &entries);
+        }
     }
 
     pub fn kick(&self, space: &SpaceId) {
@@ -498,6 +598,27 @@ impl Drive {
         read(&self.inner.spaces)
             .get(space)
             .map(|mounted| lock(&mounted.status).clone())
+    }
+
+    pub fn conflicted(&self) -> Vec<DriveEntry> {
+        let spaces: Vec<SpaceId> = read(&self.inner.spaces).keys().cloned().collect();
+        let mut out = Vec::new();
+        for space in spaces {
+            let Ok(nodes) = self.inner.store.nodes(&space) else {
+                continue;
+            };
+            out.extend(
+                nodes
+                    .iter()
+                    .filter(|node| {
+                        node.kind == Kind::File
+                            && !node.trash_pending
+                            && node.name.contains(CONFLICTED_MARK)
+                    })
+                    .map(|node| self.inner.entry(node)),
+            );
+        }
+        out
     }
 
     pub fn statuses(&self) -> Vec<DriveStatus> {
@@ -535,7 +656,7 @@ impl Drive {
         name: &str,
     ) -> Result<Option<Node>, DriveError> {
         let wanted = names::nfc(name);
-        let children = self.inner.store.children(space, folder)?;
+        let children = self.inner.store.children_folded(space, folder, &wanted);
         let exact = children
             .iter()
             .find(|node| node.name == wanted && !node.trash_pending);
@@ -635,6 +756,7 @@ impl Drive {
 
     pub fn create(&self, space: &SpaceId, new: NewNode) -> Result<Node, DriveError> {
         let node = sync::create_local(&self.inner, space, new)?;
+        self.emit_now(space, std::slice::from_ref(&node.id), Vec::new());
         self.kick(space);
         Ok(self.inner.node_view(&node))
     }
@@ -704,7 +826,7 @@ impl Drive {
         if name.is_some() || parent.is_some() {
             let folder = parent.clone().unwrap_or_else(|| node.parent.clone());
             let wanted = name.unwrap_or(&node.name).to_owned();
-            match self.rename(space, id, folder.as_ref(), &wanted) {
+            match self.rename_checked(space, id, folder.as_ref(), &wanted, true) {
                 Ok(_) => {}
                 Err(DriveError::Exists) => {
                     if let Some(holder) = self
@@ -713,7 +835,7 @@ impl Drive {
                     {
                         self.trash(space, &holder.id, TrashBy::Person)?;
                     }
-                    self.rename(space, id, folder.as_ref(), &wanted)?;
+                    self.rename_checked(space, id, folder.as_ref(), &wanted, true)?;
                 }
                 Err(error) => return Err(error),
             }
@@ -740,6 +862,7 @@ impl Drive {
     ) -> Result<Node, DriveError> {
         let node = sync::write_local(&self.inner, space, id, content, mtime_ms, None)?;
         sync::wrote(&self.inner, space, id);
+        self.emit_now(space, std::slice::from_ref(id), Vec::new());
         self.kick(space);
         Ok(self.inner.node_view(&node))
     }
@@ -751,21 +874,64 @@ impl Drive {
         folder: Option<&ItemId>,
         name: &str,
     ) -> Result<Node, DriveError> {
-        let node = sync::rename_local(&self.inner, space, id, folder, name)?;
+        self.rename_checked(space, id, folder, name, true)
+    }
+
+    pub fn rename_checked(
+        &self,
+        space: &SpaceId,
+        id: &ItemId,
+        folder: Option<&ItemId>,
+        name: &str,
+        replace: bool,
+    ) -> Result<Node, DriveError> {
+        let before = self.inner.store.node(space, id)?;
+        let node = sync::rename_local(&self.inner, space, id, folder, name, replace)?;
         if &node.id != id {
             sync::wrote(&self.inner, space, &node.id);
         }
+        let mut ids = vec![node.id.clone()];
+        ids.extend(
+            self.inner
+                .store
+                .descendants(space, &node.id)?
+                .into_iter()
+                .skip(1)
+                .map(|below| below.id),
+        );
+        let gone = match before {
+            Some(before)
+                if self
+                    .inner
+                    .store
+                    .node(space, id)?
+                    .is_none_or(|now| now.trash_pending) =>
+            {
+                vec![self.inner.entry(&before)]
+            }
+            _ => Vec::new(),
+        };
+        self.emit_now(space, &ids, gone);
         self.kick(space);
         Ok(self.inner.node_view(&node))
     }
 
     pub fn trash(&self, space: &SpaceId, id: &ItemId, by: TrashBy) -> Result<(), DriveError> {
+        let before = self
+            .inner
+            .store
+            .node(space, id)?
+            .map(|node| self.inner.entry(&node));
         sync::trash_local(&self.inner, space, id, &by)?;
+        self.emit_now(space, &[], before.into_iter().collect());
         self.kick(space);
         Ok(())
     }
 
     pub fn trash_from_os(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
+        if self.restore_root_ignore(space, id)? {
+            return Ok(());
+        }
         let files = self.guard_delete(space, id)?;
         self.trash(space, id, TrashBy::Person)?;
         self.inner.guard.record(space, id, files);
@@ -773,10 +939,34 @@ impl Drive {
     }
 
     pub async fn trash_from_os_now(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
+        if self.restore_root_ignore(space, id)? {
+            return Ok(());
+        }
         let files = self.guard_delete(space, id)?;
         self.trash_now(space, id, TrashBy::Person).await?;
         self.inner.guard.record(space, id, files);
         Ok(())
+    }
+
+    fn restore_root_ignore(&self, space: &SpaceId, id: &ItemId) -> Result<bool, DriveError> {
+        let Some(node) = self.inner.store.node(space, id)? else {
+            return Ok(false);
+        };
+        if !sync::is_root_ignore(&node)
+            || node.created
+            || node.not_synced
+            || node.trash_pending
+            || self.inner.store.base(space, id)?.is_none()
+        {
+            return Ok(false);
+        }
+        let gone = self.inner.entry(&node);
+        for row in self.inner.store.remove_subtree(space, id)? {
+            self.inner.bases.remove(&row.id);
+        }
+        self.emit_now(space, &[], vec![gone]);
+        self.kick(space);
+        Ok(true)
     }
 
     fn guard_delete(&self, space: &SpaceId, id: &ItemId) -> Result<u64, DriveError> {
@@ -788,7 +978,7 @@ impl Drive {
             return Ok(0);
         }
         let files = guard::files_in(&subtree);
-        let space_files = guard::files_in(&self.inner.store.nodes(space)?);
+        let space_files = self.inner.store.file_count(space);
         let name = self
             .mount_of(space)
             .map(|mount| mount.mount_name)
@@ -835,15 +1025,32 @@ impl Drive {
         id: &ItemId,
         by: TrashBy,
     ) -> Result<(), DriveError> {
+        let before = self
+            .inner
+            .store
+            .node(space, id)?
+            .map(|node| self.inner.entry(&node));
         sync::trash_local(&self.inner, space, id, &by)?;
-        self.sync_now(space).await?;
-        let mounted = self.inner.mounted(space)?;
-        let result = lock(&mounted.trash_results).remove(id);
-        match result {
-            Some(result) => result,
-            None if self.inner.store.node(space, id)?.is_none() => Ok(()),
-            None => Err(DriveError::Offline),
+        self.emit_now(space, &[], before.into_iter().collect());
+        if self.inner.store.node(space, id)?.is_none() {
+            return Ok(());
         }
+        let result = sync::trash_one(&self.inner, space, id).await;
+        self.kick(space);
+        result
+    }
+
+    pub async fn trash_many(
+        &self,
+        space: &SpaceId,
+        ids: &[ItemId],
+        by: TrashBy,
+    ) -> Vec<(ItemId, Result<(), DriveError>)> {
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            out.push((id.clone(), self.trash_now(space, id, by.clone()).await));
+        }
+        out
     }
 
     pub async fn open(
@@ -906,6 +1113,52 @@ impl Drive {
         Ok((nodes, next, more))
     }
 
+    pub fn file_shas(&self, space: &SpaceId) -> Result<Vec<(String, String)>, DriveError> {
+        Ok(self
+            .inner
+            .store
+            .nodes(space)?
+            .into_iter()
+            .filter(|node| node.kind == Kind::File && !node.trash_pending)
+            .filter_map(|node| node.sha256.map(|sha| (node.path, sha)))
+            .collect())
+    }
+
+    pub fn make_folders(&self, space: &SpaceId, path: &str) -> Result<(), DriveError> {
+        sync::folder_made(&self.inner, space, path)?;
+        self.kick(space);
+        Ok(())
+    }
+
+    pub fn base_text(&self, id: &ItemId, sha256: &str) -> Option<String> {
+        self.inner.bases.text(id, Some(sha256))
+    }
+
+    pub fn ignored(
+        &self,
+        space: &SpaceId,
+        path: &str,
+        is_folder: bool,
+    ) -> Result<bool, DriveError> {
+        let path = names::drive_path(path).map_err(DriveError::Invalid)?;
+        if ignore::never_synced_path(&path) {
+            return Ok(true);
+        }
+        let mut folder = names::parent(&path);
+        let parent = loop {
+            if folder == names::ROOT {
+                break None;
+            }
+            match self.inner.store.node_at(space, &folder)? {
+                Some(node) if node.kind == Kind::Folder && !node.trash_pending => {
+                    break Some(node.id)
+                }
+                _ => folder = names::parent(&folder),
+            }
+        };
+        Ok(sync::rules_for(&self.inner, space, parent.as_ref()).ignores(&path, is_folder))
+    }
+
     pub fn current_local_seq(&self, space: &SpaceId) -> Result<i64, DriveError> {
         self.inner.store.local_cursor(space)
     }
@@ -948,12 +1201,86 @@ impl Drive {
     }
 
     pub async fn read_bytes(&self, space: &SpaceId, path: &str) -> Result<Vec<u8>, DriveError> {
+        self.read_capped(space, path, u64::MAX).await
+    }
+
+    pub async fn read_capped(
+        &self,
+        space: &SpaceId,
+        path: &str,
+        limit: u64,
+    ) -> Result<Vec<u8>, DriveError> {
         let node = self.node_at(space, path)?.ok_or(DriveError::NotFound)?;
         if node.kind != Kind::File {
             return Err(DriveError::Invalid("That's a folder.".to_owned()));
         }
-        let cached = self.content(space, &node.id).await?;
-        file_access::fs::read(cached).map_err(DriveError::io)
+        if node.size > limit {
+            return Err(DriveError::Invalid(
+                "That file is too large to open here.".to_owned(),
+            ));
+        }
+        let (cached, pin, _) = sync::content_pinned(&self.inner, space, &node.id).await?;
+        let bytes = tokio::task::spawn_blocking(move || {
+            use std::io::Read as _;
+            let _pin = pin;
+            let file = file_access::fs::File::open(&cached)?;
+            let mut out = Vec::new();
+            file.take(limit).read_to_end(&mut out)?;
+            Ok::<_, io::Error>(out)
+        })
+        .await
+        .map_err(|error| DriveError::Io(error.to_string()))?
+        .map_err(DriveError::io)?;
+        Ok(bytes)
+    }
+
+    pub fn pin_blob(&self, sha256: &str) -> cache::BlobPin {
+        self.inner.cache.pin(sha256)
+    }
+
+    pub fn content_range(
+        &self,
+        space: &SpaceId,
+        path: &str,
+        start: u64,
+        len: u64,
+    ) -> io::Result<(Vec<u8>, u64)> {
+        use std::io::{Read as _, Seek as _, SeekFrom};
+        let node = self
+            .node_at(space, path)
+            .map_err(io::Error::other)?
+            .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
+        if node.kind != Kind::File {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "That's a folder.",
+            ));
+        }
+        let (cached, _pin, total) = match Handle::try_current() {
+            Ok(_) => tokio::task::block_in_place(|| {
+                self.inner
+                    .runtime
+                    .block_on(sync::content_pinned(&self.inner, space, &node.id))
+            }),
+            Err(_) => {
+                self.inner
+                    .runtime
+                    .block_on(sync::content_pinned(&self.inner, space, &node.id))
+            }
+        }
+        .map_err(|error| match error {
+            DriveError::NotFound => io::Error::from(io::ErrorKind::NotFound),
+            other => io::Error::other(other),
+        })?;
+        let mut file = file_access::fs::File::open(&cached)?;
+        let total = file.metadata().map(|meta| meta.len()).unwrap_or(total);
+        if start >= total {
+            return Ok((Vec::new(), total));
+        }
+        file.seek(SeekFrom::Start(start))?;
+        let mut out = Vec::with_capacity(len.min(total - start).min(16 * 1024 * 1024) as usize);
+        file.take(len).read_to_end(&mut out)?;
+        Ok((out, total))
     }
 
     pub fn local_content(
@@ -984,6 +1311,7 @@ impl Drive {
     ) -> Result<DriveEntry, DriveError> {
         let entry = sync::write_bytes(&self.inner, space, folder, name, bytes, replace)?;
         sync::wrote(&self.inner, space, &entry.id);
+        self.emit_now(space, std::slice::from_ref(&entry.id), Vec::new());
         self.kick(space);
         Ok(entry)
     }
@@ -991,10 +1319,11 @@ impl Drive {
     pub fn copy_in(
         &self,
         space: &SpaceId,
-        source: &Path,
+        source: &dyn CopySource,
         folder: &str,
     ) -> Result<(DriveEntry, CopyReport), DriveError> {
         let out = sync::copy_in(&self.inner, space, source, folder)?;
+        self.emit_now(space, std::slice::from_ref(&out.0.id), Vec::new());
         self.kick(space);
         Ok(out)
     }
@@ -1019,6 +1348,30 @@ impl Drive {
         limit: u32,
     ) -> Result<(Vec<TrashEntry>, Option<String>), DriveError> {
         sync::trash_list(&self.inner, space, after, limit).await
+    }
+
+    pub async fn restore_many(
+        &self,
+        space: &SpaceId,
+        ids: &[ItemId],
+    ) -> Vec<(ItemId, Result<Item, DriveError>)> {
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            out.push((id.clone(), self.restore(space, id).await));
+        }
+        out
+    }
+
+    pub async fn purge_many(
+        &self,
+        space: &SpaceId,
+        ids: &[ItemId],
+    ) -> Vec<(ItemId, Result<(), DriveError>)> {
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            out.push((id.clone(), self.purge(space, id).await));
+        }
+        out
     }
 
     pub async fn restore(&self, space: &SpaceId, id: &ItemId) -> Result<Item, DriveError> {
@@ -1047,13 +1400,27 @@ impl Inner {
             .ok_or(DriveError::NotMounted)
     }
 
+    pub(crate) fn link_send(&self, message: serde_json::Value) -> bool {
+        let link = read(&self.link).clone();
+        link.is_some_and(|link| link.send(message))
+    }
+
     pub(crate) fn person(&self) -> String {
         read(&self.person).clone().unwrap_or_default()
     }
 
+    pub(crate) fn waits_large(&self, node: &NodeRow) -> bool {
+        node.kind == Kind::File
+            && !node.not_synced
+            && !node.trash_pending
+            && (node.created || node.dirty_content)
+            && node.size > self.large_limit.load(Ordering::SeqCst)
+            && !self.store.large_allowed(&node.space, &node.id)
+    }
+
     pub(crate) fn state_of(&self, node: &NodeRow) -> LocalState {
         let key = (node.space.clone(), node.id.clone());
-        if node.not_synced {
+        if node.not_synced || self.waits_large(node) {
             LocalState::NotSynced
         } else if node.created || node.dirty_content {
             LocalState::Uploading
@@ -1098,12 +1465,8 @@ impl Inner {
     pub(crate) fn entry(&self, node: &NodeRow) -> DriveEntry {
         let key = (node.space.clone(), node.id.clone());
         let server = self.store.item(&node.space, &node.id).ok().flatten();
-        let version = self
-            .store
-            .base(&node.space, &node.id)
-            .ok()
-            .flatten()
-            .map(|base| base.version);
+        let base = self.store.base(&node.space, &node.id).ok().flatten();
+        let content_version = content_version_of(base.as_ref(), server.as_ref());
         let editing_here = self.opens.is_writing(&key);
         let mut in_use: Vec<InUse> = self
             .marks
@@ -1142,7 +1505,83 @@ impl Inner {
             state: self.state_of(node),
             keep_downloaded: self.store.kept(&node.space, node).unwrap_or(false),
             in_use,
-            version,
+            version: base.as_ref().map(|base| base.version),
+            content_version,
+            sha: base.and_then(|base| base.sha256),
+            waits_large: self.waits_large(node),
         }
+    }
+}
+
+fn content_version_of(base: Option<&Base>, server: Option<&Item>) -> Option<Version> {
+    let base = base?;
+    base.content_version.or_else(|| {
+        server
+            .filter(|item| item.version == base.version)
+            .and_then(|item| item.content_version)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(version: i64, content_version: Option<i64>) -> Item {
+        serde_json::from_value(serde_json::json!({
+            "id": "drv_a", "space_id": "s", "name": "notes.txt", "kind": "file",
+            "version": version, "seq": 1, "content_version": content_version
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn an_entry_takes_the_content_version_from_a_matching_item_when_its_base_has_none() {
+        let mut base = Base::of(&item(4, None));
+        assert_eq!(content_version_of(Some(&base), Some(&item(4, Some(2)))), Some(Version(2)));
+        assert_eq!(content_version_of(Some(&base), Some(&item(5, Some(3)))), None);
+        assert_eq!(content_version_of(Some(&base), None), None);
+        assert_eq!(content_version_of(None, Some(&item(4, Some(2)))), None);
+        base.content_version = Some(Version(1));
+        assert_eq!(content_version_of(Some(&base), Some(&item(4, Some(2)))), Some(Version(1)));
+    }
+
+    fn drive_entry(sha: Option<&str>) -> DriveEntry {
+        DriveEntry {
+            id: ItemId("drv_a".into()),
+            space_id: SpaceId("s".into()),
+            path: "/notes.txt".into(),
+            name: "notes.txt".into(),
+            kind: Kind::File,
+            size: 5,
+            mtime_ms: 7,
+            modified_by_name: "Ana".into(),
+            state: LocalState::Downloaded,
+            keep_downloaded: false,
+            in_use: Vec::new(),
+            version: Some(Version(4)),
+            content_version: Some(Version(2)),
+            sha: sha.map(String::from),
+            waits_large: false,
+        }
+    }
+
+    #[test]
+    fn an_entry_carries_its_base_sha_only_when_it_has_one() {
+        let sha = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+        let shown = serde_json::to_value(drive_entry(Some(sha))).unwrap();
+        assert_eq!(shown["sha"], sha);
+        assert_eq!(shown["version"], 4);
+        let without = serde_json::to_value(drive_entry(None)).unwrap();
+        assert!(without.get("sha").is_none());
+        let mut older = without.clone();
+        older.as_object_mut().unwrap().remove("waits_large");
+        let read: DriveEntry = serde_json::from_value(older).unwrap();
+        assert_eq!(read.sha, None);
+        let item: Item = serde_json::from_value(serde_json::json!({
+            "id": "drv_a", "space_id": "s", "name": "notes.txt", "kind": "file",
+            "version": 4, "seq": 1, "sha256": sha
+        }))
+        .unwrap();
+        assert_eq!(Base::of(&item).sha256.as_deref(), Some(sha));
     }
 }

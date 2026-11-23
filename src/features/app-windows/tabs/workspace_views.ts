@@ -1,3 +1,4 @@
+import type { TabGroupColor } from "@misty/ui";
 import type { DockingLayout } from "@/app/shell/docking_layout";
 
 export { browserHomeUrl } from "../addresses/browser_home";
@@ -73,6 +74,7 @@ export interface WorkspaceLayout {
   focusedPaneId: string;
   tabs?: WorkspaceTab[];
   activeTabId?: string;
+  groups?: WorkspaceTabGroup[];
 }
 
 export interface WorkspaceTab {
@@ -80,6 +82,14 @@ export interface WorkspaceTab {
   title?: string;
   root: WorkspaceDockNode;
   focusedPaneId: string;
+  group?: string;
+}
+
+export interface WorkspaceTabGroup {
+  id: string;
+  title: string;
+  color: TabGroupColor;
+  collapsed?: boolean;
 }
 
 export interface WorkspaceWindow {

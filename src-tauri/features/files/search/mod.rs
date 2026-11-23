@@ -3,44 +3,48 @@
 //! `files-index/` in this build's Misty data folder (tantivy's index and its scan manifest, both
 //! its own files, never `misty.db`), and runs only while the disk grant is on.
 //!
-//! One background thread walks the home folder at startup (and every few hours after, as a
-//! safety net), gently and at background priority, while a watch on the folder applies changes as
-//! they happen. Files' own changes reach the watch at once through `note_*`. The state goes out on
-//! `files://index` as an `IndexStatus`.
+//! One thread owns the index: its one writer and the manifest. Everything else sends it a message:
+//! the shared file event stream's bursts, Files' own changes (`note_*`) and a change of the disk
+//! grant (`grant_changed`). It walks the home folder only the first time, after a schema change,
+//! or when the system says events were lost; otherwise it resumes from the last event it took
+//! (kept in the manifest) and applies only what changed. Searches read the index on their own
+//! threads and never wait for it. The state goes out on `files://index` as an `IndexStatus`.
 use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
     path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
-        Arc, Mutex, OnceLock, RwLock, TryLockError,
+        mpsc, Arc, LazyLock, Mutex, OnceLock, RwLock,
     },
     time::{Duration, Instant},
 };
 
 use file_access::{
-    disk::{check_disk, disk_allowed},
+    disk::{disk_allowed, CheckedDir},
     Access,
 };
 use serde::Serialize;
 use tantivy::IndexReader;
 use tauri::{AppHandle, Emitter};
 
-use super::entry::{entry_for, FileEntry};
+use super::entry::FileEntry;
+use super::fs_events::{self, Event, RESUMES};
+use super::listing::Lister;
 use super::{asked_path, blocking, person_window};
 
 mod catalog;
 mod filter;
 mod query;
 mod scan;
-mod watch;
 
 use catalog::{Catalog, Fields};
-use watch::IndexWatch;
 
 pub const EVENT: &str = "files://index";
 
-const RESCAN_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
-const GRANT_CHECK: Duration = Duration::from_secs(5);
 const MOST_RESULTS: usize = 500;
+const DEBOUNCE: Duration = Duration::from_millis(100);
+const MAX_DELAY: Duration = Duration::from_secs(1);
+const SUPERSEDED: &str = "superseded";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -57,48 +61,26 @@ pub struct IndexStatus {
     pub files: u64,
 }
 
-pub(super) struct Service {
+enum Message {
+    Events(Vec<Event>),
+    Note(PathBuf),
+    Grant,
+}
+
+struct Shared {
     app: AppHandle,
-    root: PathBuf,
-    home: PathBuf,
-    catalog: Mutex<Option<Catalog>>,
+    sender: mpsc::Sender<Message>,
     reader: RwLock<Option<(IndexReader, Fields)>>,
-    running: AtomicBool,
+    following: AtomicBool,
     state: AtomicU8,
     files: AtomicU64,
-    watch: Mutex<Option<IndexWatch>>,
 }
 
-static SERVICE: OnceLock<Arc<Service>> = OnceLock::new();
+static SHARED: OnceLock<Arc<Shared>> = OnceLock::new();
+static TURNS: AtomicU64 = AtomicU64::new(1);
+static LATEST: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Mutex::default);
 
-fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-fn service(app: &AppHandle) -> Option<&'static Arc<Service>> {
-    if let Some(service) = SERVICE.get() {
-        return Some(service);
-    }
-    let root = catalog::root()?;
-    let home = dirs::home_dir()?;
-    Some(SERVICE.get_or_init(|| {
-        Arc::new(Service {
-            app: app.clone(),
-            root,
-            home,
-            catalog: Mutex::new(None),
-            reader: RwLock::new(None),
-            running: AtomicBool::new(false),
-            state: AtomicU8::new(0),
-            files: AtomicU64::new(0),
-            watch: Mutex::new(None),
-        })
-    }))
-}
-
-impl Service {
+impl Shared {
     fn status(&self) -> IndexStatus {
         let state = match self.state.load(Ordering::SeqCst) {
             1 => IndexState::Indexing,
@@ -131,160 +113,312 @@ impl Service {
         }
     }
 
-    fn published(&self) {
-        let reader = self
-            .reader
+    fn reader(&self) -> Option<(IndexReader, Fields)> {
+        self.reader
             .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if let Some((reader, _)) = reader.as_ref() {
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    fn published(&self) {
+        if let Some((reader, _)) = self.reader() {
             if reader.reload().is_ok() {
                 self.files
                     .store(reader.searcher().num_docs(), Ordering::SeqCst);
             }
         }
-        drop(reader);
         self.emit();
     }
 
-    fn prepare(self: &Arc<Self>) -> Result<(), String> {
-        let mut catalog = lock(&self.catalog);
-        if catalog.is_none() {
-            let opened = catalog::open(&self.root)?;
-            *self
-                .reader
-                .write()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                Some((opened.reader.clone(), opened.fields));
-            *catalog = Some(opened);
-        }
-        drop(catalog);
-        self.published();
-        let mut watch = lock(&self.watch);
-        if watch.is_none() {
-            match IndexWatch::start(Arc::downgrade(self), &self.home) {
-                Ok(started) => *watch = Some(started),
-                Err(error) => eprintln!("{error}"),
+    fn send(&self, message: Message) {
+        let _ = self.sender.send(message);
+    }
+}
+
+struct Open {
+    catalog: Catalog,
+    home: PathBuf,
+    asked_home: PathBuf,
+    resumable: bool,
+}
+
+struct Actor {
+    shared: Arc<Shared>,
+    root: PathBuf,
+    open: Option<Open>,
+}
+
+#[derive(Default)]
+struct Batch {
+    changed: BTreeSet<PathBuf>,
+    rescan: BTreeSet<PathBuf>,
+    last: u64,
+    grant: bool,
+}
+
+impl Batch {
+    fn add(&mut self, message: Message) {
+        match message {
+            Message::Grant => self.grant = true,
+            Message::Note(path) => {
+                self.changed.insert(path);
             }
+            Message::Events(events) => {
+                for event in events {
+                    self.last = self.last.max(event.id);
+                    if event.rescan {
+                        self.rescan.insert(event.path);
+                    } else {
+                        self.changed.insert(event.path);
+                    }
+                }
+            }
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.changed.is_empty() && self.rescan.is_empty() && self.last == 0
+    }
+}
+
+fn keep_going() -> bool {
+    disk_allowed()
+}
+
+impl Actor {
+    fn run(mut self, receiver: mpsc::Receiver<Message>) {
+        let _priority = filter::BackgroundPriority::enter();
+        self.grant();
+        while let Ok(first) = receiver.recv() {
+            let mut batch = Batch::default();
+            batch.add(first);
+            let started = Instant::now();
+            while !batch.grant {
+                let left = MAX_DELAY.saturating_sub(started.elapsed());
+                if left.is_zero() {
+                    break;
+                }
+                match receiver.recv_timeout(DEBOUNCE.min(left)) {
+                    Ok(message) => batch.add(message),
+                    Err(mpsc::RecvTimeoutError::Timeout) => break,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                }
+            }
+            let grant = batch.grant;
+            if !batch.is_empty() {
+                self.apply(batch);
+            }
+            if grant || !disk_allowed() {
+                self.grant();
+            }
+        }
+    }
+
+    fn publish(&self) {
+        self.shared.published();
+    }
+
+    fn grant(&mut self) {
+        match (disk_allowed(), self.open.is_some()) {
+            (true, false) => {
+                if let Err(error) = self.start() {
+                    eprintln!("{error}");
+                    self.stop();
+                }
+            }
+            (false, true) => self.stop(),
+            _ => {}
+        }
+    }
+
+    fn stop(&mut self) {
+        self.shared.following.store(false, Ordering::SeqCst);
+        if let Err(error) = fs_events::follow_index(None, None) {
+            eprintln!("{error}");
+        }
+        self.open = None;
+        self.shared.set_state(IndexState::Off);
+    }
+
+    fn start(&mut self) -> Result<(), String> {
+        self.shared.set_state(IndexState::Indexing);
+        let asked_home = dirs::home_dir().ok_or("Files' search index found no home folder.")?;
+        let home = CheckedDir::open(&asked_home, Access::Read)
+            .map(|dir| dir.path().to_path_buf())
+            .map_err(|error| format!("Files' search index can't read the home folder: {error}"))?;
+        let catalog = catalog::open(&self.root)?;
+        *self
+            .shared
+            .reader
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+            Some((catalog.reader.clone(), catalog.fields));
+        self.shared.published();
+        let stored = catalog::stored_event(&catalog.manifest)?;
+        let resume = stored.filter(|id| RESUMES && *id <= fs_events::current_id());
+        let start_id = fs_events::current_id();
+        self.shared.following.store(true, Ordering::SeqCst);
+        fs_events::follow_index(Some(home.clone()), resume)?;
+        self.open = Some(Open {
+            catalog,
+            home,
+            asked_home,
+            resumable: resume.is_some(),
+        });
+        if resume.is_none() {
+            self.full_scan(start_id);
+        }
+        if disk_allowed() && self.open.is_some() {
+            self.shared.set_state(IndexState::Ready);
         }
         Ok(())
     }
 
-    fn run(self: Arc<Self>) {
-        let _priority = filter::BackgroundPriority::enter();
-        'running: while disk_allowed() {
-            self.set_state(IndexState::Indexing);
-            if let Err(error) = self.prepare() {
-                eprintln!("{error}");
-                break;
+    fn full_scan(&mut self, start_id: u64) {
+        let shared = self.shared.clone();
+        let publish = move || shared.published();
+        let Some(open) = self.open.as_mut() else {
+            return;
+        };
+        self.shared.set_state(IndexState::Indexing);
+        let _ = catalog::forget_event(&open.catalog.manifest);
+        open.resumable = false;
+        match scan::scan(&mut open.catalog, &open.home, &keep_going, &publish) {
+            Ok(_) => {
+                open.resumable = RESUMES;
+                if RESUMES && start_id != 0 {
+                    if let Err(error) = catalog::store_event(&open.catalog.manifest, start_id) {
+                        eprintln!("{error}");
+                    }
+                }
             }
-            let keep_going = || disk_allowed();
-            let walked = match lock(&self.catalog).as_ref() {
-                Some(catalog) => scan::scan(catalog, &self.home, &keep_going),
-                None => Ok(scan::Changes::default()),
-            };
-            if let Err(error) = walked {
+            Err(error) => {
                 if disk_allowed() {
                     eprintln!("Files' search index couldn't walk the home folder: {error}");
                 }
             }
-            self.published();
-            if !disk_allowed() {
-                break;
-            }
-            self.set_state(IndexState::Ready);
-            let next = Instant::now() + RESCAN_EVERY;
-            while Instant::now() < next {
-                if !disk_allowed() {
-                    break 'running;
-                }
-                std::thread::sleep(GRANT_CHECK);
-            }
         }
-        *lock(&self.watch) = None;
-        self.running.store(false, Ordering::SeqCst);
-        self.set_state(IndexState::Off);
-        self.emit();
+        self.publish();
+        if disk_allowed() {
+            self.shared.set_state(IndexState::Ready);
+        }
     }
 
-    pub(super) fn apply(
-        &self,
-        changed: &[PathBuf],
-        rescan: &[PathBuf],
-    ) -> Option<Result<(), String>> {
+    fn real(open: &Open, path: PathBuf) -> PathBuf {
+        match path.strip_prefix(&open.asked_home) {
+            Ok(inside) if open.asked_home != open.home => open.home.join(inside),
+            _ => path,
+        }
+    }
+
+    fn apply(&mut self, batch: Batch) {
         if !disk_allowed() {
-            return Some(Ok(()));
+            return;
         }
-        let catalog = match self.catalog.try_lock() {
-            Ok(catalog) => catalog,
-            Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
-            Err(TryLockError::WouldBlock) => return None,
+        let Some(open) = self.open.as_mut() else {
+            return;
         };
-        let Some(open) = catalog.as_ref() else {
-            return Some(Ok(()));
-        };
-        let result = scan::apply(open, &self.home, changed, rescan, &|| disk_allowed());
-        drop(catalog);
-        Some(result.map(|changes| {
-            if changes.added + changes.updated + changes.removed > 0 {
-                self.published();
+        let changed: BTreeSet<PathBuf> = batch
+            .changed
+            .into_iter()
+            .map(|path| Self::real(open, path))
+            .collect();
+        let rescan: BTreeSet<PathBuf> = batch
+            .rescan
+            .into_iter()
+            .map(|path| Self::real(open, path))
+            .collect();
+        if rescan.iter().any(|path| open.home.starts_with(path)) {
+            self.full_scan(fs_events::current_id());
+            return;
+        }
+        let shared = self.shared.clone();
+        let publish = move || shared.published();
+        match scan::apply(
+            &mut open.catalog,
+            &open.home,
+            &changed,
+            &rescan,
+            &keep_going,
+            &publish,
+        ) {
+            Ok(changes) => {
+                if changes.any() {
+                    self.shared.published();
+                }
+                if open.resumable && batch.last != 0 {
+                    if let Err(error) = catalog::store_event(&open.catalog.manifest, batch.last) {
+                        eprintln!("{error}");
+                    }
+                }
             }
-        }))
-    }
-
-    fn search(
-        &self,
-        text: &str,
-        scope: Option<&Path>,
-        limit: usize,
-    ) -> Result<Vec<FileEntry>, String> {
-        let reader = self
-            .reader
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let Some((reader, fields)) = reader.as_ref() else {
-            return Ok(Vec::new());
-        };
-        let found = query::matches(reader, fields, text, scope)?;
-        Ok(found
-            .iter()
-            .map(|doc| PathBuf::from(&doc.path))
-            .filter(|path| check_disk(path, Access::Read).is_ok())
-            .filter_map(|path| entry_for(&path).ok())
-            .take(limit)
-            .collect())
+            Err(error) => {
+                if disk_allowed() {
+                    eprintln!("Files' search index couldn't take a change: {error}");
+                }
+            }
+        }
     }
 }
 
-fn published() {
-    if let Some(service) = SERVICE.get() {
-        service.published();
+fn shared(app: &AppHandle) -> Option<&'static Arc<Shared>> {
+    if let Some(shared) = SHARED.get() {
+        return Some(shared);
     }
+    let root = catalog::root()?;
+    let mut receiver = None;
+    let shared = SHARED.get_or_init(|| {
+        let (sender, taken) = mpsc::channel();
+        receiver = Some(taken);
+        Arc::new(Shared {
+            app: app.clone(),
+            sender,
+            reader: RwLock::new(None),
+            following: AtomicBool::new(false),
+            state: AtomicU8::new(0),
+            files: AtomicU64::new(0),
+        })
+    });
+    if let Some(receiver) = receiver {
+        let actor = Actor {
+            shared: shared.clone(),
+            root,
+            open: None,
+        };
+        let spawned = std::thread::Builder::new()
+            .name("misty-files-index".into())
+            .spawn(move || actor.run(receiver));
+        if let Err(error) = spawned {
+            eprintln!("Files' search index couldn't start: {error}");
+        }
+    }
+    Some(shared)
 }
 
 pub fn start_indexing(app: &AppHandle) {
-    if !disk_allowed() {
-        return;
+    if let Some(shared) = shared(app) {
+        shared.send(Message::Grant);
     }
-    let Some(service) = service(app) else {
-        return;
-    };
-    if service.running.swap(true, Ordering::SeqCst) {
-        return;
+}
+
+pub fn grant_changed() {
+    if let Some(shared) = SHARED.get() {
+        shared.send(Message::Grant);
     }
-    let worker = service.clone();
-    let spawned = std::thread::Builder::new()
-        .name("misty-files-index".into())
-        .spawn(move || worker.run());
-    if let Err(error) = spawned {
-        service.running.store(false, Ordering::SeqCst);
-        eprintln!("Files' search index couldn't start: {error}");
+}
+
+pub(crate) fn take(events: Vec<Event>) {
+    if let Some(shared) = SHARED.get() {
+        if shared.following.load(Ordering::SeqCst) {
+            shared.send(Message::Events(events));
+        }
     }
 }
 
 fn note(path: &Path) {
-    if let Some(service) = SERVICE.get() {
-        if let Some(watch) = lock(&service.watch).as_ref() {
-            watch.note(path);
+    if let Some(shared) = SHARED.get() {
+        if shared.following.load(Ordering::SeqCst) {
+            shared.send(Message::Note(path.to_path_buf()));
         }
     }
 }
@@ -302,6 +436,90 @@ pub fn note_renamed(from: &Path, to: &Path) {
     note(to);
 }
 
+fn gate(
+    hits: Vec<query::Hit>,
+    limit: usize,
+    current: &dyn Fn() -> bool,
+) -> Result<Vec<FileEntry>, String> {
+    let mut found: Vec<FileEntry> = Vec::new();
+    let mut rest = hits.as_slice();
+    while found.len() < limit && !rest.is_empty() {
+        if !current() {
+            return Err(SUPERSEDED.into());
+        }
+        let take = (limit - found.len()).max(16).min(rest.len());
+        let (chunk, after) = rest.split_at(take);
+        rest = after;
+        let mut by_folder: BTreeMap<&Path, Vec<usize>> = BTreeMap::new();
+        for (index, hit) in chunk.iter().enumerate() {
+            let path = Path::new(&hit.path);
+            if let Some(parent) = path.parent() {
+                by_folder.entry(parent).or_default().push(index);
+            }
+        }
+        let mut shown: Vec<Option<FileEntry>> = vec![None; chunk.len()];
+        for (parent, indexes) in by_folder {
+            let Ok(dir) = CheckedDir::open(parent, Access::Read) else {
+                continue;
+            };
+            let Ok(lister) = Lister::new(&dir, parent, false) else {
+                continue;
+            };
+            for index in indexes {
+                let Some(name) = Path::new(&chunk[index].path).file_name() else {
+                    continue;
+                };
+                shown[index] = lister.one(name).ok().flatten();
+            }
+        }
+        found.extend(shown.into_iter().flatten());
+    }
+    found.truncate(limit);
+    Ok(found)
+}
+
+fn search(
+    shared: &Shared,
+    text: &str,
+    scope: Option<PathBuf>,
+    limit: usize,
+    current: &dyn Fn() -> bool,
+) -> Result<Vec<FileEntry>, String> {
+    let Some((reader, fields)) = shared.reader() else {
+        return Ok(Vec::new());
+    };
+    let scope = match scope {
+        Some(scope) => Some(
+            CheckedDir::open(&scope, Access::Read)
+                .map(|dir| dir.path().to_path_buf())
+                .map_err(|error| super::failed(&scope, error))?,
+        ),
+        None => None,
+    };
+    let hits = match query::matches(&reader, &fields, text, scope.as_deref(), limit, current)? {
+        Ok(hits) => hits,
+        Err(query::Superseded) => return Err(SUPERSEDED.into()),
+    };
+    gate(hits, limit, current)
+}
+
+fn next_turn(label: &str) -> u64 {
+    let turn = TURNS.fetch_add(1, Ordering::SeqCst);
+    LATEST
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .insert(label.to_owned(), turn);
+    turn
+}
+
+fn is_latest(label: &str, turn: u64) -> bool {
+    LATEST
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(label)
+        .is_none_or(|latest| *latest == turn)
+}
+
 #[tauri::command]
 pub async fn files_search(
     webview: tauri::Webview,
@@ -314,23 +532,77 @@ pub async fn files_search(
         .filter(|scope| !scope.trim().is_empty())
         .map(|scope| asked_path(&scope))
         .transpose()?;
+    let label = format!(
+        "{}\u{0}{}\u{0}{limit}",
+        webview.label(),
+        scope
+            .as_deref()
+            .map(|scope| scope.display().to_string())
+            .unwrap_or_default()
+    );
+    let turn = next_turn(&label);
     if query.trim().is_empty() || !disk_allowed() {
         return Ok(Vec::new());
     }
-    let Some(service) = SERVICE.get().cloned() else {
+    let Some(shared) = SHARED.get().cloned() else {
         return Ok(Vec::new());
     };
-    blocking(move || service.search(&query, scope.as_deref(), limit.clamp(1, MOST_RESULTS))).await
+    blocking(move || {
+        let current = || is_latest(&label, turn);
+        search(
+            &shared,
+            &query,
+            scope,
+            limit.clamp(1, MOST_RESULTS),
+            &current,
+        )
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn files_index_status(webview: tauri::Webview) -> Result<IndexStatus, String> {
+pub async fn files_index_status(webview: tauri::Webview) -> Result<IndexStatus, String> {
     person_window(&webview)?;
-    Ok(SERVICE
+    Ok(SHARED
         .get()
-        .map(|service| service.status())
+        .map(|shared| shared.status())
         .unwrap_or(IndexStatus {
             state: IndexState::Off,
             files: 0,
         }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_burst_keeps_rescans_apart_and_remembers_its_last_event() {
+        let mut batch = Batch::default();
+        batch.add(Message::Events(vec![
+            Event {
+                path: PathBuf::from("/home/a.txt"),
+                rescan: false,
+                id: 7,
+            },
+            Event {
+                path: PathBuf::from("/home/deep"),
+                rescan: true,
+                id: 9,
+            },
+        ]));
+        batch.add(Message::Note(PathBuf::from("/home/b.txt")));
+        assert_eq!(batch.last, 9);
+        assert_eq!(batch.changed.len(), 2);
+        assert_eq!(batch.rescan.len(), 1);
+        assert!(!batch.grant);
+    }
+
+    #[test]
+    fn a_newer_search_from_the_same_window_replaces_the_older() {
+        let first = next_turn("files-test-window");
+        let second = next_turn("files-test-window");
+        assert!(!is_latest("files-test-window", first));
+        assert!(is_latest("files-test-window", second));
+    }
 }

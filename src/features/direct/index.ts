@@ -39,5 +39,6 @@ export { VoiceChannelPage } from "./calls/VoiceChannelPage";
 export { CallDock } from "./calls/CallDock";
 export { CallAudioControls } from "./calls/CallAudioControls";
 export { voicePath } from "./calls/call_session_store";
+export { endCallsForAccountReset } from "./calls/call_reset";
 export { RequestsSection } from "./settings/RequestsSection";
 export { StatusSection } from "./settings/StatusSection";

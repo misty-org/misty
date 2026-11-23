@@ -43,7 +43,7 @@ impl Workspace {
 
     pub fn run(
         &self,
-        helper: &[u8],
+        helper: &Path,
         request: &[u8],
         limits: &Limits,
         stop: &AtomicBool,
@@ -52,7 +52,7 @@ impl Workspace {
             return Err("The helper was cancelled.".into());
         }
         let executable = self.path().join("helper.exe");
-        fs::write(&executable, helper).map_err(|_| "Could not stage the helper.")?;
+        stage(helper, &executable)?;
         let mut input = File::unnamed_temp().map_err(|_| "Could not stage the request.")?;
         input
             .write_all(request)
@@ -120,6 +120,16 @@ impl Workspace {
         }
         Ok(bytes)
     }
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "copies Misty's own helper from beside its executable, which no grant covers"
+)]
+fn stage(helper: &Path, executable: &Path) -> Result<(), String> {
+    std::fs::copy(helper, executable)
+        .map(|_| ())
+        .map_err(|_| "Could not stage the helper.".to_owned())
 }
 
 fn folder_bytes(folder: &Path) -> u64 {

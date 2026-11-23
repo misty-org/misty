@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mocks } from "./local_execution.test_fixtures";
+import { startLocalExecution } from "./local_execution_start";
+import { routeLocalFollowup } from "./local_execution_followups";
 import {
-  startLocalExecution,
-  routeLocalFollowup,
   pauseLocalExecution,
   settleLocalExecution,
   finishLocalExecution,
   useLocalExecution,
-} from "./local_execution";
+} from "./local_execution_state";
 import { useCompanionState } from "../../tutor/cursor/companion_state";
 beforeEach(async () => {
   await finishLocalExecution();

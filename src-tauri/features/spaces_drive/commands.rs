@@ -9,6 +9,17 @@ use tauri::{AppHandle, Webview};
 use super::{drive, error_text, SpaceRef};
 use crate::project::person_window;
 
+const READ_DEFAULT: u64 = 16 * 1024 * 1024;
+const READ_MOST: u64 = 64 * 1024 * 1024;
+const WRITE_MOST: usize = 256 * 1024 * 1024;
+const BATCH_MOST: usize = 10_000;
+
+#[derive(Debug, Serialize)]
+pub struct Failure {
+    pub path: String,
+    pub error: String,
+}
+
 fn space_of(space_id: &str) -> Result<SpaceId, String> {
     if space_id.is_empty() || space_id.len() > 128 {
         return Err("That isn't a Space.".into());
@@ -53,7 +64,7 @@ pub async fn drive_realtime_event(
     created_at: Option<String>,
 ) -> Result<(), String> {
     person_window(&webview)?;
-    if !r#type.starts_with("drive.") {
+    if !r#type.starts_with("drive.") || super::native_link_up() {
         return Ok(());
     }
     let space = space_of(&space_id)?;
@@ -66,6 +77,15 @@ pub async fn drive_realtime_event(
     let drive = drive()?;
     drive.realtime(&space, &r#type, &payload, age).await;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn drive_conflicts(webview: Webview) -> Result<Vec<DriveEntry>, String> {
+    person_window(&webview)?;
+    let drive = drive()?;
+    tokio::task::spawn_blocking(move || drive.conflicted())
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -93,6 +113,39 @@ pub async fn drive_set_cache_limit(
         drive.set_cache_limit(limit);
     }
     Ok(bytes)
+}
+
+#[tauri::command]
+pub async fn drive_set_large_file_limit(
+    app: AppHandle,
+    webview: Webview,
+    bytes: Option<u64>,
+) -> Result<Option<u64>, String> {
+    use tauri::Manager;
+    person_window(&webview)?;
+    let store = app
+        .state::<crate::app::runtime::MistyRuntime>()
+        .environment
+        .store();
+    let limit =
+        tokio::task::spawn_blocking(move || super::device::set_large_file_limit(&store, bytes))
+            .await
+            .map_err(|error| error.to_string())??;
+    if let Ok(drive) = drive() {
+        drive.set_large_file_limit(limit);
+    }
+    Ok(bytes)
+}
+
+#[tauri::command]
+pub async fn drive_sync_large(
+    webview: Webview,
+    space_id: String,
+    path: String,
+) -> Result<DriveEntry, String> {
+    person_window(&webview)?;
+    let space = space_of(&space_id)?;
+    drive()?.sync_large(&space, &path).map_err(error_text)
 }
 
 #[tauri::command]
@@ -134,11 +187,13 @@ pub async fn drive_read(
     webview: Webview,
     space_id: String,
     path: String,
+    limit: Option<u64>,
 ) -> Result<tauri::ipc::Response, String> {
     person_window(&webview)?;
     let space = space_of(&space_id)?;
+    let limit = limit.unwrap_or(READ_DEFAULT).clamp(1, READ_MOST);
     let bytes = drive()?
-        .read_bytes(&space, &path)
+        .read_capped(&space, &path, limit)
         .await
         .map_err(error_text)?;
     Ok(tauri::ipc::Response::new(bytes))
@@ -197,20 +252,32 @@ pub async fn drive_write(
         name,
         replace,
     } = serde_json::from_str(&meta).map_err(|_| "Invalid request metadata")?;
-    let bytes = match request.body() {
-        tauri::ipc::InvokeBody::Raw(bytes) => bytes.clone(),
-        tauri::ipc::InvokeBody::Json(value) => bytes_from_json(value)?,
-    };
     let space = space_of(&space_id)?;
     let replace = match replace {
         Some(replace) => Some((item_of(&replace.item_id)?, Version(replace.version))),
         None => None,
     };
     let drive = drive()?;
-    tokio::task::spawn_blocking(move || drive.write_bytes(&space, &folder, &name, &bytes, replace))
-        .await
-        .map_err(|error| error.to_string())?
-        .map_err(error_text)
+    let wrote = match request.body() {
+        tauri::ipc::InvokeBody::Raw(bytes) => {
+            if bytes.len() > WRITE_MOST {
+                return Err("That file is too large to save here.".into());
+            }
+            tokio::task::block_in_place(|| {
+                drive.write_bytes(&space, &folder, &name, bytes, replace)
+            })
+        }
+        tauri::ipc::InvokeBody::Json(value) => {
+            let bytes = bytes_from_json(value)?;
+            if bytes.len() > WRITE_MOST {
+                return Err("That file is too large to save here.".into());
+            }
+            tokio::task::block_in_place(|| {
+                drive.write_bytes(&space, &folder, &name, &bytes, replace)
+            })
+        }
+    };
+    wrote.map_err(error_text)
 }
 
 #[tauri::command]
@@ -295,6 +362,98 @@ pub async fn drive_trash(webview: Webview, space_id: String, path: String) -> Re
 }
 
 #[tauri::command]
+pub async fn drive_trash_many(
+    webview: Webview,
+    space_id: String,
+    paths: Vec<String>,
+) -> Result<Vec<Failure>, String> {
+    person_window(&webview)?;
+    if paths.len() > BATCH_MOST {
+        return Err("That's too many at once.".into());
+    }
+    let space = space_of(&space_id)?;
+    let drive = drive()?;
+    let mut failures = Vec::new();
+    for path in paths {
+        let result = match node_id(&space, &path) {
+            Ok(id) => drive
+                .trash_now(&space, &id, TrashBy::Person)
+                .await
+                .map_err(error_text),
+            Err(error) => Err(error),
+        };
+        if let Err(error) = result {
+            failures.push(Failure { path, error });
+        }
+    }
+    Ok(failures)
+}
+
+#[tauri::command]
+pub async fn drive_restore_many(
+    app: AppHandle,
+    webview: Webview,
+    space_id: String,
+    item_ids: Vec<String>,
+) -> Result<Vec<Failure>, String> {
+    person_window(&webview)?;
+    if item_ids.len() > BATCH_MOST {
+        return Err("That's too many at once.".into());
+    }
+    let space = space_of(&space_id)?;
+    let drive = drive()?;
+    let mut failures = Vec::new();
+    for item_id in item_ids {
+        let result = match item_of(&item_id) {
+            Ok(id) => drive
+                .restore(&space, &id)
+                .await
+                .map(|_| ())
+                .map_err(error_text),
+            Err(error) => Err(error),
+        };
+        match result {
+            Ok(()) => super::forget_agent_trash(&app, &space_id, &item_id),
+            Err(error) => failures.push(Failure {
+                path: item_id,
+                error,
+            }),
+        }
+    }
+    Ok(failures)
+}
+
+#[tauri::command]
+pub async fn drive_purge_many(
+    app: AppHandle,
+    webview: Webview,
+    space_id: String,
+    item_ids: Vec<String>,
+) -> Result<Vec<Failure>, String> {
+    person_window(&webview)?;
+    if item_ids.len() > BATCH_MOST {
+        return Err("That's too many at once.".into());
+    }
+    let space = space_of(&space_id)?;
+    let drive = drive()?;
+    let mut failures = Vec::new();
+    for item_id in item_ids {
+        let result = match item_of(&item_id) {
+            Ok(id) => drive.purge(&space, &id).await.map_err(error_text),
+            Err(error) => Err(error),
+        };
+        match result {
+            Ok(()) => super::forget_agent_trash(&app, &space_id, &item_id),
+            Err(error) => failures.push(Failure {
+                path: item_id,
+                error,
+            }),
+        }
+    }
+    Ok(failures)
+}
+
+#[tauri::command]
 pub async fn drive_trash_list(
     webview: Webview,
     space_id: String,
@@ -374,13 +533,16 @@ pub async fn drive_purge(
 #[tauri::command]
 pub async fn drive_copy_in(
     webview: Webview,
+    state: tauri::State<'_, crate::app::runtime::MistyRuntime>,
     space_id: String,
     source: String,
     folder: String,
 ) -> Result<DriveEntry, String> {
     person_window(&webview)?;
     let space = space_of(&space_id)?;
-    let source = crate::spaces_folders::picked_folder(&source)?;
+    let protected = [state.environment.misty_dir()];
+    let source = crate::spaces_folders::source_to_copy(&source, &protected)?;
+    let source = crate::files::copy_source::LocalCopy::open(&source)?;
     let drive = drive()?;
     tokio::task::spawn_blocking(move || drive.copy_in(&space, &source, &folder))
         .await

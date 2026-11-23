@@ -31,6 +31,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  FramedBar,
   IconButton,
   MenuCheckItem,
   MenuItem,
@@ -46,9 +47,10 @@ import {
 } from "@misty/ui";
 import { FilesSearch, type SearchSuggest } from "./FilesSearch";
 import { keys } from "./key_labels";
-import type { FilesSort } from "./use_files_browser";
+import type { FilesSort, FilesView } from "./files_choices";
+import { ConflictsButton } from "./ConflictsButton";
 
-export type FilesView = "list" | "grid" | "columns";
+export type { FilesView } from "./files_choices";
 
 type Run = (() => void) | undefined;
 
@@ -73,46 +75,52 @@ export interface FilesNavBarProps {
 
 export function FilesNavBar(props: FilesNavBarProps) {
   return (
-    <div className="flex h-12 min-w-0 shrink-0 items-center gap-2 px-3">
-      <div role="toolbar" aria-label="Navigation" className="flex shrink-0 items-center gap-1">
-        <IconButton
-          label="Back"
-          shortcut={keys.back}
-          disabled={!props.canBack}
-          onClick={props.back}
-        >
-          <ChevronLeft />
-        </IconButton>
-        <IconButton
-          label="Forward"
-          shortcut={keys.forward}
-          disabled={!props.canForward}
-          onClick={props.forward}
-        >
-          <ChevronRight />
-        </IconButton>
-        <IconButton
-          label="Enclosing folder"
-          shortcut={keys.up}
-          disabled={!props.up}
-          onClick={props.up}
-        >
-          <ArrowUp />
-        </IconButton>
-        <IconButton label="Refresh" onClick={props.refresh}>
-          <RefreshCcw />
-        </IconButton>
-      </div>
-      <PathField
-        label="Path"
-        framed
-        className="flex-1"
-        segments={props.path}
-        value={props.typed}
-        onSubmit={props.onPath}
-        editRequest={props.pathEdit}
-        placeholder="Type a folder's path"
-      />
+    <FramedBar
+      size="main"
+      start={
+        <>
+          <div role="toolbar" aria-label="Navigation" className="flex shrink-0 items-center gap-1">
+            <IconButton
+              label="Back"
+              shortcut={keys.back}
+              disabled={!props.canBack}
+              onClick={props.back}
+            >
+              <ChevronLeft />
+            </IconButton>
+            <IconButton
+              label="Forward"
+              shortcut={keys.forward}
+              disabled={!props.canForward}
+              onClick={props.forward}
+            >
+              <ChevronRight />
+            </IconButton>
+            <IconButton
+              label="Enclosing folder"
+              shortcut={keys.up}
+              disabled={!props.up}
+              onClick={props.up}
+            >
+              <ArrowUp />
+            </IconButton>
+            <IconButton label="Refresh" onClick={props.refresh}>
+              <RefreshCcw />
+            </IconButton>
+          </div>
+          <PathField
+            label="Path"
+            framed
+            className="min-w-0 flex-1"
+            segments={props.path}
+            value={props.typed}
+            onSubmit={props.onPath}
+            editRequest={props.pathEdit}
+            placeholder="Type a folder's path"
+          />
+        </>
+      }
+    >
       <FilesSearch
         query={props.query}
         onQuery={props.onQuery}
@@ -120,12 +128,13 @@ export function FilesNavBar(props: FilesNavBarProps) {
         label={props.searchLabel}
         suggest={props.suggest}
       />
+      {props.onTransfers ? <ConflictsButton /> : null}
       {props.onTransfers ? (
         <IconButton label="Transfers" onClick={props.onTransfers}>
           <ArrowRightLeft />
         </IconButton>
       ) : null}
-    </div>
+    </FramedBar>
   );
 }
 
@@ -220,55 +229,62 @@ export function FilesActionBar(props: FilesActionBarProps) {
 
   const grid = props.view === "grid";
   return (
-    <div className="flex h-10 min-w-0 shrink-0 items-center px-3">
-      <ActionBar
-        label="File actions"
-        items={items}
-        className="min-w-0 flex-1"
-        end={
-          <div className="flex shrink-0 items-center gap-5">
-            <CollectionViewToggle
-              value={grid ? "grid" : "list"}
-              onChange={props.onView}
-              columns={
-                props.columns
-                  ? { active: props.view === "columns", onSelect: () => props.onView("columns") }
-                  : undefined
-              }
-            />
-            <div role="toolbar" aria-label="Item size and more" className="flex items-center gap-1">
-              <IconButton
-                label="Zoom out"
-                disabled={!grid || props.zoom === 0}
-                onClick={() => props.onZoom((props.zoom - 1) as CollectionZoom)}
+    <FramedBar
+      size="tools"
+      start={
+        <ActionBar
+          label="File actions"
+          items={items}
+          className="min-w-0 flex-1"
+          end={
+            <div className="flex shrink-0 items-center gap-5">
+              <CollectionViewToggle
+                value={grid ? "grid" : "list"}
+                onChange={props.onView}
+                columns={
+                  props.columns
+                    ? { active: props.view === "columns", onSelect: () => props.onView("columns") }
+                    : undefined
+                }
+              />
+              <div
+                role="toolbar"
+                aria-label="Item size and more"
+                className="flex items-center gap-1"
               >
-                <Minus />
-              </IconButton>
-              <IconButton
-                label="Zoom in"
-                disabled={!grid || props.zoom === 2}
-                onClick={() => props.onZoom((props.zoom + 1) as CollectionZoom)}
-              >
-                <Plus />
-              </IconButton>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton label="More file actions">
-                    <MoreHorizontal />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">{props.more}</DropdownMenuContent>
-              </DropdownMenu>
+                <IconButton
+                  label="Zoom out"
+                  disabled={!grid || props.zoom === 0}
+                  onClick={() => props.onZoom((props.zoom - 1) as CollectionZoom)}
+                >
+                  <Minus />
+                </IconButton>
+                <IconButton
+                  label="Zoom in"
+                  disabled={!grid || props.zoom === 2}
+                  onClick={() => props.onZoom((props.zoom + 1) as CollectionZoom)}
+                >
+                  <Plus />
+                </IconButton>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <IconButton label="More file actions">
+                      <MoreHorizontal />
+                    </IconButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">{props.more}</DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              {props.terminal ? (
+                <IconButton label="Open terminal" onClick={props.terminal}>
+                  <SquareTerminal />
+                </IconButton>
+              ) : null}
             </div>
-            {props.terminal ? (
-              <IconButton label="Open terminal" onClick={props.terminal}>
-                <SquareTerminal />
-              </IconButton>
-            ) : null}
-          </div>
-        }
-      />
-    </div>
+          }
+        />
+      }
+    />
   );
 }
 

@@ -1,8 +1,35 @@
-import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
-import { ColumnBrowser, type ColumnBrowserColumn } from "@misty/ui";
+import { type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { ColumnBrowser, type ColumnBrowserColumn, type ColumnBrowserRow } from "@misty/ui";
 import { columnRow } from "./FileItems";
 import { foldersBetween, placeInside, placeKey, type FileItem, type FilesPlace } from "./model";
-import { useColumnListings } from "./use_column_listings";
+import { arrange } from "./store/arrange";
+import type { FilesSort } from "./store/arrange_rules";
+import { useListings, type ListingEntry } from "./store/listing_cache";
+
+const arranged = new WeakMap<FileItem[], { sort: string; items: FileItem[] }>();
+
+const rows = new WeakMap<FileItem, ColumnBrowserRow>();
+
+function rowOf(item: FileItem, cut: boolean): ColumnBrowserRow {
+  if (cut) return columnRow(item, true);
+  let row = rows.get(item);
+  if (!row) {
+    row = columnRow(item, false);
+    rows.set(item, row);
+  }
+  return row;
+}
+
+function columnItems(entry: ListingEntry, sort: FilesSort | undefined): FileItem[] | null {
+  const items = entry.items;
+  if (!items) return null;
+  const sortKey = JSON.stringify(sort ?? null);
+  const kept = arranged.get(items);
+  if (kept?.sort === sortKey) return kept.items;
+  const result = arrange(items, { needle: "", sort, finder: true });
+  arranged.set(items, { sort: sortKey, items: result });
+  return result;
+}
 
 function chain(root: FilesPlace, place: FilesPlace): FilesPlace[] {
   if (place.kind === "disk")
@@ -32,7 +59,7 @@ export function ColumnsView({
   root,
   place,
   hidden,
-  revision,
+  sort,
   selected,
   cut,
   preview,
@@ -44,7 +71,7 @@ export function ColumnsView({
   root: FilesPlace;
   place: FilesPlace;
   hidden: boolean;
-  revision: number;
+  sort: FilesSort | undefined;
   selected: readonly string[];
   cut: ReadonlySet<string>;
   preview?: ReactNode;
@@ -54,31 +81,33 @@ export function ColumnsView({
   onDrop(folder: FilesPlace, items: FileItem[], copy: boolean): void;
 }) {
   const ancestors = chain(root, place);
-  const listings = useColumnListings(ancestors, hidden, revision);
-  const here = listings[listings.length - 1]?.items ?? [];
+  const listings = useListings(ancestors, hidden);
+  const hereEntry = listings[listings.length - 1];
+  const here = hereEntry ? (hereEntry.items ?? []) : [];
   const picked = selected.length === 1 ? here.find((item) => item.id === selected[0]) : undefined;
   const inside = picked ? placeInside(picked, place) : undefined;
   const places = inside ? [...ancestors, inside] : ancestors;
-  const extra = useColumnListings(inside ? [inside] : [], hidden, revision);
+  const extra = useListings(inside ? [inside] : [], hidden);
   const all = inside ? [...listings, ...extra] : listings;
+  const lists = all.map((entry) => columnItems(entry, sort));
 
   const byId = new Map<string, { item: FileItem; folder: FilesPlace }>();
-  all.forEach((listing, index) => {
-    for (const item of listing.items ?? []) byId.set(item.id, { item, folder: places[index] });
+  lists.forEach((items, index) => {
+    for (const item of items ?? []) byId.set(item.id, { item, folder: places[index] });
   });
 
   const columns: ColumnBrowserColumn[] = places.map((folder, index) => {
-    const listing = all[index];
+    const entry = all[index];
     const next = places[index + 1];
-    const items = listing?.items ?? null;
+    const items = lists[index] ?? null;
     const open =
       next && items
         ? items.find((item) => placeKey(placeInside(item, folder) ?? folder) === placeKey(next))
         : undefined;
     return {
       id: placeKey(folder),
-      rows: items ? items.map((item) => columnRow(item, cut.has(item.id))) : null,
-      error: listing?.error,
+      rows: items ? items.map((item) => rowOf(item, cut.has(item.id))) : null,
+      error: entry?.status === "failed" ? entry.error : undefined,
       selected: index === ancestors.length - 1 ? selected : open ? [open.id] : [],
     };
   });
@@ -96,7 +125,7 @@ export function ColumnsView({
       className="min-h-0 flex-1"
       columns={columns}
       onSelect={(column, id, event) => {
-        const order = (all[column]?.items ?? []).map((item) => item.id);
+        const order = (lists[column] ?? []).map((item) => item.id);
         onPick(places[column], id, event, order);
       }}
       onOpen={(_column, id) => {

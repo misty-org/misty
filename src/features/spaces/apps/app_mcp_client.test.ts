@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAppMcpClient } from "./app_mcp_client";
+import { createAppMcpClient, McpRemoteError } from "./app_mcp_client";
 import { appToolName } from "./app_tools";
 
 type Message = { id?: number; method?: string; params?: Record<string, unknown> };
@@ -75,5 +75,58 @@ describe("createAppMcpClient", () => {
 describe("appToolName", () => {
   it("matches native's internal name", () => {
     expect(appToolName("photo-craft", "get.size")).toBe("app.photo-craft.get_size");
+  });
+});
+
+describe("createAppMcpClient outcomes", () => {
+  it("tries the handshake again on the next call after one fails", async () => {
+    let answering = false;
+    const client: ReturnType<typeof createAppMcpClient> = createAppMcpClient(
+      (raw) => {
+        const message = raw as Message;
+        if (!answering || message.id === undefined) return;
+        const result =
+          message.method === "initialize"
+            ? { protocolVersion: "2025-03-26", capabilities: { tools: {} } }
+            : { tools: [{ name: "a" }] };
+        queueMicrotask(() => client.receive({ jsonrpc: "2.0", id: message.id, result }));
+      },
+      { retryMs: 5, startTimeoutMs: 20, requestTimeoutMs: 1_000 },
+    );
+    await expect(client.listTools()).rejects.toThrow();
+    answering = true;
+    await expect(client.listTools()).resolves.toHaveLength(1);
+    client.dispose();
+  });
+
+  it("tells an app's own error apart from no answer", async () => {
+    const client: ReturnType<typeof createAppMcpClient> = createAppMcpClient(
+      (raw) => {
+        const message = raw as Message;
+        if (message.id === undefined) return;
+        if (message.method === "initialize")
+          queueMicrotask(() =>
+            client.receive({ jsonrpc: "2.0", id: message.id, result: { capabilities: {} } }),
+          );
+        else if (message.params?.name === "bad")
+          queueMicrotask(() =>
+            client.receive({ jsonrpc: "2.0", id: message.id, error: { message: "No." } }),
+          );
+      },
+      { retryMs: 5, startTimeoutMs: 1_000, callTimeoutMs: 20 },
+    );
+    await expect(client.callTool("bad", {})).rejects.toBeInstanceOf(McpRemoteError);
+    const silent = await client.callTool("quiet", {}).catch((error: unknown) => error);
+    expect(silent).toBeInstanceOf(Error);
+    expect(silent).not.toBeInstanceOf(McpRemoteError);
+    client.dispose();
+  });
+
+  it("hears that the app's tools changed", () => {
+    let changed = 0;
+    const client = createAppMcpClient(() => {}, { onToolsChanged: () => (changed += 1) });
+    client.receive({ jsonrpc: "2.0", method: "notifications/tools/list_changed" });
+    expect(changed).toBe(1);
+    client.dispose();
   });
 });

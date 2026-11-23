@@ -14,7 +14,7 @@
 ;; The tools, the system libraries every program loads, and the clock. Nothing here holds the person's
 ;; own files.
 (allow file-read*
-  (subpath (param "TOOLS"))
+  (literal (param "TOOL")) (subpath (param "TOOLS"))
   (subpath "/System/Library") (subpath "/usr/lib")
   (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
   (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")

@@ -104,11 +104,7 @@ export function MemberList({
               <SpaceAgentRow
                 key={agent.agent_id}
                 agent={agent}
-                onRemove={
-                  owner || agent.owner_user_id === currentUserId
-                    ? () => onRemoveAgent(agent.agent_id)
-                    : undefined
-                }
+                onRemove={agent.can_edit ? () => onRemoveAgent(agent.agent_id) : undefined}
                 onVisibilityChange={
                   agent.owner_user_id === currentUserId
                     ? (visibility) => onAgentVisibility(agent.agent_id, visibility)

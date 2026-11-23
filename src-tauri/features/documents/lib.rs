@@ -5,7 +5,7 @@ pub mod windows;
 
 use serde::{Deserialize, Serialize};
 
-pub type WorkerBytes = fn(&str, u32) -> Result<&'static [u8], String>;
+pub type WorkerProgram = fn(&str) -> Result<std::path::PathBuf, String>;
 
 pub const MAX_AGENT_DOCUMENT_BYTES: u64 = 50 * 1024 * 1024;
 
@@ -31,7 +31,7 @@ pub struct PreparedDocumentSection {
 #[cfg(windows)]
 pub async fn prepare_document(
     path: std::path::PathBuf,
-    worker: WorkerBytes,
+    worker: WorkerProgram,
 ) -> Result<PreparedAgentDocument, String> {
     tokio::task::spawn_blocking(move || {
         let stop = std::sync::atomic::AtomicBool::new(false);
@@ -46,7 +46,7 @@ pub async fn prepare_document(
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub async fn prepare_document(
     path: std::path::PathBuf,
-    worker: WorkerBytes,
+    worker: WorkerProgram,
 ) -> Result<PreparedAgentDocument, String> {
     use std::sync::{
         atomic::{AtomicBool, Ordering},
@@ -81,7 +81,7 @@ pub async fn prepare_document(
 #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 pub async fn prepare_document(
     _path: std::path::PathBuf,
-    _worker: WorkerBytes,
+    _worker: WorkerProgram,
 ) -> Result<PreparedAgentDocument, String> {
     Err("Misty can't read documents on this system.".to_owned())
 }

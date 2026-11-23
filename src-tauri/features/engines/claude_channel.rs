@@ -74,6 +74,7 @@ pub(super) fn apply(
         provider,
         env,
         req.model.as_deref(),
+        super::agent_memory::claude_memory_dir(req).as_deref(),
         &crate::engines::support::paths::app_home().join("claude-staging"),
     )
 }
@@ -85,9 +86,30 @@ fn stage(
     provider: &Value,
     env: &HashMap<String, String>,
     model: Option<&str>,
+    memory: Option<&str>,
     directory: &Path,
 ) -> Result<(), String> {
     let mut settings = Map::new();
+    let args: Vec<String> = built
+        .command
+        .as_std()
+        .get_args()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
+    for pair in args.windows(2) {
+        if pair[0] != "--settings" {
+            continue;
+        }
+        if let Ok(Value::Object(inline)) = serde_json::from_str::<Value>(&pair[1]) {
+            settings.extend(inline);
+        }
+    }
+    if let Some(memory) = memory {
+        settings.insert(
+            "autoMemoryDirectory".into(),
+            Value::String(memory.to_string()),
+        );
+    }
     if let Some(source) = provider.get("settingsConfig").and_then(Value::as_object) {
         for &key in PASSTHROUGH_SETTINGS_KEYS {
             if let Some(value) = source.get(key) {
@@ -202,7 +224,15 @@ mod tests {
                 "permissions": {"allow": ["Bash(rm:*)"]}}});
             let env =
                 crate::engines::support::provider_files::channel_env("claude", &provider).unwrap();
-            stage(command, &provider, &env, Some("selected-model"), &directory).unwrap();
+            stage(
+                command,
+                &provider,
+                &env,
+                Some("selected-model"),
+                None,
+                &directory,
+            )
+            .unwrap();
             let path = &command.cleanup_files[0];
             let settings: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
             assert_eq!(
@@ -256,6 +286,7 @@ mod tests {
             &serde_json::json!({"baseUrl": "https://x.invalid", "apiKey": "k"}),
             &HashMap::new(),
             None,
+            None,
             &directory,
         )
         .unwrap();
@@ -265,7 +296,15 @@ mod tests {
         super::super::cleanup_staged_files(&no_model.cleanup_files);
 
         let mut failed = built();
-        assert!(stage(&mut failed, &Value::Null, &HashMap::new(), None, &native).is_err());
+        assert!(stage(
+            &mut failed,
+            &Value::Null,
+            &HashMap::new(),
+            None,
+            None,
+            &native
+        )
+        .is_err());
         assert!(failed.cleanup_files.is_empty());
         assert_eq!(std::fs::read_to_string(&native).unwrap(), original);
         std::fs::remove_file(native).unwrap();

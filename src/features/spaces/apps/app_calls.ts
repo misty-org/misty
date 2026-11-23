@@ -8,15 +8,55 @@ export interface WindowCall {
   spaceId: string;
   channelId: string;
   micOn: boolean;
+  live?: boolean;
+  deafened?: boolean;
 }
 
-export const appCallsHost = createPort<{
+type AppCallsHost = {
   current(): WindowCall | null;
   subscribe(listener: () => void): () => void;
-  join(channel: { spaceId: string; channelId: string; name: string }): Promise<void>;
+  join(
+    channel: { spaceId: string; channelId: string; name: string },
+    options?: { muted?: boolean },
+  ): Promise<void>;
   leave(): void;
   setMuted(muted: boolean): void;
-}>("App calls");
+};
+
+export const appCallsHost = createPort<AppCallsHost>("App calls");
+
+const JOIN_WAIT_MS = 20_000;
+
+let joining: Promise<unknown> = Promise.resolve();
+
+function inCall(host: AppCallsHost, spaceId: string, channelId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let stop = () => undefined as void;
+    const finish = (error?: HostError) => {
+      window.clearTimeout(timer);
+      stop();
+      if (error) reject(error);
+      else resolve();
+    };
+    const check = () => {
+      const call = host.current();
+      if (!call || call.spaceId !== spaceId || call.channelId !== channelId) {
+        finish(new HostError("internal", "Couldn’t join the voice channel."));
+        return;
+      }
+      if (call.live !== false) finish();
+    };
+    const timer = window.setTimeout(
+      () =>
+        finish(
+          new HostError("internal", "Couldn’t join the voice channel in time. Try again."),
+        ),
+      JOIN_WAIT_MS,
+    );
+    stop = host.subscribe(check);
+    check();
+  });
+}
 
 export const voiceChannelPage =
   createPort<ComponentType<{ spaceId: string; channelId: string; workspaceTabId?: string }>>(
@@ -45,13 +85,32 @@ export function createAppCalls(spaceId: string) {
         const channelId = typeof params.channel_id === "string" ? params.channel_id : "";
         const channel = (await voiceChannelsOf(spaceId)).find((item) => item.id === channelId);
         if (!channel) throw new HostError("not_found", "There is no such voice channel.");
-        await host().join({ spaceId, channelId, name: channel.title });
+        const calls = host();
+        const run = joining
+          .catch(() => undefined)
+          .then(async () => {
+            const call = calls.current();
+            if (call?.spaceId === spaceId && call.channelId === channelId && call.live !== false)
+              return;
+            await calls.join({ spaceId, channelId, name: channel.title }, { muted: true });
+            await inCall(calls, spaceId, channelId);
+          });
+        joining = run;
+        await run;
       },
       "calls.leave": async () => {
         if (host().current()?.spaceId === spaceId) host().leave();
       },
       "calls.mute": async (params: Record<string, unknown>) => {
-        if (host().current()?.spaceId === spaceId) host().setMuted(params.muted === true);
+        const call = host().current();
+        if (call?.spaceId !== spaceId) return;
+        const muted = params.muted === true;
+        if (!muted && call.deafened)
+          throw new HostError(
+            "permission_denied",
+            "The person has deafened themselves, so their microphone stays off.",
+          );
+        host().setMuted(muted);
       },
     },
     watchChannels(emit: (data: unknown) => void): () => void {

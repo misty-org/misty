@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   InUseMark,
   TagDots,
@@ -11,7 +11,6 @@ import { driveThumbnailUrl, FileNameIcon, thumbnailUrl } from "@/features/files"
 import { driveInUsePeople, driveSyncMark } from "../drive";
 import { formatBytes, formatDate, isPictured, kindOf } from "./format";
 import { itemShape, type FileItem } from "./model";
-import { thumbnailState, wantThumbnail } from "./thumbnails";
 
 const THUMBNAIL_PX = 256;
 
@@ -53,34 +52,15 @@ export function thumbnailFor(item: FileItem): string | undefined {
   return undefined;
 }
 
-function Thumbnail({ url }: { url: string }) {
-  const picture = useRef<HTMLImageElement>(null);
-  const [state, setState] = useState(() => thumbnailState(url));
-  useEffect(() => {
-    const now = thumbnailState(url);
-    setState(now);
-    const shown = picture.current;
-    if (now !== "waiting" || !shown) return;
-    let drop: (() => void) | undefined;
-    const near = new IntersectionObserver(
-      (seen) => {
-        if (drop || !seen.some((entry) => entry.isIntersecting)) return;
-        drop = wantThumbnail(url, setState);
-      },
-      { rootMargin: "200px" },
-    );
-    near.observe(shown);
-    return () => {
-      near.disconnect();
-      drop?.();
-    };
-  }, [url]);
-  return <img ref={picture} alt="" src={state === "ready" ? url : undefined} />;
+function Thumbnail({ url, fallback }: { url: string; fallback: ReactNode }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  if (failed === url) return fallback;
+  return <img alt="" src={url} loading="lazy" decoding="async" onError={() => setFailed(url)} />;
 }
 
 function preview(item: FileItem): ReactNode {
   const url = thumbnailFor(item);
-  return url ? <Thumbnail url={url} /> : undefined;
+  return url ? <Thumbnail url={url} fallback={itemIcon(item)} /> : undefined;
 }
 
 const sizeText = (item: FileItem) => (itemShape(item) === "folder" ? "—" : formatBytes(item.size));
@@ -89,7 +69,7 @@ export function collectionItem(
   item: FileItem,
   options: {
     onOpen(item: FileItem): void;
-    menu: ReactNode;
+    menu: () => ReactNode;
     onMenuOpen(): void;
     dropTarget: boolean;
   },

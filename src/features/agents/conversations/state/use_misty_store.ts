@@ -2,7 +2,7 @@ import { runtimeAiApi as aiSurfaceApi } from "@/features/agents/agents_runtime";
 import {
   finishLocalExecution,
   pauseLocalExecution,
-} from "../../runs/local-execution/local_execution";
+} from "../../runs/local-execution/local_execution_state";
 import { createMistyPanelState } from "./misty_panel_state";
 import type { MistyState } from "./misty_state";
 import { replaceActiveGlobalInvocationStream } from "./misty_store_updates";

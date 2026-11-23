@@ -1,4 +1,4 @@
-import { isE2EESupported } from "livekit-client";
+import { callEncryptionSupported } from "./call_support";
 import { notify } from "@misty/ui";
 import {
   onRealtimeMessage,
@@ -8,6 +8,8 @@ import {
 } from "@/features/spaces";
 import { deviceCallKey, newCallKey, openCallKey, sealCallKey } from "./call_keys";
 import { useCallStore, voiceRoom, type ActiveCall } from "./call_store";
+import { checkCallRoom } from "./call_room";
+import { useCallSession } from "./call_session_store";
 import { useDirectAccount } from "../direct_account";
 
 const JOIN_WAIT_MS = 5_000;
@@ -22,23 +24,36 @@ export interface VoiceChannel {
 const isVoice = (call: ActiveCall | null) =>
   call?.place.kind === "voice" ? call.place : undefined;
 
-let pendingKey: { spaceId: string; channelId: string; resolve(sealed: string): void } | null = null;
-let pendingFull: { spaceId: string; channelId: string; reject(): void } | null = null;
+interface PendingJoin {
+  spaceId: string;
+  channelId: string;
+  full?(): void;
+  key?(sealed: string): void;
+}
 
-function joined(spaceId: string, channelId: string, userId: string): Promise<string[]> {
+const pendingJoins = new Set<PendingJoin>();
+let joinAttempt = 0;
+
+const pendingFor = (spaceId: unknown, channelId: unknown) =>
+  [...pendingJoins].filter(
+    (pending) => pending.spaceId === spaceId && pending.channelId === channelId,
+  );
+
+function joined(pending: PendingJoin, userId: string): Promise<string[]> {
+  const { spaceId, channelId } = pending;
   return new Promise((resolve, reject) => {
     const listed = () => useVoicePresence.getState().bySpace[spaceId]?.[channelId] ?? [];
     const finish = (error?: Error) => {
       window.clearTimeout(timer);
       stop();
-      pendingFull = null;
+      pending.full = undefined;
       if (error) reject(error);
       else resolve(listed());
     };
     const stop = useVoicePresence.subscribe(() => {
       if (listed().includes(userId)) finish();
     });
-    pendingFull = { spaceId, channelId, reject: () => finish(new Error("This channel is full.")) };
+    pending.full = () => finish(new Error("This channel is full."));
     const timer = window.setTimeout(
       () =>
         finish(new Error("Couldn’t join the voice channel. Check your connection and try again.")),
@@ -48,56 +63,63 @@ function joined(spaceId: string, channelId: string, userId: string): Promise<str
   });
 }
 
-function channelKey(spaceId: string, channelId: string): Promise<string> {
-  return new Promise((resolve, reject) => {
+function channelKey(pending: PendingJoin): Promise<string | undefined> {
+  return new Promise((resolve) => {
     const timer = window.setTimeout(() => {
-      pendingKey = null;
-      reject(new Error("Nobody in the channel answered with its key. Try again."));
+      pending.key = undefined;
+      resolve(undefined);
     }, KEY_WAIT_MS);
-    pendingKey = {
-      spaceId,
-      channelId,
-      resolve(sealed) {
-        window.clearTimeout(timer);
-        pendingKey = null;
-        resolve(sealed);
-      },
+    pending.key = (sealed) => {
+      window.clearTimeout(timer);
+      pending.key = undefined;
+      resolve(sealed);
     };
   });
 }
 
-export async function joinVoiceChannel(
+class JoinSuperseded extends Error {}
+
+async function enterVoiceChannel(
   channel: VoiceChannel,
   userId: string,
-  start: { video?: boolean; muted?: boolean } = {},
+  start: { video?: boolean; muted?: boolean },
 ): Promise<void> {
   const store = useCallStore.getState();
   const current = isVoice(store.active);
   if (current?.spaceId === channel.spaceId && current.channelId === channel.channelId) return;
-  if (store.active && !current) {
-    notify({ message: "Leave the call you’re in first." });
-    return;
-  }
-  if (!isE2EESupported()) {
-    notify({
-      message: "Calls need end-to-end encryption, which this computer can’t do.",
-      tone: "error",
-    });
-    return;
-  }
+  if (store.active && !current) throw new Error("Leave the call you’re in first.");
+  if (!callEncryptionSupported())
+    throw new Error("Calls need end-to-end encryption, which this computer can’t do.");
   if (current) store.leave();
+  const attempt = ++joinAttempt;
+  const pending: PendingJoin = { spaceId: channel.spaceId, channelId: channel.channelId };
+  pendingJoins.add(pending);
+  const room = voiceRoom(channel.spaceId, channel.channelId);
+  const stillMine = () => {
+    if (attempt !== joinAttempt) throw new JoinSuperseded();
+  };
   try {
     const own = await deviceCallKey();
+    stillMine();
     sendRealtimeMessage({
       type: "voice",
       space_id: channel.spaceId,
       channel_id: channel.channelId,
       key_id: own.keyId,
     });
-    const people = await joined(channel.spaceId, channel.channelId, userId);
-    let key: Uint8Array<ArrayBuffer>;
-    if (people.some((id) => id !== userId)) {
-      const waiting = channelKey(channel.spaceId, channel.channelId);
+    const listed = await joined(pending, userId);
+    stillMine();
+    const check = await checkCallRoom(room);
+    stillMine();
+    if (check.full) throw new Error("This channel is full.");
+    const present =
+      useVoicePresence.getState().bySpace[channel.spaceId]?.[channel.channelId] ?? listed;
+    const others = (check.people ?? listed).filter(
+      (id) => id !== userId && (!check.people || present.includes(id)),
+    );
+    let key: Uint8Array<ArrayBuffer> | undefined;
+    if (others.length) {
+      const waiting = channelKey(pending);
       sendRealtimeMessage({
         type: "voice.key_request",
         space_id: channel.spaceId,
@@ -105,28 +127,49 @@ export async function joinVoiceChannel(
         key_id: own.keyId,
         public_key: own.publicKey,
       });
-      key = await openCallKey(await waiting);
-    } else {
-      key = newCallKey();
+      const sealed = await waiting;
+      stillMine();
+      if (sealed)
+        key = await openCallKey(sealed).catch(() => {
+          throw new Error("The call’s key couldn’t be opened.");
+        });
+      else if (!check.people)
+        throw new Error("Nobody in the channel answered with its key. Try again.");
+      stillMine();
     }
-    useCallStore.getState().join(
-      {
-        kind: "voice",
-        spaceId: channel.spaceId,
-        channelId: channel.channelId,
-        name: channel.name,
-      },
-      voiceRoom(channel.spaceId, channel.channelId),
-      key,
-      start.video ?? false,
-      start.muted ?? false,
-    );
+    const place = {
+      kind: "voice" as const,
+      spaceId: channel.spaceId,
+      channelId: channel.channelId,
+      name: channel.name,
+    };
+    useCallStore
+      .getState()
+      .join(place, room, key ?? newCallKey(), start.video ?? false, start.muted ?? false);
+    if (useCallStore.getState().active?.room !== room)
+      throw new Error("Leave the call you’re in first.");
   } catch (reason) {
-    sendRealtimeMessage({ type: "voice", space_id: channel.spaceId, channel_id: "" });
-    notify({
-      message: reason instanceof Error ? reason.message : "Couldn’t join the voice channel.",
-      tone: "error",
-    });
+    if (reason instanceof JoinSuperseded) return;
+    if (attempt === joinAttempt && !isVoice(useCallStore.getState().active))
+      sendRealtimeMessage({ type: "voice", space_id: channel.spaceId, channel_id: "" });
+    throw reason instanceof Error ? reason : new Error("Couldn’t join the voice channel.");
+  } finally {
+    pendingJoins.delete(pending);
+  }
+}
+
+export async function joinVoiceChannel(
+  channel: VoiceChannel,
+  userId: string,
+  start: { video?: boolean; muted?: boolean } = {},
+): Promise<void> {
+  try {
+    await enterVoiceChannel(channel, userId, start);
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : "Couldn’t join the voice channel.";
+    notify(
+      message === "Leave the call you’re in first." ? { message } : { message, tone: "error" },
+    );
   }
 }
 
@@ -144,7 +187,7 @@ onRealtimeMessage("voice.key_request", (message) => {
   const keyId = typeof message.key_id === "string" ? message.key_id : "";
   const from = typeof message.from === "string" ? message.from : "";
   if (!publicKey || !keyId || !from) return;
-  void sealCallKey(active.key, publicKey)
+  void sealCallKey(useCallSession.getState().controls?.baseKey ?? active.key, publicKey)
     .then((sealed) =>
       sendRealtimeMessage({
         type: "voice.key",
@@ -159,22 +202,20 @@ onRealtimeMessage("voice.key_request", (message) => {
 });
 
 onRealtimeMessage("voice.key", (message) => {
-  if (
-    !pendingKey ||
-    message.space_id !== pendingKey.spaceId ||
-    message.channel_id !== pendingKey.channelId
-  )
-    return;
-  if (typeof message.sealed === "string") pendingKey.resolve(message.sealed);
+  if (typeof message.sealed !== "string") return;
+  const sealed = message.sealed;
+  for (const pending of pendingFor(message.space_id, message.channel_id)) pending.key?.(sealed);
 });
 
 onRealtimeMessage("voice.full", (message) => {
-  if (
-    pendingFull &&
-    message.space_id === pendingFull.spaceId &&
-    message.channel_id === pendingFull.channelId
-  )
-    pendingFull.reject();
+  const waiting = pendingFor(message.space_id, message.channel_id);
+  for (const pending of waiting) pending.full?.();
+  if (waiting.length) return;
+  const place = isVoice(useCallStore.getState().active);
+  if (!place || place.spaceId !== message.space_id || place.channelId !== message.channel_id) return;
+  if (useCallStore.getState().active?.state === "live") return;
+  useCallStore.getState().leave();
+  notify({ message: "This channel is full, so you left it." });
 });
 
 useCallStore.subscribe((state, previous) => {
@@ -212,16 +253,25 @@ export const callsForApps = {
     const state = useCallStore.getState();
     const place = isVoice(state.active);
     return place
-      ? { spaceId: place.spaceId, channelId: place.channelId, micOn: Boolean(state.mic?.on) }
+      ? {
+          spaceId: place.spaceId,
+          channelId: place.channelId,
+          micOn: Boolean(state.mic?.on),
+          live: state.active?.state === "live",
+          deafened: Boolean(state.audio?.deafened),
+        }
       : null;
   },
   subscribe(listener: () => void) {
     return useCallStore.subscribe(listener);
   },
-  async join(channel: { spaceId: string; channelId: string; name: string }) {
+  async join(
+    channel: { spaceId: string; channelId: string; name: string },
+    options?: { muted?: boolean },
+  ) {
     const userId = useDirectAccount.getState().userId;
     if (!userId) throw new Error("Sign in to join a voice channel.");
-    await joinVoiceChannel(channel, userId);
+    await enterVoiceChannel(channel, userId, { muted: options?.muted ?? true });
   },
   leave() {
     if (isVoice(useCallStore.getState().active)) useCallStore.getState().leave();

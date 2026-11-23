@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
-import { LogOut, MessagesSquare, MoreHorizontal, Trash2, UserPlus } from "lucide-react";
+import {
+  LogOut,
+  MessagesSquare,
+  MoreHorizontal,
+  Phone,
+  Trash2,
+  UserPlus,
+  Video,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
-  ChannelPage,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
   ErrorState,
+  FramedPage,
   IconButton,
   IndicatorDot,
   MenuItem,
@@ -15,18 +23,17 @@ import {
   PaneLoading,
   SearchField,
   Text,
-  ToolbarDivider,
   notify,
   useConfirmDelete,
+  type ActionBarItem,
 } from "@misty/ui";
 import { useDirectUserId } from "./direct_account";
 import { useWorkspaceViewTitle, type WorkspaceView } from "@/features/app-windows";
-import { ChatBarButtons, SpaceChat, useChatBarMenu, useSpacesStore } from "@/features/spaces";
+import { SpaceChat, useChatBarActions, useChatBarMenu, useSpacesStore } from "@/features/spaces";
 import { DmMembers } from "./DmMembers";
 import { DmFace, DmProfile, DmWelcome, profileIcon } from "./DmPeople";
 import { directApi, type DirectConversation } from "./api";
 import { AddPeopleDialog } from "./AddPeopleDialog";
-import { CallButtons } from "./calls/CallButtons";
 import { dmOf, useCallStore, useCallsAvailable } from "./calls/call_store";
 import { CallStageView } from "./calls/CallView";
 import { useMissedCalls } from "./calls/missed_calls";
@@ -59,13 +66,19 @@ export function DmView({ tab, dmId }: { tab: WorkspaceView; dmId: string }) {
   if (dm) return <DmChat key={dm.id} tab={tab} dm={dm} />;
   if (fetched?.id === dmId && fetched.error)
     return (
-      <ErrorState
-        title="This conversation couldn't be opened"
-        line={fetched.error instanceof Error ? fetched.error.message : undefined}
-        action={{ label: "Try again", onClick: () => setAttempt((count) => count + 1) }}
-      />
+      <FramedPage>
+        <ErrorState
+          title="This conversation couldn't be opened"
+          line={fetched.error instanceof Error ? fetched.error.message : undefined}
+          action={{ label: "Try again", onClick: () => setAttempt((count) => count + 1) }}
+        />
+      </FramedPage>
     );
-  return <PaneLoading label="Loading the conversation" />;
+  return (
+    <FramedPage>
+      <PaneLoading label="Loading the conversation" />
+    </FramedPage>
+  );
 }
 
 function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
@@ -84,6 +97,8 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
   useWorkspaceViewTitle(tab.id, name);
   const missed = useMissedCalls((state) => state.byDm[dm.id]);
   const inCall = useCallStore((state) => dmOf(state.active) === dm.id);
+  const anyCall = useCallStore((state) => Boolean(state.active));
+  useEffect(() => useCallStore.getState().loadConfig(), []);
 
   useEffect(() => {
     void useSpacesStore
@@ -140,78 +155,128 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
     setSearchedText("");
   };
   const menu = useChatBarMenu({ spaceId: dm.id, muteId: dm.id, onPanel: closeSearch });
-  const more = (
-    <DropdownMenu>
-      <span className="relative inline-flex">
-        <DropdownMenuTrigger asChild>
-          <IconButton label="More" variant="quiet">
-            <MoreHorizontal />
-          </IconButton>
-        </DropdownMenuTrigger>
-        {menu.threadsUnread > 0 ? <IndicatorDot /> : null}
-      </span>
-      <DropdownMenuContent align="end" aria-label="Conversation actions">
-        <MenuItem icon={MessagesSquare} label={menu.threadsLabel} onSelect={menu.toggleThreads} />
-        <MenuItem icon={menu.MuteIcon} label={menu.muteLabel} onSelect={menu.toggleMute} />
-        {dm.read_only ? null : (
-          <MenuItem icon={UserPlus} label="Add people" onSelect={() => setAddingPeople(true)} />
-        )}
-        <MenuSeparator />
-        {group ? (
-          <MenuItem icon={LogOut} label="Leave group" danger onSelect={leaveGroup} />
-        ) : (
-          <MenuItem
-            icon={Trash2}
-            label="Delete conversation"
-            danger
-            onSelect={deleteConversation}
-          />
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-  const end = (
+  const sideActions = useChatBarActions({
+    spaceId: dm.id,
+    muteId: dm.id,
+    searching: Boolean(searchedText),
+    folded: true,
+    sideLabel: group ? undefined : "Profile",
+    SideIcon: group ? undefined : profileIcon,
+    onPanel: closeSearch,
+  });
+  const moreRows = (
     <>
-      <CallButtons dmId={dm.id} />
-      {callsAvailable ? <ToolbarDivider /> : null}
-      <ChatBarButtons
-        spaceId={dm.id}
-        muteId={dm.id}
-        searching={Boolean(searchedText)}
-        folded
-        sideLabel={group ? undefined : "Profile"}
-        SideIcon={group ? undefined : profileIcon}
-        onPanel={closeSearch}
-      />
-      {more}
-      <SearchField
-        containerClassName="w-40"
-        aria-label="Search messages"
-        placeholder="Search"
-        value={searchText}
-        onChange={(event) => {
-          setSearchText(event.target.value);
-          if (!event.target.value) setSearchedText("");
-        }}
-        onClear={closeSearch}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            setSearchedText(searchText.trim());
-          }
-        }}
-      />
+      <MenuItem icon={MessagesSquare} label={menu.threadsLabel} onSelect={menu.toggleThreads} />
+      <MenuItem icon={menu.MuteIcon} label={menu.muteLabel} onSelect={menu.toggleMute} />
+      {dm.read_only ? null : (
+        <MenuItem icon={UserPlus} label="Add people" onSelect={() => setAddingPeople(true)} />
+      )}
+      <MenuSeparator />
+      {group ? (
+        <MenuItem icon={LogOut} label="Leave group" danger onSelect={leaveGroup} />
+      ) : (
+        <MenuItem icon={Trash2} label="Delete conversation" danger onSelect={deleteConversation} />
+      )}
     </>
   );
+  const startCall = (video: boolean) => void useCallStore.getState().start(dm.id, video);
+  const actions: ActionBarItem[] = [
+    ...(callsAvailable
+      ? [
+          {
+            id: "voice-call",
+            icon: Phone,
+            label: "Voice call",
+            priority: 6,
+            disabled: anyCall,
+            onSelect: () => startCall(false),
+          },
+          {
+            id: "video-call",
+            icon: Video,
+            label: "Video call",
+            priority: 6,
+            disabled: anyCall,
+            onSelect: () => startCall(true),
+          },
+        ]
+      : []),
+    ...sideActions,
+    {
+      id: "more",
+      icon: MoreHorizontal,
+      label: "More",
+      priority: 9,
+      menu: moreRows,
+      render: () => (
+        <DropdownMenu>
+          <span className="relative inline-flex">
+            <DropdownMenuTrigger asChild>
+              <IconButton label="More" variant="quiet">
+                <MoreHorizontal />
+              </IconButton>
+            </DropdownMenuTrigger>
+            {menu.threadsUnread > 0 ? <IndicatorDot /> : null}
+          </span>
+          <DropdownMenuContent align="end" aria-label="Conversation actions">
+            {moreRows}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+  const search = (
+    <SearchField
+      containerClassName="w-40"
+      aria-label="Search messages"
+      placeholder="Search"
+      value={searchText}
+      onChange={(event) => {
+        setSearchText(event.target.value);
+        if (!event.target.value) setSearchedText("");
+      }}
+      onClear={closeSearch}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          setSearchedText(searchText.trim());
+        }
+      }}
+    />
+  );
+  const notice = missed ? (
+    <div className="flex shrink-0 items-center gap-2 px-4 pt-2">
+      <Text tone="muted" size="meta" className="min-w-0 flex-1">
+        {`Missed ${missed.video ? "video" : "voice"} call from ${
+          dm.members.find((member) => member.user_id === missed.from)?.username ?? "someone"
+        } at ${new Date(missed.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
+      </Text>
+      <Button variant="quiet" size="sm" onClick={() => useMissedCalls.getState().seen(dm.id)}>
+        Dismiss
+      </Button>
+    </div>
+  ) : undefined;
+  const footer = dm.read_only ? (
+    <div className="flex shrink-0 items-center gap-3 px-4 pb-3">
+      <Text tone="muted" className="min-w-0 flex-1">
+        {`You can message ${name} again once you're friends.`}
+      </Text>
+      <Button disabled={requesting} onClick={() => void addFriend()}>
+        Add friend
+      </Button>
+    </div>
+  ) : undefined;
 
-  const chat = (
-    <ChannelPage className="min-h-0 flex-1">
+  return (
+    <>
       <SpaceChat
         spaceId={dm.id}
         spaceName={name}
         workspaceTabId={tab.id}
         searchedText={searchedText}
-        search={end}
+        onCloseSearch={closeSearch}
+        actions={actions}
+        search={search}
         dm={{
           name,
           group,
@@ -223,41 +288,15 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
           ) : (
             <DmMembers members={dm.members} me={myId ?? ""} />
           ),
+          notice,
+          footer,
         }}
         stage={inCall ? <CallStageView /> : undefined}
       />
-    </ChannelPage>
-  );
-
-  return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
-      {missed ? (
-        <div className="flex shrink-0 items-center gap-2 px-4 pt-2">
-          <Text tone="muted" size="meta" className="min-w-0 flex-1">
-            {`Missed ${missed.video ? "video" : "voice"} call from ${
-              dm.members.find((member) => member.user_id === missed.from)?.username ?? "someone"
-            } at ${new Date(missed.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}
-          </Text>
-          <Button variant="quiet" size="sm" onClick={() => useMissedCalls.getState().seen(dm.id)}>
-            Dismiss
-          </Button>
-        </div>
-      ) : null}
-      {chat}
-      {dm.read_only ? (
-        <div className="flex shrink-0 items-center gap-3 px-4 pb-3">
-          <Text tone="muted" className="min-w-0 flex-1">
-            {`You can message ${name} again once you're friends.`}
-          </Text>
-          <Button disabled={requesting} onClick={() => void addFriend()}>
-            Add friend
-          </Button>
-        </div>
-      ) : null}
       {!dm.read_only ? (
         <AddPeopleDialog dm={dm} open={addingPeople} onOpenChange={setAddingPeople} />
       ) : null}
       {dialog}
-    </div>
+    </>
   );
 }

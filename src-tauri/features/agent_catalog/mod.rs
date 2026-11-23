@@ -1,16 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-//! The built-in persona catalog: the bundled, read-only agency-agents pack (MIT,
-//! https://github.com/msitarzewski/agency-agents) that backs the composer's `#` picker and the
-//! catalog in Settings. Picking a persona adds its prompt to one message; "Make an agent from
-//! this" turns it into one of the person's own agents.
-//!
-//! The pack ships as a bundle resource (`agent-catalogs/agency-agents/`, see tauri.conf.json); a
-//! development build reads it from `src-tauri/resources/agent-catalogs/agency-agents`. Loading
-//! fails closed: schema version, provider, license, counts, id prefixes, prompt paths and each
-//! prompt's SHA-256 are checked before anything is served. Which personas are switched on is a
-//! device setting kept by the renderer (`device:agent-catalog`); nothing here syncs.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -21,6 +12,8 @@ use tauri::Manager;
 
 const PROVIDER_ID: &str = "agency-agents";
 const CATALOG_DIR: &str = "agent-catalogs";
+const ARCHIVE: &str = "agency-agents.tar.zst";
+const MOST_CATALOG_BYTES: u64 = 64 * 1024 * 1024;
 const SOURCE_URL: &str = "https://github.com/msitarzewski/agency-agents";
 const SOURCE_REVISION: &str = "459dce837db3bdfdc4763d3fefd1fd854e73c8f1";
 
@@ -81,7 +74,7 @@ struct CatalogAgentsDocument {
 
 #[derive(Debug, Clone)]
 struct LoadedCatalog {
-    root: PathBuf,
+    archive: PathBuf,
     manifest: CatalogManifest,
     agents: Vec<CatalogAgent>,
 }
@@ -164,18 +157,10 @@ fn validate_safe_relative_path(value: &str, label: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn source_tree_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("resources")
-        .join(CATALOG_DIR)
-        .join(PROVIDER_ID)
-}
-
-fn catalog_root_candidates(resource_dir: Option<&Path>) -> Vec<PathBuf> {
+fn archive_candidates(resource_dir: Option<&Path>) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     if let Some(root) = resource_dir {
-        candidates.push(root.join(CATALOG_DIR).join(PROVIDER_ID));
-        candidates.push(root.join("resources").join(CATALOG_DIR).join(PROVIDER_ID));
+        candidates.push(root.join(CATALOG_DIR).join(ARCHIVE));
     }
     if let Ok(executable) = std::env::current_exe() {
         if let Some(executable_dir) = executable.parent() {
@@ -185,15 +170,15 @@ fn catalog_root_candidates(resource_dir: Option<&Path>) -> Vec<PathBuf> {
                         contents_dir
                             .join("Resources")
                             .join(CATALOG_DIR)
-                            .join(PROVIDER_ID),
+                            .join(ARCHIVE),
                     );
                 }
             }
-            candidates.push(executable_dir.join(CATALOG_DIR).join(PROVIDER_ID));
+            candidates.push(executable_dir.join(CATALOG_DIR).join(ARCHIVE));
         }
     }
     if cfg!(debug_assertions) {
-        candidates.push(source_tree_root());
+        candidates.push(PathBuf::from(env!("MISTY_AGENT_CATALOG")));
     }
     candidates
 }
@@ -202,30 +187,63 @@ fn catalog_root_candidates(resource_dir: Option<&Path>) -> Vec<PathBuf> {
     clippy::disallowed_methods,
     reason = "probes where the persona catalog is installed before granting that folder"
 )]
-fn has_catalog_manifest(candidate: &Path) -> bool {
-    candidate.join("manifest.json").is_file()
+fn is_archive(candidate: &Path) -> bool {
+    candidate.is_file()
 }
 
-fn resolve_catalog_root(resource_dir: Option<&Path>) -> Result<PathBuf, String> {
-    let found = catalog_root_candidates(resource_dir)
+fn resolve_archive(resource_dir: Option<&Path>) -> Result<PathBuf, String> {
+    let found = archive_candidates(resource_dir)
         .into_iter()
-        .find(|candidate| has_catalog_manifest(candidate))
+        .find(|candidate| is_archive(candidate))
         .ok_or_else(|| {
             "The persona catalog isn't installed with this copy of Misty.".to_string()
         })?;
-    file_access::allow_bundled_resources(&found);
+    if let Some(folder) = found.parent() {
+        file_access::allow_bundled_resources(folder);
+    }
     Ok(found)
 }
 
-fn read_json<T: for<'de> Deserialize<'de>>(path: &Path, label: &str) -> Result<T, String> {
-    let raw =
-        fs::read_to_string(path).map_err(|error| format!("Couldn't read {label}: {error}"))?;
-    serde_json::from_str(&raw).map_err(|error| format!("The {label} isn't valid: {error}"))
+fn unpack(archive: &Path, wanted: &[&str]) -> Result<HashMap<String, Vec<u8>>, String> {
+    let unreadable = |error: std::io::Error| format!("Couldn't read the persona catalog: {error}");
+    let file = fs::File::open(archive).map_err(unreadable)?;
+    let decoder = zstd::stream::read::Decoder::new(file).map_err(unreadable)?;
+    let mut entries = tar::Archive::new(decoder.take(MOST_CATALOG_BYTES));
+    let mut found = HashMap::new();
+    for entry in entries.entries().map_err(unreadable)? {
+        let mut entry = entry.map_err(unreadable)?;
+        let name = entry
+            .path()
+            .map_err(unreadable)?
+            .to_string_lossy()
+            .into_owned();
+        if wanted.contains(&name.as_str()) && !found.contains_key(&name) {
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).map_err(unreadable)?;
+            found.insert(name, bytes);
+            if found.len() == wanted.len() {
+                break;
+            }
+        }
+    }
+    Ok(found)
 }
 
-fn load_catalog_from_root(root: PathBuf) -> Result<LoadedCatalog, String> {
-    let manifest: CatalogManifest = read_json(&root.join("manifest.json"), "catalog manifest")?;
-    let document: CatalogAgentsDocument = read_json(&root.join("agents.json"), "catalog entries")?;
+fn parse<T: for<'de> Deserialize<'de>>(
+    files: &HashMap<String, Vec<u8>>,
+    name: &str,
+    label: &str,
+) -> Result<T, String> {
+    let bytes = files
+        .get(name)
+        .ok_or_else(|| format!("Couldn't read {label}: it isn't in the catalog."))?;
+    serde_json::from_slice(bytes).map_err(|error| format!("The {label} isn't valid: {error}"))
+}
+
+fn load_catalog(archive: PathBuf) -> Result<LoadedCatalog, String> {
+    let files = unpack(&archive, &["manifest.json", "agents.json"])?;
+    let manifest: CatalogManifest = parse(&files, "manifest.json", "catalog manifest")?;
+    let document: CatalogAgentsDocument = parse(&files, "agents.json", "catalog entries")?;
     if manifest.schema_version != 1 || document.schema_version != 1 {
         return Err("This persona catalog's version isn't supported.".to_string());
     }
@@ -259,7 +277,7 @@ fn load_catalog_from_root(root: PathBuf) -> Result<LoadedCatalog, String> {
         }
     }
     Ok(LoadedCatalog {
-        root,
+        archive,
         manifest,
         agents: document.agents,
     })
@@ -271,7 +289,7 @@ fn catalog(app: &tauri::AppHandle) -> Result<&'static LoadedCatalog, String> {
         return Ok(loaded);
     }
     let resource_dir = app.path().resource_dir().ok();
-    let loaded = load_catalog_from_root(resolve_catalog_root(resource_dir.as_deref())?)?;
+    let loaded = load_catalog(resolve_archive(resource_dir.as_deref())?)?;
     Ok(LOADED.get_or_init(|| loaded))
 }
 
@@ -326,8 +344,13 @@ fn resolve_prompt<'a>(
         .iter()
         .find(|entry| entry.id == agent_id)
         .ok_or_else(|| format!("There's no persona `{agent_id}`."))?;
-    let prompt = fs::read_to_string(catalog.root.join(&agent.prompt_path))
-        .map_err(|error| format!("Couldn't read the persona's prompt: {error}"))?;
+    let prompt = unpack(&catalog.archive, &[agent.prompt_path.as_str()])?
+        .remove(&agent.prompt_path)
+        .ok_or_else(|| "Couldn't read the persona's prompt: it isn't in the catalog.".to_string())
+        .and_then(|bytes| {
+            String::from_utf8(bytes)
+                .map_err(|_| "Couldn't read the persona's prompt: it isn't text.".to_string())
+        })?;
     if prompt.trim().is_empty() {
         return Err(format!("The persona `{agent_id}` has an empty prompt."));
     }
@@ -373,12 +396,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_bundled_pack_loads_and_every_prompt_matches_its_hash() {
-        let root = source_tree_root();
-        file_access::allow_bundled_resources(&root);
-        let catalog = load_catalog_from_root(root).expect("the bundled catalog");
+    fn the_packed_catalog_loads_and_every_prompt_matches_its_hash() {
+        let archive = resolve_archive(None).expect("the packed catalog");
+        let catalog = load_catalog(archive).expect("the bundled catalog");
         assert_eq!(catalog.agents.len(), catalog.manifest.agent_count);
-        for agent in catalog.agents.iter().take(10) {
+        for agent in &catalog.agents {
             resolve_prompt(&catalog, &agent.id).expect("a matching prompt");
         }
     }

@@ -1,11 +1,11 @@
-use rand::Rng;
+use rand::RngExt;
 
 const ALPHABET: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 pub(crate) fn generate_id() -> String {
-    let mut random = rand::thread_rng();
+    let mut random = rand::rng();
     (0..16)
-        .map(|_| char::from(ALPHABET[random.gen_range(0..ALPHABET.len())]))
+        .map(|_| char::from(ALPHABET[random.random_range(0..ALPHABET.len())]))
         .collect()
 }
 

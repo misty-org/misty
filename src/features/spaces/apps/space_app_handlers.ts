@@ -9,11 +9,11 @@ import { HostError, PROTOCOL_VERSIONS } from "./protocol";
 import type { ErrorCode } from "./protocol";
 import { createDriveFileCalls } from "../drive/drive_app_files";
 import type { FileHost } from "./space_app_files";
-import { createAppRooms, type RoomSource } from "./app_rooms";
+import { createAppRooms, ROOM_FEATURES, type RoomSource } from "./app_rooms";
 import { fileRoomOpener } from "./app_file_rooms";
 import { createAppCalls } from "./app_calls";
 import { appRoute } from "./app_routes";
-import { useAppControl } from "./app_screen";
+import { watchAgentControl } from "./app_screen";
 import { useSpacesStore } from "../list/use_spaces_store";
 import { memberAgentsIn, useMemberAgents } from "../list/member_agents";
 import { useSpaceRolesStore } from "../roles/use_space_roles";
@@ -26,6 +26,7 @@ export interface Source<T> {
 export interface AppHostContext {
   appId: string;
   appName?: string;
+  instance?: string;
   space: { id: string; name: string; description?: string; isMod: boolean };
   me: { user_id: string; name: string; role: "owner" | "member"; avatar_version?: number };
   permissions: string[];
@@ -62,15 +63,14 @@ function spacePresence(spaceId: string, me: string) {
   );
   return (membersBySpace[spaceId] ?? []).map((member) => {
     const viewer = viewers.get(member.user_id);
-    const here = Boolean(viewer) || member.user_id === me;
-    const account = accounts[member.user_id];
-    const status = !here ? "offline" : account && account !== "offline" ? account : "online";
+    const status = accounts[member.user_id] ?? (member.user_id === me ? "online" : "offline");
+    const shown = status !== "offline";
     return {
       user_id: member.user_id,
-      state: here ? ("online" as const) : ("offline" as const),
+      state: shown ? ("online" as const) : ("offline" as const),
       status,
       working: working.has(member.user_id),
-      ...(viewer?.place === "app" && viewer.item_id ? { app_id: viewer.item_id } : {}),
+      ...(shown && viewer?.place === "app" && viewer.item_id ? { app_id: viewer.item_id } : {}),
     };
   });
 }
@@ -103,24 +103,6 @@ function watchPresence(spaceId: string, me: string, emit: (data: unknown) => voi
     stopAgents();
     stopAccounts();
   };
-}
-
-function watchAgentControl(appId: string, me: string, emit: (data: unknown) => void): () => void {
-  let last = "";
-  const send = () => {
-    const { agents, held } = useAppControl.getState();
-    const agent = agents[appId];
-    const control = {
-      agent: agent ? { id: agent.agentId, name: agent.name, user_id: me } : null,
-      driver: agent && !held[appId] ? ("agent" as const) : ("person" as const),
-    };
-    const key = JSON.stringify(control);
-    if (key === last) return;
-    last = key;
-    emit(control);
-  };
-  send();
-  return useAppControl.subscribe(send);
 }
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -200,6 +182,8 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
     if (typeof wanted.dm === "string" && wanted.dm) {
       if (wanted.dm === context.me.user_id)
         throw new HostError("invalid", "A direct message needs someone else.");
+      if (!(await members()).some((member) => member.user_id === wanted.dm))
+        throw new HostError("invalid", "That person isn't in this Space.");
       const dm = await spacesApi.openDirectMessage(wanted.dm);
       return { kind: "dm", spaceId: dm.id };
     }
@@ -282,7 +266,7 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
         permissions: context.permissions,
         protocol: typeof protocol === "number" ? protocol : PROTOCOL_VERSIONS[0],
         versions: [...PROTOCOL_VERSIONS],
-        offers: { calls: Object.keys(calls), topics: [...HOST_TOPICS] },
+        offers: { calls: Object.keys(calls), topics: [...HOST_TOPICS, ...ROOM_FEATURES] },
       };
     },
     "route.navigate": async ({ route, replace }) => {
@@ -378,7 +362,7 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
         case "calls.current":
           return appCalls.watchCurrent(emit);
         case "agents.control":
-          return watchAgentControl(appId, context.me.user_id, emit);
+          return watchAgentControl(context.instance ?? "", context.me.user_id, emit);
         case "room":
           return rooms.subscribe(record(params), emit, end);
         default:

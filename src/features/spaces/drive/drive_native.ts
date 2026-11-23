@@ -27,6 +27,9 @@ export interface DriveEntry {
   keep_downloaded: boolean;
   in_use: DriveInUse[];
   version?: number;
+  content_version?: number;
+  sha?: string;
+  waits_large?: boolean;
 }
 
 export type DriveTrashEntry = DriveEntry & {
@@ -72,6 +75,11 @@ export const DRIVE_STATUS_EVENT = "misty://drive-status";
 export const DRIVE_CHANGED_EVENT = "misty://drive-changed";
 export const DRIVE_NOTICE_EVENT = "misty://drive-notice";
 
+export interface DriveFailure {
+  path: string;
+  error: string;
+}
+
 export interface DriveSpace {
   id: string;
   name: string;
@@ -88,6 +96,7 @@ function arrayBufferOf(value: ArrayBuffer | ArrayBufferView | number[]): ArrayBu
 
 export const driveNative = {
   status: () => invoke<DriveSpaceStatus[]>("drive_status"),
+  conflicts: () => invoke<DriveEntry[]>("drive_conflicts"),
   list: (spaceId: string, path: string, options?: { cursor?: string; limit?: number }) =>
     invoke<DriveListing>("drive_list", {
       spaceId,
@@ -99,9 +108,13 @@ export const driveNative = {
     invoke<DriveEntry | null>("drive_entry", { spaceId, path }),
   entryById: (spaceId: string, itemId: string) =>
     invoke<DriveEntry | null>("drive_entry", { spaceId, itemId }),
-  read: async (spaceId: string, path: string): Promise<ArrayBuffer> =>
+  read: async (spaceId: string, path: string, limit?: number): Promise<ArrayBuffer> =>
     arrayBufferOf(
-      await invoke<ArrayBuffer | ArrayBufferView | number[]>("drive_read", { spaceId, path }),
+      await invoke<ArrayBuffer | ArrayBufferView | number[]>("drive_read", {
+        spaceId,
+        path,
+        limit: limit ?? null,
+      }),
     ),
   write: (
     spaceId: string,
@@ -136,6 +149,12 @@ export const driveNative = {
   removeDownload: (spaceId: string, path: string) =>
     invoke<void>("drive_remove_download", { spaceId, path }),
   trash: (spaceId: string, path: string) => invoke<void>("drive_trash", { spaceId, path }),
+  trashMany: (spaceId: string, paths: string[]) =>
+    invoke<DriveFailure[]>("drive_trash_many", { spaceId, paths }),
+  restoreMany: (spaceId: string, itemIds: string[]) =>
+    invoke<DriveFailure[]>("drive_restore_many", { spaceId, itemIds }),
+  purgeMany: (spaceId: string, itemIds: string[]) =>
+    invoke<DriveFailure[]>("drive_purge_many", { spaceId, itemIds }),
   trashList: (spaceId: string) => invoke<DriveTrashEntry[]>("drive_trash_list", { spaceId }),
   restore: (spaceId: string, itemId: string) => invoke<void>("drive_restore", { spaceId, itemId }),
   restoreBurst: (spaceId: string, burst: string) =>
@@ -143,14 +162,18 @@ export const driveNative = {
   purge: (spaceId: string, itemId: string) => invoke<void>("drive_purge", { spaceId, itemId }),
   createFolder: (spaceId: string, folder: string, name: string) =>
     invoke<DriveEntry>("drive_create_folder", { spaceId, folder, name }),
-  rename: (spaceId: string, path: string, name: string) =>
-    invoke<DriveEntry>("drive_rename", { spaceId, path, name }),
-  move: (spaceId: string, paths: string[], folder: string) =>
-    invoke<DriveEntry[]>("drive_move", { spaceId, paths, folder }),
+  rename: (spaceId: string, path: string, name: string, replace?: boolean) =>
+    invoke<DriveEntry>("drive_rename", { spaceId, path, name, replace: replace ?? null }),
+  move: (spaceId: string, paths: string[], folder: string, replace?: boolean) =>
+    invoke<DriveEntry[]>("drive_move", { spaceId, paths, folder, replace: replace ?? null }),
   copyIn: (spaceId: string, source: string, folder: string) =>
     invoke<DriveEntry>("drive_copy_in", { spaceId, source, folder }),
   setCacheLimit: (bytes: number | null) =>
     invoke<number | null>("drive_set_cache_limit", { bytes }),
+  setLargeFileLimit: (bytes: number | null) =>
+    invoke<number | null>("drive_set_large_file_limit", { bytes }),
+  syncLarge: (spaceId: string, path: string) =>
+    invoke<DriveEntry>("drive_sync_large", { spaceId, path }),
   setPaused: (paused: boolean) => invoke<boolean>("drive_set_paused", { paused }),
   paused: () => invoke<boolean>("drive_paused"),
   reveal: (spaceId: string, path?: string) =>
@@ -170,11 +193,19 @@ export function driveEntryById(spaceId: string, itemId: string): Promise<DriveEn
   return driveNative.entryById(spaceId, itemId);
 }
 
-export function onDriveEvent<T>(event: string, listener: (payload: T) => void): () => void {
-  if (!hasTauriInternals()) return () => {};
+export interface DriveSubscription {
+  ready: Promise<void>;
+  stop: () => void;
+}
+
+export function subscribeDriveEvent<T>(
+  event: string,
+  listener: (payload: T) => void,
+): DriveSubscription {
+  if (!hasTauriInternals()) return { ready: Promise.resolve(), stop: () => {} };
   let stopped = false;
   let unlisten: (() => void) | null = null;
-  void getCurrentWebview()
+  const ready = getCurrentWebview()
     .listen<T>(event, ({ payload }) => {
       if (!stopped) listener(payload);
     })
@@ -185,11 +216,21 @@ export function onDriveEvent<T>(event: string, listener: (payload: T) => void): 
       },
       () => undefined,
     );
-  return () => {
-    stopped = true;
-    unlisten?.();
+  return {
+    ready,
+    stop: () => {
+      stopped = true;
+      unlisten?.();
+    },
   };
 }
+
+export function onDriveEvent<T>(event: string, listener: (payload: T) => void): () => void {
+  return subscribeDriveEvent(event, listener).stop;
+}
+
+export const subscribeDriveChanged = (listener: (changed: DriveChanged) => void) =>
+  subscribeDriveEvent(DRIVE_CHANGED_EVENT, listener);
 
 export const onDriveStatus = (listener: (status: DriveSpaceStatus | DriveSpaceStatus[]) => void) =>
   onDriveEvent(DRIVE_STATUS_EVENT, listener);

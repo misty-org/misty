@@ -39,7 +39,7 @@ export function SpaceMembers({
         <div className="flex min-w-0 items-center justify-end gap-2">
           <BringAgentMenu
             agents={spaceAgents.agents}
-            currentUserId={user?.id}
+            spaceId={spaceId}
             onBring={(agentId) => void spaceAgents.bring(agentId)}
           />
           {state.canInvite ? (

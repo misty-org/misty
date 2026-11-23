@@ -15,6 +15,7 @@ import {
 import { disk, type CompareRow, type CompareState } from "@/features/files";
 import { formatBytes, messageOf } from "../format";
 import { nameOf } from "../model";
+import { newOpId } from "../use_operations";
 
 const stateText: Record<Exclude<CompareState, "same">, string> = {
   changed: "Different",
@@ -51,13 +52,20 @@ export function CompareDialog({
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
+    const opId = newOpId();
     setRows(null);
     setError("");
-    void disk.compare(left, right).then(
-      (next) => live && setRows(next),
-      (cause) => live && setError(messageOf(cause, "The folders couldn't be compared.")),
-    );
+    void disk
+      .compare(left, right, opId)
+      .then(
+        (next) => live && setRows(next),
+        (cause) => live && setError(messageOf(cause, "The folders couldn't be compared.")),
+      )
+      .finally(() => {
+        live = false;
+      });
     return () => {
+      if (live) void disk.cancel(opId).catch(() => undefined);
       live = false;
     };
   }, [left, right, attempt]);

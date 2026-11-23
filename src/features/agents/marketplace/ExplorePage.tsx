@@ -180,9 +180,10 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
       start={{
         id: "explore-rail",
         label: "Resize the rail",
-        defaultSize: 18,
-        minSize: 14,
-        maxSize: 30,
+        width: 180,
+        minWidth: 144,
+        maxWidth: 300,
+        keep: true,
         content: railColumn,
       }}
     >

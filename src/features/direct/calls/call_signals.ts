@@ -1,25 +1,19 @@
 import { RoomEvent, type RemoteParticipant, type Room } from "livekit-client";
+import { callReactions } from "./call_reactions";
 
 const topic = "misty.signals";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-export const callReactions = [
-  { emoji: "👍", label: "Thumbs up" },
-  { emoji: "👎", label: "Thumbs down" },
-  { emoji: "👏", label: "Clapping" },
-  { emoji: "❤️", label: "Heart" },
-  { emoji: "😂", label: "Laughing" },
-  { emoji: "😮", label: "Surprised" },
-  { emoji: "🎉", label: "Party" },
-  { emoji: "🙏", label: "Thank you" },
-];
 const allowed = new Set(callReactions.map((reaction) => reaction.emoji));
 const REACTION_MS = 2400;
 const REACTION_GAP_MS = 250;
 const CAPTION_MS = 7000;
 const CAPTION_LINES = 3;
 const CAPTION_LIMIT = 500;
+
+const cipherOf = (key: Uint8Array<ArrayBuffer>) =>
+  crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 
 type Signal =
   | { t: "hand"; up: boolean; at?: number }
@@ -28,7 +22,8 @@ type Signal =
   | { t: "cc"; on: boolean }
   | { t: "said"; text: string }
   | { t: "lower" }
-  | { t: "muted" };
+  | { t: "muted" }
+  | { t: "sync" };
 
 function readSignal(value: unknown): Signal | null {
   if (!value || typeof value !== "object") return null;
@@ -47,6 +42,7 @@ function readSignal(value: unknown): Signal | null {
     return { t: "said", text: m.text.trim().slice(0, CAPTION_LIMIT) };
   if (m.t === "lower") return { t: "lower" };
   if (m.t === "muted") return { t: "muted" };
+  if (m.t === "sync") return { t: "sync" };
   return null;
 }
 
@@ -77,6 +73,7 @@ export interface SignalEvents {
 
 export class CallSignals {
   private cipher: Promise<CryptoKey>;
+  private previous: Promise<CryptoKey> | undefined;
   private hands = new Map<string, number>();
   private deaf = new Set<string>();
   private reactions = new Map<string, CallReaction>();
@@ -97,19 +94,30 @@ export class CallSignals {
 
   constructor(
     private readonly room: Room,
-    key: Uint8Array<ArrayBuffer>,
+    private key: Uint8Array<ArrayBuffer>,
     private readonly events: SignalEvents,
+    private readonly mayModerate?: (identity: string) => boolean,
   ) {
-    this.cipher = crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, [
-      "encrypt",
-      "decrypt",
-    ]);
+    this.cipher = cipherOf(key);
     room.on(RoomEvent.DataReceived, this.received);
     room.on(RoomEvent.ParticipantConnected, this.joined);
     room.on(RoomEvent.ParticipantDisconnected, this.departed);
   }
 
   current = () => this.view;
+
+  setKey(key: Uint8Array<ArrayBuffer>) {
+    if (this.disposed || key === this.key) return;
+    this.key = key;
+    this.previous = this.cipher;
+    this.cipher = cipherOf(key);
+    this.resend();
+    void this.send({ t: "sync" });
+  }
+
+  private moderates(identity: string) {
+    return identity !== this.self && Boolean(this.mayModerate?.(identity));
+  }
 
   private get self() {
     return this.room.localParticipant.identity;
@@ -193,13 +201,16 @@ export class CallSignals {
         this.caption(identity, signal.text);
         return;
       case "lower":
-        if (identity !== this.self && this.hands.has(this.self)) {
+        if (this.moderates(identity) && this.hands.has(this.self)) {
           this.setHand(false);
           this.events.lowered();
         }
         return;
       case "muted":
-        if (identity !== this.self) this.events.muted();
+        if (this.moderates(identity)) this.events.muted();
+        return;
+      case "sync":
+        if (identity !== this.self) this.resend([identity]);
         return;
       case "react": {
         const now = Date.now();
@@ -265,23 +276,33 @@ export class CallSignals {
   ) => {
     if (received !== topic || !participant || this.disposed) return;
     void (async () => {
-      const plain = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: payload.slice(0, 12) },
-        await this.cipher,
-        payload.slice(12),
-      );
+      const plain = await this.open(payload);
       const signal = readSignal(JSON.parse(decoder.decode(plain)));
       if (signal) this.apply(participant.identity, signal);
     })().catch(() => undefined);
   };
 
-  private joined = (participant: RemoteParticipant) => {
-    const to = [participant.identity];
+  private async open(payload: Uint8Array) {
+    const iv = payload.slice(0, 12);
+    const sealed = payload.slice(12);
+    const previous = this.previous;
+    try {
+      return await crypto.subtle.decrypt({ name: "AES-GCM", iv }, await this.cipher, sealed);
+    } catch (error) {
+      if (!previous) throw error;
+      return crypto.subtle.decrypt({ name: "AES-GCM", iv }, await previous, sealed);
+    }
+  }
+
+  private joined = (participant: RemoteParticipant) => this.resend([participant.identity]);
+
+  private resend(to?: string[]) {
+    if (this.disposed) return;
     const raised = this.hands.get(this.self);
     if (raised !== undefined) void this.send({ t: "hand", up: true, at: raised }, to);
     if (this.deaf.has(this.self)) void this.send({ t: "deaf", on: true }, to);
     if (this.wanted.has(this.self)) void this.send({ t: "cc", on: true }, to);
-  };
+  }
 
   private departed = (participant: RemoteParticipant) => {
     const identity = participant.identity;

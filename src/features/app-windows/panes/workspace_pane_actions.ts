@@ -1,6 +1,6 @@
 import { normalizeDockingLayout, validDockingLayout } from "@/app/shell/docking_layout";
 import { traversePaneHistory } from "./pane_history";
-import { appendTab, layoutTabs, activateTab, singleViewTab } from "./layout_tabs";
+import { appendTab, layoutTabs, activateTab } from "./layout_tabs";
 import {
   collapseEmptyDockLeaves,
   createDockId,
@@ -19,7 +19,7 @@ import {
   updateDockSplitRatio,
 } from "./dock_tree";
 import { canCloseWorkspaceView, removeDockView } from "../tabs/workspace_view_operations";
-import { maxWorkspacePanes, type WorkspaceLayout } from "../tabs/workspace_views";
+import { maxWorkspacePanes } from "../tabs/workspace_views";
 import { createDefaultWorkspaceView } from "../tabs/workspace_default_view";
 import type { StoreApi } from "zustand";
 import type { WorkspaceStore } from "../tabs/use_workspace_store";
@@ -34,7 +34,6 @@ export function workspacePaneActions(
   | "moveView"
   | "dockView"
   | "dockViews"
-  | "applyLayoutRoot"
   | "detachPaneToTab"
   | "reorderPaneViews"
   | "reorderView"
@@ -120,28 +119,6 @@ export function workspacePaneActions(
           : [];
       });
       set(withLayout(current, activateTab({ ...current.layout, tabs }, targetTab.id)));
-      return true;
-    },
-    applyLayoutRoot: (tabId, root) => {
-      const current = get();
-      const tabs = layoutTabs(current.layout);
-      const target = tabs.find((tab) => tab.id === tabId);
-      const arranged = collapseEmptyDockLeaves(root);
-      if (!target || !arranged) return false;
-      const placed = new Set(dockTreeViews(arranged).map((view) => view.id));
-      const released = dockTreeViews(target.root).filter((view) => !placed.has(view.id));
-      const next = tabs.flatMap((tab) => {
-        if (tab.id === tabId)
-          return [{ ...tab, root: arranged, focusedPaneId: dockLeaves(arranged)[0].id }];
-        let rest = tab.root;
-        for (const id of placed)
-          if (dockTreeViews(rest).some((view) => view.id === id)) rest = removeDockView(rest, id);
-        const kept = collapseEmptyDockLeaves(rest);
-        return kept ? [{ ...tab, root: kept, focusedPaneId: dockLeaves(kept)[0].id }] : [];
-      });
-      let layout: WorkspaceLayout = { ...current.layout, tabs: next };
-      for (const view of released) layout = appendTab(layout, singleViewTab(view));
-      set(withLayout(current, activateTab(layout, tabId)));
       return true;
     },
     detachPaneToTab: (viewId) => {

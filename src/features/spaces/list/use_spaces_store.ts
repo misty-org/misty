@@ -15,6 +15,11 @@ import type { SpacesStore } from "./spaces_store_types";
 import { createSpaceContentActions } from "./create_space_content_actions";
 import { createSpaceLifecycleActions } from "./create_space_lifecycle_actions";
 import {
+  noteSpacesSnapshotLoaded,
+  resetSpacesSnapshotFreshness,
+  setSpacesSnapshotQueuedCheck,
+} from "./spaces_snapshot_freshness";
+import {
   createSpacesRealtimeActions,
   resetSpacesRealtimeRuntime,
 } from "./create_spaces_realtime_actions";
@@ -24,6 +29,7 @@ const snapshotAutoMinIntervalMs = 1_500;
 const snapshotRateLimitCooldownMs = 10_000;
 const snapshotServerErrorCooldownMs = 5_000;
 let snapshotLoadPromise: Promise<void> | null = null;
+let forcedSnapshotFollowUp: Promise<void> | null = null;
 let snapshotLastRequestedAt = 0;
 let snapshotCooldownUntil = 0;
 let snapshotRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -52,6 +58,12 @@ function retrySnapshotLater(generation: number) {
 
 let spacesAccountGeneration = 0;
 
+setSpacesSnapshotQueuedCheck(() => forcedSnapshotFollowUp !== null || snapshotRetryTimer !== null);
+
+function waitMs(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((done) => setTimeout(done, ms)) : Promise.resolve();
+}
+
 export const useSpacesStore = create<SpacesStore>((set, get) => ({
   spaces: [],
   invitations: [],
@@ -72,6 +84,22 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   load: async (options) => {
     const force = options?.force === true;
     const now = Date.now();
+    if (force && (snapshotLoadPromise || now < snapshotCooldownUntil)) {
+      const waiting = snapshotLoadPromise !== null;
+      if (!waiting && snapshotRetryTimer) return;
+      if (forcedSnapshotFollowUp) return waiting ? forcedSnapshotFollowUp : undefined;
+      const generation = spacesAccountGeneration;
+      const before = snapshotLoadPromise?.catch(() => undefined) ?? Promise.resolve();
+      const followUp = before
+        .then(() => waitMs(snapshotCooldownUntil - Date.now()))
+        .then(() => {
+          if (forcedSnapshotFollowUp === followUp) forcedSnapshotFollowUp = null;
+          if (generation !== spacesAccountGeneration) return;
+          return get().load(options);
+        });
+      forcedSnapshotFollowUp = followUp;
+      return waiting ? followUp : undefined;
+    }
     if (snapshotLoadPromise) return snapshotLoadPromise;
     if (now < snapshotCooldownUntil) return;
     if (
@@ -83,7 +111,8 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
 
     const request = (async () => {
       const generation = spacesAccountGeneration;
-      snapshotLastRequestedAt = Date.now();
+      const requestedAt = Date.now();
+      snapshotLastRequestedAt = requestedAt;
       set({ loading: true, error: null });
       try {
         const snapshot = await spacesApi.snapshot((saved) => {
@@ -98,6 +127,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
         snapshotCooldownUntil = 0;
         clearSnapshotRetry(true);
         set(referenceMode.liveSpaceSnapshotState(snapshot));
+        noteSpacesSnapshotLoaded(requestedAt);
       } catch (error) {
         if (generation !== spacesAccountGeneration) return;
         if (error instanceof SpaceRequestError && error.status === 401) {
@@ -306,6 +336,8 @@ export function resetSpacesAccountState(): void {
   notifyAccountScopeReset();
   resetSpacesRealtimeRuntime();
   snapshotLoadPromise = null;
+  forcedSnapshotFollowUp = null;
+  resetSpacesSnapshotFreshness();
   snapshotLastRequestedAt = 0;
   snapshotCooldownUntil = 0;
   clearSnapshotRetry(true);

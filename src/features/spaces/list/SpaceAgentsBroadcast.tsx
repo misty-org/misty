@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMistyStore, useStudioAgents, useTeammateAgents } from "@/features/agents";
+import {
+  useMistyStore,
+  useStudioAgents,
+  useTeammateAgents,
+  useThreadWork,
+} from "@/features/agents";
 import { useWindowSpace } from "../components/space-row/use_window_space";
 import { useSpaceItemCreator } from "../overview/use_space_item_creator";
 import { memberPicture } from "../members/member_pictures";
 import { useSpacesStore } from "./use_spaces_store";
 import { sendAgentStatuses } from "./create_spaces_realtime_actions";
-import { doingLabel, memberAgentsIn, useMemberAgents } from "./member_agents";
+import {
+  doingLabel,
+  memberAgentsIn,
+  useMemberAgents,
+  type MemberAgentStatus,
+} from "./member_agents";
 
 const REPEAT_EVERY = 30_000;
 
@@ -19,9 +29,16 @@ export function SpaceAgentsBroadcast() {
   const [faces, setFaces] = useState<Record<string, string | null>>({});
   const members = useSpacesStore((state) => state.membersBySpace[spaceId]);
   const conversations = useMistyStore((state) => state.conversations);
+  const threads = useThreadWork((state) => state.byConversation);
   const statuses = useMemo(
-    () => spaceAgentStatuses(agents, spaceId, conversations),
-    [agents, spaceId, conversations],
+    () =>
+      withLanding(
+        spaceAgentStatuses(agents, spaceId, conversations),
+        spaceId,
+        conversations,
+        threads,
+      ),
+    [agents, spaceId, conversations, threads],
   );
   const said = JSON.stringify(statuses);
   useEffect(() => {
@@ -43,7 +60,7 @@ export function SpaceAgentsBroadcast() {
             owner: person(userId),
             ownerPicture: faces[userId] ?? undefined,
             state: agent.state,
-            doing: doingLabel(agent.doing, agent.state),
+            doing: doingLabel(agent.doing, agent.state, agent.waiting),
             files: agent.state === "resting" ? [] : (agent.files ?? []),
           }),
         ),
@@ -94,5 +111,26 @@ export function spaceAgentStatuses(
       doing: here ? doingCode : "",
       ...(here && files.length ? { files: files.slice(0, 5) } : {}),
     };
+  });
+}
+
+export function withLanding(
+  statuses: readonly MemberAgentStatus[],
+  spaceId: string,
+  conversations: readonly { id: string; agentId?: string }[],
+  threads: Readonly<Record<string, { spaceId: string; state: string } | null>>,
+): MemberAgentStatus[] {
+  const landing = new Set<string | undefined>();
+  const waiting = new Map<string | undefined, number>();
+  for (const chat of conversations) {
+    const thread = threads[chat.id];
+    if (thread?.spaceId !== spaceId) continue;
+    if (thread.state === "landing") landing.add(chat.agentId);
+    if (thread.state === "held") waiting.set(chat.agentId, (waiting.get(chat.agentId) ?? 0) + 1);
+  }
+  return statuses.map((status) => {
+    const queued = waiting.get(status.id) ?? 0;
+    const counted = queued ? { ...status, waiting: queued } : status;
+    return landing.has(status.id) ? { ...counted, state: "landing", doing: "files" } : counted;
   });
 }

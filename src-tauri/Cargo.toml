@@ -30,6 +30,8 @@ harness = false
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+tar = "0.4"
+zstd = { version = "0.13", default-features = false }
 
 [dependencies]
 aes-gcm = "0.10"
@@ -43,6 +45,7 @@ base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dirs = "6.0.0"
 hex = "0.4"
+httpdate = "1"
 misty-credential-store = { path = "vendor/misty-credential-store" }
 browser_data = { path = "features/sync/browser_data" }
 agent-runs = { path = "features/agents/runs" }
@@ -58,15 +61,17 @@ permissions = { path = "features/permissions" }
 space_drive = { path = "features/space_drive" }
 documents = { path = "features/documents" }
 libc = "0.2"
-rand = "0.8"
+rand = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
+# Files' duplicate finder hashes candidates with BLAKE3 (CC0-1.0 or Apache-2.0).
+blake3 = "1"
 tempfile = "3"
 tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "tray-icon", "image-png", "unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
-thiserror = "1"
+thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "process", "rt-multi-thread", "sync", "time"] }
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "query", "rustls-no-provider", "socks", "stream"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
@@ -95,7 +100,7 @@ percent-encoding = "2"
 # the CLIs' TOML and YAML configs, a lock for live registries and caches, process trees and
 # figures for the performance panel, and program lookup. All MIT or Apache-2.0.
 parking_lot = "0.12"
-toml = "0.8"
+toml = "1"
 toml_edit = "0.25"
 serde_yaml = "0.9"
 sysinfo = "0.36.1"
@@ -106,7 +111,7 @@ zip = { version = "4", default-features = false, features = ["deflate"] }
 # Files (features/files): a names-only search index of the home folder, typo-tolerant (MIT), the
 # live refresh of open folders (CC0-1.0) and walking a folder for its size and duplicates
 # (MIT/Unlicense), as Kura used them.
-tantivy = "0.26.2"
+tantivy = { version = "0.26.2", default-features = false, features = ["mmap", "lz4-compression", "columnar-zstd-compression"] }
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 walkdir = "2.5"
 
@@ -155,7 +160,11 @@ objc2-core-video = "0.3.2"
 objc2-core-foundation = "0.3.2"
 # Files' thumbnails, made by the system's own image reader (features/files/system_thumbnail.rs).
 objc2-image-io = "0.3.2"
+# Thumbnails of videos, PDFs and documents, from Quick Look (features/files/quick_look_thumbnail.rs).
+objc2-quick-look-thumbnailing = "0.3.2"
 objc2-application-services = "0.3.2"
+# Files' one stream of file events, resumable from an event id (features/files/fs_events.rs).
+objc2-core-services = { version = "0.3.2", default-features = false, features = ["std", "FSEvents", "dispatch2"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Agent page captures on WebKitGTK (features/browser/pages/linux.rs). The same versions kiri and
@@ -242,6 +251,73 @@ strip = "symbols"
 # Build-time proc macros are never shipped; keep their loader symbols intact.
 [profile.release.build-override]
 strip = false
+
+[profile.release.package.tantivy]
+opt-level = 3
+[profile.release.package.tantivy-bitpacker]
+opt-level = 3
+[profile.release.package.tantivy-columnar]
+opt-level = 3
+[profile.release.package.tantivy-common]
+opt-level = 3
+[profile.release.package.tantivy-fst]
+opt-level = 3
+[profile.release.package.tantivy-sstable]
+opt-level = 3
+[profile.release.package.tantivy-stacker]
+opt-level = 3
+[profile.release.package.bitpacking]
+opt-level = 3
+[profile.release.package.lz4_flex]
+opt-level = 3
+[profile.release.package.zstd]
+opt-level = 3
+[profile.release.package.zstd-safe]
+opt-level = 3
+[profile.release.package.zstd-sys]
+opt-level = 3
+[profile.release.package.image]
+opt-level = 3
+[profile.release.package.png]
+opt-level = 3
+[profile.release.package.zune-jpeg]
+opt-level = 3
+[profile.release.package.zune-core]
+opt-level = 3
+[profile.release.package.image-webp]
+opt-level = 3
+[profile.release.package.fdeflate]
+opt-level = 3
+[profile.release.package.flate2]
+opt-level = 3
+[profile.release.package.miniz_oxide]
+opt-level = 3
+[profile.release.package.zlib-rs]
+opt-level = 3
+[profile.release.package.simd-adler32]
+opt-level = 3
+[profile.release.package.crc32fast]
+opt-level = 3
+[profile.release.package.moxcms]
+opt-level = 3
+[profile.release.package.pxfm]
+opt-level = 3
+[profile.release.package.regex]
+opt-level = 3
+[profile.release.package.regex-automata]
+opt-level = 3
+[profile.release.package.aho-corasick]
+opt-level = 3
+[profile.release.package.memchr]
+opt-level = 3
+[profile.release.package.serde_json]
+opt-level = 3
+[profile.release.package.ryu]
+opt-level = 3
+[profile.release.package.itoa]
+opt-level = 3
+[profile.release.package.blake3]
+opt-level = 3
 
 [dev-dependencies]
 ctor = "0.8"

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { create } from "zustand";
 import {
   disk,
   type AgentTrashUsage,
@@ -7,36 +8,48 @@ import {
   type Places,
 } from "@/features/files";
 
-export function useFilesPlaces(granted: boolean) {
-  const [places, setPlaces] = useState<Places | null>(null);
-  const [tags, setTags] = useState<FinderTag[]>([]);
-  const [agentTrash, setAgentTrash] = useState<AgentTrashUsage | null>(null);
-  const [starred, setStarred] = useState<ReadonlySet<string>>(new Set());
+interface PlacesStore {
+  places: Places | null;
+  tags: FinderTag[];
+  agentTrash: AgentTrashUsage | null;
+  starred: ReadonlySet<string>;
+}
 
-  const refresh = useCallback(() => {
-    if (!granted) return;
-    void disk.tags().then(setTags, () => undefined);
-    void disk.agentTrashUsage().then(setAgentTrash, () => undefined);
-    void disk.starred().then(
-      (entries) => setStarred(new Set(entries.map((entry) => entry.path))),
-      () => undefined,
-    );
-  }, [granted]);
+export const usePlacesStore = create<PlacesStore>(() => ({
+  places: null,
+  tags: [],
+  agentTrash: null,
+  starred: new Set(),
+}));
 
+let loaded = false;
+
+export function refreshPlaces() {
+  if (!loaded) return;
+  void disk.tags().then(
+    (tags) => usePlacesStore.setState({ tags }),
+    () => undefined,
+  );
+  void disk.agentTrashUsage().then(
+    (agentTrash) => usePlacesStore.setState({ agentTrash }),
+    () => undefined,
+  );
+  void disk.starred().then(
+    (entries) => usePlacesStore.setState({ starred: new Set(entries.map((entry) => entry.path)) }),
+    () => undefined,
+  );
+}
+
+export function useLoadPlaces(granted: boolean) {
   useEffect(() => {
     if (!granted) return;
-    let live = true;
+    loaded = true;
     void disk.places().then(
-      (next) => live && setPlaces(next),
+      (places) => usePlacesStore.setState({ places }),
       () => undefined,
     );
-    refresh();
-    return () => {
-      live = false;
-    };
-  }, [granted, refresh]);
-
-  return { places, tags, agentTrash, starred, refresh };
+    refreshPlaces();
+  }, [granted]);
 }
 
 export function useFreeSpace(folder: string | undefined, granted: boolean, revision: number) {

@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use tauri::{
     ipc::{Channel, InvokeResponseBody},
-    State, Webview,
+    AppHandle, Manager, State, Webview,
 };
 use voice_capture::Capture;
 
@@ -9,7 +9,7 @@ const CHUNK_SAMPLES: usize = 1_920;
 
 #[derive(Default)]
 pub struct ShareAudioState {
-    running: Mutex<Option<Capture>>,
+    running: Mutex<Option<(String, Capture)>>,
 }
 
 #[tauri::command]
@@ -23,7 +23,7 @@ pub async fn voice_share_audio_start(
         return Err("Main Misty window required.".into());
     }
     let mut running = state.running.lock().map_err(|_| "Capture is busy.")?;
-    if let Some(previous) = running.take() {
+    if let Some((_, previous)) = running.take() {
         previous.stop();
     }
     let pending = Mutex::new(Vec::<u8>::with_capacity(CHUNK_SAMPLES * 2));
@@ -43,7 +43,7 @@ pub async fn voice_share_audio_start(
         },
     )
     .map_err(|error| error.to_string())?;
-    *running = Some(capture);
+    *running = Some((webview.label().to_owned(), capture));
     Ok(())
 }
 
@@ -52,9 +52,22 @@ pub fn voice_share_audio_stop(webview: Webview, state: State<'_, ShareAudioState
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return;
     }
-    if let Ok(mut running) = state.running.lock() {
-        if let Some(capture) = running.take() {
+    stop_owned_by(&state, webview.label());
+}
+
+fn stop_owned_by(state: &ShareAudioState, label: &str) {
+    let Ok(mut running) = state.running.lock() else {
+        return;
+    };
+    if running.as_ref().is_some_and(|(owner, _)| owner == label) {
+        if let Some((_, capture)) = running.take() {
             capture.stop();
         }
+    }
+}
+
+pub fn close_share_audio_window(app: &AppHandle, label: &str) {
+    if let Some(state) = app.try_state::<ShareAudioState>() {
+        stop_owned_by(&state, label);
     }
 }

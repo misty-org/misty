@@ -1,5 +1,10 @@
 use super::*;
 
+#[cfg(target_os = "macos")]
+const MAX_WORLD_POSTS: usize = 256;
+#[cfg(target_os = "macos")]
+const WORLD_POST_BOUND: std::time::Duration = std::time::Duration::from_secs(10);
+
 pub fn relay_script(token: &str, shortcuts: &str, sender: &str, world: bool) -> String {
     RELAY
         .replace(
@@ -45,10 +50,14 @@ pub async fn space_app_page_post(
     webview: Webview,
     mount: String,
     body: String,
+    doc: Option<String>,
 ) -> Result<(), String> {
     let page = owned_page(&webview, &mount)?;
     serde_json::from_str::<Value>(&body)
         .map_err(|_| "That isn't a message for the app.".to_owned())?;
+    if doc.as_deref().is_some_and(|doc| !on_doc(&mount, doc)) {
+        return Err("The app moved on to a new page.".into());
+    }
     if is_site(&mount) {
         let here = page.url().ok().as_ref().and_then(FrameOrigin::of);
         if here.is_none() || here != site_address(&mount) {
@@ -56,7 +65,7 @@ pub async fn space_app_page_post(
         }
     }
     if is_world(&mount) {
-        return post_to_world(page, body).await;
+        return post_to_world(page, &mount, body).await;
     }
     let argument = if body.len() > MAX_FRAME_BYTES {
         let reference = new_reference();
@@ -71,8 +80,22 @@ pub async fn space_app_page_post(
     .map_err(|error| error.to_string())
 }
 
-#[cfg(any(target_os = "macos", windows))]
-async fn post_to_world(page: Webview, body: String) -> Result<(), String> {
+#[cfg(target_os = "macos")]
+async fn post_to_world(page: Webview, mount: &str, body: String) -> Result<(), String> {
+    let Some(post) = begin_post(mount, MAX_WORLD_POSTS, WORLD_POST_BOUND) else {
+        return Err("The website app isn't keeping up, so this didn't reach it.".into());
+    };
+    let settled = mount.to_owned();
+    crate::browser::pages::content_world::post_in_content_world(
+        &page,
+        ADAPTER_WORLD,
+        format!("window.__mistyAppRelay&&window.__mistyAppRelay({body});return \"\";"),
+        Box::new(move || end_post(&settled, post)),
+    )
+}
+
+#[cfg(windows)]
+async fn post_to_world(page: Webview, _mount: &str, body: String) -> Result<(), String> {
     crate::browser::pages::content_world::evaluate_in_content_world(
         page,
         ADAPTER_WORLD,
@@ -83,7 +106,7 @@ async fn post_to_world(page: Webview, body: String) -> Result<(), String> {
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-async fn post_to_world(_page: Webview, _body: String) -> Result<(), String> {
+async fn post_to_world(_page: Webview, _mount: &str, _body: String) -> Result<(), String> {
     Err("Website apps get no Space features here.".into())
 }
 
@@ -114,9 +137,14 @@ pub fn space_app_page_take_bytes(
     webview: Webview,
     mount: String,
     reference: String,
+    discard: Option<bool>,
 ) -> Result<tauri::ipc::Response, String> {
     owned_page(&webview, &mount)?;
-    take_bytes(&mount, None, &reference)
+    let taken = take_bytes(&mount, None, &reference);
+    if discard == Some(true) {
+        return Ok(tauri::ipc::Response::new(Vec::new()));
+    }
+    taken
         .map(tauri::ipc::Response::new)
         .ok_or_else(|| "Those bytes never arrived.".to_owned())
 }

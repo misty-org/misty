@@ -15,6 +15,11 @@ type Pending = { resolve(value: unknown): void; reject(error: Error): void; time
 
 const PROTOCOL_VERSION = "2025-03-26";
 const MAX_PAGES = 10;
+const CALL_TIMEOUT_MS = 20 * 60_000;
+
+export class McpRemoteError extends Error {}
+
+export class McpUnreachable extends Error {}
 
 export interface AppMcpClient {
   receive(message: unknown): void;
@@ -32,9 +37,20 @@ const record = (value: unknown): Record<string, unknown> =>
 
 export function createAppMcpClient(
   send: (message: unknown) => void,
-  options: { requestTimeoutMs?: number; startTimeoutMs?: number; retryMs?: number } = {},
+  options: {
+    requestTimeoutMs?: number;
+    callTimeoutMs?: number;
+    startTimeoutMs?: number;
+    retryMs?: number;
+    onToolsChanged?: () => void;
+  } = {},
 ): AppMcpClient {
-  const { requestTimeoutMs = 60_000, startTimeoutMs = 15_000, retryMs = 750 } = options;
+  const {
+    requestTimeoutMs = 60_000,
+    callTimeoutMs = CALL_TIMEOUT_MS,
+    startTimeoutMs = 15_000,
+    retryMs = 750,
+  } = options;
   const pending = new Map<number, Pending>();
   let nextId = 1;
   let disposed = false;
@@ -101,11 +117,24 @@ export function createAppMcpClient(
     }
   };
 
+  const started = () => {
+    if (ready) return ready;
+    const attempt = handshake();
+    ready = attempt;
+    attempt.catch(() => {
+      if (ready === attempt) ready = undefined;
+    });
+    return attempt;
+  };
+
   return {
     receive(message) {
       const body = record(message);
       if (typeof body.method === "string") {
-        if (body.id === undefined) return;
+        if (body.id === undefined) {
+          if (body.method === "notifications/tools/list_changed") options.onToolsChanged?.();
+          return;
+        }
         const result =
           body.method === "ping"
             ? { result: {} }
@@ -119,13 +148,14 @@ export function createAppMcpClient(
       const error = record(body.error);
       if (body.error !== undefined)
         call.reject(
-          new Error(typeof error.message === "string" ? error.message : "The app's server failed."),
+          new McpRemoteError(
+            typeof error.message === "string" ? error.message : "The app's server failed.",
+          ),
         );
       else call.resolve(body.result);
     },
     async listTools() {
-      ready ??= handshake();
-      await ready;
+      await started();
       const tools: McpTool[] = [];
       let cursor: string | undefined;
       for (let page = 0; page < MAX_PAGES; page++) {
@@ -140,10 +170,11 @@ export function createAppMcpClient(
       return tools;
     },
     async callTool(name, args, signal) {
-      ready ??= handshake();
-      await ready;
+      await started().catch((error: unknown) => {
+        throw new McpUnreachable(error instanceof Error ? error.message : String(error));
+      });
       return record(
-        await request("tools/call", { name, arguments: args }, requestTimeoutMs, signal),
+        await request("tools/call", { name, arguments: args }, callTimeoutMs, signal),
       ) as McpCallResult;
     },
     dispose() {

@@ -1,11 +1,17 @@
 import type { SpaceConversation, SpaceMember, SpaceMessage } from "../../api/dto/entities";
 import type { SpaceChatDraft } from "../composer/use_space_chat_draft";
 import { spacesApi } from "../../api/api";
-import { buildMessageSpans, type MentionableAgent } from "../use_space_message_spans_store";
-import { runOwnMentions } from "../mention_runs";
+import {
+  buildMessageSpans,
+  mergeSavedSpaceMessage,
+  mergeSpaceMessages,
+  noteDeletedSpaceMessage,
+  type MentionableAgent,
+} from "../use_space_message_spans_store";
+import { expectOwnMentions, runOwnMentions } from "../mention_runs";
+import { useSpacesStore } from "../../list/use_spaces_store";
 import { useRef } from "react";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { mergeSpaceMessages } from "../use_space_message_spans_store";
 import type { MessageEditingState } from "./use_message_editing";
 export interface SpaceChatMessageActionsOptions {
   spaceId: string;
@@ -38,6 +44,7 @@ export interface SpaceChatMessageActionsOptions {
     messageId: string,
     text: string,
     fileNodeIds: string[],
+    content?: SpaceMessage["content"],
   ) => Promise<unknown>;
   storeDeleteMessage: (spaceId: string, messageId: string) => Promise<unknown>;
   storeToggleReaction: (
@@ -90,6 +97,8 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
       setGroupChatError("");
       setGroupMessages((current) => mergeSpaceMessages(current, [optimistic]));
     }
+    let handedToStore = false;
+    expectOwnMentions(nonce, options.agents, options.currentUser?.id);
     try {
       await options.beforeSend?.(message.content);
       if (conversationId) {
@@ -106,6 +115,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
         setGroupMessages((current) => mergeSpaceMessages(current, [response.message]));
         runOwnMentions(response.message, options.agents, options.currentUser?.id);
       } else {
+        handedToStore = true;
         const sent = await options.storeSendMessage(
           spaceId,
           value,
@@ -126,6 +136,15 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
               : item,
           ),
         );
+      } else if (!handedToStore) {
+        const failed = { ...message, local_delivery_state: "failed" as const };
+        useSpacesStore.setState((state) => ({
+          error: error instanceof Error ? error.message : "The message could not be sent.",
+          messagesBySpace: {
+            ...state.messagesBySpace,
+            [spaceId]: mergeSpaceMessages(state.messagesBySpace[spaceId] ?? [], [failed]),
+          },
+        }));
       }
     } finally {
       sending.current.delete(nonce);
@@ -165,9 +184,15 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
           buildMessageSpans(value, members, options.agents, options.roles),
           message.file_node_ids,
         );
-        setGroupMessages((current) => mergeSpaceMessages(current, [saved]));
+        setGroupMessages((current) => mergeSavedSpaceMessage(current, saved));
       } else {
-        await options.storeUpdateMessage(spaceId, message.id, value, message.file_node_ids);
+        await options.storeUpdateMessage(
+          spaceId,
+          message.id,
+          value,
+          message.file_node_ids,
+          buildMessageSpans(value, members, options.agents, options.roles),
+        );
       }
       editing.cancel(message.id);
     } catch (error) {
@@ -183,6 +208,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
     try {
       if (conversationId) {
         await spacesApi.deleteConversationMessage(spaceId, conversationId, message.id);
+        noteDeletedSpaceMessage(message.id);
         setGroupMessages((current) => current.filter((item) => item.id !== message.id));
       } else {
         await options.storeDeleteMessage(spaceId, message.id);
@@ -209,7 +235,7 @@ export function useSpaceChatMessageActions(options: SpaceChatMessageActionsOptio
               message.id,
               emoji,
             );
-        setGroupMessages((current) => mergeSpaceMessages(current, [saved]));
+        setGroupMessages((current) => mergeSavedSpaceMessage(current, saved));
       } else {
         await options.storeToggleReaction(spaceId, message.id, emoji, reacted);
       }

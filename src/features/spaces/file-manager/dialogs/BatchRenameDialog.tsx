@@ -72,7 +72,6 @@ export function BatchRenameDialog({
       live = false;
       clearTimeout(timer);
     };
-    // `paths` stands in by its key: the caller makes the list again on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathsKey, ruleKey]);
 

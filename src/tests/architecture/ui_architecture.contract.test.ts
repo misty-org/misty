@@ -38,6 +38,34 @@ const allowedSourceRoots = new Set([
 ]);
 
 describe("UI architecture contract", () => {
+  it("frames every in-window page with FramedPage", () => {
+    const pages = [
+      "src/features/agents/methods/AgentWorkspaceFrame.tsx",
+      "src/features/agents/marketplace/ExplorePage.tsx",
+      "src/features/direct/DmView.tsx",
+      "src/features/direct/FriendsPage.tsx",
+      "src/features/direct/calls/VoiceChannelPage.tsx",
+      "src/features/settings/components/DesktopSettingsUI.tsx",
+      "src/features/spaces/apps/SpaceAppPage.tsx",
+      "src/features/spaces/chat/SpaceChat.tsx",
+      "src/features/spaces/file-manager/FilesFrame.tsx",
+    ];
+    const failures = pages
+      .filter((path) => !existsSync(path) || !readFileSync(path, "utf8").includes("<FramedPage"))
+      .map((path) => `${path}: render the page in a FramedPage from @misty/ui`);
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
+  it("builds no page frame of its own", () => {
+    const retired = /\b(?:ChannelPage|ChannelMain|ChannelSidebar)\b/;
+    const failures = walk("src", extensions)
+      .map(repositoryPath)
+      .filter((path) => !path.startsWith("src/tests/architecture/"))
+      .filter((path) => retired.test(readFileSync(path, "utf8")))
+      .map((path) => `${path}: use FramedPage with a header and start or end columns`);
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
+
   it("keeps behavior tests colocated with their source", () => {
     const failures = walk("src", extensions)
       .map(repositoryPath)

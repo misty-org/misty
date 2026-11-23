@@ -12,6 +12,7 @@ const MARKED: &[&str] = &[
     "integration.execute",
     "message.search",
     "search.all",
+    "space.claims",
     "thread.list",
     "thread.read",
 ];

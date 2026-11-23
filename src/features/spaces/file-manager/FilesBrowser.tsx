@@ -5,7 +5,7 @@ import { FilesFrame } from "./FilesFrame";
 import { FilesPane } from "./FilesPane";
 import type { FileItem, FilesPlace } from "./model";
 import { TransfersView } from "./TransfersView";
-import type { FilesPick } from "./use_files_browser";
+import type { FilesPick } from "./files_choices";
 
 /**
  * Files in one pane: the Files page, or the picker apps open (`pick`, with its `footer` of buttons

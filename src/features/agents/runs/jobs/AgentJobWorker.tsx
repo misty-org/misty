@@ -5,7 +5,7 @@ import { endAllHostedSessions } from "../hosted-sessions/hosted_sessions";
 import { startLocalToolHost } from "../../tools/host";
 import { startLocalRunWork } from "../../tools";
 import { watchLocalExecutionForKeepAwake } from "./keep_awake";
-import { useLocalExecution } from "../local-execution/local_execution";
+import { useLocalExecution } from "../local-execution/local_execution_state";
 import { isHostWindow, onHostWindow } from "@/features/app-windows";
 import { useAgentTrashReminder } from "../../settings/agent_trash_reminder";
 

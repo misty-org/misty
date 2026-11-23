@@ -42,6 +42,33 @@ function stopWhenStranded(): Plugin {
   };
 }
 
+function stripAssetSourceMaps(): Plugin {
+  return {
+    name: "misty-strip-asset-source-maps",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      for (const file of Object.values(bundle)) {
+        if (file.type !== "asset" || !/\.m?js$/.test(file.fileName)) continue;
+        const source =
+          typeof file.source === "string" ? file.source : new TextDecoder().decode(file.source);
+        const stripped = source.replace(/\n?\/\/# sourceMappingURL=\S+\s*$/, "\n");
+        if (stripped !== source) file.source = stripped;
+      }
+    },
+  };
+}
+
+function katexWoff2Only(): Plugin {
+  return {
+    name: "misty-katex-woff2-only",
+    enforce: "pre",
+    transform(code, id) {
+      if (!/[\\/]katex[\\/]dist[\\/]katex(?:\.min)?\.css(?:$|\?)/.test(id)) return;
+      return code.replace(/,url\(fonts\/[^)]+\.(?:woff|ttf)\) format\("(?:woff|truetype)"\)/g, "");
+    },
+  };
+}
+
 export default defineConfig(({ command, mode }) => {
   const env = process.env;
   if (
@@ -66,7 +93,14 @@ export default defineConfig(({ command, mode }) => {
     root: resolve(process.cwd(), "src/app"),
     publicDir: false,
     envDir: false,
-    plugins: [react(), tailwindcss(), stopWhenStranded(), recoverDeadPages()],
+    plugins: [
+      katexWoff2Only(),
+      react(),
+      tailwindcss(),
+      stripAssetSourceMaps(),
+      stopWhenStranded(),
+      recoverDeadPages(),
+    ],
     define: {
       "import.meta.env.MISTY_SHELL_MACOS": JSON.stringify(
         ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
@@ -91,7 +125,9 @@ export default defineConfig(({ command, mode }) => {
         { find: "@", replacement: fileURLToPath(new URL("../src", import.meta.url)) },
         {
           find: /^@misty\/sdk$/,
-          replacement: fileURLToPath(new URL("../../misty-sdk/packages/sdk/src/index.ts", import.meta.url)),
+          replacement: fileURLToPath(
+            new URL("../../misty-sdk/packages/sdk/src/index.ts", import.meta.url),
+          ),
         },
         ...Object.entries(nodeShims).map(([name, file]) => ({
           find: new RegExp(`^node:${name}$`),
@@ -103,6 +139,18 @@ export default defineConfig(({ command, mode }) => {
           find: /^sharp$/,
           replacement: fileURLToPath(
             new URL("../src/shared/platform/nodeShims/sharp.ts", import.meta.url),
+          ),
+        },
+        {
+          find: /^\.\/report-html-template\.mjs$/,
+          replacement: fileURLToPath(
+            new URL("../src/shared/platform/nodeShims/midscene_report.ts", import.meta.url),
+          ),
+        },
+        {
+          find: /^@excalidraw\/mermaid-to-excalidraw$/,
+          replacement: fileURLToPath(
+            new URL("../src/shared/platform/nodeShims/mermaid_to_excalidraw.ts", import.meta.url),
           ),
         },
       ],
@@ -117,11 +165,6 @@ export default defineConfig(({ command, mode }) => {
           pet: resolve(process.cwd(), "src/app/pet.html"),
           "computer-cursor": resolve(process.cwd(), "src/app/computer-cursor.html"),
           desktop: resolve(process.cwd(), "src/app/desktop.html"),
-        },
-        output: {
-          manualChunks(id) {
-            if (id.includes("/src/features/agents/runs/local-execution/")) return "local_execution";
-          },
         },
       },
       assetsInlineLimit: 0,

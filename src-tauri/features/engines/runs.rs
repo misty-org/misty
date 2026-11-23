@@ -155,8 +155,56 @@ pub(super) fn space_dirs(run_id: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
+async fn project_thread_folder(
+    app: &AppHandle,
+    db: &database::store::Store,
+    facts: &RunFacts,
+    body: &Value,
+    conversation: &str,
+    companion_turn: bool,
+    named: String,
+) -> String {
+    if named.is_empty() || conversation.is_empty() || companion_turn {
+        return named;
+    }
+    let project = PathBuf::from(&named);
+    let linked = {
+        let (db, account, project) = (db.clone(), facts.account.clone(), project.clone());
+        tokio::task::spawn_blocking(move || {
+            !super::multirun::is_worktree(&db, &account, &project)
+                && store::is_linked(&db, &account, &project).unwrap_or(false)
+                && !super::chat_folder::is_scratch(&db, &project)
+        })
+        .await
+        .unwrap_or(false)
+    };
+    if !linked {
+        return named;
+    }
+    let misty_root = app.state::<MistyRuntime>().environment.misty_root();
+    super::multirun::thread_lane(
+        db,
+        &misty_root,
+        &facts.account,
+        body["engine"]["space"].as_str().unwrap_or(""),
+        &facts.agent_id,
+        conversation,
+        &project,
+        body["conversation_title"].as_str().unwrap_or(""),
+    )
+    .await
+    .map(|path| path.to_string_lossy().into_owned())
+    .unwrap_or(named)
+}
+
 pub(crate) async fn start(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
-    launch(app, run_id, body, false).await
+    let account = body["account"].as_str().unwrap_or("").to_string();
+    let conversation = body["conversation_id"].as_str().unwrap_or("").to_string();
+    let started = launch(app, run_id, body, false).await;
+    if started.is_err() {
+        super::thread_work::after_run(app, account, conversation);
+    }
+    started
 }
 
 pub(crate) async fn warm_up(app: &AppHandle, run_id: String, body: Value) -> Result<(), String> {
@@ -183,16 +231,36 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
     if warming && !(tutor_voice && engine == "claude") {
         return Ok(());
     }
+    let named = project_thread_folder(
+        app,
+        &db,
+        &facts,
+        &body,
+        &conversation,
+        companion_turn,
+        named,
+    )
+    .await;
+    let opened = match super::thread_work::Place::of_request(&body) {
+        Some(place) if named.is_empty() && !conversation.is_empty() && !companion_turn => {
+            super::thread_work::open(app, &db, &facts.account, &conversation, &place).await?
+        }
+        _ => None,
+    };
     let (folder, session) = {
-        let (db, account, conversation, engine, run) = (
+        let (db, account, conversation, engine, run, thread_folder) = (
             db.clone(),
             facts.account.clone(),
             conversation.clone(),
             engine.clone(),
             run_id.clone(),
+            opened.as_ref().map(|opened| opened.cwd.clone()),
         );
         tokio::task::spawn_blocking(move || -> Result<_, String> {
-            let folder = super::chat_folder::for_run(&db, &account, &conversation, &run, &named)?;
+            let folder = match thread_folder {
+                Some(folder) => folder,
+                None => super::chat_folder::for_run(&db, &account, &conversation, &run, &named)?,
+            };
             let folder_text = folder.to_string_lossy().into_owned();
             let session = if companion_turn && !tutor_voice {
                 None
@@ -235,9 +303,15 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
         .as_str()
         .filter(|space| !space.is_empty())
     {
-        let dirs: Vec<String> = crate::spaces_drive::run_folder(space)
-            .map(|drive| vec![drive.to_string_lossy().into_owned()])
-            .unwrap_or_default();
+        let dirs: Vec<String> = opened
+            .as_ref()
+            .map(|opened| opened.workspace.to_string_lossy().into_owned())
+            .into_iter()
+            .chain(
+                crate::spaces_drive::run_folder(space)
+                    .map(|drive| drive.to_string_lossy().into_owned()),
+            )
+            .collect();
         if !dirs.is_empty() {
             SPACE_DIRS
                 .lock()
@@ -287,6 +361,11 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
         Some(_) => prompt,
         None => with_history(prompt, &body["history_turns"]),
     };
+    let prompt = match (&session, &opened) {
+        (None, Some(opened)) => format!("{prompt}\n\n{}", opened.note),
+        _ => prompt,
+    };
+    let prompt = super::agent_memory::with_memory(prompt, &body, &engine, session.is_some()).await;
     live().insert(
         run_id.clone(),
         LiveRun {

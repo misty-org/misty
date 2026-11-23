@@ -1,10 +1,12 @@
 use std::{
     io::Read,
-    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
-use file_access::{disk::fs_disk, Access};
+use file_access::{
+    disk::{fs_disk, walk, ItemKind},
+    Access,
+};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
@@ -12,7 +14,7 @@ use super::{admit, admit_path};
 use crate::files::{
     display_name,
     entry::{entry_for, is_package_name, FileEntry, FileKind},
-    failed,
+    failed, gated,
 };
 
 #[path = "agent_tools_archive.rs"]
@@ -172,21 +174,6 @@ pub(super) fn all_failed(done: &[Value], failures: &[Value]) -> Result<(), Strin
         .join(" "))
 }
 
-pub(super) fn free_name(folder: &Path, name: &str) -> PathBuf {
-    let first = folder.join(name);
-    if !fs_disk::exists(&first) {
-        return first;
-    }
-    let (stem, ext) = match name.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() => (stem, format!(".{ext}")),
-        _ => (name, String::new()),
-    };
-    (2..1000)
-        .map(|n| folder.join(format!("{stem} {n}{ext}")))
-        .find(|candidate| !fs_disk::exists(candidate))
-        .unwrap_or(first)
-}
-
 fn folders_first(entries: &mut [FileEntry]) {
     entries.sort_by_key(|entry| {
         (
@@ -199,11 +186,13 @@ fn folders_first(entries: &mut [FileEntry]) {
 fn list(input: &Value) -> Result<Value, String> {
     let folder = admit(text(input, "path")?, Access::Read)?;
     let hidden = input["hidden"].as_bool() == Some(true);
-    let items = fs_disk::read_dir(&folder).map_err(|error| failed(&folder, error))?;
+    let opened = gated::dir(&folder, Access::Read, walk::WalkFor::Agent)
+        .map_err(|error| failed(&folder, error))?;
+    let items = opened.read_dir().map_err(|error| failed(&folder, error))?;
     let (mut entries, mut more) = (Vec::new(), false);
-    for item in items.flatten() {
-        let path = item.path();
-        if !hidden && display_name(&path).starts_with('.') {
+    for item in items {
+        let path = folder.join(&item.name);
+        if !hidden && item.name.to_string_lossy().starts_with('.') {
             continue;
         }
         if file_access::disk::check_agent(&path, Access::Read).is_err() {
@@ -243,49 +232,40 @@ fn search(input: &Value) -> Result<Value, String> {
     let library = home.map(|home| home.join("Library"));
     let started = Instant::now();
     let (mut found, mut seen, mut complete) = (Vec::new(), 0usize, true);
-    let mut walk = walkdir::WalkDir::new(&root)
-        .follow_links(false)
-        .max_depth(16)
-        .into_iter();
-    while let Some(next) = walk.next() {
-        let Ok(item) = next else {
-            continue;
-        };
+    let walked = walk::walk(&root, Access::Read, walk::WalkFor::Agent, &mut |step| {
         seen += 1;
         if seen > SEARCH_MOST || started.elapsed() > SEARCH_TIME {
             complete = false;
-            break;
+            return Ok(walk::WalkFlow::Stop);
         }
-        if item.depth() == 0 {
-            continue;
-        }
-        let name = item.file_name().to_string_lossy().into_owned();
+        let name = step.item.name.to_string_lossy().into_owned();
         let hidden = !dotted && name.starts_with('.');
         let lower = name.to_lowercase();
         let matches = !hidden && words.iter().all(|word| lower.contains(word));
-        let open = (item.file_type().is_dir() || matches)
-            && file_access::disk::check_agent(item.path(), Access::Read).is_ok();
-        if item.file_type().is_dir() {
-            let skip = !open
-                || hidden
+        let path = step.dir.path().join(&step.item.name);
+        let mut flow = walk::WalkFlow::Continue;
+        if step.item.kind == ItemKind::Dir {
+            let skip = hidden
+                || step.depth >= 16
                 || name == "node_modules"
                 || is_package_name(&name)
-                || (cfg!(target_os = "macos") && library.as_deref() == Some(item.path()));
+                || (cfg!(target_os = "macos") && library.as_deref() == Some(path.as_path()));
             if skip {
-                walk.skip_current_dir();
+                flow = walk::WalkFlow::SkipDir;
             }
         }
-        if !matches || !open {
-            continue;
-        }
-        if let Ok(entry) = entry_for(item.path()) {
-            found.push(entry);
-            if found.len() >= limit {
-                complete = false;
-                break;
+        if matches {
+            if let Ok(entry) = entry_for(&path) {
+                found.push(entry);
+                if found.len() >= limit {
+                    complete = false;
+                    return Ok(walk::WalkFlow::Stop);
+                }
             }
         }
-    }
+        Ok(flow)
+    });
+    walked.map_err(|error| failed(&root, error))?;
     Ok(json!({ "folder": root.display().to_string(), "results": found, "complete": complete }))
 }
 
@@ -342,7 +322,8 @@ fn read(input: &Value) -> Result<Value, String> {
         .as_u64()
         .unwrap_or(READ_DEFAULT)
         .clamp(1, READ_MOST);
-    let file = fs_disk::open(&path).map_err(|error| failed(&path, error))?;
+    let file =
+        gated::open_read_for(&path, walk::WalkFor::Agent).map_err(|error| failed(&path, error))?;
     let mut bytes = Vec::new();
     file.take(most + 1)
         .read_to_end(&mut bytes)

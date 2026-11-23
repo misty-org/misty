@@ -1,4 +1,4 @@
-import { HostError, INIT_MESSAGE, PROTOCOL_VERSION, toWireError } from "./protocol";
+import { INIT_MESSAGE, PROTOCOL_VERSION, toWireError } from "./protocol";
 import type { Frame } from "./protocol";
 
 export type Unsubscribe = () => void;
@@ -17,7 +17,11 @@ export interface HostHandlers {
   dispose?(): void;
 }
 
-export type Authorize = (kind: "call" | "subscribe", name: string) => Promise<void>;
+export type Authorize = (
+  kind: "call" | "subscribe",
+  name: string,
+  params?: unknown,
+) => Promise<void>;
 
 export interface FrameTarget {
   postMessage(message: unknown, targetOrigin: string, transfer: Transferable[]): void;
@@ -47,33 +51,36 @@ export function createHostChannel(options: {
   const endedEarly = new Set<number>();
   let disposed = false;
   let started = false;
+  let arrived: Promise<void> = Promise.resolve();
 
   const send = (message: Frame) => {
     if (!disposed) port.postMessage(message);
   };
   const fail = (id: number, error: unknown) =>
     send({ t: "res", id, ok: false, error: toWireError(error) });
-  const deny = (error: unknown): HostError =>
-    new HostError("permission_denied", error instanceof Error ? error.message : String(error));
+  const inTurn = (step: () => Promise<void> | void) => {
+    arrived = arrived.then(() => (disposed ? undefined : step())).catch(() => undefined);
+  };
 
   const handleRequest = async (id: number, method: string, params: unknown) => {
+    let answer: Promise<unknown>;
     try {
-      await authorize("call", method).catch((error: unknown) => {
-        throw deny(error);
-      });
-      send({ t: "res", id, ok: true, result: await handlers.call(method, params) });
+      await authorize("call", method, params);
+      if (disposed) return;
+      answer = handlers.call(method, params);
     } catch (error) {
       fail(id, error);
+      return;
     }
+    void answer.then(
+      (result) => send({ t: "res", id, ok: true, result }),
+      (error: unknown) => fail(id, error),
+    );
   };
 
   const handleSubscribe = async (id: number, topic: string, params: unknown) => {
-    if (subscriptions.has(id) || pending.has(id)) return;
-    pending.add(id);
     try {
-      await authorize("subscribe", topic).catch((error: unknown) => {
-        throw deny(error);
-      });
+      await authorize("subscribe", topic, params);
       if (disposed || endedEarly.delete(id)) return;
       let open = true;
       let stop: Unsubscribe | undefined;
@@ -111,7 +118,6 @@ export function createHostChannel(options: {
   };
 
   const handleUnsubscribe = (id: number) => {
-    if (pending.has(id)) endedEarly.add(id);
     subscriptions.get(id)?.();
     subscriptions.delete(id);
   };
@@ -126,19 +132,32 @@ export function createHostChannel(options: {
     const id = frameIn.id;
     switch (frameIn.t) {
       case "req":
-        if (Number.isSafeInteger(id) && typeof frameIn.method === "string")
-          void handleRequest(id as number, frameIn.method, frameIn.params);
+        if (Number.isSafeInteger(id) && typeof frameIn.method === "string") {
+          const method = frameIn.method;
+          const params = frameIn.params;
+          inTurn(() => handleRequest(id as number, method, params));
+        }
         return;
       case "sub":
-        if (Number.isSafeInteger(id) && typeof frameIn.topic === "string")
-          void handleSubscribe(id as number, frameIn.topic, frameIn.params);
+        if (Number.isSafeInteger(id) && typeof frameIn.topic === "string") {
+          const topic = frameIn.topic;
+          const params = frameIn.params;
+          if (subscriptions.has(id as number) || pending.has(id as number)) return;
+          pending.add(id as number);
+          inTurn(() => handleSubscribe(id as number, topic, params));
+        }
         return;
       case "unsub":
-        if (Number.isSafeInteger(id)) handleUnsubscribe(id as number);
+        if (Number.isSafeInteger(id)) {
+          if (pending.has(id as number)) endedEarly.add(id as number);
+          inTurn(() => handleUnsubscribe(id as number));
+        }
         return;
-      case "mcp":
-        handlers.mcp?.(frameIn.message);
+      case "mcp": {
+        const message = frameIn.message;
+        inTurn(() => handlers.mcp?.(message));
         return;
+      }
       default:
         return;
     }

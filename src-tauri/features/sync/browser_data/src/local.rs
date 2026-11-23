@@ -4,7 +4,7 @@ use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit, Nonce,
 };
-use rand::{rngs::OsRng, RngCore};
+use rand::{rand_core::UnwrapErr, rngs::SysRng, Rng};
 use rusqlite::{params, Connection, OptionalExtension};
 use zeroize::Zeroizing;
 
@@ -32,7 +32,7 @@ pub struct LocalKey(Zeroizing<[u8; 32]>);
 impl LocalKey {
     pub fn generate() -> Self {
         let mut key = Zeroizing::new([0; 32]);
-        OsRng.fill_bytes(key.as_mut());
+        UnwrapErr(SysRng).fill_bytes(key.as_mut());
         Self(key)
     }
 
@@ -112,7 +112,7 @@ impl LocalStore {
 
     fn seal(&self, profile: &str, collection: &str, id: &str, plain: &[u8]) -> Result<Vec<u8>> {
         let mut nonce = [0; NONCE];
-        OsRng.fill_bytes(&mut nonce);
+        UnwrapErr(SysRng).fill_bytes(&mut nonce);
         let aad = aad(profile, collection, id)?;
         let sealed = self
             .cipher

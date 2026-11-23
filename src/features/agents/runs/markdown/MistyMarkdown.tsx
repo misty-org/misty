@@ -1,4 +1,3 @@
-import "katex/dist/katex.min.css";
 import {
   Button,
   CopyButton,
@@ -32,7 +31,6 @@ import {
   type ReactNode,
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { FileLink } from "./fileLinks/FileLink";
@@ -45,6 +43,7 @@ import { createRevealPlan } from "./streaming/reveal_plan";
 import { RevealText } from "./streaming/RevealText";
 import type { StreamReveal } from "./streaming/stream_reveal";
 import { useLiveReveal } from "./streaming/use_live_reveal";
+import { useMathPlugin } from "./use_math_plugin";
 
 const SketchBlock = lazyTool(() =>
   import("@/features/agents/tutor/cursor/SketchBlock").then(({ SketchBlock }) => ({
@@ -101,7 +100,6 @@ const remarkPlugins: ComponentProps<typeof ReactMarkdown>["remarkPlugins"] = [
   [remarkMath, { singleDollarTextMath: false }],
 ];
 type PluginList = NonNullable<ComponentProps<typeof ReactMarkdown>["rehypePlugins"]>;
-
 const baseComponents: Components = {
   pre: ({ node, children }) => {
     const code = (node as unknown as HastNode | undefined)?.children?.find(
@@ -347,7 +345,7 @@ const MarkdownBody = memo(function MarkdownBody({
   const parts = useRef({
     starts: [] as number[],
     visible: new Map<number, string>(),
-    plugins: new Map<string, PluginList>(),
+    plugins: new Map<string, { math: boolean; list: PluginList }>(),
   });
   const liveText = useMemo(() => {
     const current = parts.current;
@@ -364,12 +362,16 @@ const MarkdownBody = memo(function MarkdownBody({
   }, [blocks]);
   const controller = useLiveReveal(liveText, streaming && reveal);
   const components = useMemo(() => streamingComponents(controller), [controller]);
-  const settledPlugins = useMemo(() => [rehypeKatex, rehypeCallouts] as PluginList, []);
+  const mathPlugin = useMathPlugin(text);
+  const settledPlugins = useMemo(
+    () => (mathPlugin ? [mathPlugin, rehypeCallouts] : [rehypeCallouts]) as PluginList,
+    [mathPlugin],
+  );
   const blockPlugins = (block: { start: number; text: string }) => {
     const current = parts.current;
     const key = blockKey(block);
     const known = current.plugins.get(key);
-    if (known) return known;
+    if (known && known.math === Boolean(mathPlugin)) return known.list;
     const plan = createRevealPlan({
       base: () =>
         current.starts
@@ -377,8 +379,10 @@ const MarkdownBody = memo(function MarkdownBody({
           .reduce((sum, start) => sum + (current.visible.get(start)?.length ?? 0), 0),
       onText: (visible) => current.visible.set(block.start, visible),
     });
-    const plugins = [rehypeKatex, rehypeCallouts, plan.plugin] as PluginList;
-    current.plugins.set(key, plugins);
+    const plugins = (
+      mathPlugin ? [mathPlugin, rehypeCallouts, plan.plugin] : [rehypeCallouts, plan.plugin]
+    ) as PluginList;
+    current.plugins.set(key, { math: Boolean(mathPlugin), list: plugins });
     return plugins;
   };
   if (!showMarkdown) return <div className="whitespace-pre-wrap">{text}</div>;

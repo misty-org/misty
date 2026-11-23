@@ -2,17 +2,25 @@ import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import { invoke } from "@/shared/platform/native_invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import bundled from "@/shared/registry/registry.json";
+
+export interface IgnoreTemplate {
+  id: string;
+  name: string;
+  markers: string[];
+  rules: string[];
+}
 
 interface RegistryDocument {
   apps: { apps: unknown[] };
   engines: { engines: unknown[] };
+  ignore?: { templates?: IgnoreTemplate[] } | null;
   published_at: string;
 }
 
 const first: RegistryDocument = {
-  apps: bundled.apps as RegistryDocument["apps"],
-  engines: bundled.engines as RegistryDocument["engines"],
+  apps: { apps: [] },
+  engines: { engines: [] },
+  ignore: null,
   published_at: "",
 };
 
@@ -24,11 +32,12 @@ async function load() {
   } catch {}
 }
 
-let followed = false;
+let followed: Promise<void> | undefined;
 
-export function followRegistry() {
-  if (followed || !hasTauriInternals()) return;
-  followed = true;
-  void load();
+export function followRegistry(): Promise<void> {
+  if (followed) return followed;
+  if (!hasTauriInternals()) return Promise.resolve();
+  followed = load();
   void listen("misty://registry-changed", () => void load());
+  return followed;
 }

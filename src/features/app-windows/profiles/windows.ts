@@ -6,6 +6,7 @@ import {
   activateTab,
 } from "../panes/layout_tabs";
 import { reconcileGroupIdentities } from "../panes/group_identity";
+import { tidyTabGroups } from "../panes/tab_groups";
 import {
   capDockLeaves,
   createDockLeaf,
@@ -56,7 +57,7 @@ export function normalizeWorkspaceLayout(layout: WorkspaceLayout): WorkspaceLayo
     });
     return { ...tab, ...normalized };
   });
-  return activateTab({ ...migrated, tabs }, activeId);
+  return tidyTabGroups(activateTab({ ...migrated, tabs }, activeId));
 }
 
 export function initialWorkspaceWindow(): WorkspaceWindowsState {

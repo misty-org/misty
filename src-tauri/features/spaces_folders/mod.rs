@@ -40,6 +40,28 @@ pub(crate) fn picked_folder(folder: &str) -> Result<PathBuf, String> {
     }
 }
 
+pub(crate) fn source_to_copy(source: &str, protected: &[PathBuf]) -> Result<PathBuf, String> {
+    if let Ok(path) = picked_folder(source) {
+        return Ok(path);
+    }
+    let asked = crate::files::asked_path(source)?;
+    let (real, kind) =
+        crate::files::copy_source::real_local(&asked).map_err(|error| error.to_string())?;
+    match kind {
+        space_drive::CopyKind::Folder => {
+            check_root(&real, protected, dirs::home_dir().as_deref())?;
+        }
+        space_drive::CopyKind::Other => {
+            return Err("Choose a file or a folder on this computer.".into());
+        }
+        space_drive::CopyKind::File if protected.iter().any(|kept| real.starts_with(kept)) => {
+            return Err("That file is Misty's own.".into());
+        }
+        space_drive::CopyKind::File => {}
+    }
+    Ok(real)
+}
+
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {

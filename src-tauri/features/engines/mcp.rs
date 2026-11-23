@@ -156,6 +156,9 @@ impl Caller {
         if crate::files::agent_paths::tools::disk_on() {
             base = format!("{base} {}", crate::files::agent_paths::tools::INSTRUCTIONS);
         }
+        if let Some(memory) = super::agent_memory::instructions(&self.run_id) {
+            base = format!("{base} {memory}");
+        }
         if self.computer() {
             format!("{base} {}", crate::computer_use::tools::INSTRUCTIONS)
         } else {
@@ -217,6 +220,12 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
         let store = tauri::Manager::state::<crate::app::runtime::MistyRuntime>(app)
             .environment
             .store();
+        let memory_space =
+            super::agent_memory::place_in(&caller.run_id, &body).map(|place| place.space);
+        if let Some(space) = &memory_space {
+            super::agent_memory::index::listen(app);
+            super::agent_memory::index::fresh(&store, space, &agent).await;
+        }
         let found = tokio::task::spawn_blocking(move || {
             super::recall::search(
                 &store,
@@ -224,6 +233,7 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
                 &agent,
                 &engine,
                 folder.as_deref(),
+                memory_space.as_deref(),
                 &query,
                 limit,
             )
@@ -249,6 +259,27 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
         .filter(|id| !id.is_empty());
     if let Some(wire) = wire {
         super::bridge::note_mcp_call(wire, &format!("mcp__misty__{name}"), &params["arguments"]);
+    }
+    if let Some(internal) = super::agent_memory::internal_name(&caller.run_id, name) {
+        let host = AppToolHost { app: app.clone() };
+        let outcome = host
+            .call(LocalToolCall {
+                run_id: caller.run_id.clone(),
+                call_id: wire
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("mcp_{}", uuid::Uuid::new_v4().simple())),
+                turn: 0,
+                name: internal.to_string(),
+                input: params["arguments"].clone(),
+            })
+            .await;
+        return match outcome {
+            LocalToolOutcome::Result(value) => result_content(value),
+            LocalToolOutcome::Rejected { code, message } => json!({
+                "isError": true,
+                "content": [{ "type": "text", "text": format!("{message} ({code})") }],
+            }),
+        };
     }
     if let Some((internal, _)) = crate::apps::mcp::resolve(name) {
         let host = AppToolHost { app: app.clone() };
@@ -366,7 +397,13 @@ async fn serve(AxumState(app): AxumState<AppHandle>, headers: HeaderMap, body: B
                 tools.extend(crate::computer_use::tools::offered());
             }
             tools.push(super::recall::tool());
-            tools.extend(crate::apps::mcp::offered());
+            tools.extend(super::agent_memory::offered(&caller.run_id));
+            if super::agent_memory::place_of(&caller.run_id).is_some() {
+                super::agent_memory::index::listen(&app);
+            }
+            let space =
+                crate::agents::run_control::local_tools::space_of_run(&app, &caller.run_id).await;
+            tools.extend(crate::apps::mcp::offered_in(space.as_deref()));
             reply(id, json!({ "tools": tools }))
         }
         "tools/call" => reply(id, call_tool(&app, &caller, &message["params"]).await),
@@ -424,6 +461,12 @@ pub(crate) fn token_in(servers: Option<&Value>) -> Option<String> {
         .as_str()?
         .strip_prefix("Bearer ")
         .map(str::to_string)
+}
+
+pub(crate) fn run_of(token: &str) -> Option<String> {
+    tokens()
+        .get(token)
+        .map(|run| super::bridge::chat_run_of(run))
 }
 
 pub(crate) fn rebind(token: &str, run_id: &str) {

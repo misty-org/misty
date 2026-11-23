@@ -104,10 +104,9 @@ pub fn after_trash(answer: Result<Item, ApiError>) -> TrashOutcome {
 pub fn replaced_save(before: Option<&Item>, now: &Item, me: &str) -> bool {
     before.is_none()
         && now.replaced_of.is_some()
-        && now.trashed
         && !now.deleted
         && now.modified_by == me
-        && now.trashed_by.as_deref().is_some_and(|by| by != me)
+        && now.trashed_by.as_deref().is_none_or(|by| by != me)
 }
 
 pub fn revived(before: Option<&Item>, now: &Item, me: &str) -> bool {
@@ -161,6 +160,7 @@ mod tests {
             trash_hold: false,
             deleted: false,
             replaced_of: None,
+            content_version: None,
         }
     }
 

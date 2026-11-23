@@ -1,14 +1,23 @@
 import { Blocks, Plus } from "lucide-react";
+import { useState } from "react";
 import {
   activeLayoutView,
   isEmptyTab,
   layoutTabs,
   tabLabel,
   useWorkspaceStore,
+  type WorkspaceTabGroup,
   type WorkspaceView,
 } from "@/features/app-windows";
-import { IconButton, TabStrip, windowToolbarClass, type TabStripTab } from "@misty/ui";
-import { LayoutButton } from "./LayoutButton";
+import {
+  IconButton,
+  RenameItemDialog,
+  TabStrip,
+  windowToolbarClass,
+  type TabStripGroup,
+  type TabStripTab,
+} from "@misty/ui";
+import { GroupMenu, TabMenu } from "./WorkspaceTabMenus";
 import { openNewTab } from "./space_navigation";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
@@ -20,7 +29,13 @@ export function WorkspaceTabBar(props: {
   onClosed(): void;
 }) {
   const layout = useWorkspaceStore((state) => state.layout);
+  const [naming, setNaming] = useState<WorkspaceTabGroup | null>(null);
+  const store = useWorkspaceStore.getState;
   const tabs = layoutTabs(layout).filter((tab) => !isEmptyTab(tab));
+  const groups = layout.groups ?? [];
+  const close = (id: string) => {
+    if (store().closeTab(id)) props.onClosed();
+  };
   const items: TabStripTab[] = tabs.map((tab) => {
     const view = activeLayoutView(tab);
     const label = tabLabel(tab);
@@ -29,9 +44,31 @@ export function WorkspaceTabBar(props: {
       label,
       icon: <ViewIcon tab={view?.placeholder ? undefined : (view ?? undefined)} icon={Blocks} />,
       closeLabel: `Close ${label}`,
+      group: tab.group,
+      menu: (
+        <TabMenu
+          tab={tab}
+          groups={groups}
+          onClose={() => close(tab.id)}
+          onChanged={props.onClosed}
+        />
+      ),
     };
   });
-  const store = useWorkspaceStore.getState;
+  const stripGroups: TabStripGroup[] = groups.map((group) => ({
+    id: group.id,
+    label: group.title,
+    color: group.color,
+    collapsed: group.collapsed,
+    menu: (
+      <GroupMenu
+        group={group}
+        onName={() => setNaming(group)}
+        onOpen={props.onOpen}
+        onChanged={props.onClosed}
+      />
+    ),
+  }));
   const select = (id: string) => {
     const view = store().selectTab(id);
     if (view) props.onOpen(view);
@@ -47,6 +84,7 @@ export function WorkspaceTabBar(props: {
       <TabStrip
         label="Open pages"
         tabs={items}
+        groups={stripGroups}
         active={layout.activeTabId ?? null}
         onSelect={select}
         dragCarries={(id) => {
@@ -55,16 +93,21 @@ export function WorkspaceTabBar(props: {
           return view ? { "workspace-tabs": view.id } : undefined;
         }}
         onDragDwell={select}
-        onClose={(id) => {
-          if (store().closeTab(id)) props.onClosed();
-        }}
-        onReorder={(id, index) => {
-          const ids = layoutTabs(store().layout).map((tab) => tab.id);
-          const rest = ids.filter((other) => other !== id);
+        onClose={close}
+        onReorder={(id, index, group) => {
+          const rest = layoutTabs(store().layout)
+            .map((tab) => tab.id)
+            .filter((other) => other !== id);
           const target = items.filter((item) => item.id !== id)[index]?.id;
-          const at = target ? rest.indexOf(target) : rest.length;
-          store().reorderTabs([...rest.slice(0, at), id, ...rest.slice(at)]);
+          store().moveTab(id, target ? rest.indexOf(target) : rest.length, group);
         }}
+        onToggleGroup={(id) => {
+          const view = store().toggleTabGroup(id);
+          if (view) props.onOpen(view);
+        }}
+        onDropOnTab={(id, target) => store().groupTabWith(id, target)}
+        onDropOnGroup={(id, group) => store().addTabToGroup(id, group)}
+        onMoveGroup={(group, before) => store().moveTabGroup(group, before)}
         after={
           <IconButton label="New tab" onClick={() => openNewTab(props.onOpen)}>
             <Plus />
@@ -72,16 +115,20 @@ export function WorkspaceTabBar(props: {
         }
         end={
           props.captionSlot ? (
-            <div className="flex items-center">
-              <LayoutButton />
-              <div id={windowsCaptionSlotId} className="flex items-center" />
-            </div>
-          ) : (
-            <LayoutButton />
-          )
+            <div id={windowsCaptionSlotId} className="flex items-center" />
+          ) : undefined
         }
         windowEdge
       />
+      {naming ? (
+        <RenameItemDialog
+          key={naming.id}
+          title={naming.title ? "Rename group" : "Name group"}
+          initialName={naming.title}
+          onConfirm={async (title) => store().updateTabGroup(naming.id, { title })}
+          onClose={() => setNaming(null)}
+        />
+      ) : null}
     </div>
   );
 }

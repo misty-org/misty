@@ -1,19 +1,18 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 //! Get Info (what an item is, its folder, permissions, owner, whether agents may change it, an
-//! image's size, the app that opens it), a folder's size, and a file's text or bytes for Quick
-//! Look and previews.
+//! image's size, the app that opens it), a folder's size on the ops queue, and the start of a
+//! file for previews.
 use std::{
     io::{BufReader, Read},
     path::Path,
 };
 
-use file_access::disk::{check_disk, fs_disk};
-use file_access::Access;
+use file_access::disk::walk;
 use serde::Serialize;
 
 use super::entry::{entry_for, FileEntry, FileKind};
 use super::listing::io_text;
-use super::{asked_path, blocking, display_name, failed, person_window};
+use super::{asked_path, blocking, failed, gated, person_window};
 
 #[derive(Serialize)]
 pub struct Dimensions {
@@ -44,13 +43,13 @@ pub struct FolderSize {
 }
 
 #[derive(Serialize)]
-pub struct TextStart {
+pub struct FileHead {
     pub text: String,
     pub truncated: bool,
+    pub binary: bool,
 }
 
-const MAX_TEXT: usize = 1024 * 1024;
-const MAX_BYTES: u64 = 100 * 1024 * 1024;
+const MAX_HEAD: u64 = 1024 * 1024;
 
 fn file_kind_label(ext: &str) -> Option<&'static str> {
     Some(match ext {
@@ -187,7 +186,7 @@ fn owner(_meta: &std::fs::Metadata) -> Option<String> {
 }
 
 fn dimensions(path: &Path) -> Option<Dimensions> {
-    let file = fs_disk::open(path).ok()?;
+    let file = gated::open_read(path).ok()?;
     let (width, height) = image::ImageReader::new(BufReader::new(file))
         .with_guessed_format()
         .ok()?
@@ -217,8 +216,11 @@ fn is_picture(ext: Option<&str>) -> bool {
 
 fn info(path: &Path) -> Result<FileInfo, String> {
     let entry = entry_for(path).map_err(|error| failed(path, io_text(&error)))?;
-    let meta = fs_disk::metadata(path)
-        .or_else(|_| fs_disk::symlink_metadata(path))
+    let meta = gated::stat(path)
+        .or_else(|error| match path.parent() {
+            None => file_access::disk::fs_disk::metadata(path),
+            Some(_) => Err(error),
+        })
         .map_err(|error| failed(path, io_text(&error)))?;
     let picture = matches!(entry.kind, FileKind::File) && is_picture(entry.ext.as_deref());
     Ok(FileInfo {
@@ -243,81 +245,53 @@ pub async fn files_info(webview: tauri::Webview, path: String) -> Result<FileInf
     blocking(move || info(&path)).await
 }
 
-fn folder_size(root: &Path) -> Result<FolderSize, String> {
-    check_disk(root, Access::Read).map_err(|error| failed(root, io_text(&error)))?;
-    let mut size = FolderSize { bytes: 0, items: 0 };
-    let walk = walkdir::WalkDir::new(root)
-        .follow_links(false)
-        .min_depth(1)
-        .into_iter()
-        .filter_entry(|item| {
-            !item.file_type().is_dir() || check_disk(item.path(), Access::Read).is_ok()
-        });
-    for item in walk.filter_map(Result::ok) {
-        size.items += 1;
-        if item.file_type().is_file() {
-            size.bytes += item.metadata().map_or(0, |meta| meta.len());
-        }
-    }
-    Ok(size)
-}
-
 #[tauri::command]
 pub async fn files_folder_size(
+    app: tauri::AppHandle,
     webview: tauri::Webview,
     path: String,
+    op_id: String,
 ) -> Result<FolderSize, String> {
     person_window(&webview)?;
     let path = asked_path(&path)?;
-    blocking(move || folder_size(&path)).await
+    super::runtime::run(&app, &webview, &op_id, "Calculating size", move |op| {
+        let stop = op.stop();
+        walk::tree_size_checked(&path, walk::WalkFor::Person, &|| stop.stopped())
+            .map(|(bytes, items)| FolderSize {
+                bytes,
+                items: items.saturating_sub(1),
+            })
+            .map_err(|error| failed(&path, io_text(&error)))
+    })
+    .await
 }
 
-fn read_text(path: &Path) -> Result<TextStart, String> {
-    let file = fs_disk::open(path).map_err(|error| failed(path, io_text(&error)))?;
+pub(crate) fn read_head(path: &Path, limit: u64) -> Result<FileHead, String> {
+    let limit = limit.clamp(1, MAX_HEAD);
+    let file = gated::open_read(path).map_err(|error| failed(path, io_text(&error)))?;
     let mut bytes = Vec::new();
-    file.take((MAX_TEXT + 1) as u64)
+    file.take(limit + 1)
         .read_to_end(&mut bytes)
         .map_err(|error| failed(path, io_text(&error)))?;
-    let truncated = bytes.len() > MAX_TEXT;
-    bytes.truncate(MAX_TEXT);
-    if bytes[..bytes.len().min(8192)].contains(&0) {
-        return Err(format!("{} isn't a text file.", display_name(path)));
-    }
-    Ok(TextStart {
+    let truncated = bytes.len() as u64 > limit;
+    bytes.truncate(limit as usize);
+    let binary = bytes.contains(&0);
+    Ok(FileHead {
         text: String::from_utf8_lossy(&bytes).into_owned(),
         truncated,
+        binary,
     })
 }
 
 #[tauri::command]
-pub async fn files_read_text(webview: tauri::Webview, path: String) -> Result<TextStart, String> {
-    person_window(&webview)?;
-    let path = asked_path(&path)?;
-    blocking(move || read_text(&path)).await
-}
-
-fn read_bytes(path: &Path) -> Result<Vec<u8>, String> {
-    let name = display_name(path);
-    let meta = fs_disk::metadata(path).map_err(|error| failed(path, io_text(&error)))?;
-    if meta.is_dir() {
-        return Err(format!("{name} is a folder."));
-    }
-    if meta.len() > MAX_BYTES {
-        return Err(format!("{name} is larger than 100 MB."));
-    }
-    fs_disk::read(path).map_err(|error| failed(path, io_text(&error)))
-}
-
-#[tauri::command]
-pub async fn files_read_bytes(
+pub async fn files_read_head(
     webview: tauri::Webview,
     path: String,
-) -> Result<tauri::ipc::Response, String> {
+    limit: u64,
+) -> Result<FileHead, String> {
     person_window(&webview)?;
     let path = asked_path(&path)?;
-    blocking(move || read_bytes(&path))
-        .await
-        .map(tauri::ipc::Response::new)
+    blocking(move || read_head(&path, limit)).await
 }
 
 #[cfg(test)]
@@ -337,6 +311,22 @@ mod tests {
             link_target: None,
             tags: Vec::new(),
         }
+    }
+
+    #[test]
+    fn the_head_of_a_file_is_capped_and_says_when_it_is_binary() {
+        let root = tempfile::tempdir().expect("temp folder");
+        let text = root.path().join("a.txt");
+        file_access::fs::write(&text, b"hello world").expect("write");
+        let head = read_head(&text, 5).expect("head");
+        assert_eq!(
+            (head.text.as_str(), head.truncated, head.binary),
+            ("hello", true, false)
+        );
+        let binary = root.path().join("b.bin");
+        file_access::fs::write(&binary, b"ab\0cd").expect("write");
+        assert!(read_head(&binary, 1 << 30).expect("head").binary);
+        assert!(read_head(root.path(), 10).is_err());
     }
 
     #[test]

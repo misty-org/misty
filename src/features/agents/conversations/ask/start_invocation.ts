@@ -9,7 +9,7 @@ import {
   runtimeAiApi as aiSurfaceApi,
   subscribeAgentsInvocation as subscribeToAiInvocation,
 } from "../../agents_runtime";
-import { useLocalExecution } from "../../runs/local-execution/local_execution";
+import { useLocalExecution } from "../../runs/local-execution/local_execution_state";
 import type { AiInvocationDeviceContext, AiSelectionSnapshot } from "../../runs/invocations";
 import type {
   AiCaptureAttachment,

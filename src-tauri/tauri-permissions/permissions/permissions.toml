@@ -15,6 +15,10 @@ identifier = "permission-page-reader"
 description = "The page it's handed, with no network or files. See page-reader.sb."
 
 [[permission]]
+identifier = "permission-speech-helper"
+description = "Speech models and recordings on this computer, with no network or other programs. See speech-helper.sb."
+
+[[permission]]
 identifier = "permission-screen-capture"
 description = "Capture the screen for the cursor companion. Off until first use."
 

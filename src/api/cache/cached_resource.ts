@@ -18,6 +18,19 @@ interface Entry {
 
 const entries = new Map<string, Entry>();
 const listeners = new Map<string, Set<() => void>>();
+const watchedLoaders = new Map<
+  string,
+  { loader: () => Promise<unknown>; persist: CachePersistence; watchers: number }
+>();
+
+export function refreshWatchedCachedResources(prefix: string): Promise<void> {
+  const reads: Promise<unknown>[] = [];
+  for (const [key, watched] of watchedLoaders) {
+    if (!key.startsWith(prefix)) continue;
+    reads.push(load(key, watched.loader, watched.persist, false).catch(() => undefined));
+  }
+  return Promise.all(reads).then(() => undefined);
+}
 
 function entry(key: string): Entry {
   let found = entries.get(key);
@@ -193,6 +206,15 @@ export function useCachedResource<T>(
     if (!key) return;
     void restore(key, persist);
     load(key, () => latestLoader.current(), persist, true).catch(() => {});
+    const watched = watchedLoaders.get(key);
+    const run = () => latestLoader.current();
+    watchedLoaders.set(key, { loader: run, persist, watchers: (watched?.watchers ?? 0) + 1 });
+    return () => {
+      const current = watchedLoaders.get(key);
+      if (!current) return;
+      if (current.watchers <= 1) watchedLoaders.delete(key);
+      else watchedLoaders.set(key, { ...current, watchers: current.watchers - 1 });
+    };
   }, [key, persist, latestLoader]);
 
   const reload = useCallback(

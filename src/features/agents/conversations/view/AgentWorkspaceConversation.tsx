@@ -52,6 +52,7 @@ import { syncChat } from "./engine/engine_session_import";
 import { localChats, markStoredChats } from "../state/local_chats";
 export type { AgentVoiceControl } from "./use_conversation_voice";
 import { conversationClass } from "./conversation_class";
+import { ThreadStatusRows } from "../../threads/ThreadStatusRows";
 
 export function AgentWorkspaceConversation({
   agent,
@@ -467,6 +468,11 @@ export function AgentWorkspaceConversation({
                 working={state.working}
                 onEdit={editPrompt}
                 onSend={(text) => void send(text, "")}
+              />
+              <ThreadStatusRows
+                conversationId={conversation?.id}
+                working={state.working && state.invocationConversationId === conversation?.id}
+                onAsk={(prompt) => void send(prompt, "")}
               />
             </>
           }

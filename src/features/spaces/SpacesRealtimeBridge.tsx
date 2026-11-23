@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useSpacesStore } from "./list/use_spaces_store";
 import { SpaceAgentsBroadcast } from "./list/SpaceAgentsBroadcast";
 import { SpaceStudioPeople } from "./list/SpaceStudioPeople";
+import { registerSpaceClaimsTool } from "./list/space_claims_tool";
 
 let pendingRealtimeDisconnectTimer: number | null = null;
 
@@ -18,6 +19,8 @@ export function SpacesRealtimeBridge() {
   const error = useSpacesStore((state) => state.error);
   const clearError = useSpacesStore((state) => state.clearError);
   const reportedErrorRef = useRef("");
+
+  useEffect(registerSpaceClaimsTool, []);
 
   useEffect(() => {
     if (pendingRealtimeDisconnectTimer != null) {

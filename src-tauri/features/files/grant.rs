@@ -1,9 +1,12 @@
-use super::person_window;
+use super::{blocking, person_window};
 
 #[tauri::command]
-pub fn files_grant_status(app: tauri::AppHandle, webview: tauri::Webview) -> Result<bool, String> {
+pub async fn files_grant_status(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+) -> Result<bool, String> {
     person_window(&webview)?;
-    Ok(permissions::disk_granted(&app))
+    blocking(move || Ok(permissions::disk_granted(&app))).await
 }
 
 #[tauri::command]

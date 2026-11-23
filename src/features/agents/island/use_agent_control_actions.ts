@@ -4,11 +4,13 @@ import { useMistyStore } from "../conversations/state/use_misty_store";
 import {
   finishLocalExecution,
   pauseLocalExecution,
+  type Execution,
+} from "../runs/local-execution/local_execution_state";
+import {
   queueLocalFollowup,
   routeLocalFollowup,
   steerLocalExecution,
-  type Execution,
-} from "../runs/local-execution/local_execution";
+} from "../runs/local-execution/local_execution_followups";
 
 export function useAgentControlActions(execution: Execution | null | undefined) {
   const taskId = execution?.taskId;

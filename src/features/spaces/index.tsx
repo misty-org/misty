@@ -1,3 +1,5 @@
+import { provideReactionPicker } from "@/shared/lib/reaction_picker";
+import { ChatEmojiPicker } from "./chat/emoji/ChatEmojiPicker";
 export type * from "./list/spaces_store_types";
 export type * from "./list/realtime_types";
 export * from "./list/reference_mode";
@@ -20,7 +22,7 @@ export {
 } from "./api/space_resource";
 export { onRealtimeMessage, onRealtimeOpen, sendRealtimeMessage } from "./list/realtime_extras";
 export { useVoicePresence, voiceChannelOf, watchVoicePresence } from "./list/voice_presence";
-export { useSpaceCan } from "./roles/use_space_roles";
+export { memberCan, prepareMemberCan, useSpaceCan } from "./roles/use_space_roles";
 export {
   doingLabel,
   memberAgentsIn,
@@ -28,8 +30,7 @@ export {
   type MemberAgentStatus,
 } from "./list/member_agents";
 export { SpaceChat } from "./chat/SpaceChat";
-export { PinnedMessagesButton } from "./chat/components/PinnedMessagesButton";
-export { ChatBarButtons, useChatBarMenu } from "./chat/components/ChatBarButtons";
+export { useChatBarActions, useChatBarMenu } from "./chat/components/ChatBarButtons";
 export { createYjsProvider } from "./journal/notes/create_yjs_provider";
 export { pageMisty } from "./apps/page_misty";
 export { appCallsHost, voiceChannelPage } from "./apps/app_calls";
@@ -66,4 +67,7 @@ export {
 export { conversationPath, spaceChatPath } from "./chat/chat_route";
 export type { Space } from "./api/dto/entities";
 
-export { FilesBrowser, FilesPage, startFilesReveal } from "./file-manager";
+export { LazyFilesPage as FilesPage } from "./file-manager/LazyFilesPage";
+export { startFilesReveal } from "./file-manager/files_reveal";
+
+provideReactionPicker(ChatEmojiPicker);

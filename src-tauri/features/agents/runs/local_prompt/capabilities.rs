@@ -15,7 +15,7 @@ pub(super) fn agent_capability_guidance(
     }
     let mut out = String::new();
     if has("space.list") {
-        out.push_str("\n\nSpaces: the user's chats, notes, drawings and files live in Spaces. A calendar means the person's connected calendar app (integration_*), never a Space. Those tools work only in your home Space, the one Space you live in, and act there without a `space`. Save what you make there without being asked. Work for another Space belongs to an agent of that Space: say so instead of trying it. space_list shows your home Space.");
+        out.push_str("\n\nSpaces: the user's chats, notes, drawings and files live in Spaces. A calendar means the person's connected calendar app (integration_*), never a Space. Those tools work only in your Space, the one Space you live in, and act there without a `space`. What you save in your thread's folder lands there on its own. Work for another Space belongs to an agent of that Space: say so instead of trying it. space_list shows your Space.");
     }
     if has("log.work.write") {
         out.push_str("\n\nNotebook: on a task with several steps, keep a short checklist with log_work_write (section plan) for yourself, and add findings with their source URLs as you learn them. The person sees the findings in the conversation, not the checklist. After earlier steps were summarized, read it again with log_work_read before continuing.");

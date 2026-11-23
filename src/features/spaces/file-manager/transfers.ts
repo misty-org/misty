@@ -1,11 +1,12 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 import { create } from "zustand";
-import { disk } from "@/features/files";
+import { disk, fileEvents, onFilesEvent, type Progress } from "@/features/files";
 
 export interface TransferWhere {
   from?: string;
   to?: string;
   items?: number;
+  stoppable?: boolean;
 }
 
 export interface Transfer extends TransferWhere {
@@ -24,7 +25,8 @@ export interface Transfer extends TransferWhere {
 }
 
 interface TransfersStore {
-  list: Transfer[];
+  byId: Record<string, Transfer>;
+  order: string[];
   paused: boolean;
   add(transfer: Transfer): void;
   update(opId: string, change: Partial<Transfer>): void;
@@ -34,18 +36,51 @@ interface TransfersStore {
 
 const KEPT = 200;
 
+let listening = false;
+
+function listen() {
+  if (listening) return;
+  listening = true;
+  onFilesEvent<Progress>(fileEvents.progress, (next) =>
+    useTransfers.getState().update(next.opId, {
+      doneBytes: next.doneBytes,
+      totalBytes: next.totalBytes,
+      item: next.item,
+    }),
+  );
+}
+
+export const canStop = (transfer: Transfer) =>
+  transfer.state === "queued" || (transfer.state === "running" && transfer.stoppable !== false);
+
+const unfinished = (transfer: Transfer | undefined) =>
+  transfer?.state === "running" || transfer?.state === "queued";
+
 export const useTransfers = create<TransfersStore>((set) => ({
-  list: [],
+  byId: {},
+  order: [],
   paused: false,
-  add: (transfer) => set((now) => ({ list: [transfer, ...now.list].slice(0, KEPT) })),
+  add: (transfer) => {
+    listen();
+    set((now) => {
+      const order = [transfer.opId, ...now.order.filter((id) => id !== transfer.opId)];
+      const kept = order.slice(0, KEPT);
+      const byId: Record<string, Transfer> = { [transfer.opId]: transfer };
+      for (const id of kept) if (id !== transfer.opId && now.byId[id]) byId[id] = now.byId[id];
+      return { order: kept, byId };
+    });
+  },
   update: (opId, change) =>
-    set((now) => ({
-      list: now.list.map((each) => (each.opId === opId ? { ...each, ...change } : each)),
-    })),
+    set((now) => {
+      const was = now.byId[opId];
+      if (!was) return now;
+      return { byId: { ...now.byId, [opId]: { ...was, ...change } } };
+    }),
   clearFinished: () =>
-    set((now) => ({
-      list: now.list.filter((each) => each.state === "running" || each.state === "queued"),
-    })),
+    set((now) => {
+      const order = now.order.filter((id) => unfinished(now.byId[id]));
+      return { order, byId: Object.fromEntries(order.map((id) => [id, now.byId[id]])) };
+    }),
   setPaused: (paused) => {
     set({ paused });
     if (!paused) pump();

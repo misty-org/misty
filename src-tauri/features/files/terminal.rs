@@ -1,17 +1,17 @@
 use std::path::Path;
 
-use file_access::disk::check_disk;
-use file_access::Access;
-
 use super::listing::io_text;
-use super::{asked_path, blocking, failed, person_window};
+use super::{asked_path, blocking, failed, gated, person_window};
 
 #[tauri::command]
 pub async fn files_open_terminal(webview: tauri::Webview, path: String) -> Result<(), String> {
     person_window(&webview)?;
     let path = asked_path(&path)?;
     blocking(move || {
-        check_disk(&path, Access::Read).map_err(|error| failed(&path, io_text(&error)))?;
+        let meta = gated::stat(&path).map_err(|error| failed(&path, io_text(&error)))?;
+        if !meta.is_dir() {
+            return Err(failed(&path, "A terminal opens only in a folder."));
+        }
         open_terminal(&path)
     })
     .await

@@ -14,6 +14,7 @@ pub(crate) use retire::retire_agent_folders;
 
 pub(super) const PROJECT: &str = "project";
 const SCRATCH: &str = "scratch";
+const THREAD: &str = "thread";
 
 fn data_dir(db: &Store) -> Option<PathBuf> {
     db.path().parent()?.parent().map(Path::to_path_buf)
@@ -43,10 +44,14 @@ pub(crate) fn scratch_for(db: &Store, conversation: &str) -> Result<PathBuf, Str
 }
 
 pub(crate) fn is_scratch(db: &Store, folder: &Path) -> bool {
-    [scratch_root(db), runs_root(db)]
-        .into_iter()
-        .flatten()
-        .any(|root| store::within(folder, &root) && !store::within(&root, folder))
+    [
+        scratch_root(db),
+        runs_root(db),
+        super::thread_work::root(db),
+    ]
+    .into_iter()
+    .flatten()
+    .any(|root| store::within(folder, &root) && !store::within(&root, folder))
 }
 
 fn make(folder: &Path) -> Result<(), String> {
@@ -112,6 +117,12 @@ pub(crate) fn for_run(
 }
 
 pub(crate) fn current(db: &Store, account: &str, conversation: &str) -> Option<PathBuf> {
+    if let Some(thread) = super::thread_work::current(db, account, conversation) {
+        return Some(thread);
+    }
+    if let Some(lane) = super::multirun::lane_folder(db, account, conversation) {
+        return Some(lane);
+    }
     if let Some((path, kind)) = store::chat_folder(db, account, conversation) {
         let path = PathBuf::from(path);
         if kind == PROJECT && usable_project(db, account, &path) {
@@ -135,6 +146,7 @@ pub(crate) fn end_run(db: &Store, run_id: &str) {
 
 pub(crate) fn forget_chat(db: &Store, account: &str, conversation: &str) -> Result<(), String> {
     store::forget_chat(db, account, conversation)?;
+    super::thread_work::forget(db, account, conversation)?;
     let scratch = scratch_for(db, conversation)?;
     if file_access::fs::is_dir(&scratch) {
         file_access::fs::remove_dir_all(&scratch).map_err(|error| error.to_string())?;
@@ -220,6 +232,18 @@ pub async fn chat_folder(
     person_window(&webview)?;
     let db = state.environment.store();
     blocking(move || {
+        if let Some(thread) = super::thread_work::current(&db, &account, &conversation) {
+            return Ok(ChatFolder {
+                path: thread.to_string_lossy().into_owned(),
+                kind: THREAD.into(),
+            });
+        }
+        if let Some(lane) = super::multirun::lane_folder(&db, &account, &conversation) {
+            return Ok(ChatFolder {
+                path: lane.to_string_lossy().into_owned(),
+                kind: PROJECT.into(),
+            });
+        }
         if let Some((path, kind)) = store::chat_folder(&db, &account, &conversation) {
             if kind == PROJECT && usable_project(&db, &account, Path::new(&path)) {
                 return Ok(ChatFolder { path, kind });

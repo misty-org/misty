@@ -19,7 +19,7 @@ export interface FileEntry {
   hidden: boolean;
   ext?: string;
   linkTarget?: string;
-  tags: FinderTag[];
+  tags?: FinderTag[];
 }
 
 export interface Listing {
@@ -180,13 +180,13 @@ export const disk = {
   places: () => invoke<Places>("files_places"),
   list: (path: string, hidden: boolean) => invoke<Listing>("files_list", { path, hidden }),
   info: (path: string) => invoke<FileInfo>("files_info", { path }),
-  folderSize: (path: string) => invoke<FolderSize>("files_folder_size", { path }),
+  folderSize: (path: string, opId: string) =>
+    invoke<FolderSize>("files_folder_size", { path, opId }),
   freeSpace: (path: string) => invoke<FreeSpace>("files_free_space", { path }),
-  watch: (path: string) => invoke<void>("files_watch", { path }),
-  unwatch: (path: string) => invoke<void>("files_unwatch", { path }),
-  readText: (path: string) =>
-    invoke<{ text: string; truncated: boolean }>("files_read_text", { path }),
-  readBytes: (path: string) => invoke<ArrayBuffer>("files_read_bytes", { path }),
+  watchOpen: (path: string, hidden: boolean) =>
+    invoke<FolderWatch>("files_watch_open", { path, hidden }),
+  watchClose: (id: string) => invoke<void>("files_watch_close", { id }),
+  readHead: (path: string, limit: number) => invoke<FileHead>("files_read_head", { path, limit }),
 
   createFolder: (dir: string, name: string) =>
     invoke<FileEntry>("files_create_folder", { dir, name }),
@@ -207,7 +207,9 @@ export const disk = {
   trash: (paths: string[]) => invoke<TrashedItem[]>("files_trash", { paths }),
   trashed: () => invoke<TrashedItem[]>("files_trashed"),
   putBack: (ids: string[]) => invoke<TransferResult>("files_put_back", { ids }),
-  deleteForever: (paths: string[]) => invoke<Failure[]>("files_delete_forever", { paths }),
+  deleteNow: (paths: string[], opId: string) =>
+    invoke<Failure[]>("files_delete_now", { paths, opId }),
+  deleteTrashed: (ids: string[]) => invoke<Failure[]>("files_delete_trashed", { ids }),
 
   undoState: () => invoke<UndoState>("files_undo_state"),
   undo: () => invoke<UndoState>("files_undo"),
@@ -217,9 +219,10 @@ export const disk = {
     invoke<void>("files_clipboard_set", { paths, cut }),
   clipboard: () => invoke<ClipboardFiles>("files_clipboard"),
 
-  open: (paths: string[]) => invoke<void>("files_open", { paths }),
+  open: (paths: string[], confirmed = false) => invoke<void>("files_open", { paths, confirmed }),
   appsFor: (path: string) => invoke<AppChoice[]>("files_apps_for", { path }),
-  openWith: (path: string, app: string) => invoke<void>("files_open_with", { path, app }),
+  openWith: (path: string, app: string, confirmed = false) =>
+    invoke<void>("files_open_with", { path, app, confirmed }),
   reveal: (path: string) => invoke<void>("files_reveal", { path }),
   openTerminal: (path: string) => invoke<void>("files_open_terminal", { path }),
 
@@ -235,8 +238,9 @@ export const disk = {
     invoke<FileEntry[]>("files_search", { query, scope, limit }),
   indexStatus: () => invoke<IndexStatus>("files_index_status"),
 
-  compress: (paths: string[]) => invoke<string>("files_compress", { paths }),
-  extract: (path: string) => invoke<string>("files_extract", { path }),
+  compress: (paths: string[], opId?: string) =>
+    invoke<string>("files_compress", { paths, opId: opId ?? null }),
+  extract: (path: string, opId: string) => invoke<string>("files_extract", { path, opId }),
   checksum: (path: string) => invoke<string>("files_checksum", { path }),
 
   thumbnailCache: () => invoke<ThumbnailCacheStatus>("files_thumbnail_cache"),
@@ -249,7 +253,8 @@ export const disk = {
     invoke<TransferResult>("files_rename_many", { paths, rule }),
   duplicates: (dir: string, opId: string) =>
     invoke<DuplicateGroup[]>("files_duplicates", { dir, opId }),
-  compare: (left: string, right: string) => invoke<CompareRow[]>("files_compare", { left, right }),
+  compare: (left: string, right: string, opId: string) =>
+    invoke<CompareRow[]>("files_compare", { left, right, opId }),
 
   agentTrash: () => invoke<AgentTrashItem[]>("files_agent_trash_list"),
   agentTrashUsage: () => invoke<AgentTrashUsage>("files_agent_trash_usage"),
@@ -297,14 +302,38 @@ export function driveFileUrl(spaceId: string, path: string, modifiedMs: number):
   return `${safeTauriAssetUrl(path, "misty-disk")}?${query.toString()}`;
 }
 
-export interface FolderChange {
+export interface FolderWatch {
+  id: string;
   path: string;
+  entries: FileEntry[];
+}
+
+export interface FolderDelta {
+  id: string;
+  added: FileEntry[];
+  changed: FileEntry[];
+  removed: string[];
+  reset?: boolean;
+}
+
+export interface FileHead {
+  text: string;
+  truncated: boolean;
+  binary: boolean;
+}
+
+const NEEDS_CONFIRM = "needs-confirm:";
+
+export function needsConfirm(cause: unknown): string | null {
+  const message = cause instanceof Error ? cause.message : typeof cause === "string" ? cause : "";
+  const at = message.indexOf(NEEDS_CONFIRM);
+  return at < 0 ? null : message.slice(at + NEEDS_CONFIRM.length).trim() || "file";
 }
 
 export type IndexChange = IndexStatus;
 
 export const fileEvents = {
-  changed: "files://changed",
+  folder: "files://folder",
   progress: "files://progress",
   index: "files://index",
   reveal: "files://reveal",

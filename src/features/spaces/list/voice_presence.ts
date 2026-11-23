@@ -7,12 +7,31 @@ interface VoicePresenceState {
 
 export const useVoicePresence = create<VoicePresenceState>(() => ({ bySpace: {} }));
 
-const watched = new Set<string>();
+const watched = new Map<string, number>();
+let watchEpoch = 0;
 
 export function watchVoicePresence(spaceId: string): () => void {
-  watched.add(spaceId);
+  const epoch = watchEpoch;
+  watched.set(spaceId, (watched.get(spaceId) ?? 0) + 1);
   sendRealtimeMessage({ type: "voice.sync", space_id: spaceId });
-  return () => watched.delete(spaceId);
+  let stopped = false;
+  return () => {
+    if (stopped || epoch !== watchEpoch) return;
+    stopped = true;
+    const count = (watched.get(spaceId) ?? 0) - 1;
+    if (count > 0) watched.set(spaceId, count);
+    else watched.delete(spaceId);
+  };
+}
+
+export function clearVoicePresence(): void {
+  useVoicePresence.setState({ bySpace: {} });
+}
+
+export function resetVoicePresence(): void {
+  watchEpoch += 1;
+  watched.clear();
+  clearVoicePresence();
 }
 
 export function voiceChannelOf(
@@ -39,5 +58,5 @@ onRealtimeMessage("voice", (message) => {
 });
 
 onRealtimeOpen(() => {
-  for (const spaceId of watched) sendRealtimeMessage({ type: "voice.sync", space_id: spaceId });
+  for (const spaceId of watched.keys()) sendRealtimeMessage({ type: "voice.sync", space_id: spaceId });
 });

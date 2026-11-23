@@ -77,6 +77,14 @@ impl Policy {
             .any(|rule| rule.reach == reach && rule.covers(real))
     }
 
+    pub fn roots_of(&self, reach: Reach) -> Vec<PathBuf> {
+        self.rules
+            .iter()
+            .filter(|rule| rule.reach == reach)
+            .map(|rule| rule.root.clone())
+            .collect()
+    }
+
     pub fn was_picked(&self, real: &Path) -> bool {
         self.rules
             .iter()

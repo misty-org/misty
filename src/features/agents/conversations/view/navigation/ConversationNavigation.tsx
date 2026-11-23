@@ -34,7 +34,7 @@ export function ConversationNavigation({
         onScrollToAnchor={rail.scrollToAnchor}
       />
       {search.open ? (
-        <div className="contents [--find-bar-inset:var(--agent-conversation-inset,0px)]">
+        <div className="contents">
           <FindBar
             floating
             label="Find in chat"

@@ -19,6 +19,8 @@ export const spaceAttachmentsApi = {
     purpose: "attachment",
     options?: LibraryUploadOptions,
   ) => uploads.uploadLibraryBlob(spaceId, blob, filename, purpose, options),
+  discardUnsentAttachment: (spaceId: string, uploadId: string) =>
+    uploads.discardUnsentAttachment(spaceId, uploadId),
   attachmentContent: (spaceId: string, attachmentId: string) =>
     fetchProtectedBlob(attachmentPath(spaceId, attachmentId)),
   downloadAttachment: (spaceId: string, attachmentId: string, filename: string) =>

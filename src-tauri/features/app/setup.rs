@@ -27,8 +27,15 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
     let runtime = MistyRuntime::new();
     #[cfg(desktop)]
-    database::retired_coding_data::remove_once_in_background(&runtime.environment);
-    tauri::async_runtime::spawn_blocking(crate::agents::models::forget_old_keys);
+    {
+        let environment = runtime.environment.clone();
+        crate::app::first_draw::after_first_draw(move || {
+            database::retired_coding_data::remove_once_in_background(&environment);
+        });
+    }
+    crate::app::first_draw::after_first_draw(|| {
+        tauri::async_runtime::spawn_blocking(crate::agents::models::forget_old_keys);
+    });
     #[cfg(desktop)]
     runtime.agents.restore_folder_grants();
     crate::engines::commands::allow_linked_folders(&runtime.environment.store());
@@ -44,7 +51,12 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     permissions::restore(app.handle());
     #[cfg(desktop)]
-    crate::files::search::start_indexing(app.handle());
+    {
+        let handle = app.handle().clone();
+        crate::app::first_draw::after_first_draw(move || {
+            crate::files::search::start_indexing(&handle);
+        });
+    }
     #[cfg(desktop)]
     app.manage(BrowserSessionState::default());
     app.manage(crate::agents::task_scopes::AgentWorkspaceState::default());
@@ -57,6 +69,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     app.manage(voice::CaptureState::default());
     app.manage(voice::ShareAudioState::default());
+    voice_speech::use_helper(voice::speech::helper_command);
     app.manage(voice::speech::SpeechState::default());
     app.manage(voice::speech_models::SpeechModelsState::default());
     #[cfg(desktop)]

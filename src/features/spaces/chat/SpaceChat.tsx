@@ -1,10 +1,9 @@
 import type { MistyPickerSource } from "@/features/files";
-import { ChannelMain, type ActionBarItem } from "@misty/ui";
+import { FramedPage, type ActionBarItem, type FramedPageColumn } from "@misty/ui";
 import { SpaceChatHeader } from "./components/SpaceChatHeader";
 import { SpaceChatComposer } from "./composer/SpaceChatComposer";
-import { ChatMemberList } from "./components/ChatMemberList";
 import { ChatStageSplit } from "./components/ChatStageSplit";
-import { SpaceChatSearch } from "./components/SpaceChatSearch";
+import { useSpaceChatSearch } from "./components/SpaceChatSearch";
 import { useSpacesStore } from "../list/use_spaces_store";
 import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/use_space_roles";
 import { isPrivateChannel } from "./sidebar/conversation_groups";
@@ -13,7 +12,7 @@ import { useSpaceEveryoneUnread } from "./space_conversations_resource";
 import { useAuth } from "@/features/account";
 import { useNativeSessionStore } from "@/features/account";
 import { useSpaceChatDraft } from "./composer/use_space_chat_draft";
-import { useWorkspaceViewTitle } from "@/features/app-windows";
+import { useWorkspaceViewShown, useWorkspaceViewTitle } from "@/features/app-windows";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -35,9 +34,11 @@ import { useSpaceChatAiAdapter } from "./hooks/use_space_chat_ai_adapter";
 import { useChatReadReceipts } from "./hooks/use_chat_read_receipts";
 import { ConversationLoadState, ConversationUnavailable } from "./components/ConversationStates";
 import { useBringMentionedAgents, useOwnMentionableAgents } from "./own_agents";
-import { ChatThreadColumn } from "./components/ChatThreadColumn";
-import { ChatThreadsList } from "./components/ChatThreadsList";
+import { ChatThreadColumn, ChatThreadHeader } from "./components/ChatThreadColumn";
+import { usePinnedMessagesSync } from "./components/ChatPinnedList";
+import { chatSideColumn, threadsColumn } from "./ChatSideColumn";
 import { useSpaceThread } from "./hooks/use_space_thread";
+import { useJumpToMessage } from "./hooks/use_jump_to_message";
 import { useChatSidePanel } from "./chat_side_panel_store";
 export function SpaceChat({
   spaceId,
@@ -47,10 +48,12 @@ export function SpaceChat({
   panel = false,
   onBack,
   searchedText = "",
+  onCloseSearch,
   actions: barActions,
-  search,
+  search: barEnd,
   dm,
   stage,
+  header: panelHeader,
 }: {
   spaceId: string;
   spaceName: string;
@@ -59,6 +62,7 @@ export function SpaceChat({
   panel?: boolean;
   onBack?: () => void;
   searchedText?: string;
+  onCloseSearch?: () => void;
   actions?: ReadonlyArray<ActionBarItem>;
   search?: ReactNode;
   dm?: {
@@ -68,19 +72,24 @@ export function SpaceChat({
     face?: ReactNode;
     welcome?: ReactNode;
     members?: ReactNode;
+    notice?: ReactNode;
+    footer?: ReactNode;
   };
   stage?: ReactNode;
+  header?: ReactNode;
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   const setupUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const user = authUser ?? setupUser;
+  const viewShown = useWorkspaceViewShown();
   const conversationId = openConversationId ?? searchParams.get("conversation") ?? "";
   const chatRootRef = useRef<HTMLDivElement>(null);
   const threadRootId = useChatSidePanel((panel) => panel.threadRootId);
   const threadSnapshot = useChatSidePanel((panel) => panel.threadRoot);
   const threadsListOpen = useChatSidePanel((panel) => panel.threadsListOpen);
+  const pinnedOpen = useChatSidePanel((panel) => panel.pinnedOpen);
   useEffect(() => useChatSidePanel.getState().reset(), [spaceId, conversationId]);
   const threadParam = searchParams.get("thread") ?? "";
   useEffect(() => {
@@ -149,12 +158,10 @@ export function SpaceChat({
     : undefined;
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
-  const agents = useOwnMentionableAgents(user?.id);
-  const bringMentionedAgents = useBringMentionedAgents(
-    spaceId,
-    agents,
-    conversation && isGroupDirectMessage(conversation, user?.id) ? conversationId : "",
-  );
+  const groupConversationId =
+    conversation && isGroupDirectMessage(conversation, user?.id) ? conversationId : "";
+  const agents = useOwnMentionableAgents(user?.id, groupConversationId ? undefined : spaceId);
+  const bringMentionedAgents = useBringMentionedAgents(spaceId, agents, groupConversationId);
   const threadState = useSpaceThread({
     spaceId,
     conversationId,
@@ -236,24 +243,15 @@ export function SpaceChat({
   const historyReady =
     !messagesLoading &&
     (!conversationId || conversationChat.loadedConversationId === conversationId);
-  const [jumpTargetId, setJumpTargetId] = useState("");
-  useEffect(() => setJumpTargetId(""), [spaceId, conversationId]);
-  const targetMessageId = jumpTargetId || searchParams.get("message") || "";
-  const targetLoaded = Boolean(
-    targetMessageId && scope.messages.some((message) => message.id === targetMessageId),
-  );
-  useEffect(() => {
-    if (!targetMessageId || !historyReady) return;
-    if (targetLoaded) {
-      if (jumpTargetId) setJumpTargetId("");
-      return;
-    }
-    if (history === "complete") {
-      if (jumpTargetId) setJumpTargetId("");
-      return;
-    }
-    if (history === "more") loadOlder();
-  }, [history, historyReady, jumpTargetId, loadOlder, targetLoaded, targetMessageId]);
+  const { targetMessageId, setJumpTargetId } = useJumpToMessage({
+    spaceId,
+    conversationId,
+    linked: searchParams.get("message") || "",
+    loaded: (id) => scope.messages.some((message) => message.id === id),
+    historyReady,
+    history,
+    loadOlder,
+  });
   useSpaceChatAiAdapter({
     spaceId,
     conversationId,
@@ -289,48 +287,77 @@ export function SpaceChat({
     store.referenceOnly,
     user?.id,
   ]);
+  usePinnedMessagesSync(spaceId, conversationId);
+  const search = useSpaceChatSearch({
+    spaceId,
+    query: searchedText,
+    conversations: conversationChat.conversations,
+    currentUserId: user?.id,
+    memberColors,
+    dm: Boolean(dm),
+    onClose: onCloseSearch,
+  });
   useChatReadReceipts({
     spaceId,
     conversationId,
-    enabled: conversationAvailable && !store.referenceOnly,
+    enabled: conversationAvailable && !store.referenceOnly && viewShown,
     messages: scope.messages,
     markSpaceRead: markRead,
   });
+  const framedState = (state: ReactNode) => (
+    <FramedPage header={panel ? panelHeader : undefined}>{state}</FramedPage>
+  );
   if (
     conversationId &&
     !scope.activeConversation &&
     (conversationChat.error || conversationChat.conversationsPending)
   )
-    return (
-      <ConversationLoadState error={conversationChat.error} onRetry={conversationChat.reload} />
+    return framedState(
+      <ConversationLoadState error={conversationChat.error} onRetry={conversationChat.reload} />,
     );
   if (!conversationAvailable)
-    return (
+    return framedState(
       <ConversationUnavailable
         onBack={() => (onBack ? onBack() : navigate(spaceChatPath(spaceId), { replace: true }))}
-      />
+      />,
     );
-  const thread = threadRootId ? (
-    <ChatThreadColumn
-      root={scope.messages.find((message) => message.id === threadRootId) ?? threadSnapshot}
-      replies={threadState.replies}
-      loading={threadState.loading}
-      loadingOlder={threadState.loadingOlder}
-      hasOlder={threadState.hasOlder}
-      error={threadState.error}
-      canWrite={access.canWriteMessages}
-      typingLabel={typing.label}
-      channelName={isDirect ? `@${channelName}` : `#${channelName}`}
-      onTypingInput={typing.onTextInput}
-      onStopTyping={typing.stop}
-      onLoadOlder={threadState.loadOlder}
-      onSend={threadState.send}
-    />
-  ) : threadsListOpen ? (
-    <ChatThreadsList spaceId={spaceId} conversationId={conversationId} />
-  ) : null;
+  const shownName = isDirect ? `@${channelName}` : `#${channelName}`;
+  const threadColumn: FramedPageColumn | null = threadRootId
+    ? {
+        id: "thread",
+        label: "Resize the thread",
+        width: 360,
+        narrow: "cover",
+        header: <ChatThreadHeader channelName={shownName} />,
+        content: (
+          <ChatThreadColumn
+            spaceId={spaceId}
+            root={scope.messages.find((message) => message.id === threadRootId) ?? threadSnapshot}
+            replies={threadState.replies}
+            loading={threadState.loading}
+            loadingOlder={threadState.loadingOlder}
+            hasOlder={threadState.hasOlder}
+            error={threadState.error}
+            canWrite={access.canWriteMessages}
+            typingLabel={typing.label}
+            channelName={shownName}
+            memberColors={memberColors}
+            onTypingInput={typing.onTextInput}
+            onStopTyping={typing.stop}
+            onLoadOlder={threadState.loadOlder}
+            onSend={threadState.send}
+            onRetry={
+              access.canWriteMessages ? (message) => void threadState.retry(message) : undefined
+            }
+          />
+        ),
+      }
+    : threadsListOpen
+      ? threadsColumn(spaceId, conversationId)
+      : null;
   const chat = (
     <div ref={chatRootRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {dm?.notice ?? null}
       {!conversationId && !dm ? (
         <SpaceSetupCards
           spaceId={spaceId}
@@ -378,7 +405,9 @@ export function SpaceChat({
         />
       </div>
 
-      {dm?.readOnly ? null : (
+      {dm?.readOnly ? (
+        (dm.footer ?? null)
+      ) : (
         <SpaceChatComposer
           spaceId={spaceId}
           canWrite={access.canWriteMessages}
@@ -428,39 +457,30 @@ export function SpaceChat({
       />
     </div>
   );
-  const members = !membersShown ? null : dm ? (
-    (dm.members ?? null)
-  ) : space ? (
-    <ChatMemberList
-      space={space}
-      spaceId={spaceId}
-      ownerUserId={space.owner_user_id}
-      currentUserId={user?.id}
-      visibleTo={
-        conversation && (isDirect || privateChannel)
-          ? (member) =>
-              conversation.participants.some((person) => person.user_id === member.user_id)
-          : undefined
-      }
-    />
-  ) : null;
-  const searchResults = searchedText ? (
-    <SpaceChatSearch
-      spaceId={spaceId}
-      query={searchedText}
-      conversations={conversationChat.conversations}
-      currentUserId={user?.id}
-      memberColors={memberColors}
-      dm={Boolean(dm)}
-    />
-  ) : null;
   if (panel)
     return (
-      <div className="flex h-full min-h-0 min-w-0">
+      <FramedPage
+        header={panelHeader}
+        end={threadColumn}
+        autoSaveId="space-chat-panel"
+        workMinWidth={200}
+      >
         {chat}
-        {thread}
-      </div>
+      </FramedPage>
     );
+  const side = chatSideColumn({
+    spaceId,
+    conversationId,
+    space,
+    conversation,
+    currentUserId: user?.id,
+    restricted: isDirect || privateChannel,
+    membersShown,
+    dm,
+    search: { open: Boolean(searchedText), header: search.header, content: search.content },
+    thread: threadColumn,
+    pinnedOpen,
+  });
   const header = (
     <SpaceChatHeader
       direct={isDirect}
@@ -469,12 +489,12 @@ export function SpaceChat({
       locked={privateChannel}
       name={dm?.name ?? channelName}
       actions={barActions}
-      end={search}
+      end={barEnd}
     />
   );
   return (
-    <ChannelMain header={header} side={searchResults ?? thread ?? members ?? undefined}>
-      {stage ? <ChatStageSplit stage={stage}>{chat}</ChatStageSplit> : chat}
-    </ChannelMain>
+    <FramedPage header={header} end={side} autoSaveId="space-chat">
+      <ChatStageSplit stage={stage}>{chat}</ChatStageSplit>
+    </FramedPage>
   );
 }

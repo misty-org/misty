@@ -1,4 +1,4 @@
-@import "tailwindcss" source("../../");
+@import "tailwindcss" source("../");
 @import "@misty/ui/styles.css";
 @import "@fontsource-variable/jetbrains-mono/index.css";
 @import "./base.css";

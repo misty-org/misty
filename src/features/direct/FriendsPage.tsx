@@ -7,6 +7,7 @@ import {
   EmptyState,
   ErrorState,
   FieldError,
+  FramedBar,
   FramedPage,
   IconButton,
   Input,
@@ -392,44 +393,45 @@ export function FriendsPage() {
     <FramedPage
       autoSaveId="friends"
       toolbar={
-        <div className="flex h-full min-w-0 items-center gap-2 pr-3 pl-6">
-          {hasAny ? (
-            <div className="w-64 min-w-0">
-              <SearchField
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search friends"
-                aria-label="Search friends"
-              />
-            </div>
+        <FramedBar
+          start={
+            hasAny ? (
+              <div className="w-64 min-w-0">
+                <SearchField
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search friends"
+                  aria-label="Search friends"
+                />
+              </div>
+            ) : null
+          }
+        >
+          {hasAny || adding ? (
+            <Popover open={adding} onOpenChange={setAdding}>
+              <PopoverTrigger asChild>
+                <Button variant="primary" icon={UserPlus}>
+                  Add friend
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end">
+                <AddFriendForm onDone={() => setAdding(false)} />
+              </PopoverContent>
+            </Popover>
           ) : null}
-          <div className="ml-auto">
-            {hasAny || adding ? (
-              <Popover open={adding} onOpenChange={setAdding}>
-                <PopoverTrigger asChild>
-                  <Button variant="primary" icon={UserPlus}>
-                    Add friend
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end">
-                  <AddFriendForm onDone={() => setAdding(false)} />
-                </PopoverContent>
-              </Popover>
-            ) : null}
-          </div>
-        </div>
+        </FramedBar>
       }
       end={{
         id: "friends-active",
         label: "Resize the active column",
-        defaultSize: 28,
-        minSize: 20,
-        maxSize: 40,
+        width: 300,
+        minWidth: 220,
+        maxWidth: 420,
         content: <ActiveNow friends={everyone} activities={activities} />,
       }}
     >
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <RowGroupStack className="h-full w-full max-w-180 px-6 pt-4 pb-10">{body()}</RowGroupStack>
+        <RowGroupStack className="h-full w-full px-3 pt-4 pb-10">{body()}</RowGroupStack>
       </main>
       {dialog}
     </FramedPage>

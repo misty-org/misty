@@ -1,6 +1,6 @@
 import { spacesApi } from "../../api/api";
 import type { SpaceConversation, SpaceEvent, SpaceMessage } from "../../api/dto/entities";
-import { readApiSessionGeneration } from "@/api/client/session";
+import { readApiAccountId, readApiSessionGeneration } from "@/api/client/session";
 import {
   useCallback,
   useEffect,
@@ -16,17 +16,20 @@ import {
   mergeSpaceMessages,
   messageFromSpaceEvent,
   oldestServerMessage,
+  patchedBySpaceEvent,
   withThreadReply,
   withoutThreadReply,
   type SpaceMessageHistory,
 } from "../use_space_message_spans_store";
 import { spacesResyncEvent } from "../../list/spaces_resync";
+import { coalescedReload } from "../../list/coalesced_reload";
 import {
   reloadSpaceConversations,
   useSpaceConversationList,
 } from "../space_conversations_resource";
 
 const pendingByConversation = new Map<string, SpaceMessage[]>();
+let loadInstance = 0;
 const noConversations: SpaceConversation[] = [];
 let pendingGeneration = -1;
 export function useSpaceConversationChat(spaceId: string, conversationId: string) {
@@ -95,6 +98,7 @@ export function useSpaceConversationChat(spaceId: string, conversationId: string
       return;
     }
     let active = true;
+    const reloadKey = `conversation-messages:${key}:${(loadInstance += 1)}`;
     setLoading(true);
     setError("");
     if (activeConversationIdRef.current !== conversationId) {
@@ -171,19 +175,27 @@ export function useSpaceConversationChat(spaceId: string, conversationId: string
         setMessages((current) => mergeSpaceMessages(current, [includedMessage]));
         return;
       }
-      void spacesApi
-        .conversationMessages(spaceId, conversationId)
-        .then(({ messages: next }) => {
+      const spaceEvent = detail.event;
+      if (spaceEvent) {
+        const me = readApiAccountId();
+        const shown = frames.current.get(key) ?? pendingByConversation.get(key) ?? [];
+        if (patchedBySpaceEvent(shown, spaceEvent, me)) {
+          setMessages((current) => patchedBySpaceEvent(current, spaceEvent, me) ?? current);
+          return;
+        }
+      }
+      void coalescedReload(reloadKey, () =>
+        spacesApi.conversationMessages(spaceId, conversationId).then(({ messages: next }) => {
           if (!active) return;
           applyNewestPage(next);
           setError("");
-        })
-        .catch((reason) => {
-          if (active)
-            setError(
-              reason instanceof Error ? reason.message : "This group chat could not be loaded.",
-            );
-        });
+        }),
+      ).catch((reason) => {
+        if (active)
+          setError(
+            reason instanceof Error ? reason.message : "This group chat could not be loaded.",
+          );
+      });
     };
     window.addEventListener("misty:space-message-event", reload);
     const resync = () => reload(new CustomEvent("resync", { detail: { spaceId, conversationId } }));

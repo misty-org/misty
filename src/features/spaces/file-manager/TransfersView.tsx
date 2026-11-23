@@ -1,6 +1,6 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 import { CircleSlash, Eraser, Pause, Play, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   CollectionFilterMenu,
   CollectionHeading,
@@ -17,7 +17,7 @@ import {
 } from "@misty/ui";
 import { formatBytes, formatDate } from "./format";
 import { nameOf } from "./model";
-import { cancelTransfer, useTransfers, type Transfer } from "./transfers";
+import { canStop, cancelTransfer, useTransfers, type Transfer } from "./transfers";
 
 const states = [
   { value: "all", label: "All" },
@@ -65,7 +65,7 @@ function TransferState({ transfer }: { transfer: Transfer }) {
 }
 
 function transferMenu(transfer: Transfer) {
-  if (transfer.state === "running" || transfer.state === "queued")
+  if (canStop(transfer))
     return (
       <MenuItem icon={CircleSlash} label="Cancel" onSelect={() => cancelTransfer(transfer.opId)} />
     );
@@ -75,7 +75,9 @@ function transferMenu(transfer: Transfer) {
 }
 
 export function TransfersView() {
-  const list = useTransfers((store) => store.list);
+  const byOpId = useTransfers((store) => store.byId);
+  const order = useTransfers((store) => store.order);
+  const list = useMemo(() => order.flatMap((id) => byOpId[id] ?? []), [order, byOpId]);
   const clearFinished = useTransfers((store) => store.clearFinished);
   const paused = useTransfers((store) => store.paused);
   const setPaused = useTransfers((store) => store.setPaused);

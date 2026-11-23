@@ -4,19 +4,17 @@ import {
   SettingsSection,
   BottomBar,
   cn,
+  FramedBar,
+  FramedPage,
   IconButton,
   InlineLink,
-  Separator,
   Skeleton,
   SkeletonControl,
-  Surface,
   Text,
-  TopBar,
   trailingControls,
   type NoticeAction,
   type SkeletonTrailing,
   useNotice,
-  WorkspaceSidebar,
 } from "@misty/ui";
 import { X } from "lucide-react";
 import { Children, createContext, isValidElement, useContext, type ReactNode } from "react";
@@ -36,90 +34,79 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     props.navigationOverride ||
     props.navigationFooter,
   );
-  return (
-    <Surface
-      aria-label={props.ariaLabel}
-      tone="page"
-      className={cn(
-        "grid min-h-0 min-w-0 overflow-hidden",
-        overlay ? "h-full" : "h-screen",
-        navigation
-          ? [
-              "grid-cols-[--spacing(62)_1px_minmax(0,1fr)]",
-              "max-[990px]:grid-cols-[--spacing(52)_1px_minmax(0,1fr)]",
-              "max-[748px]:grid-cols-[--spacing(42)_1px_minmax(0,1fr)]",
-            ]
-          : "grid-cols-[minmax(0,1fr)]",
-      )}
+  const rail = (
+    <Text
+      bare
+      as="div"
+      tone="muted"
+      data-tour={props.navigationTour}
+      className="flex min-h-0 flex-1 flex-col py-3"
     >
-      <WorkspaceSidebar
-        hidden={!navigation}
-        data-tour={props.navigationTour}
-        className={cn(
-          "w-auto gap-0 overflow-hidden border-r-0 p-0",
-          props.navigationHeader ? "pt-1 pb-3" : "py-3",
-        )}
-      >
-        <Text bare as="div" tone="muted" className="flex min-h-0 flex-1 flex-col">
-          {props.navigationHeader ? (
-            <div className="mb-2 flex h-(--ui-header) shrink-0 items-center px-3 *:w-full max-[748px]:px-2">
-              {props.navigationHeader}
-            </div>
-          ) : null}
-          {props.navigationOverride ?? (
-            <SettingsNavigation
-              groups={props.groups}
-              activeId={props.activeId}
-              label={props.navigationLabel}
-              onSelect={props.onSelect}
-              sections={props.sections}
-              activeSection={props.activeSection}
-              onSection={props.onSection}
-            />
-          )}
-          {props.navigationFooter ? (
-            <div className="shrink-0 px-3 max-[748px]:px-2">{props.navigationFooter}</div>
-          ) : null}
-        </Text>
-      </WorkspaceSidebar>
-
-      {navigation ? <Separator orientation="vertical" /> : null}
-
-      <Surface as="main" tone="page" className="relative flex min-h-0 min-w-0 flex-col">
-        {overlay ? (
-          <Surface tone="sidebar" className="shrink-0">
-            <TopBar
-              divider
-              start={
-                props.title ? (
-                  <Text
-                    as="h1"
-                    size="title"
-                    weight="semibold"
-                    tone="bright"
-                    className="min-w-0 pl-3.5 max-[792px]:pl-1"
-                  >
-                    {props.title}
-                  </Text>
-                ) : undefined
-              }
-            >
-              <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
-                <X />
-              </IconButton>
-            </TopBar>
-          </Surface>
-        ) : null}
+      {props.navigationOverride ?? (
+        <SettingsNavigation
+          groups={props.groups}
+          activeId={props.activeId}
+          label={props.navigationLabel}
+          onSelect={props.onSelect}
+          sections={props.sections}
+          activeSection={props.activeSection}
+          onSection={props.onSection}
+        />
+      )}
+      {props.navigationFooter ? (
+        <div className="shrink-0 px-3">{props.navigationFooter}</div>
+      ) : null}
+    </Text>
+  );
+  return (
+    <FramedPage
+      autoSaveId="settings"
+      workMinWidth={240}
+      className={overlay ? undefined : "h-screen"}
+      header={
+        overlay ? (
+          <FramedBar
+            start={
+              props.title ? (
+                <Text as="h1" size="title" weight="semibold" tone="bright" className="min-w-0 pl-3.5">
+                  {props.title}
+                </Text>
+              ) : undefined
+            }
+          >
+            <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
+              <X />
+            </IconButton>
+          </FramedBar>
+        ) : null
+      }
+      start={
+        navigation
+          ? {
+              id: "sections",
+              content: rail,
+              label: `Resize ${props.navigationLabel.toLowerCase()}`,
+              width: 248,
+              minWidth: 200,
+              maxWidth: 320,
+              keep: true,
+              header: props.navigationHeader ? (
+                <FramedBar
+                  start={
+                    <div className="flex min-w-0 flex-1 *:w-full">{props.navigationHeader}</div>
+                  }
+                />
+              ) : undefined,
+            }
+          : null
+      }
+    >
+      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <div
           data-settings-scroller
           className="misty-scrollbar misty-scrollbar-floating mb-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
         >
-          <div
-            className={cn(
-              "w-full max-w-180 px-6 pb-12 max-[792px]:px-4",
-              overlay ? "pt-4" : "pt-6",
-            )}
-          >
+          <div className={cn("w-full max-w-180 px-6 pb-12", overlay ? "pt-4" : "pt-6")}>
             {props.contentHeader}
             <SettingsPageTitleContext.Provider
               value={typeof props.title === "string" && overlay ? props.title : ""}
@@ -130,8 +117,8 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
         </div>
         {props.saveBar}
         {props.corner !== undefined ? <BottomBar>{props.corner}</BottomBar> : null}
-      </Surface>
-    </Surface>
+      </main>
+    </FramedPage>
   );
 }
 export function DesktopSettingsSection(props: {

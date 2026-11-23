@@ -1,18 +1,30 @@
 import { useEffect, useState } from "react";
-import { cn, Skeleton, SkeletonControl, Surface, windowToolbarClass } from "@misty/ui";
+import { RotateCw } from "lucide-react";
+import {
+  cn,
+  EmptyState,
+  ErrorState,
+  FramedBar,
+  FramedPage,
+  PaneLoading,
+  Separator,
+  Skeleton,
+  SkeletonControl,
+  Surface,
+} from "@misty/ui";
 import { AgentSettingsModal } from "../personal/AgentSettingsModal";
 import { AgentSetup } from "../personal/AgentSetup";
 import { AgentEditor } from "../personal/AgentEditor";
 import { AgentDiscardDialog } from "./AgentDiscardDialog";
 import { AgentWorkspaceFrame } from "../methods/AgentWorkspaceFrame";
-import {
-  AgentsTaskContent,
-  chatColumnClass,
-  floatingHeaderClass,
-  studioBarClass,
-} from "./AgentsTaskContent";
+import { AgentsTaskContent, AgentsTaskHeader } from "./AgentsTaskContent";
 import { createAgentsPageActions, deriveAgentsPageView } from "./agents_page_actions";
 import { useAgentsPageState } from "./use_agents_page_state";
+import { homeSpaceOf } from "../personal/agent_home_space";
+import { AgentAvatar } from "../personal/AgentAvatar";
+import { AgentThreadList } from "../threads/AgentThreadList";
+import { SharedThreadView } from "../threads/SharedThreadView";
+import { useOthersThreads } from "../threads/agent_threads";
 
 export default function NativeAgentsPage() {
   return <AgentsWorkspacePage />;
@@ -77,7 +89,54 @@ function AgentsWorkspacePage() {
       />
     );
   const { showWorkspace } = view;
-  const taskContent = <AgentsTaskContent state={state} actions={actions} view={view} />;
+  const openThread = state.params.get("thread") ?? "";
+  const agentSpace = profile ? homeSpaceOf(user?.id ?? "", profile) : "";
+  const others = useOthersThreads(agentSpace, profile?.id ?? "", user?.id ?? "");
+  const pickedThread = others.others?.find((thread) => thread.id === openThread);
+  const openTheirs = (threadId: string) => {
+    const next = new URLSearchParams(state.params);
+    next.set("thread", threadId);
+    setParams(next);
+  };
+  const threadList = profile ? (
+    <AgentThreadList
+      spaceId={agentSpace}
+      agentId={profile.id}
+      shared={others.shared}
+      others={others.others}
+      failed={others.failed}
+      openConversationId={activeConversationId}
+      openThreadId={openThread}
+      onOpenMine={(conversationId) => select(profile.id, false, conversationId)}
+      onOpenTheirs={openTheirs}
+      onRetry={others.reload}
+    />
+  ) : null;
+  const theirs =
+    !openThread || !profile ? undefined : pickedThread ? (
+      <SharedThreadView
+        spaceId={agentSpace}
+        thread={pickedThread}
+        agentName={profile.name}
+        agentAvatar={<AgentAvatar agent={profile} />}
+      />
+    ) : others.others !== null ? (
+      <EmptyState
+        title="This thread is gone"
+        line="It was removed, or it isn't shared in this Space."
+        action={{ label: "New thread", onClick: () => select(profile.id, true) }}
+      />
+    ) : others.failed ? (
+      <ErrorState
+        title="This thread couldn't load"
+        line="Check your connection and try again."
+        action={{ label: "Try again", icon: RotateCw, onClick: others.reload }}
+      />
+    ) : (
+      <PaneLoading label="Loading this thread" />
+    );
+  const taskContent = <AgentsTaskContent state={state} actions={actions} />;
+  const taskHeader = <AgentsTaskHeader state={state} view={view} />;
   return (
     <Surface
       as="main"
@@ -99,14 +158,17 @@ function AgentsWorkspacePage() {
           activity={activity.entries}
           conversationId={activeConversationId}
           disabled={view.disabled}
+          header={taskHeader}
           onNewTask={() => select(profile.id, true)}
+          threads={threadList}
+          theirs={theirs}
         >
           {taskContent}
         </AgentWorkspaceFrame>
       ) : loading && !profile ? (
         <AgentsPageSkeleton chat={Boolean(activeConversationId)} />
       ) : (
-        taskContent
+        <FramedPage header={taskHeader}>{taskContent}</FramedPage>
       )}
       <AgentSettingsModal
         open={settingsModalOpen}
@@ -142,21 +204,11 @@ function AgentsPageSkeleton({ chat }: { chat: boolean }) {
       className="flex h-full min-h-0 min-w-0 flex-1 flex-row"
     >
       <span className="sr-only">Agents</span>
-      <Surface tone="page" className="relative min-h-0 min-w-90 flex-1 overflow-hidden">
-        <div className={cn(chatColumnClass, "h-full")} aria-hidden="true">
-          <div
-            className={cn(
-              "agent-studio-bar",
-              floatingHeaderClass,
-              studioBarClass,
-              windowToolbarClass,
-            )}
-          >
-            <Skeleton className="h-3.5 w-40" />
-          </div>
+      <div className="flex min-h-0 min-w-0 flex-1" aria-hidden="true">
+        <FramedPage header={<FramedBar start={<Skeleton className="h-3.5 w-40" />} />}>
           {chat ? (
             <>
-              <div className="mx-auto grid w-full max-w-209 flex-1 content-start gap-2.5 px-6 pt-[calc(var(--agent-conversation-inset)+--spacing(4))]">
+              <div className="mx-auto grid w-full max-w-209 flex-1 content-start gap-2.5 px-6 pt-4">
                 {replyWidths.map((width, index) => (
                   <Skeleton key={index} className={cn("h-3.5", width)} />
                 ))}
@@ -169,16 +221,16 @@ function AgentsPageSkeleton({ chat }: { chat: boolean }) {
               {composer}
             </div>
           )}
+        </FramedPage>
+      </div>
+      <Separator orientation="vertical" />
+      <Surface tone="sidebar" className="flex min-h-0 flex-none" aria-hidden="true">
+        <div className="flex flex-none flex-col gap-1 px-3 pt-[calc((var(--ui-header)-var(--spacing)*8)/2)] pb-2">
+          {Array.from({ length: 4 }, (_, index) => (
+            <SkeletonControl key={index} kind="icon" />
+          ))}
         </div>
       </Surface>
-      <div
-        className="flex flex-none flex-col gap-1 px-3 pt-[calc((var(--ui-header)-var(--spacing)*8)/2)] pb-2"
-        aria-hidden="true"
-      >
-        {Array.from({ length: 4 }, (_, index) => (
-          <SkeletonControl key={index} kind="icon" />
-        ))}
-      </div>
     </div>
   );
 }

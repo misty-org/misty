@@ -1,4 +1,5 @@
 import { directApi } from "../api";
+import { useDirectAccount } from "../direct_account";
 
 const dbName = "misty-call-keys";
 const storeName = "keys";
@@ -59,6 +60,7 @@ async function writeStored(key: DeviceKey): Promise<void> {
 
 let device: Promise<DeviceKey> | null = null;
 let published = false;
+let publishedFor: string | undefined;
 
 export function deviceCallKey(): Promise<DeviceKey> {
   device ??= (async () => {
@@ -78,13 +80,24 @@ export function deviceCallKey(): Promise<DeviceKey> {
     throw error;
   });
   return device.then(async (key) => {
-    if (!published) {
+    const account = useDirectAccount.getState().userId;
+    if (!published || publishedFor !== account) {
       await directApi.putCallKey(key.keyId, key.publicKey);
       published = true;
+      publishedFor = account;
     }
     return key;
   });
 }
+
+export function forgetPublishedCallKey() {
+  published = false;
+}
+
+useDirectAccount.subscribe((state, previous) => {
+  if (!state.userId || state.userId === previous.userId || !publishedFor) return;
+  void deviceCallKey().catch(() => undefined);
+});
 
 export function newCallKey(): Uint8Array<ArrayBuffer> {
   return crypto.getRandomValues(new Uint8Array(32));

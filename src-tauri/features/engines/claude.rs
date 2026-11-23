@@ -158,6 +158,10 @@ impl Engine for ClaudeEngine {
         cmd.arg("stdio");
         let mut preapproved: Vec<&str> = Vec::new();
         let extra_dirs = extra_dirs(req);
+        let memory_dir = super::agent_memory::claude_memory_dir(req);
+        let mut memory_settings = memory_dir
+            .as_ref()
+            .map(|dir| serde_json::json!({ "autoMemoryDirectory": dir }));
         if let Some(tools) = req.allowed_tools.as_deref() {
             cmd.arg("--permission-mode");
             cmd.arg("plan");
@@ -175,8 +179,12 @@ impl Engine for ClaudeEngine {
             match self.resolve_permission(req.permission.as_deref()) {
                 "bypass" => {
                     cmd.arg("--dangerously-skip-permissions");
+                    let mut settings = folder_sandbox_settings(&extra_dirs);
+                    if let Some(dir) = memory_settings.take() {
+                        settings["autoMemoryDirectory"] = dir["autoMemoryDirectory"].clone();
+                    }
                     cmd.arg("--settings");
-                    cmd.arg(folder_sandbox_settings(&extra_dirs).to_string());
+                    cmd.arg(settings.to_string());
                 }
                 mode => {
                     cmd.arg("--permission-mode");
@@ -190,6 +198,10 @@ impl Engine for ClaudeEngine {
                     }
                 }
             }
+        }
+        if let Some(settings) = memory_settings.filter(|_| req.provider_id.is_none()) {
+            cmd.arg("--settings");
+            cmd.arg(settings.to_string());
         }
         let mut mcp_servers = req
             .mcp_servers

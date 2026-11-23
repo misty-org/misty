@@ -7,7 +7,6 @@ export type TourId =
   | "space"
   | "space-chat"
   | "search"
-  | "layout"
   | "add-sources"
   | "agent-settings";
 

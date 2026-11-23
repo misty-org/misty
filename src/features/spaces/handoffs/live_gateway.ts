@@ -10,7 +10,7 @@ import {
 import { leaveViewingPlace, setViewingPlace } from "../list/create_spaces_realtime_actions";
 import { useSpacesStore } from "../list/use_spaces_store";
 import { memberPicture, myPicture } from "../members/member_pictures";
-import { LabNoteBodyEditor } from "../journal/notes/components/LabNoteBodyEditor";
+import { LiveNoteBodyEditor } from "../journal/notes/components/LiveNoteBodyEditor";
 import { handoffBody } from "./space_posts";
 import { VisibilityMenu } from "../components/VisibilityMenu";
 import { setItemVisibility, type ItemVisibility } from "../api/visibility";
@@ -41,7 +41,7 @@ export const liveGateway = {
       doc: room.doc,
       awareness: room.awareness,
       role: session.ticket.role,
-      synced: room.synced.catch(() => new Promise<void>(() => {})),
+      synced: room.synced,
       lost,
       onLost(listener: () => void) {
         const stopRoom = room.onLost(() => listener());
@@ -171,5 +171,5 @@ export const liveGateway = {
     leaveViewingPlace(place, itemId);
   },
 
-  NoteBodyEditor: LabNoteBodyEditor,
+  NoteBodyEditor: LiveNoteBodyEditor,
 };

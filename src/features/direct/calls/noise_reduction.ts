@@ -1,7 +1,6 @@
 import type { AudioProcessorOptions, LocalAudioTrack, Track, TrackProcessor } from "livekit-client";
 import type * as Suppressor from "@sapphi-red/web-noise-suppressor";
 import workletUrl from "@sapphi-red/web-noise-suppressor/rnnoiseWorklet.js?url";
-import wasmUrl from "@sapphi-red/web-noise-suppressor/rnnoise.wasm?url";
 import simdUrl from "@sapphi-red/web-noise-suppressor/rnnoise_simd.wasm?url";
 
 let suppressor: Promise<typeof Suppressor> | undefined;
@@ -19,7 +18,7 @@ function library() {
 
 function rnnoise() {
   binary ??= library()
-    .then(({ loadRnnoise }) => loadRnnoise({ url: wasmUrl, simdUrl }))
+    .then(({ loadRnnoise }) => loadRnnoise({ url: simdUrl, simdUrl }))
     .catch((error: unknown) => {
       binary = undefined;
       throw error;

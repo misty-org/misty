@@ -127,6 +127,36 @@ pub fn all_paths(store: &Store) -> Vec<PathBuf> {
     read().unwrap_or_default()
 }
 
+pub fn of_conversation(store: &Store, account: &str, conversation: &str) -> Option<Row> {
+    select(
+        store,
+        "account = ?1 AND conversation = ?2",
+        &[account, conversation],
+    )
+    .ok()?
+    .into_iter()
+    .next()
+}
+
+pub fn set_base(
+    store: &Store,
+    account: &str,
+    multirun: &str,
+    lane: i64,
+    base: &str,
+) -> Result<(), String> {
+    store
+        .connect()
+        .map_err(text)?
+        .execute(
+            "UPDATE multirun_worktrees SET base = ?4
+             WHERE account = ?1 AND multirun = ?2 AND lane = ?3",
+            rusqlite::params![account, multirun, lane, base],
+        )
+        .map(|_| ())
+        .map_err(text)
+}
+
 pub fn mark_kept(store: &Store, account: &str, multirun: &str, lane: i64) -> Result<(), String> {
     store
         .connect()

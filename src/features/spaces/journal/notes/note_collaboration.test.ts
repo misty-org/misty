@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as ApiClient from "@/api/client";
 
 const spaceRequestMock = vi.hoisted(() => vi.fn());
 const providerDestroyMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/features/spaces/api/api", () => ({
-  spaceRequest: spaceRequestMock,
+vi.mock("@/api/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiClient>()),
+  apiRequest: spaceRequestMock,
 }));
 
 vi.mock("y-partyserver/provider", () => ({
@@ -12,6 +14,8 @@ vi.mock("y-partyserver/provider", () => ({
     destroy = providerDestroyMock;
     on = vi.fn();
     disconnect = vi.fn();
+    awareness = { on: vi.fn(), off: vi.fn() };
+    _awarenessUpdateHandler = vi.fn();
   },
 }));
 

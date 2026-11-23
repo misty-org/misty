@@ -1,9 +1,16 @@
-import { Fragment, useMemo } from "react";
-import { MemberGroupHeading, MemberList, MemberRow, type MemberPresence } from "@misty/ui";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  ErrorState,
+  MemberGroupHeading,
+  MemberList,
+  MemberRow,
+  type MemberPresence,
+} from "@misty/ui";
 import { useMistyStore, useStudioAgents } from "@/features/agents";
 import { useNow } from "@/shared/hooks/use_now";
 import type { Space, SpaceMember, SpaceRoleDef } from "../../api/dto/entities";
 import { MemberRolesMenu } from "../../roles/MemberRolesMenu";
+import { loadSpaceMembers } from "../load_space_members";
 import { useSpacesStore } from "../../list/use_spaces_store";
 import { doingLabel, memberAgentsIn, useMemberAgents } from "../../list/member_agents";
 import { spaceAgentStatuses } from "../../list/SpaceAgentsBroadcast";
@@ -22,9 +29,17 @@ interface Row {
   line: string;
 }
 
-function agentLine(agent: { name: string; state: string; doing: string; files?: string[] }) {
+function agentLine(agent: {
+  name: string;
+  state: string;
+  doing: string;
+  files?: string[];
+  waiting?: number;
+}) {
   const file = agent.files?.[0]?.split("/").pop();
-  const doing = file ? `editing ${file}` : doingLabel(agent.doing, agent.state as never);
+  const doing = file
+    ? `editing ${file}`
+    : doingLabel(agent.doing, agent.state as never, agent.waiting);
   return doing ? `${agent.name} is ${doing.charAt(0).toLowerCase()}${doing.slice(1)}` : agent.name;
 }
 
@@ -42,6 +57,19 @@ export function ChatMemberList(props: {
   const { spaceId } = props;
   const now = useNow();
   const people = useSpacesStore((state) => state.membersBySpace[spaceId]);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (people) return;
+    let active = true;
+    setFailed(false);
+    void loadSpaceMembers(spaceId).catch(() => {
+      if (active) setFailed(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [people, spaceId, attempt]);
   const viewers = useSpacesStore((state) => state.presenceBySpace[spaceId]);
   const accounts = useAccountPresence((state) => state.byUser);
   const voice = useVoicePresence((state) => state.bySpace[spaceId]);
@@ -138,8 +166,22 @@ export function ChatMemberList(props: {
     apps,
   ]);
 
+  if (!people && failed)
+    return (
+      <MemberList label="Members">
+        <ErrorState
+          inline
+          title="Members couldn’t load"
+          action={{
+            label: "Try again",
+            variant: "secondary",
+            onClick: () => setAttempt((count) => count + 1),
+          }}
+        />
+      </MemberList>
+    );
   return (
-    <MemberList label="Members">
+    <MemberList label="Members" loading={!people}>
       {groups.map((group) => (
         <Fragment key={group.title}>
           <MemberGroupHeading title={group.title} count={group.rows.length} />

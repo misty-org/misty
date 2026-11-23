@@ -1,4 +1,4 @@
-import "@/app/SettingsSections";
+import "@/app/settings_sections";
 import { initializeHostAgentsRuntime } from "@/features/agents/host_agents_runtime";
 import type * as AppShell from "@/app/shell";
 import type { SettingsSection } from "@/features/settings";
@@ -6,11 +6,11 @@ import { fireEvent } from "@testing-library/react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SettingsStoreModule from "./preferences/use_settings_store";
 
 import SettingsWorkspace from "./SettingsPage";
-import { settingsAreaEntry, settingsGroups } from "./SettingsRegistry";
+import { preloadSettingsSections, settingsAreaEntry, settingsGroups } from "./SettingsRegistry";
 const PAGES: SettingsSection[] = settingsGroups.flatMap((group) =>
   group.areas.map((area) => settingsAreaEntry(area)!.id),
 );
@@ -109,6 +109,9 @@ describe("SettingsWorkspace", () => {
       );
     });
   }
+  beforeAll(async () => {
+    await preloadSettingsSections();
+  });
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");

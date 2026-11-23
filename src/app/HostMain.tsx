@@ -1,6 +1,6 @@
 import "./feature_seams";
 import "./settings_effects";
-import "./SettingsSections";
+import "./settings_sections";
 import { initializeHostAgentsRuntime } from "@/features/agents/host_agents_runtime";
 import { applySavedFonts } from "@/features/engine-config/fonts";
 import { startPerformanceRecording } from "@/features/engine-config/performance";
@@ -15,6 +15,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { applyCachedAppTheme } from "@/features/settings";
 import { installUiStorage } from "@/shared/lib/ui_storage";
 import { followRegistry } from "@/native/registry";
+import { loadServerChoice } from "@/api/deployment/server_choice";
 configureMistyBrowserLinkOpener(async (url) => {
   if (!hasTauriInternals()) throw new Error("Links open only from the desktop app.");
   await openUrl(url);
@@ -24,7 +25,7 @@ initializeHostAgentsRuntime();
 applyCachedAppTheme();
 installUiStorage();
 void applySavedFonts();
-followRegistry();
+const registryReady = followRegistry();
 if (hasTauriInternals()) startPerformanceRecording();
 if (import.meta.env.DEV || import.meta.env.VITE_MISTY_DEBUG === "1") {
   void import("@/shared/platform/client_debug").then(({ installClientDebugging }) => {
@@ -48,7 +49,7 @@ async function bootstrap() {
   removeRetiredStorage();
   const appModules = Promise.all([import("./App"), import("@/styles/styles.css")]);
   void import("./layouts/DesktopLayout").catch(() => undefined);
-  await (await import("@/api/deployment/server_choice")).loadServerChoice();
+  await Promise.all([loadServerChoice(), registryReady]);
   const [{ App }] = await appModules;
   root.render(
     <AppErrorBoundary>

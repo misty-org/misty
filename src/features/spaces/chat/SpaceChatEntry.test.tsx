@@ -25,9 +25,6 @@ vi.mock("./SpaceChat", () => ({
     </div>
   ),
 }));
-vi.mock("./components/PinnedMessagesButton", () => ({
-  PinnedMessagesButton: () => <button type="button">Pinned</button>,
-}));
 vi.mock("./sidebar/use_space_conversations", () => ({
   useSpaceConversations: () => ({ conversations: [], loading: false, upsert: vi.fn() }),
 }));

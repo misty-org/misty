@@ -76,7 +76,7 @@ export function MessageAnchorRail({
     <nav
       aria-label="Your messages"
       className={cn(
-        "pointer-events-none absolute top-[calc(var(--agent-conversation-inset,0px)+var(--spacing)*14)] bottom-35 left-3",
+        "pointer-events-none absolute top-14 bottom-35 left-3",
         "z-[var(--stack-sticky)] flex w-10 flex-col items-start justify-center-safe gap-0.5 overflow-visible",
         "max-[990px]:hidden",
       )}

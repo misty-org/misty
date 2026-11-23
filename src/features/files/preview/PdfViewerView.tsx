@@ -33,6 +33,8 @@ export default function PdfViewerView({
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [loadError, setLoadError] = useState("");
+  const [ratio, setRatio] = useState(11 / 8.5);
+  const [near, setNear] = useState<ReadonlySet<number>>(() => new Set([1, 2]));
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -62,6 +64,28 @@ export default function PdfViewerView({
     pageNodes.current.forEach((node) => observer.observe(node));
     return () => observer.disconnect();
   }, [compact, numPages, baseWidth, zoom]);
+
+  useEffect(() => {
+    if (compact) return;
+    const root = scrollRef.current;
+    if (!root || numPages === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) =>
+        setNear((now) => {
+          const next = new Set(now);
+          for (const entry of entries) {
+            const pageNumber = Number((entry.target as HTMLElement).dataset.page);
+            if (!pageNumber) continue;
+            if (entry.isIntersecting) next.add(pageNumber);
+            else next.delete(pageNumber);
+          }
+          return next.size === now.size && [...next].every((page) => now.has(page)) ? now : next;
+        }),
+      { root, rootMargin: "100% 0px" },
+    );
+    pageNodes.current.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [compact, numPages]);
 
   const changeZoom = useCallback(
     (delta: number) =>
@@ -148,20 +172,38 @@ export default function PdfViewerView({
                     <Page
                       pageNumber={1}
                       width={pageWidth}
-                      className="overflow-hidden rounded-md shadow-lg"
+                      className="overflow-hidden rounded-md"
                       renderTextLayer={false}
                       renderAnnotationLayer={false}
                     />
                   )
                 : Array.from({ length: numPages }, (_, index) => (
-                    <div key={index} ref={registerPage(index + 1)} data-page={index + 1}>
-                      <Page
-                        pageNumber={index + 1}
-                        width={pageWidth}
-                        className="mb-4 overflow-hidden rounded-md shadow-lg"
-                        renderTextLayer
-                        renderAnnotationLayer
-                      />
+                    <div
+                      key={index}
+                      ref={registerPage(index + 1)}
+                      data-page={index + 1}
+                      style={
+                        near.has(index + 1)
+                          ? undefined
+                          : { width: pageWidth, height: Math.round(pageWidth * ratio) }
+                      }
+                    >
+                      {near.has(index + 1) ? (
+                        <Page
+                          pageNumber={index + 1}
+                          width={pageWidth}
+                          className="mb-4 overflow-hidden rounded-md"
+                          renderTextLayer
+                          renderAnnotationLayer
+                          onLoadSuccess={
+                            index === 0
+                              ? (page) =>
+                                  page.originalWidth > 0 &&
+                                  setRatio(page.originalHeight / page.originalWidth)
+                              : undefined
+                          }
+                        />
+                      ) : null}
                     </div>
                   ))}
           </Document>

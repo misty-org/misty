@@ -1,10 +1,9 @@
-import { Bell, BellOff, MessagesSquare, Users, type LucideIcon } from "lucide-react";
-import { IconButton, IndicatorDot } from "@misty/ui";
+import { Bell, BellOff, MessagesSquare, Pin, Users, type LucideIcon } from "lucide-react";
+import { IconButton, IndicatorDot, type ActionBarItem } from "@misty/ui";
 import { setMuted, useMessageNotices } from "@/shared/lib/message_notices";
 import { useChatSidePanel } from "../chat_side_panel_store";
 import { useThreadsUnread } from "../hooks/use_threads_unread";
 import { useChatSidebarPreferences } from "../sidebar/chat_sidebar_preferences";
-import { PinnedMessagesButton } from "./PinnedMessagesButton";
 
 export function useChatBarMenu(props: {
   spaceId: string;
@@ -34,7 +33,7 @@ export function useChatBarMenu(props: {
   };
 }
 
-export function ChatBarButtons(props: {
+export function useChatBarActions(props: {
   spaceId: string;
   conversationId?: string;
   muteId: string;
@@ -44,22 +43,37 @@ export function ChatBarButtons(props: {
   sideLabel?: string;
   SideIcon?: LucideIcon;
   onPanel(): void;
-}) {
-  const { spaceId, conversationId = "" } = props;
+}): ActionBarItem[] {
   const menu = useChatBarMenu(props);
+  const pinnedOpen = useChatSidePanel((panel) => panel.pinnedOpen);
   const membersShown = !useChatSidebarPreferences((state) => state.value.hideMembers);
   const saveMembers = useChatSidebarPreferences((state) => state.set);
   const SideIcon = props.SideIcon ?? Users;
+  const sideLabel = props.sideLabel ?? "Members";
 
+  const membersPressed = membersShown && !props.searching && !menu.threadsOpen && !pinnedOpen;
   const toggleMembers = () => {
     props.onPanel();
     useChatSidePanel.getState().reset();
-    saveMembers((current) => ({ ...current, hideMembers: membersShown }));
+    saveMembers((current) => ({ ...current, hideMembers: membersPressed }));
   };
-  return (
-    <>
-      {props.folded ? null : (
-        <>
+  const togglePinned = () => {
+    props.onPanel();
+    const panel = useChatSidePanel.getState();
+    if (panel.pinnedOpen) panel.closePinned();
+    else panel.openPinned();
+  };
+  const items: ActionBarItem[] = [];
+  if (!props.folded)
+    items.push(
+      {
+        id: "threads",
+        icon: MessagesSquare,
+        label: menu.threadsLabel,
+        priority: 9,
+        pressed: menu.threadsOpen,
+        onSelect: menu.toggleThreads,
+        render: () => (
           <span className="relative inline-flex">
             <IconButton
               label={menu.threadsLabel}
@@ -71,27 +85,33 @@ export function ChatBarButtons(props: {
             </IconButton>
             {menu.threadsUnread > 0 ? <IndicatorDot /> : null}
           </span>
-          <IconButton
-            label={menu.muteLabel}
-            variant="quiet"
-            aria-pressed={menu.muted}
-            onClick={menu.toggleMute}
-          >
-            <menu.MuteIcon />
-          </IconButton>
-        </>
-      )}
-      <PinnedMessagesButton spaceId={spaceId} conversationId={conversationId} />
-      {props.members === false ? null : (
-        <IconButton
-          label={props.sideLabel ?? "Members"}
-          variant="quiet"
-          aria-pressed={membersShown && !props.searching && !menu.threadsOpen}
-          onClick={toggleMembers}
-        >
-          <SideIcon />
-        </IconButton>
-      )}
-    </>
-  );
+        ),
+      },
+      {
+        id: "mute",
+        icon: menu.MuteIcon,
+        label: menu.muteLabel,
+        priority: 2,
+        pressed: menu.muted,
+        onSelect: menu.toggleMute,
+      },
+    );
+  items.push({
+    id: "pinned",
+    icon: Pin,
+    label: "Pinned",
+    priority: 3,
+    pressed: pinnedOpen,
+    onSelect: togglePinned,
+  });
+  if (props.members !== false)
+    items.push({
+      id: "members",
+      icon: SideIcon,
+      label: sideLabel,
+      priority: 5,
+      pressed: membersPressed,
+      onSelect: toggleMembers,
+    });
+  return items;
 }

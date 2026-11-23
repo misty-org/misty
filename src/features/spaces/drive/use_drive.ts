@@ -6,6 +6,7 @@ import {
   drivePath,
   onDriveChanged,
   onDriveStatus,
+  subscribeDriveChanged,
   type DriveChanged,
   type DriveEntry,
   type DriveSpaceStatus,
@@ -95,6 +96,11 @@ export function applyDriveChange(
   changed: DriveChanged,
 ): DriveEntry[] {
   const gone = removedIds(changed);
+  const here = new Set(entries.map((entry) => entry.id));
+  const touches = changed.items.some(
+    (item) => here.has(item.id) || driveParent(item.path) === folder,
+  );
+  if (!touches && ![...gone].some((id) => here.has(id))) return entries;
   const updates = new Map<string, DriveEntry>();
   for (const item of changed.items) if (!gone.has(item.id)) updates.set(item.id, item);
   const next: DriveEntry[] = [];
@@ -132,6 +138,7 @@ export function useDriveList(spaceId: string | undefined, path: string) {
             }
           : undefined,
       });
+    let held: DriveChanged[] | null = [];
     const read = (cursor?: string) =>
       driveNative.list(spaceId, folder, { cursor, limit: PAGE }).then(
         (page) => {
@@ -141,6 +148,12 @@ export function useDriveList(spaceId: string | undefined, path: string) {
             ...entries.current,
             ...page.entries.filter((entry) => !known.has(entry.id)),
           ];
+          if (held) {
+            for (const changed of held) {
+              entries.current = applyDriveChange(folder, entries.current, changed);
+            }
+            held = null;
+          }
           ready(page.next_cursor);
         },
         (cause) => {
@@ -150,17 +163,25 @@ export function useDriveList(spaceId: string | undefined, path: string) {
         },
       );
 
-    const stop = onDriveChanged((changed) => {
+    const subscription = subscribeDriveChanged((changed) => {
       if (!live || changed.space_id !== spaceId) return;
-      entries.current = applyDriveChange(folder, entries.current, changed);
+      if (held) {
+        held.push(changed);
+        return;
+      }
+      const next = applyDriveChange(folder, entries.current, changed);
+      if (next === entries.current) return;
+      entries.current = next;
       setState((current) =>
         current.status === "ready" ? { ...current, entries: entries.current } : current,
       );
     });
-    void read();
+    void subscription.ready.then(() => {
+      if (live) void read();
+    });
     return () => {
       live = false;
-      stop();
+      subscription.stop();
     };
   }, [spaceId, folder, attempt]);
 

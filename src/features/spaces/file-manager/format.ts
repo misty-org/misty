@@ -3,15 +3,17 @@ import { itemShape, type FileItem } from "./model";
 
 export const formatBytes = (bytes: number) => formatDriveBytes(bytes);
 
+const dateFormat = new Intl.DateTimeFormat([], {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 export function formatDate(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return "—";
-  return new Date(ms).toLocaleString([], {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return dateFormat.format(ms);
 }
 
 const extensionOf = (name: string) => {
@@ -59,7 +61,13 @@ export function kindOf(item: FileItem): string {
 }
 
 const PICTURED = new Set(
-  "png apng jpg jpeg gif webp avif svg bmp ico heic heif tif tiff".split(" "),
+  [
+    "png apng jpg jpeg gif webp avif svg bmp ico heic heif tif tiff psd",
+    "mp4 m4v mov webm mkv avi mpg mpeg",
+    "pdf key pages numbers docx xlsx pptx",
+  ]
+    .join(" ")
+    .split(" "),
 );
 
 export const isPictured = (name: string) => PICTURED.has(extensionOf(name));

@@ -2,19 +2,21 @@ use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::{atomic::Ordering, Arc},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use serde_json::Value;
 
 use crate::api::{Change, NewItem};
-use crate::ignore::{DriveRules, GIT_IGNORE_FILE, IGNORE_FILE};
-use crate::in_use::{self, RENEW_EVERY, STALE_CHECK, USED_LATELY};
+use crate::cache::BlobPin;
+use crate::copy_source::{CopyFlow, CopyFolder, CopyKind, CopySource};
+use crate::ignore::{never_synced_name, DriveRules, GIT_IGNORE_FILE, IGNORE_FILE};
+use crate::in_use::{self, ANSWER_HOLD, STALE_CHECK, USED_LATELY};
 use crate::model::*;
 use crate::names;
 use crate::planner::{self, Down, Trees, Up};
 use crate::rules::{self, CreateOutcome, TrashOutcome, UpdateOutcome};
-use crate::store::NodeRow;
+use crate::store::{ChildKey, NodeRow};
 use crate::transfer::{self, EMPTY_SHA256};
 use crate::{lock, ApiError, DriveError, Inner, Key, Mounted, NewNode};
 
@@ -22,6 +24,9 @@ const QUIET: Duration = Duration::from_millis(500);
 const MARKS_QUIET: Duration = Duration::from_millis(500);
 const MARKS_FRESH: Duration = Duration::from_secs(45);
 const MAX_IGNORE_TEXT: u64 = 256 * 1024;
+const RETRY_FIRST: Duration = Duration::from_secs(2);
+const RETRY_MOST: Duration = Duration::from_secs(300);
+const MAX_COPY_ITEMS: u64 = 50_000;
 
 #[derive(Default)]
 struct Touched {
@@ -41,6 +46,7 @@ pub(crate) async fn run(inner: Arc<Inner>, space: SpaceId) {
         }
     }
     read_marks(&inner, &space).await;
+    let mut retry = RETRY_FIRST;
     loop {
         let Ok(mounted) = inner.mounted(&space) else {
             return;
@@ -49,12 +55,25 @@ pub(crate) async fn run(inner: Arc<Inner>, space: SpaceId) {
             return;
         }
         keep_marks(&inner, &space).await;
-        if !inner.paused.load(Ordering::SeqCst) {
-            let _ = round(&inner, &space).await;
-        }
-        tokio::select! {
-            _ = mounted.kick.notified() => tokio::time::sleep(QUIET).await,
-            _ = tokio::time::sleep(RENEW_EVERY) => {}
+        let failed = if inner.paused.load(Ordering::SeqCst) {
+            false
+        } else {
+            match round(&inner, &space).await {
+                Ok(()) => false,
+                Err(DriveError::Offline | DriveError::Api(ApiError::Server { .. })) => true,
+                Err(_) => false,
+            }
+        };
+        if failed {
+            tokio::select! {
+                _ = mounted.kick.notified() => tokio::time::sleep(QUIET).await,
+                _ = tokio::time::sleep(retry) => {}
+            }
+            retry = (retry * 2).min(RETRY_MOST);
+        } else {
+            retry = RETRY_FIRST;
+            mounted.kick.notified().await;
+            tokio::time::sleep(QUIET).await;
         }
     }
 }
@@ -67,10 +86,28 @@ fn retry_error(message: &str) -> DriveError {
     }
 }
 
+pub(crate) fn is_root_ignore(node: &NodeRow) -> bool {
+    node.parent.is_none() && node.kind == Kind::File && node.name.eq_ignore_ascii_case(IGNORE_FILE)
+}
+
+fn waits_large(inner: &Inner, space: &SpaceId, id: &ItemId) -> bool {
+    inner
+        .store
+        .node(space, id)
+        .ok()
+        .flatten()
+        .is_some_and(|node| inner.waits_large(&node))
+}
+
 fn set_status(inner: &Inner, mounted: &Mounted, status: StatusKind, message: Option<String>) {
     let space = &mounted.mount.space;
-    let nodes = inner.store.nodes(space).unwrap_or_default();
-    let pending_uploads = nodes.iter().filter(|node| node.dirty()).count() as u64;
+    let waiting = inner
+        .store
+        .dirty_nodes(space)
+        .iter()
+        .filter(|node| inner.waits_large(node))
+        .count() as u64;
+    let pending_uploads = inner.store.dirty_count(space).saturating_sub(waiting);
     let pending_downloads = lock(&inner.downloading)
         .iter()
         .filter(|(at, _)| at == space)
@@ -99,7 +136,7 @@ pub(crate) async fn round(inner: &Arc<Inner>, space: &SpaceId) -> Result<(), Dri
         let complete = pull(inner, space, &mut touched).await?;
         up(inner, &mounted, space, &mut touched).await?;
         down(inner, space, complete, &mut touched)?;
-        leases(inner, &mounted, space).await;
+        settle_holds(inner, &mounted, space).await;
         fetch_wanted(inner, space).await;
         evict(inner, &mut touched);
         Ok::<(), DriveError>(())
@@ -222,18 +259,20 @@ fn save_replaced(inner: &Inner, space: &SpaceId, copy: &Item) {
         .map(|node| node.name.clone())
         .or_else(|| item.as_ref().map(|item| item.name.clone()))
         .unwrap_or_else(|| copy.name.clone());
-    let writer = copy.trashed_by.clone().unwrap_or_default();
+    let writer = copy
+        .trashed_by
+        .clone()
+        .or_else(|| item.as_ref().map(|item| item.modified_by.clone()))
+        .unwrap_or_default();
     let by = item
         .as_ref()
         .filter(|item| item.modified_by == writer)
         .map(|item| item.modified_by_name.clone())
         .or_else(|| {
-            inner.store.items(space).ok().and_then(|items| {
-                items
-                    .into_iter()
-                    .find(|other| other.modified_by == writer && !other.modified_by_name.is_empty())
-                    .map(|other| other.modified_by_name)
-            })
+            inner
+                .store
+                .item_by_writer(space, &writer)
+                .map(|other| other.modified_by_name)
         });
     inner.events.notice(&Notice {
         count: None,
@@ -249,25 +288,11 @@ fn save_replaced(inner: &Inner, space: &SpaceId, copy: &Item) {
 }
 
 fn trees(inner: &Inner, space: &SpaceId, complete: bool) -> Result<Trees, DriveError> {
+    let (server, base, local) = inner.store.planning(space, complete);
     Ok(Trees {
-        server: inner
-            .store
-            .items(space)?
-            .into_iter()
-            .map(|item| (item.id.clone(), item))
-            .collect(),
-        base: inner
-            .store
-            .bases(space)?
-            .into_iter()
-            .map(|base| (base.id.clone(), base))
-            .collect(),
-        local: inner
-            .store
-            .nodes(space)?
-            .into_iter()
-            .map(|node| (node.id.clone(), node))
-            .collect(),
+        server,
+        base,
+        local,
         complete,
     })
 }
@@ -282,9 +307,19 @@ async fn up(
     let mut trashes = Vec::new();
     for op in ops {
         match op {
+            Up::Create(id) if waits_large(inner, space, &id) => {}
+            Up::Update {
+                id,
+                content: true,
+                place: false,
+            } if waits_large(inner, space, &id) => {}
             Up::Create(id) => create_up(inner, mounted, space, &id, touched).await?,
             Up::Update { id, .. } => update_up(inner, mounted, space, &id, touched).await?,
-            Up::Trash(id) => trashes.push(id),
+            Up::Trash(id) => {
+                if !lock(&mounted.trashing).contains(&id) {
+                    trashes.push(id)
+                }
+            }
             Up::DropLocal(id) => {
                 for node in inner.store.remove_subtree(space, &id)? {
                     inner.bases.remove(&node.id);
@@ -297,6 +332,27 @@ async fn up(
         trash_up(inner, mounted, space, trashes, touched).await?;
     }
     Ok(())
+}
+
+pub(crate) async fn trash_one(
+    inner: &Arc<Inner>,
+    space: &SpaceId,
+    id: &ItemId,
+) -> Result<(), DriveError> {
+    let mounted = inner.mounted(space)?;
+    if !lock(&mounted.trashing).insert(id.clone()) {
+        return Err(DriveError::Changed);
+    }
+    let mut touched = Touched::default();
+    let result = trash_up(inner, &mounted, space, vec![id.clone()], &mut touched).await;
+    lock(&mounted.trashing).remove(id);
+    emit(inner, &mounted, space, &touched);
+    let mut results = result?;
+    match results.remove(id) {
+        Some(result) => result,
+        None if inner.store.node(space, id)?.is_none() => Ok(()),
+        None => Err(DriveError::Offline),
+    }
 }
 
 async fn send_blob(
@@ -618,8 +674,8 @@ fn server_free_name(
             taken.insert(names::fold(&child.server_name));
         }
     }
-    for item in inner.store.items(space)? {
-        if item.parent_id.as_ref() == parent && item.is_live() && &item.id != except {
+    for item in inner.store.item_children(space, parent)? {
+        if item.is_live() && &item.id != except {
             taken.insert(names::fold(&item.name));
         }
     }
@@ -869,7 +925,8 @@ async fn update_up(
         if node.created || node.trash_pending || node.not_synced {
             return Ok(());
         }
-        let content = node.dirty_content && node.kind == Kind::File;
+        let content =
+            node.dirty_content && node.kind == Kind::File && !waits_large(inner, space, id);
         let place = node.dirty_place;
         if !content && !place {
             return Ok(());
@@ -949,6 +1006,7 @@ async fn update_up(
             });
         }
         let answer = inner.api.change(space, id, if_match, &change).await;
+        let forbidden = matches!(answer, Err(ApiError::Forbidden));
         match rules::after_update(answer, place) {
             UpdateOutcome::Accepted(item) => {
                 return commit(inner, space, &node, &item, sent, place, touched)
@@ -1018,6 +1076,16 @@ async fn update_up(
             UpdateOutcome::Retry(message) => return Err(retry_error(&message)),
             UpdateOutcome::Failed(message) => {
                 inner.store.delete_transfer(space, id)?;
+                if forbidden && is_root_ignore(&node) {
+                    if let Some(server) = inner.store.item(space, id)?.filter(Item::is_live) {
+                        take_theirs(inner, space, &node, &server, touched)?;
+                    }
+                    touched.problem = Some(
+                        "Only the Space's owner and moderators can change its .mistyignore."
+                            .to_owned(),
+                    );
+                    return Ok(());
+                }
                 touched.problem = Some(message);
                 return Ok(());
             }
@@ -1182,7 +1250,9 @@ async fn trash_up(
     space: &SpaceId,
     ids: Vec<ItemId>,
     touched: &mut Touched,
-) -> Result<(), DriveError> {
+) -> Result<HashMap<ItemId, Result<(), DriveError>>, DriveError> {
+    let mut results: HashMap<ItemId, Result<(), DriveError>> = HashMap::new();
+    let _ = mounted;
     let mut wait = Duration::ZERO;
     for id in &ids {
         match inner.api.check_in_use(space, id).await {
@@ -1230,12 +1300,12 @@ async fn trash_up(
                     inner.bases.remove(&gone.id);
                     touched.removed.insert(gone.id.clone(), inner.entry(&gone));
                 }
-                lock(&mounted.trash_results).insert(id.clone(), Ok(()));
+                results.insert(id.clone(), Ok(()));
             }
             TrashOutcome::RefusedInUse(who) => {
                 bring_back(inner, space, &node, touched)?;
                 let line = rules::in_use_line(&who, &node.name);
-                lock(&mounted.trash_results).insert(id.clone(), Err(DriveError::InUse(line)));
+                results.insert(id.clone(), Err(DriveError::InUse(line)));
                 let first = who.first();
                 inner.events.notice(&Notice {
                     count: None,
@@ -1257,13 +1327,12 @@ async fn trash_up(
             TrashOutcome::Retry(message) => return Err(retry_error(&message)),
             TrashOutcome::Failed(message) => {
                 bring_back(inner, space, &node, touched)?;
-                lock(&mounted.trash_results)
-                    .insert(id.clone(), Err(DriveError::Invalid(message.clone())));
+                results.insert(id.clone(), Err(DriveError::Invalid(message.clone())));
                 touched.problem = Some(message);
             }
         }
     }
-    Ok(())
+    Ok(results)
 }
 
 fn bring_back(
@@ -1282,15 +1351,14 @@ fn bring_back(
         }
         touched.changed.insert(row.id.clone());
     }
-    let clash = inner
-        .store
-        .children(space, node.parent.as_ref())?
-        .into_iter()
-        .any(|other| {
-            other.id != node.id
-                && !other.trash_pending
-                && names::fold(&other.name) == names::fold(&node.name)
-        });
+    let clash = taken_by(
+        inner,
+        space,
+        node.parent.as_ref(),
+        &node.name,
+        Some(&node.id),
+    )
+    .is_some();
     if clash {
         let name = unique_name(
             inner,
@@ -1347,7 +1415,7 @@ fn down(
 }
 
 fn tidy_names(inner: &Inner, space: &SpaceId, touched: &mut Touched) -> Result<(), DriveError> {
-    for node in inner.store.nodes(space)? {
+    for node in inner.store.untidy_nodes(space) {
         if node.created || node.dirty_place || node.trash_pending || node.not_synced {
             continue;
         }
@@ -1355,15 +1423,7 @@ fn tidy_names(inner: &Inner, space: &SpaceId, touched: &mut Touched) -> Result<(
         if node.name == wanted {
             continue;
         }
-        let free = inner
-            .store
-            .children(space, node.parent.as_ref())?
-            .iter()
-            .all(|other| {
-                other.id == node.id
-                    || other.trash_pending
-                    || names::fold(&other.name) != names::fold(&wanted)
-            });
+        let free = taken_by(inner, space, node.parent.as_ref(), &wanted, Some(&node.id)).is_none();
         if free {
             inner
                 .store
@@ -1430,6 +1490,20 @@ fn add_down(
     Ok(())
 }
 
+pub(crate) fn taken_by(
+    inner: &Inner,
+    space: &SpaceId,
+    parent: Option<&ItemId>,
+    name: &str,
+    except: Option<&ItemId>,
+) -> Option<NodeRow> {
+    inner
+        .store
+        .children_folded(space, parent, name)
+        .into_iter()
+        .find(|child| Some(&child.id) != except && !child.trash_pending)
+}
+
 pub(crate) fn unique_name(
     inner: &Inner,
     space: &SpaceId,
@@ -1437,20 +1511,13 @@ pub(crate) fn unique_name(
     wanted: &str,
     except: Option<&ItemId>,
 ) -> Result<String, DriveError> {
-    let taken: HashSet<String> = inner
-        .store
-        .children(space, parent)?
-        .into_iter()
-        .filter(|child| Some(&child.id) != except && !child.trash_pending)
-        .map(|child| names::fold(&child.name))
-        .collect();
-    if !taken.contains(&names::fold(wanted)) {
+    if taken_by(inner, space, parent, wanted, except).is_none() {
         return Ok(wanted.to_owned());
     }
     let mut n = 2;
     loop {
         let candidate = names::numbered(wanted, n);
-        if !taken.contains(&names::fold(&candidate)) {
+        if taken_by(inner, space, parent, &candidate, except).is_none() {
             return Ok(candidate);
         }
         n += 1;
@@ -1473,73 +1540,144 @@ fn local_name_for(
     )
 }
 
-async fn leases(inner: &Arc<Inner>, mounted: &Mounted, space: &SpaceId) {
-    let mut wants: HashMap<ItemId, bool> = HashMap::new();
-    for (key, writing) in inner.opens.reportable_keys() {
+fn hold_wanted(inner: &Inner, space: &SpaceId, node: &NodeRow) -> Option<bool> {
+    if node.created || node.not_synced || node.trash_pending {
+        return None;
+    }
+    let key: Key = (space.clone(), node.id.clone());
+    if inner.opens.reportable(&key) {
+        return Some(inner.opens.is_writing(&key) || node.dirty_content);
+    }
+    if node.dirty_content {
+        return Some(true);
+    }
+    inner.opens.is_answered(&key).then_some(false)
+}
+
+pub(crate) async fn hold(
+    inner: &Inner,
+    mounted: &Mounted,
+    space: &SpaceId,
+    id: &ItemId,
+    editing: bool,
+) {
+    if lock(&mounted.held).get(id) == Some(&editing) {
+        return;
+    }
+    let sent = inner.link_send(serde_json::json!({
+        "type": "drive.hold",
+        "active": true,
+        "space_id": space.as_str(),
+        "item_id": id.as_str(),
+        "editing": editing,
+        "device_id": inner.config.device.id,
+        "device_name": inner.config.device.name,
+    }));
+    if sent || inner.api.mark_in_use(space, id, editing).await.is_ok() {
+        lock(&mounted.held).insert(id.clone(), editing);
+    }
+}
+
+pub(crate) async fn release(inner: &Inner, mounted: &Mounted, space: &SpaceId, id: &ItemId) {
+    if lock(&mounted.held).remove(id).is_none() {
+        return;
+    }
+    let sent = inner.link_send(serde_json::json!({
+        "type": "drive.hold",
+        "active": false,
+        "space_id": space.as_str(),
+        "item_id": id.as_str(),
+        "device_id": inner.config.device.id,
+        "device_name": inner.config.device.name,
+    }));
+    if !sent {
+        let _ = inner.api.clear_in_use(space, id).await;
+    }
+}
+
+pub(crate) async fn settle_hold(inner: &Inner, mounted: &Mounted, space: &SpaceId, id: &ItemId) {
+    let wanted = inner
+        .store
+        .node(space, id)
+        .ok()
+        .flatten()
+        .and_then(|node| hold_wanted(inner, space, &node));
+    match wanted {
+        Some(editing) => hold(inner, mounted, space, id, editing).await,
+        None => release(inner, mounted, space, id).await,
+    }
+}
+
+async fn settle_holds(inner: &Arc<Inner>, mounted: &Mounted, space: &SpaceId) {
+    let mut ids: HashSet<ItemId> = lock(&mounted.held).keys().cloned().collect();
+    for node in inner.store.dirty_nodes(space) {
+        if node.dirty_content {
+            ids.insert(node.id);
+        }
+    }
+    for (key, _) in inner.opens.reportable_keys() {
         if &key.0 == space {
-            wants.insert(key.1, writing);
+            ids.insert(key.1);
         }
     }
-    for node in inner.store.nodes(space).unwrap_or_default() {
-        if node.dirty_content && !node.created && !node.not_synced {
-            wants.insert(node.id, true);
+    for id in ids {
+        settle_hold(inner, mounted, space, &id).await;
+    }
+}
+
+pub(crate) fn resend_holds(inner: &Inner) {
+    let spaces: Vec<Arc<Mounted>> = inner
+        .spaces
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .values()
+        .cloned()
+        .collect();
+    for mounted in spaces {
+        let held: Vec<(ItemId, bool)> = lock(&mounted.held)
+            .iter()
+            .map(|(id, editing)| (id.clone(), *editing))
+            .collect();
+        for (id, editing) in held {
+            inner.link_send(serde_json::json!({
+                "type": "drive.hold",
+                "active": true,
+                "space_id": mounted.mount.space.as_str(),
+                "item_id": id.as_str(),
+                "editing": editing,
+                "device_id": inner.config.device.id,
+                "device_name": inner.config.device.name,
+            }));
         }
     }
-    for (at, id) in inner.opens.answered_live() {
-        if &at == space {
-            wants.entry(id).or_insert(false);
-        }
-    }
-    let marked: HashMap<ItemId, Instant> = lock(&mounted.marked).clone();
-    let mut renewed = marked.clone();
-    for (id, editing) in &wants {
-        if inner
-            .store
-            .node(space, id)
-            .ok()
-            .flatten()
-            .is_some_and(|node| node.created)
-        {
-            continue;
-        }
-        let due = marked.get(id).is_none_or(|at| at.elapsed() >= RENEW_EVERY);
-        if !due {
-            continue;
-        }
-        match inner.api.mark_in_use(space, id, *editing).await {
-            Ok(_) => {
-                let key = (space.clone(), id.clone());
-                renewed.insert(id.clone(), Instant::now());
-                inner.opens.renewed(&key);
-            }
-            Err(ApiError::NotFound) => {}
-            Err(_) => break,
-        }
-    }
-    for id in marked.keys() {
-        if !wants.contains_key(id) {
-            if inner.api.clear_in_use(space, id).await.is_ok() {
-                renewed.remove(id);
-            }
-        }
-    }
-    *lock(&mounted.marked) = renewed;
 }
 
 async fn fetch_wanted(inner: &Arc<Inner>, space: &SpaceId) {
     if !inner.cache.holds_files() {
         return;
     }
-    let nodes = inner.store.nodes(space).unwrap_or_default();
-    for node in nodes {
+    let mut wanted: Vec<ItemId> = inner
+        .opens
+        .open_keys()
+        .into_iter()
+        .filter(|(at, _)| at == space)
+        .map(|(_, id)| id)
+        .collect();
+    for pin in inner.store.pins(space) {
+        for node in inner.store.descendants(space, &pin).unwrap_or_default() {
+            if node.kind == Kind::File && !node.downloaded {
+                wanted.push(node.id);
+            }
+        }
+    }
+    for id in wanted {
+        let Ok(Some(node)) = inner.store.node(space, &id) else {
+            continue;
+        };
         if node.kind != Kind::File || node.downloaded || node.dirty() || node.not_synced {
             continue;
         }
-        let key = (space.clone(), node.id.clone());
-        let wanted = inner.opens.is_open(&key) || inner.store.kept(space, &node).unwrap_or(false);
-        if wanted {
-            let _ = content(inner, space, &node.id).await;
-        }
+        let _ = content(inner, space, &node.id).await;
     }
 }
 
@@ -1561,6 +1699,16 @@ pub(crate) async fn content(
     space: &SpaceId,
     id: &ItemId,
 ) -> Result<PathBuf, DriveError> {
+    content_pinned(inner, space, id)
+        .await
+        .map(|(path, _, _)| path)
+}
+
+pub(crate) async fn content_pinned(
+    inner: &Inner,
+    space: &SpaceId,
+    id: &ItemId,
+) -> Result<(PathBuf, BlobPin, u64), DriveError> {
     let node = inner.store.node(space, id)?.ok_or(DriveError::NotFound)?;
     if node.kind != Kind::File {
         return Err(DriveError::Invalid("That's a folder.".to_owned()));
@@ -1570,7 +1718,9 @@ pub(crate) async fn content(
         .clone()
         .unwrap_or_else(|| EMPTY_SHA256.to_owned());
     let blob = inner.cache.blob_path(&sha256);
-    let finish = |inner: &Inner| -> Result<PathBuf, DriveError> {
+    let pin = inner.cache.pin(&sha256);
+    let size = node.size;
+    let finish = |inner: &Inner, pin: BlobPin| -> Result<(PathBuf, BlobPin, u64), DriveError> {
         inner.cache.touch(&inner.store, &sha256, node.size)?;
         if let Some(mut now) = inner.store.node(space, id)? {
             if inner.cache.holds_files()
@@ -1581,14 +1731,14 @@ pub(crate) async fn content(
                 inner.store.update_node(&now)?;
             }
         }
-        Ok(blob.clone())
+        Ok((blob.clone(), pin, size))
     };
     if inner.cache.has(&sha256) {
-        return finish(inner);
+        return finish(inner, pin);
     }
     if sha256 == EMPTY_SHA256 {
         inner.cache.put_bytes(&inner.store, &[])?;
-        return finish(inner);
+        return finish(inner, pin);
     }
     if node.created || node.dirty_content || node.not_synced {
         return Err(DriveError::Corrupt);
@@ -1599,7 +1749,7 @@ pub(crate) async fn content(
         .clone();
     let _held = gate.lock().await;
     if inner.cache.has(&sha256) {
-        return finish(inner);
+        return finish(inner, pin);
     }
     let key: Key = (space.clone(), id.clone());
     lock(&inner.downloading).insert(key.clone());
@@ -1613,7 +1763,7 @@ pub(crate) async fn content(
             inner.bases.keep_file(id, &blob, node.size);
         }
     }
-    finish(inner)
+    finish(inner, pin)
 }
 
 fn folder_at(inner: &Inner, space: &SpaceId, path: &str) -> Result<Option<ItemId>, DriveError> {
@@ -1632,7 +1782,11 @@ fn folder_at(inner: &Inner, space: &SpaceId, path: &str) -> Result<Option<ItemId
     Ok(Some(node.id))
 }
 
-fn folder_made(inner: &Inner, space: &SpaceId, path: &str) -> Result<Option<ItemId>, DriveError> {
+pub(crate) fn folder_made(
+    inner: &Inner,
+    space: &SpaceId,
+    path: &str,
+) -> Result<Option<ItemId>, DriveError> {
     match folder_at(inner, space, path) {
         Err(DriveError::NotFound) => {}
         found => return found,
@@ -1659,6 +1813,7 @@ fn folder_made(inner: &Inner, space: &SpaceId, path: &str) -> Result<Option<Item
                     None,
                     now_ms(),
                     None,
+                    None,
                 )?
                 .id
             }
@@ -1672,7 +1827,9 @@ fn check_name(name: &str) -> Result<String, DriveError> {
     if name.is_empty()
         || name == "."
         || name == ".."
-        || name.contains(['/', '\0'])
+        || name
+            .chars()
+            .any(|c| c == '/' || c == '\0' || names::hidden_char(c))
         || name.len() > 255
     {
         return Err(DriveError::Invalid(format!(
@@ -1682,7 +1839,7 @@ fn check_name(name: &str) -> Result<String, DriveError> {
     Ok(name)
 }
 
-fn rules_for(inner: &Inner, space: &SpaceId, folder: Option<&ItemId>) -> DriveRules {
+pub(crate) fn rules_for(inner: &Inner, space: &SpaceId, folder: Option<&ItemId>) -> DriveRules {
     let mut rules = DriveRules::default();
     let mut chain = Vec::new();
     let mut current = folder.cloned();
@@ -1698,11 +1855,16 @@ fn rules_for(inner: &Inner, space: &SpaceId, folder: Option<&ItemId>) -> DriveRu
     }
     chain.push((None, names::ROOT.to_owned()));
     for (id, path) in chain.into_iter().rev() {
-        for child in inner.store.children(space, id.as_ref()).unwrap_or_default() {
-            if child.kind != Kind::File
-                || !(child.name == GIT_IGNORE_FILE || child.name == IGNORE_FILE)
-                || child.size > MAX_IGNORE_TEXT
-            {
+        for file in [GIT_IGNORE_FILE, IGNORE_FILE] {
+            let Some(child) = inner
+                .store
+                .children_folded(space, id.as_ref(), file)
+                .into_iter()
+                .find(|child| child.name.eq_ignore_ascii_case(file) && !child.trash_pending)
+            else {
+                continue;
+            };
+            if child.kind != Kind::File || child.size > MAX_IGNORE_TEXT {
                 continue;
             }
             let Some(sha) = child.sha256.as_deref() else {
@@ -1726,6 +1888,7 @@ fn create_node(
     content: Option<(String, u64)>,
     mtime_ms: i64,
     id: Option<ItemId>,
+    rules: Option<&DriveRules>,
 ) -> Result<NodeRow, DriveError> {
     let name = check_name(name)?;
     let mut parent_synced = true;
@@ -1740,21 +1903,14 @@ fn create_node(
         }
         parent_synced = !folder.not_synced;
     }
-    let siblings = inner.store.children(space, parent.as_ref())?;
+    let siblings = inner.store.children_folded(space, parent.as_ref(), &name);
     if let Some(mut revived) = siblings
         .iter()
-        .find(|other| {
-            other.trash_pending
-                && other.kind == kind
-                && names::fold(&other.name) == names::fold(&name)
-        })
+        .find(|other| other.trash_pending && other.kind == kind)
         .filter(|_| id.is_none())
         .cloned()
     {
-        if siblings
-            .iter()
-            .all(|other| other.trash_pending || names::fold(&other.name) != names::fold(&name))
-        {
+        if siblings.iter().all(|other| other.trash_pending) {
             if revived.kind == Kind::Folder {
                 for child in inner.store.children(space, Some(&revived.id))? {
                     if child.trash_pending {
@@ -1794,10 +1950,7 @@ fn create_node(
                 .ok_or(DriveError::NotFound);
         }
     }
-    if siblings
-        .iter()
-        .any(|other| !other.trash_pending && names::fold(&other.name) == names::fold(&name))
-    {
+    if siblings.iter().any(|other| !other.trash_pending) {
         return Err(DriveError::Exists);
     }
     let id = match id {
@@ -1822,7 +1975,10 @@ fn create_node(
     };
     let path = names::join(&parent_path, &name);
     let not_synced = !parent_synced
-        || rules_for(inner, space, parent.as_ref()).ignores(&path, kind == Kind::Folder);
+        || match rules {
+            Some(rules) => rules.ignores(&path, kind == Kind::Folder),
+            None => rules_for(inner, space, parent.as_ref()).ignores(&path, kind == Kind::Folder),
+        };
     let (sha256, size) = match (kind, content) {
         (Kind::Folder, _) => (None, 0),
         (Kind::File, Some((sha256, size))) => (Some(sha256), size),
@@ -1876,6 +2032,7 @@ pub(crate) fn create_local(
         content,
         new.mtime_ms,
         new.id,
+        None,
     )
 }
 
@@ -1940,6 +2097,7 @@ pub(crate) fn rename_local(
     id: &ItemId,
     folder: Option<&ItemId>,
     name: &str,
+    replace: bool,
 ) -> Result<NodeRow, DriveError> {
     let node = inner
         .store
@@ -1949,6 +2107,15 @@ pub(crate) fn rename_local(
     let name = check_name(name)?;
     if node.parent.as_ref() == folder && node.name == name {
         return Ok(node);
+    }
+    if is_root_ignore(&node)
+        && !node.created
+        && !node.not_synced
+        && (folder.is_some() || !name.eq_ignore_ascii_case(IGNORE_FILE))
+    {
+        return Err(DriveError::Fixed(
+            "The Space's .mistyignore stays at its top.".to_owned(),
+        ));
     }
     if let Some(folder) = folder {
         let target = inner
@@ -1960,16 +2127,11 @@ pub(crate) fn rename_local(
             return Err(DriveError::Invalid("That isn't a folder.".to_owned()));
         }
     }
-    let clash = inner
-        .store
-        .children(space, folder)?
-        .into_iter()
-        .find(|other| {
-            other.id != node.id
-                && !other.trash_pending
-                && names::fold(&other.name) == names::fold(&name)
-        });
+    let clash = taken_by(inner, space, folder, &name, Some(&node.id));
     if let Some(mut target) = clash {
+        if !replace {
+            return Err(DriveError::Exists);
+        }
         if target.kind == Kind::File && node.kind == Kind::File {
             let sha256 = node
                 .sha256
@@ -2020,9 +2182,25 @@ pub(crate) fn trash_local(
         .node(space, id)?
         .filter(|node| !node.trash_pending)
         .ok_or(DriveError::NotFound)?;
+    let open_here = inner
+        .store
+        .descendants(space, id)?
+        .into_iter()
+        .find(|below| inner.opens.is_open(&(space.clone(), below.id.clone())));
+    if let Some(open) = open_here {
+        return Err(DriveError::InUse(format!(
+            "“{}” is open on this computer.",
+            open.name
+        )));
+    }
     if node.created || node.not_synced {
         inner.store.remove_subtree(space, id)?;
         return Ok(());
+    }
+    if is_root_ignore(&node) {
+        return Err(DriveError::Fixed(
+            "The Space's .mistyignore can't be deleted. Change its lines instead.".to_owned(),
+        ));
     }
     node.trash_pending = true;
     node.trash_held = by.held();
@@ -2086,24 +2264,8 @@ async fn report_open(inner: &Arc<Inner>, key: &Key) {
         inner.local_changed(space, id);
     }
     let editing = inner.opens.is_writing(key) || node.dirty_content;
-    match inner.api.mark_in_use(space, id, editing).await {
-        Ok(_) => {
-            lock(&mounted.marked).insert(id.clone(), Instant::now());
-            inner.opens.renewed(key);
-            let dirty = inner
-                .store
-                .node(space, id)
-                .ok()
-                .flatten()
-                .is_some_and(|node| node.dirty());
-            if !inner.opens.is_open(key) && !dirty && !inner.opens.answered_live().contains(key) {
-                if lock(&mounted.marked).remove(id).is_some() {
-                    let _ = inner.api.clear_in_use(space, id).await;
-                }
-            }
-        }
-        Err(_) => {}
-    }
+    hold(inner, &mounted, space, id, editing).await;
+    settle_hold(inner, &mounted, space, id).await;
 }
 
 pub(crate) async fn close(inner: &Arc<Inner>, space: &SpaceId, id: &ItemId, editing: bool) {
@@ -2126,9 +2288,7 @@ pub(crate) async fn close(inner: &Arc<Inner>, space: &SpaceId, id: &ItemId, edit
     }
     inner.opens.forget_answer(&key);
     if let Ok(mounted) = inner.mounted(space) {
-        if lock(&mounted.marked).remove(id).is_some() {
-            let _ = inner.api.clear_in_use(space, id).await;
-        }
+        release(inner, &mounted, space, id).await;
     }
 }
 
@@ -2186,6 +2346,10 @@ pub(crate) async fn realtime(
     }
 }
 
+pub(crate) async fn refresh_marks(inner: &Arc<Inner>, space: &SpaceId) {
+    read_marks(inner, space).await;
+}
+
 async fn read_marks(inner: &Arc<Inner>, space: &SpaceId) {
     let changed = match inner.api.in_use_marks(space).await {
         Ok(marks) => {
@@ -2198,7 +2362,7 @@ async fn read_marks(inner: &Arc<Inner>, space: &SpaceId) {
                         .as_deref()
                         .and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
                         .map(|at| at.timestamp_millis())
-                        .unwrap_or(now + in_use::LEASE.as_millis() as i64);
+                        .unwrap_or(i64::MAX);
                     let held = in_use::Held {
                         user_id: mark.user_id,
                         name: mark.name,
@@ -2265,6 +2429,7 @@ async fn answer_check(inner: &Arc<Inner>, mounted: &Mounted, space: &SpaceId, id
         .await
         .unwrap_or_default();
     let lately = now_ms() - USED_LATELY.as_millis() as i64;
+    let mut answered = Vec::new();
     for node in subtree {
         if node.created || node.not_synced || node.trash_pending {
             continue;
@@ -2279,16 +2444,24 @@ async fn answer_check(inner: &Arc<Inner>, mounted: &Mounted, space: &SpaceId, id
             continue;
         }
         let editing = inner.opens.is_writing(&key) || node.dirty_content;
-        if inner
-            .api
-            .mark_in_use(space, &node.id, editing)
-            .await
-            .is_ok()
-        {
-            inner.opens.answered(key);
-            lock(&mounted.marked).insert(node.id.clone(), Instant::now());
-        }
+        inner.opens.answered(key);
+        hold(inner, mounted, space, &node.id, editing).await;
+        answered.push(node.id.clone());
     }
+    if answered.is_empty() {
+        return;
+    }
+    let later = inner.clone();
+    let space = space.clone();
+    inner.runtime.spawn(async move {
+        tokio::time::sleep(ANSWER_HOLD).await;
+        let Ok(mounted) = later.mounted(&space) else {
+            return;
+        };
+        for id in answered {
+            settle_hold(&later, &mounted, &space, &id).await;
+        }
+    });
 }
 
 pub(crate) fn entries(
@@ -2300,29 +2473,19 @@ pub(crate) fn entries(
 ) -> Result<EntryPage, DriveError> {
     inner.mounted(space)?;
     let folder = folder_at(inner, space, path)?;
-    let mut children: Vec<NodeRow> = inner
-        .store
-        .children(space, folder.as_ref())?
-        .into_iter()
-        .filter(|node| !node.trash_pending)
-        .collect();
-    children.sort_by(|a, b| {
-        (a.kind != Kind::Folder)
-            .cmp(&(b.kind != Kind::Folder))
-            .then_with(|| names::fold(&a.name).cmp(&names::fold(&b.name)))
-    });
-    let start: usize = cursor.and_then(|cursor| cursor.parse().ok()).unwrap_or(0);
+    let after = match cursor.filter(|cursor| !cursor.is_empty()) {
+        Some(cursor) => Some(ChildKey::from_cursor(cursor).ok_or_else(|| {
+            DriveError::Invalid("That list position isn't one Misty gave.".to_owned())
+        })?),
+        None => None,
+    };
     let limit = limit.unwrap_or(500).clamp(1, 5000);
-    let page: Vec<DriveEntry> = children
-        .iter()
-        .skip(start)
-        .take(limit)
-        .map(|node| inner.entry(node))
-        .collect();
-    let next = start + page.len();
+    let (rows, next) = inner
+        .store
+        .children_page(space, folder.as_ref(), after.as_ref(), limit);
     Ok(EntryPage {
-        entries: page,
-        next_cursor: (next < children.len()).then(|| next.to_string()),
+        entries: rows.iter().map(|node| inner.entry(node)).collect(),
+        next_cursor: next.map(|key| key.cursor()),
     })
 }
 
@@ -2335,13 +2498,21 @@ pub(crate) fn write_bytes(
     replace: Option<(ItemId, Version)>,
 ) -> Result<DriveEntry, DriveError> {
     inner.mounted(space)?;
-    let (sha256, size) = inner.cache.put_bytes(&inner.store, bytes)?;
     if let Some((id, version)) = replace {
         let mut node = inner
             .store
             .node(space, &id)?
             .filter(|node| !node.trash_pending)
             .ok_or(DriveError::NotFound)?;
+        if node.kind != Kind::File {
+            return Err(DriveError::Invalid("That's a folder.".to_owned()));
+        }
+        if version.0 < 1 && !(node.created || node.not_synced) {
+            return Err(DriveError::Invalid(
+                "Saving over a file needs the version that was opened.".to_owned(),
+            ));
+        }
+        let (sha256, size) = inner.cache.put_bytes(&inner.store, bytes)?;
         set_content(
             inner,
             space,
@@ -2357,6 +2528,7 @@ pub(crate) fn write_bytes(
     let parent = folder_made(inner, space, folder)?;
     let name = check_name(name)?;
     let free = unique_name(inner, space, parent.as_ref(), &name, None)?;
+    let (sha256, size) = inner.cache.put_bytes(&inner.store, bytes)?;
     let node = create_node(
         inner,
         space,
@@ -2366,24 +2538,155 @@ pub(crate) fn write_bytes(
         Some((sha256, size)),
         now_ms(),
         None,
+        None,
     )?;
     Ok(inner.entry(&node))
+}
+
+fn time_ms(at: Option<std::time::SystemTime>) -> i64 {
+    at.and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|elapsed| elapsed.as_millis() as i64)
+        .unwrap_or_else(now_ms)
+}
+
+struct CopiedFile {
+    path: String,
+    sha256: String,
+    size: u64,
+    mtime_ms: i64,
+}
+
+fn read_rules(dir: &dyn CopyFolder, at: &str, rules: &mut DriveRules) {
+    use std::io::Read as _;
+    for file in [GIT_IGNORE_FILE, IGNORE_FILE] {
+        let Ok(handle) = dir.open(std::ffi::OsStr::new(file)) else {
+            continue;
+        };
+        let mut text = String::new();
+        if handle
+            .take(MAX_IGNORE_TEXT)
+            .read_to_string(&mut text)
+            .is_ok()
+        {
+            rules.add(at, &text);
+        }
+    }
 }
 
 pub(crate) fn copy_in(
     inner: &Inner,
     space: &SpaceId,
-    source: &Path,
+    source: &dyn CopySource,
     folder: &str,
 ) -> Result<(DriveEntry, CopyReport), DriveError> {
     inner.mounted(space)?;
     let parent = folder_at(inner, space, folder)?;
     let top_name = source
-        .file_name()
+        .name()
         .and_then(|name| name.to_str())
         .map(names::safe_local_name)
-        .ok_or_else(|| DriveError::Invalid("Choose a folder with a name.".to_owned()))?;
-    let (files, skipped) = crate::ignore::drive_files(source).map_err(DriveError::Invalid)?;
+        .ok_or_else(|| DriveError::Invalid("Choose something with a name.".to_owned()))?;
+    let here = rules_for(inner, space, parent.as_ref());
+    if source.kind() == CopyKind::File {
+        if never_synced_name(&top_name) {
+            return Err(DriveError::Invalid(format!(
+                "Misty keeps “{top_name}” on this computer only."
+            )));
+        }
+        let mut file = source.open().map_err(DriveError::io)?;
+        let (sha256, size) = inner.cache.put_reader(&inner.store, &mut file, |_| true)?;
+        let free = unique_name(inner, space, parent.as_ref(), &top_name, None)?;
+        let node = create_node(
+            inner,
+            space,
+            parent,
+            &free,
+            Kind::File,
+            Some((sha256, size)),
+            time_ms(source.modified()),
+            None,
+            Some(&here),
+        )?;
+        return Ok((
+            inner.entry(&node),
+            CopyReport {
+                files: 1,
+                bytes: size,
+                ..CopyReport::default()
+            },
+        ));
+    }
+    if source.kind() != CopyKind::Folder {
+        return Err(DriveError::Invalid("Choose a file or a folder.".to_owned()));
+    }
+    let mut rules = DriveRules::default();
+    let mut loaded: HashSet<PathBuf> = HashSet::new();
+    let mut folders: Vec<String> = Vec::new();
+    let mut files: Vec<CopiedFile> = Vec::new();
+    let mut skipped = 0u64;
+    let mut failure: Option<DriveError> = None;
+    source
+        .walk(&mut |step| {
+            let relative = step.relative;
+            let above = relative.parent().map(Path::to_path_buf).unwrap_or_default();
+            if loaded.insert(above.clone()) {
+                let at =
+                    names::path_from_components(&above).unwrap_or_else(|_| names::ROOT.to_owned());
+                read_rules(step.folder, &at, &mut rules);
+            }
+            let Ok(path) = names::path_from_components(relative) else {
+                skipped += 1;
+                return match step.kind {
+                    CopyKind::Folder => CopyFlow::SkipFolder,
+                    _ => CopyFlow::Continue,
+                };
+            };
+            if (folders.len() + files.len()) as u64 >= MAX_COPY_ITEMS {
+                failure = Some(DriveError::Invalid(format!(
+                    "That has more than {MAX_COPY_ITEMS} items. Leave some out in .mistyignore."
+                )));
+                return CopyFlow::Stop;
+            }
+            match step.kind {
+                CopyKind::Folder => {
+                    if names::file_name(&path).eq_ignore_ascii_case(".git")
+                        || rules.ignores(&path, true)
+                    {
+                        skipped += 1;
+                        return CopyFlow::SkipFolder;
+                    }
+                    folders.push(path);
+                }
+                CopyKind::File => {
+                    if rules.ignores(&path, false) {
+                        skipped += 1;
+                        return CopyFlow::Continue;
+                    }
+                    let Ok(mut file) = step.folder.open(step.name) else {
+                        skipped += 1;
+                        return CopyFlow::Continue;
+                    };
+                    match inner.cache.put_reader(&inner.store, &mut file, |_| true) {
+                        Ok((sha256, size)) => files.push(CopiedFile {
+                            path,
+                            sha256,
+                            size,
+                            mtime_ms: time_ms(step.modified),
+                        }),
+                        Err(error) => {
+                            failure = Some(error);
+                            return CopyFlow::Stop;
+                        }
+                    }
+                }
+                CopyKind::Other => skipped += 1,
+            }
+            CopyFlow::Continue
+        })
+        .map_err(DriveError::io)?;
+    if let Some(failure) = failure {
+        return Err(failure);
+    }
     let free = unique_name(inner, space, parent.as_ref(), &top_name, None)?;
     let top = create_node(
         inner,
@@ -2392,68 +2695,69 @@ pub(crate) fn copy_in(
         &free,
         Kind::Folder,
         None,
-        now_ms(),
+        time_ms(source.modified()),
         None,
+        Some(&here),
     )?;
     let mut report = CopyReport {
         skipped,
         folders: 1,
         ..CopyReport::default()
     };
-    let mut folders: HashMap<String, ItemId> = HashMap::new();
-    folders.insert(String::new(), top.id.clone());
-    for file in files {
-        let mut parts: Vec<&str> = file.path.split('/').collect();
-        let Some(name) = parts.pop() else {
+    let mut made: HashMap<String, ItemId> = HashMap::new();
+    made.insert(names::ROOT.to_owned(), top.id.clone());
+    folders.sort_by_key(|path| (path.matches('/').count(), path.clone()));
+    for path in folders {
+        let Some(above) = made.get(&names::parent(&path)).cloned() else {
+            report.skipped += 1;
             continue;
         };
-        let mut so_far = String::new();
-        let mut folder_id = top.id.clone();
-        for part in parts {
-            let key = if so_far.is_empty() {
-                part.to_owned()
-            } else {
-                format!("{so_far}/{part}")
-            };
-            folder_id = match folders.get(&key) {
-                Some(id) => id.clone(),
-                None => {
-                    let made = create_node(
-                        inner,
-                        space,
-                        Some(folder_id.clone()),
-                        &names::safe_local_name(part),
-                        Kind::Folder,
-                        None,
-                        now_ms(),
-                        None,
-                    )?;
-                    report.folders += 1;
-                    folders.insert(key.clone(), made.id.clone());
-                    made.id
-                }
-            };
-            so_far = key;
-        }
-        let mtime_ms = file_access::fs::metadata(&file.absolute)
-            .ok()
-            .and_then(|meta| meta.modified().ok())
-            .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|elapsed| elapsed.as_millis() as i64)
-            .unwrap_or_else(now_ms);
-        let (sha256, size) = inner.cache.copy_in(&inner.store, &file.absolute)?;
+        let name = unique_name(
+            inner,
+            space,
+            Some(&above),
+            &names::safe_local_name(names::file_name(&path)),
+            None,
+        )?;
+        let folder = create_node(
+            inner,
+            space,
+            Some(above),
+            &name,
+            Kind::Folder,
+            None,
+            now_ms(),
+            None,
+            Some(&here),
+        )?;
+        report.folders += 1;
+        made.insert(path, folder.id);
+    }
+    for file in files {
+        let Some(above) = made.get(&names::parent(&file.path)).cloned() else {
+            report.skipped += 1;
+            continue;
+        };
+        let name = unique_name(
+            inner,
+            space,
+            Some(&above),
+            &names::safe_local_name(names::file_name(&file.path)),
+            None,
+        )?;
         create_node(
             inner,
             space,
-            Some(folder_id),
-            &names::safe_local_name(name),
+            Some(above),
+            &name,
             Kind::File,
-            Some((sha256, size)),
-            mtime_ms,
+            Some((file.sha256, file.size)),
+            file.mtime_ms,
             None,
+            Some(&here),
         )?;
         report.files += 1;
-        report.bytes += size;
+        report.bytes += file.size;
     }
     Ok((inner.entry(&top), report))
 }
@@ -2497,21 +2801,26 @@ pub(crate) fn remove_download(
         if file.kind != Kind::File || file.dirty() || file.not_synced || inner.opens.is_open(&key) {
             continue;
         }
+        if file
+            .sha256
+            .as_deref()
+            .is_some_and(|sha| inner.cache.pinned(sha))
+        {
+            continue;
+        }
         let _ = mounted.face.evict(space, &file.id);
         file.downloaded = false;
         inner.store.update_node(&file)?;
         if let Some(sha) = file.sha256.clone() {
             let users = inner.store.nodes_with_blob(&sha)?;
-            let needed = users.iter().any(|user| {
-                user.dirty()
-                    || user.not_synced
-                    || (user.downloaded && user.id != file.id)
-                    || inner.opens.is_open(&(user.space.clone(), user.id.clone()))
-            });
-            if !needed {
-                let _ = file_access::fs::remove_file(inner.cache.blob_path(&sha));
-                inner.store.forget_blob(&sha)?;
-            }
+            inner.cache.drop_blob(&inner.store, &sha, || {
+                users.iter().any(|user| {
+                    user.dirty()
+                        || user.not_synced
+                        || (user.downloaded && user.id != file.id)
+                        || inner.opens.is_open(&(user.space.clone(), user.id.clone()))
+                })
+            })?;
         }
     }
     Ok(())
@@ -2569,6 +2878,9 @@ pub(crate) async fn trash_list(
                     keep_downloaded: false,
                     in_use: Vec::new(),
                     version: Some(item.version),
+                    content_version: item.content_version,
+                    sha: item.sha256.clone(),
+                    waits_large: false,
                 },
                 trashed_at: item.trashed_at.clone(),
                 trashed_by_name: Some(item.modified_by_name.clone()),

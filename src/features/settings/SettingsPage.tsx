@@ -1,6 +1,6 @@
 import { useAppStore } from "@/app/shell";
 import { Button, ErrorState, SearchField } from "@misty/ui";
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -194,23 +194,32 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
             <DesktopSettingsRowSkeleton label={pageTitle} rows={4} control="switch" />
           </DesktopSettingsSection>
         )}
-        {settings &&
-          pageEntries.map((item) => {
-            const Block = item.Component;
-            return (
-              <div
-                key={item.id}
-                data-settings-page={item.id}
-                data-settings-target={`page:${item.id}`}
-                tabIndex={-1}
-                className="mb-5 outline-none last:mb-0"
-              >
-                <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
-                  <Block {...controls} />
-                </SettingsPageScope.Provider>
-              </div>
-            );
-          })}
+        {settings && (
+          <Suspense
+            fallback={
+              <DesktopSettingsSection title={pageTitle}>
+                <DesktopSettingsRowSkeleton label={pageTitle} rows={4} control="switch" />
+              </DesktopSettingsSection>
+            }
+          >
+            {pageEntries.map((item) => {
+              const Block = item.Component;
+              return (
+                <div
+                  key={item.id}
+                  data-settings-page={item.id}
+                  data-settings-target={`page:${item.id}`}
+                  tabIndex={-1}
+                  className="mb-5 outline-none last:mb-0"
+                >
+                  <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
+                    <Block {...controls} />
+                  </SettingsPageScope.Provider>
+                </div>
+              );
+            })}
+          </Suspense>
+        )}
       </div>
     </DesktopSettingsFrame>
   );

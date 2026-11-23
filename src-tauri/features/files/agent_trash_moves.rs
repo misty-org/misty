@@ -114,7 +114,11 @@ pub(super) fn out_of_holding(holding: &Path, target: &Path) -> Result<(), String
         }
     }
     if in_volume_holding(holding) {
-        return fs_disk::rename(holding, target).map_err(failed);
+        use file_access::{disk::place, Access};
+        let (held_dir, held) =
+            super::super::gated::parent(holding, Access::Write).map_err(failed)?;
+        let (to_dir, to) = super::super::gated::parent(target, Access::Write).map_err(failed)?;
+        return place::rename_new(&held_dir, &held, &to_dir, &to).map_err(failed);
     }
     if !in_misty_holding(holding) {
         return Err("That item isn't in Agent trash.".into());

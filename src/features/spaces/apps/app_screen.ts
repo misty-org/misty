@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { watchAllRunEvents } from "@/features/agents";
 import type { FrameTarget } from "./host_channel";
 
 const SCREEN_MESSAGE = "misty:screen";
@@ -8,6 +9,8 @@ export interface ScreenChannel {
   command<T = unknown>(name: string, args?: Record<string, unknown>): Promise<T>;
   dispose(): void;
 }
+
+export class ScreenRefused extends Error {}
 
 export function createScreenChannel(frame: FrameTarget, onPersonInput: () => void): ScreenChannel {
   const channel = new MessageChannel();
@@ -29,7 +32,7 @@ export function createScreenChannel(frame: FrameTarget, onPersonInput: () => voi
     if (!call) return;
     waiting.delete(frameIn.id);
     if (frameIn.ok) call.resolve(frameIn.result);
-    else call.reject(new Error(frameIn.error || "The app didn't do that."));
+    else call.reject(new ScreenRefused(frameIn.error || "The app didn't do that."));
   };
   frame.postMessage({ type: SCREEN_MESSAGE }, "*", [channel.port2]);
   return {
@@ -68,6 +71,7 @@ export function createScreenChannel(frame: FrameTarget, onPersonInput: () => voi
 export interface AgentInApp {
   agentId: string;
   name: string;
+  runId?: string;
   x: number;
   y: number;
 }
@@ -75,29 +79,79 @@ export interface AgentInApp {
 interface AppControlState {
   agents: Record<string, AgentInApp | undefined>;
   held: Record<string, boolean | undefined>;
-  point(appId: string, agent: AgentInApp): void;
-  leave(appId: string): void;
-  takeBack(appId: string): void;
-  handBack(appId: string): void;
+  point(instance: string, agent: AgentInApp): void;
+  leave(instance: string): void;
+  takeBack(instance: string): void;
+  handBack(instance: string): void;
+}
+
+const RUN_ENDS = new Set(["invocation.completed", "invocation.failed", "invocation.canceled"]);
+
+const runWatches = new Map<string, { runId: string; stop: () => void }>();
+
+function unwatchRun(instance: string) {
+  runWatches.get(instance)?.stop();
+  runWatches.delete(instance);
+}
+
+function watchRun(instance: string, runId: string | undefined) {
+  if (runId && runWatches.get(instance)?.runId === runId) return;
+  unwatchRun(instance);
+  if (!runId) return;
+  const stop = watchAllRunEvents((ended, event) => {
+    if (ended !== runId || !RUN_ENDS.has(event.type)) return;
+    if (useAppControl.getState().agents[instance]?.runId === runId)
+      useAppControl.getState().leave(instance);
+  });
+  runWatches.set(instance, { runId, stop });
 }
 
 export const useAppControl = create<AppControlState>((set, get) => ({
   agents: {},
   held: {},
-  point: (appId, agent) => set((state) => ({ agents: { ...state.agents, [appId]: agent } })),
-  leave: (appId) =>
-    set((state) => ({
-      agents: { ...state.agents, [appId]: undefined },
-      held: { ...state.held, [appId]: undefined },
-    })),
-  takeBack: (appId) => {
-    if (!get().agents[appId]) return;
-    set((state) => ({ held: { ...state.held, [appId]: true } }));
+  point: (instance, agent) => {
+    watchRun(instance, agent.runId);
+    set((state) => ({ agents: { ...state.agents, [instance]: agent } }));
   },
-  handBack: (appId) => set((state) => ({ held: { ...state.held, [appId]: undefined } })),
+  leave: (instance) => {
+    unwatchRun(instance);
+    set((state) => ({
+      agents: { ...state.agents, [instance]: undefined },
+      held: { ...state.held, [instance]: undefined },
+    }));
+  },
+  takeBack: (instance) => {
+    if (!get().agents[instance]) return;
+    set((state) => ({ held: { ...state.held, [instance]: true } }));
+  },
+  handBack: (instance) => set((state) => ({ held: { ...state.held, [instance]: undefined } })),
 }));
 
+export function watchAgentControl(
+  instance: string,
+  owner: string,
+  emit: (data: unknown) => void,
+): () => void {
+  let last = "";
+  const send = () => {
+    const { agents, held } = useAppControl.getState();
+    const agent = agents[instance];
+    const control = {
+      agent: agent ? { id: agent.agentId, name: agent.name, user_id: owner } : null,
+      driver: agent && !held[instance] ? ("agent" as const) : ("person" as const),
+    };
+    const key = JSON.stringify(control);
+    if (key === last) return;
+    last = key;
+    emit(control);
+  };
+  send();
+  return useAppControl.subscribe(send);
+}
+
 export interface RunningAppHandle {
+  instance: string;
+  spaceId: string;
   appId: string;
   appName: string;
   screen: ScreenChannel;
@@ -106,20 +160,30 @@ export interface RunningAppHandle {
 
 const running = new Map<string, RunningAppHandle>();
 
+export const runningKey = (spaceId: string, appId: string) => `${spaceId}/${appId}`;
+
 export const useRunningAppIds = create<{ ids: string[] }>(() => ({ ids: [] }));
-const publish = () => useRunningAppIds.setState({ ids: [...running.keys()].sort() });
+const publish = () =>
+  useRunningAppIds.setState({
+    ids: [
+      ...new Set([...running.values()].map((handle) => runningKey(handle.spaceId, handle.appId))),
+    ].sort(),
+  });
 
 export function noteRunningApp(handle: RunningAppHandle): () => void {
-  running.set(handle.appId, handle);
+  running.set(handle.instance, handle);
   publish();
   return () => {
-    if (running.get(handle.appId) === handle) {
-      running.delete(handle.appId);
+    if (running.get(handle.instance) === handle) {
+      running.delete(handle.instance);
       publish();
     }
   };
 }
 
-export function runningApp(appId: string): RunningAppHandle | undefined {
-  return running.get(appId);
+export function runningApp(spaceId: string, appId: string): RunningAppHandle | undefined {
+  let found: RunningAppHandle | undefined;
+  for (const handle of running.values())
+    if (handle.spaceId === spaceId && handle.appId === appId) found = handle;
+  return found;
 }

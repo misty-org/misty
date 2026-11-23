@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{LazyLock, Mutex, MutexGuard};
 
 use serde_json::{json, Value};
@@ -27,9 +28,18 @@ enum Source {
 }
 
 struct Entry {
+    app_id: String,
+    space_id: Option<String>,
     source: Source,
     tools: Vec<Tool>,
     paid: bool,
+    order: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Route {
+    pub webview: String,
+    pub instance: String,
 }
 
 static APPROVED: LazyLock<Mutex<HashSet<(String, String)>>> =
@@ -55,25 +65,54 @@ pub fn approve_for(chat: &str, internal: &str) {
     }
 }
 
+fn tool_of<'a>(internal: &'a str, app_id: &str) -> Option<&'a str> {
+    internal
+        .strip_prefix("app.")?
+        .strip_prefix(app_id)?
+        .strip_prefix('.')
+}
+
 pub fn is_paid(internal: &str) -> bool {
-    let Some(rest) = internal.strip_prefix("app.") else {
-        return false;
-    };
-    registry().iter().any(|(app_id, entry)| {
-        entry.paid
-            && rest
-                .strip_prefix(app_id.as_str())
-                .is_some_and(|tail| tail.starts_with('.'))
-    })
+    registry()
+        .values()
+        .any(|entry| entry.paid && tool_of(internal, &entry.app_id).is_some())
 }
 
 static REGISTRY: LazyLock<Mutex<HashMap<String, Entry>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+static ORDER: AtomicU64 = AtomicU64::new(0);
+
+static WITHDRAWN: tokio::sync::Notify = tokio::sync::Notify::const_new();
+
+pub fn withdrawn() -> tokio::sync::futures::Notified<'static> {
+    WITHDRAWN.notified()
+}
+
+fn tell_withdrawn() {
+    WITHDRAWN.notify_waiters();
+}
+
 fn registry() -> MutexGuard<'static, HashMap<String, Entry>> {
     REGISTRY
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn next_order() -> u64 {
+    ORDER.fetch_add(1, Ordering::Relaxed)
+}
+
+fn frame_key(session: &str) -> String {
+    format!("frame:{session}")
+}
+
+fn standby_key(webview: &str, app_id: &str) -> String {
+    format!("standby:{webview}:{app_id}")
+}
+
+fn program_key(app_id: &str) -> String {
+    format!("program:{app_id}")
 }
 
 fn sanitized(name: &str) -> String {
@@ -128,7 +167,7 @@ fn parse(raw: &Value) -> Result<Tool, String> {
 }
 
 pub fn register(session: &str, webview: &str, raw_tools: &[Value]) -> Result<usize, String> {
-    let (app_id, _space) = permissions::identity(session, webview)
+    let (app_id, space) = permissions::identity(session, webview)
         .ok_or_else(|| "This app isn't running.".to_owned())?;
     let tools = parse_all(raw_tools)?;
     let count = tools.len();
@@ -137,12 +176,19 @@ pub fn register(session: &str, webview: &str, raw_tools: &[Value]) -> Result<usi
         webview: webview.to_owned(),
     };
     let paid = permissions::reaches_paid_host(session, webview);
-    registry().insert(
-        app_id,
+    let mut registry = registry();
+    let order = registry
+        .get(&frame_key(session))
+        .map_or_else(next_order, |entry| entry.order);
+    registry.insert(
+        frame_key(session),
         Entry {
+            app_id,
+            space_id: Some(space),
             source,
             tools,
             paid,
+            order,
         },
     );
     Ok(count)
@@ -167,94 +213,196 @@ pub fn unregister(session: &str, webview: &str) {
     registry().retain(|_, entry| {
         !matches!(&entry.source, Source::Frame { session: s, webview: w } if s == session && w == webview)
     });
+    tell_withdrawn();
 }
 
-pub fn register_standby(webview: &str, app_id: &str, raw_tools: &[Value]) -> Result<usize, String> {
+pub fn has_instance(instance: &str) -> bool {
+    instance.is_empty() || registry().contains_key(&frame_key(instance))
+}
+
+fn webview_of(source: &Source) -> Option<&str> {
+    match source {
+        Source::Frame { webview, .. } | Source::Standby { webview } => Some(webview),
+        Source::Program => None,
+    }
+}
+
+pub fn close_window(webview: &str) {
+    registry().retain(|_, entry| webview_of(&entry.source) != Some(webview));
+    permissions::close_window(webview);
+    tell_withdrawn();
+}
+
+fn close_unless(open: impl Fn(&str) -> bool, offers: impl Fn(&Entry) -> bool) {
+    let gone: HashSet<String> = registry()
+        .values()
+        .filter(|&entry| offers(entry))
+        .filter_map(|entry| webview_of(&entry.source))
+        .filter(|&webview| !open(webview))
+        .map(str::to_owned)
+        .collect();
+    for webview in gone {
+        close_window(&webview);
+    }
+}
+
+pub fn forget_closed(open: impl Fn(&str) -> bool) {
+    close_unless(open, |_| true);
+}
+
+pub fn route_open(
+    internal: &str,
+    space: Option<&str>,
+    open: impl Fn(&str) -> bool,
+) -> Result<Route, String> {
+    close_unless(open, |entry| tool_of(internal, &entry.app_id).is_some());
+    route(internal, space)
+}
+
+pub fn register_standby(
+    webview: &str,
+    app_id: &str,
+    space_id: Option<&str>,
+    raw_tools: &[Value],
+) -> Result<usize, String> {
     if !super::manifest::valid_id(app_id) {
         return Err("That isn't an app id.".into());
     }
     let tools = parse_all(raw_tools)?;
     let count = tools.len();
-    let mut registry = registry();
-    if registry
-        .get(app_id)
-        .is_some_and(|entry| !matches!(entry.source, Source::Standby { .. }))
-    {
-        return Ok(0);
-    }
-    registry.insert(
-        app_id.to_owned(),
+    registry().insert(
+        standby_key(webview, app_id),
         Entry {
+            app_id: app_id.to_owned(),
+            space_id: space_id.filter(|space| !space.is_empty()).map(str::to_owned),
             source: Source::Standby {
                 webview: webview.to_owned(),
             },
             tools,
             paid: false,
+            order: next_order(),
         },
     );
     Ok(count)
 }
 
 pub fn unregister_standby(webview: &str, app_id: &str) {
-    let mut registry = registry();
-    if registry.get(app_id).is_some_and(
-        |entry| matches!(&entry.source, Source::Standby { webview: w } if w == webview),
-    ) {
-        registry.remove(app_id);
-    }
+    registry().remove(&standby_key(webview, app_id));
+    tell_withdrawn();
 }
 
 pub(super) fn register_program(app_id: &str, raw_tools: &[Value]) -> Result<usize, String> {
     let tools = parse_all(raw_tools)?;
     let count = tools.len();
     registry().insert(
-        app_id.to_owned(),
+        program_key(app_id),
         Entry {
+            app_id: app_id.to_owned(),
+            space_id: None,
             source: Source::Program,
             tools,
             paid: false,
+            order: next_order(),
         },
     );
     Ok(count)
 }
 
 pub(super) fn unregister_program(app_id: &str) {
-    let mut registry = registry();
-    if registry
-        .get(app_id)
-        .is_some_and(|entry| entry.source == Source::Program)
-    {
-        registry.remove(app_id);
-    }
+    registry().remove(&program_key(app_id));
 }
 
 pub fn served_by_program(internal: &str) -> Option<(String, String)> {
-    let rest = internal.strip_prefix("app.")?;
     let registry = registry();
-    let found = registry.iter().find_map(|(app_id, entry)| {
+    let found = registry.values().find_map(|entry| {
         if entry.source != Source::Program {
             return None;
         }
-        let tool = rest.strip_prefix(app_id.as_str())?.strip_prefix('.')?;
+        let tool = tool_of(internal, &entry.app_id)?;
         entry
             .tools
             .iter()
             .find(|candidate| candidate.name == tool)
-            .map(|candidate| (app_id.clone(), candidate.original.clone()))
+            .map(|candidate| (entry.app_id.clone(), candidate.original.clone()))
     });
     found
 }
 
-pub fn offered() -> Vec<Value> {
+pub fn route(internal: &str, space: Option<&str>) -> Result<Route, String> {
+    let space = space.filter(|space| !space.is_empty());
     let registry = registry();
-    let mut apps: Vec<_> = registry.iter().collect();
-    apps.sort_by(|a, b| a.0.cmp(b.0));
+    let mut found: Vec<&Entry> = registry
+        .values()
+        .filter(|entry| entry.source != Source::Program)
+        .filter(|entry| {
+            tool_of(internal, &entry.app_id)
+                .is_some_and(|tool| entry.tools.iter().any(|candidate| candidate.name == tool))
+        })
+        .collect();
+    match space {
+        Some(space) => found.retain(|entry| entry.space_id.as_deref().is_none_or(|own| own == space)),
+        None => {
+            let spaces: HashSet<&str> = found
+                .iter()
+                .filter_map(|entry| entry.space_id.as_deref())
+                .collect();
+            if spaces.len() > 1 {
+                return Err("That app is open in more than one Space, so Misty can't tell which one to use. Ask the person which Space they mean.".into());
+            }
+        }
+    }
+    found.sort_by_key(|entry| {
+        (
+            matches!(entry.source, Source::Standby { .. }),
+            std::cmp::Reverse(entry.order),
+        )
+    });
+    found
+        .first()
+        .and_then(|entry| match &entry.source {
+            Source::Frame { session, webview } => Some(Route {
+                webview: webview.clone(),
+                instance: session.clone(),
+            }),
+            Source::Standby { webview } => Some(Route {
+                webview: webview.clone(),
+                instance: String::new(),
+            }),
+            Source::Program => None,
+        })
+        .ok_or_else(|| "That app isn't open in this agent's Space.".to_owned())
+}
+
+pub fn offered() -> Vec<Value> {
+    offered_in(None)
+}
+
+pub fn offered_in(space: Option<&str>) -> Vec<Value> {
+    let space = space.filter(|space| !space.is_empty());
+    let registry = registry();
+    let mut entries: Vec<&Entry> = registry
+        .values()
+        .filter(|entry| {
+            space.is_none_or(|space| entry.space_id.as_deref().is_none_or(|own| own == space))
+        })
+        .collect();
+    entries.sort_by(|a, b| {
+        a.app_id
+            .cmp(&b.app_id)
+            .then(matches!(a.source, Source::Standby { .. }).cmp(&matches!(b.source, Source::Standby { .. })))
+            .then(b.order.cmp(&a.order))
+    });
+    let mut seen = HashSet::new();
     let mut tools = Vec::new();
-    for (app_id, entry) in apps {
+    for entry in entries {
         for tool in &entry.tools {
+            let name = wire(&entry.app_id, &tool.name);
+            if !seen.insert(name.clone()) {
+                continue;
+            }
             tools.push(json!({
-                "name": wire(app_id, &tool.name),
-                "description": format!("[{app_id} app] {}", tool.description),
+                "name": name,
+                "description": format!("[{} app] {}", entry.app_id, tool.description),
                 "inputSchema": tool.schema,
                 "annotations": { "readOnlyHint": tool.read_only },
             }));
@@ -265,26 +413,25 @@ pub fn offered() -> Vec<Value> {
 
 pub fn resolve(wire_name: &str) -> Option<(String, String)> {
     let registry = registry();
-    let found = registry.iter().find_map(|(app_id, entry)| {
+    let found = registry.values().find_map(|entry| {
         entry
             .tools
             .iter()
-            .find(|tool| wire(app_id, &tool.name) == wire_name)
-            .map(|tool| (internal_name(app_id, &tool.name), tool.original.clone()))
+            .find(|tool| wire(&entry.app_id, &tool.name) == wire_name)
+            .map(|tool| (internal_name(&entry.app_id, &tool.name), tool.original.clone()))
     });
     found
 }
 
 fn find(internal: &str) -> Option<(String, Tool)> {
-    let rest = internal.strip_prefix("app.")?;
     let registry = registry();
-    let found = registry.iter().find_map(|(app_id, entry)| {
-        let tool = rest.strip_prefix(app_id.as_str())?.strip_prefix('.')?;
+    let found = registry.values().find_map(|entry| {
+        let tool = tool_of(internal, &entry.app_id)?;
         entry
             .tools
             .iter()
             .find(|candidate| candidate.name == tool)
-            .map(|candidate| (app_id.clone(), candidate.clone()))
+            .map(|candidate| (entry.app_id.clone(), candidate.clone()))
     });
     found
 }
@@ -393,6 +540,117 @@ mod tests {
         unregister_program("program-demo");
         assert!(!is_registered("app.program-demo.mix_volume"));
         assert_eq!(served_by_program("app.program-demo.mix_volume"), None);
+    }
+
+    #[test]
+    fn a_call_goes_to_the_instance_in_the_runs_space() {
+        let manifest = AppManifest::parse(
+            br#"{"id":"mcp-route","name":"Demo","version":"1.0.0","logo":"l.svg","entry":"i.html","permissions":["files"],"mcp":"frame"}"#,
+        )
+        .unwrap();
+        let here = permissions::open(&manifest, "space-a", "w1", &[Permission::Files]).unwrap();
+        let there = permissions::open(&manifest, "space-b", "w2", &[Permission::Files]).unwrap();
+        register(&here, "w1", &[json!({ "name": "crop" })]).unwrap();
+        register(&there, "w2", &[json!({ "name": "crop" })]).unwrap();
+        assert_eq!(
+            route("app.mcp-route.crop", Some("space-a")),
+            Ok(Route {
+                webview: "w1".into(),
+                instance: here.clone()
+            })
+        );
+        assert_eq!(
+            route("app.mcp-route.crop", Some("space-b")).map(|found| found.webview),
+            Ok("w2".into())
+        );
+        assert!(route("app.mcp-route.crop", Some("space-c")).is_err());
+        assert!(route("app.mcp-route.crop", None).is_err());
+        assert_eq!(
+            offered()
+                .iter()
+                .filter(|tool| tool["name"] == "app_mcp_route_crop")
+                .count(),
+            1
+        );
+        unregister(&there, "w2");
+        assert!(!has_instance(&there) && has_instance(&here));
+        assert_eq!(
+            route("app.mcp-route.crop", None).map(|found| found.instance),
+            Ok(here.clone())
+        );
+        unregister(&here, "w1");
+        permissions::close(&here, "w1");
+        permissions::close(&there, "w2");
+    }
+
+    #[test]
+    fn a_closed_window_is_dropped_and_the_call_goes_to_a_live_one() {
+        let manifest = AppManifest::parse(
+            br#"{"id":"mcp-closed","name":"Demo","version":"1.0.0","logo":"l.svg","entry":"i.html","permissions":["files"],"mcp":"frame"}"#,
+        )
+        .unwrap();
+        let gone = permissions::open(&manifest, "space-a", "closed-w", &[Permission::Files]).unwrap();
+        register(&gone, "closed-w", &[json!({ "name": "crop" })]).unwrap();
+        register_standby("live-w", "mcp-closed", Some("space-a"), &[json!({ "name": "crop" })])
+            .unwrap();
+        let open = |label: &str| label == "live-w";
+        assert_eq!(
+            route_open("app.mcp-closed.crop", Some("space-a"), open),
+            Ok(Route {
+                webview: "live-w".into(),
+                instance: String::new()
+            })
+        );
+        assert!(!has_instance(&gone));
+        assert_eq!(permissions::identity(&gone, "closed-w"), None);
+        assert!(route_open("app.mcp-closed.crop", Some("space-a"), |_| false).is_err());
+        assert!(!is_registered("app.mcp-closed.crop"));
+    }
+
+    #[test]
+    fn closing_a_window_withdraws_everything_it_offered() {
+        let session = session_for("mcp-window", "shut-w");
+        register(&session, "shut-w", &[json!({ "name": "crop" })]).unwrap();
+        register_standby("shut-w", "mcp-window-standby", None, &[json!({ "name": "trim" })])
+            .unwrap();
+        close_window("shut-w");
+        assert!(!is_registered("app.mcp-window.crop"));
+        assert!(!is_registered("app.mcp-window-standby.trim"));
+        assert_eq!(permissions::identity(&session, "shut-w"), None);
+    }
+
+    #[test]
+    fn a_run_is_offered_only_the_tools_of_apps_open_in_its_space() {
+        let manifest = AppManifest::parse(
+            br#"{"id":"mcp-offer","name":"Demo","version":"1.0.0","logo":"l.svg","entry":"i.html","permissions":["files"],"mcp":"frame"}"#,
+        )
+        .unwrap();
+        let here = permissions::open(&manifest, "space-a", "offer-w", &[Permission::Files]).unwrap();
+        register(&here, "offer-w", &[json!({ "name": "crop" })]).unwrap();
+        register_program("mcp-offer-program", &[json!({ "name": "mix" })]).unwrap();
+        let names = |space| -> Vec<String> {
+            offered_in(space)
+                .iter()
+                .filter_map(|tool| tool["name"].as_str().map(str::to_owned))
+                .collect()
+        };
+        assert!(names(Some("space-a")).contains(&"app_mcp_offer_crop".to_owned()));
+        assert!(!names(Some("space-b")).contains(&"app_mcp_offer_crop".to_owned()));
+        assert!(names(Some("space-b")).contains(&"app_mcp_offer_program_mix".to_owned()));
+        assert!(names(None).contains(&"app_mcp_offer_crop".to_owned()));
+        unregister(&here, "offer-w");
+        unregister_program("mcp-offer-program");
+        permissions::close(&here, "offer-w");
+    }
+
+    #[test]
+    fn withdrawing_a_window_wakes_whoever_waits_on_it() {
+        let session = session_for("mcp-wake", "wake-w");
+        register(&session, "wake-w", &[json!({ "name": "crop" })]).unwrap();
+        let waiting = withdrawn();
+        tokio::pin!(waiting);
+        close_window("wake-w");
+        assert!(futures_util::FutureExt::now_or_never(waiting.as_mut()).is_some());
     }
 
     #[test]

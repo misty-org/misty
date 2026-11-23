@@ -9,7 +9,7 @@ use tauri::AppHandle;
 
 use super::transfer::TransferResult;
 use super::undo::{record, Change};
-use super::{asked_path, blocking, display_name, failed, person_window};
+use super::{asked_path, asked_paths, blocking, display_name, failed, gated, person_window};
 
 mod compare;
 mod duplicates;
@@ -23,7 +23,7 @@ pub(crate) fn sha256_of(
     path: &Path,
     mut read: impl FnMut(u64) -> bool,
 ) -> Result<Option<String>, String> {
-    let mut file = fs_disk::open(path).map_err(|error| failed(path, error))?;
+    let mut file = gated::open_read(path).map_err(|error| failed(path, error))?;
     let mut hasher = Sha256::new();
     let mut buffer = vec![0u8; 256 * 1024];
     loop {
@@ -66,7 +66,7 @@ pub async fn files_checksum(webview: tauri::Webview, path: String) -> Result<Str
     person_window(&webview)?;
     let path = asked_path(&path)?;
     blocking(move || {
-        if fs_disk::is_dir(&path) {
+        if gated::is_dir(&path) {
             return Err(failed(&path, "a folder has no checksum"));
         }
         sha256_of(&path, |_| true)?.ok_or_else(|| failed(&path, "the checksum was stopped"))
@@ -78,11 +78,12 @@ pub async fn files_checksum(webview: tauri::Webview, path: String) -> Result<Str
 pub async fn files_make_link(webview: tauri::Webview, path: String) -> Result<String, String> {
     person_window(&webview)?;
     let path = asked_path(&path)?;
+    let window = webview.label().to_owned();
     blocking(move || {
-        fs_disk::symlink_metadata(&path).map_err(|error| failed(&path, error))?;
+        gated::stat(&path).map_err(|error| failed(&path, error))?;
         let link = alias_path(&path)?;
         fs_disk::symlink(&path, &link).map_err(|error| failed(&link, error))?;
-        record("Make Alias", Change::Created(link.clone()));
+        record(&window, "Make Alias", Change::Created(link.clone()));
         super::search::note_added(&link);
         Ok(link.display().to_string())
     })
@@ -96,10 +97,7 @@ pub async fn files_rename_preview(
     rule: RenameRule,
 ) -> Result<Vec<RenamePreview>, String> {
     person_window(&webview)?;
-    let paths = paths
-        .iter()
-        .map(|path| asked_path(path))
-        .collect::<Result<Vec<_>, _>>()?;
+    let paths = asked_paths(&paths)?;
     blocking(move || {
         Ok(rename::plan(&paths, &rule)
             .into_iter()
@@ -116,11 +114,9 @@ pub async fn files_rename_many(
     rule: RenameRule,
 ) -> Result<TransferResult, String> {
     person_window(&webview)?;
-    let paths = paths
-        .iter()
-        .map(|path| asked_path(path))
-        .collect::<Result<Vec<_>, _>>()?;
-    blocking(move || Ok(rename::rename_many(&paths, &rule))).await
+    let paths = asked_paths(&paths)?;
+    let window = webview.label().to_owned();
+    blocking(move || Ok(rename::rename_many(&window, &paths, &rule))).await
 }
 
 #[tauri::command]
@@ -132,17 +128,25 @@ pub async fn files_duplicates(
 ) -> Result<Vec<DuplicateGroup>, String> {
     person_window(&webview)?;
     let dir = asked_path(&dir)?;
-    blocking(move || duplicates::find(&app, &dir, &op_id)).await
+    super::runtime::run(&app, &webview, &op_id, "Finding duplicates", move |op| {
+        duplicates::find(&dir, op)
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn files_compare(
+    app: AppHandle,
     webview: tauri::Webview,
     left: String,
     right: String,
+    op_id: String,
 ) -> Result<Vec<CompareRow>, String> {
     person_window(&webview)?;
     let left = asked_path(&left)?;
     let right = asked_path(&right)?;
-    blocking(move || compare::compare(&left, &right)).await
+    super::runtime::run(&app, &webview, &op_id, "Comparing", move |op| {
+        compare::compare(&left, &right, op)
+    })
+    .await
 }

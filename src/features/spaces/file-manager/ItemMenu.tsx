@@ -1,6 +1,7 @@
 import {
   AppWindow,
   ClipboardCopy,
+  CloudUpload,
   Copy,
   CopyPlus,
   Diff,
@@ -21,26 +22,32 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
+import { useState } from "react";
 import {
   MenuCheckItem,
   MenuItem,
   MenuSeparator,
   MenuSubmenu,
+  notify,
   TagDot,
   tagToneName,
 } from "@misty/ui";
 import type { FinderTag } from "@/features/files";
 import { desktopOs } from "@/shared/platform/desktop_os";
-import type { DriveEntry } from "../drive";
+import { driveNative, type DriveEntry } from "../drive";
+import { useSpacesStore } from "../list/use_spaces_store";
 import type { FileActions } from "./file_actions";
+import { useFilesChoices } from "./files_choices";
 import { isArchive } from "./format";
-import { keys } from "./key_labels";
-import { localPath, type FileItem, type FilesPlace } from "./model";
+import { isMac, keys } from "./key_labels";
+import { localPath, type FileItem } from "./model";
 import { DiskOpenWithItems, DriveOpenWithItems } from "./OpenWithItems";
-import type { DriveOpenApp } from "./use_drive_open_with";
+import { targetsOf, usePane } from "./pane_context";
+import { sourceOf } from "./sources";
+import { useDriveOpenWith, type DriveOpenApp } from "./use_drive_open_with";
+import { usePlacesStore } from "./use_files_places";
 
 export interface MenuContext {
-  place: FilesPlace;
   granted: boolean;
   picking: boolean;
   macos: boolean;
@@ -75,7 +82,9 @@ function TagRows({ items, ctx }: { items: FileItem[]; ctx: MenuContext }) {
 
 function TrashRows({ items, ctx }: { items: FileItem[]; ctx: MenuContext }) {
   const first = items[0].source;
-  const deletable = first.kind !== "drive-trash" || ctx.canPurge(first.entry.space_id);
+  const deletable =
+    sourceOf(items[0]).purge !== undefined &&
+    (first.kind !== "drive-trash" || ctx.canPurge(first.entry.space_id));
   return (
     <>
       <MenuItem icon={Undo2} label="Put back" onSelect={() => ctx.actions.putBack(items)} />
@@ -99,8 +108,7 @@ export function ItemMenu({ items, ctx }: { items: FileItem[]; ctx: MenuContext }
   const item = items[0];
   const one = items.length === 1;
   const source = item.source;
-  if (source.kind === "trash" || source.kind === "agent-trash" || source.kind === "drive-trash")
-    return ctx.picking ? null : <TrashRows items={items} ctx={ctx} />;
+  if (sourceOf(item).inTrash) return ctx.picking ? null : <TrashRows items={items} ctx={ctx} />;
   const { actions } = ctx;
   const onDisk = items.every((each) => each.source.kind === "disk") && ctx.granted;
   const local = items.every((each) => localPath(each) !== undefined);
@@ -155,6 +163,20 @@ export function ItemMenu({ items, ctx }: { items: FileItem[]; ctx: MenuContext }
           {drive && one ? (
             <>
               <MenuSeparator />
+              {drive.waits_large ? (
+                <MenuItem
+                  icon={CloudUpload}
+                  label="Sync this file"
+                  onSelect={() =>
+                    void driveNative.syncLarge(drive.space_id, drive.path).catch(() =>
+                      notify({
+                        message: `${drive.name} couldn't be synced. Try again.`,
+                        tone: "error",
+                      }),
+                    )
+                  }
+                />
+              ) : null}
               <MenuItem
                 icon={Pencil}
                 label="Rename"
@@ -287,4 +309,37 @@ export function ItemMenu({ items, ctx }: { items: FileItem[]; ctx: MenuContext }
       )}
     </>
   );
+}
+
+export function ItemMenuFor({ item }: { item: FileItem }) {
+  const pane = usePane();
+  const [items] = useState(() => targetsOf(pane, item));
+  const picking = Boolean(pane.pick);
+  const starred = usePlacesStore((store) => store.starred);
+  const tags = usePlacesStore((store) => store.tags);
+  const spaces = useSpacesStore((store) => store.spaces);
+  const { setInfo } = useFilesChoices(picking);
+  const drive = item.source.kind === "drive" ? item.source.entry : undefined;
+  const driveOpen = useDriveOpenWith(drive?.space_id);
+  const ctx: MenuContext = {
+    granted: pane.granted,
+    picking,
+    macos: isMac,
+    actions: pane.actions,
+    starred,
+    tags,
+    quickLook: (target) => pane.store.getState().setQuick(target),
+    info: (target) => {
+      pane.store.getState().select([target.id]);
+      setInfo(true);
+    },
+    driveApps: driveOpen.appsFor,
+    openDriveIn: driveOpen.openIn,
+    canPurge: (spaceId) => {
+      const held: readonly string[] =
+        spaces.find((space) => space.id === spaceId)?.permissions ?? [];
+      return held.includes("drive.purge") || held.includes("administrator");
+    },
+  };
+  return <ItemMenu items={items} ctx={ctx} />;
 }

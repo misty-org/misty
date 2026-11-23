@@ -66,6 +66,30 @@ export function useSpaceCan(spaceId: string, permission: SpacePermission): boole
   return spaceCan(space, permission);
 }
 
+export function memberCan(spaceId: string, userId: string, permission: SpacePermission): boolean {
+  const spaces = useSpacesStore.getState();
+  if (spaces.spaces.find((item) => item.id === spaceId)?.owner_user_id === userId) return true;
+  const member = spaces.membersBySpace[spaceId]?.find((item) => item.user_id === userId);
+  if (!member) return false;
+  if (member.role === "owner") return true;
+  const roles = useSpaceRolesStore.getState().bySpace[spaceId] ?? [];
+  return roles.some(
+    (role) =>
+      (role.is_default || Boolean(member.role_ids?.includes(role.id))) &&
+      (role.permissions.includes("administrator") || role.permissions.includes(permission)),
+  );
+}
+
+export function prepareMemberCan(spaceId: string): Promise<void> {
+  const spaces = useSpacesStore.getState();
+  return Promise.all([
+    spaces.membersBySpace[spaceId] ? undefined : spaces.loadMembers(spaceId),
+    useSpaceRolesStore.getState().bySpace[spaceId]
+      ? undefined
+      : useSpaceRolesStore.getState().load(spaceId),
+  ]).then(() => undefined);
+}
+
 export function memberRoles(member: SpaceMember | undefined, roles: SpaceRoleDef[] | undefined) {
   if (!member?.role_ids?.length || !roles) return [];
   return roles.filter((role) => !role.is_default && member.role_ids!.includes(role.id));

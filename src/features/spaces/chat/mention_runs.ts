@@ -8,8 +8,42 @@ import { followAddress } from "@/features/agents";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { MentionableAgent } from "./use_space_message_spans_store";
 import { noticeAgentMemoryOnce } from "./agent_memory_notice";
+import { messageFromSpaceEvent } from "./use_space_message_spans_store";
+import type { SpaceEvent } from "../api/dto/entities";
 
 const maxAgents = 3;
+const rememberedLimit = 500;
+const ranMessages = new Set<string>();
+const awaitingEcho = new Map<
+  string,
+  { agents: readonly MentionableAgent[]; senderId: string }
+>();
+
+function remember<T>(store: Set<T> | Map<T, unknown>, limit: number) {
+  if (store.size <= limit) return;
+  const oldest = store.keys().next().value;
+  if (oldest !== undefined) store.delete(oldest);
+}
+
+export function expectOwnMentions(
+  clientNonce: string | undefined,
+  agents: readonly MentionableAgent[] | undefined,
+  senderId: string | undefined,
+): void {
+  if (!clientNonce || !senderId || !agents?.length) return;
+  awaitingEcho.set(clientNonce, { agents, senderId });
+  remember(awaitingEcho, rememberedLimit);
+}
+
+if (typeof window !== "undefined")
+  window.addEventListener("misty:space-message-event", (event) => {
+    const detail = (event as CustomEvent<{ event?: SpaceEvent }>).detail;
+    if (detail?.event?.type !== "message.created") return;
+    const message = messageFromSpaceEvent(detail.event);
+    const waiting = message?.client_nonce ? awaitingEcho.get(message.client_nonce) : undefined;
+    if (!message || !waiting) return;
+    runOwnMentions(message, waiting.agents, waiting.senderId);
+  });
 const startFailed = "couldn't start this. Check its engine in Settings › Agents and ask again.";
 
 type Span = SpaceMessage["content"][number];
@@ -98,12 +132,15 @@ export function runOwnMentions(
   agents: readonly MentionableAgent[] | undefined,
   senderId: string | undefined,
 ): void {
+  if (message.client_nonce) awaitingEcho.delete(message.client_nonce);
   if (!hasTauriInternals() || !agents?.length) return;
   if (!senderId || message.sender_user_id !== senderId) return;
+  if (ranMessages.has(message.id)) return;
   const text = plainText(message.content);
   const post = (reply: string) => {
     const content: Span[] = [{ type: "text", text: reply }];
     const nonce = `mention_${crypto.randomUUID()}`;
+    const threadRootId = message.thread_root_id ?? "";
     return message.conversation_id
       ? spacesApi.sendConversationMessage(
           message.space_id,
@@ -113,10 +150,15 @@ export function runOwnMentions(
           [],
           message.id,
           nonce,
+          "text",
+          threadRootId,
         )
-      : spacesApi.sendMessage(message.space_id, content, [], [], message.id, nonce);
+      : spacesApi.sendMessage(message.space_id, content, [], [], message.id, nonce, threadRootId);
   };
   const mentioned = ownMentions(message.content, agents, senderId);
-  if (mentioned.length) void noticeAgentMemoryOnce(message.space_id).catch(() => undefined);
+  if (!mentioned.length) return;
+  ranMessages.add(message.id);
+  remember(ranMessages, rememberedLimit);
+  void noticeAgentMemoryOnce(message.space_id).catch(() => undefined);
   for (const agent of mentioned) void answerOne(message, agent, text, post);
 }

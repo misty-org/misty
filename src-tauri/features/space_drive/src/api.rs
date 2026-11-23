@@ -11,7 +11,6 @@ use std::{io, pin::Pin, sync::Arc, time::Duration};
 
 use bytes::Bytes;
 use futures_util::{future::BoxFuture, Stream};
-use rand::Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -293,7 +292,7 @@ fn item_path(space: &SpaceId, id: &ItemId, rest: &str) -> String {
 
 fn backoff(attempt: u32) -> Duration {
     let base = Duration::from_millis(500) * 2u32.saturating_pow(attempt.saturating_sub(1));
-    let jitter = Duration::from_millis(rand::thread_rng().gen_range(0..500));
+    let jitter = Duration::from_millis(rand::random_range(0..500));
     base.min(MAX_BACKOFF) + jitter
 }
 
@@ -342,6 +341,10 @@ pub fn refusal(status: u16, body: &[u8]) -> ApiError {
         (409, "invalid_move") => ApiError::Server {
             status,
             message: "A folder can't move into itself.".to_owned(),
+        },
+        (409, "protected") => ApiError::Server {
+            status,
+            message: "The Space's .mistyignore stays at its top.".to_owned(),
         },
         (404, "parent_missing") => ApiError::ParentMissing,
         (423, _) => ApiError::InUse(
@@ -636,6 +639,25 @@ impl Api {
         let mut page: TrashPage = self.json(Method::Get, path, None, None).await?;
         page.next_after = page.next_after.filter(|next| !next.is_empty());
         Ok(page)
+    }
+
+    pub async fn realtime_ticket(&self) -> Result<String, ApiError> {
+        let answer: Value = self
+            .json(
+                Method::Post,
+                "/realtime/tickets".to_owned(),
+                None,
+                Some(json!({ "after": -1 })),
+            )
+            .await?;
+        answer
+            .get("ticket")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| ApiError::Server {
+                status: 200,
+                message: "The server sent no ticket.".to_owned(),
+            })
     }
 
     pub async fn purge(&self, space: &SpaceId, id: &ItemId) -> Result<(), ApiError> {

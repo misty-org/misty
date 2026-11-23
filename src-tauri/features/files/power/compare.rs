@@ -1,21 +1,22 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 //! Compare folders: everything in either folder by its path inside it. Two files are the same
-//! when their contents are: sizes first, then, only when the sizes agree, their SHA-256. A folder
-//! in both is changed when anything under it differs; a folder in only one is one row, without
-//! its contents listed. Links compare by where they point.
+//! when their contents are: sizes first, then, only when the sizes agree, their bytes, read side
+//! by side until the first difference. A folder in both is changed when anything under it
+//! differs; a folder in only one is one row, without its contents listed. Links compare by where
+//! they point. Only what differs is returned.
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
+    io::{self, Read},
     path::{Path, PathBuf},
 };
 
-use file_access::{
-    disk::{check_disk, fs_disk},
-    Access,
-};
+use file_access::disk::{walk, ItemKind};
+use file_access::Access;
 use serde::Serialize;
-use walkdir::WalkDir;
 
-use super::{failed, sha256_of};
+use super::super::gated;
+use super::super::progress::{Op, Stop};
+use super::failed;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -47,36 +48,73 @@ pub(super) enum Item {
 
 pub(super) type Inventory = BTreeMap<String, Item>;
 
-fn inventory(root: &Path) -> Result<Inventory, String> {
-    check_disk(root, Access::Read).map_err(|error| failed(root, error))?;
-    if !fs_disk::is_dir(root) {
+fn inventory(root: &Path, stop: &Stop) -> Result<Inventory, String> {
+    if !gated::is_dir(root) {
         return Err(failed(root, "only folders can be compared"));
     }
     let mut items = Inventory::new();
-    for entry in WalkDir::new(root).min_depth(1).follow_links(false) {
-        let Ok(entry) = entry else { continue };
-        if entry.file_name() == ".DS_Store" {
-            continue;
+    walk::walk(root, Access::Read, walk::WalkFor::Person, &mut |step| {
+        if stop.stopped() {
+            return Err(gated::cancelled());
         }
-        let Ok(relative) = entry.path().strip_prefix(root) else {
-            continue;
-        };
-        let relative = relative
+        if step.item.name == ".DS_Store" {
+            return Ok(walk::WalkFlow::Continue);
+        }
+        let relative = step
+            .relative
             .components()
             .map(|part| part.as_os_str().to_string_lossy().into_owned())
             .collect::<Vec<_>>()
             .join("/");
-        let kind = entry.file_type();
-        let item = if kind.is_symlink() {
-            Item::Link(fs_disk::read_link(entry.path()).unwrap_or_default())
-        } else if kind.is_dir() {
-            Item::Folder
-        } else {
-            Item::File(entry.metadata().map(|meta| meta.len()).unwrap_or(0))
+        let item = match step.item.kind {
+            ItemKind::Link => Item::Link(step.dir.read_link(&step.item.name).unwrap_or_default()),
+            ItemKind::Dir => Item::Folder,
+            ItemKind::File => Item::File(step.item.len),
+            ItemKind::Other => return Ok(walk::WalkFlow::Continue),
         };
         items.insert(relative, item);
-    }
+        Ok(walk::WalkFlow::Continue)
+    })
+    .map_err(|error| failed(root, error))?;
     Ok(items)
+}
+
+fn fill(file: &mut impl Read, buffer: &mut [u8]) -> io::Result<usize> {
+    let mut filled = 0;
+    while filled < buffer.len() {
+        match file.read(&mut buffer[filled..]) {
+            Ok(0) => break,
+            Ok(count) => filled += count,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(filled)
+}
+
+fn same_bytes(
+    left: &Path,
+    right: &Path,
+    stop: &Stop,
+    read: &mut dyn FnMut(u64),
+) -> io::Result<bool> {
+    let mut one = gated::open_read(left)?;
+    let mut two = gated::open_read(right)?;
+    let mut a = vec![0u8; 256 * 1024];
+    let mut b = vec![0u8; 256 * 1024];
+    loop {
+        if stop.stopped() {
+            return Err(gated::cancelled());
+        }
+        let (got_a, got_b) = (fill(&mut one, &mut a)?, fill(&mut two, &mut b)?);
+        if got_a != got_b || a[..got_a] != b[..got_b] {
+            return Ok(false);
+        }
+        if got_a == 0 {
+            return Ok(true);
+        }
+        read(got_a as u64);
+    }
 }
 
 fn ancestors(relative: &str) -> impl Iterator<Item = &str> {
@@ -148,15 +186,27 @@ pub(super) fn rows(
     rows
 }
 
-pub(super) fn compare(left: &Path, right: &Path) -> Result<Vec<CompareRow>, String> {
-    let left_items = inventory(left)?;
-    let right_items = inventory(right)?;
-    let hash =
-        |root: &Path, relative: &str| sha256_of(&root.join(relative), |_| true).ok().flatten();
-    Ok(rows(&left_items, &right_items, |relative| {
-        let one = hash(left, relative);
-        one.is_some() && one == hash(right, relative)
-    }))
+pub(super) fn compare(left: &Path, right: &Path, op: &mut Op) -> Result<Vec<CompareRow>, String> {
+    let stop = op.stop();
+    let left_items = inventory(left, &stop)?;
+    let right_items = inventory(right, &stop)?;
+    let rows = rows(&left_items, &right_items, |relative| {
+        let name = relative.rsplit('/').next().unwrap_or(relative).to_owned();
+        same_bytes(
+            &left.join(relative),
+            &right.join(relative),
+            &stop,
+            &mut |bytes| op.advance(bytes, &name),
+        )
+        .unwrap_or(false)
+    });
+    if op.cancelled() {
+        return Err("Cancelled.".into());
+    }
+    Ok(rows
+        .into_iter()
+        .filter(|row| row.state != CompareState::Same)
+        .collect())
 }
 
 #[cfg(test)]
@@ -221,13 +271,24 @@ mod tests {
         let root = tempfile::tempdir().expect("temp folder");
         let (left, right) = (root.path().join("left"), root.path().join("right"));
         for dir in [&left, &right] {
-            fs_disk::create_dir_all(dir.join("sub")).expect("folder");
+            file_access::fs::create_dir_all(dir.join("sub")).expect("folder");
         }
-        fs_disk::write(left.join("sub/same.txt"), b"hello").expect("write");
-        fs_disk::write(right.join("sub/same.txt"), b"hello").expect("write");
-        fs_disk::write(left.join("sub/changed.txt"), b"abc").expect("write");
-        fs_disk::write(right.join("sub/changed.txt"), b"abd").expect("write");
-        let rows = compare(&left, &right).expect("compare");
+        file_access::fs::write(left.join("sub/same.txt"), b"hello").expect("write");
+        file_access::fs::write(right.join("sub/same.txt"), b"hello").expect("write");
+        file_access::fs::write(left.join("sub/changed.txt"), b"abc").expect("write");
+        file_access::fs::write(right.join("sub/changed.txt"), b"abd").expect("write");
+        let stop = Stop::default();
+        let left_items = inventory(&left, &stop).expect("left");
+        let right_items = inventory(&right, &stop).expect("right");
+        let rows = rows(&left_items, &right_items, |relative| {
+            same_bytes(
+                &left.join(relative),
+                &right.join(relative),
+                &stop,
+                &mut |_| {},
+            )
+            .unwrap_or(false)
+        });
         let state = |relative: &str| {
             rows.iter()
                 .find(|row| row.relative == relative)

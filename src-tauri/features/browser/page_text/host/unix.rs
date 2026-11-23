@@ -1,12 +1,11 @@
 use std::{
-    os::unix::fs::{MetadataExt, PermissionsExt},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::Stdio,
     sync::{Arc, Mutex, PoisonError},
     time::Duration,
 };
 
-use page_text::protocol::{MAX_ANSWER_BYTES, PROTOCOL};
+use page_text::protocol::MAX_ANSWER_BYTES;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     process::Command,
@@ -30,32 +29,13 @@ struct Staged {
 
 static STAGED: Mutex<Option<Arc<Staged>>> = Mutex::new(None);
 
-fn worker() -> Result<&'static [u8], String> {
-    crate::app::embedded_workers::builtin_worker("page-reader", PROTOCOL)
-}
-
-fn still_intact(executable: &Path, bytes: &[u8]) -> bool {
-    let Ok(metadata) = fs::symlink_metadata(executable) else {
-        return false;
-    };
-    let private = metadata.file_type().is_file()
-        && metadata.mode() & 0o777 == 0o500
-        && metadata.uid() == unsafe { libc::getuid() };
-    private && fs::read(executable).is_ok_and(|found| found == bytes)
-}
-
-fn stage(bytes: &[u8]) -> Result<Staged, String> {
+fn stage(executable: PathBuf) -> Result<Staged, String> {
     let folder = tempfile::Builder::new()
         .prefix("misty-page-reader-")
         .tempdir()
         .map_err(|_| "the reader's folder couldn't be made")?;
-    let executable = folder.path().join("worker");
-    fs::write(&executable, bytes).map_err(|_| "the reader couldn't be staged")?;
-    fs::set_permissions(&executable, fs::Permissions::from_mode(0o500))
-        .map_err(|_| "the reader couldn't be staged")?;
-    let executable = fs::canonicalize(&executable).map_err(|_| "the reader couldn't be staged")?;
     let folder_path =
-        fs::canonicalize(folder.path()).map_err(|_| "the reader couldn't be staged")?;
+        fs::canonicalize(folder.path()).map_err(|_| "the reader's folder couldn't be made")?;
     Ok(Staged {
         _folder: folder,
         folder_path,
@@ -64,14 +44,14 @@ fn stage(bytes: &[u8]) -> Result<Staged, String> {
 }
 
 fn staged() -> Result<Arc<Staged>, String> {
-    let bytes = worker()?;
+    let executable = crate::app::workers::program("page-reader")?;
     let mut slot = STAGED.lock().unwrap_or_else(PoisonError::into_inner);
     if let Some(current) = slot.as_ref() {
-        if still_intact(&current.executable, bytes) {
+        if current.executable == executable && fs::is_dir(&current.folder_path) {
             return Ok(current.clone());
         }
     }
-    let fresh = Arc::new(stage(bytes)?);
+    let fresh = Arc::new(stage(executable)?);
     *slot = Some(fresh.clone());
     Ok(fresh)
 }

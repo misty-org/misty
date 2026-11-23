@@ -1,5 +1,4 @@
 import { Plus, Users } from "lucide-react";
-import type { ReactNode } from "react";
 import { useAuth } from "@/features/account";
 import type { WorkspaceView } from "@/features/app-windows";
 import {
@@ -100,11 +99,9 @@ export function FriendsRow({
 export function PersonalSections({
   route,
   onOpen,
-  children,
 }: {
   route: string;
   onOpen(view: WorkspaceView): void;
-  children?: ReactNode;
 }) {
   useDmListUpdates();
   const { user } = useAuth();
@@ -160,7 +157,6 @@ export function PersonalSections({
                 );
               })
             )}
-            {children}
           </>
         ) : null}
       </section>

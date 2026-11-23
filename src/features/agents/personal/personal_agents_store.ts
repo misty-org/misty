@@ -4,6 +4,10 @@ import { invoke } from "@/native/invoke";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSettingsStore } from "@/features/settings";
 import { listPersonalAgents, newEngineAgents, personalAgentsApi } from "./personal_agents_api";
+import { refreshSpaceAgents } from "./space_agent_sync";
+import { agentAccountId } from "./agent_account";
+
+export const spaceAgentsChangedEvent = "misty:space-agents-changed";
 
 interface PersonalAgentsState {
   accountId: string;
@@ -73,10 +77,31 @@ useSpaceWindowStore.subscribe((state, previous) => {
     return;
   const { accountId, agents, load } = usePersonalAgentsStore.getState();
   if (!accountId || state.personalSpaceOwner !== accountId) return;
-  if (agents.some((agent) => !agent.space_id)) void load(accountId);
+  if (agents.some((agent) => !agent.space_id || (!agent.revision && !agent.system_managed)))
+    void load(accountId);
 });
 
-export function defaultAgentOf(agents: readonly AgentProfile[]): AgentProfile | undefined {
+if (typeof window !== "undefined")
+  window.addEventListener(spaceAgentsChangedEvent, (event) => {
+    const spaceId = (event as CustomEvent<{ spaceId?: string }>).detail?.spaceId;
+    const { accountId } = usePersonalAgentsStore.getState();
+    if (!spaceId || !accountId) return;
+    void refreshSpaceAgents(accountId, spaceId)
+      .then((agents) => {
+        if (agents && usePersonalAgentsStore.getState().accountId === accountId)
+          usePersonalAgentsStore.setState({ agents });
+      })
+      .catch(() => undefined);
+  });
+
+const mineFirst = (agents: readonly AgentProfile[]) => {
+  const account = agentAccountId();
+  const mine = agents.filter((agent) => !agent.owner_user_id || agent.owner_user_id === account);
+  return mine.length ? mine : agents;
+};
+
+export function defaultAgentOf(all: readonly AgentProfile[]): AgentProfile | undefined {
+  const agents = mineFirst(all);
   const document = useSettingsStore.getState().settings?.document as
     Record<string, Record<string, unknown> | undefined> | undefined;
   const engine = String(document?.agent?.default_engine ?? "");

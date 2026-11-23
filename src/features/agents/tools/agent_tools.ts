@@ -1,4 +1,4 @@
-import { spaceAgentsApi } from "../api/space_agents";
+import { copyAgentToSpace } from "../personal/space_agent_sync";
 import { LocalToolRejected, type LocalToolHandler } from "./host";
 import { listSpaces, spaceTargets } from "./space/routing";
 import { agentAccountId } from "../personal/agent_account";
@@ -34,6 +34,8 @@ const configure: LocalToolHandler = async (request) => {
   const agents = await listPersonalAgents(agentAccountId());
   const id = textOf(input.agent_id)?.trim() ?? "";
   const current = agents.find((agent) => agent.id === id);
+  if (current?.can_edit === false)
+    throw invalid("Only this agent's maker, its Space's owner or a moderator can change it.");
   if (operation === "delete") {
     if (!current) throw invalid("That agent doesn't exist.");
     if (current.system_managed) throw invalid("The default Misty agent can't be deleted.");
@@ -41,6 +43,8 @@ const configure: LocalToolHandler = async (request) => {
     return { deleted_agent_id: id };
   }
   if (operation === "update" && !current) throw invalid("That agent doesn't exist.");
+  const space = textOf(input.space)?.trim();
+  const [target] = space ? spaceTargets(await listSpaces(request), space, "change") : [];
   const base: Partial<AgentProfile> = current ?? {};
   const name = (textOf(input.name) ?? base.name ?? "").trim();
   if (!name) throw invalid("An agent needs a name.");
@@ -61,13 +65,11 @@ const configure: LocalToolHandler = async (request) => {
       version: typeof input.version === "number" ? input.version : base.version,
     },
     current?.id,
+    current ? {} : { spaceId: target?.id },
   );
-  const space = textOf(input.space)?.trim();
-  if (!space) return { agent: saved };
-  const [target] = spaceTargets(await listSpaces(request), space, "change");
-  if (!target) return { agent: saved };
-  await spaceAgentsApi.add(target.id, saved.id, saved.name);
-  return { agent: saved, added_to_space: target.id };
+  if (!target || saved.space_id === target.id) return { agent: saved };
+  const copy = await copyAgentToSpace(saved, target.id);
+  return { agent: saved, copied_to_space: target.id, copy_id: copy.id };
 };
 
 export const agentTools: Record<string, LocalToolHandler> = {

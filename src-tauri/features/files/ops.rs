@@ -1,19 +1,21 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 //! New Folder, New File, Rename and Duplicate, as Finder does them: a name that is taken is
-//! refused (never replaced), a rename that only changes case goes through a temporary name so a
-//! disk that ignores case still takes it, and a duplicate is named "name copy.ext", then
-//! "name copy 2.ext". Each one is noted for Undo and for the search index.
+//! refused (never replaced), a rename that only changes case is allowed on a disk that ignores
+//! case, and a duplicate is named "name copy.ext", then "name copy 2.ext". Each one is noted for
+//! Undo and for the search index.
 use std::{
+    ffi::OsString,
     io,
     path::{Component, Path, PathBuf},
 };
 
-use file_access::disk::fs_disk;
+use file_access::disk::{place, walk};
+use file_access::Access;
 
 use super::entry::{entry_for, FileEntry};
 use super::listing::io_text;
 use super::undo::{self, Change};
-use super::{asked_path, blocking, failed, person_window};
+use super::{asked_path, asked_paths, blocking, failed, gated, person_window};
 
 pub(crate) fn valid_name(name: &str) -> Result<&str, String> {
     if name.trim().is_empty() {
@@ -33,58 +35,27 @@ fn taken(name: &str) -> String {
     format!("The name {name} is already taken.")
 }
 
-pub(crate) fn rename_path(from: &Path, to: &Path) -> io::Result<()> {
-    let case_only = from.parent() == to.parent()
-        && from.file_name() != to.file_name()
-        && from
-            .file_name()
-            .map(|name| name.to_string_lossy().to_lowercase())
-            == to
-                .file_name()
-                .map(|name| name.to_string_lossy().to_lowercase());
-    if case_only {
-        let parent = from.parent().unwrap_or(from);
-        let step = parent.join(format!(".misty-rename-{}", uuid::Uuid::new_v4()));
-        fs_disk::rename(from, &step)?;
-        return fs_disk::rename(&step, to).inspect_err(|_| {
-            let _ = fs_disk::rename(&step, from);
-        });
-    }
-    if fs_disk::exists(to) {
-        return Err(io::Error::from(io::ErrorKind::AlreadyExists));
-    }
-    fs_disk::rename(from, to)
-}
-
-fn folder(dir: &Path) -> Result<(), String> {
-    if fs_disk::is_dir(dir) {
-        Ok(())
-    } else {
-        Err(failed(dir, "That isn't a folder."))
-    }
-}
-
 fn entry(path: &Path) -> Result<FileEntry, String> {
     entry_for(path).map_err(|error| failed(path, io_text(&error)))
 }
 
-fn create(dir: &Path, name: &str, make_folder: bool) -> Result<FileEntry, String> {
+fn create(window: &str, dir: &Path, name: &str, make_folder: bool) -> Result<FileEntry, String> {
     let name = valid_name(name)?;
-    folder(dir)?;
-    let path = dir.join(name);
-    if fs_disk::exists(&path) {
-        return Err(taken(name));
-    }
+    let folder = gated::dir(dir, Access::Write, walk::WalkFor::Person)
+        .map_err(|error| failed(dir, io_text(&error)))?;
+    let wanted = OsString::from(name);
     let made = if make_folder {
-        fs_disk::create_dir(&path)
+        folder.create_dir(&wanted)
     } else {
-        fs_disk::create_new(&path).map(drop)
+        folder.create_file(&wanted).map(drop)
     };
+    let path = folder.path().join(name);
     made.map_err(|error| match error.kind() {
         io::ErrorKind::AlreadyExists => taken(name),
         _ => failed(&path, io_text(&error)),
     })?;
     undo::record(
+        window,
         if make_folder {
             "New Folder"
         } else {
@@ -104,7 +75,8 @@ pub async fn files_create_folder(
 ) -> Result<FileEntry, String> {
     person_window(&webview)?;
     let dir = asked_path(&dir)?;
-    blocking(move || create(&dir, &name, true)).await
+    let window = webview.label().to_owned();
+    blocking(move || create(&window, &dir, &name, true)).await
 }
 
 #[tauri::command]
@@ -115,24 +87,28 @@ pub async fn files_create_file(
 ) -> Result<FileEntry, String> {
     person_window(&webview)?;
     let dir = asked_path(&dir)?;
-    blocking(move || create(&dir, &name, false)).await
+    let window = webview.label().to_owned();
+    blocking(move || create(&window, &dir, &name, false)).await
 }
 
-fn rename(path: &Path, name: &str) -> Result<FileEntry, String> {
+fn rename(window: &str, path: &Path, name: &str) -> Result<FileEntry, String> {
     let name = valid_name(name)?;
-    let parent = path
-        .parent()
-        .ok_or_else(|| failed(path, "A drive can't be renamed here."))?;
-    fs_disk::symlink_metadata(path).map_err(|error| failed(path, io_text(&error)))?;
-    let target = parent.join(name);
-    if target == path {
+    let (folder, from) =
+        gated::parent(path, Access::Write).map_err(|error| failed(path, io_text(&error)))?;
+    folder
+        .metadata(&from)
+        .map_err(|error| failed(path, io_text(&error)))?;
+    let to = OsString::from(name);
+    if to == from {
         return entry(path);
     }
-    rename_path(path, &target).map_err(|error| match error.kind() {
+    place::rename_new(&folder, &from, &folder, &to).map_err(|error| match error.kind() {
         io::ErrorKind::AlreadyExists => taken(name),
         _ => failed(path, io_text(&error)),
     })?;
+    let target = path.with_file_name(name);
     undo::record(
+        window,
         "Rename",
         Change::Renamed {
             from: path.to_path_buf(),
@@ -151,7 +127,8 @@ pub async fn files_rename(
 ) -> Result<FileEntry, String> {
     person_window(&webview)?;
     let path = asked_path(&path)?;
-    blocking(move || rename(&path, &name)).await
+    let window = webview.label().to_owned();
+    blocking(move || rename(&window, &path, &name)).await
 }
 
 pub(crate) fn copy_name(name: &str, folder: bool, counter: u32) -> String {
@@ -168,16 +145,31 @@ pub(crate) fn copy_name(name: &str, folder: bool, counter: u32) -> String {
     }
 }
 
-pub(crate) fn copy_target(source: &Path, dir: &Path) -> io::Result<PathBuf> {
+pub(crate) fn copy_beside(
+    source: &Path,
+    dir: &Path,
+    progress: &mut dyn FnMut(u64, &Path) -> bool,
+) -> io::Result<(PathBuf, walk::CopyOutcome)> {
     let name = super::display_name(source);
-    let folder = fs_disk::symlink_metadata(source)?.is_dir();
-    (1..=9999u32)
-        .map(|counter| dir.join(copy_name(&name, folder, counter)))
-        .find(|candidate| !fs_disk::exists(candidate))
-        .ok_or_else(|| io::Error::other("There are too many copies already."))
+    let folder = gated::stat(source)?.is_dir();
+    for counter in 1..=9999u32 {
+        let candidate = copy_name(&name, folder, counter);
+        match walk::copy_tree_checked(
+            source,
+            dir,
+            std::ffi::OsStr::new(&candidate),
+            walk::WalkFor::Person,
+            progress,
+        ) {
+            Ok(outcome) => return Ok((dir.join(candidate), outcome)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::other("There are too many copies already."))
 }
 
-fn duplicate(paths: &[PathBuf]) -> Result<Vec<String>, String> {
+fn duplicate(window: &str, paths: &[PathBuf]) -> Result<Vec<String>, String> {
     let mut made = Vec::new();
     let mut problem = None;
     for source in paths {
@@ -185,10 +177,8 @@ fn duplicate(paths: &[PathBuf]) -> Result<Vec<String>, String> {
             problem.get_or_insert_with(|| failed(source, "A drive can't be duplicated."));
             continue;
         };
-        let copied = copy_target(source, dir)
-            .and_then(|target| super::transfer::copy_plain(source, &target).map(|()| target));
-        match copied {
-            Ok(target) => {
+        match copy_beside(source, dir, &mut |_, _| true) {
+            Ok((target, _)) => {
                 super::search::note_added(&target);
                 made.push(target);
             }
@@ -198,7 +188,7 @@ fn duplicate(paths: &[PathBuf]) -> Result<Vec<String>, String> {
         }
     }
     if !made.is_empty() {
-        undo::record("Duplicate", Change::Copied(made.clone()));
+        undo::record(window, "Duplicate", Change::Copied(made.clone()));
     }
     match (made.is_empty(), problem) {
         (true, Some(error)) => Err(error),
@@ -212,11 +202,9 @@ pub async fn files_duplicate(
     paths: Vec<String>,
 ) -> Result<Vec<String>, String> {
     person_window(&webview)?;
-    let paths = paths
-        .iter()
-        .map(|path| asked_path(path))
-        .collect::<Result<Vec<_>, _>>()?;
-    blocking(move || duplicate(&paths)).await
+    let paths = asked_paths(&paths)?;
+    let window = webview.label().to_owned();
+    blocking(move || duplicate(&window, &paths)).await
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, QuestionPanel, Text } from "@misty/ui";
 import { resumeExecutionAfterWait } from "../runs/jobs/execution_handoff";
-import { useLocalExecution } from "../runs/local-execution/local_execution";
+import { useLocalExecution } from "../runs/local-execution/local_execution_state";
 import { interventionLabels } from "./api";
 import { useAgentInterventions } from "./store";
 import { useNow } from "@/shared/hooks/use_now";

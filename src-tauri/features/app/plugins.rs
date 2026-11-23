@@ -43,6 +43,10 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
             crate::apps::scheme::SCHEME,
             crate::apps::scheme::handle,
         )
+        .register_asynchronous_uri_scheme_protocol(
+            crate::apps::logo_cache::SCHEME,
+            crate::apps::logo_cache::handle,
+        )
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_keystore::init())

@@ -1,4 +1,3 @@
-import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { Highlight } from "@tiptap/extension-highlight";
 import { Image } from "@tiptap/extension-image";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
@@ -11,9 +10,7 @@ import { UniqueID } from "@tiptap/extension-unique-id";
 import type { AnyExtension } from "@tiptap/core";
 import { Markdown } from "@tiptap/markdown";
 import { StarterKit } from "@tiptap/starter-kit";
-import { common, createLowlight } from "lowlight";
-
-export const noteLowlight = createLowlight(common);
+import { NoteCodeBlock } from "./note_code_block";
 
 export function noteSchemaExtensions(options: {
   image?: AnyExtension;
@@ -45,8 +42,7 @@ export function noteSchemaExtensions(options: {
     TextAlign.configure({
       types: ["heading", "paragraph"],
     }),
-    CodeBlockLowlight.configure({
-      lowlight: noteLowlight,
+    NoteCodeBlock.configure({
       defaultLanguage: null,
     }),
     Table.configure({

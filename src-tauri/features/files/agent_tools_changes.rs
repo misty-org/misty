@@ -1,6 +1,9 @@
 use std::path::Path;
 
-use file_access::{disk::fs_disk, Access};
+use file_access::{
+    disk::{fs_disk, place, walk},
+    Access,
+};
 use serde_json::{json, Value};
 use tauri::AppHandle;
 
@@ -10,8 +13,15 @@ use crate::files::{
     agent_trash::move_to_agent_trash,
     display_name,
     entry::{entry_for, FinderTag},
-    failed, search,
+    failed, gated, search,
 };
+
+fn agent_parent(
+    path: &Path,
+) -> Result<(file_access::disk::CheckedDir, std::ffi::OsString), String> {
+    gated::parent_for(path, Access::Write, walk::WalkFor::Agent)
+        .map_err(|error| failed(path, error))
+}
 
 fn shown(path: &Path) -> String {
     path.display().to_string()
@@ -46,7 +56,8 @@ pub(super) fn create_folder(input: &Value) -> Result<Value, String> {
     let path = admit(text(input, "path")?, Access::Write)?;
     let name = display_name(&path);
     valid_name(&name)?;
-    fs_disk::create_dir(&path).map_err(|error| {
+    let (folder, made) = agent_parent(&path)?;
+    folder.create_dir(&made).map_err(|error| {
         if error.kind() == std::io::ErrorKind::AlreadyExists {
             format!("{name} is there already.")
         } else {
@@ -68,25 +79,22 @@ pub(super) fn rename(input: &Value) -> Result<Value, String> {
     if target == path {
         return Ok(json!({ "renamed": { "from": shown(&path), "to": shown(&target) } }));
     }
-    let case_only = display_name(&path).to_lowercase() == name.to_lowercase();
-    if !case_only && fs_disk::exists(&target) {
-        return Err(format!("An item named {name} is there already."));
-    }
-    fs_disk::rename(&path, &target).map_err(|error| failed(&path, error))?;
+    let (from_dir, from) = agent_parent(&path)?;
+    let (to_dir, to) = agent_parent(&target)?;
+    place::rename_new(&from_dir, &from, &to_dir, &to).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::AlreadyExists {
+            format!("An item named {name} is there already.")
+        } else {
+            failed(&path, error)
+        }
+    })?;
     search::note_renamed(&path, &target);
     Ok(json!({ "renamed": { "from": shown(&path), "to": shown(&target) } }))
 }
 
 fn copy_item(source: &Path, target: &Path) -> std::io::Result<()> {
-    let meta = fs_disk::symlink_metadata(source)?;
-    if meta.file_type().is_symlink() {
-        let points_to = fs_disk::read_link(source)?;
-        return fs_disk::symlink(points_to, target);
-    }
-    if meta.is_dir() {
-        return fs_disk::copy_tree(source, target);
-    }
-    fs_disk::copy(source, target).map(|_| ())
+    let (folder, name) = gated::split(target)?;
+    walk::copy_tree_checked(source, folder, name, walk::WalkFor::Agent, &mut |_, _| true).map(drop)
 }
 
 fn transfer_one(source: &str, folder: &Path, copy: bool) -> Result<Value, String> {
@@ -99,17 +107,23 @@ fn transfer_one(source: &str, folder: &Path, copy: bool) -> Result<Value, String
     if folder.starts_with(&source) {
         return Err(format!("{name} can't go inside itself."));
     }
-    if fs_disk::exists(&target) {
-        return Err(format!(
-            "An item named {name} is in that folder already. Rename one first."
-        ));
-    }
+    let taken = || format!("An item named {name} is in that folder already. Rename one first.");
     if copy {
-        copy_item(&source, &target).map_err(|error| failed(&source, error))?;
+        copy_item(&source, &target).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::AlreadyExists {
+                taken()
+            } else {
+                failed(&source, error)
+            }
+        })?;
         search::note_added(&target);
     } else {
-        fs_disk::rename(&source, &target).map_err(|error| {
-            if crosses_drives(&error) {
+        let (from_dir, from) = agent_parent(&source)?;
+        let (to_dir, to) = agent_parent(&target)?;
+        place::rename_new(&from_dir, &from, &to_dir, &to).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::AlreadyExists {
+                taken()
+            } else if crosses_drives(&error) {
                 format!(
                     "{name} is on another drive, and moving it there would mean deleting the \
 original. Copy it instead."
@@ -206,13 +220,8 @@ pub(super) fn delete(input: &Value) -> Result<Value, String> {
     let (mut done, mut failures) = (Vec::new(), Vec::new());
     for asked in &paths {
         let gone = admit(asked, Access::Write).and_then(|path| {
-            let meta = fs_disk::symlink_metadata(&path).map_err(|error| failed(&path, error))?;
-            let removed = if meta.is_dir() {
-                fs_disk::remove_dir_all(&path)
-            } else {
-                fs_disk::remove_file(&path)
-            };
-            removed.map_err(|error| failed(&path, error))?;
+            walk::remove_tree_checked(&path, walk::WalkFor::Agent, &mut |_| true)
+                .map_err(|error| failed(&path, error))?;
             search::note_removed(&path);
             Ok(shown(&path))
         });

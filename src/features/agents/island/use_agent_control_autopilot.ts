@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { shortcutMatchesEvent } from "@/shared/shortcuts/bindings";
-import { pauseLocalExecution, type Execution } from "../runs/local-execution/local_execution";
+import { pauseLocalExecution, type Execution } from "../runs/local-execution/local_execution_state";
 import { autopilotStopShortcut, watchWorkspaceAutopilot } from "../runs/jobs/workspace_autopilot";
 
 export function useAgentControlAutopilot(

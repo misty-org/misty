@@ -18,7 +18,7 @@ export function FilesListFooter({
   selectedBytes: number;
   free: FreeSpace | null;
   progress: FilesProgress | null;
-  onCancel(): void;
+  onCancel?: () => void;
 }) {
   const share =
     progress && progress.totalBytes > 0
@@ -45,9 +45,11 @@ export function FilesListFooter({
               {progress.item ? `${progress.label} ${progress.item}` : progress.label}
             </Text>
             <Progress value={share} aria-label={progress.label} className="w-32" />
-            <Button variant="quiet" size="sm" onClick={onCancel}>
-              Cancel
-            </Button>
+            {onCancel ? (
+              <Button variant="quiet" size="sm" onClick={onCancel}>
+                Cancel
+              </Button>
+            ) : null}
           </>
         ) : null}
         {free ? (

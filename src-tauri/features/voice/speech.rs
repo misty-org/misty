@@ -12,6 +12,26 @@ use super::speech_models;
 const SPEECH_EVENT: &str = "misty://speech";
 const SAID_EVENT: &str = "misty://speech-said";
 
+#[cfg(target_os = "macos")]
+const HELPER_PROFILE: &str = include_str!("../../tauri-permissions/permissions/speech-helper.sb");
+
+pub fn helper_command() -> Result<std::process::Command, String> {
+    let program = crate::app::workers::program("speech")?;
+    #[cfg(target_os = "macos")]
+    {
+        let mut command = std::process::Command::new(sandbox::macos::SANDBOX_EXEC);
+        command
+            .args(sandbox::macos::arguments(
+                HELPER_PROFILE,
+                &[("TOOL", program.as_path())],
+            ))
+            .arg(&program);
+        Ok(command)
+    }
+    #[cfg(not(target_os = "macos"))]
+    Ok(std::process::Command::new(program))
+}
+
 #[derive(Default)]
 struct Chosen {
     hearing: Option<String>,

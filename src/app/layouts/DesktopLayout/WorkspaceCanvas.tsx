@@ -4,6 +4,7 @@ import type { TabSide } from "@/app/shell/docking_layout";
 import {
   dockLeaves,
   findDockLeaf,
+  startWorkspaceSides,
   useWorkspaceStore,
   type WorkspaceView,
 } from "@/features/app-windows";
@@ -17,11 +18,10 @@ import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { useClearTabsShortcut } from "./UseClearTabsShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { TopEdge } from "./TopEdge";
-import { LayoutPopup } from "./LayoutPopup";
 import { WorkspaceTabBar } from "./WorkspaceTabBar";
 import { WorkspaceSearch } from "./search/WorkspaceSearch";
 import { openChatRoute, openNewChat, openWorkspaceRoute } from "./space_navigation";
-import { openAgentsPageEvent, TrayAgentsSync } from "@/features/agents";
+import { openAgentsPageEvent, SharedThreadsSync, TrayAgentsSync } from "@/features/agents";
 import { openRouteEvent } from "@/shared/lib/open_route";
 import { useAppPrograms, useAppStandby, useWindowSpace } from "@/features/spaces";
 import type { WorkspaceTab } from "@/features/app-windows";
@@ -84,6 +84,8 @@ export function WorkspaceCanvas(props: {
     return () =>
       window.removeEventListener("misty:workspace-projection-applied", navigateToActiveLayoutTab);
   }, [navigateToActiveLayoutTab]);
+
+  useEffect(() => startWorkspaceSides(), []);
 
   const splitWorkspacePane = useCallback(
     (paneId: string, direction: DockSplitDirection, tabId?: string) => {
@@ -180,7 +182,6 @@ export function WorkspaceCanvas(props: {
         />
         <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
         <PaneSwapMode />
-        <LayoutPopup onApplied={navigateToActiveLayoutTab} />
         <WorkspaceSearch onOpen={openTab} path={location.pathname} />
         <TrayAgentsSync
           onOpenChat={(agentId, chatId) =>
@@ -188,6 +189,7 @@ export function WorkspaceCanvas(props: {
           }
           onNewChat={() => openNewChat(openTab)}
         />
+        <SharedThreadsSync />
       </Surface>
     </>
   );

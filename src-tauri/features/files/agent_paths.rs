@@ -25,8 +25,15 @@ pub(crate) fn admit_path(path: &Path, access: Access) -> Result<PathBuf, String>
 }
 
 #[tauri::command]
-pub fn files_grant_revoke(app: tauri::AppHandle, webview: tauri::Webview) -> Result<(), String> {
+pub async fn files_grant_revoke(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+) -> Result<(), String> {
     super::person_window(&webview)?;
-    permissions::revoke_disk_grant(&app);
-    Ok(())
+    super::blocking(move || {
+        permissions::revoke_disk_grant(&app);
+        crate::files::search::grant_changed();
+        Ok(())
+    })
+    .await
 }

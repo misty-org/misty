@@ -4,6 +4,7 @@ import type { MessageSpan } from "./dto/common";
 import type { SpaceRequest } from "./space_request_types";
 
 export const spaceMessagePageSize = 50;
+export const spaceMessageSendTimeoutMs = 30_000;
 
 export function createSpaceChatApi(request: SpaceRequest) {
   return {
@@ -29,6 +30,7 @@ export function createSpaceChatApi(request: SpaceRequest) {
         message: SpaceMessage;
       }>(`/spaces/${encodeURIComponent(spaceId)}/messages`, {
         method: "POST",
+        signal: AbortSignal.timeout(spaceMessageSendTimeoutMs),
         body: JSON.stringify({
           content,
           file_node_ids: fileNodeIds,

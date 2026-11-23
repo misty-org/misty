@@ -7,8 +7,7 @@ use std::{
 
 use crate::model::{ItemId, SpaceId};
 
-pub const LEASE: Duration = Duration::from_secs(120);
-pub const RENEW_EVERY: Duration = Duration::from_secs(30);
+pub const ANSWER_HOLD: Duration = Duration::from_secs(120);
 pub const USED_LATELY: Duration = Duration::from_secs(5 * 60);
 pub const STALE_CHECK: Duration = Duration::from_secs(10);
 pub const REPORT_AFTER: Duration = Duration::from_secs(3);
@@ -19,7 +18,6 @@ type Key = (SpaceId, ItemId);
 struct OpenState {
     readers: u32,
     writers: u32,
-    renewed: Option<Instant>,
     since: Option<Instant>,
     written: bool,
 }
@@ -118,22 +116,6 @@ impl Opens {
         newly
     }
 
-    pub fn renewed(&self, key: &Key) {
-        if let Some(state) = lock(&self.open).get_mut(key) {
-            state.renewed = Some(Instant::now());
-        }
-    }
-
-    pub fn due(&self) -> Vec<(Key, bool)> {
-        lock(&self.open)
-            .iter()
-            .filter(|(_, state)| {
-                state.reportable() && state.renewed.is_none_or(|at| at.elapsed() >= RENEW_EVERY)
-            })
-            .map(|(key, state)| (key.clone(), state.editing()))
-            .collect()
-    }
-
     pub fn answered(&self, key: Key) {
         lock(&self.answered).insert(key, Instant::now());
     }
@@ -142,9 +124,15 @@ impl Opens {
         lock(&self.answered).remove(key);
     }
 
+    pub fn is_answered(&self, key: &Key) -> bool {
+        lock(&self.answered)
+            .get(key)
+            .is_some_and(|at| at.elapsed() < ANSWER_HOLD)
+    }
+
     pub fn answered_live(&self) -> Vec<Key> {
         let mut answered = lock(&self.answered);
-        answered.retain(|_, at| at.elapsed() < LEASE);
+        answered.retain(|_, at| at.elapsed() < ANSWER_HOLD);
         answered.keys().cloned().collect()
     }
 }

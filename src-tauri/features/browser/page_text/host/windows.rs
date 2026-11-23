@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use page_text::protocol::{MAX_ANSWER_BYTES, MAX_INPUT_BYTES, PROTOCOL};
+use page_text::protocol::{MAX_ANSWER_BYTES, MAX_INPUT_BYTES};
 
 use sandbox::{Limits, Workspace};
 
@@ -23,7 +23,7 @@ pub(super) async fn run(input: Vec<u8>) -> Result<Vec<u8>, String> {
     let stop = Arc::new(AtomicBool::new(false));
     let _cancel = CancelOnDrop(stop.clone());
     tokio::task::spawn_blocking(move || {
-        let worker = crate::app::embedded_workers::builtin_worker("page-reader", PROTOCOL)?;
+        let worker = crate::app::workers::program("page-reader")?;
         let workspace = Workspace::new(CONTAINER)?;
         let limits = Limits {
             memory_bytes: 1024 * 1024 * 1024,
@@ -33,7 +33,7 @@ pub(super) async fn run(input: Vec<u8>) -> Result<Vec<u8>, String> {
             work_bytes: 64 * 1024 * 1024 + MAX_INPUT_BYTES as u64,
             processes: 1,
         };
-        workspace.run(worker, &input, &limits, &stop)
+        workspace.run(&worker, &input, &limits, &stop)
     })
     .await
     .map_err(|_| "the reader stopped".to_owned())?

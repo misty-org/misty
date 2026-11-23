@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { spacesApi } from "../../api/api";
 import type { SpaceEvent, SpaceMember, SpaceMessage } from "../../api/dto/entities";
-import { runOwnMentions } from "../mention_runs";
+import { expectOwnMentions, runOwnMentions } from "../mention_runs";
 import {
   buildMessageSpans,
   mergeSpaceMessages,
   messageFromSpaceEvent,
+  patchedBySpaceEvent,
   type MentionableAgent,
 } from "../use_space_message_spans_store";
+import { spacesResyncEvent } from "../../list/spaces_resync";
+import { isWindowViewing } from "./window_viewing";
 
 export function useSpaceThread(options: {
   spaceId: string;
@@ -32,10 +35,28 @@ export function useSpaceThread(options: {
   latest.current = options;
   const threadKey = `${spaceId}:${rootId}`;
 
-  const markRead = useCallback(
-    () => void spacesApi.markThreadRead(spaceId, rootId).catch(() => undefined),
-    [spaceId, rootId],
-  );
+  const unreadWhileAway = useRef(false);
+  const markRead = useCallback(() => {
+    if (!isWindowViewing()) {
+      unreadWhileAway.current = true;
+      return;
+    }
+    unreadWhileAway.current = false;
+    void spacesApi.markThreadRead(spaceId, rootId).catch(() => undefined);
+  }, [spaceId, rootId]);
+
+  useEffect(() => {
+    if (!rootId) return;
+    const back = () => {
+      if (unreadWhileAway.current && isWindowViewing()) markRead();
+    };
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    return () => {
+      document.removeEventListener("visibilitychange", back);
+      window.removeEventListener("focus", back);
+    };
+  }, [rootId, markRead]);
 
   useEffect(() => {
     if (!rootId) {
@@ -83,15 +104,24 @@ export function useSpaceThread(options: {
         return;
       }
       const included = messageFromSpaceEvent(detail.event);
-      if (included?.thread_root_id !== rootId) return;
+      if (!included) {
+        const spaceEvent = detail.event;
+        const me = latest.current.currentUser?.id ?? "";
+        setReplies((current) => patchedBySpaceEvent(current, spaceEvent, me) ?? current);
+        return;
+      }
+      if (included.thread_root_id !== rootId) return;
       setReplies((current) => mergeSpaceMessages(current, [included]));
       if (detail.event.type === "message.created") markRead();
     };
+    const resync = () => void load();
     window.addEventListener("misty:space-message-event", onEvent);
+    window.addEventListener(spacesResyncEvent, resync);
     return () => {
       active = false;
       if (activeThreadRef.current === threadKey) activeThreadRef.current = "";
       window.removeEventListener("misty:space-message-event", onEvent);
+      window.removeEventListener(spacesResyncEvent, resync);
     };
   }, [spaceId, rootId, markRead, threadKey]);
 
@@ -117,33 +147,17 @@ export function useSpaceThread(options: {
     }
   }, [hasOlder, replies, rootId, spaceId, threadKey]);
 
-  const send = useCallback(
-    async (text: string) => {
-      const value = text.trim();
+  const deliver = useCallback(
+    async (optimistic: SpaceMessage) => {
       const current = latest.current;
-      if (!value || !current.currentUser) return;
-      const nonce = `thread_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-      if (sending.current.has(nonce)) return;
+      const nonce = optimistic.client_nonce;
+      if (!nonce || !current.currentUser || sending.current.has(nonce)) return;
       sending.current.add(nonce);
-      const content = buildMessageSpans(value, current.members, current.agents, current.roles);
-      const optimistic: SpaceMessage = {
-        seq: Date.now(),
-        id: `optimistic_${nonce}`,
-        client_nonce: nonce,
-        local_delivery_state: "sending",
-        space_id: spaceId,
-        conversation_id: conversationId || undefined,
-        sender_user_id: current.currentUser.id,
-        sender_name: current.currentUser.name || "You",
-        sender_kind: "person",
-        content,
-        file_node_ids: [],
-        attachments: [],
-        reactions: [],
-        thread_root_id: rootId,
-        created_at: new Date().toISOString(),
-      };
-      setReplies((list) => mergeSpaceMessages(list, [optimistic]));
+      const content = optimistic.content;
+      setReplies((list) =>
+        mergeSpaceMessages(list, [{ ...optimistic, local_delivery_state: "sending" }]),
+      );
+      expectOwnMentions(nonce, current.agents, current.currentUser.id);
       try {
         await current.beforeSend?.(content);
         const response = conversationId
@@ -178,5 +192,47 @@ export function useSpaceThread(options: {
     [spaceId, conversationId, rootId],
   );
 
-  return { replies, loading, loadingOlder, hasOlder, error, loadOlder, send };
+  const retry = useCallback(
+    (message: SpaceMessage) => {
+      if (
+        message.local_delivery_state !== "failed" ||
+        message.thread_root_id !== rootId ||
+        message.sender_user_id !== latest.current.currentUser?.id
+      )
+        return;
+      return deliver(message);
+    },
+    [deliver, rootId],
+  );
+
+  const send = useCallback(
+    async (text: string) => {
+      const value = text.trim();
+      const current = latest.current;
+      if (!value || !current.currentUser) return;
+      const nonce = `thread_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      const content = buildMessageSpans(value, current.members, current.agents, current.roles);
+      const optimistic: SpaceMessage = {
+        seq: Date.now(),
+        id: `optimistic_${nonce}`,
+        client_nonce: nonce,
+        local_delivery_state: "sending",
+        space_id: spaceId,
+        conversation_id: conversationId || undefined,
+        sender_user_id: current.currentUser.id,
+        sender_name: current.currentUser.name || "You",
+        sender_kind: "person",
+        content,
+        file_node_ids: [],
+        attachments: [],
+        reactions: [],
+        thread_root_id: rootId,
+        created_at: new Date().toISOString(),
+      };
+      await deliver(optimistic);
+    },
+    [deliver, rootId, spaceId, conversationId],
+  );
+
+  return { replies, loading, loadingOlder, hasOlder, error, loadOlder, send, retry };
 }

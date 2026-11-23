@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine as _};
-use rand::RngCore;
+use rand::Rng;
 
 use crate::account::credential_store;
 use crate::app::error::{ApiError, ApiResult};
@@ -34,7 +34,7 @@ pub fn load_or_create(account_id: &str, local_device_id: &str) -> ApiResult<[u8;
         }
         None => {
             let mut bytes = [0u8; 32];
-            rand::thread_rng().fill_bytes(&mut bytes);
+            rand::rng().fill_bytes(&mut bytes);
             credential_store::store(DEVICE_KEY_SERVICE, &scope, &STANDARD_NO_PAD.encode(bytes))
                 .map_err(|error| {
                     ApiError::Message(format!("Could not secure this device's identity: {error}"))

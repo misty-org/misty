@@ -96,6 +96,7 @@ pub fn close_browser_webview(
 }
 
 pub(crate) fn forget_closed_pages(app: &AppHandle) {
+    crate::apps::mcp::forget_closed(|label| app.get_webview(label).is_some());
     if let Some(state) = app.try_state::<BrowserSessionState>() {
         if let Ok(mut sessions) = state.sessions.lock() {
             sessions.retain(|id, _| {

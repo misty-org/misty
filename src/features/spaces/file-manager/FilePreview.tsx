@@ -1,88 +1,71 @@
 import { useEffect, useState } from "react";
 import { ErrorState, PaneLoading } from "@misty/ui";
-import { filesApi } from "@/features/agents";
-import { disk, driveFileUrl, EmbeddedUniversalPreview, fileUrl } from "@/features/files";
-import { driveNative, mimeFromName } from "../drive";
-import { driveHasContent, thumbnailFor } from "./FileItems";
+import { EmbeddedUniversalPreview, previewKind, type PreviewText } from "@/features/files";
+import { mimeFromName } from "../drive";
+import { thumbnailFor } from "./FileItems";
 import { messageOf } from "./format";
 import type { FileItem } from "./model";
+import { sourceOf } from "./sources";
 
-const streamed = (mime: string) =>
-  mime.startsWith("image/") ||
-  mime.startsWith("video/") ||
-  mime.startsWith("audio/") ||
-  mime === "application/pdf";
+const HEAD_BYTES = 256 * 1024;
+const DOCUMENT_MAX_BYTES = 50 * 1024 * 1024;
 
-type Source =
-  { status: "loading" } | { status: "failed"; message: string } | { status: "ready"; url: string };
+type Head =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "failed"; message: string }
+  | { status: "ready"; text?: PreviewText };
 
-function useSource(item: FileItem, mime: string): Source {
-  const [source, setSource] = useState<Source>({ status: "loading" });
+function useHead(item: FileItem, wanted: boolean): Head {
+  const [head, setHead] = useState<Head>({ status: "idle" });
   const key = `${item.id}:${item.modifiedMs}`;
   useEffect(() => {
-    const from = item.source;
-    if (from.kind === "disk" && streamed(mime)) {
-      setSource({ status: "ready", url: fileUrl(from.entry.path, item.modifiedMs) });
-      return;
-    }
-    if (from.kind === "drive" && streamed(mime) && driveHasContent(from.entry.state)) {
-      setSource({
-        status: "ready",
-        url: driveFileUrl(from.entry.space_id, from.entry.path, item.modifiedMs),
-      });
-      return;
-    }
-    const read =
-      from.kind === "disk"
-        ? () => disk.readBytes(from.entry.path)
-        : from.kind === "project"
-          ? () => filesApi.readBytes(from.path)
-          : from.kind === "drive"
-            ? () => driveNative.read(from.entry.space_id, from.entry.path)
-            : null;
-    if (!read)
-      return setSource({ status: "failed", message: "This item can't be previewed here." });
+    const read = sourceOf(item).readHead;
+    if (!wanted || !read) return setHead({ status: "idle" });
     let live = true;
-    let url = "";
-    setSource({ status: "loading" });
-    void read().then(
-      (bytes) => {
-        if (!live) return;
-        url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-        setSource({ status: "ready", url });
-      },
+    setHead({ status: "loading" });
+    void read(item, HEAD_BYTES).then(
+      (got) =>
+        live &&
+        setHead({
+          status: "ready",
+          text: got.binary ? undefined : { text: got.text, truncated: got.truncated },
+        }),
       (cause) =>
         live &&
-        setSource({ status: "failed", message: messageOf(cause, "The file couldn't be read.") }),
+        setHead({ status: "failed", message: messageOf(cause, "The file couldn't be read.") }),
     );
     return () => {
       live = false;
-      if (url) URL.revokeObjectURL(url);
     };
-    // `item` stands in by its key: the listing makes it again whenever it is read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, mime]);
-  return source;
+  }, [key, wanted]);
+  return head;
 }
 
-export function FilePreview({ item }: { item: FileItem }) {
+export function FilePreview({ item, compact = false }: { item: FileItem; compact?: boolean }) {
   const mime = mimeFromName(item.name);
-  const source = useSource(item, mime);
-  const placeholder = mime.startsWith("image/") ? thumbnailFor(item) : undefined;
-  if (source.status === "loading")
-    return placeholder ? (
-      <EmbeddedUniversalPreview name={item.name} mimeType={mime} url="" placeholder={placeholder} />
-    ) : (
-      <PaneLoading label={`Opening ${item.name}`} />
-    );
-  if (source.status === "failed")
-    return <ErrorState inline title="This file couldn't be previewed" line={source.message} />;
+  const kind = previewKind(item.name, mime);
+  const head = useHead(item, kind === "text");
+  const streamed =
+    kind === "image" ||
+    kind === "video" ||
+    kind === "audio" ||
+    kind === "pdf" ||
+    (kind === "document" && item.size <= DOCUMENT_MAX_BYTES);
+  const url = streamed ? (sourceOf(item).previewUrl(item) ?? "") : "";
+  const placeholder = kind === "image" ? thumbnailFor(item) : undefined;
+  if (head.status === "loading") return <PaneLoading label={`Opening ${item.name}`} />;
+  if (head.status === "failed")
+    return <ErrorState inline title="This file couldn't be previewed" line={head.message} />;
   return (
     <EmbeddedUniversalPreview
       name={item.name}
       mimeType={mime}
-      url={source.url}
+      url={url}
       placeholder={placeholder}
+      text={head.status === "ready" ? head.text : undefined}
+      compact={compact}
     />
   );
 }

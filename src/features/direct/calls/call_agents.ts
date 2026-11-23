@@ -1,6 +1,7 @@
 import {
   RoomEvent,
   Track,
+  TrackEvent,
   type LocalTrackPublication,
   type Participant,
   type RemoteParticipant,
@@ -52,6 +53,9 @@ interface Remote {
   state: CallAgentState;
 }
 
+const cipherOf = (key: Uint8Array<ArrayBuffer>) =>
+  crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+
 export class CallAgents {
   private own = new Map<string, Own>();
   private remote = new Map<string, Remote>();
@@ -65,17 +69,15 @@ export class CallAgents {
   private listeners = new Set<() => void>();
   private snapshot: CallAgentView[] = [];
   private disposed = false;
+  private watchedMic?: Track;
   others = 0;
   nameOf: (identity: string) => string = (identity) => identity;
 
   constructor(
     private readonly room: Room,
-    key: Uint8Array<ArrayBuffer>,
+    private key: Uint8Array<ArrayBuffer>,
   ) {
-    this.cipher = crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, [
-      "encrypt",
-      "decrypt",
-    ]);
+    this.cipher = cipherOf(key);
     room.on(RoomEvent.DataReceived, this.received);
     room.on(RoomEvent.ParticipantConnected, this.joined);
     room.on(RoomEvent.ParticipantDisconnected, this.departed);
@@ -123,6 +125,13 @@ export class CallAgents {
     this.changed();
   }
 
+  setKey(key: Uint8Array<ArrayBuffer>) {
+    if (this.disposed || key === this.key) return;
+    this.key = key;
+    this.cipher = cipherOf(key);
+    for (const id of this.own.keys()) this.announce(id);
+  }
+
   stopTurn(id: string) {
     const own = this.own.get(id);
     if (!own?.turn) return;
@@ -143,6 +152,7 @@ export class CallAgents {
     this.own.clear();
     this.remote.clear();
     this.deafenAll();
+    this.watchMic(undefined);
     this.room.off(RoomEvent.DataReceived, this.received);
     this.room.off(RoomEvent.ParticipantConnected, this.joined);
     this.room.off(RoomEvent.ParticipantDisconnected, this.departed);
@@ -169,9 +179,26 @@ export class CallAgents {
     return this.session;
   }
 
+  private watchMic(track: Track | undefined) {
+    if (track === this.watchedMic) return;
+    this.watchedMic?.off(TrackEvent.Restarted, this.micRestarted);
+    this.watchedMic?.off(TrackEvent.TrackProcessorUpdate, this.micRestarted);
+    this.watchedMic = track;
+    track?.on(TrackEvent.Restarted, this.micRestarted);
+    track?.on(TrackEvent.TrackProcessorUpdate, this.micRestarted);
+  }
+
+  private micRestarted = () => {
+    const me = this.room.localParticipant;
+    const track = me.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+    if (track) this.hear(me.identity, track);
+  };
+
   private hearEveryone() {
     const me = this.room.localParticipant;
-    const mine = me.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+    const published = me.getTrackPublication(Track.Source.Microphone)?.track;
+    this.watchMic(published);
+    const mine = published?.mediaStreamTrack;
     if (mine) this.hear(me.identity, mine);
     for (const participant of this.room.remoteParticipants.values()) {
       const track = participant.getTrackPublication(Track.Source.Microphone)?.track
@@ -211,9 +238,10 @@ export class CallAgents {
   }
 
   private micChanged = (publication: LocalTrackPublication) => {
+    if (publication.source !== Track.Source.Microphone) return;
+    this.watchMic(publication.track);
     const track = publication.track?.mediaStreamTrack;
-    if (publication.source === Track.Source.Microphone && track)
-      this.hear(this.room.localParticipant.identity, track);
+    if (track) this.hear(this.room.localParticipant.identity, track);
   };
 
   private trackSubscribed = (

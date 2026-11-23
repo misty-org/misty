@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import {
-  continueQueuedLocalWork,
   pauseLocalExecution,
   useLocalExecution,
-} from "../runs/local-execution/local_execution";
+} from "../runs/local-execution/local_execution_state";
+import { continueQueuedLocalWork } from "../runs/local-execution/local_execution_followups";
 import { Button, Surface, Text, ViewportLayer } from "@misty/ui";
 import { AgentControlIsland } from "./AgentControlIsland";
 

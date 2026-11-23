@@ -38,7 +38,7 @@ export function activateTab(layout: WorkspaceLayout, id: string): WorkspaceLayou
   const tabs = layoutTabs(layout);
   const active = tabs.find((tab) => tab.id === id);
   return active
-    ? { root: active.root, focusedPaneId: active.focusedPaneId, tabs, activeTabId: id }
+    ? { ...layout, root: active.root, focusedPaneId: active.focusedPaneId, tabs, activeTabId: id }
     : layout;
 }
 
@@ -141,6 +141,13 @@ export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayou
   );
 }
 
-export function workspaceTabsById(state: { layout: WorkspaceLayout }): Map<string, WorkspaceView> {
-  return new Map(allLayoutViews(state.layout).map((tab) => [tab.id, tab]));
+export function workspaceTabsById(state: {
+  layout: WorkspaceLayout;
+  aside?: { layout: WorkspaceLayout };
+}): Map<string, WorkspaceView> {
+  const views = [
+    ...allLayoutViews(state.layout),
+    ...(state.aside ? allLayoutViews(state.aside.layout) : []),
+  ];
+  return new Map(views.map((tab) => [tab.id, tab]));
 }

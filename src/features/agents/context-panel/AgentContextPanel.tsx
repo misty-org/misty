@@ -25,7 +25,7 @@ export function AgentContextPanel(props: {
   agent: AgentProfile;
 }) {
   const { folder, kind, loaded, failed, retry } = useChatFolder(props.conversationId);
-  const scratch = kind === "scratch";
+  const scratch = kind === "scratch" || kind === "thread";
   const chat = terminalChatKey(props.conversationId, useWorkspaceViewId());
   if (props.tab === "steps") return <StepsPanel conversationId={props.conversationId} />;
   return (
@@ -38,7 +38,9 @@ export function AgentContextPanel(props: {
               picker={
                 scratch ? (
                   <Text size="control" tone="bright" className="px-1">
-                    Scratch
+                    {kind === "thread"
+                      ? (folder.split(/[\\/]/).filter(Boolean).pop() ?? folder)
+                      : "Scratch"}
                   </Text>
                 ) : (
                   <ChatFolderPicker conversationId={props.conversationId} />

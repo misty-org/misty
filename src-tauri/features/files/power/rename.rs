@@ -8,10 +8,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use file_access::disk::fs_disk;
+use file_access::disk::{fs_disk, place};
+use file_access::Access;
 use serde::{Deserialize, Serialize};
 
 use super::super::entry::{extension, is_package_name};
+use super::super::gated;
 use super::super::transfer::{Failure, TransferResult};
 use super::{display_name, failed, record, Change};
 
@@ -143,7 +145,7 @@ pub(super) fn plan(paths: &[PathBuf], rule: &RenameRule) -> Vec<Plan> {
         .enumerate()
         .map(|(position, path)| {
             let from = display_name(path);
-            let folder = fs_disk::is_dir(path);
+            let folder = gated::is_dir(path);
             let to = new_name(rule, &from, folder, position as u64);
             (path.clone(), from, to)
         })
@@ -151,7 +153,19 @@ pub(super) fn plan(paths: &[PathBuf], rule: &RenameRule) -> Vec<Plan> {
     mark_clashes(items, taken_on_disk)
 }
 
-pub(super) fn rename_many(paths: &[PathBuf], rule: &RenameRule) -> TransferResult {
+fn rename_one(path: &Path, to: &str) -> Result<PathBuf, String> {
+    let (folder, from) = gated::parent(path, Access::Write).map_err(|error| error.to_string())?;
+    place::rename_new(&folder, &from, &folder, std::ffi::OsStr::new(to)).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::AlreadyExists {
+            "that name is taken".to_owned()
+        } else {
+            error.to_string()
+        }
+    })?;
+    Ok(path.with_file_name(to))
+}
+
+pub(super) fn rename_many(window: &str, paths: &[PathBuf], rule: &RenameRule) -> TransferResult {
     let mut created = Vec::new();
     let mut failures = Vec::new();
     let mut moved = Vec::new();
@@ -159,33 +173,29 @@ pub(super) fn rename_many(paths: &[PathBuf], rule: &RenameRule) -> TransferResul
         if preview.from == preview.to {
             continue;
         }
-        let error = if preview.clash {
-            Some(if valid_name(&preview.to) {
+        let done = if preview.clash {
+            Err(if valid_name(&preview.to) {
                 "that name is taken".to_owned()
             } else {
                 "that isn't a name a file can have".to_owned()
             })
         } else {
-            let target = path.with_file_name(&preview.to);
-            fs_disk::rename(&path, &target)
-                .err()
-                .map(|error| error.to_string())
-                .or_else(|| {
-                    super::super::search::note_renamed(&path, &target);
-                    created.push(target.display().to_string());
-                    moved.push((path.clone(), target));
-                    None
-                })
+            rename_one(&path, &preview.to)
         };
-        if let Some(error) = error {
-            failures.push(Failure {
+        match done {
+            Ok(target) => {
+                super::super::search::note_renamed(&path, &target);
+                created.push(target.display().to_string());
+                moved.push((path.clone(), target));
+            }
+            Err(error) => failures.push(Failure {
                 path: path.display().to_string(),
                 error: failed(&path, error),
-            });
+            }),
         }
     }
     if !moved.is_empty() {
-        record("Rename Items", Change::Moved(moved));
+        record(window, "Rename Items", Change::Moved(moved));
     }
     TransferResult {
         created,

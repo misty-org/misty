@@ -5,7 +5,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { SpacePageLoadingPlaceholder } from "../components/SpacePageLoadingPlaceholder";
 import { voiceChannelPage } from "../apps/app_calls";
-import { FilesPage } from "../file-manager/FilesPage";
+import { LazyFilesPage } from "../file-manager/LazyFilesPage";
 import { useSpacesStore } from "../list/use_spaces_store";
 
 async function loadChat() {
@@ -14,7 +14,8 @@ async function loadChat() {
 }
 const Chat = lazy(loadChat);
 async function loadExplore() {
-  const { ExplorePage } = await import("@/features/agents");
+  const { loadExplorePage } = await import("@/features/agents");
+  const { ExplorePage } = await loadExplorePage();
   return { default: ExplorePage };
 }
 const Explore = lazy(loadExplore);
@@ -110,7 +111,7 @@ export function SpaceSectionView(props: {
     <div className="relative h-full min-h-0 overflow-hidden">
       <Suspense fallback={<SpacePageLoadingPlaceholder shape={shape} />}>
         {section === "files" ? (
-          <FilesPage />
+          <LazyFilesPage />
         ) : section === "explore" ? (
           <Explore
             spaceId={spaceId}

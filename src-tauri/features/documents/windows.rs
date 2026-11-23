@@ -19,7 +19,7 @@ const INPUT_LIMIT: u64 = crate::MAX_AGENT_DOCUMENT_BYTES;
 pub fn process(
     path: &Path,
     stop: &AtomicBool,
-    worker: super::WorkerBytes,
+    worker: super::WorkerProgram,
 ) -> Result<Value, String> {
     let display_name = path
         .file_name()
@@ -67,12 +67,7 @@ pub fn process(
         work_bytes: 2 * INPUT_LIMIT + 64 * 1024 * 1024,
         processes: 1,
     };
-    let response = workspace.run(
-        worker("document-processing", PROTOCOL)?,
-        &body,
-        &limits,
-        stop,
-    )?;
+    let response = workspace.run(&worker("document-processing")?, &body, &limits, stop)?;
     let value: Value =
         serde_json::from_slice(&response).map_err(|_| "Invalid document processor response.")?;
     if value.get("protocol").and_then(Value::as_u64) != Some(u64::from(PROTOCOL)) {

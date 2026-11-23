@@ -1,13 +1,22 @@
-import { useEffect, useLayoutEffect, useRef, type ComponentType, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSessionGoalRunner } from "../goals/session_goals";
 import { ContextRail } from "../context-panel/ContextRail";
 import { useRailShown } from "../context-panel/rail_layout_store";
-import { ChatSessionCard, ChatSidePanels } from "../context-panel/ChatSidePanels";
+import { ChatSessionCard, useAgentChatSidePanel } from "../context-panel/ChatSidePanels";
+import { CHAT_MIN_WIDTH } from "../context-panel/context_panel_store";
 import { isUnread, markConversationRead } from "./conversation_reads";
-import { cn, Separator, Surface } from "@misty/ui";
+import { Button, cn, designPx, FramedBar, FramedPage, Separator, Surface, Text } from "@misty/ui";
 import { AgentMemoryPage } from "../memory/AgentMemoryPage";
+import { homeSpaceOf } from "../personal/agent_home_space";
 import { createPort } from "@/shared/lib/seams";
 
 const emptyChatClass = cn(
@@ -51,8 +60,11 @@ export function AgentWorkspaceFrame({
   activity,
   conversationId,
   disabled,
+  header,
   children,
   onNewTask,
+  threads,
+  theirs,
 }: {
   agent: AgentProfile;
   accountId: string;
@@ -61,10 +73,36 @@ export function AgentWorkspaceFrame({
   activity: MistyActivityEntry[];
   conversationId: string;
   disabled: boolean;
+  header?: ReactNode;
   children: ReactNode;
   onNewTask(): void;
+  threads?: ReactNode;
+  theirs?: ReactNode;
 }) {
   const chatPageRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const element = frameRef.current;
+    if (!element) return;
+    const measure = (width: number) => {
+      if (width > 0) setRoom(designPx(width));
+    };
+    measure(element.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[entries.length - 1];
+      if (entry) measure(entry.contentRect.width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const sidePanel = useAgentChatSidePanel({
+    conversationId,
+    agent,
+    active: page === "task",
+    room,
+  });
   const activeId = page === "task" ? conversationId : undefined;
   let latest: MistyActivityEntry | undefined;
   for (const entry of activity) {
@@ -99,13 +137,47 @@ export function AgentWorkspaceFrame({
       )}
       data-page={page}
     >
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="relative flex min-h-0 min-w-0 flex-1 gap-0">
-          <Surface tone="page" className="relative isolate min-h-0 min-w-90 flex-1 overflow-hidden">
-            <div ref={chatPageRef} className="flex h-full min-w-0" hidden={page !== "task"}>
+      <div ref={frameRef} className="flex min-h-0 min-w-0 flex-1">
+        <FramedPage
+          autoSaveId="agent-chat"
+          workMinWidth={CHAT_MIN_WIDTH}
+          header={page === "task" ? header : undefined}
+          start={
+            threads
+              ? {
+                  id: "threads",
+                  label: "Threads",
+                  width: 288,
+                  minWidth: 216,
+                  header: (
+                    <FramedBar
+                      start={
+                        <Text size="control" weight="medium" tone="bright">
+                          Threads
+                        </Text>
+                      }
+                    >
+                      <Button variant="primary" onClick={onNewTask}>
+                        New thread
+                      </Button>
+                    </FramedBar>
+                  ),
+                  content: threads,
+                }
+              : null
+          }
+          end={theirs ? null : sidePanel}
+        >
+          <div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden">
+            <div
+              ref={chatPageRef}
+              className="flex h-full min-w-0"
+              hidden={page !== "task" || Boolean(theirs)}
+            >
               {children}
             </div>
-            {page === "task" ? (
+            {page === "task" && theirs ? theirs : null}
+            {page === "task" && !theirs ? (
               <ChatSessionCard conversationId={conversationId} agent={agent} />
             ) : null}
             {page === "files" ? <FilesPageSlot /> : null}
@@ -116,13 +188,11 @@ export function AgentWorkspaceFrame({
                 agentName={agent.name}
                 engine={agent.engine}
                 conversationId={conversationId}
+                spaceId={agent.system_managed ? undefined : homeSpaceOf(accountId, agent)}
               />
             ) : null}
-          </Surface>
-          {page === "task" ? (
-            <ChatSidePanels conversationId={conversationId} agent={agent} />
-          ) : null}
-        </div>
+          </div>
+        </FramedPage>
       </div>
       {page === "task" && railShown ? (
         <>

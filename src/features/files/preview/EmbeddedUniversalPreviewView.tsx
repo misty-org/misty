@@ -12,9 +12,48 @@ import {
 } from "./preview_media_tables";
 import { PreviewMessage } from "./PreviewPrimitives";
 import { cn, PaneLoading, PlaceholderIcon, Surface, Text, lazyTool, ToolSuspense } from "@misty/ui";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 
 const PdfViewer = lazyTool(() => import("./PdfViewerView"));
+
+const inlineImage = (url: string) => /^(?:data|blob):/i.test(url.trim());
+
+function safeUrl(url: string, key: string): string {
+  if (key === "src") return inlineImage(url) ? url : "";
+  return defaultUrlTransform(url);
+}
+
+const markdownParts: Components = {
+  img: ({ src, alt }) =>
+    typeof src === "string" && inlineImage(src) ? <img src={src} alt={alt ?? ""} /> : null,
+  a: ({ href, children }) => (
+    <a
+      href={href}
+      onClick={(event) => {
+        event.preventDefault();
+        if (href && /^(?:https?:|mailto:)/i.test(href))
+          void openExternalLink(href).catch(() => undefined);
+      }}
+    >
+      {children}
+    </a>
+  ),
+};
+
+export interface PreviewText {
+  text: string;
+  truncated: boolean;
+}
+
+function StartOnly({ shown }: { shown: boolean }) {
+  if (!shown) return null;
+  return (
+    <Text size="meta" tone="muted" wrap className="pt-4">
+      Showing the start of this file
+    </Text>
+  );
+}
 
 export function EmbeddedUniversalPreviewView(props: {
   runtime: EmbeddedPreviewRuntime;
@@ -33,6 +72,8 @@ export function EmbeddedUniversalPreviewView(props: {
   onVideoMetadata?: () => void;
   onVideoTime?: () => void;
   fallbackAction?: React.ReactNode;
+  text?: PreviewText;
+  compact?: boolean;
 }) {
   const extension = sourceExtension({ path: "", name: props.name });
   const isImage = props.mimeType.startsWith("image/") || Boolean(imageMimeTypes[extension]);
@@ -48,7 +89,7 @@ export function EmbeddedUniversalPreviewView(props: {
     props.url,
     extension,
     props.mimeType,
-    isReadableDocument,
+    isReadableDocument && !props.text,
     props.runtime.readBytes,
     props.runtime.extractDocumentText,
   );
@@ -130,22 +171,41 @@ export function EmbeddedUniversalPreviewView(props: {
           </Surface>
         )}
       >
-        <PdfViewer Error={props.runtime.Error} url={props.url} name={props.name} />
+        <PdfViewer
+          Error={props.runtime.Error}
+          url={props.url}
+          name={props.name}
+          compact={props.compact}
+        />
       </ToolSuspense>
     );
-  if (resource?.kind === "markdown")
+  const markdown = extension === "md" || extension === "markdown";
+  const given = props.text;
+  const shown =
+    given && textExtensions.has(extension)
+      ? { kind: markdown ? "markdown" : "text", text: given.text, truncated: given.truncated }
+      : resource?.kind === "markdown" || resource?.kind === "text"
+        ? { kind: resource.kind, text: resource.text ?? "", truncated: false }
+        : null;
+  if (shown?.kind === "markdown")
     return (
       <article className="prose prose-invert mx-auto h-full w-full max-w-4xl overflow-auto px-8 py-10">
-        <ReactMarkdown>{resource.text ?? ""}</ReactMarkdown>
+        <ReactMarkdown urlTransform={safeUrl} components={markdownParts}>
+          {shown.text}
+        </ReactMarkdown>
+        <StartOnly shown={shown.truncated} />
       </article>
     );
-  if (resource?.kind === "text")
+  if (shown?.kind === "text")
     return (
-      <pre className="m-0 h-full w-full overflow-auto whitespace-pre-wrap break-words p-7 text-left font-mono text-ui leading-6">
-        <Text bare tone="muted">
-          {resource.text}
-        </Text>
-      </pre>
+      <div className="h-full w-full overflow-auto p-7">
+        <pre className="m-0 whitespace-pre-wrap break-words text-left font-mono text-ui leading-6">
+          <Text bare tone="muted">
+            {shown.text}
+          </Text>
+        </pre>
+        <StartOnly shown={shown.truncated} />
+      </div>
     );
   if (resource?.kind === "document")
     return (

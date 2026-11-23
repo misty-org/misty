@@ -1,6 +1,7 @@
 import { dockTreeViews } from "../panes/dock_tree";
 import { isEmptyTab } from "../panes/layout_tabs";
 import type { WorkspaceDockNode, WorkspaceTab, WorkspaceView } from "./workspace_views";
+import type { WorkspaceSide } from "./workspace_sides";
 
 interface StoredView {
   id: string;
@@ -27,6 +28,7 @@ type StoredNode =
     };
 export interface TabFields {
   order: number;
+  side?: WorkspaceSide;
   title?: string;
   tree: StoredNode;
 }
@@ -69,9 +71,10 @@ function storedNode(node: WorkspaceDockNode): StoredNode {
   };
 }
 
-export function tabFields(tab: WorkspaceTab, order: number): TabFields {
+export function tabFields(tab: WorkspaceTab, order: number, side?: WorkspaceSide): TabFields {
   return {
     order,
+    ...(side ? { side } : {}),
     ...(tab.title ? { title: tab.title } : {}),
     tree: storedNode(tab.root),
   };
@@ -151,6 +154,7 @@ export function tabFromFields(
         ? previous.focusedPaneId
         : firstLeafId(fields.tree),
     ...(fields.title ? { title: fields.title } : {}),
+    ...(previous?.group ? { group: previous.group } : {}),
   };
 }
 

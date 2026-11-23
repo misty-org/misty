@@ -7,7 +7,7 @@ import {
   addHostedChildViews,
   hostedSessionForTask,
 } from "../hosted-sessions/hosted_sessions_state";
-import { useLocalExecution } from "../local-execution/local_execution";
+import { useLocalExecution } from "../local-execution/local_execution_state";
 import { ensureAgentDevice } from "../../personal/use_agent_device_store";
 import { agentsDeviceSnapshot } from "../../personal/use_agents_store";
 import { DeviceOperationNotAttempted, type ClaimedWorkflowNodeJob } from "./worker_browser_jobs";

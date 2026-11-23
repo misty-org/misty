@@ -53,6 +53,7 @@ export interface SpacesStore {
     messageId: string,
     text: string,
     fileNodeIds?: string[],
+    content?: SpaceMessage["content"],
   ) => Promise<void>;
   deleteMessage: (spaceId: string, messageId: string) => Promise<void>;
   toggleMessageReaction: (

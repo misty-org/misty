@@ -1,4 +1,4 @@
-import { spaceAgentsApi, type SpaceAgent } from "@/features/agents";
+import { copyAgent, removeAgent, spaceAgentsApi, type SpaceAgent } from "@/features/agents";
 import { usePersonalAgentsStore } from "@/features/agents";
 import { setItemVisibility, type ItemVisibility } from "../../api/visibility";
 import { useCallback, useEffect, useState } from "react";
@@ -21,6 +21,14 @@ export function useSpaceAgentMembers(spaceId: string) {
       });
     return () => controller.abort();
   }, [spaceId, revision]);
+  useEffect(() => {
+    const changed = (event: Event) => {
+      if ((event as CustomEvent<{ spaceId?: string }>).detail?.spaceId === spaceId)
+        setRevision((value) => value + 1);
+    };
+    window.addEventListener("misty:space-agents-changed", changed);
+    return () => window.removeEventListener("misty:space-agents-changed", changed);
+  }, [spaceId]);
   const change = useCallback(async (work: () => Promise<unknown>, failure: string) => {
     setError("");
     try {
@@ -34,12 +42,19 @@ export function useSpaceAgentMembers(spaceId: string) {
     agents,
     error,
     bring: (agentId: string) =>
-      change(() => {
-        const mine = usePersonalAgentsStore.getState().agents.find((agent) => agent.id === agentId);
-        return spaceAgentsApi.add(spaceId, agentId, mine?.name ?? "");
-      }, "That agent couldn’t be added."),
+      change(async () => {
+        const known = usePersonalAgentsStore.getState().agents.find((agent) => agent.id === agentId);
+        if (!known) throw new Error("That agent is gone.");
+        await copyAgent(known, spaceId);
+      }, "That agent couldn’t be copied here."),
     remove: (agentId: string) =>
-      change(() => spaceAgentsApi.remove(spaceId, agentId), "That agent couldn’t be removed."),
+      change(async () => {
+        const known = usePersonalAgentsStore
+          .getState()
+          .agents.find((agent) => agent.id === agentId && agent.space_id === spaceId);
+        if (known) await removeAgent(known.id);
+        else await spaceAgentsApi.remove(spaceId, agentId);
+      }, "That agent couldn’t be deleted."),
     setVisibility: (agentId: string, visibility: ItemVisibility) =>
       change(
         () => setItemVisibility(spaceId, "agent", agentId, visibility),

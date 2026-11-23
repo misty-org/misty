@@ -1,12 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHostChannel } from "./host_channel";
-import type { HostHandlers } from "./host_channel";
+import type { Authorize, HostHandlers } from "./host_channel";
 import { HostError, INIT_MESSAGE, PROTOCOL_VERSION } from "./protocol";
 import type { Frame } from "./protocol";
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 25));
 
-function setup(overrides: Partial<HostHandlers> = {}, authorize = vi.fn(async () => {})) {
+function setup(
+  overrides: Partial<HostHandlers> = {},
+  authorize: Authorize = vi.fn(async () => {}),
+) {
   const frame = { postMessage: vi.fn() };
   const handlers: HostHandlers = {
     call: vi.fn(async (method: string) => ({ method })),
@@ -38,14 +41,14 @@ describe("createHostChannel", () => {
     const { port, received, authorize, handlers } = setup();
     port.postMessage({ t: "req", id: 1, method: "files.list" });
     await settle();
-    expect(authorize).toHaveBeenCalledWith("call", "files.list");
+    expect(authorize).toHaveBeenCalledWith("call", "files.list", undefined);
     expect(handlers.call).toHaveBeenCalledWith("files.list", undefined);
     expect(received).toEqual([{ t: "res", id: 1, ok: true, result: { method: "files.list" } }]);
   });
 
   it("answers permission_denied and runs nothing when native refuses", async () => {
     const authorize = vi.fn(async () => {
-      throw new Error("Sketch wasn't approved for files.save.");
+      throw new HostError("permission_denied", "Sketch wasn't approved for files.save.");
     });
     const { port, received, handlers } = setup({}, authorize);
     port.postMessage({ t: "req", id: 2, method: "files.save" });
@@ -59,6 +62,43 @@ describe("createHostChannel", () => {
         error: { code: "permission_denied", message: "Sketch wasn't approved for files.save." },
       },
     ]);
+  });
+
+  it("answers internal, not permission_denied, when the check itself fails", async () => {
+    const authorize = vi.fn(async () => {
+      throw new Error("IPC went away.");
+    });
+    const { port, received, handlers } = setup({}, authorize);
+    port.postMessage({ t: "sub", id: 3, topic: "room" });
+    await settle();
+    expect(handlers.subscribe).not.toHaveBeenCalled();
+    expect(received).toEqual([
+      { t: "end", id: 3, error: { code: "internal", message: "IPC went away." } },
+    ]);
+  });
+
+  it("runs an app's frames in the order they came, so its last updates land before it leaves", async () => {
+    const order: string[] = [];
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const authorize = vi.fn(async (_kind: string, name: string) => {
+      if (name === "room.update") await gate;
+    });
+    const stop = vi.fn(() => order.push("stop"));
+    const call = vi.fn(async (method: string) => {
+      order.push(method);
+      return null;
+    });
+    const { port } = setup({ call, subscribe: vi.fn(() => stop) }, authorize);
+    port.postMessage({ t: "sub", id: 1, topic: "room" });
+    await settle();
+    port.postMessage({ t: "req", id: 2, method: "room.update" });
+    port.postMessage({ t: "unsub", id: 1 });
+    await settle();
+    expect(order).toEqual([]);
+    release();
+    await settle();
+    expect(order).toEqual(["room.update", "stop"]);
   });
 
   it("keeps a handler's error code and hides other errors' codes as internal", async () => {
@@ -131,7 +171,7 @@ describe("createHostChannel", () => {
 
   it("ends a subscription native refuses, and never starts one ended while it waited", async () => {
     const refuse = vi.fn(async () => {
-      throw new Error("no");
+      throw new HostError("permission_denied", "no");
     });
     const denied = setup({}, refuse);
     denied.port.postMessage({ t: "sub", id: 1, topic: "room" });

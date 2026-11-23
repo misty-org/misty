@@ -4,7 +4,7 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use hkdf::Hkdf;
-use rand::{rngs::OsRng, RngCore};
+use rand::{rand_core::UnwrapErr, rngs::SysRng, Rng};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use uuid::Uuid;
@@ -88,7 +88,7 @@ pub struct RecoveryKey(Zeroizing<[u8; 32]>);
 
 fn random<const N: usize>() -> [u8; N] {
     let mut bytes = [0; N];
-    OsRng.fill_bytes(&mut bytes);
+    UnwrapErr(SysRng).fill_bytes(&mut bytes);
     bytes
 }
 

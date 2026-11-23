@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { Room } from "livekit-client";
 import {
   appIcons,
@@ -27,26 +27,35 @@ const noSubscribe = () => () => undefined;
 export function useCallAgent({
   room,
   call,
+  key: given,
   others,
   nameOf,
 }: {
   room: Room | null;
   call: ActiveCall;
+  key?: Uint8Array<ArrayBuffer>;
   others: number;
   nameOf(identity: string): string;
 }): CallAgentPart {
   const [session, setSession] = useState<CallAgents | null>(null);
-  const key = call.key;
+  const key = given ?? call.key;
+
+  const keyNow = useRef(key);
+  keyNow.current = key;
 
   useEffect(() => {
     if (!room) return;
-    const created = new CallAgents(room, key);
+    const created = new CallAgents(room, keyNow.current);
     setSession(created);
     return () => {
       created.dispose();
       setSession(null);
     };
-  }, [room, key]);
+  }, [room]);
+
+  useEffect(() => {
+    session?.setKey(key);
+  }, [session, key]);
 
   useEffect(() => {
     if (session) session.others = others;

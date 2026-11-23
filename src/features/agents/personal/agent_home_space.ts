@@ -45,22 +45,3 @@ export async function placeUnplacedAgents(
   }
   return placed;
 }
-
-export async function moveAgentHome(
-  account: string,
-  agentId: string,
-  spaceId: string,
-): Promise<AgentProfile> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const raw = await localDocuments.get(account, kind, agentId);
-    if (!raw) throw new Error("This agent is gone.");
-    const current = JSON.parse(raw) as AgentProfile;
-    const next: AgentProfile = {
-      ...current,
-      space_id: spaceId,
-      updated_at: new Date().toISOString(),
-    };
-    if (await localDocuments.swap(account, kind, agentId, raw, JSON.stringify(next))) return next;
-  }
-  throw new Error("This agent changed since it was opened. Open it again and retry.");
-}

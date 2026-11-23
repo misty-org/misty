@@ -1,9 +1,18 @@
-import { useMemberAgents, type MemberAgentStatus } from "./member_agents";
+import { clearMemberAgents, useMemberAgents, type MemberAgentStatus } from "./member_agents";
 import { dispatchRealtimeExtra, setRealtimeSender } from "./realtime_extras";
 import { httpOutageRemainingMs } from "@/api/client/http";
 import { applyRealtimeEventSafely } from "./apply_realtime_event";
 import { coalescedReload, resetCoalescedReloads } from "./coalesced_reload";
-import { readRealtimeCursor } from "../api/realtime_cursor";
+import {
+  doubtRealtimeCursor,
+  readRealtimeCursor,
+  resetRealtimeCursor,
+  resetRealtimeCursors,
+} from "../api/realtime_cursor";
+import { refreshWatchedSpaceResources } from "../api/space_resource";
+import { useSpaceRolesStore } from "../roles/use_space_roles";
+import { forgetDeletedSpaceMessages } from "../chat/use_space_message_spans_store";
+import { clearVoicePresence, resetVoicePresence } from "./voice_presence";
 import { resolveSpacesApiBase, SpaceRequestError, spacesApi } from "../api/api";
 import { errorText } from "@/shared/lib/format";
 import type { SpacesStore } from "./spaces_store_types";
@@ -13,6 +22,26 @@ import { setSpacesConnection, useSpacesConnection } from "./spaces_connection";
 
 const realtimeConnectTimeoutMs = 12_000;
 const realtimeTicketRateLimitCooldownMs = 30_000;
+const realtimeProbeWaitMs = 8_000;
+const realtimeLongAwayMs = 90_000;
+const realtimeSpaceListStaleMs = 3_000;
+const typingShownMs = 4_000;
+const realtimeQuietReplayAfterMs = 60_000;
+const failedApplyResyncFirstMs = 1_000;
+const failedApplyResyncMostMs = 30_000;
+const failedApplyStreakResetMs = 60_000;
+let failedApplyResync: { promise: Promise<void>; timer: number; settle: () => void } | null = null;
+let failedApplyStreak = 0;
+let failedApplyLastAt = 0;
+let resyncWantsApps = false;
+let realtimeReplayQuiet = true;
+let realtimeHasConnected = false;
+let realtimeProbeTimer: number | null = null;
+let realtimeLastMessageAt = 0;
+let realtimeDownSince = 0;
+let hiddenSince = 0;
+let realtimeGet: (() => SpacesStore) | null = null;
+const typingTimers = new Map<string, number>();
 let realtimeSocket: WebSocket | null = null;
 let realtimeConnecting = false;
 let reconnectTimer: number | null = null;
@@ -31,6 +60,8 @@ let currentViewingActive = computeViewingActivity();
 const realtimeScope = {
   currentAccountId: () => realtimeAccountId,
   accountGeneration: () => readAccountGeneration(),
+  resync: () => (realtimeGet ? resyncSpaces(realtimeGet, { apps: true }) : Promise.resolve()),
+  resyncAfterFailure: () => (realtimeGet ? resyncAfterFailedApply(realtimeGet) : Promise.resolve()),
 };
 
 type SpacesSet = (
@@ -42,6 +73,7 @@ export function createSpacesRealtimeActions(
   readGeneration: () => number,
 ): Pick<SpacesStore, "connectRealtime" | "disconnectRealtime" | "setViewingSpace" | "sendTyping"> {
   readAccountGeneration = readGeneration;
+  realtimeGet = get;
   return {
     connectRealtime: async (accountId) => {
       accountId = accountId.trim();
@@ -50,7 +82,10 @@ export function createSpacesRealtimeActions(
       realtimeAccountId = accountId;
       realtimeWanted = true;
       if (realtimeConnectPromise) return realtimeConnectPromise;
-      if (Date.now() < realtimeTicketCooldownUntil) return;
+      if (Date.now() < realtimeTicketCooldownUntil) {
+        scheduleReconnect(get, accountId, realtimeGeneration);
+        return;
+      }
       if (
         realtimeConnecting ||
         realtimeSocket?.readyState === WebSocket.OPEN ||
@@ -96,14 +131,24 @@ export function createSpacesRealtimeActions(
             }
             clearRealtimeOpenTimer();
             realtimeOpenedAt = Date.now();
+            realtimeLastMessageAt = realtimeOpenedAt;
+            const downFor = realtimeDownSince ? realtimeOpenedAt - realtimeDownSince : 0;
+            realtimeDownSince = 0;
+            realtimeReplayQuiet = !realtimeHasConnected || downFor >= realtimeQuietReplayAfterMs;
+            realtimeHasConnected = true;
             setSpacesConnection("connected");
             setRealtimeSender((payload) => {
               if (realtimeSocket !== socket || socket.readyState !== WebSocket.OPEN) return false;
               socket.send(payload);
               return true;
             });
-            set((state) => ({ error: state.snapshotReady ? null : state.error }));
-            if (!get().snapshotReady || get().referenceOnly)
+            set({ error: null });
+            const firstLoadRunning = !get().snapshotReady && get().loading;
+            if (
+              (!get().snapshotReady && !firstLoadRunning) ||
+              get().referenceOnly ||
+              downFor > realtimeSpaceListStaleMs
+            )
               void get().load({ force: true, accountId });
             if (currentViewingSpaceId || currentPlace) sendViewing();
           };
@@ -114,12 +159,22 @@ export function createSpacesRealtimeActions(
               realtimeAccountId !== accountId
             )
               return;
+            realtimeLastMessageAt = Date.now();
             try {
               const envelope = JSON.parse(String(message.data)) as RealtimeEnvelope;
               if (envelope.type === "replay") {
                 for (const event of envelope.events)
-                  applyRealtimeEventSafely(event, accountId, get, set, realtimeScope);
-                if (envelope.resync_required) void resyncSpaces(get);
+                  applyRealtimeEventSafely(event, accountId, get, set, realtimeScope, {
+                    quiet: realtimeReplayQuiet,
+                  });
+                if (envelope.resync_required) {
+                  if (typeof envelope.newest_event_id === "number")
+                    resetRealtimeCursor(accountId, envelope.newest_event_id);
+                  else if (envelope.events.length === 0) doubtRealtimeCursor(accountId);
+                  void resyncSpaces(get, { apps: true });
+                }
+              } else if (envelope.type === "control") {
+                void resyncSpaces(get, { apps: false });
               } else if (envelope.type === "event") {
                 applyRealtimeEventSafely(envelope.event, accountId, get, set, realtimeScope);
               } else if (envelope.type === "presence") {
@@ -134,20 +189,10 @@ export function createSpacesRealtimeActions(
                   .getState()
                   .receive(envelope.space_id, envelope.user_id, envelope.agents);
               } else if (envelope.type === "typing") {
-                set((state) => {
-                  const key = spaceTypingScopeKey(envelope.space_id, envelope.conversation_id);
-                  const typingByUser = { ...(state.typingByConversation[key] ?? {}) };
-                  if (envelope.active) typingByUser[envelope.user_id] = Date.now() + 4_000;
-                  else delete typingByUser[envelope.user_id];
-                  return {
-                    typingByConversation: {
-                      ...state.typingByConversation,
-                      [key]: typingByUser,
-                    },
-                  };
-                });
-              } else if (!dispatchRealtimeExtra(envelope)) {
-                void resyncSpaces(get);
+                const key = spaceTypingScopeKey(envelope.space_id, envelope.conversation_id);
+                setTyping(set, key, envelope.user_id, envelope.active);
+              } else {
+                dispatchRealtimeExtra(envelope);
               }
             } catch {}
           };
@@ -159,8 +204,11 @@ export function createSpacesRealtimeActions(
             )
               return;
             clearRealtimeOpenTimer();
+            clearRealtimeProbe();
             realtimeSocket = null;
             setRealtimeSender(null);
+            if (!realtimeDownSince) realtimeDownSince = Date.now();
+            forgetLiveValues(set);
             if (realtimeOpenedAt && Date.now() - realtimeOpenedAt >= stableConnectionMs)
               reconnectAttempt = 0;
             realtimeOpenedAt = 0;
@@ -218,27 +266,136 @@ export function createSpacesRealtimeActions(
   };
 }
 
-function resyncSpaces(get: () => SpacesStore) {
-  return coalescedReload("spaces", async () => {
+function resyncAfterFailedApply(get: () => SpacesStore): Promise<void> {
+  if (failedApplyResync) return failedApplyResync.promise;
+  const now = Date.now();
+  if (now - failedApplyLastAt >= failedApplyStreakResetMs) failedApplyStreak = 0;
+  failedApplyLastAt = now;
+  const delay = Math.min(
+    failedApplyResyncMostMs,
+    failedApplyResyncFirstMs * 2 ** Math.min(failedApplyStreak, 5),
+  );
+  failedApplyStreak += 1;
+  let settle = () => {};
+  const promise = new Promise<void>((resolve) => {
+    settle = resolve;
+  });
+  const pending = {
+    promise,
+    settle,
+    timer: window.setTimeout(() => {
+      void resyncSpaces(get, { apps: true })
+        .catch(() => undefined)
+        .finally(() => {
+          if (failedApplyResync === pending) failedApplyResync = null;
+          settle();
+        });
+    }, delay),
+  };
+  failedApplyResync = pending;
+  return promise;
+}
+
+function cancelFailedApplyResync() {
+  const pending = failedApplyResync;
+  failedApplyResync = null;
+  if (!pending) return;
+  window.clearTimeout(pending.timer);
+  pending.settle();
+}
+
+function resyncSpaces(get: () => SpacesStore, options: { apps: boolean }) {
+  if (options.apps) resyncWantsApps = true;
+  return coalescedReload("spaces-resync", async () => {
+    const apps = resyncWantsApps;
+    resyncWantsApps = false;
     await get().load({ force: true });
-    for (const spaceId of Object.keys(get().messagesBySpace))
-      void coalescedReload(`messages:${spaceId}`, () => get().loadMessages(spaceId));
+    const state = get();
+    const known = new Set(state.spaces.map((space) => space.id));
+    const quietly = (read: Promise<unknown>) => read.catch(() => undefined);
+    const reads: Promise<unknown>[] = [quietly(refreshWatchedSpaceResources())];
+    for (const spaceId of Object.keys(state.messagesBySpace))
+      reads.push(quietly(coalescedReload(`messages:${spaceId}`, () => get().loadMessages(spaceId))));
+    for (const spaceId of Object.keys(state.membersBySpace))
+      if (known.has(spaceId))
+        reads.push(quietly(coalescedReload(`members:${spaceId}`, () => get().loadMembers(spaceId))));
+    for (const spaceId of Object.keys(state.nodesBySpace))
+      if (known.has(spaceId))
+        reads.push(quietly(coalescedReload(`nodes:${spaceId}`, () => get().loadNodes(spaceId))));
+    for (const spaceId of Object.keys(useSpaceRolesStore.getState().bySpace))
+      if (known.has(spaceId))
+        reads.push(
+          quietly(
+            coalescedReload(`roles:${spaceId}`, () => useSpaceRolesStore.getState().load(spaceId)),
+          ),
+        );
     window.dispatchEvent(new Event(spacesResyncEvent));
     const pages: [string, string][] = [["misty:space-note-event", "note.resync"]];
-    for (const space of get().spaces)
+    for (const space of state.spaces)
       for (const [page, type] of pages)
         window.dispatchEvent(
           new CustomEvent(page, { detail: { type, space_id: space.id, payload: {} } }),
         );
+    if (apps)
+      window.dispatchEvent(
+        new CustomEvent("misty:space-apps-changed", {
+          detail: { accountId: realtimeAccountId, spaceId: "" },
+        }),
+      );
+    await Promise.all(reads);
   });
+}
+
+function setTyping(set: SpacesSet, key: string, userId: string, active: boolean) {
+  const timerKey = `${key}\u0000${userId}`;
+  const previous = typingTimers.get(timerKey);
+  if (previous != null) window.clearTimeout(previous);
+  typingTimers.delete(timerKey);
+  if (active)
+    typingTimers.set(
+      timerKey,
+      window.setTimeout(() => {
+        typingTimers.delete(timerKey);
+        setTyping(set, key, userId, false);
+      }, typingShownMs),
+    );
+  set((state) => {
+    const typingByUser = { ...(state.typingByConversation[key] ?? {}) };
+    if (active) typingByUser[userId] = Date.now() + typingShownMs;
+    else if (userId in typingByUser) delete typingByUser[userId];
+    else return {};
+    return { typingByConversation: { ...state.typingByConversation, [key]: typingByUser } };
+  });
+}
+
+function clearTypingTimers() {
+  for (const timer of typingTimers.values()) window.clearTimeout(timer);
+  typingTimers.clear();
+}
+
+function forgetLiveValues(set: SpacesSet) {
+  clearTypingTimers();
+  set({ presenceBySpace: {}, typingByConversation: {} });
+  clearVoicePresence();
+  clearMemberAgents();
 }
 
 export function resetSpacesRealtimeRuntime(): void {
   stopRealtimeConnection();
+  failedApplyStreak = 0;
+  failedApplyLastAt = 0;
+  resyncWantsApps = false;
   resetCoalescedReloads();
+  resetRealtimeCursors();
+  forgetDeletedSpaceMessages();
+  resetVoicePresence();
+  clearMemberAgents();
+  clearTypingTimers();
   reconnectAttempt = 0;
   realtimeConnectPromise = null;
   realtimeTicketCooldownUntil = 0;
+  realtimeDownSince = 0;
+  realtimeHasConnected = false;
 }
 
 function scheduleReconnect(get: () => SpacesStore, accountId: string, generation: number) {
@@ -249,9 +406,11 @@ function scheduleReconnect(get: () => SpacesStore, accountId: string, generation
     reconnectTimer != null
   )
     return;
+  const ceiling = Math.min(60_000, 2_000 * 2 ** reconnectAttempt);
   const delay = Math.max(
     httpOutageRemainingMs(),
-    Math.min(60_000, 2_000 * 2 ** reconnectAttempt) + Math.floor(Math.random() * 750),
+    realtimeTicketCooldownUntil - Date.now(),
+    500 + Math.floor(Math.random() * ceiling),
   );
   reconnectAttempt += 1;
   reconnectTimer = window.setTimeout(() => {
@@ -274,6 +433,8 @@ function stopRealtimeConnection() {
   if (reconnectTimer != null) window.clearTimeout(reconnectTimer);
   reconnectTimer = null;
   clearRealtimeOpenTimer();
+  clearRealtimeProbe();
+  cancelFailedApplyResync();
   const socket = realtimeSocket;
   realtimeSocket = null;
   socket?.close();
@@ -306,6 +467,57 @@ export function leaveViewingPlace(place: PresencePlace, itemId?: string): void {
   setViewingPlace(null);
 }
 
+function checkRealtimeAfterWake(): void {
+  const get = realtimeGet;
+  if (!realtimeWanted || !realtimeAccountId || !get) return;
+  const socket = realtimeSocket;
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    if (realtimeConnecting || socket?.readyState === WebSocket.CONNECTING) return;
+    if (Date.now() < realtimeTicketCooldownUntil) return;
+    if (reconnectTimer != null) window.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    void get().connectRealtime(realtimeAccountId);
+    return;
+  }
+  if (realtimeProbeTimer != null) return;
+  const spaces = get().spaces;
+  if (!spaces.length) return;
+  const probeSpaceId = spaces.some((space) => space.id === currentViewingSpaceId)
+    ? currentViewingSpaceId
+    : spaces[0].id;
+  const askedAt = Date.now();
+  try {
+    socket.send(JSON.stringify({ type: "ping" }));
+    socket.send(JSON.stringify({ type: "voice.sync", space_id: probeSpaceId }));
+  } catch {
+    return;
+  }
+  realtimeProbeTimer = window.setTimeout(() => {
+    realtimeProbeTimer = null;
+    if (realtimeSocket !== socket || socket.readyState !== WebSocket.OPEN) return;
+    if (realtimeLastMessageAt >= askedAt) return;
+    try {
+      socket.close();
+    } catch {}
+  }, realtimeProbeWaitMs);
+}
+
+function clearRealtimeProbe() {
+  if (realtimeProbeTimer != null) window.clearTimeout(realtimeProbeTimer);
+  realtimeProbeTimer = null;
+}
+
+function handleRealtimeVisibility(): void {
+  if (typeof document === "undefined") return;
+  if (document.visibilityState === "hidden") {
+    if (!hiddenSince) hiddenSince = Date.now();
+    return;
+  }
+  const away = hiddenSince ? Date.now() - hiddenSince : 0;
+  hiddenSince = 0;
+  if (away >= realtimeLongAwayMs) checkRealtimeAfterWake();
+}
+
 function sendViewing(): void {
   const spaceId = currentViewingSpaceId || currentPlace?.spaceId || "";
   if (realtimeSocket?.readyState !== WebSocket.OPEN) return;
@@ -336,8 +548,13 @@ function handleViewingActivityChange(): void {
 
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", handleViewingActivityChange);
+  document.addEventListener("visibilitychange", handleRealtimeVisibility);
   window.addEventListener("focus", handleViewingActivityChange);
   window.addEventListener("blur", handleViewingActivityChange);
+  window.addEventListener("online", checkRealtimeAfterWake);
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) checkRealtimeAfterWake();
+  });
 }
 
 function clearRealtimeOpenTimer() {

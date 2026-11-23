@@ -11,7 +11,6 @@ import {
   Globe,
   Info,
   Keyboard,
-  LayoutDashboard,
   MessageSquareDot,
   MousePointer2,
   Orbit,
@@ -50,7 +49,6 @@ import { CaptureBarStatus } from "@/features/voice";
 import { Button, StateMark } from "@misty/ui";
 import {
   HelpButton,
-  LayoutButton,
   MistyPanelButton,
   NewChatButton,
   NewTabButton,
@@ -208,13 +206,6 @@ export const bottomBarItems: Record<BottomBarItemId, BarItem> = {
     icon: Search,
     side: "end",
     Item: SearchButton,
-  },
-  layout: {
-    label: "Layout",
-    description: "Splits the window into panes.",
-    icon: LayoutDashboard,
-    side: "end",
-    Item: LayoutButton,
   },
   mistyPanel: {
     label: "Misty panel",

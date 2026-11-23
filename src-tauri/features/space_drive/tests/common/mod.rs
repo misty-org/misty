@@ -241,6 +241,7 @@ impl State {
             trash_hold: false,
             deleted: false,
             replaced_of: Some(current.id.clone()),
+            content_version: None,
         };
         self.content_version.insert(copy.id.0.clone(), 1);
         self.items.insert(copy.id.0.clone(), copy.clone());
@@ -598,6 +599,7 @@ impl FakeServer {
                     trash_hold: false,
                     deleted: false,
                     replaced_of: None,
+                    content_version: None,
                 };
                 state.content_version.insert(id.clone(), 1);
                 state.items.insert(id, item.clone());

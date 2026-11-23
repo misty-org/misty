@@ -53,7 +53,7 @@ import { callPath, useCallSession } from "./call_session_store";
 import type { CallAgentView } from "./call_agents";
 import type { CallPerson } from "./use_live_kit_call";
 import { DeviceChoices, SpeakerChoices } from "./DeviceChoices";
-import { callReactions } from "./call_signals";
+import { callReactions } from "./call_reactions";
 import { CallPersonMenu } from "./CallPersonMenu";
 import { featured, useCallTitle, useStableOrder } from "./call_stage_order";
 

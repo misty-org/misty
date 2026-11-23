@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { LocalToolRejected, loadRunEntry, usePersonalAgentsStore } from "@/features/agents";
 import type { LocalToolHandler } from "@/features/agents";
 import type { ScreenChannel } from "./app_screen";
-import { useAppControl } from "./app_screen";
+import { ScreenRefused, useAppControl } from "./app_screen";
 
 export interface ToolDefinition {
   name: string;
@@ -33,13 +33,14 @@ const fraction = (value: unknown, what: string) => {
 };
 
 export function createScreenTools(options: {
+  instance: string;
   appId: string;
   appName: string;
   screen: ScreenChannel;
   frame(): HTMLElement | null;
   snapshot?: () => Promise<{ dataUrl: string; width: number; height: number }>;
 }) {
-  const { appId, appName, screen } = options;
+  const { instance, appName, screen } = options;
   const definitions: ToolDefinition[] = [
     {
       name: "screen_read",
@@ -113,7 +114,7 @@ export function createScreenTools(options: {
     return { agentId, name: agent?.name || "Agent" };
   };
   const inControl = () => {
-    if (useAppControl.getState().held[appId])
+    if (useAppControl.getState().held[instance])
       throw new LocalToolRejected(
         "person_has_control",
         `The person is using ${appName} now and took control back. Wait for them to hand it back, or ask them in the chat.`,
@@ -129,15 +130,16 @@ export function createScreenTools(options: {
       if (at) {
         const [x, y] = at(input);
         const agent = await agentOf(runId);
-        useAppControl.getState().point(appId, { ...agent, x, y });
+        useAppControl.getState().point(instance, { ...agent, runId, x, y });
       }
       try {
         return await run(input);
       } catch (error) {
         if (error instanceof LocalToolRejected) throw error;
-        throw new LocalToolRejected(
-          "app_screen_failed",
-          error instanceof Error ? error.message : String(error),
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof ScreenRefused) throw new LocalToolRejected("app_screen_failed", message);
+        throw new Error(
+          `${message} It may or may not have happened; look before doing it again.`,
         );
       }
     };

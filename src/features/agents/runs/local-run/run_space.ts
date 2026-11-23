@@ -21,7 +21,7 @@ export async function runHomeSpace(account: string, agentId: string | undefined)
   if (home && spacesKnownFor(account) && spaces.length && !spaces.some((s) => s.id === home)) {
     const name = agent?.name || "This agent";
     throw new HomeSpaceGone(
-      `${name}'s home Space is gone: it was deleted, or you left it. Pick a new home Space in its settings.`,
+      `${name}'s Space is gone: it was deleted, or you left it. Copy it into a Space you're in from its settings.`,
     );
   }
   return home;

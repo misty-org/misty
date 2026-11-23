@@ -24,7 +24,7 @@ import {
   tourCorner,
 } from "@/features/agents";
 import { browserLibrary } from "@/features/browser";
-import { callsForApps, VoiceChannelPage } from "@/features/direct";
+import { callsForApps, endCallsForAccountReset, VoiceChannelPage } from "@/features/direct";
 import { noteAsk, vocativeRouting, voiceCleanup, voiceDevice, voiceEngine } from "@/features/voice";
 import {
   SetupStepBody,
@@ -52,6 +52,7 @@ import {
 } from "@/features/spaces";
 
 accountResets.listen((previousAccountId) => {
+  endCallsForAccountReset();
   resetSpacesAccountState();
   resetAiSurfaceAccountState(previousAccountId);
 });

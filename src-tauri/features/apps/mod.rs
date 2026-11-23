@@ -1,6 +1,7 @@
 pub mod bundle;
 pub mod commands;
 pub mod frames;
+pub mod logo_cache;
 pub mod manifest;
 pub mod mcp;
 pub mod permissions;

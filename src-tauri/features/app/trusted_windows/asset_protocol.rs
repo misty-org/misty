@@ -71,7 +71,8 @@ pub(crate) fn single_range(header: &str, length: u64) -> Option<(u64, u64)> {
         }
         (start, "") => {
             let start: u64 = start.parse().ok()?;
-            (start, (start + RANGE_CHUNK - 1).min(length - 1))
+            let last = start.checked_add(RANGE_CHUNK)?.checked_sub(1)?;
+            (start, last.min(length - 1))
         }
         (start, end) => (
             start.parse().ok()?,
@@ -137,6 +138,7 @@ async fn serve(
             .body(Cow::Borrowed(&[][..]))
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
     };
+    let end = end.min(start.saturating_add(RANGE_CHUNK * 8) - 1);
     let count = end - start + 1;
     file.seek(SeekFrom::Start(start))
         .await
@@ -188,5 +190,10 @@ mod tests {
         assert_eq!(single_range("bytes=0-1,4-5", 1000), None);
         assert_eq!(single_range("items=0-1", 1000), None);
         assert_eq!(single_range("bytes=0-0", 0), None);
+        assert_eq!(single_range(&format!("bytes={}-", u64::MAX), 1000), None);
+        assert_eq!(
+            single_range(&format!("bytes=-{}", u64::MAX), 1000),
+            Some((0, 999))
+        );
     }
 }

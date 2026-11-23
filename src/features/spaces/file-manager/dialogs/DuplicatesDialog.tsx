@@ -17,22 +17,14 @@ import {
 import { disk, type DuplicateGroup } from "@/features/files";
 import { countText, formatBytes, messageOf } from "../format";
 import { nameOf, parentOf } from "../model";
-import type { TransferWhere } from "../transfers";
-
-type Run = <T>(
-  label: string,
-  work: (opId: string) => Promise<T>,
-  where?: TransferWhere,
-) => Promise<T>;
+import { newOpId } from "../use_operations";
 
 export function DuplicatesDialog({
   dir,
-  run,
   onTrash,
   onClose,
 }: {
   dir: string;
-  run: Run;
   onTrash(paths: string[]): Promise<void>;
   onClose(): void;
 }) {
@@ -44,16 +36,23 @@ export function DuplicatesDialog({
 
   useEffect(() => {
     let live = true;
+    const opId = newOpId();
     setGroups(null);
     setError("");
-    void run("Finding duplicates", (opId) => disk.duplicates(dir, opId), { from: dir }).then(
-      (found) => live && setGroups(found),
-      (cause) => live && setError(messageOf(cause, "Duplicates couldn't be found.")),
-    );
+    void disk
+      .duplicates(dir, opId)
+      .then(
+        (found) => live && setGroups(found),
+        (cause) => live && setError(messageOf(cause, "Duplicates couldn't be found.")),
+      )
+      .finally(() => {
+        live = false;
+      });
     return () => {
+      if (live) void disk.cancel(opId).catch(() => undefined);
       live = false;
     };
-  }, [dir, run, attempt]);
+  }, [dir, attempt]);
 
   const toggle = (path: string, on: boolean) =>
     setPicked((now) => (on ? [...now, path] : now.filter((other) => other !== path)));

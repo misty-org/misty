@@ -18,7 +18,8 @@ export {
   type AgentsHubPage,
 } from "./hub/agents_hub_store";
 export { HubAgentsPage } from "./hub/HubAgentsPage";
-export { ExplorePage, type MarketTab } from "./marketplace/ExplorePage";
+export type { MarketTab } from "./marketplace/ExplorePage";
+export const loadExplorePage = () => import("./marketplace/ExplorePage");
 
 export type { AppRequest } from "./connected-apps/api";
 export { appsApi } from "./connected-apps/api";
@@ -63,6 +64,7 @@ export {
 } from "./settings/FeatureSections";
 
 export { spaceAgentsApi, type SpaceAgent } from "./api/space_agents";
+export { copyAgent, removeAgent } from "./personal/save_agent";
 export { spacesGateway } from "./spaces-gateway/spaces_gateway";
 export { findVocative, routeToAgent } from "./tutor/cursor/vocative_route";
 
@@ -162,3 +164,9 @@ export {
 export { provideExploreApps } from "./marketplace/explore_apps";
 
 export { filesPage } from "./methods/AgentWorkspaceFrame";
+export { tryEveryEngine } from "./threads/engine_test";
+export { threadClashes, type ThreadClashes } from "./threads/thread_work";
+export { openAgentThread } from "./tutor/cursor/tutor_handoff";
+export { SharedThreadsSync } from "./threads/SharedThreadsSync";
+export { useThreadWork, watchThreadWork } from "./threads/thread_work";
+export { homeSpaceOf } from "./personal/agent_home_space";

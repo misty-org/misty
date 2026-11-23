@@ -9,7 +9,7 @@ import { AgentControlComposer } from "./AgentControlComposer";
 import { AgentControlQuestions } from "./AgentControlQuestions";
 import { AgentControlTaskControls } from "./AgentControlTaskControls";
 import { listenForActionQuestions, useIslandQuestions } from "./action_questions";
-import { useLocalExecution } from "../runs/local-execution/local_execution";
+import { useLocalExecution } from "../runs/local-execution/local_execution_state";
 import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import { islandClass, liveStep, settled, statusText, liveReply } from "./agent_control_status";
 import { useAgentControlActions } from "./use_agent_control_actions";

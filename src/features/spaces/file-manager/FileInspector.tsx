@@ -20,20 +20,35 @@ import { disk, type FileInfo, type FolderSize } from "@/features/files";
 import { FilePreview } from "./FilePreview";
 import { countText, formatBytes, formatDate, kindOf, messageOf } from "./format";
 import { itemIcon } from "./FileItems";
-import { listPlace } from "./list_folder";
 import { localPath, parentOf, placeInside, type FileItem, type FilesPlace } from "./model";
+import { sourceOf } from "./sources";
+import { useListing } from "./store/listing_cache";
+import { newOpId } from "./use_operations";
+
+const SETTLE_MS = 150;
+
+function useSettled() {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(true), SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  return settled;
+}
 
 type Loaded =
   | { status: "loading" }
   | { status: "failed"; message: string }
   | { status: "ready"; info: FileInfo };
 
-function useInfo(path: string | undefined, folder: boolean) {
+function useInfo(path: string | undefined, folder: boolean, settled: boolean) {
   const [state, setState] = useState<Loaded>({ status: "loading" });
   const [size, setSize] = useState<FolderSize | null>(null);
   useEffect(() => {
-    if (!path) return;
+    if (!path || !settled) return;
     let live = true;
+    let sizing = false;
+    const opId = newOpId();
     setState({ status: "loading" });
     setSize(null);
     void disk.info(path).then(
@@ -42,15 +57,23 @@ function useInfo(path: string | undefined, folder: boolean) {
         live &&
         setState({ status: "failed", message: messageOf(cause, "Its details couldn't be read.") }),
     );
-    if (folder)
-      void disk.folderSize(path).then(
-        (next) => live && setSize(next),
-        () => undefined,
-      );
+    if (folder) {
+      sizing = true;
+      void disk
+        .folderSize(path, opId)
+        .then(
+          (next) => live && setSize(next),
+          () => undefined,
+        )
+        .finally(() => {
+          sizing = false;
+        });
+    }
     return () => {
       live = false;
+      if (sizing) void disk.cancel(opId).catch(() => undefined);
     };
-  }, [path, folder]);
+  }, [path, folder, settled]);
   return { state, size };
 }
 
@@ -109,7 +132,7 @@ function diskRows(item: FileItem, info: FileInfo, size: FolderSize | null): Prop
     });
   if (info.defaultApp) rows.push({ label: "Opens with", value: info.defaultApp });
   if (info.entry.linkTarget) rows.push({ label: "Original", value: info.entry.linkTarget });
-  if (info.entry.tags.length)
+  if (info.entry.tags?.length)
     rows.push({ label: "Tags", value: <TagDots tags={info.entry.tags} /> });
   rows.push({ label: "Permissions", value: info.permissions });
   if (info.owner) rows.push({ label: "Owner", value: info.owner });
@@ -145,37 +168,28 @@ function otherRows(item: FileItem): PropertyListItem[] {
   return rows;
 }
 
-function useFolderItems(place: FilesPlace | undefined) {
-  const [items, setItems] = useState<FileItem[] | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
-  useEffect(() => {
-    if (!place) return;
-    let live = true;
-    setItems(null);
-    setFailed(null);
-    void listPlace(place, false).then(
-      (next) => live && setItems(next),
-      (cause) => live && setFailed(messageOf(cause, "This folder couldn't be read.")),
-    );
-    return () => {
-      live = false;
-    };
-  }, [place]);
-  return { items, failed };
-}
-
 function FolderPreview({
   item,
   from,
+  hidden,
   onOpen,
 }: {
   item: FileItem;
   from: FilesPlace;
+  hidden: boolean;
   onOpen(item: FileItem): void;
 }) {
   const [place] = useState(() => placeInside(item, from));
-  const { items, failed } = useFolderItems(place);
-  if (failed) return <ErrorState inline title="This folder couldn't be read" line={failed} />;
+  const listing = useListing(place, hidden);
+  const items = listing.items;
+  if (listing.status === "failed")
+    return (
+      <ErrorState
+        inline
+        title="This folder couldn't be read"
+        line={listing.error ?? "This folder couldn't be read."}
+      />
+    );
   if (items === null) return <ListRowSkeleton label="What the folder holds" rows={5} />;
   if (!items.length) return <EmptyState inline line="This folder is empty." />;
   return (
@@ -202,24 +216,28 @@ function FolderPreview({
 function ItemDetails({
   item,
   from,
+  hidden,
   onOpen,
 }: {
   item: FileItem;
   from: FilesPlace;
+  hidden: boolean;
   onOpen(item: FileItem): void;
 }) {
+  const settled = useSettled();
   const disked = item.source.kind === "disk" ? localPath(item) : undefined;
-  const { state, size } = useInfo(disked, item.folder);
-  const previewed = !item.folder && (item.source.kind === "disk" || item.source.kind === "project");
+  const { state, size } = useInfo(disked, item.folder, settled);
+  const source = sourceOf(item);
+  const previewed = !item.folder && !source.inTrash;
   const folderPreview = item.folder && placeInside(item, from) !== undefined;
   return (
     <div className="flex flex-col">
       {previewed || folderPreview ? (
         <Surface tone="card" radius="lg" className="relative h-52 min-h-0 overflow-y-auto">
-          {previewed ? (
-            <FilePreview key={item.id} item={item} />
+          {!settled ? null : previewed ? (
+            <FilePreview key={item.id} item={item} compact />
           ) : (
-            <FolderPreview item={item} from={from} onOpen={onOpen} />
+            <FolderPreview item={item} from={from} hidden={hidden} onOpen={onOpen} />
           )}
         </Surface>
       ) : null}
@@ -242,10 +260,12 @@ function ItemDetails({
 export function FileInspector({
   items,
   from,
+  hidden,
   onOpen,
 }: {
   items: FileItem[];
   from: FilesPlace;
+  hidden: boolean;
   onOpen(item: FileItem): void;
 }) {
   let body;
@@ -262,7 +282,10 @@ export function FileInspector({
         line={`${countText(items.length)} selected, ${formatBytes(bytes)}`}
       />
     );
-  } else body = <ItemDetails key={items[0].id} item={items[0]} from={from} onOpen={onOpen} />;
+  } else
+    body = (
+      <ItemDetails key={items[0].id} item={items[0]} from={from} hidden={hidden} onOpen={onOpen} />
+    );
   return (
     <aside aria-label="Preview" className="flex size-full min-h-0 flex-col overflow-y-auto p-3">
       {body}

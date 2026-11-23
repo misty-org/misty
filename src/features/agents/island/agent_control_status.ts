@@ -1,7 +1,7 @@
 import { cn } from "@misty/ui";
 import type { useMistyStore } from "../conversations/state/use_misty_store";
 import type { GlobalAiMessage } from "../conversations/state/conversation_types";
-import type { Execution } from "../runs/local-execution/local_execution";
+import type { Execution } from "../runs/local-execution/local_execution_state";
 import { toolLabel } from "../progress/progress_timeline";
 
 export const islandClass = cn(

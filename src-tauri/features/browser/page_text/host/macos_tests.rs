@@ -1,6 +1,6 @@
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
-use std::{net::TcpListener, time::Instant};
+use std::{net::TcpListener, path::Path, time::Instant};
 
 use agent_runs::{InProcessPageReader, PageReader};
 use serde::Deserialize;
@@ -98,40 +98,36 @@ async fn a_page_over_the_limit_fails_plainly() {
 
 #[tokio::test]
 async fn a_failing_worker_is_an_error_and_not_a_second_try_here() {
+    use std::os::unix::fs::PermissionsExt;
     let refused = answer(b"no settings line").await;
     assert!(refused.contains("refused"), "{refused}");
-    let bytes = worker().unwrap();
-    let broken = stage(bytes).unwrap();
-    fs::set_permissions(&broken.executable, fs::Permissions::from_mode(0o700)).unwrap();
-    fs::write(&broken.executable, b"#!/bin/sh\nexit 3\n").unwrap();
-    fs::set_permissions(&broken.executable, fs::Permissions::from_mode(0o500)).unwrap();
+    let folder = tempfile::tempdir().unwrap();
+    let failing = folder.path().join("worker");
+    std::fs::write(&failing, b"#!/bin/sh\nexit 3\n").unwrap();
+    std::fs::set_permissions(&failing, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let broken = stage(std::fs::canonicalize(&failing).unwrap()).unwrap();
     assert!(run_in(&broken, b"anything".to_vec()).await.is_err());
 }
 
 #[test]
-fn a_changed_copy_is_never_run() {
-    let bytes = worker().unwrap();
-    let copy = stage(bytes).unwrap();
-    assert!(still_intact(&copy.executable, bytes));
-    fs::set_permissions(&copy.executable, fs::Permissions::from_mode(0o700)).unwrap();
-    assert!(!still_intact(&copy.executable, bytes));
-    fs::write(&copy.executable, b"something else").unwrap();
-    fs::set_permissions(&copy.executable, fs::Permissions::from_mode(0o500)).unwrap();
-    assert!(!still_intact(&copy.executable, bytes));
+fn the_reader_runs_from_beside_the_app_in_a_private_folder() {
+    let worker = staged().unwrap();
+    assert_eq!(
+        worker.executable,
+        crate::app::workers::program("page-reader").unwrap()
+    );
+    assert!(worker.folder_path.is_dir());
+    assert!(std::fs::read_dir(&worker.folder_path)
+        .unwrap()
+        .next()
+        .is_none());
 }
 
-#[tokio::test]
-async fn one_copy_lasts_across_reads_and_a_tampered_one_is_replaced() {
-    let bytes = worker().unwrap();
+#[test]
+fn one_folder_lasts_across_reads() {
     let first = staged().unwrap();
     let again = staged().unwrap();
-    assert!(still_intact(&again.executable, bytes));
-    drop((first, again));
-    let current = staged().unwrap();
-    fs::set_permissions(&current.executable, fs::Permissions::from_mode(0o700)).unwrap();
-    let replaced = staged().unwrap();
-    assert_ne!(replaced.executable, current.executable);
-    assert!(still_intact(&replaced.executable, bytes));
+    assert!(Arc::ptr_eq(&first, &again));
 }
 
 #[cfg(debug_assertions)]

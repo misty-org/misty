@@ -281,6 +281,7 @@ mod tests {
             trash_hold: false,
             deleted: false,
             replaced_of: None,
+            content_version: None,
         }
     }
 

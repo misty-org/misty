@@ -1,6 +1,7 @@
 import {
   peekCachedResource,
   refreshCachedResource,
+  refreshWatchedCachedResources,
   setCachedResource,
   useCachedResource,
   type CachedResource,
@@ -34,4 +35,8 @@ export function setSpaceResource<T>(path: string, next: T | ((previous: T | unde
 
 export function peekSpaceResource<T>(path: string): T | undefined {
   return peekCachedResource<T>(spaceResourceKey(path));
+}
+
+export function refreshWatchedSpaceResources(): Promise<void> {
+  return refreshWatchedCachedResources(spaceResourceKey(""));
 }

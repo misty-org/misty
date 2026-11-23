@@ -20,13 +20,13 @@ brotli-decompressor = "5"
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 # Reading a page, and the JavaScript string and regex rules it shares with the runtime.
 page_text = { path = "../../browser/page_text" }
-rand = "0.8"
+rand = "0.10"
 regex = "1"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls-no-provider", "stream"] }
 serde = { version = "1", features = ["derive"] }
 # `raw_value` keeps tool schemas and call inputs in their original key order (`model_calls/raw_json.rs`).
 serde_json = { version = "1", features = ["raw_value"] }
-thiserror = "1"
+thiserror = "2"
 url = "2"
 tokio = { version = "1", features = ["macros", "net", "rt", "sync", "time"] }
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect", "rustls-tls-native-roots"] }

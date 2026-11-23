@@ -7,25 +7,24 @@ export type ContextPanelSurface = Exclude<ContextPanelTab, "session">;
 
 export const PANEL_DEFAULT_WIDTH = 440;
 export const PANEL_MIN_WIDTH = 320;
+export const PANEL_MAX_WIDTH = 1280;
+export const CHAT_MIN_WIDTH = 360;
 
 export const useContextPanel = create<{
   tab: ContextPanelSurface | null;
   session: boolean;
   sessionTucked: boolean;
-  width: number;
   expanded: boolean;
   toggle(tab: ContextPanelTab): void;
   show(tab: ContextPanelTab): void;
   close(): void;
   closeSession(): void;
   setSessionTucked(tucked: boolean): void;
-  setWidth(width: number): void;
   toggleExpanded(): void;
 }>((set, get) => ({
   tab: null,
   session: false,
   sessionTucked: false,
-  width: PANEL_DEFAULT_WIDTH,
   expanded: false,
   toggle: (tab) =>
     tab === "session"
@@ -37,8 +36,6 @@ export const useContextPanel = create<{
   close: () => set({ tab: null, expanded: false }),
   closeSession: () => set({ session: false }),
   setSessionTucked: (sessionTucked) => set({ sessionTucked }),
-  setWidth: (width) =>
-    set({ width: Math.max(PANEL_MIN_WIDTH, Math.round(width)), expanded: false }),
   toggleExpanded: () => set({ expanded: !get().expanded }),
 }));
 
@@ -46,7 +43,6 @@ interface SavedContextPanel {
   tab: ContextPanelSurface | null;
   session: boolean;
   sessionTucked: boolean;
-  width: number;
   expanded: boolean;
 }
 
@@ -58,7 +54,6 @@ const savedPanel = createDeviceSetting<SavedContextPanel>({
     tab: null,
     session: false,
     sessionTucked: false,
-    width: PANEL_DEFAULT_WIDTH,
     expanded: false,
   },
   normalize: (stored) => {
@@ -68,10 +63,6 @@ const savedPanel = createDeviceSetting<SavedContextPanel>({
       tab,
       session: saved.session === true,
       sessionTucked: saved.sessionTucked === true,
-      width:
-        typeof saved.width === "number"
-          ? Math.max(PANEL_MIN_WIDTH, Math.round(saved.width))
-          : PANEL_DEFAULT_WIDTH,
       expanded: Boolean(tab) && saved.expanded === true,
     };
   },
@@ -88,7 +79,6 @@ savedPanel.subscribe((state) => {
   openRestored = true;
   applyingRemote = true;
   if (first && !touchedEarly) useContextPanel.setState(state.value);
-  else if (!first) useContextPanel.setState({ width: state.value.width });
   applyingRemote = false;
 });
 
@@ -100,22 +90,20 @@ useContextPanel.subscribe((state, previous) => {
     state.tab === previous.tab &&
     state.session === previous.session &&
     state.sessionTucked === previous.sessionTucked &&
-    state.width === previous.width &&
     state.expanded === previous.expanded
   )
     return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { tab, session, sessionTucked, width, expanded } = useContextPanel.getState();
+    const { tab, session, sessionTucked, expanded } = useContextPanel.getState();
     const saved = savedPanel.getState().value;
     if (
       saved.tab === tab &&
       saved.session === session &&
       saved.sessionTucked === sessionTucked &&
-      saved.width === width &&
       saved.expanded === expanded
     )
       return;
-    savedPanel.getState().set({ tab, session, sessionTucked, width, expanded });
+    savedPanel.getState().set({ tab, session, sessionTucked, expanded });
   }, 250);
 });

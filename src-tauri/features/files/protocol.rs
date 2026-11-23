@@ -1,16 +1,20 @@
 use std::{
     borrow::Cow,
-    io::{BufReader, Cursor, Read, Seek, SeekFrom},
+    io::{self, Cursor, Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     time::UNIX_EPOCH,
 };
 
-use file_access::{disk::fs_disk, fs::File};
+#[cfg(target_os = "macos")]
+use std::sync::{Condvar, Mutex};
+
 use sha2::{Digest, Sha256};
 use tauri::{
     http::{header, Request, Response, StatusCode},
     UriSchemeContext, UriSchemeResponder, Wry,
 };
+
+use file_access::disk::CheckedFile as File;
 
 use super::thumbnail_cache::ThumbnailCache;
 use crate::app::trusted_windows::asset_protocol::{app_origin, requested_path, single_range};
@@ -20,8 +24,64 @@ pub const SCHEME: &str = "misty-disk";
 const CONTENT_CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 const RANGE_CHUNK: u64 = 1000 * 1024;
 const MAX_THUMBNAIL_SOURCE: u64 = 64 * 1024 * 1024;
+const SMALL_ORIGINAL: u64 = 512 * 1024;
+const WHOLE_ANY: u64 = 8 * 1024 * 1024;
+const WHOLE_PICTURE: u64 = 64 * 1024 * 1024;
 
 type Served = Response<Cow<'static, [u8]>>;
+
+static THUMBNAILS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
+#[cfg(target_os = "macos")]
+static QUICK_LOOK: Turns = Turns::new(2);
+
+#[cfg(target_os = "macos")]
+struct Turns {
+    busy: Mutex<usize>,
+    freed: Condvar,
+    most: usize,
+}
+
+#[cfg(target_os = "macos")]
+struct Turn(&'static Turns);
+
+#[cfg(target_os = "macos")]
+impl Turns {
+    const fn new(most: usize) -> Self {
+        Self {
+            busy: Mutex::new(0),
+            freed: Condvar::new(),
+            most,
+        }
+    }
+
+    fn take(&'static self) -> Turn {
+        let mut busy = self
+            .busy
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        while *busy >= self.most {
+            busy = self
+                .freed
+                .wait(busy)
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        }
+        *busy += 1;
+        Turn(self)
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for Turn {
+    fn drop(&mut self) {
+        let mut busy = self
+            .0
+            .busy
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *busy = busy.saturating_sub(1);
+        self.0.freed.notify_one();
+    }
+}
 
 pub fn handle(
     context: UriSchemeContext<'_, Wry>,
@@ -30,18 +90,35 @@ pub fn handle(
 ) {
     let app = context.app_handle().clone();
     let origin = app_origin(&app);
-    let thumbnails = super::thumbnail_cache::ThumbnailCache::of(&app);
     if !crate::browser::app_windows::is_person_window(context.webview_label()) {
         responder.respond(status(StatusCode::FORBIDDEN, &origin));
         return;
     }
+    let foreign = request
+        .headers()
+        .get(header::ORIGIN)
+        .is_some_and(|seen| seen.to_str().map_or(true, |seen| seen != origin));
+    if foreign {
+        responder.respond(status(StatusCode::FORBIDDEN, &origin));
+        return;
+    }
+    let Some((source, wanted)) = requested(request.uri()) else {
+        responder.respond(status(StatusCode::FORBIDDEN, &origin));
+        return;
+    };
+    let thumbnails = ThumbnailCache::of(&app);
     tauri::async_runtime::spawn(async move {
+        let _turn = match wanted {
+            Wanted::Thumbnail(_) => THUMBNAILS.acquire().await.ok(),
+            Wanted::File => None,
+        };
+        let failed_origin = origin.clone();
         let response = tokio::task::spawn_blocking(move || {
-            serve(&request, &origin, thumbnails.as_ref())
+            serve(&request, source, wanted, &origin, thumbnails.as_ref())
                 .unwrap_or_else(|code| status(code, &origin))
         })
         .await
-        .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR, &app_origin(&app)));
+        .unwrap_or_else(|_| status(StatusCode::INTERNAL_SERVER_ERROR, &failed_origin));
         responder.respond(response);
     });
 }
@@ -54,7 +131,7 @@ fn status(code: StatusCode, origin: &str) -> Served {
         .expect("static response")
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Wanted {
     Thumbnail(u32),
     File,
@@ -64,16 +141,6 @@ enum Wanted {
 enum Source {
     Disk(PathBuf),
     Drive { space: String, path: String },
-}
-
-type Opener = fn(&Path) -> std::io::Result<File>;
-
-fn open_disk(path: &Path) -> std::io::Result<File> {
-    fs_disk::open(path)
-}
-
-fn open_own(path: &Path) -> std::io::Result<File> {
-    File::open(path)
 }
 
 fn requested(uri: &tauri::http::Uri) -> Option<(Source, Wanted)> {
@@ -147,49 +214,107 @@ fn served_mime(path: &Path) -> Option<&'static str> {
     })
 }
 
-fn not_found(error: std::io::Error) -> StatusCode {
+fn not_found(error: io::Error) -> StatusCode {
     match error.kind() {
-        std::io::ErrorKind::NotFound => StatusCode::NOT_FOUND,
+        io::ErrorKind::NotFound => StatusCode::NOT_FOUND,
         _ => StatusCode::FORBIDDEN,
+    }
+}
+
+enum Body {
+    Disk(File),
+    Drive {
+        drive: space_drive::Drive,
+        space: space_drive::SpaceId,
+        path: String,
+    },
+}
+
+struct Opened {
+    body: Body,
+    len: u64,
+    named: PathBuf,
+    key: Vec<u8>,
+    quick_look: Option<PathBuf>,
+}
+
+impl Opened {
+    fn read(&mut self, start: u64, count: u64) -> io::Result<Vec<u8>> {
+        match &mut self.body {
+            Body::Disk(file) => {
+                file.seek(SeekFrom::Start(start))?;
+                let mut body = Vec::with_capacity(usize::try_from(count).unwrap_or(0));
+                Read::by_ref(file).take(count).read_to_end(&mut body)?;
+                Ok(body)
+            }
+            Body::Drive { drive, space, path } => drive
+                .content_range(space, path, start, count)
+                .map(|(bytes, _)| bytes),
+        }
+    }
+}
+
+fn open(source: Source) -> Result<Opened, StatusCode> {
+    match source {
+        Source::Disk(path) => {
+            let file = super::gated::open_read(&path).map_err(not_found)?;
+            let meta = file.metadata().map_err(not_found)?;
+            let modified = meta
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+                .map_or(0, |since| since.as_nanos());
+            let mut key = path.as_os_str().as_encoded_bytes().to_vec();
+            key.push(0);
+            key.extend(meta.len().to_le_bytes());
+            key.extend(modified.to_le_bytes());
+            Ok(Opened {
+                body: Body::Disk(file),
+                len: meta.len(),
+                quick_look: Some(path.clone()),
+                named: path,
+                key,
+            })
+        }
+        Source::Drive { space, path } => {
+            let drive = crate::spaces_drive::drive().map_err(|_| StatusCode::NOT_FOUND)?;
+            let space = space_drive::SpaceId(space);
+            let node = drive
+                .node_at(&space, &path)
+                .map_err(|_| StatusCode::NOT_FOUND)?
+                .filter(|node| node.kind == space_drive::Kind::File)
+                .ok_or(StatusCode::NOT_FOUND)?;
+            let quick_look = drive.local_content(&space, &path).ok().flatten();
+            let mut key = format!("drive\0{}\0{}\0", space.0, path).into_bytes();
+            key.extend(node.sha256.as_deref().unwrap_or("").as_bytes());
+            key.extend(node.mtime_ms.to_le_bytes());
+            key.extend(node.size.to_le_bytes());
+            Ok(Opened {
+                len: node.size,
+                named: PathBuf::from(&path),
+                key,
+                quick_look,
+                body: Body::Drive { drive, space, path },
+            })
+        }
     }
 }
 
 fn serve(
     request: &Request<Vec<u8>>,
+    source: Source,
+    wanted: Wanted,
     origin: &str,
     thumbnails: Option<&ThumbnailCache>,
 ) -> Result<Served, StatusCode> {
-    let (source, wanted) = requested(request.uri()).ok_or(StatusCode::FORBIDDEN)?;
-    let (path, named, meta, open): (PathBuf, PathBuf, std::fs::Metadata, Opener) = match source {
-        Source::Disk(path) => {
-            let meta = fs_disk::metadata(&path).map_err(not_found)?;
-            (path.clone(), path, meta, open_disk as Opener)
-        }
-        Source::Drive {
-            space,
-            path: in_drive,
-        } => {
-            let drive = crate::spaces_drive::drive().map_err(|_| StatusCode::NOT_FOUND)?;
-            let cached = drive
-                .local_content(&space_drive::SpaceId(space), &in_drive)
-                .map_err(|_| StatusCode::NOT_FOUND)?
-                .ok_or(StatusCode::NOT_FOUND)?;
-            let meta = file_access::fs::metadata(&cached).map_err(not_found)?;
-            (cached, PathBuf::from(in_drive), meta, open_own as Opener)
-        }
-    };
-    if !meta.is_file() {
-        return Err(StatusCode::NOT_FOUND);
-    }
+    let mut opened = open(source)?;
     let base = Response::builder()
         .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin)
         .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
     match wanted {
         Wanted::Thumbnail(size) => {
-            if meta.len() > MAX_THUMBNAIL_SOURCE {
-                return Err(StatusCode::NOT_FOUND);
-            }
-            let (body, mime) = cached_thumbnail(&path, &meta, size, thumbnails, open)
+            let (body, mime) = small_original(&mut opened, size)
+                .or_else(|| cached_thumbnail(&mut opened, size, thumbnails))
                 .ok_or(StatusCode::NOT_FOUND)?;
             base.header(
                 header::CACHE_CONTROL,
@@ -203,7 +328,7 @@ fn serve(
         }
         Wanted::File => {
             let base = base.header(header::CACHE_CONTROL, "no-store");
-            let mime = served_mime(&named).ok_or(StatusCode::NOT_FOUND)?;
+            let mime = served_mime(&opened.named).ok_or(StatusCode::NOT_FOUND)?;
             let base = if mime == "application/pdf" {
                 base
             } else {
@@ -213,29 +338,42 @@ fn serve(
                 .headers()
                 .get(header::RANGE)
                 .and_then(|value| value.to_str().ok());
-            file(&path, meta.len(), mime, range, base, open)
+            file(&mut opened, mime, range, base)
         }
     }
 }
 
+fn small_original(opened: &mut Opened, size: u32) -> Option<(Vec<u8>, &'static str)> {
+    if opened.len > SMALL_ORIGINAL {
+        return None;
+    }
+    let body = opened.read(0, opened.len).ok()?;
+    let mime = picture_mime(&body)?;
+    let (width, height) = image::ImageReader::new(Cursor::new(&body))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()?;
+    let most = size.saturating_mul(2);
+    (width <= most && height <= most).then_some((body, mime))
+}
+
 fn cached_thumbnail(
-    path: &Path,
-    meta: &std::fs::Metadata,
+    opened: &mut Opened,
     size: u32,
     cache: Option<&ThumbnailCache>,
-    open: Opener,
 ) -> Option<(Vec<u8>, &'static str)> {
     let Some(cache) = cache else {
-        return thumbnail(path, size, open);
+        return thumbnail(opened, size);
     };
-    let kept = cache.dir.join(thumbnail_name(path, meta, size));
+    let kept = cache.dir.join(thumbnail_name(&opened.key, size));
     if let Ok(body) = file_access::fs::read(&kept) {
         if let Some(mime) = picture_mime(&body) {
             cache.touched(&kept);
             return Some((body, mime));
         }
     }
-    let (body, mime) = thumbnail(path, size, open)?;
+    let (body, mime) = thumbnail(opened, size)?;
     let partial = kept.with_extension(format!("{}.part", std::process::id()));
     let saved = file_access::fs::create_dir_all(&cache.dir)
         .and_then(|()| file_access::fs::write(&partial, &body))
@@ -248,17 +386,10 @@ fn cached_thumbnail(
     Some((body, mime))
 }
 
-fn thumbnail_name(path: &Path, meta: &std::fs::Metadata, size: u32) -> String {
-    let modified = meta
-        .modified()
-        .ok()
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .map_or(0, |since| since.as_nanos());
+fn thumbnail_name(key: &[u8], size: u32) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(path.as_os_str().as_encoded_bytes());
+    hasher.update(key);
     hasher.update([0]);
-    hasher.update(meta.len().to_le_bytes());
-    hasher.update(modified.to_le_bytes());
     hasher.update(size.to_le_bytes());
     hex::encode(hasher.finalize())
 }
@@ -273,13 +404,8 @@ fn picture_mime(body: &[u8]) -> Option<&'static str> {
     }
 }
 
-fn thumbnail(path: &Path, size: u32, open: Opener) -> Option<(Vec<u8>, &'static str)> {
-    let file = open(path).ok()?;
-    #[cfg(target_os = "macos")]
-    if let Some(made) = super::system_thumbnail::thumbnail(path, size) {
-        return Some(made);
-    }
-    let picture = image::ImageReader::new(BufReader::new(file))
+fn decoded(bytes: &[u8], size: u32) -> Option<(Vec<u8>, &'static str)> {
+    let picture = image::ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
         .ok()?
         .decode()
@@ -301,45 +427,88 @@ fn thumbnail(path: &Path, size: u32, open: Opener) -> Option<(Vec<u8>, &'static 
     }
 }
 
+#[cfg(target_os = "macos")]
+fn quick_look(opened: &Opened, size: u32) -> Option<(Vec<u8>, &'static str)> {
+    let path = opened.quick_look.as_deref()?;
+    if let Body::Disk(_) = opened.body {
+        let (folder, name) = super::gated::parent(path, file_access::Access::Read).ok()?;
+        if !folder.metadata(&name).ok()?.is_file() {
+            return None;
+        }
+    }
+    let _turn = QUICK_LOOK.take();
+    super::quick_look_thumbnail::thumbnail(path, size)
+}
+
+fn thumbnail(opened: &mut Opened, size: u32) -> Option<(Vec<u8>, &'static str)> {
+    if opened.len <= MAX_THUMBNAIL_SOURCE {
+        if let Ok(bytes) = opened.read(0, opened.len) {
+            #[cfg(target_os = "macos")]
+            if let Some(made) = super::system_thumbnail::thumbnail(&bytes, size) {
+                return Some(made);
+            }
+            if let Some(made) = decoded(&bytes, size) {
+                return Some(made);
+            }
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        quick_look(opened, size)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = &opened.quick_look;
+        None
+    }
+}
+
+fn is_media(mime: &str) -> bool {
+    mime.starts_with("video/") || mime.starts_with("audio/")
+}
+
 fn file(
-    path: &Path,
-    length: u64,
+    opened: &mut Opened,
     mime: &'static str,
     range: Option<&str>,
     base: tauri::http::response::Builder,
-    open: Opener,
 ) -> Result<Served, StatusCode> {
-    let mut opened = open(path).map_err(not_found)?;
+    let length = opened.len;
     let base = base
         .header(header::CONTENT_TYPE, mime)
         .header(header::ACCEPT_RANGES, "bytes");
-    let Some(range) = range else {
-        let mut body = Vec::with_capacity(usize::try_from(length).unwrap_or(0));
-        opened
-            .read_to_end(&mut body)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        return base
-            .header(header::CONTENT_LENGTH, body.len())
-            .body(Cow::Owned(body))
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
-    };
-    let Some((start, end)) = single_range(range, length) else {
-        return base
-            .status(StatusCode::RANGE_NOT_SATISFIABLE)
-            .header(header::CONTENT_RANGE, format!("bytes */{length}"))
-            .body(Cow::Borrowed(&[][..]))
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
+    let (start, end) = match range {
+        None if length <= WHOLE_ANY || (!is_media(mime) && length <= WHOLE_PICTURE) => {
+            let body = opened
+                .read(0, length)
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            return base
+                .header(header::CONTENT_LENGTH, body.len())
+                .body(Cow::Owned(body))
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        None if is_media(mime) => (0, length - 1),
+        None => return Err(StatusCode::PAYLOAD_TOO_LARGE),
+        Some(range) => match single_range(range, length) {
+            Some(found) => found,
+            None => {
+                return base
+                    .status(StatusCode::RANGE_NOT_SATISFIABLE)
+                    .header(header::CONTENT_RANGE, format!("bytes */{length}"))
+                    .body(Cow::Borrowed(&[][..]))
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        },
     };
     let end = end.min(start.saturating_add(RANGE_CHUNK * 8) - 1);
     let count = end - start + 1;
-    opened
-        .seek(SeekFrom::Start(start))
+    let body = opened
+        .read(start, count)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let mut body = Vec::with_capacity(usize::try_from(count).unwrap_or(0));
-    Read::by_ref(&mut opened)
-        .take(count)
-        .read_to_end(&mut body)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if body.is_empty() {
+        return Err(StatusCode::RANGE_NOT_SATISFIABLE);
+    }
+    let end = start + body.len() as u64 - 1;
     base.status(StatusCode::PARTIAL_CONTENT)
         .header(header::ACCESS_CONTROL_EXPOSE_HEADERS, "content-range")
         .header(
@@ -415,17 +584,12 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::disallowed_methods)]
     fn a_kept_thumbnail_is_named_for_its_image_and_size_and_never_by_its_path() {
-        let file =
-            std::env::temp_dir().join(format!("misty-thumb-name-{}.png", std::process::id()));
-        std::fs::write(&file, b"x").unwrap();
-        let meta = std::fs::metadata(&file).unwrap();
-        let small = thumbnail_name(&file, &meta, 96);
-        assert_eq!(small, thumbnail_name(&file, &meta, 96));
-        assert_ne!(small, thumbnail_name(&file, &meta, 256));
+        let key = b"/Users/me/misty-thumb-name.png\0".to_vec();
+        let small = thumbnail_name(&key, 96);
+        assert_eq!(small, thumbnail_name(&key, 96));
+        assert_ne!(small, thumbnail_name(&key, 256));
         assert!(!small.contains("misty-thumb-name"));
-        std::fs::remove_file(&file).unwrap();
         assert_eq!(picture_mime(b"\x89PNG\r\n\x1a\nrest"), Some("image/png"));
         assert_eq!(picture_mime(&[0xFF, 0xD8, 0xFF, 0xE0]), Some("image/jpeg"));
         assert_eq!(picture_mime(b"<svg"), None);
@@ -443,5 +607,6 @@ mod tests {
         );
         assert_eq!(served_mime(Path::new("/a/page.html")), None);
         assert_eq!(served_mime(Path::new("/a/script.js")), None);
+        assert!(is_media("video/mp4") && !is_media("application/pdf"));
     }
 }

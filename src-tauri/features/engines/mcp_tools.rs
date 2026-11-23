@@ -217,10 +217,14 @@ pub(crate) fn names_misty_tool(tool: &str, call: &Value) -> bool {
     let named = |text: &str| {
         let text = text.to_ascii_lowercase();
         text.contains("misty")
-            && space_tools()
+            && (space_tools()
                 .iter()
                 .filter_map(|offered| offered["name"].as_str())
                 .any(|name| text.contains(name))
+                || crate::engines::agent_memory::WIRE_NAMES
+                    .iter()
+                    .any(|name| text.contains(name))
+                || text.contains(&format!("misty__{}", crate::engines::recall::RECALL)))
     };
     named(tool) || named(&call.to_string())
 }

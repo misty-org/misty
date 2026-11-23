@@ -1,75 +1,22 @@
-use std::{
-    io::{self, Read, Seek, Write},
-    path::{Component, Path},
-};
+use std::path::Path;
 
-use file_access::{disk::fs_disk, Access};
+use file_access::disk::{fs_disk, walk};
+use file_access::Access;
 use serde_json::{json, Value};
-use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
-use super::{free_name, optional, path_list, text};
+use super::{optional, path_list, text};
 use crate::files::{
     agent_paths::{admit, admit_path},
-    display_name, failed,
+    archive::{free_name, pack, unpack_zip, Limits, Naming, Unpacker},
+    display_name, failed, gated,
+    progress::Stop,
 };
 
 const ENTRIES_MOST: usize = 100_000;
 const BYTES_MOST: u64 = 8 << 30;
 
-#[derive(Default)]
-struct Tally {
-    files: u64,
-    bytes: u64,
-    entries: usize,
-    skipped: u64,
-}
-
-impl Tally {
-    fn room(&mut self, size: u64) -> Result<(), String> {
-        self.entries += 1;
-        if self.entries > ENTRIES_MOST || self.bytes.saturating_add(size) > BYTES_MOST {
-            return Err("That is more than one archive can hold here. Pick fewer items.".into());
-        }
-        Ok(())
-    }
-}
-
-fn add<W: Write + Seek>(
-    writer: &mut ZipWriter<W>,
-    path: &Path,
-    name: &str,
-    tally: &mut Tally,
-) -> Result<(), String> {
-    if file_access::disk::check_agent(path, Access::Read).is_err() {
-        tally.skipped += 1;
-        return Ok(());
-    }
-    let meta = fs_disk::symlink_metadata(path).map_err(|error| failed(path, error))?;
-    let options = SimpleFileOptions::default()
-        .compression_method(CompressionMethod::Deflated)
-        .large_file(meta.len() >= u64::from(u32::MAX));
-    if meta.file_type().is_symlink() {
-        tally.skipped += 1;
-    } else if meta.is_dir() {
-        tally.room(0)?;
-        writer
-            .add_directory(format!("{name}/"), options)
-            .map_err(|error| failed(path, error))?;
-        let items = fs_disk::read_dir(path).map_err(|error| failed(path, error))?;
-        for item in items.flatten() {
-            let inner = format!("{name}/{}", item.file_name().to_string_lossy());
-            add(writer, &item.path(), &inner, tally)?;
-        }
-    } else if meta.is_file() {
-        tally.room(meta.len())?;
-        writer
-            .start_file(name, options)
-            .map_err(|error| failed(path, error))?;
-        let mut file = fs_disk::open(path).map_err(|error| failed(path, error))?;
-        tally.bytes += io::copy(&mut file, writer).map_err(|error| failed(path, error))?;
-        tally.files += 1;
-    }
-    Ok(())
+fn agent_dir(path: &Path) -> Result<file_access::disk::CheckedDir, String> {
+    gated::dir(path, Access::Write, walk::WalkFor::Agent).map_err(|error| failed(path, error))
 }
 
 pub(super) fn zip(input: &Value) -> Result<Value, String> {
@@ -84,9 +31,6 @@ pub(super) fn zip(input: &Value) -> Result<Value, String> {
             if !display_name(&target).to_lowercase().ends_with(".zip") {
                 return Err("The archive's name ends in .zip.".into());
             }
-            if fs_disk::exists(&target) {
-                return Err(format!("{} is there already.", display_name(&target)));
-            }
             target
         }
         None => {
@@ -98,50 +42,38 @@ pub(super) fn zip(input: &Value) -> Result<Value, String> {
             } else {
                 "Archive.zip".to_owned()
             };
-            admit_path(&free_name(folder, &name), Access::Write)?
+            admit_path(&folder.join(name), Access::Write)?
         }
     };
-    let file = fs_disk::create_new(&target).map_err(|error| failed(&target, error))?;
-    let mut writer = ZipWriter::new(file);
-    let mut tally = Tally::default();
-    let packed = sources
-        .iter()
-        .try_for_each(|source| add(&mut writer, source, &display_name(source), &mut tally))
-        .and_then(|()| {
-            writer
-                .finish()
-                .map(|_| ())
-                .map_err(|error| failed(&target, error))
-        });
-    if let Err(error) = packed {
-        let _ = fs_disk::remove_file(&target);
-        return Err(error);
-    }
+    let (folder, name) = gated::split(&target).map_err(|error| failed(&target, error))?;
+    let dir = agent_dir(folder)?;
+    let name = name.to_string_lossy().into_owned();
+    let naming = if optional(input, "to").is_some() {
+        Naming::Exact(&name)
+    } else {
+        Naming::KeepBoth(&name)
+    };
+    let stop = Stop::default();
+    let (archive, tally) = pack(
+        &sources,
+        &dir,
+        naming,
+        walk::WalkFor::Agent,
+        &stop,
+        &mut |_, _| {},
+    )
+    .map_err(|error| {
+        if error.kind() == std::io::ErrorKind::AlreadyExists {
+            format!("{} is there already.", display_name(&target))
+        } else {
+            failed(&target, error)
+        }
+    })?;
     Ok(json!({
-        "archive": target.display().to_string(),
+        "archive": archive.display().to_string(),
         "files": tally.files,
         "skipped": tally.skipped,
     }))
-}
-
-fn make_folders(into: &Path, relative: &Path) -> Result<(), String> {
-    let mut current = into.to_path_buf();
-    for part in relative.components() {
-        let Component::Normal(name) = part else {
-            return Err("That entry leaves the folder.".into());
-        };
-        current.push(name);
-        if fs_disk::is_dir(&current) {
-            continue;
-        }
-        admit_path(&current, Access::Write)?;
-        fs_disk::create_dir(&current).map_err(|error| failed(&current, error))?;
-    }
-    Ok(())
-}
-
-fn is_link(mode: Option<u32>) -> bool {
-    mode.is_some_and(|mode| mode & 0o170000 == 0o120000)
 }
 
 pub(super) fn extract(input: &Value) -> Result<Value, String> {
@@ -163,82 +95,38 @@ pub(super) fn extract(input: &Value) -> Result<Value, String> {
             admit_path(&free_name(folder, stem), Access::Write)?
         }
     };
-    if fs_disk::exists(&into) && !fs_disk::is_dir(&into) {
-        return Err(format!(
-            "{} is there already, and it isn't a folder.",
-            display_name(&into)
-        ));
-    }
-    if !fs_disk::exists(&into) {
-        fs_disk::create_dir(&into).map_err(|error| failed(&into, error))?;
-    }
-    let file = fs_disk::open(&archive).map_err(|error| failed(&archive, error))?;
-    let mut zip = ZipArchive::new(file).map_err(|error| failed(&archive, error))?;
-    if zip.len() > ENTRIES_MOST {
-        return Err(format!(
-            "{name} holds more items than can be unpacked here."
-        ));
-    }
-    let mut tally = Tally::default();
-    for index in 0..zip.len() {
-        let mut entry = zip
-            .by_index(index)
-            .map_err(|error| failed(&archive, error))?;
-        let Some(relative) = entry.enclosed_name() else {
-            tally.skipped += 1;
-            continue;
-        };
-        if entry.is_dir() {
-            if make_folders(&into, &relative).is_err() {
-                tally.skipped += 1;
-            }
-            continue;
+    match fs_disk::symlink_metadata(&into) {
+        Ok(meta) if !meta.is_dir() => {
+            return Err(format!(
+                "{} is there already, and it isn't a folder.",
+                display_name(&into)
+            ))
         }
-        if is_link(entry.unix_mode()) {
-            tally.skipped += 1;
-            continue;
+        Ok(_) => {}
+        Err(_) => {
+            let (folder, made) = gated::split(&into).map_err(|error| failed(&into, error))?;
+            agent_dir(folder)?
+                .create_dir(made)
+                .map_err(|error| failed(&into, error))?;
         }
-        let parent = relative.parent().unwrap_or(Path::new(""));
-        let target = into.join(&relative);
-        let open = make_folders(&into, parent)
-            .and_then(|()| admit_path(&target, Access::Write))
-            .and_then(|target| {
-                fs_disk::create_new(&target).map_err(|error| failed(&target, error))
-            });
-        let Ok(mut output) = open else {
-            tally.skipped += 1;
-            continue;
-        };
-        tally.room(entry.size())?;
-        let left = BYTES_MOST - tally.bytes;
-        let written = io::copy(&mut (&mut entry).take(left), &mut output)
-            .map_err(|error| failed(&target, error))?;
-        tally.bytes += written;
-        tally.files += 1;
     }
+    let root = agent_dir(&into)?;
+    let file = gated::open_read_for(&archive, walk::WalkFor::Agent)
+        .map_err(|error| failed(&archive, error))?;
+    let room = Limits::for_folder(&into);
+    let limits = Limits {
+        bytes: room.bytes.min(BYTES_MOST),
+        entries: ENTRIES_MOST,
+    };
+    let stop = Stop::default();
+    let mut progress = |_: u64, _: &str| {};
+    let mut unpacker = Unpacker::new(&root, limits, &stop, &mut progress);
+    let unpacked = unpack_zip(file, &mut unpacker);
+    let tally = std::mem::take(&mut unpacker.tally);
+    unpacked.map_err(|error| failed(&archive, error))?;
     Ok(json!({
         "folder": into.display().to_string(),
         "files": tally.files,
         "skipped": tally.skipped,
     }))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn links_in_an_archive_are_told_apart() {
-        assert!(is_link(Some(0o120777)));
-        assert!(!is_link(Some(0o100644)));
-        assert!(!is_link(None));
-    }
-
-    #[test]
-    fn an_archive_has_a_ceiling() {
-        let mut tally = Tally::default();
-        assert!(tally.room(10).is_ok());
-        tally.bytes = 10;
-        assert!(tally.room(BYTES_MOST).is_err());
-    }
 }

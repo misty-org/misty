@@ -19,7 +19,12 @@ import {
   ListRowSkeleton,
   Text,
 } from "@misty/ui";
-import { agentMemoryApi, type AgentMemoryNote, type AgentMemoryNotes } from "./agent_memory_api";
+import {
+  agentMemoryApi,
+  SPACE_MEMORY_SOURCE,
+  type AgentMemoryNote,
+  type AgentMemoryNotes,
+} from "./agent_memory_api";
 
 export function AgentMemoryPage(props: {
   accountId: string;
@@ -27,6 +32,7 @@ export function AgentMemoryPage(props: {
   agentName: string;
   engine?: string;
   conversationId?: string;
+  spaceId?: string;
 }) {
   const [result, setResult] = useState<AgentMemoryNotes>({ notes: [], errors: [] });
   const [loading, setLoading] = useState(true);
@@ -39,19 +45,20 @@ export function AgentMemoryPage(props: {
     setLoading(true);
     setError("");
     try {
-      const next = await agentMemoryApi.list(
-        props.accountId,
-        props.agentId,
-        props.engine ?? "",
-        props.conversationId,
-      );
+      const next = await agentMemoryApi.list({
+        accountId: props.accountId,
+        agentId: props.agentId,
+        engine: props.engine ?? "",
+        conversationId: props.conversationId,
+        spaceId: props.spaceId,
+      });
       setResult(next);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The agent's memory couldn't be read.");
     } finally {
       setLoading(false);
     }
-  }, [props.accountId, props.agentId, props.engine, props.conversationId]);
+  }, [props.accountId, props.agentId, props.engine, props.conversationId, props.spaceId]);
 
   useEffect(() => {
     void reload();
@@ -64,10 +71,13 @@ export function AgentMemoryPage(props: {
     setDeleteError("");
     try {
       await agentMemoryApi.delete(
-        props.accountId,
-        props.agentId,
-        props.engine ?? "",
-        props.conversationId,
+        {
+          accountId: props.accountId,
+          agentId: props.agentId,
+          engine: props.engine ?? "",
+          conversationId: props.conversationId,
+          spaceId: props.spaceId,
+        },
         note.id,
       );
       setResult((current) => ({
@@ -162,8 +172,10 @@ export function AgentMemoryPage(props: {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this memory note?</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete “{deleting?.title}” from {deleting?.source}? The note will be removed from the
-              engine's own memory.
+              Delete “{deleting?.title}” from {deleting?.source}?{" "}
+              {deleting?.source === SPACE_MEMORY_SOURCE
+                ? "It leaves this agent's memory for everyone in the Space and moves to the Space's trash."
+                : "The note will be removed from the engine's own memory."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

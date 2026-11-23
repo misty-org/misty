@@ -1,7 +1,6 @@
 import {
   CircleHelp,
   Keyboard,
-  LayoutDashboard,
   Moon,
   PanelLeft,
   PanelRight,
@@ -12,7 +11,6 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { useSidebarCollapsedStore } from "@/app/shell";
-import { useLayoutEditor } from "@/features/app-windows";
 import { useMistyPanelStore } from "@/features/agents";
 import { openSettings, useAppThemeStore, useSettingsStore } from "@/features/settings";
 import { appZoomDefault, setAppZoom, useAppZoomValue } from "@/shared/hooks/use_app_zoom";
@@ -64,19 +62,6 @@ export function SearchButton() {
   return (
     <IconButton label="Search" onClick={() => useSearchDialog.getState().setOpen(true)}>
       <Search />
-    </IconButton>
-  );
-}
-
-export function LayoutButton() {
-  const active = useLayoutEditor((state) => state.active);
-  return (
-    <IconButton
-      label="Layout"
-      aria-pressed={active}
-      onClick={() => useLayoutEditor.getState().toggle()}
-    >
-      <LayoutDashboard />
     </IconButton>
   );
 }

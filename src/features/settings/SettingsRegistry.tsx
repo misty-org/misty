@@ -10,7 +10,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import type { ComponentType } from "react";
+import { lazy, type ComponentType } from "react";
 import { spaceIcons } from "@misty/ui";
 import type { SettingOwnership } from "./device-preferences/registry";
 import type { SettingsContentProps, SettingsSection } from "./settings_types";
@@ -115,13 +115,36 @@ const settingsBlocks: readonly SettingsBlock[] = [
 
 export const settingsRegistry: SettingsRegistryEntry[] = [];
 
+type SettingsComponents = Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>>;
+
+let sectionsLoad: Promise<SettingsComponents> | undefined;
+let loadSections: (() => Promise<SettingsComponents>) | undefined;
+
+export function preloadSettingsSections(): Promise<SettingsComponents | undefined> {
+  if (!loadSections) return Promise.resolve(undefined);
+  sectionsLoad ??= loadSections().catch((error: unknown) => {
+    sectionsLoad = undefined;
+    throw error;
+  });
+  return sectionsLoad;
+}
+
+const Missing: ComponentType<SettingsContentProps> = () => null;
+
 export function registerSettingsSections(
-  components: Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>>,
+  ids: readonly SettingsSection[],
+  load: () => Promise<SettingsComponents>,
 ): void {
   settingsRegistry.length = 0;
+  sectionsLoad = undefined;
+  loadSections = load;
   for (const entry of settingsBlocks) {
-    const Component = components[entry.id];
-    if (Component) settingsRegistry.push({ ...entry, Component });
+    if (!ids.includes(entry.id)) continue;
+    const Component = lazy(async () => {
+      const components = await preloadSettingsSections();
+      return { default: components?.[entry.id] ?? Missing };
+    });
+    settingsRegistry.push({ ...entry, Component });
   }
 }
 

@@ -3,7 +3,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, cn, Input, screenMarkClass, Surface, ViewportLayer } from "@misty/ui";
-import { DictationPill } from "@/features/voice";
+import { DictationPill } from "@/features/voice/pill";
 import "@/styles/styles.css";
 
 export function DesktopOverlayRoot() {

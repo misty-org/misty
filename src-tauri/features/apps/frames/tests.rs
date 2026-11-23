@@ -104,3 +104,17 @@ fn the_relay_carries_its_token_and_limit() {
     assert!(script.contains(&MAX_FRAME_BYTES.to_string()));
     assert!(!script.contains("__MISTY_APP_") && !script.contains("__KIRI_HOST_SENDER__"));
 }
+
+#[test]
+fn a_post_that_never_settles_is_released_after_its_bound() {
+    register("post-test", "site", "1.0.0", "window-1", true, None).unwrap();
+    let long = std::time::Duration::from_secs(60);
+    let first = begin_post("post-test", 1, long).unwrap();
+    assert_eq!(begin_post("post-test", 1, long), None);
+    end_post("post-test", first);
+    let stuck = begin_post("post-test", 1, long).unwrap();
+    assert!(begin_post("post-test", 1, std::time::Duration::ZERO).is_some());
+    end_post("post-test", stuck);
+    assert_eq!(begin_post("missing-mount", 1, long), None);
+    forget("post-test");
+}

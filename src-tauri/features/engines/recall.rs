@@ -159,12 +159,43 @@ fn chat_chunks(
     Ok(())
 }
 
+fn space_memory_chunks(
+    store: &Store,
+    space: &str,
+    agent_id: &str,
+    query: &str,
+    into: &mut Vec<Chunk>,
+) -> Result<(), String> {
+    let hits = super::agent_memory::index::matching(
+        store,
+        space,
+        agent_id,
+        &pieces(query),
+        query,
+        MAX_CANDIDATES,
+    )?;
+    for hit in hits {
+        chunks(
+            &format!(
+                "note: {} · {}",
+                super::agent_memory::index::SOURCE,
+                hit.title
+            ),
+            &hit.text,
+            into,
+        );
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(super) fn search(
     store: &Store,
     account: &str,
     agent_id: &str,
     engine: &str,
     folder: Option<&Path>,
+    memory_space: Option<&str>,
     query: &str,
     limit: usize,
 ) -> Result<String, String> {
@@ -179,6 +210,12 @@ pub(super) fn search(
             &note.content,
             &mut all,
         );
+    }
+    let mut errors = notes.errors;
+    if let Some(space) = memory_space.filter(|space| !space.is_empty()) {
+        if space_memory_chunks(store, space, agent_id, query, &mut all).is_err() {
+            errors.push("Couldn't search this agent's memory in its Space.".into());
+        }
     }
     chat_chunks(store, account, agent_id, query, &mut all)?;
     let pattern = Pattern::parse(query.trim(), CaseMatching::Ignore, Normalization::Smart);
@@ -205,11 +242,11 @@ pub(super) fn search(
             .collect::<Vec<_>>()
             .join("\n\n")
     };
-    if !notes.errors.is_empty() {
+    if !errors.is_empty() {
         if result != "Nothing in your memory matches that." {
             result.push_str("\n\n");
         }
-        result.push_str(&notes.errors.join("\n"));
+        result.push_str(&errors.join("\n"));
     }
     Ok(result)
 }
@@ -222,22 +259,42 @@ pub(crate) async fn agent_memory_list(
     agent_id: String,
     engine: String,
     conversation_id: Option<String>,
+    space_id: Option<String>,
 ) -> Result<MemoryNotes, String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only a profile's window can read engine memory.".into());
     }
-    let folder = resolve_agent_folder(
-        &state.environment.store(),
-        &account,
-        &agent_id,
-        conversation_id.as_deref(),
-    )?;
-    tauri::async_runtime::spawn_blocking(move || Ok(memory_notes(&engine, folder.as_deref())))
+    let store = state.environment.store();
+    let folder = resolve_agent_folder(&store, &account, &agent_id, conversation_id.as_deref())?;
+    let mut found: MemoryNotes =
+        tauri::async_runtime::spawn_blocking(move || memory_notes(&engine, folder.as_deref()))
+            .await
+            .map_err(|error| error.to_string())?;
+    if let Some(space) = space_id.filter(|space| !space.is_empty()) {
+        super::agent_memory::index::listen(tauri::Manager::app_handle(&webview));
+        super::agent_memory::index::fresh(&store, &space, &agent_id).await;
+        let (store, agent) = (store.clone(), agent_id.clone());
+        let listed = tauri::async_runtime::spawn_blocking(move || {
+            super::agent_memory::index::notes(&store, &space, &agent)
+        })
         .await
-        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())?;
+        match listed {
+            Ok(notes) => {
+                let mut shared = notes;
+                shared.append(&mut found.notes);
+                found.notes = shared;
+            }
+            Err(_) => found
+                .errors
+                .push("Couldn't read this agent's memory in its Space.".into()),
+        }
+    }
+    Ok(found)
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn agent_memory_delete(
     webview: tauri::Webview,
     state: tauri::State<'_, crate::app::runtime::MistyRuntime>,
@@ -246,9 +303,22 @@ pub(crate) async fn agent_memory_delete(
     engine: String,
     conversation_id: Option<String>,
     note_id: String,
+    space_id: Option<String>,
 ) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only a profile's window can delete engine memory.".into());
+    }
+    if note_id.starts_with(super::agent_memory::index::NOTE_PREFIX) {
+        let space = space_id
+            .filter(|space| !space.is_empty())
+            .ok_or_else(|| "This memory note is no longer available.".to_string())?;
+        return super::agent_memory::forget_from_view(
+            &state.environment.store(),
+            &space,
+            &agent_id,
+            &note_id,
+        )
+        .await;
     }
     let folder = resolve_agent_folder(
         &state.environment.store(),

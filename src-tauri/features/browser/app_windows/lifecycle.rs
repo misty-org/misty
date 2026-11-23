@@ -36,6 +36,11 @@ fn build_window<R: Runtime>(
     tauri::WebviewWindowBuilder::from_config(app, &config)
         .map_err(|error| error.to_string())?
         .initialization_script(format!("window.__MISTY_WINDOW__ = {opening};"))
+        .on_page_load(|window, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                crate::agents::run_control::local_tools::window_reloaded(window.label());
+            }
+        })
         .title(title)
         .build()
         .map_err(|error| error.to_string())?;
@@ -173,8 +178,10 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
             window_geometry::forget(label);
             crate::app::macos_window_effects::mac_rounded_corners::forget_window(label);
             crate::browser::forget_closed_pages(window.app_handle());
+            crate::agents::run_control::local_tools::window_closed(label);
             crate::project::terminal::close_window(label);
             crate::voice::speech::close_window(window.app_handle(), label);
+            crate::voice::close_share_audio_window(window.app_handle(), label);
             if QUITTING.load(Ordering::SeqCst) {
                 return;
             }

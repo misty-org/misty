@@ -4,9 +4,9 @@ import {
   finishLocalExecution,
   pauseLocalExecution,
   settleLocalExecution,
-  startLocalExecution,
   useLocalExecution,
-} from "../../runs/local-execution/local_execution";
+} from "../../runs/local-execution/local_execution_state";
+import { startLocalExecution } from "../../runs/local-execution/local_execution_start";
 import type { AiInvocationDeviceContext } from "../../runs/invocations";
 import { globalMistyError } from "../state/global_misty_actions";
 import type { MistyState } from "../state/misty_state";

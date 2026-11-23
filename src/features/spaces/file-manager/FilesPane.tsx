@@ -1,47 +1,74 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { notify, Portal, PropertyList, Separator, Surface, Text } from "@misty/ui";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { Portal, PropertyList, Surface, Text, type CollectionItem } from "@misty/ui";
 import { disk } from "@/features/files";
-import { useSpacesStore } from "../list/use_spaces_store";
-import { enclosing, keyCommands, pathSegments, searchLocations, typedPath } from "./browser_parts";
+import { mimeFromName } from "../drive";
+import { acceptsFile } from "../apps/space_app_files";
+import { keyCommands } from "./browser_parts";
 import { ColumnsView } from "./ColumnsView";
-import { collectionItem, thumbnailFor } from "./FileItems";
-import { FileInspector } from "./FileInspector";
+import type { FilesDialogs } from "./dialogs/UseFilesDialogs";
+import { FilesDialogsHost } from "./dialogs/UseFilesDialogs";
+import { canCreateIn, canPasteIn, createFileActions, fail } from "./file_actions";
+import { collectionItem } from "./FileItems";
 import { FilePreview } from "./FilePreview";
-import { FilesListFooter } from "./FilesBottomBar";
-import { handleFilesKey, shownOrder } from "./files_keys";
-import { FilesMain, type BackgroundMenu } from "./FilesMain";
-import type { SearchSuggest } from "./FilesSearch";
-import { FilesSidebar } from "./FilesSidebar";
-import { FilesActionBar, FilesNavBar, MoreRows, type FilesMoreMenu } from "./FilesToolbar";
-import { formatBytes, formatDate, kindOf, messageOf } from "./format";
-import { ItemMenu, type MenuContext } from "./ItemMenu";
+import { useFilesChoices, type FilesPick, type FilesSort } from "./files_choices";
+import { handleFilesKey } from "./files_keys";
+import { useFilesReveal } from "./files_reveal";
+import { FilesMain, type BackgroundMenu, type MainListing } from "./FilesMain";
+import {
+  PaneFooter,
+  PaneInspector,
+  PanePickFooter,
+  PaneQuickLook,
+  PaneSidebar,
+  PaneToolbar,
+} from "./FilesPaneParts";
+import { formatBytes, formatDate, kindOf } from "./format";
+import { ItemMenuFor } from "./ItemMenu";
+import { finderOrdered } from "./list_folder";
 import {
   browsable,
   localPath,
   parentOf,
-  placeFolder,
   placeInside,
   samePlace,
   type FileItem,
   type FilesPlace,
 } from "./model";
-import { QuickLook } from "./QuickLook";
-import { prewarmThumbnails } from "./thumbnails";
-import { useFilesBrowser, type FilesPick, type FilesSort } from "./use_files_browser";
+import { PaneContext, usePane, type PaneApi } from "./pane_context";
+import { useArranged } from "./store/arrange";
+import { BrowserStoreContext, createBrowserStore, useBrowser } from "./store/browser_store";
+import { refreshUnwatched, useListing } from "./store/listing_cache";
+import { useDriveOpenWith } from "./use_drive_open_with";
+import { refreshPlaces, useLoadPlaces } from "./use_files_places";
+import { useIndexSearch, useIndexStatus } from "./use_listing";
+import { useIgnoreOffer } from "./use_ignore_offer";
+import { refreshUndo, runOperation } from "./use_operations";
 
 export interface PaneSlots {
   toolbar: HTMLElement | null;
+  tools: HTMLElement | null;
   sidebar: HTMLElement | null;
   inspector: HTMLElement | null;
   footer: HTMLElement | null;
 }
 
+const NO_ITEMS: FileItem[] = [];
+
 function ColumnPreview({ item }: { item: FileItem }) {
   return (
     <div className="flex w-60 shrink-0 flex-col gap-3 p-3">
       <div className="relative h-48 min-h-0 overflow-hidden">
-        <FilePreview key={item.id} item={item} />
+        <FilePreview key={item.id} item={item} compact />
       </div>
       <Text weight="semibold" tone="bright" full>
         {item.name}
@@ -55,6 +82,311 @@ function ColumnPreview({ item }: { item: FileItem }) {
           { label: "Modified", value: formatDate(item.modifiedMs) },
         ]}
       />
+    </div>
+  );
+}
+
+const ColumnsArea = memo(function ColumnsArea({
+  shown,
+  hidden,
+  sort,
+}: {
+  shown: Map<string, FileItem>;
+  hidden: boolean;
+  sort: FilesSort | undefined;
+}) {
+  const { store, actions } = usePane();
+  const place = useBrowser((state) => state.place);
+  const root = useBrowser((state) => state.columnRoot);
+  const selected = useBrowser((state) => state.selected);
+  const cut = useBrowser((state) => state.cut);
+  const ids = useMemo(() => [...selected], [selected]);
+  const one = ids.length === 1 ? shown.get(ids[0]) : undefined;
+  return (
+    <ColumnsView
+      root={root}
+      place={place}
+      hidden={hidden}
+      sort={sort}
+      selected={ids}
+      cut={cut}
+      preview={one && !one.folder ? <ColumnPreview item={one} /> : undefined}
+      onPick={(at, id, event, columnOrder) => {
+        const state = store.getState();
+        if (samePlace(at, state.place)) state.pick(id, columnOrder, event);
+        else state.go(at, { replace: true, select: [id] });
+      }}
+      onOpen={actions.open}
+      menu={(item) => <ItemMenuFor item={item} />}
+      onDrop={actions.dropInto}
+    />
+  );
+});
+
+const MainArea = memo(function MainArea({
+  listing,
+  items,
+  searching,
+  columns,
+  background,
+  drag,
+}: {
+  listing: MainListing;
+  items: CollectionItem[];
+  searching: boolean;
+  columns?: ReactNode;
+  background: BackgroundMenu;
+  drag: Parameters<typeof FilesMain>[0]["drag"];
+}) {
+  const pane = usePane();
+  const { store } = pane;
+  const picking = Boolean(pane.pick);
+  const choices = useFilesChoices(picking);
+  const place = useBrowser((state) => state.place);
+  const selected = useBrowser((state) => state.selected);
+  const lead = useBrowser((state) => state.lead);
+  const ids = useMemo(() => [...selected], [selected]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const columnsShown = Boolean(columns);
+  const orderIds = () => {
+    const reported = pane.order.current;
+    return reported.ids.length === pane.shown.current.size
+      ? reported.ids
+      : [...pane.shown.current.keys()];
+  };
+  const onShownOrder = useCallback(
+    (shownIds: string[], perRow: number) => {
+      pane.order.current = { ids: shownIds, perRow };
+    },
+    [pane],
+  );
+  return (
+    <FilesMain
+      place={place}
+      view={columnsShown ? "columns" : choices.view}
+      zoom={choices.zoom}
+      sort={choices.sort ?? null}
+      onSort={(next) =>
+        choices.setSort(
+          next ? { key: next.key as FilesSort["key"], descending: next.descending } : undefined,
+        )
+      }
+      listing={listing}
+      items={items}
+      searching={searching}
+      selected={ids}
+      reveal={lead}
+      onShownOrder={onShownOrder}
+      onSelect={(event, id, onOpen) => {
+        if (event.detail >= 2) return onOpen();
+        store.getState().pick(id, orderIds(), event);
+      }}
+      drag={drag}
+      background={background}
+      columns={columns}
+      scrollRef={scrollRef}
+      onKeyDown={(event) =>
+        handleFilesKey(
+          event,
+          keyCommands(pane, {
+            setInfo: choices.setInfo,
+            setView: choices.setView,
+            toggleHidden: choices.toggleHidden,
+            focusSearch: () => pane.searchRef.current?.focus(),
+          }),
+          columnsShown,
+        )
+      }
+    />
+  );
+});
+
+function PaneBody({
+  slots,
+  footer,
+  onTransfers,
+  driveOpen,
+}: {
+  slots: PaneSlots;
+  footer?: (picked: FileItem[], open: (item: FileItem) => void) => ReactNode;
+  onTransfers?: () => void;
+  driveOpen: { current: (item: FileItem) => void };
+}) {
+  const pane = usePane();
+  const { store, granted, pick, actions } = pane;
+  const picking = Boolean(pick);
+  const choices = useFilesChoices(picking);
+  const { hidden, sort, view } = choices;
+  const place = useBrowser((state) => state.place);
+  const query = useBrowser((state) => state.query);
+  const listing = useListing(place, hidden);
+  useIgnoreOffer(place, listing.items, !picking);
+  const index = useIndexStatus(granted);
+  const searched = useIndexSearch(place, query, index);
+  const base = searched
+    ? searched.status === "ready"
+      ? searched.items
+      : NO_ITEMS
+    : (listing.items ?? NO_ITEMS);
+  const accept = pick?.accept;
+  const accepted = useMemo(
+    () =>
+      accept?.length
+        ? base.filter(
+            (item) => item.folder || acceptsFile(accept, mimeFromName(item.name), item.name),
+          )
+        : base,
+    [base, accept],
+  );
+  const needle = searched ? "" : query.trim().toLocaleLowerCase();
+  const items = useArranged(accepted, {
+    needle,
+    sort,
+    finder: !searched && finderOrdered(place),
+  });
+  const shown = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
+  useLayoutEffect(() => {
+    pane.shown.current = shown;
+  }, [pane, shown]);
+
+  const driveSpace =
+    place.kind === "space-drive" || place.kind === "space-drive-trash" ? place.spaceId : undefined;
+  const drives = useDriveOpenWith(driveSpace);
+  useLayoutEffect(() => {
+    driveOpen.current = (item) => {
+      if (item.source.kind !== "drive") return;
+      const apps = drives.appsFor(item.source.entry);
+      if (apps.length) drives.openIn(item.source.entry, apps[0].id);
+      else store.getState().setQuick(item);
+    };
+  });
+
+  const cards = useRef(new WeakMap<FileItem, CollectionItem>());
+  const collection = useMemo(
+    () =>
+      items.map((item) => {
+        const kept = cards.current.get(item);
+        if (kept) return kept;
+        const made = collectionItem(item, {
+          onOpen: actions.open,
+          menu: () => <ItemMenuFor item={item} />,
+          onMenuOpen: () => {
+            const state = store.getState();
+            if (!state.selected.has(item.id)) state.select([item.id]);
+          },
+          dropTarget:
+            item.folder &&
+            !picking &&
+            (item.source.kind === "drive" || localPath(item) !== undefined),
+        });
+        cards.current.set(item, made);
+        return made;
+      }),
+    [items, actions, store, picking],
+  );
+
+  const drag = useMemo(
+    () =>
+      picking || !browsable(place)
+        ? undefined
+        : {
+            canDrop: (target: string) => {
+              const item = shown.get(target);
+              return Boolean(
+                item?.folder && (item.source.kind === "drive" || localPath(item) !== undefined),
+              );
+            },
+            onDrop: (target: string | null, ids: string[], copy: boolean) => {
+              const dropped = ids.flatMap((id) => shown.get(id) ?? []);
+              const into = target ? shown.get(target) : undefined;
+              const destination = into ? placeInside(into, place) : place;
+              if (destination) actions.dropInto(destination, dropped, copy);
+            },
+          },
+    [picking, place, shown, actions],
+  );
+
+  const hiddenToggle = browsable(place)
+    ? { shown: hidden, toggle: choices.toggleHidden }
+    : undefined;
+  const background = useMemo(
+    (): BackgroundMenu =>
+      picking
+        ? { hidden: hiddenToggle }
+        : {
+            create: canCreateIn(place, granted) ? actions.create : undefined,
+            paste: canPasteIn(place, granted) ? () => void actions.paste() : undefined,
+            duplicates:
+              granted && place.kind === "disk" ? () => actions.duplicates(place.path) : undefined,
+            emptyAgentTrash:
+              place.kind === "agent-trash" && items.length ? actions.emptyAgentTrash : undefined,
+            goToFolder: granted ? () => store.getState().editPath() : undefined,
+            hidden: hiddenToggle,
+          },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [picking, place, granted, actions, store, items.length > 0, hidden, choices.toggleHidden],
+  );
+
+  const searching = Boolean(query.trim());
+  const columnsShown = view === "columns" && browsable(place);
+  const ready = listing.items !== null;
+  const mainListing = useMemo((): MainListing => {
+    if (searched)
+      return {
+        status: searched.status,
+        message: searched.status === "failed" ? searched.message : undefined,
+        retry: listing.retry,
+      };
+    return {
+      status: ready ? "ready" : listing.status,
+      message: listing.error,
+      retry: listing.retry,
+    };
+  }, [searched, ready, listing.status, listing.error, listing.retry]);
+
+  return (
+    <div className="relative flex size-full min-h-0 min-w-0 flex-col">
+      <Surface tone="page" className="flex min-h-0 flex-1 flex-col">
+        <MainArea
+          listing={mainListing}
+          items={collection}
+          searching={searching}
+          columns={
+            columnsShown && !searching ? (
+              <ColumnsArea shown={shown} hidden={hidden} sort={sort} />
+            ) : undefined
+          }
+          background={background}
+          drag={drag}
+        />
+        <PaneFooter shown={shown} count={mainListing.status === "ready" ? items.length : null} />
+      </Surface>
+      {slots.toolbar ? (
+        <Portal container={slots.toolbar}>
+          <PaneToolbar
+            shown={shown}
+            empty={items.length === 0}
+            onTransfers={onTransfers}
+            tools={slots.tools}
+          />
+        </Portal>
+      ) : null}
+      {slots.sidebar ? (
+        <Portal container={slots.sidebar}>
+          <PaneSidebar />
+        </Portal>
+      ) : null}
+      {slots.inspector ? (
+        <Portal container={slots.inspector}>
+          <PaneInspector shown={shown} hidden={hidden} />
+        </Portal>
+      ) : null}
+      {pick && footer && slots.footer ? (
+        <Portal container={slots.footer}>
+          <PanePickFooter shown={shown} footer={footer} />
+        </Portal>
+      ) : null}
+      <PaneQuickLook />
     </div>
   );
 }
@@ -74,298 +406,78 @@ export function FilesPane({
   slots: PaneSlots;
   onTransfers?: () => void;
 }) {
-  const state = useFilesBrowser({ granted, start, pick, revealHere: true });
-  const { place, items, selectedItems, selection, actions, view, places } = state;
-  const spaces = useSpacesStore((store) => store.spaces);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [store] = useState(() => createBrowserStore(start, pick ? pick.multiple : true));
+  const dialogs = useRef<FilesDialogs | null>(null);
+  const driveOpen = useRef<(item: FileItem) => void>(() => undefined);
+  const pickRef = useRef(pick);
+  useLayoutEffect(() => {
+    pickRef.current = pick;
+  });
+  const shown = useRef(new Map<string, FileItem>());
+  const order = useRef({ ids: [] as string[], perRow: 1 });
   const searchRef = useRef<HTMLInputElement>(null);
-  const picking = Boolean(pick);
-  const columnsShown = view === "columns" && browsable(place);
-  const order = () => shownOrder(scrollRef.current, items);
-  const one = selectedItems.length === 1 ? selectedItems[0] : undefined;
-  const folder = placeFolder(place);
-  const changes = !picking;
-
-  const menuCtx: MenuContext = {
-    place,
-    granted,
-    picking,
-    macos: state.macos,
-    actions,
-    starred: places.starred,
-    tags: places.tags,
-    quickLook: state.setQuick,
-    info: (item) => {
-      selection.set([item.id]);
-      state.setInfo(true);
-    },
-    driveApps: state.driveOpen.appsFor,
-    openDriveIn: state.driveOpen.openIn,
-    canPurge: state.canPurge,
-  };
-  const targets = (item: FileItem) =>
-    selection.selected.includes(item.id) ? selectedItems : [item];
-  const menuFor = (item: FileItem) => <ItemMenu items={targets(item)} ctx={menuCtx} />;
-  const pointAt = (item: FileItem) => () => {
-    if (!selection.selected.includes(item.id)) selection.set([item.id]);
-  };
-  const droppable = (item: FileItem) =>
-    item.folder && !picking && (item.source.kind === "drive" || localPath(item) !== undefined);
-
-  const collection = items.map((item) =>
-    collectionItem(item, {
-      onOpen: actions.open,
-      menu: menuFor(item),
-      onMenuOpen: pointAt(item),
-      dropTarget: droppable(item),
-    }),
-  );
-  const byId = new Map(items.map((item) => [item.id, item]));
-  const drag =
-    picking || !browsable(place)
-      ? undefined
-      : {
-          canDrop: (target: string) => {
-            const item = byId.get(target);
-            return Boolean(item && droppable(item));
+  const [pane] = useState((): PaneApi => {
+    const changed = () => {
+      refreshUnwatched();
+      refreshUndo();
+      refreshPlaces();
+      store.getState().bump();
+    };
+    const actions = createFileActions({
+      store,
+      granted,
+      run: (label, work, where) =>
+        runOperation(label, work, where, {
+          started: (opId) => store.getState().setOp(opId),
+          ended: (opId) => {
+            if (store.getState().opId === opId) store.getState().setOp(null);
           },
-          onDrop: (target: string | null, ids: string[], copy: boolean) => {
-            const dropped = ids.flatMap((id) => byId.get(id) ?? []);
-            const into = target ? byId.get(target) : undefined;
-            const destination = into ? placeInside(into, place) : place;
-            if (destination) state.dropInto(destination, dropped, copy);
-          },
-        };
+        }),
+      ask: () => dialogs.current,
+      openDrive: (item) => driveOpen.current(item),
+      changed,
+      pick: pick
+        ? (items) => pickRef.current?.onPick(items.filter((item) => !item.folder))
+        : undefined,
+    });
+    return { store, granted, pick, actions, shown, order, searchRef };
+  });
+  const value = useMemo(() => ({ ...pane, pick }), [pane, pick]);
+  useLoadPlaces(granted);
 
-  const background: BackgroundMenu = picking
-    ? { hidden: browsable(place) ? { shown: state.hidden, toggle: state.toggleHidden } : undefined }
-    : {
-        create: actions.canCreate ? actions.create : undefined,
-        paste: actions.canPaste ? () => void actions.paste() : undefined,
-        duplicates:
-          granted && place.kind === "disk" ? () => actions.duplicates(place.path) : undefined,
-        emptyAgentTrash:
-          place.kind === "agent-trash" && items.length ? actions.emptyAgentTrash : undefined,
-        goToFolder: granted ? () => actions.goToFolder(places.places?.home) : undefined,
-        hidden: browsable(place) ? { shown: state.hidden, toggle: state.toggleHidden } : undefined,
-      };
-
-  const up = enclosing(place);
-  const segments = pathSegments(place, places.places, spaces, (next) => state.go(next));
-  const title = segments[segments.length - 1]?.label ?? "Files";
-  const [pathEdit, setPathEdit] = useState(0);
-  const commands = {
-    ...keyCommands(state, order, () => searchRef.current?.focus()),
-    goToFolder: granted && !picking ? () => setPathEdit((count) => count + 1) : undefined,
-  };
-  const trashable =
-    selectedItems.length > 0 &&
-    selectedItems.every((item) => ["disk", "project", "drive"].includes(item.source.kind));
-
-  const refresh = () => {
-    state.listing.reload();
-    state.undo.refresh();
-    state.places.refresh();
-  };
-  const goPath = (text: string) => {
-    const home = places.places?.home;
-    const path = home && (text === "~" || text.startsWith("~/")) ? `${home}${text.slice(1)}` : text;
-    if (path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path)) state.go({ kind: "disk", path });
-    else
-      notify({
-        message: `There's no folder at “${text}”. Type a whole path, such as ~/Documents.`,
-        tone: "error",
-      });
-  };
-  const inTrash =
-    place.kind === "trash" || place.kind === "agent-trash" || place.kind === "space-drive-trash";
-  const folderPath = typedPath(place);
-  const more: FilesMoreMenu = {
-    sort: { value: state.sort, set: state.setSort },
-    hidden: background.hidden,
-    refresh,
-    copyFolderPath: folderPath
-      ? () =>
-          void navigator.clipboard
-            .writeText(folderPath)
-            .catch(() => notify({ message: "Couldn't copy the path.", tone: "error" }))
-      : undefined,
-    copySelectedPath: selectedItems.length ? () => actions.copyPath(selectedItems) : undefined,
-    duplicates: background.duplicates,
-    emptyAgentTrash: background.emptyAgentTrash,
-  };
-  const selectedBytes = selectedItems.reduce((sum, item) => sum + (item.folder ? 0 : item.size), 0);
-  const terminalAt = place.kind === "disk" || place.kind === "project" ? place.path : undefined;
-  const openTerminal = terminalAt
-    ? () =>
-        void disk
-          .openTerminal(terminalAt)
-          .catch((cause) =>
-            notify({ message: messageOf(cause, "The terminal couldn't open."), tone: "error" }),
-          )
-    : undefined;
-  const suggest: SearchSuggest | undefined = picking
-    ? undefined
-    : {
-        locations: searchLocations(places.places, spaces, granted),
-        indexed: granted,
-        onPlace: (next) => state.go(next, { root: true }),
-        onEntry: (entry) =>
-          entry.kind === "folder"
-            ? state.go({ kind: "disk", path: entry.path })
-            : state.go({ kind: "disk", path: parentOf(entry.path) }, { select: [entry.path] }),
-      };
-
-  const gridPictures = view === "grid" ? items.flatMap((item) => thumbnailFor(item) ?? []) : [];
-  const gridPicturesKey = gridPictures.join("\n");
-  const latestPictures = useRef(gridPictures);
-  latestPictures.current = gridPictures;
+  const reveal = useFilesReveal();
   useEffect(() => {
-    prewarmThumbnails(latestPictures.current);
-  }, [gridPicturesKey]);
+    if (!reveal.path || !granted || pick) return;
+    store
+      .getState()
+      .go({ kind: "disk", path: parentOf(reveal.path) }, { select: [reveal.path], root: true });
+    useFilesReveal.setState({ path: null });
+  }, [reveal.path, reveal.at, granted, pick, store]);
 
-  const columns = columnsShown ? (
-    <ColumnsView
-      root={state.columnRoot}
-      place={place}
-      hidden={state.hidden}
-      revision={state.revision}
-      selected={selection.selected}
-      cut={state.cut}
-      preview={one && !one.folder ? <ColumnPreview item={one} /> : undefined}
-      onPick={(at, id, event, columnOrder) => {
-        if (samePlace(at, place)) selection.pick(id, columnOrder, event);
-        else state.go(at, { replace: true, select: [id] });
-      }}
-      onOpen={actions.open}
-      menu={(item) => menuFor(item)}
-      onDrop={state.dropInto}
-    />
-  ) : undefined;
-
-  const toolbar = (
-    <>
-      <FilesNavBar
-        back={state.nav.back}
-        forward={state.nav.forward}
-        canBack={state.nav.canBack}
-        canForward={state.nav.canForward}
-        up={up ? () => state.go(up) : undefined}
-        refresh={refresh}
-        path={segments}
-        typed={folderPath}
-        onPath={granted ? goPath : undefined}
-        pathEdit={pathEdit}
-        query={state.query}
-        onQuery={state.setQuery}
-        searchRef={searchRef}
-        searchLabel={`Search ${title}`}
-        suggest={suggest}
-        onTransfers={onTransfers}
-      />
-      {changes ? (
-        <>
-          <Separator />
-          <FilesActionBar
-            create={actions.canCreate ? actions.create : undefined}
-            undo={
-              granted
-                ? {
-                    label: state.undo.state.undo,
-                    redoLabel: state.undo.state.redo,
-                    run: () => void state.undo.undo(),
-                    redo: () => void state.undo.redo(),
-                  }
-                : undefined
-            }
-            cut={commands.cut}
-            copy={commands.copy}
-            paste={folder && actions.canPaste ? () => void actions.paste() : undefined}
-            restore={
-              inTrash
-                ? { run: selectedItems.length ? () => actions.putBack(selectedItems) : undefined }
-                : undefined
-            }
-            rename={commands.rename}
-            trash={!inTrash && trashable ? () => void actions.trash(selectedItems) : undefined}
-            view={columnsShown ? "columns" : view === "columns" ? "list" : view}
-            onView={state.setView}
-            columns={browsable(place)}
-            zoom={state.zoom}
-            onZoom={state.setZoom}
-            more={<MoreRows menu={more} />}
-            terminal={openTerminal}
-          />
-        </>
-      ) : null}
-    </>
+  const onDialogs = useCallback((next: FilesDialogs | null) => {
+    dialogs.current = next;
+  }, []);
+  const trashFound = useCallback(
+    async (paths: string[]) => {
+      try {
+        await disk.trash(paths);
+      } catch (cause) {
+        fail(cause, "Couldn't move it to the Trash.");
+      } finally {
+        refreshUnwatched();
+        refreshUndo();
+        store.getState().bump();
+      }
+    },
+    [store],
   );
 
   return (
-    <div className="relative flex size-full min-h-0 min-w-0 flex-col">
-      <Surface tone="page" className="flex min-h-0 flex-1 flex-col">
-        <FilesMain
-          place={place}
-          view={columnsShown ? "columns" : view}
-          zoom={state.zoom}
-          sort={state.sort ?? null}
-          onSort={(next) =>
-            state.setSort(
-              next ? { key: next.key as FilesSort["key"], descending: next.descending } : undefined,
-            )
-          }
-          listing={
-            state.searched ? { ...state.searched, retry: state.listing.retry } : state.listing
-          }
-          items={collection}
-          searching={Boolean(state.query.trim())}
-          selected={selection.selected}
-          onSelect={(event, id, onOpen) => {
-            if (event.detail >= 2) return onOpen();
-            selection.pick(id, order().ids, event);
-          }}
-          drag={drag}
-          background={background}
-          columns={columns}
-          scrollRef={scrollRef}
-          onKeyDown={(event) => handleFilesKey(event, commands, columnsShown)}
-        />
-        <FilesListFooter
-          count={state.shown.status === "ready" ? items.length : null}
-          selected={selectedItems.length}
-          selectedBytes={selectedBytes}
-          free={state.free}
-          progress={state.operation.progress}
-          onCancel={state.operation.cancel}
-        />
-      </Surface>
-      {slots.toolbar ? <Portal container={slots.toolbar}>{toolbar}</Portal> : null}
-      {slots.sidebar ? (
-        <Portal container={slots.sidebar}>
-          <FilesSidebar
-            current={place}
-            granted={granted}
-            picking={picking}
-            places={places.places}
-            tags={places.tags}
-            agentTrash={places.agentTrash}
-            macos={state.macos}
-            folded={state.folded}
-            onFold={state.setFolded}
-            onGo={(next) => state.go(next, { root: true })}
-          />
-        </Portal>
-      ) : null}
-      {slots.inspector ? (
-        <Portal container={slots.inspector}>
-          <FileInspector items={selectedItems} from={place} onOpen={actions.open} />
-        </Portal>
-      ) : null}
-      {pick && footer && slots.footer ? (
-        <Portal container={slots.footer}>{footer(selectedItems, actions.open)}</Portal>
-      ) : null}
-      {state.quick ? <QuickLook item={state.quick} onClose={() => state.setQuick(null)} /> : null}
-      {state.dialogs}
-    </div>
+    <BrowserStoreContext.Provider value={store}>
+      <PaneContext.Provider value={value}>
+        <PaneBody slots={slots} footer={footer} onTransfers={onTransfers} driveOpen={driveOpen} />
+        <FilesDialogsHost onReady={onDialogs} trash={trashFound} />
+      </PaneContext.Provider>
+    </BrowserStoreContext.Provider>
   );
 }

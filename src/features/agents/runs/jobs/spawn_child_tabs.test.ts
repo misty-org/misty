@@ -27,7 +27,7 @@ vi.mock("../../personal/use_agent_device_store", () => ({
   ensureAgentDevice: async () => ({ id: "device-1" }),
 }));
 import { useHostedSessions } from "../hosted-sessions/hosted_sessions_state";
-import { useLocalExecution, type Execution } from "../local-execution/local_execution";
+import { useLocalExecution, type Execution } from "../local-execution/local_execution_state";
 import { childTabCapabilities, spawnChildTabs } from "./spawn_child_tabs";
 import { DeviceOperationNotAttempted } from "./worker_browser_jobs";
 

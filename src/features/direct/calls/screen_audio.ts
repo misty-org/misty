@@ -17,9 +17,11 @@ export async function shareScreenAudio(
   let stopped = false;
   let restarts = 0;
 
+  const leaving = () => void stop();
   const stop = async () => {
     if (stopped) return;
     stopped = true;
+    window.removeEventListener("pagehide", leaving);
     audio.onmessage = () => undefined;
     await invoke("voice_share_audio_stop").catch(() => undefined);
     if (publication?.track)
@@ -37,6 +39,7 @@ export async function shareScreenAudio(
     start().catch(giveUp);
   };
 
+  window.addEventListener("pagehide", leaving);
   try {
     await context.audioWorklet.addModule(workletUrl);
     node = new AudioWorkletNode(context, "misty-screen-audio", {

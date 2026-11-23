@@ -1,10 +1,22 @@
 use std::{
     io,
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, RwLock,
+    },
 };
 
 use super::{check, check_link, real_path, refused, secrets, Access, Reach, POLICY};
+
+pub mod checked;
+pub mod place;
+mod sys;
+pub mod walk;
+
+pub use crate::paths::normalize_asked;
+pub use checked::{CheckedDir, CheckedFile, DirItem, ItemKind};
+pub use walk::{CopyOutcome, WalkFlow, WalkFor, WalkStep};
 
 static GRANTED: AtomicBool = AtomicBool::new(false);
 
@@ -21,23 +33,69 @@ pub fn disk_allowed() -> bool {
 }
 
 fn always_closed(real: &Path, access: Access) -> Option<&'static str> {
-    ClosedPlaces::resolve().why(real, access)
+    closed_places().why(real, access)
+}
+
+fn folded(path: &Path) -> PathBuf {
+    PathBuf::from(path.to_string_lossy().to_lowercase())
+}
+
+fn under(path: &Path, folder: &Path) -> bool {
+    path.starts_with(folder)
+        || (cfg!(target_os = "macos") && folded(path).starts_with(folded(folder)))
+}
+
+pub(crate) fn same_place(a: &Path, b: &Path) -> bool {
+    a == b || (cfg!(target_os = "macos") && folded(a) == folded(b))
+}
+
+type PlacesKey = (Option<PathBuf>, Option<PathBuf>, PathBuf);
+
+static CLOSED: RwLock<Option<Arc<ClosedPlaces>>> = RwLock::new(None);
+
+fn closed_places() -> Arc<ClosedPlaces> {
+    let key: PlacesKey = (
+        super::paths::misty_root_dir(),
+        dirs::home_dir(),
+        std::env::temp_dir(),
+    );
+    if let Some(places) = CLOSED
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_ref()
+        .filter(|places| places.key == key)
+    {
+        return places.clone();
+    }
+    let fresh = Arc::new(ClosedPlaces::resolve(key));
+    *CLOSED
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(fresh.clone());
+    fresh
 }
 
 struct ClosedPlaces {
+    key: PlacesKey,
     misty_root: Option<PathBuf>,
     keychains: Vec<PathBuf>,
+    temp: PathBuf,
 }
 
 impl ClosedPlaces {
-    fn resolve() -> Self {
+    fn resolve(key: PlacesKey) -> Self {
+        let misty_root = key
+            .0
+            .as_ref()
+            .and_then(|root| real_path::resolve(root).ok());
+        let temp = real_path::resolve(&key.2).unwrap_or_else(|_| key.2.clone());
         Self {
-            misty_root: super::paths::misty_root_dir()
-                .and_then(|root| real_path::resolve(&root).ok()),
+            misty_root,
             keychains: keychain_folders()
                 .into_iter()
                 .map(|folder| real_path::resolve(&folder).unwrap_or(folder))
                 .collect(),
+            temp,
+            key,
         }
     }
 
@@ -45,11 +103,34 @@ impl ClosedPlaces {
         if self.is_misty_data(real) {
             return Some("That folder holds Misty's own data.");
         }
-        if self.keychains.iter().any(|folder| real.starts_with(folder)) {
+        if self.keychains.iter().any(|folder| under(real, folder)) {
             return Some("Keychains can't be opened here.");
         }
-        if access == Access::Write && is_system_folder(real) {
+        if access == Access::Write && is_system_folder(real, &self.temp) {
             return Some("System folders can't be changed.");
+        }
+        None
+    }
+
+    fn inside(&self, real: &Path) -> Option<&'static str> {
+        let policy = POLICY
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let misty = self
+            .misty_root
+            .iter()
+            .cloned()
+            .chain(
+                [Reach::MistyHome, Reach::AppFolders, Reach::WebsiteData]
+                    .into_iter()
+                    .flat_map(|reach| policy.roots_of(reach)),
+            )
+            .any(|folder| under(&folder, real));
+        if misty {
+            return Some("That folder holds Misty's own data.");
+        }
+        if self.keychains.iter().any(|folder| under(folder, real)) {
+            return Some("That folder holds the computer's keychains.");
         }
         None
     }
@@ -70,7 +151,7 @@ impl ClosedPlaces {
             || self
                 .misty_root
                 .as_ref()
-                .is_some_and(|root| real.starts_with(root))
+                .is_some_and(|root| under(real, root))
     }
 
     fn is_drive_mount(&self, real: &Path) -> bool {
@@ -86,7 +167,7 @@ impl ClosedPlaces {
 
 #[cfg(test)]
 fn is_misty_data(real: &Path) -> bool {
-    ClosedPlaces::resolve().is_misty_data(real)
+    closed_places().is_misty_data(real)
 }
 
 fn keychain_folders() -> Vec<PathBuf> {
@@ -118,9 +199,8 @@ fn keychain_folders() -> Vec<PathBuf> {
     folders
 }
 
-fn is_system_folder(real: &Path) -> bool {
-    let temp = real_path::resolve(&std::env::temp_dir()).unwrap_or_else(|_| std::env::temp_dir());
-    if real.starts_with(&temp) {
+fn is_system_folder(real: &Path, temp: &Path) -> bool {
+    if under(real, temp) {
         return false;
     }
     #[cfg(unix)]
@@ -132,7 +212,7 @@ fn is_system_folder(real: &Path) -> bool {
         if real == Path::new("/") {
             return true;
         }
-        if system.iter().any(|folder| real.starts_with(folder)) {
+        if system.iter().any(|folder| under(real, Path::new(folder))) {
             return true;
         }
     }
@@ -196,17 +276,15 @@ fn gate(path: &Path, real: &Path, access: Access, link: bool) -> io::Result<()> 
 }
 
 pub struct DiskFolder {
-    dir: PathBuf,
     real: PathBuf,
-    closed: ClosedPlaces,
+    closed: Arc<ClosedPlaces>,
 }
 
 impl DiskFolder {
     pub fn open(dir: &Path) -> io::Result<Self> {
         Ok(Self {
-            dir: dir.to_path_buf(),
             real: real_path::resolve(dir)?,
-            closed: ClosedPlaces::resolve(),
+            closed: closed_places(),
         })
     }
 
@@ -215,7 +293,7 @@ impl DiskFolder {
         if self.closed.why(&real, access).is_some() {
             return false;
         }
-        disk_allowed() || check_link(&self.dir.join(name), access).is_ok()
+        disk_allowed() || checked::policy_allows(&real, access)
     }
 }
 
@@ -294,13 +372,17 @@ fn directly_in_agent_trash(held: &Path) -> io::Result<()> {
 pub fn rename_into_agent_trash(from: &Path, held: &Path) -> io::Result<()> {
     check_agent(from, Access::Write)?;
     directly_in_agent_trash(held)?;
-    std::fs::rename(from, held)
+    let (from_dir, from_name) = CheckedDir::open_parent(from, Access::Write, checked::Gate::Agent)?;
+    let (held_dir, held_name) = CheckedDir::open_parent(held, Access::Write, checked::Gate::App)?;
+    place::rename_new(&from_dir, &from_name, &held_dir, &held_name)
 }
 
 pub fn rename_out_of_agent_trash(held: &Path, to: &Path) -> io::Result<()> {
     directly_in_agent_trash(held)?;
     check_disk_link(to, Access::Write)?;
-    std::fs::rename(held, to)
+    let (held_dir, held_name) = CheckedDir::open_parent(held, Access::Write, checked::Gate::App)?;
+    let (to_dir, to_name) = CheckedDir::open_parent(to, Access::Write, checked::Gate::Person)?;
+    place::rename_new(&held_dir, &held_name, &to_dir, &to_name)
 }
 
 pub mod fs_disk {
@@ -368,9 +450,20 @@ pub mod fs_disk {
         fs::remove_dir(path)
     }
 
+    fn absolute(path: &Path) -> io::Result<PathBuf> {
+        if path.is_absolute() {
+            Ok(path.to_path_buf())
+        } else {
+            Ok(std::env::current_dir()?.join(path))
+        }
+    }
+
     pub fn remove_dir_all(path: impl AsRef<Path>) -> io::Result<()> {
-        check_disk_link(path.as_ref(), Access::Write)?;
-        fs::remove_dir_all(path)
+        super::walk::remove_tree_checked(
+            &absolute(path.as_ref())?,
+            super::walk::WalkFor::Person,
+            &mut |_| true,
+        )
     }
 
     pub fn rename(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
@@ -432,10 +525,21 @@ pub mod fs_disk {
     }
 
     pub fn copy_tree(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
-        let (from, to) = (from.as_ref(), to.as_ref());
-        check_disk(from, Access::Read)?;
-        check_disk_link(to, Access::Write)?;
-        crate::fs::copy_tree_unchecked(from, to)
+        let (from, to) = (absolute(from.as_ref())?, absolute(to.as_ref())?);
+        let (Some(folder), Some(name)) = (to.parent(), to.file_name()) else {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "A whole drive can't be used here.",
+            ));
+        };
+        super::walk::copy_tree_checked(
+            &from,
+            folder,
+            name,
+            super::walk::WalkFor::Person,
+            &mut |_, _| true,
+        )
+        .map(drop)
     }
 
     pub fn exists(path: impl AsRef<Path>) -> bool {
@@ -452,17 +556,22 @@ pub mod fs_disk {
 }
 
 #[cfg(test)]
+static GRANT: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
+pub(crate) fn grant_lock() -> std::sync::MutexGuard<'static, ()> {
+    GRANT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+#[cfg(test)]
+mod gate_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, sync::Mutex};
-
-    static GRANT: Mutex<()> = Mutex::new(());
-
-    fn grant_lock() -> std::sync::MutexGuard<'static, ()> {
-        GRANT
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
+    use std::fs;
 
     fn home() -> PathBuf {
         dirs::home_dir().expect("a home folder")

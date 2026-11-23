@@ -15,6 +15,7 @@ import {
 import type { ClosedWorkspaceItem } from "./closed_workspace_items";
 import { currentWindowId } from "../profiles/profile_window";
 import { browserWorkspaceStoreVersion } from "../recovery/workspace_recovery_storage";
+import type { AsideWorkspace } from "./workspace_sides";
 
 const knownLayout = (layout: WorkspaceLayout) =>
   normalizeWorkspaceLayout(withKnownWorkspaceViews(layout));
@@ -42,6 +43,23 @@ function knownClosedItems(value: unknown): ClosedWorkspaceItem[] {
   });
 }
 
+function knownSide(value: unknown): WorkspaceStore["side"] {
+  return value === "personal" || value === "spaces" ? value : undefined;
+}
+
+function knownAside(value: unknown): AsideWorkspace | undefined {
+  const aside = value as Partial<AsideWorkspace> | null | undefined;
+  if (!aside || typeof aside !== "object" || !aside.layout) return undefined;
+  return {
+    layout: knownLayout(aside.layout),
+    lastUsedViewByGroup:
+      aside.lastUsedViewByGroup && typeof aside.lastUsedViewByGroup === "object"
+        ? aside.lastUsedViewByGroup
+        : {},
+    closedItems: knownClosedItems(aside.closedItems),
+  };
+}
+
 export function migrateWorkspaceStore(persisted: unknown, version: number): WorkspaceStore {
   const state = persisted as Partial<WorkspaceStore> | null | undefined;
   if (version < browserWorkspaceStoreVersion || !state || typeof state !== "object") {
@@ -57,6 +75,8 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     layout: knownLayout(state.layout ?? initialWorkspaceLayout()),
     activeWindowId: currentWindowId(),
     closedItems: knownClosedItems(state.closedItems),
+    side: knownSide(state.side),
+    aside: knownSide(state.side) ? knownAside(state.aside) : undefined,
   } as WorkspaceStore;
 }
 
@@ -67,5 +87,7 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
     dockingLayout: state.dockingLayout,
     lastUsedViewByGroup: state.lastUsedViewByGroup,
     closedItems: state.closedItems,
+    side: state.side,
+    aside: state.aside,
   };
 }

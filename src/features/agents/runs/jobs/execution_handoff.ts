@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useLocalExecution } from "../local-execution/local_execution";
+import { useLocalExecution } from "../local-execution/local_execution_state";
 
 export function continuationScreen(conversationId: string): { executionMode: "agent" } | undefined {
   const execution = useLocalExecution.getState().execution;

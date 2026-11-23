@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use base64::Engine as _;
-use rand::RngCore;
+use rand::Rng;
 use reqwest::{header, Client, StatusCode};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -202,7 +202,7 @@ pub async fn discover(http: &Client, server: &str) -> Access {
 
 fn random_text() -> String {
     let mut bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut bytes);
+    rand::rng().fill_bytes(&mut bytes);
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
 }
 

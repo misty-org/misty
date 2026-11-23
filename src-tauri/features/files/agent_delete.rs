@@ -1,12 +1,12 @@
-use super::person_window;
+use super::{blocking, person_window};
 
 #[tauri::command]
-pub fn files_agent_delete_status(
+pub async fn files_agent_delete_status(
     app: tauri::AppHandle,
     webview: tauri::Webview,
 ) -> Result<bool, String> {
     person_window(&webview)?;
-    Ok(permissions::agent_delete_on(&app))
+    blocking(move || Ok(permissions::agent_delete_on(&app))).await
 }
 
 #[tauri::command]
@@ -19,11 +19,14 @@ pub async fn files_agent_delete_allow(
 }
 
 #[tauri::command]
-pub fn files_agent_delete_stop(
+pub async fn files_agent_delete_stop(
     app: tauri::AppHandle,
     webview: tauri::Webview,
 ) -> Result<(), String> {
     person_window(&webview)?;
-    permissions::stop_agent_delete(&app);
-    Ok(())
+    blocking(move || {
+        permissions::stop_agent_delete(&app);
+        Ok(())
+    })
+    .await
 }

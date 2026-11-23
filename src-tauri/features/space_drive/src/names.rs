@@ -118,14 +118,27 @@ pub fn nfc(name: &str) -> String {
     name.nfc().collect()
 }
 
+pub fn hidden_char(c: char) -> bool {
+    matches!(
+        c,
+        '\u{202A}'..='\u{202E}'
+            | '\u{2066}'..='\u{2069}'
+            | '\u{200B}'..='\u{200D}'
+            | '\u{2060}'
+            | '\u{FEFF}'
+    )
+}
+
+pub fn refused_char(c: char) -> bool {
+    c == '/' || c == '\\' || c.is_control() || hidden_char(c)
+}
+
 pub fn server_accepts(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 255
         && name != "."
         && name != ".."
-        && !name
-            .chars()
-            .any(|c| c == '/' || c == '\\' || c.is_control())
+        && !name.chars().any(refused_char)
         && nfc(name) == name
 }
 
@@ -135,7 +148,7 @@ pub fn server_name(local: &str) -> String {
         out.push(match ch {
             '/' => '／',
             '\\' => '＼',
-            c if c.is_control() => '_',
+            c if c.is_control() || hidden_char(c) => '_',
             c => c,
         });
     }
@@ -169,6 +182,7 @@ pub fn safe_local_name(name: &str) -> String {
             '/' => '／',
             '\\' => '＼',
             '\0'..='\u{1f}' => '_',
+            c if hidden_char(c) => '_',
             ':' if cfg!(windows) => '：',
             '*' if cfg!(windows) => '＊',
             '?' if cfg!(windows) => '？',
@@ -204,7 +218,29 @@ pub fn safe_local_name(name: &str) -> String {
 }
 
 pub fn fold(name: &str) -> String {
-    nfc(name).to_lowercase()
+    let mut out = String::with_capacity(name.len());
+    for ch in name.nfd() {
+        match ch {
+            'ß' | 'ẞ' => out.push_str("ss"),
+            'ς' => out.push('σ'),
+            'ﬀ' => out.push_str("ff"),
+            'ﬁ' => out.push_str("fi"),
+            'ﬂ' => out.push_str("fl"),
+            'ﬃ' => out.push_str("ffi"),
+            'ﬄ' => out.push_str("ffl"),
+            'ﬅ' | 'ﬆ' => out.push_str("st"),
+            other => {
+                for lower in other.to_lowercase() {
+                    match lower {
+                        'ß' => out.push_str("ss"),
+                        'ς' => out.push('σ'),
+                        lower => out.push(lower),
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 pub fn unique_names(names: &[String], keys: &[String]) -> Vec<String> {
@@ -376,6 +412,38 @@ mod tests {
         assert!(server_accepts("Café.txt"));
         assert_eq!(server_name(decomposed), "Café.txt");
         assert_eq!(fold("CAFÉ.TXT"), fold(decomposed));
+    }
+
+    #[test]
+    fn refuses_hidden_direction_and_width_marks() {
+        for name in [
+            "invoice\u{202E}fdp.exe",
+            "a\u{2066}b",
+            "zero\u{200B}width",
+            "joined\u{200D}",
+            "word\u{2060}joiner",
+            "\u{FEFF}bom.txt",
+        ] {
+            assert!(!server_accepts(name), "{name:?}");
+            assert!(
+                server_name(name).chars().all(|c| !hidden_char(c)),
+                "{name:?}"
+            );
+        }
+        assert!(server_accepts("Notes.md"));
+    }
+
+    #[test]
+    fn folds_names_as_a_case_blind_mac_drive_does() {
+        assert_eq!(fold("Straße.txt"), fold("STRASSE.TXT"));
+        assert_eq!(fold("ΣΟΦΟΣ"), fold("σοφος"));
+        assert_eq!(fold("ﬁle"), fold("FILE"));
+        assert_eq!(fold("İstanbul"), fold("i\u{307}stanbul"));
+        assert_eq!(fold("Cafe\u{301}"), fold("CAFÉ"));
+        assert_ne!(fold("a.txt"), fold("b.txt"));
+        let names: Vec<String> = ["Straße", "STRASSE"].map(String::from).to_vec();
+        let keys: Vec<String> = ["a", "b"].map(String::from).to_vec();
+        assert_eq!(unique_names(&names, &keys)[1], "STRASSE (2)");
     }
 
     #[test]

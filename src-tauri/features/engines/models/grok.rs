@@ -19,7 +19,7 @@ pub fn parse_grok_config_models(content: &str) -> Vec<EngineModel> {
         context_keys: &["context_window"],
         provider_key: None,
     };
-    let Ok(root) = content.parse::<toml::Value>() else {
+    let Ok(root) = toml::from_str::<toml::Value>(content) else {
         return Vec::new();
     };
     let current = root

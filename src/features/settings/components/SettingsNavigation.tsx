@@ -1,4 +1,4 @@
-import { cn, NavGroupHeading, NavList, NavRow, OverflowFadeText } from "@misty/ui";
+import { NavGroupHeading, NavList, NavRow, OverflowFadeText } from "@misty/ui";
 import type { LucideIcon } from "lucide-react";
 import { Fragment } from "react";
 export interface DesktopSettingsNavEntry<Id extends string = string> {
@@ -26,7 +26,7 @@ export function SettingsNavigation<Id extends string>(props: {
   return (
     <nav
       aria-label={props.label}
-      className={cn("misty-scrollbar min-h-0 flex-1 overflow-y-auto px-3 max-[748px]:px-2")}
+      className="misty-scrollbar min-h-0 flex-1 overflow-y-auto px-3"
     >
       {props.groups.map((group) => (
         <div key={group.label} role="group" aria-label={group.label} className="pb-3">

@@ -164,6 +164,7 @@ pub async fn space_app_session_open(
 ) -> Result<String, String> {
     person_window(&webview)?;
     let label = webview.label().to_owned();
+    let generation = permissions::window_generation(&label);
     tauri::async_runtime::spawn_blocking(move || {
         let manifest = match super::site::site_entry(&app_id).filter(|site| site.version == version)
         {
@@ -174,10 +175,23 @@ pub async fn space_app_session_open(
         if !manifest.runs_here() {
             return Err(format!("{} isn't made for this computer.", manifest.name));
         }
-        permissions::open(&manifest, &space_id, &label, &approved)
+        permissions::open_since(&manifest, &space_id, &label, &approved, generation)
     })
     .await
     .map_err(|error| error.to_string())?
+}
+
+#[derive(serde::Serialize)]
+pub struct Refusal {
+    denied: bool,
+    message: String,
+}
+
+fn refused(message: String) -> Refusal {
+    Refusal {
+        denied: true,
+        message,
+    }
 }
 
 #[tauri::command]
@@ -186,14 +200,14 @@ pub fn space_app_session_check(
     session: String,
     kind: String,
     name: String,
-) -> Result<(), String> {
-    person_window(&webview)?;
+) -> Result<(), Refusal> {
+    person_window(&webview).map_err(refused)?;
     let kind = match kind.as_str() {
         "call" => Kind::Call,
         "subscribe" => Kind::Subscribe,
-        _ => return Err("That isn't a kind of call.".into()),
+        _ => return Err(refused("That isn't a kind of call.".into())),
     };
-    permissions::check(&session, webview.label(), kind, &name)
+    permissions::check(&session, webview.label(), kind, &name).map_err(refused)
 }
 
 #[tauri::command]
@@ -210,10 +224,11 @@ pub fn space_app_mcp_register(
 pub fn space_app_tools_standby(
     webview: Webview,
     app_id: String,
+    space_id: Option<String>,
     tools: Vec<serde_json::Value>,
 ) -> Result<usize, String> {
     person_window(&webview)?;
-    mcp::register_standby(webview.label(), &app_id, &tools)
+    mcp::register_standby(webview.label(), &app_id, space_id.as_deref(), &tools)
 }
 
 #[tauri::command]

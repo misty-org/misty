@@ -339,6 +339,12 @@ permissions = [
   "allow-chat-open-in-code",
   "allow-chat-scratch-clear",
   "allow-chat-scratch-usage",
+  "allow-thread-clashes",
+  "allow-thread-lane-of",
+  "allow-thread-outputs",
+  "allow-thread-work-land",
+  "allow-thread-work-resolve",
+  "allow-thread-work-status",
   "allow-engine-models",
   "allow-engine-catalog",
   "allow-engines-list",
@@ -561,7 +567,7 @@ permissions = [
 
 [[set]]
 identifier = "action-drive"
-description = "Each Space's drive on this computer: listing, reading and writing its files, new folders, renaming and moving, in-use marks, keep downloaded, the cache's limit, pausing sync, the Space's trash and copying a folder in"
+description = "Each Space's drive on this computer: listing, reading and writing its files, new folders, renaming and moving, in-use marks, keep downloaded, the cache's limit, the size past which a file waits to sync and syncing one that waits, pausing sync, the Space's trash and copying a folder in"
 permissions = [
   "allow-drive-close",
   "allow-drive-copy-in",
@@ -573,19 +579,25 @@ permissions = [
   "allow-drive-open",
   "allow-drive-paused",
   "allow-drive-purge",
+  "allow-drive-purge-many",
   "allow-drive-read",
   "allow-drive-realtime-event",
   "allow-drive-remove-download",
   "allow-drive-rename",
   "allow-drive-restore",
   "allow-drive-restore-burst",
+  "allow-drive-restore-many",
   "allow-drive-reveal",
   "allow-drive-set-cache-limit",
+  "allow-drive-set-large-file-limit",
   "allow-drive-set-paused",
+  "allow-drive-conflicts",
   "allow-drive-status",
+  "allow-drive-sync-large",
   "allow-drive-sync-spaces",
   "allow-drive-trash",
   "allow-drive-trash-list",
+  "allow-drive-trash-many",
   "allow-drive-write",
 ]
 
@@ -611,7 +623,8 @@ permissions = [
   "allow-files-conflicts",
   "allow-files-create-file",
   "allow-files-create-folder",
-  "allow-files-delete-forever",
+  "allow-files-delete-now",
+  "allow-files-delete-trashed",
   "allow-files-duplicate",
   "allow-files-duplicates",
   "allow-files-extract",
@@ -630,8 +643,7 @@ permissions = [
   "allow-files-open-with",
   "allow-files-places",
   "allow-files-put-back",
-  "allow-files-read-bytes",
-  "allow-files-read-text",
+  "allow-files-read-head",
   "allow-files-recent",
   "allow-files-redo",
   "allow-files-rename",
@@ -651,6 +663,6 @@ permissions = [
   "allow-files-trashed",
   "allow-files-undo",
   "allow-files-undo-state",
-  "allow-files-unwatch",
-  "allow-files-watch",
+  "allow-files-watch-close",
+  "allow-files-watch-open",
 ]

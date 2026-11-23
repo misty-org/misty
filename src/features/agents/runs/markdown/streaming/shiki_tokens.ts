@@ -1,34 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-  createCssVariablesTheme,
-  createHighlighterCore,
-  type HighlighterCore,
-  type ThemedToken,
-} from "shiki/core";
-import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
-import { bundledLanguages } from "shiki/langs";
+import type { ThemedToken } from "shiki/core";
+import { codeLanguage } from "@/shared/lib/highlight/code_languages";
 
 type Lines = ThemedToken[][];
 
-const theme = createCssVariablesTheme({ name: "misty", variablePrefix: "--shiki-" });
 const LIMIT = { entries: 64, characters: 300_000 };
 const cache = new Map<string, Lines>();
 let cachedCharacters = 0;
-let highlighter: Promise<HighlighterCore> | undefined;
-
-function core() {
-  highlighter ??= createHighlighterCore({
-    themes: [theme],
-    langs: [],
-    engine: createJavaScriptRegexEngine({ forgiving: true }),
-  });
-  return highlighter;
-}
-
-function grammar(language: string | undefined) {
-  const id = language?.toLowerCase();
-  return id && id in bundledLanguages ? (id as keyof typeof bundledLanguages) : undefined;
-}
 
 const keyOf = (code: string, language: string) => `${language}\u0000${code}`;
 
@@ -45,10 +23,8 @@ function remember(key: string, lines: Lines) {
 }
 
 async function tokenize(code: string, language: string): Promise<Lines> {
-  const shiki = await core();
-  if (!shiki.getLoadedLanguages().includes(language))
-    await shiki.loadLanguage(bundledLanguages[language as keyof typeof bundledLanguages]);
-  return shiki.codeToTokensBase(code, { lang: language, theme: "misty" });
+  const { tokenize } = await import("@/shared/lib/highlight/shiki_highlighter");
+  return tokenize(code, language);
 }
 
 export function closedFence(raw: string): boolean {
@@ -60,7 +36,7 @@ export function closedFence(raw: string): boolean {
 }
 
 export function useCodeTokens(code: string, language: string | undefined, settled: boolean) {
-  const id = grammar(language);
+  const id = codeLanguage(language);
   const key = id ? keyOf(code, id) : "";
   const known = key ? cache.get(key) : undefined;
   const [loaded, setLoaded] = useState<{ key: string; lines: Lines }>();

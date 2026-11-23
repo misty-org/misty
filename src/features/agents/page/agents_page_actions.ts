@@ -40,6 +40,7 @@ export function createAgentsPageActions(state: AgentsPageState) {
       const next = new URLSearchParams(params);
       next.set("agent", id);
       next.delete("view");
+      next.delete("thread");
       if (nextConversationId) next.set("conversation", nextConversationId);
       else next.delete("conversation");
       setParams(next, { replace: true });

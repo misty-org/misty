@@ -7,7 +7,7 @@ mod adapter_world;
 mod downloads;
 mod navigation;
 mod permissions;
-use navigation::{open_outside, stays_in_app, stays_on_site};
+use navigation::{refuse_outside, stays_in_app, stays_on_site};
 pub use permissions::{
     __cmd__space_app_page_permission_answer, __cmd__space_apps_forget_permissions,
     __tauri_command_name_space_app_page_permission_answer,
@@ -21,6 +21,8 @@ pub struct AppPageOpenRequest {
     pub mount: String,
     pub app_id: String,
     pub version: String,
+    #[serde(default)]
+    pub space_id: Option<String>,
     #[serde(flatten)]
     pub bounds: AppPageBounds,
 }
@@ -214,6 +216,7 @@ pub async fn space_app_page_open(
         mount,
         app_id,
         version,
+        space_id,
         bounds,
     } = request;
     if !manifest::valid_id(&app_id) || !manifest::valid_version(&version) {
@@ -252,6 +255,7 @@ pub async fn space_app_page_open(
         Kind::Bundle => None,
     };
     let token = frames::register(&mount, &app_id, &version, &owner, world, gate)?;
+    frames::set_space(&mount, space_id.filter(|space| !space.is_empty() && space.len() <= 200));
     let shortcuts =
         serde_json::to_string(&crate::browser::input::shortcuts::current_shortcut_bindings(&state))
             .unwrap_or_else(|_| "[]".to_owned());
@@ -271,7 +275,6 @@ pub async fn space_app_page_open(
             }
         }
     };
-    let navigation_app = app.clone();
     let window_app = app.clone();
     let download_app = app.clone();
     let download_mount = mount.clone();
@@ -282,6 +285,10 @@ pub async fn space_app_page_open(
     let window_rules = site_rules.clone();
     let window_label = label.clone();
     let navigation_id = app_id.clone();
+    let window_id = app_id.clone();
+    let navigation_app = app.clone();
+    let navigation_mount = mount.clone();
+    let window_mount = mount.clone();
     let load_mount = mount.clone();
     let reapplies_shortcuts = matches!(kind, Kind::Bundle);
     let builder = with_store_data(
@@ -301,7 +308,7 @@ pub async fn space_app_page_open(
         if stays {
             return true;
         }
-        open_outside(&navigation_app, url);
+        refuse_outside(&navigation_app, &navigation_mount, &navigation_id, url);
         false
     })
     .on_new_window(move |url, _features| {
@@ -313,7 +320,7 @@ pub async fn space_app_page_open(
                 }
             }
         }
-        open_outside(&window_app, &url);
+        refuse_outside(&window_app, &window_mount, &window_id, &url);
         NewWindowResponse::Deny
     })
     .on_download(move |_webview, event| downloads::handle(&download_app, &download_mount, event))

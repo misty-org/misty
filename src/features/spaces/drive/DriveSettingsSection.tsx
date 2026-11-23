@@ -17,6 +17,24 @@ const choices = [
   { value: "none", label: "No limit" },
 ];
 
+const MB = 1024 * 1024;
+const largeChoices = [
+  { value: "100", label: "100 MB" },
+  { value: "500", label: "500 MB" },
+  { value: "1024", label: "1 GB" },
+  { value: "5120", label: "5 GB" },
+  { value: "none", label: "No limit" },
+];
+
+const savedLargeChoice = createDeviceSetting<string>({
+  scope: "drive-large-file-choice",
+  defaults: "1024",
+  normalize: (stored) =>
+    typeof stored === "string" && largeChoices.some((item) => item.value === stored)
+      ? stored
+      : "1024",
+});
+
 const savedCacheChoice = createDeviceSetting<string>({
   scope: "drive-cache-choice",
   defaults: "none",
@@ -26,6 +44,7 @@ const savedCacheChoice = createDeviceSetting<string>({
 
 export function DriveSettingsSection(props: SettingsContentProps) {
   const chosen = savedCacheChoice((state) => state.value);
+  const large = savedLargeChoice((state) => state.value);
   const [paused, setPaused] = useState<boolean | null>(null);
   useEffect(() => {
     driveNative
@@ -50,6 +69,28 @@ export function DriveSettingsSection(props: SettingsContentProps) {
                 notify({ message: "Syncing couldn't be changed. Try again.", tone: "error" }),
               )
           }
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Ask before syncing files over"
+        description="Larger files stay on this computer until you choose Sync this file in Files."
+      >
+        <DropdownControl
+          value={large}
+          options={largeChoices}
+          disabled={props.working}
+          onValueChange={(value) => {
+            const bytes = value === "none" ? null : Number(value) * MB;
+            driveNative
+              .setLargeFileLimit(bytes)
+              .then(() => savedLargeChoice.getState().set(value))
+              .catch(() =>
+                notify({
+                  message: "The size couldn't be changed. Try again.",
+                  tone: "error",
+                }),
+              );
+          }}
         />
       </SettingsRow>
       <SettingsRow

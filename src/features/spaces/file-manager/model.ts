@@ -55,6 +55,13 @@ export function childOf(folder: string, name: string): string {
   return folder.endsWith(separator) ? `${folder}${name}` : `${folder}${separator}${name}`;
 }
 
+export function checkName(name: string): string {
+  if (!name.trim()) throw new Error("Give it a name.");
+  if (name === "." || name === "..") throw new Error(`“${name}” can't be used as a name.`);
+  if (/[\\/\0]/.test(name)) throw new Error("A name can't have a slash in it.");
+  return name;
+}
+
 export function foldersBetween(root: string, path: string): string[] {
   if (path === root) return [root];
   const separator = separatorOf(root);
@@ -128,9 +135,11 @@ export function localPath(item: FileItem): string | undefined {
   return undefined;
 }
 
+const nameOrder = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
 export function finderOrder(a: FileItem, b: FileItem): number {
   if (a.folder !== b.folder) return a.folder ? -1 : 1;
-  return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+  return nameOrder.compare(a.name, b.name);
 }
 
 export function diskItem(entry: FileEntry): FileItem {
@@ -141,7 +150,7 @@ export function diskItem(entry: FileEntry): FileItem {
     size: entry.size,
     modifiedMs: entry.modifiedMs,
     hidden: entry.hidden,
-    tags: entry.tags,
+    tags: entry.tags ?? [],
     source: { kind: "disk", entry },
   };
 }

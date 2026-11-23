@@ -18,7 +18,7 @@ type SpaceToolRun = (request: LocalToolRequest, space: SpaceRow) => Promise<unkn
 export const isPersonalSpace = (space: SpaceRow) => space.is_default && space.role === "owner";
 
 const HOME_GONE =
-  "My home Space is gone: it was deleted, or the person left it. Ask them to pick a new home Space in my settings.";
+  "The Space I live in is gone: it was deleted, or the person left it. Ask them to copy me into a Space they're in.";
 
 export async function listSpaces(
   request: Pick<LocalToolRequest, "signal" | "runId">,

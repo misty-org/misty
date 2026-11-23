@@ -8,16 +8,16 @@ import {
   DropdownMenuTrigger,
   MenuItem,
 } from "@misty/ui";
-import { UserPlus } from "lucide-react";
+import { CopyPlus } from "lucide-react";
 import { useEffect } from "react";
 
 export function BringAgentMenu({
   agents,
-  currentUserId,
+  spaceId,
   onBring,
 }: {
   agents: SpaceAgent[] | undefined;
-  currentUserId: string | undefined;
+  spaceId: string;
   onBring: (agentId: string) => void;
 }) {
   const { user } = useAuth();
@@ -25,18 +25,17 @@ export function BringAgentMenu({
   useEffect(() => {
     if (user?.id) void usePersonalAgentsStore.getState().load(user.id);
   }, [user?.id]);
-  const here = new Set(
-    (agents ?? [])
-      .filter((agent) => agent.owner_user_id === currentUserId)
-      .map((agent) => agent.agent_id),
+  const here = new Set((agents ?? []).map((agent) => agent.agent_id));
+  const available = mine.filter(
+    (agent) =>
+      !agent.system_managed && agent.space_id !== spaceId && !here.has(agent.id),
   );
-  const available = mine.filter((agent) => agent.enabled && !here.has(agent.id));
   if (!agents || !available.length) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="secondary" icon={UserPlus}>
-          Bring an agent
+        <Button type="button" variant="secondary" icon={CopyPlus}>
+          Copy an agent here
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

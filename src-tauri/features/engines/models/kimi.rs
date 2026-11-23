@@ -55,7 +55,7 @@ pub fn parse_kimi_config_models(content: &str) -> Vec<EngineModel> {
         context_keys: &["max_context_size", "context_window"],
         provider_key: Some("provider"),
     };
-    let Ok(root) = content.parse::<toml::Value>() else {
+    let Ok(root) = toml::from_str::<toml::Value>(content) else {
         return Vec::new();
     };
     let default = root

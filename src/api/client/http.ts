@@ -1,4 +1,5 @@
 import type { AccountRequestInit } from "./native_account_fetch";
+import { abortAny } from "./abort_any";
 import { cookieSessionFetch } from "./cookie_session";
 import { rateLimitResponse, recordRateLimit } from "./rate_limit";
 const TRANSIENT_NETWORK_PATTERNS = [
@@ -26,6 +27,38 @@ function isAbortError(error: unknown): boolean {
     return true;
   }
   return false;
+}
+
+const idempotentAnswerTimeoutMs = 30_000;
+
+class RequestTimeoutError extends Error {
+  constructor() {
+    super("The server took too long to answer.");
+    this.name = "RequestTimeoutError";
+  }
+}
+
+function boundedAttempt(
+  init: AccountRequestInit,
+  bounded: boolean,
+): { init: AccountRequestInit; answered(): void; timedOut(): boolean } {
+  if (!bounded) return { init, answered: () => {}, timedOut: () => false };
+  const controller = new AbortController();
+  let expired = false;
+  const caller = init.signal;
+  const timer = setTimeout(() => {
+    expired = true;
+    controller.abort();
+  }, idempotentAnswerTimeoutMs);
+  const combined = abortAny(caller ? [caller, controller.signal] : [controller.signal]);
+  return {
+    init: { ...init, signal: combined.signal },
+    answered: () => {
+      clearTimeout(timer);
+      combined.dispose();
+    },
+    timedOut: () => expired,
+  };
 }
 
 let outageUntil = 0;
@@ -67,10 +100,15 @@ export async function httpRequest(
       throw abortErr;
     }
 
+    const attemptInit = boundedAttempt(init, isIdempotent);
     try {
       const coolingDown = rateLimitResponse(input, init);
-      if (coolingDown) return coolingDown;
-      const response = await cookieSessionFetch(input, init);
+      if (coolingDown) {
+        attemptInit.answered();
+        return coolingDown;
+      }
+      const response = await cookieSessionFetch(input, attemptInit.init);
+      attemptInit.answered();
       recordRateLimit(input, init, response);
       const answered =
         response.status === 503 &&
@@ -88,9 +126,17 @@ export async function httpRequest(
       noteAvailable();
       return response;
     } catch (error) {
+      attemptInit.answered();
+      if (attemptInit.timedOut() && !init.signal?.aborted) {
+        lastError = new RequestTimeoutError();
+        break;
+      }
       lastError = error;
-      if (isAbortError(error) || init.signal?.aborted) {
-        const abortErr = error instanceof Error ? error : new Error("Request was aborted");
+      if (isAbortError(error)) throw error;
+      if (init.signal?.aborted) {
+        const abortErr = new Error(error instanceof Error ? error.message : "Request was aborted", {
+          cause: error,
+        });
         abortErr.name = "AbortError";
         throw abortErr;
       }
@@ -118,16 +164,17 @@ function backoffDelay(attempt: number, signal?: AbortSignal | null, minimumMs = 
       reject(abortErr);
       return;
     }
-    const timer = setTimeout(resolve, delay);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(timer);
-        const abortErr = new Error("Request was aborted");
-        abortErr.name = "AbortError";
-        reject(abortErr);
-      };
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      const abortErr = new Error("Request was aborted");
+      abortErr.name = "AbortError";
+      reject(abortErr);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 

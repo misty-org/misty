@@ -8,7 +8,7 @@ export interface TeammateAgent {
   name: string;
   owner: string;
   ownerPicture?: string;
-  state: StudioState;
+  state: StudioState | "landing";
   doing: string;
   files: string[];
 }

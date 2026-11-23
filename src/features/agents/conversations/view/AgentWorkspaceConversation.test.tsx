@@ -5,6 +5,7 @@ import type { AgentProfile } from "@/shared/schemas";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type * as ActionQuestions from "@/features/agents/island/action_questions";
+import type * as LocalExecutionState from "@/features/agents/runs/local-execution/local_execution_state";
 import { NoticeViewport } from "@misty/ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -31,7 +32,8 @@ vi.mock("./AgentConversationView", () => ({
   AgentConversationView: () => <div>Conversation messages</div>,
 }));
 const finishExecutionMock = vi.fn(async () => {});
-vi.mock("@/features/agents/runs/local-execution/local_execution", () => ({
+vi.mock("@/features/agents/runs/local-execution/local_execution_state", async (importOriginal) => ({
+  ...(await importOriginal<typeof LocalExecutionState>()),
   finishLocalExecution: () => finishExecutionMock(),
 }));
 vi.mock("@/shared/platform/tauri", () => ({

@@ -1,18 +1,22 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 //! One folder's items, as Files lists them: folders first, then by name without regard to case,
-//! without the system's own junk files, hidden items only when asked. The folder is checked by
-//! the disk gate once; each item is then read from its directory entry, and a large folder is
-//! read on a few threads at once, as Kura does, since one stat (and one tag read) per item is
-//! what a big listing costs.
+//! without the system's own junk files, hidden items only when asked. The folder is opened once
+//! through the disk gate as a checked handle and read in one pass (names and their own stat);
+//! closed places are left out, hidden items are dropped before any further work, a link is read
+//! only through the handle, and a large folder is shaped on a few threads at once, as Kura does.
 use std::{
+    ffi::{OsStr, OsString},
     io,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
-use file_access::disk::{fs_disk, DiskFolder};
+use file_access::{
+    disk::{CheckedDir, DirItem, DiskFolder},
+    Access,
+};
 use serde::Serialize;
 
-use super::entry::{extension, is_package_name, millis, FileEntry, FileKind};
+use super::entry::{entry_in, hidden_name, Facts, FileEntry, FileKind};
 use super::{asked_path, blocking, failed, person_window};
 
 #[derive(Serialize)]
@@ -42,67 +46,6 @@ pub(crate) fn io_text(error: &io::Error) -> String {
     }
 }
 
-#[cfg(windows)]
-fn hidden_by_system(meta: &std::fs::Metadata) -> bool {
-    use std::os::windows::fs::MetadataExt;
-    const HIDDEN: u32 = 0x2;
-    const SYSTEM: u32 = 0x4;
-    meta.file_attributes() & (HIDDEN | SYSTEM) != 0
-}
-
-#[cfg(target_os = "macos")]
-fn hidden_by_system(meta: &std::fs::Metadata) -> bool {
-    use std::os::macos::fs::MetadataExt;
-    const UF_HIDDEN: u32 = 0x8000;
-    meta.st_flags() & UF_HIDDEN != 0
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn hidden_by_system(_meta: &std::fs::Metadata) -> bool {
-    false
-}
-
-fn entry_from(
-    gate: &DiskFolder,
-    item: &std::fs::DirEntry,
-    name: String,
-    path: PathBuf,
-) -> Option<FileEntry> {
-    let own = item.metadata().ok()?;
-    let (meta, kind, link_target) = if own.file_type().is_symlink() {
-        let target = fs_disk::read_link(&path)
-            .ok()
-            .map(|target| target.display().to_string());
-        match fs_disk::metadata(&path) {
-            Ok(followed) if followed.is_dir() => (followed, FileKind::Folder, target),
-            Ok(followed) => (followed, FileKind::Link, target),
-            Err(_) => (own, FileKind::Link, target),
-        }
-    } else if own.is_dir() {
-        let kind = if is_package_name(&name) {
-            FileKind::Package
-        } else {
-            FileKind::Folder
-        };
-        (own, kind, None)
-    } else {
-        (own, FileKind::File, None)
-    };
-    let folder = matches!(kind, FileKind::Folder);
-    Some(FileEntry {
-        hidden: name.starts_with('.') || hidden_by_system(&meta),
-        ext: if folder { None } else { extension(&name) },
-        size: if folder { 0 } else { meta.len() },
-        modified_ms: millis(meta.modified()),
-        created_ms: millis(meta.created()),
-        tags: super::tags::read_tags_in(gate, &name, &path),
-        path: path.display().to_string(),
-        link_target,
-        kind,
-        name,
-    })
-}
-
 pub(crate) fn sort_entries(entries: &mut [FileEntry]) {
     entries.sort_by_cached_key(|entry| {
         let rank = u8::from(!matches!(entry.kind, FileKind::Folder));
@@ -110,27 +53,65 @@ pub(crate) fn sort_entries(entries: &mut [FileEntry]) {
     });
 }
 
-pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>> {
-    let items: Vec<(std::fs::DirEntry, String)> = fs_disk::read_dir(dir)?
-        .flatten()
-        .map(|item| {
-            let name = item.file_name().to_string_lossy().into_owned();
-            (item, name)
+pub(crate) struct Lister<'a> {
+    pub folder: &'a CheckedDir,
+    pub gate: DiskFolder,
+    pub shown: &'a Path,
+    pub hidden: bool,
+}
+
+impl<'a> Lister<'a> {
+    pub(crate) fn new(folder: &'a CheckedDir, shown: &'a Path, hidden: bool) -> io::Result<Self> {
+        Ok(Self {
+            gate: DiskFolder::open(folder.path())?,
+            folder,
+            shown,
+            hidden,
         })
-        .filter(|(_, name)| !is_os_junk(name))
-        .filter(|(_, name)| hidden || !name.starts_with('.'))
-        .collect();
-    let folder = DiskFolder::open(dir)?;
-    let read = |(item, name): (std::fs::DirEntry, String)| {
-        let path = dir.join(&name);
-        entry_from(&folder, &item, name, path)
-    };
-    let threads = std::thread::available_parallelism()
-        .map_or(1, |count| count.get())
-        .min(MAX_THREADS);
-    let mut entries: Vec<FileEntry> = if items.len() < PARALLEL_FROM || threads < 2 {
-        items.into_iter().filter_map(read).collect()
-    } else {
+    }
+
+    pub(crate) fn shows_name(&self, name: &OsStr) -> bool {
+        let text = name.to_string_lossy();
+        if is_os_junk(&text) || (!self.hidden && hidden_name(&text)) {
+            return false;
+        }
+        self.gate.allows(&text, Access::Read)
+    }
+
+    fn shape(&self, name: &OsStr, facts: Facts) -> Option<FileEntry> {
+        if !self.hidden && facts.system_hidden {
+            return None;
+        }
+        Some(entry_in(self.folder, &self.gate, self.shown, name, facts))
+    }
+
+    pub(crate) fn from_item(&self, item: &DirItem) -> Option<FileEntry> {
+        let system_hidden = super::entry::hidden_item(self.folder.path(), item);
+        self.shape(&item.name, Facts::of_item(item, system_hidden))
+    }
+
+    pub(crate) fn one(&self, name: &OsStr) -> io::Result<Option<FileEntry>> {
+        if !self.shows_name(name) {
+            return Ok(None);
+        }
+        let meta = self.folder.metadata(name)?;
+        Ok(self.shape(name, Facts::of_meta(&meta)))
+    }
+
+    pub(crate) fn all(&self) -> io::Result<Vec<(OsString, FileEntry)>> {
+        let items: Vec<DirItem> = self
+            .folder
+            .read_dir()?
+            .into_iter()
+            .filter(|item| self.shows_name(&item.name))
+            .collect();
+        let read = |item: DirItem| self.from_item(&item).map(|entry| (item.name, entry));
+        let threads = std::thread::available_parallelism()
+            .map_or(1, |count| count.get())
+            .min(MAX_THREADS);
+        if items.len() < PARALLEL_FROM || threads < 2 {
+            return Ok(items.into_iter().filter_map(read).collect());
+        }
         let chunk = items.len().div_ceil(threads).max(1);
         let mut shares = Vec::new();
         let mut rest = items;
@@ -139,10 +120,11 @@ pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>
             shares.push(rest);
             rest = tail;
         }
-        std::thread::scope(|scope| {
+        Ok(std::thread::scope(|scope| {
             let workers: Vec<_> = shares
                 .into_iter()
                 .map(|share| {
+                    let read = &read;
                     scope.spawn(move || share.into_iter().filter_map(read).collect::<Vec<_>>())
                 })
                 .collect();
@@ -150,11 +132,25 @@ pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>
                 .into_iter()
                 .flat_map(|worker| worker.join().unwrap_or_default())
                 .collect()
-        })
-    };
-    if !hidden {
-        entries.retain(|entry| !entry.hidden);
+        }))
     }
+}
+
+pub(crate) fn list_open(
+    folder: &CheckedDir,
+    shown: &Path,
+    hidden: bool,
+) -> io::Result<Vec<(OsString, FileEntry)>> {
+    Lister::new(folder, shown, hidden)?.all()
+}
+
+pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>> {
+    let shown = file_access::disk::normalize_asked(dir)?;
+    let folder = CheckedDir::open(&shown, Access::Read)?;
+    let mut entries: Vec<FileEntry> = list_open(&folder, &shown, hidden)?
+        .into_iter()
+        .map(|(_, entry)| entry)
+        .collect();
     sort_entries(&mut entries);
     Ok(entries)
 }
@@ -195,6 +191,16 @@ mod tests {
         }
     }
 
+    #[allow(clippy::disallowed_methods)]
+    fn scratch() -> (tempfile::TempDir, std::path::PathBuf) {
+        let directory = tempfile::Builder::new()
+            .prefix("misty-listing-")
+            .tempdir()
+            .unwrap();
+        let root = std::fs::canonicalize(directory.path()).unwrap();
+        (directory, root)
+    }
+
     #[test]
     fn folders_come_first_then_names_without_case() {
         let mut entries = vec![
@@ -218,5 +224,66 @@ mod tests {
         assert!(is_os_junk("thumbs.db"));
         assert!(is_os_junk("Desktop.ini"));
         assert!(!is_os_junk(".gitignore"));
+    }
+
+    #[allow(clippy::disallowed_methods)]
+    #[test]
+    fn hidden_items_and_junk_stay_out_unless_asked() {
+        let (_directory, root) = scratch();
+        std::fs::write(root.join("seen.txt"), b"x").unwrap();
+        std::fs::write(root.join(".secret"), b"x").unwrap();
+        std::fs::write(root.join(".DS_Store"), b"x").unwrap();
+        let names = |hidden: bool| -> Vec<String> {
+            list_folder(&root, hidden)
+                .unwrap()
+                .into_iter()
+                .map(|entry| entry.name)
+                .collect()
+        };
+        assert_eq!(names(false), ["seen.txt"]);
+        assert_eq!(names(true), [".secret", "seen.txt"]);
+    }
+
+    #[cfg(unix)]
+    #[allow(clippy::disallowed_methods)]
+    #[test]
+    fn a_link_is_listed_with_its_target_and_a_folder_link_as_a_folder() {
+        let (_directory, root) = scratch();
+        std::fs::create_dir_all(root.join("real")).unwrap();
+        std::fs::write(root.join("file.txt"), b"hello").unwrap();
+        std::os::unix::fs::symlink(root.join("real"), root.join("to-folder")).unwrap();
+        std::os::unix::fs::symlink(root.join("file.txt"), root.join("to-file")).unwrap();
+        std::os::unix::fs::symlink(root.join("gone"), root.join("dangling")).unwrap();
+        let entries = list_folder(&root, false).unwrap();
+        let find = |name: &str| entries.iter().find(|entry| entry.name == name).unwrap();
+        assert_eq!(find("to-folder").kind, FileKind::Folder);
+        assert_eq!(
+            find("to-folder").link_target.as_deref(),
+            Some(root.join("real").to_str().unwrap())
+        );
+        assert_eq!(find("to-file").kind, FileKind::Link);
+        assert_eq!(find("to-file").size, 5);
+        assert_eq!(find("dangling").kind, FileKind::Link);
+        assert_eq!(
+            find("file.txt").path,
+            root.join("file.txt").display().to_string()
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[allow(clippy::disallowed_methods)]
+    #[test]
+    fn closed_places_are_left_out_of_a_listing() {
+        let home = dirs::home_dir().expect("a home folder");
+        let library = home.join("Library");
+        std::fs::create_dir_all(library.join("Keychains")).unwrap();
+        std::fs::create_dir_all(library.join("Fonts")).unwrap();
+        let names: Vec<String> = list_folder(&library, true)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.name)
+            .collect();
+        assert!(names.contains(&"Fonts".to_owned()));
+        assert!(!names.contains(&"Keychains".to_owned()));
     }
 }

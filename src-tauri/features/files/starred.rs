@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::params;
 use tauri::AppHandle;
 
-use super::db::{connect, now_ms};
+use super::db::{now_ms, with};
 use super::entry::{entry_for, FileEntry};
 use super::{asked_path, blocking, person_window};
 
@@ -55,22 +55,24 @@ pub fn note_recent_path(app: &AppHandle, path: &Path) {
 }
 
 fn note_recent(app: &AppHandle, path: &Path) -> Result<(), String> {
-    let connection = connect(app)?;
-    connection
-        .execute(
-            "INSERT INTO files_recent (path, opened_at) VALUES (?1, ?2)
-             ON CONFLICT(path) DO UPDATE SET opened_at = excluded.opened_at",
-            params![path.display().to_string(), now_ms()],
-        )
-        .map_err(db_error)?;
-    connection
-        .execute(
-            "DELETE FROM files_recent WHERE path NOT IN
-             (SELECT path FROM files_recent ORDER BY opened_at DESC LIMIT ?1)",
-            params![RECENT_KEPT],
-        )
-        .map_err(db_error)?;
-    Ok(())
+    with(app, |connection| {
+        let transaction = connection.transaction().map_err(db_error)?;
+        transaction
+            .execute(
+                "INSERT INTO files_recent (path, opened_at) VALUES (?1, ?2)
+                 ON CONFLICT(path) DO UPDATE SET opened_at = excluded.opened_at",
+                params![path.display().to_string(), now_ms()],
+            )
+            .map_err(db_error)?;
+        transaction
+            .execute(
+                "DELETE FROM files_recent WHERE path NOT IN
+                 (SELECT path FROM files_recent ORDER BY opened_at DESC LIMIT ?1)",
+                params![RECENT_KEPT],
+            )
+            .map_err(db_error)?;
+        transaction.commit().map_err(db_error)
+    })
 }
 
 #[tauri::command]
@@ -80,11 +82,12 @@ pub async fn files_starred(
 ) -> Result<Vec<FileEntry>, String> {
     person_window(&webview)?;
     blocking(move || {
-        let connection = connect(&app)?;
-        let paths = paths_in(
-            &connection,
-            "SELECT path FROM files_starred ORDER BY starred_at DESC",
-        )?;
+        let paths = with(&app, |connection| {
+            paths_in(
+                connection,
+                "SELECT path FROM files_starred ORDER BY starred_at DESC",
+            )
+        })?;
         let (found, _gone) = entries(paths, usize::MAX);
         Ok(found)
     })
@@ -104,26 +107,27 @@ pub async fn files_star(
         .map(|path| asked_path(path))
         .collect::<Result<_, _>>()?;
     blocking(move || {
-        let mut connection = connect(&app)?;
-        let transaction = connection.transaction().map_err(db_error)?;
-        let at = now_ms();
-        for path in &paths {
-            let path = path.display().to_string();
-            if on {
-                transaction
-                    .execute(
-                        "INSERT INTO files_starred (path, starred_at) VALUES (?1, ?2)
+        with(&app, |connection| {
+            let transaction = connection.transaction().map_err(db_error)?;
+            let at = now_ms();
+            for path in &paths {
+                let path = path.display().to_string();
+                if on {
+                    transaction
+                        .execute(
+                            "INSERT INTO files_starred (path, starred_at) VALUES (?1, ?2)
                          ON CONFLICT(path) DO NOTHING",
-                        params![path, at],
-                    )
-                    .map_err(db_error)?;
-            } else {
-                transaction
-                    .execute("DELETE FROM files_starred WHERE path = ?1", params![path])
-                    .map_err(db_error)?;
+                            params![path, at],
+                        )
+                        .map_err(db_error)?;
+                } else {
+                    transaction
+                        .execute("DELETE FROM files_starred WHERE path = ?1", params![path])
+                        .map_err(db_error)?;
+                }
             }
-        }
-        transaction.commit().map_err(db_error)
+            transaction.commit().map_err(db_error)
+        })
     })
     .await
 }
@@ -135,13 +139,18 @@ pub async fn files_recent(
 ) -> Result<Vec<FileEntry>, String> {
     person_window(&webview)?;
     blocking(move || {
-        let connection = connect(&app)?;
-        let paths = paths_in(
-            &connection,
-            "SELECT path FROM files_recent ORDER BY opened_at DESC",
-        )?;
+        let paths = with(&app, |connection| {
+            paths_in(
+                connection,
+                "SELECT path FROM files_recent ORDER BY opened_at DESC",
+            )
+        })?;
         let (found, gone) = entries(paths, RECENT_SHOWN);
-        forget(&connection, "files_recent", &gone)?;
+        with(&app, |connection| {
+            let transaction = connection.transaction().map_err(db_error)?;
+            forget(&transaction, "files_recent", &gone)?;
+            transaction.commit().map_err(db_error)
+        })?;
         Ok(found)
     })
     .await

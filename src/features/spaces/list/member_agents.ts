@@ -4,9 +4,10 @@ import { spaceRequest } from "../api/api";
 export interface MemberAgentStatus {
   id: string;
   name: string;
-  state: "working" | "needs-you" | "resting";
+  state: "working" | "needs-you" | "landing" | "resting";
   doing: string;
   files?: string[];
+  waiting?: number;
 }
 
 export interface AgentActivityLine {
@@ -35,6 +36,10 @@ export const useMemberAgents = create<MemberAgentsState>((set, get) => ({
   },
 }));
 
+export function clearMemberAgents(): void {
+  useMemberAgents.setState({ bySpace: {} });
+}
+
 export function memberAgentsIn(
   state: Pick<MemberAgentsState, "bySpace">,
   spaceId: string,
@@ -45,8 +50,10 @@ export function memberAgentsIn(
     .flatMap(([userId, heard]) => heard.agents.map((agent) => ({ userId, agent })));
 }
 
-export function doingLabel(doing: string, state: MemberAgentStatus["state"]): string {
+export function doingLabel(doing: string, state: MemberAgentStatus["state"], waiting = 0): string {
   if (state === "needs-you") return "Waiting for its person";
+  if (state === "landing")
+    return waiting > 0 ? `Landing its changes, ${waiting} waiting` : "Landing its changes";
   if (state === "resting") return "";
   return (
     {

@@ -93,7 +93,7 @@ async fn pdf(bytes: &[u8], address: &url::Url) -> Result<ReadLink, String> {
     file_access::fs_async::write(&path, bytes)
         .await
         .map_err(|error| error.to_string())?;
-    let document = documents::prepare_document(path, crate::app::embedded_workers::builtin_worker)
+    let document = documents::prepare_document(path, crate::app::workers::program)
         .await
         .map_err(|_| "Misty couldn't read that PDF.".to_owned())?;
     let text = document
@@ -203,10 +203,9 @@ pub async fn tutor_read_dropped(
     file_access::fs_async::write(&path, bytes)
         .await
         .map_err(|error| error.to_string())?;
-    let mut document =
-        documents::prepare_document(path, crate::app::embedded_workers::builtin_worker)
-            .await
-            .map_err(|_| format!("Misty couldn't read {name}."))?;
+    let mut document = documents::prepare_document(path, crate::app::workers::program)
+        .await
+        .map_err(|_| format!("Misty couldn't read {name}."))?;
     document.display_name = name;
     Ok(document)
 }

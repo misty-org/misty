@@ -1,6 +1,6 @@
 use std::{
-    env,
-    path::{Path, PathBuf},
+    env, io,
+    path::{Component, Path, PathBuf},
     sync::OnceLock,
 };
 
@@ -114,6 +114,35 @@ fn requested_kind() -> Option<String> {
         (Some(kind), Some(name)) if kind == DEV_FOLDER => Some(name),
         _ => None,
     }
+}
+
+pub fn normalize_asked(path: &Path) -> io::Result<PathBuf> {
+    if !path.is_absolute() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "That path isn't a full one.",
+        ));
+    }
+    if !crate::is_local_path(path) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "Only this computer's own drives can be opened.",
+        ));
+    }
+    let mut normal = PathBuf::new();
+    for part in path.components() {
+        match part {
+            Component::ParentDir => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Paths with .. in them aren't used.",
+                ))
+            }
+            Component::CurDir => {}
+            part => normal.push(part),
+        }
+    }
+    Ok(normal)
 }
 
 pub fn misty_data_root() -> Option<PathBuf> {

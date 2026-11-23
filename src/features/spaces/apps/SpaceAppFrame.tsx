@@ -39,11 +39,12 @@ export function SpaceAppFrame({
     makeHandlers,
   });
   const [channel, setChannel] = useState(true);
-  const agent = useAppControl((state) => state.agents[appId]);
-  const held = useAppControl((state) => Boolean(state.held[appId]));
+  const instance = app.status === "ready" ? app.instance : "";
+  const agent = useAppControl((state) => (instance ? state.agents[instance] : undefined));
+  const held = useAppControl((state) => Boolean(instance && state.held[instance]));
   useNotice(Boolean(agent && held), {
     message: agent ? `You have control of ${appName}. ${agent.name} is waiting.` : "",
-    action: { label: "Hand back", onSelect: () => useAppControl.getState().handBack(appId) },
+    action: { label: "Hand back", onSelect: () => useAppControl.getState().handBack(instance) },
   });
   const [silent, setSilent] = useState(false);
   const ready = app.status === "ready";
@@ -74,11 +75,14 @@ export function SpaceAppFrame({
   return (
     <AppPageStage
       key={`${appId}@${version}`}
+      spaceId={spaceId}
       appId={appId}
       version={version}
       appName={appName}
       site={Boolean(site)}
+      instance={app.instance}
       start={app.start}
+      leave={app.leave}
       save={app.save}
       onChannel={setChannel}
     />

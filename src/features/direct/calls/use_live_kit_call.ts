@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ConnectionError,
   ConnectionQuality,
   LocalAudioTrack,
   createAudioAnalyser,
@@ -18,7 +19,7 @@ import { notify } from "@misty/ui";
 import { directApi } from "../api";
 import { useCallStore, type ActiveCall } from "./call_store";
 import { playCallSound } from "./call_sounds";
-import { CallKeyProvider, startKeyRotation } from "./key_rotation";
+import { CallKeyProvider, startKeyRotation, type KeyRotation } from "./key_rotation";
 import { shareScreenAudio } from "./screen_audio";
 import {
   canPickSpeaker,
@@ -31,6 +32,7 @@ import {
 import { CallSignals, type CallCaption, type CallReaction, type SignalsView } from "./call_signals";
 import { applyNoiseReduction } from "./noise_reduction";
 import { captionVoice } from "./call_captions";
+import { moderatesVoice, prepareVoiceModerators } from "./call_moderators";
 
 export interface CallPerson {
   id: string;
@@ -54,6 +56,7 @@ export interface CallPerson {
 export interface CallControls {
   room: Room | null;
   people: CallPerson[];
+  baseKey: Uint8Array<ArrayBuffer>;
   micOn: boolean;
   cameraOn: boolean;
   screenOn: boolean;
@@ -137,7 +140,7 @@ function personOf(
       ];
   return {
     id: participant.identity,
-    name: participant.name || participant.identity,
+    name: "",
     self,
     speaking: participant.isSpeaking,
     micOn: participant.isMicrophoneEnabled,
@@ -166,6 +169,34 @@ const ALONE_WARNING_MS = 4 * 60_000;
 const RECONNECT_GRACE_MS = 4000;
 const RECOVER_AFTER_MS = 10_000;
 const LOWER_HAND_AFTER_MS = 3000;
+const FRAME_ASK_GAP_MS = 4000;
+const FRAME_QUIET_MS = 30_000;
+const FRAME_WARN_AFTER = 3;
+const MIC_TRIES = 4;
+const removedAttribute = "misty.removed";
+
+const frameError = (error: unknown) =>
+  error instanceof Error && /^(InvalidKey|MissingKey)\b/.test(error.message);
+
+const frameSender = (error: unknown) => {
+  const identity = (error as { participantIdentity?: unknown }).participantIdentity;
+  if (typeof identity === "string" && identity) return identity;
+  const message = error instanceof Error ? error.message : "";
+  const named =
+    / for participant (.+)$/.exec(message) ??
+    / key set not found for (.+) at index \d+$/.exec(message);
+  return named?.[1] || undefined;
+};
+
+const removedFor = (room: Room) => room.localParticipant.attributes[removedAttribute];
+
+const fullRoom = (error: unknown) =>
+  Boolean(
+    error &&
+      typeof error === "object" &&
+      ((error as { code?: unknown }).code === "room_full" ||
+        (error instanceof Error && /max participants|room is full/i.test(error.message))),
+  );
 
 function receiveQuality(room: Room, quality: VideoQuality) {
   for (const person of room.remoteParticipants.values())
@@ -198,9 +229,19 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
   const [offerLowerHand, setOfferLowerHand] = useState(false);
   const noiseReduction = savedNoiseReduction((state) => state.value);
   const micBeforeDeafen = useRef(false);
+  const micWanted = useRef<boolean | null>(null);
+  const micSettling = useRef(false);
+  const deafWanted = useRef(false);
+  const deafRef = useRef(false);
+  const signalsRef = useRef<CallSignals | null>(null);
+  const carried = useRef<{ room: Room; hand: boolean; captions: boolean } | null>(null);
   const [, setVersion] = useState(0);
   const bump = useCallback(() => setVersion((n) => n + 1), []);
   const { room: roomName, key, video } = call;
+  const [baseKey, setBaseKey] = useState(key);
+  const baseKeyNow = useRef(baseKey);
+  baseKeyNow.current = baseKey;
+  const moderatedSpace = call.place.kind === "voice" ? call.place.spaceId : "";
   const startMuted = Boolean(call.muted);
   const watching = useRef(new Set<string>());
   const screenAudio = useRef<Promise<(() => Promise<void>) | undefined> | undefined>(undefined);
@@ -210,6 +251,34 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
     const stop = await stopping;
     await stop?.();
   }, []);
+  const settleMic = useCallback(
+    async (room: Room, sound = true) => {
+      if (micSettling.current) return;
+      micSettling.current = true;
+      try {
+        for (
+          let tries = 0;
+          tries < MIC_TRIES &&
+          micWanted.current !== null &&
+          room.localParticipant.isMicrophoneEnabled !== micWanted.current;
+          tries++
+        ) {
+          const on = micWanted.current;
+          try {
+            await room.localParticipant.setMicrophoneEnabled(on);
+          } catch (error) {
+            micWanted.current = room.localParticipant.isMicrophoneEnabled;
+            throw error;
+          }
+          if (sound) playCallSound(on ? "unmute" : "mute");
+          bump();
+        }
+      } finally {
+        micSettling.current = false;
+      }
+    },
+    [bump],
+  );
 
   useEffect(() => {
     if (!isE2EESupported()) {
@@ -218,16 +287,22 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
     }
     const watched = watching.current;
     let cancelled = false;
+    micWanted.current = null;
+    deafWanted.current = false;
     const worker = new Worker(new URL("livekit-client/e2ee-worker", import.meta.url), {
       type: "module",
     });
     const keyProvider = new CallKeyProvider();
-    let stopRotation: (() => void) | undefined;
+    let keys: KeyRotation | undefined;
     let live = false;
     let aloneTimer: ReturnType<typeof setTimeout> | undefined;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let recoverTimer: ReturnType<typeof setTimeout> | undefined;
     let steppedDown = false;
+    let lastFrameError = 0;
+    let lastFrameAsk = 0;
+    let frameAsks = 0;
+    let frameWarned = false;
     const qualityChanged = (quality: ConnectionQuality, participant: Participant) => {
       bump();
       if (participant.identity !== room.localParticipant.identity) return;
@@ -273,28 +348,59 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       videoCaptureDefaults: { deviceId: chosen("videoinput") },
       audioOutput: { deviceId: chosen("audiooutput") },
     });
+    setBaseKey(key);
     setRoom(room);
-    const signalling = new CallSignals(room, key, {
-      changed: bump,
-      lowered: () => notify({ message: "A moderator lowered your hand." }),
-      muted: () => {
-        savedCallAudio.getState().set((current) => ({ ...current, muted: true }));
-        notify({ message: "A moderator muted you." });
-      },
-    });
-    setSignals(signalling);
     const fail = (message: string) => {
       if (cancelled) return;
       notify({ message, tone: "error" });
       useCallStore.getState().leave();
     };
+    const keyed = () => Boolean(keys?.keyed);
+    const subscribeAll = () => {
+      if (cancelled || !keyed()) return;
+      for (const person of room.remoteParticipants.values())
+        for (const publication of person.trackPublications.values())
+          subscribe(publication, watching.current.has(person.identity));
+      bump();
+    };
+    const encryptionFailed = (error: unknown) => {
+      if (cancelled) return;
+      if (!frameError(error)) {
+        console.error("The call's encryption reported a problem:", error);
+        return;
+      }
+      const now = Date.now();
+      if (now - lastFrameError > FRAME_QUIET_MS) frameAsks = 0;
+      lastFrameError = now;
+      if (!keys?.keyed || now - lastFrameAsk < FRAME_ASK_GAP_MS) return;
+      lastFrameAsk = now;
+      frameAsks += 1;
+      keys.ask();
+      const who = frameSender(error);
+      const known =
+        who && (who === room.localParticipant.identity || room.remoteParticipants.has(who))
+          ? who
+          : undefined;
+      keys.refresh(known);
+      if (known) keys.check(known);
+      if (frameAsks >= FRAME_WARN_AFTER && !frameWarned) {
+        frameWarned = true;
+        notify({
+          message: "Someone in the call can’t be heard or seen on this computer.",
+          tone: "error",
+        });
+      }
+    };
+    let othersHere = 0;
     const onJoined = () => {
+      othersHere = room.remoteParticipants.size;
       useCallStore.getState().setAnswered();
       if (live) playCallSound("personJoined");
       watchAlone();
       bump();
     };
     const onLeft = () => {
+      othersHere = room.remoteParticipants.size;
       if (live) playCallSound("personLeft");
       watchAlone();
       bump();
@@ -305,7 +411,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       .on(
         RoomEvent.TrackPublished,
         (publication: RemoteTrackPublication, person: RemoteParticipant) => {
-          subscribe(publication, watching.current.has(person.identity));
+          if (keyed()) subscribe(publication, watching.current.has(person.identity));
           if (steppedDown && publication.kind === Track.Kind.Video)
             publication.setVideoQuality(VideoQuality.LOW);
           bump();
@@ -350,29 +456,41 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         clearTimeout(reconnectTimer);
         reconnectTimer = undefined;
         setReconnecting(false);
+        subscribeAll();
       })
-      .on(RoomEvent.EncryptionError, () => fail("The call’s encryption failed, so it ended."))
+      .on(RoomEvent.EncryptionError, encryptionFailed)
       .on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         if (cancelled) return;
         if (reason === DisconnectReason.ROOM_DELETED) {
-          notify({ message: "The call ended because no one else was in it." });
+          notify({
+            message: othersHere
+              ? "The call ended."
+              : "The call ended because no one else was in it.",
+          });
         } else if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
-          notify({ message: "A moderator removed you from the call." });
+          const why = removedFor(room);
+          notify({
+            message:
+              why === "space"
+                ? "You’re no longer in this Space’s call."
+                : why === "direct"
+                  ? "The call ended."
+                  : "A moderator removed you from the call.",
+          });
         }
         useCallStore.getState().leave();
       });
 
     void (async () => {
       try {
-        await keyProvider.setKeyAt(key, 0);
+        await keyProvider.remember(key, 0);
+        keyProvider.use(0);
         await room.setE2EEEnabled(true);
         const { token, url } = await directApi.callToken(roomName);
         if (cancelled) return;
         await room.connect(url, token, { autoSubscribe: false });
+        othersHere = room.remoteParticipants.size;
         if (cancelled) return;
-        for (const person of room.remoteParticipants.values())
-          for (const publication of person.trackPublications.values())
-            subscribe(publication, watching.current.has(person.identity));
         if (!(await encryptionOn(room)) || cancelled) {
           fail("The call couldn’t be encrypted, so it ended.");
           return;
@@ -381,9 +499,19 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
           fail(`A call holds at most ${maxPeople} people.`);
           return;
         }
-        const stop = await startKeyRotation(room, keyProvider, key);
-        if (cancelled) return stop();
-        stopRotation = stop;
+        const started = await startKeyRotation(room, keyProvider, key, {
+          keyed: subscribeAll,
+          base: (next) => {
+            if (cancelled) return;
+            signalsRef.current?.setKey(next);
+            setBaseKey(next);
+          },
+        });
+        if (cancelled) return started.stop();
+        keys = started;
+        await started.ready;
+        if (cancelled) return;
+        subscribeAll();
         if (room.remoteParticipants.size) useCallStore.getState().setAnswered();
         useCallStore.getState().setLive();
         live = true;
@@ -391,40 +519,101 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         watchAlone();
         const remembered = savedCallAudio.getState().value;
         const quiet = startMuted || remembered.muted;
-        if (!quiet && !remembered.deafened) await room.localParticipant.setMicrophoneEnabled(true);
         if (remembered.deafened) {
           micBeforeDeafen.current = !quiet;
-          signalling.setDeaf(true);
+          deafWanted.current = true;
+          signalsRef.current?.setDeaf(true);
+        } else if (!quiet) {
+          micWanted.current = true;
+          await settleMic(room, false).catch(() => {
+            if (!cancelled)
+              notify({
+                message: "Your microphone couldn’t be turned on, so you joined muted.",
+                tone: "error",
+              });
+          });
         }
-        if (video) await room.localParticipant.setCameraEnabled(true);
+        if (video && !cancelled)
+          await room.localParticipant.setCameraEnabled(true).catch(() => {
+            if (!cancelled)
+              notify({
+                message: "Your camera couldn’t be turned on, so you joined with sound only.",
+                tone: "error",
+              });
+          });
         bump();
       } catch (error) {
         console.error("The call couldn't connect:", error);
-        fail("The call couldn’t connect.");
+        const full =
+          fullRoom(error) ||
+          (error instanceof ConnectionError &&
+            !cancelled &&
+            (await directApi.callToken(roomName).then(() => false, fullRoom)));
+        fail(full ? "This call is full." : "The call couldn’t connect.");
       }
     })();
 
     return () => {
       cancelled = true;
       setReconnecting(false);
-      signalling.dispose();
-      setSignals(null);
       setVolumes(new Map());
       if (live) playCallSound("leave");
       watched.clear();
       clearTimeout(aloneTimer);
       clearTimeout(reconnectTimer);
       clearTimeout(recoverTimer);
-      stopRotation?.();
+      keys?.stop();
       void stopScreenAudio();
       setRoom(null);
       void room.disconnect().finally(() => worker.terminate());
     };
-  }, [roomName, key, video, startMuted, maxPeople, bump, stopScreenAudio]);
+  }, [roomName, key, video, startMuted, maxPeople, bump, stopScreenAudio, settleMic]);
+
+  useEffect(() => {
+    if (moderatedSpace) prepareVoiceModerators(moderatedSpace);
+  }, [moderatedSpace]);
+
+  useEffect(() => {
+    if (!room) return;
+    const made = new CallSignals(
+      room,
+      baseKeyNow.current,
+      {
+        changed: bump,
+        lowered: () => notify({ message: "A moderator lowered your hand." }),
+        muted: () => {
+          micWanted.current = false;
+          savedCallAudio.getState().set((current) => ({ ...current, muted: true }));
+          notify({ message: "A moderator muted you." });
+        },
+      },
+      moderatedSpace ? (identity) => moderatesVoice(moderatedSpace, identity) : undefined,
+    );
+    signalsRef.current = made;
+    setSignals(made);
+    const before = carried.current?.room === room ? carried.current : null;
+    carried.current = null;
+    if (deafWanted.current) made.setDeaf(true);
+    if (before?.hand) made.setHand(true);
+    if (before?.captions) made.setCaptions(true);
+    return () => {
+      const view = made.current();
+      const me = room.localParticipant.identity;
+      carried.current = { room, hand: view.hands.has(me), captions: view.captionsWanted.has(me) };
+      made.dispose();
+      if (signalsRef.current === made) signalsRef.current = null;
+      setSignals(null);
+    };
+  }, [room, moderatedSpace, bump]);
+
+  useEffect(() => {
+    signals?.setKey(baseKey);
+  }, [signals, baseKey]);
 
   const view = signals?.current() ?? noSignals;
   const self = room?.localParticipant.identity ?? "";
   const deafened = view.deaf.has(self);
+  deafRef.current = deafened;
   const places = handPlaces(view.hands);
   const handUp = view.hands.has(self);
   const selfSpeaking = Boolean(room?.localParticipant.isSpeaking);
@@ -491,23 +680,20 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       mic: {
         on: micOn,
         set: (on) => {
-          if (room.localParticipant.isMicrophoneEnabled === on) return;
-          void room.localParticipant
-            .setMicrophoneEnabled(on)
-            .then(() => {
-              playCallSound(on ? "unmute" : "mute");
-              bump();
-            })
-            .catch(() =>
-              notify({ message: "The microphone couldn’t be turned on.", tone: "error" }),
-            );
+          if (on && deafRef.current) return;
+          micWanted.current = on;
+          savedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
+          void settleMic(room).catch(() =>
+            notify({ message: "The microphone couldn’t be turned on.", tone: "error" }),
+          );
         },
       },
     });
-  }, [room, micOn, bump]);
+  }, [room, micOn, settleMic]);
   const controls: CallControls = {
     room,
     people,
+    baseKey,
     micOn,
     cameraOn: Boolean(local?.isCameraEnabled),
     screenOn: Boolean(local?.isScreenShareEnabled),
@@ -519,19 +705,26 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
     captionsOn: view.captionsWanted.has(self),
     captions: view.captions,
     offerLowerHand: offerLowerHand && handUp,
-    toggleDeafen: () =>
-      run(async (room) => {
-        const on = !deafened;
-        if (on) {
-          micBeforeDeafen.current = room.localParticipant.isMicrophoneEnabled;
-          if (micBeforeDeafen.current) await room.localParticipant.setMicrophoneEnabled(false);
-        } else if (micBeforeDeafen.current) {
-          await room.localParticipant.setMicrophoneEnabled(true);
-        }
-        signals?.setDeaf(on);
-        savedCallAudio.getState().set((current) => ({ ...current, deafened: on }));
-        playCallSound(on ? "mute" : "unmute");
-      }, "Deafening didn’t work."),
+    toggleDeafen: () => {
+      if (!room) return;
+      const on = !deafened;
+      if (on) {
+        micBeforeDeafen.current = micSettling.current
+          ? Boolean(micWanted.current)
+          : room.localParticipant.isMicrophoneEnabled;
+        micWanted.current = false;
+      } else if (micBeforeDeafen.current) {
+        micWanted.current = true;
+      }
+      deafWanted.current = on;
+      deafRef.current = on;
+      signals?.setDeaf(on);
+      savedCallAudio.getState().set((current) => ({ ...current, deafened: on }));
+      playCallSound(on ? "mute" : "unmute");
+      void settleMic(room, false).catch(() =>
+        notify({ message: "Deafening didn’t work.", tone: "error" }),
+      );
+    },
     toggleHand: () => signals?.setHand(!handUp),
     toggleCaptions: () => signals?.setCaptions(!view.captionsWanted.has(self)),
     lowerHandOf: (personId) => signals?.lowerHandOf(personId),
@@ -587,16 +780,24 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
             : "That speaker couldn’t be used.",
       );
     },
-    toggleMic: () =>
-      run(async (room) => {
-        const on = !room.localParticipant.isMicrophoneEnabled;
-        await room.localParticipant.setMicrophoneEnabled(on);
-        if (on && deafened) signals?.setDeaf(false);
-        savedCallAudio
-          .getState()
-          .set((current) => ({ muted: !on, deafened: on ? false : current.deafened }));
-        playCallSound(on ? "unmute" : "mute");
-      }, "The microphone couldn’t be turned on."),
+    toggleMic: () => {
+      if (!room) return;
+      const on = micSettling.current
+        ? !micWanted.current
+        : !room.localParticipant.isMicrophoneEnabled;
+      if (on && deafened) {
+        deafWanted.current = false;
+        deafRef.current = false;
+        signals?.setDeaf(false);
+      }
+      savedCallAudio
+        .getState()
+        .set((current) => ({ muted: !on, deafened: on ? false : current.deafened }));
+      micWanted.current = on;
+      void settleMic(room).catch(() =>
+        notify({ message: "The microphone couldn’t be turned on.", tone: "error" }),
+      );
+    },
     toggleCamera: () =>
       run(
         (room) => room.localParticipant.setCameraEnabled(!room.localParticipant.isCameraEnabled),

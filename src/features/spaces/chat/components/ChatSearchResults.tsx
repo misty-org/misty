@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Hash } from "lucide-react";
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Hash, X } from "lucide-react";
 import {
   ChannelMessage,
   ChannelMessageText,
   CommandPaletteMatch,
   EmptyState,
   ErrorState,
+  FramedBar,
   IconButton,
   SkeletonList,
   Text,
@@ -39,12 +40,13 @@ const stampFormat = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-export function ChatSearchResults(props: {
+export function useChatSearchResults(props: {
   spaceId: string;
   query: string;
   whereSaid(message: SpaceMessage): { name: string; direct: boolean };
   colorOf(message: SpaceMessage): string | undefined;
   onOpen(message: SpaceMessage): void;
+  onClose?(): void;
 }) {
   const parsed = useMemo(() => parseQuery(props.query), [props.query]);
   const [found, setFound] = useState<Found>({ status: "loading" });
@@ -55,6 +57,7 @@ export function ChatSearchResults(props: {
     setFound({ status: "loading" });
     if (!parsed.words) {
       setFound({ status: "done", messages: [] });
+      setNewestFirst(true);
       return;
     }
     searchSpaceMessages(props.spaceId, parsed.words, controller.signal)
@@ -82,9 +85,9 @@ export function ChatSearchResults(props: {
     () => parsed.words.toLowerCase().split(/\s+/).filter(Boolean),
     [parsed.words],
   );
-  return (
-    <section aria-label="Search results" className="flex h-full min-h-0 w-96 shrink-0 flex-col">
-      <div className="flex h-11 shrink-0 items-center gap-2 px-4">
+  const header = (
+    <FramedBar
+      start={
         <Text
           as="h2"
           size="control"
@@ -97,22 +100,32 @@ export function ChatSearchResults(props: {
             ? `${messages.length} ${messages.length === 1 ? "result" : "results"}`
             : "Search results"}
         </Text>
-        {found.status === "done" && messages.length > 1 ? (
-          <IconButton
-            label={newestFirst ? "Newest first" : "Oldest first"}
-            onClick={() => setNewestFirst((current) => !current)}
-          >
-            {newestFirst ? <ArrowDownWideNarrow /> : <ArrowUpNarrowWide />}
-          </IconButton>
-        ) : null}
-      </div>
+      }
+    >
+      {found.status === "done" && messages.length > 1 ? (
+        <IconButton
+          label={newestFirst ? "Newest first" : "Oldest first"}
+          onClick={() => setNewestFirst((current) => !current)}
+        >
+          {newestFirst ? <ArrowDownWideNarrow /> : <ArrowUpNarrowWide />}
+        </IconButton>
+      ) : null}
+      {props.onClose ? (
+        <IconButton label="Close search" onClick={props.onClose}>
+          <X />
+        </IconButton>
+      ) : null}
+    </FramedBar>
+  );
+  const content = (
+    <section aria-label="Search results" className="flex min-h-0 flex-1 flex-col">
       {found.status === "loading" ? (
         <SkeletonList
           label="Search results"
           rows={5}
           lines={2}
           leading="avatar-lg"
-          className="px-2"
+          className="px-2 pt-2"
         />
       ) : found.status === "failed" ? (
         <ErrorState
@@ -127,7 +140,7 @@ export function ChatSearchResults(props: {
       ) : !messages.length ? (
         <EmptyState inline title="Nothing matches" line="Try other words." />
       ) : (
-        <div className="misty-scrollbar-flush min-h-0 flex-1 overflow-y-auto pb-4">
+        <div className="misty-scrollbar-flush min-h-0 flex-1 overflow-y-auto pt-1 pb-4">
           {messages.map((message, index) => {
             const where = whereSaid(message);
             const previous = messages[index - 1];
@@ -183,6 +196,7 @@ export function ChatSearchResults(props: {
       )}
     </section>
   );
+  return { header, content };
 }
 
 function Highlighted(props: { text: string; terms: string[] }) {

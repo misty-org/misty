@@ -1,0 +1,33 @@
+[package]
+name = "speech_helper"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[[bin]]
+name = "misty-speech"
+path = "src/main.rs"
+
+[dependencies]
+voice_speech = { path = "..", default-features = false }
+sherpa-onnx = "2.0.2"
+symphonia = { version = "0.5.4", features = ["aac", "alac", "isomp4", "mp3"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[profile.dev]
+debug = 1
+incremental = false
+panic = "abort"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+strip = "symbols"
+panic = "abort"
+
+[profile.release.build-override]
+strip = false

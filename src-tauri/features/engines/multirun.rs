@@ -307,8 +307,128 @@ pub async fn multirun_keep(
     }
     let label = format!("Multi-run {}, run {}", row.multirun, row.lane);
     worktrees::keep(&folder, &worktree, &row.base, &label).await?;
+    let kept_at = worktrees::head(&worktree).await?;
     let db = state.environment.store();
-    blocking(move || store::mark_kept(&db, &row.account, &row.multirun, row.lane)).await
+    blocking(move || {
+        store::mark_kept(&db, &row.account, &row.multirun, row.lane)?;
+        store::set_base(&db, &row.account, &row.multirun, row.lane, &kept_at)
+    })
+    .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadLane {
+    multirun: String,
+    lane: i64,
+    branch: String,
+    folder: String,
+    project: String,
+}
+
+pub(crate) fn lane_folder(
+    db: &database::store::Store,
+    account: &str,
+    conversation: &str,
+) -> Option<PathBuf> {
+    store::of_conversation(db, account, conversation)
+        .map(|row| PathBuf::from(row.path))
+        .filter(|path| file_access::fs::is_dir(path))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn thread_lane(
+    db: &database::store::Store,
+    misty_root: &Path,
+    account: &str,
+    space: &str,
+    agent: &str,
+    conversation: &str,
+    project: &Path,
+    title: &str,
+) -> Option<PathBuf> {
+    if conversation.is_empty() {
+        return None;
+    }
+    let found = {
+        let (db, account, conversation) =
+            (db.clone(), account.to_string(), conversation.to_string());
+        blocking(move || Ok(store::of_conversation(&db, &account, &conversation)))
+            .await
+            .ok()
+            .flatten()
+    };
+    if let Some(row) = found {
+        let path = PathBuf::from(&row.path);
+        if file_access::fs::is_dir(&path) {
+            return Some(path);
+        }
+        let (db, account, multirun) = (db.clone(), row.account.clone(), row.multirun.clone());
+        let _ = blocking(move || store::delete(&db, &account, &multirun)).await;
+    }
+    if worktrees::readiness(project).await.ok()? != "ready" {
+        return None;
+    }
+    let base = worktrees::head(project).await.ok()?;
+    let id = new_id();
+    let home = root(misty_root).join(&id);
+    file_access::fs::create_dir_all(&home).ok()?;
+    let home = file_access::fs::canonicalize(&home).ok()?;
+    let path = home.join("1");
+    let branch = format!("misty/thread-{id}");
+    let task = plain(title).unwrap_or_else(|_| "Thread".to_string());
+    let row = Row {
+        account: account.to_string(),
+        multirun: id,
+        lane: 1,
+        space: super::commands::space_key(space).unwrap_or_default(),
+        folder: project.to_string_lossy().to_string(),
+        path: path.to_string_lossy().to_string(),
+        branch: branch.clone(),
+        base: base.clone(),
+        agent: agent.to_string(),
+        conversation: conversation.to_string(),
+        task,
+        kept: false,
+        created_at: now(),
+    };
+    if worktrees::add(project, &path, &branch, &base)
+        .await
+        .is_err()
+    {
+        take_down(&home, std::slice::from_ref(&row)).await;
+        return None;
+    }
+    file_access::allow_linked_folder(&path);
+    let (db, kept) = (db.clone(), vec![row.clone()]);
+    if blocking(move || store::insert(&db, &kept)).await.is_err() {
+        take_down(&home, &[row]).await;
+        return None;
+    }
+    Some(path)
+}
+
+#[tauri::command]
+pub async fn thread_lane_of(
+    webview: tauri::Webview,
+    state: State<'_, MistyRuntime>,
+    account: String,
+    conversation: String,
+) -> Result<Option<ThreadLane>, String> {
+    person_window(&webview)?;
+    let db = state.environment.store();
+    blocking(move || {
+        Ok(
+            store::of_conversation(&db, &account, &conversation).map(|row| ThreadLane {
+                multirun: row.multirun,
+                lane: row.lane,
+                branch: row.branch,
+                folder: row.path,
+                project: row.folder,
+            }),
+        )
+    })
+    .await
 }
 
 #[tauri::command]

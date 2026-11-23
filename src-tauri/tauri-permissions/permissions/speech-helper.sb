@@ -1,0 +1,5 @@
+(version 1)
+(allow default)
+(deny process-exec)
+(allow process-exec (literal (param "TOOL")))
+(deny network*)

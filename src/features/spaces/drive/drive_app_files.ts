@@ -45,6 +45,24 @@ export function appFolderName(appName: string): string {
   return safe && safe !== "." && safe !== ".." ? safe : "App";
 }
 
+const MAX_NAME_BYTES = 255;
+
+const twoDigits = (value: number) => String(value).padStart(2, "0");
+
+export function conflictedCopyName(name: string, at: Date): string {
+  const day = `${at.getUTCFullYear()}-${twoDigits(at.getUTCMonth() + 1)}-${twoDigits(at.getUTCDate())}`;
+  const stamp = `${day} ${twoDigits(at.getUTCHours())}${twoDigits(at.getUTCMinutes())}`;
+  const dot = name.lastIndexOf(".");
+  let base = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : "";
+  const suffix = ` (conflicted copy ${stamp})`;
+  const encoder = new TextEncoder();
+  const size = (text: string) => encoder.encode(text).length;
+  while (base && size(base) + size(suffix) + size(extension) > MAX_NAME_BYTES)
+    base = Array.from(base).slice(0, -1).join("");
+  return `${base}${suffix}${extension}`;
+}
+
 const messageOf = (cause: unknown) =>
   cause instanceof Error ? cause.message : typeof cause === "string" ? cause : "";
 
@@ -94,7 +112,7 @@ export interface DriveFileCalls {
   dispose(): void;
 }
 
-type HoldReason = "open" | "pick" | "room";
+type HoldReason = "open" | "room";
 
 export function createDriveFileCalls(
   spaceId: string,
@@ -105,38 +123,37 @@ export function createDriveFileCalls(
   const appFolder = `/${appFolderName(appName)}`;
   const paths = new Map<string, string>();
   const opened = new Map<string, DriveEntry>();
-  const held = new Map<string, { path: string; reasons: Set<HoldReason> }>();
+  const held = new Map<string, { id: string; path: string; editing: boolean }>();
   let disposed = false;
+  const holdKey = (id: string, reason: HoldReason) => `${reason}:${id}`;
   const holdFor = async (entry: DriveEntry, reason: HoldReason) => {
-    const known = held.get(entry.id);
-    if (known) {
-      known.reasons.add(reason);
-      return;
-    }
-    const hold = { path: entry.path, reasons: new Set<HoldReason>([reason]) };
-    held.set(entry.id, hold);
+    const key = holdKey(entry.id, reason);
+    if (held.has(key)) return;
+    const hold = { id: entry.id, path: entry.path, editing: reason === "room" };
+    held.set(key, hold);
     try {
-      await driveNative.open(spaceId, entry.path, true);
+      await driveNative.open(spaceId, entry.path, hold.editing);
     } catch (cause) {
-      if (held.get(entry.id) === hold) held.delete(entry.id);
+      if (held.get(key) === hold) held.delete(key);
       throw cause;
     }
-    if (disposed || held.get(entry.id) !== hold)
-      void driveNative.close(spaceId, entry.path, true).catch(() => undefined);
+    if (disposed || held.get(key) !== hold)
+      void driveNative.close(spaceId, entry.path, hold.editing).catch(() => undefined);
   };
-  const closeHold = (id: string, path: string) =>
-    void driveEntryById(spaceId, id)
+  const closeHold = (hold: { id: string; path: string; editing: boolean }) =>
+    void driveEntryById(spaceId, hold.id)
       .then(
-        (entry) => entry?.path ?? path,
-        () => path,
+        (entry) => entry?.path ?? hold.path,
+        () => hold.path,
       )
-      .then((now) => driveNative.close(spaceId, now, true))
+      .then((now) => driveNative.close(spaceId, now, hold.editing))
       .catch(() => undefined);
   const releaseFor = (id: string, reason: HoldReason) => {
-    const hold = held.get(id);
-    if (!hold || !hold.reasons.delete(reason) || hold.reasons.size) return;
-    held.delete(id);
-    closeHold(id, hold.path);
+    const key = holdKey(id, reason);
+    const hold = held.get(key);
+    if (!hold) return;
+    held.delete(key);
+    closeHold(hold);
   };
   const shown = (entry: DriveEntry) => {
     paths.set(entry.id, entry.path);
@@ -256,16 +273,6 @@ export function createDriveFileCalls(
           ),
         ),
       );
-      const now = new Set(picked.map((file) => file.id));
-      for (const [id, hold] of [...held])
-        if (hold.reasons.has("pick") && !now.has(id)) releaseFor(id, "pick");
-      await Promise.all(
-        entries.map((entry) =>
-          entry && entry.kind === "file"
-            ? holdFor(entry, "pick").catch(() => undefined)
-            : undefined,
-        ),
-      );
       return picked.map((file) => {
         const entry = entries.find((candidate) => candidate?.id === file.id);
         return entry ? shown(entry) : shownRef(file);
@@ -356,7 +363,7 @@ export function createDriveFileCalls(
     },
     dispose() {
       disposed = true;
-      for (const [id, { path }] of held) closeHold(id, path);
+      for (const hold of held.values()) closeHold(hold);
       held.clear();
     },
   };

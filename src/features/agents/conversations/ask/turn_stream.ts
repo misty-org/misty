@@ -1,6 +1,6 @@
 import { useCollaborationStore } from "../../plans/agent_collaboration";
 import { awaitUserForExecution, resumeExecutionAfterWait } from "../../runs/jobs/execution_handoff";
-import { settleLocalExecution } from "../../runs/local-execution/local_execution";
+import { settleLocalExecution } from "../../runs/local-execution/local_execution_state";
 import { usePersonalAgentsStore } from "../../personal/personal_agents_store";
 import { globalMistyError } from "../state/global_misty_actions";
 import { applyGlobalInvocationEvent, patchConversationMessage } from "../state/misty_store_updates";

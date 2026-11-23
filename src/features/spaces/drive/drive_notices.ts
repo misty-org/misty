@@ -24,21 +24,10 @@ export function driveNoticeOptions(notice: DriveNotice): Parameters<typeof notif
     }
     case "delete_refused_in_use":
       return { message: `${by} has ${name} open` };
-    case "save_replaced": {
-      const itemId = notice.item_id;
+    case "save_replaced":
       return {
-        message: `${by}'s save replaced yours on ${name}`,
-        action: itemId
-          ? {
-              label: "Restore",
-              onSelect: () =>
-                void driveNative
-                  .restore(spaceId, itemId)
-                  .catch(failed(`Your save of ${name} couldn't be restored. Try again.`)),
-            }
-          : undefined,
+        message: `${by} saved ${name} after you, so yours is kept beside it as a conflicted copy`,
       };
-    }
     case "revived":
       return { message: `${by}'s edit brought ${name} back` };
     case "deletes_held": {

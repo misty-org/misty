@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use serde::Serialize;
@@ -10,6 +11,47 @@ use crate::names::{self, relative_text};
 
 pub const IGNORE_FILE: &str = ".mistyignore";
 pub const GIT_IGNORE_FILE: &str = ".gitignore";
+
+pub const HEAVY_FOLDERS: &[&str] = &[
+    "node_modules",
+    "bower_components",
+    "jspm_packages",
+    ".pnpm-store",
+    ".venv",
+    "venv",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".tox",
+    ".nox",
+    ".ipynb_checkpoints",
+    "target",
+    "dist",
+    "build",
+    ".next",
+    ".nuxt",
+    ".svelte-kit",
+    ".turbo",
+    ".parcel-cache",
+    ".vite",
+    ".angular",
+    ".expo",
+    ".cache",
+    "coverage",
+    ".gradle",
+    ".dart_tool",
+    ".build",
+    "Pods",
+    "DerivedData",
+    ".terraform",
+    ".serverless",
+    "elm-stuff",
+    ".stack-work",
+    "zig-cache",
+    ".zig-cache",
+    "zig-out",
+];
 
 const MAX_FILES: usize = 50_000;
 const SCAN_ENTRIES: usize = 5_000;
@@ -35,6 +77,14 @@ pub fn never_synced_path(path: &str) -> bool {
         || file_access::secrets::closed_to_agents(Path::new(path.trim_start_matches('/')))
 }
 
+static HEAVY: LazyLock<Option<Gitignore>> = LazyLock::new(|| {
+    let mut builder = GitignoreBuilder::new(Path::new("/drive"));
+    for folder in HEAVY_FOLDERS {
+        let _ = builder.add_line(None, &format!("{folder}/"));
+    }
+    builder.build().ok()
+});
+
 #[derive(Default)]
 pub struct DriveRules {
     folders: Vec<(String, Gitignore)>,
@@ -59,7 +109,11 @@ impl DriveRules {
             return true;
         }
         let absolute = Path::new("/drive").join(path.trim_start_matches('/'));
-        let mut ignored = false;
+        let mut ignored = HEAVY.as_ref().is_some_and(|defaults| {
+            defaults
+                .matched_path_or_any_parents(&absolute, is_folder)
+                .is_ignore()
+        });
         for (folder, rules) in &self.folders {
             if !names::is_within(path, folder) || path == folder {
                 continue;
@@ -75,7 +129,27 @@ impl DriveRules {
     }
 }
 
+fn brought_back(root: &Path) -> HashSet<String> {
+    let mut names = HashSet::new();
+    for file in [GIT_IGNORE_FILE, IGNORE_FILE] {
+        let Ok(text) = file_access::fs::read_to_string(root.join(file)) else {
+            continue;
+        };
+        for line in text.lines() {
+            let Some(rule) = line.trim().strip_prefix('!') else {
+                continue;
+            };
+            let name = rule.trim_start_matches('/').trim_end_matches('/');
+            if HEAVY_FOLDERS.contains(&name) {
+                names.insert(name.to_owned());
+            }
+        }
+    }
+    names
+}
+
 fn builder(root: &Path) -> ignore::WalkBuilder {
+    let kept = brought_back(root);
     let mut builder = ignore::WalkBuilder::new(root);
     builder
         .hidden(false)
@@ -85,7 +159,14 @@ fn builder(root: &Path) -> ignore::WalkBuilder {
         .require_git(false)
         .follow_links(false)
         .add_custom_ignore_filename(IGNORE_FILE)
-        .filter_entry(|entry| entry.depth() == 0 || entry.file_name() != ".git");
+        .filter_entry(move |entry| {
+            entry.depth() == 0
+                || (entry.file_name() != ".git"
+                    && !(entry.file_type().is_some_and(|kind| kind.is_dir())
+                        && entry.file_name().to_str().is_some_and(|name| {
+                            HEAVY_FOLDERS.contains(&name) && !kept.contains(name)
+                        })))
+        });
     builder
 }
 
@@ -284,5 +365,25 @@ mod tests {
         assert!(rules.ignores("/build/out.txt", false));
         assert!(!rules.ignores("/app/keep.log", false));
         assert!(!rules.ignores("/notes.md", false));
+    }
+
+    #[test]
+    fn heavy_folders_stay_unless_brought_back() {
+        let mut rules = DriveRules::default();
+        assert!(rules.ignores("/node_modules", true));
+        assert!(rules.ignores("/site/node_modules/react/index.js", false));
+        assert!(rules.ignores("/app/.venv/bin/python", false));
+        assert!(rules.ignores("/crate/target/debug/app", false));
+        assert!(rules.ignores("/web/.next/cache/a", false));
+        assert!(rules.ignores("/py/__pycache__/m.pyc", false));
+        assert!(!rules.ignores("/build", false));
+        assert!(!rules.ignores("/notes/target.md", false));
+        assert!(!rules.ignores("/Builds/report.pdf", false));
+        rules.add("/", "!build/\n");
+        rules.add("/site", "!node_modules/\n");
+        assert!(!rules.ignores("/build/out.txt", false));
+        assert!(!rules.ignores("/site/node_modules/react/index.js", false));
+        assert!(rules.ignores("/other/node_modules/react/index.js", false));
+        assert!(rules.ignores("/app/dist/bundle.js", false));
     }
 }

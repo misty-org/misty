@@ -249,11 +249,7 @@ export function SpaceChatComposer(props: {
                     key={attachment.id}
                     icon={File}
                     name={attachment.display_name}
-                    onRemove={() =>
-                      draft.setPendingAttachments((current) =>
-                        current.filter((item) => item.id !== attachment.id),
-                      )
-                    }
+                    onRemove={() => draft.removeAttachment(attachment)}
                   />
                 ))}
               </>

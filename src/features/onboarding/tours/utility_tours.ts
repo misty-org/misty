@@ -21,26 +21,6 @@ export const utilityTours = {
       },
     ],
   },
-  layout: {
-    label: "Layout tour",
-    steps: [
-      {
-        target: "layout-tabs",
-        title: "Your tabs",
-        body: "These are your open tabs. Click one to add it, or drag it onto the picture.",
-      },
-      {
-        target: "layout-canvas",
-        title: "Arrange your window",
-        body: "A small picture of your window. Drop a tab on an edge to split, or in the middle to swap. Drag a box to move it.",
-      },
-      {
-        target: "layout-apply",
-        title: "Try it out",
-        body: "Nothing changes until you press Apply.",
-      },
-    ],
-  },
   "add-sources": {
     label: "Add sources tour",
     steps: [

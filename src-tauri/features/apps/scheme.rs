@@ -135,6 +135,10 @@ fn page_bytes(
                 .map_err(|_| StatusCode::FORBIDDEN)?;
             quiet(StatusCode::NO_CONTENT, Vec::new())
         }
+        tauri::http::Method::DELETE => {
+            frames::take_bytes(mount, Some(token), reference);
+            quiet(StatusCode::NO_CONTENT, Vec::new())
+        }
         _ => Err(StatusCode::METHOD_NOT_ALLOWED),
     }
 }

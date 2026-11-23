@@ -5,11 +5,17 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use voice_speech::{
-    decode_file, recognize_file, recognize_samples, resample, Hearing, HearingEvent, HearingFamily,
-    HearingSpec, Recognizer, VadSpec, Voice, VoiceSpec,
+    decode_file, recognize_file, recognize_samples, resample, use_helper, Hearing, HearingEvent,
+    HearingFamily, HearingSpec, Recognizer, VadSpec, Voice, VoiceSpec,
 };
 
+fn helper() -> Result<std::process::Command, String> {
+    let program = std::env::var("MISTY_SPEECH_HELPER").map_err(|_| "set MISTY_SPEECH_HELPER")?;
+    Ok(std::process::Command::new(program))
+}
+
 fn models() -> PathBuf {
+    use_helper(helper);
     PathBuf::from(std::env::var("MISTY_SPEECH_MODELS").expect("set MISTY_SPEECH_MODELS"))
 }
 

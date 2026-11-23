@@ -4,7 +4,7 @@ use super::{deliver, HANDLER_NAME};
 use objc::runtime::{Class, Object, Sel, BOOL, YES};
 use objc::{msg_send, sel, sel_impl};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     ffi::{CStr, CString},
     sync::{Mutex, OnceLock},
 };
@@ -19,8 +19,8 @@ fn targets() -> &'static Mutex<HashMap<usize, String>> {
     TARGETS.get_or_init(Mutex::default)
 }
 
-fn installed() -> &'static Mutex<HashSet<usize>> {
-    static INSTALLED: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
+fn installed() -> &'static Mutex<HashMap<String, usize>> {
+    static INSTALLED: OnceLock<Mutex<HashMap<String, usize>>> = OnceLock::new();
     INSTALLED.get_or_init(Mutex::default)
 }
 
@@ -68,7 +68,10 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
             let controller: *mut Object = msg_send![configuration, userContentController];
             let first = installed()
                 .lock()
-                .map(|mut controllers| controllers.insert(controller as usize))
+                .map(|mut controllers| {
+                    controllers.insert(label.clone(), controller as usize)
+                        != Some(controller as usize)
+                })
                 .unwrap_or(false);
             if !first {
                 return;
@@ -85,11 +88,13 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
             });
             let handler: *mut Object = msg_send![class, new];
             if let Ok(mut targets) = targets().lock() {
+                targets.retain(|_, known| known != &label);
                 targets.insert(handler as usize, label);
             }
             let name = CString::new(HANDLER_NAME).expect("handler name");
             let name: *mut Object =
                 msg_send![Class::get("NSString").unwrap(), stringWithUTF8String: name.as_ptr()];
+            let _: () = msg_send![controller, removeScriptMessageHandlerForName: name];
             let _: () = msg_send![controller, addScriptMessageHandler: handler name: name];
             let _: () = msg_send![handler, release];
         })
@@ -97,6 +102,9 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
 }
 
 pub(super) fn forget(webview: &str) {
+    if let Ok(mut controllers) = installed().lock() {
+        controllers.remove(webview);
+    }
     if let Ok(mut targets) = targets().lock() {
         targets.retain(|_, label| label != webview);
     }

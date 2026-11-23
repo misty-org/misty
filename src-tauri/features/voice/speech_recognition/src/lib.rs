@@ -1,28 +1,23 @@
-//! Speech on this computer through open models, with no key and nothing sent anywhere: hearing
-//! (voice activity detection, then a speech recognition model), recorded files, and speaking in
-//! a voice. Every model runs through sherpa-onnx (Apache-2.0) on the CPU, the same on macOS,
-//! Windows and Linux. Which models there are, and where they come from, is Misty's catalog
-//! (`misty-registry`); the app downloads them and hands this crate their files.
-//!
-//! The crate has no app framework coupling: callers own events, windows and model files.
-
 use serde::{Deserialize, Serialize};
 
-mod decode;
-mod file;
-mod hearing;
 mod model;
-mod player;
-mod recognizer;
-mod voice;
+pub mod protocol;
 
-pub use decode::{decode_file, resample, SAMPLE_RATE};
-pub use file::{recognize_file, recognize_samples};
-pub use hearing::{Hearing, HearingEvent};
+#[cfg(feature = "client")]
+mod client;
+#[cfg(feature = "client")]
+mod player;
+
+#[cfg(feature = "client")]
+pub use client::{
+    decode_file, recognize_file, recognize_samples, resample, use_helper, Hearing, Launch,
+    Recognizer, Voice,
+};
 pub use model::{HearingFamily, HearingSpec, VadSpec, VoiceSpec};
+#[cfg(feature = "client")]
 pub use player::{play, Playback};
-pub use recognizer::Recognizer;
-pub use voice::{Speech, Voice};
+
+pub const SAMPLE_RATE: i32 = 16_000;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct Phrase {
@@ -40,6 +35,20 @@ pub struct Word {
     pub text: String,
     pub start: f64,
     pub end: f64,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Speech {
+    pub samples: Vec<f32>,
+    pub rate: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum HearingEvent {
+    Started { input: String },
+    Stopped { input: String },
+    Heard { input: String, phrase: Phrase },
+    Closed,
 }
 
 pub fn reason(code: &str) -> String {

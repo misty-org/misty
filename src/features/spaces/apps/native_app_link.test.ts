@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { applyAwarenessUpdate, Awareness, encodeAwarenessUpdate } from "y-protocols/awareness";
-import { coalesceAwareness, mergeAwareness, SDK_LANE } from "./native_app_link";
+import { coalesceAwareness, mergeAwareness, refsIn, SDK_LANE } from "./native_app_link";
 
 function awarenessWith(client: number) {
   const doc = new Y.Doc();
@@ -47,5 +47,20 @@ describe("app page awareness", () => {
     applyAwarenessUpdate(reader, merged.data.update, "test");
     expect(reader.getStates().get(1)).toEqual({ x: 2 });
     expect(out[2]![0]).toBe("misty:screen");
+  });
+});
+
+describe("refsIn", () => {
+  it("finds every byte reference a frame carries, however deep", () => {
+    expect(
+      refsIn({
+        t: "evt",
+        data: [
+          { $mistyBytes: "", r: "a", k: "Uint8Array" },
+          { inner: { $mistyBytes: "AA==", k: "Uint8Array" } },
+        ],
+        more: { $mistyBytes: "", r: "b", k: "ArrayBuffer" },
+      }),
+    ).toEqual(["a", "b"]);
   });
 });

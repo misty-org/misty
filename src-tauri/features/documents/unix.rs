@@ -2,7 +2,7 @@ use file_access::fs;
 use file_access::fs::File;
 use std::{
     io::{Read, Seek, SeekFrom, Write},
-    os::unix::fs::{FileExt, PermissionsExt},
+    os::unix::fs::FileExt,
     path::Path,
     process::{Command, Stdio},
     sync::atomic::{AtomicBool, Ordering},
@@ -42,15 +42,14 @@ fn plain_environment(command: &mut Command, work: &Path) {
 fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), String> {
     use std::os::unix::process::CommandExt;
     let failed = |_| "Could not confine document processor.".to_owned();
-    let executable = fs::canonicalize(executable).map_err(failed)?;
     let work = fs::canonicalize(work).map_err(failed)?;
     let mut command = Command::new(sandbox::macos::SANDBOX_EXEC);
     command
         .args(sandbox::macos::arguments(
             PROFILE,
-            &[("TOOL", &executable), ("WORK", &work)],
+            &[("TOOL", executable), ("WORK", &work)],
         ))
-        .arg(&executable);
+        .arg(executable);
     plain_environment(&mut command, &work);
     command.process_group(0);
     unsafe {
@@ -71,10 +70,9 @@ fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), 
     use sandbox::linux::{Access, Confinement, Policy};
     use std::os::unix::process::CommandExt;
     let failed = |_| "Could not confine document processor.".to_owned();
-    let executable = fs::canonicalize(executable).map_err(failed)?;
     let work = fs::canonicalize(work).map_err(failed)?;
     let confinement = Confinement::new(&Policy {
-        program: executable.clone(),
+        program: executable.to_path_buf(),
         required: vec![(work.clone(), Access::Private)],
         optional: Vec::new(),
         forks: false,
@@ -85,7 +83,7 @@ fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), 
             (libc::RLIMIT_CORE, 0),
         ],
     })?;
-    let mut command = Command::new(&executable);
+    let mut command = Command::new(executable);
     plain_environment(&mut command, &work);
     unsafe {
         command.pre_exec(confinement.hook());
@@ -108,7 +106,7 @@ impl Drop for Child {
 pub fn process(
     path: &Path,
     stop: &AtomicBool,
-    worker: super::WorkerBytes,
+    worker: super::WorkerProgram,
 ) -> Result<Value, String> {
     let display_name = path
         .file_name()
@@ -135,11 +133,7 @@ pub fn process(
         .prefix("misty-document-")
         .tempdir()
         .map_err(|_| "Could not create document workspace.")?;
-    let executable = work.path().join("worker");
-    fs::write(&executable, worker("document-processing", PROTOCOL)?)
-        .map_err(|_| "Could not stage document processor.")?;
-    fs::set_permissions(&executable, fs::Permissions::from_mode(0o500))
-        .map_err(|_| "Could not prepare processor permissions.")?;
+    let executable = worker("document-processing")?;
     let started = Instant::now();
     stage_input(
         &input,

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useLocalExecution } from "../runs/local-execution/local_execution";
+import { useLocalExecution } from "../runs/local-execution/local_execution_state";
 import { saveAgentArtifact } from "./agent_artifacts";
 
 interface TaskArtifact {

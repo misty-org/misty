@@ -1,16 +1,19 @@
-import { createMisty, type AppContext, type Misty } from "@misty/sdk";
+import { createMisty, FIRST_OFFERS, type HelloResult, type Misty } from "@misty/sdk";
 import * as Y from "yjs";
 import { useUserStore } from "@/features/account/core";
-import { spaceRequest } from "../api/api";
-import { createYjsProvider } from "../journal/notes/create_yjs_provider";
+import {
+  createYjsProvider,
+  firstCollaborationTicket,
+  requestCollaborationTicket,
+} from "../journal/notes/create_yjs_provider";
 import {
   acquireNoteCollaborationSession,
   releaseNoteCollaborationSession,
 } from "../journal/notes/note_collaboration";
 import { useSpacesStore } from "../list/use_spaces_store";
-import { providerRoom, type HostRoom, type RoomSource } from "./app_rooms";
+import { providerRoom, ROOM_FEATURES, type HostRoom, type RoomSource } from "./app_rooms";
 import { createHostChannel, type FrameTarget } from "./host_channel";
-import { createSpaceAppHandlers } from "./space_app_handlers";
+import { createSpaceAppHandlers, HOST_TOPICS } from "./space_app_handlers";
 import { themeSource } from "./theme_source";
 
 export type MistyPage = "code" | "lab";
@@ -23,12 +26,11 @@ interface RoomTicket {
 
 function codeRoomSource(spaceId: string): RoomSource {
   const ticket = (sessionId: string) =>
-    spaceRequest<RoomTicket>(
+    requestCollaborationTicket<RoomTicket>(
       `/spaces/${encodeURIComponent(spaceId)}/code-sessions/${encodeURIComponent(sessionId)}/collaboration-ticket`,
-      { method: "POST" },
     );
-  return async (sessionId, { gc }) => {
-    const first = await ticket(sessionId);
+  return async (sessionId, { gc, signal }) => {
+    const first = await firstCollaborationTicket(() => ticket(sessionId), signal);
     const doc = new Y.Doc({ gc });
     return providerRoom(
       createYjsProvider(first, doc, "code-room", () => ticket(sessionId)),
@@ -69,6 +71,11 @@ function labRoomSource(spaceId: string): RoomSource {
 
 const pageNames: Record<MistyPage, string> = { code: "Code", lab: "Lab" };
 
+const pageOffers = {
+  calls: [...new Set([...FIRST_OFFERS.calls, "room.sync", "room.serialized"])],
+  topics: [...new Set([...FIRST_OFFERS.topics, ...HOST_TOPICS, ...ROOM_FEATURES])],
+};
+
 const clients = new Map<string, Misty>();
 
 export function pageMisty(spaceId: string, page: MistyPage): Misty {
@@ -79,8 +86,8 @@ export function pageMisty(spaceId: string, page: MistyPage): Misty {
   const space = useSpacesStore.getState().spaces.find((candidate) => candidate.id === spaceId);
   const me = useUserStore.getState().me;
   const isMod = Boolean(space?.permissions?.includes("apps.manage"));
-  const route: AppContext["route"] = { path: "/", params: {} };
-  const context: AppContext = {
+  const route: HelloResult["route"] = { path: "/", params: {} };
+  const context: HelloResult = {
     app_id: page,
     space: { id: spaceId, name: space?.name ?? "", is_mod: isMod },
     me: {
@@ -92,6 +99,7 @@ export function pageMisty(spaceId: string, page: MistyPage): Misty {
     theme: themeSource.get(),
     route,
     permissions: [],
+    offers: pageOffers,
   };
   const handlers = createSpaceAppHandlers({
     appId: page,

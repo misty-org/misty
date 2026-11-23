@@ -137,24 +137,3 @@ export function handleFilesKey(
                 : 0;
   if (delta) run(() => commands.move(delta, event.shiftKey));
 }
-
-export function shownOrder(container: HTMLElement | null, items: { id: string; name: string }[]) {
-  const fallback = { ids: items.map((item) => item.id), perRow: 1 };
-  if (!container) return fallback;
-  const byName = new Map<string, string>();
-  for (const item of items) if (!byName.has(item.name)) byName.set(item.name, item.id);
-  const seen = new Set<string>();
-  const shown: { id: string; top: number }[] = [];
-  for (const element of Array.from(container.querySelectorAll<HTMLElement>("[aria-label]"))) {
-    const id = byName.get(element.getAttribute("aria-label") ?? "");
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    shown.push({ id, top: element.getBoundingClientRect().top });
-  }
-  if (shown.length !== items.length) return fallback;
-  const perRow = Math.max(
-    1,
-    shown.filter((entry) => Math.abs(entry.top - shown[0].top) < 2).length,
-  );
-  return { ids: shown.map((entry) => entry.id), perRow };
-}

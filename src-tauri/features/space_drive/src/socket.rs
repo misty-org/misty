@@ -10,8 +10,6 @@ use tokio::{
     net::{UnixListener, UnixStream},
 };
 
-const SEND_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
-
 use crate::{Drive, DriveError, Item, ItemId, Kind, NewNode, Node, Seq, SpaceId};
 
 pub const PROTOCOL: u32 = 2;
@@ -67,6 +65,9 @@ impl Server {
                     continue;
                 };
                 if !stream.peer_cred().is_ok_and(|peer| peer.uid() == me) {
+                    continue;
+                }
+                if !peer::is_extension(&stream) {
                     continue;
                 }
                 let drive = accept_drive.clone();
@@ -562,7 +563,7 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
                 None
             };
             let content = staged(request, staging)?;
-            let (mut node, mut refetch) = drive.modify(
+            let (node, refetch) = drive.modify(
                 &space,
                 &id,
                 base,
@@ -574,14 +575,6 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
                     .and_then(Value::as_i64)
                     .unwrap_or_else(crate::now_ms),
             )?;
-            if content.is_some() {
-                let sent = node.sha256.clone();
-                let _ = tokio::time::timeout(SEND_WAIT, drive.sync_now(&space)).await;
-                if let Some(now) = drive.node(&space, &id)? {
-                    refetch |= now.sha256 != sent;
-                    node = now;
-                }
-            }
             Ok(json!({ "item": node_value(drive, &space, &node), "refetch": refetch }))
         }
         "trash" => {
@@ -634,4 +627,157 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
 fn sorted(mut nodes: Vec<Node>) -> Vec<Node> {
     nodes.sort_by(|a, b| a.name.cmp(&b.name));
     nodes
+}
+
+#[cfg(target_os = "macos")]
+mod peer {
+    use std::ffi::c_void;
+    use std::os::fd::AsRawFd;
+
+    use core_foundation::{
+        base::{CFType, TCFType},
+        data::CFData,
+        dictionary::{CFDictionary, CFDictionaryRef},
+        string::{CFString, CFStringRef},
+    };
+    use core_foundation_sys::base::{CFRelease, CFTypeRef};
+
+    const SOL_LOCAL: libc::c_int = 0;
+    const LOCAL_PEERTOKEN: libc::c_int = 6;
+    const SIGNING_INFORMATION: u32 = 1 << 1;
+
+    type CodeRef = *const c_void;
+
+    #[link(name = "Security", kind = "framework")]
+    extern "C" {
+        static kSecGuestAttributeAudit: CFStringRef;
+        static kSecCodeInfoIdentifier: CFStringRef;
+        static kSecCodeInfoTeamIdentifier: CFStringRef;
+        fn SecCodeCopyGuestWithAttributes(
+            host: CodeRef,
+            attributes: CFDictionaryRef,
+            flags: u32,
+            guest: *mut CodeRef,
+        ) -> i32;
+        fn SecCodeCheckValidity(code: CodeRef, flags: u32, requirement: *const c_void) -> i32;
+        fn SecCodeCopySelf(flags: u32, code: *mut CodeRef) -> i32;
+        fn SecCodeCopyStaticCode(code: CodeRef, flags: u32, static_code: *mut CodeRef) -> i32;
+        fn SecCodeCopySigningInformation(
+            code: CodeRef,
+            flags: u32,
+            information: *mut CFDictionaryRef,
+        ) -> i32;
+    }
+
+    struct Owned(CodeRef);
+
+    impl Drop for Owned {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                // SAFETY: the pointer came from a Security "Copy" call, so this code owns one
+                // reference to it.
+                unsafe { CFRelease(self.0 as CFTypeRef) };
+            }
+        }
+    }
+
+    fn signing(code: CodeRef) -> Option<(Option<String>, Option<String>)> {
+        let mut fixed: CodeRef = std::ptr::null();
+        // SAFETY: `code` is a live code object and `fixed` is a valid out pointer.
+        if unsafe { SecCodeCopyStaticCode(code, 0, &mut fixed) } != 0 || fixed.is_null() {
+            return None;
+        }
+        let fixed = Owned(fixed);
+        let mut info: CFDictionaryRef = std::ptr::null();
+        // SAFETY: `fixed` is a live static code object and `info` is a valid out pointer.
+        if unsafe { SecCodeCopySigningInformation(fixed.0, SIGNING_INFORMATION, &mut info) } != 0
+            || info.is_null()
+        {
+            return None;
+        }
+        // SAFETY: the dictionary came from a "Copy" call, so taking it under the create rule
+        // releases it once.
+        let info: CFDictionary<CFString, CFType> =
+            unsafe { CFDictionary::wrap_under_create_rule(info) };
+        let text = |key: CFStringRef| {
+            // SAFETY: the key is one of Security's constant strings, live for the process.
+            let key = unsafe { CFString::wrap_under_get_rule(key) };
+            info.find(&key)
+                .and_then(|value| value.downcast::<CFString>())
+                .map(|value| value.to_string())
+        };
+        // SAFETY: reading Security's exported constant strings.
+        let (identifier, team) = unsafe { (kSecCodeInfoIdentifier, kSecCodeInfoTeamIdentifier) };
+        Some((text(identifier), text(team)))
+    }
+
+    fn own_team() -> Option<Option<String>> {
+        let mut me: CodeRef = std::ptr::null();
+        // SAFETY: `me` is a valid out pointer.
+        if unsafe { SecCodeCopySelf(0, &mut me) } != 0 || me.is_null() {
+            return None;
+        }
+        let me = Owned(me);
+        signing(me.0).map(|(_, team)| team)
+    }
+
+    pub fn is_extension(stream: &tokio::net::UnixStream) -> bool {
+        let mut token = [0u32; 8];
+        let mut length = std::mem::size_of_val(&token) as libc::socklen_t;
+        // SAFETY: the buffer is an audit token's size and `length` says so.
+        let read = unsafe {
+            libc::getsockopt(
+                stream.as_raw_fd(),
+                SOL_LOCAL,
+                LOCAL_PEERTOKEN,
+                token.as_mut_ptr().cast::<c_void>(),
+                &mut length,
+            )
+        };
+        if read != 0 || length as usize != std::mem::size_of_val(&token) {
+            return false;
+        }
+        let bytes: Vec<u8> = token.iter().flat_map(|word| word.to_ne_bytes()).collect();
+        let data = CFData::from_buffer(&bytes);
+        // SAFETY: reading Security's exported constant string.
+        let audit = unsafe { CFString::wrap_under_get_rule(kSecGuestAttributeAudit) };
+        let attributes = CFDictionary::from_CFType_pairs(&[(audit, data.as_CFType())]);
+        let mut guest: CodeRef = std::ptr::null();
+        // SAFETY: the attributes dictionary is live for the call and `guest` is a valid out
+        // pointer.
+        let found = unsafe {
+            SecCodeCopyGuestWithAttributes(
+                std::ptr::null(),
+                attributes.as_concrete_TypeRef(),
+                0,
+                &mut guest,
+            )
+        };
+        if found != 0 || guest.is_null() {
+            return false;
+        }
+        let guest = Owned(guest);
+        // SAFETY: `guest` is a live code object; a null requirement checks the signature alone.
+        if unsafe { SecCodeCheckValidity(guest.0, 0, std::ptr::null()) } != 0 {
+            return false;
+        }
+        let Some((identifier, team)) = signing(guest.0) else {
+            return false;
+        };
+        if identifier.as_deref() != Some(crate::face::file_provider::extension_bundle_id()) {
+            return false;
+        }
+        match (own_team(), team) {
+            (Some(Some(mine)), Some(theirs)) => mine == theirs,
+            (Some(None), None) => cfg!(debug_assertions),
+            _ => false,
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+mod peer {
+    pub fn is_extension(_stream: &tokio::net::UnixStream) -> bool {
+        true
+    }
 }

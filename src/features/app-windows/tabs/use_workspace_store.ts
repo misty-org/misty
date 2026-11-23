@@ -13,21 +13,25 @@ import type {
   DockDropZone,
   DockSplitDirection,
   OpenWorkspaceSurfaceRequest,
-  WorkspaceDockNode,
   WorkspaceGroupKey,
+  WorkspaceTabGroup,
   WorkspaceView,
 } from "./workspace_views";
 import { initialWorkspaceWindow, type WorkspaceWindowsState } from "../profiles/windows";
 import { type ClosedWorkspaceItem } from "./closed_workspace_items";
+import type { AsideWorkspace, WorkspaceSide } from "./workspace_sides";
 import { migrateWorkspaceStore, partialWorkspaceStore } from "./workspace_store_persistence";
 import { workspaceOpenActions } from "./workspace_open_actions";
 import { workspacePaneActions } from "../panes/workspace_pane_actions";
 import { workspaceTabActions } from "./workspace_tab_actions";
 import { workspaceViewActions } from "./workspace_view_actions";
+import { workspaceGroupActions } from "./workspace_group_actions";
 
 export interface WorkspaceStore extends WorkspaceWindowsState {
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedItems: ClosedWorkspaceItem[];
+  side?: WorkspaceSide;
+  aside?: AsideWorkspace;
   newTab: (route?: string) => WorkspaceView;
   navigatePane: (delta: number, paneId?: string) => WorkspaceView | null;
   detachPaneToTab: (viewId: string) => boolean;
@@ -49,7 +53,6 @@ export interface WorkspaceStore extends WorkspaceWindowsState {
   cycleView: (direction: 1 | -1) => WorkspaceView | null;
   selectView: (index: number | "last") => WorkspaceView | null;
   dockViews: (tabIds: string[], paneId: string, zone: DockDropZone, index?: number) => boolean;
-  applyLayoutRoot: (tabId: string, root: WorkspaceDockNode) => boolean;
   moveView: (tabId: string, paneId: string, index?: number) => boolean;
   dockView: (tabId: string, paneId: string, zone: DockDropZone, index?: number) => boolean;
   reorderPaneViews: (paneId: string, ids: string[]) => void;
@@ -62,6 +65,22 @@ export interface WorkspaceStore extends WorkspaceWindowsState {
   fillEmptyPanes: () => void;
   updateSplitRatio: (splitId: string, ratio: number) => void;
   toggleSidebar: (tabId: string) => void;
+  groupTabWith: (tabId: string, targetId: string) => void;
+  addTabToGroup: (tabId: string, group: string) => void;
+  newTabGroup: (tabId: string) => void;
+  removeTabFromGroup: (tabId: string) => void;
+  moveTab: (tabId: string, index: number, group?: string | null) => void;
+  moveTabGroup: (id: string, before: string | null) => void;
+  updateTabGroup: (
+    id: string,
+    patch: Partial<Pick<WorkspaceTabGroup, "title" | "color" | "collapsed">>,
+  ) => void;
+  toggleTabGroup: (id: string) => WorkspaceView | null;
+  ungroupTabs: (id: string) => void;
+  closeTabGroup: (id: string) => boolean;
+  newTabInGroup: (id: string) => WorkspaceView;
+  showTabGroupSideBySide: (id: string) => void;
+  separateTab: (tabId: string) => void;
   reset: () => void;
 }
 
@@ -75,12 +94,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       ...workspaceViewActions(set, get),
       ...workspaceTabActions(set, get),
       ...workspacePaneActions(set, get),
+      ...workspaceGroupActions(set, get),
       reset: () => {
         set({
           ...initialWorkspaceWindow(),
           lastUsedViewByGroup: {},
           closedItems: [],
           dockingLayout: undefined,
+          side: undefined,
+          aside: undefined,
         });
       },
     }),

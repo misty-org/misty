@@ -28,10 +28,43 @@ export function xmlToText(xml: string): string {
     .trim();
 }
 
+const namedEntities: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: "\u00a0",
+  ndash: "\u2013",
+  mdash: "\u2014",
+  hellip: "\u2026",
+  lsquo: "\u2018",
+  rsquo: "\u2019",
+  ldquo: "\u201c",
+  rdquo: "\u201d",
+  bull: "\u2022",
+  copy: "\u00a9",
+  reg: "\u00ae",
+  trade: "\u2122",
+};
+
+function codePoint(value: number, fallback: string): string {
+  if (!Number.isInteger(value) || value < 0 || value > 0x10ffff) return fallback;
+  if (value >= 0xd800 && value <= 0xdfff) return fallback;
+  return String.fromCodePoint(value);
+}
+
 function decodeXmlEntities(value: string): string {
-  const textarea = document.createElement("textarea");
-  textarea.innerHTML = value;
-  return textarea.value;
+  return value.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]*);/gi, (whole, body: string) => {
+    if (body[0] === "#")
+      return codePoint(
+        body[1] === "x" || body[1] === "X"
+          ? Number.parseInt(body.slice(2), 16)
+          : Number.parseInt(body.slice(1), 10),
+        whole,
+      );
+    return namedEntities[body.toLowerCase()] ?? whole;
+  });
 }
 
 export function rtfToText(value: string): string {
@@ -63,4 +96,17 @@ function typeFamily(extension: string, mimeType?: string | null): string {
   if (textExtensions.has(extension)) return "text";
   if (archiveExtensions.has(extension)) return "archive";
   return "file";
+}
+
+export type PreviewKind = "image" | "video" | "audio" | "pdf" | "text" | "document" | "other";
+
+export function previewKind(name: string, mimeType: string): PreviewKind {
+  const extension = sourceExtension({ path: "", name });
+  if (mimeType.startsWith("image/") || imageMimeTypes[extension]) return "image";
+  if (mimeType.startsWith("video/") || videoMimeTypes[extension]) return "video";
+  if (mimeType.startsWith("audio/") || audioMimeTypes[extension]) return "audio";
+  if (mimeType === "application/pdf" || extension === "pdf") return "pdf";
+  if (textExtensions.has(extension)) return "text";
+  if (officeExtensions.has(extension)) return "document";
+  return "other";
 }

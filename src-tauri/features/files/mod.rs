@@ -1,19 +1,24 @@
 //! Files: Misty's own file manager, a Finder for the whole disk, behind the disk grant.
 //!
 //! Much of it is adapted from Kura (MIT, Copyright (c) 2026 Kura contributors; see `NOTICE`), kept
-//! to what Finder does: no transfer queue, no saved workspaces or transfer history, no tabs, no
-//! cloud drives. Every operation runs at once and on its own; a long copy reports its progress on
-//! `files://progress` and stops on `files_cancel`.
+//! to what Finder does: no saved workspaces or transfer history, no tabs, no cloud drives. Long
+//! work (a copy, a delete, an archive, a folder's size, duplicates, a comparison) waits its turn on
+//! a small native queue (`runtime.rs`), reports its progress on `files://progress` to the window
+//! that started it, and stops on `files_cancel`.
 //!
 //! Every path a window names reaches the disk only through `file_access::disk`, which this folder
-//! alone may use (`gate_tests.rs` holds the rest of the code to that), and every command first
-//! checks it came from a person's own window. Agents reach the same code only through
-//! `agent_paths::admit`, which checks each path with `file_access::disk::check_agent`.
+//! alone may use (`gate_tests.rs` holds the rest of the code to that), as open, checked folder
+//! handles (`gated.rs`) rather than path strings, and every command first checks it came from a
+//! person's own window. Nothing here replaces an item unless the person chose Replace. Agents
+//! reach the same code only through `agent_paths::admit` and the agent gate.
 //!
 //! The renderer's side is `src/features/files/api/disk.ts`, which names every command and shape.
 
 pub mod clipboard;
+pub(crate) mod copy_source;
 pub mod entry;
+mod fs_events;
+pub(crate) mod gated;
 pub mod info;
 pub mod listing;
 pub mod open;
@@ -21,6 +26,9 @@ pub mod ops;
 pub mod places;
 pub mod progress;
 pub mod protocol;
+#[cfg(target_os = "macos")]
+mod quick_look_thumbnail;
+pub mod runtime;
 #[cfg(target_os = "macos")]
 mod system_thumbnail;
 pub mod terminal;
@@ -58,14 +66,11 @@ pub(crate) async fn blocking<T: Send + 'static>(
 }
 
 pub(crate) fn asked_path(path: &str) -> Result<PathBuf, String> {
-    let path = PathBuf::from(path);
-    if !path.is_absolute() {
-        return Err("That isn't a full path.".into());
-    }
-    if !file_access::is_local_path(&path) {
-        return Err("Files opens only this computer's own drives.".into());
-    }
-    Ok(path)
+    file_access::disk::normalize_asked(Path::new(path)).map_err(|error| error.to_string())
+}
+
+pub(crate) fn asked_paths(paths: &[String]) -> Result<Vec<PathBuf>, String> {
+    paths.iter().map(|path| asked_path(path)).collect()
 }
 
 pub(crate) fn display_name(path: &Path) -> String {

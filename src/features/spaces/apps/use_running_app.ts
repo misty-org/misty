@@ -1,15 +1,18 @@
+import { useUserStore } from "@/features/account/core";
 import { invoke } from "@/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createScreenChannel,
   noteRunningApp,
   useAppControl,
+  watchAgentControl,
   type ScreenChannel,
 } from "./app_screen";
 import { createScreenTools } from "./app_screen_tools";
 import { offerAppTools } from "./app_tools";
 import { createHostChannel } from "./host_channel";
-import type { FrameTarget, HostChannel, HostHandlers } from "./host_channel";
+import type { Authorize, FrameTarget, HostChannel, HostHandlers } from "./host_channel";
+import { HostError } from "./protocol";
 
 export interface AppManifest {
   id: string;
@@ -59,11 +62,52 @@ export type RunningApp =
   | {
       status: "ready";
       manifest: AppManifest;
+      instance: string;
       start: (frame: FrameTarget, element: HTMLElement, page?: AppPageView) => void;
+      leave: () => void;
       save: (file: SavedDownload) => Promise<void>;
     };
 
 const asMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+function refusalOf(error: unknown): HostError {
+  if (isRecord(error) && error.denied === true)
+    return new HostError("permission_denied", String(error.message ?? "That isn't allowed."));
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "Misty couldn't check what the app may do.";
+  return new HostError("internal", message);
+}
+
+function sessionCheck(session: string): Authorize {
+  const grants = new Map<string, Promise<void>>();
+  return (kind, name, params) => {
+    const asked =
+      kind === "subscribe" && name === "room" && isRecord(params) && params.file !== undefined
+        ? "room.file"
+        : name;
+    const key = `${kind}:${asked}`;
+    const known = grants.get(key);
+    if (known) return known;
+    const check = invoke<void>("space_app_session_check", { session, kind, name: asked }).catch(
+      (error: unknown) => {
+        throw refusalOf(error);
+      },
+    );
+    grants.set(key, check);
+    check.catch((error: unknown) => {
+      if (!(error instanceof HostError && error.code === "permission_denied"))
+        grants.delete(key);
+    });
+    return check;
+  };
+}
 
 export function useRunningApp(options: {
   spaceId: string;
@@ -94,6 +138,19 @@ export function useRunningApp(options: {
     let screen: ScreenChannel | undefined;
     let unnote: (() => void) | undefined;
     let live: HostHandlers | undefined;
+    const leave = () => {
+      live = undefined;
+      if (alive) setConnected(false);
+      channel?.dispose();
+      channel = undefined;
+      tools?.dispose();
+      tools = undefined;
+      screen?.dispose();
+      screen = undefined;
+      unnote?.();
+      unnote = undefined;
+      if (session) useAppControl.getState().leave(session);
+    };
     setApp({ status: "setup" });
     setConnected(false);
 
@@ -126,26 +183,25 @@ export function useRunningApp(options: {
       }
       session = opened;
       const running = manifest;
+      const authorize = sessionCheck(opened);
+      const granted = approvedNow.filter((permission) => running.permissions.includes(permission));
       setApp({
         status: "ready",
         manifest: running,
+        instance: opened,
+        leave,
         async save(file) {
-          await invoke<void>("space_app_session_check", {
-            session: opened,
-            kind: "call",
-            name: "files.save",
-          });
+          await authorize("call", "files.save");
           if (!live) throw new Error(`${running.name} isn't connected to Misty yet.`);
           const data = file.data.slice().buffer;
           await live.call("files.save", { name: file.name, mime: file.mime, data });
         },
         start(frame, element, page) {
-          channel?.dispose();
-          tools?.dispose();
-          screen?.dispose();
-          screen = createScreenChannel(frame, () => useAppControl.getState().takeBack(appId));
-          unnote?.();
+          leave();
+          screen = createScreenChannel(frame, () => useAppControl.getState().takeBack(opened));
           const handle = {
+            instance: opened,
+            spaceId,
             appId,
             appName: running.name,
             screen,
@@ -153,6 +209,7 @@ export function useRunningApp(options: {
           };
           unnote = noteRunningApp(handle);
           const screenTools = createScreenTools({
+            instance: opened,
             appId,
             appName: running.name,
             screen,
@@ -167,13 +224,18 @@ export function useRunningApp(options: {
             extra: screenTools,
           });
           const offered = tools;
+          const base = handlersRef.current({ ...running, permissions: granted });
+          const owner = useUserStore.getState().me?.id ?? "";
           channel = createHostChannel({
             frame,
-            authorize: (kind, name) =>
-              invoke<void>("space_app_session_check", { session: opened, kind, name }),
+            authorize,
             onActivity: () => setConnected(true),
             handlers: (live = {
-              ...handlersRef.current(running),
+              ...base,
+              subscribe: (topic, params, emit, end) =>
+                topic === "agents.control"
+                  ? watchAgentControl(opened, owner, emit)
+                  : base.subscribe(topic, params, emit, end),
               mcp: running.mcp === "frame" ? (message) => offered.receive(message) : undefined,
             }),
           });
@@ -189,12 +251,7 @@ export function useRunningApp(options: {
 
     return () => {
       alive = false;
-      live = undefined;
-      channel?.dispose();
-      tools?.dispose();
-      screen?.dispose();
-      unnote?.();
-      useAppControl.getState().leave(appId);
+      leave();
       if (session) void invoke("space_app_session_close", { session }).catch(() => {});
     };
   }, [spaceId, appId, version, approvedKey, url, sha256, wrapKey, siteKey, attempt]);
