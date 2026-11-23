@@ -42,15 +42,9 @@ use super::qoder_session::{
 };
 use super::{BuiltCommand, Engine, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
 
-/// Model catalog probe budget: a temp-dir session/new skips any workspace
-/// scan, so the handshake lands in seconds; the cap is pure slow-machine
-/// headroom (same convention as the qoder probe).
 const MODEL_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const MODEL_PROBE_TOTAL: Duration = Duration::from_secs(20);
 
-/// One model row from the session's own `model` config option, resolved to
-/// the picker's `provider/model` id. `is_default` marks the option the
-/// session booted with (the CLI's configured default), which leads the list.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ProbeModel {
     pub id: String,
@@ -58,16 +52,12 @@ pub(crate) struct ProbeModel {
     pub is_default: bool,
 }
 
-/// Per-turn projection state: usage from the prompt result (the Done payload)
-/// and the tool names seen at tool_call start, so a later name-less
-/// tool_call_update can patch the row it belongs to.
 #[derive(Default)]
 struct TurnView {
     last_usage: Option<Value>,
     tool_names: HashMap<String, String>,
 }
 
-/// Drive one send as a MiniMax ACP turn.
 pub(super) async fn run_acp_turn(
     core: TurnCore,
     req: SendRequest,
@@ -83,9 +73,6 @@ pub(super) async fn run_acp_turn(
     let mut state = TurnState::new(req.session_id.clone());
     let mut view = TurnView::default();
     let preassigned_session_id = req.session_id.clone();
-    // Abort-safe backstop: the by-name removals below only run when the task
-    // finishes normally. An abort or a panic would otherwise leave this run's
-    // keys pinning a concurrency slot until app exit.
     let _registry_guard =
         VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
     let mut cleanup_files = cleanup_files;
@@ -99,10 +86,6 @@ pub(super) async fn run_acp_turn(
         &mut cleanup_files,
     )
     .await;
-    // Pending questions die with the turn: settle their cards BEFORE any
-    // terminal dispatch, or the monotonic saw_done/saw_error guard in
-    // dispatch_event would drop these and leave answerable cards pointing at
-    // a settled turn.
     for key in [
         state.native_session_id.clone(),
         Some(core.run_id.clone()),
@@ -130,8 +113,6 @@ pub(super) async fn run_acp_turn(
         core.dispatch_event(&mut state, EngineEvent::Done { session_id, usage });
     }
     core.registry.remove_if_pid(&core.run_id, virtual_pid);
-    // A resumed conversation was keyed under the incoming session id, and the
-    // handshake may have rekeyed it to the CLI's own id: drop both aliases.
     if let Some(session_id) = state.native_session_id.clone() {
         core.registry.remove_if_pid(&session_id, virtual_pid);
     }
@@ -151,8 +132,6 @@ async fn turn_inner(
     killed: &Arc<AtomicBool>,
     cleanup_files: &mut Vec<std::path::PathBuf>,
 ) -> Result<(), String> {
-    // Misty: the chat's process from its last turn, still on this session, takes the prompt
-    // straight away (`warm.rs`); otherwise one starts and opens the session.
     let fingerprint = super::warm::claim(&core.run_id);
     let mut warm = match super::warm::take_acp(core, req, fingerprint) {
         Some(warm) => {
@@ -162,16 +141,11 @@ async fn turn_inner(
         None => {
             let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
             spawned.acp.reports_as = Some(core.engine_id.clone());
-            // The registry entry exists before this task runs, so a parked question's
-            // answer always finds this child's stdin (and the session-id alias clones
-            // it later, making `answer_question` work by either key).
             core.registry
                 .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
             let session_id = match handshake(&mut spawned.acp, core, state, req, killed).await {
                 Ok(session_id) => session_id,
                 Err(error) => {
-                    // ACP is a session protocol: the CLI stays resident after the prompt
-                    // response, so every exit path tears the tree down.
                     teardown(&mut spawned.child).await;
                     return Err(terminal_message(error, &spawned.stderr_buf));
                 }
@@ -200,14 +174,11 @@ async fn turn_inner(
     )
     .await
     .map_err(|error| terminal_message(error, &warm.item.spawned.stderr_buf));
-    // A clean turn leaves the process warm for the chat's next message; anything else ends it.
     let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
     super::warm::park_acp(core, req, fingerprint, clean, warm);
     result
 }
 
-/// Opens the turn's session on a new process: `initialize`, the session re-attached (or a new
-/// one), then its configuration. Returns the session id.
 async fn handshake(
     acp: &mut AcpProcess,
     core: &TurnCore,
@@ -233,7 +204,6 @@ async fn handshake(
     Ok(session_id)
 }
 
-/// Runs the turn's prompt on an open session.
 async fn prompt(
     acp: &mut AcpProcess,
     core: &TurnCore,
@@ -246,9 +216,6 @@ async fn prompt(
     let gate = crate::engines::gate::AcpGate::of(core, req);
     let blocks = prompt_blocks(&req.prompt, &req.images, &req.workspace);
     let workspace = req.workspace.clone();
-    // One router for the whole prompt: updates, agent requests and the
-    // permission ask all mutate the same turn state, so they cannot live in
-    // separate callbacks.
     let mut router = |line: &AcpLine| match line {
         AcpLine::Notification { method, params } if method == "session/update" => {
             if let Some(usage) = usage_update(params) {
@@ -258,13 +225,9 @@ async fn prompt(
             handle_session_update(core, state, view, params);
             None
         }
-        // Forms this client cannot render release the CLI instead of holding
-        // it parked until the prompt times out.
         AcpLine::AgentRequest { id, method, .. } if method == "elicitation/create" => {
             Some(jsonrpc_result_response(id, json!({ "action": "decline" })))
         }
-        // Permission asks and client file writes go to Misty's gate, which answers later on
-        // this child's stdin.
         AcpLine::AgentRequest { id, method, params } => {
             crate::engines::gate::acp_agent_request(Some(&gate), &workspace, id, method, params)
         }
@@ -287,9 +250,6 @@ async fn prompt(
     Ok(())
 }
 
-/// Re-attach the conversation's session, or open a fresh one. An unknown or
-/// expired resume id is the normal failure, and a fresh session keeps the
-/// user's message alive instead of failing the whole send.
 async fn attach_session(
     acp: &mut AcpProcess,
     req: &SendRequest,
@@ -311,8 +271,6 @@ async fn attach_session(
             .await;
         match load {
             Ok(result) => loaded = Some(result),
-            // An interrupt is not a failed resume: retrying it as a new
-            // session would spawn work the user just cancelled.
             Err(error) => {
                 if killed.load(Ordering::SeqCst) {
                     return Err(error);
@@ -345,8 +303,10 @@ async fn attach_session(
     Ok((session_id, session_result))
 }
 
-/// Grant only the additional roots that still exist: a stale grant must not
-/// fail the whole handshake.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "checks the folders the person added to a MiniMax run, which need not be linked"
+)]
 async fn existing_dirs(dirs: &[String]) -> Vec<String> {
     let mut out = Vec::new();
     for dir in dirs {
@@ -358,8 +318,6 @@ async fn existing_dirs(dirs: &[String]) -> Vec<String> {
     out
 }
 
-/// The session id from a handshake result: `session/new` returns it at the
-/// top level; `session/load` may report it only under `_meta.sessionId`.
 fn extract_session_id(value: &Value) -> Option<String> {
     value
         .get("sessionId")
@@ -371,14 +329,6 @@ fn extract_session_id(value: &Value) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Apply the requested permission and model through the config surface
-/// verified live on mcode 0.5.1: permission lives in the `permissionMode`
-/// config option (`default`=Ask / `auto` / `bypassPermissions`), plan is a
-/// session mode, and the `model` option only accepts values from its own
-/// advertised list (`m:<provider>:<model>:v:<variant>` — friendly
-/// `provider/model` ids are rejected with -32602). Everything resolves
-/// against the session's own options; a build that offers none gets one
-/// Warn and keeps its defaults instead of failing every send.
 async fn apply_session_config(
     acp: &mut AcpProcess,
     session_id: &str,
@@ -401,16 +351,12 @@ async fn apply_session_config(
             );
         }
     } else {
-        // mcode keeps a session's plan mode in the session itself (a later load reports
-        // `currentModeId: "plan"`, mcode 0.7.7), so a turn that isn't a plan leaves it first.
         if let Some(mode) = leave_plan_mode(session_result) {
             set_mode(acp, session_id, &mode, killed).await?;
         }
         let value = permission_config_value(requested);
         match set_config_option(acp, session_id, "permissionMode", value, killed).await {
             Ok(()) => {}
-            // A build without the option keeps its own policy; the CLI
-            // default (`auto`) already matches the GUI's default mode.
             Err(error)
                 if error.code == JSONRPC_METHOD_NOT_FOUND
                     || error.code == JSONRPC_INVALID_PARAMS =>
@@ -448,8 +394,6 @@ async fn apply_session_config(
                     ));
                 }
             }
-            // Not in the CLI's own list (stale picker id or a custom model
-            // this account cannot run): keep the CLI default, say so.
             None => {
                 core.dispatch_event(
                     state,
@@ -463,9 +407,6 @@ async fn apply_session_config(
     Ok(())
 }
 
-/// GUI permission mode → the verified `permissionMode` option values
-/// (`default`=Ask / `auto`). Its `bypassPermissions` (Full access) is never
-/// used: MiniMax has no sandbox that keeps it inside its folder (no Bypass).
 fn permission_config_value(requested: &str) -> &'static str {
     match requested {
         "manual" => "default",
@@ -473,8 +414,6 @@ fn permission_config_value(requested: &str) -> &'static str {
     }
 }
 
-/// One model option value `m:<provider>:<model>:v:<variant>` split into
-/// (`provider/model`, variant). Non-conforming values are skipped.
 fn parse_model_option_value(value: &str) -> Option<(String, String)> {
     let mut parts = value.split(':');
     if parts.next()? != "m" {
@@ -492,11 +431,6 @@ fn parse_model_option_value(value: &str) -> Option<(String, String)> {
     Some((format!("{provider}/{model}"), variant.to_string()))
 }
 
-/// Pick the model option value matching the requested `provider/model` id,
-/// preferring the `thinking` variant unless the requested effort is off
-/// (the CLI bakes thinking into the model variant; there is no separate
-/// effort option). None when no advertised option matches — the caller
-/// keeps the CLI's own default then.
 fn resolve_model_value(
     session_result: &Value,
     requested: &str,
@@ -551,8 +485,6 @@ async fn set_mode(
     match outcome {
         Ok(_) => Ok(()),
         Err(error) if rpc_code(&error) == Some(JSONRPC_METHOD_NOT_FOUND) => {
-            // The session advertised modes but this build rejects the
-            // switch: keep the CLI default rather than failing the send.
             eprintln!("[minimax] session/set_mode unsupported on this build: {error}");
             Ok(())
         }
@@ -560,9 +492,6 @@ async fn set_mode(
     }
 }
 
-/// One `session/set_config_option` call, keeping the typed rpc error so the
-/// caller can distinguish "this build has no such option" from a real
-/// failure.
 async fn set_config_option(
     acp: &mut AcpProcess,
     session_id: &str,
@@ -586,8 +515,6 @@ async fn set_config_option(
     }
 }
 
-/// The routed error string embeds `rpc:{method}:{code}:{message}`; recover
-/// the typed parts instead of string-matching the whole thing.
 fn rpc_error(raw: &str, method: &str) -> super::qoder_session::AcpRpcError {
     let code = rpc_code(raw).unwrap_or(super::qoder_session::JSONRPC_INTERNAL_ERROR);
     let message = raw
@@ -615,11 +542,6 @@ fn rpc_code(raw: &str) -> Option<i64> {
         .ok()
 }
 
-/// Permission → ACP session mode. Only the plan request routes here (the
-/// other modes live in the `permissionMode` config option); matched
-/// heuristically against the modes the session actually advertises, since
-/// mode ids are CLI vocabulary. Object entries (`{id, name}`) and flat id
-/// strings both match.
 fn mode_id(permission: Option<&str>, session_result: &Value) -> Option<String> {
     let modes = session_result["modes"]["availableModes"]
         .as_array()
@@ -658,8 +580,6 @@ fn mode_id(permission: Option<&str>, session_result: &Value) -> Option<String> {
     })
 }
 
-/// The mode to switch a session to when it is in plan mode and the turn isn't a plan: the
-/// first advertised mode that isn't a plan (mcode's `default`). None when it isn't in plan.
 fn leave_plan_mode(session_result: &Value) -> Option<String> {
     let modes = &session_result["modes"];
     let current = modes["currentModeId"].as_str()?;
@@ -678,17 +598,11 @@ fn leave_plan_mode(session_result: &Value) -> Option<String> {
         .map(str::to_string)
 }
 
-/// ACP prompt content blocks. mcode advertises `promptCapabilities.image:
-/// false` (live 0.5.1), so pictures ride as absolute paths inside the text
-/// block for the agent's own file tools to read — no image blocks.
 fn prompt_blocks(text: &str, images: &[String], workspace: &Path) -> Vec<Value> {
     let prompt = super::images::minimax_prompt_with_images(text, images, workspace);
     vec![json!({ "type": "text", "text": prompt })]
 }
 
-/// One `session/update` notification projected to engine events. mcode
-/// speaks the shared ACP update vocabulary, so the mapping matches the
-/// grok/qoder drivers'.
 fn handle_session_update(
     core: &TurnCore,
     state: &mut TurnState,
@@ -730,16 +644,10 @@ fn handle_session_update(
     }
 }
 
-/// ACP's `usage_update` (the context's used/size). MiniMax Code sends it once a turn finishes,
-/// and only when it knows the model's window.
 fn usage_update(params: &Value) -> Option<Value> {
     super::kimi_acp::usage(params)
 }
 
-/// The prompt result's token totals, projected onto the names the frontend's usage parser reads
-/// (same convention as grok). MiniMax Code 0.x answers with ACP's own `usage` (`totalTokens`,
-/// `inputTokens`, `outputTokens`, `cachedReadTokens`, ...; its input leaves the cache out) and
-/// keeps `_meta` for its turn record; older builds put the totals in `_meta`.
 fn prompt_usage(result: &Value) -> Option<Value> {
     let meta = result
         .get("usage")
@@ -767,9 +675,6 @@ fn prompt_usage(result: &Value) -> Option<Value> {
     Some(Value::Object(usage))
 }
 
-/// Live model catalog via a throwaway `mcode acp` handshake in the temp
-/// dir (session/new there skips any workspace scan). The caller caches the
-/// last success; failures degrade to an error so it can fall back.
 pub(crate) async fn probe_models(bin: &str) -> Result<Vec<ProbeModel>, String> {
     let cwd = std::env::temp_dir();
     let killed = AtomicBool::new(false);
@@ -812,11 +717,6 @@ async fn probe_handshake(
     Ok(models_from_config_options(&session_result))
 }
 
-/// Group the session's `model` config options into picker rows: variant
-/// entries (`m:<provider>:<model>:v:<variant>`) collapse to one
-/// `provider/model` row each in the CLI's own menu order (thinking effort
-/// folds in at send time), and the option matching the session's current
-/// value — the CLI's configured default — leads the list.
 pub(crate) fn models_from_config_options(session_result: &Value) -> Vec<ProbeModel> {
     let model_option = session_result["configOptions"]
         .as_array()
@@ -840,8 +740,6 @@ pub(crate) fn models_from_config_options(session_result: &Value) -> Vec<ProbeMod
         if rows.iter().any(|row| row.id == base) {
             continue;
         }
-        // The CLI's own label carries the variant suffix ("MiniMax-M3 ·
-        // thinking"); strip it and fall back to the id.
         let name = option["name"]
             .as_str()
             .map(|name| name.split(" · ").next().unwrap_or(name).trim().to_string())
@@ -863,8 +761,6 @@ pub(crate) fn models_from_config_options(session_result: &Value) -> Vec<ProbeMod
     rows
 }
 
-/// Terminal message precedence (mirrors qoder/grok): the rpc error's message
-/// part, then the CLI's stderr tail, then the raw error.
 fn terminal_message(raw: String, stderr_buf: &Arc<Mutex<String>>) -> String {
     let bare = raw
         .strip_prefix("rpc:")

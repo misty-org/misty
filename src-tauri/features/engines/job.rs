@@ -27,8 +27,6 @@ use windows::Win32::System::JobObjects::{
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 
-/// Owning handle to a kill-on-close job. The handle is only ever closed
-/// (from `Drop`); nothing reads or writes it concurrently.
 pub(crate) struct KillOnCloseJob(HANDLE);
 
 unsafe impl Send for KillOnCloseJob {}
@@ -36,21 +34,12 @@ unsafe impl Sync for KillOnCloseJob {}
 
 impl Drop for KillOnCloseJob {
     fn drop(&mut self) {
-        // Dropping the last handle is what triggers the kernel sweep of any
-        // surviving members — that is the whole point of the guard.
         unsafe {
             let _ = CloseHandle(self.0);
         }
     }
 }
 
-/// Put `child` into a fresh kill-on-close job and return the shared guard.
-/// The sweep fires when every clone of the returned Arc is gone.
-///
-/// `None` (with a log line) when the platform refuses — the caller then
-/// keeps the taskkill-based cleanup as its only backstop, exactly as today.
-/// Failure modes: the child already exited between spawn and assignment, or
-/// it sits inside a job that forbids nesting (rare since Windows 8).
 pub(crate) fn assign_kill_on_close(child: &tokio::process::Child) -> Option<Arc<KillOnCloseJob>> {
     let raw = child.raw_handle()?;
     let process = HANDLE(raw);
@@ -92,10 +81,6 @@ mod tests {
     use super::*;
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
-    /// The field scenario: the direct child (cmd) exits while a detached
-    /// grandchild (ping) keeps running, so `taskkill /T` has no tree left
-    /// to walk. Dropping the guard must still sweep the orphan via job
-    /// membership.
     #[tokio::test]
     async fn job_close_sweeps_orphaned_grandchild() {
         let mut child = tokio::process::Command::new("cmd")
@@ -108,7 +93,6 @@ mod tests {
         let cmd_pid = child.id().unwrap_or(0);
         let guard = assign_kill_on_close(&child).expect("job assignment succeeds");
 
-        // `start /b` detaches ping; cmd exits immediately afterwards.
         let _ = child.wait().await;
         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
 
@@ -118,7 +102,6 @@ mod tests {
             true,
             ProcessRefreshKind::nothing(),
         );
-        // The orphan still carries the dead cmd's pid as its parent field.
         let orphans: std::collections::HashSet<Pid> = sys
             .processes()
             .iter()

@@ -2,7 +2,6 @@ import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@m
 import { FilePreview } from "./FilePreview";
 import type { FileItem } from "./model";
 
-/** Quick Look: the file large, over Files, opened and closed with Space as Finder's is. */
 export function QuickLook({ item, onClose }: { item: FileItem; onClose(): void }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>

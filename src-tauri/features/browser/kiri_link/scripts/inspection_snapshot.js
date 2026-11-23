@@ -30,8 +30,6 @@ function (nonce, maxText, maxElements, readSemantic) {
     const parent = element => element.parentElement || element.ownerDocument.defaultView?.frameElement;
     const availableControl = (element) => {
       if (/^(hidden|password)$/i.test(element.getAttribute("type") || "")) return false;
-      // Websites intentionally hide file inputs behind an upload button. Keep
-      // these addressable by the dedicated upload action, not ordinary fills.
       if (element.tagName === "INPUT" && element.type === "file") return true;
       for (let node = element; node; node = parent(node)) {
         if (node.hidden || node.inert || node.getAttribute("aria-hidden") === "true") return false;
@@ -40,8 +38,6 @@ function (nonce, maxText, maxElements, readSemantic) {
       }
       return true;
     };
-    // Composite menus use roving tabindex: only the focused item has tabindex=0.
-    // Their remaining visible actions are still independently addressable.
     const selector = 'a[href],button,input:not([type="hidden"]):not([type="password"]),select,textarea,[contenteditable="true"],[role="textbox"],[role="button"],[role="link"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[tabindex]:not([tabindex="-1"])';
     const candidates = [];
     let documents = 0, frameLimitReached = false;
@@ -57,8 +53,6 @@ function (nonce, maxText, maxElements, readSemantic) {
       }
       for (const frame of owner.querySelectorAll("iframe,frame")) {
         try {
-          // Only documents the normal same-origin DOM can access are eligible.
-          // Keep the exact frame/document chain pinned across review and action.
           const child = frame.contentDocument;
           if (!child?.defaultView || !availableControl(frame)) continue;
           collect(child, () => {
@@ -66,7 +60,7 @@ function (nonce, maxText, maxElements, readSemantic) {
             catch { return false; }
           }, depth + 1);
           if (candidates.length > maxElements) return;
-        } catch { /* Cross-origin and sandboxed frames remain inaccessible. */ }
+        } catch {}
       }
     };
     collect(document, () => true, 0);

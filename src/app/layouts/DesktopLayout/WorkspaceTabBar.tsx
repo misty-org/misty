@@ -9,26 +9,17 @@ import {
 } from "@/features/app-windows";
 import { IconButton, TabStrip, windowToolbarClass, type TabStripTab } from "@misty/ui";
 import { LayoutButton } from "./LayoutButton";
-import { openNewTab } from "./spaceNavigation";
+import { openNewTab } from "./space_navigation";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
-/**
- * The window's open pages as a row of tabs above the page. A tab selects its page, closes from its
- * closer or a middle click, and drags to a new place in the row. Dragged down onto the page, a
- * tab's page docks into a split there (up to four panes); paused over another tab while held, the
- * drag opens that tab, so a page can be carried into another tab's layout. Each tab keeps its own
- * split layout, which the layout button at the row's far end also edits.
- */
 export function WorkspaceTabBar(props: {
   gridColumn: number;
-  /** Keeps a slot after the layout button for the Windows caption buttons. */
   captionSlot?: boolean;
   onOpen(view: WorkspaceView): void;
   onClosed(): void;
 }) {
   const layout = useWorkspaceStore((state) => state.layout);
-  // A window with no pages keeps one empty tab that is never shown.
   const tabs = layoutTabs(layout).filter((tab) => !isEmptyTab(tab));
   const items: TabStripTab[] = tabs.map((tab) => {
     const view = activeLayoutView(tab);
@@ -47,8 +38,6 @@ export function WorkspaceTabBar(props: {
   };
 
   return (
-    // A window toolbar, so on Windows and Linux the row ends short of the caption buttons in the
-    // window's top-right corner instead of running under them.
     <div
       className={`min-w-0 ${windowToolbarClass}`}
       style={{ gridColumn: props.gridColumn, gridRow: 2 }}
@@ -60,7 +49,6 @@ export function WorkspaceTabBar(props: {
         tabs={items}
         active={layout.activeTabId ?? null}
         onSelect={select}
-        // A dragged tab is its open page to the panes, which dock it into a split.
         dragCarries={(id) => {
           const tab = tabs.find((candidate) => candidate.id === id);
           const view = tab && activeLayoutView(tab);
@@ -73,7 +61,6 @@ export function WorkspaceTabBar(props: {
         onReorder={(id, index) => {
           const ids = layoutTabs(store().layout).map((tab) => tab.id);
           const rest = ids.filter((other) => other !== id);
-          // The row hides the empty tab, so place by the shown tab now at `index`.
           const target = items.filter((item) => item.id !== id)[index]?.id;
           const at = target ? rest.indexOf(target) : rest.length;
           store().reorderTabs([...rest.slice(0, at), id, ...rest.slice(at)]);
@@ -83,7 +70,6 @@ export function WorkspaceTabBar(props: {
             <Plus />
           </IconButton>
         }
-        // Only the window's own control: a page's tools sit in that page's own bar under the tabs.
         end={
           props.captionSlot ? (
             <div className="flex items-center">

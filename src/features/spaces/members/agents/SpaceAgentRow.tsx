@@ -6,9 +6,8 @@ import { useAuth } from "@/features/account";
 import type { AgentProfile } from "@/shared/schemas";
 import { IconButton, Text, cn } from "@misty/ui";
 import { X } from "lucide-react";
-import { agentOwnerLabel } from "./useSpaceAgentMembers";
+import { agentOwnerLabel } from "./use_space_agent_members";
 
-/** One agent, shown under the person who brought it. */
 export function SpaceAgentRow({
   agent,
   compact = false,
@@ -17,9 +16,7 @@ export function SpaceAgentRow({
 }: {
   agent: SpaceAgent;
   compact?: boolean;
-  /** Offered to the agent's owner and the Space's owner. */
   onRemove?: () => void;
-  /** Offered to the agent's owner only. */
   onVisibilityChange?: (visibility: ItemVisibility) => void;
 }) {
   const { user } = useAuth();
@@ -27,7 +24,9 @@ export function SpaceAgentRow({
     <div
       className={cn(
         "flex min-w-0 items-center",
-        compact ? "min-h-9 gap-2.5 rounded-md py-1 pl-6 pr-1.5" : "min-h-12 gap-3 py-2 pl-14 pr-4",
+        compact
+          ? "min-h-9 gap-2.5 rounded-md py-1 pl-6 pr-1.5"
+          : "min-h-10 gap-3 py-1 pl-12 pr-1.5",
       )}
     >
       <span className={cn("inline-flex shrink-0", compact ? "size-7" : "size-8")}>
@@ -44,12 +43,7 @@ export function SpaceAgentRow({
         />
       </span>
       <div className="min-w-0 flex-1">
-        <Text
-          as="p"
-          full
-          tone="default"
-          className={cn("m-0 font-medium", compact ? "text-xs" : "text-sm")}
-        >
+        <Text as="p" full tone="default" size={compact ? "meta" : "control"} className="m-0">
           {agent.agent_name}
           <Text bare tone="muted" className="font-normal">
             {`, ${agentOwnerLabel(agent, user?.id)}`}

@@ -1,4 +1,4 @@
-import type { ShortcutCommandDefinition, ShortcutScope } from "./shortcutTypes";
+import type { ShortcutCommandDefinition, ShortcutScope } from "./shortcut_types";
 
 interface CommandOptions {
   description: string;

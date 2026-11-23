@@ -1,5 +1,3 @@
-//! `/mcp`: Codex's MCP servers, listed, and signed in to.
-
 use super::*;
 
 pub(super) async fn mcp(context: &Context) -> Result<Output, String> {
@@ -101,9 +99,6 @@ fn auth_status(server: &Value) -> &'static str {
     }
 }
 
-/// Starts an MCP server's sign-in and opens its page. Codex finishes the sign-in on its own
-/// callback, inside this app-server, so the app-server keeps running until the sign-in ends or
-/// times out, after Misty has opened the page.
 async fn mcp_login(context: &Context, server: &str) -> Result<Output, String> {
     let mut params = json!({ "name": server, "timeoutSecs": LOGIN_TIMEOUT.as_secs() });
     let mut rpc = open(context).await?;

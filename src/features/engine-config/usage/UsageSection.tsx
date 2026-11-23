@@ -1,24 +1,18 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * Agents › Usage: plan limits with reset times, read through each CLI, and usage by
- * day, engine, model and folder from the CLIs' own logs, priced from LiteLLM's table. In
- * desktop-cc-gui this view ships as a separate plugin on the same native data; here it is a
- * Settings block.
- */
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow,
   DesktopSettingsRowSkeleton,
   DesktopSettingsSection,
 } from "@/features/settings";
-import { useCachedResource } from "@/api/cache/cached-resource";
-import { EngineMark } from "../EngineMark";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import {
   Button,
   ChoiceGroup,
   cn,
+  Mark,
   OverflowFadeText,
   Skeleton,
   Table,
@@ -42,7 +36,7 @@ import {
   type UsagePriceInfo,
   type UsageQueryResult,
   type UsageSource,
-} from "./usageApi";
+} from "./usage_api";
 import {
   dailyTotals,
   engineName,
@@ -51,9 +45,9 @@ import {
   formatTokens,
   groupRows,
   type UsageGroup,
-} from "./usageFormat";
+} from "./usage_format";
 import { LimitsBlock } from "./UsageLimits";
-import { message, useReportError } from "./usageShared";
+import { message, useReportError } from "./usage_shared";
 
 type Range = "7" | "30" | "90";
 
@@ -75,11 +69,6 @@ function rangeDates(days: number) {
   return { from: localDay(from), to: localDay(to) };
 }
 
-/**
- * What the blocks show, kept on this computer between launches so a visit paints the last copy at
- * once and refreshes behind it. None of it carries a key: plan limits, token counts, log folders
- * and the price table's date.
- */
 const SOURCES_KEY = "engine-config/usage-sources";
 const usageKey = (range: Range) => `engine-config/usage:${range}`;
 
@@ -100,7 +89,6 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
   const [range, setRange] = useState<Range>("7");
   const [group, setGroup] = useState<UsageGroup>("engine");
   const dates = useMemo(() => rangeDates(Number(range)), [range]);
-  // Keyed by the range: a visit shows that range's last copy, then today's span behind it.
   const usage = useCachedResource<UsageQueryResult>(
     usageKey(range),
     () => queryUsage({ ...rangeDates(Number(range)), bucket: "day" }),
@@ -152,7 +140,6 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
                 content={`${day.day}: ${formatTokens(day.tokens)} tokens, ${formatCost(day.cost)}`}
               >
                 <div className="flex h-full min-w-0 flex-1 items-end">
-                  {/* A bar is the muted text color at half strength. */}
                   <Text
                     bare
                     as="div"
@@ -167,7 +154,7 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
             ))}
           </div>
           {grouped.length === 0 ? (
-            <Text as="p" tone="muted" className="text-sm">
+            <Text size="meta" as="p" tone="muted">
               No usage in this range
             </Text>
           ) : (
@@ -189,7 +176,12 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
                       <Tooltip content={entry.key}>
                         <span className="flex min-w-0 items-center gap-2">
                           {group === "engine" ? (
-                            <EngineMark engine={entry.key} size={12} name={engineName(entry.key)} />
+                            <Mark
+                              of={`engine:${entry.key}`}
+                              size={12}
+                              label={engineName(entry.key)}
+                              aria-hidden
+                            />
                           ) : null}
                           <OverflowFadeText>
                             {group === "engine"
@@ -229,10 +221,6 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
   );
 }
 
-/**
- * The usage block's first load: the three figures, the chart, and the table's header and rows
- * with the name and its five right-aligned numbers.
- */
 function UsageSkeleton() {
   return (
     <div role="status" aria-label="Usage" aria-busy="true" className="grid gap-4 py-3">
@@ -269,10 +257,10 @@ function UsageSkeleton() {
 function Figure(props: { label: string; value: string }) {
   return (
     <div className="grid gap-0.5">
-      <Text bare tone="muted" className="text-sm">
+      <Text size="meta" bare tone="muted">
         {props.label}
       </Text>
-      <Text bare tone="bright" weight="semibold" className="text-lg tabular-nums">
+      <Text size="title" bare tone="bright" weight="semibold" className="tabular-nums">
         {props.value}
       </Text>
     </div>
@@ -320,7 +308,6 @@ function SourcesBlock(props: { onError: (error: string | null) => void }) {
     <DesktopSettingsSection title="Logs and prices">
       {sources === null ? (
         logs.loading ? (
-          // One row per engine whose logs Misty reads (Engine::ALL).
           <DesktopSettingsRowSkeleton label="Logs" rows={4} description control="text" />
         ) : null
       ) : (
@@ -331,7 +318,7 @@ function SourcesBlock(props: { onError: (error: string | null) => void }) {
             description={source.roots.join(", ")}
             muted={source.status !== "ok"}
           >
-            <Text bare tone="muted" className="text-sm tabular-nums">
+            <Text size="meta" bare tone="muted" className="tabular-nums">
               {source.status === "ok"
                 ? `${source.files.toLocaleString("en-US")} ${source.files === 1 ? "log" : "logs"}`
                 : sourceStatus[source.status]}

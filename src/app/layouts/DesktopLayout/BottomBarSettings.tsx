@@ -10,15 +10,10 @@ import {
   bottomBarItemIds,
   useBottomBar,
   type BottomBarItemId,
-} from "./bottomBarStore";
+} from "./bottom_bar_store";
 
 type Zone = "start" | "end" | "hidden";
 
-/**
- * Settings › Interface › Bottom bar: what the window's bottom bar shows. The bar is drawn as it
- * sits, a left end and a right end, and every item drags between them and the hidden ones below,
- * or along its end to a new place. A shown item's ✕ hides it; a hidden one comes back on a click.
- */
 export function BottomBarSettings() {
   const { start, end } = useBottomBar(
     useShallow((state) => ({ start: state.start, end: state.end })),
@@ -29,7 +24,6 @@ export function BottomBarSettings() {
   const isDefault =
     start.join() === bottomBarDefaults.start.join() && end.join() === bottomBarDefaults.end.join();
 
-  /** Puts `id` in `zone`, before or after `target` (an item there), or at its end. */
   const move = (id: BottomBarItemId, zone: Zone, target = "", after = true) => {
     const next = {
       start: start.filter((other) => other !== id),
@@ -42,7 +36,6 @@ export function BottomBarSettings() {
     }
     useBottomBar.getState().set(next);
   };
-  /** To its usual end: window-wide status on the left, the page in view on the right. */
   const show = (id: BottomBarItemId) => move(id, bottomBarItems[id].side);
 
   return (
@@ -118,7 +111,6 @@ function ZoneList(props: {
       role="list"
       aria-label={label}
       className={cn(
-        // The ends are the bar: one row that scrolls once it is full. The rest is a palette grid.
         zone === "hidden"
           ? "grid min-h-10 grid-cols-[repeat(auto-fill,minmax(--spacing(48),1fr))] gap-1"
           : "flex min-h-10 min-w-0 flex-1 items-center gap-1 overflow-x-auto",

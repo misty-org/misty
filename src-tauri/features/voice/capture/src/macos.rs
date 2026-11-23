@@ -1,7 +1,3 @@
-//! Core Audio and AVAudioEngine capture, called straight from Rust through
-//! the objc2 bindings. The native objects own the devices; [`Delivery`] owns
-//! the callbacks.
-
 mod microphone;
 mod sources;
 mod system_audio;
@@ -26,11 +22,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 pub(crate) use sources::capture_sources;
 
-/// Core Audio's system object, which owns the default devices and the
-/// process list.
 const SYSTEM: AudioObjectID = kAudioObjectSystemObject as AudioObjectID;
 
-/// Why a capture could not start.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum StartFailure {
     Denied,
@@ -57,9 +50,6 @@ struct DeliveryState {
     frames: FrameCounter,
 }
 
-/// Delivers PCM to the caller until closed. Close is synchronous: once it
-/// returns, neither sink runs again, so a stopped capture never reports
-/// audio or a failure late.
 struct Delivery {
     state: Mutex<DeliveryState>,
     channel: Channel,
@@ -80,8 +70,6 @@ impl Delivery {
         }
     }
 
-    // A sink that panicked mid-call must not take every later callback down
-    // with a poisoned lock; the state it guards stays consistent either way.
     fn state(&self) -> MutexGuard<'_, DeliveryState> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -107,8 +95,6 @@ impl Delivery {
     }
 }
 
-/// A global-scope, main-element property address, the only kind this
-/// module reads or listens to.
 fn global(selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
     AudioObjectPropertyAddress {
         mSelector: selector,
@@ -117,8 +103,6 @@ fn global(selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
     }
 }
 
-/// Interleaved PCM16 at the format's rate and channel count, what every
-/// chunk carries.
 fn output_format(format: Format) -> Option<Retained<AVAudioFormat>> {
     // SAFETY: a plain initialiser with valid arguments; nil comes back as None.
     unsafe {
@@ -132,10 +116,6 @@ fn output_format(format: Format) -> Option<Retained<AVAudioFormat>> {
     }
 }
 
-/// Converts one captured buffer of `frames` frames at `input_rate` to the
-/// output format and hands the samples on. The converter is reused from
-/// buffer to buffer and keeps its resampling state, so each call supplies
-/// the one buffer and then reports "no data now" rather than end of stream.
 fn convert_and_send(
     converter: &AVAudioConverter,
     input: &AVAudioPCMBuffer,
@@ -248,7 +228,6 @@ pub(crate) fn start(
     Ok(Running { native })
 }
 
-/// Everything the computer plays except Misty, as 48 kHz stereo.
 pub(crate) fn start_share(sink: Sink, failure: FailureSink) -> Result<Running, CaptureError> {
     let delivery = Arc::new(Delivery::new(Channel::System, sink, failure));
     let capture = system_audio::start(&[], true, Format::Share, delivery)

@@ -1,4 +1,3 @@
-// Fixtures are built with the standard file calls, as tests may (`src-tauri/clippy.toml`).
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 use super::*;
 use std::fs;
@@ -101,7 +100,6 @@ fn a_file_the_person_changed_since_waits_for_them() {
     place.write("a.txt", "agent\n");
     place.write("b.txt", "agent\n");
     let after = place.snap();
-    // The person edits one of the agent's files afterwards, and one of their own.
     place.write("b.txt", "person\n");
     place.write("notes.txt", "mine\n");
 
@@ -110,7 +108,6 @@ fn a_file_the_person_changed_since_waits_for_them() {
         paths(&plan),
         vec![("a.txt", "restore", false), ("b.txt", "restore", true)]
     );
-    // Putting back only the agent's own leaves the person's work alone.
     let failed = restore(
         place.root.path(),
         place.folder(),
@@ -222,7 +219,6 @@ fn the_folders_own_repository_is_left_alone() {
 
     let plan = place.plan(&[turn(before, after)]);
     assert_eq!(paths(&plan), vec![("a.txt", "restore", false)]);
-    // Misty's store is elsewhere: the folder's own index never learns about any of this.
     assert!(own.index().unwrap().is_empty());
     assert!(place.folder().join(".git").is_dir());
 }

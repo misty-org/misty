@@ -1,11 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * Skills hub transport: two commands (`engine_skills_query` / `engine_skills_mutate`)
- * plus error normalization. Backend errors arrive as `{ code, message }`;
- * callers branch on `code` for retry paths (rate limit → retry later,
- * conflict → reload, readonly → hide the action).
- */
 import { invoke } from "@/native/invoke";
 import type {
   DiscoveredSkill,
@@ -45,8 +39,6 @@ function normalizeError(error: unknown): SkillsHubError {
   return new SkillsHubError("internal", String(error));
 }
 
-/** Query one mode of the hub; `params` stay loose because the backend is the
- *  source of truth for each mode's shape. */
 async function query<T>(mode: string, params: Record<string, unknown> = {}): Promise<T> {
   try {
     return await invoke<T>("engine_skills_query", { mode, params });
@@ -56,10 +48,6 @@ async function query<T>(mode: string, params: Record<string, unknown> = {}): Pro
 }
 
 async function mutate<T = SkillMutationResult>(mutation: SkillsMutation): Promise<T> {
-  // `engine_skills_mutate` takes two params — the action plus that action's own
-  // payload. The call sites pass one bag keyed by `action`, so split it here:
-  // shipping the bag flat made every mutation fail with
-  // "invalid args `payload` … missing required key payload".
   const { action, ...payload } = mutation;
   try {
     return await invoke<T>("engine_skills_mutate", { action, payload });
@@ -68,8 +56,6 @@ async function mutate<T = SkillMutationResult>(mutation: SkillsMutation): Promis
   }
 }
 
-/** `force` must be the string "1" — the backend mirrors the upstream HTTP
- *  semantics (`params.force === "1"`). */
 function forceParam(force?: boolean): Record<string, unknown> {
   return force ? { force: "1" } : {};
 }
@@ -85,7 +71,6 @@ export const skillsHubApi = {
   activity: (limit = 50) => query<{ activity: SkillActivityEntry[] }>("activity", { limit }),
   usage: (force?: boolean) => query<SkillUsageResult>("skill_usage", forceParam(force)),
   content: (directory: string) => query<SkillContentResult>("skill_content", { directory }),
-  /** Discover details: skills.sh gives no description or body, so the repo's SKILL.md is read. */
   remoteContent: (skill: DiscoveredSkill) =>
     query<SkillRemoteContent>("remote_skill_content", {
       owner: skill.repoOwner,

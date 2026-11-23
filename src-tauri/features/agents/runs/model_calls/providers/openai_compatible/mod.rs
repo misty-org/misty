@@ -1,5 +1,3 @@
-//! Chat completions, as OpenRouter, NVIDIA, Ollama and other compatible servers speak them. Ported
-//! from `@ai-sdk/openai-compatible`.
 mod decoder;
 mod request;
 
@@ -47,12 +45,18 @@ impl LanguageModel for OpenAiCompatibleModel {
         Box::pin(async move {
             let (body, warnings) = request::build(&self.model, &options, self.provider.as_str())?;
             let mut headers = Vec::new();
-            // A local server may run without a key.
             if !self.api_key.is_empty() {
                 headers.push(("authorization", format!("Bearer {}", self.api_key)));
             }
-            let response =
-                post_json(&self.client, &self.url, &headers, &body, &self.api_key, error_message).await?;
+            let response = post_json(
+                &self.client,
+                &self.url,
+                &headers,
+                &body,
+                &self.api_key,
+                error_message,
+            )
+            .await?;
             let decoder = decoder::CompatibleDecoder::new(self.provider.as_str(), warnings);
             Ok(decoded_stream(response, decoder, &self.api_key))
         })

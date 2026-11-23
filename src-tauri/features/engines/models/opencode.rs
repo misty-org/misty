@@ -8,14 +8,9 @@ pub(super) async fn opencode_catalog(bin: &str) -> super::EngineCatalog {
             return super::EngineCatalog::authoritative(models);
         }
     }
-    // No answer from `opencode models`: no list of ours stands in for the engine's.
     super::EngineCatalog::unknown()
 }
 
-/// `opencode models` prints one `provider/model` id per line (plus ANSI
-/// styling and possible chatter), the CLI's own default marked `(default)`.
-/// There is no `--json` flag and no display names: a row is its id, as the
-/// CLI prints it, never a name Misty makes up.
 pub fn parse_models_output(stdout: &str) -> Vec<EngineModel> {
     let clean = strip_ansi_codes(stdout);
     let mut default_index = None;
@@ -38,8 +33,6 @@ pub fn parse_models_output(stdout: &str) -> Vec<EngineModel> {
             context_window: None,
         });
     }
-    // The frontend auto-selects the leading entry when nothing is pinned:
-    // lead with the one the CLI marks as its default.
     if let Some(index) = default_index.filter(|index| *index > 0) {
         let entry = models.remove(index);
         models.insert(0, entry);
@@ -90,7 +83,6 @@ openai/gpt-5.3-codex
                 "openai/gpt-5.3-codex",
             ]
         );
-        // OpenCode names nothing, so neither does Misty.
         assert_eq!(models[1].name, None);
         assert_eq!(models[1].provider, "opencode");
     }

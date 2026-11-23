@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Lock, Mic, MicOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { IconButton, Spinner, Surface } from "@misty/ui";
-import type { PillState } from "../dictationEngine";
+import type { PillState } from "../dictation_engine";
 import { remCss } from "@misty/ui";
 
 const initial: PillState = {
@@ -15,10 +15,6 @@ const initial: PillState = {
 };
 const BARS = [0.5, 0.8, 1, 0.7, 0.9, 0.55];
 
-/**
- * The dictation pill under the cursor (window misty-dictation-pill). It only
- * draws what the main window sends; Mute asks the main window to stop.
- */
 export function DictationPill() {
   const [pill, setPill] = useState(initial);
   useEffect(() => {
@@ -31,7 +27,6 @@ export function DictationPill() {
   const level = Math.min(1, pill.power * 6);
   const words = pill.text || pill.provisional;
   return (
-    // Dark in every theme, over whatever is under the cursor: the smoke panel and its white text.
     <Surface
       tone="smoke"
       radius="xl"
@@ -83,7 +78,6 @@ export function DictationPill() {
         </Surface>
       )}
       {listening && (
-        // The pill keeps its light text in every theme, so the glyph does too in every state.
         <IconButton
           label="Mute and stop dictation"
           hint="Mute"

@@ -1,4 +1,3 @@
-//! Signed run grants.
 use serde_json::Value;
 
 use super::{valid_device_id, SignedRecord};
@@ -11,8 +10,6 @@ pub struct RunGrant {
     pub requester_device_id: String,
     pub target_device_id: String,
     pub agent_id: String,
-    /// The chat or scheduled run this grant is for. A command's workspace and its write access to a
-    /// shared folder come from this, never from the job, so a job can't reach another chat's.
     pub chat_key: String,
     pub capabilities: Vec<String>,
     pub scopes: Vec<String>,

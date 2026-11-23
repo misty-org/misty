@@ -1,12 +1,10 @@
 import { useNotice } from "@misty/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
-import { type AiUserSettings } from "../runs/invocations/aiSettingsTypes";
+import { type AiUserSettings } from "../runs/invocations/ai_settings_types";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { SwitchControl, TextAreaControl } from "../../settings/SettingsControls";
 
-/** Access › Limits: what agents stop and ask about, including sites they may read but never
- * click, type or submit on. Rows passed as children come first. */
 export function AgentSitesSection(props: { children?: ReactNode }) {
   const [settings, setSettings] = useState<AiUserSettings | null>(null);
   const [working, setWorking] = useState(false);

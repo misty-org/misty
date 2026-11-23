@@ -25,7 +25,7 @@ import {
   withSkinTone,
   type ChatEmoji,
   type EmojiCategoryKey,
-} from "./emojiData";
+} from "./emoji_data";
 
 const categoryIcons: Record<EmojiCategoryKey, LucideIcon> = {
   people: Smile,
@@ -38,13 +38,8 @@ const categoryIcons: Record<EmojiCategoryKey, LucideIcon> = {
   flags: Flag,
 };
 
-/** An emoji's first name, read as words: "thumbsup" stays, "slight_smile" reads "slight smile". */
 const nameOf = (emoji: ChatEmoji) => emoji.names[0]?.replace(/_/g, " ") ?? "";
 
-/**
- * Space chat's emoji picker: @misty/ui's EmojiPicker over the chat's emoji, with the ones this
- * device used lately first and its one saved skin tone. A pick is remembered for next time.
- */
 export function ChatEmojiPicker(props: {
   children?: ReactElement;
   anchor?: ReactNode;
@@ -58,7 +53,6 @@ export function ChatEmojiPicker(props: {
   const frequent = useFrequentEmoji((state) => state.value);
   const tone = useSkinTone((state) => state.value);
   const setTone = useSkinTone((state) => state.set);
-  // The recent order is pinned while the picker is in use, so it doesn't shuffle under the pointer.
   const pinned = useRef(frequent);
   if (props.open === false) pinned.current = frequent;
   const choice = useCallback(
@@ -113,7 +107,6 @@ export function ChatEmojiPicker(props: {
   );
 }
 
-/** Up to `count` emoji for quick reactions: those this device used lately, then the defaults. */
 export function useQuickEmoji(count: number): string[] {
   const frequent = useFrequentEmoji((state) => state.value);
   return useMemo(
@@ -125,7 +118,6 @@ export function useQuickEmoji(count: number): string[] {
   );
 }
 
-/** A message of only a few emoji and spaces, set large as Discord does. */
 export function isJumbo(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length > 60) return false;

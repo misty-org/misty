@@ -1,4 +1,3 @@
-//! The session commands the sign-in flow calls: capture, restore and forget.
 use super::{
     activate, credential_io, current, has_active_account, install, key, restore_preserves_scope,
     server, set_account, AccountClient,
@@ -37,9 +36,6 @@ pub async fn auth_session_restore(
         Some(&app),
         |scope| !restore_preserves_scope(&url, account_id.as_deref(), scope),
         || {
-            // Additional renderers restore the same account at startup. Keep
-            // its current client, refresh lock and native task leases intact. This
-            // check and the account-change decision share the lifecycle barrier.
             if has_active_account(&url, account_id.as_deref()) {
                 set_account(&url, account_id.as_deref());
                 return Ok(true);
@@ -49,17 +45,14 @@ pub async fn auth_session_restore(
                 set_account(&url, None);
                 return Ok(false);
             };
-            // Whether or not its session is still good, the windows are this account's: one
-            // whose session expired keeps its profiles while it waits to sign in again. A
-            // credential read that failed changes nothing.
             let value =
-                credential_io(|| misty_credential_store::account::load(&key(&url, &account_id)))?;
+                credential_io(|| misty_credential_store::account::load(&key(&url, account_id)))?;
             set_account(&url, Some(account_id));
             let Some(value) = value else {
                 return Ok(false);
             };
             let value = zeroize::Zeroizing::new(value);
-            let Some(client) = AccountClient::restore(&url, &account_id, &value)? else {
+            let Some(client) = AccountClient::restore(&url, account_id, &value)? else {
                 return Ok(false);
             };
             activate(&url, client)?;
@@ -87,13 +80,10 @@ pub async fn auth_session_forget(
         },
         || {
             credential_io(|| misty_credential_store::account::delete(&key(&url, &account_id)))?;
-            // Its tokens go too, even if the server couldn't be told, so a later refresh can't
-            // save the session again.
             let client = current(&url)?;
             if client.require_account(&url, &account_id).is_ok() {
                 client.clear()?;
             }
-            // Forgetting the account in use signs out: the windows are nobody's now.
             if active.load(Ordering::Relaxed) {
                 set_account(&url, None);
             }

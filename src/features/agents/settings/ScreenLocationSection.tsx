@@ -1,18 +1,16 @@
 import { useNotice } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
-import { type ScreenLocation } from "../runs/invocations/aiSettingsTypes";
+import { type ScreenLocation } from "../runs/invocations/ai_settings_types";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { ChoiceControl, SwitchControl } from "../../settings/SettingsControls";
-import { setKeepAwakeForAgents } from "../runs/jobs/keepAwake";
+import { setKeepAwakeForAgents } from "../runs/jobs/keep_awake";
 
-// "window" is a new tab in this window; the stored name predates the label.
 const options: { value: ScreenLocation; label: string }[] = [
   { value: "window", label: "New tab" },
   { value: "ask", label: "Ask each time" },
 ];
 
-/** Where agents open a screen when a task needs a website or the desktop. */
 export function ScreenLocationSection() {
   const [location, setLocation] = useState<ScreenLocation | null>(null);
   const [keepAwake, setKeepAwake] = useState<boolean | null>(null);

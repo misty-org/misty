@@ -4,8 +4,8 @@ import { Button, ChannelReply, InlineLink, RoleMention, Textarea } from "@misty/
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { MessageSpan } from "../../api/dto/common";
 import { ChatAvatar } from "./ChatAvatar";
-import { messageReplyPreviewText } from "./messageText";
-import { useSpaceRolesStore } from "../../roles/useSpaceRoles";
+import { messageReplyPreviewText } from "./message_text";
+import { useSpaceRolesStore } from "../../roles/use_space_roles";
 
 export function messageTextForLinks(spans: MessageSpan[]): string {
   return spans
@@ -13,11 +13,9 @@ export function messageTextForLinks(spans: MessageSpan[]): string {
     .join("");
 }
 
-/** A span of a message: words, a link, or a mention. */
 export function Span(props: { span: MessageSpan; plainMentions: boolean }) {
   const { span } = props;
   if (span.type === "text") {
-    // An agent writes its mentions into its text; they read as mentions all the same.
     if (!props.plainMentions) return <>{span.text}</>;
     return span.text
       .split(/(@[\p{L}\p{N}_.'’-]+(?:\s+[\p{Lu}][\p{L}\p{N}_.'’-]*){0,2})/gu)
@@ -39,7 +37,6 @@ export function Span(props: { span: MessageSpan; plainMentions: boolean }) {
   return <RoleMention label={span.label} />;
 }
 
-/** A role mention in its role's color, or as any other mention once the role is gone. */
 function ChatRoleMention(props: { roleId: string; label: string }) {
   const role = useSpaceRolesStore((state) => {
     for (const roles of Object.values(state.bySpace)) {
@@ -51,7 +48,6 @@ function ChatRoleMention(props: { roleId: string; label: string }) {
   return <RoleMention color={role?.color || undefined} label={role?.name ?? props.label} />;
 }
 
-/** The line over a reply: the original's sender and a line of it, or why it isn't there. */
 export function ReplyLine(props: {
   replied: SpaceMessage | undefined;
   avatarUrl: string;
@@ -80,7 +76,6 @@ export function ReplyLine(props: {
   );
 }
 
-/** A message being edited: its text in a box, Escape to cancel and Enter to save, with both as buttons. */
 export function EditBox(props: {
   message: SpaceMessage;
   text: string;

@@ -1,5 +1,3 @@
-// New native cursor windows use companion.html. Keep already-open windows from
-// older development binaries isolated during a frontend hot reload as well.
 export const startup = (async () => {
   const legacyCompanion = new URLSearchParams(location.search).get("cursor_companion");
   if (legacyCompanion !== null && "__TAURI_INTERNALS__" in window) {
@@ -11,7 +9,7 @@ export const startup = (async () => {
       message.textContent =
         "Companion controls have moved to Agents. Restart Misty to finish updating.";
       document.getElementById("root")?.replaceChildren(message);
-    } else await (await import("./cursorEntry")).cursorStartup;
+    } else await (await import("./cursor_entry")).cursorStartup;
     return;
   }
   await (

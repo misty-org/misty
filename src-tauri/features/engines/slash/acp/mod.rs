@@ -1,35 +1,3 @@
-//! The Kimi, Grok, MiniMax and Hermes commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! All four run over ACP, one process per turn (`grok_acp.rs`, `minimax_acp.rs`), and each sends
-//! the commands its ACP server runs in `available_commands_update` (`reported.rs`). The
-//! `Runs::Turn` rows here are the ones each server runs from a prompt, with its own descriptions,
-//! so the menu has them before the engine's first run. The `Runs::Misty` rows are ACP calls Misty
-//! makes out of turn on a short-lived process opened on the chat's session (`OutOfTurn`).
-//!
-//! What each engine is:
-//! - Kimi is Kimi Code (`@moonshot-ai/kimi-code`, `~/.kimi-code`), not the archived kimi-cli. Its
-//!   ACP server runs `compact`, `status`, `usage`, `mcp`, `tasks`, `help` and its skills; its
-//!   TUI's `init`, `export`, `import`, `title` and `yolo` answer "Unknown ACP command" over ACP.
-//! - Grok is xai-org/grok-build. Its ACP prompt runs its own built-ins; `/plan`, `/auto`,
-//!   `/fork`, `/rename` and `/model` are the terminal app's and reach the model as plain text, so
-//!   fork and rename are its `_x.ai/session/*` calls here.
-//! - MiniMax Code's ACP prompt runs ten commands itself; every other `/word` (`goal`, `review`,
-//!   `init`, …) reaches the model as plain text.
-//! - Hermes Agent runs `hermes acp` on its gateway: its adapter answers a few commands and sends
-//!   the rest to the gateway's `slash.exec`, which refuses `save`, `bg`, `btw`, `agents`,
-//!   `rollback`, `stop`, `reload-mcp`, `reload-skills`, `update`, `resume` and `sessions` and
-//!   refuses `/branch` in favor of ACP `session/fork`. Misty runs the refused ones it can reach:
-//!   `btw` in a fork it deletes after, `bg` as a fork opened as a new chat, `save` through
-//!   `hermes sessions export`, `rollback`'s list from Hermes's checkpoint store, `agents` from
-//!   its `processes.json`; `reload-mcp` and `reload-skills` say why they can't run here. `stop`,
-//!   `resume`, `sessions` and `update` are the composer's and Settings'.
-//!
-//! Left out on purpose: Hermes's `/yolo` and Grok's `/always-approve`, which turn off the
-//! engine's own asks with no sandbox holding it in its folder (`modes.rs`); the commands the
-//! composer answers for every engine (`help`, `model`, `new`, `diff`, `voice`, `approvals`, …);
-//! Grok's `usage` (its totals reset in each new process, and every turn is one); and renames for
-//! Kimi, MiniMax and Hermes, which have no ACP call for it (Hermes's `/title` is a turn).
-
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
@@ -53,8 +21,6 @@ use hermes::{
 };
 use out_of_turn::OutOfTurn;
 
-/// Kimi Code's ACP built-ins (`acp-server/src/builtin-commands.ts`). Its skills come in its own
-/// report, as `skill:<name>` (or a built-in skill's bare name).
 const KIMI: &[Command] = &[
     turn("compact", "Compact the conversation context")
         .hint("<optional custom summarization instructions>"),
@@ -64,9 +30,6 @@ const KIMI: &[Command] = &[
     misty("fork", "Fork this session into a new chat").hint("[title]"),
 ];
 
-/// Grok's built-ins that every session has (`session/slash_commands.rs`, `BuiltinGate::AlwaysOn`).
-/// The ones behind a feature (memory, hooks, plugins, goal, workflows, `/loop`, `/feedback`)
-/// come in its own report when that feature is on.
 const GROK: &[Command] = &[
     turn(
         "compact",
@@ -85,8 +48,6 @@ const GROK: &[Command] = &[
     misty("rename", "Rename the current session").hint("<title>"),
 ];
 
-/// The commands MiniMax Code's ACP prompt runs itself (its `ur` table), but `help`, `new` (which
-/// only says to start a new thread) and `model` (the composer's picker).
 const MINIMAX: &[Command] = &[
     turn("status", "Show account and model status"),
     turn("doctor", "Check the local config file"),
@@ -98,9 +59,6 @@ const MINIMAX: &[Command] = &[
     misty("fork", "Fork this session into a new chat").hint("[title]"),
 ];
 
-/// The Hermes commands its ACP adapter or gateway runs (`hermes_cli/commands.py`,
-/// `gateway/session_commands.py`), with its own descriptions. Hints are trimmed to what the
-/// gateway accepts over ACP (`/usage reset` and `/voice tts` are refused there).
 const HERMES: &[Command] = &[
     turn("status", "Show session, model, token, and context info"),
     turn(
@@ -248,9 +206,6 @@ const HERMES: &[Command] = &[
     ),
 ];
 
-/// Commands an engine reports that the menu leaves out (see the module's note): Grok's
-/// `/always-approve`, which its ACP prompt runs and which turns off every ask with no sandbox
-/// holding Grok in its folder, and Hermes's `/yolo`.
 pub fn withheld(engine: &str) -> &'static [&'static str] {
     match engine {
         "grok" => &["always-approve"],
@@ -306,18 +261,10 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     }
 }
 
-/// The chat's title for a fork, when the command named one.
 fn fork_title(context: &Context) -> Option<String> {
     Some(context.args.clone()).filter(|title| !title.is_empty())
 }
 
-/// ACP `session/fork`, which Kimi Code, MiniMax Code and Hermes each advertise
-/// (`sessionCapabilities.fork`) and answer with the new session's `sessionId`. The session is
-/// opened first, so an engine that forks only what it has open (MiniMax inherits the open
-/// session's servers) finds it.
-///
-/// Hermes's `/bg` runs a prompt in a separate session beside this one; here that is a fork,
-/// opened as a new chat that sends the prompt, since the new chat shows this one's turns.
 async fn fork(
     context: &Context,
     folder: &Path,
@@ -345,8 +292,6 @@ async fn fork(
     })
 }
 
-/// MiniMax Code forks only at a finished reply, and says so in its own terms
-/// (`Invalid params: message-boundary-not-found`, mcode 0.7.7).
 fn fork_refusal(error: String) -> String {
     if error.contains("message-boundary-not-found") || error.contains("message-boundary-invalid") {
         "MiniMax Code forks a session only after a reply has finished.".into()
@@ -355,7 +300,6 @@ fn fork_refusal(error: String) -> String {
     }
 }
 
-/// A string field, trimmed, when it has one.
 fn text(value: &Value, key: &str) -> Option<String> {
     value
         .get(key)
@@ -365,7 +309,6 @@ fn text(value: &Value, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Grok wraps some answers in `{result, error}` (`ExtMethodResult`) and not others.
 fn unwrapped(value: &Value) -> &Value {
     value
         .get("result")
@@ -376,11 +319,6 @@ fn unwrapped(value: &Value) -> &Value {
 #[cfg(test)]
 mod tests;
 
-/// The Hermes commands Misty runs, against the installed Hermes on a scratch home: set
-/// `MISTY_TEST_HERMES_HOME` to a Hermes home whose `config.yaml` names a model on a closed
-/// localhost port (`provider: custom`, `base_url: http://127.0.0.1:9/v1`), so a session opens
-/// and nothing can reach a model. `/btw` is left out: it is a model turn. Run with
-/// `--ignored --test-threads=1 --nocapture`.
 #[cfg(test)]
 #[path = "live_tests.rs"]
 mod live;

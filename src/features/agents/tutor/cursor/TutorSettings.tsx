@@ -19,23 +19,22 @@ import {
   useNotice,
   type CompanionTint,
 } from "@misty/ui";
-import { companionAvailable, setCompanionOn, useCompanionOn } from "./companionOn";
+import { companionAvailable, setCompanionOn, useCompanionOn } from "./companion_on";
 import {
   companionSizeDefault,
   companionSizeMax,
   companionSizeMin,
   companionSizeStep,
   normalizeCompanionSize,
-} from "./companionSize";
-import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
-import { useTutorSetup } from "./tutorSetup";
-import { useMistyStore } from "../../conversations/state/useMistyStore";
-import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
-import { tutorConversationOf, tutorTurns } from "./tutorConversation";
-import { openAgentThread } from "./tutorHandoff";
-import { forgetTutorStyle, useTutorStyle } from "./tutorStyle";
+} from "./companion_size";
+import { companionControl, useCompanionState, type CompanionControl } from "./companion_state";
+import { useTutorSetup } from "./tutor_setup";
+import { useMistyStore } from "../../conversations/state/use_misty_store";
+import { usePersonalAgentsStore } from "../../personal/personal_agents_store";
+import { tutorConversationOf, tutorTurns } from "./tutor_conversation";
+import { openAgentThread } from "./tutor_handoff";
+import { forgetTutorStyle, useTutorStyle } from "./tutor_style";
 
-/** How Tutor was asked to answer, with the way to go back; shown only once there is some. */
 function TutorStyleRow({ onError }: { onError(error: string): void }) {
   const style = useTutorStyle();
   if (!style.length) return null;
@@ -51,10 +50,6 @@ function TutorStyleRow({ onError }: { onError(error: string): void }) {
   );
 }
 
-/**
- * What was asked of Tutor in the last day, newest first. A turn whose work went to an agent
- * opens that agent's chat; Tutor keeps nothing older.
- */
 function TutorRecent() {
   const conversations = useMistyStore((state) => state.conversations);
   const agents = usePersonalAgentsStore((state) => state.agents);
@@ -90,7 +85,6 @@ function TutorRecent() {
 
 const talkKeys = () => (/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt");
 
-/** What Tutor is doing, in a few words under its name. */
 export function tutorStatus(input: {
   ready: boolean | undefined;
   on: boolean | undefined;
@@ -105,12 +99,6 @@ export function tutorStatus(input: {
   return `Ready. Hold ${input.talkKeys} anywhere to talk.`;
 }
 
-/**
- * Settings › Tutor. Tutor is the companion at the cursor, on anywhere on the desktop while Misty
- * runs, and switched from here or the menu bar. It runs on the default engine and this computer's
- * own speech. The page leads with Misty herself, what Tutor is doing and its switch, then how it
- * behaves; with no default engine, it says where to pick one.
- */
 export function TutorSettings() {
   const on = useCompanionOn();
   const setup = useTutorSetup();
@@ -181,18 +169,13 @@ export function TutorSettings() {
         </Section>
       ) : null}
 
-      {/* Tutor hears and speaks through this computer's own speech; its voice is in Settings ›
-          Voice. */}
       <Section title="Voice">
-        <Row label="Talk shortcut" description="Hold it anywhere on your desktop.">
+        <Row label="Talk shortcut">
           <Text size="control" tone="muted">
             {talkKeys()}
           </Text>
         </Row>
-        <Row
-          label="Captions while Tutor talks"
-          description="Shows what Tutor says at the bottom of the screen."
-        >
+        <Row label="Captions while Tutor talks">
           <Switch
             aria-label="Captions while Tutor talks"
             checked={presentation.captions === true}
@@ -206,7 +189,7 @@ export function TutorSettings() {
 
       {setup.ready && on ? (
         <Section title="Tour">
-          <Row label="Tutor tour" description="Try each thing Tutor does once, out loud.">
+          <Row label="Tutor tour">
             <Button
               icon={GraduationCap}
               disabled={!control}

@@ -18,11 +18,17 @@ import {
   Text,
 } from "@misty/ui";
 import { AddFromGitHubDialog } from "./AddFromGitHubDialog";
-import { permissionLines } from "./appPermissions";
+import { permissionLines } from "./app_permissions";
 import { RemoveAppDialog } from "./RemoveAppDialog";
-import { appRoute } from "./appRoutes";
-import { catalogLogoUrl, useRegistryApps, type CatalogApp } from "./thirdPartyApps";
-import { useSpaceApps } from "./useSpaceApps";
+import { appRoute } from "./app_routes";
+import {
+  catalogLogoUrl,
+  isSiteApp,
+  siteHost,
+  useRegistryApps,
+  type CatalogApp,
+} from "./third_party_apps";
+import { useSpaceApps } from "./use_space_apps";
 
 const matches = (query: string, ...texts: (string | undefined)[]) => {
   const words = query.trim().toLowerCase();
@@ -31,11 +37,6 @@ const matches = (query: string, ...texts: (string | undefined)[]) => {
 
 const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(1);
 
-/**
- * The apps of a Space: the open-source apps a mod can add, on one shelf. Picking one opens its
- * details, where Get shows what the app may do and adds it. The apps agents sign in to are
- * connectors, in Explore's Connectors.
- */
 export function ExploreAppsSection({
   spaceId,
   canManage,
@@ -47,11 +48,8 @@ export function ExploreAppsSection({
   spaceId: string;
   canManage: boolean;
   query?: string;
-  /** On All, each shelf shows this many, with See all opening the section. */
   limit?: number;
-  /** On All: the shelves' See all, which opens the Apps section. */
   onSeeAll?: () => void;
-  /** On All: the apps that export a banner, as featured cards above the shelves. */
   featured?: boolean;
 }) {
   const navigate = useNavigate();
@@ -88,7 +86,6 @@ export function ExploreAppsSection({
       See all
     </Button>
   ) : canManage ? (
-    // In the Apps section a mod can add any open-source app by its link, listed here or not.
     <Button variant="quiet" size="sm" onClick={() => setAdding(true)}>
       Add from GitHub
     </Button>
@@ -132,7 +129,14 @@ export function ExploreAppsSection({
           {cut(listed).map((app) => (
             <ShelfItem
               key={app.id}
-              logo={<AppLogoImage src={catalogLogoUrl(app)} name={app.name} size="tile" />}
+              logo={
+                <AppLogoImage
+                  src={catalogLogoUrl(app)}
+                  name={app.name}
+                  size="tile"
+                  render={app.icon_render}
+                />
+              }
               title={app.name}
               line={app.description ?? `by ${app.maker}`}
               action={appAction(app)}
@@ -165,7 +169,14 @@ export function ExploreAppsSection({
             }
           }}
           banner={picked.banner}
-          logo={<AppLogoImage src={catalogLogoUrl(picked)} name={picked.name} size="tile" />}
+          logo={
+            <AppLogoImage
+              src={catalogLogoUrl(picked)}
+              name={picked.name}
+              size="tile"
+              render={picked.icon_render}
+            />
+          }
           title={picked.name}
           line={picked.description ?? `by ${picked.maker}`}
           action={appAction(picked, "lg")}
@@ -179,12 +190,19 @@ export function ExploreAppsSection({
               />
             ) : undefined
           }
-          facts={[
-            { label: "Maker", value: picked.maker },
-            { label: "Version", value: picked.version },
-            { label: "Size", value: megabytes(picked.size), detail: "MB" },
-            { label: "License", value: "Open source", detail: picked.license },
-          ]}
+          facts={
+            isSiteApp(picked)
+              ? [
+                  { label: "Maker", value: picked.maker },
+                  { label: "Website", value: siteHost(picked) },
+                ]
+              : [
+                  { label: "Maker", value: picked.maker },
+                  { label: "Version", value: picked.version },
+                  { label: "Size", value: megabytes(picked.size), detail: "MB" },
+                  { label: "License", value: "Open source", detail: picked.license },
+                ]
+          }
           previews={picked.screenshots?.map((src, index) => ({
             src,
             alt: `${picked.name}, picture ${index + 1}`,
@@ -234,7 +252,6 @@ export function ExploreAppsSection({
   );
 }
 
-/** Up to two apps that export a banner, as featured cards; none shows when no app has one. */
 function FeaturedApps({
   apps,
   onOpen,

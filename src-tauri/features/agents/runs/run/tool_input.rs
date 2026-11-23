@@ -1,29 +1,26 @@
-//! What the `ai` package's `parseToolCall` does with a tool call before anyone sees it: reads its JSON,
-//! checks it against the tool's schema, and turns anything wrong into an error the model can correct.
-//! The call keeps its place in the transcript either way, with whatever input could be read.
 use crate::js_json::JsValue;
 use crate::model_calls::{RawJson, ToolDefinition};
 
 use super::{json_error::json_syntax_error, schema_check::schema_errors};
 
 pub(crate) struct ParsedCall {
-    /// The input as the assistant's message carries it: parsed JSON, or a string of what it wrote.
     pub(crate) input: RawJson,
-    /// What the tool runs on, when the call is valid.
     pub(crate) value: JsValue,
-    /// `getErrorMessage(error)` for a call that isn't.
     pub(crate) invalid: Option<String>,
 }
 
 fn has_forbidden_key(value: &JsValue) -> bool {
     match value {
         JsValue::Array(items) => items.iter().any(has_forbidden_key),
-        JsValue::Object(fields) => fields.iter().any(|(key, field)| key == "__proto__" || (key == "constructor" && field.get("prototype").is_some()) || has_forbidden_key(field)),
+        JsValue::Object(fields) => fields.iter().any(|(key, field)| {
+            key == "__proto__"
+                || (key == "constructor" && field.get("prototype").is_some())
+                || has_forbidden_key(field)
+        }),
         _ => false,
     }
 }
 
-/// `secureJsonParse`.
 fn secure_parse(text: &str) -> Option<JsValue> {
     JsValue::parse(text).filter(|value| !has_forbidden_key(value))
 }
@@ -40,12 +37,16 @@ fn schema_failure(tool: &str, value: &JsValue, problem: &str) -> String {
     format!("AI_InvalidToolInputError: Invalid input for tool {tool}: AI_TypeValidationError: Type validation failed: Value: {}.\nError message: Error: {problem}", value.stringify())
 }
 
-/// `raw` is the JSON text the model wrote. `active` is what it was offered this turn.
 pub(crate) fn parse_tool_call(name: &str, raw: &str, active: &[&ToolDefinition]) -> ParsedCall {
     let parsed = secure_parse(raw);
-    // What the transcript shows when the call fails: what could be read, or the text itself.
-    let carried = parsed.clone().unwrap_or_else(|| JsValue::String(raw.to_owned()));
-    let invalid = |message: String| ParsedCall { input: as_raw(&carried), value: carried.clone(), invalid: Some(message) };
+    let carried = parsed
+        .clone()
+        .unwrap_or_else(|| JsValue::String(raw.to_owned()));
+    let invalid = |message: String| ParsedCall {
+        input: as_raw(&carried),
+        value: carried.clone(),
+        invalid: Some(message),
+    };
     let Some(tool) = active.iter().find(|tool| tool.name == name) else {
         let names: Vec<&str> = active.iter().map(|tool| tool.name.as_str()).collect();
         return invalid(format!("AI_NoSuchToolError: Model tried to call unavailable tool '{name}'. Available tools: {}.", names.join(", ")));
@@ -63,7 +64,11 @@ pub(crate) fn parse_tool_call(name: &str, raw: &str, active: &[&ToolDefinition])
     if let Some(problem) = schema_errors(&schema, &value) {
         return invalid(schema_failure(name, &value, &problem));
     }
-    ParsedCall { input: as_raw(&value), value, invalid: None }
+    ParsedCall {
+        input: as_raw(&value),
+        value,
+        invalid: None,
+    }
 }
 
 #[cfg(test)]
@@ -82,7 +87,10 @@ mod tests {
 
     #[test]
     fn a_valid_call_keeps_its_key_order_as_javascript_writes_it() {
-        let schema = ToolDefinition { input_schema: RawJson::from_text("{}".to_owned()).unwrap(), ..tool() };
+        let schema = ToolDefinition {
+            input_schema: RawJson::from_text("{}".to_owned()).unwrap(),
+            ..tool()
+        };
         let call = parse_tool_call("t", r#"{ "z" : 1, "a" : 2.50 }"#, &[&schema]);
         assert_eq!(call.invalid, None);
         assert_eq!(call.input.get(), r#"{"z":1,"a":2.5}"#);
@@ -92,7 +100,10 @@ mod tests {
     fn an_unknown_tool_is_named_with_what_was_offered() {
         let definition = tool();
         let call = parse_tool_call("nope", "{}", &[&definition]);
-        assert_eq!(call.invalid.unwrap(), "AI_NoSuchToolError: Model tried to call unavailable tool 'nope'. Available tools: t.");
+        assert_eq!(
+            call.invalid.unwrap(),
+            "AI_NoSuchToolError: Model tried to call unavailable tool 'nope'. Available tools: t."
+        );
     }
 
     #[test]
@@ -108,12 +119,18 @@ mod tests {
         let definition = tool();
         let call = parse_tool_call("t", "{oops", &[&definition]);
         assert_eq!(call.input.get(), r#""{oops""#);
-        assert!(call.invalid.unwrap().contains("JSON parsing failed: Text: {oops."));
+        assert!(call
+            .invalid
+            .unwrap()
+            .contains("JSON parsing failed: Text: {oops."));
     }
 
     #[test]
     fn empty_input_counts_as_an_empty_object() {
-        let definition = ToolDefinition { input_schema: RawJson::empty_object(), ..tool() };
+        let definition = ToolDefinition {
+            input_schema: RawJson::empty_object(),
+            ..tool()
+        };
         let call = parse_tool_call("t", "  ", &[&definition]);
         assert_eq!(call.invalid, None);
         assert_eq!(call.input.get(), "{}");

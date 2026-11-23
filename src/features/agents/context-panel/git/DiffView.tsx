@@ -15,7 +15,7 @@ import {
   type TextTone,
 } from "@misty/ui";
 import { absoluteOf, openChangedFile } from "./ChangesFileContextMenu";
-import { diffSteps, type DiffStep } from "./diffSteps";
+import { diffSteps, type DiffStep } from "./diff_steps";
 import {
   gitApi,
   gitErrorText,
@@ -23,12 +23,11 @@ import {
   type GitFileEntry,
   type GitImageDiff,
   type GitStatus,
-} from "./gitApi";
+} from "./git_api";
 import type { DiffTarget } from "./store";
 import { uiPx } from "@misty/ui";
 
 const DIFF_TRUNCATE_LINES = 2000;
-/** The before and after of an image, side by side. */
 const imagesClass = "flex min-h-0 flex-1 gap-2 p-2";
 const DIFF_VIRTUALIZE_LINES = 500;
 
@@ -38,7 +37,6 @@ interface AnnotatedLine {
   newNo: number | null;
 }
 
-/** Gives each line its old and new line number from the `@@` hunk headers. */
 export function annotateDiff(lines: string[]): AnnotatedLine[] {
   let oldLine = 0;
   let newLine = 0;
@@ -58,7 +56,6 @@ export function annotateDiff(lines: string[]): AnnotatedLine[] {
   });
 }
 
-/** What kind of line it is; the `+++` and `---` file headers aren't additions or removals. */
 export function diffLineKind(text: string): "add" | "del" | "hunk" | null {
   if (text.startsWith("+") && !text.startsWith("+++")) return "add";
   if (text.startsWith("-") && !text.startsWith("---")) return "del";
@@ -66,7 +63,6 @@ export function diffLineKind(text: string): "add" | "del" | "hunk" | null {
   return null;
 }
 
-/** The status row of the file shown: from the staged list, else the unstaged or untracked one. */
 function findStatusEntry(status: GitStatus | undefined, target: DiffTarget) {
   return target.staged
     ? status?.staged.find((entry) => entry.path === target.file)
@@ -74,15 +70,10 @@ function findStatusEntry(status: GitStatus | undefined, target: DiffTarget) {
         status?.untracked.find((entry) => entry.path === target.file));
 }
 
-/** Changes when the file's own row does, so a refresh of other files doesn't read it again. */
 function entrySignature(entry: GitFileEntry | undefined) {
   return entry ? `${entry.status}:${entry.additions ?? ""}:${entry.deletions ?? ""}` : "";
 }
 
-/**
- * The last diff read of each file this session, so opening one again shows it at once while it is
- * read again. Diffs can be long, so only a few are kept, in memory and never on disk.
- */
 const shownDiffs = new Map<string, string>();
 const MOST_SHOWN_DIFFS = 24;
 
@@ -92,10 +83,6 @@ function rememberDiff(key: string, text: string) {
   if (shownDiffs.size > MOST_SHOWN_DIFFS) shownDiffs.delete(shownDiffs.keys().next().value!);
 }
 
-/**
- * One file's diff, with line numbers; or, for a long one, one hunk at a time. An image shows
- * as its before and after.
- */
 export function DiffView(props: {
   workspacePath: string;
   target: DiffTarget;
@@ -104,7 +91,6 @@ export function DiffView(props: {
 }) {
   const { workspacePath, target } = props;
   const diffKey = `${workspacePath}\n${target.staged ? "staged" : "unstaged"}\n${target.file}`;
-  // The diff shown belongs to the file shown: another file starts from its own last read.
   const [read, setRead] = useState(() => ({ key: diffKey, text: shownDiffs.get(diffKey) ?? null }));
   if (read.key !== diffKey) setRead({ key: diffKey, text: shownDiffs.get(diffKey) ?? null });
   const diffText = read.text;
@@ -120,7 +106,6 @@ export function DiffView(props: {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    // A patch says nothing useful about an image, so both versions are read instead.
     const work = isImage
       ? gitApi
           .diffImages(workspacePath, target.file, target.staged)
@@ -224,7 +209,7 @@ export function DiffView(props: {
             <IconButton label="Previous step" disabled={at <= 0} onClick={() => setAt(at - 1)}>
               <ChevronLeft />
             </IconButton>
-            <Text bare tone="muted" className="text-xs">
+            <Text size="meta" bare tone="muted">
               Step {Math.min(at, steps.length - 1) + 1} of {steps.length}
             </Text>
             <IconButton
@@ -241,7 +226,6 @@ export function DiffView(props: {
   );
 }
 
-/** One hunk on its own, for reading a long change a step at a time. */
 function StepBody({ step }: { step: DiffStep }) {
   return (
     <div className="context-diff">
@@ -325,8 +309,6 @@ function DiffContent(props: {
   );
 }
 
-/** A diff line's text: added lines bright, removed ones plain, the rest muted. Its fill, which
- * says what the line is, comes from codeViews.css. */
 const lineTone: Record<"add" | "del" | "hunk" | "none", TextTone> = {
   add: "bright",
   del: "default",
@@ -354,7 +336,6 @@ const DiffLine = memo(function DiffLine({ line }: { line: AnnotatedLine }) {
   );
 });
 
-/** A line's number in the old or the new file, faint beside the code and never selected with it. */
 function LineNumber({ value }: { value: number | null }) {
   return (
     <Text bare tone="muted" className="w-9 flex-none pr-2 text-right opacity-70 select-none">
@@ -363,7 +344,6 @@ function LineNumber({ value }: { value: number | null }) {
   );
 }
 
-/** A line in place of the diff: there is nothing to show, or reading it failed. */
 function DiffNote({ error, children }: { error?: boolean; children: string }) {
   return (
     <Text
@@ -384,17 +364,13 @@ function DiffNote({ error, children }: { error?: boolean; children: string }) {
   );
 }
 
-/** The image before and after. A side that doesn't exist in a version is left out, so a new
- * image shows one pane rather than an empty comparison. Clicking one shows it at full size. */
 function ImageDiffBody(props: { file: string; sides: GitImageDiff | null; error: string | null }) {
   const [zoomed, setZoomed] = useState<string | null>(null);
   if (props.error) {
     return <DiffNote error>{props.error}</DiffNote>;
   }
   if (props.sides === null) {
-    return (
-      <PaneLoading label="Loading images" />
-    );
+    return <PaneLoading label="Loading images" />;
   }
   const both = props.sides.old !== null && props.sides.new !== null;
   const panes: { key: string; label: string; src: string }[] = [];

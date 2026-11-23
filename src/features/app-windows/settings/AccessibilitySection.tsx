@@ -3,9 +3,8 @@ import {
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/features/settings";
 import { booleanSetting, SwitchControl } from "../../settings/SettingsControls";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import type { SettingsContentProps } from "../../settings/settings_types";
 
-/** Settings › Interface › Accessibility: how much the interface moves. Device-only. */
 export function AccessibilitySection(props: SettingsContentProps) {
   return (
     <SettingsSectionBlock title="Accessibility">

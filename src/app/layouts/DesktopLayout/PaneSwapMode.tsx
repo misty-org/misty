@@ -21,11 +21,6 @@ function paneRect(id: string): DOMRect | null {
   return element?.getBoundingClientRect() ?? null;
 }
 
-/**
- * Swap mode: the arrow keys choose which pane trades places with the focused
- * one, Enter swaps, Escape leaves. A native page draws above the app, so the
- * mode raises the app layer while it is on and takes keyboard focus off any page.
- */
 export function PaneSwapMode() {
   const sourceId = usePaneSwapMode((state) => state.sourceId);
   const targetId = usePaneSwapMode((state) => state.targetId);
@@ -52,7 +47,6 @@ export function PaneSwapMode() {
       event.preventDefault();
       event.stopPropagation();
     };
-    // A pane that closes, or a layout that rebuilds, ends the mode.
     const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
       if (state.layout.root === previous.layout.root) return;
       const ids = dockLeaves(state.layout.root).map((pane) => pane.id);
@@ -60,7 +54,6 @@ export function PaneSwapMode() {
       if (source && (!ids.includes(source) || (target && !ids.includes(target)))) cancel();
     });
     const redraw = () => rerender((value) => value + 1);
-    // A drag started from a pane ends the mode when it is dropped or cancelled.
     const dragged = (event: Event) => {
       const dragging = (event as CustomEvent<boolean>).detail;
       setDragging(dragging);
@@ -90,7 +83,6 @@ export function PaneSwapMode() {
       ))}
       {source && <PaneOutline rect={source} tone="source" />}
       {target && targetId && <PaneOutline rect={target} tone="target" />}
-      {/* Spoken to screen readers only; sighted people see the outlines move. */}
       <div role="status" className="sr-only">
         Drag any pane, or arrow keys choose. Enter swaps. Escape cancels.
       </div>
@@ -111,8 +103,6 @@ function PaneOutline({ rect, tone }: { rect: DOMRect; tone: "source" | "target" 
   );
 }
 
-/** Covers a pane while the mode is on, so a press anywhere on it (even over a native page)
- * picks the pane up instead of reaching the page. */
 function PaneDragSurface({
   pane,
   rect,
@@ -142,7 +132,6 @@ function PaneDragSurface({
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
       className={cn(
         "fixed cursor-grab touch-none layer-blocking-popup active:cursor-grabbing",
-        // The pressed surface stays mounted for the whole gesture; it just stops catching hits.
         passive && "pointer-events-none",
       )}
     />

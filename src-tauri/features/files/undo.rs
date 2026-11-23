@@ -1,7 +1,3 @@
-//! Undo and Redo for what the person did in Files, kept in memory until Misty quits, as Finder
-//! keeps it: the last 50 changes. Every change records what it did ([`record`]); undoing one does
-//! its opposite, and what that opposite did is what Redo then undoes again, so the two stacks hold
-//! one kind of thing. A new change clears Redo.
 use std::{
     path::PathBuf,
     sync::{LazyLock, Mutex},
@@ -11,21 +7,15 @@ use serde::Serialize;
 
 use super::{blocking, failed, person_window};
 
-/// What a change did.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Change {
-    /// A new item (a folder, a file, an archive). Undoing it moves it to the Trash.
     Created(PathBuf),
     Renamed { from: PathBuf, to: PathBuf },
-    /// Items moved, each from its first path to its second.
     Moved(Vec<(PathBuf, PathBuf)>),
-    /// New copies. Undoing them moves them to the Trash.
     Copied(Vec<PathBuf>),
-    /// Items moved to the Trash, by their trash ledger ids. Undoing them puts them back.
     Trashed(Vec<String>),
 }
 
-/// The most changes kept.
 const MOST: usize = 50;
 
 #[derive(Default)]
@@ -55,10 +45,11 @@ impl Stacks {
 static STACKS: LazyLock<Mutex<Stacks>> = LazyLock::new(Mutex::default);
 
 fn stacks() -> std::sync::MutexGuard<'static, Stacks> {
-    STACKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    STACKS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Notes a change the person made, under the name Undo and Redo give it ("Move", "Rename"…).
 pub fn record(label: &'static str, change: Change) {
     stacks().record(label, change);
 }
@@ -72,15 +63,13 @@ pub struct UndoState {
     pub redo: Option<String>,
 }
 
-/// Does the opposite of `change` and returns what that did.
 fn revert(change: Change) -> Result<Change, String> {
     match change {
         Change::Created(path) => trash_again(vec![path]),
         Change::Copied(paths) => trash_again(paths),
         Change::Renamed { from, to } => {
-            super::ops::rename_path(&to, &from).map_err(|error| {
-                failed(&to, super::listing::io_text(&error))
-            })?;
+            super::ops::rename_path(&to, &from)
+                .map_err(|error| failed(&to, super::listing::io_text(&error)))?;
             super::search::note_renamed(&to, &from);
             Ok(Change::Renamed { from: to, to: from })
         }
@@ -100,7 +89,8 @@ fn revert(change: Change) -> Result<Change, String> {
                         back.push((to, from));
                     }
                     Err(error) => {
-                        first_error.get_or_insert_with(|| failed(&to, super::listing::io_text(&error)));
+                        first_error
+                            .get_or_insert_with(|| failed(&to, super::listing::io_text(&error)));
                     }
                 }
             }
@@ -116,7 +106,9 @@ fn revert(change: Change) -> Result<Change, String> {
                     return Err(failure.error);
                 }
             }
-            Ok(Change::Copied(result.created.into_iter().map(PathBuf::from).collect()))
+            Ok(Change::Copied(
+                result.created.into_iter().map(PathBuf::from).collect(),
+            ))
         }
     }
 }
@@ -128,15 +120,19 @@ fn trash_again(paths: Vec<PathBuf>) -> Result<Change, String> {
             return Err(failure.error);
         }
     }
-    Ok(Change::Trashed(trashed.into_iter().map(|item| item.id).collect()))
+    Ok(Change::Trashed(
+        trashed.into_iter().map(|item| item.id).collect(),
+    ))
 }
 
-/// Takes the newest change off one stack, does its opposite, and puts what that did on the
-/// other. A change that can't be undone (its item was removed meanwhile) is dropped.
 fn step(undoing: bool) -> Result<UndoState, String> {
     let taken = {
         let mut stacks = stacks();
-        if undoing { stacks.undo.pop() } else { stacks.redo.pop() }
+        if undoing {
+            stacks.undo.pop()
+        } else {
+            stacks.redo.pop()
+        }
     };
     let Some((label, change)) = taken else {
         return Ok(stacks().state());
@@ -163,7 +159,10 @@ pub fn files_undo_state(webview: tauri::Webview) -> Result<UndoState, String> {
 }
 
 #[tauri::command]
-pub async fn files_undo(app: tauri::AppHandle, webview: tauri::Webview) -> Result<UndoState, String> {
+pub async fn files_undo(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+) -> Result<UndoState, String> {
     person_window(&webview)?;
     blocking(move || {
         super::trash::attach(&app);
@@ -173,7 +172,10 @@ pub async fn files_undo(app: tauri::AppHandle, webview: tauri::Webview) -> Resul
 }
 
 #[tauri::command]
-pub async fn files_redo(app: tauri::AppHandle, webview: tauri::Webview) -> Result<UndoState, String> {
+pub async fn files_redo(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+) -> Result<UndoState, String> {
     person_window(&webview)?;
     blocking(move || {
         super::trash::attach(&app);

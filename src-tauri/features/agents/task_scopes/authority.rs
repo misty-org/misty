@@ -1,9 +1,7 @@
-//! Checks at native boundaries that an agent task still holds its authority.
 use super::{AgentWorkspaceState, WorkspaceState};
 use std::time::Instant;
 use tauri::{AppHandle, Manager};
 
-/// Check at the last native boundary, including after renderer loss or device sleep.
 pub fn authorize_scope(
     app: &AppHandle,
     scope_id: &str,
@@ -44,8 +42,6 @@ pub(super) fn authorize_scope_state(
     Ok(())
 }
 
-// Keep scope tombstones when changing accounts: removing them would enable the
-// legacy unbound-scope fallback for an action already in flight.
 pub(super) fn invalidate_account_leases(inner: &mut WorkspaceState) -> Vec<String> {
     inner.foreground_pending.clear();
     inner.leases.drain().map(|(task, _)| task).collect()
@@ -66,7 +62,6 @@ pub(crate) fn stop_account_tasks(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Full-window control always requires a live foreground lease; no legacy fallback.
 pub fn authorize_window_task(
     app: &AppHandle,
     task: &str,
@@ -86,7 +81,6 @@ pub fn authorize_window_task(
     }
 }
 
-/// The Space window whose renderer holds a task's lease.
 pub fn task_window(app: &tauri::AppHandle, task: &str) -> Option<String> {
     let state = app.try_state::<AgentWorkspaceState>()?;
     let inner = state.0.lock().ok()?;

@@ -1,9 +1,9 @@
-import "./agentCloudAvatars.testFixtures";
+import "./agent_cloud_avatars.test_fixtures";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { NoticeViewport, resetNotices } from "@misty/ui";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const save = vi.hoisted(() => vi.fn());
-vi.mock("@/features/agents/personal/personalAgentsApi", () => ({ personalAgentsApi: { save } }));
+vi.mock("@/features/agents/personal/personal_agents_api", () => ({ personalAgentsApi: { save } }));
 const speech = vi.hoisted(() => {
   const state = {
     catalog: {
@@ -25,10 +25,9 @@ const speech = vi.hoisted(() => {
     load: async () => {},
     install: async () => {},
   };
-  const useSpeechModels = Object.assign(
-    (pick: (value: typeof state) => unknown) => pick(state),
-    { getState: () => state },
-  );
+  const useSpeechModels = Object.assign((pick: (value: typeof state) => unknown) => pick(state), {
+    getState: () => state,
+  });
   return { useSpeechModels };
 });
 vi.mock("@/features/voice", () => ({
@@ -53,7 +52,6 @@ afterEach(() => {
 });
 beforeEach(() => save.mockReset());
 const start = (onSaved = vi.fn(async () => {})) => {
-  // A failure is a notice, drawn where the app draws them.
   render(
     <>
       <NoticeViewport />
@@ -67,7 +65,6 @@ const start = (onSaved = vi.fn(async () => {})) => {
   );
   fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Research partner" } });
   fireEvent.change(screen.getByLabelText("Purpose"), { target: { value: "Compare sources" } });
-  // Its voice is the person's pick, part of making it.
   fireEvent.click(screen.getByRole("button", { name: "Heart" }));
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   return onSaved;

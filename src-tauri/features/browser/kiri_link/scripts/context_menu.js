@@ -1,12 +1,8 @@
-// Runs in the initialization closure; the shortcut token is never published on window.
 let rightClickPrevented = false;
-// A two-finger trackpad swipe past the page's edge goes back or forward, with an arrow (below).
 
 const updateRightClickState = (event) => {
   if (event.button === 2) {
     if (event.defaultPrevented) rightClickPrevented = true;
-    // Move handleContextMenu to the end of the window listener queue
-    // so any listeners added by page scripts run first.
     window.removeEventListener('contextmenu', handleContextMenu);
     window.addEventListener('contextmenu', handleContextMenu);
   }
@@ -14,7 +10,6 @@ const updateRightClickState = (event) => {
 
 const handleContextMenu = (event) => {
   if (!event.isTrusted) return;
-  // If the page prevented the right-click or contextmenu event, do not show Misty's menu.
   if (event.defaultPrevented || rightClickPrevented) {
     rightClickPrevented = false;
     return;
@@ -23,7 +18,6 @@ const handleContextMenu = (event) => {
   const target = event.target instanceof Element ? event.target : event.target?.parentElement;
   if (!target) return;
   const editable = target.closest('input,textarea,[contenteditable="true"],[role="textbox"]');
-  // Fields keep the engine's own menu so AutoFill, passwords, and spelling suggestions still work.
   if (editable) return;
   event.preventDefault();
   const sensitive = editable?.matches('input[type="password"]');
@@ -37,7 +31,6 @@ const handleContextMenu = (event) => {
     url: location.href.slice(0, 2048), selection: Boolean(selection), editable: Boolean(editable),
     link: link ? safeURL(link.href) : '', image: image ? safeURL(image.currentSrc || image.src) : '',
   };
-  // The page's own data may pass through its hooks; the token never does.
   const json = stringify(payload);
   if (typeof json !== 'string') return;
   sendHostNavigation('misty-context-menu:open?token=' + encode(shortcutToken) + '&payload=' + encode(json));
@@ -53,9 +46,6 @@ window.addEventListener('mousedown', (event) => {
 }, false);
 window.addEventListener('contextmenu', handleContextMenu);
 
-// The arrow that shows where a swipe leads: a black circle sliding in from the edge
-// that turns white once letting go would navigate. It lives in a closed
-// shadow root so the page's styles cannot reach it.
 const gestureArrow = (() => {
   let host = null;
   let circle = null;
@@ -74,7 +64,6 @@ const gestureArrow = (() => {
     circle = root.querySelector('.c');
   };
   return {
-    // progress runs from 0 (just started) to 1 (letting go navigates).
     show(action, progress) {
       if (!host) build();
       clearTimeout(hideTimer);
@@ -104,11 +93,6 @@ const gestureArrow = (() => {
 const sendGesture = (action) =>
   sendHostNavigation('misty-context-menu:gesture?token=' + encode(shortcutToken) + '&action=' + action);
 
-// Two-finger swipe: horizontal scrolling that nothing on the page can take moves the
-// arrow in from that edge; letting go past the threshold goes back (swipe right) or
-// forward (swipe left). Listened for after the page's own handlers, so a page that
-// handles sideways wheel itself (maps, carousels) keeps it. A scroll that reached the
-// edge must pause before the next one navigates, as in other Mac browsers.
 const swipeThreshold = 150;
 let swipe = null;
 let swipeLockedUntil = 0;

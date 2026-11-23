@@ -1,7 +1,6 @@
 import { Surface, Text } from "@misty/ui";
 import { Component, type ReactNode } from "react";
 
-/** The last line under the whole app: an error nothing else caught. Nothing is reported. */
 export class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {

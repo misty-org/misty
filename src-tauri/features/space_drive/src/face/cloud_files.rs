@@ -80,40 +80,38 @@ use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
 use windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
 use windows::Win32::Storage::CloudFilters::*;
 use windows::Win32::Storage::FileSystem::{
-    CreateFileW, GetFileAttributesW, ReadDirectoryChangesW, SetFileAttributesW, FILE_ATTRIBUTE_DIRECTORY,
-    FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_READONLY, FILE_BASIC_INFO, FILE_FLAGS_AND_ATTRIBUTES,
-    FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OVERLAPPED, FILE_GENERIC_READ, FILE_LIST_DIRECTORY,
-    FILE_NOTIFY_CHANGE_ATTRIBUTES, FILE_NOTIFY_CHANGE_CREATION, FILE_NOTIFY_CHANGE_DIR_NAME,
-    FILE_NOTIFY_CHANGE_FILE_NAME, FILE_NOTIFY_CHANGE_LAST_WRITE, FILE_NOTIFY_CHANGE_SIZE,
-    FILE_NOTIFY_INFORMATION, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
-    FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES, INVALID_FILE_ATTRIBUTES, OPEN_EXISTING, READ_CONTROL,
-    SYNCHRONIZE, WRITE_DAC,
+    CreateFileW, GetFileAttributesW, ReadDirectoryChangesW, SetFileAttributesW,
+    FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_READONLY, FILE_BASIC_INFO,
+    FILE_FLAGS_AND_ATTRIBUTES, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OVERLAPPED, FILE_GENERIC_READ,
+    FILE_LIST_DIRECTORY, FILE_NOTIFY_CHANGE_ATTRIBUTES, FILE_NOTIFY_CHANGE_CREATION,
+    FILE_NOTIFY_CHANGE_DIR_NAME, FILE_NOTIFY_CHANGE_FILE_NAME, FILE_NOTIFY_CHANGE_LAST_WRITE,
+    FILE_NOTIFY_CHANGE_SIZE, FILE_NOTIFY_INFORMATION, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE,
+    FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES, INVALID_FILE_ATTRIBUTES,
+    OPEN_EXISTING, READ_CONTROL, SYNCHRONIZE, WRITE_DAC,
 };
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
-use windows::Win32::System::IO::{CancelIoEx, GetOverlappedResult, GetOverlappedResultEx, OVERLAPPED};
+use windows::Win32::System::IO::{
+    CancelIoEx, GetOverlappedResult, GetOverlappedResultEx, OVERLAPPED,
+};
 
 use crate::{
     lock, names, Drive, DriveError, Item, ItemId, Kind, LocalState, NewNode, Node, OsFace, SpaceId,
     SpaceMount, TrashBy, Version,
 };
 
-/// The first part of every sync root id, which Explorer groups a provider's roots by.
-const PROVIDER: &str = if cfg!(debug_assertions) { "MistyDev" } else { "Misty" };
-/// Misty's provider id, the same for every root (`IStorageProviderSyncRootInfo2.ProviderId`).
+const PROVIDER: &str = if cfg!(debug_assertions) {
+    "MistyDev"
+} else {
+    "Misty"
+};
 const PROVIDER_ID: GUID = GUID::from_u128(0x6d1f3c2a_9b4e_4f57_a0c8_3e5d7b2194f6);
-/// One `TRANSFER_DATA` call: a multiple of 4 KiB, as the platform requires of every chunk but the
-/// last.
 const CHUNK: usize = 1 << 20;
 const ALIGN: u64 = 4096;
-/// How long a local path stays quiet before Misty looks at it, so an app's save settles first.
 const QUIET: Duration = Duration::from_millis(1500);
-/// How often uploads that landed are looked for, besides each `changed`.
 const SETTLE_EVERY: Duration = Duration::from_secs(5);
 const MAX_IDENTITY: usize = CF_PLACEHOLDER_MAX_FILE_IDENTITY_LENGTH as usize;
-/// Windows' `ERROR_SHARING_VIOLATION` and `ERROR_LOCK_VIOLATION`.
 const SHARING: [i32; 2] = [32, 33];
 
-/// The face of every Space on this computer: one sync root each.
 pub struct CloudFilesFace {
     drive: Drive,
     roots: Mutex<HashMap<SpaceId, Arc<Root>>>,
@@ -131,12 +129,7 @@ impl CloudFilesFace {
         lock(&self.roots).get(space).cloned()
     }
 
-    /// Takes a Space's sync root away (the person left the Space): what is in sync leaves the
-    /// computer, the registration goes, and the folder goes once it is empty. A file changed here
-    /// and not uploaded, or one that stays on this computer alone, is left where it is. The drive
-    /// is unmounted first, so nothing answers callbacks any more.
     pub fn remove_sync_root(&self, mount: &SpaceMount) -> Result<(), DriveError> {
-        // Taken out first, so the face's lock isn't held while the watcher is joined.
         let root = lock(&self.roots).remove(&mount.space);
         if let Some(root) = root {
             root.shutdown();
@@ -172,7 +165,6 @@ impl OsFace for CloudFilesFace {
     }
 
     fn unmount(&self, space: &SpaceId) -> Result<(), DriveError> {
-        // The registration stays, so the files stay in Explorer until Misty connects again.
         let root = lock(&self.roots).remove(space);
         if let Some(root) = root {
             root.shutdown();
@@ -191,7 +183,6 @@ impl OsFace for CloudFilesFace {
             return Ok(());
         };
         if lock(&root.quiet_evict).contains(item) {
-            // Windows freed it already; the drive is only catching up.
             return Ok(());
         }
         let Some(path) = root.path_of(item) else {
@@ -210,9 +201,6 @@ impl OsFace for CloudFilesFace {
     }
 }
 
-// Win32 plumbing.
-
-/// An owned Win32 handle, closed when dropped.
 struct Owned(HANDLE);
 
 // SAFETY: a kernel handle may be used and closed from any thread.
@@ -247,12 +235,10 @@ fn gate(path: &Path, access: Access) -> Result<(), DriveError> {
     file_access::check(path, access).map_err(DriveError::io)
 }
 
-/// Opens a file or folder for its metadata and placeholder state, never its data, so it never
-/// fetches anything and works on a read-only file. `WRITE_DAC` is the right the Cloud Files calls
-/// that change a placeholder accept in place of `WRITE_DATA`.
 fn open_item(path: &Path) -> Result<Owned, DriveError> {
     gate(path, Access::Write)?;
-    let access = FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | READ_CONTROL | WRITE_DAC | SYNCHRONIZE;
+    let access =
+        FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | READ_CONTROL | WRITE_DAC | SYNCHRONIZE;
     // SAFETY: a NUL-terminated path that outlives the call; no security attributes or template.
     let handle = unsafe {
         CreateFileW(
@@ -269,8 +255,6 @@ fn open_item(path: &Path) -> Result<Owned, DriveError> {
     Ok(Owned(handle))
 }
 
-/// Whether nobody has the file open for writing now: an open that denies others writing succeeds
-/// only then. Used before reading an edit, so a save still under way isn't taken half done.
 fn nobody_writing(path: &Path) -> Result<bool, DriveError> {
     gate(path, Access::Read)?;
     // SAFETY: as in `open_item`.
@@ -291,11 +275,13 @@ fn nobody_writing(path: &Path) -> Result<bool, DriveError> {
             Ok(true)
         }
         Err(error) if is_sharing(&error) => Ok(false),
-        Err(error) => Err(face_error("Windows couldn't open a file in the drive", error)),
+        Err(error) => Err(face_error(
+            "Windows couldn't open a file in the drive",
+            error,
+        )),
     }
 }
 
-/// Milliseconds since 1970 as a FILETIME (100 ns since 1601).
 fn filetime(ms: i64) -> i64 {
     (ms.max(0) + 11_644_473_600_000) * 10_000
 }
@@ -306,8 +292,6 @@ fn ms_of(time: std::time::SystemTime) -> i64 {
         .unwrap_or(0)
 }
 
-/// Turns a file's read-only attribute on or off, keeping its in-sync mark: the in-sync policy
-/// tracks the attribute, and this change is Misty's own, not the person's.
 fn set_readonly(path: &Path, readonly: bool) {
     if gate(path, Access::Write).is_err() {
         return;
@@ -326,7 +310,10 @@ fn set_readonly(path: &Path, readonly: bool) {
     if wanted == attributes {
         return;
     }
-    let was_in_sync = placeholder(path).ok().flatten().is_some_and(|state| state.in_sync);
+    let was_in_sync = placeholder(path)
+        .ok()
+        .flatten()
+        .is_some_and(|state| state.in_sync);
     // SAFETY: as above.
     if unsafe { SetFileAttributesW(&wide, FILE_FLAGS_AND_ATTRIBUTES(wanted)) }.is_err() {
         return;
@@ -335,7 +322,12 @@ fn set_readonly(path: &Path, readonly: bool) {
         if let Ok(handle) = open_item(path) {
             // SAFETY: a handle opened above.
             unsafe {
-                let _ = CfSetInSyncState(handle.0, CF_IN_SYNC_STATE_IN_SYNC, CF_SET_IN_SYNC_FLAG_NONE, None);
+                let _ = CfSetInSyncState(
+                    handle.0,
+                    CF_IN_SYNC_STATE_IN_SYNC,
+                    CF_SET_IN_SYNC_FLAG_NONE,
+                    None,
+                );
             }
         }
     }
@@ -350,7 +342,6 @@ fn is_readonly(path: &Path) -> bool {
     attributes != INVALID_FILE_ATTRIBUTES && attributes & FILE_ATTRIBUTE_READONLY.0 != 0
 }
 
-/// The SID of the person Misty runs as, for the sync root's id.
 fn user_sid() -> Result<String, DriveError> {
     let failed = |error| face_error("Windows couldn't name the signed-in user", error);
     // SAFETY: the token handle is owned and closed by `Owned`; the buffer is as long as the size
@@ -380,15 +371,15 @@ fn user_sid() -> Result<String, DriveError> {
     }
 }
 
-/// `Misty!<SID>!<account id>.<space id>`, the form the shell asks a sync root's id to take.
 fn sync_root_id(mount: &SpaceMount) -> Result<String, DriveError> {
     if mount.domain.contains('!') {
-        return Err(DriveError::Invalid("That Space can't have a drive here.".to_owned()));
+        return Err(DriveError::Invalid(
+            "That Space can't have a drive here.".to_owned(),
+        ));
     }
     Ok(format!("{PROVIDER}!{}!{}", user_sid()?, mount.domain))
 }
 
-/// Registers (or updates) the Space's sync root with the filter and with Explorer.
 fn register(mount: &SpaceMount, id: &str) -> Result<(), DriveError> {
     gate(&mount.path, Access::Write)?;
     let failed = |error| face_error("Windows couldn't set up the drive", error);
@@ -400,7 +391,6 @@ fn register(mount: &SpaceMount, id: &str) -> Result<(), DriveError> {
     info.SetPath(&folder).map_err(failed)?;
     info.SetDisplayNameResource(&HSTRING::from(format!("Misty - {}", mount.mount_name)))
         .map_err(failed)?;
-    // Misty's own icon, the first in its executable. This reads no file; Explorer does, later.
     let icon = std::env::current_exe()
         .map(|exe| format!("{},0", exe.display()))
         .unwrap_or_default();
@@ -411,8 +401,6 @@ fn register(mount: &SpaceMount, id: &str) -> Result<(), DriveError> {
         .map_err(failed)?;
     info.SetPopulationPolicy(StorageProviderPopulationPolicy::AlwaysFull)
         .map_err(failed)?;
-    // Every attribute and time the WinRT policy names: `CF_INSYNC_POLICY_TRACK_ALL` as far as the
-    // shell spells it.
     let track_all = StorageProviderInSyncPolicy::FileCreationTime
         | StorageProviderInSyncPolicy::FileReadOnlyAttribute
         | StorageProviderInSyncPolicy::FileHiddenAttribute
@@ -429,17 +417,14 @@ fn register(mount: &SpaceMount, id: &str) -> Result<(), DriveError> {
     info.SetVersion(&HSTRING::from(env!("CARGO_PKG_VERSION")))
         .map_err(failed)?;
     info.SetShowSiblingsAsGroup(false).map_err(failed)?;
-    let context = CryptographicBuffer::CreateFromByteArray(mount.domain.as_bytes()).map_err(failed)?;
+    let context =
+        CryptographicBuffer::CreateFromByteArray(mount.domain.as_bytes()).map_err(failed)?;
     info.SetContext(&context).map_err(failed)?;
-    // Newer Windows versions only; older ones just don't offer them.
     let _ = info.SetAllowPinning(true);
     let _ = info.SetProviderId(PROVIDER_ID);
     StorageProviderSyncRootManager::Register(&info).map_err(failed)
 }
 
-// Identities and placeholder state.
-
-/// What a placeholder shows: the item, and the server version and content it was made from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Identity {
     id: ItemId,
@@ -464,7 +449,9 @@ impl Identity {
         format!(
             "{}\n{}\n{}",
             self.id,
-            self.version.map(|version| version.0.to_string()).unwrap_or_default(),
+            self.version
+                .map(|version| version.0.to_string())
+                .unwrap_or_default(),
             self.sha256.as_deref().unwrap_or_default()
         )
         .into_bytes()
@@ -477,8 +464,14 @@ impl Identity {
         if !ItemId::is_valid(id) {
             return None;
         }
-        let version = parts.next().and_then(|text| text.parse::<i64>().ok()).map(Version);
-        let sha256 = parts.next().filter(|text| !text.is_empty()).map(str::to_owned);
+        let version = parts
+            .next()
+            .and_then(|text| text.parse::<i64>().ok())
+            .map(Version);
+        let sha256 = parts
+            .next()
+            .filter(|text| !text.is_empty())
+            .map(str::to_owned);
         Some(Self {
             id: ItemId(id.to_owned()),
             version,
@@ -487,17 +480,14 @@ impl Identity {
     }
 }
 
-/// A placeholder's state, from `CfGetPlaceholderInfo`.
 #[derive(Clone, Debug)]
 struct Placeholder {
     identity: Option<Identity>,
     in_sync: bool,
     pin: CF_PIN_STATE,
-    /// Bytes of its content on this disk: 0 while it is online only.
     on_disk: i64,
 }
 
-/// The placeholder at `path`, or `None` when it is a plain file or folder.
 fn placeholder(path: &Path) -> Result<Option<Placeholder>, DriveError> {
     let handle = open_item(path)?;
     placeholder_of(&handle)
@@ -525,7 +515,8 @@ fn placeholder_of(handle: &Owned) -> Result<Option<Placeholder>, DriveError> {
     // in the same buffer, `FileIdentityLength` long (capped at what the buffer holds).
     let (info, identity) = unsafe {
         let info = &*(buffer.as_ptr() as *const CF_PLACEHOLDER_STANDARD_INFO);
-        let start = (buffer.as_ptr() as *const u8).add(offset_of!(CF_PLACEHOLDER_STANDARD_INFO, FileIdentity));
+        let start = (buffer.as_ptr() as *const u8)
+            .add(offset_of!(CF_PLACEHOLDER_STANDARD_INFO, FileIdentity));
         let length = (info.FileIdentityLength as usize).min(MAX_IDENTITY);
         (*info, std::slice::from_raw_parts(start, length).to_vec())
     };
@@ -541,12 +532,16 @@ fn set_in_sync(path: &Path) {
     if let Ok(handle) = open_item(path) {
         // SAFETY: a handle opened above.
         unsafe {
-            let _ = CfSetInSyncState(handle.0, CF_IN_SYNC_STATE_IN_SYNC, CF_SET_IN_SYNC_FLAG_NONE, None);
+            let _ = CfSetInSyncState(
+                handle.0,
+                CF_IN_SYNC_STATE_IN_SYNC,
+                CF_SET_IN_SYNC_FLAG_NONE,
+                None,
+            );
         }
     }
 }
 
-/// A placeholder's metadata from what the drive knows of it.
 fn fs_metadata(node: &Node) -> CF_FS_METADATA {
     let time = filetime(node.mtime_ms);
     let attributes = match node.kind {
@@ -561,12 +556,14 @@ fn fs_metadata(node: &Node) -> CF_FS_METADATA {
             ChangeTime: time,
             FileAttributes: attributes,
         },
-        FileSize: if node.kind == Kind::File { node.size as i64 } else { 0 },
+        FileSize: if node.kind == Kind::File {
+            node.size as i64
+        } else {
+            0
+        },
     }
 }
 
-/// `CfUpdatePlaceholder` on the file at `path`. A read-only file that refuses it gets its
-/// read-only attribute taken off for the call.
 fn update_placeholder(
     path: &Path,
     metadata: Option<&CF_FS_METADATA>,
@@ -575,8 +572,8 @@ fn update_placeholder(
 ) -> Result<(), DriveError> {
     let bytes = identity.bytes();
     let attempt = || -> Result<(), windows::core::Error> {
-        // E_FAIL when the gate or the open refuses: nothing to retry with the attribute off.
-        let handle = open_item(path).map_err(|_| windows::core::Error::from(HRESULT(0x8000_4005_u32 as i32)))?;
+        let handle = open_item(path)
+            .map_err(|_| windows::core::Error::from(HRESULT(0x8000_4005_u32 as i32)))?;
         // SAFETY: the handle, metadata and identity bytes outlive the call.
         unsafe {
             CfUpdatePlaceholder(
@@ -603,8 +600,6 @@ fn update_placeholder(
     result.map_err(|error| face_error("Windows couldn't update a file in the drive", error))
 }
 
-/// Deletes what under `path` is in sync with the server, keeping local edits and plain files and
-/// the folders that hold them. Used when the person leaves a Space; nothing answers callbacks then.
 fn remove_in_sync(path: &Path) -> bool {
     let Ok(meta) = file_access::fs::symlink_metadata(path) else {
         return true;
@@ -632,8 +627,6 @@ fn remove_in_sync(path: &Path) -> bool {
     }
 }
 
-// One mounted Space.
-
 enum Work {
     Changed(Vec<Item>),
     Path(PathBuf),
@@ -644,13 +637,10 @@ enum Work {
 enum OpenEvent {
     Opened(ItemId),
     Closed(ItemId),
-    /// A write was seen on an open file: its mark becomes an editing one.
     Editing(ItemId),
     Stop,
 }
 
-/// What a file looked like when its content was handed to the drive, to tell later whether it
-/// changed again before the upload landed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Fingerprint {
     size: u64,
@@ -658,14 +648,14 @@ struct Fingerprint {
 }
 
 fn fingerprint(path: &Path) -> Option<Fingerprint> {
-    file_access::fs::metadata(path).ok().map(|meta| Fingerprint {
-        size: meta.len(),
-        written: meta.last_write_time(),
-    })
+    file_access::fs::metadata(path)
+        .ok()
+        .map(|meta| Fingerprint {
+            size: meta.len(),
+            written: meta.last_write_time(),
+        })
 }
 
-/// An item whose content was handed to the drive; once it is up, its placeholder takes the new
-/// identity and is marked in sync.
 #[derive(Clone, Debug)]
 struct Pending {
     path: PathBuf,
@@ -674,12 +664,9 @@ struct Pending {
 
 enum Outcome {
     Done,
-    /// Busy (someone is still writing it, or it's locked): look again after the next quiet spell.
     Retry,
 }
 
-/// The key a callback's context carries, looked up here, so a callback that arrives after its
-/// root went never touches freed memory.
 static ROOTS: LazyLock<Mutex<HashMap<usize, Arc<Root>>>> = LazyLock::new(Default::default);
 static NEXT_KEY: AtomicUsize = AtomicUsize::new(1);
 
@@ -691,16 +678,10 @@ struct Root {
     pid: u32,
     connection: Mutex<Option<CF_CONNECTION_KEY>>,
     stop: AtomicBool,
-    /// Where each item's placeholder was last seen. Checked against the placeholder's identity
-    /// before anything acts on it, since a folder moved with everything in it.
     index: Mutex<HashMap<ItemId, PathBuf>>,
-    /// Items Misty itself is deleting or moving now: their callbacks are let through.
     own: Mutex<HashSet<ItemId>>,
-    /// Items whose delete waits for the server's answer.
     deleting: Mutex<HashSet<ItemId>>,
-    /// Items Windows just freed, so the drive's `remove_download` doesn't ask again.
     quiet_evict: Mutex<HashSet<ItemId>>,
-    /// Fetches under way, by transfer key, with their cancel flags.
     transfers: Mutex<HashMap<i64, Arc<AtomicBool>>>,
     pending: Mutex<HashMap<ItemId, Pending>>,
     work: Mutex<mpsc::Sender<Work>>,
@@ -755,9 +736,11 @@ impl Root {
         };
         *lock(&root.connection) = Some(connection);
 
-        drive
-            .runtime()
-            .spawn(opens_task(drive.clone(), mount.space.clone(), opens_receive));
+        drive.runtime().spawn(opens_task(
+            drive.clone(),
+            mount.space.clone(),
+            opens_receive,
+        ));
         std::thread::Builder::new()
             .name("misty-drive-hydrate".to_owned())
             .spawn(move || {
@@ -766,7 +749,8 @@ impl Root {
                         // SAFETY: a handle opened above; this fetches through Misty's own
                         // FETCH_DATA callback, on another thread.
                         unsafe {
-                            let _ = CfHydratePlaceholder(handle.0, 0, -1, CF_HYDRATE_FLAG_NONE, None);
+                            let _ =
+                                CfHydratePlaceholder(handle.0, 0, -1, CF_HYDRATE_FLAG_NONE, None);
                         }
                     }
                 }
@@ -810,7 +794,6 @@ impl Root {
         self.stop.load(Ordering::SeqCst)
     }
 
-    /// The path below the root, as its parts. `None` outside the root; empty for the root.
     fn relative(&self, path: &Path) -> Option<PathBuf> {
         let full = path.to_string_lossy();
         let root = self.path.to_string_lossy();
@@ -833,7 +816,6 @@ impl Root {
         names::local_path(&self.path, &node.path)
     }
 
-    /// Where an item's placeholder is: the last place it was seen, or where the drive puts it.
     fn path_of(&self, id: &ItemId) -> Option<PathBuf> {
         if let Some(path) = lock(&self.index).get(id).cloned() {
             if file_access::fs::exists(&path) {
@@ -847,7 +829,6 @@ impl Root {
             .map(|node| self.local_path(&node))
     }
 
-    /// Where `id`'s placeholder is, only if the one there really is it.
     fn indexed(&self, id: &ItemId) -> Option<PathBuf> {
         let path = lock(&self.index).get(id).cloned()?;
         let found = placeholder(&path).ok().flatten()?.identity?;
@@ -858,7 +839,6 @@ impl Root {
         lock(&self.index).insert(id.clone(), path.to_path_buf());
     }
 
-    /// Runs one of Misty's own deletes or moves of `id`, letting its callback through.
     fn as_own<T>(&self, id: &ItemId, work: impl FnOnce() -> T) -> T {
         lock(&self.own).insert(id.clone());
         let out = work();
@@ -869,8 +849,6 @@ impl Root {
     fn is_own(&self, id: &ItemId) -> bool {
         lock(&self.own).contains(id)
     }
-
-    // The worker: server changes, local changes, settling uploads.
 
     fn work_loop(self: Arc<Self>, receive: mpsc::Receiver<Work>) {
         self.reconcile_all();
@@ -898,7 +876,6 @@ impl Root {
                 .filter(|(_, at)| at.elapsed() >= QUIET)
                 .map(|(path, _)| path.clone())
                 .collect();
-            // Folders before what's in them.
             ready.sort_by_key(|path| path.components().count());
             for path in ready {
                 waiting.remove(&path);
@@ -913,16 +890,11 @@ impl Root {
         }
     }
 
-    /// Walks the whole root against `drive.db`.
     fn reconcile_all(&self) {
         let root = self.path.clone();
         self.reconcile_folder(None, &root);
     }
 
-    /// One folder against the drive's children of it, then its subfolders. Run at mount and
-    /// after the watcher lost events, it trusts what's here for what changed here: the drive's
-    /// records are what this face last showed, and the server's news arrives through `changed`.
-    /// A name the drive has and this folder lacks is made again rather than taken as deleted.
     fn reconcile_folder(&self, folder: Option<&ItemId>, dir: &Path) {
         if self.stopped() {
             return;
@@ -946,7 +918,6 @@ impl Root {
                     Err(_) => continue,
                 };
                 let Some(state) = state else {
-                    // Plain: new here, or local-only.
                     self.send(Work::Path(path));
                     continue;
                 };
@@ -962,7 +933,6 @@ impl Root {
                     None => self.drive.node(&self.space, &identity.id).ok().flatten(),
                 };
                 let Some(mut node) = node else {
-                    // Its item is gone. What's in sync goes with it; an edit is kept.
                     if state.in_sync {
                         self.remove_tree(&path);
                     } else {
@@ -971,7 +941,6 @@ impl Root {
                     continue;
                 };
                 if node.parent.as_ref() != folder || names::fold(&node.name) != names::fold(&name) {
-                    // Renamed or moved here while Misty was away.
                     match self.drive.rename(&self.space, &node.id, folder, &name) {
                         Ok(moved) => node = moved,
                         Err(_) => continue,
@@ -986,11 +955,9 @@ impl Root {
         let mut missing = Vec::new();
         for node in by_id.into_values() {
             if here.contains(&names::fold(&node.name)) {
-                // A plain file holds the name; handling it settles which item it is.
                 continue;
             }
             if node.state == LocalState::NotSynced {
-                // Something kept on this computer alone that isn't here any more.
                 let _ = self.drive.trash(&self.space, &node.id, TrashBy::Person);
                 continue;
             }
@@ -1007,7 +974,6 @@ impl Root {
         }
     }
 
-    /// Makes placeholders for `nodes` in `dir`, in one call.
     fn create_placeholders(&self, dir: &Path, nodes: &[Node]) {
         if nodes.is_empty() || gate(dir, Access::Write).is_err() {
             return;
@@ -1016,7 +982,10 @@ impl Root {
             .iter()
             .map(|node| node.name.encode_utf16().chain(std::iter::once(0)).collect())
             .collect();
-        let identities: Vec<Vec<u8>> = nodes.iter().map(|node| Identity::of(node).bytes()).collect();
+        let identities: Vec<Vec<u8>> = nodes
+            .iter()
+            .map(|node| Identity::of(node).bytes())
+            .collect();
         let mut infos: Vec<CF_PLACEHOLDER_CREATE_INFO> = nodes
             .iter()
             .enumerate()
@@ -1027,7 +996,6 @@ impl Root {
                         CF_PLACEHOLDER_CREATE_FLAG_MARK_IN_SYNC
                             | CF_PLACEHOLDER_CREATE_FLAG_DISABLE_ON_DEMAND_POPULATION
                     }
-                    // Content made here waits to go up: it isn't in sync until it has.
                     Kind::File if uploading => CF_PLACEHOLDER_CREATE_FLAG_NONE,
                     Kind::File => CF_PLACEHOLDER_CREATE_FLAG_MARK_IN_SYNC,
                 };
@@ -1072,8 +1040,6 @@ impl Root {
         }
     }
 
-    /// Brings an existing placeholder in line with the drive: its identity and content, its
-    /// pin, and no read-only mark.
     fn sync_placeholder(&self, path: &Path, node: &Node, state: &Placeholder) {
         let identity = Identity::of(node);
         match node.kind {
@@ -1097,16 +1063,17 @@ impl Root {
     fn update_file(&self, path: &Path, node: &Node, state: &Placeholder, identity: &Identity) {
         if state.identity.as_ref() == Some(identity) {
             if !state.in_sync && state.on_disk > 0 && !lock(&self.pending).contains_key(&node.id) {
-                // Changed here: the worker reads it.
                 self.send(Work::Path(path.to_path_buf()));
             } else if !state.in_sync && state.on_disk == 0 && node.state != LocalState::Uploading {
                 set_in_sync(path);
             }
             return;
         }
-        let shown = state.identity.as_ref().and_then(|shown| shown.sha256.clone());
+        let shown = state
+            .identity
+            .as_ref()
+            .and_then(|shown| shown.sha256.clone());
         if shown == identity.sha256 {
-            // Only the version moved (a rename elsewhere, say): the content shown is still right.
             let flags = if state.in_sync {
                 CF_UPDATE_FLAG_MARK_IN_SYNC
             } else {
@@ -1116,21 +1083,22 @@ impl Root {
             return;
         }
         if !state.in_sync || node.state == LocalState::Uploading {
-            // An edit here is on its way up; the drive settles it against the server's (merged,
-            // or the last save wins).
             if state.on_disk > 0 && !lock(&self.pending).contains_key(&node.id) {
                 self.send(Work::Path(path.to_path_buf()));
             }
             return;
         }
-        // New content from the server: the placeholder takes its size and identity and goes
-        // online-only; a pinned file is fetched again.
         let pinned = state.pin == CF_PIN_STATE_PINNED;
         if pinned {
             if let Ok(handle) = open_item(path) {
                 // SAFETY: a handle opened above.
                 unsafe {
-                    let _ = CfSetPinState(handle.0, CF_PIN_STATE_UNSPECIFIED, CF_SET_PIN_FLAG_NONE, None);
+                    let _ = CfSetPinState(
+                        handle.0,
+                        CF_PIN_STATE_UNSPECIFIED,
+                        CF_SET_PIN_FLAG_NONE,
+                        None,
+                    );
                 }
             }
         }
@@ -1145,7 +1113,8 @@ impl Root {
             if let Ok(handle) = open_item(path) {
                 // SAFETY: a handle opened above.
                 unsafe {
-                    let _ = CfSetPinState(handle.0, CF_PIN_STATE_PINNED, CF_SET_PIN_FLAG_NONE, None);
+                    let _ =
+                        CfSetPinState(handle.0, CF_PIN_STATE_PINNED, CF_SET_PIN_FLAG_NONE, None);
                 }
             }
             if updated.is_ok() {
@@ -1154,8 +1123,6 @@ impl Root {
         }
     }
 
-    /// The person's "Always keep on this device" and "Free up space" (the pin) into the drive,
-    /// and the drive's Keep downloaded onto a placeholder nobody pinned or unpinned yet.
     fn pins(&self, path: &Path, node: &Node, state: &Placeholder) {
         let Ok(Some(entry)) = self.drive.entry_by_id(&self.space, &node.id) else {
             return;
@@ -1179,7 +1146,12 @@ impl Root {
                 if let Ok(handle) = open_item(path) {
                     // SAFETY: a handle opened above.
                     unsafe {
-                        let _ = CfSetPinState(handle.0, CF_PIN_STATE_PINNED, CF_SET_PIN_FLAG_NONE, None);
+                        let _ = CfSetPinState(
+                            handle.0,
+                            CF_PIN_STATE_PINNED,
+                            CF_SET_PIN_FLAG_NONE,
+                            None,
+                        );
                     }
                 }
                 if node.kind == Kind::File && state.on_disk == 0 && node.size > 0 {
@@ -1190,13 +1162,15 @@ impl Root {
         }
     }
 
-    /// Deletes what under `path` is in sync, as Misty's own delete; keeps local edits.
     fn remove_tree(&self, path: &Path) -> bool {
         let Ok(meta) = file_access::fs::symlink_metadata(path) else {
             return true;
         };
         let state = placeholder(path).ok().flatten();
-        let id = state.as_ref().and_then(|state| state.identity.as_ref()).map(|identity| identity.id.clone());
+        let id = state
+            .as_ref()
+            .and_then(|state| state.identity.as_ref())
+            .map(|identity| identity.id.clone());
         if meta.is_dir() {
             let mut all = true;
             if let Ok(entries) = file_access::fs::read_dir(path) {
@@ -1235,7 +1209,6 @@ impl Root {
         removed.is_ok()
     }
 
-    /// Server changes that landed in `drive.db`.
     fn apply_server(&self, items: &[Item]) {
         for item in items {
             if self.stopped() {
@@ -1262,8 +1235,6 @@ impl Root {
         }
     }
 
-    /// Shows `node` at its place: moves its placeholder there, or makes one, then brings it in
-    /// line. Answers where it is.
     fn place(&self, node: &Node, depth: usize) -> Option<PathBuf> {
         if depth > 64 {
             return None;
@@ -1271,7 +1242,11 @@ impl Root {
         let expected = self.local_path(node);
         let parent_dir = expected.parent()?.to_path_buf();
         if !file_access::fs::is_dir(&parent_dir) {
-            let parent = self.drive.node(&self.space, node.parent.as_ref()?).ok().flatten()?;
+            let parent = self
+                .drive
+                .node(&self.space, node.parent.as_ref()?)
+                .ok()
+                .flatten()?;
             self.place(&parent, depth + 1)?;
         }
         let current = self.indexed(&node.id).or_else(|| {
@@ -1284,7 +1259,6 @@ impl Root {
                     .to_string_lossy()
                     .eq_ignore_ascii_case(&expected.to_string_lossy());
                 if !same_name && file_access::fs::exists(&expected) {
-                    // Something else holds the name here; the next walk settles it.
                     return None;
                 }
                 let moved = self.as_own(&node.id, || file_access::fs::rename(&current, &expected));
@@ -1311,8 +1285,6 @@ impl Root {
         Some(expected)
     }
 
-    /// Uploads that landed: their placeholders take the new identity and are marked in sync. A
-    /// file that changed again since is read again instead.
     fn settle(&self) {
         let waiting: Vec<(ItemId, Pending)> = lock(&self.pending)
             .iter()
@@ -1335,10 +1307,10 @@ impl Root {
                 self.send(Work::Path(path));
                 continue;
             }
-            let shown = crate::ignore::sha256_file(&path, |_| ()).ok().map(|(sha256, _)| sha256);
+            let shown = crate::ignore::sha256_file(&path, |_| ())
+                .ok()
+                .map(|(sha256, _)| sha256);
             if node.kind == Kind::File && shown.is_some() && shown != node.sha256 {
-                // The drive merged this edit with one made elsewhere: the file takes the merged
-                // content, fetched again.
                 let metadata = fs_metadata(&node);
                 let _ = update_placeholder(
                     &path,
@@ -1347,13 +1319,16 @@ impl Root {
                     CF_UPDATE_FLAG_DEHYDRATE | CF_UPDATE_FLAG_MARK_IN_SYNC,
                 );
             } else {
-                let _ = update_placeholder(&path, None, &Identity::of(&node), CF_UPDATE_FLAG_MARK_IN_SYNC);
+                let _ = update_placeholder(
+                    &path,
+                    None,
+                    &Identity::of(&node),
+                    CF_UPDATE_FLAG_MARK_IN_SYNC,
+                );
             }
             self.remember(&id, &path);
         }
     }
-
-    // Local changes.
 
     fn local_change(&self, path: &Path) -> Outcome {
         let Some(relative) = self.relative(path) else {
@@ -1368,8 +1343,6 @@ impl Root {
         let meta = match file_access::fs::symlink_metadata(path) {
             Ok(meta) => meta,
             Err(_) => {
-                // Gone. A placeholder's delete came through its callback; something kept on this
-                // computer alone just goes from the records.
                 if let Ok(Some(node)) = self.drive.node_at(&self.space, &drive_path) {
                     if node.state == LocalState::NotSynced {
                         let _ = self.drive.trash(&self.space, &node.id, TrashBy::Person);
@@ -1388,7 +1361,13 @@ impl Root {
         }
     }
 
-    fn placeholder_changed(&self, path: &Path, drive_path: &str, dir: bool, state: Placeholder) -> Outcome {
+    fn placeholder_changed(
+        &self,
+        path: &Path,
+        drive_path: &str,
+        dir: bool,
+        state: Placeholder,
+    ) -> Outcome {
         let Some(identity) = state.identity.clone() else {
             return Outcome::Done;
         };
@@ -1398,18 +1377,21 @@ impl Root {
         self.remember(&identity.id, path);
         let node = self.drive.node(&self.space, &identity.id).ok().flatten();
         let Some(node) = node else {
-            // Its item is gone. A placeholder moved onto another item's name now stands for it;
-            // an edit outlives its item as a new one.
             let other = self.drive.node_at(&self.space, drive_path).ok().flatten();
             return match other {
                 Some(other) if (other.kind == Kind::Folder) == dir => {
-                    if update_placeholder(path, None, &Identity::of(&other), CF_UPDATE_FLAG_NONE).is_err() {
+                    if update_placeholder(path, None, &Identity::of(&other), CF_UPDATE_FLAG_NONE)
+                        .is_err()
+                    {
                         return Outcome::Retry;
                     }
                     self.remember(&other.id, path);
                     match placeholder(path) {
                         Ok(Some(state))
-                            if state.identity.as_ref().is_some_and(|shown| shown.id == other.id) =>
+                            if state
+                                .identity
+                                .as_ref()
+                                .is_some_and(|shown| shown.id == other.id) =>
                         {
                             self.placeholder_changed(path, drive_path, dir, state)
                         }
@@ -1432,12 +1414,10 @@ impl Root {
         }
         if let Some(pending) = lock(&self.pending).get(&node.id) {
             if fingerprint(path) == pending.fingerprint {
-                // Still the content already handed over.
                 return Outcome::Done;
             }
         }
         if state.on_disk == 0 {
-            // Online only, so no content changed here: an attribute or time did.
             if !lock(&self.pending).contains_key(&node.id) {
                 set_in_sync(path);
             }
@@ -1446,7 +1426,6 @@ impl Root {
         self.upload_edit(path, &identity, &node)
     }
 
-    /// Hands an edited placeholder's content to the drive, against the version it was made from.
     fn upload_edit(&self, path: &Path, identity: &Identity, node: &Node) -> Outcome {
         match nobody_writing(path) {
             Ok(true) => {}
@@ -1455,12 +1434,15 @@ impl Root {
         }
         match crate::ignore::sha256_file(path, |_| ()) {
             Ok((sha256, _)) if Some(&sha256) == identity.sha256.as_ref() => {
-                // Written back unchanged.
                 set_in_sync(path);
                 return Outcome::Done;
             }
             Ok(_) => {}
-            Err(error) if error.raw_os_error().is_some_and(|code| SHARING.contains(&code)) => {
+            Err(error)
+                if error
+                    .raw_os_error()
+                    .is_some_and(|code| SHARING.contains(&code)) =>
+            {
                 return Outcome::Retry;
             }
             Err(_) => return Outcome::Done,
@@ -1468,7 +1450,10 @@ impl Root {
         let staged = self.drive.temp_path();
         if let Err(error) = file_access::fs::copy(path, &staged) {
             let _ = file_access::fs::remove_file(&staged);
-            return if error.raw_os_error().is_some_and(|code| SHARING.contains(&code)) {
+            return if error
+                .raw_os_error()
+                .is_some_and(|code| SHARING.contains(&code))
+            {
                 Outcome::Retry
             } else {
                 Outcome::Done
@@ -1480,11 +1465,17 @@ impl Root {
             .map(ms_of)
             .unwrap_or(0);
         let _ = self.opens.send(OpenEvent::Editing(node.id.clone()));
-        match self.drive.modify(&self.space, &node.id, identity.version, None, None, Some(staged.as_path()), mtime) {
+        match self.drive.modify(
+            &self.space,
+            &node.id,
+            identity.version,
+            None,
+            None,
+            Some(staged.as_path()),
+            mtime,
+        ) {
             Ok((now, refetch)) => {
                 if refetch {
-                    // The drive answered other content than this edit (merged with one made
-                    // elsewhere): this file shows the item's content.
                     let metadata = fs_metadata(&now);
                     let _ = update_placeholder(
                         path,
@@ -1514,7 +1505,6 @@ impl Root {
         }
     }
 
-    /// An edited placeholder whose item is gone: its content becomes a new item where it is.
     fn recreate(&self, path: &Path, drive_path: &str) -> Outcome {
         let Some(relative) = self.relative(path) else {
             return Outcome::Done;
@@ -1531,9 +1521,6 @@ impl Root {
         Outcome::Done
     }
 
-    /// Hands a file's content to the drive as a new item in `parent`. Answers the item and where
-    /// the file is now: moved to the item's name when the drive gave it another (a name a folder
-    /// already holds), or the existing file it was written into.
     fn new_file(&self, path: &Path, parent: Option<ItemId>, name: &str) -> Option<(Node, PathBuf)> {
         if !matches!(nobody_writing(path), Ok(true)) {
             return None;
@@ -1569,7 +1556,6 @@ impl Root {
         };
         let at = self.local_path(&node);
         let path = if at != path {
-            // Not a placeholder yet, so no callback: a plain rename.
             match file_access::fs::rename(path, &at) {
                 Ok(()) => at,
                 Err(_) => path.to_path_buf(),
@@ -1590,8 +1576,6 @@ impl Root {
         Some((node, path))
     }
 
-    /// A file or folder that isn't a placeholder: new here, the local file of a drive item that
-    /// has none yet, or something kept on this computer alone.
     fn plain_changed(&self, path: &Path, relative: &Path, drive_path: &str, dir: bool) -> Outcome {
         if let Ok(Some(node)) = self.drive.node_at(&self.space, drive_path) {
             return match (node.kind, dir) {
@@ -1640,7 +1624,9 @@ impl Root {
             } else {
                 path.to_path_buf()
             };
-            if node.state != LocalState::NotSynced && self.convert(&path, &Identity::of(&node), true).is_err() {
+            if node.state != LocalState::NotSynced
+                && self.convert(&path, &Identity::of(&node), true).is_err()
+            {
                 return Outcome::Retry;
             }
             self.remember(&node.id, &path);
@@ -1660,8 +1646,6 @@ impl Root {
         Outcome::Done
     }
 
-    /// A plain file standing where a drive item is: its content becomes the item's, and it
-    /// becomes the item's placeholder. One kept on this computer alone stays plain.
     fn adopt_file(&self, path: &Path, node: &Node) -> Outcome {
         if !matches!(nobody_writing(path), Ok(true)) {
             return Outcome::Retry;
@@ -1681,7 +1665,15 @@ impl Root {
                 .and_then(|meta| meta.modified())
                 .map(ms_of)
                 .unwrap_or(0);
-            match self.drive.modify(&self.space, &node.id, node.version, None, None, Some(staged.as_path()), mtime) {
+            match self.drive.modify(
+                &self.space,
+                &node.id,
+                node.version,
+                None,
+                None,
+                Some(staged.as_path()),
+                mtime,
+            ) {
                 Ok((changed, refetch)) => {
                     now = changed;
                     lost = refetch;
@@ -1706,11 +1698,13 @@ impl Root {
                 },
             );
         }
-        if self.convert(path, &Identity::of(&now), in_sync || lost).is_err() {
+        if self
+            .convert(path, &Identity::of(&now), in_sync || lost)
+            .is_err()
+        {
             return Outcome::Retry;
         }
         if lost {
-            // The drive answered other content than this file's (a merge); it shows the item's.
             lock(&self.pending).remove(&now.id);
             let metadata = fs_metadata(&now);
             let _ = update_placeholder(
@@ -1723,8 +1717,6 @@ impl Root {
         Outcome::Done
     }
 
-    /// The drive folder at `relative` (empty: the root), made from the local folder first when
-    /// the drive doesn't have it yet.
     fn ensure_folder(&self, relative: &Path) -> Result<Option<ItemId>, Outcome> {
         if relative.as_os_str().is_empty() {
             return Ok(None);
@@ -1758,7 +1750,6 @@ impl Root {
             )
             .map_err(|_| Outcome::Retry)?;
         let identity = Identity::of(&made);
-        // A plain folder is converted; one whose old item is gone takes the new identity.
         match placeholder(&local) {
             Ok(Some(_)) => {
                 let _ = update_placeholder(&local, None, &identity, CF_UPDATE_FLAG_MARK_IN_SYNC);
@@ -1772,7 +1763,6 @@ impl Root {
         Ok(Some(made.id))
     }
 
-    /// Queues everything in a folder that just became the drive's.
     fn scan_new(&self, dir: &Path) {
         if let Ok(entries) = file_access::fs::read_dir(dir) {
             for entry in entries.flatten() {
@@ -1791,17 +1781,20 @@ impl Root {
         };
         // SAFETY: the handle and identity bytes outlive the call; no overlapped I/O.
         let converted = unsafe {
-            CfConvertToPlaceholder(handle.0, Some(bytes.as_ptr().cast()), bytes.len() as u32, flags, None, None)
+            CfConvertToPlaceholder(
+                handle.0,
+                Some(bytes.as_ptr().cast()),
+                bytes.len() as u32,
+                flags,
+                None,
+                None,
+            )
         };
         converted.map_err(|error| face_error("Windows couldn't add a file to the drive", error))?;
         self.remember(&identity.id, path);
         Ok(())
     }
 
-    // The watcher.
-
-    /// Watches the whole root with `ReadDirectoryChangesW`, handing each changed path to the
-    /// worker. Overlapped, so it can look at the stop flag twice a second.
     fn watch(self: Arc<Self>) {
         if gate(&self.path, Access::Read).is_err() {
             return;
@@ -1828,7 +1821,6 @@ impl Root {
             | FILE_NOTIFY_CHANGE_LAST_WRITE
             | FILE_NOTIFY_CHANGE_CREATION
             | FILE_NOTIFY_CHANGE_ATTRIBUTES;
-        // DWORD-aligned, as the API needs.
         let mut buffer = vec![0u32; 64 * 1024 / 4];
         while !self.stopped() {
             // SAFETY: all zeroes is an idle OVERLAPPED.
@@ -1853,7 +1845,8 @@ impl Root {
             let mut got = 0u32;
             let finished = loop {
                 // SAFETY: the operation started above, on this handle and OVERLAPPED.
-                let waited = unsafe { GetOverlappedResultEx(handle.0, &overlapped, &mut got, 500, false) };
+                let waited =
+                    unsafe { GetOverlappedResultEx(handle.0, &overlapped, &mut got, 500, false) };
                 match waited {
                     Ok(()) => break true,
                     Err(error) if is_win32(&error, WIN32_ERROR(WAIT_TIMEOUT.0)) => {
@@ -1875,7 +1868,6 @@ impl Root {
                 return;
             }
             if got == 0 {
-                // More changed than the buffer held: walk everything.
                 self.send(Work::Rescan);
                 continue;
             }
@@ -1890,9 +1882,15 @@ impl Root {
                 // of UTF-16 right after the record's fixed part.
                 let (next, name) = unsafe {
                     let record = &*(bytes.0.add(offset) as *const FILE_NOTIFY_INFORMATION);
-                    let start = bytes.0.add(offset + offset_of!(FILE_NOTIFY_INFORMATION, FileName)) as *const u16;
-                    let length = (record.FileNameLength as usize / 2)
-                        .min((bytes.1.saturating_sub(offset + offset_of!(FILE_NOTIFY_INFORMATION, FileName))) / 2);
+                    let start = bytes
+                        .0
+                        .add(offset + offset_of!(FILE_NOTIFY_INFORMATION, FileName))
+                        as *const u16;
+                    let length = (record.FileNameLength as usize / 2).min(
+                        (bytes.1.saturating_sub(
+                            offset + offset_of!(FILE_NOTIFY_INFORMATION, FileName),
+                        )) / 2,
+                    );
                     let name = OsString::from_wide(std::slice::from_raw_parts(start, length));
                     (record.NextEntryOffset as usize, name)
                 };
@@ -1909,9 +1907,6 @@ impl Root {
     }
 }
 
-/// Opens and closes, in the order Windows reported them, as in-use marks: the first open of an
-/// item marks it, the last close lets it go, and a write seen while it is open turns the mark
-/// into an editing one.
 async fn opens_task(
     drive: Drive,
     space: SpaceId,
@@ -1960,10 +1955,6 @@ async fn opens_task(
     }
 }
 
-// Callbacks. Windows calls these on its own threads; each finds its root by the context key,
-// copies what it needs out of the callback's memory, and answers through `CfExecute`, at once or
-// from a task once the drive has answered. A panic stops at the boundary.
-
 type Callback = unsafe extern "system" fn(*const CF_CALLBACK_INFO, *const CF_CALLBACK_PARAMETERS);
 
 const fn entry(kind: CF_CALLBACK_TYPE, callback: Callback) -> CF_CALLBACK_REGISTRATION {
@@ -1976,19 +1967,27 @@ const fn entry(kind: CF_CALLBACK_TYPE, callback: Callback) -> CF_CALLBACK_REGIST
 static CALLBACKS: [CF_CALLBACK_REGISTRATION; 9] = [
     entry(CF_CALLBACK_TYPE_FETCH_DATA, on_fetch_data),
     entry(CF_CALLBACK_TYPE_CANCEL_FETCH_DATA, on_cancel_fetch_data),
-    entry(CF_CALLBACK_TYPE_NOTIFY_FILE_OPEN_COMPLETION, on_open_completion),
-    entry(CF_CALLBACK_TYPE_NOTIFY_FILE_CLOSE_COMPLETION, on_close_completion),
+    entry(
+        CF_CALLBACK_TYPE_NOTIFY_FILE_OPEN_COMPLETION,
+        on_open_completion,
+    ),
+    entry(
+        CF_CALLBACK_TYPE_NOTIFY_FILE_CLOSE_COMPLETION,
+        on_close_completion,
+    ),
     entry(CF_CALLBACK_TYPE_NOTIFY_DELETE, on_delete),
     entry(CF_CALLBACK_TYPE_NOTIFY_RENAME, on_rename),
     entry(CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE, on_dehydrate),
-    entry(CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE_COMPLETION, on_dehydrate_completion),
+    entry(
+        CF_CALLBACK_TYPE_NOTIFY_DEHYDRATE_COMPLETION,
+        on_dehydrate_completion,
+    ),
     CF_CALLBACK_REGISTRATION {
         Type: CF_CALLBACK_TYPE_NONE,
         Callback: None,
     },
 ];
 
-/// What an answer to a callback needs, copied out of it.
 #[derive(Clone, Copy)]
 struct Request {
     connection: CF_CONNECTION_KEY,
@@ -2018,12 +2017,17 @@ impl Request {
     }
 }
 
-/// `CF_SIZE_OF_OP_PARAM`: the union's offset plus the one member used.
 fn param_size<T>() -> u32 {
     (offset_of!(CF_OPERATION_PARAMETERS, Anonymous) + size_of::<T>()) as u32
 }
 
-fn transfer(request: &Request, buffer: *const c_void, offset: i64, length: i64, status: NTSTATUS) -> windows::core::Result<()> {
+fn transfer(
+    request: &Request,
+    buffer: *const c_void,
+    offset: i64,
+    length: i64,
+    status: NTSTATUS,
+) -> windows::core::Result<()> {
     let info = request.info(CF_OPERATION_TYPE_TRANSFER_DATA);
     let mut params = CF_OPERATION_PARAMETERS {
         ParamSize: param_size::<CF_OPERATION_PARAMETERS_0_0>(),
@@ -2119,7 +2123,6 @@ fn from_own_process(root: &Root, info: &CF_CALLBACK_INFO) -> bool {
     unsafe { (*info.ProcessInfo).ProcessId == root.pid }
 }
 
-/// A path a callback names: whole (`C:\…`), or from the volume's root, joined to its drive.
 fn callback_path(info: &CF_CALLBACK_INFO, text: PCWSTR) -> Option<PathBuf> {
     if text.is_null() {
         return None;
@@ -2138,19 +2141,29 @@ fn callback_path(info: &CF_CALLBACK_INFO, text: PCWSTR) -> Option<PathBuf> {
         // SAFETY: as above.
         String::from_utf16(unsafe { info.VolumeDosName.as_wide() }).ok()?
     };
-    Some(PathBuf::from(format!("{}{}", drive.trim_end_matches('\\'), text)))
+    Some(PathBuf::from(format!(
+        "{}{}",
+        drive.trim_end_matches('\\'),
+        text
+    )))
 }
 
 fn guarded(work: impl FnOnce()) {
     let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(work));
 }
 
-unsafe extern "system" fn on_fetch_data(info: *const CF_CALLBACK_INFO, params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_fetch_data(
+    info: *const CF_CALLBACK_INFO,
+    params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: Windows passes valid structs for the callback's duration.
     guarded(|| unsafe { fetch_data(&*info, &*params) });
 }
 
-unsafe extern "system" fn on_cancel_fetch_data(info: *const CF_CALLBACK_INFO, _params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_cancel_fetch_data(
+    info: *const CF_CALLBACK_INFO,
+    _params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: as above.
     guarded(|| unsafe {
         let info = &*info;
@@ -2162,7 +2175,10 @@ unsafe extern "system" fn on_cancel_fetch_data(info: *const CF_CALLBACK_INFO, _p
     });
 }
 
-unsafe extern "system" fn on_open_completion(info: *const CF_CALLBACK_INFO, params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_open_completion(
+    info: *const CF_CALLBACK_INFO,
+    params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: as above.
     guarded(|| unsafe {
         let (info, params) = (&*info, &*params);
@@ -2176,24 +2192,38 @@ unsafe extern "system" fn on_open_completion(info: *const CF_CALLBACK_INFO, para
     });
 }
 
-unsafe extern "system" fn on_close_completion(info: *const CF_CALLBACK_INFO, _params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_close_completion(
+    info: *const CF_CALLBACK_INFO,
+    _params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: as above.
     guarded(|| unsafe { open_event(&*info, OpenEvent::Closed) });
 }
 
-unsafe extern "system" fn on_delete(info: *const CF_CALLBACK_INFO, params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_delete(
+    info: *const CF_CALLBACK_INFO,
+    params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: as above.
     guarded(|| unsafe {
         let (info, params) = (&*info, &*params);
         let request = Request::of(info);
-        if params.Anonymous.Delete.Flags.contains(CF_CALLBACK_DELETE_FLAG_IS_UNDELETE) {
+        if params
+            .Anonymous
+            .Delete
+            .Flags
+            .contains(CF_CALLBACK_DELETE_FLAG_IS_UNDELETE)
+        {
             return ack_delete(&request, STATUS_SUCCESS);
         }
         trash(info, request, ack_delete);
     });
 }
 
-unsafe extern "system" fn on_rename(info: *const CF_CALLBACK_INFO, params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_rename(
+    info: *const CF_CALLBACK_INFO,
+    params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: as above.
     guarded(|| unsafe {
         let (info, params) = (&*info, &*params);
@@ -2203,7 +2233,10 @@ unsafe extern "system" fn on_rename(info: *const CF_CALLBACK_INFO, params: *cons
     });
 }
 
-unsafe extern "system" fn on_dehydrate(info: *const CF_CALLBACK_INFO, _params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_dehydrate(
+    info: *const CF_CALLBACK_INFO,
+    _params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: as above.
     guarded(|| unsafe {
         let info = &*info;
@@ -2214,17 +2247,27 @@ unsafe extern "system" fn on_dehydrate(info: *const CF_CALLBACK_INFO, _params: *
             (None, _) => false,
             (_, None) => true,
         };
-        let status = if allowed { STATUS_SUCCESS } else { STATUS_CLOUD_FILE_IN_USE };
+        let status = if allowed {
+            STATUS_SUCCESS
+        } else {
+            STATUS_CLOUD_FILE_IN_USE
+        };
         ack_dehydrate(&request, status, &bytes);
     });
 }
 
-unsafe extern "system" fn on_dehydrate_completion(info: *const CF_CALLBACK_INFO, params: *const CF_CALLBACK_PARAMETERS) {
+unsafe extern "system" fn on_dehydrate_completion(
+    info: *const CF_CALLBACK_INFO,
+    params: *const CF_CALLBACK_PARAMETERS,
+) {
     // SAFETY: as above.
     guarded(|| unsafe {
         let (info, params) = (&*info, &*params);
         let done = params.Anonymous.DehydrateCompletion;
-        if !done.Flags.contains(CF_CALLBACK_DEHYDRATE_COMPLETION_FLAG_DEHYDRATED) {
+        if !done
+            .Flags
+            .contains(CF_CALLBACK_DEHYDRATE_COMPLETION_FLAG_DEHYDRATED)
+        {
             return;
         }
         let (Some(root), Some(identity)) = (root_of(info), identity_of(info)) else {
@@ -2233,22 +2276,16 @@ unsafe extern "system" fn on_dehydrate_completion(info: *const CF_CALLBACK_INFO,
         let Ok(Some(node)) = root.drive.node(&root.space, &identity.id) else {
             return;
         };
-        // "Free up space", or Windows making room: the drive forgets the download (and the
-        // pin), without asking Windows to free it again.
         lock(&root.quiet_evict).insert(identity.id.clone());
         let _ = root.drive.remove_download(&root.space, &node.path);
         lock(&root.quiet_evict).remove(&identity.id);
     });
 }
 
-/// A file may go online-only unless it has changes not uploaded, stays on this computer alone,
-/// or is open.
 fn may_free(root: &Root, id: &ItemId) -> bool {
     let Ok(Some(entry)) = root.drive.entry_by_id(&root.space, id) else {
         return true;
     };
-    // Only the person's own opens keep the content here: someone else having it open elsewhere
-    // is a shared mark, never a reason this computer can't free its copy.
     !entry.in_use.iter().any(|mark| mark.you)
         && !matches!(entry.state, LocalState::Uploading | LocalState::NotSynced)
         && !lock(&root.pending).contains_key(id)
@@ -2258,7 +2295,6 @@ fn open_event(info: &CF_CALLBACK_INFO, event: fn(ItemId) -> OpenEvent) {
     let Some(root) = root_of(info) else {
         return;
     };
-    // Misty's own handles (this face's, its previews') carry their own marks.
     if from_own_process(&root, info) {
         return;
     }
@@ -2297,11 +2333,11 @@ fn fetch_data(info: &CF_CALLBACK_INFO, params: &CF_CALLBACK_PARAMETERS) {
         unsafe {
             let _ = CfReportProviderProgress(request.connection, request.transfer, size, 0);
         }
-        // Fetched into a file of this face's own, so a cache eviction can't take it mid-way.
         let staged = root.drive.temp_path();
-        let fetched = root.drive.fetch_to(&root.space, &identity.id, &staged).await;
-        // The content handed over has to be the one the placeholder shows: its size, and its
-        // SHA-256 when the placeholder names one (the drive checked the download against it).
+        let fetched = root
+            .drive
+            .fetch_to(&root.space, &identity.id, &staged)
+            .await;
         let shown = |node: &Node| {
             node.size as i64 == size
                 && (identity.sha256.is_none() || node.sha256 == identity.sha256)
@@ -2314,9 +2350,7 @@ fn fetch_data(info: &CF_CALLBACK_INFO, params: &CF_CALLBACK_PARAMETERS) {
                     .await
                     .unwrap_or(Err(Some(STATUS_CLOUD_FILE_UNSUCCESSFUL)))
             }
-            // The server's content changed since the placeholder was made; it is updated next.
             Ok(_) => Err(Some(STATUS_CLOUD_FILE_NOT_IN_SYNC)),
-            // `Offline`, or the server's own "unreachable" (`ApiError::Offline`).
             Err(error) if error.code() == "server_unreachable" => {
                 Err(Some(STATUS_CLOUD_FILE_NETWORK_UNAVAILABLE))
             }
@@ -2332,9 +2366,13 @@ fn fetch_data(info: &CF_CALLBACK_INFO, params: &CF_CALLBACK_PARAMETERS) {
     });
 }
 
-/// Hands a fetched file to Windows from the 4 KiB boundary at or before `offset` to its end, in
-/// `CHUNK`s. `Err(None)` when Windows cancelled the fetch, so nothing more is said.
-fn send_file(request: &Request, path: &Path, offset: i64, size: i64, cancelled: &AtomicBool) -> Result<(), Option<NTSTATUS>> {
+fn send_file(
+    request: &Request,
+    path: &Path,
+    offset: i64,
+    size: i64,
+    cancelled: &AtomicBool,
+) -> Result<(), Option<NTSTATUS>> {
     let failed = Some(STATUS_CLOUD_FILE_UNSUCCESSFUL);
     let mut file = file_access::fs::File::open(path).map_err(|_| failed)?;
     let end = size.max(0) as u64;
@@ -2347,7 +2385,14 @@ fn send_file(request: &Request, path: &Path, offset: i64, size: i64, cancelled: 
         }
         let want = ((end - at) as usize).min(CHUNK);
         file.read_exact(&mut buffer[..want]).map_err(|_| failed)?;
-        transfer(request, buffer.as_ptr().cast(), at as i64, want as i64, STATUS_SUCCESS).map_err(|_| None)?;
+        transfer(
+            request,
+            buffer.as_ptr().cast(),
+            at as i64,
+            want as i64,
+            STATUS_SUCCESS,
+        )
+        .map_err(|_| None)?;
         at += want as u64;
         // SAFETY: the connection and transfer the fetch named.
         unsafe {
@@ -2357,10 +2402,6 @@ fn send_file(request: &Request, path: &Path, offset: i64, size: i64, cancelled: 
     Ok(())
 }
 
-/// A delete, or a move out of the root: the item goes to the Space's trash once the server
-/// agrees. Refused (Windows keeps the file) when someone has it open; let
-/// through when offline, since the trash move waits in `drive.db` and anything refused later
-/// comes back.
 fn trash(info: &CF_CALLBACK_INFO, request: Request, ack: fn(&Request, NTSTATUS)) {
     let Some(root) = root_of(info) else {
         return ack(&request, STATUS_SUCCESS);
@@ -2386,10 +2427,8 @@ fn trash(info: &CF_CALLBACK_INFO, request: Request, ack: fn(&Request, NTSTATUS))
             .await;
         let status = match result {
             Err(DriveError::InUse(_)) => STATUS_CLOUD_FILE_IN_USE,
-            // The delete guard stopped a run of deletes: the file stays.
             Err(DriveError::Held(_)) => STATUS_CLOUD_FILE_UNSUCCESSFUL,
             Err(DriveError::Changed) => STATUS_CLOUD_FILE_NOT_IN_SYNC,
-            // The server refused for another reason and the item came back.
             Err(DriveError::Invalid(_)) => STATUS_CLOUD_FILE_UNSUCCESSFUL,
             _ => STATUS_SUCCESS,
         };
@@ -2416,18 +2455,19 @@ fn rename_item(info: &CF_CALLBACK_INFO, flags: CF_CALLBACK_RENAME_FLAGS, target:
     let inside = flags.contains(CF_CALLBACK_RENAME_FLAG_TARGET_IN_SCOPE);
     let relative = target.as_deref().and_then(|target| root.relative(target));
     let (Some(target), Some(relative), true) = (target.clone(), relative, inside) else {
-        // Out of the drive, the Recycle Bin included: a trash move.
         return trash(info, request, ack_rename);
     };
-    let Some(name) = relative.file_name().and_then(|name| name.to_str()).map(str::to_owned) else {
+    let Some(name) = relative
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_owned)
+    else {
         return ack_rename(&request, STATUS_CLOUD_FILE_UNSUCCESSFUL);
     };
     let folder = match root.ensure_folder(relative.parent().unwrap_or(Path::new(""))) {
         Ok(folder) => folder,
         Err(_) => return ack_rename(&request, STATUS_CLOUD_FILE_UNSUCCESSFUL),
     };
-    // Moving onto another file's name keeps that file as the item (a save over it): the
-    // placeholder being moved takes its identity, and the one it replaces may go.
     let replaced = root
         .drive
         .lookup(&root.space, folder.as_ref(), &name)
@@ -2437,11 +2477,19 @@ fn rename_item(info: &CF_CALLBACK_INFO, flags: CF_CALLBACK_RENAME_FLAGS, target:
     if let Some(other) = &replaced {
         lock(&root.own).insert(other.id.clone());
     }
-    let status = match root.drive.rename(&root.space, &identity.id, folder.as_ref(), &name) {
+    let status = match root
+        .drive
+        .rename(&root.space, &identity.id, folder.as_ref(), &name)
+    {
         Ok(node) => {
             if let Some(source) = callback_path(info, info.NormalizedPath) {
                 if node.id != identity.id {
-                    let _ = update_placeholder(&source, None, &Identity::of(&node), CF_UPDATE_FLAG_NONE);
+                    let _ = update_placeholder(
+                        &source,
+                        None,
+                        &Identity::of(&node),
+                        CF_UPDATE_FLAG_NONE,
+                    );
                     lock(&root.index).remove(&identity.id);
                 }
             }
@@ -2454,7 +2502,6 @@ fn rename_item(info: &CF_CALLBACK_INFO, flags: CF_CALLBACK_RENAME_FLAGS, target:
     };
     ack_rename(&request, status);
     if let Some(other) = replaced {
-        // Let the replaced placeholder's delete through, then stop letting it.
         let root = root.clone();
         let id = other.id;
         std::thread::spawn(move || {

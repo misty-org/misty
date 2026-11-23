@@ -1,9 +1,3 @@
-//! Copy, Cut and Paste of files on the system's own clipboard, so a copy in Files pastes in Finder
-//! or Explorer and the other way round. The platform code is the chat's file panel's
-//! (`project/files/clipboard.rs`). macOS's clipboard has no "cut", so Files keeps that beside the
-//! paths it wrote and trusts it only while the clipboard still holds that write (its change count
-//! hasn't moved). Where the system has no file clipboard Misty can reach (Linux), the paths are
-//! kept here alone.
 use std::sync::{LazyLock, Mutex};
 
 use file_access::disk::fs_disk;
@@ -19,8 +13,6 @@ pub struct ClipboardFiles {
     pub cut: bool,
 }
 
-/// The last write from Files: its paths, whether they were cut, and the clipboard's change count
-/// right after it.
 struct Written {
     paths: Vec<String>,
     cut: bool,
@@ -30,10 +22,11 @@ struct Written {
 static WRITTEN: LazyLock<Mutex<Option<Written>>> = LazyLock::new(Mutex::default);
 
 fn written() -> std::sync::MutexGuard<'static, Option<Written>> {
-    WRITTEN.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    WRITTEN
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Puts the items on the clipboard. Items that aren't there are left off.
 #[tauri::command]
 pub async fn files_clipboard_set(
     app: tauri::AppHandle,
@@ -52,7 +45,6 @@ pub async fn files_clipboard_set(
     if kept.is_empty() {
         return Err("Nothing to copy.".into());
     }
-    // Linux has no file clipboard Misty can reach; Files then keeps the paths here alone.
     let change_count = system::write_checked_paths_on_main_thread(&app, kept.clone())
         .await
         .unwrap_or(None);
@@ -64,7 +56,6 @@ pub async fn files_clipboard_set(
     Ok(())
 }
 
-/// The files on the clipboard, and whether Files cut them.
 #[tauri::command]
 pub async fn files_clipboard(
     app: tauri::AppHandle,

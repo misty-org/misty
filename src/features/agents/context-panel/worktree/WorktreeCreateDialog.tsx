@@ -17,7 +17,7 @@ import {
   Switch,
   Text,
 } from "@misty/ui";
-import { currentSpaceKey } from "../../engines/enginesApi";
+import { currentSpaceKey } from "../../engines/engines_api";
 import { BranchCombobox } from "./BranchCombobox";
 import {
   defaultBaseRef,
@@ -26,14 +26,14 @@ import {
   parsePrInput,
   randomBranchSuffix,
   suggestPrBranch,
-} from "./prInput";
+} from "./pr_input";
 import {
   worktreeApi,
   type PrPreview,
   type WorktreeCreateArgs,
   type WorktreeListing,
-} from "./worktreeApi";
-import { useWorktreeStore } from "./worktreeStore";
+} from "./worktree_api";
+import { useWorktreeStore } from "./worktree_store";
 
 type SourceTab = "new" | "existing" | "pr";
 
@@ -45,16 +45,12 @@ const resolveErrorText: Record<ResolveError, string> = {
   invalidPrInput: "That isn't a pull request number or GitHub link",
 };
 
-/** The pull request tab's preview: asked for a moment after typing stops, and again once the
- * title arrives (the branch name takes its words). A key stops the loop once it settles. */
 function usePrPreview(tab: SourceTab, folder: string, prNumber: number | null, prInput: string) {
   const [preview, setPreview] = useState<PrPreview | null>(null);
   const [resolving, setResolving] = useState(false);
   const [resolveError, setResolveError] = useState<ResolveError | null>(null);
   const seq = useRef(0);
   const lastKey = useRef("");
-  // The suggested branch carries three random digits, kept while the number stays the same, or
-  // every render would make a new name and the preview would chase it.
   const [suffix, setSuffix] = useState(() => ({ pr: prNumber, value: randomBranchSuffix() }));
   if (suffix.pr !== prNumber) setSuffix({ pr: prNumber, value: randomBranchSuffix() });
   const branchSuffix = suffix.value;
@@ -100,14 +96,11 @@ function usePrPreview(tab: SourceTab, folder: string, prNumber: number | null, p
         });
     }, 400);
     return () => window.clearTimeout(timer);
-    // The title takes part in the branch name, so a late title asks once more.
   }, [tab, folder, prNumber, prInput, preview?.title, branchSuffix]);
   const suggestedBranch = prNumber ? suggestPrBranch(prNumber, preview?.title, branchSuffix) : "";
   return { preview, resolving, resolveError, suggestedBranch };
 }
 
-/** What is wrong with the choice so far, under the field it is about. `flush` drops the pull
- * back toward the field above, inside the pull request's card. */
 function Alert({ flush = false, children }: { flush?: boolean; children: ReactNode }) {
   return (
     <Text wrap size="caption" tone="failed" role="alert" className={flush ? undefined : "-mt-1.5"}>
@@ -116,7 +109,6 @@ function Alert({ flush = false, children }: { flush?: boolean; children: ReactNo
   );
 }
 
-/** A pull request's title, state, author and size, and anything in the way. */
 function PrPreviewCard({
   preview,
   branch,
@@ -136,7 +128,6 @@ function PrPreviewCard({
         <>
           <Text bare as="p" size="meta" tone="bright" className="flex min-w-0 items-center gap-2">
             <Text className="flex-1">{preview.title}</Text>
-            {/* A pull request's state is its own mark: merged in violet, closed in red. */}
             {preview.state === "MERGED" ? (
               <Badge tone="violet" data-state="merged">
                 Merged
@@ -163,11 +154,6 @@ function PrPreviewCard({
   );
 }
 
-/**
- * A new worktree of the folder's repository: from a new branch, an existing one or a GitHub
- * pull request. It starts in the background and the dialog closes at once; progress shows in
- * the worktree menu. Where it goes is shown, not asked: it is always beside the repository.
- */
 export function WorktreeCreateDialog({
   folder,
   conversationId,
@@ -176,7 +162,6 @@ export function WorktreeCreateDialog({
   onOpenChange,
 }: {
   folder: string;
-  /** The chat whose folder switches to the new worktree, when that is asked for. */
   conversationId: string;
   listing: WorktreeListing;
   open: boolean;
@@ -186,7 +171,6 @@ export function WorktreeCreateDialog({
   const [tab, setTab] = useState<SourceTab>("new");
   const [prInput, setPrInput] = useState("");
   const [branchName, setBranchName] = useState("");
-  // Unpicked, the base follows the default worked out below.
   const [pickedBase, setPickedBase] = useState<string | null>(null);
   const [existing, setExisting] = useState<string | null>(null);
   const [switchAfter, setSwitchAfter] = useState(prefs.switchAfter);

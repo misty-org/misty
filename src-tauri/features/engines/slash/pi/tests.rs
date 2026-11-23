@@ -106,7 +106,6 @@ fn tui_only_modes_say_why() {
     assert!(omp_usage("tan", "work").is_none());
 }
 
-/// get_state and get_session_stats as pi 1.5.2 answers them in rpc mode.
 #[test]
 fn session_panel_reads_pi_1_5_state_and_stats() {
     let state = json!({"model":{"id":"probe-model","name":"probe-model","api":"openai-completions",
@@ -139,7 +138,6 @@ fn session_panel_reads_pi_1_5_state_and_stats() {
     );
     assert!(rows(1).contains(&("Total".into(), "5".into())));
     assert!(rows(2).contains(&("Context".into(), "1,645 of 128,000 (1.3%)".into())));
-    // No model to run: pi says "unknown", and an empty session has no context usage.
     let state = json!({"model":{"id":"unknown","name":"unknown","provider":"unknown"},
         "thinkingLevel":"off","sessionId":"01a1d85b","autoCompactionEnabled":true});
     let stats = json!({"userMessages":0,"totalMessages":0,"tokens":{"total":0},"cost":0});
@@ -148,8 +146,6 @@ fn session_panel_reads_pi_1_5_state_and_stats() {
     assert!(!sections[2].rows.iter().any(|row| row.label == "Context"));
 }
 
-/// pi 1.5.2's get_tree after a prompt that never reached a model: its system prompt, the
-/// person's message, three failed replies and the retries' context edits.
 #[test]
 fn tree_of_a_pi_1_5_session_marks_the_last_shown_message() {
     let node = |entry: Value, children: Vec<Value>| json!({"entry": entry, "children": children});

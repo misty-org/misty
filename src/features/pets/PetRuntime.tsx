@@ -11,14 +11,13 @@ import {
 } from "@/features/agents";
 import { openSettings } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { petSettingsEvent, petsApi } from "./petsApi";
-import { derivePetStates, type PetStateSnapshot } from "./petState";
+import { petSettingsEvent, petsApi } from "./pets_api";
+import { derivePetStates, type PetStateSnapshot } from "./pet_state";
 
 const DISPLAY_INTERVAL_MS = 1800;
 const COMPLETION_DISPLAY_MS = 5400;
 
 function snapshotSignature(snapshot: PetStateSnapshot): string {
-  // The look direction belongs to the native cursor tracker, not to this.
   return [snapshot.sessionKey, snapshot.sessionName, snapshot.status, snapshot.activity].join(":");
 }
 
@@ -34,13 +33,8 @@ const IDLE_SNAPSHOT: PetStateSnapshot = {
   activity: "idle",
 };
 
-/**
- * Tells the pet what the person's agents are doing. Rendered once in a person's window; the pet
- * itself is its own window (`pet.html`). Nothing runs while the pet is off.
- */
 export function PetRuntime() {
   const accountId = useAgentAccountId();
-  // The menu bar's "Set up Pet" opens the pet's settings here, to import or pick one.
   useEffect(() => {
     if (!hasTauriInternals()) return;
     const remove = getCurrentWindow().listen("misty://tray-pet-settings", () =>
@@ -142,7 +136,6 @@ export function PetRuntime() {
     void usePersonalAgentsStore.getState().load(accountId);
     reloadPetEnabled();
     const unlistenSettings = listen(petSettingsEvent, reloadPetEnabled);
-    // Runs report many times a second; the pet only needs to follow along.
     const stopWatching = watchAllRunEvents(() => {
       if (!petEnabled) return;
       window.clearTimeout(refreshTimer);

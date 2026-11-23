@@ -5,8 +5,6 @@ use crate::engines::support::event_sink::{Emit, EventSink};
 use crate::engines::ProcessRegistry;
 use std::sync::Mutex as StdMutex;
 
-/// Keeps the raw event JSON: parking is only observable through what the
-/// frontend receives and what the registry holds for the answer.
 struct CollectingEmitter(StdMutex<Vec<String>>);
 
 impl Emit for CollectingEmitter {
@@ -62,8 +60,6 @@ fn test_request() -> SendRequest {
 }
 
 fn elicitation_params(message: &str) -> Value {
-    // Live shape: elicitFromAcpClient wraps the select as a form with a single value property
-    // (acp-agent.ts:354-365 + :2009-2017).
     json!({
         "mode": "form",
         "sessionId": "s-1",
@@ -91,7 +87,6 @@ fn initialize_declares_elicitation_form_and_the_check_gates_it() {
         params["clientCapabilities"]["elicitation"],
         json!({ "form": {} })
     );
-    // The shared bare params don't declare it, so OMP would silently auto-approve; the check must stop it.
     assert!(!elicitation_form_declared(&initialize_params()));
     assert!(!elicitation_form_declared(&json!({
         "clientCapabilities": { "elicitation": { "form": null } }
@@ -103,12 +98,10 @@ fn detects_only_the_plan_approval_elicitation() {
     assert!(is_plan_approval_elicitation(&elicitation_params(
         "Approve plan \"auth\" and start implementation?\n\n# Auth\n"
     )));
-    // Option order doesn't matter, but the set must be exactly these two labels.
     let mut swapped = elicitation_params("Approve plan \"a\" and start implementation?\n\nx");
     swapped["requestedSchema"]["properties"]["value"]["enum"] =
         json!(["Refine plan", "Approve and execute"]);
     assert!(is_plan_approval_elicitation(&swapped));
-    // The ask tool's elicitations (another schema or labels) never take the review branch.
     for params in [
         json!({ "mode": "form", "requestedSchema": { "properties": { "value": { "type": "string" } } } }),
         json!({ "mode": "form", "requestedSchema": { "properties": { "value": { "enum": ["Approve and execute"] } } } }),
@@ -125,9 +118,6 @@ fn detects_only_the_plan_approval_elicitation() {
 
 #[test]
 fn approval_frames_match_the_cli_labels_exactly() {
-    // Labels verbatim: any drift falls to refine (exact comparison), and the reply shape is
-    // CreateElicitationResponse
-    // {action:"accept", content:{value}} (protocol.ts:440-443).
     let frames = approval_frames(&json!(9));
     assert_eq!(
         frames["approve"],
@@ -145,7 +135,6 @@ fn approval_frames_match_the_cli_labels_exactly() {
             "result": { "action": "accept", "content": { "value": "Refine plan" } },
         })
     );
-    // A string rpc id round-trips with its type.
     let frames = approval_frames(&json!("req-3"));
     assert_eq!(frames["approve"]["id"], json!("req-3"));
     assert_eq!(frames["changes"]["id"], json!("req-3"));
@@ -159,12 +148,10 @@ fn parses_the_approval_message_and_binds_the_preview() {
     .expect("approval message");
     assert_eq!(title, "auth-refactor");
     assert_eq!(preview, "# 认证重构\n步骤一\n");
-    // Anything not shaped as a review is None (ask messages, truncated messages).
     assert!(parse_approval_message("选哪种？").is_none());
     assert!(parse_approval_message("Approve plan \"\" and start implementation?").is_none());
     assert!(parse_approval_message("Approve plan \"x\" and run?").is_none());
 
-    // Preview = the first 12 lines plus the ellipsis, checked both ways.
     let short = "a\nb\nc";
     assert!(preview_matches(short, "a\nb\nc"));
     assert!(!preview_matches(short, "a\nb\nc\n…"));
@@ -176,7 +163,6 @@ fn parses_the_approval_message_and_binds_the_preview() {
         .join("\n");
     assert!(preview_matches(long, &format!("{head12}\n…")));
     assert!(!preview_matches(long, &head12));
-    // The body changed after the proposal → refused.
     assert!(!preview_matches(long, "l1\nl2\nCHANGED\n…"));
 }
 
@@ -186,7 +172,6 @@ fn slug_and_heading_follow_the_cli_rules() {
         slug_from_title("auth-refactor"),
         Some("auth-refactor".into())
     );
-    // A trailing -plan is stripped (case-insensitive); an empty slug falls back to the sanitized title.
     assert_eq!(slug_from_title("auth-plan"), Some("auth".into()));
     assert_eq!(slug_from_title("auth-PLAN"), Some("auth".into()));
     assert_eq!(slug_from_title("plan"), Some("plan".into()));
@@ -195,7 +180,6 @@ fn slug_and_heading_follow_the_cli_rules() {
         Some("My-feature".into())
     );
     assert_eq!(slug_from_title("!!!"), None);
-    // The first level-one heading; ## and # without a space don't count.
     assert_eq!(first_heading("# 认证重构\n正文"), Some("认证重构".into()));
     assert_eq!(first_heading("## 二级\n# 一级"), Some("一级".into()));
     assert_eq!(first_heading("#noSpace\n正文"), None);
@@ -206,7 +190,6 @@ fn slug_and_heading_follow_the_cli_rules() {
 fn session_dir_name_encoding_matches_the_cli() {
     let home = Path::new("/Users/alice");
     let tmp = Path::new("/private/var/folders/xx");
-    // Relative to home (home itself included) → the `-` prefix.
     assert_eq!(
         encode_session_dir_name(
             Path::new("/Users/alice/proj"),
@@ -217,7 +200,6 @@ fn session_dir_name_encoding_matches_the_cli() {
         "-proj"
     );
     assert_eq!(encode_session_dir_name(home, Some(home), tmp, home), "-");
-    // Relative to tmp → `-tmp-…`.
     assert_eq!(
         encode_session_dir_name(
             Path::new("/private/var/folders/xx/ws"),
@@ -227,7 +209,6 @@ fn session_dir_name_encoding_matches_the_cli() {
         ),
         "-tmp-ws"
     );
-    // Any other absolute path → legacy `--…--`, with separators and colons turned into `-`.
     assert_eq!(
         encode_session_dir_name(
             Path::new("/Volumes/data/proj"),
@@ -246,22 +227,18 @@ fn whitelist_read_rejects_escape_oversize_and_missing() {
     std::fs::create_dir_all(&local).unwrap();
     std::fs::write(local.join("auth-plan.md"), "# Auth\n").unwrap();
 
-    // A normal read; a missing candidate is Ok(None).
     assert_eq!(
         read_plan_candidate(&local, "auth-plan.md").unwrap(),
         Some("# Auth\n".to_string())
     );
     assert_eq!(read_plan_candidate(&local, "ghost-plan.md").unwrap(), None);
-    // A name that isn't *plan.md, or has a separator or .., is refused outright.
     assert!(read_plan_candidate(&local, "notes.md").is_err());
     assert!(read_plan_candidate(&local, "a/b-plan.md").is_err());
     assert!(read_plan_candidate(&local, "..\\x-plan.md").is_err());
-    // Over the limit is refused.
     std::fs::write(local.join("huge-plan.md"), vec![b'x'; MAX_PLAN_BYTES + 1]).unwrap();
     let error = read_plan_candidate(&local, "huge-plan.md").unwrap_err();
     assert!(error.contains("1 MiB"), "{error}");
 
-    // A symlink escaping the local root → refused.
     #[cfg(unix)]
     {
         let outside = root.join("outside-plan.md");
@@ -283,22 +260,18 @@ fn verified_plan_loads_only_when_the_preview_matches() {
     let params = elicitation_params(
         "Approve plan \"auth\" and start implementation?\n\n# Auth 计划\n第一步\n第二步\n",
     );
-    let (loaded, title) = load_verified_plan(&[local.clone()], &params).unwrap();
+    let (loaded, title) = load_verified_plan(std::slice::from_ref(&local), &params).unwrap();
     assert_eq!(loaded, content);
     assert_eq!(title, "auth");
-    // The elicitation is only a preview: what is read must be the full text, not the 12-line summary.
     assert!(loaded.contains("第一步"));
 
-    // A preview that doesn't match → refused (changed after the proposal).
     let stale =
         elicitation_params("Approve plan \"auth\" and start implementation?\n\n# 别的计划\n");
-    let error = load_verified_plan(&[local.clone()], &stale).unwrap_err();
+    let error = load_verified_plan(std::slice::from_ref(&local), &stale).unwrap_err();
     assert!(error.contains("doesn't match"), "{error}");
-    // No artifacts root → refused.
     assert!(load_verified_plan(&[], &params).is_err());
-    // No plan file → refused.
     let empty = temp_dir("verified-empty");
-    assert!(load_verified_plan(&[empty.clone()], &params).is_err());
+    assert!(load_verified_plan(std::slice::from_ref(&empty), &params).is_err());
     let _ = std::fs::remove_dir_all(&root);
     let _ = std::fs::remove_dir_all(&empty);
 }
@@ -307,8 +280,6 @@ fn verified_plan_loads_only_when_the_preview_matches() {
 fn session_local_roots_scans_the_session_artifacts_dir() {
     let base = temp_dir("roots");
     let sessions_root = base.join("sessions");
-    // The workspace sits in a temp directory and its encoded name comes from the same function
-    // (the scan is tested apart from the encoding).
     let workspace = base.join("ws");
     std::fs::create_dir_all(&workspace).unwrap();
     let encoded = session_dir_name(&workspace);
@@ -316,7 +287,6 @@ fn session_local_roots_scans_the_session_artifacts_dir() {
         .join(&encoded)
         .join("2026-09-24T10-00-00.000_01JTESTSESSION/local");
     std::fs::create_dir_all(&local).unwrap();
-    // Transcript files (.jsonl) and other sessions' directories aren't picked.
     std::fs::write(
         sessions_root
             .join(&encoded)
@@ -341,8 +311,6 @@ async fn resume_is_refused_before_any_spawn() {
     let mut req = test_request();
     req.session_id = Some("01JOLD".to_string());
     let built = BuiltCommand {
-        // The refusal must come before spawning: with a command that is sure to fail, a real
-        // spawn would blow up with another error instead of this message.
         command: tokio::process::Command::new("ccgui-definitely-not-a-real-binary"),
         stdin_payload: None,
         keep_stdin_open: false,
@@ -367,7 +335,6 @@ async fn usage_update_sizes_the_context_and_the_turn_total_keeps_its_window() {
     let (core, _registry, emitter) = test_core();
     let mut state = TurnState::new(None);
     let mut view = TurnView::default();
-    // omp 18's usage_update (`getContextUsage()` and the session's cost).
     let update = json!({"sessionId": "s1", "update": {"sessionUpdate": "usage_update",
         "size": 128000, "used": 14777, "cost": {"amount": 0.01, "currency": "USD"}}});
     handle_session_update(&core, &mut state, &mut view, &update);
@@ -375,12 +342,10 @@ async fn usage_update_sizes_the_context_and_the_turn_total_keeps_its_window() {
     core.sink.flush();
     let emitted = emitter.0.lock().unwrap().join(" ");
     assert!(emitted.contains("\"used\":14777"), "{emitted}");
-    // Its prompt answer: the turn's usage-statistics delta, which adds up every call.
     let answer = json!({"stopReason": "end_turn", "usage": {"inputTokens": 300,
         "outputTokens": 200, "totalTokens": 40300, "cachedReadTokens": 39800}});
     let usage = prompt_usage(&answer, view.context_window).unwrap();
     assert_eq!(usage["model_context_window"], 128000);
-    // Read alone it sizes the bar; after the usage_update the bridge keeps the update's size.
     assert_eq!(
         crate::engines::bridge::context_usage(&usage),
         (Some(40300), Some(128000))

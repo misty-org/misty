@@ -2,12 +2,13 @@ import type {
   ShortcutBindingPair,
   ShortcutCommandDefinition,
   ShortcutPlatform,
-} from "./shortcutTypes";
-import { chatCommands } from "./chatCommands";
-import { codeCommands } from "./codeCommands";
+} from "./shortcut_types";
+import { callCommands } from "./call_commands";
+import { chatCommands } from "./chat_commands";
+import { codeCommands } from "./code_commands";
 import { command } from "./factory";
-import { workspaceCommands } from "./workspaceCommands";
-export type * from "./shortcutTypes";
+import { workspaceCommands } from "./workspace_commands";
+export type * from "./shortcut_types";
 const shellCommands: ShortcutCommandDefinition[] = [
   command("misty.contextual_companion", "Toggle chat panel", {
     description: "Open or close the chat panel beside the page.",
@@ -41,6 +42,38 @@ const shellCommands: ShortcutCommandDefinition[] = [
     aliases: ["log out", "account"],
     allowInEditable: true,
     nativeMenu: true,
+  }),
+  command("app.open_explore", "Open Explore", {
+    description: "Open Explore: agent templates, apps, engines and more.",
+    category: "Misty",
+    aliases: ["store", "catalog", "registry"],
+    mac: "Cmd+Shift+E",
+    windows: "Ctrl+Shift+E",
+    allowInEditable: true,
+  }),
+  command("app.open_files", "Open Files", {
+    description: "Open the Space's Files.",
+    category: "Misty",
+    aliases: ["drive", "documents", "folders"],
+    mac: "Cmd+Shift+D",
+    windows: "Ctrl+Shift+D",
+    allowInEditable: true,
+  }),
+  command("app.open_apps", "Open Apps", {
+    description: "Open the Space's apps.",
+    category: "Misty",
+    aliases: ["launcher", "applications"],
+    mac: "Cmd+Shift+A",
+    windows: "Ctrl+Shift+A",
+    allowInEditable: true,
+  }),
+  command("app.open_friends", "Open Friends", {
+    description: "Open Friends and friend requests.",
+    category: "Misty",
+    aliases: ["people", "contacts", "friend requests"],
+    mac: "Cmd+Shift+U",
+    windows: "Ctrl+Shift+U",
+    allowInEditable: true,
   }),
   command("app.zoom_in", "Scale app up", {
     description: "Make Misty's own interface larger.",
@@ -115,6 +148,7 @@ export const shortcutCommandRegistry: ShortcutCommandDefinition[] = [
   ...workspaceCommands,
   ...tabAndToolCommands,
   ...chatCommands,
+  ...callCommands,
   ...codeCommands,
 ];
 

@@ -1,9 +1,9 @@
 import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import { useWorkspaceStore } from "@/features/app-windows/tabs/useWorkspaceStore";
-import { tabSides } from "@/app/shell/dockingLayout";
-import { dockingGeometry } from "./dockingGeometry";
+import { useWorkspaceStore } from "@/features/app-windows/tabs/use_workspace_store";
+import { tabSides } from "@/app/shell/docking_layout";
+import { dockingGeometry } from "./docking_geometry";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 
 const lifecycle = vi.hoisted(() => ({ mount: vi.fn(), unmount: vi.fn() }));
@@ -21,7 +21,7 @@ vi.mock("./WorkspaceDockTree", async () => {
     },
   };
 });
-vi.mock("./dockSplitFit", () => ({
+vi.mock("./dock_split_fit", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
 afterEach(cleanup);
@@ -59,7 +59,6 @@ it("keeps tab panels direct children of the pane frame so its rounded corner app
       <WorkspaceCanvas tabPosition="left" />
     </MemoryRouter>,
   );
-  // Each tab panel is a PaneFrame, which draws the pane corner and seam, directly in the panes.
   expect(
     container.querySelector('[data-workspace-panes] > [role="tabpanel"][data-slot="pane-frame"]'),
   ).not.toBeNull();

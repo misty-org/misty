@@ -1,4 +1,3 @@
-//! Reads a chat-completions event stream.
 use std::collections::HashMap;
 
 use chrono::{DateTime, SecondsFormat};
@@ -11,7 +10,6 @@ use crate::model_calls::tool_calls::{ToolCallDelta, ToolCallTracker};
 const TEXT_ID: &str = "txt-0";
 const REASONING_ID: &str = "reasoning-0";
 
-/// A call whose name hasn't arrived. Some servers send arguments first.
 #[derive(Default)]
 struct PendingCall {
     id: Option<String>,
@@ -50,7 +48,10 @@ impl CompatibleDecoder {
 
     fn close_reasoning(&mut self, out: &mut Vec<StreamPart>) {
         if self.reasoning_open {
-            out.push(StreamPart::ReasoningEnd { id: REASONING_ID.into(), provider_metadata: None });
+            out.push(StreamPart::ReasoningEnd {
+                id: REASONING_ID.into(),
+                provider_metadata: None,
+            });
             self.reasoning_open = false;
         }
     }
@@ -67,9 +68,17 @@ impl CompatibleDecoder {
         let name = function.and_then(|function| string_field(function, "name"));
         let arguments = function.and_then(|function| string_field(function, "arguments"));
         let metadata = self.thought_metadata(delta);
-        // Servers that send no index, or a call already forwarded, go straight to the tracker.
         let Some(index) = index.filter(|index| !self.forwarded.contains_key(index)) else {
-            self.forward(ToolCallDelta { index, id, name, arguments, metadata }, out);
+            self.forward(
+                ToolCallDelta {
+                    index,
+                    id,
+                    name,
+                    arguments,
+                    metadata,
+                },
+                out,
+            );
             return;
         };
         let position = match self.pending.iter().position(|(known, _)| *known == index) {
@@ -166,7 +175,9 @@ fn converted_usage(usage: Option<&Value>) -> Usage {
 
 impl StreamDecoder for CompatibleDecoder {
     fn start(&mut self, out: &mut Vec<StreamPart>) {
-        out.push(StreamPart::StreamStart { warnings: std::mem::take(&mut self.warnings) });
+        out.push(StreamPart::StreamStart {
+            warnings: std::mem::take(&mut self.warnings),
+        });
     }
 
     fn event(&mut self, data: &str, out: &mut Vec<StreamPart>) {
@@ -182,7 +193,10 @@ impl StreamDecoder for CompatibleDecoder {
             return;
         }
         if !chunk.get("choices").is_some_and(Value::is_array) {
-            self.fail(json!({ "name": "AI_TypeValidationError", "message": "A chunk had no choices." }), out);
+            self.fail(
+                json!({ "name": "AI_TypeValidationError", "message": "A chunk had no choices." }),
+                out,
+            );
             return;
         }
         if self.first_chunk {
@@ -216,18 +230,36 @@ impl StreamDecoder for CompatibleDecoder {
             .filter(|text| !text.is_empty());
         if let Some(text) = reasoning {
             if !self.reasoning_open {
-                out.push(StreamPart::ReasoningStart { id: REASONING_ID.into(), provider_metadata: None });
+                out.push(StreamPart::ReasoningStart {
+                    id: REASONING_ID.into(),
+                    provider_metadata: None,
+                });
                 self.reasoning_open = true;
             }
-            out.push(StreamPart::ReasoningDelta { id: REASONING_ID.into(), delta: text.to_owned(), provider_metadata: None });
+            out.push(StreamPart::ReasoningDelta {
+                id: REASONING_ID.into(),
+                delta: text.to_owned(),
+                provider_metadata: None,
+            });
         }
-        if let Some(text) = delta.get("content").and_then(Value::as_str).filter(|text| !text.is_empty()) {
+        if let Some(text) = delta
+            .get("content")
+            .and_then(Value::as_str)
+            .filter(|text| !text.is_empty())
+        {
             self.close_reasoning(out);
             if !self.text_open {
-                out.push(StreamPart::TextStart { id: TEXT_ID.into(), provider_metadata: None });
+                out.push(StreamPart::TextStart {
+                    id: TEXT_ID.into(),
+                    provider_metadata: None,
+                });
                 self.text_open = true;
             }
-            out.push(StreamPart::TextDelta { id: TEXT_ID.into(), delta: text.to_owned(), provider_metadata: None });
+            out.push(StreamPart::TextDelta {
+                id: TEXT_ID.into(),
+                delta: text.to_owned(),
+                provider_metadata: None,
+            });
         }
         if let Some(calls) = delta.get("tool_calls").and_then(Value::as_array) {
             self.close_reasoning(out);
@@ -240,10 +272,12 @@ impl StreamDecoder for CompatibleDecoder {
     fn finish(&mut self, out: &mut Vec<StreamPart>) {
         self.close_reasoning(out);
         if self.text_open {
-            out.push(StreamPart::TextEnd { id: TEXT_ID.into(), provider_metadata: None });
+            out.push(StreamPart::TextEnd {
+                id: TEXT_ID.into(),
+                provider_metadata: None,
+            });
             self.text_open = false;
         }
-        // Calls whose name never came still get their chance, and fail plainly if they can't.
         for (index, call) in std::mem::take(&mut self.pending) {
             self.forward(
                 ToolCallDelta {
@@ -267,19 +301,28 @@ impl StreamDecoder for CompatibleDecoder {
             );
         }
         let mut metadata = Map::new();
-        let details = self.usage.as_ref().and_then(|usage| usage.get("completion_tokens_details"));
+        let details = self
+            .usage
+            .as_ref()
+            .and_then(|usage| usage.get("completion_tokens_details"));
         let mut own = Map::new();
         for (from, to) in [
             ("accepted_prediction_tokens", "acceptedPredictionTokens"),
             ("rejected_prediction_tokens", "rejectedPredictionTokens"),
         ] {
-            if let Some(count) = details.and_then(|details| details.get(from)).filter(|count| !count.is_null()) {
+            if let Some(count) = details
+                .and_then(|details| details.get(from))
+                .filter(|count| !count.is_null())
+            {
                 own.insert(to.to_owned(), count.clone());
             }
         }
         metadata.insert(self.provider.clone(), Value::Object(own));
         out.push(StreamPart::Finish {
-            finish_reason: self.finish_reason.take().unwrap_or_else(FinishReason::error),
+            finish_reason: self
+                .finish_reason
+                .take()
+                .unwrap_or_else(FinishReason::error),
             usage: converted_usage(self.usage.as_ref()),
             provider_metadata: Some(Value::Object(metadata)),
         });

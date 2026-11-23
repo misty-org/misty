@@ -1,23 +1,3 @@
-//! pi/omp provider auth and custom-provider config.
-//!
-//! Ported from the reference desktop-cc-gui's pi_auth.rs / pi_models_config.rs,
-//! generalized over the pi family:
-//! - pi  keeps credentials in `<agent>/auth.json` and custom providers in
-//!   `<agent>/models.json` (JSONC).
-//! - omp (a pi fork) keeps credentials in the SQLite `auth_credentials` table
-//!   of `<agent>/agent.db` and custom providers in `<agent>/models.yml` (YAML).
-//!   Writes are plain INSERT/DELETE: omp's own triggers bump
-//!   `auth_change_revision`, so running omp instances pick changes up.
-//!
-//! Shared contract:
-//! - The CLI's store is the single source of truth; unknown entries and
-//!   `oauth` credentials MUST survive writes untouched.
-//! - File writes are atomic (same-dir tmp + rename) with `0600` on Unix.
-//! - A corrupted store fails closed: errors are returned, never overwritten.
-//! - Full API keys never leave this module: list output only carries a masked
-//!   display string (head(6) + tail(4); short keys fully masked; `!` command /
-//!   `$` env-interpolation keys are returned verbatim — they are not secrets).
-
 use serde::Serialize;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
@@ -26,14 +6,9 @@ use super::engine_home;
 
 struct ProviderDef {
     id: &'static str,
-    /// env var the CLI falls back to when no credential is stored;
-    /// `None` marks OAuth-only providers (GitHub Copilot).
     env_var: Option<&'static str>,
 }
 
-/// Provider catalog aligned with pi v0.84.3's env map (omp forked the same
-/// provider registry). `google-vertex` uses ADC/service accounts (no paste-able
-/// key) and is deliberately excluded.
 const PROVIDER_CATALOG: &[ProviderDef] = &[
     ProviderDef {
         id: "anthropic",
@@ -183,7 +158,6 @@ const PROVIDER_CATALOG: &[ProviderDef] = &[
         id: "xiaomi-token-plan-sgp",
         env_var: Some("XIAOMI_TOKEN_PLAN_SGP_API_KEY"),
     },
-    // OAuth-only (no env var / api_key path).
     ProviderDef {
         id: "github-copilot",
         env_var: None,
@@ -204,12 +178,7 @@ fn home_dir_name(engine: &str) -> Result<&'static str, String> {
     }
 }
 
-/// `<agent>` dir: `$PI_CODING_AGENT_DIR` when set (both CLIs honor it; omp kept
-/// it from the pi fork), else `~/.pi/agent` / `~/.omp/agent`. Also the root of
-/// the CLI's blob store, which history resolves `blob:sha256:` image refs
-/// against (see `history::extract::pi_image_part`).
 pub(crate) fn agent_dir(engine: &str) -> Result<PathBuf, String> {
-    // The engine is checked first: the variable mustn't make an unknown engine look like pi.
     let home = home_dir_name(engine)?;
     if let Some(dir) = std::env::var_os("PI_CODING_AGENT_DIR").filter(|v| !v.is_empty()) {
         return Ok(PathBuf::from(dir));
@@ -217,18 +186,14 @@ pub(crate) fn agent_dir(engine: &str) -> Result<PathBuf, String> {
     Ok(engine_home(None, home).join("agent"))
 }
 
-// ── shared output shapes ────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthProviderSnapshot {
     pub id: String,
     pub env_var: Option<String>,
-    /// configured | none
     pub state: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub masked_key: Option<String>,
-    /// literal | command | envRef — how the CLI will resolve the stored key.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub key_source: Option<String>,
 }
@@ -238,8 +203,6 @@ pub struct AuthProviderSnapshot {
 pub struct AuthListResult {
     pub store: AuthStoreInfo,
     pub providers: Vec<AuthProviderSnapshot>,
-    /// Provider ids holding an active OAuth credential (raw store ids — e.g.
-    /// pi lands ChatGPT subscription logins under `openai-codex`).
     pub oauth_providers: Vec<String>,
 }
 
@@ -247,15 +210,12 @@ pub struct AuthListResult {
 #[serde(rename_all = "camelCase")]
 pub struct AuthStoreInfo {
     pub path: String,
-    /// authJson | sqlite
     pub kind: String,
     pub exists: bool,
 }
 
-/// Mask a stored key for display. Never exposes more than head(6) + tail(4).
 fn mask_key(key: &str) -> String {
     if key.starts_with('!') || key.starts_with('$') {
-        // Command execution / env interpolation: not a secret literal.
         return key.to_string();
     }
     if key.chars().count() > 10 {
@@ -303,15 +263,10 @@ fn validate_new_key(provider_id: &str, key: &str) -> Result<String, String> {
     Ok(trimmed.to_string())
 }
 
-/// Snapshots for every catalog entry, given a lookup that yields the stored
-/// literal key for an id.
 fn snapshots_for(get_key: impl Fn(&str) -> Option<String>) -> Vec<AuthProviderSnapshot> {
     PROVIDER_CATALOG
         .iter()
         .map(|def| {
-            // Deliberately auth-store only: the app process env ≠ the login
-            // shell env the CLI actually inherits, so reporting "env active"
-            // here would be unreliable.
             let (state, masked_key, src) = match get_key(def.id) {
                 Some(key) => (
                     "configured".to_string(),
@@ -331,11 +286,10 @@ fn snapshots_for(get_key: impl Fn(&str) -> Option<String>) -> Vec<AuthProviderSn
         .collect()
 }
 
-// ── pi: auth.json ───────────────────────────────────────────────────────────
-
-/// Read auth.json into a JSON object map.
-/// - Missing file → `Ok(None)`.
-/// - Corrupted JSON / non-object root → `Err` (fail-closed; never overwritten).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own credentials in place, which PI_CODING_AGENT_DIR may put outside the engine folders the gate grants"
+)]
 fn read_auth_map(path: &std::path::Path) -> Result<Option<Map<String, Value>>, String> {
     match std::fs::read_to_string(path) {
         Ok(content) => {
@@ -361,7 +315,10 @@ fn read_auth_map(path: &std::path::Path) -> Result<Option<Map<String, Value>>, S
     }
 }
 
-/// Atomically write text: same-dir tmp file + rename, `0600` on Unix.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "saves the key the person entered into the engine's own credentials in place, which PI_CODING_AGENT_DIR may put outside the engine folders the gate grants"
+)]
 fn atomic_write_private(path: &std::path::Path, content: &str) -> Result<(), String> {
     let parent = path
         .parent()
@@ -455,7 +412,7 @@ fn pi_delete_credential(agent: &std::path::Path, provider_id: &str) -> Result<()
     let path = agent.join("auth.json");
     let mut map = match read_auth_map(&path)? {
         Some(map) => map,
-        None => return Ok(()), // nothing to delete
+        None => return Ok(()),
     };
     if let Some(entry) = map.get(provider_id) {
         let entry_type = entry.get("type").and_then(Value::as_str).unwrap_or("");
@@ -469,14 +426,10 @@ fn pi_delete_credential(agent: &std::path::Path, provider_id: &str) -> Result<()
     write_auth_map(&path, &map)
 }
 
-// ── omp: agent.db auth_credentials ──────────────────────────────────────────
-//
-// omp's credential store: rows (provider, credential_type, data JSON,
-// identity_key, disabled_cause, …); api_key data is `{"key":"…"}`. Triggers
-// installed by omp bump `auth_change_revision` on every INSERT/UPDATE/DELETE,
-// and live omp instances watch `PRAGMA data_version`, so direct writes are
-// picked up without a restart. WAL mode permits the concurrent access.
-
+#[allow(
+    clippy::disallowed_methods,
+    reason = "opens the engine's own credential store in place, which PI_CODING_AGENT_DIR may put outside the engine folders the gate grants"
+)]
 fn omp_connect(
     agent: &std::path::Path,
     read_only: bool,
@@ -510,9 +463,17 @@ fn omp_connect(
     Ok((conn, path))
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "checks for the engine's own credential store in place, which PI_CODING_AGENT_DIR may put outside the engine folders the gate grants"
+)]
+fn agent_db_exists(path: &std::path::Path) -> bool {
+    path.exists()
+}
+
 fn omp_list(agent: &std::path::Path) -> Result<AuthListResult, String> {
     let path = agent.join("agent.db");
-    let exists = path.exists();
+    let exists = agent_db_exists(&path);
     if !exists {
         return Ok(AuthListResult {
             store: AuthStoreInfo {
@@ -594,8 +555,8 @@ fn omp_delete_credential(agent: &std::path::Path, provider_id: &str) -> Result<(
         format!("[PI_FAMILY_AUTH_UNKNOWN_PROVIDER] unknown provider: {provider_id}")
     })?;
     let path = agent.join("agent.db");
-    if !path.exists() {
-        return Ok(()); // nothing to delete
+    if !agent_db_exists(&path) {
+        return Ok(());
     }
     let (conn, _) = omp_connect(agent, false)?;
     let api_keys: i64 = conn
@@ -628,13 +589,6 @@ fn omp_delete_credential(agent: &std::path::Path, provider_id: &str) -> Result<(
     Ok(())
 }
 
-// ── custom providers: models.json (pi) / models.yml (omp) ──────────────────
-//
-// Deliberately different secrecy boundary from the credential stores above:
-// `apiKey` values here are the user's own config text (literal / `$ENV` /
-// `!command`), so the raw file text IS returned for editing.
-
-/// pi template (JSON with comments); omp gets the YAML equivalent below.
 const MODELS_TEMPLATE_JSON: &str = r#"{
   "providers": {
     "my-relay": {
@@ -689,12 +643,9 @@ pub struct CustomProviderSummary {
 #[serde(rename_all = "camelCase")]
 pub struct ModelsConfigReadResult {
     pub file: ModelsFileInfo,
-    /// Raw file text (comments included); `None` when the file does not exist.
     pub text: Option<String>,
-    /// Default example for the editor when `text` is missing/blank.
     pub template: String,
     pub providers: Vec<CustomProviderSummary>,
-    /// Human-readable parse error when the file is corrupted; summaries stay empty.
     pub parse_error: Option<String>,
 }
 
@@ -702,7 +653,6 @@ pub struct ModelsConfigReadResult {
 #[serde(rename_all = "camelCase")]
 pub struct ModelsFileInfo {
     pub path: String,
-    /// json | yaml
     pub format: String,
     pub exists: bool,
 }
@@ -720,8 +670,6 @@ fn models_config_path(agent: &std::path::Path, engine: &str) -> Result<PathBuf, 
     Ok(agent.join(file))
 }
 
-/// Strip `//` and `/* */` comments outside string literals (JSONC → JSON).
-/// Kept deliberately small; sufficient for hand-written config files.
 fn strip_jsonc_comments(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     let mut chars = input.chars().peekable();
@@ -753,7 +701,7 @@ fn strip_jsonc_comments(input: &str) -> String {
                 }
             }
             '/' if chars.peek() == Some(&'*') => {
-                chars.next(); // consume '*'
+                chars.next();
                 let mut prev = '\0';
                 for c in chars.by_ref() {
                     if prev == '*' && c == '/' {
@@ -768,9 +716,6 @@ fn strip_jsonc_comments(input: &str) -> String {
     out
 }
 
-/// Loose structural validation: parseable, `providers` is a map, each
-/// provider's `models` items carry a string `id`. Unknown fields are accepted
-/// and preserved (the raw user text is stored verbatim).
 pub(crate) fn validate_models_config_text(engine: &str, text: &str) -> Result<Value, String> {
     let value: Value = if engine == "omp" {
         serde_yaml::from_str(text).map_err(|error| {
@@ -853,6 +798,14 @@ fn summarize_providers(value: &Value) -> Vec<CustomProviderSummary> {
     out
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own model config in place, which PI_CODING_AGENT_DIR may put outside the engine folders the gate grants"
+)]
+fn read_models_text(path: &std::path::Path) -> std::io::Result<String> {
+    std::fs::read_to_string(path)
+}
+
 fn read_models_config(
     agent: &std::path::Path,
     engine: &str,
@@ -869,7 +822,7 @@ fn read_models_config(
         exists,
     };
 
-    let text = match std::fs::read_to_string(&path) {
+    let text = match read_models_text(&path) {
         Ok(content) => content,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             return Ok(ModelsConfigReadResult {
@@ -917,15 +870,11 @@ fn read_models_config(
 }
 
 fn write_models_config(agent: &std::path::Path, engine: &str, text: &str) -> Result<(), String> {
-    // Fail-closed: any validation error leaves the existing file untouched.
     validate_models_config_text(engine, text)?;
     let path = models_config_path(agent, engine)?;
     atomic_write_private(&path, text)
 }
 
-// ── Tauri commands ──────────────────────────────────────────────────────────
-
-/// Runs pi's or omp's side in the engine's agent folder; any other engine is an error, never a panic.
 fn by_engine<T>(
     engine: &str,
     pi: impl FnOnce(&std::path::Path) -> Result<T, String>,
@@ -941,13 +890,11 @@ fn by_engine<T>(
     }
 }
 
-/// List the pi-family provider catalog with credential states (keys masked).
 #[tauri::command]
 pub fn pi_family_auth_list(engine: String) -> Result<AuthListResult, String> {
     by_engine(&engine, pi_list, omp_list)
 }
 
-/// Set (create/replace) an API key credential.
 #[tauri::command]
 pub fn pi_family_auth_set_api_key(
     engine: String,
@@ -962,7 +909,6 @@ pub fn pi_family_auth_set_api_key(
     )
 }
 
-/// Delete an api_key credential (OAuth entries are refused).
 #[tauri::command]
 pub fn pi_family_auth_delete_credential(engine: String, provider_id: String) -> Result<(), String> {
     let id = provider_id.as_str();
@@ -973,14 +919,11 @@ pub fn pi_family_auth_delete_credential(engine: String, provider_id: String) -> 
     )
 }
 
-/// Read models.json / models.yml: raw text + provider summaries + parse error.
 #[tauri::command]
 pub fn pi_family_models_config_read(engine: String) -> Result<ModelsConfigReadResult, String> {
     read_models_config(&agent_dir(&engine)?, &engine)
 }
 
-/// Write models.json / models.yml after loose validation. Raw text is stored
-/// verbatim (comments and field order survive).
 #[tauri::command]
 pub fn pi_family_models_config_write(engine: String, text: String) -> Result<(), String> {
     write_models_config(&agent_dir(&engine)?, &engine, &text)

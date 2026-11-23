@@ -4,12 +4,8 @@ import {
   type SettingsContentProps,
 } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
-import { selectSearchSources } from "./searchSources";
+import { selectSearchSources } from "./search_sources";
 
-/**
- * Settings › Search: the sources a search asks besides Misty's own places and the Space. Each
- * one left off is never asked, so its results never show.
- */
 export function SearchSettings(props: SettingsContentProps) {
   const include = selectSearchSources(props.document);
   const toggle = (key: string, checked: boolean) => (

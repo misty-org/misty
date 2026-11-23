@@ -1,6 +1,3 @@
-//! The shell and its tools, ready to run: one program, embedded in the signed app, with a link to it for
-//! each tool's name, in a private folder that goes on `PATH`. It's the same set on every computer, and
-//! nothing about it depends on what a person has installed.
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex, PoisonError},
@@ -18,18 +15,12 @@ const PROGRAM: &str = "misty-agent-shell.exe";
 const PROGRAM: &str = "misty-agent-shell";
 
 pub(super) struct Tools {
-    /// Holds the private folder for as long as a command may use it.
     _keep: tempfile::TempDir,
-    /// The real path of the folder, which an OS profile compares against.
     pub folder: PathBuf,
-    /// The real path of the program every link leads to.
     pub program: PathBuf,
     stamp: Stamp,
 }
 
-/// What the program file looked like when it was staged. Commands can't write to this folder under
-/// their OS profile, so a stamp is enough to notice something else changing it, and reading the whole
-/// file back for each command would keep the program's bytes in memory for nothing.
 #[derive(PartialEq, Eq)]
 struct Stamp {
     length: u64,
@@ -53,8 +44,6 @@ fn link_tool(program: &Path, link: &Path) -> std::io::Result<()> {
     fs::symlink(program, link)
 }
 
-/// A hard link rather than a symbolic link, because Windows only lets administrators and developer
-/// mode make those, and the program finds its name from what it was started as.
 #[cfg(windows)]
 fn link_tool(program: &Path, link: &Path) -> std::io::Result<()> {
     fs::hard_link(program, link.with_extension("exe"))
@@ -77,7 +66,6 @@ fn stage(bytes: &[u8]) -> Result<Tools, String> {
         .prefix("misty-agent-shell-")
         .tempdir()
         .map_err(failed)?;
-    // Seatbelt matches real paths, and the temp folder's own path goes through a link.
     let folder = fs::canonicalize(keep.path()).map_err(failed)?;
     let program = folder.join(PROGRAM);
     fs::write(&program, bytes).map_err(failed)?;
@@ -94,7 +82,6 @@ fn stage(bytes: &[u8]) -> Result<Tools, String> {
     })
 }
 
-/// The program as it was staged, with every link there.
 fn still_intact(tools: &Tools) -> bool {
     let links = |name: &&str| {
         let link = tools.folder.join(name);
@@ -105,7 +92,6 @@ fn still_intact(tools: &Tools) -> bool {
     TOOL_NAMES.iter().all(links) && Stamp::of(&tools.program).as_ref() == Some(&tools.stamp)
 }
 
-/// The tools, staged now if it's the first command or the copy on disk has changed.
 pub(super) fn ready() -> Result<Arc<Tools>, String> {
     let mut slot = READY.lock().unwrap_or_else(PoisonError::into_inner);
     if let Some(current) = slot.as_ref() {
@@ -123,7 +109,6 @@ pub(super) fn ready() -> Result<Arc<Tools>, String> {
 mod tests {
     use super::*;
 
-    /// A private copy, since other tests are running commands through the shared one.
     fn staged() -> Tools {
         stage(builtin_worker("agent-shell", PROTOCOL).unwrap()).unwrap()
     }

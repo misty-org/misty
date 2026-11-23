@@ -1,17 +1,3 @@
-//! The opencode commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Misty runs OpenCode's turns on a managed `opencode serve` (`opencode_server.rs`), so what its
-//! terminal app does with its own `/` commands is a call to that server's HTTP API, made here out
-//! of turn, against the chat's session (`ses_…`) and folder. `/compact`, `/init` and `/review`
-//! are OpenCode's own session calls and go in the turn (`opencode_session::run_command`).
-//!
-//! OpenCode 2.x moved the server API under `/api/…` (checked against 2.3.0's `/openapi.json` and a
-//! live server): each command below picks its route from [`opencode_server::is_v2`]. 2.x dropped
-//! session sharing and Console orgs, and serves no LSP or formatter status, so those say so.
-//!
-//! Left out: `/workspaces` and `/warp` (behind OpenCode's experimental workspaces flag) and
-//! `/move` (moving a session to another folder, not checked against a running server).
-
 use std::time::Duration;
 
 use reqwest::Method;
@@ -34,8 +20,6 @@ use shell::{shell, shell_v2};
 use status::{debug, debug_v2, status, status_v2};
 
 pub const COMMANDS: &[Command] = &[
-    // OpenCode's report leaves `/compact` out (its terminal app runs it, not the server's command
-    // list), and it would vanish from the menu once the report replaces the built-in rows.
     turn(
         "compact",
         "Summarize the conversation so far to free context",
@@ -63,15 +47,10 @@ pub const COMMANDS: &[Command] = &[
     misty("org", "Show or switch your OpenCode Console org").hint("[name]"),
 ];
 
-/// How long an ordinary call may take.
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
-/// A shell command answers once it has finished, so it gets as long as a command might run.
 const SHELL_TIMEOUT: Duration = Duration::from_secs(600);
-/// The MCP sign-in waits for the browser; past this it is left running and the person is told
-/// to finish there. OpenCode gives up on its own after its callback timeout.
 const SIGN_IN_WAIT: Duration = Duration::from_secs(3);
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(600);
-/// The most of a shell command's output shown, from its end.
 const MOST_OUTPUT: usize = 20_000;
 
 const NO_SESSION: &str = "OpenCode has no session for this chat yet. Send a message first.";
@@ -80,7 +59,6 @@ const NO_SHARING: &str = "OpenCode 2 removed session sharing.";
 pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     let args = context.args.as_str();
     match name {
-        // Bare, these open Misty's own MCP settings, as `/mcp` does for every engine.
         "mcp" | "mcps" if args.is_empty() => return Ok(Output::open("settings:engine-mcp")),
         "rename" if args.is_empty() => return Err("Give the new title: /rename <title>".into()),
         "shell" if args.is_empty() => return Err("Give a command to run: /shell <command>".into()),
@@ -92,8 +70,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     );
     let session = context.session.clone();
     if in_session && session.is_none() {
-        // A chat that hasn't run yet still takes the title; OpenCode's session starts with the
-        // first message.
         if name == "rename" {
             return Ok(Output::Rename {
                 title: args.to_owned(),
@@ -140,11 +116,9 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     }
 }
 
-/// The running server, routed to the chat's folder.
 struct Server {
     origin: String,
     directory: Option<String>,
-    /// OpenCode 2.x's `/api/…` routes.
     v2: bool,
 }
 
@@ -155,8 +129,6 @@ impl Server {
             .folder
             .as_ref()
             .map(|folder| folder.to_string_lossy().into_owned());
-        // The server is up for this folder: its commands go to the `/` menu now, before the
-        // chat's first turn.
         if let Some(directory) = &directory {
             tokio::spawn(opencode_session::report_commands(
                 origin.clone(),
@@ -171,7 +143,6 @@ impl Server {
         })
     }
 
-    /// The route for this server: 2.x's `/api/…` one, else 1.x's.
     fn path(&self, v1: impl Into<String>, v2: impl Into<String>) -> String {
         if self.v2 {
             v2.into()
@@ -206,8 +177,6 @@ impl Server {
         self.call(Method::GET, path, None).await
     }
 
-    /// The session's messages, oldest first. Only session commands ask, and a session always
-    /// has its folder.
     async fn messages(&self, session: &str) -> Result<Vec<Value>, String> {
         let directory = self.directory.as_deref().unwrap_or_default();
         opencode_session::messages(&self.origin, directory, session).await
@@ -222,7 +191,6 @@ fn message_id(message: &Value) -> Option<&str> {
     text_at(message, "/info/id")
 }
 
-/// What the person typed in a message: its text parts, less the ones OpenCode added itself.
 fn prompt_text(message: &Value) -> String {
     message
         .get("parts")
@@ -238,7 +206,6 @@ fn prompt_text(message: &Value) -> String {
         .join("")
 }
 
-/// A message's first line, short enough for a notice.
 fn first_line(text: &str) -> String {
     text.trim()
         .lines()
@@ -249,7 +216,6 @@ fn first_line(text: &str) -> String {
         .collect()
 }
 
-/// The last `most` characters of `text`.
 fn tail(text: &str, most: usize) -> &str {
     let count = text.chars().count();
     if count <= most {
@@ -262,7 +228,6 @@ fn tail(text: &str, most: usize) -> &str {
     &text[start..]
 }
 
-/// A name as one URL path segment: anything but unreserved characters percent-encoded.
 fn path_segment(name: &str) -> String {
     name.bytes()
         .map(|byte| match byte {

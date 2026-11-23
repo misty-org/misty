@@ -17,12 +17,11 @@ import {
   ListRow,
   ListRowSkeleton,
 } from "@misty/ui";
-import { personTone } from "@/shared/lib/personTone";
-import { personInitials } from "@/shared/lib/personInitials";
+import { personTone } from "@/shared/lib/person_tone";
+import { personInitials } from "@/shared/lib/person_initials";
 import { directApi, type DirectConversation, type Person } from "./api";
-import { dmPath, reloadDms, reloadFriends, useFriends } from "./directData";
+import { dmPath, reloadDms, reloadFriends, useFriends } from "./direct_data";
 
-/** The most people a group DM holds, the person included. */
 const mostPeople = 10;
 
 function Face({ person }: { person: Person }) {
@@ -33,10 +32,6 @@ function Face({ person }: { person: Person }) {
   );
 }
 
-/**
- * Adds friends to a DM. Adding to a one-to-one DM starts a new group with the two of them and
- * the people picked, which opens; a group takes them in.
- */
 export function AddPeopleDialog({
   dm,
   open,
@@ -94,16 +89,15 @@ export function AddPeopleDialog({
         <ErrorState
           inline
           title="Your friends couldn't be loaded"
-          action={{ label: "Try again", onClick: () => void reloadFriends().catch(() => undefined) }}
+          action={{
+            label: "Try again",
+            onClick: () => void reloadFriends().catch(() => undefined),
+          }}
         />
       );
     if (!candidates.length)
       return (
-        <EmptyState
-          inline
-          title="No one to add"
-          line="Friends who aren't here yet show here."
-        />
+        <EmptyState inline title="No one to add" line="Friends who aren't here yet show here." />
       );
     return candidates.map((person) => {
       const checked = picked.includes(person.user_id);

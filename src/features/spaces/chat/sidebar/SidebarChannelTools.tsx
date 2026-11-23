@@ -13,13 +13,12 @@ import { useAuth } from "@/features/account";
 import { spacesApi } from "../../api/api";
 import type { SpaceConversation } from "../../api/dto/entities";
 import { SpaceDialogs, type SpaceDialog } from "../../components/space-row/SpaceDialogs";
-import { useSpacesStore } from "../../list/useSpacesStore";
-import { spaceCan } from "../../roles/useSpaceRoles";
+import { useSpacesStore } from "../../list/use_spaces_store";
+import { spaceCan } from "../../roles/use_space_roles";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
-import { conversationName } from "./conversationGroups";
-import { useSpaceConversations } from "./useSpaceConversations";
+import { conversationName } from "./conversation_groups";
+import { useSpaceConversations } from "./use_space_conversations";
 
-/** What the person may do with the Space's channels here. */
 function useChannelRights(spaceId: string) {
   const space = useSpacesStore((state) => state.spaces.find((item) => item.id === spaceId));
   const referenceOnly = useSpacesStore((state) => state.referenceOnly);
@@ -32,11 +31,6 @@ function useChannelRights(spaceId: string) {
   };
 }
 
-/**
- * A channel row in the window's sidebar with its right-click menu: Invite people, then, for
- * someone who manages channels, Edit channel and Delete channel (which asks first). `everyone`
- * (no `conversation`) offers only the invite. The row itself is the child.
- */
 export function ChannelRowMenu(props: {
   spaceId: string;
   conversation?: SpaceConversation;

@@ -10,9 +10,9 @@ import {
   type CompanionTint,
 } from "@misty/ui";
 import type { AgentProfile } from "@/shared/schemas";
-import { agentCloudVariants } from "../../personal/agentCloudAvatars";
+import { agentCloudVariants } from "../../personal/agent_cloud_avatars";
 import { AgentAvatar, AgentCloudImage } from "../../personal/AgentPicture";
-import { normalizeCompanionSize } from "./companionSize";
+import { normalizeCompanionSize } from "./companion_size";
 import type { PresentedHandoff, Presentation } from "./protocol";
 
 type CursorOverlayMarkupProps = {
@@ -20,22 +20,18 @@ type CursorOverlayMarkupProps = {
   marker: RefObject<HTMLDivElement | null>;
   focus: RefObject<HTMLDivElement | null>;
   sketch?: RefObject<HTMLDivElement | null>;
-  /** The paint the pointer leaves while the person asks. */
   trail?: RefObject<HTMLDivElement | null>;
-  /** The caption at the bottom of the screen. */
   caption?: RefObject<HTMLDivElement | null>;
   group: RefObject<HTMLDivElement | null>;
   bubble: RefObject<HTMLDivElement | null>;
   meter: RefObject<HTMLDivElement | null>;
 };
 
-/** The bubble beside the companion: the point it names, or what needs attention. */
 const bubbleClass = cn(
   "absolute top-[calc(var(--spacing)*4.5*var(--companion-scale,1))] w-max rounded-md px-2 py-1",
   "text-micro font-medium",
   screenMarkClass.fill,
 );
-/** What the bubble says about work handed to an agent. */
 function handoffLine({ agent, state }: PresentedHandoff) {
   if (state === "waiting") return `${agent.name} needs you`;
   if (state === "done") return `${agent.name} is done`;
@@ -43,16 +39,12 @@ function handoffLine({ agent, state }: PresentedHandoff) {
   return `${agent.name} is on it`;
 }
 
-/** The meter and the spinner sit centered on the companion's point, at its size. */
 const centeredClass = cn(
   "absolute -translate-x-1/2 -translate-y-1/2 scale-[var(--companion-scale,1)] opacity-0",
   "transition-opacity duration-150 ease-[ease]",
-  // With Misty beside the pointer, they sit just under her.
   "group-data-[sprite]/companion:top-[calc(var(--spacing)*6*var(--companion-scale,1))]",
 );
-/** A bubble beside the companion moves clear of Misty while she shows. */
 const besideSpriteClass = "group-data-[sprite]/companion:left-5";
-/** Misty's own picture: the Sky cloud, the one the companion has always worn. */
 const mistyCloud = agentCloudVariants[0];
 
 export function CursorOverlayMarkup({
@@ -98,7 +90,6 @@ export function CursorOverlayMarkup({
           "cursor-group group/companion absolute top-0 left-0 size-0 opacity-0",
           "transition-opacity duration-400 ease-[ease] motion-reduce:transition-none",
         )}
-        // While an agent does the work, the bubble saying so takes the spinner's place.
         data-phase={
           presentation.phase === "processing" && presentation.handoff
             ? "handoff"
@@ -112,8 +103,6 @@ export function CursorOverlayMarkup({
         }
       >
         {presentation.sprite === true && (
-          // A click on Misty opens Tutor's text box. She takes the pointer only while it is on
-          // her (`data-on-misty`, set by the loop), so everywhere else stays the app's.
           <Pressable
             aria-label="Ask Misty"
             tabIndex={-1}
@@ -159,8 +148,6 @@ export function CursorOverlayMarkup({
           )}
           viewBox="0 0 18 18"
         >
-          {/* Plain strokes only: WebKit draws a masked foreignObject blurred and out of place
-              while it turns. */}
           <circle cx="9" cy="9" r="7" strokeWidth="2.5" className={screenMarkClass.spinnerTrack} />
           <circle
             cx="9"
@@ -181,7 +168,6 @@ export function CursorOverlayMarkup({
           )}
         />
         {presentation.hint && (
-          // Shown by the loop: as Misty first appears, and on a pointer that has rested a while.
           <div
             className={cn(
               "cursor-hint-bubble left-2.5 opacity-0 transition-opacity duration-500 ease-out",
@@ -207,7 +193,6 @@ export function CursorOverlayMarkup({
           </div>
         )}
         {presentation.error && !presentation.point && (
-          // What went wrong, said plainly; holding the talk keys again is the retry.
           <div className={cn("cursor-error-bubble left-0 max-w-72", bubbleClass)}>
             {presentation.error.includes("Speech failed:")
               ? "Speech unavailable"

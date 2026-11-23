@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import type * as ReactRouter from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mistyCloudServer, useServerChoice } from "@/api/deployment/serverChoice";
+import { mistyCloudServer, useServerChoice } from "@/api/deployment/server_choice";
 
 const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
@@ -40,14 +40,14 @@ vi.mock("../AuthContext", () => ({
   }),
 }));
 
-vi.mock("../sessions/useAccountStore", () => ({
+vi.mock("../sessions/use_account_store", () => ({
   accountSignIn: mocks.accountSignIn,
 }));
 
 import { NoticeViewport } from "@misty/ui";
 import SignIn from "./SignInPage";
-import { useSetupStore } from "../setup/useSetupStore";
-import { SavedAccountSessionUnavailableError } from "../sessions/sessionErrors";
+import { useSetupStore } from "../setup/use_setup_store";
+import { SavedAccountSessionUnavailableError } from "../sessions/session_errors";
 
 function setInputValue(input: HTMLInputElement, value: string) {
   const valueSetter = Object.getOwnPropertyDescriptor(
@@ -147,17 +147,14 @@ describe("SignInPage", () => {
       );
     });
 
-    // Saved accounts come first, even when adding one.
     expect(container.textContent).toContain("Choose an account");
     await useAnotherAccount(container);
 
-    // Verify title, with no subheading
     expect(container.textContent).toContain("Add another account");
     expect(container.textContent).not.toContain(
       "Your current account will remain signed in on this device.",
     );
 
-    // Verify actual input fields are rendered, NOT dead website buttons
     const emailInput = container.querySelector<HTMLInputElement>('input[type="email"]');
     const passwordInput = container.querySelector<HTMLInputElement>('input[type="password"]');
     expect(emailInput).not.toBeNull();
@@ -165,7 +162,6 @@ describe("SignInPage", () => {
     expect(container.textContent).not.toContain("Sign in on the website");
     expect(container.textContent).not.toContain("Create an account on the website");
 
-    // The page has no back button: the logo in the bar goes to the welcome page.
     expect(backButtonIn(container)).toBeNull();
     expect(container.textContent).not.toContain("Return to app");
   });
@@ -250,7 +246,6 @@ describe("SignInPage", () => {
   );
 
   it("submits in-app credentials and authenticates when adding another account", async () => {
-    // A device that was set up before goes straight back to the page that asked.
     useSetupStore.setState({ welcomed: true });
     mockAccounts = [{ id: "acc-1", email: "alice@example.com", username: "Alice" }];
     mocks.accountSignIn.mockResolvedValue({

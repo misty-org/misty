@@ -23,11 +23,6 @@
 // Misty's changes: names are kept in NFC as the server keeps them, the server's own name rules are
 // checked here, and the path checks shared folders use (`spaces_folders/paths.rs`) moved in.
 
-//! Drive paths and the local names items get.
-//!
-//! A drive path is `/`-rooted and uses `/` whatever the platform: `/`, `/Reports`,
-//! `/Reports/q3.xlsx`. It is the item's path under its Space's mount after names were made safe
-//! and unique on this computer, so it maps one-to-one to a local path.
 use std::{
     collections::{HashMap, HashSet},
     path::{Component, Path, PathBuf},
@@ -56,14 +51,12 @@ pub fn file_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or_default()
 }
 
-/// Whether `path` is `ancestor` or inside it.
 pub fn is_within(path: &str, ancestor: &str) -> bool {
     ancestor == ROOT
         || path == ancestor
         || (path.starts_with(ancestor) && path.as_bytes().get(ancestor.len()) == Some(&b'/'))
 }
 
-/// Rewrites `path` from under `from` to under `to`.
 pub fn rebase(path: &str, from: &str, to: &str) -> String {
     if path == from {
         return to.to_owned();
@@ -76,8 +69,6 @@ pub fn rebase(path: &str, from: &str, to: &str) -> String {
     }
 }
 
-/// A drive path a window or the extension named, checked and normalized: `/`-rooted, no `.` or
-/// `..` parts, no empty parts, NFC. `""` and `"/"` are the root.
 pub fn drive_path(text: &str) -> Result<String, String> {
     let refuse = || Err(format!("“{text}” isn't a path in the drive."));
     if text.len() > 16 * 1024 || text.contains(['\\', '\0']) {
@@ -97,15 +88,13 @@ pub fn drive_path(text: &str) -> Result<String, String> {
     })
 }
 
-/// Converts a path relative to a mount into a drive path.
 pub fn path_from_components(relative: &Path) -> Result<String, String> {
     let mut parts = Vec::new();
     for component in relative.components() {
         match component {
-            Component::Normal(part) => parts.push(nfc(
-                part.to_str()
-                    .ok_or_else(|| "File names must be valid Unicode.".to_owned())?,
-            )),
+            Component::Normal(part) => parts.push(nfc(part
+                .to_str()
+                .ok_or_else(|| "File names must be valid Unicode.".to_owned())?)),
             Component::CurDir => {}
             _ => return Err("Drive paths can't leave their drive.".to_owned()),
         }
@@ -125,24 +114,21 @@ pub fn local_path(mount: &Path, path: &str) -> PathBuf {
     out
 }
 
-/// A name in NFC, as the server keeps names.
 pub fn nfc(name: &str) -> String {
     name.nfc().collect()
 }
 
-/// Whether the server takes `name`: NFC, 1–255 bytes, no `/`, `\`, NUL or control characters, not
-/// `.` or `..`.
 pub fn server_accepts(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 255
         && name != "."
         && name != ".."
-        && !name.chars().any(|c| c == '/' || c == '\\' || c.is_control())
+        && !name
+            .chars()
+            .any(|c| c == '/' || c == '\\' || c.is_control())
         && nfc(name) == name
 }
 
-/// A local name made acceptable to the server: NFC, look-alikes for what it refuses, and
-/// shortened to 255 bytes on a character boundary, keeping the extension.
 pub fn server_name(local: &str) -> String {
     let mut out = String::with_capacity(local.len());
     for ch in nfc(local).chars() {
@@ -176,8 +162,6 @@ fn shorten(name: &str, bytes: usize) -> String {
     format!("{cut}{tail}")
 }
 
-/// Makes a server name usable as a local file name. Windows refuses several more characters than
-/// the server does, so those become look-alikes.
 pub fn safe_local_name(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for ch in name.chars() {
@@ -219,15 +203,10 @@ pub fn safe_local_name(name: &str) -> String {
     nfc(&out)
 }
 
-/// The key two names collide under: most local disks treat names that differ only in case as
-/// one, and the server keeps names unique by `lower()`.
 pub fn fold(name: &str) -> String {
     nfc(name).to_lowercase()
 }
 
-/// Gives every entry in one folder a distinct local name. Names that collide (names differing
-/// only in case, or two that became the same look-alike) get ` (2)`, ` (3)`, … in the order of
-/// `keys`, so the same listing always produces the same names.
 pub fn unique_names(names: &[String], keys: &[String]) -> Vec<String> {
     let mut order: Vec<usize> = (0..names.len()).collect();
     order.sort_by(|&left, &right| {
@@ -237,7 +216,6 @@ pub fn unique_names(names: &[String], keys: &[String]) -> Vec<String> {
     });
     let mut taken: HashSet<String> = HashSet::new();
     let mut result = vec![String::new(); names.len()];
-    // Unique names keep their spelling even if a later suffix would collide.
     let mut counts = HashMap::<String, usize>::new();
     for name in names {
         *counts.entry(fold(name)).or_default() += 1;
@@ -265,7 +243,6 @@ pub fn unique_names(names: &[String], keys: &[String]) -> Vec<String> {
     result
 }
 
-/// `name` with ` (n)` before its extension.
 pub fn numbered(name: &str, n: usize) -> String {
     let (stem, extension) = split_extension(name);
     match extension {
@@ -274,7 +251,6 @@ pub fn numbered(name: &str, n: usize) -> String {
     }
 }
 
-/// `name` with ` (note)` before its extension: `Report (restored).pdf`.
 pub fn noted(name: &str, note: &str) -> String {
     let (stem, extension) = split_extension(name);
     let out = match extension {
@@ -293,7 +269,6 @@ pub fn split_extension(name: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// Files editors and the OS create next to documents. They are never uploaded.
 pub fn is_scratch_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     name.starts_with("~$")
@@ -318,15 +293,9 @@ pub fn is_scratch_name(name: &str) -> bool {
         ]
         .iter()
         .any(|suffix| lower.ends_with(suffix))
-        || lower.contains(".sb-") // macOS safe-save scratch files
+        || lower.contains(".sb-")
 }
 
-// The checks shared folders make on paths a window or the server names, moved here from
-// `spaces_folders/paths.rs`, which re-exports them.
-
-/// A path inside a shared folder, as the server and the walker write it (`docs/notes.md`), turned
-/// into a relative path. Refused: empty, absolute, `.` or `..` parts, backslashes, and any `.git`
-/// part, so nothing reaches outside the folder or plants a repository's hooks in Misty's cache.
 pub fn relative(text: &str) -> Result<PathBuf, String> {
     let refuse = || Err(format!("“{text}” isn't a path inside the folder."));
     if text.is_empty() || text.len() > 4096 || text.contains(['\\', '\0']) {
@@ -342,14 +311,16 @@ pub fn relative(text: &str) -> Result<PathBuf, String> {
         }
         path.push(part);
     }
-    if path.is_absolute() || path.components().any(|part| !matches!(part, Component::Normal(_))) {
+    if path.is_absolute()
+        || path
+            .components()
+            .any(|part| !matches!(part, Component::Normal(_)))
+    {
         return refuse();
     }
     Ok(path)
 }
 
-/// A path relative to `root` as the server writes it, `/` between its parts. `None` for the root
-/// itself, a path outside it, or a name that isn't UTF-8 (it couldn't be named on the server).
 pub fn relative_text(root: &Path, path: &Path) -> Option<String> {
     let rest = path.strip_prefix(root).ok()?;
     let mut parts = Vec::new();
@@ -362,7 +333,6 @@ pub fn relative_text(root: &Path, path: &Path) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join("/"))
 }
 
-/// A 64-character SHA-256 in hex, lowercased.
 pub fn sha256(text: &str) -> Result<String, String> {
     let fine = text.len() == 64 && text.bytes().all(|byte| byte.is_ascii_hexdigit());
     fine.then(|| text.to_ascii_lowercase())
@@ -441,7 +411,14 @@ mod tests {
 
     #[test]
     fn recognizes_scratch_files() {
-        for name in ["~$report.docx", ".DS_Store", "a.txt.swp", "notes.tmp", "x~", "._a"] {
+        for name in [
+            "~$report.docx",
+            ".DS_Store",
+            "a.txt.swp",
+            "notes.tmp",
+            "x~",
+            "._a",
+        ] {
             assert!(is_scratch_name(name), "{name}");
         }
         for name in ["report.docx", ".gitignore", "temp.txt"] {

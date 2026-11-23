@@ -2,7 +2,7 @@
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { IconButton, Input, Pressable, SidePanelHeader } from "@misty/ui";
-import { terminalTabTitle, useTerminalStore, type TerminalTab } from "./terminalStore";
+import { terminalTabTitle, useTerminalStore, type TerminalTab } from "./terminal_store";
 import { TerminalView } from "./TerminalView";
 import "./terminal.css";
 
@@ -45,13 +45,6 @@ function TabTitle(props: { tab: TerminalTab; index: number; onRename(title: stri
   );
 }
 
-/**
- * The chat's terminals: a strip of tabs and one shell per tab. Each chat has its own, so two
- * chats side by side never share a shell. A new tab runs in the chat's folder, and a tab keeps
- * the folder it was opened in. Shells outlive the panel: closing it, or switching tabs or chats,
- * leaves every shell running, and its output is there when the tab shows again. A shell ends
- * when its tab is closed. Double-click a tab to rename it.
- */
 export default function TerminalPanel({ chat, folder }: { chat: string; folder: string }) {
   const tabs = useTerminalStore((state) => state.tabsByChat[chat] ?? noTabs);
   const activeId = useTerminalStore((state) => state.activeByChat[chat]);
@@ -60,7 +53,6 @@ export default function TerminalPanel({ chat, folder }: { chat: string; folder: 
   const closeTab = useTerminalStore((state) => state.closeTab);
   const renameTab = useTerminalStore((state) => state.renameTab);
 
-  // The panel always shows a shell: opening it on a chat with no tabs starts the first one.
   useEffect(() => {
     if (!tabs.length) newTab(chat, folder);
   }, [tabs.length, chat, folder, newTab]);
@@ -72,7 +64,6 @@ export default function TerminalPanel({ chat, folder }: { chat: string; folder: 
 
   return (
     <div className="terminal-panel">
-      {/* The tabs are the panel's header row; on the Code page, a bar of their own. */}
       <SidePanelHeader bar>
         <div className="terminal-tabs" role="tablist" aria-label="Terminals">
           {tabs.map((tab, index) => {

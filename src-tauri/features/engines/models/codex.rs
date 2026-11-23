@@ -1,8 +1,10 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/models/codex.rs.
 use super::{run_probe, EngineModel};
 
-/// Codex's active model from its own config: `$CODEX_HOME/config.toml`
-/// (default ~/.codex). Channel overrides remain scoped to their child process.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Codex's own config in place, under the home the person may have set outside the engine folders the gate grants"
+)]
 pub(super) fn codex_config_model() -> Option<EngineModel> {
     let home = crate::engines::codex_home();
     let content = std::fs::read_to_string(home.join("config.toml")).ok()?;
@@ -27,12 +29,6 @@ fn parse_codex_config_model(content: &str) -> Option<EngineModel> {
             .map(|window| window as u64),
     })
 }
-/// `codex debug models` → {"models":[{slug,display_name,visibility,
-/// context_window,…}]}; `visibility: "list"` marks exactly the entries the
-/// interactive picker offers ("hide" = internal/deprecated).
-/// The catalog's rows and, from the same JSON, what Codex says about each: its description, its
-/// reasoning levels (`supported_reasoning_levels`, each with Codex's own line about it) and its
-/// default level (`default_reasoning_level`).
 pub(super) async fn run_codex_debug_models(
     bin: &str,
 ) -> Result<
@@ -94,7 +90,6 @@ pub fn parse_codex_model_details(
                     context_window: row
                         .get("context_window")
                         .and_then(serde_json::Value::as_u64),
-                    // Its faster service tier, by Codex's own id and name, when it lists one.
                     fast: row
                         .get("service_tiers")
                         .and_then(serde_json::Value::as_array)
@@ -209,7 +204,6 @@ mod tests {
             ["low", "max"]
         );
         assert_eq!(levels[1].description.as_deref(), Some("Deepest"));
-        // No tier listed: no fast mode of Misty's making.
         assert!(luna.fast.is_none());
         let tiered = parse_codex_model_details(
             r#"{"models":[{"slug":"m","visibility":"list","service_tiers":[{"id":"priority","name":"Priority"}]}]}"#,

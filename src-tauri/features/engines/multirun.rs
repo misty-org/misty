@@ -1,14 +1,3 @@
-//! Multi-run: one task given to several agents at once, each on an outside engine in its own Git
-//! worktree of the Space's linked folder, so their changes never meet. The person compares what
-//! each did and keeps one, which is folded into the folder staged and uncommitted.
-//!
-//! The worktrees live under Misty's own folder and are named here, never by a window. A chat
-//! turn may run in one because this file recorded it for that account (`is_worktree`), which is
-//! the only way a folder that isn't linked becomes somewhere an engine can work. Nothing here
-//! pushes, and only what multi-run made is ever removed.
-//!
-//! The idea follows OpenChamber's multi-run; none of its code is used here.
-
 mod store;
 #[cfg(test)]
 mod tests;
@@ -29,23 +18,18 @@ use store::Row;
 const MAX_LANES: usize = 4;
 const MAX_TASK: usize = 20_000;
 
-/// Whether multi-run made exactly this folder for this account, so a turn may run in it.
 pub(crate) fn is_worktree(db: &database::store::Store, account: &str, folder: &Path) -> bool {
     store::is_worktree(db, account, folder)
 }
 
-/// Every worktree multi-run has on this computer, for the file gate as the app starts.
 pub(crate) fn worktree_folders(db: &database::store::Store) -> Vec<PathBuf> {
     store::all_paths(db)
 }
 
-/// A full commit id, as `git rev-parse` prints it.
 fn is_commit(text: &str) -> bool {
     matches!(text.len(), 40 | 64) && text.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-/// A multi-run's id: ten lowercase hex digits, made here. It becomes part of a folder's and a
-/// branch's name, so nothing else is accepted.
 fn is_id(text: &str) -> bool {
     text.len() == 10
         && text
@@ -61,7 +45,6 @@ fn branch_name(id: &str, lane: i64) -> String {
     format!("misty/multirun-{id}-{lane}")
 }
 
-/// An id a window names (an agent, a chat). It is only ever stored and compared.
 fn plain(text: &str) -> Result<String, String> {
     let text = text.trim();
     if text.is_empty() || text.len() > 200 || text.chars().any(char::is_control) {
@@ -70,7 +53,6 @@ fn plain(text: &str) -> Result<String, String> {
     Ok(text.to_string())
 }
 
-/// `~/.misty/shared/multirun`, shared by every build: each repository knows its worktrees by path.
 fn root(misty_root: &Path) -> PathBuf {
     misty_root
         .join(file_access::paths::SHARED_FOLDER)
@@ -101,7 +83,6 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-/// An agent chosen for a multi-run, and the chat its turn will be shown in.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LaneAsk {
@@ -115,7 +96,6 @@ pub struct Lane {
     index: i64,
     agent_id: String,
     conversation_id: String,
-    /// The worktree, which the lane's chat turns name as their folder.
     folder: String,
     branch: String,
     kept: bool,
@@ -126,13 +106,11 @@ pub struct Lane {
 pub struct Multirun {
     id: String,
     task: String,
-    /// The linked folder the lanes were made from.
     folder: String,
     created_at: i64,
     lanes: Vec<Lane>,
 }
 
-/// Rows in the store's order (a multi-run's lanes together) as multi-runs.
 fn grouped(rows: Vec<Row>) -> Vec<Multirun> {
     let mut runs: Vec<Multirun> = Vec::new();
     for row in rows {
@@ -158,8 +136,6 @@ fn grouped(rows: Vec<Row>) -> Vec<Multirun> {
     runs
 }
 
-/// Removes the worktrees and branches of `rows` and the folder that held them. `home` is that
-/// folder, under Misty's own; a worktree recorded anywhere else is left alone.
 async fn take_down(home: &Path, rows: &[Row]) {
     for row in rows {
         let (folder, path) = (Path::new(&row.folder), Path::new(&row.path));
@@ -191,7 +167,6 @@ async fn lane_of(
         .ok_or_else(|| "That run isn't part of a multi-run on this computer.".to_string())
 }
 
-/// Whether the linked folder can take a multi-run: `ready`, or what is in the way.
 #[tauri::command]
 pub async fn multirun_check(
     app: tauri::AppHandle,
@@ -204,8 +179,6 @@ pub async fn multirun_check(
     worktrees::readiness(&folder).await
 }
 
-/// Makes a worktree and a branch for each chosen agent, from the commit the folder is on, and
-/// records them. The window then starts each agent's chat turn in its lane's folder.
 #[tauri::command]
 pub async fn multirun_start(
     webview: tauri::Webview,
@@ -278,7 +251,6 @@ pub async fn multirun_start(
         .ok_or_else(|| "That multi-run can't be started.".to_string())
 }
 
-/// A Space's multi-runs on this computer, newest first.
 #[tauri::command]
 pub async fn multirun_list(
     webview: tauri::Webview,
@@ -296,7 +268,6 @@ pub async fn multirun_list(
         .map(grouped)
 }
 
-/// What one lane changed since the multi-run started: each file, with its diff.
 #[tauri::command]
 pub async fn multirun_changes(
     webview: tauri::Webview,
@@ -311,13 +282,10 @@ pub async fn multirun_changes(
     if !file_access::fs::is_dir(&worktree) || !is_commit(&row.base) {
         return Err("This run's folder is gone.".into());
     }
-    // Beside the worktree, not in it: `<home>/<lane>.index`.
     let index = worktree.with_extension("index");
     crate::project::git::changes_since(&worktree, &index, &row.base).await
 }
 
-/// Keeps one lane: its work is folded into the linked folder, staged and not committed, for the
-/// person to review and commit in the changes panel.
 #[tauri::command]
 pub async fn multirun_keep(
     app: tauri::AppHandle,
@@ -329,7 +297,6 @@ pub async fn multirun_keep(
 ) -> Result<(), String> {
     person_window(&webview)?;
     let row = lane_of(&state, &account, &multirun, lane).await?;
-    // The folder must still be one this account links.
     let folder = linked_path(&app, &account, &row.folder).await?;
     let worktree = PathBuf::from(&row.path);
     if !file_access::fs::is_dir(&worktree) || !is_commit(&row.base) {
@@ -344,8 +311,6 @@ pub async fn multirun_keep(
     blocking(move || store::mark_kept(&db, &row.account, &row.multirun, row.lane)).await
 }
 
-/// Discards a multi-run: stops what still runs in it, then removes its worktrees and branches.
-/// The chats stay, and so does anything already kept in the linked folder.
 #[tauri::command]
 pub async fn multirun_discard(
     webview: tauri::Webview,
@@ -367,11 +332,9 @@ pub async fn multirun_discard(
         for run in super::runs::live_in(Path::new(&row.path)) {
             stopped |= super::runs::cancel(&run);
         }
-        // A process kept warm there would hold the folder it is about to lose.
         super::runs::end_warm_in(Path::new(&row.path));
     }
     if stopped {
-        // An engine told to stop takes a moment to let go of its folder.
         tokio::time::sleep(Duration::from_millis(400)).await;
     }
     let home = root(&state.environment.misty_root()).join(&multirun);

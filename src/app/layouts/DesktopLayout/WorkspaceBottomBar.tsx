@@ -8,8 +8,8 @@ import {
   bottomBarItemIds,
   useBottomBar,
   type BottomBarItemId,
-} from "./bottomBarStore";
-import { closedHeight } from "./spaceBarTiming";
+} from "./bottom_bar_store";
+import { closedHeight } from "./space_bar_timing";
 
 type Side = "start" | "end";
 
@@ -20,19 +20,11 @@ const items = Object.fromEntries(
   }),
 ) as Record<BottomBarItemId, BarItem>;
 
-/** The end an item goes back to when it's shown again: where it sits by default. */
 const homeSide = (id: BottomBarItemId): Side =>
   bottomBarDefaults.start.includes(id) ? "start" : "end";
 
-/**
- * The window's bottom bar, under the panes and beside the sidebar's account row. It keeps room
- * at the bottom of the window so nothing floats over a page's own content, and shows the items
- * the person picked, in their order, at either end: dragged into place there, or hidden and shown
- * again from a right-click on that end, as in Settings › Interface › Bottom bar.
- */
 export function WorkspaceBottomBar(props: {
   gridColumn: number;
-  /** Opens a page as the tab bar does, for items that open a chat or a new tab. */
   onOpen(view: WorkspaceView): void;
 }) {
   const { start, end } = useBottomBar(
@@ -40,7 +32,6 @@ export function WorkspaceBottomBar(props: {
   );
   useEffect(() => void useBottomBar.getState().load(), []);
   const hidden = bottomBarItemIds.filter((id) => !start.includes(id) && !end.includes(id));
-  // Each end is its own bar: what it shows, then what it would show if the person showed it.
   const layoutOf = (side: Side): BarLayout => {
     const shown = side === "start" ? start : end;
     const off = hidden.filter((id) => homeSide(id) === side);
@@ -58,16 +49,12 @@ export function WorkspaceBottomBar(props: {
       layout={layoutOf(side)}
       onChange={(next) => save(side, next)}
       onReset={() => useBottomBar.getState().reset()}
-      // The start fills the bar's free room, so a right-click anywhere on the bar opens a menu.
       className={side === "start" ? "min-w-0 flex-1 gap-2 self-stretch" : "gap-2 self-stretch"}
     />
   );
   return (
     <BottomBarOpenContext.Provider value={props.onOpen}>
       <div
-        // As tall as the sidebar's account row beside it (the header band's 48px), so the
-        // bar's controls sit level with the account button. At that height they keep the
-        // standard 32px, as everywhere else in the window.
         className="[--ui-bottom-bar-standard:var(--ui-header)]"
         style={{ gridColumn: props.gridColumn, gridRow: 4, paddingBottom: closedHeight }}
       >

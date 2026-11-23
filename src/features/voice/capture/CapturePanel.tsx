@@ -2,18 +2,18 @@ import { FileText, ListChecks, MessageSquare, Mic, MicOff, Square, X } from "luc
 import { useEffect, useRef, useState } from "react";
 import {
   Button,
+  FloatingPanel,
   IconButton,
   Input,
-  OverflowFadeText,
   Text,
   Textarea,
   Tooltip,
   useNotice,
 } from "@misty/ui";
-import type { VoiceNoteMode } from "./captureApi";
-import { askAboutCapturedNote } from "./openNote";
-import { speakersOf } from "./transcriptTurns";
-import { useCaptureStore } from "./useCaptureStore";
+import type { VoiceNoteMode } from "./capture_api";
+import { askAboutCapturedNote } from "./open_note";
+import { speakersOf } from "./transcript_turns";
+import { useCaptureStore } from "./use_capture_store";
 
 const sourceLabel = {
   mic: "Microphone",
@@ -21,43 +21,64 @@ const sourceLabel = {
   app: "An app",
 } as const;
 
-/** What it listens to, as the end of "Listening to …". */
 const listeningTo = {
   mic: "the microphone",
   system: "system audio",
   app: "an app",
 } as const;
 
-/**
- * The live Note for a capture: what is being heard, by speaker, with the
- * person's own notes beside it. Mute and Stop stay visible while listening.
- * Once stopped, the transcript turns into a Note in the person's own Space.
- */
 export function CapturePanel() {
   const store = useCaptureStore();
   const notice = store.notice;
   const close = store.close;
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => end.current?.scrollIntoView({ block: "end" }), [store.turns.length]);
-  // Once the capture is over, what is left to say is a notice in the corner.
   useNotice(store.phase === "idle" && Boolean(notice), { message: notice ?? "", onDismiss: close });
   if (store.phase === "idle") return null;
   const listening = store.phase === "live" || store.phase === "starting";
   const busy = store.phase === "working" || store.phase === "saving";
   const make = (mode: VoiceNoteMode) => void store.makeNote(mode);
   return (
-    <aside
-      aria-label="Listening"
+    <div
       data-misty-notification="true"
       data-misty-window-drag-block="true"
-      className="fixed right-4 bottom-4 z-50 flex max-h-[70vh] w-96 flex-col gap-3 rounded-lg border bg-background p-4 shadow-lg"
+      className="fixed right-4 bottom-4 layer-notification flex max-h-[70vh] flex-col"
     >
-      <header className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <OverflowFadeText as="div" className="text-sm font-medium">
-            {store.title || "Listening"}
-          </OverflowFadeText>
-          <Text bare as="div" tone="muted" className="text-xs">
+      <FloatingPanel
+        anchor="free"
+        width="lg"
+        className="min-h-0"
+        title={store.title || "Listening"}
+        onClose={listening || busy ? undefined : close}
+        actions={
+          listening ? (
+            <>
+              <IconButton
+                label={store.muted ? "Unmute microphone" : "Mute microphone"}
+                variant="quiet"
+                disabled={!store.source?.mic || store.phase !== "live"}
+                onClick={() => void store.toggleMute()}
+              >
+                {store.muted ? <MicOff /> : <Mic />}
+              </IconButton>
+              <IconButton
+                label="Stop"
+                variant="quiet"
+                disabled={store.phase !== "live"}
+                onClick={() => void store.stop()}
+              >
+                <Square />
+              </IconButton>
+            </>
+          ) : busy ? (
+            <IconButton label="Close" size="sm" variant="quiet" disabled>
+              <X />
+            </IconButton>
+          ) : undefined
+        }
+      >
+        <div className="flex min-h-0 flex-col gap-3">
+          <Text size="meta" tone="muted">
             {store.phase === "live"
               ? store.source
                 ? `Listening to ${listeningTo[store.source.kind]}`
@@ -68,82 +89,57 @@ export function CapturePanel() {
                   ? sourceLabel[store.source.kind]
                   : "Transcript"}
           </Text>
+          {notice && (
+            <Text as="p" size="meta" tone="muted" role="status" wrap>
+              {notice}
+            </Text>
+          )}
+          <Lanes />
+          <div ref={end} />
+          <Textarea
+            aria-label="Your notes"
+            placeholder="Your notes. They're kept as you write them."
+            value={store.notes}
+            onChange={(event) => store.setNotes(event.target.value)}
+            rows={3}
+          />
+          {!listening && store.transcriptId && (
+            <footer className="flex min-w-0 gap-2">
+              <Button variant="primary" disabled={busy} onClick={() => make("notes")}>
+                <FileText /> {store.noteId ? "Redo notes" : "Turn into notes"}
+              </Button>
+              <Button variant="quiet" disabled={busy} onClick={() => make("summary")}>
+                Summarize
+              </Button>
+              <Button variant="quiet" disabled={busy} onClick={() => make("actions")}>
+                <ListChecks /> Action items
+              </Button>
+              <Button
+                variant="quiet"
+                disabled={busy || !store.noteId}
+                onClick={() => void askAboutCapturedNote()}
+              >
+                <MessageSquare /> Ask about it
+              </Button>
+            </footer>
+          )}
         </div>
-        {listening ? (
-          <>
-            <IconButton
-              label={store.muted ? "Unmute microphone" : "Mute microphone"}
-              disabled={!store.source?.mic || store.phase !== "live"}
-              onClick={() => void store.toggleMute()}
-            >
-              {store.muted ? <MicOff /> : <Mic />}
-            </IconButton>
-            <Button
-              variant="quiet"
-              disabled={store.phase !== "live"}
-              onClick={() => void store.stop()}
-            >
-              <Square /> Stop
-            </Button>
-          </>
-        ) : (
-          <IconButton label="Close" onClick={close} disabled={busy}>
-            <X />
-          </IconButton>
-        )}
-      </header>
-      {notice && (
-        <Text bare as="p" tone="muted" role="status" className="text-xs">
-          {notice}
-        </Text>
-      )}
-      <Lanes />
-      <div ref={end} />
-      <Textarea
-        aria-label="Your notes"
-        placeholder="Your notes. They're kept as you write them."
-        value={store.notes}
-        onChange={(event) => store.setNotes(event.target.value)}
-        rows={3}
-      />
-      {!listening && store.transcriptId && (
-        <footer className="flex min-w-0 gap-2">
-          <Button variant="primary" disabled={busy} onClick={() => make("notes")}>
-            <FileText /> {store.noteId ? "Redo notes" : "Turn into notes"}
-          </Button>
-          <Button variant="quiet" disabled={busy} onClick={() => make("summary")}>
-            Summarize
-          </Button>
-          <Button variant="quiet" disabled={busy} onClick={() => make("actions")}>
-            <ListChecks /> Action items
-          </Button>
-          <Button
-            variant="quiet"
-            disabled={busy || !store.noteId}
-            onClick={() => void askAboutCapturedNote()}
-          >
-            <MessageSquare /> Ask about it
-          </Button>
-        </footer>
-      )}
-    </aside>
+      </FloatingPanel>
+    </div>
   );
 }
 
-/** One lane per turn, labelled with the speaker's name for this capture. */
 function Lanes() {
   const { turns, speakers, phase, rename } = useCaptureStore();
   const [editing, setEditing] = useState<string | null>(null);
   if (!turns.length)
-    // Nothing is being fetched: the capture waits for someone to speak, which may take a while,
-    // so it says so quietly instead of drawing placeholder text.
     return phase === "starting" || phase === "live" ? (
-      <Text as="p" tone="muted" role="status" className="m-0 text-sm">
+      <Text as="p" size="control" tone="muted" role="status" className="m-0">
         Listening
       </Text>
     ) : null;
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto text-sm">
+    <Text bare as="div" size="control" className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex flex-wrap gap-1">
         {speakersOf(turns).map((speaker) =>
           editing === speaker ? (
@@ -165,12 +161,7 @@ function Lanes() {
             />
           ) : (
             <Tooltip key={speaker} content="Rename">
-              <Button
-                variant="quiet"
-                size="sm"
-                className="text-xs"
-                onClick={() => setEditing(speaker)}
-              >
+              <Button variant="quiet" size="sm" onClick={() => setEditing(speaker)}>
                 {speakers[speaker] ?? speaker}
               </Button>
             </Tooltip>
@@ -179,12 +170,14 @@ function Lanes() {
       </div>
       {turns.map((turn, index) => (
         <p key={`${turn.start}-${index}`} className="leading-snug">
-          <span className="font-medium">{speakers[turn.speaker] ?? turn.speaker}</span>{" "}
+          <Text bare weight="medium">
+            {speakers[turn.speaker] ?? turn.speaker}
+          </Text>{" "}
           <Text bare tone="muted">
             {turn.text}
           </Text>
         </p>
       ))}
-    </div>
+    </Text>
   );
 }

@@ -1,20 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! pi (`~/.pi/agent/sessions`) and oh-my-pi (`~/.omp/agent/sessions`)
-//! session logs: `<cwd-slug>/<ts>_<session>.jsonl`, with task subagents in
-//! nested directories. Each file starts with a `{"type":"session",id,cwd}`
-//! header (a `title` line may precede it); `type:"message"` entries whose
-//! `message.role` is `assistant` carry `usage` {input, output, cacheRead,
-//! cacheWrite, reasoning|reasoningTokens}. `input` already excludes cache
-//! reads and reasoning is part of `output` (totalTokens = input + output +
-//! cacheRead + cacheWrite on real logs).
-//!
-//! Key: engine + response timestamp + provider `responseId` (entry id when
-//! absent). A forked/branched session copies these entries verbatim, so the
-//! copy upserts onto the original instead of double counting. The 8-hex
-//! entry id alone is too short to be globally unique across sessions.
-
 use super::{clean, de_count, de_opt_count, de_opt_string, model_or_unknown, UsageEvent};
 use crate::engine_config::usage_stats::time::{epoch_ms_from_number, parse_iso_ms};
 use crate::engine_config::usage_stats::types::{Engine, Tokens};

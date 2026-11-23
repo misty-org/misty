@@ -1,6 +1,6 @@
-import type { GlobalAiMessage } from "../state/conversationTypes";
-import { useMistyStore } from "../state/useMistyStore";
-import { MessageActions, Tooltip, type MessageAction } from "@misty/ui";
+import type { GlobalAiMessage } from "../state/conversation_types";
+import { useMistyStore } from "../state/use_misty_store";
+import { MessageActions, Tooltip, useNow, type MessageAction } from "@misty/ui";
 import {
   Copy,
   Forward,
@@ -13,31 +13,23 @@ import {
   ThumbsUp,
   Volume2,
 } from "lucide-react";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSpaceWindowStore } from "@/features/app-windows";
-import { spacesGateway } from "../../spaces-gateway/spacesGateway";
+import { spacesGateway } from "../../spaces-gateway/spaces_gateway";
 import { HandOffDialog } from "./HandOffDialog";
-import { formatCost } from "../../context-panel/chatUsage";
+import { formatCost } from "../../context-panel/chat_usage";
 import { formatTokens, tookText } from "./meta/format";
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const fullFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-/**
- * The one action bar under each message, aligned to its edge: shown only while the message is
- * hovered or holds focus. Answers share one set of actions whether they finished or failed; Try again
- * joins them only on a retryable failure.
- */
 export function AgentMessageActions(props: {
   conversationId?: string;
   message: GlobalAiMessage;
-  /** The message text as shown, without private context envelopes. */
   text: string;
   working: boolean;
   retryPrompt?: string;
-  /** The prompt message a retry starts from. */
   retryFrom?: string;
-  /** The prompt can be sent again as typed: no attachments or private context. */
   resendable?: boolean;
   onRetry: (prompt: string, fromMessageId?: string) => void;
   onEdit?: (text: string) => void;
@@ -47,7 +39,6 @@ export function AgentMessageActions(props: {
   const state = message.state ?? "completed";
   const user = message.role === "user";
   const [handOff, setHandOff] = useState(false);
-  // Re-read when the window shows another Space.
   useSpaceWindowStore((store) => store.identity.key);
   const space = !user ? spacesGateway.maybe()?.sharedWindowSpace() : undefined;
   const speech = useReadAloud(props.text);
@@ -135,8 +126,7 @@ export function AgentMessageActions(props: {
         align={user ? "end" : "start"}
         actions={actions}
         className={user ? undefined : "mt-1"}
-        trailing={user ? <MessageTime message={message} /> : undefined}
-        facts={user ? undefined : <ReplyFacts message={message} />}
+        trailing={user ? <MessageTime message={message} /> : <ReplyTime message={message} />}
       />
       {handOff && space ? (
         <HandOffDialog space={space} draft={props.text} onClose={() => setHandOff(false)} />
@@ -145,10 +135,6 @@ export function AgentMessageActions(props: {
   );
 }
 
-/**
- * Keeps the person's rating with the reply, in the chat this device saves. It isn't sent
- * anywhere: runs have no server to report to.
- */
 function rateMessage(conversationId: string, messageId: string, rating?: "good" | "bad") {
   useMistyStore.setState((state) => ({
     conversations: state.conversations.map((conversation) =>
@@ -164,7 +150,6 @@ function rateMessage(conversationId: string, messageId: string, rating?: "good" 
   }));
 }
 
-/** Text the person highlighted inside this answer, so Reply can quote just that part. */
 function selectedText(button: HTMLElement) {
   const selection = window.getSelection();
   const message = button.closest("[data-message]");
@@ -173,10 +158,8 @@ function selectedText(button: HTMLElement) {
   return message.contains(range.commonAncestorContainer) ? selection.toString().trim() : "";
 }
 
-/** Reads the reply aloud with the system's voice, and stops it. Nothing without speech. */
 function useReadAloud(text: string) {
   const [speaking, setSpeaking] = useState(false);
-  // Only this message's own utterance is stopped on unmount, never another message's.
   const utterance = useRef<SpeechSynthesisUtterance>(undefined);
   const speech = typeof window !== "undefined" ? window.speechSynthesis : undefined;
   useEffect(
@@ -203,7 +186,6 @@ function useReadAloud(text: string) {
   };
 }
 
-/** When the message was sent; its tooltip has the full date. */
 function MessageTime({ message }: { message: GlobalAiMessage }) {
   const date = new Date(message.createdAt);
   if (Number.isNaN(date.getTime())) return null;
@@ -214,46 +196,36 @@ function MessageTime({ message }: { message: GlobalAiMessage }) {
   );
 }
 
-/**
- * A reply's facts, in view under it: how long the run took, the tokens it wrote and what it cost
- * when the engine said. The model isn't one: the chat's model is in the composer.
- * The time it was sent is the tooltip on how long it took, or stands alone when there is nothing
- * else to say.
- */
-function ReplyFacts({ message }: { message: GlobalAiMessage }) {
+function ReplyTime({ message }: { message: GlobalAiMessage }) {
+  const now = useNow();
   const date = new Date(message.createdAt);
-  const sent = Number.isNaN(date.getTime()) ? "" : fullFormat.format(date);
-  const facts: ReactNode[] = [];
-  if (message.durationMs)
-    facts.push(
-      sent ? (
-        <Tooltip key="took" content={sent}>
-          <span>{tookText(message.durationMs)}</span>
-        </Tooltip>
-      ) : (
-        <span key="took">{tookText(message.durationMs)}</span>
-      ),
-    );
+  if (Number.isNaN(date.getTime())) return null;
   const usage = message.usage;
-  if (usage?.output)
-    facts.push(
-      <Tooltip key="tokens" content={tokenBreakdown(usage)}>
-        <span className="tabular-nums">{formatTokens(usage.output)} tokens</span>
-      </Tooltip>,
-    );
   const cost = usage?.costUsd;
-  if (typeof cost === "number" && cost > 0) facts.push(<span key="cost">{formatCost(cost)}</span>);
-  if (!message.durationMs) facts.push(<MessageTime key="time" message={message} />);
+  const details = [
+    fullFormat.format(date),
+    message.durationMs ? `worked for ${tookText(message.durationMs)}` : "",
+    usage?.output ? tokenBreakdown(usage) : "",
+    typeof cost === "number" && cost > 0 ? formatCost(cost) : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
   return (
-    <>
-      {facts.map((fact, index) => (
-        <Fragment key={index}>{fact}</Fragment>
-      ))}
-    </>
+    <Tooltip content={details}>
+      <time dateTime={message.createdAt}>{agoText(date.getTime(), now)}</time>
+    </Tooltip>
   );
 }
 
-/** The tokens a reply's usage report counts, for the tooltip on its total. */
+function agoText(time: number, now: number) {
+  const minutes = Math.floor((now - time) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return timeFormat.format(time);
+}
+
 function tokenBreakdown(usage: NonNullable<GlobalAiMessage["usage"]>) {
   return [
     usage.input ? `${formatTokens(usage.input)} in` : "",
@@ -265,7 +237,6 @@ function tokenBreakdown(usage: NonNullable<GlobalAiMessage["usage"]>) {
     .join(", ");
 }
 
-/** Speech reads prose, not Markdown punctuation. */
 function plainText(markdown: string) {
   return markdown
     .replace(/```[\s\S]*?```/g, " ")

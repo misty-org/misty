@@ -4,32 +4,27 @@ import {
   layoutTabs,
   migrateTabs,
   activateTab,
-} from "../panes/layoutTabs";
-import { reconcileGroupIdentities } from "../panes/groupIdentity";
+} from "../panes/layout_tabs";
+import { reconcileGroupIdentities } from "../panes/group_identity";
 import {
   capDockLeaves,
   createDockLeaf,
   dockLeaves,
   fillEmptyDockLeaves,
   normalizeDockNode,
-} from "../panes/dockTree";
+} from "../panes/dock_tree";
 import {
   maxWorkspacePanes,
   type WorkspaceLayout,
   type WorkspaceWindow,
-} from "../tabs/workspaceViews";
-import { createDefaultWorkspaceView } from "../tabs/workspaceDefaultView";
-import { currentWindowId, useProfileWindowStore } from "./profileWindow";
-import type { DockingLayout } from "@/app/shell/dockingLayout";
+} from "../tabs/workspace_views";
+import { createDefaultWorkspaceView } from "../tabs/workspace_default_view";
+import { currentWindowId, useProfileWindowStore } from "./profile_window";
+import type { DockingLayout } from "@/app/shell/docking_layout";
 
-/**
- * One renderer runs one OS window, which belongs to one profile for its whole life. Its tabs and
- * panes are `layout`, and `activeWindowId` is the native window's id, which names its saved tabs.
- */
 export interface WorkspaceWindowsState {
   activeWindowId: string;
   layout: WorkspaceLayout;
-  /** Where this window keeps its navigation and tabs; the device default when unset. */
   dockingLayout?: DockingLayout;
 }
 
@@ -43,7 +38,6 @@ export function initialWorkspaceLayout(): WorkspaceLayout {
 export function normalizeWorkspaceLayout(layout: WorkspaceLayout): WorkspaceLayout {
   const migrated = recoverPaneHistoryViews(migrateTabs(layout));
   const activeId = migrated.activeTabId ?? layoutTabs(migrated)[0].id;
-  // Having no tabs at all is a real state; only fill panes when other tabs exist.
   const noTabs = layoutTabs(migrated).every(isEmptyTab);
   const tabs = layoutTabs(migrated).map((tab) => {
     const source = tab.id === activeId ? migrated : tab;
@@ -72,7 +66,6 @@ export function initialWorkspaceWindow(): WorkspaceWindowsState {
   };
 }
 
-/** This OS window as agents see it, named after its profile. */
 function currentWindow(state: WorkspaceWindowsState): WorkspaceWindow {
   const { profile } = useProfileWindowStore.getState();
   return {
@@ -85,7 +78,6 @@ function currentWindow(state: WorkspaceWindowsState): WorkspaceWindow {
   };
 }
 
-/** The windows this renderer holds: always its one OS window. */
 export function currentWindows(state: WorkspaceWindowsState): WorkspaceWindow[] {
   return [currentWindow(state)];
 }

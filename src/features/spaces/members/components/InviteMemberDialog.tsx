@@ -11,7 +11,7 @@ import {
 } from "@misty/ui";
 import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { MemberDialogsState } from "./useMemberDialogs";
+import type { MemberDialogsState } from "./use_member_dialogs";
 
 export function InviteMemberDialog({
   dialogs,
@@ -38,7 +38,14 @@ export function InviteMemberDialog({
               <DialogTitle>Invite to {spaceName}</DialogTitle>
               <DialogDescription>The invitation expires after seven days.</DialogDescription>
             </DialogHeader>
-            <Text bare as="label" tone="muted" className="mt-5 grid gap-2 text-xs font-medium">
+            <Text
+              bare
+              as="label"
+              size="meta"
+              tone="muted"
+              weight="medium"
+              className="mt-5 grid gap-2"
+            >
               Email address
               <Input
                 autoFocus
@@ -74,7 +81,6 @@ export function InviteMemberDialog({
   );
 }
 
-/** The link right after inviting, for the owner to pass on. A server with Mailjet also emails it. */
 function InvitationLink(props: { email: string; link: string; onDone: () => void }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {

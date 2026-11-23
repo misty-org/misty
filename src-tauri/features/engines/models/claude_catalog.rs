@@ -8,13 +8,6 @@ use super::super::{EffortLevel, EngineModel, FastMode, ModelDetails};
 use super::{claude_config_dir, read_cli_config};
 use crate::known_names::MAIN_MODEL_SECTION;
 
-/// Claude Code's own model menu for the signed-in account: the catalog the CLI downloads and
-/// caches in `<config>/cache/model-catalog/` (the `-cc.json` file is the terminal CLI's; the
-/// desktop app's `-ccd.json` is the same list). Its main models, then the ones its menu keeps
-/// under "More models", each with its own name, description, effort levels (named, with the
-/// CLI's badges), the level the CLI last used with it, context window, fast mode and notice.
-/// None when nothing is cached, or when the CLI runs on a custom endpoint, another cloud or
-/// remapped families: the account's catalog doesn't describe those, and the aliases do.
 pub(in super::super) fn account_catalog(
     bin: Option<&std::path::Path>,
 ) -> Option<(
@@ -32,20 +25,19 @@ pub(in super::super) fn account_catalog(
     let dir = claude_config_dir().join("cache").join("model-catalog");
     let file = catalog_file(&dir, signed_in_org().as_deref())?;
     let value: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(file).ok()?).ok()?;
+        serde_json::from_str(&file_access::fs::read_to_string(file).ok()?).ok()?;
     let version = bin.and_then(cli_version);
     let catalog = parse_account_catalog(&value, version.as_deref());
     (!catalog.0.is_empty()).then_some(catalog)
 }
 
-/// The CLI's settings point it at another endpoint (a relay or gateway).
 fn uses_custom_endpoint() -> bool {
     if std::env::var_os("ANTHROPIC_BASE_URL").is_some_and(|value| !value.is_empty()) {
         return true;
     }
     let dir = claude_config_dir();
     ["settings.json", "settings.local.json"].iter().any(|name| {
-        std::fs::read_to_string(dir.join(name))
+        file_access::fs::read_to_string(dir.join(name))
             .ok()
             .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
             .and_then(|value| {
@@ -58,14 +50,13 @@ fn uses_custom_endpoint() -> bool {
     })
 }
 
-/// The signed-in account's organization, from the CLI's own `.claude.json`.
 fn signed_in_org() -> Option<String> {
     let path = match std::env::var_os("CLAUDE_CONFIG_DIR").filter(|dir| !dir.is_empty()) {
         Some(dir) => PathBuf::from(dir).join(".claude.json"),
         None => dirs::home_dir()?.join(".claude.json"),
     };
     let value: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
+        serde_json::from_str(&file_access::fs::read_to_string(path).ok()?).ok()?;
     value
         .pointer("/oauthAccount/organizationUuid")
         .and_then(serde_json::Value::as_str)
@@ -73,11 +64,8 @@ fn signed_in_org() -> Option<String> {
         .filter(|org| !org.is_empty())
 }
 
-/// The cached catalog to read: the signed-in organization's terminal (`-cc`) catalog, else the
-/// newest terminal one, else the newest desktop (`-ccd`) one. The published, unsigned-in
-/// catalog (`published-*`) is the CLI's own fallback document, not an account's menu.
 fn catalog_file(dir: &std::path::Path, org: Option<&str>) -> Option<PathBuf> {
-    let mut files: Vec<(PathBuf, String, std::time::SystemTime)> = std::fs::read_dir(dir)
+    let mut files: Vec<(PathBuf, String, std::time::SystemTime)> = file_access::fs::read_dir(dir)
         .ok()?
         .filter_map(Result::ok)
         .filter_map(|entry| {
@@ -103,8 +91,10 @@ fn catalog_file(dir: &std::path::Path, org: Option<&str>) -> Option<PathBuf> {
         .map(|file| file.0.clone())
 }
 
-/// The installed CLI's version, from its versioned install path
-/// (`…/claude/versions/2.1.322`). None when the path doesn't say.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves the installed Claude Code program, which lives outside the gate"
+)]
 fn cli_version(bin: &std::path::Path) -> Option<String> {
     let resolved = std::fs::canonicalize(bin).ok()?;
     let name = resolved.file_name()?.to_string_lossy().into_owned();
@@ -112,7 +102,6 @@ fn cli_version(bin: &std::path::Path) -> Option<String> {
     (parts.len() == 3 && parts.iter().all(|part| part.parse::<u64>().is_ok())).then_some(name)
 }
 
-/// `a` is older than `b`, both dotted numbers ("2.1.251" < "2.1.280").
 pub(super) fn older(a: &str, b: &str) -> bool {
     let parse = |text: &str| -> Vec<u64> {
         text.split('.')
@@ -141,7 +130,6 @@ pub(super) fn parse_account_catalog(
     let Some(catalog) = value.get("catalog") else {
         return (models, details);
     };
-    // The level the CLI last used with each model, and the model it runs now.
     let remembered: std::collections::HashMap<String, String> = catalog
         .pointer("/state/thinking_by_model")
         .and_then(serde_json::Value::as_array)
@@ -164,7 +152,6 @@ pub(super) fn parse_account_catalog(
         let Some(id) = text(row.get("id")) else {
             continue;
         };
-        // A model this CLI is too old to run stays out of its menu, as the CLI's own does.
         if let (Some(needs), Some(have)) = (text(row.get("min_claude_code_version")), cli_version) {
             if older(have, &needs) {
                 continue;
@@ -223,7 +210,6 @@ pub(super) fn parse_account_catalog(
                     }
                     .to_string(),
                 ),
-                // Its fast mode by the CLI's own name for it, and the option that turns it on.
                 fast: row.get("fast_mode").and_then(|fast| {
                     Some(FastMode {
                         label: text(fast.get("name"))?,

@@ -1,7 +1,6 @@
-//! Per-tab browser sessions: what each page is, who may drive it and where its data lives.
-
 use super::*;
 
+#[derive(Default)]
 pub struct BrowserSessionState {
     pub(super) context_menu:
         Mutex<HashMap<String, crate::browser::menus::context_menu::PendingMenu>>,
@@ -11,30 +10,13 @@ pub struct BrowserSessionState {
     pub(crate) shortcut_tokens: Mutex<HashMap<String, String>>,
 }
 
-impl Default for BrowserSessionState {
-    fn default() -> Self {
-        Self {
-            context_menu: Mutex::default(),
-            sessions: Mutex::default(),
-            reserved_downloads: Mutex::default(),
-            shortcut_bindings: Mutex::default(),
-            shortcut_tokens: Mutex::default(),
-        }
-    }
-}
-
 #[derive(Default)]
 pub(super) struct BrowserSession {
     pub(super) agent_input_locked: bool,
-    // An agent's tab while its run goes on: the ring stays even when the person has taken it
-    // over and the lock is off.
     pub(super) agent_ring: bool,
-    // Native auxiliary windows stay attached to this live integration view.
     pub(super) popup_parent: Option<String>,
     pub(super) origin_space_id: Option<String>,
     pub(super) store_id: Option<String>,
-    // The page's Misty profile. Only this, never the store above, is included in renderer and
-    // agent observations.
     pub(super) profile: Option<String>,
     pub(super) scope_id: String,
     pub(super) grants: HashMap<String, BrowserGrant>,
@@ -42,8 +24,6 @@ pub(super) struct BrowserSession {
     pub(super) element_targets: HashMap<String, String>,
     pub(super) downloads: Vec<BrowserDownload>,
     pub(super) pending_agent_download: Option<PendingAgentDownload>,
-    /// The agent run a tab works for, when an agent opened it in the person's window
-    /// the benchmark pictures each run's own tabs.
     pub(super) agent_run_id: Option<String>,
 }
 

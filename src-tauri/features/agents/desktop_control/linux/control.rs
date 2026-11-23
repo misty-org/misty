@@ -1,12 +1,3 @@
-//! Desktop control on Linux: Misty uses the person's apps on one display for a task, with
-//! computer use's driver (XTest on X11, the RemoteDesktop portal on Wayland) and its virtual
-//! cursor showing where each action lands.
-//!
-//! As on the other systems, registration takes nothing: the first capture enters control, after
-//! asking when the person wants to be asked, and a 30-second lease renewed while the task runs
-//! ends control when Misty stops renewing it. On X11 the person's Escape stops control at once;
-//! Wayland lets no app watch the keyboard, so there the compositor's sharing indicator and the
-//! task's own Stop end it.
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
@@ -40,9 +31,7 @@ struct Control {
 }
 
 static CONTROL: Mutex<Option<Control>> = Mutex::new(None);
-/// Bumped on every prepare, so an old watchdog ends.
 static GENERATION: AtomicU64 = AtomicU64::new(0);
-/// While Misty itself presses keys, an Escape it sends isn't the person's.
 static ACTING: AtomicBool = AtomicBool::new(false);
 
 fn with<T>(work: impl FnOnce(&mut Control) -> T) -> T {
@@ -52,7 +41,6 @@ fn with<T>(work: impl FnOnce(&mut Control) -> T) -> T {
     work(control.get_or_insert_with(Control::default))
 }
 
-/// Registers `task` for desktop control. Nothing is captured or taken yet.
 pub fn prepare(app: &AppHandle, task: &str, ask: bool) {
     stop_control(None);
     let generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
@@ -107,14 +95,12 @@ pub fn renew(task: &str) {
     });
 }
 
-/// The task waits for the person: hand the desktop back, keep the task.
 pub fn yield_control(task: &str) {
     if with(|control| !control.stopped && control.task == task) {
         release_control();
     }
 }
 
-/// Misty stopped the task: end control without announcing it.
 pub fn stop(task: &str) {
     if with(|control| control.task == task) {
         stop_control(None);
@@ -146,7 +132,6 @@ fn stop_control(reason: Option<&str>) {
     }
 }
 
-/// Asks the person once before control begins, when they want to be asked.
 fn confirm(task: &str) -> Result<(), String> {
     let pending = with(|control| {
         if control.stopped || control.task != task {
@@ -203,7 +188,6 @@ fn confirm(task: &str) -> Result<(), String> {
     Err(failure.into())
 }
 
-/// The display already controlled, else the primary one.
 fn target_display() -> Option<u32> {
     with(|control| control.display.filter(|_| control.controlling))
 }
@@ -223,7 +207,6 @@ fn live(task: &str) -> Result<(), String> {
     })
 }
 
-/// Captures the controlled display for the agent, entering control first. Worker thread.
 pub fn capture(task: &str) -> Result<Value, String> {
     confirm(task)?;
     live(task)?;
@@ -247,12 +230,10 @@ pub fn capture(task: &str) -> Result<Value, String> {
         "taskID": task,
         "displayID": display.id,
         "frame": [display.x, display.y, display.width, display.height],
-        // The image is handed to the agent; its size stays with the snapshot for mapping.
         "frameSize": [frame.width, frame.height],
     }))
 }
 
-/// Performs one validated action on the controlled display. Worker thread.
 pub fn action(input: &Value) -> Result<Value, String> {
     let task = input["taskID"].as_str().unwrap_or("");
     live(task)?;
@@ -281,7 +262,6 @@ pub fn action(input: &Value) -> Result<Value, String> {
             Some(display),
         ),
         "scroll" => {
-            // Wheel steps of about 40 pixels, as Windows' desktop control counts them.
             let steps = |key: &str| {
                 let delta = action[key].as_i64().unwrap_or(0) as f64 / 40.0;
                 (delta.round() as i32).clamp(-20, 20)
@@ -300,14 +280,12 @@ pub fn action(input: &Value) -> Result<Value, String> {
             .and_then(driver::action_key),
         _ => Err("Unsupported desktop action.".into()),
     };
-    // Let Misty's own Escape clear the server's key map before watching again.
     thread::sleep(Duration::from_millis(60));
     ACTING.store(false, Ordering::SeqCst);
     with(|control| control.last_action = Some(Instant::now()));
     result.map(|message| json!({ "attempted": true, "verified": false, "message": message }))
 }
 
-/// The driver's chord for a workspace key.
 fn chord_of(key: &str) -> Option<&'static str> {
     Some(match key {
         "Enter" => "enter",

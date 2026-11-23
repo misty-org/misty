@@ -13,13 +13,14 @@ use file_access::{fs, Access};
 use rusqlite::{params, Connection, OptionalExtension};
 use tantivy::{
     doc,
-    schema::{Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, FAST, STORED, STRING},
+    schema::{
+        Field, IndexRecordOption, Schema, TextFieldIndexing, TextOptions, Value, FAST, STORED,
+        STRING,
+    },
     Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, Term,
 };
 
-/// Bumped when the schema or the manifest's table changes: both are then built afresh.
 const SCHEMA_VERSION: i64 = 1;
-/// The writer's memory before it writes a segment out. Kept small: the index is only names.
 const WRITER_BUDGET: usize = 32 * 1024 * 1024;
 const MANIFEST_FILE: &str = "manifest.sqlite3";
 
@@ -35,7 +36,6 @@ pub(super) struct Fields {
     pub hidden: Field,
 }
 
-/// One indexed item.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct Doc {
     pub path: String,
@@ -48,7 +48,6 @@ pub(super) struct Doc {
     pub hidden: bool,
 }
 
-/// What a scan can change about an item; everything else follows from its path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Signature {
     is_file: bool,
@@ -60,11 +59,16 @@ pub(super) struct Signature {
 
 impl From<&Doc> for Signature {
     fn from(doc: &Doc) -> Self {
-        Self { is_file: doc.is_file, is_dir: doc.is_dir, size: doc.size, modified_ms: doc.modified_ms, hidden: doc.hidden }
+        Self {
+            is_file: doc.is_file,
+            is_dir: doc.is_dir,
+            size: doc.size,
+            modified_ms: doc.modified_ms,
+            hidden: doc.hidden,
+        }
     }
 }
 
-/// The open index and manifest. One writer at a time: whoever holds this holds both.
 pub(super) struct Catalog {
     pub index: Index,
     pub fields: Fields,
@@ -77,7 +81,9 @@ fn build_schema() -> (Schema, Fields) {
     let name_indexing = TextFieldIndexing::default()
         .set_tokenizer("default")
         .set_index_option(IndexRecordOption::WithFreqsAndPositions);
-    let name_options = TextOptions::default().set_indexing_options(name_indexing).set_stored();
+    let name_options = TextOptions::default()
+        .set_indexing_options(name_indexing)
+        .set_stored();
     let fields = Fields {
         path: builder.add_text_field("path", STRING | STORED),
         name: builder.add_text_field("name", name_options),
@@ -99,11 +105,8 @@ fn manifest_error(error: rusqlite::Error) -> String {
     format!("The search index's list couldn't be read: {error}")
 }
 
-/// Opens the index in `dir`, or makes it afresh when it is missing, unreadable, of another
-/// schema, or `fresh` is asked for. True in the second place when it was made afresh.
 fn open_index(dir: &Path, schema: Schema, fresh: bool) -> Result<(Index, bool), String> {
     fs::create_dir_all(dir).map_err(index_error)?;
-    // tantivy writes the folder itself, so the gate checks it here.
     file_access::check(dir, Access::Write).map_err(index_error)?;
     if !fresh {
         if let Ok(index) = Index::open_in_dir(dir) {
@@ -114,17 +117,22 @@ fn open_index(dir: &Path, schema: Schema, fresh: bool) -> Result<(Index, bool), 
     }
     let _ = fs::remove_dir_all(dir);
     fs::create_dir_all(dir).map_err(index_error)?;
-    Index::create_in_dir(dir, schema).map(|index| (index, true)).map_err(index_error)
+    Index::create_in_dir(dir, schema)
+        .map(|index| (index, true))
+        .map_err(index_error)
 }
 
-/// Opens (or makes) the catalog in `root`.
 pub(super) fn open(root: &Path) -> Result<Catalog, String> {
     fs::create_dir_all(root).map_err(index_error)?;
     let manifest = fs::open_sqlite(root.join(MANIFEST_FILE)).map_err(manifest_error)?;
     manifest
-        .execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA cache_size = -32768;")
+        .execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA cache_size = -32768;",
+        )
         .map_err(manifest_error)?;
-    let version: i64 = manifest.query_row("PRAGMA user_version", [], |row| row.get(0)).map_err(manifest_error)?;
+    let version: i64 = manifest
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(manifest_error)?;
     let (schema, fields) = build_schema();
     let (index, fresh) = open_index(&root.join("index"), schema, version != SCHEMA_VERSION)?;
     if fresh || version != SCHEMA_VERSION {
@@ -148,14 +156,20 @@ pub(super) fn open(root: &Path) -> Result<Catalog, String> {
         .reload_policy(ReloadPolicy::Manual)
         .try_into()
         .map_err(index_error)?;
-    Ok(Catalog { index, fields, reader, manifest })
+    Ok(Catalog {
+        index,
+        fields,
+        reader,
+        manifest,
+    })
 }
 
 pub(super) fn writer(index: &Index) -> Result<IndexWriter, String> {
-    index.writer_with_num_threads(1, WRITER_BUDGET).map_err(index_error)
+    index
+        .writer_with_num_threads(1, WRITER_BUDGET)
+        .map_err(index_error)
 }
 
-/// Replaces the path's document with `doc`.
 pub(super) fn put_doc(writer: &IndexWriter, fields: &Fields, doc: &Doc) -> Result<(), String> {
     delete_doc(writer, fields, &doc.path);
     writer
@@ -178,8 +192,16 @@ pub(super) fn delete_doc(writer: &IndexWriter, fields: &Fields, path: &str) {
 }
 
 pub(super) fn doc_from(fields: &Fields, doc: &TantivyDocument) -> Option<Doc> {
-    let text = |field: Field| doc.get_first(field).and_then(|value| value.as_str()).map(ToOwned::to_owned);
-    let number = |field: Field| doc.get_first(field).and_then(|value| value.as_u64()).unwrap_or(0);
+    let text = |field: Field| {
+        doc.get_first(field)
+            .and_then(|value| value.as_str())
+            .map(ToOwned::to_owned)
+    };
+    let number = |field: Field| {
+        doc.get_first(field)
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0)
+    };
     Some(Doc {
         path: text(fields.path)?,
         name: text(fields.name)?,
@@ -192,7 +214,6 @@ pub(super) fn doc_from(fields: &Fields, doc: &TantivyDocument) -> Option<Doc> {
     })
 }
 
-/// The catalog's entry for a local file or folder. None for a name that isn't valid text.
 pub(super) fn local_doc(path: &Path, meta: &file_access::disk::fs_disk::Metadata) -> Option<Doc> {
     let name = path.file_name().and_then(|name| name.to_str())?;
     Some(Doc {
@@ -216,11 +237,11 @@ pub(super) fn local_doc(path: &Path, meta: &file_access::disk::fs_disk::Metadata
     })
 }
 
-// ── The manifest ────────────────────────────────────────────────────────────────────────────────
-
 pub(super) fn lookup(manifest: &Connection, path: &str) -> Result<Option<Signature>, String> {
     manifest
-        .prepare_cached("SELECT is_file, is_dir, size, modified_ms, hidden FROM search_docs WHERE path = ?1")
+        .prepare_cached(
+            "SELECT is_file, is_dir, size, modified_ms, hidden FROM search_docs WHERE path = ?1",
+        )
         .map_err(manifest_error)?
         .query_row(params![path], |row| {
             Ok(Signature {
@@ -265,10 +286,13 @@ pub(super) fn forget(manifest: &Connection, path: &str) -> Result<(), String> {
         .map_err(manifest_error)
 }
 
-/// The key range holding every path strictly below `root`.
 fn range_below(root: &str) -> (String, String) {
     let separator = if cfg!(windows) { '\\' } else { '/' };
-    let lower = if root.ends_with(['/', '\\']) { root.to_owned() } else { format!("{root}{separator}") };
+    let lower = if root.ends_with(['/', '\\']) {
+        root.to_owned()
+    } else {
+        format!("{root}{separator}")
+    };
     let mut upper = lower.clone();
     let last = upper.pop().unwrap_or(separator);
     upper.push(char::from_u32(last as u32 + 1).unwrap_or(char::MAX));
@@ -297,7 +321,6 @@ pub(super) fn paths_below(manifest: &Connection, root: &str) -> Result<Vec<Strin
     rows.collect::<Result<_, _>>().map_err(manifest_error)
 }
 
-/// Where the catalog lives: `files-index/` in this build's data folder.
 pub(super) fn root() -> Option<PathBuf> {
     file_access::paths::misty_home_dir().map(|home| home.join("files-index"))
 }

@@ -1,6 +1,3 @@
-//! Commands in an AppContainer with no capabilities, so no network and nothing but what's granted
-//! here. A job bounds memory, CPU and process count, and ends everything when the command does. This
-//! compiles from macOS, but only the `sandbox` crate's tests on a Windows machine prove it holds.
 use file_access::secrets::{is_secret_file, is_secret_folder};
 use std::{
     ffi::{OsStr, OsString},
@@ -21,9 +18,6 @@ use sha2::{Digest, Sha256};
 
 use super::{output::CappedOutput, tools, ShellOutcome, ShellRequest};
 
-/// Files that hold secrets stay closed even in a shared folder, because a command's output reaches
-/// the model. Windows has no rule by name, so they're found before a command runs.
-/// How many entries of a shared folder are looked through for secrets and Git folders.
 const MAX_SCANNED_ENTRIES: usize = 200_000;
 
 #[derive(Default)]
@@ -70,7 +64,6 @@ fn scan(root: &Path) -> Scanned {
     found
 }
 
-/// Takes the grants back when the command ends, so a chat that changes folder loses the old one.
 struct FolderGrant<'a> {
     container: &'a Container,
     root: PathBuf,
@@ -96,8 +89,6 @@ fn read_capped(file: &mut File) -> (String, bool) {
     output.finish()
 }
 
-/// One argument as a Windows program reads its command line: quotes around it, a quote inside it
-/// escaped, and backslashes doubled only where they come before a quote.
 fn quote_argument(argument: &str) -> String {
     let mut quoted = String::with_capacity(argument.len() + 2);
     quoted.push('"');
@@ -146,7 +137,6 @@ fn run_blocking(
         for path in &scanned.closed {
             container.limit(path, None)?;
         }
-        // Hooks written to a Git folder would later run outside the sandbox.
         for path in &scanned.git_folders {
             container.limit(path, Some(Access::ReadExecute))?;
         }
@@ -209,7 +199,6 @@ fn run_blocking(
             break None;
         }
     };
-    // Whatever way it ended, nothing it started outlives it.
     job.terminate();
     drop(grant);
     let (out, cut_out) = read_capped(&mut stdout);

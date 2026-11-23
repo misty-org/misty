@@ -1,4 +1,3 @@
-//! Screens a person shares with the agent, as the parts of a first user turn.
 use std::sync::LazyLock;
 
 use chrono::DateTime;
@@ -9,7 +8,6 @@ use crate::model_calls::{FileData, UserPart};
 
 use super::{js_json::number_text, js_regex::js_regex};
 
-/// One of Misty's own visible controls, in its capture's pixels; x and y are its center.
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct ScreenControl {
     pub(crate) label: String,
@@ -18,12 +16,10 @@ pub(crate) struct ScreenControl {
     pub(crate) y: f64,
     pub(crate) width: f64,
     pub(crate) height: f64,
-    /// "hover" when the control is invisible until the pointer is over it.
     #[serde(default)]
     pub(crate) reveal: Option<String>,
 }
 
-/// A supplied file or screen capture.
 #[derive(Clone, Debug, Deserialize)]
 pub(crate) struct TaskFile {
     pub(crate) id: String,
@@ -53,13 +49,11 @@ fn text_part(text: String) -> UserPart {
     UserPart::Text { text }
 }
 
-/// `new Date(ms).toISOString()`.
 fn iso_time(ms: f64) -> Option<String> {
     let time = DateTime::from_timestamp_millis(ms as i64)?;
     Some(time.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
 }
 
-/// The label and binary image must describe the same screenshot coordinate space.
 pub(crate) fn companion_image_parts(captures: &[DisplayCapture]) -> Vec<UserPart> {
     let mut parts = Vec::with_capacity(captures.len() * 2);
     for capture in captures {
@@ -82,38 +76,47 @@ pub(crate) fn companion_image_parts(captures: &[DisplayCapture]) -> Vec<UserPart
             file.id,
             file.content_hash,
         )));
-        // Tagged inline data is the multimodal representation the SDK sends.
-        // The API has already validated the data URL, MIME, decoded dimensions and hash.
-        let data = file.data_url.split_once(',').map_or(file.data_url.as_str(), |(_, data)| data);
+        let data = file
+            .data_url
+            .split_once(',')
+            .map_or(file.data_url.as_str(), |(_, data)| data);
         parts.push(UserPart::File {
-            data: FileData::Data { data: data.to_owned() },
+            data: FileData::Data {
+                data: data.to_owned(),
+            },
             media_type: file.mime_type.clone(),
         });
-        if let Some(controls) = capture.controls.as_deref().filter(|controls| !controls.is_empty()) {
+        if let Some(controls) = capture
+            .controls
+            .as_deref()
+            .filter(|controls| !controls.is_empty())
+        {
             parts.push(text_part(misty_control_list(&capture.screen, controls)));
         }
     }
     parts
 }
 
-static CAPTURE_DETAIL: LazyLock<Regex> = LazyLock::new(|| js_regex(r" — (.+) \(\d+ × \d+\)$", false));
+static CAPTURE_DETAIL: LazyLock<Regex> =
+    LazyLock::new(|| js_regex(r" — (.+) \(\d+ × \d+\)$", false));
 static PRIMARY_FOCUS: LazyLock<Regex> = LazyLock::new(|| js_regex(r"^primary \((.*)\)$", false));
 
 fn quoted(text: &str) -> String {
     serde_json::to_string(text).unwrap_or_default()
 }
 
-/// What a display capture is to the person. The desktop names the primary display's focus
-/// ("primary (Code: main.rs)" or "primary (cursor)") and sends the focused window again as window1
-/// at full resolution. Titles are page data.
 fn companion_focus(capture: &DisplayCapture) -> String {
     let detail = CAPTURE_DETAIL
         .captures(&capture.file.name)
         .and_then(|found| found.get(1))
         .map(|found| found.as_str());
     if capture.source.as_deref() == Some("desktop-window") {
-        let named = detail.filter(|detail| !detail.is_empty()).map_or_else(String::new, |detail| format!(" ({})", quoted(detail)));
-        return format!(" — the focused window at full resolution, a closer look at the primary screen{named}");
+        let named = detail
+            .filter(|detail| !detail.is_empty())
+            .map_or_else(String::new, |detail| format!(" ({})", quoted(detail)));
+        return format!(
+            " — the focused window at full resolution, a closer look at the primary screen{named}"
+        );
     }
     if !capture.primary {
         return String::new();
@@ -129,7 +132,6 @@ fn companion_focus(capture: &DisplayCapture) -> String {
     }
 }
 
-/// Misty's own controls on one screenshot, named by Misty itself rather than read off the pixels.
 fn misty_control_list(screen: &str, controls: &[ScreenControl]) -> String {
     let rows = controls
         .iter()
@@ -142,7 +144,11 @@ fn misty_control_list(screen: &str, controls: &[ScreenControl]) -> String {
                 number_text(control.y),
                 number_text(control.width),
                 number_text(control.height),
-                if control.reveal.as_deref() == Some("hover") { ", hidden until the pointer is over it" } else { "" },
+                if control.reveal.as_deref() == Some("hover") {
+                    ", hidden until the pointer is over it"
+                } else {
+                    ""
+                },
             )
         })
         .collect::<Vec<_>>()
@@ -183,8 +189,6 @@ mod tests {
             .collect()
     }
 
-    // The TypeScript case also pushes the parts through the AI SDK's prompt conversion with a mock
-    // model. `sdk::Message` is already that converted shape, so this checks the parts directly.
     #[test]
     fn delivers_the_same_decoded_bytes_and_labeled_coordinate_space_to_the_model_api() {
         let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOZkAAAAASUVORK5CYII=";
@@ -200,7 +204,11 @@ mod tests {
         assert!(text.contains("abc123"));
         assert!(text.contains("1 x 1 screenshot pixels"));
         assert!(text.contains("2026-09-27T00:00:00.000Z"));
-        let UserPart::File { data: FileData::Data { data }, media_type } = &parts[1] else {
+        let UserPart::File {
+            data: FileData::Data { data },
+            media_type,
+        } = &parts[1]
+        else {
             panic!("expected inline image bytes");
         };
         assert_eq!(media_type, "image/png");
@@ -211,15 +219,32 @@ mod tests {
     #[test]
     fn names_the_window_in_front_on_the_primary_screen_and_the_focused_window_capture() {
         let parts = companion_image_parts(&[
-            capture("screen1 — primary (Code: main.rs) (2 × 2)", "screen1", true, None),
+            capture(
+                "screen1 — primary (Code: main.rs) (2 × 2)",
+                "screen1",
+                true,
+                None,
+            ),
             capture("screen2 (2 × 2)", "screen2", false, None),
-            capture("window1 — Code: main.rs (2 × 2)", "window1", false, Some("desktop-window")),
+            capture(
+                "window1 — Code: main.rs (2 × 2)",
+                "window1",
+                false,
+                Some("desktop-window"),
+            ),
         ]);
         let labels = labels(&parts);
-        assert!(labels[0].contains("screen1 — primary focus (the window in front: \"Code: main.rs\")"));
+        assert!(
+            labels[0].contains("screen1 — primary focus (the window in front: \"Code: main.rs\")")
+        );
         assert!(labels[1].starts_with("screen2: "));
         assert!(labels[2].contains("window1 — the focused window at full resolution, a closer look at the primary screen (\"Code: main.rs\")"));
-        let cursor = companion_image_parts(&[capture("screen1 — primary (cursor) (2 × 2)", "screen1", true, None)]);
+        let cursor = companion_image_parts(&[capture(
+            "screen1 — primary (cursor) (2 × 2)",
+            "screen1",
+            true,
+            None,
+        )]);
         assert!(self::labels(&cursor)[0].contains("screen1 — primary focus (cursor)"));
     }
 

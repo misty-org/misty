@@ -5,24 +5,22 @@ import {
   ColorSwatch,
   CustomColorSwatch,
   Input,
+  RowGroupStack,
   ScrollArea,
+  SettingsRow,
+  SettingsSection,
   Switch,
   Text,
   roleColorPresets,
 } from "@misty/ui";
 import type { RoleInput, SpaceMember, SpaceRoleDef } from "../api/dto/entities";
-import { permissionGroups } from "./rolePermissions";
+import { permissionGroups } from "./role_permissions";
 
 type Tab = "display" | "permissions" | "members";
 
-/**
- * One role's settings, after Discord's: how it looks (name, color, shown on its own in the
- * member list), what it allows, and who has it. Every change saves itself.
- */
 export function RoleEditor(props: {
   role: SpaceRoleDef;
   members: SpaceMember[];
-  /** False for a role at or above the person's own: it shows, but nothing changes. */
   editable: boolean;
   onChange: (input: RoleInput) => void;
   onMembers: (userId: string, has: boolean) => void;
@@ -67,7 +65,7 @@ export function RoleEditor(props: {
       <ScrollArea className="min-h-0 flex-1">
         {tab === "display" ? (
           <div className="flex flex-col gap-5 pr-2">
-            <Text bare as="label" tone="muted" weight="medium" className="grid gap-2 text-meta">
+            <Text bare as="label" size="meta" tone="muted" weight="medium" className="grid gap-2">
               Role name
               <Input
                 value={name}
@@ -87,7 +85,6 @@ export function RoleEditor(props: {
               <div
                 role="radiogroup"
                 aria-label="Role color"
-                // A palette: even columns of 20px swatches, as many as the width holds.
                 className="grid grid-cols-[repeat(auto-fill,--spacing(5))] gap-2"
               >
                 <ColorSwatch
@@ -118,41 +115,48 @@ export function RoleEditor(props: {
                 ) : null}
               </div>
             </div>
-            <SettingSwitch
-              label="Show members separately"
-              line="People with this role get their own group in the member list."
-              checked={role.hoist}
-              disabled={!props.editable}
-              onChange={(hoist) => props.onChange({ hoist })}
-            />
-            <SettingSwitch
-              label="Allow anyone to @mention this role"
-              line="Everyone with the role is told when it is mentioned."
-              checked={role.mentionable}
-              disabled={!props.editable}
-              onChange={(mentionable) => props.onChange({ mentionable })}
-            />
+            <SettingsSection>
+              <SettingsRow
+                label="Show members separately"
+                description="People with this role get their own group in the member list."
+              >
+                <Switch
+                  aria-label="Show members separately"
+                  checked={role.hoist}
+                  disabled={!props.editable}
+                  onCheckedChange={(hoist) => props.onChange({ hoist })}
+                />
+              </SettingsRow>
+              <SettingsRow
+                label="Allow anyone to @mention this role"
+                description="Everyone with the role is told when it is mentioned."
+              >
+                <Switch
+                  aria-label="Allow anyone to @mention this role"
+                  checked={role.mentionable}
+                  disabled={!props.editable}
+                  onCheckedChange={(mentionable) => props.onChange({ mentionable })}
+                />
+              </SettingsRow>
+            </SettingsSection>
           </div>
         ) : tab === "permissions" ? (
-          <div className="flex flex-col gap-6 pr-2">
+          <RowGroupStack className="pr-2">
             {permissionGroups.map((group) => (
-              <section key={group.title} className="flex flex-col gap-4">
-                <Text as="h3" size="meta" tone="muted" weight="semibold">
-                  {group.title}
-                </Text>
+              <SettingsSection key={group.title} title={group.title}>
                 {group.permissions.map((info) => (
-                  <SettingSwitch
-                    key={info.permission}
-                    label={info.label}
-                    line={info.line}
-                    checked={role.permissions.includes(info.permission)}
-                    disabled={!props.editable}
-                    onChange={(on) => toggle(info.permission, on)}
-                  />
+                  <SettingsRow key={info.permission} label={info.label} description={info.line}>
+                    <Switch
+                      aria-label={info.label}
+                      checked={role.permissions.includes(info.permission)}
+                      disabled={!props.editable}
+                      onCheckedChange={(on) => toggle(info.permission, on)}
+                    />
+                  </SettingsRow>
                 ))}
-              </section>
+              </SettingsSection>
             ))}
-          </div>
+          </RowGroupStack>
         ) : (
           <ChoiceList
             label={`People with ${role.name}`}
@@ -175,27 +179,4 @@ export function RoleEditor(props: {
 
 function countWith(members: SpaceMember[], roleId: string) {
   return members.filter((member) => member.role_ids?.includes(roleId)).length;
-}
-
-/** A settings row: what it is and one line on what it does, with its switch at the end. */
-function SettingSwitch(props: {
-  label: string;
-  line: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center justify-between gap-4">
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <Text size="control" tone="default" weight="medium" wrap>
-          {props.label}
-        </Text>
-        <Text size="meta" tone="muted" wrap>
-          {props.line}
-        </Text>
-      </span>
-      <Switch checked={props.checked} disabled={props.disabled} onCheckedChange={props.onChange} />
-    </label>
-  );
 }

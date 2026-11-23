@@ -1,6 +1,3 @@
-//! Pictures of the page after a run's browser steps, so the person can see what each step did and
-//! play a run back. They live in `~/.misty/data/run-pictures/<run>/`, go with the run's steps, and
-//! never sync or reach the server.
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -15,9 +12,7 @@ use tauri::{AppHandle, Manager, Webview};
 
 use super::windows::account_of_window;
 
-/// A run's pages are pictured at most this often.
 const EVERY: Duration = Duration::from_millis(1200);
-/// A picture larger than this isn't kept.
 const MAX_BYTES: usize = 400_000;
 
 pub(super) fn folder(app: &AppHandle) -> Option<PathBuf> {
@@ -38,7 +33,6 @@ pub(super) fn store_of(app: &AppHandle) -> Option<database::store::Store> {
     )
 }
 
-/// A run id as a folder name: anything but letters, digits, `-` and `_` becomes `_`.
 pub(super) fn safe(name: &str) -> String {
     name.chars()
         .map(|c| {
@@ -52,7 +46,6 @@ pub(super) fn safe(name: &str) -> String {
         .collect()
 }
 
-/// Whether a tool works in the agent's browser.
 fn is_browser_tool(tool: &str) -> bool {
     let name = tool.rsplit("__").next().unwrap_or(tool);
     name.starts_with("browser.") || name.starts_with("browser_")
@@ -76,7 +69,6 @@ fn due(run_id: &str) -> bool {
     true
 }
 
-/// After a browser step ends, pictures the run's page and files it with the step.
 pub(super) fn after_step(app: &AppHandle, run_id: &str, event: &Value) {
     let kind = event["type"].as_str().unwrap_or("");
     if kind != "tool.completed" && kind != "tool.failed" {
@@ -104,7 +96,6 @@ pub(super) fn after_step(app: &AppHandle, run_id: &str, event: &Value) {
         };
         let _ = tauri::async_runtime::spawn_blocking(move || -> Option<()> {
             let connection = store.connect().ok()?;
-            // Filed under the run its steps are filed under.
             let root: String = connection
                 .query_row(
                     "SELECT run_id FROM agent_run_steps WHERE call_id = ?1",
@@ -122,14 +113,12 @@ pub(super) fn after_step(app: &AppHandle, run_id: &str, event: &Value) {
     });
 }
 
-/// Deletes a run's pictures.
 pub(super) fn forget_run(app: &AppHandle, run_id: &str) {
     if let Some(base) = folder(app) {
         let _ = file_access::fs::remove_dir_all(base.join(safe(run_id)));
     }
 }
 
-/// Deletes the picture folders of runs that no longer have steps.
 pub(super) fn prune(app: &AppHandle) {
     let (Some(base), Some(store)) = (folder(app), store_of(app)) else {
         return;
@@ -161,7 +150,6 @@ pub(super) fn prune(app: &AppHandle) {
     }
 }
 
-/// One step's picture, as a data address the window can show. Only the run's own person gets it.
 #[tauri::command]
 pub async fn agent_run_step_picture(
     app: AppHandle,

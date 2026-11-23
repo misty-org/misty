@@ -84,7 +84,6 @@ describe("skills utils", () => {
   it("offers installed engines plus any engine holding a copy in the detail list", () => {
     const targets = [target("claude", true), target("grok", true), target("hermes", false)];
     const row = skill({ targetStates: { claude: "synced", hermes: "orphan" } });
-    // An engine that isn't installed but holds a copy (or lost one) still shows: the way to clean up mustn't disappear.
     expect(relevantTargets(row, targets).map((item) => item.id)).toEqual([
       "claude",
       "grok",
@@ -98,7 +97,6 @@ describe("skills utils", () => {
     const row = skill({ targets: ["claude"], targetStates: { claude: "synced", grok: "off" } });
     expect(nextTargets(row, "grok", true)).toEqual(["claude", "grok"]);
     expect(nextTargets(row, "claude", false)).toEqual([]);
-    // orphan: the backend lists only synced targets, so turning it on adds the id back.
     const orphan = skill({
       targets: ["claude"],
       targetStates: { claude: "synced", codex: "orphan" },
@@ -138,7 +136,6 @@ describe("skills utils", () => {
     };
     expect(usageForSkill(usage, skill())?.invocations).toBe(3);
     expect(usageForSkill(usage, skill({ id: "other", directory: "alpha" }))?.invocations).toBe(3);
-    // An ambiguous name that matched no installed skill mustn't take another skill's calls.
     const twins = [
       skill({ id: "x", name: "twin", directory: "twin-a" }),
       skill({ id: "y", name: "twin", directory: "twin-b" }),

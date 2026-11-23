@@ -1,4 +1,3 @@
-//! What the app windows ask of agents on this computer.
 use tauri::State;
 
 use crate::agents::PrepareScopedAgentDocumentRequest;
@@ -27,8 +26,6 @@ pub async fn agents_list_scoped_files(
     state.agents.list_scoped_files(request).await
 }
 
-/// The document is parsed in the bundled worker, confined by the operating
-/// system; the shared folder's file is copied in, never opened in place.
 #[tauri::command]
 pub async fn agents_prepare_scoped_document(
     webview: tauri::Webview,
@@ -46,9 +43,6 @@ pub async fn agents_prepare_scoped_document(
         .map_err(crate::app::error::ApiError::Message)
 }
 
-/// Tutor's file sources: the person picks files in the system dialog, and each is parsed in the
-/// confined document worker. The window never names a path, so it can read only what was picked.
-/// A file that can't be read is left out; nothing picked is an empty list.
 #[tauri::command]
 pub async fn tutor_pick_sources(
     app: tauri::AppHandle,
@@ -79,7 +73,8 @@ pub async fn tutor_pick_sources(
     let mut prepared = Vec::new();
     for file in files.into_iter().take(20) {
         let Ok(path) = file.into_path() else { continue };
-        let too_big = std::fs::metadata(&path)
+        file_access::allow_picked_file(&path, file_access::Access::Read);
+        let too_big = file_access::fs::metadata(&path)
             .map(|meta| meta.len() > documents::MAX_AGENT_DOCUMENT_BYTES)
             .unwrap_or(true);
         if too_big {
@@ -94,17 +89,14 @@ pub async fn tutor_pick_sources(
     Ok(prepared)
 }
 
-// Commands that live in the feature's other modules, named here so the command table can list them all
-// from one place. `generate_handler!` needs each command's hidden macros beside it, so those are named too.
 pub(crate) use crate::agents::chats::commands::{
     __cmd__agent_chats_adopt, __cmd__agent_chats_delete, __cmd__agent_chats_get,
-    __cmd__agent_chats_list, __cmd__agent_chats_put, __cmd__agent_chats_swap,
-    __cmd__agent_chats_messages_page, __cmd__agent_chats_messages_upsert,
-    __tauri_command_name_agent_chats_adopt, __tauri_command_name_agent_chats_delete,
-    __tauri_command_name_agent_chats_get, __tauri_command_name_agent_chats_list,
-    __tauri_command_name_agent_chats_put, __tauri_command_name_agent_chats_swap, agent_chats_adopt,
-    __tauri_command_name_agent_chats_messages_page,
-    __tauri_command_name_agent_chats_messages_upsert, agent_chats_delete, agent_chats_get,
+    __cmd__agent_chats_list, __cmd__agent_chats_messages_page, __cmd__agent_chats_messages_upsert,
+    __cmd__agent_chats_put, __cmd__agent_chats_swap, __tauri_command_name_agent_chats_adopt,
+    __tauri_command_name_agent_chats_delete, __tauri_command_name_agent_chats_get,
+    __tauri_command_name_agent_chats_list, __tauri_command_name_agent_chats_messages_page,
+    __tauri_command_name_agent_chats_messages_upsert, __tauri_command_name_agent_chats_put,
+    __tauri_command_name_agent_chats_swap, agent_chats_adopt, agent_chats_delete, agent_chats_get,
     agent_chats_list, agent_chats_messages_page, agent_chats_messages_upsert, agent_chats_put,
     agent_chats_swap,
 };
@@ -131,32 +123,29 @@ pub(crate) use crate::agents::connected_apps::direct::commands::{
 };
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) use crate::agents::cursor::{
-    __cmd__cursor_companion_ask_close, __cmd__cursor_companion_ask_open,
-    __cmd__cursor_companion_bind_task, __cmd__cursor_companion_hit,
-    __tauri_command_name_cursor_companion_ask_open, __tauri_command_name_cursor_companion_hit,
-    cursor_companion_ask_open, cursor_companion_hit,
-    __cmd__cursor_companion_ask_part, __tauri_command_name_cursor_companion_ask_part,
-    cursor_companion_ask_part,
-    __cmd__cursor_companion_ask_dismiss, __tauri_command_name_cursor_companion_ask_dismiss,
-    cursor_companion_ask_dismiss,
-    __cmd__cursor_companion_ask_shot, __tauri_command_name_cursor_companion_ask_shot,
-    cursor_companion_ask_shot,
+    __cmd__cursor_companion_ask_close, __cmd__cursor_companion_ask_dismiss,
+    __cmd__cursor_companion_ask_open, __cmd__cursor_companion_ask_part,
+    __cmd__cursor_companion_ask_shot, __cmd__cursor_companion_bind_task,
     __cmd__cursor_companion_capture, __cmd__cursor_companion_capture_region,
-    __cmd__cursor_companion_configure, __cmd__cursor_companion_interrupt,
-    __cmd__cursor_companion_present, __cmd__cursor_companion_snap,
-    __cmd__cursor_companion_snapshot, __cmd__cursor_companion_trail,
+    __cmd__cursor_companion_configure, __cmd__cursor_companion_hit,
+    __cmd__cursor_companion_interrupt, __cmd__cursor_companion_present,
+    __cmd__cursor_companion_snap, __cmd__cursor_companion_snapshot, __cmd__cursor_companion_trail,
     __cmd__cursor_companion_watch_clicks, __tauri_command_name_cursor_companion_ask_close,
+    __tauri_command_name_cursor_companion_ask_dismiss,
+    __tauri_command_name_cursor_companion_ask_open, __tauri_command_name_cursor_companion_ask_part,
+    __tauri_command_name_cursor_companion_ask_shot,
     __tauri_command_name_cursor_companion_bind_task, __tauri_command_name_cursor_companion_capture,
     __tauri_command_name_cursor_companion_capture_region,
-    __tauri_command_name_cursor_companion_configure,
+    __tauri_command_name_cursor_companion_configure, __tauri_command_name_cursor_companion_hit,
     __tauri_command_name_cursor_companion_interrupt, __tauri_command_name_cursor_companion_present,
     __tauri_command_name_cursor_companion_snap, __tauri_command_name_cursor_companion_snapshot,
     __tauri_command_name_cursor_companion_trail,
     __tauri_command_name_cursor_companion_watch_clicks, cursor_companion_ask_close,
-    cursor_companion_bind_task, cursor_companion_capture, cursor_companion_capture_region,
-    cursor_companion_configure, cursor_companion_interrupt, cursor_companion_present,
-    cursor_companion_snap, cursor_companion_snapshot, cursor_companion_trail,
-    cursor_companion_watch_clicks,
+    cursor_companion_ask_dismiss, cursor_companion_ask_open, cursor_companion_ask_part,
+    cursor_companion_ask_shot, cursor_companion_bind_task, cursor_companion_capture,
+    cursor_companion_capture_region, cursor_companion_configure, cursor_companion_hit,
+    cursor_companion_interrupt, cursor_companion_present, cursor_companion_snap,
+    cursor_companion_snapshot, cursor_companion_trail, cursor_companion_watch_clicks,
 };
 #[cfg(windows)]
 pub(crate) use crate::agents::desktop_control::windows::overlays::{
@@ -173,6 +162,12 @@ pub(crate) use crate::agents::live_pages_memory::{
     __cmd__system_memory_pressure, __tauri_command_name_system_memory_pressure,
     system_memory_pressure,
 };
+pub(crate) use crate::agents::run_control::browser_log::{
+    __cmd__agent_browser_log, __cmd__agent_browser_log_picture, __cmd__agent_browser_log_record,
+    __tauri_command_name_agent_browser_log, __tauri_command_name_agent_browser_log_picture,
+    __tauri_command_name_agent_browser_log_record, agent_browser_log, agent_browser_log_picture,
+    agent_browser_log_record,
+};
 pub(crate) use crate::agents::run_control::calls::{
     __cmd__tutor_overview_audio, __cmd__tutor_overview_delete, __cmd__tutor_overview_make,
     __cmd__tutor_transcribe_sources, __tauri_command_name_tutor_overview_audio,
@@ -187,24 +182,18 @@ pub(crate) use crate::agents::run_control::local_runs::{
     __cmd__agent_run_cancel, __cmd__agent_run_contexts, __cmd__agent_run_end_proposal,
     __cmd__agent_run_follow, __cmd__agent_run_pause, __cmd__agent_run_publish,
     __cmd__agent_run_receipts, __cmd__agent_run_start, __cmd__agent_run_steer,
-    __tauri_command_name_agent_run_cancel, __tauri_command_name_agent_run_contexts,
-    __tauri_command_name_agent_run_end_proposal, __tauri_command_name_agent_run_follow,
-    __tauri_command_name_agent_run_pause, __tauri_command_name_agent_run_publish,
-    __tauri_command_name_agent_run_receipts, __tauri_command_name_agent_run_start,
-    __tauri_command_name_agent_run_steer, agent_run_cancel, agent_run_contexts,
+    __cmd__agent_run_warm_up, __tauri_command_name_agent_run_cancel,
+    __tauri_command_name_agent_run_contexts, __tauri_command_name_agent_run_end_proposal,
+    __tauri_command_name_agent_run_follow, __tauri_command_name_agent_run_pause,
+    __tauri_command_name_agent_run_publish, __tauri_command_name_agent_run_receipts,
+    __tauri_command_name_agent_run_start, __tauri_command_name_agent_run_steer,
+    __tauri_command_name_agent_run_warm_up, agent_run_cancel, agent_run_contexts,
     agent_run_end_proposal, agent_run_follow, agent_run_pause, agent_run_publish,
-    agent_run_receipts, agent_run_start, agent_run_steer, __cmd__agent_run_warm_up,
-    __tauri_command_name_agent_run_warm_up, agent_run_warm_up,
+    agent_run_receipts, agent_run_start, agent_run_steer, agent_run_warm_up,
 };
 pub(crate) use crate::agents::run_control::local_tools::{
     __cmd__agent_tool_finish, __cmd__agent_tool_host_ready, __tauri_command_name_agent_tool_finish,
     __tauri_command_name_agent_tool_host_ready, agent_tool_finish, agent_tool_host_ready,
-};
-pub(crate) use crate::agents::run_control::browser_log::{
-    __cmd__agent_browser_log, __cmd__agent_browser_log_picture, __cmd__agent_browser_log_record,
-    __tauri_command_name_agent_browser_log, __tauri_command_name_agent_browser_log_picture,
-    __tauri_command_name_agent_browser_log_record, agent_browser_log, agent_browser_log_picture,
-    agent_browser_log_record,
 };
 pub(crate) use crate::agents::run_control::run_ledger::{
     __cmd__agent_run_timeline, __tauri_command_name_agent_run_timeline, agent_run_timeline,

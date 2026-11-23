@@ -46,26 +46,16 @@ pub use plan::CliUpdatePlan;
 
 use routes::Route;
 
-/// The event an install's output is streamed on.
 pub const CLI_UPDATE_PROGRESS_EVENT: &str = "engine-cli://update-progress";
 
 const CLI_VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 const NPM_VIEW_TIMEOUT: Duration = Duration::from_secs(15);
 const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(15);
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(420);
-/// Bytes of installer output quoted back in a failure error.
 const ERROR_TAIL_CAP: usize = 2048;
-/// Chars per streamed output line; minified progress-bar lines would
-/// otherwise flood the IPC channel in one event.
 const PROGRESS_LINE_CAP: usize = 1000;
-/// Per-stream capture cap for run_capture/run_streaming. Callers need the
-/// first line (version probes) or a failure tail — both fit in a few KB,
-/// and normal npm output stays well under this. Without a cap a chatty or
-/// stuck installer buffered unboundedly for up to INSTALL_TIMEOUT.
 const CAPTURE_CAP_BYTES: usize = 1024 * 1024;
 
-/// The npm package of each engine published there. Grok, Antigravity and Qoder ship through their
-/// own installers, so they get the local version only: no latest version and no update action.
 fn npm_package(engine: &str) -> Option<&'static str> {
     match engine {
         "claude" => Some("@anthropic-ai/claude-code"),
@@ -89,16 +79,10 @@ pub struct CliVersionStatus {
     pub local_version: Option<String>,
     pub latest_version: Option<String>,
     pub update_available: bool,
-    /// How the install/update button acts: "npm" | "native"; null when the
-    /// engine has no lifecycle action (grok).
     pub update_kind: Option<&'static str>,
-    /// How Uninstall removes the copy found (`uninstall.rs`): "misty" for the one Misty installed
-    /// in `~/.misty/shared/engines`, "npm", "brew" or "maker"; null when Misty can't tell, and then
-    /// the row offers no Uninstall.
     pub remove_kind: Option<&'static str>,
 }
 
-/// The program each engine is started as, when it differs from the engine id.
 fn cli_binary_name(engine: &str) -> &str {
     match engine {
         "minimax" => "mcode",
@@ -108,9 +92,6 @@ fn cli_binary_name(engine: &str) -> &str {
     }
 }
 
-/// Where the engine's program is: the program path set in Settings › Engines when there is one,
-/// else found the way Misty finds engines to run; the bare name when it isn't installed
-/// (starting it then fails, which reads as not installed).
 pub(crate) fn engine_bin(engine: &str) -> String {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let overridden = settings
@@ -126,8 +107,6 @@ pub(crate) fn engine_bin(engine: &str) -> String {
         .unwrap_or_else(|| name.to_string())
 }
 
-/// A command for `bin` with Misty's search PATH and the proxy from Settings. On Windows a `.cmd`
-/// or `.bat` wrapper (how npm installs a program) runs through `cmd /c`.
 pub(crate) fn command_for_binary(bin: &str) -> Command {
     #[cfg(windows)]
     let mut command = {
@@ -151,7 +130,6 @@ pub(crate) fn command_for_binary(bin: &str) -> Command {
     command
 }
 
-/// `path` for showing, with the home folder as `~`.
 fn shown_path(path: &std::path::Path) -> String {
     let home = support::home_dir();
     match path.strip_prefix(&home) {
@@ -175,13 +153,6 @@ pub struct UpdateResult {
     pub ok: bool,
     pub version: Option<String>,
 }
-/// Claude Code / Codex ship both as npm packages and as native installer
-/// builds; pushing an npm global install onto a native install would shadow
-/// it with a second binary. The npm copy is either inside a node_modules tree
-/// (unix: the bin symlink resolves into it) or an npm global shim sitting next
-/// to one (Windows: `%APPDATA%\npm\<cli>.cmd` beside
-/// `%APPDATA%\npm\node_modules\<package>`). Not installed → "native" (the
-/// official installer is the default path).
 fn native_or_npm_kind(engine: &str, bin: &str) -> &'static str {
     let resolved = resolve_link(bin)
         .map(|p| p.to_string_lossy().into_owned())
@@ -193,13 +164,10 @@ fn native_or_npm_kind(engine: &str, bin: &str) -> &'static str {
     }
 }
 
-/// `bin` is an npm global shim: its directory holds `node_modules/<package>`.
 fn beside_npm_package(engine: &str, bin: &str) -> bool {
     let Some(package) = npm_package(engine) else {
         return false;
     };
-    // Only an absolute shim path has a real install directory; a bare name
-    // would resolve `node_modules` against the app's working directory.
     let path = std::path::Path::new(bin);
     path.is_absolute()
         && path
@@ -207,9 +175,6 @@ fn beside_npm_package(engine: &str, bin: &str) -> bool {
             .is_some_and(|dir| is_dir_outside_gate(&dir.join("node_modules").join(package)))
 }
 
-// Telling an npm install from a standalone one only follows the program's link and asks whether
-// a package folder sits beside it; nothing is read. These are program folders, outside the file
-// gate, as when Misty finds a program to run (`engines::resolve`).
 #[allow(clippy::disallowed_methods)]
 fn resolve_link(bin: &str) -> std::io::Result<std::path::PathBuf> {
     std::fs::canonicalize(bin)
@@ -220,7 +185,6 @@ fn is_dir_outside_gate(path: &std::path::Path) -> bool {
     path.is_dir()
 }
 
-/// The route an install or update takes, from where the program was found and whether it runs.
 fn route_for(engine: &str, bin: &str, installed: bool) -> Option<Route> {
     routes::route(engine, bin, installed, cfg!(windows))
 }
@@ -230,9 +194,6 @@ pub(crate) struct CliProbe {
     pub(crate) version: Option<String>,
 }
 
-/// `<bin> --version`: first non-empty stdout line, 10s cap. A spawn failure
-/// means not installed; a successful run with no version line still counts
-/// as installed (we just have nothing to display).
 pub(crate) async fn probe_local_version(bin: &str) -> CliProbe {
     let mut command = command_for_binary(bin);
     command.arg("--version");
@@ -257,9 +218,6 @@ pub(crate) async fn probe_local_version(bin: &str) -> CliProbe {
     }
 }
 
-/// The latest published version, from the npm registry (`/<package>/latest`), through the
-/// proxy from Settings. Falls back to `npm view` when the registry can't be reached directly
-/// (an npm config with its own registry or proxy).
 async fn probe_latest_version(package: &str) -> Option<String> {
     if let Some(version) = registry_latest(package).await {
         return Some(version);
@@ -305,8 +263,6 @@ pub async fn engine_cli_status(engine: String) -> Result<CliVersionStatus, Strin
     let engine = checked_engine(&engine)?;
     let bin = engine_bin(&engine);
     let package = npm_package(&engine);
-    // Local probe and registry probe are independent — run them concurrently
-    // so the header waits on the slower of the two, not the sum.
     let (local, latest) = tokio::join!(probe_local_version(&bin), async move {
         match package {
             Some(package) => probe_latest_version(package).await,
@@ -335,7 +291,6 @@ pub async fn engine_cli_status(engine: String) -> Result<CliVersionStatus, Strin
     })
 }
 
-/// The plan for the install dialog (`plan.rs`).
 #[tauri::command]
 pub async fn engine_cli_update_plan(engine: String) -> Result<CliUpdatePlan, String> {
     let engine = checked_engine(&engine)?;
@@ -360,7 +315,6 @@ pub async fn engine_cli_update(engine: String, run_id: String) -> Result<UpdateR
         });
     }
     routes::run(&engine, route, &bin, &reporter).await?;
-    // The version after the install, found again: a fresh install is a new program.
     let probe = probe_local_version(&engine_bin(&engine)).await;
     if !probe.installed {
         return Err(format!(
@@ -373,9 +327,6 @@ pub async fn engine_cli_update(engine: String, run_id: String) -> Result<UpdateR
     })
 }
 
-/// Uninstalls an engine the way its copy was installed (`uninstall.rs`): Misty's own folder in
-/// `~/.misty/shared/engines`, npm's or Homebrew's copy through them, or a maker's installer copy. Its
-/// sign-in and settings stay.
 #[tauri::command]
 pub async fn engine_cli_remove(engine: String) -> Result<(), String> {
     let engine = checked_engine(&engine)?;
@@ -391,11 +342,6 @@ fn is_file_outside_gate(path: &std::path::Path) -> bool {
     path.is_file()
 }
 
-// ==================== Progress streaming ====================
-
-/// Streams an install's output to the dialog as `engine-cli://update-progress` events, each an
-/// array of lines, so the dialog shows the install as it happens. `run_id` scopes the events to
-/// one confirmed run; the dialog ignores anything else.
 #[derive(Clone)]
 struct ProgressReporter {
     sink: Arc<dyn support::Emit>,
@@ -403,7 +349,6 @@ struct ProgressReporter {
     engine: Arc<str>,
 }
 
-/// Sends to the app's windows once setup has run.
 struct AppEmit;
 
 impl support::Emit for AppEmit {
@@ -427,7 +372,6 @@ impl ProgressReporter {
         }
     }
 
-    /// phase: "started" | "stdout" | "stderr" | "finished"
     fn emit(&self, phase: &'static str, line: Option<String>, exit_ok: Option<bool>) {
         let event = serde_json::json!([{
             "runId": self.run_id,
@@ -443,11 +387,6 @@ impl ProgressReporter {
     fn flush(&self) {}
 }
 
-// ==================== Shared process helpers ====================
-
-/// Run a short-lived command to completion with a timeout, capturing all of
-/// stdout/stderr. The child gets its own process group (unix) so a timeout
-/// kill takes grandchildren (npm's cmd/node chain) down too.
 pub(crate) struct ProcOutput {
     pub(crate) status: Option<std::process::ExitStatus>,
     pub(crate) stdout: String,
@@ -462,8 +401,6 @@ pub(crate) async fn run_capture(
     run_capture_capped(command, limit, CAPTURE_CAP_BYTES).await
 }
 
-/// `run_capture` keeping up to `cap` bytes of each stream, for a CLI whose answer is the output
-/// itself (a marketplace's `--json` listing runs to megabytes) rather than a version or a tail.
 pub(crate) async fn run_capture_capped(
     command: &mut Command,
     limit: Duration,
@@ -479,9 +416,6 @@ pub(crate) async fn run_capture_capped(
     support::hide_console_tokio(command);
     let mut child = command.spawn().map_err(|e| e.to_string())?;
     let pid = child.id();
-    // Kill-on-close job (Windows): the taskkill timeout path only walks a
-    // live tree, so a grandchild orphaned before it ran would escape; the
-    // job sweeps members whenever this guard drops — timeout or completion.
     #[cfg(windows)]
     let _tree_guard = job::assign_kill_on_close(&child);
     let stdout = child.stdout.take().map(|pipe| spawn_read_all(pipe, cap));
@@ -498,8 +432,6 @@ pub(crate) async fn run_capture_capped(
             (None, true)
         }
     };
-    // Settle sweep (unix): the group is empty on a clean exit (ESRCH); what
-    // remains is a grandchild the probed CLI orphaned — kill it now.
     #[cfg(unix)]
     if let Some(pid) = pid.filter(|p| *p != 0) {
         support::kill_process_group(pid);
@@ -525,9 +457,6 @@ fn spawn_read_all<R: AsyncRead + Unpin + Send + 'static>(
     cap: usize,
 ) -> JoinHandle<String> {
     tokio::spawn(async move {
-        // Keep the first cap + 1 bytes, then drain the rest
-        // to a sink so the child never blocks on a full pipe (same
-        // pattern as plugin_caps::read_stream_capped).
         let mut taken = pipe.take((cap + 1) as u64);
         let mut bytes = Vec::new();
         let _ = taken.read_to_end(&mut bytes).await;
@@ -535,9 +464,6 @@ fn spawn_read_all<R: AsyncRead + Unpin + Send + 'static>(
         String::from_utf8_lossy(&bytes).into_owned()
     })
 }
-/// Like `run_capture`, but each output line is also pushed to the progress
-/// reporter as it arrives. The full text is still captured for failure
-/// tails, so error reporting is unchanged.
 async fn run_streaming(
     command: &mut Command,
     limit: Duration,
@@ -553,7 +479,6 @@ async fn run_streaming(
     support::hide_console_tokio(command);
     let mut child = command.spawn().map_err(|e| e.to_string())?;
     let pid = child.id();
-    // Same kill-on-close job rationale as run_capture above.
     #[cfg(windows)]
     let _tree_guard = job::assign_kill_on_close(&child);
     reporter.emit("started", None, None);
@@ -577,7 +502,6 @@ async fn run_streaming(
             (None, true)
         }
     };
-    // Same unix settle sweep as run_capture above.
     #[cfg(unix)]
     if let Some(pid) = pid.filter(|p| *p != 0) {
         support::kill_process_group(pid);
@@ -600,9 +524,6 @@ async fn run_streaming(
     })
 }
 
-/// Read a stream line by line, reporting each line (clipped to
-/// PROGRESS_LINE_CAP chars) while capturing the full text. Invalid UTF-8
-/// ends the read early — captured-so-far is still returned.
 fn spawn_read_lines<R: AsyncRead + Unpin + Send + 'static>(
     pipe: R,
     reporter: ProgressReporter,
@@ -612,8 +533,6 @@ fn spawn_read_lines<R: AsyncRead + Unpin + Send + 'static>(
         let mut lines = tokio::io::BufReader::new(pipe).lines();
         let mut captured = String::new();
         while let Ok(Some(line)) = lines.next_line().await {
-            // The capture is capped; reading and reporting go on past it so the child never
-            // blocks on a full pipe.
             if captured.len() + line.len() <= CAPTURE_CAP_BYTES {
                 captured.push_str(&line);
                 captured.push('\n');
@@ -629,7 +548,6 @@ fn spawn_read_lines<R: AsyncRead + Unpin + Send + 'static>(
     })
 }
 
-/// Last `cap` bytes of `text`, on a char boundary.
 fn tail(text: &str, cap: usize) -> &str {
     if text.len() <= cap {
         return text.trim();
@@ -641,37 +559,25 @@ fn tail(text: &str, cap: usize) -> &str {
     text[start..].trim()
 }
 
-// ==================== Signed in ====================
-
-/// Whether the person is signed in to an engine's CLI, as the CLI itself says. `None` when the
-/// CLI has no way to ask (the engine then signs in on its first run).
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CliSignInStatus {
     pub engine: String,
     pub installed: bool,
     pub signed_in: Option<bool>,
-    /// What the CLI said, first line, for the row's tooltip (never a token: these commands print
-    /// the account's email or plan at most).
     pub detail: Option<String>,
 }
 
-/// The CLI's own sign-in status command, where it has one.
 fn sign_in_status_args(engine: &str) -> Option<&'static [&'static str]> {
     match engine {
         "claude" => Some(&["auth", "status"]),
         "codex" => Some(&["login", "status"]),
-        // Qoder CLI's `status` prints "Account: Not logged in" until it is signed in.
         "qoder" | "qoder-cn" => Some(&["status"]),
-        // Grok Build has no status command, but `grok models` starts with "You are not
-        // authenticated." until it is signed in, and lists the models after.
         "grok" => Some(&["models"]),
         _ => None,
     }
 }
 
-/// Reads a status command's answer: Claude Code prints JSON with `loggedIn`; otherwise the exit
-/// code says it, and a "not logged in" line wins over a zero exit.
 fn parse_sign_in(output: &ProcOutput) -> (Option<bool>, Option<String>) {
     let text = format!("{}\n{}", output.stdout, output.stderr);
     let lines: Vec<&str> = text
@@ -679,8 +585,6 @@ fn parse_sign_in(output: &ProcOutput) -> (Option<bool>, Option<String>) {
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('{'))
         .collect();
-    // The line about the account where the CLI prints one among others (Qoder's version line,
-    // Grok's model list), else the first.
     let detail = lines
         .iter()
         .find(|line| {
@@ -715,10 +619,6 @@ fn parse_sign_in(output: &ProcOutput) -> (Option<bool>, Option<String>) {
     }
 }
 
-/// Gemini CLI and Qwen Code have no status command: their `settings.json` names the way they
-/// sign in (`security.auth.selectedType`, or the older `selectedAuthType`), and their own sign-in
-/// leaves `oauth_creds.json` beside it. Only whether that file exists is looked at: it is never
-/// opened. A key or cloud way counts as signed in once chosen.
 fn settings_sign_in(engine: &str) -> Option<(Option<bool>, Option<String>)> {
     let folder = match engine {
         "gemini" => std::env::var_os("GEMINI_CLI_HOME")
@@ -729,7 +629,7 @@ fn settings_sign_in(engine: &str) -> Option<(Option<bool>, Option<String>)> {
         "qwen" => support::home_dir().join(".qwen"),
         _ => return None,
     };
-    let settings = std::fs::read_to_string(folder.join("settings.json"))
+    let settings = file_access::fs::read_to_string(folder.join("settings.json"))
         .ok()
         .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok());
     let selected = settings.as_ref().and_then(|value| {
@@ -741,7 +641,7 @@ fn settings_sign_in(engine: &str) -> Option<(Option<bool>, Option<String>)> {
     });
     Some(sign_in_from_selection(
         selected.as_deref(),
-        folder.join("oauth_creds.json").is_file(),
+        file_access::fs::is_file(folder.join("oauth_creds.json")),
     ))
 }
 
@@ -758,9 +658,6 @@ fn sign_in_from_selection(
     }
 }
 
-/// Antigravity has no status command. On Linux its sign-in leaves a token file (only whether it
-/// exists is looked at); elsewhere the token is in the system keychain, which Misty never reads,
-/// so a sign-in Misty watched finish on this device is what counts.
 fn agy_sign_in() -> (Option<bool>, Option<String>) {
     let token = crate::engines::agy::agy_home().join("antigravity-oauth-token");
     let signed_in = (cfg!(target_os = "linux") && is_file_outside_gate(&token))
@@ -772,8 +669,6 @@ fn agy_sign_in() -> (Option<bool>, Option<String>) {
 pub async fn engine_cli_signed_in(engine: String) -> Result<CliSignInStatus, String> {
     let engine = checked_engine(&engine)?;
     let bin = engine_bin(&engine);
-    // An engine with no status command: what its own store says (Pi, Oh My Pi), or a sign-in
-    // Misty watched finish (`sign_in::remembered_sign_in`).
     let known = match engine.as_str() {
         "agy" => Some(agy_sign_in()),
         _ => sign_in::remembered_sign_in(&engine).or_else(|| settings_sign_in(&engine)),
@@ -819,10 +714,6 @@ pub async fn engine_cli_signed_in(engine: String) -> Result<CliSignInStatus, Str
     })
 }
 
-// ==================== Version compare ====================
-
-/// Semver-ish tuple from the first digit-run in the text: "v1.2.3",
-/// "2.1.228 (Claude Code)", "1.2" all parse; anything without digits → None.
 fn parse_version(text: &str) -> Option<(u64, u64, u64)> {
     let text = text.trim();
     let start = text.find(|c: char| c.is_ascii_digit())?;

@@ -1,6 +1,4 @@
-//! The pure pieces, the table, and the whole Git flow against a real repository in a temporary
-//! folder: worktrees, a lane's changes, keeping one, refusing a clash, and taking it all down.
-#![allow(clippy::disallowed_methods)] // Fixtures are built with the standard library.
+#![allow(clippy::disallowed_methods)]
 
 use std::collections::HashSet;
 use std::fs;
@@ -111,7 +109,6 @@ fn a_turn_may_run_only_in_a_worktree_recorded_for_its_account() {
     )
     .unwrap();
     assert!(is_worktree(&db, "me", Path::new("/m/a/1")));
-    // Not a folder inside it, the folder above it, another account, or the linked folder.
     assert!(!is_worktree(&db, "me", Path::new("/m/a/1/src")));
     assert!(!is_worktree(&db, "me", Path::new("/m/a")));
     assert!(!is_worktree(&db, "someone", Path::new("/m/a/1")));
@@ -176,7 +173,6 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
     );
     fs::create_dir_all(&home).unwrap();
 
-    // What is in the way, one thing at a time.
     fs::create_dir_all(base_dir.join("plain")).unwrap();
     assert_eq!(
         worktrees::readiness(&base_dir.join("plain")).await.unwrap(),
@@ -196,7 +192,6 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
         "not_top_level"
     );
 
-    // Three lanes from the same commit.
     let base = worktrees::head(&repo).await.unwrap();
     let lane =
         |n: i64| -> (PathBuf, String) { (home.join(n.to_string()), branch_name("0a1b2c3d4e", n)) };
@@ -207,7 +202,6 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
     }
     let (one, two, three) = (lane(1).0, lane(2).0, lane(3).0);
 
-    // Lane 1 leaves loose changes and a new file; lane 2 commits its own, as some agents do.
     fs::write(one.join("a.txt"), "one\nTWO\n").unwrap();
     fs::write(one.join("new.txt"), "hello\n").unwrap();
     fs::write(two.join("a.txt"), "one\ntwo, differently\n").unwrap();
@@ -227,7 +221,6 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
     );
     assert!(first[0].patch.contains("-two\n+TWO\n"));
     assert!(first[1].patch.contains("+hello"));
-    // Reading a lane's changes leaves its own index alone: the new file is still untracked.
     assert!(ok(&one, &["status", "--porcelain"])
         .await
         .contains("?? new.txt"));
@@ -244,16 +237,13 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
         .unwrap();
     assert!(third.is_empty());
 
-    // The person has a change of their own in the folder, in a file no lane touched.
     fs::write(repo.join("keep.txt"), "mine, edited\n").unwrap();
 
-    // A lane that did nothing has nothing to keep.
     let nothing = worktrees::keep(&repo, &three, &base, "Multi-run, run 3")
         .await
         .unwrap_err();
     assert!(nothing.contains("changed nothing"), "{nothing}");
 
-    // Uncommitted work in a file the lane also changed is a refusal that touches nothing.
     fs::write(repo.join("a.txt"), "one\ntwo\nthree\n").unwrap();
     let clash = worktrees::keep(&repo, &one, &base, "Multi-run, run 1")
         .await
@@ -266,7 +256,6 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
     assert_eq!(ok(&repo, &["diff", "--cached", "--name-only"]).await, "");
     fs::write(repo.join("a.txt"), "one\ntwo\n").unwrap();
 
-    // Keeping lane 1 stages its work in the folder and commits nothing there.
     worktrees::keep(&repo, &one, &base, "Multi-run, run 1")
         .await
         .unwrap();
@@ -285,13 +274,11 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
     );
     assert_eq!(ok(&repo, &["diff", "--name-only"]).await, "keep.txt\n");
 
-    // With that still staged, a second keep is refused.
     let staged = worktrees::keep(&repo, &two, &base, "Multi-run, run 2")
         .await
         .unwrap_err();
     assert!(staged.contains("staged changes"), "{staged}");
 
-    // Once the person commits it, lane 2 disagrees with the folder: refused, and backed out.
     ok(&repo, &["commit", "--quiet", "-m", "keep run 1"]).await;
     let moved = worktrees::head(&repo).await.unwrap();
     let conflict = worktrees::keep(&repo, &two, &base, "Multi-run, run 2")
@@ -306,7 +293,6 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
     );
     assert!(repo.join("src/lib.rs").is_file());
 
-    // Taking the multi-run down removes its worktrees and branches, and nothing else.
     let rows: Vec<Row> = (1..=3)
         .map(|n| Row {
             folder: repo.to_string_lossy().to_string(),
@@ -329,7 +315,6 @@ async fn a_multirun_goes_from_worktrees_to_one_kept_run_and_is_taken_down() {
         "mine, edited\n"
     );
 
-    // A worktree recorded outside multi-run's own folder is never removed.
     let elsewhere = base_dir.join("elsewhere");
     worktrees::add(&repo, &elsewhere, "misty/multirun-0a1b2c3d4e-9", &moved)
         .await

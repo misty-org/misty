@@ -1,16 +1,16 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorktreeInfo, WorktreeListing } from "./worktreeApi";
+import type { WorktreeInfo, WorktreeListing } from "./worktree_api";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/shared/platform/nativeInvoke", () => native);
-vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
+vi.mock("@/shared/platform/native_invoke", () => native);
+vi.mock("../../personal/agent_account", () => ({ agentAccountId: () => "me" }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ listen: vi.fn(() => Promise.resolve(() => {})) }),
 }));
-vi.mock("../../engines/enginesApi", () => ({ currentSpaceKey: () => "space-1" }));
-vi.mock("../../shared-folders/chatFolder", () => {
+vi.mock("../../engines/engines_api", () => ({ currentSpaceKey: () => "space-1" }));
+vi.mock("../../shared-folders/chat_folder", () => {
   const state = {
     byConversation: {},
     loadProjects: vi.fn(() => Promise.resolve([])),
@@ -25,7 +25,7 @@ vi.mock("../../shared-folders/chatFolder", () => {
 
 import { DeleteWorktreeDialog, warningsFor } from "./DeleteWorktreeDialog";
 import { WorktreeCreateDialog } from "./WorktreeCreateDialog";
-import { useWorktreeStore } from "./worktreeStore";
+import { useWorktreeStore } from "./worktree_store";
 
 afterEach(cleanup);
 

@@ -9,8 +9,6 @@ pub(super) async fn remove_worktree(
     branch: Option<&str>,
     delete_branch: bool,
 ) -> Result<WorktreeRemoveResult, String> {
-    // Git resolves a relative path against the repository, and the fallbacks below against
-    // the process's own folder: refuse the ambiguity.
     if !Path::new(worktree).is_absolute() {
         return Err("A worktree's path must be absolute.".into());
     }
@@ -30,15 +28,11 @@ pub(super) async fn remove_worktree(
     )
     .await?;
     if !out.success {
-        // Git lost track of it (pruned by hand, moved). Remove the folder only when it was
-        // surely a worktree of this repository; anything else keeps Git's refusal.
         let dir = Path::new(worktree);
         if is_orphan_worktree_dir(repo, &common_dir, dir).await {
             file_access::fs::remove_dir_all(dir)
                 .map_err(|error| format!("{worktree} couldn't be removed: {error}"))?;
         } else if is_plain_dir(dir) && !file_access::fs::exists(dir.join(".git")) {
-            // `--force` already dropped the registration but couldn't remove a busy folder
-            // (a terminal's working folder on Windows); only an empty leftover goes now.
             file_access::fs::remove_dir(dir).map_err(|_| summarize_stderr(&out.stderr))?;
         } else {
             return Err(summarize_stderr(&out.stderr));
@@ -50,8 +44,6 @@ pub(super) async fn remove_worktree(
     let mut branch_kept_reason = None;
     if delete_branch {
         if let Some(branch) = branch.filter(|b| !b.trim().is_empty() && !b.starts_with('-')) {
-            // `-d` refuses an unmerged branch; the person saw the merged check and chose to
-            // delete, so `-D` follows.
             let (soft, _) = run_git(repo, &["branch", "-d", "--", branch], None).await?;
             if soft.success {
                 branch_deleted = true;
@@ -76,8 +68,6 @@ pub(super) async fn remove_worktree(
     })
 }
 
-/// The real form of a path that may not exist: the deepest existing ancestor made real, the
-/// rest added back. Keeps `/var` and `/private/var` from defeating a prefix check.
 pub(super) fn canonical_lossy(path: &Path) -> PathBuf {
     let mut existing = path.to_path_buf();
     let mut rest: Vec<std::ffi::OsString> = Vec::new();
@@ -98,7 +88,6 @@ pub(super) fn canonical_lossy(path: &Path) -> PathBuf {
     }
 }
 
-/// Drops `.` and `..` by their names, so a gitdir can't climb out of the worktrees folder.
 pub(super) fn normalize_lexically(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for part in path.components() {
@@ -113,8 +102,6 @@ pub(super) fn normalize_lexically(path: &Path) -> PathBuf {
     out
 }
 
-/// The `gitdir:` a linked worktree's `.git` file points at. The main checkout has a `.git`
-/// folder, which never counts.
 pub(super) fn worktree_gitdir(dir: &Path) -> Option<PathBuf> {
     let dot_git = dir.join(".git");
     if !file_access::fs::symlink_metadata(&dot_git).ok()?.is_file() {
@@ -133,14 +120,10 @@ pub(super) fn worktree_gitdir(dir: &Path) -> Option<PathBuf> {
     })
 }
 
-/// A real folder, not a link to one.
 pub(super) fn is_plain_dir(dir: &Path) -> bool {
     file_access::fs::symlink_metadata(dir).is_ok_and(|m| m.is_dir())
 }
 
-/// Whether `dir` may be deleted as a lost worktree: a folder Git no longer lists, not the
-/// repository or a folder around it, whose `.git` file points at exactly
-/// `<common>/worktrees/<name>` while that folder is gone.
 pub(super) async fn is_orphan_worktree_dir(repo: &Path, common_dir: &Path, dir: &Path) -> bool {
     if !is_plain_dir(dir) {
         return false;
@@ -167,7 +150,6 @@ pub(super) async fn is_orphan_worktree_dir(repo: &Path, common_dir: &Path, dir: 
     };
     let worktrees = canonical_lossy(&common_dir.join("worktrees"));
     let gitdir = normalize_lexically(&canonical_lossy(&gitdir));
-    // Exactly one level below worktrees/: deeper is a submodule of a worktree.
     let Ok(rel) = gitdir.strip_prefix(&worktrees) else {
         return false;
     };
@@ -178,7 +160,6 @@ pub(super) async fn is_orphan_worktree_dir(repo: &Path, common_dir: &Path, dir: 
     ) {
         return false;
     }
-    // A Git folder that still exists means Git tracks this tree elsewhere: not lost.
     !file_access::fs::exists(&gitdir)
 }
 
@@ -192,7 +173,6 @@ pub(super) fn branch_merged(repo: &Path, branch: &str, base: &str) -> Result<boo
         .revparse_single(base)
         .and_then(|o| o.peel_to_commit())
         .map_err(|e| format!("Branch {base}: {}", e.message()))?;
-    // A commit isn't its own descendant to libgit2, but a fresh branch on the base is merged.
     Ok(branch_tip.id() == base_tip.id()
         || repo
             .graph_descendant_of(base_tip.id(), branch_tip.id())

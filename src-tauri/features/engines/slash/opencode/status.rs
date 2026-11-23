@@ -1,9 +1,5 @@
-//! `/status` and `/debug`: what the server has loaded and where it runs.
-
 use super::*;
 
-/// What OpenCode's terminal app shows under `/status`: its MCP servers, LSP servers, formatters
-/// and plugins. A part that won't load says why in its own section.
 pub(super) async fn status(server: &Server) -> Result<Output, String> {
     let (mcp, lsp, formatter, config) = tokio::join!(
         server.get("/mcp"),
@@ -33,7 +29,6 @@ pub(super) async fn status(server: &Server) -> Result<Output, String> {
             })
             .collect()
     });
-    // OpenCode lists LSP servers only once one has started.
     if !lsp.rows.is_empty() || lsp.text.as_deref() != Some(NONE) {
         sections.push(lsp);
     }
@@ -79,7 +74,6 @@ pub(super) async fn status(server: &Server) -> Result<Output, String> {
 
 const NONE: &str = "None";
 
-/// One status section: its rows from a loaded answer, "None" when it has none, or the error.
 fn section_of(
     heading: &str,
     answer: Result<Value, String>,
@@ -100,7 +94,6 @@ fn section_of(
     }
 }
 
-/// An MCP server's state, in the words OpenCode's own status uses.
 pub(super) fn mcp_state(name: &str, status: &Value) -> String {
     match text_at(status, "/status").unwrap_or_default() {
         "connected" => "Connected".into(),
@@ -113,8 +106,6 @@ pub(super) fn mcp_state(name: &str, status: &Value) -> String {
     }
 }
 
-/// A plugin's name and version from its spec, as OpenCode's status shows them: `name@1.2` from
-/// npm, the file's (or its folder's, for an `index`) name from a `file://` path.
 fn plugin_name(spec: &str) -> (String, String) {
     if let Some(path) = spec.strip_prefix("file://") {
         let mut parts = path.rsplit('/').filter(|part| !part.is_empty());
@@ -135,7 +126,6 @@ fn plugin_name(spec: &str) -> (String, String) {
     }
 }
 
-/// What OpenCode's terminal app shows under `/debug`, plus the server's paths and branch.
 pub(super) async fn debug(server: &Server, session: Option<&str>) -> Result<Output, String> {
     let (health, paths, vcs, config) = tokio::join!(
         server.get("/global/health"),
@@ -174,8 +164,6 @@ pub(super) async fn debug(server: &Server, session: Option<&str>) -> Result<Outp
     ))
 }
 
-/// 2.x's status: its MCP servers (`GET /api/mcp`, a list) and the plugins it loaded beyond its
-/// own built-in ones (`GET /api/plugin`). 2.x serves no LSP or formatter status.
 pub(super) async fn status_v2(server: &Server) -> Result<Output, String> {
     let (mcp, plugins) = tokio::join!(server.get("/api/mcp"), server.get("/api/plugin"));
     let mcp = section_of("MCP servers", mcp, |mcp| {
@@ -213,8 +201,6 @@ pub(super) async fn status_v2(server: &Server) -> Result<Output, String> {
     Ok(Output::info("Status", vec![mcp, plugins]))
 }
 
-/// 2.x's debug facts: version (`/api/info`), folder and project (`/api/location`), branch
-/// (`/api/vcs`), default model (`/api/model/default`) and the config files it read (`/api/config`).
 pub(super) async fn debug_v2(server: &Server, session: Option<&str>) -> Result<Output, String> {
     let (info, location, vcs, model, config) = tokio::join!(
         server.get("/api/info"),

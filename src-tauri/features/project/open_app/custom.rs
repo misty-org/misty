@@ -3,11 +3,6 @@
 
 use super::*;
 
-// ---------------------------------------------------------------------------
-// Programs the person added
-// ---------------------------------------------------------------------------
-
-/// A program the person picked in the system's file dialog.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomProgram {
@@ -22,8 +17,6 @@ pub(super) struct Programs {
     pub(super) programs: Vec<CustomProgram>,
 }
 
-/// The `settings_state` row the programs live in. Windows can neither read nor write a
-/// `grant:` row (`settings::profile_store`), so only this file can change which programs run.
 pub(super) const PROGRAMS_SCOPE: &str = "grant:open-in-programs";
 
 pub(super) fn read_programs(store: &database::store::Store) -> Result<Programs, String> {
@@ -59,33 +52,22 @@ pub(super) fn write_programs(
         .map_err(|error| error.to_string())
 }
 
-/// What a window may ask about the added programs.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum CustomRequest {
-    /// The programs added so far.
     List,
-    /// Pick a program in the system's dialog and add it; nothing if the person cancels.
     Add,
-    Remove {
-        id: String,
-    },
-    /// Open a linked folder, or a file in one, in an added program.
-    Open {
-        id: String,
-        path: String,
-    },
+    Remove { id: String },
+    Open { id: String, path: String },
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomResult {
     pub programs: Vec<CustomProgram>,
-    /// The program just added.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub added: Option<CustomProgram>,
 }
-/// The program the person picks in the system's own dialog. On macOS that's an app bundle.
 pub(super) async fn pick_program(app: &tauri::AppHandle) -> Result<Option<PathBuf>, String> {
     use tauri_plugin_dialog::DialogExt;
     let (send, receive) = tokio::sync::oneshot::channel();
@@ -111,7 +93,6 @@ pub(super) async fn pick_program(app: &tauri::AppHandle) -> Result<Option<PathBu
         .map_err(|_| "Choose a program on this computer.".to_string())
 }
 
-/// A program's name for the menu: its bundle or file name without the ending.
 pub(super) fn program_name(path: &Path) -> String {
     path.file_stem()
         .map(|stem| stem.to_string_lossy().into_owned())
@@ -124,7 +105,6 @@ pub(super) async fn open_custom(program: &Path, target: &Path, name: &str) -> Re
         .map_err(|error| format!("{name} can't be found: {error}"))?;
     #[cfg(target_os = "macos")]
     {
-        // `open <bundle> <path>` starts an app bundle; a bare program is started directly.
         if program
             .extension()
             .is_some_and(|ending| ending.eq_ignore_ascii_case("app"))
@@ -150,7 +130,6 @@ pub(super) async fn open_custom(program: &Path, target: &Path, name: &str) -> Re
     if !file_access::fs::is_file(&program) {
         return Err(format!("{name} isn't a program."));
     }
-    // Nothing is parsed by a shell: the program gets the path as its one argument.
     let mut command = crate::engines::resolve::command_for(&program);
     command
         .arg(target)

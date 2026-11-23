@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CliUpdatePlan } from "./api";
 import { CliUpdateDialog } from "./CliUpdateDialog";
-import type { CliUpdateFlow, CliUpdateFlowState } from "./useCliUpdateFlow";
+import type { CliUpdateFlow, CliUpdateFlowState } from "./use_cli_update_flow";
 
 const plan = (needsDeveloperTools: boolean): CliUpdatePlan => ({
   engine: "hermes",
@@ -42,7 +42,6 @@ describe("CliUpdateDialog without Apple's developer tools", () => {
       const flow = flowAt({ plan: plan(true) });
       render(<CliUpdateDialog engine="hermes" flow={flow} plain={plain} />);
       expect(screen.getByText("This needs Apple's developer tools first.")).toBeTruthy();
-      // The first-run dialog doesn't start anything on its own here.
       expect(flow.confirm).not.toHaveBeenCalled();
       expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Install developer tools" }));

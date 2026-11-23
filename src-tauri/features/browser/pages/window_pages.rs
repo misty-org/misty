@@ -1,7 +1,5 @@
-//! Hiding, parking and closing all of a window's pages at once.
 use crate::browser::*;
 
-/// The pages of the caller's window whose label starts with `prefix`, except the ids in `keep`.
 fn window_pages(caller: &Webview, app: &AppHandle, prefix: &str, keep: &[String]) -> Vec<Webview> {
     let keep: HashSet<String> = keep
         .iter()
@@ -18,7 +16,6 @@ fn window_pages(caller: &Webview, app: &AppHandle, prefix: &str, keep: &[String]
         .collect()
 }
 
-/// Runs `step` on every page, collecting each failure.
 fn each_page(
     pages: Vec<Webview>,
     step: impl Fn(&Webview) -> Result<(), String>,
@@ -51,10 +48,6 @@ pub struct BrowserWebviewsCloseExceptRequest {
     pub keep: Vec<String>,
 }
 
-/// Closes the agents' pages in the caller's window that the renderer does not know. The agent
-/// browser starts every tab asleep after a reload and opens a new page when one is shown, so a page
-/// from before the reload has no tab, never moves again and stays drawn over the window.
-/// Async for the same reason as `browser_webview_close`: never close on the UI thread.
 #[tauri::command]
 pub async fn browser_webviews_close_except(
     caller: Webview,

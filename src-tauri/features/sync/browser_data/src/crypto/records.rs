@@ -1,4 +1,3 @@
-//! Data sealed for this computer under a key, such as workspace recovery.
 use super::*;
 
 impl RecoveryKey {

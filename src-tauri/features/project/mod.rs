@@ -28,8 +28,6 @@ pub(crate) fn person_window(webview: &tauri::Webview) -> Result<(), String> {
     }
 }
 
-/// The real path of `path`, if it lies in a folder this account linked to a Space. `..` and
-/// links are resolved first, so neither reaches outside.
 pub(crate) async fn linked_path(
     app: &tauri::AppHandle,
     account: &str,
@@ -42,7 +40,6 @@ pub(crate) async fn linked_path(
     let db = app.state::<MistyRuntime>().environment.store();
     let account = account.to_string();
     tokio::task::spawn_blocking(move || {
-        // A file that doesn't exist yet is placed by its folder, which must.
         let real = match file_access::fs::canonicalize(&asked) {
             Ok(real) => real,
             Err(_) => {

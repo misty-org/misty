@@ -1,10 +1,3 @@
-//! One-time removal of what the coding feature left on this computer: the file snapshots in
-//! `<misty home>/checkpoints`. Its preferences go in `misty.db` migration 20, and its browser
-//! storage in the app's startup (`HostMain.tsx`).
-//!
-//! Best effort. It runs on its own thread, so a large folder never holds up launch and a failure
-//! never stops it. A removal that fails is tried again next launch; once it has worked, or there
-//! was nothing to remove, a mark in `settings_state` means it never runs again.
 use super::environment::AppEnvironmentService;
 use super::store::Store;
 use file_access::fs;
@@ -48,11 +41,7 @@ fn remove_once(store: &Store, misty_dir: &Path) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-/// Removes `<misty_dir>/checkpoints` when it is a real directory. A symlink (or a junction on
-/// Windows) or a file with that name stays, and so does what a symlink points to, inside the
-/// folder or not: removing a directory unlinks the symlinks in it without following them.
 fn remove_checkpoints_folder(misty_dir: &Path) -> io::Result<()> {
-    // With no home folder the data root is a relative path, which could mean anywhere.
     if !misty_dir.is_absolute() {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -69,12 +58,10 @@ fn remove_checkpoints_folder(misty_dir: &Path) -> io::Result<()> {
 }
 
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
 
-    /// A data folder with a `checkpoints` folder and its neighbours, which must all survive.
     fn data_folder() -> (tempfile::TempDir, PathBuf) {
         let directory = tempfile::tempdir().unwrap();
         let misty_dir = directory.path().join(".misty");
@@ -130,10 +117,12 @@ mod tests {
         let (_directory, misty_dir) = data_folder();
         let store = store_in(&misty_dir);
         remove_once(&store, &misty_dir).unwrap();
-        // A folder that appears after the cleanup is not this cleanup's to remove.
         fill_checkpoints(&misty_dir);
         remove_once(&store, &misty_dir).unwrap();
-        assert!(misty_dir.join(FOLDER).join("run-1/files/snapshot").is_file());
+        assert!(misty_dir
+            .join(FOLDER)
+            .join("run-1/files/snapshot")
+            .is_file());
     }
 
     #[test]
@@ -156,10 +145,12 @@ mod tests {
     fn a_database_that_will_not_open_removes_nothing_and_only_reports() {
         let (_directory, misty_dir) = data_folder();
         fill_checkpoints(&misty_dir);
-        // The database's parent is a file, so it can't be created.
         let store = Store::at(misty_dir.join("checkpoints.json/misty.db"));
         assert!(remove_once(&store, &misty_dir).is_err());
-        assert!(misty_dir.join(FOLDER).join("run-1/files/snapshot").is_file());
+        assert!(misty_dir
+            .join(FOLDER)
+            .join("run-1/files/snapshot")
+            .is_file());
     }
 
     #[cfg(unix)]

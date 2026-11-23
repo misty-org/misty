@@ -1,8 +1,5 @@
-// The cocoa crate's AppKit bindings are deprecated in favor of objc2.
 #![allow(unexpected_cfgs)]
 #![allow(deprecated)]
-
-//! The native window buttons: where they rest, and sliding them away with the bar that holds them.
 
 use tauri::{AppHandle, Runtime, Webview};
 
@@ -27,36 +24,27 @@ unsafe extern "C" {
 #[cfg(target_os = "macos")]
 static TRAFFIC_LIGHT_CONSTRAINTS_ASSOCIATION_KEY: u8 = 0;
 
-/// The offset the layout last asked for, kept on the window itself so a new window has none.
 #[cfg(target_os = "macos")]
 static TRAFFIC_LIGHT_PLACEMENT_ASSOCIATION_KEY: u8 = 1;
 
-/// How long a revealed window keeps its buttons hidden waiting for the layout to place them.
 #[cfg(target_os = "macos")]
 const PLACEMENT_WAIT: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[cfg(target_os = "macos")]
 const OBJC_ASSOCIATION_RETAIN_NONATOMIC: usize = 1;
 
-/// How far the buttons slid away with their bar, sideways and up, kept on the window while they
-/// are away, so one window's hidden bar never moves another window's buttons.
 #[cfg(target_os = "macos")]
 static TRAFFIC_LIGHT_AWAY_ASSOCIATION_KEY: u8 = 2;
 
-/// Where the first button rests, from the window's left edge, before any offset.
 #[cfg(target_os = "macos")]
 const TRAFFIC_LIGHT_DEFAULT_X: f64 = 20.0;
 
-/// Where the buttons' centers rest, from the window's top edge, before any offset.
 #[cfg(target_os = "macos")]
 const TRAFFIC_LIGHT_DEFAULT_Y: f64 = 19.0;
 
 #[cfg(target_os = "macos")]
 const TRAFFIC_LIGHT_SPACING: f64 = 23.0;
 
-/// Brings the native window buttons in with the bar that holds them, or sends them out with it:
-/// over `duration_ms` they slide `distance` points sideways (the sidebar, eased) or `rise` points
-/// up (the Space bar, at constant speed). They never fade: away, they sit outside the window.
 #[tauri::command]
 pub fn set_traffic_lights_visible<R: Runtime>(
     _app: AppHandle<R>,
@@ -79,7 +67,6 @@ pub fn set_traffic_lights_visible<R: Runtime>(
                     return;
                 }
                 remember_away(ns_window, (!visible).then_some((distance, rise)));
-                // Before the layout first places them they stay hidden, wherever they are.
                 let placed = placement(ns_window);
                 let (offset_x, offset_y) = placed.unwrap_or((0.0, 0.0));
                 let rest_x = TRAFFIC_LIGHT_DEFAULT_X + offset_x;
@@ -106,7 +93,6 @@ pub fn set_traffic_lights_visible<R: Runtime>(
                     if placed.is_some() {
                         let _: () = msg_send![button, setHidden: cocoa::base::NO];
                     }
-                    // Each button's constraints are four long: its leading edge, then its top.
                     if !constraints.is_null() {
                         let leading: id =
                             msg_send![constraints, objectAtIndex: (kind as usize) * 4];
@@ -192,7 +178,6 @@ unsafe fn hide_buttons(ns_window: id) {
     }
 }
 
-/// Hidden buttons appear at once where they now sit, already on their bar.
 #[cfg(target_os = "macos")]
 unsafe fn show_buttons(ns_window: id) {
     for kind in 0..3_i64 {
@@ -203,15 +188,11 @@ unsafe fn show_buttons(ns_window: id) {
     }
 }
 
-/// Before the window is first shown: the buttons wait hidden until the layout places them, so
-/// they never show in AppKit's spot and then jump. Returns whether they are waiting.
 #[cfg(target_os = "macos")]
 pub unsafe fn hold_traffic_lights(ns_window: id) -> bool {
     hold_buttons(ns_window)
 }
 
-/// [`hold_traffic_lights`] for a window known only by the raw pointer a webview gives
-/// (`ns_window()`), so callers outside this module never name `cocoa`'s deprecated `id`.
 #[cfg(target_os = "macos")]
 pub unsafe fn hold_traffic_lights_of(ns_window: *mut c_void) -> bool {
     hold_buttons(ns_window as id)
@@ -226,7 +207,6 @@ unsafe fn hold_buttons(ns_window: id) -> bool {
     true
 }
 
-/// A window whose layout never placed its buttons still gets them, in the usual spot.
 #[cfg(target_os = "macos")]
 pub fn release_traffic_lights_later<R: Runtime>(webview: Webview<R>) {
     tauri::async_runtime::spawn(async move {
@@ -240,8 +220,6 @@ pub fn release_traffic_lights_later<R: Runtime>(webview: Webview<R>) {
     });
 }
 
-/// Leaving full screen, AppKit brings the buttons back in its own spot and drops the anchors that
-/// held them. They hide as the window leaves and come back already in place once it has.
 #[cfg(target_os = "macos")]
 pub fn install() {
     unsafe fn observe(name: &str, block: id) {
@@ -289,12 +267,9 @@ pub fn install() {
             &*stayed as *const _ as id,
         );
     }
-    // The observers live as long as the app does.
     std::mem::forget((leaving, left, stayed));
 }
 
-/// Anchors the buttons `offset_x`/`offset_y` from their usual spot and shows them there. In full
-/// screen the offset is only remembered, for when the window leaves it.
 #[cfg(target_os = "macos")]
 pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f64) {
     remember_placement(ns_window, offset_x, offset_y);
@@ -311,10 +286,6 @@ pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f6
         return;
     }
 
-    // Pin the native controls to the 38-point custom titlebar. One-time frame
-    // writes are replaced by AppKit's next layout; resize callbacks correcting
-    // those frames in turn cause jitter. Native anchors keep the same position
-    // as part of layout, without a Misty resize handler or frame rewrites.
     let content_view = ns_window.contentView();
     if content_view.is_null() {
         return;
@@ -324,7 +295,6 @@ pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f6
     if !previous.is_null() {
         let _: () = msg_send![class!(NSLayoutConstraint), deactivateConstraints: previous];
     }
-    // Laid out again while their bar is away, the buttons start where it left them.
     let (away_x, away_y) = away_offset(ns_window).unwrap_or((0.0, 0.0));
     let leading: id = msg_send![content_view, leadingAnchor];
     let top: id = msg_send![content_view, topAnchor];
@@ -366,6 +336,5 @@ pub unsafe fn position_traffic_lights(ns_window: id, offset_x: f64, offset_y: f6
     if !root.is_null() {
         let _: () = msg_send![root, layoutSubtreeIfNeeded];
     }
-    // Laid out in place first, so they only ever appear where they belong.
     show_buttons(ns_window);
 }

@@ -1,10 +1,6 @@
-//! `/mcps`: connecting, disconnecting and signing in to OpenCode's MCP servers.
-
 use super::status::mcp_state;
 use super::*;
 
-/// `/mcps <name> on|off` connects or disconnects one of OpenCode's MCP servers;
-/// `/mcps auth <name>` signs in to one.
 pub(super) async fn mcp(server: &Server, args: &str) -> Result<Output, String> {
     let words: Vec<&str> = args.split_whitespace().collect();
     match words.as_slice() {
@@ -42,10 +38,6 @@ pub(super) async fn mcp(server: &Server, args: &str) -> Result<Output, String> {
     }
 }
 
-/// Signs in to an MCP server through OpenCode's own flow (`POST /mcp/:name/auth/authenticate`):
-/// OpenCode opens the server's sign-in page in the browser and catches the redirect on its own
-/// local callback. That call answers only once the sign-in is done, so it is left running, and
-/// only an answer that comes at once (a refusal, or a server signed in already) is shown.
 async fn mcp_sign_in(server: &Server, name: &str) -> Result<Output, String> {
     if server.v2 {
         return mcp_sign_in_v2(server, name).await;
@@ -76,7 +68,6 @@ async fn mcp_sign_in(server: &Server, name: &str) -> Result<Output, String> {
     }
 }
 
-/// A server's status in `GET /mcp`'s answer: 1.x's map by name, 2.x's list of `{name, status}`.
 fn mcp_status(all: &Value, name: &str) -> Option<Value> {
     if let Some(list) = data(all).as_array() {
         return list
@@ -87,9 +78,6 @@ fn mcp_status(all: &Value, name: &str) -> Option<Value> {
     all.get(name).cloned()
 }
 
-/// 2.x signs in to an MCP server through its integration: the server's `integrationID` in
-/// `GET /api/mcp`, that integration's OAuth method, and `POST …/connect/oauth`, which gives the
-/// page to open. OpenCode catches the redirect itself when the attempt's mode is `auto`.
 async fn mcp_sign_in_v2(server: &Server, name: &str) -> Result<Output, String> {
     let all = server.get("/api/mcp").await?;
     let integration = data(&all)

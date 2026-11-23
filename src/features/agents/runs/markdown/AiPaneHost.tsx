@@ -1,4 +1,4 @@
-import { useAgentAccountId } from "../../personal/agentAccount";
+import { useAgentAccountId } from "../../personal/agent_account";
 import {
   createContext,
   useCallback,
@@ -14,10 +14,10 @@ import type {
   AiCompanionAnchor,
   AiSurfaceAdapter,
   AiSuggestedAction,
-} from "../invocations/invocationTypes";
-import "./aiSurface.css";
+} from "../invocations/invocation_types";
+import "./ai_surface.css";
 
-export type { AiSurfaceId } from "../invocations/invocationTypes";
+export type { AiSurfaceId } from "../invocations/invocation_types";
 
 interface AiPaneContextValue {
   paneId: string;
@@ -70,7 +70,6 @@ export function AiPaneHost({
   }, []);
   const summon = useCallback(
     (_anchor?: AiCompanionAnchor) => {
-      // Where the person pointed is presentation only; the request carries the pane's context.
       if (accountId && adapterRef.current) summonCompanion(accountId, paneId);
     },
     [accountId, paneId, summonCompanion],
@@ -175,8 +174,6 @@ function aiContextBoundary(adapter: AiSurfaceAdapter | null) {
   try {
     context = adapter.getContext();
   } catch {
-    // Downloaded surfaces can expire before React commits their replacement.
-    // Never retain the old context or crash the host while it is being removed.
     return "none";
   }
   const spaces = [

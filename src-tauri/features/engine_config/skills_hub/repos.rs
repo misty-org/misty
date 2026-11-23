@@ -8,9 +8,7 @@ use serde_json::{json, Value};
 use super::core::*;
 use super::fsutil::*;
 use super::registry::*;
-// ===== Repositories =====
 
-/// upstream normalizeRepo。
 pub(super) fn normalize_repo(repo: &Value) -> Value {
     let owner = js_string(repo.get("owner")).trim().to_string();
     let name = js_string(repo.get("name")).trim().to_string();
@@ -26,7 +24,6 @@ pub(super) fn normalize_repo(repo: &Value) -> Value {
     json!({"owner": owner, "name": name, "branch": branch, "enabled": enabled})
 }
 
-/// upstream OWNER_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/。
 pub(super) fn owner_name_valid(value: &str) -> bool {
     let bytes = value.as_bytes();
     if bytes.is_empty() || bytes.len() > 100 || !bytes[0].is_ascii_alphanumeric() {
@@ -45,7 +42,6 @@ pub(super) fn invalidate_discover_cache() {
     let _ = fs::remove_file(discover_cache_path());
 }
 
-/// Drops entries matching `"owner/name"`, lowercased (shared by upstream addRepo/removeRepo).
 pub(super) fn retain_repos_not(repos: &mut Vec<Value>, key: &str) {
     repos.retain(|entry| {
         format!(
@@ -58,7 +54,6 @@ pub(super) fn retain_repos_not(repos: &mut Vec<Value>, key: &str) {
     });
 }
 
-/// upstream addRepo: validate → dedupe → push → invalidate the discover cache.
 pub(super) fn add_repo(repo_input: &Value) -> SkillResult<Value> {
     let repo = normalize_repo(repo_input);
     let owner = js_string(repo.get("owner"));
@@ -88,7 +83,6 @@ pub(super) fn add_repo(repo_input: &Value) -> SkillResult<Value> {
     Ok(json!({"ok": true, "repo": repo}))
 }
 
-/// upstream removeRepo。
 pub(super) fn remove_repo(owner: &str, name: &str) -> SkillResult<Value> {
     let mut registry = read_registry();
     retain_repos_not(

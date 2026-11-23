@@ -1,14 +1,9 @@
-//! Claude Code itself: `/help`, `/version` and `/doctor`.
-
 use super::*;
 
 async fn initialize(context: &Context) -> Result<Value, String> {
     ask(context, json!({ "subtype": "initialize" })).await
 }
 
-/// Claude Code's commands: the ones its `initialize` answer lists (its local commands, skills
-/// and plugins' commands), then its terminal app's own that Misty runs (`/status`, `/hooks`,
-/// …), which a headless Claude Code doesn't list. `__`-named ones are its internal plumbing.
 pub(super) async fn help(context: &Context) -> Result<Output, String> {
     let answer = initialize(context).await?;
     let listed = list(&answer, "commands");
@@ -53,8 +48,6 @@ pub(super) async fn version(context: &Context) -> Result<Output, String> {
     Ok(Output::done(format!("Claude Code {version}")))
 }
 
-/// What Claude Code's `/doctor` checks that Misty can read: its status, the MCP servers that
-/// failed and the sandbox's missing pieces. Its own `/doctor` is a terminal-bound skill.
 pub(super) async fn doctor(context: &Context) -> Result<Output, String> {
     let mut control = Control::start(&folder(context), context.session.as_deref(), false).await?;
     let outcome = doctor_with(&mut control, context.session.as_deref()).await;

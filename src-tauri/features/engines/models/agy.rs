@@ -8,12 +8,9 @@ pub(super) async fn agy_catalog(bin: &str) -> super::EngineCatalog {
             return super::EngineCatalog::authoritative(models);
         }
     }
-    // No answer from `agy models`: no list of ours stands in for the engine's.
     super::EngineCatalog::unknown()
 }
 
-/// `agy models` prints a status line then `id<TAB>Display Name` rows.
-/// There is no `--json` flag on 1.2.x.
 pub fn parse_agy_models_tsv(stdout: &str) -> Vec<EngineModel> {
     let mut models = Vec::new();
     let mut seen = std::collections::HashSet::new();

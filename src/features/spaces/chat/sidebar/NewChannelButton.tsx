@@ -1,17 +1,12 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { IconButton, RowTools } from "@misty/ui";
-import { useSpacesStore } from "../../list/useSpacesStore";
+import { useSpacesStore } from "../../list/use_spaces_store";
 import type { SpaceConversation } from "../../api/dto/entities";
-import { spaceCan } from "../../roles/useSpaceRoles";
+import { spaceCan } from "../../roles/use_space_roles";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
-import { useSpaceConversations } from "./useSpaceConversations";
+import { useSpaceConversations } from "./use_space_conversations";
 
-/**
- * The + at the end of the sidebar's Channels heading, shown while the heading (a `group/row`) is
- * hovered, as Discord keeps it beside its channel list. It opens the New channel dialog and, once
- * the channel is made, opens it. Only someone who may manage the Space's channels sees it.
- */
 export function NewChannelButton(props: {
   spaceId: string;
   onCreated(conversation: SpaceConversation): void;

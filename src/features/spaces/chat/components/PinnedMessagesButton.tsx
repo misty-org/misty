@@ -16,10 +16,10 @@ import {
   SkeletonList,
 } from "@misty/ui";
 import type { SpaceMessage } from "../../api/dto/entities";
-import { useSpaceCan } from "../../roles/useSpaceRoles";
+import { useSpaceCan } from "../../roles/use_space_roles";
 import { ChatAvatar } from "./ChatAvatar";
-import { spansToText } from "./messageText";
-import { pinnedChatKey, useCanPin, usePinnedStore } from "./pinnedStore";
+import { spansToText } from "./message_text";
+import { pinnedChatKey, useCanPin, usePinnedStore } from "./pinned_store";
 
 const stampFormat = new Intl.DateTimeFormat(undefined, {
   month: "numeric",
@@ -29,11 +29,6 @@ const stampFormat = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-/**
- * Pinned, in a chat's bar: a panel of the chat's pinned messages, the most recently pinned first,
- * each with Jump (which opens it in the chat) and, where the person may pin, Unpin. It reads the
- * pins again whenever a message in this Space is pinned or unpinned.
- */
 export function PinnedMessagesButton({
   spaceId,
   conversationId = "",
@@ -52,7 +47,11 @@ export function PinnedMessagesButton({
     usePinnedStore.getState().ensure(spaceId, conversationId);
     const onEvent = (event: Event) => {
       const detail = (
-        event as CustomEvent<{ spaceId?: string; conversationId?: string; event?: { type?: string } }>
+        event as CustomEvent<{
+          spaceId?: string;
+          conversationId?: string;
+          event?: { type?: string };
+        }>
       ).detail;
       const type = detail?.event?.type;
       if (detail?.spaceId !== spaceId) return;
@@ -64,7 +63,6 @@ export function PinnedMessagesButton({
     return () => window.removeEventListener("misty:space-message-event", onEvent);
   }, [spaceId, conversationId]);
 
-  // Opening the panel reads the pins again behind what it shows.
   useEffect(() => {
     if (open) void usePinnedStore.getState().load(spaceId, conversationId);
   }, [open, spaceId, conversationId]);
@@ -88,7 +86,9 @@ export function PinnedMessagesButton({
       <PopoverContent size="lg" align="end">
         <PopoverHeader
           title="Pinned messages"
-          detail={list?.status === "done" && list.messages.length ? list.messages.length : undefined}
+          detail={
+            list?.status === "done" && list.messages.length ? list.messages.length : undefined
+          }
         />
         {!list || list.status === "loading" ? (
           <PopoverBody>

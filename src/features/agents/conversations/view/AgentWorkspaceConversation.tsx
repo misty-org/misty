@@ -1,7 +1,7 @@
-import { takeComputerCommand } from "@/features/computer-use/computerUseAttachment";
+import { takeComputerCommand } from "@/features/computer-use/computer_use_attachment";
 import { MistyContextBar } from "../composer/MistyContextBar";
-import { useGlobalMistyAttachments } from "../composer/useGlobalMistyAttachments";
-import { useMistyStore } from "../state/useMistyStore";
+import { useGlobalMistyAttachments } from "../composer/use_global_misty_attachments";
+import { useMistyStore } from "../state/use_misty_store";
 import type { AgentProfile } from "@/shared/schemas";
 import {
   useCallback,
@@ -12,10 +12,10 @@ import {
   type Ref,
   type ReactNode,
 } from "react";
-import { useStableCallback } from "@/shared/hooks/useStableCallback";
+import { useStableCallback } from "@/shared/hooks/use_stable_callback";
 import { PaneLoading, Text } from "@misty/ui";
-import { useMistyWhileShown } from "../state/useMistyWhileShown";
-import { useCompanionState } from "../../tutor/cursor/companionState";
+import { useMistyWhileShown } from "../state/use_misty_while_shown";
+import { useCompanionState } from "../../tutor/cursor/companion_state";
 import {
   AgentComposeError,
   AgentReplyTarget,
@@ -23,34 +23,35 @@ import {
 } from "./AgentComposeNotices";
 import { AgentConversationComposer } from "./AgentConversationComposer";
 import { AgentConversationTranscript } from "./AgentConversationTranscript";
-import { steerRunningTask, submitWorkspaceMessage, untilIdle } from "./conversationSend";
-import { useConversationTurnActions } from "./useConversationTurnActions";
+import { steerRunningTask, submitWorkspaceMessage, untilIdle } from "./conversation_send";
+import { useConversationTurnActions } from "./use_conversation_turn_actions";
 import { RewindFilesDialog } from "./RewindFilesDialog";
-import { useConversationVoice, type AgentVoiceControl } from "./useConversationVoice";
-import { useDraftStatus } from "./useDraftStatus";
-import { useFollowLatestMessage } from "./useFollowLatestMessage";
-import { replyPrompt } from "./replyQuote";
+import { useConversationVoice, type AgentVoiceControl } from "./use_conversation_voice";
+import { useDraftStatus } from "./use_draft_status";
+import { useFollowLatestMessage } from "./use_follow_latest_message";
+import { replyPrompt } from "./reply_quote";
 import { RunStatusStrip } from "./status/RunStatusStrip";
 import { PermissionDock } from "./PermissionDock";
 import { ConversationNavigation } from "./navigation/ConversationNavigation";
-import { useChatShortcuts } from "./navigation/useChatShortcuts";
-import { recordPrompt } from "../composer/promptHistory";
-import { usePermissionMode } from "../../plans/permissionMode";
+import { useChatShortcuts } from "./navigation/use_chat_shortcuts";
+import { recordPrompt } from "../composer/prompt_history";
+import { usePermissionMode } from "../../plans/permission_mode";
 import { AgentQuestionCard } from "../../plans/AgentQuestionCard";
 import { WaitingForYouCard } from "../../interventions/WaitingForYouCard";
-import { useCollaborationComposer } from "../../plans/useCollaborationComposer";
-import { takeBrowserCommand } from "../composer/controls/composerChoices";
-import { mistyEngine } from "../../engines/enginesApi";
-import { useChatFolder } from "../../shared-folders/chatFolder";
-import { runComposerCommand } from "../composer/commands/engineCommands";
+import { useCollaborationComposer } from "../../plans/use_collaboration_composer";
+import { takeBrowserCommand } from "../composer/controls/composer_choices";
+import { mistyEngine } from "../../engines/engines_api";
+import { useChatFolder } from "../../shared-folders/chat_folder";
+import { runComposerCommand } from "../composer/commands/engine_commands";
 import { CommandReportDialog } from "../composer/commands/CommandReportDialog";
+import { EngineTodoLane } from "./engine/EngineTodos";
 import { EngineQueueChips } from "./engine/EngineQueueChips";
 import { EngineHistoryDialog } from "./engine/EngineHistoryDialog";
-import { useEngineQueue } from "./engine/engineQueue";
-import { syncChat } from "./engine/engineSessionImport";
-import { localChats, markStoredChats } from "../state/localChats";
-export type { AgentVoiceControl } from "./useConversationVoice";
-import { conversationClass } from "./conversationClass";
+import { useEngineQueue } from "./engine/engine_queue";
+import { syncChat } from "./engine/engine_session_import";
+import { localChats, markStoredChats } from "../state/local_chats";
+export type { AgentVoiceControl } from "./use_conversation_voice";
+import { conversationClass } from "./conversation_class";
 
 export function AgentWorkspaceConversation({
   agent,
@@ -69,21 +70,17 @@ export function AgentWorkspaceConversation({
   agent?: AgentProfile;
   conversationId?: string;
   emptyContent?: ReactNode;
-  /** Shown under the composer while the chat has no messages, such as ideas to start from. */
   emptyFooter?: ReactNode;
   initialDraft?: string;
   spaceId: string;
   accountId: string;
   onCreate: () => void;
-  /** Starts a new chat with this agent, for `/new`. */
   onNewChat?(): void;
   voiceControlRef?: Ref<AgentVoiceControl>;
   onVoiceStateChange?(state: { recording: boolean; busy: boolean }): void;
   onDraftStateChange?: (status: { dirty: boolean; busy: boolean }) => void;
 }) {
   const spaceId = "";
-  // Only what this view shows, and nothing while its tab is hidden; a whole-store subscription
-  // re-rendered the transcript on every unrelated store write.
   const state = useMistyWhileShown((s) => ({
     query: s.query,
     conversations: s.conversations,
@@ -103,9 +100,7 @@ export function AgentWorkspaceConversation({
     if (initialDraft && !useMistyStore.getState().query)
       useMistyStore.getState().setQuery(initialDraft);
   }, [initialDraft]);
-  /** The answer, or part of one, the next message responds to. */
   const [reply, setReply] = useState("");
-  /** The engine's own history, opened with `/resume`. */
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const loadingOlderRef = useRef(false);
@@ -116,12 +111,10 @@ export function AgentWorkspaceConversation({
     (c) => c.agentId === agent?.id || (!c.agentId && agent?.system_managed),
   );
   const conversation = scoped.find((c) => c.id === (conversationId ?? state.activeConversationId));
-  // The store runs one task at a time; only the conversation that owns it animates.
   const shownWorking =
     state.working &&
     (!state.invocationConversationId || state.invocationConversationId === conversation?.id);
   const permission = usePermissionMode(conversation?.id, agent?.default_run_mode);
-  // The folder the chat works in, as the composer reads it, for the commands that need it.
   const outsideEngine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
   const { folder } = useChatFolder(conversation?.id);
   const activeConversationId = conversationId ?? state.activeConversationId;
@@ -220,11 +213,8 @@ export function AgentWorkspaceConversation({
       selectedAgentId: agent?.id,
       selectedSpaceId: spaceId,
       activeConversationId: conversation?.id ?? "",
-      // A pending handoff (a page, selection or folder sent to Misty) belongs
-      // to the next message here.
       ...(useMistyStore.getState().handoff ? {} : { handoff: undefined, context: [] }),
     });
-  /** The open conversation's id, made first when there is none yet. */
   const ensureConversation = async () => {
     prepare();
     return useMistyStore.getState().newConversation(spaceId);
@@ -249,7 +239,6 @@ export function AgentWorkspaceConversation({
     clearDraft: () => setDraft(""),
   });
   const { questions, proposedPlan } = collaboration;
-  /** `resume`: an answer to a run that handed off, continued on that run's screen. */
   const send = async (
     typed = draft,
     quote = reply,
@@ -257,13 +246,11 @@ export function AgentWorkspaceConversation({
     resume = false,
   ) => {
     const written = typed;
-    // /browser attaches Misty's browser to this message; /plan runs as a command.
     if (!quote) {
       const rest = takeComputerCommand(
         takeBrowserCommand(typed, conversation?.id),
         conversation?.id,
       );
-      // `/browser` alone only attaches it, for the message still to be written.
       if (rest !== typed && !rest.trim() && !attachments.attachments.length) {
         setDraft("");
         return;
@@ -271,8 +258,6 @@ export function AgentWorkspaceConversation({
       typed = rest;
     }
     const onEngine = Boolean(outsideEngine);
-    // A `/` command Misty runs: its own, or one of the engine's that only its terminal app runs
-    // (`engineCommands.ts`). What it leaves to send goes on as the message.
     let after: (() => Promise<void>) | undefined;
     if (!quote && typed.trim().startsWith("/")) {
       let ran;
@@ -317,7 +302,6 @@ export function AgentWorkspaceConversation({
       (!prompt.trim() && !attachments.attachments.length)
     )
       return;
-    // An outside engine's turn can't be steered: the message waits for it to end.
     if (state.working && onEngine && conversation?.id && !attachments.attachments.length) {
       useEngineQueue.getState().add(conversation.id, prompt);
       setDraft("");
@@ -338,12 +322,10 @@ export function AgentWorkspaceConversation({
       return;
     }
     if (!useMistyStore.getState().error) {
-      // Only what the person typed; a quote or a plan run isn't theirs to recall.
       if (written === draft && written.trim()) recordPrompt(written);
       setDraft("");
       setReply("");
       attachments.consume();
-      // `/clear`: the memory-saving turn has ended, so the session can go now.
       if (after) {
         await untilIdle();
         await after().catch((error: unknown) =>
@@ -405,7 +387,6 @@ export function AgentWorkspaceConversation({
         messages={conversation?.messages}
         scrollRef={scrollRef}
       />
-      {/* The transcript's column and gutters, so bubbles line up with the composer. */}
       <div className="agent-compose-area mx-auto w-full max-w-209 shrink-0 px-6 pt-3 pb-4">
         <AgentComposeError
           error={state.error}
@@ -473,12 +454,21 @@ export function AgentWorkspaceConversation({
             );
           }}
           status={
-            <EngineQueueChips
-              conversationId={conversation?.id}
-              working={state.working}
-              onEdit={editPrompt}
-              onSend={(text) => void send(text, "")}
-            />
+            <>
+              <EngineTodoLane
+                runId={
+                  state.working && state.invocationConversationId === conversation?.id
+                    ? state.invocationId
+                    : undefined
+                }
+              />
+              <EngineQueueChips
+                conversationId={conversation?.id}
+                working={state.working}
+                onEdit={editPrompt}
+                onSend={(text) => void send(text, "")}
+              />
+            </>
           }
           empty={!conversation?.messages.length}
         />

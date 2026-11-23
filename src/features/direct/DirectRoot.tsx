@@ -1,16 +1,11 @@
 import { useEffect } from "react";
 import { notify } from "@misty/ui";
 import { directApi } from "./api";
-import { useStatusUpdates } from "./statusStore";
-import { useDirectAccount } from "./directAccount";
+import { useStatusUpdates } from "./status_store";
+import { useDirectAccount } from "./direct_account";
 import { IncomingCallHost } from "./calls/IncomingCallHost";
 import { MessageNotifier } from "./MessageNotifier";
 
-/**
- * What the account's own side of Misty keeps running while signed in, mounted once at the
- * window's root: status (everyone's, and this computer going idle), one-time notices from the
- * server, and incoming calls.
- */
 export function DirectRoot({ accountId }: { accountId: string | undefined }) {
   useEffect(() => {
     useDirectAccount.setState({ userId: accountId });

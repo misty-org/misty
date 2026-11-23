@@ -1,6 +1,3 @@
-//! Runs started on this computer, with no server behind them. The
-//! app starts and follows them here. Their events reach the windows of the account they belong to, and
-//! are kept while the app is open so a window that reloads can catch up on a run in progress.
 use std::{
     collections::{HashMap, VecDeque},
     sync::{Mutex, MutexGuard, OnceLock, PoisonError},
@@ -15,9 +12,7 @@ use tauri::{AppHandle, Manager, Webview};
 use super::windows::{account_of_window, emit_to_account, note_window};
 use database::store::Store;
 
-/// Runs whose events are kept, oldest forgotten first.
 const KEPT_RUNS: usize = 64;
-/// A long run streams many small deltas. Past this its oldest events go, never its newest.
 const KEPT_EVENTS: usize = 20_000;
 
 const TERMINAL: [&str; 3] = [
@@ -29,7 +24,6 @@ const TERMINAL: [&str; 3] = [
 #[derive(Default)]
 struct Log {
     events: HashMap<String, Vec<Value>>,
-    /// Whose each run is, kept after its request is gone.
     accounts: HashMap<String, String>,
     order: VecDeque<String>,
 }
@@ -59,7 +53,6 @@ fn keep(run_id: &str, event: &Value) {
     }
 }
 
-/// How the run's kept events say it ended, if they do.
 fn ended_state(events: &[Value]) -> Option<&str> {
     events.iter().rev().find_map(|event| {
         let kind = event.get("type")?.as_str()?;
@@ -69,7 +62,6 @@ fn ended_state(events: &[Value]) -> Option<&str> {
     })
 }
 
-/// A run whose answer is being turned into a proposal has stopped in the crate and not yet ended.
 fn follow_state(events: &[Value], live: bool) -> String {
     let proposing = || {
         events
@@ -83,14 +75,11 @@ fn follow_state(events: &[Value], live: bool) -> String {
     }
 }
 
-/// Whether a run is going in this app now, asked without starting Misty's own runtime: a runtime
-/// that isn't running runs nothing.
 pub(super) fn is_going(run_id: &str) -> bool {
     crate::engines::runs::is_live(run_id)
         || super::current().is_some_and(|running| running.runtime.local_run_live(run_id))
 }
 
-/// Whether a run began a write and nobody saw it end, or it ended uncertain.
 pub(super) fn has_unconfirmed(store: &Store, run_id: &str) -> bool {
     let check = || -> rusqlite::Result<bool> {
         let connection = store.connect()?;
@@ -106,11 +95,9 @@ pub(super) fn has_unconfirmed(store: &Store, run_id: &str) -> bool {
                 .is_some_and(|value| value["result"]["status"] == "uncertain"),
         }))
     };
-    // A journal that can't be read says nothing is known, the safe reading.
     check().unwrap_or(true)
 }
 
-/// Whose this run is. A run nobody can place reads as nobody's, and reaches only windows that ask.
 fn account_of_run(run_id: &str) -> Option<String> {
     if let Some(account) = log().accounts.get(run_id) {
         return Some(account.clone());
@@ -122,7 +109,6 @@ fn account_of_run(run_id: &str) -> Option<String> {
     Some(account)
 }
 
-/// Keeps an event and tells the run's account's windows.
 pub(crate) fn publish_native(app: &AppHandle, run_id: &str, event: &Value) {
     keep(run_id, event);
     super::run_ledger::note_event(app, run_id, event);
@@ -167,7 +153,6 @@ fn person_window(webview: &Webview) -> Result<(), String> {
     }
 }
 
-/// A window of the run's own account, or of a run nobody can place.
 pub(super) fn window_of_run(webview: &Webview, run_id: &str) -> Result<(), String> {
     person_window(webview)?;
     match (account_of_run(run_id), account_of_window(webview.label())) {
@@ -178,14 +163,10 @@ pub(super) fn window_of_run(webview: &Webview, run_id: &str) -> Result<(), Strin
     }
 }
 
-/// What a window may say about a run: never how it ended, and never a card, which native code raises
-/// itself from what it holds.
 fn publishable(kind: &str) -> bool {
     !kind.starts_with("invocation.") && !kind.starts_with("app.")
 }
 
-/// How a run whose answer became a proposal ends, once the app has built it. It says only what a run
-/// stopped in the crate and waiting for its proposal may say.
 fn may_end_proposal(events: &[Value], kind: &str) -> bool {
     matches!(kind, "invocation.completed" | "invocation.failed")
         && events
@@ -194,7 +175,6 @@ fn may_end_proposal(events: &[Value], kind: &str) -> bool {
         && ended_state(events).is_none()
 }
 
-/// Starts a run. A repeat with the same `run_id` while it's going changes nothing.
 #[tauri::command]
 pub async fn agent_run_start(
     app: AppHandle,
@@ -203,7 +183,6 @@ pub async fn agent_run_start(
     body: Value,
 ) -> Result<(), String> {
     person_window(&webview)?;
-    // A run that has spoken already started once: this launch never starts it again.
     if log().events.contains_key(&run_id) {
         return Ok(());
     }
@@ -212,25 +191,18 @@ pub async fn agent_run_start(
         log().accounts.insert(run_id.clone(), account.to_owned());
     }
     super::run_ledger::note_start(&app, &run_id, &body);
-    // The folder the turn works in is saved first, so a rewind can put its files back.
     super::turn_rewind::before_run(&app, &run_id, &body).await;
-    // Every run goes to an outside engine (the agent's, or the default engine): Misty has no model
-    // of its own, so its runtime isn't started for a run (it stays in the code, unused).
     let started = if crate::engines::runs::wants(&body) {
         crate::engines::runs::start(&app, run_id.clone(), body).await
     } else {
         Err("Pick a default engine in Settings › Agents.".to_owned())
     };
-    // A run that never started has no events to end its row, which would say it is going for good.
     if started.is_err() {
         super::run_ledger::note_event(&app, &run_id, &json!({ "type": "invocation.failed" }));
     }
     started
 }
 
-/// Warms up the engine for a Tutor spoken session's first turn while the person is still talking
-/// (`engines/warm_up.rs`). The body is the turn's own, with no prompt yet. It starts no run: nothing
-/// is noted for it, and a request it doesn't apply to does nothing.
 #[tauri::command]
 pub async fn agent_run_warm_up(
     app: AppHandle,
@@ -253,8 +225,6 @@ async fn start_on_runtime(app: &AppHandle, run_id: String, body: Value) -> Resul
         .map_err(|error| error.code().to_owned())
 }
 
-/// The person wrote to a run in progress: the id its message goes by, or nothing when it has stopped
-/// listening.
 #[tauri::command]
 pub async fn agent_run_steer(
     app: AppHandle,
@@ -263,7 +233,6 @@ pub async fn agent_run_steer(
     text: String,
 ) -> Result<Option<String>, String> {
     window_of_run(&webview, &run_id)?;
-    // An outside engine takes one message per turn; it can't be written to while it works.
     if crate::engines::runs::is_live(&run_id) {
         return Ok(None);
     }
@@ -273,8 +242,6 @@ pub async fn agent_run_steer(
         .steer_local(&run_id, &text))
 }
 
-/// The person took the run's window, or gave it back. An outside engine can't be paused mid-turn,
-/// so while the person holds its page, its browser calls are refused (`take_over`).
 #[tauri::command]
 pub async fn agent_run_pause(
     app: AppHandle,
@@ -283,7 +250,6 @@ pub async fn agent_run_pause(
     paused: bool,
 ) -> Result<bool, String> {
     window_of_run(&webview, &run_id)?;
-    // Handing back always lets the browser through again, whatever the run has become since.
     if !paused {
         super::take_over::release(&run_id);
     }
@@ -314,7 +280,6 @@ pub async fn agent_run_cancel(
         .map_err(|error| error.code().to_owned())
 }
 
-/// What these earlier runs wrote, newest first, so the next turn can check before repeating one.
 #[tauri::command]
 pub async fn agent_run_receipts(
     app: AppHandle,
@@ -334,7 +299,6 @@ pub async fn agent_run_receipts(
     .map_err(|error| error.to_string())
 }
 
-/// A tab joined the run: its tools come from the request's contexts, so they're listed from now on.
 #[tauri::command]
 pub async fn agent_run_contexts(
     app: AppHandle,
@@ -350,8 +314,6 @@ pub async fn agent_run_contexts(
         .map_err(|error| error.code().to_owned())
 }
 
-/// An event a window raised for a run, such as a plan it proposed, kept with the run's own so a window
-/// that reloads sees it too.
 #[tauri::command]
 pub fn agent_run_publish(
     app: AppHandle,
@@ -376,7 +338,6 @@ pub fn agent_run_publish(
     Ok(())
 }
 
-/// Ends a run whose answer became a proposal. It takes a run that's waiting for exactly this.
 #[tauri::command]
 pub fn agent_run_end_proposal(
     app: AppHandle,
@@ -400,7 +361,6 @@ pub struct RunFollow {
 }
 
 pub(crate) async fn read_follow(app: &AppHandle, run_id: &str) -> Result<RunFollow, String> {
-    // A run on an outside engine is live without Misty's own runtime ever starting.
     let live = crate::engines::runs::is_live(run_id)
         || super::ensure(app).await?.runtime.local_run_live(run_id);
     let events = log().events.get(run_id).cloned().unwrap_or_default();
@@ -408,8 +368,6 @@ pub(crate) async fn read_follow(app: &AppHandle, run_id: &str) -> Result<RunFoll
     Ok(RunFollow { state, events })
 }
 
-/// What a window needs to pick a run back up: its state and what it has said so far. `state_only`
-/// leaves the events out, for a window that only checks whether a long run is still going.
 #[tauri::command]
 pub async fn agent_run_follow(
     app: AppHandle,

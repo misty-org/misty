@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   show: vi.fn(),
 }));
 
-vi.mock("../folders/deviceState", () => ({
+vi.mock("../folders/device_state", () => ({
   readDeviceState: async (scope: string) => mocks.stored.get(scope) ?? null,
   updateDeviceState: async (
     scope: string,
@@ -22,22 +22,22 @@ vi.mock("../folders/deviceState", () => ({
     return next;
   },
 }));
-vi.mock("../terminal/terminalApi", () => ({
+vi.mock("../terminal/terminal_api", () => ({
   terminalApi: { open: mocks.open, write: mocks.write, close: mocks.close },
 }));
 vi.mock("../terminal/sessions", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureTerminalOutputListener: () => {},
 }));
-vi.mock("../contextPanelStore", () => ({
+vi.mock("../context_panel_store", () => ({
   useContextPanel: { getState: () => ({ show: mocks.show }) },
 }));
-vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "local" }));
+vi.mock("../../personal/agent_account", () => ({ agentAccountId: () => "local" }));
 
 import { LaunchScriptButton, requestLaunchScriptEditor } from "./LaunchScriptActions";
-import { useLaunchScripts } from "./launchScripts";
-import { LAUNCH_TAB_KEY } from "./runLaunchScript";
-import { useTerminalStore } from "../terminal/terminalStore";
+import { useLaunchScripts } from "./launch_scripts";
+import { LAUNCH_TAB_KEY } from "./run_launch_script";
+import { useTerminalStore } from "../terminal/terminal_store";
 
 const FOLDER = "/work/app";
 const CHAT = "chat-1";
@@ -85,7 +85,6 @@ describe("LaunchScriptButton", () => {
     expect(mocks.write).toHaveBeenCalledWith(launchTab, "npm run dev\n");
     expect(mocks.show).toHaveBeenCalledWith("terminal");
 
-    // A second run reuses the tab and starts its shell again first.
     fireEvent.click(screen.getByRole("button", { name: "Run start command" }));
     await waitFor(() => expect(mocks.close).toHaveBeenCalledWith(launchTab));
     await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(2));

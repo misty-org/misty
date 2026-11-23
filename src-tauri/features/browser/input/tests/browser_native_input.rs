@@ -1,8 +1,3 @@
-//! macOS integration regression: exercises real trusted WKWebView events.
-//!
-//! AppKit needs the process's main thread and a window server, so this is a test with
-//! its own `main` (see `Cargo.toml`) and only runs when asked:
-//! `MISTY_NATIVE_INPUT_TEST=1 cargo test --test browser_native_input`.
 #![cfg(target_os = "macos")]
 #![allow(dead_code, unused_imports)]
 
@@ -31,7 +26,6 @@ fn spin(seconds: f64) {
     NSRunLoop::currentRunLoop().runUntilDate(&NSDate::dateWithTimeIntervalSinceNow(seconds));
 }
 
-/// Runs `script` in the page and returns its JSON-encoded result.
 fn evaluate(view: &WKWebView, script: &str) -> Value {
     let slot: Rc<RefCell<Option<String>>> = Rc::default();
     let sink = slot.clone();

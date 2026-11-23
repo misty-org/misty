@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { command } from "@/shared/shortcuts/factory";
 import type { ShortcutsSnapshot } from "@/native/ipc";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import type { SettingsContentProps } from "../../settings/settings_types";
 import { ShortcutsSection } from "./ShortcutsSection";
 
 const definitions = [

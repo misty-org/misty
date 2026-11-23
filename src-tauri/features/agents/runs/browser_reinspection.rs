@@ -1,8 +1,5 @@
-//! What a run does after a browser action was rejected for a stale page read.
 use super::js_json::JsValue;
 
-/// Only the control plane's explicit pre-dispatch rejection permits replanning. An uncertain result,
-/// denial, transport error, or arbitrary tool failure does not.
 pub(crate) fn requires_browser_reinspection(name: &str, output: Option<&JsValue>) -> bool {
     if !["browser.upload", "browser.steps", "browser.fill_form"].contains(&name) {
         return false;
@@ -15,7 +12,6 @@ pub(crate) fn requires_browser_reinspection(name: &str, output: Option<&JsValue>
         && result.get("attempted") == Some(&JsValue::Bool(false))
 }
 
-/// Snapshot refs and inspections carry different references.
 pub(crate) fn browser_reinspection_tool(name: &str) -> &'static str {
     if name == "browser.steps" || name == "browser.fill_form" {
         return "browser.snapshot";
@@ -23,7 +19,6 @@ pub(crate) fn browser_reinspection_tool(name: &str) -> &'static str {
     "browser.inspect"
 }
 
-/// Told to the model with its visible tool names before the next turn.
 pub(crate) fn browser_reinspection_instruction(name: &str) -> &'static str {
     if name == "browser.snapshot" {
         return "The previous page action was rejected before dispatch because the page changed since its snapshot. Call browser_snapshot now, then act with the new refs and documentId. Do not report that the rejected action succeeded.";
@@ -35,8 +30,10 @@ pub(crate) fn browser_reinspection_instruction(name: &str) -> &'static str {
 mod tests {
     use super::*;
 
-    const STALE: &str = r#"{"status":"failure","reason":"browser_snapshot_stale","attempted":false}"#;
-    const ATTEMPTED: &str = r#"{"status":"failure","reason":"browser_snapshot_stale","attempted":true}"#;
+    const STALE: &str =
+        r#"{"status":"failure","reason":"browser_snapshot_stale","attempted":false}"#;
+    const ATTEMPTED: &str =
+        r#"{"status":"failure","reason":"browser_snapshot_stale","attempted":true}"#;
 
     fn requires(name: &str, output: &str) -> bool {
         requires_browser_reinspection(name, Some(&JsValue::parse(output).unwrap()))
@@ -60,7 +57,10 @@ mod tests {
 
     #[test]
     fn inspects_the_page_again_after_a_stale_upload() {
-        assert_eq!(browser_reinspection_tool("browser.upload"), "browser.inspect");
+        assert_eq!(
+            browser_reinspection_tool("browser.upload"),
+            "browser.inspect"
+        );
         assert!(browser_reinspection_instruction("browser.inspect").contains("browser_inspect"));
     }
 

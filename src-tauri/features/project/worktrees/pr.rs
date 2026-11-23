@@ -17,8 +17,6 @@ pub(super) struct GhPrAuthor {
     pub(super) login: Option<String>,
 }
 
-/// `gh pr view` with a hard deadline: it may be missing, signed out or slow, and every one of
-/// those only makes the preview plainer.
 pub(super) async fn gh_pr_view(number: u64, repo_slug: &str) -> Option<GhPrView> {
     let program = crate::engines::resolve::find_program("gh")?;
     let mut command = crate::engines::resolve::command_for(&program);

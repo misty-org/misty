@@ -1,21 +1,14 @@
 import { useEffect, useState } from "react";
-import { EngineMark } from "@/features/engine-config/EngineMark";
-import { Field, Input, OptionSelect } from "@misty/ui";
-import { listEngineModels, mistyEngine, useEnginesList, type EngineModel } from "./enginesApi";
+import { Field, Input, Mark, OptionSelect } from "@misty/ui";
+import { listEngineModels, mistyEngine, useEnginesList, type EngineModel } from "./engines_api";
 
-/**
- * Which engine an agent runs on: Misty's own, or one of the outside engines the person has
- * installed. An outside engine signs in and picks its provider by itself; Misty only starts it.
- */
 export function AgentEngineField(props: {
   engine: string;
   model: string;
-  /** Misty's own agent always runs on Misty. */
   locked?: boolean;
   onEngine(engine: string): void;
   onModel(model: string): void;
 }) {
-  // The last engine list shows at once; a fresh one follows behind it.
   const engines = useEnginesList().data ?? [];
   const engine = props.engine || mistyEngine;
   const [models, setModels] = useState<{ engine: string; list: EngineModel[] }>({
@@ -33,24 +26,25 @@ export function AgentEngineField(props: {
     };
   }, [engine]);
   const offered = models.engine === engine ? models.list : [];
-  // Models are told apart by name: no icon repeated down the list.
   const modelOptions = [
     { value: "", label: "The engine's default" },
     ...offered.map((model) => ({ value: model.id, label: model.label })),
   ];
-  // A model typed or saved earlier that the engine no longer lists still shows.
   if (props.model && !offered.some((model) => model.id === props.model))
     modelOptions.push({ value: props.model, label: props.model });
   const options = [
     ...engines.map((item) => ({
       value: item.id,
       label: item.installed ? item.name : `${item.name} (not installed)`,
-      icon: <EngineMark engine={item.id} name={item.name} size={16} />,
+      icon: <Mark of={`engine:${item.id}`} label={item.name} size={16} aria-hidden />,
     })),
   ];
-  // An engine saved earlier still shows while the list loads, or if its adapter is gone.
   if (!options.some((option) => option.value === engine))
-    options.push({ value: engine, label: engine, icon: <EngineMark engine={engine} size={16} /> });
+    options.push({
+      value: engine,
+      label: engine,
+      icon: <Mark of={`engine:${engine}`} size={16} />,
+    });
   return (
     <>
       <Field label="Engine">

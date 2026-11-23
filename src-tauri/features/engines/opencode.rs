@@ -22,11 +22,7 @@ impl Engine for OpenCodeEngine {
         true
     }
 
-    /// Never invoked on the virtual path (`send_host_stream` branches before
-    /// the process spawn); a stub keeps the trait contract honest.
     fn supports_images(&self) -> bool {
-        // prompt_async parts accept data-URL file parts; that IS the serve
-        // image transport.
         true
     }
     fn supports_effort(&self) -> bool {
@@ -37,8 +33,6 @@ impl Engine for OpenCodeEngine {
         true
     }
 
-    /// OpenCode's primary agents, Build and Plan. Each `permission.asked` goes to Misty's gate.
-    /// No no-asking mode: OpenCode has no sandbox that keeps it inside its folder.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[

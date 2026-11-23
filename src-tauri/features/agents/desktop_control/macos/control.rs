@@ -1,5 +1,3 @@
-//! Desktop control: the task that holds the desktop, its lease, the Escape
-//! guard, and the island and mist it shows. All state lives on the main queue.
 use std::{
     cell::RefCell,
     ffi::c_void,
@@ -71,14 +69,10 @@ pub(super) fn epoch() -> f64 {
         .unwrap_or(0.0)
 }
 
-/// The task that holds the desktop, if any.
 pub(super) fn task() -> Option<String> {
     state(|state| state.task.clone())
 }
 
-/// Gives the desktop back without ending the task: no input tap, cursor or
-/// capture. While the task waits for the person the island stays and the mist
-/// thins; otherwise both go. The next visual tool call enters control again.
 fn release_control(waiting: bool) {
     let tap = state(|state| {
         state.controlling = false;
@@ -107,7 +101,6 @@ fn release_control(waiting: bool) {
     mist_waiting(false);
 }
 
-/// Ends control; a reason is announced to Misty once.
 pub(super) fn stop_control(reason: Option<&str>) {
     let reason = reason.filter(|reason| !reason.is_empty());
     let announce = state(|state| {
@@ -130,8 +123,6 @@ pub(super) fn stop_control(reason: Option<&str>) {
     }
 }
 
-/// Misty acts with its own cursor, so the person's input is never blocked. The
-/// tap only listens for Escape and the voice shortcut, which stop the task.
 unsafe extern "C-unwind" fn guard_input(
     _proxy: CGEventTapProxy,
     kind: CGEventType,
@@ -255,8 +246,6 @@ pub(super) fn begin_control(
     None
 }
 
-/// Registration does not capture or take input. The first visual tool call enters
-/// control, so a question answered from its initial screenshot does not lock input.
 pub(crate) fn prepare(task_id: &str, ask: bool, callback: fn(Value), island_callback: fn(Value)) {
     let next = task_id.to_owned();
     on_main(move |_| {
@@ -298,7 +287,6 @@ pub(crate) fn renew(task_id: &str) {
     });
 }
 
-/// The task waits for the person: hand the desktop back but keep the task.
 pub(crate) fn yield_control(task_id: &str) {
     let expected = task_id.to_owned();
     on_main(move |_| {
@@ -308,8 +296,6 @@ pub(crate) fn yield_control(task_id: &str) {
     });
 }
 
-/// What Misty's island shows: a status line, a meta line (sub-agents, where)
-/// and what the person needs to do while the task waits.
 pub(crate) fn island_text(task_id: &str, json: &str) {
     let expected = task_id.to_owned();
     let Ok(Value::Object(input)) = serde_json::from_str::<Value>(json) else {

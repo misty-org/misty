@@ -1,4 +1,3 @@
-// Tests build their fixtures directly, outside the file gate.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use std::{net::TcpListener, time::Instant};
@@ -38,7 +37,6 @@ struct Recorded {
     limit: usize,
 }
 
-/// Every page recorded from the TypeScript runtime, read both ways.
 #[tokio::test]
 async fn every_recorded_page_reads_the_same_in_the_worker() {
     let folder =
@@ -98,7 +96,6 @@ async fn a_page_over_the_limit_fails_plainly() {
     assert!(matches!(failed, Err(agent_runs::PageReadError::Reader(_))));
 }
 
-/// Nothing falls back to this process: a worker that fails is that fetch's error.
 #[tokio::test]
 async fn a_failing_worker_is_an_error_and_not_a_second_try_here() {
     let refused = answer(b"no settings line").await;
@@ -128,7 +125,6 @@ async fn one_copy_lasts_across_reads_and_a_tampered_one_is_replaced() {
     let bytes = worker().unwrap();
     let first = staged().unwrap();
     let again = staged().unwrap();
-    // Other tests stage too, so compare the rule rather than this one's identity alone.
     assert!(still_intact(&again.executable, bytes));
     drop((first, again));
     let current = staged().unwrap();
@@ -138,8 +134,6 @@ async fn one_copy_lasts_across_reads_and_a_tampered_one_is_replaced() {
     assert!(still_intact(&replaced.executable, bytes));
 }
 
-/// The worker's own attempts, from inside its real profile. Debug builds of the worker hold these
-/// probes, so a release can't, and each has a case that must work so a broken probe can't pass.
 #[cfg(debug_assertions)]
 mod confinement {
     use super::*;
@@ -149,7 +143,6 @@ mod confinement {
     }
 
     fn secret_file() -> (tempfile::NamedTempFile, String) {
-        // The real home folder, which is where the person's own files are, not a temp path.
         let home = dirs::home_dir().unwrap();
         let file = tempfile::Builder::new()
             .prefix(".misty-reader-probe-")
@@ -170,7 +163,6 @@ mod confinement {
             probe("list", dirs::home_dir().unwrap().to_str().unwrap()).await,
             "refused"
         );
-        // It can read its own binary, so a refusal above is the profile and not the probe.
         let own = staged().unwrap();
         assert_eq!(probe("read", own.executable.to_str().unwrap()).await, "ok");
     }
@@ -193,7 +185,6 @@ mod confinement {
     async fn it_cannot_reach_the_network() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
-        // The listener is really there.
         assert!(std::net::TcpStream::connect(address).is_ok());
         assert_eq!(probe("connect", &address.to_string()).await, "refused");
         assert_eq!(probe("connect", "1.1.1.1:443").await, "refused");
@@ -207,7 +198,6 @@ mod confinement {
 
     #[tokio::test]
     async fn the_environment_carries_nothing() {
-        // `command` clears it; a key in this process's environment must not reach a parser.
         std::env::set_var("MISTY_TEST_SECRET", "1");
         let worker = staged().unwrap();
         let (spawned, _keep) = command(&worker).unwrap();
@@ -221,7 +211,6 @@ mod confinement {
     }
 }
 
-/// Reports what a read costs. Run with `--ignored --nocapture`.
 #[tokio::test]
 #[ignore]
 async fn how_long_a_read_takes() {

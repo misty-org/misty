@@ -18,9 +18,6 @@ fn modes_result(modes: Value) -> Value {
     json!({ "sessionId": "mvs_a", "modes": { "availableModes": modes } })
 }
 
-/// The live session/new shape (mcode 0.5.1): only `default` and `plan`
-/// are session modes — everything else lives in the `permissionMode`
-/// config option, so only the plan request routes through `mode_id`.
 #[test]
 fn mode_matching_reads_advertised_ids_and_names() {
     let modes = json!([
@@ -31,17 +28,13 @@ fn mode_matching_reads_advertised_ids_and_names() {
         mode_id(Some("plan"), &modes_result(modes.clone())).as_deref(),
         Some("plan")
     );
-    // Non-plan permissions never match a session mode: they ride the
-    // `permissionMode` config option instead.
     assert_eq!(mode_id(Some("auto"), &modes_result(modes.clone())), None);
     assert_eq!(mode_id(Some("bypass"), &modes_result(modes)), None);
-    // Flat string-mode spellings also match.
     let flat = json!(["default", "plan"]);
     assert_eq!(
         mode_id(Some("plan"), &modes_result(flat)).as_deref(),
         Some("plan")
     );
-    // No advertised modes → None (the driver keeps the CLI default).
     assert_eq!(mode_id(Some("plan"), &json!({})), None);
 }
 
@@ -49,13 +42,10 @@ fn mode_matching_reads_advertised_ids_and_names() {
 fn permission_config_maps_onto_the_verified_values() {
     assert_eq!(permission_config_value("auto"), "auto");
     assert_eq!(permission_config_value("manual"), "default");
-    // No folder sandbox, so never Full access.
     assert_eq!(permission_config_value("bypass"), "auto");
     assert_eq!(permission_config_value("plan"), "auto");
 }
 
-/// The live `model` config option (mcode 0.5.1): internal
-/// `m:<provider>:<model>:v:<variant>` values only.
 fn model_session_result() -> Value {
     json!({
         "sessionId": "mvs_a",
@@ -77,7 +67,6 @@ fn model_session_result() -> Value {
 
 #[test]
 fn model_resolution_matches_live_config_values() {
-    // Thinking variant preferred for a normal effort request…
     assert_eq!(
         resolve_model_value(
             &model_session_result(),
@@ -87,8 +76,6 @@ fn model_resolution_matches_live_config_values() {
         .as_deref(),
         Some("m:minimax:MiniMax-M3:v:thinking")
     );
-    // …plain variant when the effort is off, with a fall-back to the
-    // first candidate when the wanted variant does not exist.
     assert_eq!(
         resolve_model_value(&model_session_result(), "minimax/MiniMax-M3", Some("off")).as_deref(),
         Some("m:minimax:MiniMax-M3:v:")
@@ -102,7 +89,6 @@ fn model_resolution_matches_live_config_values() {
         .as_deref(),
         Some("m:minimax:MiniMax-M2.7-highspeed:v:thinking")
     );
-    // A `#variant` suffix on the picker id is stripped before matching.
     assert_eq!(
         resolve_model_value(
             &model_session_result(),
@@ -112,7 +98,6 @@ fn model_resolution_matches_live_config_values() {
         .as_deref(),
         Some("m:minimax:MiniMax-M2.7:v:thinking")
     );
-    // Unknown model / no model option at all → None (keep CLI default).
     assert_eq!(
         resolve_model_value(&model_session_result(), "minimax/Nope-M99", None),
         None
@@ -137,10 +122,6 @@ fn parse_model_option_skips_non_conforming_values() {
     assert_eq!(parse_model_option_value("m:::v:"), None);
 }
 
-/// The live session/new menu (mcode 0.5.1): variant entries collapse to
-/// one row per model, labels lose their variant suffix, and the CLI's
-/// configured default leads — including providers the user added
-/// themselves (a GLM channel lists as glm/…).
 #[test]
 fn probe_menu_collapses_variants_and_leads_with_the_default() {
     let rows = models_from_config_options(&json!({
@@ -163,7 +144,6 @@ fn probe_menu_collapses_variants_and_leads_with_the_default() {
     assert!(!rows[1].is_default);
     assert_eq!(rows[1].name.as_deref(), Some("MiniMax-M3"));
     assert_eq!(rows[2].name.as_deref(), Some("glm-4.7"));
-    // A handshake without a model option yields an empty menu.
     assert!(models_from_config_options(&json!({ "configOptions": [] })).is_empty());
 }
 
@@ -179,8 +159,6 @@ fn rpc_error_recovery_keeps_code_and_message() {
 
 #[test]
 fn the_prompt_answers_acp_usage_sizes_the_context() {
-    // MiniMax Code's prompt answer: ACP's `usage` (its input leaves the cache out) beside its
-    // own turn record in `_meta`.
     let answer = json!({"stopReason": "end_turn",
         "usage": {"totalTokens": 18200, "inputTokens": 1200, "outputTokens": 200,
             "cachedReadTokens": 16800},
@@ -192,7 +170,6 @@ fn the_prompt_answers_acp_usage_sizes_the_context() {
         crate::engines::bridge::context_usage(&usage),
         (Some(18200), None)
     );
-    // Its usage_update once the turn finishes: the context's size, sent on as `used`.
     let update = usage_update(&json!({"sessionId": "s1", "update": {
         "sessionUpdate": "usage_update", "used": 18200, "size": 204800,
         "cost": {"amount": 0.002, "currency": "USD"}}}))
@@ -220,8 +197,6 @@ fn usage_and_updates_project_onto_frontend_keys() {
     assert!(prompt_usage(&json!({})).is_none());
 }
 
-/// mcode 0.7.7's `session/load` answer for a session last run in plan mode (the mode outlives the
-/// process; `permissionMode` is per process and comes back `auto`).
 fn loaded_in_plan() -> Value {
     json!({
         "modes": {"currentModeId": "plan", "availableModes": [
@@ -246,8 +221,6 @@ fn a_session_left_in_plan_mode_goes_back_to_default() {
     fresh["modes"]["currentModeId"] = json!("default");
     assert_eq!(leave_plan_mode(&fresh), None);
     assert_eq!(leave_plan_mode(&json!({})), None);
-    // The plan request still finds mcode's plan mode, and the other modes are its permission
-    // option's values.
     assert_eq!(
         mode_id(Some("plan"), &loaded_in_plan()).as_deref(),
         Some("plan")

@@ -86,8 +86,9 @@ struct Catalog {
     support: Vec<SupportEntry>,
 }
 
-static CATALOG: LazyLock<Catalog> =
-    LazyLock::new(|| serde_json::from_value(crate::registry::current().speech()).unwrap_or_default());
+static CATALOG: LazyLock<Catalog> = LazyLock::new(|| {
+    serde_json::from_value(crate::registry::current().speech()).unwrap_or_default()
+});
 
 pub fn hearing(id: &str) -> Option<&'static HearingEntry> {
     CATALOG.hearing.iter().find(|entry| entry.id == id)
@@ -127,7 +128,7 @@ fn files_dir(package: &Package) -> Option<PathBuf> {
 }
 
 fn installed(package: &Package) -> bool {
-    package_dir(package).is_some_and(|dir| dir.join(COMPLETE).is_file())
+    package_dir(package).is_some_and(|dir| file_access::fs::is_file(dir.join(COMPLETE)))
 }
 
 fn pins() -> HashMap<String, String> {
@@ -363,7 +364,7 @@ pub async fn speech_remove(
     }
     for package in gone {
         if let Some(dir) = package_dir(&package) {
-            if dir.exists() {
+            if file_access::fs::exists(&dir) {
                 file_access::fs::remove_dir_all(&dir)
                     .map_err(|_| "Misty couldn't remove the model.".to_string())?;
             }

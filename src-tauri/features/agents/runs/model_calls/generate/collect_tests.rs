@@ -1,4 +1,3 @@
-//! Adding up a stream.
 use futures_util::stream;
 use serde_json::json;
 
@@ -50,7 +49,11 @@ async fn parts_are_assembled_in_the_order_they_began() {
     let AssistantPart::ToolCall { input, .. } = &turn.content[2] else {
         panic!("expected a tool call");
     };
-    assert_eq!(input.get(), r#"{"z":1,"a":2}"#, "key order kept and spacing as JSON.stringify writes it");
+    assert_eq!(
+        input.get(),
+        r#"{"z":1,"a":2}"#,
+        "key order kept and spacing as JSON.stringify writes it"
+    );
 }
 
 #[tokio::test]
@@ -89,7 +92,10 @@ async fn empty_text_is_dropped_but_empty_reasoning_stays() {
         { "type": "text-end", "id": "t" },
     ])))
     .await;
-    assert_eq!(written(&turn), json!([{ "type": "reasoning", "text": "", "providerOptions": { "anthropic": { "redactedData": "blob" } } }]));
+    assert_eq!(
+        written(&turn),
+        json!([{ "type": "reasoning", "text": "", "providerOptions": { "anthropic": { "redactedData": "blob" } } }])
+    );
     assert_eq!(turn.text, "");
 }
 
@@ -104,7 +110,10 @@ async fn a_restarted_id_begins_a_new_part() {
         { "type": "text-end", "id": "t" },
     ])))
     .await;
-    assert_eq!(written(&turn), json!([{ "type": "text", "text": "One" }, { "type": "text", "text": "Two" }]));
+    assert_eq!(
+        written(&turn),
+        json!([{ "type": "text", "text": "One" }, { "type": "text", "text": "Two" }])
+    );
     assert_eq!(turn.text, "OneTwo");
 }
 
@@ -117,9 +126,17 @@ async fn unreadable_tool_input_becomes_an_empty_object() {
         { "type": "tool-call", "toolCallId": "d", "toolName": "t", "input": "{\"__proto__\":{}}" },
     ])))
     .await;
-    let inputs: Vec<&str> = turn.tool_calls.iter().map(|call| call.input.get()).collect();
+    let inputs: Vec<&str> = turn
+        .tool_calls
+        .iter()
+        .map(|call| call.input.get())
+        .collect();
     assert_eq!(inputs, ["{}", "{}", "{}", "{}"]);
-    let valid: Vec<bool> = turn.tool_calls.iter().map(|call| call.input_is_valid).collect();
+    let valid: Vec<bool> = turn
+        .tool_calls
+        .iter()
+        .map(|call| call.input_is_valid)
+        .collect();
     assert_eq!(valid, [false, true, false, false]);
     assert_eq!(turn.tool_calls[0].raw_input, "{not json");
 }

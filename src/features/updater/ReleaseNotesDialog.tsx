@@ -1,16 +1,21 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong): ReleaseNotesPane.tsx.
 // See NOTICE.
 
-/**
- * After Misty restarts on an update: what changed, from the release's own notes, once. Closing
- * the dialog marks it read.
- */
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 import { MistyMarkdown } from "@/features/agents";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, Dialog, DialogContent, DialogTitle, Text } from "@misty/ui";
-import { type ReleaseNotes, takeReleaseNotes } from "./releaseNotes";
+import {
+  Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Text,
+} from "@misty/ui";
+import { type ReleaseNotes, takeReleaseNotes } from "./release_notes";
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
@@ -41,24 +46,28 @@ export function ReleaseNotesDialog() {
     <Dialog open onOpenChange={(open) => (open ? undefined : setNotes(null))}>
       <DialogContent
         aria-describedby={undefined}
-        className="flex max-h-[80vh] w-150 max-w-[94vw] flex-col gap-4 p-5"
+        size="lg"
+        layout="scroll"
+        className="max-h-[80vh]"
       >
-        <div className="flex items-baseline gap-2 pr-10">
-          <DialogTitle className="text-base">What's new in Misty {notes.version}</DialogTitle>
+        <DialogHeader className="flex-row items-baseline gap-2">
+          <DialogTitle>What's new in Misty {notes.version}</DialogTitle>
           {date ? (
-            <Text bare tone="muted" className="text-sm">
+            <Text size="meta" tone="muted">
               {date}
             </Text>
           ) : null}
-        </div>
-        <Text bare as="div" tone="default" className="min-h-0 flex-1 overflow-y-auto pr-1 text-sm">
-          <MistyMarkdown>{notes.notes}</MistyMarkdown>
-        </Text>
-        <div className="flex justify-end">
-          <Button variant="primary" autoFocus onClick={() => setNotes(null)}>
+        </DialogHeader>
+        <DialogBody>
+          <Text bare as="div" tone="default">
+            <MistyMarkdown size="control">{notes.notes}</MistyMarkdown>
+          </Text>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="primary" size="lg" autoFocus onClick={() => setNotes(null)}>
             Done
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

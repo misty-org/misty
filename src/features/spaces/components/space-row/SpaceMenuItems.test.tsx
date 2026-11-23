@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { Space } from "../../api/dto/entities";
 
 const spaces: Space[] = [];
-vi.mock("../../list/useSpacesStore", () => ({
+vi.mock("../../list/use_spaces_store", () => ({
   useSpacesStore: (selector: (state: { spaces: Space[] }) => unknown) => selector({ spaces }),
 }));
 vi.mock("@/features/app-windows", async (original) => ({
@@ -48,8 +48,6 @@ const theirs = space({ id: "theirs", name: "Theirs", role: "member", owner_user_
 it("lists the person's own Space first in the switcher", () => {
   spaces.splice(0, spaces.length, team, theirs, own);
   open(<SpaceMenuItems space={team} onDialog={vi.fn()} onCreate={vi.fn()} />);
-  // Each row's text is its avatar's initials, then its name.
-  // The Space rows come first; the menu's own check items (Mute notifications) follow them.
   const rows = screen
     .getAllByRole("menuitemcheckbox")
     .map((item) => item.textContent ?? "")

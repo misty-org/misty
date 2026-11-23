@@ -3,16 +3,8 @@ import { Folder } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { invoke } from "@/native/invoke";
 import { Text } from "@misty/ui";
-import { agentAccountId } from "../../personal/agentAccount";
+import { agentAccountId } from "../../personal/agent_account";
 
-/**
- * The GitHub account behind each linked folder's `origin` remote (`project_git_owners`), for the
- * avatar on its row in the folder lists. Kept for the whole window, a folder with no GitHub owner
- * included, so rows mounting again don't read every repository again; rows mounting together
- * share one native call.
- */
-
-/** Folder → owner login; null when it has none. */
 const owners = new Map<string, string | null>();
 const listeners = new Map<string, Set<() => void>>();
 const pending = new Set<string>();
@@ -56,7 +48,6 @@ async function flushOwners() {
       notify(path);
     }
   } catch {
-    // A failed call isn't remembered as "no owner": the next row to mount asks again.
   } finally {
     for (const path of batch) pending.delete(path);
   }
@@ -70,7 +61,6 @@ function requestOwners(paths: Iterable<string>) {
   if (queue.length && flushTimer === null) flushTimer = setTimeout(() => void flushOwners(), 0);
 }
 
-/** The GitHub owner of a folder's `origin`, or null when it has none or isn't known yet. */
 function useFolderOwner(path: string | undefined): string | null {
   const subscribePath = useCallback((onChange: () => void) => subscribe(path, onChange), [path]);
   const read = useCallback(() => (path ? (owners.get(path) ?? null) : null), [path]);
@@ -81,16 +71,11 @@ function useFolderOwner(path: string | undefined): string | null {
   return owner;
 }
 
-/** GitHub's `<login>.png` serves the account's own avatar; twice the CSS size stays sharp. */
 function githubAvatarUrl(login: string, cssSize: number): string {
   const size = Math.min(460, Math.max(1, Math.round(cssSize * 2)));
   return `https://github.com/${encodeURIComponent(login)}.png?size=${size}`;
 }
 
-/**
- * A folder row's leading tile: the owner's GitHub avatar when its `origin` is on GitHub, else the
- * folder icon, which also stays underneath while the image loads or when it can't.
- */
 export function FolderAvatar({ path, size = 16 }: { path: string; size?: number }) {
   const owner = useFolderOwner(path);
   const src = owner ? githubAvatarUrl(owner, size) : null;

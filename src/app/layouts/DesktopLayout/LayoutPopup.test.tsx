@@ -5,7 +5,6 @@ import { LayoutPopup } from "./LayoutPopup";
 
 beforeEach(() => {
   useWorkspaceStore.getState().reset();
-  // Two tabs: the window shows the second, so the first list row is the one not yet placed.
   useWorkspaceStore.getState().newTab();
 });
 afterEach(async () => {
@@ -26,7 +25,6 @@ function apply() {
   return dockLeaves(useWorkspaceStore.getState().layout.root);
 }
 
-/** A pointer event the shared drag reads, as its own tests send them. */
 function pointer(element: EventTarget, type: string, x: number, y: number) {
   const event = new MouseEvent(type, {
     bubbles: true,
@@ -47,7 +45,6 @@ it("adds a page pressed in the list to the current tab's layout and applies it",
 });
 
 it("splits a pane with a page dragged onto its side", () => {
-  // The draft's one pane fills the canvas; list rows sit at the top left.
   vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
     this: HTMLElement,
   ) {
@@ -62,6 +59,5 @@ it("splits a pane with a page dragged onto its side", () => {
   pointer(window, "pointerup", 880, 200);
   const panes = apply();
   expect(panes).toHaveLength(2);
-  // Dropped on the right edge, the page sits to the right of the one already shown.
   expect(panes[0].views[0].id).toBe(shown.id);
 });

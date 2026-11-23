@@ -1,11 +1,3 @@
-//! Who may use a file or folder.
-//!
-//! A confined process passes two access checks: one as the person, and one as
-//! its container and capabilities, where only rules that allow count: a rule
-//! denying a container is ignored, and so is an integrity label once the
-//! container is allowed in. So a container is kept out of something only by
-//! never being allowed it. Rules here only ever allow, and [`limit`] takes a
-//! container's inherited allowance off one file or folder.
 use std::{
     mem,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
@@ -33,8 +25,8 @@ use windows_sys::Win32::{
     Storage::FileSystem::{
         CreateFileW, DELETE, FILE_ALL_ACCESS, FILE_FLAG_BACKUP_SEMANTICS,
         FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_EXECUTE, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
-        FILE_SHARE_DELETE,
-        FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, READ_CONTROL, WRITE_DAC,
+        FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, READ_CONTROL,
+        WRITE_DAC,
     },
 };
 
@@ -51,23 +43,15 @@ const SECURITY_DESCRIPTOR_REVISION: u32 = 1;
 const SDDL_REVISION: u32 = 1;
 const INHERIT: u8 = (OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE) as u8;
 
-/// What a container or capability may do with a path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Access {
-    /// Read, write and delete the folder and everything inside.
     Full,
-    /// Read, write and delete everything inside the folder; the folder
-    /// itself can't be deleted or renamed.
     Inside,
-    /// Read, run, add and edit everything inside, but never delete, rename or move: both need the
-    /// delete rights this leaves out.
     AddEdit,
-    /// Read and run the folder and everything inside.
     ReadExecute,
 }
 
 impl Access {
-    /// The allow rules (access mask, inheritance flags) this access takes.
     fn rules(self) -> &'static [(u32, u8)] {
         const INSIDE_ONLY: u8 = INHERIT | INHERIT_ONLY_ACE as u8;
         match self {
@@ -76,13 +60,14 @@ impl Access {
                 (FILE_ALL_ACCESS & !DELETE, 0),
                 (FILE_ALL_ACCESS, INSIDE_ONLY),
             ],
-            Self::AddEdit => &[(FILE_GENERIC_READ | FILE_GENERIC_WRITE | FILE_GENERIC_EXECUTE, INHERIT)],
+            Self::AddEdit => &[(
+                FILE_GENERIC_READ | FILE_GENERIC_WRITE | FILE_GENERIC_EXECUTE,
+                INHERIT,
+            )],
             Self::ReadExecute => &[(FILE_GENERIC_READ | FILE_GENERIC_EXECUTE, INHERIT)],
         }
     }
 
-    /// The rules on `path`. A file has nothing to pass them on to, so it
-    /// takes the folder's own rule without inheritance.
     fn rules_on(self, path: &Path) -> Vec<(u32, u8)> {
         if is_folder(path) {
             return self.rules().to_vec();
@@ -99,7 +84,6 @@ impl Access {
     }
 }
 
-/// How a write treats the DACL's protection from inheritance.
 #[derive(Clone, Copy)]
 enum Protection {
     Keep,
@@ -107,14 +91,10 @@ enum Protection {
     Unprotect,
 }
 
-/// Whether `sid` already has exactly `access` on `path`.
 pub(crate) fn has(path: &Path, sid: PSID, access: Access) -> Result<bool, String> {
     Ok(Dacl::read(path)?.has(sid, &access.rules_on(path)))
 }
 
-/// Gives `sid` `access` to `path`, replacing any other rule it had there. A
-/// no-op when the rules are already there, so an inherited rule isn't spread
-/// through a large folder again on every run.
 pub(crate) fn grant(path: &Path, sid: PSID, access: Access) -> Result<(), String> {
     let dacl = Dacl::read(path)?;
     let rules = &access.rules_on(path);
@@ -134,8 +114,6 @@ pub(crate) fn grant(path: &Path, sid: PSID, access: Access) -> Result<(), String
     write_dacl(path, list.acl(), dacl.control, spread, protection)
 }
 
-/// Removes every rule `sid` has on `path` itself; inherited rules below it
-/// go with it.
 pub(crate) fn forget(path: &Path, sid: PSID) -> Result<(), String> {
     let dacl = Dacl::read(path)?;
     if dacl.ours(sid).next().is_none() {
@@ -143,8 +121,6 @@ pub(crate) fn forget(path: &Path, sid: PSID) -> Result<(), String> {
     }
     let spread = dacl.ours(sid).any(|ace| ace.flags() & INHERIT != 0);
     let mut list = AclBuilder::new(dacl.size());
-    // Inherited entries are kept: a write that doesn't spread stores the list
-    // exactly as given, and one that does recomputes them anyway.
     for ace in dacl.aces() {
         if !ace.is_for(sid) || ace.inherited() {
             list.copy(&ace, 0)?;
@@ -153,11 +129,6 @@ pub(crate) fn forget(path: &Path, sid: PSID) -> Result<(), String> {
     write_dacl(path, list.acl(), dacl.control, spread, Protection::Keep)
 }
 
-/// Narrows what `sid` may do with `path` to `access` (nothing, when `None`),
-/// whatever it inherits from the folder around it. `path` gets a DACL of its
-/// own: the same entries as now, made explicit, minus the container's, plus
-/// `access`. A folder's contents follow. Returns the original DACL for
-/// [`restore`], or `None` when `path` was already narrowed this way.
 pub(crate) fn limit(
     path: &Path,
     sid: PSID,
@@ -188,7 +159,6 @@ pub(crate) fn limit(
     Ok(Some(original))
 }
 
-/// Puts back a DACL [`limit`] returned. A folder's contents follow again.
 pub(crate) fn restore(path: &Path, original: &str) -> Result<(), String> {
     let failed = || "Could not restore who may use the file.".to_owned();
     let text = wide(original);
@@ -216,11 +186,8 @@ pub(crate) fn restore(path: &Path, original: &str) -> Result<(), String> {
         Protection::Unprotect
     };
     if !spread {
-        // A file has nothing below it: the original goes back exactly.
         return write_dacl(path, parsed.acl, parsed.control, false, protection);
     }
-    // A folder's inherited entries are recomputed from its parent, and its
-    // contents from it, so only its own entries are written.
     let mut list = AclBuilder::new(parsed.size());
     for ace in parsed.aces().filter(|ace| !ace.inherited()) {
         list.copy(&ace, 0)?;

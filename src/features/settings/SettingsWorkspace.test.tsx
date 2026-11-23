@@ -1,5 +1,5 @@
 import "@/app/SettingsSections";
-import { initializeHostAgentsRuntime } from "@/features/agents/hostAgentsRuntime";
+import { initializeHostAgentsRuntime } from "@/features/agents/host_agents_runtime";
 import type * as AppShell from "@/app/shell";
 import type { SettingsSection } from "@/features/settings";
 import { fireEvent } from "@testing-library/react";
@@ -7,24 +7,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as SettingsStoreModule from "./preferences/useSettingsStore";
+import type * as SettingsStoreModule from "./preferences/use_settings_store";
 
-/**
- * A structural safety net for the settings surface.
- *
- * `npm run check` is format + typecheck + vitest + audit, none of which notices
- * a section that renders blank or a nav entry wired to a component that no
- * longer exists. These tests exist so restructuring settings cannot silently
- * empty a tab.
- */
-
-// Import the registry so the test always mirrors the real nav list.
 import SettingsWorkspace from "./SettingsPage";
-import { settingsAreaEntry, settingsGroups } from "./settingsRegistry";
+import { settingsAreaEntry, settingsGroups } from "./SettingsRegistry";
 const PAGES: SettingsSection[] = settingsGroups.flatMap((group) =>
   group.areas.map((area) => settingsAreaEntry(area)!.id),
 );
-/** Pages whose content comes from the engines or a catalog, which nothing answers here. */
 const fromEngines = new Set<SettingsSection>(["engines-channels"]);
 const mocks = vi.hoisted(() => {
   const settingsState = {
@@ -78,7 +67,7 @@ vi.mock("@/app/shell", async (importOriginal) => {
     useAppStore,
   };
 });
-vi.mock("./preferences/useSettingsStore", async (importOriginal) => {
+vi.mock("./preferences/use_settings_store", async (importOriginal) => {
   const actual = await importOriginal<typeof SettingsStoreModule>();
   const useSettingsStore = (selector?: (state: unknown) => unknown) =>
     selector ? selector(mocks.settingsState) : mocks.settingsState;
@@ -151,8 +140,6 @@ describe("SettingsWorkspace", () => {
   it.each(PAGES)("renders the %s page with content", async (section) => {
     await render(section);
     const main = container.querySelector("main")!;
-    // These fill from the engines and the persona catalog as they answer, skeletons until then;
-    // here, with nothing to answer, they only have to open.
     if (!fromEngines.has(section)) expect(main.textContent!.length).toBeGreaterThan(20);
     expect(main.querySelector(`[data-settings-page="${section}"]`)).not.toBeNull();
     expect(main.textContent).not.toMatch(/coming soon|in progress|Loading…/i);

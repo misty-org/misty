@@ -7,35 +7,27 @@ import { Button, IconButton, Input, SidePanelHeader } from "@misty/ui";
 import { AgentBrowserStage } from "./AgentBrowserStage";
 import { AgentBrowserTabs } from "./AgentBrowserTabs";
 import { AgentViewSwitcher } from "./AgentViewSwitcher";
-import { browserAddress } from "../context-panel/browserAddress";
-import { hostAddress } from "./hostAddress";
-import { navigateShownTab } from "../tabs/agentPersonTabs";
-import { agentTab } from "../tabs/agentTabs";
-import { detachAgentBrowser, useAgentBrowser } from "./agentBrowserStore";
+import { browserAddress } from "../context-panel/browser_address";
+import { hostAddress } from "./host_address";
+import { navigateShownTab } from "../tabs/agent_person_tabs";
+import { agentTab } from "../tabs/agent_tabs";
+import { detachAgentBrowser, useAgentBrowser } from "./agent_browser_store";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { BrowserLog } from "../browser-log/BrowserLog";
-import { closeBrowserLog, openBrowserLog, useBrowserLog } from "../browser-log/browserLogStore";
+import { closeBrowserLog, openBrowserLog, useBrowserLog } from "../browser-log/browser_log_store";
 import { PickedElementCard } from "./PickedElementCard";
-import { useElementPick } from "./useElementPick";
+import { useElementPick } from "./use_element_pick";
 
-/**
- * The agent browser in the chat's side panel: a small copy of Misty's own browser beside the
- * open chat. Its views' switcher sits above; the shown view's tabs are on top, then back, forward
- * and reload with the address; the page fills the rest. The
- * person reads and scrolls; while the agent acts, its page takes no input until they take over.
- */
 export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   const chat = useAgentBrowser((state) =>
     conversationId ? state.chats[conversationId] : undefined,
   );
   const tabs = useAgentBrowser((state) => state.tabs);
-  // The run whose page the person holds; a later run, or the same one ended, isn't held.
   const [heldRun, setHeldRun] = useState<string>();
   const view = chat?.views.find((item) => item.id === chat.shownView) ?? chat?.views[0];
   const shown = view ? tabs[view.shownScope] : undefined;
   const elementPick = useElementPick(shown?.viewId ?? "", shown?.url, Boolean(shown?.loading));
   const log = useBrowserLog((state) => (conversationId ? state.chats[conversationId] : undefined));
-  // The run's browser log takes the page's place, even after the run's tabs have closed.
   if (log && conversationId) {
     return (
       <section
@@ -67,7 +59,6 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
       setHeldRun(undefined);
       return;
     }
-    // Only a run that is really held hands its page over.
     if (await aiSurfaceApi.pauseInvocation(runId).catch(() => false)) setHeldRun(runId);
   };
   const run = (command: string) => {
@@ -90,7 +81,6 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
   );
   const hands = (
     <>
-      {/* Only a tab showing the person's own local app can be picked from. */}
       {elementPick.local && (
         <IconButton
           label={elementPick.picking ? "Cancel picking" : "Pick an element"}
@@ -118,8 +108,6 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
       )}
     </>
   );
-  // The address field: the site of a secure page at rest, the full address while typing. The person
-  // can send the shown tab anywhere unless the agent is acting on it.
   const address = (
     <AddressField
       key={view.shownScope}
@@ -129,23 +117,18 @@ export function AgentBrowser({ conversationId }: { conversationId?: string }) {
       onGo={(url) => void navigateShownTab(view.shownScope, url)}
     />
   );
-  // The panel around it has the close button; shrinking to a picture is the browser's own.
   const foot = (
     <IconButton label="Shrink to a picture" onClick={() => detachAgentBrowser(chat.conversationId)}>
       <PictureInPicture2 />
     </IconButton>
   );
   return (
-    // Its gaps and padding are the page's: the live page is placed over the stage's measured box.
-    // The sidebar card's head starts after the window buttons; here it is far from them.
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 p-1.5 [--shell-tab-height:calc(var(--spacing)*7.5)] [--window-chrome-left:0px]"
       aria-label="Agent browser"
     >
       <AgentViewSwitcher chat={chat} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
-        {/* The tabs are the panel's header row, beside its widen and close, as a browser's tab
-            strip sits beside its window buttons. Travel, the address and the hands go under them. */}
         <SidePanelHeader>
           <AgentBrowserTabs conversationId={chat.conversationId} view={view} />
         </SidePanelHeader>
@@ -189,7 +172,7 @@ function AddressField(props: {
       spellCheck={false}
       autoCapitalize="off"
       autoCorrect="off"
-      className="min-w-0 flex-1 px-3 text-sm"
+      className="min-w-0 flex-1 px-3 text-control"
       onFocus={(event) => {
         setDraft(props.url);
         const field = event.currentTarget;

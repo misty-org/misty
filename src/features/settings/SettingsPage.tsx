@@ -22,18 +22,17 @@ import {
   setSettingsStaging,
   useDevicePreferences,
 } from "./device-preferences/store";
-import { settingsErrorMessage } from "./settingsErrors";
+import { settingsErrorMessage } from "./settings_errors";
 import {
   settingsAreaEntry,
   settingsAreas,
   settingsGroups,
   settingsRegistry,
-} from "./settingsRegistry";
-import type { SettingsContentProps, SettingsSection } from "./settingsTypes";
-import { useSettingsStore } from "./preferences/useSettingsStore";
-import { useFocusSettingRow } from "./useFocusSettingRow";
+} from "./SettingsRegistry";
+import type { SettingsContentProps, SettingsSection } from "./settings_types";
+import { useSettingsStore } from "./preferences/use_settings_store";
+import { useFocusSettingRow } from "./use_focus_setting_row";
 
-// Read when the page renders, after the app has registered the feature sections.
 const navGroups = (): DesktopSettingsNavGroup<SettingsSection>[] =>
   settingsGroups.map((group) => ({
     label: group.label,
@@ -50,7 +49,6 @@ interface SettingsWorkspaceProps {
   onClose?: () => void;
 }
 
-/** Settings: a sidebar of pages under feature groups, and one scrolling page per entry. */
 export const SettingsWorkspace = memo(function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const store = useSettingsStore(
     useShallow((state) => ({
@@ -81,8 +79,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
   const entry = settingsRegistry.find((item) => item.id === section) ?? settingsRegistry[0];
   const pageEntries = settingsRegistry.filter((item) => item.area === entry.area);
   const results = useMemo(() => searchSettings(query), [query]);
-  // A long page (many sections) lists its sections under its row in the sidebar; picking one
-  // scrolls there.
   const [jumped, setJumped] = useState("");
   const jumpTo = (id: string) => {
     setJumped(id);
@@ -95,7 +91,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
   useEffect(() => {
     if (!settings) void load();
   }, [settings, load]);
-  // While this page is open, edits wait for Save changes; closing it drops anything unsaved.
   useEffect(() => {
     setSettingsStaging(true);
     return () => setSettingsStaging(false);
@@ -106,7 +101,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
     setQuery("");
   };
   const openResult = (result: SettingsSearchResult) => select(result.page, result.focus);
-  // Pages draw only once the settings are read: never defaults standing in for them.
   const controls: SettingsContentProps = {
     document: settings?.document ?? {},
     launchOnLogin: store.launchOnLogin,
@@ -125,7 +119,6 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
     app,
   };
   const pageTitle = settingsAreas[entry.area].label;
-  // Settings that never came say so in the page; a later failure (a save) is a notice.
   const error = (settings ? store.error : null) || preferences.error;
 
   return (
@@ -210,7 +203,7 @@ export const SettingsWorkspace = memo(function SettingsWorkspace(props: Settings
                 data-settings-page={item.id}
                 data-settings-target={`page:${item.id}`}
                 tabIndex={-1}
-                className="mb-8 outline-none last:mb-0"
+                className="mb-5 outline-none last:mb-0"
               >
                 <SettingsPageScope.Provider value={{ page: item.id, owner: item.owner }}>
                   <Block {...controls} />

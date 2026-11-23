@@ -1,11 +1,5 @@
-// Chrome-style status bubble: shows the hovered link, or that the page is
-// still loading, in the page's bottom-left corner. It is drawn inside the page
-// because DOM in Misty's renderer cannot sit above a native WebView.
 (() => {
   if (window.top !== window || window.__MISTY_SET_STATUS__) return;
-  // Escape-to-stop is reported over Kiri's host channel with the tab's token,
-  // which never leaves this closure. The message is built by concatenation
-  // because site scripts can replace JSON and prototype methods.
   const statusToken = __MISTY_STATUS_TOKEN_PLACEHOLDER__;
   const bindHost = __KIRI_HOST_SENDER_PLACEHOLDER__;
   let postToHost = bindHost();
@@ -13,11 +7,7 @@
     postToHost = postToHost || bindHost();
     if (postToHost) postToHost('{"token":"' + statusToken + '","status":"stopped"}');
   };
-  // Single-page sites (YouTube and most apps) change the URL with the History API or the hash,
-  // which loads nothing, so the host would never hear of it. Report each change; the host only
-  // accepts an address within the view's own origin.
   let reportedHref = String(location);
-  // Captured now, before site scripts can replace it.
   const encode = encodeURIComponent;
   const reportLocation = () => {
     const href = String(location);
@@ -25,8 +15,6 @@
     reportedHref = href;
     postToHost = postToHost || bindHost();
     if (!postToHost) return;
-    // The new address rides along, so the host need not wait for the view to catch up. A very
-    // long one is left out and the host reads the view's own address instead.
     const encoded = encode(href);
     postToHost('{"token":"' + statusToken + '","status":"location"'
       + (encoded.length <= 800 ? ',"url":"' + encoded + '"' : "") + '}');
@@ -85,7 +73,6 @@
     host.style.cssText = "all:initial;position:fixed;inset:auto;pointer-events:none;z-index:2147483647;";
     const shadow = host.attachShadow({ mode: "closed" });
     label = document.createElement("div");
-    // A constructed sheet is not blocked by a page's style-src policy.
     try {
       const sheet = new CSSStyleSheet();
       sheet.replaceSync(css);
@@ -100,7 +87,6 @@
     return true;
   };
 
-  // Keep both ends of a long address readable, as Chrome does.
   const fit = (text) => {
     const limit = Math.max(24, Math.floor(Math.min(innerWidth * 0.66, 720) / 6.6));
     if (text.length <= limit) return text;
@@ -119,7 +105,6 @@
 
   const place = () => {
     if (!label) return;
-    // Step aside when the pointer is over the bubble's corner.
     const height = cachedHeight || 22;
     const width = cachedWidth || 120;
     const covered = pointer.y >= innerHeight - Math.max(height, 22) - 8
@@ -138,7 +123,6 @@
     if (!next) {
       cachedWidth = 0;
       cachedHeight = 0;
-      // A short grace period stops flicker when moving between adjacent links.
       hideTimer = setTimeout(() => {
         shown = "";
         label?.classList.remove("visible");
@@ -158,8 +142,6 @@
       place();
       label.classList.add("visible");
     };
-    // Loading and an already-visible bubble update at once; a fresh hover
-    // waits briefly so a pointer passing across the page does not flash it.
     if (shown || !link) reveal();
     else showTimer = setTimeout(reveal, 80);
   };
@@ -195,8 +177,6 @@
   }, true);
   document.addEventListener("focusin", (event) => setLink(linkFor(event.target)), true);
   document.addEventListener("focusout", () => setLink(""), true);
-  // Escape stops a page that is still loading, as in Chrome and Safari. The
-  // page still receives the key; only the load is cancelled.
   document.addEventListener("keydown", (event) => {
     if (!event.isTrusted || event.key !== "Escape" || !loading) return;
     window.stop();
@@ -206,9 +186,6 @@
   }, true);
   document.addEventListener("fullscreenchange", render);
   window.addEventListener("blur", () => setLink(""));
-  // WebKit only reports a finished load when the navigation finishes cleanly; one that fails or
-  // is cancelled after its document committed (common on YouTube) never does, and the tab would
-  // spin forever. The document finishing is the same answer, so report it too.
   const reportLoaded = () => {
     postToHost = postToHost || bindHost();
     if (postToHost) postToHost('{"token":"' + statusToken + '","status":"loaded"}');
@@ -218,8 +195,6 @@
     render();
     reportLoaded();
   });
-  // A page whose last image, frame or request never finishes never fires load either. Once its
-  // document is ready it is usable, so stop the spinner a few seconds later regardless.
   document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
       if (!loading) return;
@@ -228,7 +203,6 @@
       reportLoaded();
     }, 4000);
   });
-  // A page restored from the back/forward cache fires no load.
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) reportLoaded();
   });
@@ -238,7 +212,6 @@
     render();
   });
 
-  // Native pushes load phases.
   window.__MISTY_SET_STATUS__ = (state) => {
     if (!state || typeof state !== "object") return;
     if (typeof state.loading === "boolean") loading = state.loading;

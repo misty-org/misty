@@ -1,8 +1,6 @@
 import type { SVGProps } from "react";
 import paths from "./socialMarks.json";
 
-/** Monochrome brand marks for the signed-out bar, from Simple Icons (CC0). Lucide has no brands, and
- * `BrandIcon` keeps each logo's own colors. */
 function mark(d: string) {
   return function SocialIcon(props: SVGProps<SVGSVGElement>) {
     return (

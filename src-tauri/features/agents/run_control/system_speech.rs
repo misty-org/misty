@@ -1,14 +1,6 @@
-//! An audio overview spoken in Misty's voices: open voice models from its catalog, running on
-//! this computer (`voice::speech`), with no key. The result is a 24 kHz, 16-bit mono WAV
-//! (`calls::tutor_overview_make`), two voices taking turns.
-
 const RATE: u32 = 24_000;
-/// A short pause between lines, so two voices don't run into each other.
 const PAUSE_SAMPLES: usize = (RATE as usize) / 4;
 
-/// Speaks each line in its speaker's voice and joins them into one WAV. `first` is the voice the
-/// person chose (a catalog id), for speaker 0; the other speaker gets another voice on this
-/// computer that speaks the same language, else the same one.
 pub(crate) async fn speak_dialogue(
     app: &tauri::AppHandle,
     lines: &[(u8, String)],
@@ -60,7 +52,6 @@ fn unavailable() -> String {
     "Misty's voice isn't set up on this computer. Set it up in Settings › Voice.".into()
 }
 
-/// `samples` at `from` as `to`, by linear interpolation.
 fn at_rate(samples: &[f32], from: u32, to: u32) -> Vec<f32> {
     if from == to || samples.is_empty() || from == 0 {
         return samples.to_vec();

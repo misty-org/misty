@@ -1,6 +1,3 @@
-//! What a run has read, kept per run in `misty.db` so a restart doesn't forget it. After a private read,
-//! opening a new host with a query string, or an address carrying a long token, stops for the person in
-//! both modes, since that's how read data would leave. A run with no private read never stops here.
 use std::net::IpAddr;
 
 use rusqlite::params;
@@ -16,17 +13,13 @@ const HOST_PREFIX: &str = "host:";
 pub(crate) struct Taint {
     pub(crate) private_read: bool,
     pub(crate) page_read: bool,
-    /// Hosts the person allowed since then. A host only ever opened unasked earns nothing: otherwise a
-    /// plain visit would open the way for the next call's query string.
     pub(crate) approved_hosts: Vec<String>,
 }
 
-/// Whether this call read the person's private data.
 pub(crate) fn reads_private(name: &str, input: &Value) -> bool {
     match name {
-        "folder.read" | "shell.run" | "file.read" | "file.search" | "files.read" | "message.search"
-        | "thread.read" | "thread.list"
-        | "search.all" => true,
+        "folder.read" | "shell.run" | "file.read" | "file.search" | "files.read"
+        | "message.search" | "thread.read" | "thread.list" | "search.all" => true,
         "integration.execute" => {
             let slug = input.get("tool_slug").and_then(Value::as_str).unwrap_or("");
             crate::agents::connected_apps::policy::classify(slug, &[])
@@ -36,7 +29,6 @@ pub(crate) fn reads_private(name: &str, input: &Value) -> bool {
     }
 }
 
-/// Whether this call's result holds text from a web page.
 pub(crate) fn reads_page(name: &str) -> bool {
     matches!(
         name,
@@ -63,7 +55,6 @@ fn host_of(url: &url::Url) -> Option<String> {
         .map(|host| host.trim_end_matches('.').to_ascii_lowercase())
 }
 
-/// A private or local-only host this address names, for what agents may not open unasked.
 pub(crate) fn private_host(raw: &str) -> Option<String> {
     let url = url::Url::parse(raw.trim()).ok()?;
     if !matches!(url.scheme(), "http" | "https") {
@@ -98,7 +89,6 @@ fn token_like(part: &str) -> bool {
     length >= 48 || (length >= 24 && digit && letter)
 }
 
-/// Whether an address carries something long enough to be data rather than a page's name.
 fn carries_token(url: &url::Url) -> bool {
     let path = url.path();
     path.len() >= 200
@@ -108,7 +98,6 @@ fn carries_token(url: &url::Url) -> bool {
             .is_some_and(|host| host.split('.').any(|label| label.len() >= 32))
 }
 
-/// Why opening this address should stop for the person, or nothing.
 pub(crate) fn url_asks(raw: &str, taint: &Taint) -> Option<String> {
     if !taint.private_read {
         return None;
@@ -133,7 +122,6 @@ pub(crate) fn url_asks(raw: &str, taint: &Taint) -> Option<String> {
     })
 }
 
-/// The addresses a program names in its text. What it builds at run time is checked as it opens them.
 pub(crate) fn urls_in_code(code: &str) -> Vec<String> {
     static ADDRESS: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     ADDRESS
@@ -166,7 +154,6 @@ fn mark(store: &Store, runs: &[String], kind: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// Notes what a finished call read, for the run and those it reports to.
 pub(crate) fn note_call(store: &Store, family: &[String], name: &str, input: &Value) {
     if reads_private(name, input) {
         let _ = mark(store, family, PRIVATE);
@@ -176,7 +163,6 @@ pub(crate) fn note_call(store: &Store, family: &[String], name: &str, input: &Va
     }
 }
 
-/// The person allowed an address: this host may take query strings for the rest of the run.
 pub(crate) fn approve_host(store: &Store, family: &[String], raw: &str) {
     let host = url::Url::parse(raw.trim()).ok().as_ref().and_then(host_of);
     if let Some(host) = host {
@@ -184,8 +170,6 @@ pub(crate) fn approve_host(store: &Store, family: &[String], raw: &str) {
     }
 }
 
-/// What the family has read. A journal that can't be read counts as a private read and a page read, so
-/// a broken database can only ask more.
 pub(crate) fn load(store: &Store, family: &[String]) -> Taint {
     let read = || -> rusqlite::Result<Taint> {
         let connection = store.connect()?;

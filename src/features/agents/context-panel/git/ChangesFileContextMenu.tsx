@@ -17,15 +17,14 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@misty/ui";
-import { useContextPanel } from "../contextPanelStore";
-import { filesApi } from "../files/filesApi";
-import { useFilesStore } from "../files/filesStore";
-import { sendPathToComposer } from "../files/sendToComposer";
-import type { GitFileEntry } from "./gitApi";
+import { useContextPanel } from "../context_panel_store";
+import { filesApi } from "../files/files_api";
+import { useFilesStore } from "../files/files_store";
+import { sendPathToComposer } from "../files/send_to_composer";
+import type { GitFileEntry } from "./git_api";
 
 const HTML_RE = /\.(?:html?|xhtml)$/i;
 
-/** `entry`'s path on disk, from the repository its row belonged to. */
 export function absoluteOf(repository: string, relative: string) {
   return /[\\/]$/.test(repository) ? `${repository}${relative}` : `${repository}/${relative}`;
 }
@@ -36,19 +35,12 @@ const isWindows = () => typeof navigator !== "undefined" && navigator.platform.i
 const revealLabel = () =>
   isMac() ? "Reveal in Finder" : isWindows() ? "Show in Explorer" : "Show in file manager";
 
-/** Opens a changed file in the Code page's editor while it shows, else the files panel's. */
 export function openChangedFile(path: string) {
   void useFilesStore.getState().openFile(path);
   useContextPanel.getState().show("files");
 }
 
-/**
- * The right-click menu of a changed file's row: open it, stage or unstage it, throw its changes
- * away (after asking), copy its path, reveal it, mention it in the chat. Failures go through
- * `run`, the panel's own error line.
- */
 export function ChangesFileMenu(props: {
-  /** The linked folder the chat works in, for the mention's relative path. */
   folder: string;
   repository: string;
   entry: GitFileEntry;

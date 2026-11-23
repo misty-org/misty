@@ -20,29 +20,25 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import { useWorkspaceViewId } from "@/features/app-windows";
 import { readonlyReasonText, useMcpInventory } from "@/features/engine-config/mcp";
 import { useInstalledSkills } from "@/features/engine-config/skills";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import { Switch, Tooltip } from "@misty/ui";
 import { formatTokens, tookText } from "../conversations/view/meta/format";
-import { openAgentsHub } from "../hub/agentsHubStore";
-import { useMistyStore } from "../conversations/state/useMistyStore";
-import { mistyEngine } from "../engines/enginesApi";
-import { formatCost, turnStats } from "./chatUsage";
-import { gitApi, type BranchPullRequest } from "./git/gitApi";
-import { useLaunchScripts } from "./launch-script/launchScripts";
-import { runLaunchScript } from "./launch-script/runLaunchScript";
+import { openAgentsHub } from "../hub/agents_hub_store";
+import { useMistyStore } from "../conversations/state/use_misty_store";
+import { mistyEngine } from "../engines/engines_api";
+import { formatCost, turnStats } from "./chat_usage";
+import { gitApi, type BranchPullRequest } from "./git/git_api";
+import { useLaunchScripts } from "./launch-script/launch_scripts";
+import { runLaunchScript } from "./launch-script/run_launch_script";
 import { Row, Section } from "./SessionRows";
-import { terminalChatKey } from "./terminal/terminalStore";
+import { terminalChatKey } from "./terminal/terminal_store";
 
 const noScripts: never[] = [];
 
-/**
- * The folder's start commands, one row each: pressing one runs it in the chat's launch tab, as
- * the play button in the panel's head does. Nothing shows until the folder has one.
- */
 export function StartCommandRows(props: { conversationId: string; folder: string }) {
   const entries = useLaunchScripts((state) => state.byFolder[props.folder] ?? noScripts);
   const chat = terminalChatKey(props.conversationId, useWorkspaceViewId());
@@ -63,7 +59,6 @@ export function StartCommandRows(props: { conversationId: string; folder: string
   ));
 }
 
-/** What a pull request's checks and state read as, the way GitHub words them. */
 function pullRequestStatus(pr: BranchPullRequest): string {
   if (pr.state === "MERGED") return "Merged";
   if (pr.state === "CLOSED") return "Closed";
@@ -79,7 +74,6 @@ function pullRequestIcon(pr: BranchPullRequest): LucideIcon {
   return pr.draft ? GitPullRequestDraft : GitPullRequest;
 }
 
-/** The skills the chat's engine reads, from the installed list this computer last scanned. */
 function useEngineSkills(engine: string): number | null {
   const skills = useInstalledSkills(engine !== mistyEngine);
   return useMemo(() => {
@@ -88,11 +82,6 @@ function useEngineSkills(engine: string): number | null {
   }, [skills.skills, skills.targets, engine]);
 }
 
-/**
- * What the chat works from beyond its messages: the branch's pull request and the issues it
- * closes, read through the person's own GitHub CLI, and the skills its engine has. Rows open
- * them on GitHub, or the skills in Settings.
- */
 export function ContextSources(props: { engine: string; folder: string; branch?: string }) {
   const [open, setOpen] = useState(true);
   const prKey =
@@ -143,10 +132,6 @@ export function ContextSources(props: { engine: string; folder: string; branch?:
   );
 }
 
-/**
- * The chat's engine's MCP servers with their switches. A switch writes the CLI's own config, so
- * it holds for every chat on that engine (and in the CLI itself); a read-only one says why.
- */
 export function McpServers(props: { engine: string; folder: string }) {
   const [open, setOpen] = useState(true);
   const outside = props.engine !== mistyEngine;
@@ -157,7 +142,6 @@ export function McpServers(props: { engine: string; folder: string }) {
   const entries = engine?.support === "none" ? [] : (engine?.config.entries ?? []);
   if (!entries.length) return null;
   const on = entries.filter((entry) => entry.enabled).length;
-  // The same name from two config files says which file each switch writes.
   const names = new Map<string, number>();
   for (const entry of entries) names.set(entry.name, (names.get(entry.name) ?? 0) + 1);
   return (
@@ -201,7 +185,6 @@ export function McpServers(props: { engine: string; folder: string }) {
   );
 }
 
-/** How the chat's turns went: how many, how long, and what the latest one spent. Folded at first. */
 export function TurnStats(props: { conversationId: string }) {
   const [open, setOpen] = useState(false);
   const messages = useMistyStore(

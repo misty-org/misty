@@ -8,8 +8,6 @@ use std::time::Duration;
 
 #[cfg(test)]
 const FLUSH_INTERVAL: Duration = Duration::from_millis(32);
-// Chat already coalesces updates per animation frame and budgets Markdown
-// parsing separately. Keep IPC batching, but don't add two frames of waiting.
 const CHAT_FLUSH_INTERVAL: Duration = Duration::from_millis(16);
 const FLUSH_BYTES: usize = 64 * 1024;
 
@@ -18,8 +16,6 @@ pub const ENGINE_EVENT_NAME: &str = "engine://event";
 pub const SESSIONS_CHANGED_EVENT: &str = "sessions://changed";
 pub const SCAN_PROGRESS_EVENT: &str = "scan://progress";
 
-/// History-scan progress for the status bar; `finished` marks the last event
-/// of a scan run.
 #[derive(serde::Serialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanProgress {
@@ -28,16 +24,12 @@ pub struct ScanProgress {
     pub finished: bool,
 }
 
-/// Events are serialized once at push time; flush then only joins the cached
-/// byte strings into a JSON array (previously every event serialized twice).
 struct Pending {
     events: Vec<String>,
     bytes: usize,
     scheduled: bool,
 }
 
-/// Runtime-agnostic event emitter so tests can drive the mock runtime.
-/// Payloads arrive as pre-serialized JSON text.
 pub trait Emit: Send + Sync {
     fn emit_json(&self, name: &str, raw_json: &str);
 }
@@ -54,7 +46,6 @@ impl EventSink {
         Self::with_interval(emitter, ENGINE_EVENT_NAME, CHAT_FLUSH_INTERVAL)
     }
 
-    /// Batched sink emitting under a custom event name (e.g. terminal output).
     #[cfg(test)]
     pub fn with_name(emitter: Arc<dyn Emit>, name: &'static str) -> Arc<Self> {
         Self::with_interval(emitter, name, FLUSH_INTERVAL)
@@ -123,11 +114,9 @@ impl EventSink {
         self.emitter.emit_json(self.name, &payload);
     }
 
-    /// Non-batched immediate emit for low-frequency signals.
     pub fn emit_sessions_changed(&self) {
         self.emitter.emit_json(SESSIONS_CHANGED_EVENT, "null");
     }
-    /// Non-batched immediate emit; the scan loop self-throttles.
     pub fn emit_scan_progress(&self, progress: ScanProgress) {
         if let Ok(json) = serde_json::to_string(&progress) {
             self.emitter.emit_json(SCAN_PROGRESS_EVENT, &json);

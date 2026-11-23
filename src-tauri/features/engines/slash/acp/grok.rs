@@ -1,9 +1,5 @@
-//! Grok's own `_x.ai/session/*` calls.
-
 use super::*;
 
-/// Grok's own fork (`_x.ai/session/fork`): it copies the saved session to a new id in the same
-/// folder and starts nothing, so the next turn loads the copy as any session.
 pub(super) async fn grok_fork(
     context: &Context,
     folder: &Path,
@@ -25,7 +21,6 @@ pub(super) async fn grok_fork(
     })
 }
 
-/// Grok's own rename (`_x.ai/session/rename`), which writes the title into its saved session.
 pub(super) async fn grok_rename(
     context: &Context,
     folder: &Path,
@@ -45,7 +40,6 @@ pub(super) async fn grok_rename(
     Ok(Output::Rename { title })
 }
 
-/// One of Grok's calls on its saved sessions, which needs no session open.
 async fn grok_call(
     context: &Context,
     folder: &Path,
@@ -58,8 +52,6 @@ async fn grok_call(
     result
 }
 
-/// Grok's `/session-info` out of turn (`_x.ai/session/info`), on the session opened here. It
-/// answers only for a session this process has open, with an empty object otherwise.
 pub(super) async fn grok_status(
     context: &Context,
     folder: &Path,
@@ -92,7 +84,6 @@ pub(super) async fn grok_status(
     ))
 }
 
-/// Grok's `SessionInfoResponse` (`session/acp_types.rs`) as rows.
 pub(super) fn grok_info_rows(info: &Value) -> Vec<super::super::Row> {
     let number = |value: &Value, key: &str| value.get(key).and_then(Value::as_u64);
     let mut rows = Vec::new();

@@ -1,10 +1,3 @@
-//! Signing in to an app's own MCP server the way the MCP authorization spec lays out: the server
-//! names its authorization server, Misty registers itself there for this one sign-in (dynamic client
-//! registration), and the person approves in their browser with PKCE. Misty has no client secret of
-//! its own and no server in between; the tokens go to the keychain (`store.rs`).
-//!
-//! A server that only works with an app registered ahead of time ("needs app") isn't offered: that
-//! would mean Misty keeping keys of its own.
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -16,20 +9,14 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-/// How long the browser sign-in may take before Misty stops listening for it.
 const SIGN_IN_LIMIT: Duration = Duration::from_secs(600);
 const PROBE_LIMIT: Duration = Duration::from_secs(10);
 
-/// What signing in to a server takes.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Access {
-    /// The server answers without a sign-in.
     Open,
-    /// The server takes a sign-in Misty can do with no key of its own.
     Keyless(Discovered),
-    /// The server needs an app registered ahead of time.
     NeedsApp,
-    /// No answer, or one Misty can't use.
     Unreachable,
 }
 
@@ -53,7 +40,6 @@ pub struct Discovered {
     pub scope: Option<String>,
 }
 
-/// Tokens from a sign-in or a refresh.
 #[derive(Clone, Debug)]
 pub struct Tokens {
     pub access_token: String,
@@ -61,7 +47,6 @@ pub struct Tokens {
     pub expires_at: Option<i64>,
 }
 
-/// The client the app registered for one sign-in.
 #[derive(Clone, Debug)]
 pub struct Registered {
     pub client_id: String,
@@ -105,14 +90,12 @@ async fn json_at(http: &Client, url: &str) -> Option<Value> {
     response.json().await.ok()
 }
 
-/// `resource_metadata="…"` and `scope="…"` from a 401's challenge.
 fn challenge_field(challenge: &str, field: &str) -> Option<String> {
     let start = challenge.find(&format!("{field}=\""))? + field.len() + 2;
     let end = challenge[start..].find('"')? + start;
     Some(challenge[start..end].to_owned())
 }
 
-/// Asks the server what a sign-in takes, without signing in.
 pub async fn discover(http: &Client, server: &str) -> Access {
     let Ok(url) = url::Url::parse(server) else {
         return Access::Unreachable;
@@ -308,7 +291,6 @@ async fn token_request(
     }
 }
 
-/// A new access token from a refresh token.
 pub async fn refresh(
     http: &Client,
     token_endpoint: &str,
@@ -329,7 +311,6 @@ pub async fn refresh(
     token_request(http, token_endpoint, form).await
 }
 
-/// A sign-in under way: open `authorize_url` in the browser, then await `finish`.
 pub struct SignIn {
     pub authorize_url: String,
     pub registered: Registered,
@@ -337,8 +318,6 @@ pub struct SignIn {
     state: String,
     verifier: String,
     redirect_uri: String,
-    /// A page to send the browser on to once the code is here, so the tab doesn't end on the
-    /// one-time local address. Nothing from the sign-in goes with it.
     done_page: Option<String>,
 }
 
@@ -347,7 +326,6 @@ pub async fn begin(
     found: &Discovered,
     done_page: Option<String>,
 ) -> Result<SignIn, String> {
-    // A one-time address on this computer only, which the browser comes back to.
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .await
         .map_err(|_| "Misty couldn't start the sign-in. Try again.".to_owned())?;
@@ -393,9 +371,6 @@ const FAILED_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Misty</titl
 <body style=\"font:16px system-ui;background:#141414;color:#eee;display:grid;place-items:center;height:90vh\">\
 <p>The sign-in didn't finish. Go back to Misty and try again.</p>";
 
-/// What the browser gets back at the one-time address: on success, a redirect to the done page
-/// when there is one (a bare address, so nothing from the sign-in leaves this computer), else a
-/// local page saying how it went.
 fn callback_answer(ok: bool, done_page: Option<&str>) -> String {
     if let (true, Some(page)) = (ok, done_page) {
         return format!(
@@ -409,7 +384,6 @@ fn callback_answer(ok: bool, done_page: Option<&str>) -> String {
     )
 }
 
-/// The `code` from the browser's return to the one-time address, checked against `state`.
 fn callback_code(request_line: &str, state: &str) -> Option<Result<String, String>> {
     let target = request_line.split_whitespace().nth(1)?;
     let url = url::Url::parse(&format!("http://127.0.0.1{target}")).ok()?;
@@ -434,7 +408,6 @@ fn callback_code(request_line: &str, state: &str) -> Option<Result<String, Strin
 }
 
 impl SignIn {
-    /// Waits for the browser to come back, then trades the code for tokens.
     pub async fn finish(self, http: &Client, found: &Discovered) -> Result<Tokens, String> {
         let code = tokio::time::timeout(SIGN_IN_LIMIT, async {
             loop {

@@ -10,35 +10,28 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { SkeletonList, SuggestionItem, SuggestionList, Text } from "@misty/ui";
-import { mistyEngine } from "../../../engines/enginesApi";
-import { commandIcon } from "../commands/commandIcons";
-import { catalogFor, mistyCommandsFor } from "../commands/engineCommands";
-import { matchMentionEntries, mentionIndex, prefetchMentionIndex } from "./mentionFiles";
+import { mistyEngine } from "../../../engines/engines_api";
+import { commandIcon } from "../commands/command_icons";
+import { catalogFor, mistyCommandsFor } from "../commands/engine_commands";
+import { matchMentionEntries, mentionIndex, prefetchMentionIndex } from "./mention_files";
 import { matchPrompts, promptsFor } from "@/features/engine-config/prompts";
-import { openAgentsHub } from "../../../hub/agentsHubStore";
-import { applyTrigger, filterItems, mentionOf, triggerAt, type Trigger } from "./composerTriggers";
+import { openAgentsHub } from "../../../hub/agents_hub_store";
+import { applyTrigger, filterItems, mentionOf, triggerAt, type Trigger } from "./composer_triggers";
 import { PersonaMakeAgent, personaSuggestions } from "../../../personas/PersonaSuggestions";
 
 interface Suggestion {
   key: string;
   name: string;
   description: string;
-  /** What replaces the typed trigger. */
   insert: string;
   icon: "file" | "folder" | "command" | "skill" | "browser" | "prompt" | "new" | "persona";
-  /** What a command takes after its name, such as `[model]` or `show | refresh`. */
   hint?: string;
-  /** Where a command comes from, which picks its icon (`commandIcon`). */
   origin?: "builtin" | "user" | "project";
-  /** A catalog persona's id, which can also be made into an agent from the menu. */
   persona?: string;
-  /** A command run in the composer instead of inserted. */
   action?: "browser" | "new-prompt";
-  /** Where it comes from, shown quietly at the row's end. */
   source?: string;
 }
 
-/** Misty's own commands, run in the composer rather than sent. */
 const browserCommand: Suggestion = {
   key: "misty:browser",
   name: "browser",
@@ -49,7 +42,6 @@ const browserCommand: Suggestion = {
   source: "Misty",
 };
 
-/** Screen and input control for one message on an outside engine (`features/computer-use`). */
 const computerCommand: Suggestion = {
   key: "misty:computer",
   name: "computer",
@@ -61,7 +53,6 @@ const computerCommand: Suggestion = {
 
 const sourceLabel = { builtin: "", user: "Yours", project: "Project" } as const;
 
-/** The `!` menu's last row, which opens the prompt library in the Agents window. */
 const newPrompt: Suggestion = {
   key: "prompt:new",
   name: "New prompt",
@@ -106,8 +97,6 @@ async function suggestionsFor(
   const catalog = outside ? await catalogFor(engine, folder) : { commands: [], skills: [] };
   if (trigger.kind === "command") {
     const engineNames = new Set(catalog.commands.map((item) => item.name.toLowerCase()));
-    // Misty's own commands, less those the engine has itself, unless Misty's always wins
-    // (`engineCommands.ts`).
     const own = mistyCommandsFor(engine, engineNames);
     const ownNames = new Set(own.map((item) => item.name));
     const ownCommands: Suggestion[] = own.map((item) => ({
@@ -150,10 +139,6 @@ async function suggestionsFor(
   );
 }
 
-/**
- * The last list each menu showed for what was typed, so opening a menu again paints its rows at
- * once while they are looked up again. A few dozen are kept, in memory only.
- */
 const shownLists = new Map<string, Suggestion[]>();
 const MOST_SHOWN_LISTS = 40;
 const listKey = (trigger: Trigger, engine: string, folder: string) =>
@@ -190,17 +175,12 @@ const emptyText = {
   persona: "No matching templates",
 };
 
-/**
- * The `@`, `/`, `$` and `!` menus for one composer. `onKeyDown` takes the keys the menu needs while it
- * is open and returns true for them, so the composer doesn't also send or switch modes.
- */
 export function useComposerSuggestions(input: {
   text: string;
   setText(text: string): void;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   engine: string;
   folder: string;
-  /** Runs a command chosen from the menu, such as attaching the browser. */
   onAction?(action: "browser"): void;
 }) {
   const [trigger, setTrigger] = useState<Trigger>();
@@ -222,7 +202,6 @@ export function useComposerSuggestions(input: {
     }
     setTrigger(found);
     setSelected(0);
-    // A menu asked this before shows that list in the same paint; the lookup refreshes it.
     const key = listKey(found, engine, folder);
     const known = shownLists.get(key);
     if (known) setItems(known);
@@ -283,7 +262,6 @@ export function useComposerSuggestions(input: {
   const open = Boolean(trigger);
   const popup = trigger ? (
     <SuggestionList
-      // Floats above the box, as wide as the text.
       className={
         "absolute -right-3 bottom-full -left-3 z-[var(--stack-overlay)] mb-4.5 max-h-70 " +
         "overflow-y-auto"
@@ -340,7 +318,7 @@ export function useComposerSuggestions(input: {
           />
         ))
       ) : (
-        <Text bare as="p" tone="muted" className="px-3 py-2 text-xs">
+        <Text size="meta" bare as="p" tone="muted" className="px-3 py-2">
           {trigger.kind === "file" && !folder
             ? "Link a folder to this Space to mention its files"
             : emptyText[trigger.kind]}

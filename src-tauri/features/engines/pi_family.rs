@@ -3,9 +3,6 @@ use super::{
     command_for_binary, images, push_session_id, BuiltCommand, Engine, EngineEvent, SendRequest,
 };
 use serde_json::Value;
-/// The OMP ACP plan-session driver. Declared here rather than in mod.rs: the adapter belongs to
-/// pi_family, and mod.rs only routes to it (send_reserved's Own branch and send_host_stream's
-/// "omp" arm).
 #[path = "omp_acp.rs"]
 pub(crate) mod omp_acp;
 #[path = "pi_compaction.rs"]
@@ -20,7 +17,6 @@ pub(crate) use pi_served_models::{
     loads_served_model_bridge, prepare_served_models_file, served_models_path,
 };
 
-/// Extract and normalize the context-window field.
 fn attach_context_window(mut usage: Value) -> Value {
     if usage.get("model_context_window").is_some() {
         return usage;
@@ -46,37 +42,19 @@ fn attach_context_window(mut usage: Value) -> Value {
     usage
 }
 
-/// pi and omp are the same CLI protocol (omp is a fork of pi), but they
-/// diverge at spawn: pi runs one-shot `--print --mode json`, while omp runs
-/// `--mode rpc-ui` — the only headless mode where the CLI registers its `ask`
-/// tool (hasUI gate) and bridges the question dialogs as `extension_ui_request`
-/// frames we can answer over stdin.
 pub struct PiFamilyEngine {
     pub id: &'static str,
-    /// The reassembly buffer for omp rpc-ui v2 large frames: chunkId → chunks. pi's json mode doesn't use it.
     rpc_chunks: std::sync::Mutex<std::collections::HashMap<String, RpcChunkAcc>>,
-    /// This run's served-model sidecar, set before the reader starts and only
-    /// when the injected extension was told to write it. `message_end`
-    /// consults it when the runtime did not set `upstreamModel` itself.
     served_models_file: std::sync::OnceLock<std::path::PathBuf>,
 }
 
-/// The partial state of reassembling a v2 `rpc_chunk` sequence.
 struct RpcChunkAcc {
     parts: Vec<Option<String>>,
     received: usize,
 }
 
-/// The "Confirm" option's label when an omp `confirm` dialog becomes a two-choice card; the
-/// answer frame's confirmed check and the card share this constant, so neither spells it alone.
 pub(crate) const CONFIRM_YES_LABEL: &str = "Confirm";
 
-/// pi has no built-in question tool (omp's ask is its fork's own): this bridge extension is the
-/// pi session's ask_user tool, calling ctx.ui.select/input per question. In rpc mode those become
-/// extension_ui_request frames, which the app shows as question cards and answers. The options
-/// follow omp's ask fallback chain: single choice is one select frame, multiple choice loops
-/// until Done, and the Other sentinel switches to input for free text. At runtime it imports
-/// only node:fs (to write the upstream-model sidecar); parameters are plain JSON Schema.
 const PI_ASK_BRIDGE: &str = r#"// CC GUI ask bridge — pi sessions get their ask_user tool from this
 // extension. One select/input dialog per question (pi's wire format has no
 // multi-select), mirroring omp's degraded ask chain so the host app renders
@@ -294,18 +272,16 @@ export default function ccguiAskBridge(pi: ExtensionAPI) {
 }
 "#;
 
-/// Writes the bridge extension under app_home (rewritten only when its content changed) and
-/// returns the path `-e` takes.
 fn ensure_pi_ask_bridge() -> Result<String, String> {
     let dir = crate::engines::support::paths::app_home().join("pi-extensions");
-    std::fs::create_dir_all(&dir)
+    file_access::fs::create_dir_all(&dir)
         .map_err(|e| format!("create pi extension dir {}: {e}", dir.display()))?;
     let path = dir.join("ccgui-ask-bridge.ts");
-    let stale = std::fs::read_to_string(&path)
+    let stale = file_access::fs::read_to_string(&path)
         .map(|current| current != PI_ASK_BRIDGE)
         .unwrap_or(true);
     if stale {
-        std::fs::write(&path, PI_ASK_BRIDGE)
+        file_access::fs::write(&path, PI_ASK_BRIDGE)
             .map_err(|e| format!("write pi ask bridge {}: {e}", path.display()))?;
     }
     Ok(path.to_string_lossy().into_owned())
@@ -327,30 +303,18 @@ pub fn omp() -> PiFamilyEngine {
     }
 }
 
-/// An explicit omp plan request runs on the ACP plan transport: mod.rs routes that send to
-/// send_host_stream's "omp" arm (omp_acp::run_acp_turn) instead of the usual rpc-ui child.
 pub(crate) fn acp_plan_requested(req: &SendRequest) -> bool {
     req.permission.as_deref() == Some("plan")
 }
 
-/// The ACP plan session's launch command: `omp --mode acp` (the `omp acp` subcommand is
-/// equivalent). The omp_acp driver spawns the child and stdin/stdout are JSON-RPC pipes, so
-/// there is no stdin_payload and no --extension ask bridge (ACP asks go through elicitation).
-/// Model and effort are passed over ACP after the handshake (session/set_config_option
-/// model|thinking), not repeated on argv, so the person's choice isn't downgraded.
 fn build_omp_acp_plan_command(
     req: &SendRequest,
     mut cmd: tokio::process::Command,
 ) -> Result<BuiltCommand, String> {
-    // The review point (planModeState / the proposal handler) lives only in memory and
-    // session/load doesn't re-register it: a resumed session has no verifiable human wait
-    // point, so it is refused before spawning.
     if req.session_id.is_some() {
         return Err(omp_acp::RESUME_REFUSAL.to_string());
     }
     cmd.args(["--mode", "acp"]);
-    // service-tier has no ACP config equivalent, so it stays a launch flag (the same check and
-    // gating as the rpc path: only an explicit openai-codex selector passes it).
     if req.model.as_deref().is_some_and(|m| {
         m.strip_prefix("openai-codex/")
             .is_some_and(|id| !id.is_empty())
@@ -383,7 +347,6 @@ impl Engine for PiFamilyEngine {
         true
     }
 
-    /// Pi has no modes and never stops to ask; Oh My Pi adds its ACP plan mode.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const PI: &[super::modes::EngineMode] = &[mode("default", "Default", Edits, "auto")];
@@ -398,11 +361,6 @@ impl Engine for PiFamilyEngine {
         }
     }
 
-    /// OMP's human plan review uses the native ACP plan flow (session/set_mode plan + the
-    /// elicitation.form handshake + the plan file's full text, driven by omp_acp). pi has no
-    /// plan support at all, and silently falling back to auto is a forbidden downgrade. The old
-    /// headless `--plan-yolo` flow auto-approved plans and can never be a "human plan review"
-    /// entry point.
     fn plan_approval(&self) -> crate::engines::plan_review::PlanApproval {
         if self.id == "omp" {
             crate::engines::plan_review::PlanApproval::Typed {
@@ -441,16 +399,9 @@ impl Engine for PiFamilyEngine {
             }
             cmd.args(["--no-extensions", "--tools", &tools.join(",")]);
         }
-        // OMP's native ACP plan flow: an explicit plan request runs on the ACP transport and the
-        // omp_acp driver owns the child (stdio JSON-RPC + a parked elicitation). Approving a plan
-        // is the person's decision, so this command line never carries
-        // --plan-yolo/--plan-yolo-into/--auto-approve.
         if self.id == "omp" && acp_plan_requested(req) {
             return build_omp_acp_plan_command(req, cmd);
         }
-        // pi and omp both run rpc: question dialogs arrive as extension_ui_request frames and the
-        // answers are written back on stdin. omp uses rpc-ui (hasUI turns on the CLI's own ask);
-        // pi uses rpc plus our ask bridge extension (pi has no built-in question tool).
         let rpc_ui = self.id == "omp";
         let rpc_mode = rpc_ui || self.id == "pi";
         if rpc_ui {
@@ -474,8 +425,6 @@ impl Engine for PiFamilyEngine {
             cmd.arg("--model");
             cmd.arg(model);
         }
-        // Only explicit OpenAI-Codex selectors opt into this per-app preference.
-        // Never leak it to pi, another provider or an unknown CLI default.
         if self.id == "omp"
             && req.model.as_deref().is_some_and(|m| {
                 m.strip_prefix("openai-codex/")
@@ -489,21 +438,12 @@ impl Engine for PiFamilyEngine {
                 cmd.args(["--service-tier", tier]);
             }
         }
-        // Let the CLI encode thinking for the selected provider; adding generic
-        // effort fields in the bridge breaks Responses and other strict APIs.
         if let Some(effort) = req.effort.as_deref() {
             cmd.arg("--thinking");
             cmd.arg(effort);
         }
-        // Auto leaves the CLI's own tools.approvalMode alone. An explicit omp plan request
-        // already took the ACP command above (build_omp_acp_plan_command, after
-        // prepare_launch's gate) and never reaches this rpc branch; a pi plan request is
-        // refused by ensure_plan_approval before the command is built.
         if let Some(session_id) = req.session_id.as_deref() {
             if !session_id.starts_with('-') {
-                // Resuming in rpc mode: omp takes `--resume` (an id prefix works), pi takes
-                // `--session <id>` (pi's --session-id assigns an id to a new session, it doesn't
-                // resume). Only pi's one-shot json mode uses --session-id.
                 if self.id == "omp" {
                     cmd.arg("--resume");
                 } else if rpc_mode {
@@ -514,11 +454,6 @@ impl Engine for PiFamilyEngine {
                 cmd.arg(session_id);
             }
         }
-        // Image attachments as `@<abs path>` file references ahead of the
-        // prompt. data: URLs can't be file-referenced; the frontend's paste
-        // flow already materializes blobs to files, so anything left is
-        // skipped here rather than breaking argv. rpc mode refuses @file arguments, so omp's
-        // pictures go in the prompt command's base64 field instead (below).
         if !rpc_mode {
             for raw in &req.images {
                 if let Some(absolute) = images::absolutize_image_path(raw, &req.workspace) {
@@ -527,21 +462,12 @@ impl Engine for PiFamilyEngine {
             }
         }
         if rpc_mode {
-            // In rpc mode the prompt is an NDJSON command on stdin (positional arguments aren't
-            // dispatched). Commands run in order: get_state for the sessionId (json mode's
-            // session header frame has no rpc equivalent), then the task; omp first negotiates
-            // v2 chunking. Writing early is harmless: the input loop starts once the session is
-            // ready, and the pipe buffers these lines.
             let is_omp_compact = self.id == "omp" && req.native_compact && req.images.is_empty();
-            // pi's rpc prompt runs none of its built-in commands (it would send `/compact` to the
-            // model as text), so `/compact [instructions]` becomes pi's own compact call.
             let pi_compact = if self.id == "pi" && req.images.is_empty() {
                 pi_compact_instructions(&req.prompt)
             } else {
                 None
             };
-            // OMP handles /compact as a local RPC command. The native command responds once
-            // compaction is done.
             let request = if is_omp_compact {
                 serde_json::json!({ "id": "ccgui-compact", "type": "compact" })
             } else if let Some(instructions) = pi_compact {
@@ -570,9 +496,6 @@ impl Engine for PiFamilyEngine {
                 }
                 prompt
             };
-            // v2 chunk negotiation is omp's own addition; pi only has v1 (oversized frames are
-            // truncated, the session is unaffected). json mode's session header frame has no rpc
-            // equivalent; the get_state response carries the sessionId.
             let mut lines = Vec::new();
             if rpc_ui {
                 lines.push(serde_json::json!({"id": "ccgui-negotiate", "type": "negotiate_protocol", "protocolVersion": 2}).to_string());
@@ -586,15 +509,12 @@ impl Engine for PiFamilyEngine {
                 lines.push(serde_json::json!({"id": "ccgui-effort", "type": "set_thinking_level", "level": effort}).to_string());
             }
             lines.push(serde_json::json!({"id": "ccgui-state", "type": "get_state"}).to_string());
-            // omp announces its commands on its own (available_commands_update); pi only answers
-            // get_commands, with its extension, prompt-template and skill commands.
             if self.id == "pi" {
                 lines.push(
                     serde_json::json!({"id": "ccgui-commands", "type": "get_commands"}).to_string(),
                 );
             }
             lines.push(request.to_string());
-            // omp's compact answer doesn't say how big the context now is; its stats do.
             if is_omp_compact {
                 let stats = pi_compaction::COMPACT_STATS_ID;
                 lines.push(
@@ -605,19 +525,11 @@ impl Engine for PiFamilyEngine {
             return Ok(BuiltCommand {
                 command: cmd,
                 stdin_payload: Some(payload),
-                // Question answers (extension_ui_response) are written back on this same stdin;
-                // the reader closes it when Done settles, and the rpc process drains and exits.
                 keep_stdin_open: true,
                 cleanup_files: Vec::new(),
                 preassigned_session_id: None,
             });
         }
-        // Prompt travels through stdin, never argv: on Windows the pi shim is a
-        // `.cmd` batch file spawned via `cmd /c`, and cmd.exe cuts a multiline
-        // argument at the first newline - every line after the first was
-        // dropped. pi joins piped stdin into the initial message
-        // (`readPipedStdin` -> `buildInitialMessage`), so the prompt rides
-        // stdin verbatim, matching codex; `@<abs path>` image refs stay in argv.
         Ok(BuiltCommand {
             command: cmd,
             stdin_payload: Some(req.prompt.clone()),
@@ -631,8 +543,6 @@ impl Engine for PiFamilyEngine {
         let _ = self.served_models_file.set(path.to_path_buf());
     }
 
-    /// Only a run whose extension writes the sidecar can report what served
-    /// it; read-only and ACP plan runs have no observer.
     fn reports_served(&self) -> bool {
         self.served_models_file.get().is_some()
     }
@@ -642,8 +552,6 @@ impl Engine for PiFamilyEngine {
             .served_models_file
             .get()
             .map(std::path::PathBuf::as_path);
-        // v2 chunk reassembly: a complete frame goes through the normal parse, and partial
-        // chunks produce no events. The cheap check first spares every other line the lock.
         if line.contains("\"rpc_chunk\"") {
             if let Some(frame) = self.reassemble_chunk(line) {
                 parse_pi_family_line_for_engine(self.id, sidecar, &frame, out);
@@ -660,9 +568,6 @@ fn parse_pi_family_line_for_engine(
     line: &str,
     out: &mut Vec<EngineEvent>,
 ) {
-    // The frames only the host reads are found by their exact `"type":"…"` text first, so
-    // ordinary stream frames skip a second JSON parse. Model text can't match it: inside a JSON
-    // string the quotes are escaped.
     if line.contains("\"command\"")
         && line.contains("\"compact\"")
         && parse_compact_response(id, line, out)
@@ -685,8 +590,6 @@ fn parse_pi_family_line_for_engine(
     parse_pi_family_line_with_sidecar(line, out, sidecar);
 }
 
-/// `/compact [instructions]` as pi's compact call: the instructions, or None when the prompt is
-/// anything else (`/compactor` included).
 fn pi_compact_instructions(prompt: &str) -> Option<String> {
     let rest = prompt.trim().strip_prefix("/compact")?;
     if !rest.is_empty() && !rest.starts_with(char::is_whitespace) {
@@ -695,8 +598,6 @@ fn pi_compact_instructions(prompt: &str) -> Option<String> {
     Some(rest.trim().to_string())
 }
 
-/// The compact call's answer ends the turn: it comes once compaction is done, and no agent_end
-/// follows it. omp's turn ends on the stats call written after it, which sizes the context.
 fn parse_compact_response(id: &str, line: &str, out: &mut Vec<EngineEvent>) -> bool {
     let Ok(value) = serde_json::from_str::<Value>(line) else {
         return false;
@@ -728,8 +629,6 @@ fn parse_compact_response(id: &str, line: &str, out: &mut Vec<EngineEvent>) -> b
     true
 }
 
-/// What omp's local commands (`/context`, `/session`, `/mcp list`, …) print, as reply text. The
-/// turn's end comes after it, with the prompt's `agentInvoked: false` answer.
 fn parse_command_output(line: &str, out: &mut Vec<EngineEvent>) -> bool {
     let Ok(value) = serde_json::from_str::<Value>(line) else {
         return false;
@@ -747,8 +646,6 @@ fn parse_command_output(line: &str, out: &mut Vec<EngineEvent>) -> bool {
     true
 }
 
-/// A command's terminal text without its colors. Kept in a text block so its aligned columns and
-/// bars survive, unless it is Markdown already (the changelog is).
 fn command_output_text(raw: &str) -> Option<String> {
     let text = strip_terminal_codes(raw);
     let text = text.trim_end();
@@ -765,8 +662,6 @@ fn command_output_text(raw: &str) -> Option<String> {
     })
 }
 
-/// Drops terminal escape sequences: CSI (colors, `ESC [ … letter`) and OSC (links, `ESC ] … BEL`
-/// or `ESC \`). Everything else, spacing included, stays.
 pub(crate) fn strip_terminal_codes(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len());
     let mut chars = raw.chars().peekable();
@@ -804,10 +699,6 @@ pub(crate) fn strip_terminal_codes(raw: &str) -> String {
     out
 }
 
-/// The commands the engine says it runs from a prompt, for the composer's `/` menu
-/// (`reported.rs`): omp's `available_commands_update` frame (and its get_available_commands
-/// answer), pi's get_commands answer. Both list `{name, description, input?: {hint}}`, the shape
-/// ACP's report has, so they go through the same store.
 fn report_commands(id: &str, line: &str) -> bool {
     let Ok(value) = serde_json::from_str::<Value>(line) else {
         return false;
@@ -820,8 +711,6 @@ fn report_commands(id: &str, line: &str) -> bool {
                 Some("get_commands" | "get_available_commands")
             ) =>
         {
-            // An older pi without get_commands answers with an error: nothing to report, and
-            // nothing worth a warning either.
             value.pointer("/data/commands")
         }
         _ => return false,
@@ -838,10 +727,6 @@ fn report_commands(id: &str, line: &str) -> bool {
     true
 }
 
-/// A prompt the engine ran itself without the agent: omp's built-in commands answer
-/// `agentInvoked: false` (and omp's `prompt_result` says the same of an extension command), pi
-/// answers `disposition: "handled"` for an extension command. No agent_end follows either, so
-/// this answer is the turn's end.
 fn prompt_ran_locally(value: &Value) -> bool {
     let Some(data) = value.get("data") else {
         return false;
@@ -852,9 +737,6 @@ fn prompt_ran_locally(value: &Value) -> bool {
 }
 
 impl PiFamilyEngine {
-    /// Reassembles a v2 `rpc_chunk` sequence, returning the full frame text once complete.
-    /// Out-of-order and repeated chunks are accepted; a sequence with contradicting counts is
-    /// dropped whole.
     fn reassemble_chunk(&self, line: &str) -> Option<String> {
         use base64::Engine as _;
         let value: Value = serde_json::from_str(line).ok()?;
@@ -898,7 +780,6 @@ impl PiFamilyEngine {
     }
 }
 
-/// Shared NDJSON parser for pi and omp (`--mode json`).
 #[cfg(test)]
 fn parse_pi_family_line(line: &str, out: &mut Vec<EngineEvent>) {
     parse_pi_family_line_with_sidecar(line, out, None);
@@ -909,9 +790,6 @@ fn parse_pi_family_line_with_sidecar(
     out: &mut Vec<EngineEvent>,
     sidecar: Option<&std::path::Path>,
 ) {
-    // Stream updates can include the entire growing message twice (message
-    // and assistantMessageEvent.partial). Skip those snapshots without
-    // allocating a JSON object tree for every token.
     #[derive(serde::Deserialize)]
     struct Envelope {
         #[serde(rename = "type")]
@@ -969,8 +847,6 @@ fn parse_pi_family_line_with_sidecar(
         return;
     };
     match event_type {
-        // Response stream opens: reader.rs starts the genMs window here so
-        // TTFT and tool-argument decoding are counted, not just text deltas.
         "message_start" => out.push(EngineEvent::Generation { active: true }),
         "session" => {
             push_session_id(&value, "id", out);
@@ -980,10 +856,6 @@ fn parse_pi_family_line_with_sidecar(
                 let trimmed = level.trim();
                 if !trimmed.is_empty() {
                     out.push(EngineEvent::Effort(trimmed.to_string()));
-                    // The session's effective level is the runtime's own
-                    // account of the level in force — auto-thinking can move
-                    // it away from the request, which is exactly what the
-                    // response check should surface.
                     out.push(EngineEvent::Served {
                         model: None,
                         effort: Some(trimmed.to_string()),
@@ -991,11 +863,6 @@ fn parse_pi_family_line_with_sidecar(
                 }
             }
         }
-        // omp rpc-ui command responses: get_state carries the sessionId (json mode's session
-        // header frame has no rpc equivalent); a prompt the engine ran itself without the agent
-        // ends the turn; a failed prompt and a failed compact are fatal, other failed commands
-        // only warn. A failed negotiate_protocol means the server speaks only v1: large frames
-        // may be truncated, but the session is unaffected.
         "response" => {
             let command = value.get("command").and_then(Value::as_str).unwrap_or("");
             let success = value
@@ -1034,15 +901,12 @@ fn parse_pi_family_line_with_sidecar(
                 }
             }
         }
-        // A v1 oversized frame was truncated or the server failed to chunk: content is lost,
-        // but at least the person knows.
         "rpc_frame_error" => {
             out.push(EngineEvent::Warn(
                 "omp protocol frame error; some output may be truncated".to_string(),
             ));
         }
         "extension_ui_request" => parse_ui_request(&value, out),
-        // omp's answer for a prompt an extension command took: no agent ran, so it ends the turn.
         "prompt_result" => {
             if value.get("agentInvoked").and_then(Value::as_bool) == Some(false) {
                 out.push(EngineEvent::Done {
@@ -1051,8 +915,6 @@ fn parse_pi_family_line_with_sidecar(
                 });
             }
         }
-        // pi's final settle (omp doesn't send this frame; if it did, the monotonic settle guard
-        // would drop it).
         "agent_settled" => out.push(EngineEvent::AgentSettled),
         "tool_execution_start" => {
             let name = value
@@ -1098,14 +960,6 @@ fn parse_pi_family_line_with_sidecar(
             if let Some(effort) = reported_effort.clone() {
                 out.push(EngineEvent::Effort(effort));
             }
-            // What actually served the turn, when the runtime can tell:
-            // `upstreamModel` is the id recovered from the response itself
-            // (thinking signature / router). When the runtime does not fill
-            // it, the injected extension has already observed the provider's
-            // own `model` field and appended it to this run's sidecar; match
-            // it by the response id. `message.model` itself is only the
-            // request record for OpenAI-compatible providers, so it is never
-            // used as served evidence here.
             let response_id = value
                 .get("message")
                 .and_then(|m| {
@@ -1137,14 +991,10 @@ fn parse_pi_family_line_with_sidecar(
                     pi_compaction::with_context_size(usage.clone()),
                 )));
             }
-            // A failed model call can still retry. Only a terminal agent_end
-            // (or process EOF) decides the run's outcome.
             if let Some(error) = nested_error_text(&value, &["message"]) {
                 out.push(EngineEvent::Warn(error));
             }
         }
-        // omp's names; pi 1.5.2 sends `compaction_start`/`compaction_end` (its manual
-        // compaction included).
         "auto_compaction_start" | "compaction_start" => {
             out.push(EngineEvent::Compaction {
                 active: true,
@@ -1166,10 +1016,6 @@ fn parse_pi_family_line_with_sidecar(
             }
         }
         "auto_retry_start" => {
-            // The CLI is backing off before re-issuing the request (provider
-            // 5xx / stream-envelope failures). Live progress, not an error:
-            // the run status line renders "Retrying x of y" and the next content
-            // event clears it.
             out.push(EngineEvent::Retry {
                 attempt: value.get("attempt").and_then(Value::as_u64).unwrap_or(0),
                 max: value
@@ -1186,8 +1032,6 @@ fn parse_pi_family_line_with_sidecar(
             });
         }
         "auto_retry_end" => {
-            // A retry saga can hand off to compaction/continuation. Clear its
-            // indicator, but leave run settlement to terminal agent_end/EOF.
             out.push(EngineEvent::Retry {
                 attempt: 0,
                 max: 0,
@@ -1205,9 +1049,6 @@ fn parse_pi_family_line_with_sidecar(
         }
         "turn_end" | "agent_end" => {
             let error = attempt_error(&value);
-            // turn_end precedes the retry decision. OMP explicitly marks its
-            // final agent_end; pi/older CLIs may emit agent_end BEFORE retry
-            // and lack isTerminal, so their outcome remains provisional to EOF.
             if event_type == "agent_end"
                 && value.get("isTerminal").and_then(Value::as_bool) == Some(true)
                 && value.get("willRetry").and_then(Value::as_bool) != Some(true)
@@ -1227,7 +1068,6 @@ fn parse_pi_family_line_with_sidecar(
     }
 }
 
-/// The final assistant result wins; earlier failed attempts may have recovered.
 fn attempt_error(value: &Value) -> Option<String> {
     let message = value.get("message").or_else(|| {
         value
@@ -1244,9 +1084,6 @@ fn attempt_error(value: &Value) -> Option<String> {
                 .then(|| "Model request failed".to_string())
         })
 }
-/// Display label for a tool call: the human-readable intent when the CLI
-/// provides one, prefixed with the tool name so the frontend's type
-/// classification still sees the raw name token.
 pub fn tool_label(name: &str, intent: Option<&str>) -> String {
     match intent {
         Some(intent) if !intent.trim().is_empty() && intent.trim() != name => {
@@ -1259,10 +1096,6 @@ pub fn tool_label(name: &str, intent: Option<&str>) -> String {
     }
 }
 
-/// Find the first non-empty error text across the shapes omp emits:
-/// `<prefix>.errorMessage`, top-level `errorMessage`, `error.message`, and
-/// `<prefix>.error` when it is a plain string. Returns the
-/// trimmed text; None when the event carries no error.
 fn nested_error_text(value: &Value, prefix: &[&str]) -> Option<String> {
     let mut candidates: Vec<Option<&str>> = Vec::new();
     for pre in prefix {
@@ -1296,12 +1129,6 @@ fn nested_error_text(value: &Value, prefix: &[&str]) -> Option<String> {
         .map(str::to_string)
 }
 
-/// The bridge for omp rpc-ui's question/input dialogs. Without askDialog frames, AskTool falls
-/// back to a select/editor chain per question (multiple choice is a CLI-side loop of selects),
-/// so the wire carries only single choice and free text. Each method that needs an answer
-/// becomes one question card, answered by `extension_ui_answer_frame`. cancel is a withdrawal
-/// notice (no answer, just close the card); fire-and-forget methods such as
-/// notify/setStatus/setWidget don't appear here.
 fn parse_ui_request(value: &Value, out: &mut Vec<EngineEvent>) {
     let method = value.get("method").and_then(Value::as_str).unwrap_or("");
     if method == "cancel" {
@@ -1328,7 +1155,6 @@ fn parse_ui_request(value: &Value, out: &mut Vec<EngineEvent>) {
                 .and_then(Value::as_array)
                 .cloned()
                 .unwrap_or_default();
-            // optionDetails lines up with options by position and carries only descriptions.
             let details = value.get("optionDetails").and_then(Value::as_array);
             let options: Vec<Value> = labels
                 .iter()
@@ -1365,7 +1191,6 @@ fn parse_ui_request(value: &Value, out: &mut Vec<EngineEvent>) {
                 ],
             )
         }
-        // input/editor are free text: the card's own text field answers them, with no options.
         "input" | "editor" => (title, Vec::new()),
         _ => return,
     };
@@ -1379,7 +1204,6 @@ fn parse_ui_request(value: &Value, out: &mut Vec<EngineEvent>) {
                 "multiSelect": false,
                 "options": options,
             }],
-            // The answer side needs only the method to shape the response frame; id is the request_id.
             "extui": { "method": method },
         }),
     });
@@ -1387,8 +1211,6 @@ fn parse_ui_request(value: &Value, out: &mut Vec<EngineEvent>) {
 
 #[cfg(test)]
 mod tests {
-    /// Runs `build` while holding the lock the tests that move `HOME` hold: building writes pi's
-    /// ask bridge under the home folder, which those tests remove when they finish.
     fn home_locked<T>(build: impl FnOnce() -> T) -> T {
         let _home = crate::engines::support::paths::HOME_ENV_LOCK.lock();
         build()
@@ -1425,7 +1247,6 @@ mod tests {
 
     #[test]
     fn omp_native_compact_uses_the_rpc_command_and_nothing_else_does() {
-        // The built-in /compact: OMP takes its native compact command.
         let mut req = plan_req(None);
         req.prompt = "/compact".to_string();
         req.native_compact = true;
@@ -1433,18 +1254,13 @@ mod tests {
             rpc_command_types(&omp(), &req),
             vec!["compact", "get_session_stats"]
         );
-        // pi runs no built-in command from a prompt, so its /compact is always its compact call.
         assert_eq!(rpc_command_types(&pi(), &req), vec!["compact"]);
 
-        // A person's own catalog command of the same name is expanded by the CLI: the text is
-        // the same but unmarked, and must never become the compact command (or it could never run).
         req.native_compact = false;
         assert_eq!(rpc_command_types(&omp(), &req), vec!["prompt"]);
 
-        // /compact with an argument is the CLI's command too, not the host's button.
         req.prompt = "/compact focus on the changes".to_string();
         assert_eq!(rpc_command_types(&omp(), &req), vec!["prompt"]);
-        // pi passes the argument as its compact instructions; a longer name stays a prompt.
         assert_eq!(rpc_command_types(&pi(), &req), vec!["compact"]);
         assert_eq!(
             pi_compact_instructions(&req.prompt).as_deref(),
@@ -1453,7 +1269,6 @@ mod tests {
         assert_eq!(pi_compact_instructions("/compactor"), None);
     }
 
-    /// The command types this send writes on stdin, after the fixed negotiate/state prefix.
     fn rpc_command_types(engine: &PiFamilyEngine, req: &SendRequest) -> Vec<String> {
         let built = home_locked(|| engine.build_command(req, "fake-cli")).unwrap();
         built
@@ -1485,8 +1300,6 @@ mod tests {
             review_kind,
             crate::engines::plan_review::PlanReviewKind::NativeRequest
         );
-        // The limitations must tell the person: no text feedback, no recovery of the review
-        // point, new sessions only.
         assert!(limitations.contains("Refine"), "{limitations}");
         assert!(matches!(
             pi().plan_approval(),
@@ -1509,19 +1322,14 @@ mod tests {
         req.service_tier = Some("priority".to_string());
         let built = home_locked(|| omp().build_command(&req, "fake-omp")).unwrap();
         let args = argv_of(&built);
-        // The ACP entry flag; the driver owns stdin.
         let mode = args.iter().position(|arg| arg == "--mode").expect("--mode");
         assert_eq!(args[mode + 1], "acp");
-        // No auto-approve flag ever appears on the plan command line.
         assert!(!args.contains(&"--plan-yolo".to_string()), "{args:?}");
         assert!(!args.contains(&"--plan-yolo-into".to_string()), "{args:?}");
         assert!(!args.contains(&"--auto-approve".to_string()), "{args:?}");
-        // The rpc-ui ask bridge isn't part of the ACP transport.
         assert!(!args.contains(&"--extension".to_string()), "{args:?}");
-        // Model and effort go over the ACP config protocol, not repeated on argv.
         assert!(!args.contains(&"--model".to_string()), "{args:?}");
         assert!(!args.contains(&"--thinking".to_string()), "{args:?}");
-        // service-tier has no ACP equivalent: it stays a launch flag and passes the check.
         let tier = args
             .iter()
             .position(|arg| arg == "--service-tier")
@@ -1529,21 +1337,18 @@ mod tests {
         assert_eq!(args[tier + 1], "priority");
         assert!(built.stdin_payload.is_none());
         assert!(!built.keep_stdin_open);
-        // An invalid tier fails the same check as on the rpc path.
         req.service_tier = Some("flex".to_string());
         assert!(home_locked(|| omp().build_command(&req, "fake-omp")).is_err());
     }
 
     #[test]
     fn omp_plan_refuses_resume_before_spawn() {
-        // A resumed session has no verifiable human wait point (planModeState is memory only).
         let mut req = plan_req(Some("plan"));
         req.session_id = Some("01JOLD".to_string());
         let error = home_locked(|| omp().build_command(&req, "fake-omp"))
             .err()
             .unwrap();
         assert!(error.contains("new session"), "{error}");
-        // The auto/bypass paths are unaffected.
         assert!(home_locked(|| omp().build_command(&plan_req(Some("auto")), "fake-omp")).is_ok());
     }
 
@@ -1552,9 +1357,7 @@ mod tests {
         let plain = plan_req(None);
         assert!(loads_served_model_bridge("omp", &plain));
         assert!(loads_served_model_bridge("pi", &plain));
-        // omp plan requests run over ACP without the extension.
         assert!(!loads_served_model_bridge("omp", &plan_req(Some("plan"))));
-        // Read-only pi passes --no-extensions.
         let read_only = SendRequest {
             allowed_tools: Some(vec!["read".to_string()]),
             ..plan_req(None)
@@ -1573,8 +1376,6 @@ mod tests {
 
     #[test]
     fn message_end_reports_the_served_model() {
-        // `upstreamModel` is the id recovered from the response itself
-        // (thinking signature / router) and wins over the runtime's record.
         let mut out = Vec::new();
         parse_pi_family_line(
             &serde_json::json!({
@@ -1596,9 +1397,6 @@ mod tests {
             "got {out:?}"
         );
 
-        // No upstream id recovered: `message.model` is the runtime's request
-        // record, not evidence of what served the turn. Echoing it here made
-        // the response check report the request as its own response.
         let mut out = Vec::new();
         parse_pi_family_line(
             &serde_json::json!({
@@ -1614,7 +1412,6 @@ mod tests {
             "the requested id must not be reported as served: {out:?}"
         );
 
-        // Effort is still independent evidence even when the model is unknown.
         let mut out = Vec::new();
         parse_pi_family_line(
             &serde_json::json!({
@@ -1650,7 +1447,6 @@ mod tests {
             "got {out:?}"
         );
 
-        // Blank or absent effort emits nothing.
         for line in [
             serde_json::json!({ "type": "message_end", "thinking_effort": " " }).to_string(),
             serde_json::json!({ "type": "message_end", "message": {} }).to_string(),
@@ -1738,7 +1534,6 @@ mod tests {
             "success": true, "data": { "tokensBefore": 100, "tokensAfter": 20 },
         })
         .to_string();
-        // omp's turn ends on the stats answer that follows (pi_compaction.rs).
         let mut out = Vec::new();
         omp().parse_line(&compact_success, &mut out);
         assert!(matches!(&out[..], [EngineEvent::Usage(_)]), "got {out:?}");
@@ -1754,7 +1549,6 @@ mod tests {
         );
         assert!(matches!(&out[..], [EngineEvent::Error(_)]), "got {out:?}");
 
-        // pi's /compact is its compact call too, so its answer ends pi's turn the same way.
         let mut out = Vec::new();
         pi().parse_line(&compact_success, &mut out);
         assert!(
@@ -1762,7 +1556,6 @@ mod tests {
             "got {out:?}"
         );
 
-        // Unrelated command failures remain non-terminal warnings.
         let mut out = Vec::new();
         omp().parse_line(
             &serde_json::json!({
@@ -1774,7 +1567,6 @@ mod tests {
         );
         assert!(matches!(&out[..], [EngineEvent::Warn(_)]), "got {out:?}");
 
-        // A failed negotiate_protocol = v1 fallback: neither a warning nor fatal.
         let mut out = Vec::new();
         omp().parse_line(
             &serde_json::json!({
@@ -1789,7 +1581,6 @@ mod tests {
 
     #[test]
     fn local_commands_reply_with_their_output_and_end_the_turn() {
-        // omp 18's /context: colored terminal text, then the prompt's agentInvoked:false answer.
         let mut out = Vec::new();
         omp().parse_line(
             r#"{"type":"command_output","text":"Context window: 1000 tokens\n  Free [\u001b[38;5;243m##\u001b[39m] 99%"}"#,
@@ -1808,7 +1599,6 @@ mod tests {
             }
             other => panic!("got {other:?}"),
         }
-        // A prompt the agent takes, and a skill command it runs, don't end the turn.
         let mut out = Vec::new();
         for line in [
             r#"{"id":"ccgui-prompt","type":"response","command":"prompt","success":true}"#,
@@ -1818,7 +1608,6 @@ mod tests {
             omp().parse_line(line, &mut out);
         }
         assert!(out.is_empty(), "got {out:?}");
-        // pi's extension command, and omp's, handled without the agent.
         let mut out = Vec::new();
         pi().parse_line(
             r#"{"id":"ccgui-prompt","type":"response","command":"prompt","success":true,"data":{"disposition":"handled"}}"#,
@@ -1839,7 +1628,6 @@ mod tests {
 
     #[test]
     fn reported_commands_reach_the_menu() {
-        // Under their own ids, so tests reading the real engines' menus aren't disturbed.
         assert!(report_commands(
             "test-omp",
             r#"{"type":"available_commands_update","commands":[{"name":"context","description":"Show context usage","source":"builtin"},{"name":"todo","description":"Manage todos","input":{"hint":"<subcommand>"}}]}"#,
@@ -1848,7 +1636,6 @@ mod tests {
             "test-pi",
             r#"{"id":"ccgui-commands","type":"response","command":"get_commands","success":true,"data":{"commands":[{"name":"skill:review","description":"Review","source":"skill"}]}}"#,
         ));
-        // An older pi without get_commands: swallowed, nothing reported.
         assert!(report_commands(
             "test-pi-old",
             r#"{"id":"ccgui-commands","type":"response","command":"get_commands","success":false,"error":"Unknown command: get_commands"}"#,
@@ -2087,8 +1874,6 @@ mod tests {
             _ => panic!("expected tool message"),
         }
 
-        // bash-style args carry no path key -> None. No file chip, but the
-        // command still lands in `args` for the expandable panel.
         let line = serde_json::json!({
             "type": "tool_execution_start",
             "toolCallId": "tool_2",
@@ -2167,7 +1952,6 @@ mod tests {
             _ => panic!("expected tool message with todos"),
         }
 
-        // Non-todo tool args carry no payload.
         let line = serde_json::json!({
             "type": "tool_execution_start",
             "toolCallId": "tool_4",
@@ -2183,12 +1967,6 @@ mod tests {
         }
     }
 
-    /// The live path's only reliable todo source for this tool. Two real
-    /// gaps it covers: the start event carries no `args` for `todo` (so the
-    /// list would stay stale until the session was reloaded), and a
-    /// phase-wide `done` names a PHASE, which no task-keyed patch could
-    /// apply. `abandoned` is omp's own spelling for a dropped task and must
-    /// not read as still-to-do.
     #[test]
     fn tool_execution_end_carries_the_authoritative_todo_snapshot() {
         let line = serde_json::json!({
@@ -2222,7 +2000,6 @@ mod tests {
                 patch,
                 ..
             } => {
-                // A full post-op list, not a delta: it replaces what the row holds.
                 assert!(todos.replace);
                 assert!(*patch, "must land on the in-flight todo row");
                 let seen: Vec<(&str, &str)> = todos
@@ -2244,7 +2021,6 @@ mod tests {
             other => panic!("expected a todo snapshot patch, got {other:?}"),
         }
 
-        // A non-todo tool's result carries no list.
         let line = serde_json::json!({
             "type": "tool_execution_end",
             "toolName": "bash",
@@ -2281,8 +2057,6 @@ mod tests {
         for line in [
             serde_json::json!({"type":"turn_end","errorMessage":"boom"}),
             serde_json::json!({"type":"turn_end","error":{"message":"nested boom"}}),
-            // Real omp 401 shape: the failure nests in `message.errorMessage`
-            // with stopReason=error on the enclosing message.
             serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"error","errorStatus":401,"errorMessage":"401 Invalid token"}}),
         ] {
             let mut out = Vec::new();
@@ -2298,7 +2072,6 @@ mod tests {
 
     #[test]
     fn agent_end_after_error_does_not_emit_done() {
-        // A terminal agent_end must preserve failure rather than emit Done.
         let line = serde_json::json!({
             "type":"agent_end",
             "message":{"stopReason":"error","errorMessage":"401 Invalid token"},
@@ -2313,7 +2086,6 @@ mod tests {
             "Done leaked after Error: {out:?}"
         );
 
-        // Healthy turn: agent_end without an error still settles with Done.
         let ok_line = serde_json::json!({"type":"agent_end","isTerminal":true}).to_string();
         let mut ok_out = Vec::new();
         parse_pi_family_line(&ok_line, &mut ok_out);
@@ -2325,8 +2097,6 @@ mod tests {
 
     #[test]
     fn failed_attempt_can_retry_before_the_agent_finishes() {
-        // turn_end describes one model call, before the session decides
-        // whether to retry. It must not cause the runner to kill the CLI.
         let lines = [
             serde_json::json!({"type":"message_end","message":{"role":"assistant","stopReason":"error","errorMessage":"socket closed unexpectedly"}}),
             serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"error","errorMessage":"socket closed unexpectedly"}}),
@@ -2485,8 +2255,6 @@ mod tests {
         assert!(out
             .iter()
             .any(|e| matches!(e, EngineEvent::Effort(l) if l == "high")));
-        // The effective level is also evidence for the response check:
-        // auto-thinking can move it away from the request.
         assert!(out.iter().any(|e| matches!(
             e,
             EngineEvent::Served { model: None, effort: Some(l) } if l == "high"

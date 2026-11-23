@@ -1,13 +1,8 @@
 import type { DirEntry } from "@/features/agents";
 import type { AgentTrashItem, FileEntry, FinderTag, TrashedItem } from "@/features/files";
-import type { SpaceDrivePlace, SpaceDriveTrashPlace } from "../apps/file-picker/pickerPlaces";
+import type { SpaceDrivePlace, SpaceDriveTrashPlace } from "../apps/file-picker/picker_places";
 import type { DriveEntry, DriveTrashEntry } from "../drive";
 
-/**
- * Where Files is looking. A folder on the disk (behind the disk grant), a folder of one of the person's
- * projects (all Files reaches when the grant is off), a folder of a Space's drive or its trash, or one of
- * the sidebar's lists: Recent, Starred, a Finder tag, Misty's Trash and Agent trash.
- */
 export type FilesPlace =
   | { kind: "disk"; path: string }
   | { kind: "project"; root: string; path: string }
@@ -19,7 +14,6 @@ export type FilesPlace =
   | { kind: "trash" }
   | { kind: "agent-trash" };
 
-/** What an item is, by where it lives; each carries the native shape it came from. */
 export type FileSource =
   | { kind: "disk"; entry: FileEntry }
   | { kind: "project"; path: string }
@@ -28,12 +22,9 @@ export type FileSource =
   | { kind: "agent-trash"; item: AgentTrashItem }
   | { kind: "drive-trash"; entry: DriveTrashEntry };
 
-/** One item Files lists, whatever its place. */
 export interface FileItem {
-  /** A disk or project item's own path; otherwise its source and id. */
   id: string;
   name: string;
-  /** It opens into a listing of its own (a folder, never a package or an app). */
   folder: boolean;
   size: number;
   modifiedMs: number;
@@ -44,13 +35,11 @@ export interface FileItem {
 
 const separatorOf = (path: string) => (path.includes("\\") && !path.includes("/") ? "\\" : "/");
 
-/** The last name in a path. */
 export function nameOf(path: string): string {
   const trimmed = path.replace(/[\\/]+$/, "");
   return trimmed.split(/[\\/]/).pop() || trimmed || path;
 }
 
-/** The folder a path is in; the path itself at a root (`/`, `C:\`). */
 export function parentOf(path: string): string {
   const separator = separatorOf(path);
   const trimmed = path.length > 1 ? path.replace(/[\\/]+$/, "") : path;
@@ -61,13 +50,11 @@ export function parentOf(path: string): string {
   return /^[A-Za-z]:$/.test(parent) ? `${parent}\\` : parent;
 }
 
-/** A path inside a folder, with the separator the folder's own path uses. */
 export function childOf(folder: string, name: string): string {
   const separator = separatorOf(folder);
   return folder.endsWith(separator) ? `${folder}${name}` : `${folder}${separator}${name}`;
 }
 
-/** The folders from `root` down to `path`, both included; just `path` when it isn't inside `root`. */
 export function foldersBetween(root: string, path: string): string[] {
   if (path === root) return [root];
   const separator = separatorOf(root);
@@ -82,7 +69,6 @@ export function foldersBetween(root: string, path: string): string[] {
   return folders;
 }
 
-/** Every folder above `path`, from the top of its disk, then `path`. */
 export function foldersAbove(path: string): string[] {
   const chain = [path];
   let at = path;
@@ -95,12 +81,10 @@ export function foldersAbove(path: string): string[] {
   return chain;
 }
 
-/** The folder a place lists on the disk, for those that are one. */
 export function placeFolder(place: FilesPlace): string | undefined {
   return place.kind === "disk" || place.kind === "project" ? place.path : undefined;
 }
 
-/** A key naming the place, for effects and resets. */
 export function placeKey(place: FilesPlace): string {
   switch (place.kind) {
     case "disk":
@@ -120,36 +104,34 @@ export function placeKey(place: FilesPlace): string {
 
 export const samePlace = (a: FilesPlace, b: FilesPlace) => placeKey(a) === placeKey(b);
 
-/** The places whose items are folders and files that open into more: the ones Columns can show. */
 export const browsable = (place: FilesPlace) =>
   place.kind === "disk" || place.kind === "project" || place.kind === "space-drive";
 
-/** The place a folder item opens into, from the place it is listed in. */
 export function placeInside(item: FileItem, from: FilesPlace): FilesPlace | undefined {
   if (!item.folder) return undefined;
   const source = item.source;
   if (source.kind === "disk") return { kind: "disk", path: source.entry.path };
   if (source.kind === "project")
-    return { kind: "project", root: from.kind === "project" ? from.root : source.path, path: source.path };
+    return {
+      kind: "project",
+      root: from.kind === "project" ? from.root : source.path,
+      path: source.path,
+    };
   if (source.kind === "drive")
     return { kind: "space-drive", spaceId: source.entry.space_id, path: source.entry.path };
   return undefined;
 }
 
-/** A disk or project item's path on this computer. */
 export function localPath(item: FileItem): string | undefined {
   if (item.source.kind === "disk") return item.source.entry.path;
   if (item.source.kind === "project") return item.source.path;
   return undefined;
 }
 
-/** Folders first, then names as Finder sorts them. */
 export function finderOrder(a: FileItem, b: FileItem): number {
   if (a.folder !== b.folder) return a.folder ? -1 : 1;
   return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
 }
-
-// ── From the native shapes ──────────────────────────────────────────────────────────────────────
 
 export function diskItem(entry: FileEntry): FileItem {
   return {
@@ -231,7 +213,6 @@ export function agentTrashItem(item: AgentTrashItem): FileItem {
   };
 }
 
-/** What the item is, for an icon: a folder or a file. */
 export function itemShape(item: FileItem): "folder" | "file" {
   if (item.folder) return "folder";
   const source = item.source;

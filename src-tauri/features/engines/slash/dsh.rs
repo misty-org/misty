@@ -1,11 +1,3 @@
-//! The dsh commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! DeepSeek Harness's slash commands come from its plugins, so the host lists them per session
-//! (`commands/list`, reported to the `/` menu on every turn) and a message that names one runs
-//! through `commands/execute` inside the turn (`dsh_session.rs`). The turn commands here fill the
-//! menu until the host has reported. Rename and fork are session calls (`session/rename`,
-//! `session/fork`), and `/export` is the host's ZIP download, so Misty runs those out of turn.
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -34,10 +26,7 @@ pub const COMMANDS: &[Command] = &[
     misty("export", "Save this session's log as a ZIP archive"),
 ];
 
-/// Renaming resumes a cold session first and forking copies its events, which can outlast the
-/// host's three-second probe budget.
 const SESSION_CALL_TIMEOUT: Duration = Duration::from_secs(60);
-/// The export packs the whole log with its subagents and attachments.
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 pub async fn run(context: Context, name: &str) -> Result<Output, String> {
@@ -53,7 +42,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     }
 }
 
-/// The host's origin, once it is up: adopted, or started as a turn would start it.
 async fn host_origin() -> Result<String, String> {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let state = crate::engines::support::state().ok_or("Misty's engine layer isn't open.")?;
@@ -61,8 +49,6 @@ async fn host_origin() -> Result<String, String> {
     Ok(dsh_host::configured_origin(&settings))
 }
 
-/// `session/rename` pins the title (automatic titles stop), and the chat takes the title the
-/// host accepted.
 async fn rename(origin: &str, session: &str, title: &str) -> Result<Output, String> {
     if title.is_empty() {
         return Err("Give the session a title: /rename <title>".to_string());
@@ -82,8 +68,6 @@ async fn rename(origin: &str, session: &str, title: &str) -> Result<Output, Stri
     Ok(Output::Rename { title })
 }
 
-/// `session/fork` without a boundary copies the latest completed-turn prefix into a new session
-/// in the same workspace. What follows `/fork` is sent there as its first message.
 async fn fork(origin: &str, session: &str, message: &str) -> Result<Output, String> {
     let forked = host_call_slow(
         origin,
@@ -104,13 +88,9 @@ async fn fork(origin: &str, session: &str, message: &str) -> Result<Output, Stri
     })
 }
 
-/// The host's `/export` only tells its web page to download `GET /api/session.export`, so Misty
-/// downloads that ZIP itself, into the chat's folder (where the session works), or Misty's own
-/// exports folder when the chat has none.
 async fn export(origin: &str, session: &str, folder: Option<&Path>) -> Result<Output, String> {
     let mut request = slow_client(origin)
         .get(format!("{origin}/api/session.export"))
-        // The host's own /export packs the subagents' logs too.
         .query(&[("sessionId", session), ("includeDescendants", "true")])
         .timeout(EXPORT_TIMEOUT);
     if let Some(cookie) = dsh_host::host_cookie(origin) {
@@ -136,11 +116,11 @@ async fn export(origin: &str, session: &str, folder: Option<&Path>) -> Result<Ou
         || crate::engines::support::paths::app_home().join("exports"),
         Path::to_path_buf,
     );
-    tokio::fs::create_dir_all(&dir)
+    file_access::fs_async::create_dir_all(&dir)
         .await
         .map_err(|e| format!("Couldn't create {} ({e})", dir.display()))?;
     let path = archive_path(&dir, session);
-    tokio::fs::write(&path, &archive)
+    file_access::fs_async::write(&path, &archive)
         .await
         .map_err(|e| format!("Couldn't save {} ({e})", path.display()))?;
     Ok(Output::done(format!(
@@ -149,7 +129,6 @@ async fn export(origin: &str, session: &str, folder: Option<&Path>) -> Result<Ou
     )))
 }
 
-/// The host's own archive name, `dsh-session-<id>.zip`, with the id kept to one safe segment.
 fn archive_path(dir: &Path, session: &str) -> PathBuf {
     let id: String = session
         .chars()

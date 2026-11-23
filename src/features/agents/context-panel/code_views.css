@@ -1,0 +1,45 @@
+.context-diff {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-caption);
+  line-height: 1.55;
+  padding-bottom: calc(var(--spacing) * 2);
+}
+.preview-card-selector {
+  display: block;
+  overflow: hidden;
+  -webkit-mask-image: var(--mask-fade-end);
+  mask-image: var(--mask-fade-end);
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-caption);
+  color: var(--color-cream);
+}
+.preview-card-styles dd {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: calc(var(--spacing) * 1.25);
+  margin: 0;
+  overflow: hidden;
+  -webkit-mask-image: var(--mask-fade-end);
+  mask-image: var(--mask-fade-end);
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-micro);
+  color: var(--color-cream);
+}
+.git-diff-lines {
+  padding: var(--spacing) 0;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: var(--text-caption);
+  line-height: 1.6;
+}
+.git-diff-line[data-kind="add"] {
+  background: color-mix(in srgb, var(--tone-added) 12%, transparent);
+}
+.git-diff-line[data-kind="del"] {
+  background: color-mix(in srgb, var(--tone-failed) 12%, transparent);
+}
+.git-diff-line[data-kind="hunk"] {
+  background: color-mix(in srgb, var(--misty-theme-text) 4%, transparent);
+}

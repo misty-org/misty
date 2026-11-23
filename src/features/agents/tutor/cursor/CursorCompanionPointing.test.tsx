@@ -1,10 +1,8 @@
-// Spoken screen questions, continuations after a screen request, and
-// walkthrough steps that wait for the person's click.
 import "./CompanionController.testFixtures";
 import { act, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { emit, mocks, mounted, opened, presentations } from "./CompanionController.testFixtures";
-import { useCompanionState } from "./companionState";
+import { useCompanionState } from "./companion_state";
 import type { DisplayCapture } from "./protocol";
 
 const screen: DisplayCapture = {
@@ -101,7 +99,6 @@ it("answers a spoken screen question from fresh captures, then points and reads 
       interrupted: false,
     }),
   );
-  // Admitted work is not announced; the companion shows progress instead.
   expect(useCompanionState.getState().presentation.phase).toBe("processing");
   complete("teach", "it's in the toolbar. [POINT:640,360:click Commit:screen1]");
   await waitFor(() => expect(mocks.speech).toHaveBeenCalledWith("teach"));
@@ -161,7 +158,6 @@ it("reads the continuation, not the request, when a spoken task asks to see the 
       continuation: true,
     }),
   );
-  // The spoken conversation stays open to read the continuation's answer.
   expect(mocks.conversationClose).not.toHaveBeenCalled();
   complete("continued", "that's a missing import. [POINT:100,200:the import line:screen1]");
   await waitFor(() => expect(mocks.speech).toHaveBeenCalledWith("continued"));

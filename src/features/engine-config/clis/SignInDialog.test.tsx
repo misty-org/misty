@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SignInStarted } from "./signInApi";
+import type { SignInStarted } from "./sign_in_api";
 
 const api = vi.hoisted(() => ({
   start: vi.fn(),
@@ -11,7 +11,7 @@ const api = vi.hoisted(() => ({
 }));
 const closed = vi.hoisted(() => ({ current: null as ((ok: boolean) => void) | null }));
 
-vi.mock("./signInApi", () => ({
+vi.mock("./sign_in_api", () => ({
   signInApi: api,
   listenSignIn: vi.fn(async (_id: string, _data: unknown, onClosed: (ok: boolean) => void) => {
     closed.current = onClosed;
@@ -19,7 +19,7 @@ vi.mock("./signInApi", () => ({
   }),
 }));
 
-vi.mock("@/shared/lib/terminal/xtermLoader", () => ({
+vi.mock("@/shared/lib/terminal/xterm_loader", () => ({
   loadXterm: async () => ({
     Terminal: class {
       cols = 80;
@@ -61,7 +61,6 @@ describe("SignInDialog", () => {
     expect(screen.getByText(/A Claude page opens in your browser/)).toBeTruthy();
     expect(screen.getByLabelText("Code")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Show details" })).toBeTruthy();
-    // The line that runs sits in the folded details.
     expect(screen.getByText("claude auth login").closest('[data-state="closed"]')).not.toBeNull();
   });
 
@@ -111,7 +110,6 @@ describe("SignInDialog", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Done" }));
     });
-    // Done says the person finished in the CLI's own screen.
     const id = api.start.mock.calls[0]![1] as string;
     expect(api.close).toHaveBeenCalledWith(id, true);
     expect(onClose).toHaveBeenCalled();

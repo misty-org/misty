@@ -45,8 +45,6 @@ fn load_settings_normalizes_imgui_settings_schema_without_clobbering_existing_va
         document.get("schema_version").and_then(Value::as_i64),
         Some(SETTINGS_SCHEMA_VERSION)
     );
-    // Unknown keys must survive the prune, or an extension's settings would
-    // vanish on upgrade.
     assert_eq!(
         document
             .get("general")
@@ -73,8 +71,6 @@ fn load_settings_normalizes_imgui_settings_schema_without_clobbering_existing_va
             .and_then(Value::as_bool),
         Some(true),
     );
-    // Schema 6: the Code workspace, file manager and file indexing left Misty, so their
-    // sections are neither kept nor backfilled.
     for section in ["search", "editor", "terminal", "files", "transfer_profiles"] {
         assert!(
             !document
@@ -88,7 +84,6 @@ fn load_settings_normalizes_imgui_settings_schema_without_clobbering_existing_va
         .and_then(Value::as_object)
         .is_some_and(|general| general.contains_key("preferred_terminal_app")));
 
-    // Schema 3 retirements: controls that persisted but had no reader.
     for (section, key) in [
         ("appearance", "ui_scale_index"),
         ("appearance", "font_size_index"),
@@ -106,7 +101,6 @@ fn load_settings_normalizes_imgui_settings_schema_without_clobbering_existing_va
         );
     }
 
-    // Sections introduced alongside the redesign must be backfilled.
     for (section, key) in [
         ("general", "reopen_last_session"),
         ("appearance", "app_zoom"),

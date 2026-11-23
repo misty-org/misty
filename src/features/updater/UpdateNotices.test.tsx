@@ -15,7 +15,6 @@ vi.mock("@/features/agents", () => ({
   MistyMarkdown: ({ children }: { children: string }) => <div>{children}</div>,
 }));
 vi.mock("@/shared/platform/relaunch", () => ({ relaunch: vi.fn() }));
-// The menu bar's "Check for updates" reaches the window as an event.
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ listen: async () => () => {} }),
 }));

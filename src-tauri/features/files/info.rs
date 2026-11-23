@@ -49,12 +49,9 @@ pub struct TextStart {
     pub truncated: bool,
 }
 
-/// The most of a file's text read for a preview: the project panel's 1 MB.
 const MAX_TEXT: usize = 1024 * 1024;
-/// The most bytes handed back whole: a Space file's upload limit.
 const MAX_BYTES: u64 = 100 * 1024 * 1024;
 
-/// What a kind of file is called, by its extension.
 fn file_kind_label(ext: &str) -> Option<&'static str> {
     Some(match ext {
         "pdf" => "PDF document",
@@ -139,19 +136,25 @@ pub(crate) fn kind_label(entry: &FileEntry) -> String {
 fn permissions(meta: &std::fs::Metadata) -> String {
     use std::os::unix::fs::PermissionsExt;
     let mode = meta.permissions().mode();
-    [0o400, 0o200, 0o100, 0o040, 0o020, 0o010, 0o004, 0o002, 0o001]
-        .iter()
-        .zip("rwxrwxrwx".chars())
-        .map(|(bit, letter)| if mode & bit != 0 { letter } else { '-' })
-        .collect()
+    [
+        0o400, 0o200, 0o100, 0o040, 0o020, 0o010, 0o004, 0o002, 0o001,
+    ]
+    .iter()
+    .zip("rwxrwxrwx".chars())
+    .map(|(bit, letter)| if mode & bit != 0 { letter } else { '-' })
+    .collect()
 }
 
 #[cfg(windows)]
 fn permissions(meta: &std::fs::Metadata) -> String {
-    if meta.permissions().readonly() { "Read only" } else { "Read and write" }.to_owned()
+    if meta.permissions().readonly() {
+        "Read only"
+    } else {
+        "Read and write"
+    }
+    .to_owned()
 }
 
-/// The owning user's name, as `ls -l` shows it.
 #[cfg(unix)]
 fn owner(meta: &std::fs::Metadata) -> Option<String> {
     use std::os::unix::fs::MetadataExt;
@@ -162,7 +165,13 @@ fn owner(meta: &std::fs::Metadata) -> Option<String> {
     // SAFETY: every pointer is valid for the call; `result` is null or points at `record`, whose
     // strings live in `buffer`.
     let status = unsafe {
-        libc::getpwuid_r(uid, record.as_mut_ptr(), buffer.as_mut_ptr(), buffer.len(), &mut result)
+        libc::getpwuid_r(
+            uid,
+            record.as_mut_ptr(),
+            buffer.as_mut_ptr(),
+            buffer.len(),
+            &mut result,
+        )
     };
     if status != 0 || result.is_null() {
         return Some(uid.to_string());
@@ -177,7 +186,6 @@ fn owner(_meta: &std::fs::Metadata) -> Option<String> {
     None
 }
 
-/// An image's pixel size, from its header alone.
 fn dimensions(path: &Path) -> Option<Dimensions> {
     let file = fs_disk::open(path).ok()?;
     let (width, height) = image::ImageReader::new(BufReader::new(file))
@@ -191,7 +199,19 @@ fn dimensions(path: &Path) -> Option<Dimensions> {
 fn is_picture(ext: Option<&str>) -> bool {
     matches!(
         ext,
-        Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "tif" | "tiff" | "ico" | "tga" | "hdr")
+        Some(
+            "png"
+                | "jpg"
+                | "jpeg"
+                | "gif"
+                | "webp"
+                | "bmp"
+                | "tif"
+                | "tiff"
+                | "ico"
+                | "tga"
+                | "hdr"
+        )
     )
 }
 
@@ -203,7 +223,10 @@ fn info(path: &Path) -> Result<FileInfo, String> {
     let picture = matches!(entry.kind, FileKind::File) && is_picture(entry.ext.as_deref());
     Ok(FileInfo {
         kind_label: kind_label(&entry),
-        parent: path.parent().map(|parent| parent.display().to_string()).unwrap_or_default(),
+        parent: path
+            .parent()
+            .map(|parent| parent.display().to_string())
+            .unwrap_or_default(),
         permissions: permissions(&meta),
         owner: owner(&meta),
         owned_by_you: file_access::disk::owned_by_you(path),
@@ -220,8 +243,6 @@ pub async fn files_info(webview: tauri::Webview, path: String) -> Result<FileInf
     blocking(move || info(&path)).await
 }
 
-/// Everything in a folder, counted: its files' bytes and how many items it holds. Links count as
-/// items but aren't followed, and folders the gate keeps closed (Misty's own data) are left out.
 fn folder_size(root: &Path) -> Result<FolderSize, String> {
     check_disk(root, Access::Read).map_err(|error| failed(root, io_text(&error)))?;
     let mut size = FolderSize { bytes: 0, items: 0 };
@@ -242,13 +263,15 @@ fn folder_size(root: &Path) -> Result<FolderSize, String> {
 }
 
 #[tauri::command]
-pub async fn files_folder_size(webview: tauri::Webview, path: String) -> Result<FolderSize, String> {
+pub async fn files_folder_size(
+    webview: tauri::Webview,
+    path: String,
+) -> Result<FolderSize, String> {
     person_window(&webview)?;
     let path = asked_path(&path)?;
     blocking(move || folder_size(&path)).await
 }
 
-/// A text file's start, up to 1 MB. A file with a zero byte early on isn't text.
 fn read_text(path: &Path) -> Result<TextStart, String> {
     let file = fs_disk::open(path).map_err(|error| failed(path, io_text(&error)))?;
     let mut bytes = Vec::new();
@@ -285,7 +308,6 @@ fn read_bytes(path: &Path) -> Result<Vec<u8>, String> {
     fs_disk::read(path).map_err(|error| failed(path, io_text(&error)))
 }
 
-/// A file's bytes, whole, up to 100 MB, for previews and for copying into a Space's drive.
 #[tauri::command]
 pub async fn files_read_bytes(
     webview: tauri::Webview,
@@ -319,10 +341,19 @@ mod tests {
 
     #[test]
     fn kinds_are_named_in_words() {
-        assert_eq!(kind_label(&file("Report.PDF", FileKind::File)), "PDF document");
-        assert_eq!(kind_label(&file("data.parquet", FileKind::File)), "PARQUET file");
+        assert_eq!(
+            kind_label(&file("Report.PDF", FileKind::File)),
+            "PDF document"
+        );
+        assert_eq!(
+            kind_label(&file("data.parquet", FileKind::File)),
+            "PARQUET file"
+        );
         assert_eq!(kind_label(&file("Makefile", FileKind::File)), "Document");
-        assert_eq!(kind_label(&file("Safari.app", FileKind::Package)), "Application");
+        assert_eq!(
+            kind_label(&file("Safari.app", FileKind::Package)),
+            "Application"
+        );
         assert_eq!(kind_label(&file("Projects", FileKind::Folder)), "Folder");
     }
 }

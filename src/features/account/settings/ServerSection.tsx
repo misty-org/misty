@@ -1,13 +1,9 @@
-import { currentApiBase, useServerChoice } from "@/api/deployment/serverChoice";
-import { useAuth } from "../sessions/authState";
-import { openSignInSheet, serverHost } from "../setup/serverSetup";
+import { currentApiBase, useServerChoice } from "@/api/deployment/server_choice";
+import { useAuth } from "../sessions/auth_state";
+import { openSignInSheet, serverHost } from "../setup/server_setup";
 import { Button } from "@misty/ui";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 
-/**
- * Settings › Server: which Misty server this device uses. The choice is a device setting and
- * never syncs. Changing it opens the setup wizard; moving to another server signs out of this one.
- */
 export function ServerSection() {
   const { user } = useAuth();
   const choice = useServerChoice((state) => state.choice);

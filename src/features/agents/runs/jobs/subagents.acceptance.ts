@@ -1,13 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { liveAcceptanceEnabled } from "@/tests/acceptance/liveEnv";
-import { defaultAgentId, MistyClient, type InvocationRun } from "@/tests/acceptance/mistyClient";
+import { liveAcceptanceEnabled } from "@/tests/acceptance/live_env";
+import { defaultAgentId, MistyClient, type InvocationRun } from "@/tests/acceptance/misty_client";
 import { writeAcceptanceReport } from "@/tests/acceptance/report";
 
-// Sub-agents and the notebook, live on the local server: a run
-// splits research across sub-agents with agent_delegate, keeps a notebook,
-// and merges what they found. No browser is attached, so the sub-agents
-// research with web search. The account's first Space is its personal one,
-// where the notebook is mirrored as a note.
 let client: MistyClient;
 let agentId: string;
 let spaceId: string;
@@ -48,8 +43,6 @@ describe.skipIf(!liveAcceptanceEnabled)("sub-agents and the notebook on the loca
       delegation: last(delegations)?.delegation,
       notebook: last(notebooks)?.notebook,
     });
-    // A run that cannot source a fact reports itself incomplete. Allow that
-    // only while web search is down (it needs Gateway credit).
     const searches = run.tools.filter(
       (tool) => tool.name === "web_search" && tool.outcome !== "started",
     );
@@ -59,12 +52,9 @@ describe.skipIf(!liveAcceptanceEnabled)("sub-agents and the notebook on the loca
     ).toContain(run.terminal);
     expect(ran(run, "agent_delegate")).toBe(true);
     const children = last(delegations)?.delegation?.children ?? [];
-    // One per country; a retry after a failed source may add more.
     expect(children.length).toBeGreaterThanOrEqual(3);
     for (const country of ["France", "Japan", "Kenya"])
       expect(children.some((child) => child.goal.includes(country))).toBe(true);
-    // Every sub-agent finished with an answer. One may still report itself
-    // incomplete when a source was unreachable (web search needs Gateway credit).
     expect(
       children.every(
         (child) => ["completed", "failed"].includes(child.state) && Boolean(child.summary),
@@ -73,12 +63,9 @@ describe.skipIf(!liveAcceptanceEnabled)("sub-agents and the notebook on the loca
     expect(children.some((child) => child.state === "completed")).toBe(true);
     for (const answer of ["Paris", "Tokyo", "Nairobi", "euro", "yen", "shilling"])
       expect(run.text.toLowerCase()).toContain(answer.toLowerCase());
-    // The sub-agents' findings reached the conversation; the agent's own
-    // checklist did not.
     const notebook = last(notebooks)?.notebook;
     expect(notebook?.plan.trim()).toBeFalsy();
     expect(notebook?.findings.trim()).toBeTruthy();
-    // The findings are a note in the personal Space.
     expect(notebook?.noteId).toBeTruthy();
     const note = await client.json<{ title: string; markdown?: string }>(
       `/spaces/${spaceId}/notes/${notebook?.noteId}`,

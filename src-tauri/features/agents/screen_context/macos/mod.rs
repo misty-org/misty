@@ -1,5 +1,3 @@
-//! Screen context on macOS: whether Misty may see other windows, and a still of
-//! the window the person was in, to attach to an ask.
 use std::sync::{
     atomic::{AtomicI32, Ordering},
     mpsc,
@@ -20,7 +18,6 @@ use crate::agents::cursor::macos::{
     support::{error_json, jpeg, macos_at_least, on_main_queued, on_screen_windows},
 };
 
-/// The process whose window was last attached when Misty itself is in front.
 static SOURCE_PID: AtomicI32 = AtomicI32::new(0);
 
 pub(super) fn main_focused() {
@@ -39,7 +36,6 @@ pub(super) fn status(request: bool) -> Value {
     json!({"supported": true, "allowed": allowed, "shortcutRegistered": false, "external": external})
 }
 
-/// Called on a Rust blocking worker. AppKit work is dispatched to the main queue.
 pub(super) fn capture() -> Value {
     if !macos_at_least(14, 0) {
         return error_json("Screen context requires macOS 14 or later.");

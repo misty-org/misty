@@ -1,9 +1,5 @@
-//! The agent operations that read or prepare a page directly: a visual capture,
-//! a typed draft and a provider request.
 use super::*;
 
-/// `browser.visual`: the page's inspection with a picture of the page or, for a
-/// task with display captures, those instead.
 pub(super) async fn visual_browser(
     app: &AppHandle,
     state: &BrowserSessionState,
@@ -56,7 +52,6 @@ pub(super) async fn visual_browser(
     Ok(observed)
 }
 
-/// `browser.type`: writes draft text into an inspected element.
 pub(super) async fn type_browser(
     app: &AppHandle,
     state: &BrowserSessionState,

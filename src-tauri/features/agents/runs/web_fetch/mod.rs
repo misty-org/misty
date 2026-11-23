@@ -1,4 +1,3 @@
-//! web.fetch: one public page read on this device, without a screen.
 pub(crate) mod decode;
 pub(crate) mod fetch_step;
 pub(crate) mod public_fetch;

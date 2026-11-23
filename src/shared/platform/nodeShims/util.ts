@@ -1,4 +1,3 @@
-// The few node:util helpers Midscene's planner path uses.
 export const promisify =
   <T>(fn: (...args: unknown[]) => void) =>
   (...args: unknown[]) =>

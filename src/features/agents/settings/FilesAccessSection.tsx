@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import { disk } from "@/features/files";
-import { invoke } from "@/shared/platform/nativeInvoke";
+import { invoke } from "@/shared/platform/native_invoke";
 import { ErrorState, useNotice } from "@misty/ui";
 import {
   DesktopSettingsRow as Row,
@@ -27,14 +27,8 @@ const deleteLine =
   "Off, agents move what they clean up to Agent trash for you to look over. " +
   "On, they may delete for good, and still ask every time.";
 
-/** Turns the disk grant off (`files_grant_revoke`); turning it on is only ever the native prompt. */
 const revokeDiskGrant = () => invoke<void>("files_grant_revoke");
 
-/**
- * What Files and agents may do with this computer's files: the disk grant, and whether agents may
- * delete. Turning either on goes through a native prompt, so nothing in a page can; turning them
- * off is a plain switch. Both live on the device and never sync.
- */
 export function FilesAccessSection() {
   const listing = useCachedResource("agents/files-access", readAccess, { persist: "device" });
   const access = listing.data ?? null;
@@ -56,7 +50,7 @@ export function FilesAccessSection() {
   };
   if (loadFailed)
     return (
-      <Section title="Files">
+      <Section title="Disk">
         <ErrorState
           inline
           title="Couldn't read these permissions"
@@ -67,16 +61,13 @@ export function FilesAccessSection() {
     );
   if (access === null)
     return (
-      <Section title="Files">
-        <DesktopSettingsRowSkeleton label="Files" rows={2} description control="switch" />
+      <Section title="Disk">
+        <DesktopSettingsRowSkeleton label="Disk" rows={2} description control="switch" />
       </Section>
     );
   return (
-    <Section title="Files">
-      <Row
-        label="Files can open this computer"
-        description={diskLine}
-      >
+    <Section title="Disk">
+      <Row label="Files can open this computer" description={diskLine}>
         <SwitchControl
           checked={access.disk}
           disabled={working}
@@ -84,10 +75,7 @@ export function FilesAccessSection() {
         />
       </Row>
       {access.disk || access.agentDelete ? (
-        <Row
-          label="Let agents delete files"
-          description={deleteLine}
-        >
+        <Row label="Let agents delete files" description={deleteLine}>
           <SwitchControl
             checked={access.agentDelete}
             disabled={working}

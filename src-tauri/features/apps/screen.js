@@ -1,8 +1,3 @@
-// Misty's screen helper, added to every app's entry page so an agent can work in the app the person has open:
-// read what the page shows, click, type, press keys and scroll there, as a person would. It talks to Misty over a
-// channel of its own (`misty:screen`), apart from the SDK's, and tells Misty when the person touches the app, so
-// a click of theirs takes control back. Positions are fractions of the page's view, 0 to 1. It changes nothing
-// else about the page.
 (function () {
   "use strict";
   var port = null;
@@ -24,7 +19,6 @@
     return String(label).replace(/\s+/g, " ").trim().slice(0, 80);
   }
 
-  // What the page shows: its title, its text and its controls with where they are.
   function read() {
     var selector = "a[href],button,input,select,textarea,[role=button],[role=link],[role=tab],[role=menuitem]," +
       "[role=checkbox],[contenteditable=true],canvas";
@@ -52,7 +46,6 @@
     };
   }
 
-  // The largest canvas on the page as a picture, for a page drawn on a canvas when Misty can't capture the view.
   function look() {
     var canvases = Array.prototype.slice.call(document.querySelectorAll("canvas")).filter(visible);
     canvases.sort(function (a, b) { return b.width * b.height - a.width * a.height; });
@@ -61,7 +54,6 @@
         var url = canvases[index].toDataURL("image/png");
         if (url && url.length > 100) return { dataUrl: url };
       } catch (error) {
-        // A canvas tainted by another origin can't be read; try the next.
       }
     }
     return { dataUrl: null };
@@ -114,7 +106,6 @@
       target.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
       return { typed: text.length };
     }
-    // A page drawn on a canvas reads keys, so the text goes as keys.
     for (var index = 0; index < text.length; index++) {
       var character = text[index];
       var init = { key: character, bubbles: true, cancelable: true, composed: true };
@@ -134,8 +125,6 @@
     return { scrolled: dy };
   }
 
-  // An app's adapter (misty-apps', `mcp: adapter`) sets `window.mistyAdapter` to its tools: `tools`, a list of
-  // { name, description, inputSchema, annotations }, and `call(name, args)`, which may answer with a promise.
   function adapterTools() {
     var adapter = window.mistyAdapter;
     return { tools: adapter && Array.isArray(adapter.tools) ? adapter.tools : [] };
@@ -151,7 +140,6 @@
     "adapter.tools": adapterTools, "adapter.call": adapterCall,
   };
 
-  // The person's own input (trusted events only, never the agent's), at most twice a second.
   function personInput(event) {
     if (!event.isTrusted || !port) return;
     var now = Date.now();
@@ -162,10 +150,8 @@
   window.addEventListener("pointerdown", personInput, true);
   window.addEventListener("keydown", personInput, true);
 
-  window.addEventListener("message", function (event) {
-    var data = event.data;
-    if (event.source !== window.parent || !data || data.type !== "misty:screen" || !event.ports[0]) return;
-    port = event.ports[0];
+  function attach(next) {
+    port = next;
     port.onmessage = function (message) {
       var frame = message.data;
       if (!frame || frame.t !== "cmd" || typeof frame.id !== "number") return;
@@ -182,5 +168,12 @@
         fail(error);
       }
     };
+  }
+
+  Object.defineProperty(window, "__mistyScreenAttach", { value: attach, writable: false, configurable: false });
+  window.addEventListener("message", function (event) {
+    var data = event.data;
+    if (event.source !== window.parent || !data || data.type !== "misty:screen" || !event.ports[0]) return;
+    attach(event.ports[0]);
   });
 })();

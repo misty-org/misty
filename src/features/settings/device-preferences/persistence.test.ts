@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/shared/platform/nativeInvoke", () => native);
+vi.mock("@/shared/platform/native_invoke", () => native);
 import { mutateState, readState } from "./persistence";
 
 beforeEach(() => {

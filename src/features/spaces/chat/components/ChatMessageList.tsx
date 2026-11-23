@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, type FormEvent, type ReactNode } from "react";
 import { Hash, Lock } from "lucide-react";
 import { ChannelDivider, ChannelWelcome } from "@misty/ui";
-import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
@@ -9,6 +9,7 @@ import { DirectMessageIntro } from "./DirectMessageIntro";
 import { ChatStarters } from "./ChatStarters";
 import { ChatMessagesLoading } from "./ChatMessagesLoading";
 import { MessageRow } from "./ChatMessageRow";
+import { AgentWorkLine } from "./AgentWorkLine";
 
 const longDate = new Intl.DateTimeFormat(undefined, {
   weekday: "long",
@@ -17,11 +18,6 @@ const longDate = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
-/**
- * A Space chat's history, as Discord lays it out, from @misty/ui's channel pieces: the channel's
- * welcome at the start, a line for each day and one where the unread messages begin, and each
- * message with its sender, its reply line, its files, reactions and thread.
- */
 export function ChatMessageList(props: SpaceChatMessagesProps) {
   const rows = useMemo(() => buildChatDisplayRows(props.messages), [props.messages]);
   const avatars = useMemberAvatarUrls(props.spaceId, props.messages);
@@ -32,6 +28,13 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
   const rowProps = useStableRowProps(props);
   const avatarFor = (message: SpaceMessage) =>
     message.origin?.author_avatar_url || avatars.get(message.sender_user_id) || "";
+  const latestByAgent = useMemo(() => {
+    const latest = new Map<string, string>();
+    for (const message of props.messages)
+      if (message.sender_kind === "agent" && message.sender_agent_id && message.sender_user_id)
+        latest.set(`${message.sender_user_id}:${message.sender_agent_id}`, message.id);
+    return new Set(latest.values());
+  }, [props.messages]);
   const atStart = !props.hasOlderMessages || !props.messages.length;
   const stream: ReactNode[] = [];
   for (const { message, compact, dateLabel } of rows) {
@@ -56,6 +59,15 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
         props={rowProps}
       />,
     );
+    if (latestByAgent.has(message.id) && message.sender_agent_id)
+      stream.push(
+        <AgentWorkLine
+          key={`work:${message.id}`}
+          spaceId={props.spaceId}
+          userId={message.sender_user_id}
+          agentId={message.sender_agent_id}
+        />,
+      );
   }
   return (
     <div
@@ -104,7 +116,6 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
   );
 }
 
-/** Row handlers that call the latest props, so memoized rows skip re-rendering while typing. */
 function useStableRowProps(props: SpaceChatMessagesProps): SpaceChatMessagesProps {
   const latest = useRef(props);
   useLayoutEffect(() => {

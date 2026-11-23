@@ -1,24 +1,16 @@
-//! What engines keep in plain files and show in their terminal apps' dialogs: context (memory)
-//! files, agent definitions, hooks and permission rules. Gemini CLI, Qwen Code, Qoder and
-//! CodeBuddy share the shapes (Claude Code's, mostly), so their `/memory`, `/agents`, `/hooks`
-//! and `/permissions` read them here and answer with what is on disk.
-
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
 use super::{row, Output, Row, Section};
 
-/// The most rows one list shows; a longer one says how many it left out.
 const MOST_ROWS: usize = 200;
-/// How long a description may run in a row.
 const MOST_DESCRIPTION: usize = 160;
 
 pub fn home() -> Option<PathBuf> {
     dirs::home_dir()
 }
 
-/// `path` with the home folder written as `~`.
 pub fn display_path(path: &Path) -> String {
     if let Some(home) = home() {
         if let Ok(rest) = path.strip_prefix(&home) {
@@ -32,14 +24,15 @@ pub fn display_path(path: &Path) -> String {
     path.display().to_string()
 }
 
-/// A settings file read as JSON. Gemini CLI and Qwen Code accept comments in theirs, so `//`
-/// and `/* */` comments are dropped first. None when the file is missing or isn't JSON.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an engine's own files in place, in its home or in the person's project, which may sit outside what the gate grants"
+)]
 pub fn read_json(path: &Path) -> Option<Value> {
     let text = std::fs::read_to_string(path).ok()?;
     serde_json::from_str(&strip_json_comments(&text)).ok()
 }
 
-/// JSON text without its comments; strings (and the escapes in them) are left alone.
 pub fn strip_json_comments(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
@@ -87,9 +80,10 @@ pub fn strip_json_comments(text: &str) -> String {
     out
 }
 
-/// The folder and the folders above it up to its repository root (the first that holds a
-/// `.git`), root first: where these engines look for project context files. A folder outside
-/// any repository is searched alone.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "walks up from the person's project to its repository root; those folders need not be linked"
+)]
 pub fn project_chain(folder: &Path) -> Vec<PathBuf> {
     let home = home();
     let mut chain = Vec::new();
@@ -108,9 +102,10 @@ pub fn project_chain(folder: &Path) -> Vec<PathBuf> {
     vec![folder.to_path_buf()]
 }
 
-/// The context files an engine loads: `global` (its own folder's) and, in each folder of the
-/// project chain, every one of `project_names` (a name may carry a subfolder, such as
-/// `.codebuddy/CODEBUDDY.md`). One row per file that exists, with its size.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "lists the context files an engine reads in its home and in the folders above the person's project, which need not be linked"
+)]
 pub fn context_section(
     heading: &str,
     global: &[PathBuf],
@@ -151,6 +146,10 @@ pub fn context_section(
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an engine's own files in place, in its home or in the person's project, which may sit outside what the gate grants"
+)]
 fn file_size(path: &Path) -> String {
     match std::fs::read_to_string(path) {
         Ok(text) => {
@@ -161,8 +160,10 @@ fn file_size(path: &Path) -> String {
     }
 }
 
-/// The agents defined as Markdown files with front matter (`name`, `description`) in `dir` and
-/// its subfolders one level down. None when there are none.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an engine's own files in place, in its home or in the person's project, which may sit outside what the gate grants"
+)]
 pub fn agents_section(heading: &str, dir: &Path) -> Option<Section> {
     let mut files = markdown_files(dir);
     for entry in read_dir_sorted(dir) {
@@ -193,6 +194,10 @@ pub fn agents_section(heading: &str, dir: &Path) -> Option<Section> {
     })
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an engine's own files in place, in its home or in the person's project, which may sit outside what the gate grants"
+)]
 fn markdown_files(dir: &Path) -> Vec<PathBuf> {
     read_dir_sorted(dir)
         .into_iter()
@@ -200,6 +205,10 @@ fn markdown_files(dir: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an engine's own files in place, in its home or in the person's project, which may sit outside what the gate grants"
+)]
 fn read_dir_sorted(dir: &Path) -> Vec<PathBuf> {
     let mut entries: Vec<PathBuf> = std::fs::read_dir(dir)
         .map(|entries| entries.flatten().map(|entry| entry.path()).collect())
@@ -208,7 +217,10 @@ fn read_dir_sorted(dir: &Path) -> Vec<PathBuf> {
     entries
 }
 
-/// `name` and `description` from a Markdown file's YAML front matter.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an engine's own files in place, in its home or in the person's project, which may sit outside what the gate grants"
+)]
 fn agent_front_matter(path: &Path) -> (Option<String>, Option<String>) {
     let Ok(text) = std::fs::read_to_string(path) else {
         return (None, None);
@@ -241,9 +253,6 @@ fn shorten(text: &str) -> String {
     format!("{cut}…")
 }
 
-/// The hooks one settings file configures, in the shape these engines share:
-/// `hooks: { <Event>: [{ matcher?, hooks: [{ type, command | prompt | url, name? }] }] }`.
-/// One row per hook, under the event (and matcher) it runs on. None when it has none.
 pub fn hooks_section(label: &str, path: &Path) -> Option<Section> {
     let settings = read_json(path)?;
     let events = settings.get("hooks")?.as_object()?;
@@ -276,7 +285,6 @@ pub fn hooks_section(label: &str, path: &Path) -> Option<Section> {
     })
 }
 
-/// What one hook runs: its command, prompt or URL, after its name when it has one.
 fn hook_action(hook: &Value) -> String {
     let text = |key: &str| hook.get(key).and_then(Value::as_str).map(str::trim);
     let action = text("command")
@@ -290,8 +298,6 @@ fn hook_action(hook: &Value) -> String {
     }
 }
 
-/// The permission rules one settings file sets: `permissions: { allow, ask, deny }` (and its
-/// default mode and extra folders when it names them). None when it sets none.
 pub fn permissions_section(label: &str, path: &Path) -> Option<Section> {
     let settings = read_json(path)?;
     let permissions = settings.get("permissions")?.as_object()?;
@@ -335,7 +341,6 @@ fn capped(mut rows: Vec<Row>) -> Vec<Row> {
     rows
 }
 
-/// An `Info` with `sections`, or with one line saying `empty` when there are none.
 pub fn info_or(title: &str, sections: Vec<Section>, empty: impl Into<String>) -> Output {
     if sections.is_empty() {
         return Output::info(
@@ -349,8 +354,6 @@ pub fn info_or(title: &str, sections: Vec<Section>, empty: impl Into<String>) ->
     Output::info(title, sections)
 }
 
-/// The settings files an engine layers, user first: `<user_dir>/settings.json`, then the
-/// project's `<folder>/<project_dir>/settings.json` and `settings.local.json`.
 pub fn settings_files(
     user_dir: &Path,
     project_dir: &str,
@@ -368,7 +371,6 @@ pub fn settings_files(
     files
 }
 
-/// `/hooks` over `files`.
 pub fn hooks_info(engine: &str, files: &[(&str, PathBuf)]) -> Output {
     let sections = files
         .iter()
@@ -381,7 +383,6 @@ pub fn hooks_info(engine: &str, files: &[(&str, PathBuf)]) -> Output {
     )
 }
 
-/// `/permissions` over `files`.
 pub fn permissions_info(engine: &str, files: &[(&str, PathBuf)]) -> Output {
     let sections = files
         .iter()
@@ -394,7 +395,6 @@ pub fn permissions_info(engine: &str, files: &[(&str, PathBuf)]) -> Output {
     )
 }
 
-/// `/agents` over the engine's user and project agent folders.
 pub fn agents_info(engine: &str, dirs: &[(&str, PathBuf)]) -> Output {
     let sections = dirs
         .iter()

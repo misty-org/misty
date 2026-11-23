@@ -1,23 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Probing an MCP server: really connect once by its config and do the `initialize` plus
-//! `tools/list` handshake. A stdio server is started, and `npx` may download its package on the
-//! way. The result only says "Misty can connect and complete the handshake right now", apart from
-//! the status a CLI session reported.
-//!
-//! When it runs (the window's `engine-config/mcp/probe-store.ts`):
-//! - The person's own sources (`~/.claude.json`, `~/.codex/config.toml` and similar files):
-//!   probed once when the MCP page or `/mcp` panel opens (results kept 3 minutes), or on request;
-//! - Workspace sources (`workspace_file`: the config file is in the repository and can arrive
-//!   with it): never probed automatically. Before a manual probe `engine_mcp_probe_plan` shows the
-//!   person the full command or address to confirm, and `${ENV}` in URLs and headers isn't
-//!   expanded.
-//!
-//! Safety: the command, arguments, environment and headers are always parsed again from the
-//! config file (`probe_target`), never taken from the window; the result carries only tool names
-//! and an error summary, never a credential.
-
 use super::McpError;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -25,19 +8,13 @@ use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, BufReader};
 
-/// A cold stdio start (npx's first download) is much slower than HTTP.
 const STDIO_TIMEOUT: Duration = Duration::from_secs(25);
 const HTTP_TIMEOUT: Duration = Duration::from_secs(12);
-/// The cap on one protocol line, so a server writing logs or large objects to stdout can't use up
-/// memory. A valid `tools/list` can be large (139 tools came to about 1.9 MB in one case); the old
-/// 1 MiB cap dropped the whole response and the page showed "can't connect".
 const MAX_LINE: usize = 64 * 1024 * 1024;
-/// The most tool names listed in the details (`tool_count` isn't limited by it).
 const MAX_TOOLS: usize = 40;
 const CLIENT_NAME: &str = "misty";
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
-/// A connection target parsed from config (not redacted; used only here).
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ProbeTarget {
     pub command: Option<String>,
@@ -46,15 +23,11 @@ pub(crate) struct ProbeTarget {
     pub cwd: Option<String>,
     pub url: Option<String>,
     pub headers: Vec<(String, String)>,
-    /// The transport as written in the config (stdio / http / sse / local / remote / …).
     pub transport: Option<String>,
-    /// From a config file inside the workspace (`super::source_in_workspace`): `${ENV}` in URLs
-    /// and headers is sent as written, never expanded from this process's environment.
     pub from_workspace: bool,
 }
 
 impl ProbeTarget {
-    /// How to probe it: stdio / http / unknown.
     pub(crate) fn kind(&self) -> &'static str {
         match self.transport.as_deref().map(str::trim) {
             Some("stdio") | Some("local") => "stdio",
@@ -65,9 +38,6 @@ impl ProbeTarget {
         }
     }
 
-    /// A URL or header value: the person's own config expands `${VAR}` by the CLI's rules; config
-    /// from a repository doesn't, or `"url": "https://x/?k=${OPENAI_API_KEY}"` could use a probe
-    /// to send the key away.
     fn outbound_value(&self, value: &str) -> String {
         if self.from_workspace {
             value.to_string()
@@ -77,13 +47,9 @@ impl ProbeTarget {
     }
 }
 
-/// What the person confirms before a workspace source is probed by hand: the full command and
-/// address, and only the names of env vars and headers (their values may be keys). The URL is
-/// redacted and `${ENV}` isn't expanded.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpProbePlan {
-    /// stdio | http | unknown
     pub kind: String,
     pub command: Option<String>,
     pub args: Vec<String>,
@@ -91,10 +57,6 @@ pub struct McpProbePlan {
     pub env_keys: Vec<String>,
     pub url: Option<String>,
     pub header_keys: Vec<String>,
-    /// Hash of the full target (values included): `mcp_probe` runs a
-    /// workspace target only when handed this exact fingerprint, so what
-    /// executes is what the user confirmed — not whatever the file says by
-    /// the time the click lands (a `git pull` or an agent may rewrite it).
     pub fingerprint: String,
 }
 
@@ -127,8 +89,6 @@ fn fingerprint(target: &ProbeTarget) -> String {
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
-/// Workspace targets need the fingerprint of the plan the user confirmed;
-/// the user's own servers never asked for confirmation.
 fn require_confirmed(target: &ProbeTarget, confirmed: Option<&str>) -> Result<(), McpError> {
     if !target.from_workspace || confirmed == Some(fingerprint(target).as_str()) {
         return Ok(());
@@ -138,7 +98,6 @@ fn require_confirmed(target: &ProbeTarget, confirmed: Option<&str>) -> Result<()
     ))
 }
 
-/// What a probe would run, for confirming first (runs nothing).
 #[tauri::command]
 pub async fn engine_mcp_probe_plan(
     webview: tauri::Webview,
@@ -153,15 +112,12 @@ pub async fn engine_mcp_probe_plan(
     .await
 }
 
-/// A probe request from the window; the entry id is resolved here to the real command in the config.
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpProbeRequest {
     pub entry_id: String,
     #[serde(default)]
     pub workspace: Option<String>,
-    /// `McpProbePlan.fingerprint` of the plan the user confirmed; required
-    /// for workspace sources (see `require_confirmed`).
     #[serde(default)]
     pub plan_fingerprint: Option<String>,
 }
@@ -169,13 +125,9 @@ pub struct McpProbeRequest {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpProbeResult {
-    /// connected | needs_auth | failed | unsupported
     pub status: String,
     pub message: Option<String>,
-    /// Tool names, at most `MAX_TOOLS` (for the details list).
     pub tools: Vec<String>,
-    /// How many tools `tools/list` declared, not cut by `MAX_TOOLS`. Counts on the page must use
-    /// it (a server may declare 139 while the list shows the first 40).
     pub tool_count: usize,
     pub server_name: Option<String>,
     pub protocol_version: Option<String>,
@@ -212,7 +164,6 @@ impl Default for McpProbeResult {
     }
 }
 
-/// Probes one MCP server: an explicit action, not cached (the window keeps what it shows).
 #[tauri::command]
 pub async fn engine_mcp_probe(
     webview: tauri::Webview,
@@ -242,8 +193,6 @@ async fn run_probe(target: &ProbeTarget) -> McpProbeResult {
     result
 }
 
-// ===== stdio =====
-
 async fn probe_stdio(target: &ProbeTarget) -> McpProbeResult {
     probe_stdio_within(target, STDIO_TIMEOUT).await
 }
@@ -258,8 +207,6 @@ async fn probe_stdio_within(target: &ProbeTarget, timeout: Duration) -> McpProbe
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
-    // Misty's search PATH (so `npx` and `uvx` are found from a GUI launch) and the proxy from
-    // Settings; the entry's own env wins over both.
     cmd.envs(crate::engine_config::support::child_env());
     if let Some(cwd) = target.cwd.as_deref() {
         cmd.current_dir(cwd);
@@ -267,12 +214,8 @@ async fn probe_stdio_within(target: &ProbeTarget, timeout: Duration) -> McpProbe
     for (key, value) in &target.env {
         cmd.env(key, expand_env(value));
     }
-    // Its own process group: npx / uvx start more children, and the whole group is killed after.
     #[cfg(unix)]
     cmd.process_group(0);
-    // Windows: a GUI process starting a console program pops up a visible console (uv.exe,
-    // node.exe and cmd.exe are all console programs). stdio is redirected, so the window is only
-    // noise, and opening the page probes every stdio server at once.
     #[cfg(windows)]
     crate::engine_config::support::hide_console_tokio(&mut cmd);
     let mut child = match cmd.spawn() {
@@ -299,8 +242,6 @@ async fn probe_stdio_within(target: &ProbeTarget, timeout: Duration) -> McpProbe
     }
 }
 
-/// `npx` and friends ship as `.cmd` shims on Windows that CreateProcess can't run by bare name;
-/// they're found on Misty's search PATH and wrapped the way the engines are.
 pub(crate) fn launch_command(program: &str) -> tokio::process::Command {
     #[cfg(windows)]
     {
@@ -311,7 +252,6 @@ pub(crate) fn launch_command(program: &str) -> tokio::process::Command {
     tokio::process::Command::new(program)
 }
 
-/// Cleanup: kill the whole process group first (grandchildren hold the pipe), then reap the child.
 async fn finish_process(pid: u32, child: &mut tokio::process::Child) {
     if pid != 0 {
         crate::engine_config::support::kill_process_group(pid);
@@ -353,17 +293,11 @@ async fn write_message(
         .map_err(|error| format!("Couldn't write to the server: {error}"))
 }
 
-/// Reads the child's stdout line by line. One read can bring several lines (a log and a response
-/// in the same chunk): what's left stays in the buffer instead of being dropped with the line.
 struct LineReader<R> {
     inner: BufReader<R>,
     buffer: Vec<u8>,
-    /// The byte cap on one line (without the newline).
     limit: usize,
-    /// The current line is too long: drop it up to the next newline.
     dropping: bool,
-    /// How many lines were dropped for length, so a failed handshake can give the real reason
-    /// instead of an untrue "the server sent no response it understood".
     dropped: usize,
 }
 
@@ -382,7 +316,6 @@ impl<R: tokio::io::AsyncRead + Unpin> LineReader<R> {
         }
     }
 
-    /// Reads the next line into `out`; returns the bytes consumed, 0 at EOF.
     async fn next_line(&mut self, out: &mut Vec<u8>) -> std::io::Result<usize> {
         loop {
             if let Some(index) = self.buffer.iter().position(|byte| *byte == b'\n') {
@@ -419,8 +352,6 @@ impl<R: tokio::io::AsyncRead + Unpin> LineReader<R> {
     }
 }
 
-/// Reads up to the JSON-RPC response with the matching id, skipping logs and banners the server
-/// prints to stdout and unrelated notifications.
 async fn read_result<R: tokio::io::AsyncRead + Unpin>(
     reader: &mut LineReader<R>,
     id: i64,
@@ -458,8 +389,6 @@ async fn read_result<R: tokio::io::AsyncRead + Unpin>(
     ))
 }
 
-/// A note about lines dropped for length, added to the failure, so "the response was too big and
-/// was dropped" isn't reported as the misleading "the server sent no response Misty recognized".
 fn overlong_note<R: tokio::io::AsyncRead + Unpin>(reader: &LineReader<R>) -> String {
     if reader.dropped == 0 {
         return String::new();
@@ -471,21 +400,15 @@ fn overlong_note<R: tokio::io::AsyncRead + Unpin>(reader: &LineReader<R>) -> Str
     )
 }
 
-// ===== HTTP / SSE =====
-
 async fn probe_http(target: &ProbeTarget) -> McpProbeResult {
     let Some(url) = target.url.as_deref().map(|url| target.outbound_value(url)) else {
         return McpProbeResult::failed("The config has no server address");
     };
-    // The app installs the TLS provider at launch; tests and the lazy proxy may not have.
     let _ = rustls::crypto::ring::default_provider().install_default();
     let mut builder = reqwest::Client::builder().timeout(HTTP_TIMEOUT);
     if !is_loopback_url(&url) {
         builder = crate::engine_config::proxy::apply_to_client(builder);
     } else {
-        // Servers on this computer (Figma, an IDE's built-in MCP and the like) are reached
-        // directly: a proxy would turn a request to 127.0.0.1 into a 502 that says nothing about
-        // the server.
         builder = builder.no_proxy();
     }
     let client = match builder.build() {
@@ -592,7 +515,6 @@ async fn probe_http(target: &ProbeTarget) -> McpProbeResult {
     assemble(initialized, tools)
 }
 
-/// The `result` of a JSON-RPC response; one with an `error` is always a failure.
 fn payload_result(value: &Value) -> Result<Value, String> {
     if let Some(error) = value.get("error") {
         return Err(rpc_error_message(error));
@@ -615,7 +537,6 @@ fn is_loopback_url(raw: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// The body may be JSON or SSE (`data: {...}`); takes the message with the matching id.
 fn response_payload(body: &str, id: i64) -> Option<Value> {
     let trimmed = body.trim();
     if trimmed.starts_with('{') {
@@ -639,8 +560,6 @@ fn response_payload(body: &str, id: i64) -> Option<Value> {
     }
     None
 }
-
-// ===== Shared =====
 
 fn initialize_request() -> Value {
     json!({
@@ -701,7 +620,6 @@ fn error_message(error: &reqwest::Error) -> String {
     if error.is_timeout() {
         return "Timed out".to_string();
     }
-    // reqwest wraps TCP connect errors in the Request kind, so `is_connect()` isn't always true.
     if error.is_connect() || detail.contains("connect") {
         return "Couldn't connect (the server isn't running or the address can't be reached)"
             .to_string();
@@ -709,8 +627,6 @@ fn error_message(error: &reqwest::Error) -> String {
     detail
 }
 
-/// Expands `${VAR}` / `${VAR:-default}` in config (as the CLIs do); an undefined variable becomes
-/// an empty string rather than sending the literal text.
 pub(crate) fn expand_env(value: &str) -> String {
     if !value.contains("${") {
         return value.to_string();

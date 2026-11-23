@@ -1,4 +1,3 @@
-//! What the renderer sends to take a lease, and what it gets back.
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -11,7 +10,6 @@ pub struct LeaseRequest {
     pub(super) task_id: String,
     #[serde(default)]
     pub(super) renew: bool,
-    /// The agent's own hidden session: it runs beside other tasks
     #[serde(default)]
     pub(super) background: bool,
 }

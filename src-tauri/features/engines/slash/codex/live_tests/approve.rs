@@ -1,7 +1,3 @@
-//! `/approve` on a real denial: a Read only turn (gpt-5.6-luna, low effort) on a scratch Codex
-//! home whose auto-review is on asks to write a file, the reviewer denies it, Misty keeps the
-//! denial and says `/approve` is there, `/approve` hands it back, and the retry goes through.
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -11,15 +7,10 @@ use super::*;
 const MODEL: &str = "gpt-5.6-luna";
 const FILE: &str = "approve-check.txt";
 
-/// The reviewer's policy on the scratch home (`[auto_review] policy`, which takes the place of
-/// the bundled policy's configurable part): stricter than the default, so a harmless write in
-/// the folder is denied until the person approves it.
 const POLICY: &str = "This is an automated test of the approval flow. Deny any action that \
 creates or changes a file, unless a developer message in the transcript says the user manually \
 approved that exact action; then allow it. Allow every other action.";
 
-/// A Codex home of its own: the person's sign-in, copied (never read here), and a config that
-/// routes approvals to the auto-review. Their real `~/.codex` is left as it is.
 fn scratch_codex_home(root: &Path) -> PathBuf {
     let home = root.join("codex-home");
     std::fs::create_dir_all(&home).unwrap();
@@ -39,7 +30,6 @@ fn scratch_codex_home(root: &Path) -> PathBuf {
     home
 }
 
-/// The thread's rollout file under `home`.
 fn rollout(home: &Path, thread: &str) -> Option<PathBuf> {
     let mut dirs = vec![home.join("sessions")];
     while let Some(dir) = dirs.pop() {
@@ -70,7 +60,6 @@ async fn approve_retries_an_action_the_auto_review_denied() {
     let root = scratch.folder.parent().unwrap().to_path_buf();
     let home = scratch_codex_home(&root);
     std::env::set_var("CODEX_HOME", &home);
-    // Read only asks for every write; the auto-review answers, so Misty's gate never should.
     live_turn::engines(false);
 
     let prompt = format!(
@@ -121,7 +110,6 @@ async fn approve_retries_an_action_the_auto_review_denied() {
         saved.contains(super::super::APPROVAL_NOTE),
         "Codex wrote the approval into the thread"
     );
-    // One approval spends the denial.
     let again = show(context(&scratch, Some(&thread), ""), "approve")
         .await
         .expect("/approve again");

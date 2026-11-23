@@ -32,7 +32,6 @@ fn input_bounds_and_key_names_are_enforced() {
     ] {
         assert!(validate(&input).is_ok());
     }
-    // Control is the command key off macOS: the same limits apply.
     #[cfg(not(target_os = "macos"))]
     {
         assert!(validate(&json!({"kind":"key","key":"a","modifiers":["Control"]})).is_ok());

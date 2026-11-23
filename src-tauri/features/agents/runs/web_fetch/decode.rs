@@ -1,25 +1,29 @@
-//! A response body's bytes, decoded and capped. The cap holds on the decoded size, so a small
-//! compressed body can't fill memory.
 use std::io::{self, Write};
 
 use brotli_decompressor::DecompressorWriter;
 use flate2::{write::GzDecoder, Decompress, FlushDecompress, Status};
 
-/// Keeps up to its limit, and fails the writer once full so a decoder stops working.
 struct Capped {
     kept: Vec<u8>,
     limit: usize,
-    /// As in the TypeScript, a body that exactly fills the limit counts as cut short.
     full: bool,
 }
 
 impl Capped {
     fn new(limit: usize) -> Self {
-        Self { kept: Vec::new(), limit, full: false }
+        Self {
+            kept: Vec::new(),
+            limit,
+            full: false,
+        }
     }
 
     fn take(&mut self) -> Self {
-        Self { kept: std::mem::take(&mut self.kept), limit: self.limit, full: self.full }
+        Self {
+            kept: std::mem::take(&mut self.kept),
+            limit: self.limit,
+            full: self.full,
+        }
     }
 
     fn done(self) -> (Vec<u8>, bool) {
@@ -44,12 +48,20 @@ impl Write for Capped {
 }
 
 enum Stage {
-    /// Not compressed, or a finished gzip stream followed by padding.
-    Plain { sink: Capped, ignore_rest: bool },
-    /// `createUnzip` decides between gzip and zlib from the first two bytes.
-    Undecided { limit: usize, start: Vec<u8> },
+    Plain {
+        sink: Capped,
+        ignore_rest: bool,
+    },
+    Undecided {
+        limit: usize,
+        start: Vec<u8>,
+    },
     Gzip(GzDecoder<Capped>),
-    Zlib { inflate: Decompress, sink: Capped, ended: bool },
+    Zlib {
+        inflate: Decompress,
+        sink: Capped,
+        ended: bool,
+    },
     Brotli(Box<DecompressorWriter<Capped>>),
 }
 
@@ -58,16 +70,20 @@ pub(crate) struct BodyDecoder(Stage);
 const GZIP_MAGIC: [u8; 2] = [0x1F, 0x8B];
 
 impl BodyDecoder {
-    /// A decoder for the response's `content-encoding`, already lowercased.
     pub(crate) fn new(encoding: &str, limit: usize) -> Self {
         Self(match encoding {
             "br" => Stage::Brotli(Box::new(DecompressorWriter::new(Capped::new(limit), 4096))),
-            "gzip" | "deflate" => Stage::Undecided { limit, start: Vec::new() },
-            _ => Stage::Plain { sink: Capped::new(limit), ignore_rest: false },
+            "gzip" | "deflate" => Stage::Undecided {
+                limit,
+                start: Vec::new(),
+            },
+            _ => Stage::Plain {
+                sink: Capped::new(limit),
+                ignore_rest: false,
+            },
         })
     }
 
-    /// Whether the limit was reached, so the rest needn't be read.
     pub(crate) fn full(&self) -> bool {
         match &self.0 {
             Stage::Plain { sink, .. } | Stage::Zlib { sink, .. } => sink.full,
@@ -77,7 +93,6 @@ impl BodyDecoder {
         }
     }
 
-    /// Takes more of the body. Reaching the limit is not a failure.
     pub(crate) fn write(&mut self, mut bytes: &[u8]) -> io::Result<()> {
         if let Stage::Undecided { limit, start } = &mut self.0 {
             start.extend_from_slice(bytes);
@@ -89,21 +104,31 @@ impl BodyDecoder {
             self.0 = if held.starts_with(&GZIP_MAGIC) {
                 Stage::Gzip(GzDecoder::new(Capped::new(limit)))
             } else {
-                Stage::Zlib { inflate: Decompress::new(true), sink: Capped::new(limit), ended: false }
+                Stage::Zlib {
+                    inflate: Decompress::new(true),
+                    sink: Capped::new(limit),
+                    ended: false,
+                }
             };
             return self.write(&held);
         }
         while !bytes.is_empty() && !self.full() {
             let result = match &mut self.0 {
-                Stage::Plain { ignore_rest: true, .. } | Stage::Undecided { .. } => return Ok(()),
+                Stage::Plain {
+                    ignore_rest: true, ..
+                }
+                | Stage::Undecided { .. } => return Ok(()),
                 Stage::Plain { sink, .. } => sink.write(bytes),
-                Stage::Zlib { inflate, sink, ended } => inflate_some(inflate, sink, ended, bytes),
+                Stage::Zlib {
+                    inflate,
+                    sink,
+                    ended,
+                } => inflate_some(inflate, sink, ended, bytes),
                 Stage::Brotli(decoder) => decoder.write(bytes),
                 Stage::Gzip(decoder) => decoder.write(bytes),
             };
             match result {
                 Ok(0) if matches!(self.0, Stage::Gzip(_)) => self.next_gzip_member(bytes)?,
-                // A finished zlib stream takes nothing more, and Node ignores the rest.
                 Ok(0) => return Ok(()),
                 Ok(used) => bytes = &bytes[used..],
                 Err(_) if self.full() => return Ok(()),
@@ -113,8 +138,6 @@ impl BodyDecoder {
         Ok(())
     }
 
-    /// A gzip member ended with more to come. As in Node's zlib, a zero byte is padding and the rest
-    /// is ignored, and anything else has to be another member.
     fn next_gzip_member(&mut self, rest: &[u8]) -> io::Result<()> {
         let Stage::Gzip(decoder) = &mut self.0 else {
             return Ok(());
@@ -122,19 +145,19 @@ impl BodyDecoder {
         decoder.try_finish()?;
         let sink = decoder.get_mut().take();
         self.0 = if rest.first() == Some(&0) {
-            Stage::Plain { sink, ignore_rest: true }
+            Stage::Plain {
+                sink,
+                ignore_rest: true,
+            }
         } else {
             Stage::Gzip(GzDecoder::new(sink))
         };
         Ok(())
     }
 
-    /// The body so far, and whether there was more. Fails on a compressed stream that ended early,
-    /// unless the limit was reached first.
     pub(crate) fn finish(self) -> io::Result<(Vec<u8>, bool)> {
         match self.0 {
             Stage::Plain { sink, .. } => Ok(sink.done()),
-            // Nothing at all is an empty body, and one byte can't be a stream.
             Stage::Undecided { start, .. } if start.is_empty() => Ok((Vec::new(), false)),
             Stage::Undecided { .. } => Err(io::Error::from(io::ErrorKind::UnexpectedEof)),
             Stage::Gzip(mut decoder) => {
@@ -164,14 +187,20 @@ impl BodyDecoder {
     }
 }
 
-/// Inflates what it can of `bytes` into the sink, and says how much it used.
-fn inflate_some(inflate: &mut Decompress, sink: &mut Capped, ended: &mut bool, bytes: &[u8]) -> io::Result<usize> {
+fn inflate_some(
+    inflate: &mut Decompress,
+    sink: &mut Capped,
+    ended: &mut bool,
+    bytes: &[u8],
+) -> io::Result<usize> {
     if *ended {
         return Ok(0);
     }
     let mut out = [0u8; 16 * 1024];
     let (read, wrote) = (inflate.total_in(), inflate.total_out());
-    let status = inflate.decompress(bytes, &mut out, FlushDecompress::None).map_err(io::Error::other)?;
+    let status = inflate
+        .decompress(bytes, &mut out, FlushDecompress::None)
+        .map_err(io::Error::other)?;
     let produced = (inflate.total_out() - wrote) as usize;
     sink.write_all(&out[..produced])?;
     *ended = status == Status::StreamEnd;
@@ -179,7 +208,6 @@ fn inflate_some(inflate: &mut Decompress, sink: &mut Capped, ended: &mut bool, b
     if used == 0 && produced == 0 && !*ended {
         return Err(io::Error::from(io::ErrorKind::InvalidData));
     }
-    // Output with no input used still has more to give, which counts as progress on the same bytes.
     if used == 0 && !*ended {
         return inflate_some(inflate, sink, ended, bytes);
     }
@@ -211,7 +239,6 @@ mod tests {
 
     fn decode(encoding: &str, body: &[u8], limit: usize) -> io::Result<(Vec<u8>, bool)> {
         let mut decoder = BodyDecoder::new(encoding, limit);
-        // One byte at a time finds any slip at a chunk's edge.
         for byte in body.chunks(1) {
             if decoder.full() {
                 break;
@@ -223,16 +250,28 @@ mod tests {
 
     #[test]
     fn plain_bodies_are_cut_at_the_limit_and_filling_it_counts_as_cut() {
-        assert_eq!(decode("", b"hello", 10).unwrap(), (b"hello".to_vec(), false));
+        assert_eq!(
+            decode("", b"hello", 10).unwrap(),
+            (b"hello".to_vec(), false)
+        );
         assert_eq!(decode("", b"hello", 5).unwrap(), (b"hello".to_vec(), true));
-        assert_eq!(decode("identity", b"hello", 3).unwrap(), (b"hel".to_vec(), true));
+        assert_eq!(
+            decode("identity", b"hello", 3).unwrap(),
+            (b"hel".to_vec(), true)
+        );
     }
 
     #[test]
     fn gzip_and_zlib_are_told_apart_from_their_first_bytes_whatever_the_header_says() {
         for encoding in ["gzip", "deflate"] {
-            assert_eq!(decode(encoding, &gzip(b"unpacked"), 100).unwrap(), (b"unpacked".to_vec(), false));
-            assert_eq!(decode(encoding, &zlib(b"unpacked"), 100).unwrap(), (b"unpacked".to_vec(), false));
+            assert_eq!(
+                decode(encoding, &gzip(b"unpacked"), 100).unwrap(),
+                (b"unpacked".to_vec(), false)
+            );
+            assert_eq!(
+                decode(encoding, &zlib(b"unpacked"), 100).unwrap(),
+                (b"unpacked".to_vec(), false)
+            );
         }
         assert_eq!(decode("gzip", b"", 100).unwrap(), (Vec::new(), false));
     }
@@ -271,9 +310,13 @@ mod tests {
 
     #[test]
     fn brotli_decodes_and_a_stream_cut_short_fails() {
-        // The crate only decompresses, so this is `brotliCompressSync("unpacked")` recorded from Node.
-        let recorded: &[u8] = &[0x8B, 0x03, 0x80, 0x75, 0x6E, 0x70, 0x61, 0x63, 0x6B, 0x65, 0x64, 0x03];
-        assert_eq!(decode("br", recorded, 100).unwrap(), (b"unpacked".to_vec(), false));
+        let recorded: &[u8] = &[
+            0x8B, 0x03, 0x80, 0x75, 0x6E, 0x70, 0x61, 0x63, 0x6B, 0x65, 0x64, 0x03,
+        ];
+        assert_eq!(
+            decode("br", recorded, 100).unwrap(),
+            (b"unpacked".to_vec(), false)
+        );
         assert_eq!(decode("br", recorded, 4).unwrap(), (b"unpa".to_vec(), true));
         assert!(decode("br", &recorded[..6], 100).is_err());
     }

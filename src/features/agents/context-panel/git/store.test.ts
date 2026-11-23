@@ -1,14 +1,14 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import type * as GitApiModule from "./gitApi";
+import type * as GitApiModule from "./git_api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ init: vi.fn(), status: vi.fn() }));
 
-vi.mock("./gitApi", async (importOriginal) => ({
+vi.mock("./git_api", async (importOriginal) => ({
   ...(await importOriginal<typeof GitApiModule>()),
   gitApi: api,
 }));
-vi.mock("../files/filesStore", () => ({
+vi.mock("../files/files_store", () => ({
   useFilesStore: { getState: () => ({ refreshTree: () => Promise.resolve() }) },
 }));
 
@@ -46,14 +46,11 @@ describe("git store init", () => {
         settled = true;
       });
     await vi.waitFor(() => expect(api.status).toHaveBeenCalled());
-    // Still busy while the status is read: the panel would otherwise enable the button again
-    // over a body that still says there's no repository.
     expect(settled).toBe(false);
     resolveStatus(freshStatus);
     await pending;
 
     expect(api.init).toHaveBeenCalledWith("/plain");
-    // The TTL from the first answer doesn't skip the read, and the join shares its request.
     expect(api.status).toHaveBeenCalledTimes(1);
     const state = useGitStore.getState();
     expect(state.notRepoByWorkspace["/plain"]).toBe(false);
@@ -70,7 +67,6 @@ describe("git store init", () => {
         }),
       )
       .mockResolvedValue(freshStatus);
-    // A refresh already in flight when the person clicks, such as one on window focus.
     const stale = useGitStore.getState().refresh("/plain", true);
     const pending = useGitStore.getState().init("/plain");
     await new Promise((done) => setTimeout(done, 0));

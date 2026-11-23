@@ -1,5 +1,3 @@
-//! What Settings and the save dialogs call. Windows can read and change these, never by themselves
-//! adding a path: a path only becomes reachable from a native dialog's own answer.
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -28,7 +26,6 @@ pub struct SandboxPermissionRow {
     pub on: bool,
 }
 
-/// Everything Settings › Agents › Access shows: each permission, then the Downloads grant.
 #[tauri::command]
 pub fn sandbox_permissions_list(
     webview: Webview,
@@ -51,8 +48,6 @@ pub fn sandbox_permissions_list(
     Ok(rows)
 }
 
-/// A switch in Settings. The Downloads grant can only be revoked here: it's given by the prompt on
-/// the first download, so saying yes to it has one place.
 #[tauri::command]
 pub fn sandbox_permission_set(
     webview: Webview,
@@ -79,8 +74,6 @@ pub struct SaveFileFilter {
     pub extensions: Vec<String>,
 }
 
-/// Asks where to save with the system's dialog and grants that one file. The dialog runs here, not
-/// in the window, so the window can't name a path of its own. `None` when the person cancels.
 #[tauri::command]
 pub async fn sandbox_pick_save_file(
     app: AppHandle,

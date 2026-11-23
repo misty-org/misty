@@ -14,12 +14,11 @@ import {
   Tooltip,
   type TextTone,
 } from "@misty/ui";
-import { getFileTreeIconSvg } from "../files/fileIcons";
-import type { GitTreeDirNode } from "./git-tree";
-import type { GitFileEntry } from "./gitApi";
+import { getFileTreeIconSvg } from "../files/file_icons";
+import type { GitTreeDirNode } from "./git_tree";
+import type { GitFileEntry } from "./git_api";
 import { remCss } from "@misty/ui";
 
-/** The one-letter mark Git uses for each state, shown before the name. */
 const LETTERS: Record<GitFileEntry["status"], string> = {
   modified: "M",
   added: "A",
@@ -28,18 +27,14 @@ const LETTERS: Record<GitFileEntry["status"], string> = {
   typechange: "T",
 };
 
-/** What Git says of a file, as the color of its letter and name: new, gone or changed. */
 function statusTone(status: string): TextTone {
   if (status === "added" || status === "untracked") return "added";
   if (status === "deleted") return "removed";
   return "changed";
 }
 
-/** The square an icon or a chevron sits in at the row's start. */
 const glyphCell = "grid size-4 flex-none place-items-center";
 
-/** A row of the changes list: 32px, the name taking the room, its actions over its end. */
-// The shared row; its left padding is the tree indent, set inline.
 const rowClass = cn(rowShape, "group/row relative text-meta");
 
 type SelectedState = "all" | "some" | "none";
@@ -55,24 +50,18 @@ interface FileRowProps {
   onToggleSelect?: (path: string) => void;
   actionLabel: string;
   actionKind: "stage" | "unstage";
-  /** The untracked group: the file is new to Git. */
   isNew?: boolean;
-  /** Only on the folder side (unstaged and untracked); asks before throwing changes away. */
   discardLabel?: string;
   onDiscard?: (path: string) => void;
   onAction: (path: string) => void;
   onOpen: (path: string) => void;
-  /** Wraps the row in its right-click menu. */
   menu?: (entry: GitFileEntry, row: ReactNode) => ReactNode;
   actionBusy: boolean;
-  /** The name alone, in the tree view; the list shows the whole path. */
   displayName?: string;
 }
 
-/** The name's button: it takes the row's room, so a click anywhere on the name opens it. */
 const nameButtonClass = "flex min-w-0 flex-1 items-baseline overflow-hidden text-left text-meta";
 
-/** The icon and the name: the folders before it cut from the left, so the file's own name stays. */
 function FileNameCell(props: {
   path: string;
   displayName?: string;
@@ -119,7 +108,6 @@ function FileNameCell(props: {
   );
 }
 
-/** Added and removed lines at the row's end. */
 function FileStats({ entry }: { entry: GitFileEntry }) {
   return (
     <span className="flex flex-none items-center gap-1 text-micro tabular-nums">
@@ -146,7 +134,6 @@ function RowActions(props: {
   onDiscard?: () => void;
   onAction?: () => void;
 }) {
-  // The actions cover the row's end on hover or focus, so the path keeps the whole width.
   return (
     <RowTools reveal="cover">
       <ActionBar

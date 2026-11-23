@@ -1,9 +1,3 @@
-//! `webauthn`: passkeys and security keys behind `navigator.credentials`,
-//! where the engine cannot reach the OS authenticator for arbitrary sites
-//! (WKWebView without Safari's entitlement path). This module decides what a
-//! page may ask for and shapes the replies; an `Authenticator` per platform
-//! runs the ceremony with the caller's real origin.
-
 mod attestation;
 #[cfg(all(target_os = "macos", feature = "tauri"))]
 pub mod macos;
@@ -15,7 +9,6 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Value};
 use std::{future::Future, pin::Pin, sync::Arc};
 
-/// Installed only where an `Authenticator` is available (see `capabilities::shims`).
 #[cfg_attr(not(all(target_os = "macos", feature = "tauri")), allow(dead_code))]
 pub(crate) const SHIM: &str = include_str!("shim.js");
 
@@ -36,22 +29,17 @@ impl Attachment {
 
 #[derive(Clone, Debug)]
 pub struct CreateRequest {
-    /// The caller's origin, as Kiri established it.
     pub origin: String,
     pub rp_id: String,
     pub challenge: Vec<u8>,
     pub user_id: Vec<u8>,
     pub user_name: String,
     pub user_display_name: String,
-    /// COSE algorithms, in the page's order of preference.
     pub algorithms: Vec<i64>,
     pub exclude: Vec<Vec<u8>>,
     pub attachment: Option<Attachment>,
-    /// "required", "preferred" or "discouraged".
     pub resident_key: String,
-    /// "required", "preferred" or "discouraged".
     pub user_verification: String,
-    /// "none", "indirect", "direct" or "enterprise".
     pub attestation: String,
 }
 
@@ -85,8 +73,6 @@ pub struct Assertion {
 
 pub type Ceremony<T> = Pin<Box<dyn Future<Output = Result<T, KiriError>> + Send>>;
 
-/// The OS side of a ceremony. The OS shows its own sheet, which is the
-/// user's consent; Kiri has already checked the relying party.
 pub trait Authenticator: Send + Sync + 'static {
     fn create(&self, request: CreateRequest, host: Arc<dyn Host>) -> Ceremony<Registration>;
     fn get(&self, request: GetRequest, host: Arc<dyn Host>) -> Ceremony<Assertion>;

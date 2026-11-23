@@ -1,4 +1,4 @@
-import { personalAgentsApi } from "./personalAgentsApi";
+import { personalAgentsApi } from "./personal_agents_api";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import {
   BackButton,
@@ -19,7 +19,7 @@ import {
 } from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
 import { AgentAvatar, AgentCloudImage } from "./AgentAvatar";
-import { agentCloudVariants } from "./agentCloudAvatars";
+import { agentCloudVariants } from "./agent_cloud_avatars";
 import { AgentAccess, type AgentAccessState } from "./AgentAccess";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { AgentVoicePicker } from "./AgentVoicePicker";
@@ -78,7 +78,6 @@ export function AgentSetup(props: {
     setBusy(true);
     setError("");
     try {
-      // If refreshing the list fails after creation, retry completion without creating a duplicate.
       const id = createdId.current ?? (await personalAgentsApi.save(draft)).id;
       createdId.current = id;
       if (live.current) await props.onSaved(id, companion);
@@ -106,10 +105,12 @@ export function AgentSetup(props: {
         <Text
           bare
           as="h2"
+          size="title"
+          weight="medium"
           tone="bright"
           ref={headingRef}
           tabIndex={-1}
-          className="text-xl font-medium outline-none"
+          className="outline-none"
         >
           {titles[step]}
         </Text>
@@ -171,7 +172,6 @@ export function AgentSetup(props: {
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               />
             </Field>
-            {/* Its own voice, picked by the person: part of making it, like its picture. */}
             <Field label="Voice">
               <AgentVoicePicker
                 name={draft.name}
@@ -227,7 +227,7 @@ export function AgentSetup(props: {
               selected={[companion ? "companion" : "chat"]}
               onSelect={(value) => setCompanion(value === "companion")}
             />
-            <Text bare as="p" tone="muted" className="text-xs">
+            <Text size="meta" bare as="p" tone="muted">
               Your agent uses your account’s existing access. You can change companion settings
               anytime.
             </Text>

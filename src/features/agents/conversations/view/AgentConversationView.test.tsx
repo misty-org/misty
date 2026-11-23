@@ -3,7 +3,7 @@ import { afterEach, expect, it } from "vitest";
 import type {
   GlobalAiConversation,
   GlobalAiMessage,
-} from "@/features/agents/conversations/state/conversationTypes";
+} from "@/features/agents/conversations/state/conversation_types";
 import { AgentConversationView } from "./AgentConversationView";
 
 afterEach(cleanup);

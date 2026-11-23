@@ -1,13 +1,8 @@
 import { Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@misty/ui";
-import { knownSiteIcon, loadSiteIcon } from "./siteIconLoader";
+import { knownSiteIcon, loadSiteIcon } from "./site_icon_loader";
 
-/**
- * A site's icon, fetched by the app so a site's headers can't block it. An icon that wouldn't show
- * on the current theme gets a small backing (`.misty-site-icon` in base.css). A globe holds the
- * space while it loads; `onFailed` says there is none, for the caller to show its own fallback.
- */
 export function SiteIcon(props: { url: string; className?: string; onFailed?: () => void }) {
   const { url, onFailed } = props;
   const [loaded, setLoaded] = useState(() => ({ url, icon: knownSiteIcon(url) }));

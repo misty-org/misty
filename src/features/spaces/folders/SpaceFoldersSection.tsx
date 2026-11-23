@@ -11,16 +11,11 @@ import {
   useConfirmDelete,
   useNotice,
 } from "@misty/ui";
-import { driveNative, type DriveEntry } from "../drive/driveNative";
-import { useDriveList } from "../drive/useDrive";
+import { driveNative, type DriveEntry } from "../drive/drive_native";
+import { useDriveList } from "../drive/use_drive";
 import { CopyFolderDialog, errorText } from "./CopyFolderDialog";
-import { pickFolderToCopy } from "./shareFolder";
+import { pickFolderToCopy } from "./share_folder";
 
-/**
- * The folders at the top of the Space's drive, in the Space menu's Shared folders dialog: each with
- * who last changed it and when. Copy into the Space picks a folder on this computer and copies it
- * in; a row's ⋯ shows it in the drive or moves it to the Space's trash.
- */
 export function SpaceFoldersSection({ spaceId }: { spaceId: string }) {
   const listing = useDriveList(spaceId, "/");
   const [copying, setCopying] = useState<string | null>(null);
@@ -95,7 +90,11 @@ export function SpaceFoldersSection({ spaceId }: { spaceId: string }) {
               menuLabel={`Actions for ${folder.name}`}
               menu={
                 <>
-                  <MenuItem icon={FolderOpen} label="Show in drive" onSelect={() => reveal(folder)} />
+                  <MenuItem
+                    icon={FolderOpen}
+                    label="Show in drive"
+                    onSelect={() => reveal(folder)}
+                  />
                   <MenuSeparator />
                   <MenuItem icon={Trash2} label="Delete" danger onSelect={() => remove(folder)} />
                 </>
@@ -130,7 +129,6 @@ export function SpaceFoldersSection({ spaceId }: { spaceId: string }) {
           onOpenChange={setDialogOpen}
           spaceId={spaceId}
           localFolder={copying}
-          // The copy shows in the list as the drive reports it.
           onCopied={() => undefined}
         />
       ) : null}

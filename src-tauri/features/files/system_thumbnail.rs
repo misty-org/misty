@@ -1,12 +1,8 @@
-//! Thumbnails made by macOS's own image reader (ImageIO), as Finder makes them: it reads a photo's
-//! embedded preview where it is big enough, decodes a JPEG straight at the size asked for instead of
-//! whole, and handles every kind of picture the system does (HEIC, RAW, TIFF, PSD…). A large
-//! picture comes back in a few milliseconds where decoding it whole took a few hundred, so Files'
-//! grid and preview show their pictures at once. `protocol.rs` falls back to the `image` crate when
-//! this gives nothing.
 use std::path::Path;
 
-use objc2_core_foundation::{CFBoolean, CFDictionary, CFMutableData, CFNumber, CFString, CFType, CFURL};
+use objc2_core_foundation::{
+    CFBoolean, CFDictionary, CFMutableData, CFNumber, CFString, CFType, CFURL,
+};
 use objc2_core_graphics::{CGImage, CGImageAlphaInfo};
 use objc2_image_io::{
     kCGImageDestinationLossyCompressionQuality, kCGImageSourceCreateThumbnailFromImageAlways,
@@ -14,11 +10,8 @@ use objc2_image_io::{
     kCGImageSourceThumbnailMaxPixelSize, CGImageDestination, CGImageSource,
 };
 
-/// How a JPEG thumbnail is compressed: high enough that a 2x screen shows no blocks.
 const JPEG_QUALITY: f64 = 0.85;
 
-/// A picture of the image at `path`, at most `size` pixels on its longer side and turned upright:
-/// a PNG when it has transparency, else a JPEG. None when the system can't read it.
 pub(crate) fn thumbnail(path: &Path, size: u32) -> Option<(Vec<u8>, &'static str)> {
     let url = CFURL::from_file_path(path)?;
     // SAFETY: the ImageIO keys are constant CFStrings the framework defines.
@@ -33,12 +26,9 @@ pub(crate) fn thumbnail(path: &Path, size: u32) -> Option<(Vec<u8>, &'static str
     };
     let yes: &CFType = CFBoolean::new(true);
     let no: &CFType = CFBoolean::new(false);
-    // The full image is never kept decoded: only the thumbnail is wanted.
     let opening = CFDictionary::<CFString, CFType>::from_slices(&[should_cache], &[no]);
     let pixels = CFNumber::new_i32(i32::try_from(size).ok()?);
     let longest: &CFType = &pixels;
-    // Always from the image itself, at the size asked for, rather than a small embedded preview,
-    // which would show blurred on the grid; ImageIO still decodes no more of it than it needs.
     let making = CFDictionary::<CFString, CFType>::from_slices(
         &[from_image, with_transform, max_size, should_cache],
         &[yes, yes, longest, no],
@@ -49,8 +39,12 @@ pub(crate) fn thumbnail(path: &Path, size: u32) -> Option<(Vec<u8>, &'static str
         source.thumbnail_at_index(0, Some(as_plain(&making)))?
     };
     let alpha = CGImage::alpha_info(Some(&*image));
-    let opaque = [CGImageAlphaInfo::None, CGImageAlphaInfo::NoneSkipLast, CGImageAlphaInfo::NoneSkipFirst]
-        .contains(&alpha);
+    let opaque = [
+        CGImageAlphaInfo::None,
+        CGImageAlphaInfo::NoneSkipLast,
+        CGImageAlphaInfo::NoneSkipFirst,
+    ]
+    .contains(&alpha);
     let (kind, mime) = if opaque {
         ("public.jpeg", "image/jpeg")
     } else {

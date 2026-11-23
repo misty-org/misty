@@ -1,6 +1,3 @@
-//! Plain shaping of engine values for the chat: clipping, one-line summaries, tool output and
-//! the question cards an ask carries.
-
 use serde_json::{json, Value};
 
 pub(super) fn clip(text: &str, limit: usize) -> String {
@@ -12,7 +9,6 @@ pub(super) fn clip(text: &str, limit: usize) -> String {
     clipped
 }
 
-/// What a tool call is about, in one line, from whichever field the engine names it by.
 pub(super) fn summary(input: &Value) -> String {
     let field = [
         "command",
@@ -40,7 +36,6 @@ pub(super) fn summary(input: &Value) -> String {
     clip(&text, 600)
 }
 
-/// A tool's result as text for its row.
 pub(super) fn output_text(result: &Value) -> String {
     let text = match result {
         Value::String(text) => text.clone(),
@@ -69,7 +64,6 @@ pub(super) fn output_text(result: &Value) -> String {
     clip(&text, 4000)
 }
 
-/// Whether a tool result reports a failure.
 pub(super) fn result_failed(result: &Value) -> Option<String> {
     let failed = result["isError"].as_bool() == Some(true)
         || result["is_error"].as_bool() == Some(true)
@@ -87,14 +81,6 @@ pub(super) fn result_failed(result: &Value) -> Option<String> {
     })
 }
 
-/// How full the context is, out of the engine layer's usage report: the tokens it holds and the
-/// model's window, either of which may be missing.
-///
-/// The size is the first of: Codex's and OpenCode's `total_tokens`, an explicit `used` (ACP's
-/// usage_update, pi's reply, a compaction's `0`), the camelCase `totalTokens` that ACP prompt
-/// results carry (Grok's `_meta`, MiniMax's and omp's `usage`, pi-ai), then the sum of the
-/// token buckets. Only an explicit `used` can say 0: a failed attempt reports zero tokens, and
-/// that must not read as a compaction's unknown size.
 pub(crate) fn context_usage(usage: &Value) -> (Option<u64>, Option<u64>) {
     let number = |name: &str| usage.get(name).and_then(Value::as_u64);
     let window = number("model_context_window")
@@ -108,7 +94,6 @@ pub(crate) fn context_usage(usage: &Value) -> (Option<u64>, Option<u64>) {
         .or_else(|| number("used"))
         .or_else(|| number("totalTokens").filter(counted))
         .or_else(|| {
-            // Each bucket under the first name it's sent by, so one spelt two ways counts once.
             let parts: Vec<u64> = [
                 &["input_tokens", "inputTokens"][..],
                 &["cache_read_input_tokens", "cacheRead", "cachedReadTokens"][..],
@@ -127,7 +112,6 @@ pub(crate) fn context_usage(usage: &Value) -> (Option<u64>, Option<u64>) {
     (used, window)
 }
 
-/// The usage report's token buckets, under each name an engine sends them by.
 pub(super) const USAGE_BUCKETS: [(&str, &[&str]); 4] = [
     ("input", &["input_tokens", "inputTokens", "input"]),
     ("output", &["output_tokens", "outputTokens", "output"]),
@@ -150,8 +134,6 @@ pub(super) const USAGE_BUCKETS: [(&str, &[&str]); 4] = [
     ),
 ];
 
-/// Whether a report's size is only an ACP turn's `totalTokens`, which sums every model call in
-/// the turn rather than measuring the context.
 pub(super) fn only_turn_total(usage: &Value) -> bool {
     let counted = |name: &str| {
         usage
@@ -162,8 +144,6 @@ pub(super) fn only_turn_total(usage: &Value) -> bool {
     !counted("total_tokens") && usage.get("used").is_none() && counted("totalTokens")
 }
 
-/// The question cards an engine's ask carries, in one shape: `{question, header, options:
-/// [{label, description}], multiSelect}`.
 pub(super) fn question_cards(input: &Value) -> Vec<Value> {
     input["questions"]
         .as_array()
@@ -196,8 +176,6 @@ pub(super) fn question_cards(input: &Value) -> Vec<Value> {
         .collect()
 }
 
-/// A tool's raw parameters or result for the chat's payload viewer, clipped so one huge result
-/// can't flood the run's events. It stays on this device with the chat.
 pub(super) fn clip_value(value: &Value) -> Value {
     const LIMIT: usize = 24_000;
     match value {

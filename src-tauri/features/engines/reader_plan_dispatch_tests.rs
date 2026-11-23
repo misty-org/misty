@@ -104,21 +104,18 @@ async fn plan_review_ready_persists_parks_flat_and_emits_without_context() {
     );
     core.sink.flush();
 
-    // Stored: native code assigns the revision.
     let stored = plan_review::get_review(&db, "plan-x", 1)
         .unwrap()
         .expect("record persisted");
     assert_eq!(stored.revision, 1);
     assert_eq!(stored.status, plan_review::PlanStatus::AwaitingReview);
 
-    // Parked: the context flat at the top with the injected revision, for respond to read.
     let entry = core.registry.get("run-plan").unwrap();
     let parked = entry.plans.lock().unwrap().get("plan-x").cloned().unwrap();
     assert_eq!(parked["revision"], 1);
     assert_eq!(parked["route"], "stdin");
     assert!(parked["frames"]["approve"]["ok"].as_bool().unwrap());
 
-    // Event: the camelCase record, never the native reply context.
     let events = collector.0.lock().unwrap();
     let payload = events
         .iter()
@@ -144,8 +141,6 @@ async fn a_persistence_failure_settles_as_error_without_parking() {
     );
     core.sink.flush();
 
-    // The store refuses the write: nothing parked, no plan_review, settled as Error, never
-    // pretending the plan can be approved.
     let entry = core.registry.get("run-plan").unwrap();
     assert!(entry.plans.lock().unwrap().is_empty());
     let events = collector.0.lock().unwrap();

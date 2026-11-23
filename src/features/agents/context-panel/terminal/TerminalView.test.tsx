@@ -3,20 +3,13 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-/**
- * TerminalView drives xterm through a small public surface; the heavy parts (xterm, FitAddon,
- * ResizeObserver, the native calls, FontFaceSet) are stand-ins, so the test checks the wiring:
- * what font reaches xterm, when the shell hears the size, and that late work after unmount is
- * dropped.
- */
-
 const apiMocks = vi.hoisted(() => ({
   open: vi.fn(async () => {}),
   write: vi.fn(async () => {}),
   resize: vi.fn(async () => {}),
   close: vi.fn(async () => {}),
 }));
-vi.mock("./terminalApi", async (importOriginal) => ({
+vi.mock("./terminal_api", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   terminalApi: apiMocks,
 }));
@@ -25,8 +18,7 @@ vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ listen: vi.fn(async () => () => {}) }),
 }));
 
-// Opening files goes through the files panel's store, which isn't under test here.
-vi.mock("./openTarget", () => ({
+vi.mock("./open_target", () => ({
   openTerminalPath: vi.fn(),
   openTerminalUrl: vi.fn(),
   resolveTerminalPath: () => null,
@@ -43,7 +35,6 @@ const xtermMocks = vi.hoisted(() => {
     openedWith: Element | null = null;
     disposed = false;
     element: HTMLElement | undefined = undefined;
-    /** fontFamily values that really changed (xterm ignores setting the same value). */
     fontFamilySets: string[] = [];
     options: Record<string, unknown>;
     private family: string;
@@ -118,7 +109,7 @@ const xtermMocks = vi.hoisted(() => {
   return { instances, fits, FakeTerminal, FakeFitAddon, FakeWebglAddon, FakeImageAddon };
 });
 
-vi.mock("@/shared/lib/terminal/xtermLoader", () => ({
+vi.mock("@/shared/lib/terminal/xterm_loader", () => ({
   loadXterm: async () => ({
     Terminal: xtermMocks.FakeTerminal,
     FitAddon: xtermMocks.FakeFitAddon,
@@ -158,7 +149,7 @@ import {
   computedMonoFontStack,
 } from "@/shared/lib/terminal/appearance";
 import { clearTerminalSessionState, receiveTerminalOutput } from "./sessions";
-import { TERMINAL_GONE } from "./terminalApi";
+import { TERMINAL_GONE } from "./terminal_api";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -194,12 +185,10 @@ describe("TerminalView wiring", () => {
     await act(async () => {
       root!.render(<TerminalView id={ID} cwd={CWD} onCloseTab={() => {}} />);
     });
-    // loadXterm() → setXterm → setup effect.
     await flush();
     await flush();
   }
 
-  /** The shell starts once the face loads (or briefly later) and the layout settles. */
   async function started() {
     await act(async () => {
       await vi.waitFor(() => expect(apiMocks.open).toHaveBeenCalled(), { timeout: 2000 });
@@ -269,7 +258,6 @@ describe("TerminalView wiring", () => {
     });
     await flush();
 
-    // A probe value makes xterm see a real change, then the real family comes back.
     expect(term.fontFamilySets).toEqual([`${family}, monospace`, family]);
   });
 

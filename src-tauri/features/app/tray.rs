@@ -1,15 +1,7 @@
-//! Misty in the menu bar: the system's own menu, on every platform. On macOS the icon is the Misty
-//! mark as a template image and a click opens the menu under it, like any menu bar app. Windows
-//! shows the app on a left click and the menu on a right click; Linux trays only open menus.
-//!
-//! The menu starts a new chat, lists the chats whose agents are working or waiting on the person
-//! (and stops them all), stops computer use while an agent works the screen, and holds Tutor, the
-//! pet, updates, Settings and opening, restarting or quitting Misty. The main window says what to
-//! list: Tutor's state (`cursor_companion_tray`), the busy chats (`tray_agents`) and a found update
-//! (`tray_update`), built in code from the person's own runs; computer use is read where it runs.
-//! The menu is built again whenever any of it changes. Nothing here leaves the device.
-
-use std::sync::{atomic::{AtomicBool, Ordering}, Mutex, OnceLock};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex, OnceLock,
+};
 
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -20,8 +12,6 @@ use tauri::{
 
 const TRAY_ID: &str = "misty";
 
-/// The person hid the icon (Settings › Server › Menu bar). While it is hidden, closing the last
-/// window ends Misty, since nothing would be left to bring it back.
 static HIDDEN: AtomicBool = AtomicBool::new(false);
 
 pub fn hidden() -> bool {
@@ -39,30 +29,21 @@ const STOP_AGENTS: &str = "tray_stop_agents";
 const STOP_SCREEN: &str = "tray_stop_screen";
 const UPDATES: &str = "tray_updates";
 const SETTINGS: &str = "tray_settings";
-/// A chat's item: this prefix and the chat's id.
 const CHAT_PREFIX: &str = "tray_chat:";
 
-/// Sent to the main window, whose renderer runs Tutor: turn it on or off, or open its settings.
 const TUTOR_TOGGLE_EVENT: &str = "misty://tray-tutor-toggle";
 const TUTOR_SETTINGS_EVENT: &str = "misty://tray-tutor-settings";
-/// Sent to the main window: open the pet's settings, to import or pick one.
 const PET_SETTINGS_EVENT: &str = "misty://tray-pet-settings";
-/// Sent to the main window: open this chat.
 const OPEN_CHAT_EVENT: &str = "misty://tray-open-chat";
-/// Sent to the main window: start a new chat with the agent used last.
 const NEW_CHAT_EVENT: &str = "misty://tray-new-chat";
-/// Sent to the main window, which knows the runs: stop every chat's run.
 const STOP_AGENTS_EVENT: &str = "misty://tray-stop-agents";
-/// Sent to the main window: open Settings at Updates and check there, where installing lives.
 const CHECK_UPDATES_EVENT: &str = "misty://tray-check-updates";
-/// The app menu's own route for a shortcut command (`app_menu.rs`), here with "Open settings".
 const SHORTCUT_EVENT: &str = "misty://shortcut-command";
 const OPEN_SETTINGS_COMMAND: &str = "app.open_settings";
 
 const MOST_CHATS: usize = 6;
 const MOST_TITLE: usize = 200;
 
-/// A chat the menu lists: its agent is working, or waiting on the person.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayChat {
@@ -70,7 +51,6 @@ pub struct TrayChat {
     pub agent_id: String,
     pub title: String,
     pub agent_name: String,
-    /// `working` or `needs-you`.
     pub status: String,
 }
 
@@ -82,14 +62,11 @@ struct TrayTutor {
 
 #[derive(Default)]
 struct TrayMenuState {
-    /// Absent until a main window says what Tutor is.
     tutor: Option<TrayTutor>,
     chats: Vec<TrayChat>,
-    /// The version a main window found to update to, if any.
     update: Option<String>,
 }
 
-/// The app, for what changes away from any handle (computer use ending), to build the menu again.
 static APP: OnceLock<AppHandle<Wry>> = OnceLock::new();
 
 #[path = "tray_glyphs.rs"]
@@ -97,10 +74,9 @@ mod glyphs;
 use glyphs::{set_glyphs, Glyph};
 #[path = "tray_windows.rs"]
 mod windows;
-pub(crate) use windows::{show_main_window, tutor_settings, tutor_toggle};
 use windows::{open_chat, to_main_window};
+pub(crate) use windows::{show_main_window, tutor_settings, tutor_toggle};
 
-/// The menu and, item by item in the same order (separators included), the glyph each shows.
 struct BuiltMenu {
     menu: Menu<Wry>,
     glyphs: Vec<Option<Glyph>>,
@@ -152,8 +128,6 @@ pub fn setup(app: &tauri::App<Wry>) -> Result<(), String> {
     Ok(())
 }
 
-/// The menu as the state says, in the system's own look: plain items, separators, checkmarks
-/// and, on macOS, a small glyph before each item, like the system's own menu bar apps.
 fn build_menu(app: &AppHandle<Wry>, state: &TrayMenuState) -> Result<BuiltMenu, String> {
     let error = |error: tauri::Error| format!("Could not build the menu bar menu: {error}");
     let menu = Menu::new(app).map_err(error)?;
@@ -199,8 +173,6 @@ fn build_menu(app: &AppHandle<Wry>, state: &TrayMenuState) -> Result<BuiltMenu, 
         } else {
             format!("{title} with {}", chat.agent_name)
         };
-        // The chat's state as the system's own status dot: green while its agent works, amber
-        // while it waits on the person.
         let dot = if waiting {
             "NSStatusPartiallyAvailable"
         } else {
@@ -217,8 +189,6 @@ fn build_menu(app: &AppHandle<Wry>, state: &TrayMenuState) -> Result<BuiltMenu, 
             Some(Glyph::Symbol("stop.circle")),
         )?;
     }
-    // While an agent works the screen, the way to take it back is always one click away, as
-    // Escape is.
     if crate::computer_use::screen_in_use() {
         add(
             &item(STOP_SCREEN, "Computer use is on — Stop", true, None)?,
@@ -242,8 +212,6 @@ fn build_menu(app: &AppHandle<Wry>, state: &TrayMenuState) -> Result<BuiltMenu, 
             )?;
         }
     }
-    // The pet shows as a switch once one is imported; until then the item leads to its settings,
-    // where one is imported or picked.
     let pet = crate::pets::read_settings(app);
     let pet_glyph = Some(Glyph::Symbol("pawprint"));
     if pet.pet_id.trim().is_empty() {
@@ -280,7 +248,6 @@ fn build_menu(app: &AppHandle<Wry>, state: &TrayMenuState) -> Result<BuiltMenu, 
     Ok(BuiltMenu { menu, glyphs })
 }
 
-/// Builds the menu again from what the menu bar knows now.
 pub(crate) fn refresh(app: &AppHandle<Wry>) {
     let Some(tray_state) = app.try_state::<MistyTrayState>() else {
         return;
@@ -298,7 +265,6 @@ pub(crate) fn refresh(app: &AppHandle<Wry>) {
     set_glyphs(app, built.glyphs);
 }
 
-/// Builds the menu again from anywhere, once the menu bar is set up.
 pub(crate) fn changed() {
     if let Some(app) = APP.get() {
         refresh(app);
@@ -349,8 +315,6 @@ pub fn handle_menu_event(app: &AppHandle<Wry>, id: &str) {
     }
 }
 
-/// The main window tells the menu bar what Tutor is: on or off, and whether it's set up. Not set
-/// up, the item says so, and choosing it opens setup.
 #[tauri::command]
 pub fn cursor_companion_tray(
     webview: tauri::Webview,
@@ -370,7 +334,6 @@ pub fn cursor_companion_tray(
     Ok(())
 }
 
-/// A main window lists the chats whose agents are working or waiting on the person.
 #[tauri::command]
 pub fn tray_agents(
     webview: tauri::Webview,
@@ -398,7 +361,6 @@ pub fn tray_agents(
     Ok(())
 }
 
-/// A main window found a newer Misty (`version`), or none (empty): the menu offers it.
 #[tauri::command]
 pub fn tray_update(
     webview: tauri::Webview,
@@ -418,7 +380,6 @@ pub fn tray_update(
     Ok(())
 }
 
-/// Shows or hides the menu bar (tray) icon, from Settings.
 #[tauri::command]
 pub fn app_set_tray_hidden(
     webview: tauri::Webview,
@@ -430,7 +391,8 @@ pub fn app_set_tray_hidden(
     }
     HIDDEN.store(hidden, Ordering::SeqCst);
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        tray.set_visible(!hidden).map_err(|error| error.to_string())?;
+        tray.set_visible(!hidden)
+            .map_err(|error| error.to_string())?;
     }
     Ok(())
 }

@@ -33,7 +33,6 @@ fn strips_jsonc_comments() {
 #[test]
 fn pi_set_list_delete_roundtrip_preserves_oauth_and_unknown() {
     let dir = temp_dir("pi-roundtrip");
-    // Pre-existing oauth + unknown entries must survive writes.
     std::fs::write(
         dir.join("auth.json"),
         r#"{"openai-codex": {"type": "oauth", "refresh": "r"}, "custom-x": {"type": "api_key", "key": "keepme", "env": {"A": "B"}}}"#,
@@ -52,7 +51,6 @@ fn pi_set_list_delete_roundtrip_preserves_oauth_and_unknown() {
         .contains("········"));
     assert_eq!(list.oauth_providers, vec!["openai-codex".to_string()]);
 
-    // Raw file still carries the preserved entries.
     let raw: Value =
         serde_json::from_str(&std::fs::read_to_string(dir.join("auth.json")).unwrap()).unwrap();
     assert_eq!(raw["openai-codex"]["type"], "oauth");
@@ -79,7 +77,6 @@ fn pi_set_list_delete_roundtrip_preserves_oauth_and_unknown() {
         "none"
     );
 
-    // OAuth-only catalog entries refuse API-key writes.
     let err = pi_set_api_key(&dir, "github-copilot", "x").unwrap_err();
     assert!(err.contains("OAUTH_ONLY"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -91,7 +88,6 @@ fn pi_corrupted_auth_fails_closed() {
     std::fs::write(dir.join("auth.json"), "{not json").unwrap();
     assert!(pi_list(&dir).unwrap_err().contains("CORRUPTED"));
     assert!(pi_set_api_key(&dir, "anthropic", "sk-test-value-1").is_err());
-    // Never overwritten.
     assert_eq!(
         std::fs::read_to_string(dir.join("auth.json")).unwrap(),
         "{not json"
@@ -99,8 +95,6 @@ fn pi_corrupted_auth_fails_closed() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Mirror of omp's schema + revision triggers (from omp's auth
-/// migrations), so tests exercise the same write path live omp uses.
 fn create_omp_db(dir: &std::path::Path) {
     let conn = rusqlite::Connection::open(dir.join("agent.db")).unwrap();
     conn.execute_batch(
@@ -150,20 +144,18 @@ fn omp_set_list_delete_roundtrip() {
     create_omp_db(&dir);
 
     omp_set_api_key(&dir, "openai", "sk-test-openai-123").unwrap();
-    assert!(omp_revision(&dir) > 0); // omp's triggers fired
+    assert!(omp_revision(&dir) > 0);
     let list = omp_list(&dir).unwrap();
     assert!(list.store.exists);
     let openai = list.providers.iter().find(|p| p.id == "openai").unwrap();
     assert_eq!(openai.state, "configured");
     assert_eq!(openai.key_source.as_deref(), Some("literal"));
 
-    // Replace: the masked key tracks the new value.
     omp_set_api_key(&dir, "openai", "sk-test-openai-456").unwrap();
     let list = omp_list(&dir).unwrap();
     let openai = list.providers.iter().find(|p| p.id == "openai").unwrap();
     assert!(openai.masked_key.as_deref().unwrap().ends_with("-456"));
 
-    // OAuth rows survive api_key writes and are listed separately.
     let (conn, _) = omp_connect(&dir, false).unwrap();
     conn.execute(
         "INSERT INTO auth_credentials (provider, credential_type, data, identity_key) VALUES ('openai-codex', 'oauth', '{\"access\":\"a\"}', 'k')",
@@ -175,7 +167,6 @@ fn omp_set_list_delete_roundtrip() {
     let list = omp_list(&dir).unwrap();
     assert_eq!(list.oauth_providers, vec!["openai-codex".to_string()]);
 
-    // Delete removes only api_key rows; oauth-only providers refuse.
     omp_delete_credential(&dir, "openai").unwrap();
     let list = omp_list(&dir).unwrap();
     assert_eq!(
@@ -192,7 +183,6 @@ fn omp_set_list_delete_roundtrip() {
 
 #[test]
 fn models_config_validate_and_summarize() {
-    // pi: JSONC with comments.
     let json = "{\n  // relay\n  \"providers\": {\"r\": {\"baseUrl\": \"https://x/v1\", \"apiKey\": \"$K\", \"models\": [{\"id\": \"m1\"}]}}\n}";
     let value = validate_models_config_text("pi", json).unwrap();
     let summaries = summarize_providers(&value);
@@ -204,7 +194,6 @@ fn models_config_validate_and_summarize() {
         validate_models_config_text("pi", "{\"providers\": {\"r\": {\"models\": [{}]}}}").is_err()
     );
 
-    // omp: YAML.
     let yaml = "providers:\n  r:\n    baseUrl: https://x/v1\n    api: openai-completions\n    models:\n      - id: m1\n      - id: m2\n";
     let value = validate_models_config_text("omp", yaml).unwrap();
     let summaries = summarize_providers(&value);
@@ -216,7 +205,6 @@ fn models_config_validate_and_summarize() {
 #[test]
 fn models_config_read_write_roundtrip() {
     let dir = temp_dir("models");
-    // Missing file: no text, template offered, nothing written.
     let read = read_models_config(&dir, "pi").unwrap();
     assert!(!read.file.exists);
     assert!(read.text.is_none());
@@ -228,8 +216,6 @@ fn models_config_read_write_roundtrip() {
     assert_eq!(read.file.format, "json");
     assert!(read.parse_error.is_none());
 
-    // Corrupted file: read reports parse_error; invalid writes leave the
-    // file untouched.
     std::fs::write(dir.join("models.json"), "{bad").unwrap();
     let read = read_models_config(&dir, "pi").unwrap();
     assert!(read.parse_error.is_some());
@@ -239,7 +225,6 @@ fn models_config_read_write_roundtrip() {
         "{bad"
     );
 
-    // omp lands on models.yml.
     write_models_config(&dir, "omp", MODELS_TEMPLATE_YAML).unwrap();
     let read = read_models_config(&dir, "omp").unwrap();
     assert!(read.file.path.ends_with("models.yml"));

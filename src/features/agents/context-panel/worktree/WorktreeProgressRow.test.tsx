@@ -3,14 +3,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn(() => Promise.resolve()) }));
-vi.mock("@/shared/platform/nativeInvoke", () => native);
-vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
-vi.mock("../../shared-folders/chatFolder", () => ({
+vi.mock("@/shared/platform/native_invoke", () => native);
+vi.mock("../../personal/agent_account", () => ({ agentAccountId: () => "me" }));
+vi.mock("../../shared-folders/chat_folder", () => ({
   useChatFolders: { getState: () => ({ loadProjects: vi.fn(), use: vi.fn() }) },
 }));
 
 import { WorktreeProgressRow } from "./WorktreeProgressRow";
-import { useWorktreeStore, type PendingCreation } from "./worktreeStore";
+import { useWorktreeStore, type PendingCreation } from "./worktree_store";
 
 afterEach(cleanup);
 

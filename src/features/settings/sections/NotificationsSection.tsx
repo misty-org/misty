@@ -1,5 +1,8 @@
-import { DesktopSettingsRow as Row, DesktopSettingsSection as SettingsSectionBlock } from "../components/DesktopSettingsUI";
-import { useMessageNotices } from "@/shared/lib/messageNotices";
+import {
+  DesktopSettingsRow as Row,
+  DesktopSettingsSection as SettingsSectionBlock,
+} from "../components/DesktopSettingsUI";
+import { useMessageNotices } from "@/shared/lib/message_notices";
 import { ChoiceControl, SwitchControl } from "../SettingsControls";
 import { PreferenceRow } from "./PreferenceRow";
 
@@ -9,11 +12,6 @@ const spaceChoices = [
   { value: "off", label: "Off" },
 ];
 
-/**
- * Settings › Profile › Notifications: what Misty tells the person while they are away, from DMs,
- * Spaces and agents. Do not disturb (in Status) silences all of it; a muted Space or DM is muted
- * from its own menu. Device-only.
- */
 export function NotificationsSection() {
   const prefs = useMessageNotices((state) => state.value);
   const change = (next: Partial<typeof prefs>) =>

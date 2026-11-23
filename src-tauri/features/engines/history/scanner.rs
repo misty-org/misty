@@ -16,19 +16,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-// Scanning and deletion must agree on disk + index state. In particular, a
-// scan that parsed a file before deletion must not upsert it afterwards.
 pub(super) static SCAN_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
-/// Bump when indexed title or preview derivation changes so unchanged files
-/// are rebuilt from the current normalized history rows rather than trusted as
-/// current. v9: envelope/title-noise migration (<local-command-*>,
-/// slash-prefixed titles). v10: internal frames are hidden only when a live
-/// capture validator recorded their identity, so summaries derived by the
-/// older "any JSON-valid frame" guess are stale.
 const TITLE_VERSION: &str = "10";
-
-// ==================== Scan ====================
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,18 +28,13 @@ pub struct ScanReport {
     pub reused: usize,
 }
 
-/// One candidate session file on disk, identified lazily.
 struct Candidate {
     engine: &'static str,
     path: PathBuf,
-    /// Session id known from the filename/index without reading the file.
     known_id: Option<String>,
-    /// Workspace attribution without reading the file (filename-keyed engines).
     known_workspace: Option<String>,
 }
 
-/// The scan only ever needs the
-/// db and the event sink, so callers pass those two directly.
 fn scan_with_sink(
     db: &crate::engines::support::db::Db,
     sink: &Arc<crate::engines::support::event_sink::EventSink>,
@@ -65,8 +50,6 @@ fn scan_with_sink(
     )
 }
 
-/// A scan run here and now, for a read that needs a session the index doesn't know yet (a chat
-/// Misty started since the last scan). Waits for one already running.
 pub(crate) fn scan_now(
     db: &crate::engines::support::db::Db,
     sink: &Arc<crate::engines::support::event_sink::EventSink>,
@@ -74,7 +57,6 @@ pub(crate) fn scan_now(
     scan_with_sink(db, sink).map(|_| ())
 }
 
-/// The scan itself, decoupled from the event sink for testing.
 #[cfg(test)]
 pub fn scan_with(
     db: &crate::engines::support::db::Db,
@@ -84,7 +66,6 @@ pub fn scan_with(
     scan_with_guard(db, on_changed, &guard)
 }
 
-/// Deletion keeps this guard until both the file and database rows are gone.
 #[cfg(test)]
 pub(super) fn scan_with_guard(
     db: &crate::engines::support::db::Db,
@@ -94,19 +75,12 @@ pub(super) fn scan_with_guard(
     scan_inner(db, on_changed, |_| {}, guard)
 }
 
-// ---------- phase helpers (each stage is lock-free except where noted) ----------
-
-/// Enumerate every candidate session file (filename/index engines use no content).
 fn gather_candidates(workspaces: &[String]) -> Vec<Candidate> {
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut seen_paths: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
-    // CodeBuddy project dirs are CLI-private, so attribution needs each
-    // transcript's recorded cwd. Its bounded cache reads only new/changed heads,
-    // once per file rather than once per workspace.
     let codebuddy = codebuddy_transcripts();
     for workspace_path in workspaces {
         let workspace = PathBuf::from(workspace_path);
-        // Filename/index-keyed engines identify cheaply per workspace.
         for file in discover_claude(&workspace)
             .into_iter()
             .chain(discover_kimi(&workspace))
@@ -137,7 +111,6 @@ fn gather_candidates(workspaces: &[String]) -> Vec<Candidate> {
             }
         }
     }
-    // Head-keyed engines: enumerate once, attribute by content on change.
     for (engine, paths) in [
         ("codex", codex_candidates()),
         ("pi", pi_family_candidates(".pi")),
@@ -158,7 +131,6 @@ fn gather_candidates(workspaces: &[String]) -> Vec<Candidate> {
     candidates
 }
 
-/// Stat every candidate and fold (path, size, mtime) into one signature.
 fn stat_all(workspaces: &[String], candidates: &[Candidate]) -> (Vec<Option<(i64, i64)>>, String) {
     let mut signature_hasher = Sha256::new();
     signature_hasher.update(format!("v{}|", crate::engines::support::db::CACHE_VERSION).as_bytes());
@@ -182,8 +154,6 @@ fn stat_all(workspaces: &[String], candidates: &[Candidate]) -> (Vec<Option<(i64
     (stats, format!("{:x}", signature_hasher.finalize()))
 }
 
-/// Tier-1 gate (brief lock): a matching global signature means nothing
-/// changed unless indexed summaries were produced by an older derivation.
 struct Tier1 {
     signature: String,
     retitle_pending: bool,
@@ -211,9 +181,6 @@ fn tier1_gate(
             |r| r.get(0),
         )
         .ok();
-    // A summary derivation change invalidates every indexed title and preview:
-    // their old values cannot reliably identify which normalization rule is
-    // missing (for example, a visible prefix followed by a host-only tail).
     let retitle_pending = title_version.as_deref() != Some(TITLE_VERSION);
     if previous.as_deref() == Some(signature.as_str()) && row_count > 0 && !retitle_pending {
         return Ok(None);
@@ -224,15 +191,12 @@ fn tier1_gate(
     }))
 }
 
-/// One indexed session file as the db currently records it.
 struct IndexedFile {
     size: i64,
     mtime_ms: i64,
     workspace_path: String,
 }
 
-/// Prefetch (brief lock) the stored per-file index state and, while a summary
-/// migration runs, mark every indexed path stale. Parsing remains lock-free.
 fn prefetch_stat_keys(
     db: &crate::engines::support::db::Db,
     retitle_pending: bool,
@@ -276,8 +240,6 @@ fn prefetch_stat_keys(
     Ok((stats, stale))
 }
 
-/// One changed file fully processed outside the db lock: identity peek (for
-/// head-keyed engines) + the lightweight summary parse.
 struct PreparedUpsert {
     engine: &'static str,
     session_id: String,
@@ -297,8 +259,6 @@ fn prepare_candidate(
 ) -> Option<PreparedUpsert> {
     let (size, mtime_ms) = sig;
     let path_str = cand.path.to_string_lossy().to_string();
-    // Unchanged on disk and not pending re-title: reuse. The stored row names the session, so this
-    // check costs no head peek.
     if let Some(indexed) = stat_keys.get(&path_str) {
         if (indexed.size, indexed.mtime_ms) == sig
             && cand
@@ -310,14 +270,10 @@ fn prepare_candidate(
             return None;
         }
     }
-    // Identify the session (peek only for head-keyed engines).
     let (session_id, workspace_path) = match (&cand.known_id, &cand.known_workspace) {
         (Some(id), Some(ws)) => (id.clone(), ws.clone()),
         _ => {
-            let Some((id, cwd)) = identify_head(cand.engine, &cand.path) else {
-                return None;
-            };
-            // Attribute only files belonging to a registered workspace.
+            let (id, cwd) = identify_head(cand.engine, &cand.path)?;
             if !workspaces
                 .iter()
                 .any(|w| same_or_child(Path::new(&cwd), Path::new(w)))
@@ -339,8 +295,6 @@ fn prepare_candidate(
     })
 }
 
-/// Drop Codex / DSH subagent sessions that were indexed as top-level chats.
-/// Returns true when any row was removed.
 fn prune_hidden_subagent_sessions(db: &crate::engines::support::db::Db) -> Result<bool, String> {
     let a = prune_engine_subagent_sessions(db, "codex", is_codex_subagent_file)?;
     let b = prune_engine_subagent_sessions(db, "dsh", is_dsh_subagent_file)?;
@@ -391,11 +345,6 @@ fn prune_engine_subagent_sessions(
     Ok(true)
 }
 
-/// Drop Codex rows indexed from a previous CODEX_HOME after the user points
-/// the CLI settings at another directory. Returns true when any row was removed.
-///
-/// No custom home → no-op. Default `~/.codex` users must not lose history
-/// because of a path-prefix mismatch (symlink, case, missing file).
 fn prune_codex_sessions_outside_home(db: &crate::engines::support::db::Db) -> Result<bool, String> {
     #[cfg(not(test))]
     {
@@ -409,8 +358,6 @@ fn prune_codex_sessions_outside_home(db: &crate::engines::support::db::Db) -> Re
         }
     }
     let home = crate::engines::codex_home();
-    // v0.9 provider-home sessions live outside any codex home but stay
-    // valid history; pruning them would re-hide upgraded users' sessions.
     let legacy_root = crate::engines::support::paths::legacy_home().join("codex-provider-homes");
     let paths: Vec<(String, String)> = {
         let conn = db.0.lock();
@@ -451,10 +398,6 @@ fn prune_codex_sessions_outside_home(db: &crate::engines::support::db::Db) -> Re
     Ok(true)
 }
 
-/// Drop OpenCode subagent (child) and never-messaged sessions that an earlier
-/// scan indexed before `discover_opencode` learned to filter them. The flat
-/// file check used for codex/dsh can't inspect a virtual db address, so this
-/// re-asks the shared database which indexed sessions are still visible.
 fn prune_opencode_hidden_sessions(db: &crate::engines::support::db::Db) -> Result<bool, String> {
     let grouped: std::collections::HashMap<PathBuf, Vec<String>> = {
         let conn = db.0.lock();
@@ -479,9 +422,6 @@ fn prune_opencode_hidden_sessions(db: &crate::engines::support::db::Db) -> Resul
         }
         drop(stmt);
         drop(conn);
-        // A tree row indexed before its session moved into opencode.db is
-        // judged by the database row, as discovery now resolves it: a visible
-        // one is re-pointed by the upsert, a hidden one (archived) is dropped.
         for (root, rows) in trees {
             let in_database = opencode_db_updated_times(&root);
             if in_database.is_empty() {
@@ -498,7 +438,6 @@ fn prune_opencode_hidden_sessions(db: &crate::engines::support::db::Db) -> Resul
     };
     let mut dead: Vec<String> = Vec::new();
     for (db_path, session_ids) in grouped {
-        // Unreadable db (missing/locked): leave every indexed row alone.
         let Some(visible) = super::opencode_v2::visible_sessions(&db_path, &session_ids) else {
             continue;
         };
@@ -519,11 +458,10 @@ fn prune_opencode_hidden_sessions(db: &crate::engines::support::db::Db) -> Resul
     Ok(true)
 }
 
-/// Conservative existence check: only NotFound counts as gone, and only on
-/// storage that is attached right now. Permission errors, device-not-ready,
-/// offline SMB roots and similar failures must never wipe indexed history.
-/// Storage is probed first so a detached drive costs one probe per pass
-/// rather than one per row.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "checks whether an engine's session file is gone, in place, wherever the engine keeps it"
+)]
 fn definitely_missing(path: &Path, attached: &mut HashMap<PathBuf, bool>) -> bool {
     let Some(dir) = path.parent() else {
         return false;
@@ -534,18 +472,11 @@ fn definitely_missing(path: &Path, attached: &mut HashMap<PathBuf, bool>) -> boo
             .is_some_and(|e| e.kind() == std::io::ErrorKind::NotFound)
 }
 
-/// A detached volume answers NotFound too: Rust maps Windows
-/// ERROR_INVALID_DRIVE / ERROR_BAD_NETPATH / ERROR_BAD_NET_NAME to NotFound,
-/// and an unmounted macOS volume leaves `/Volumes/<name>` absent. Dropping
-/// those rows would lose their pin, custom title and plan reviews, which a
-/// rescan after re-attaching cannot restore. So a NotFound counts only when
-/// the nearest existing ancestor is a real directory: one must exist at all
-/// (a gone Windows drive has none, not even its root), it must not be a
-/// dangling symlink (an engine home linked onto a detached disk), and it must
-/// not be a bare mount container. Verdicts are memoized per directory for one
-/// GC pass.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "probes the folders above an engine's session file to tell a missing file from an unmounted drive"
+)]
 fn storage_attached(dir: &Path, verdicts: &mut HashMap<PathBuf, bool>) -> bool {
-    // Settle the volume root first: a gone drive fails here once per pass.
     if let Some(root) = dir.ancestors().last().filter(|root| *root != dir) {
         if !storage_attached(root, verdicts) {
             return false;
@@ -559,7 +490,6 @@ fn storage_attached(dir: &Path, verdicts: &mut HashMap<PathBuf, bool>) -> bool {
             break;
         }
         visited.push(ancestor);
-        // A relative path's walk ends at "", the working directory.
         let probe = if ancestor.as_os_str().is_empty() {
             Path::new(".")
         } else {
@@ -572,7 +502,6 @@ fn storage_attached(dir: &Path, verdicts: &mut HashMap<PathBuf, bool>) -> bool {
                 break;
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            // Unreadable ancestor: existence below it is unknowable.
             Err(_) => break,
         }
     }
@@ -582,10 +511,6 @@ fn storage_attached(dir: &Path, verdicts: &mut HashMap<PathBuf, bool>) -> bool {
     verdict
 }
 
-/// Directories that only hold mount points (macOS `/Volumes`, Linux `/mnt`,
-/// `/media`, `/run/media`) and their direct children (the per-volume or
-/// per-user level). As the nearest existing ancestor they mean the volume
-/// beneath unmounted, not that the transcript was deleted.
 fn is_mount_container(dir: &Path) -> bool {
     ["/Volumes", "/mnt", "/media", "/run/media"]
         .iter()
@@ -593,9 +518,6 @@ fn is_mount_container(dir: &Path) -> bool {
         .any(|container| dir == container || dir.parent() == Some(container))
 }
 
-/// UNC roots (`\\server\share`, `\\wsl.localhost\...`) have unreliable
-/// existence semantics from the host. `\\?\C:\...` is a local extended-length
-/// path and must NOT be treated as remote; `\\?\UNC\...` is UNC again.
 fn is_remote_path(path: &str) -> bool {
     if path.starts_with("\\\\?\\UNC\\") {
         return true;
@@ -606,28 +528,11 @@ fn is_remote_path(path: &str) -> bool {
     path.starts_with("\\\\")
 }
 
-/// Phase B follow-up: drop rows whose transcript file is definitely gone.
-/// Files deleted outside the app (CLI-side cleanup, engine-home migration,
-/// leftovers from older versions) used to stay in `sessions` forever, listed
-/// as unopenable ghost sessions (upstream #1083 / #1086 / #1103 / #1104).
-///
-/// Deletion is conservative on purpose:
-/// - only rows whose file_path is not in this scan's FULL candidate set
-///   (reused/unchanged candidates must not be dropped: the reparsed rows are
-///   only a subset);
-/// - the file must be NotFound, never another error, and its storage must be
-///   attached (see [`storage_attached`]);
-/// - remote UNC paths are skipped, and OpenCode's synthetic
-///   `opencode.db#session-id` addresses are skipped too — they are not real
-///   files, so metadata on them is always NotFound (their row-level lifecycle
-///   is handled by explicit opencode deletion, not file GC).
 fn prune_missing_file_sessions(
     db: &crate::engines::support::db::Db,
     candidates: &[Candidate],
 ) -> Result<bool, String> {
     let live: HashSet<PathBuf> = candidates.iter().map(|c| c.path.clone()).collect();
-    // Short lock for the row read; all file probing happens outside the lock
-    // so metadata I/O cannot stretch the write-side critical section.
     let rows: Vec<(String, String, String, String)> = {
         let conn = db.0.lock();
         let mut stmt = conn
@@ -665,10 +570,6 @@ fn prune_missing_file_sessions(
         {
             continue;
         }
-        // A previous Qoder discovery build could persist a colliding bucket's
-        // file under the wrong workspace. The file still exists, so missing-
-        // file GC alone would never repair it. Delete only positive conflicts;
-        // unreadable/unknown cwd must not destroy an indexed custom title.
         if matches!(engine.as_str(), "qoder" | "qoder-cn")
             && qoder_transcript_conflicts_with_workspace(&path, Path::new(&workspace_path))
         {
@@ -701,8 +602,6 @@ fn prune_stale_sessions(db: &crate::engines::support::db::Db) -> Result<bool, St
     Ok(outside || subagent || opencode)
 }
 
-/// Phase B (one lock, one transaction): upsert every prepared row, then
-/// record the global scan markers only when every stale title was rebuilt.
 fn upsert_rows(
     db: &crate::engines::support::db::Db,
     rows: &[PreparedUpsert],
@@ -712,9 +611,6 @@ fn upsert_rows(
     let mut conn = db.0.lock();
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     for row in rows {
-        // Engines whose jsonl has no per-line timestamps would otherwise land
-        // at updated_at=0 and fall off the sidebar's recent list. File mtime
-        // is the fallback for every engine, not a grok-only special case.
         let created_at = row.summary.first_ts.or(Some(row.mtime_ms));
         let updated_at = row.summary.last_ts.or(Some(row.mtime_ms));
         tx.execute(
@@ -763,8 +659,6 @@ fn upsert_rows(
     tx.commit().map_err(|e| e.to_string())
 }
 
-/// `on_progress` fires throttled during the parse loop and once with
-/// `finished: true` when a scan that emitted any progress completes.
 fn scan_inner(
     db: &crate::engines::support::db::Db,
     on_changed: impl Fn(),
@@ -775,10 +669,6 @@ fn scan_inner(
     let candidates = gather_candidates(&workspaces);
     let (stats, signature) = stat_all(&workspaces, &candidates);
     let Some(tier1) = tier1_gate(db, signature)? else {
-        // An unchanged signature only says no candidate moved. A row whose
-        // file vanished before this build ever indexed it (older versions
-        // never reclaimed one) is invisible to the signature, so the file GC
-        // runs here too; rows still in the candidate set cost no I/O.
         let missing = prune_missing_file_sessions(db, &candidates)?;
         let pruned = prune_stale_sessions(db)?;
         if super::codex_titles::sync(db)? || pruned || missing {
@@ -792,7 +682,6 @@ fn scan_inner(
     };
     let (stat_keys, stale_paths) = prefetch_stat_keys(db, tier1.retitle_pending)?;
 
-    // Phase A (lock-free): parse changed files, collect rows to upsert.
     let total = candidates.len();
     let step = (total / 50).max(1);
     if total > 0 {
@@ -838,7 +727,6 @@ fn scan_inner(
         }
     }
 
-    // Phase B: the db lock is held only for the upsert transaction.
     let reparsed = rows.len();
     upsert_rows(
         db,
@@ -864,8 +752,6 @@ fn scan_inner(
     })
 }
 
-/// Spawn a background scan off the Tauri runtime. Concurrent invocations
-/// collapse: a scan already in flight makes the new call a no-op.
 pub fn spawn_scan(
     db: Arc<crate::engines::support::db::Db>,
     sink: Arc<crate::engines::support::event_sink::EventSink>,
@@ -879,7 +765,6 @@ pub fn spawn_scan(
         return;
     }
     tauri::async_runtime::spawn_blocking(move || {
-        // RAII so a panicking scan still frees the slot for the next one.
         struct ResetOnDrop;
         impl Drop for ResetOnDrop {
             fn drop(&mut self) {
@@ -887,17 +772,10 @@ pub fn spawn_scan(
             }
         }
         let _guard = ResetOnDrop;
-        // Every folder the engines' own history shows a chat in becomes a workspace first, so
-        // the scan lists chats from folders no Space links and no agent owns.
         super::past_folders::register(&db);
         if let Err(error) = scan_with_sink(&db, &sink) {
             eprintln!("[scanner] scan failed: {error}");
         }
-        // Full-text index follows every scan — including tier-1
-        // short-circuits: right after an upgrade the scan may see no file
-        // change while the (empty) index still has every session pending.
-        // The pass re-parses only sessions whose stat moved, so on a steady
-        // machine this is one cheap COUNT query.
         super::search::spawn_index(db);
     });
 }
@@ -906,17 +784,8 @@ pub fn spawn_scan(
 pub(super) mod tests {
     use super::*;
 
-    /// Point HOME at a scratch dir for the duration of a test.
-    /// Serialized: two tests mutating HOME in parallel would clobber each other.
     pub(crate) use crate::engines::support::paths::HOME_ENV_LOCK as HOME_LOCK;
 
-    /// Engines' own home variables: `engine_home()` / `codex_home()` read these first and fall
-    /// back to HOME / USERPROFILE only without them.
-    ///
-    /// The tests need every engine pointed at the scratch home, and changing HOME alone can't
-    /// do that: on a machine with `DSH_HOME` / `CODEX_HOME` set, the scan lands outside the
-    /// scratch folder and misses the test's session files, so the tests fail only there. These
-    /// variables are cleared on `set` and restored as they were on `drop`.
     const ENGINE_HOME_KEYS: [&str; 6] = [
         "CLAUDE_CONFIG_DIR",
         "CODEX_HOME",
@@ -936,13 +805,8 @@ pub(super) mod tests {
             let lock = HOME_LOCK.lock();
             let prev = std::env::var_os("HOME");
             std::env::set_var("HOME", home);
-            // engine_home's test fallback reads HOME, then USERPROFILE on
-            // Windows — both must point at the scratch home, and BOTH must
-            // be restored on drop even when HOME was unset before (the
-            // typical Windows case).
             let prev_profile = std::env::var_os("USERPROFILE");
             std::env::set_var("USERPROFILE", home);
-            // Clear the engine-level variables: they take effect before HOME / USERPROFILE.
             let engine_homes = ENGINE_HOME_KEYS
                 .into_iter()
                 .map(|key| {
@@ -972,7 +836,6 @@ pub(super) mod tests {
                 Some(value) => std::env::set_var("USERPROFILE", value),
                 None => std::env::remove_var("USERPROFILE"),
             }
-            // Restore the engine-level variables as they were: unset stays unset.
             for (key, value) in &self.engine_homes {
                 match value {
                     Some(value) => std::env::set_var(key, value),
@@ -1002,8 +865,6 @@ pub(super) mod tests {
         encoder.finish().unwrap();
     }
 
-    /// A custom codex home must not prune sessions indexed from a v0.9
-    /// managed provider home — they live outside every codex home by design.
     #[test]
     fn prune_codex_outside_home_keeps_provider_home_sessions() -> Result<(), String> {
         let home = scratch_dir("prune-codex-legacy");
@@ -1054,8 +915,6 @@ pub(super) mod tests {
         Ok(())
     }
 
-    /// End-to-end: an omp file with a prepended title line is attributed to
-    /// a registered workspace and parsed into the sessions table.
     #[test]
     fn scan_attributes_omp_session_with_title_head() -> Result<(), String> {
         let home = scratch_dir("scan-home");
@@ -1063,15 +922,16 @@ pub(super) mod tests {
         let sessions_dir = home.join(".omp").join("agent").join("sessions").join("-ws");
         std::fs::create_dir_all(&sessions_dir).map_err(|e| e.to_string())?;
         std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
+        let session_line = format!(
+            "{{\"type\":\"session\",\"version\":3,\"id\":\"sid-1\",\"timestamp\":\"2026-09-05T07:13:57.946Z\",\"cwd\":\"{}\"}}",
+            workspace.display().to_string().replace('\\', "\\\\")
+        );
         std::fs::write(
             sessions_dir.join("s.jsonl"),
             format!(
                 "{}\n{}\n{}\n{}\n",
                 "{\"type\":\"title\",\"v\":1,\"title\":\"t\"}",
-                format!(
-                    "{{\"type\":\"session\",\"version\":3,\"id\":\"sid-1\",\"timestamp\":\"2026-09-05T07:13:57.946Z\",\"cwd\":\"{}\"}}",
-                    workspace.display().to_string().replace('\\', "\\\\")
-                ),
+                session_line,
                 "{\"type\":\"message\",\"timestamp\":\"2026-09-05T07:14:06.682Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}}",
                 "{\"type\":\"message\",\"timestamp\":\"2026-09-05T07:14:07.682Z\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"answer\\n<CCGUI_INTERNAL_abcdefgh>{\\\"pluginId\\\":\\\"bridge\\\"}</CCGUI_INTERNAL_abcdefgh>\"}]}}",
             ),
@@ -1100,17 +960,10 @@ pub(super) mod tests {
             )
             .map_err(|e| e.to_string())?
         };
-        // This rollout's frame was never recorded by a live capture validator,
-        // so history keeps it visible: an unrecorded look-alike is model output,
-        // not a host-hidden frame.
         let frame = "<CCGUI_INTERNAL_abcdefgh>{\"pluginId\":\"bridge\"}</CCGUI_INTERNAL_abcdefgh>";
         assert_eq!(title, "hello");
         assert_eq!(preview, format!("answer\n{frame}"));
 
-        // Simulate an older cache with an unchanged rollout whose summary still
-        // carries the host-only request tail and hides a frame no validator ever
-        // accepted. The summary migration must bypass both stat caches and
-        // preserve custom titles.
         {
             let conn = db.0.lock();
             conn.execute(
@@ -1222,14 +1075,10 @@ pub(super) mod tests {
             workspace_a.to_string_lossy().as_ref()
         );
 
-        // The tier-1 no-op path still enumerates CodeBuddy before its gate, but
-        // the unchanged transcript's content must not be opened again.
         super::super::discovery::reset_codebuddy_head_read_count();
         assert_eq!(scan_with(&db, || {})?.reparsed, 0);
         assert_eq!(super::super::discovery::codebuddy_head_read_count(), 0);
 
-        // A newly appearing file changes the tier-1 signature. Identify only
-        // that file; the existing head remains cached.
         write_transcript(&second, "second", &workspace_b, "second title")?;
         super::super::discovery::reset_codebuddy_head_read_count();
         assert_eq!(scan_with(&db, || {})?.reparsed, 1);
@@ -1239,8 +1088,6 @@ pub(super) mod tests {
             workspace_b.to_string_lossy().as_ref()
         );
 
-        // Changing size and recorded cwd invalidates just this head and updates
-        // the complete history row through the normal scan pipeline.
         write_transcript(&second, "second", &workspace_a, "updated second title")?;
         super::super::discovery::reset_codebuddy_head_read_count();
         assert_eq!(scan_with(&db, || {})?.reparsed, 1);
@@ -1274,16 +1121,14 @@ pub(super) mod tests {
         std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
 
         let session_contents = |id: &str, title: &str| {
-            format!(
-                "{}\n{}\n",
-                format!(
-                    "{{\"type\":\"session\",\"version\":3,\"id\":\"{id}\",\"timestamp\":\"2026-09-05T07:13:57.946Z\",\"cwd\":\"{}\"}}",
-                    workspace.display().to_string().replace('\\', "\\\\")
-                ),
-                format!(
-                    "{{\"type\":\"message\",\"timestamp\":\"2026-09-05T07:14:06.682Z\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{title}\"}}]}}}}"
-                )
-            )
+            let session_line = format!(
+                "{{\"type\":\"session\",\"version\":3,\"id\":\"{id}\",\"timestamp\":\"2026-09-05T07:13:57.946Z\",\"cwd\":\"{}\"}}",
+                workspace.display().to_string().replace('\\', "\\\\")
+            );
+            let message_line = format!(
+                "{{\"type\":\"message\",\"timestamp\":\"2026-09-05T07:14:06.682Z\",\"message\":{{\"role\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{title}\"}}]}}}}"
+            );
+            format!("{session_line}\n{message_line}\n")
         };
         let valid_path = sessions_dir.join("valid.jsonl");
         let retry_path = sessions_dir.join("retry.jsonl");
@@ -1381,8 +1226,6 @@ pub(super) mod tests {
         Ok(())
     }
 
-    /// Grok injects `<user_info>` as the first user turn and omits per-line
-    /// timestamps. Scan must still title from `<user_query>` and sort by mtime.
     #[test]
     fn scan_grok_titles_from_user_query_and_uses_mtime() -> Result<(), String> {
         let home = scratch_dir("scan-grok-home");
@@ -1498,9 +1341,6 @@ pub(super) mod tests {
         Ok(())
     }
 
-    /// Spawned Codex subagent rollouts share the parent's first user line.
-    /// They must not become extra sidebar rows, and a previously indexed
-    /// child must be pruned on the next scan.
     #[test]
     fn scan_skips_and_prunes_codex_subagent_rollouts() -> Result<(), String> {
         let home = scratch_dir("scan-codex-subagent");
@@ -1586,9 +1426,6 @@ pub(super) mod tests {
         Ok(())
     }
 
-    /// DSH writes one compressed log per spawned child. Those files must not
-    /// become extra sidebar rows, and a previously indexed child must be
-    /// pruned on the next scan.
     #[test]
     fn scan_skips_and_prunes_dsh_subagent_sessions() -> Result<(), String> {
         let home = scratch_dir("scan-dsh-subagent");
@@ -1655,9 +1492,6 @@ pub(super) mod tests {
         Ok(())
     }
 
-    /// An earlier scan (before the db arm filtered subagents / empty sessions)
-    /// indexed rows that discovery no longer returns. The prune must drop them
-    /// from the sidebar while leaving the still-visible session alone.
     #[test]
     fn scan_prunes_hidden_opencode_sessions() -> Result<(), String> {
         let home = scratch_dir("scan-opencode-hidden");
@@ -1738,21 +1572,12 @@ pub(super) mod tests {
         Ok(())
     }
 
-    /// Rows indexed from the JSON tree before OpenCode 1.2+ migrated it into
-    /// opencode.db follow the database copy: a visible one is re-pointed to
-    /// its database row, one the database hides (archived) leaves the sidebar
-    /// instead of lingering on the frozen file, and a tree newer than the
-    /// database (a 1.1 binary still in use) keeps its tree row.
     #[test]
     fn scan_resolves_tree_rows_superseded_by_the_database() -> Result<(), String> {
         let home = scratch_dir("scan-opencode-migrated");
         let workspace = home.join("ws");
         std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
         let ws = workspace.to_string_lossy().to_string();
-        // Build every component with `join`, exactly as `opencode_data_roots`
-        // does: the row stores discovery's path text verbatim, so a literal
-        // `.local/share/opencode` would differ on Windows (`\` vs `/`) even
-        // though it names the same directory.
         let data_root = home.join(".local").join("share").join("opencode");
         let project = data_root.join("storage").join("session").join("b8119e41");
         std::fs::create_dir_all(&project).map_err(|e| e.to_string())?;
@@ -1846,9 +1671,6 @@ pub(super) mod tests {
             .join("sessions")
             .join("rollout-keep.jsonl");
         std::fs::create_dir_all(rollout.parent().unwrap()).map_err(|e| e.to_string())?;
-        // The transcript must actually exist: this test verifies the default
-        // home is not pruned by path prefix, and a real session has a real
-        // file (missing files are now reclaimed by the file-existence GC).
         std::fs::write(&rollout, "{}\n").map_err(|e| e.to_string())?;
         let _guard = HomeGuard::set(&home);
         let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
@@ -1934,8 +1756,6 @@ pub(super) mod tests {
 
     #[test]
     fn scan_prunes_transcripts_deleted_outside_the_app() -> Result<(), String> {
-        // A transcript deleted outside the app (CLI cleanup, home migration)
-        // must not stay listed forever (upstream #1083 / #1086 / #1103).
         let home = scratch_dir(&format!("gc-external-{}", uuid::Uuid::new_v4()));
         let _guard = HomeGuard::set(&home);
         struct HomeEnv(Option<std::ffi::OsString>);
@@ -1981,13 +1801,10 @@ pub(super) mod tests {
         scan_with(&db, || {})?;
         assert_eq!(session_count(&db, "codex", "keep"), 1);
         assert_eq!(session_count(&db, "codex", "gone"), 1);
-        // Delete outside the app: the next scan drops the dead row and keeps
-        // the unchanged (reused) one.
         std::fs::remove_file(&gone).map_err(|e| e.to_string())?;
         scan_with(&db, || {})?;
         assert_eq!(session_count(&db, "codex", "gone"), 0);
         assert_eq!(session_count(&db, "codex", "keep"), 1);
-        // Deleting again (already gone) is harmless.
         scan_with(&db, || {})?;
         assert_eq!(session_count(&db, "codex", "keep"), 1);
         drop(db);
@@ -2005,7 +1822,7 @@ pub(super) mod tests {
             .map_err(|e| e.to_string())?;
         let live_file = home.join("live.jsonl");
         std::fs::write(&live_file, "{}\n").map_err(|e| e.to_string())?;
-        let ghost_file = home.join("ghost.jsonl"); // never created
+        let ghost_file = home.join("ghost.jsonl");
         let synthetic = super::super::opencode_db_session_path(&home.join("opencode.db"), "abc123");
         {
             let conn = db.0.lock();
@@ -2047,23 +1864,18 @@ pub(super) mod tests {
             known_workspace: Some(workspace.to_string_lossy().into_owned()),
         }];
         assert!(prune_missing_file_sessions(&db, &candidates)?);
-        // Local ghost row removed; live, UNC, extended-UNC and OpenCode's
-        // synthetic db#session-id address must survive.
         assert_eq!(session_count(&db, "claude", "ghost"), 0);
         assert_eq!(session_count(&db, "claude", "live"), 1);
         assert_eq!(session_count(&db, "claude", "unc"), 1);
         assert_eq!(session_count(&db, "claude", "extended"), 1);
-        // `\\?\C:\...` is a LOCAL extended-length path: still GC-eligible.
         assert_eq!(session_count(&db, "claude", "extended-local"), 0);
         assert_eq!(session_count(&db, "opencode", "synthetic"), 1);
-        // Idempotent: nothing left to prune.
         assert!(!prune_missing_file_sessions(&db, &candidates)?);
         drop(db);
         std::fs::remove_dir_all(&home).ok();
         Ok(())
     }
 
-    /// Restores CODEX_HOME on drop (HomeGuard only covers HOME/USERPROFILE).
     struct CodexHomeEnv(Option<std::ffi::OsString>);
     impl Drop for CodexHomeEnv {
         fn drop(&mut self) {
@@ -2074,7 +1886,6 @@ pub(super) mod tests {
         }
     }
 
-    /// A db with one registered workspace and CODEX_HOME at `codex_home`.
     fn codex_gc_fixture(
         home: &Path,
         codex_home: &Path,
@@ -2126,8 +1937,6 @@ pub(super) mod tests {
 
     #[test]
     fn file_gc_runs_even_when_disk_is_unchanged() -> Result<(), String> {
-        // A dead row left by an older version: its file vanished before this
-        // build ever scanned, so no stat signature change will announce it.
         let home = scratch_dir(&format!("gc-unchanged-{}", uuid::Uuid::new_v4()));
         let codex_home = home.join(".codex");
         let (_guard, _env, workspace, db) = codex_gc_fixture(&home, &codex_home)?;
@@ -2157,9 +1966,6 @@ pub(super) mod tests {
     #[cfg(unix)]
     #[test]
     fn file_gc_keeps_rows_on_detached_storage() -> Result<(), String> {
-        // The codex home is a symlink onto a disk that later detaches: every
-        // transcript reads NotFound, yet nothing was deleted. The rows, with
-        // the user's pin and title, must outlive the outage.
         let home = scratch_dir(&format!("gc-detached-{}", uuid::Uuid::new_v4()));
         let disk = home.join("disk");
         std::fs::create_dir_all(disk.join("codex")).map_err(|e| e.to_string())?;
@@ -2195,7 +2001,6 @@ pub(super) mod tests {
         std::fs::rename(&parked, &disk).map_err(|e| e.to_string())?;
         scan_with(&db, || {})?;
         assert_eq!(user_fields(&db)?, (1, Some("my name".to_string())));
-        // Re-attached, a real deletion through the same link is reclaimed.
         std::fs::remove_file(&rollout).map_err(|e| e.to_string())?;
         scan_with(&db, || {})?;
         assert_eq!(session_count(&db, "codex", "pinned"), 0);
@@ -2228,8 +2033,6 @@ pub(super) mod tests {
         }
         let home = scratch_dir(&format!("gc-probe-{}", uuid::Uuid::new_v4()));
         let mut verdicts = HashMap::new();
-        // Missing directories under an existing one: attached storage, so a
-        // NotFound there is a real deletion (a whole kimi/grok session dir).
         assert!(storage_attached(
             &home.join("gone").join("deeper"),
             &mut verdicts
@@ -2243,14 +2046,12 @@ pub(super) mod tests {
         }
         #[cfg(target_os = "macos")]
         {
-            // An unmounted volume leaves only /Volumes behind.
             let volume = format!("/Volumes/ccgui-missing-{}", uuid::Uuid::new_v4());
             let sessions = Path::new(&volume).join(".codex").join("sessions");
             assert!(!storage_attached(&sessions, &mut verdicts));
         }
         #[cfg(windows)]
         {
-            // A drive letter that is not attached fails at its root.
             if let Some(letter) =
                 ('D'..='Z').find(|c| std::fs::metadata(format!("{c}:\\")).is_err())
             {
@@ -2329,7 +2130,6 @@ pub(super) mod tests {
             .unwrap();
     }
 
-    /// Two folders whose names encode to the same CLI directory: sessions belong by the cwd in the transcript.
     #[test]
     fn qoder_colliding_workspaces_keep_their_own_sessions() {
         let home = scratch_dir("qoder-collision-both");
@@ -2363,7 +2163,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// A folder never added to the app, used only in a terminal: its sessions must not appear under its look-alike.
     #[test]
     fn qoder_unregistered_neighbor_stays_out_of_workspace() {
         let home = scratch_dir("qoder-collision-neighbor");
@@ -2383,7 +2182,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// Regression: `my-app`'s sessions stay put after `my app` is added and another turn is run.
     #[test]
     fn qoder_new_turn_stays_in_its_workspace_after_colliding_add() {
         let home = scratch_dir("qoder-collision-turn");
@@ -2416,7 +2214,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// A file with no cwd in a lossy CLI folder must not be guessed onto one of the colliding workspaces by name.
     #[test]
     fn qoder_unknown_cwd_is_not_guessed_from_cli_bucket() {
         let home = scratch_dir("qoder-collision-unknown-cwd");
@@ -2439,7 +2236,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// When an older build recorded the wrong workspace, the attribution is rewritten even with an unchanged file signature, and the title kept.
     #[test]
     fn qoder_unchanged_file_repairs_previous_workspace_attribution() {
         let home = scratch_dir("qoder-repair-unchanged");
@@ -2476,7 +2272,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// When the real workspace isn't registered, an old row known to belong elsewhere can't stay under the wrong one.
     #[test]
     fn qoder_confirmed_old_misattribution_is_pruned() {
         let home = scratch_dir("qoder-prune-misattributed");
@@ -2498,7 +2293,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// While a workspace symlink's target is briefly unmounted, a path-alias difference must not trigger a destructive cleanup.
     #[cfg(unix)]
     #[test]
     fn qoder_detached_workspace_alias_keeps_indexed_metadata() {

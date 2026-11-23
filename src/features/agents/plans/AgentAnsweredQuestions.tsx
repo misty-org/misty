@@ -1,13 +1,9 @@
 import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { useCollaborationStore } from "./store";
-import type { AgentQuestionSet } from "./planTypes";
+import type { AgentQuestionSet } from "./plan_types";
 
 const noSets: AgentQuestionSet[] = [];
 
-/**
- * Questions a run asked and got answered while it waited, shown read-only with
- * that run's answer. Answers given after a hand-off are their own user turn.
- */
 export function AgentAnsweredQuestions({
   conversationId,
   invocationId,

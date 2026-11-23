@@ -1,9 +1,3 @@
-//! First-use permissions: things Misty can do with the rest of the computer that stay off until the
-//! person says yes. Answers live in `settings_state` in `misty.db`,
-//! on this device, and never sync.
-//!
-//! [`ensure`] asks, so it's for a person's action in a window. Anything else, such as a background
-//! job, uses [`is_on`], which refuses without asking.
 mod disk;
 mod downloads;
 mod store;
@@ -32,7 +26,6 @@ pub enum Permission {
     DictationTyping,
 }
 
-/// What a native prompt says. It has to say plainly what's being allowed.
 pub(crate) struct Prompt {
     title: &'static str,
     message: &'static str,
@@ -45,7 +38,6 @@ impl Permission {
         Permission::DictationTyping,
     ];
 
-    /// Its name in `src-tauri/tauri-permissions/permissions/permissions.toml`.
     pub const fn id(self) -> &'static str {
         match self {
             Permission::ScreenCapture => "permission-screen-capture",
@@ -60,7 +52,6 @@ impl Permission {
             .find(|permission| permission.id() == id)
     }
 
-    /// Where its answer is kept in `settings_state`.
     pub(crate) const fn scope(self) -> &'static str {
         match self {
             Permission::ScreenCapture => "permission:screen-capture",
@@ -69,7 +60,6 @@ impl Permission {
         }
     }
 
-    /// Its row in Settings.
     pub const fn label(self) -> &'static str {
         match self {
             Permission::ScreenCapture => "See your screen",
@@ -96,8 +86,6 @@ impl Permission {
     }
 }
 
-/// The permissions a process is held to by its own OS profile. They're Misty's defaults, so the
-/// person never gets asked about them. Listed so a test can compare this file with `permissions.toml`.
 #[cfg(test)]
 const PROCESS_PERMISSIONS: [&str; 3] = [
     "permission-agent-shell",
@@ -105,16 +93,10 @@ const PROCESS_PERMISSIONS: [&str; 3] = [
     "permission-page-reader",
 ];
 
-/// Whether it's on, without asking. This is the check for anything no person started.
 pub fn is_on(app: &AppHandle, permission: Permission) -> bool {
     store::read(app, permission.scope())
 }
 
-/// True if it's on; otherwise asks and remembers the answer. A declined one asks again on the next
-/// attempt, and attempts made while its prompt is up are refused rather than asking twice.
-///
-/// Waits for the answer, so an async caller should use [`ensure_async`]. The main thread can call
-/// it: the dialog has no parent window, so the plugin shows it from a thread of its own.
 pub fn ensure(app: &AppHandle, permission: Permission) -> bool {
     if is_on(app, permission) {
         return true;
@@ -134,13 +116,11 @@ pub async fn ensure_async(app: &AppHandle, permission: Permission) -> bool {
         .unwrap_or(false)
 }
 
-/// Reconnects what was allowed before to the file gate, when Misty starts.
 pub fn restore(app: &AppHandle) {
     restore_downloads_grant(app);
     restore_disk_grant(app);
 }
 
-/// Shows the prompt and waits. Anything but a clear yes is a no.
 pub(crate) fn ask(app: &AppHandle, prompt: &Prompt) -> bool {
     let (send, receive) = std::sync::mpsc::channel();
     app.dialog()
@@ -157,7 +137,6 @@ pub(crate) fn ask(app: &AppHandle, prompt: &Prompt) -> bool {
     receive.recv().unwrap_or(false)
 }
 
-/// One prompt per thing being asked: a second attempt while it's up gets no prompt of its own.
 pub(crate) struct Asking(&'static str);
 
 impl Asking {
@@ -165,7 +144,6 @@ impl Asking {
         let mut asking = ASKING
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        // Not `then_some`: it would build a value whose drop takes this lock, even for a no.
         if asking.insert(scope) {
             Some(Self(scope))
         } else {
@@ -188,15 +166,12 @@ static ASKING: LazyLock<Mutex<HashSet<&'static str>>> = LazyLock::new(Mutex::def
 #[cfg(test)]
 mod tests;
 
-/// The database the answers are kept in. The app manages one at launch.
 pub struct Backing(pub database::store::Store);
 
-/// Turns one permission on or off from Settings.
 pub fn set(app: &AppHandle, permission: Permission, on: bool) {
     store::write(app, permission.scope(), on);
 }
 
-/// Tests never reach the person's real data, whatever they exercise.
 #[cfg(test)]
 #[ctor::ctor]
 fn isolate_tests() {

@@ -1,6 +1,6 @@
 import { spaceWorkspaceToolFromRoute, type WorkspaceView } from "@/features/app-windows";
 import { workspaceAppIcon } from "@/features/app-windows";
-import { appIconStrokeWidth, BrandIcon, brandIconAsset, Text } from "@misty/ui";
+import { appIconStrokeWidth, Mark, markFor, Text } from "@misty/ui";
 import { Armchair, CodeXml, FlaskConical, type LucideIcon } from "lucide-react";
 import { AgentAvatar, defaultAgentOf, usePersonalAgentsStore } from "@/features/agents";
 import { DestinationIcon } from "./NavigatorDestinationIcon";
@@ -17,17 +17,12 @@ function getViewIcon(tab: WorkspaceView | undefined, fallback: LucideIcon): Luci
     workspaceAppIcon(getViewAppId(tab), tab?.surfaceId === "space" ? "space" : "app") ?? fallback
   );
 }
-/** The Agents pages that aren't a chat, with the icons their sidebar rows wear. */
 const agentsPlaceIcons: Record<string, LucideIcon> = {
   lab: FlaskConical,
   studio: Armchair,
   code: CodeXml,
 };
 
-/**
- * A chat's agent, as its sidebar row shows it: the engine's own logo, never a generic agent
- * glyph. A new chat with no agent named yet shows the agent new chats start with.
- */
 function ChatAgentIcon({ route }: { route: string }) {
   const agentId = new URL(route, "https://misty.local").searchParams.get("agent");
   const agent = usePersonalAgentsStore((state) =>
@@ -59,14 +54,12 @@ export function ViewIcon({
       : null;
   if (tab?.surfaceId === "agents" && !place) return <ChatAgentIcon route={tab.route} />;
   const appId = getViewAppId(tab);
-  if (brandIconAsset(appId)) return <BrandIcon brand={appId} size={size} />;
+  if (markFor(appId)) return <Mark of={appId} size={size} />;
   const section = tab ? new URL(tab.route, "https://misty.local").searchParams.get("view") : null;
   if (
     tab &&
     section &&
-    ["explorer", "recent", "favorites", "collections", "deleted"].includes(
-      section,
-    )
+    ["explorer", "recent", "favorites", "collections", "deleted"].includes(section)
   )
     return (
       <span className="inline-flex shrink-0 [&_svg]:!size-4">

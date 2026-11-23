@@ -78,7 +78,7 @@ cd $HOME\misty-org\misty
 npm run tauri dev
 ```
 
-The first build takes a while. On Windows the dev runner starts a copy of the app (`tasks/run-windows-desktop.ts`),
+The first build takes a while. On Windows the dev runner starts a copy of the app (`tasks/run_windows_desktop.ts`),
 so a rebuild isn't blocked by the running one.
 
 To build the installer instead, run `npm run tauri -- build --bundles nsis`. It writes a per-user installer to

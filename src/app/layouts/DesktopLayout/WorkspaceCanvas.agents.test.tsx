@@ -12,7 +12,7 @@ import { WorkspaceCanvas } from "./WorkspaceCanvas";
 vi.mock("./WorkspaceDockTree", () => ({
   WorkspaceDockTree: () => <div>Workspace contents</div>,
 }));
-vi.mock("./dockSplitFit", () => ({
+vi.mock("./dock_split_fit", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
 vi.mock("./WorkspaceSidebar", () => ({

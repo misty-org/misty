@@ -1,14 +1,9 @@
-// The prompt and pictures one engine turn starts with, built from the chat's request (`runs.rs`).
-
 use std::path::PathBuf;
 
 use serde_json::Value;
 
-/// How much of a chat's earlier turns a fresh engine session is given, newest kept.
 const HISTORY_SEED_LIMIT: usize = 60_000;
 
-/// A chat the engine has no session for yet but that already has turns (a forked chat, or one that
-/// changed engine) starts with those turns written out, so the engine knows what came before.
 pub(super) fn with_history(prompt: String, history: &Value) -> String {
     let Some(turns) = history.as_array().filter(|turns| !turns.is_empty()) else {
         return prompt;
@@ -43,14 +38,11 @@ pub(super) fn with_history(prompt: String, history: &Value) -> String {
     )
 }
 
-/// What a turn with the Browser attachment adds after the prompt.
 const BROWSER_HINT: &str = "\n\n(Use Misty's browser for this, through the misty MCP server: open a tab with \
 screen_open, read it with browser_snapshot and act with browser_steps, or do several page steps in one \
 browser_run program. Save what a program collects with its saveAs option rather than copying it into \
 files yourself. I can watch it and take over.)";
 
-/// The prompt an engine gets. With the Browser attachment it is told to work in Misty's browser,
-/// whose tools the Space's MCP server offers only then (mcp.rs).
 pub(super) fn with_browser_hint(prompt: &str, browser: bool) -> String {
     if !browser {
         return prompt.to_string();
@@ -58,9 +50,6 @@ pub(super) fn with_browser_hint(prompt: &str, browser: bool) -> String {
     format!("{prompt}{BROWSER_HINT}")
 }
 
-/// The pictures among a request's attachments, saved where the engine layer reads pasted
-/// images. Anything that isn't an inline image is left out: an engine reads files from its
-/// folder with its own tools.
 pub(super) fn save_images(attachments: &Value) -> Vec<PathBuf> {
     attachments
         .as_array()
@@ -86,8 +75,6 @@ pub(super) fn save_images(attachments: &Value) -> Vec<PathBuf> {
         .collect()
 }
 
-/// Where one run's attached documents are saved. The engine is given this folder as one it may
-/// read (`send_reserved`), and the folders are cleared when Misty starts.
 pub(crate) fn attached_files_dir(run_id: &str) -> PathBuf {
     let name: String = run_id
         .chars()
@@ -99,15 +86,12 @@ pub(crate) fn attached_files_dir(run_id: &str) -> PathBuf {
         .join(if name.is_empty() { "run".into() } else { name })
 }
 
-/// Clears every run's attached documents, at startup: a run that ended has no use for them.
 pub(crate) fn sweep_attached_files() {
     let _ = file_access::fs::remove_dir_all(
         crate::engines::support::paths::app_home().join("attached-files"),
     );
 }
 
-/// A safe file name for an attachment: its own name without any folder, and a `.txt` ending
-/// when what arrives is the text Misty took out of it (a Word document, say).
 fn attachment_file_name(name: &str, mime: &str, index: usize) -> String {
     let base: String = name
         .rsplit(['/', '\\'])
@@ -131,8 +115,6 @@ fn attachment_file_name(name: &str, mime: &str, index: usize) -> String {
     }
 }
 
-/// The documents among a request's attachments (PDFs, and the text of Word, Markdown, CSV and
-/// JSON files), saved as files the engine reads with its own tools. Pictures go as images instead.
 pub(super) fn save_files(attachments: &Value, run_id: &str) -> Vec<PathBuf> {
     use base64::Engine as _;
     let dir = attached_files_dir(run_id);
@@ -177,7 +159,6 @@ pub(super) fn save_files(attachments: &Value, run_id: &str) -> Vec<PathBuf> {
     saved
 }
 
-/// The prompt with the attached documents named after it, so the engine opens them.
 pub(super) fn with_attached_files(prompt: String, files: &[PathBuf]) -> String {
     if files.is_empty() || prompt.trim_start().starts_with('/') {
         return prompt;
@@ -198,9 +179,6 @@ pub(super) fn with_attached_files(prompt: String, files: &[PathBuf]) -> String {
     )
 }
 
-/// In a shared Space, the files teammates' agents are changing right now go before the prompt, as
-/// advice. The renderer builds the note from run events, never from a model; a slash command the
-/// CLI runs itself is left as it is.
 pub(super) fn with_teammates(prompt: String, note: &Value) -> String {
     match note.as_str().map(str::trim) {
         Some(note) if !note.is_empty() && !prompt.trim_start().starts_with('/') => {
@@ -218,10 +196,6 @@ mod tests {
 
     #[test]
     fn documents_are_saved_for_the_engine_and_named_in_the_prompt() {
-        // The folder comes from `HOME`, which tests that use a scratch home move and then delete
-        // (the history scanner's, CodeBuddy's, DSH's). Saved while one of them held a scratch
-        // `HOME`, the files sat outside the folder asked for afterwards, or were deleted before
-        // they were read back, so this failed now and then. Those tests hold this lock.
         let _home = crate::engines::support::paths::HOME_ENV_LOCK.lock();
         let run = format!("test-{}", uuid::Uuid::new_v4());
         let attachments = json!([

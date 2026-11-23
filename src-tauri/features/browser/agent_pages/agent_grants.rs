@@ -1,14 +1,9 @@
-//! Agent grants, the page ring and capability checks for browser pages.
-
 use crate::browser::*;
 
-/// An agent controls a page while its input is locked to the agent or any of
-/// its grants can act on it, not only read it.
 pub(in crate::browser) fn agent_controls_page(session: &BrowserSession) -> bool {
     session.agent_input_locked || session.agent_ring || session.grants.values().any(grant_acts)
 }
 
-/// Grants that let an agent act on the page, not only read it.
 pub(in crate::browser) fn grant_acts(grant: &BrowserGrant) -> bool {
     [
         "browser.interact",
@@ -24,7 +19,6 @@ pub(in crate::browser) fn grant_acts(grant: &BrowserGrant) -> bool {
     .any(|capability| grant.capabilities.contains(*capability))
 }
 
-/// The control ring glows around a page while an agent controls it.
 pub(in crate::browser) fn sync_agent_ring(app: &AppHandle, id: &str, active: bool) {
     let Some(webview) = webview_label(id)
         .ok()
@@ -40,9 +34,6 @@ pub(in crate::browser) fn sync_agent_ring(app: &AppHandle, id: &str, active: boo
     draw_agent_ring(&webview, active);
 }
 
-/// WebView2 has no native overlay inside the page's view, so the ring is a
-/// non-interactive element the page draws itself. A new document drops it, so
-/// it is drawn again after each load.
 #[cfg(not(target_os = "macos"))]
 pub(in crate::browser) fn draw_agent_ring(webview: &Webview, active: bool) {
     let _ = webview.eval(format!(

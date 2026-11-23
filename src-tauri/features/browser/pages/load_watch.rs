@@ -1,7 +1,5 @@
-//! Watches a page's loads: address changes without a load, and loads that never report a finish.
 use crate::browser::*;
 
-/// The page's address changed without a load (History API, hash, single-page navigation).
 #[cfg(target_os = "macos")]
 pub(in crate::browser) fn emit_navigated(app: &AppHandle, id: &str, url: String) {
     let _ = app.emit_to(
@@ -15,8 +13,6 @@ pub(in crate::browser) fn emit_navigated(app: &AppHandle, id: &str, url: String)
     );
 }
 
-/// Each load start and finish moves a page's counter, so a watchdog can tell its load is still
-/// the current one.
 static LOAD_GENERATIONS: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
 pub(in crate::browser) fn next_load_generation(id: &str) -> u64 {
     let mut generations = LOAD_GENERATIONS
@@ -36,9 +32,6 @@ fn current_load_generation(id: &str) -> u64 {
         .unwrap_or(0)
 }
 
-/// A navigation that fails or is cancelled before its document commits never reports a finish, and
-/// the tab would show its loading spinner forever. A load that is still the current one after this
-/// long is treated as over.
 pub(in crate::browser) fn watch_load(app: &AppHandle, id: &str, generation: u64) {
     let app = app.clone();
     let id = id.to_owned();
@@ -54,8 +47,6 @@ pub(in crate::browser) fn watch_load(app: &AppHandle, id: &str, generation: u64)
     });
 }
 
-/// A page changed its address without a load. It names the new one, which is accepted only within
-/// the view's own origin (the History API cannot go further); the view's own URL is the fallback.
 pub(in crate::browser) fn emit_location(
     app: &AppHandle,
     owner: &str,

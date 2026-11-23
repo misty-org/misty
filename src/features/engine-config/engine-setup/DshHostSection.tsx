@@ -2,24 +2,28 @@
 // DshHostStatusCard.tsx, DshConnectionCard.tsx and useDshHost.ts.
 // See NOTICE.
 
-/**
- * DeepSeek Harness in Agents › Channels: its local host, `dsh web`, and how Misty reaches it.
- * A host already running on the address is adopted; otherwise Misty can start one, now or with
- * the app. Its providers and keys live in the host's own web page, not here. Probes run when the
- * page opens and when asked, never on a timer: the host has no push channel.
- */
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useState, type KeyboardEvent } from "react";
-import { peekCachedResource, useCachedResource } from "@/api/cache/cached-resource";
+import { peekCachedResource, useCachedResource } from "@/api/cache/cached_resource";
 import {
   DesktopSettingsRow,
   DesktopSettingsRowSkeleton,
   DesktopSettingsSection as Section,
 } from "@/features/settings";
-import { Badge, Button, cn, ErrorState, Input, Surface, Switch, Text } from "@misty/ui";
+import {
+  Badge,
+  Button,
+  ErrorState,
+  Input,
+  SettingsRow,
+  StateMark,
+  Switch,
+  Text,
+  type StateMarkKind,
+} from "@misty/ui";
 import { CliUpdateDialog } from "../clis/CliUpdateDialog";
-import { useCliUpdateFlow } from "../clis/useCliUpdateFlow";
+import { useCliUpdateFlow } from "../clis/use_cli_update_flow";
 import { binKey, dshHostApi, useEngineSettings, type DshHostStatus } from "./api";
 
 const DEFAULT_HOST = "127.0.0.1";
@@ -35,28 +39,21 @@ const TITLES: Record<HostState, string> = {
   down: "Not running",
 };
 
-// The neutral dot is the muted text color at half strength.
-const DOT: Record<HostState, string> = {
-  connected: "bg-emerald-400",
-  down: "bg-red-400",
-  checking: "bg-current/50",
-  starting: "bg-current/50",
-  missing: "bg-current/50",
+const MARK: Record<HostState, StateMarkKind | null> = {
+  connected: "online",
+  down: "failed",
+  checking: "working",
+  starting: "working",
+  missing: null,
 };
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/**
- * The host's status, kept for this session so returning to the page shows the last answer at
- * once and probes again behind it. Not saved past the session: a host's state from an earlier
- * run is no guide to this one, and its self-description is the host's own to say.
- */
 const DSH_HOST_KEY = "engine-config/dsh-host";
 
 function useDshHostProbe() {
   const resource = useCachedResource(DSH_HOST_KEY, dshHostApi.status);
   const { reload, set } = resource;
-  // A failed start or stop, shown until the next good answer.
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"checking" | "starting" | "stopping" | null>(null);
 
@@ -92,7 +89,6 @@ function useDshHostProbe() {
       const current = peekCachedResource<DshHostStatus>(DSH_HOST_KEY);
       if (current) set({ ...current, running: false, ownership: null, describe: null });
       setActionError(null);
-      // Only Misty's own host is ever stopped: confirm against a real probe.
       void refresh();
     } catch (reason) {
       setActionError(errorText(reason));
@@ -114,7 +110,6 @@ const commitOnEnter = (commit: () => void) => (event: KeyboardEvent<HTMLInputEle
   }
 };
 
-/** The host's state, what it runs, and what can be done about it. */
 function HostCard({
   probe,
   hostState,
@@ -133,76 +128,55 @@ function HostCard({
   const provider = typeof describe?.provider === "string" ? describe.provider : "";
   const model = typeof describe?.model === "string" ? describe.model : "";
   const runsOn = provider && model ? `${model} from ${provider}` : provider || model;
+  const mark = MARK[hostState];
   const recheck = (
     <Button disabled={busy !== null} onClick={() => void probe.refresh(true)}>
       Check again
     </Button>
   );
   return (
-    <Surface aria-live="polite" tone="card" edge="hairline" radius="xl" className="grid gap-3 p-3">
-      <div className="flex items-center gap-2">
-        <Text
-          bare
-          tone="muted"
-          aria-hidden
-          className={cn("size-2 shrink-0 rounded-full", DOT[hostState])}
-        />
-        <Text bare as="p" tone="bright" weight="medium" className="text-sm">
-          {TITLES[hostState]}
-        </Text>
-        {hostState === "connected" || hostState === "down" ? (
-          <Text bare as="code" tone="muted" className="text-xs">
-            {origin}
-          </Text>
-        ) : null}
-        {status?.ownership === "adopted" ? <Badge variant="outline">Already running</Badge> : null}
-      </div>
-      {runsOn ? (
-        <Text as="p" tone="muted" className="text-xs">
-          {runsOn}
-        </Text>
+    <SettingsRow
+      aria-live="polite"
+      label={TITLES[hostState]}
+      description={
+        hostState === "down" && status?.error
+          ? status.error
+          : runsOn || (hostState === "connected" || hostState === "down" ? origin : undefined)
+      }
+    >
+      {status?.ownership === "adopted" ? <Badge variant="outline">Already running</Badge> : null}
+      {hostState === "connected" ? (
+        <>
+          <Button variant="primary" onClick={openPage}>
+            Open its page
+          </Button>
+          {status?.ownership === "spawned" ? (
+            <Button disabled={busy !== null} onClick={() => void probe.stop()}>
+              Stop
+            </Button>
+          ) : null}
+          {recheck}
+        </>
+      ) : hostState === "down" ? (
+        <>
+          <Button variant="primary" disabled={busy !== null} onClick={() => void probe.start()}>
+            Start now
+          </Button>
+          {recheck}
+        </>
+      ) : hostState === "missing" ? (
+        <>
+          <Button variant="primary" disabled={busy !== null} onClick={onInstall}>
+            Install
+          </Button>
+          {recheck}
+        </>
       ) : null}
-      {hostState === "down" && status?.error ? (
-        <Text tone="muted" wrap className="text-xs">
-          {status.error}
-        </Text>
-      ) : null}
-      <div className="flex items-center justify-end gap-2">
-        {hostState === "connected" ? (
-          <>
-            <Button variant="primary" onClick={openPage}>
-              Open its page
-            </Button>
-            {status?.ownership === "spawned" ? (
-              <Button disabled={busy !== null} onClick={() => void probe.stop()}>
-                Stop
-              </Button>
-            ) : null}
-            {recheck}
-          </>
-        ) : hostState === "down" ? (
-          <>
-            <Button variant="primary" disabled={busy !== null} onClick={() => void probe.start()}>
-              Start now
-            </Button>
-            {recheck}
-          </>
-        ) : hostState === "missing" ? (
-          <>
-            <Button variant="primary" disabled={busy !== null} onClick={onInstall}>
-              Install
-            </Button>
-            {recheck}
-          </>
-        ) : (
-          <Button disabled>{TITLES[hostState]}</Button>
-        )}
-      </div>
-    </Surface>
+      {mark ? <StateMark kind={mark} label={TITLES[hostState]} className="shrink-0" /> : null}
+    </SettingsRow>
   );
 }
 
-/** The DeepSeek Harness host and its connection settings. */
 export function DshHostSection() {
   const probe = useDshHostProbe();
   const { settings, loadError, retry, save } = useEngineSettings();
@@ -274,16 +248,15 @@ export function DshHostSection() {
     <>
       <Section title="Local host">
         {probe.error ? (
-          <Text role="alert" tone="muted" wrap className="mb-3 text-sm">
+          <Text size="meta" role="alert" tone="muted" wrap className="px-3 py-1.5">
             {probe.error}
           </Text>
         ) : null}
         {saveError ? (
-          <Text role="alert" tone="muted" wrap className="mb-3 text-sm">
+          <Text size="meta" role="alert" tone="muted" wrap className="px-3 py-1.5">
             {saveError}
           </Text>
         ) : null}
-        {/* The first probe shows as the card's own Checking state, at the card's real size. */}
         <HostCard
           probe={probe}
           hostState={hostState}
@@ -295,7 +268,7 @@ export function DshHostSection() {
         {settings ? (
           <>
             <DesktopSettingsRow label="Program path">
-              <Text full={bin || undefined} tone="muted" className="min-w-0 max-w-55 text-xs">
+              <Text size="meta" full={bin || undefined} tone="muted" className="min-w-0 max-w-55">
                 {bin || "Found on PATH"}
               </Text>
               <Button onClick={() => void chooseBin()}>Choose</Button>
@@ -340,8 +313,6 @@ export function DshHostSection() {
             action={{ label: "Try again", onClick: retry }}
           />
         ) : (
-          // The three rows it stands for: the program path's Choose, the address fields and
-          // the switch.
           <>
             <DesktopSettingsRowSkeleton label="Reading the program path" control="button" />
             <DesktopSettingsRowSkeleton label="Reading the address" control="field" />

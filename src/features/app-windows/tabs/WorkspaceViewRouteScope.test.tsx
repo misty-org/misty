@@ -2,8 +2,8 @@ import { act, memo } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dockLeaves, dockTreeViews } from "../panes/dockTree";
-import { useWorkspaceStore } from "./useWorkspaceStore";
+import { dockLeaves, dockTreeViews } from "../panes/dock_tree";
+import { useWorkspaceStore } from "./use_workspace_store";
 import { useWorkspaceViewFocused, WorkspaceViewRouteScope } from "./WorkspaceViewRouteScope";
 
 function FocusProbe({ label }: { label: string }) {

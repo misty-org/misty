@@ -9,8 +9,6 @@ struct Scratch {
     engine: &'static str,
 }
 
-/// The test binary points HOME at a scratch folder; Misty's settings, which name where pi
-/// and omp are installed, live in the person's real one.
 fn use_real_home() {
     // SAFETY: getpwuid returns the calling user's static record, read before anything else.
     let home = unsafe {
@@ -66,8 +64,6 @@ fn context(scratch: &Scratch, session: Option<&str>, args: &str) -> Context {
     }
 }
 
-/// A saved session with one message of the person's, at $0: the prompt goes to the scratch
-/// provider on a closed port and fails, with retries off.
 async fn dead_end_session(scratch: &Scratch) -> String {
     let (mut cmd, bin) =
         crate::engines::pi_family::cli_command(scratch.engine, &scratch.folder).unwrap();
@@ -225,8 +221,6 @@ async fn omp_commands_on_a_real_session() {
     forked_session(show(at(""), "branch").await.unwrap(), &session);
     assert!(show(at("2"), "branch").await.is_err());
 
-    // `/session info` is one of omp's own commands, run in the turn: it prints its text and
-    // answers without the agent.
     let mut rpc = RpcSession::open("omp", &scratch.folder, &session)
         .await
         .unwrap();
@@ -235,13 +229,11 @@ async fn omp_commands_on_a_real_session() {
         .await
         .unwrap();
     assert_eq!(answer["agentInvoked"], false, "{answer}");
-    // An rpc command omp doesn't have is refused at once, not waited out.
     let started = std::time::Instant::now();
     assert!(rpc.call("get_tree", json!({})).await.is_err());
     assert!(started.elapsed() < Duration::from_secs(10));
     rpc.close().await;
 
-    // `/vibe` and empty side questions answer before any process starts.
     assert!(matches!(
         show(at(""), "vibe").await,
         Ok(Output::Done { .. })

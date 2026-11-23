@@ -21,8 +21,8 @@ import {
   IconButton,
   MenuItem,
 } from "@misty/ui";
-import { parentPath, useFilesStore } from "./filesStore";
-import { useTreePreferences } from "./treePreferences";
+import { parentPath, useFilesStore } from "./files_store";
+import { useTreePreferences } from "./tree_preferences";
 
 const revealLabel = navigator.platform.includes("Mac")
   ? "Reveal in Finder"
@@ -30,19 +30,11 @@ const revealLabel = navigator.platform.includes("Mac")
     ? "Reveal in Explorer"
     : "Reveal in file manager";
 
-/** What a page that shows the tree on its own (the Code page) adds over it. */
 export interface FileTreeToolbarOptions {
-  /** The row under the tools that names the folder, such as its picker. */
   heading?: ReactNode;
-  /** Opens a terminal in the folder, when the page has one. */
   onOpenTerminal?(): void;
 }
 
-/**
- * The tree's own tools on a row of their own, above the folder's name, so a long name keeps the
- * whole width: new file and folder at the folder's top, reveal the open file, collapse all, and
- * the rest in ⋯. It stands in for the root row's hover tools where the page has room for it.
- */
 export function FileTreeToolbar({
   root,
   options,
@@ -137,8 +129,6 @@ export function FileTreeToolbar({
         </DropdownMenu>
       </div>
       {options.heading ? (
-        // The folder's name under the tools: the picker that changes it. The tree is the
-        // sidebar's one section, so nothing folds it away.
         <div className="flex h-8 min-w-0 flex-none items-center px-2">{options.heading}</div>
       ) : null}
     </>

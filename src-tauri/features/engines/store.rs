@@ -1,6 +1,3 @@
-// What the engines keep in `misty.db`, on this computer only: the project folders the person
-// picked, the folder each chat works in, and each chat's session in its engine. None ever syncs.
-
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -16,7 +13,6 @@ fn text(error: rusqlite::Error) -> String {
     error.to_string()
 }
 
-/// Every project folder on this computer, to let the file gate reach them as the app starts.
 pub fn all_folders(store: &Store) -> Result<Vec<PathBuf>, String> {
     let connection = store.connect().map_err(text)?;
     let mut statement = connection
@@ -30,8 +26,6 @@ pub fn all_folders(store: &Store) -> Result<Vec<PathBuf>, String> {
         .map_err(text)
 }
 
-/// Whether the account may work in this folder: one of its project folders or inside one, or a
-/// chat's scratch folder Misty keeps (`chat_folder.rs`).
 pub fn is_linked(store: &Store, account: &str, folder: &Path) -> Result<bool, String> {
     if super::chat_folder::is_scratch(store, folder) {
         return Ok(true);
@@ -51,15 +45,14 @@ pub fn is_linked(store: &Store, account: &str, folder: &Path) -> Result<bool, St
     Ok(false)
 }
 
-/// Whether `path` is `root` or lies inside it. On Windows one folder has several spellings: a
-/// canonical path starts `\\?\C:\` where the folder picker and Misty's data folder give `C:\`,
-/// either may use `/`, and letter case doesn't matter. Both are compared in one form there, or a
-/// linked folder never matches itself. Elsewhere paths compare as they are.
 pub(crate) fn within(path: &Path, root: &Path) -> bool {
     #[cfg(windows)]
     {
         let form = |path: &Path| {
-            let mut text = dunce::simplified(path).to_string_lossy().replace('/', "\\").to_lowercase();
+            let mut text = dunce::simplified(path)
+                .to_string_lossy()
+                .replace('/', "\\")
+                .to_lowercase();
             while text.ends_with('\\') {
                 text.pop();
             }
@@ -74,7 +67,6 @@ pub(crate) fn within(path: &Path, root: &Path) -> bool {
     }
 }
 
-/// Adds a project folder, or marks one already there as just used.
 pub fn add_project(store: &Store, account: &str, path: &str) -> Result<(), String> {
     let at = now();
     store
@@ -89,7 +81,6 @@ pub fn add_project(store: &Store, account: &str, path: &str) -> Result<(), Strin
         .map_err(text)
 }
 
-/// Forgets a project folder. Returns whether any account on this computer still has it.
 pub fn remove_project(store: &Store, account: &str, path: &str) -> Result<bool, String> {
     let connection = store.connect().map_err(text)?;
     connection
@@ -107,7 +98,6 @@ pub fn remove_project(store: &Store, account: &str, path: &str) -> Result<bool, 
         .map_err(text)
 }
 
-/// The account's project folders, most recently used first, as (path, last used).
 pub fn projects(store: &Store, account: &str) -> Result<Vec<(String, i64)>, String> {
     let connection = store.connect().map_err(text)?;
     let mut statement = connection
@@ -117,12 +107,13 @@ pub fn projects(store: &Store, account: &str) -> Result<Vec<(String, i64)>, Stri
         )
         .map_err(text)?;
     let rows = statement
-        .query_map([account], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+        .query_map([account], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
         .map_err(text)?;
     rows.collect::<Result<_, _>>().map_err(text)
 }
 
-/// The folder a chat works in, as (path, kind), kind being `project` or `scratch`.
 pub fn chat_folder(store: &Store, account: &str, conversation: &str) -> Option<(String, String)> {
     store
         .connect()
@@ -135,7 +126,6 @@ pub fn chat_folder(store: &Store, account: &str, conversation: &str) -> Option<(
         .ok()
 }
 
-/// The chats that work in a project, with its path: the Code page lists them, the sidebar doesn't.
 pub fn project_chats(store: &Store, account: &str) -> Result<Vec<(String, String)>, String> {
     let connection = store.connect().map_err(text)?;
     let mut statement = connection
@@ -144,12 +134,13 @@ pub fn project_chats(store: &Store, account: &str) -> Result<Vec<(String, String
         )
         .map_err(text)?;
     let rows = statement
-        .query_map([account], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .query_map([account], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
         .map_err(text)?;
     rows.collect::<Result<_, _>>().map_err(text)
 }
 
-/// The folder new projects go in, chosen in the system's dialog during setup; `None` before then.
 pub fn projects_home(store: &Store, account: &str) -> Option<String> {
     store
         .connect()
@@ -162,7 +153,6 @@ pub fn projects_home(store: &Store, account: &str) -> Option<String> {
         .ok()
 }
 
-/// Sets the folder new projects go in.
 pub fn set_projects_home(store: &Store, account: &str, path: &str) -> Result<(), String> {
     store
         .connect()
@@ -176,7 +166,6 @@ pub fn set_projects_home(store: &Store, account: &str, path: &str) -> Result<(),
         .map_err(text)
 }
 
-/// Sets the folder a chat works in, replacing the one it had.
 pub fn set_chat_folder(
     store: &Store,
     account: &str,
@@ -197,7 +186,6 @@ pub fn set_chat_folder(
         .map_err(text)
 }
 
-/// Forgets what a deleted chat kept: its folder and its engine sessions.
 pub fn forget_chat(store: &Store, account: &str, conversation: &str) -> Result<(), String> {
     let connection = store.connect().map_err(text)?;
     for statement in [
@@ -211,7 +199,6 @@ pub fn forget_chat(store: &Store, account: &str, conversation: &str) -> Result<(
     Ok(())
 }
 
-/// Every chat id this computer keeps, whatever the account, to find scratch folders left behind.
 pub fn all_chat_ids(store: &Store) -> Result<std::collections::HashSet<String>, String> {
     let connection = store.connect().map_err(text)?;
     let mut statement = connection
@@ -223,7 +210,6 @@ pub fn all_chat_ids(store: &Store) -> Result<std::collections::HashSet<String>, 
     rows.collect::<Result<_, _>>().map_err(text)
 }
 
-/// The engine's own session for a chat, to continue it in the same folder.
 pub fn session(
     store: &Store,
     account: &str,
@@ -243,7 +229,6 @@ pub fn session(
         .ok()
 }
 
-/// The engine session a chat last kept, with its engine, wherever it ran: `(engine, session)`.
 pub fn chat_session(store: &Store, account: &str, conversation: &str) -> Option<(String, String)> {
     store
         .connect()
@@ -280,7 +265,6 @@ pub fn keep_session(
         .map_err(text)
 }
 
-/// Forgets the engine's session for a chat (`/clear`): the next turn starts a new one.
 pub fn forget_session(store: &Store, account: &str, conversation: &str) -> Result<(), String> {
     store
         .connect()
@@ -293,20 +277,19 @@ pub fn forget_session(store: &Store, account: &str, conversation: &str) -> Resul
         .map_err(text)
 }
 
-/// The folders Misty made for agents before chats owned their folders, as (account, path), for
-/// the one-time move to projects or the Trash (`chat_folder::retire_agent_folders`).
 pub fn old_agent_folders(store: &Store) -> Result<Vec<(String, String)>, String> {
     let connection = store.connect().map_err(text)?;
     let mut statement = connection
         .prepare("SELECT account, path FROM agent_folders")
         .map_err(text)?;
     let rows = statement
-        .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
         .map_err(text)?;
     rows.collect::<Result<_, _>>().map_err(text)
 }
 
-/// Forgets every agent folder row once they were moved or thrown away.
 pub fn clear_old_agent_folders(store: &Store) -> Result<(), String> {
     store
         .connect()

@@ -1,12 +1,3 @@
-//! Agent trash: where an agent's `files.trash` puts what it cleans up, instead of deleting it or
-//! using the system Trash, after Kura's own trash folder and put-back ledger.
-//! Each item waits in a holding folder Misty owns (`agent_trash_moves.rs`), with a row in
-//! `files_agent_trash` saying where it came from, which agent and chat moved it, and when. An item
-//! in a mounted Space drive goes to that Space's own trash instead, held there so it never empties
-//! itself; the drive writes its row (no holding path) once the server has it.
-//!
-//! It never empties itself. Only the person's window lists it, puts items back and deletes them:
-//! every command here checks that, and no tool or SDK call reaches them.
 use std::path::{Path, PathBuf};
 
 use file_access::disk::fs_disk;
@@ -22,7 +13,6 @@ mod moves;
 #[cfg(test)]
 pub(crate) use moves::misty_holding;
 
-/// One item in Agent trash (`AgentTrashItem` in `disk.ts`).
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentTrashItem {
@@ -52,25 +42,20 @@ pub struct AgentTrashUsage {
     pub oldest_ms: Option<i64>,
 }
 
-/// What Put back does when something is already at the item's old place (`Resolution`).
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub enum PutBackChoice {
-    /// The one there now goes to the system Trash, where Put Back can return it.
     Replace,
-    /// The item comes back beside it, as "name 2".
     KeepBoth,
     Skip,
 }
 
-/// `Failure` in `disk.ts`: an item, by its name or path, and why it didn't go.
 #[derive(Clone, Debug, Serialize)]
 pub struct HeldFailure {
     pub path: String,
     pub error: String,
 }
 
-/// `TransferResult` in `disk.ts`.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct PutBackResult {
     pub created: Vec<String>,
@@ -78,7 +63,6 @@ pub struct PutBackResult {
     pub cancelled: bool,
 }
 
-/// A row of `files_agent_trash`.
 #[derive(Clone, Debug)]
 struct Row {
     id: i64,
@@ -92,7 +76,6 @@ struct Row {
 }
 
 impl Row {
-    /// The Space's trash keeps it, not a holding folder.
     fn in_drive(&self) -> Option<(SpaceId, ItemId)> {
         match (&self.space, &self.item) {
             (Some(space), Some(item)) if ItemId::is_valid(item) => {
@@ -111,7 +94,6 @@ fn connect(app: &AppHandle) -> Result<rusqlite::Connection, String> {
         .map_err(|error| error.to_string())
 }
 
-/// Every row, newest first, or only those `ids` names.
 fn rows(app: &AppHandle, ids: Option<&[i64]>) -> Result<Vec<Row>, String> {
     let connection = connect(app)?;
     let mut statement = connection
@@ -148,7 +130,6 @@ fn forget_row(app: &AppHandle, id: i64) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-/// The Space and drive path of an item inside a mounted Space drive.
 fn drive_item(path: &Path) -> Option<(SpaceId, String)> {
     if !file_access::is_in_space_drive(path) {
         return None;
@@ -171,10 +152,6 @@ fn drive_item(path: &Path) -> Option<(SpaceId, String)> {
     None
 }
 
-/// Moves an item an agent trashed into Agent trash and answers its row's id. The path has passed
-/// `agent_paths::admit` for writing already. An item in a Space drive goes to that Space's trash,
-/// held for the person; its row comes from the drive once the server takes it, so the answer then
-/// is 0.
 pub fn move_to_agent_trash(
     app: &AppHandle,
     path: &Path,
@@ -217,9 +194,11 @@ pub fn move_to_agent_trash(
     match saved {
         Ok(id) => Ok(id),
         Err(error) => {
-            // Never held without a record of where it came from.
             let _ = moves::out_of_holding(&holding, path);
-            Err(format!("Misty couldn't record {} in Agent trash: {error}", display_name(path)))
+            Err(format!(
+                "Misty couldn't record {} in Agent trash: {error}",
+                display_name(path)
+            ))
         }
     }
 }
@@ -270,9 +249,16 @@ pub async fn files_agent_trash_usage(
     .await
 }
 
-/// Puts one held item back where it was. `None` when it was skipped.
-fn put_back_local(app: &AppHandle, row: &Row, choice: PutBackChoice) -> Result<Option<String>, String> {
-    let holding = PathBuf::from(row.holding.as_deref().ok_or("That item isn't in Agent trash.")?);
+fn put_back_local(
+    app: &AppHandle,
+    row: &Row,
+    choice: PutBackChoice,
+) -> Result<Option<String>, String> {
+    let holding = PathBuf::from(
+        row.holding
+            .as_deref()
+            .ok_or("That item isn't in Agent trash.")?,
+    );
     let original = super::asked_path(&row.original)?;
     let name = display_name(&original);
     let mut target = original.clone();
@@ -280,7 +266,9 @@ fn put_back_local(app: &AppHandle, row: &Row, choice: PutBackChoice) -> Result<O
         match choice {
             PutBackChoice::Skip => return Ok(None),
             PutBackChoice::KeepBoth => {
-                let folder = original.parent().ok_or("That item has no folder to go back to.")?;
+                let folder = original
+                    .parent()
+                    .ok_or("That item has no folder to go back to.")?;
                 target = super::transfer::keep_both_name(folder, &name);
             }
             PutBackChoice::Replace => {
@@ -313,9 +301,9 @@ pub async fn files_agent_trash_put_back(
     let mut result = PutBackResult::default();
     for row in found {
         let done = match row.in_drive() {
-            Some((space, item)) => restore_in_drive(&app, &space, &item).await.map(|()| {
-                Some(row.original.clone())
-            }),
+            Some((space, item)) => restore_in_drive(&app, &space, &item)
+                .await
+                .map(|()| Some(row.original.clone())),
             None => {
                 let (app, row) = (app.clone(), row.clone());
                 blocking(move || put_back_local(&app, &row, resolution)).await
@@ -342,7 +330,6 @@ async fn restore_in_drive(app: &AppHandle, space: &SpaceId, item: &ItemId) -> Re
     Ok(())
 }
 
-/// Deletes held items for good, after the person's confirm in `ConfirmDeleteDialog`.
 async fn delete_rows(app: &AppHandle, found: Vec<Row>) -> Vec<HeldFailure> {
     let mut failed = Vec::new();
     for row in found {

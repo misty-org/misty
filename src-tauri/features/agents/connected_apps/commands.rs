@@ -1,4 +1,3 @@
-//! The native commands behind connected apps. Only a person's window may call them.
 use serde_json::{json, Value};
 use tauri::Manager;
 
@@ -11,10 +10,8 @@ use super::{
 use crate::app::runtime::MistyRuntime;
 use database::store::Store;
 
-/// What a remembered approval is held by in the app's list, where the server's are held by an agent.
 const THIS_COMPUTER: &str = "this_computer";
 
-/// The account this window is signed in as, whose connections its pages show.
 fn person(webview: &tauri::Webview) -> Result<String, Failure> {
     if crate::browser::app_windows::is_person_window(webview.label()) {
         Ok(super::window_account(webview.label()))
@@ -26,7 +23,6 @@ fn person(webview: &tauri::Webview) -> Result<String, Failure> {
     }
 }
 
-/// The run's account for a tool call, the window's for a person's own page.
 async fn account_for(
     app: &tauri::AppHandle,
     webview: &tauri::Webview,
@@ -55,7 +51,6 @@ fn missing_request() -> Failure {
     rejected("not_found", "That request does not exist.")
 }
 
-/// A card's current state.
 #[tauri::command]
 pub async fn apps_request_get(
     app: tauri::AppHandle,
@@ -71,7 +66,6 @@ pub async fn apps_request_get(
     Ok(json!({ "request": request.view() }))
 }
 
-/// Records the person's answer to a card.
 #[tauri::command]
 pub async fn apps_request_decide(
     app: tauri::AppHandle,
@@ -88,7 +82,6 @@ pub async fn apps_request_decide(
     Ok(json!({ "request": request.view() }))
 }
 
-/// The remembered approvals, in the shape of the server's list.
 #[tauri::command]
 pub async fn apps_grants_list(
     app: tauri::AppHandle,
@@ -130,7 +123,6 @@ pub async fn apps_grants_list(
     Ok(json!({ "grants": items }))
 }
 
-/// Forgets one remembered approval, or all of them with no `id`.
 #[tauri::command]
 pub async fn apps_grants_revoke(
     app: tauri::AppHandle,
@@ -209,8 +201,6 @@ pub async fn apps_tool_execute(
 ) -> Result<execute::Executed, Failure> {
     person(&webview)?;
     let account_choice = account.clone();
-    // The run's frozen mode, as it was started, however the chat has changed since. "Ask before acting"
-    // can only make it stricter, and a setting that can't be read counts as asking.
     let facts = crate::agents::run_control::tool_gate::facts_of_run(&app, &run_id).await;
     let settings = crate::agents::run_control::tool_gate::agent_settings(&device_store(&app));
     let mode = mode_of(
@@ -247,7 +237,6 @@ fn mode_of(auto: bool, actions_ask: bool, settings_read: bool) -> &'static str {
     }
 }
 
-/// Shows a card in its run's chat, from what native code holds: a window can't make one up.
 #[tauri::command]
 pub async fn apps_request_show(
     app: tauri::AppHandle,

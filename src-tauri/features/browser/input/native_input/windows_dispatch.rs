@@ -1,8 +1,5 @@
-//! Windows: trusted input through the DevTools protocol, rechecked against the grant.
 use super::*;
 
-/// Windows: trusted input through the DevTools protocol, rechecked against
-/// the grant before it lands.
 #[cfg(windows)]
 pub(super) async fn dispatch_windows(
     app: &AppHandle,
@@ -30,7 +27,6 @@ pub(super) async fn dispatch_windows(
     }
     let target = cursor_target(input);
     if let Some(script) = cursor_script(input, &observed["viewport"]) {
-        // Let the user watch the cursor arrive before the input lands.
         let _ = webview.eval(script);
         tokio::time::sleep(std::time::Duration::from_millis(
             crate::browser::agent_pages::page_agent::CURSOR_GLIDE_MS,

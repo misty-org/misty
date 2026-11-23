@@ -1,18 +1,15 @@
-//! Replays what the Vercel AI SDK's `embedMany`, `generateSpeech` and `transcribe` sent and gave back
-//! against these clients. Record new fixtures with
-//! the recorder in the TypeScript runtime, in git history before it was removed.
-// Fixtures are read from this crate's own test folder.
 #![allow(clippy::disallowed_methods)]
 
 mod support;
 
 use std::{collections::BTreeMap, fs, path::PathBuf};
 
-use base64::{engine::general_purpose::STANDARD, Engine};
 use agent_runs::model_calls::{
-    embed_many, generate_speech, resolve_embedding_model, resolve_speech_model, resolve_transcription_model, testing,
-    transcribe, Credential, ModelError, ModelRoute, ProviderId, SpeechRequest,
+    embed_many, generate_speech, resolve_embedding_model, resolve_speech_model,
+    resolve_transcription_model, testing, transcribe, Credential, ModelError, ModelRoute,
+    ProviderId, SpeechRequest,
 };
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use support::{serve_replies, MockServer, Reply};
@@ -60,7 +57,6 @@ struct Thrown {
     is_retryable: Option<bool>,
 }
 
-/// Transport details the SDK and this client may differ in without any meaning.
 const IGNORED_HEADERS: [&str; 7] = [
     "host",
     "connection",
@@ -98,19 +94,29 @@ fn route_for(fixture: &Fixture, server: &MockServer) -> ModelRoute {
 }
 
 fn options_of(input: &Value) -> Option<Map<String, Value>> {
-    input.get("providerOptions").and_then(Value::as_object).cloned()
+    input
+        .get("providerOptions")
+        .and_then(Value::as_object)
+        .cloned()
 }
 
 fn numbers_alike(value: &Value) -> Value {
     match value {
         Value::Number(number) => json!(number.as_f64()),
         Value::Array(items) => Value::Array(items.iter().map(numbers_alike).collect()),
-        Value::Object(fields) => Value::Object(fields.iter().map(|(key, field)| (key.clone(), numbers_alike(field))).collect()),
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(key, field)| (key.clone(), numbers_alike(field)))
+                .collect(),
+        ),
         other => other.clone(),
     }
 }
 
-fn sorted_by_body(mut requests: Vec<(String, String, BTreeMap<String, String>, Value)>) -> Vec<(String, String, BTreeMap<String, String>, Value)> {
+fn sorted_by_body(
+    mut requests: Vec<(String, String, BTreeMap<String, String>, Value)>,
+) -> Vec<(String, String, BTreeMap<String, String>, Value)> {
     requests.sort_by_key(|request| request.3.to_string());
     requests
 }
@@ -140,7 +146,11 @@ fn check_requests(fixture: &Fixture, server: &MockServer) {
         .cloned()
         .map(|sent| (sent.method, sent.path, sent.headers, sent.body))
         .collect();
-    let (ours, theirs) = if fixture.unordered_requests { (sorted_by_body(ours), sorted_by_body(theirs)) } else { (ours, theirs) };
+    let (ours, theirs) = if fixture.unordered_requests {
+        (sorted_by_body(ours), sorted_by_body(theirs))
+    } else {
+        (ours, theirs)
+    };
     assert_eq!(ours.len(), theirs.len(), "{name}: request count");
     for (ours, theirs) in ours.iter().zip(&theirs) {
         assert_eq!(ours.0, theirs.0, "{name}: method");
@@ -152,23 +162,41 @@ fn check_requests(fixture: &Fixture, server: &MockServer) {
 
 fn check_failure(fixture: &Fixture, error: ModelError) {
     let name = &fixture.name;
-    let thrown = fixture.thrown.as_ref().unwrap_or_else(|| panic!("{name}: failed where the SDK didn't: {error}"));
+    let thrown = fixture
+        .thrown
+        .as_ref()
+        .unwrap_or_else(|| panic!("{name}: failed where the SDK didn't: {error}"));
     assert_eq!(Some(error.to_string()), thrown.message, "{name}: message");
     match error {
-        ModelError::Api { status, retryable, .. } => {
+        ModelError::Api {
+            status, retryable, ..
+        } => {
             assert_eq!(Some(status), thrown.status_code, "{name}: status");
             assert_eq!(Some(retryable), thrown.is_retryable, "{name}: retryable");
         }
-        ModelError::NoOutput { name: kind, .. } => assert_eq!(Some(kind), thrown.name.as_deref(), "{name}: kind"),
-        ModelError::Unsupported(_) => assert_eq!(thrown.name.as_deref(), Some("AI_UnsupportedFunctionalityError"), "{name}: kind"),
+        ModelError::NoOutput { name: kind, .. } => {
+            assert_eq!(Some(kind), thrown.name.as_deref(), "{name}: kind")
+        }
+        ModelError::Unsupported(_) => assert_eq!(
+            thrown.name.as_deref(),
+            Some("AI_UnsupportedFunctionalityError"),
+            "{name}: kind"
+        ),
         other => panic!("{name}: unexpected failure: {other}"),
     }
 }
 
 fn check_result(fixture: &Fixture, ours: Value) {
     let name = &fixture.name;
-    let theirs = fixture.result.as_ref().unwrap_or_else(|| panic!("{name}: the SDK threw, but this client didn't"));
-    assert_eq!(numbers_alike(&ours), numbers_alike(theirs), "{name}: result");
+    let theirs = fixture
+        .result
+        .as_ref()
+        .unwrap_or_else(|| panic!("{name}: the SDK threw, but this client didn't"));
+    assert_eq!(
+        numbers_alike(&ours),
+        numbers_alike(theirs),
+        "{name}: result"
+    );
 }
 
 async fn replay_embed(fixture: &Fixture, route: &ModelRoute, client: &reqwest::Client) {
@@ -189,15 +217,30 @@ async fn replay_embed(fixture: &Fixture, route: &ModelRoute, client: &reqwest::C
     }
 }
 
-async fn replay_speech(fixture: &Fixture, route: &ModelRoute, client: &reqwest::Client, server: &MockServer) {
-    // ElevenLabs has a fixed address, and the SDK's was pointed at the mock the same way.
+async fn replay_speech(
+    fixture: &Fixture,
+    route: &ModelRoute,
+    client: &reqwest::Client,
+    server: &MockServer,
+) {
     let model = if fixture.credential_provider == ProviderId::Elevenlabs {
         let origin = server.base_url.trim_end_matches("/v1");
-        testing::elevenlabs_speech_model(client, origin, "test-key-parity", fixture.model_id.trim_start_matches("elevenlabs/"))
+        testing::elevenlabs_speech_model(
+            client,
+            origin,
+            "test-key-parity",
+            fixture.model_id.trim_start_matches("elevenlabs/"),
+        )
     } else {
         resolve_speech_model(&fixture.model_id, route, client).unwrap()
     };
-    let text = |key: &str| fixture.input.get(key).and_then(Value::as_str).map(str::to_owned);
+    let text = |key: &str| {
+        fixture
+            .input
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
     let request = SpeechRequest {
         text: text("text").unwrap(),
         voice: text("voice"),
@@ -224,7 +267,9 @@ async fn replay_speech(fixture: &Fixture, route: &ModelRoute, client: &reqwest::
 
 async fn replay_transcribe(fixture: &Fixture, route: &ModelRoute, client: &reqwest::Client) {
     let model = resolve_transcription_model(&fixture.model_id, route, client).unwrap();
-    let audio = STANDARD.decode(fixture.input["audioBase64"].as_str().unwrap()).unwrap();
+    let audio = STANDARD
+        .decode(fixture.input["audioBase64"].as_str().unwrap())
+        .unwrap();
     let options = options_of(&fixture.input);
     match transcribe(model.as_ref(), &audio, options.as_ref(), Some(0)).await {
         Ok(result) => check_result(
@@ -266,7 +311,11 @@ fn fixtures_with(prefix: &str) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = fs::read_dir(&folder)
         .unwrap()
         .map(|entry| entry.unwrap().path())
-        .filter(|path| path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with(prefix)))
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(prefix))
+        })
         .collect();
     files.sort();
     assert!(!files.is_empty(), "no {prefix} fixtures");

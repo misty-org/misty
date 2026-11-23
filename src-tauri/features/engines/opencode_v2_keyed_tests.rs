@@ -1,6 +1,3 @@
-//! Misty's 2.x turn path on a keyed, priced provider: a custom OpenAI-compatible provider in a
-//! scratch OpenCode config, pointed at a fake provider on loopback, so nothing is spent.
-
 use std::path::Path;
 
 use super::fake_provider::{fake_provider, FakeProvider, Seen, SLOW_MARK, TOOL_MARK};
@@ -9,16 +6,11 @@ use super::*;
 
 const PAID_KEY: &str = "sk-misty-fake-paid";
 const FREE_KEY: &str = "sk-misty-fake-free";
-/// The model Misty picks, as `provider/model`; its config key is `pricey`, its upstream id this.
 const MODEL: &str = "fakepaid/pricey";
 const UPSTREAM_MODEL: &str = "upstream-pricey-v1";
 const WINDOW: u64 = 123_456;
-/// What the fake provider reports for every call: 1000 prompt tokens (400 of them cached), 50
-/// out. At $3 in, $15 out and $0.30 cached per million, OpenCode prices one step at this.
 const STEP_COST: f64 = (600.0 * 3.0 + 50.0 * 15.0 + 400.0 * 0.3) / 1_000_000.0;
 
-/// OpenCode's config, data, state and cache under `root` (and HOME, so nothing falls back to the
-/// user's own), with `config` as its global config. The server Misty starts inherits these.
 fn isolate_opencode(root: &Path, config: &Value) {
     for (name, dir) in [
         ("HOME", "home"),
@@ -51,8 +43,6 @@ fn isolate_opencode(root: &Path, config: &Value) {
     }
 }
 
-/// Two custom providers: the session starts on the free one (the config's default), so Misty's
-/// pick has to switch it to the paid one, priced and with its own window.
 fn keyed_config(paid: &FakeProvider, free: &FakeProvider) -> Value {
     json!({
         "$schema": "https://opencode.ai/config.json",
@@ -82,7 +72,6 @@ fn keyed_config(paid: &FakeProvider, free: &FakeProvider) -> Value {
     })
 }
 
-/// Stops the server Misty started and drops the scratch folder, even when an assert fails.
 struct Cleanup(
     Arc<opencode_server::OpencodeServerState>,
     std::path::PathBuf,
@@ -99,9 +88,6 @@ fn cost_of(usage: &Value) -> f64 {
     usage["cost_usd"].as_f64().unwrap_or(-1.0)
 }
 
-/// A turn on a keyed, priced provider through Misty's real path, spending nothing: text, a tool
-/// and a stop mid-turn, with the window, the cache, the cost and the key checked end to end.
-/// `OPENCODE_BIN=/path/to/opencode cargo test --lib live_v2_keyed_provider -- --ignored --nocapture`
 #[tokio::test]
 #[ignore]
 async fn live_v2_keyed_provider() {
@@ -211,7 +197,6 @@ async fn live_v2_keyed_provider() {
         "no read result with the file's text: {kinds:?}"
     );
     assert_eq!(text_of(&kinds), "notes.txt says hello", "{kinds:?}");
-    // Two steps (the call, then the answer), so the turn cost two steps' worth.
     let usage = of_kind(&kinds, "usage");
     let last = usage.last().expect("no usage");
     assert!(usage.len() >= 2, "{kinds:?}");
@@ -268,7 +253,6 @@ async fn live_v2_keyed_provider() {
         "the server kept the stopped turn going"
     );
 
-    // Every step went to the paid provider, on its upstream model id, with its key.
     let paid_seen = paid.seen.lock().unwrap().clone();
     let free_seen = free.seen.lock().unwrap().clone();
     eprintln!("  paid saw {paid_seen:?}\n  free saw {free_seen:?}");
@@ -288,8 +272,6 @@ async fn live_v2_keyed_provider() {
     );
 }
 
-/// Each `session.step.ended` prices its own step; the usage Misty reports carries the turn's
-/// total so far, and nothing when the model has no prices.
 #[tokio::test]
 async fn step_costs_add_up_over_the_turn() {
     use crate::engines::support::event_sink::EventSink;
@@ -322,7 +304,6 @@ async fn step_costs_add_up_over_the_turn() {
         )
         .await;
         if n == 1 {
-            // A model with no prices reports no cost.
             assert!(view.last_usage.as_ref().unwrap().get("cost_usd").is_none());
         }
     }

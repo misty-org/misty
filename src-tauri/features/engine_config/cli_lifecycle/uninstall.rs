@@ -1,42 +1,27 @@
-// Uninstalling an engine, whoever installed it. Misty's own copy goes with its folder in
-// `~/.misty/shared/engines` (`routes::remove`). A copy that was on the computer before goes the way
-// it came: npm's global copy through npm, Homebrew's through brew, and a copy from the maker's own
-// installer by deleting its program and the versions that installer keeps beside it. The engine's
-// sign-in, settings and history (`~/.claude`, `~/.codex`, `~/.hermes` and the like) always stay.
-// A copy found anywhere else is left alone, since Misty can't tell what else would go with it, and
-// the row offers no Uninstall for it.
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::{hermes_launchers, node_runtime, npm_package, routes, support, ProcOutput};
 use crate::engines::support::paths::InstallRoot;
 
-/// npm and brew take a few seconds to uninstall; this only stops one that hangs.
 const UNINSTALL_TIMEOUT: Duration = Duration::from_secs(180);
 
-/// How an installed engine is uninstalled, from where its program was found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Removal {
-    /// Misty installed it: its folder in `~/.misty/shared/engines`.
     Misty,
-    /// npm installed it globally under `prefix`: `npm uninstall -g --prefix <prefix> <package>`.
     Npm {
         prefix: PathBuf,
         package: &'static str,
     },
-    /// Homebrew installed it: `<brew> uninstall [--cask] <name>`.
     Brew {
         brew: PathBuf,
         name: String,
         cask: bool,
     },
-    /// The maker's installer put it here: these files and folders go.
     Files(Vec<PathBuf>),
 }
 
 impl Removal {
-    /// How the frontend words the confirmation: "misty", "npm", "brew" or "maker".
     pub(super) fn kind(&self) -> &'static str {
         match self {
             Removal::Misty => "misty",
@@ -47,12 +32,9 @@ impl Removal {
     }
 }
 
-/// The person's folders a maker's installer writes into.
 pub(super) struct Homes {
     pub(super) home: PathBuf,
-    /// `CODEX_HOME`, else `~/.codex`.
     pub(super) codex_home: PathBuf,
-    /// `HERMES_HOME`, else Hermes Agent's own default.
     pub(super) hermes_home: PathBuf,
 }
 
@@ -71,7 +53,6 @@ impl Homes {
     }
 }
 
-/// How `engine`'s copy at `bin` is uninstalled, or `None` when Misty can't tell.
 pub(super) fn removal(engine: &str, bin: &str) -> Option<Removal> {
     removal_in(
         &InstallRoot::here(),
@@ -82,7 +63,6 @@ pub(super) fn removal(engine: &str, bin: &str) -> Option<Removal> {
     )
 }
 
-/// [`removal`] with Misty's folder at `root` and the person's folders at `homes`.
 pub(super) fn removal_in(
     root: &InstallRoot,
     homes: &Homes,
@@ -98,14 +78,11 @@ pub(super) fn removal_in(
         return Some(Removal::Misty);
     }
     let real = real(path);
-    // Homebrew first: a formula built on an npm package also has a `node_modules` inside.
     brew_package(&real)
         .or_else(|| npm_global(engine, path, &real, windows))
         .or_else(|| maker_files(engine, path, &real, homes).map(Removal::Files))
 }
 
-/// A program inside Homebrew's `Cellar/<formula>` or `Caskroom/<cask>`, uninstalled with the
-/// `brew` of that same Homebrew.
 fn brew_package(real: &Path) -> Option<Removal> {
     let parts: Vec<_> = real.components().collect();
     let at = parts.iter().position(|part| {
@@ -113,14 +90,16 @@ fn brew_package(real: &Path) -> Option<Removal> {
         part == "Cellar" || part == "Caskroom"
     })?;
     let cask = parts[at].as_os_str() == "Caskroom";
-    let name = parts.get(at + 1)?.as_os_str().to_string_lossy().into_owned();
+    let name = parts
+        .get(at + 1)?
+        .as_os_str()
+        .to_string_lossy()
+        .into_owned();
     let prefix: PathBuf = parts[..at].iter().collect();
     let brew = prefix.join("bin").join("brew");
     (!name.is_empty() && is_file(&brew)).then_some(Removal::Brew { brew, name, cask })
 }
 
-/// npm's global copy: `<prefix>/bin/<cli>` linking into `<prefix>/lib/node_modules/<package>`, or
-/// on Windows a `<prefix>\<cli>.cmd` shim beside `<prefix>\node_modules\<package>`.
 fn npm_global(engine: &str, path: &Path, real: &Path, windows: bool) -> Option<Removal> {
     let package = npm_package(engine)?;
     let (prefix, modules) = if windows {
@@ -134,28 +113,22 @@ fn npm_global(engine: &str, path: &Path, real: &Path, windows: bool) -> Option<R
     if !super::is_dir_outside_gate(&installed) {
         return None;
     }
-    // On Windows the shim is a file of its own; elsewhere the program must lead into the package.
     (windows || real.starts_with(self::real(&installed))).then(|| Removal::Npm {
         prefix: prefix.to_path_buf(),
         package,
     })
 }
 
-/// What a maker's installer left, for the installers whose layout is known. Only the program and
-/// the versions kept for it go, never the engine's own settings folder.
 fn maker_files(engine: &str, path: &Path, real: &Path, homes: &Homes) -> Option<Vec<PathBuf>> {
     let local_bin = homes.home.join(".local").join("bin");
     let in_local_bin = path.parent() == Some(local_bin.as_path());
     match engine {
-        // Claude Code's installer: `~/.local/bin/claude`, its versions in `~/.local/share/claude`.
         "claude" => {
             let versions = homes.home.join(".local").join("share").join("claude");
             let ours = real.starts_with(self::real(&versions))
                 || (in_local_bin && super::is_dir_outside_gate(&versions));
             ours.then(|| vec![path.to_path_buf(), versions])
         }
-        // Codex's script: a link in `~/.local/bin` into `~/.codex/packages/standalone`, with its
-        // code-mode host beside it.
         "codex" => {
             let standalone = homes.codex_home.join("packages").join("standalone");
             let standalone_real = self::real(&standalone);
@@ -173,15 +146,11 @@ fn maker_files(engine: &str, path: &Path, real: &Path, homes: &Homes) -> Option<
             files.push(standalone);
             Some(files)
         }
-        // OpenCode's script: one program in `~/.opencode/bin`.
         "opencode" => {
             let dir = homes.home.join(".opencode").join("bin");
             (path.parent() == Some(dir.as_path())).then(|| vec![path.to_path_buf()])
         }
-        // Antigravity's script: one program copied into `~/.local/bin`.
         "agy" => in_local_bin.then(|| vec![path.to_path_buf()]),
-        // Hermes Agent's script: a checkout in `<hermes home>/hermes-agent` and wrappers that start
-        // it; `run` takes every wrapper naming that checkout.
         "hermes" => {
             let checkout = homes.hermes_home.join("hermes-agent");
             let ours = hermes_launchers::wrapper_names(path, &checkout)
@@ -193,7 +162,6 @@ fn maker_files(engine: &str, path: &Path, real: &Path, homes: &Homes) -> Option<
     }
 }
 
-/// Uninstalls `engine`'s copy at `bin` the way `removal` says.
 pub(super) async fn run(engine: &str, bin: &str, removal: Removal) -> Result<(), String> {
     match removal {
         Removal::Misty => {
@@ -232,8 +200,6 @@ pub(super) async fn run(engine: &str, bin: &str, removal: Removal) -> Result<(),
     }
 }
 
-/// npm to uninstall with: the computer's own, else Misty's Node.js. The global prefix is passed
-/// to it, so it needn't be the npm that installed the copy.
 fn npm_program() -> Option<(String, Vec<String>)> {
     if let Some(npm) = routes::computer_npm() {
         return Some((npm, Vec::new()));
@@ -274,13 +240,9 @@ fn finished(name: &str, output: &ProcOutput) -> Result<(), String> {
     })
 }
 
-/// Deletes a maker's install: each file or link, and each folder with everything in it. Hermes
-/// Agent's other wrappers for the same checkout go too. These are program folders outside the
-/// file gate, as when Misty finds a program to run.
 #[allow(clippy::disallowed_methods)]
 fn delete_files(engine: &str, files: &[PathBuf]) -> Result<(), String> {
     if engine == "hermes" {
-        // The checkout holds no record of launchers, so only those that name it go.
         if let Some(checkout) = files.last() {
             hermes_launchers::remove_owned(&hermes_launchers::dirs(), checkout, checkout);
         }

@@ -15,9 +15,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { ContextMenuContent, ContextMenuSeparator, MenuItem } from "@misty/ui";
-import { canOpenInBrowser } from "../editor/editorViewMode";
-import { parentPath } from "./filesStore";
-import type { FileTreeMenuTarget } from "./useFileTreeOperations";
+import { canOpenInBrowser } from "../editor/editor_view_mode";
+import { parentPath } from "./files_store";
+import type { FileTreeMenuTarget } from "./use_file_tree_operations";
 
 const revealLabel = navigator.platform.includes("Mac")
   ? "Reveal in Finder"
@@ -25,11 +25,6 @@ const revealLabel = navigator.platform.includes("Mac")
     ? "Reveal in Explorer"
     : "Reveal in file manager";
 
-/**
- * The tree's right-click menu. Where it opens and how it closes come from the shared context
- * menu; this lists the file actions. New and paste go into the folder itself for a folder's row,
- * and into the folder that holds it for a file's.
- */
 export function FileTreeContextMenu({
   target,
   isRoot,
@@ -49,7 +44,6 @@ export function FileTreeContextMenu({
   onTrash,
 }: {
   target: FileTreeMenuTarget;
-  /** The linked folder's own row: it can't be renamed or trashed from here. */
   isRoot: boolean;
   pasteDisabled: boolean;
   onNewFile(dir: string): void;

@@ -1,6 +1,3 @@
-//! Precise pointing for the cursor companion: the real control near a model's
-//! point (macOS Accessibility), a full-resolution crop around it for the model
-//! to place again, and the clicks a walkthrough step waits for.
 mod region;
 mod snap;
 pub use region::capture_region;
@@ -14,18 +11,16 @@ use serde_json::{json, Value};
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Webview};
 
-/// Sends a click to the main window while a walkthrough step waits for one.
 pub(super) fn forward_click(app: &AppHandle, state: &super::CursorCompanionState, x: f64, y: f64) {
     let turn = state.click_turn.load(Ordering::SeqCst);
     if state.watch_clicks.load(Ordering::SeqCst) && current(state, turn) {
-        let _ = crate::browser::app_windows::emit_to_primary(
-            &app,
+        crate::browser::app_windows::emit_to_primary(
+            app,
             "misty://cursor-click",
             json!({"turn":turn,"x":x,"y":y}),
         );
     }
 }
-/// Starts or stops forwarding the person's clicks for a walkthrough step.
 #[tauri::command]
 pub fn cursor_companion_watch_clicks(
     webview: Webview,
@@ -42,8 +37,6 @@ pub fn cursor_companion_watch_clicks(
     state.watch_clicks.store(watching, Ordering::SeqCst);
     Ok(())
 }
-/// Where the pointer went while the talk keys were held for `turn`, in global units: what the
-/// person circled or scribbled over as they asked. Empty for any other turn.
 #[tauri::command]
 pub fn cursor_companion_trail(
     webview: Webview,
@@ -58,7 +51,6 @@ pub fn cursor_companion_trail(
     let trail = state.trail.lock().unwrap();
     Ok(trail.iter().map(|&(x, y)| [x, y]).collect())
 }
-/// The real control at or near a pointed-at spot, or null.
 #[tauri::command]
 pub async fn cursor_companion_snap(
     webview: Webview,
@@ -75,8 +67,6 @@ pub async fn cursor_companion_snap(
         .map_err(|e| e.to_string())??;
     Ok(element.unwrap_or(Value::Null))
 }
-/// A full-resolution crop of one display centered on a global point, so the
-/// model can place a pointer it could only estimate from the downscaled view.
 #[tauri::command]
 pub async fn cursor_companion_capture_region(
     webview: Webview,
@@ -127,9 +117,6 @@ pub async fn cursor_companion_capture_region(
     .map_err(|e| e.to_string())?
 }
 
-/// A crop of one display around a companion point. `x`, `y`, `region_width`
-/// and `region_height` place it in display-local units (points on macOS,
-/// physical pixels on Windows); `width` and `height` are its pixels.
 pub struct RegionCapture {
     pub bytes: Vec<u8>,
     pub width: u32,

@@ -36,10 +36,10 @@ const stateWords: Record<Transfer["state"], string> = {
   cancelled: "Cancelled",
 };
 
-/** A transfer's state where its row ends: its progress while it runs, else its mark. */
 function TransferState({ transfer }: { transfer: Transfer }) {
   if (transfer.state === "running") {
-    const share = transfer.totalBytes > 0 ? Math.min(100, (transfer.doneBytes / transfer.totalBytes) * 100) : 0;
+    const share =
+      transfer.totalBytes > 0 ? Math.min(100, (transfer.doneBytes / transfer.totalBytes) * 100) : 0;
     return (
       <span className="flex w-40 items-center gap-2">
         <Progress value={share} aria-label={transfer.label} className="flex-1" />
@@ -66,19 +66,14 @@ function TransferState({ transfer }: { transfer: Transfer }) {
 
 function transferMenu(transfer: Transfer) {
   if (transfer.state === "running" || transfer.state === "queued")
-    return <MenuItem icon={CircleSlash} label="Cancel" onSelect={() => cancelTransfer(transfer.opId)} />;
+    return (
+      <MenuItem icon={CircleSlash} label="Cancel" onSelect={() => cancelTransfer(transfer.opId)} />
+    );
   if (transfer.retry && transfer.state !== "done")
     return <MenuItem icon={RotateCcw} label="Try again" onSelect={transfer.retry} />;
   return undefined;
 }
 
-/**
- * Kura's Transfers, a tab of its own: every copy, move, compress and other long operation Files ran
- * in this window, newest first, with where it read from and wrote to, its progress while it runs,
- * what became of it, and Cancel or Try again in its menu. The queue runs one at a time and can be
- * paused (what runs finishes, what waits stays). A search and a filter by state narrow it; finished
- * ones can be cleared.
- */
 export function TransfersView() {
   const list = useTransfers((store) => store.list);
   const clearFinished = useTransfers((store) => store.clearFinished);
@@ -88,7 +83,9 @@ export function TransfersView() {
   const [state, setState] = useState<string>("all");
   const needle = query.trim().toLocaleLowerCase();
   const shown = list.filter(
-    (each) => (state === "all" || each.state === state) && (!needle || each.label.toLocaleLowerCase().includes(needle)),
+    (each) =>
+      (state === "all" || each.state === state) &&
+      (!needle || each.label.toLocaleLowerCase().includes(needle)),
   );
   const byId = new Map(shown.map((each) => [each.opId, each]));
 
@@ -132,7 +129,11 @@ export function TransfersView() {
   ];
   const items: CollectionItem[] = shown.map((transfer) => ({
     id: transfer.opId,
-    title: transfer.error ? `${transfer.label}: ${transfer.error}` : transfer.item ? `${transfer.label} ${transfer.item}` : transfer.label,
+    title: transfer.error
+      ? `${transfer.label}: ${transfer.error}`
+      : transfer.item
+        ? `${transfer.label} ${transfer.item}`
+        : transfer.label,
     category: stateWords[transfer.state],
     updated: formatDate(transfer.endedAt ?? transfer.startedAt ?? transfer.queuedAt),
     metadata: { Size: transfer.totalBytes > 0 ? formatBytes(transfer.totalBytes) : "—" },
@@ -151,11 +152,33 @@ export function TransfersView() {
           ...(paused || waiting
             ? [
                 paused
-                  ? { id: "queue", icon: Play, label: "Resume queue", priority: 2, onSelect: () => setPaused(false) }
-                  : { id: "queue", icon: Pause, label: "Pause queue", priority: 2, onSelect: () => setPaused(true) },
+                  ? {
+                      id: "queue",
+                      icon: Play,
+                      label: "Resume queue",
+                      priority: 2,
+                      onSelect: () => setPaused(false),
+                    }
+                  : {
+                      id: "queue",
+                      icon: Pause,
+                      label: "Pause queue",
+                      priority: 2,
+                      onSelect: () => setPaused(true),
+                    },
               ]
             : []),
-          ...(finished ? [{ id: "clear", icon: Eraser, label: "Clear finished", priority: 1, onSelect: clearFinished }] : []),
+          ...(finished
+            ? [
+                {
+                  id: "clear",
+                  icon: Eraser,
+                  label: "Clear finished",
+                  priority: 1,
+                  onSelect: clearFinished,
+                },
+              ]
+            : []),
         ]}
         end={
           <>
@@ -177,12 +200,21 @@ export function TransfersView() {
       />
       {items.length ? (
         <div className="px-4 pb-4">
-          <CollectionItems view="list" columns={columns} columnSetId="files-transfers" items={items} />
+          <CollectionItems
+            view="list"
+            columns={columns}
+            columnSetId="files-transfers"
+            items={items}
+          />
         </div>
       ) : (
         <EmptyState
           title={list.length ? "No transfers match" : "No transfers yet"}
-          line={list.length ? "Try another search or filter." : "Copies, moves and other long operations show up here."}
+          line={
+            list.length
+              ? "Try another search or filter."
+              : "Copies, moves and other long operations show up here."
+          }
         />
       )}
     </CollectionPage>

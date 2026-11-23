@@ -1,8 +1,3 @@
-//! Encrypted pending saves for workspace recovery. When the database cannot
-//! take a write, the value waits in one sealed file per key beside it, so a
-//! retry replaces the earlier attempt instead of adding a duplicate. A slot
-//! records the database revision it was based on: it replays only onto that
-//! revision, and any newer database copy wins over it.
 use crate::{
     recovery::{validate_key, RecoveryRecord, RecoveryStore, MAX_BYTES},
     Error, Result,
@@ -24,14 +19,11 @@ fn aad(key: &str, base: u64) -> String {
     format!("workspace-recovery:pending:v1:{key}:{base}")
 }
 
-/// Failures the pending slot can outlast: the database itself, or its capacity.
-/// Stale revisions and invalid keys stay errors for the caller to resolve.
 fn retryable(error: &Error) -> bool {
     matches!(error, Error::Storage(_) | Error::TooLarge)
 }
 
 impl RecoveryStore {
-    /// The newest local value: a pending save if one waits, else the database copy.
     pub fn read(&self, key: &str) -> Result<Option<RecoveryRecord>> {
         let saved = self.read_saved(key);
         let Some((base, value)) = self.pending_slot(key)? else {
@@ -41,7 +33,6 @@ impl RecoveryStore {
             Ok(record) => record.as_ref().map_or(0, |r| r.revision),
             Err(_) => base,
         };
-        // A database copy newer than the slot's base already superseded it.
         if revision != base {
             return saved;
         }
@@ -52,8 +43,6 @@ impl RecoveryStore {
         }))
     }
 
-    /// Saves `value` over revision `expected`. If the database cannot take it,
-    /// the value waits in its key's pending slot and the result says so.
     pub fn write(&mut self, key: &str, expected: u64, value: &str) -> Result<RecoveryRecord> {
         validate_key(key)?;
         if value.len() > MAX_BYTES {
@@ -77,7 +66,6 @@ impl RecoveryStore {
         }
     }
 
-    /// Keys whose newest value is waiting in a pending slot.
     pub fn pending_keys(&self) -> Result<Vec<String>> {
         let mut keys = Vec::new();
         for path in self.slot_paths()? {
@@ -89,8 +77,6 @@ impl RecoveryStore {
         Ok(keys)
     }
 
-    /// Moves every pending save into the database that can go there now. A slot
-    /// the database already holds, or has moved past, is dropped.
     pub(crate) fn replay_pending(&mut self) -> Result<()> {
         for path in self.slot_paths()? {
             let Some(slot) = read_slot(&path)? else {
@@ -107,7 +93,6 @@ impl RecoveryStore {
             match self.write_saved(&slot.key, slot.base, &value) {
                 Ok(_) => remove(&path)?,
                 Err(error) if retryable(&error) => return Err(error),
-                // The slot can never apply (for example an immutable archive).
                 Err(_) => remove(&path)?,
             }
         }
@@ -156,8 +141,6 @@ impl RecoveryStore {
             builder.mode(0o700);
         }
         builder.create(&self.pending).map_err(|_| Error::Recovery)?;
-        // Write beside the slot, then rename over it: a crash leaves either the
-        // previous pending save or the new one, never a torn file.
         let path = self.slot_path(key);
         let partial = path.with_extension("partial");
         let mut options = fs::OpenOptions::new();
@@ -236,7 +219,6 @@ mod tests {
         let mut store = RecoveryStore::open(&path, scope, RecoveryKey::generate()).unwrap();
         store.write("workspace", 0, "first").unwrap();
         store.save_slot("workspace", 1, "older pending").unwrap();
-        // A database save that landed while removing its slot failed.
         store.write_saved("workspace", 1, "newer").unwrap();
         assert_eq!(store.read("workspace").unwrap().unwrap().value, "newer");
         store.replay_pending().unwrap();

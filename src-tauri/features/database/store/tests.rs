@@ -66,7 +66,6 @@ fn migration_18_keeps_the_device_id_and_drops_what_is_no_longer_kept() {
         )
         .unwrap();
     assert_eq!(id, "\"device_old\"");
-    // An account already seeded stays seeded; old import names don't come along.
     let moved: Vec<String> = connection
         .prepare("SELECT scope FROM settings_state WHERE document = 'true'")
         .unwrap()
@@ -174,12 +173,17 @@ fn migration_20_removes_only_the_coding_preferences() {
         state("settings-baseline:hosted"),
         (3, r#"{"agent":{"mode":"act"}}"#.into())
     );
-    // Nothing else changes, not even its spacing or revision.
     assert_eq!(
         state("clean"),
-        (7, r#"{ "version": 3, "values": {"agents.mode": "act"} }"#.into())
+        (
+            7,
+            r#"{ "version": 3, "values": {"agents.mode": "act"} }"#.into()
+        )
     );
     assert_eq!(state("device:id"), (1, r#""device_old""#.into()));
     assert_eq!(state("profile-collections:a"), (1, "true".into()));
-    assert_eq!(state("broken"), (3, r#"{not json "coding_default_tool""#.into()));
+    assert_eq!(
+        state("broken"),
+        (3, r#"{not json "coding_default_tool""#.into())
+    );
 }

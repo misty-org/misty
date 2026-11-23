@@ -1,12 +1,8 @@
-//! What the renderer may publish into a profile's records. Nothing here lets a renderer read or
-//! write a profile's records: those stay native.
 #[cfg(test)]
 mod boundary {
     use browser_data::document::entities;
     use serde_json::Value;
 
-    /// Written by `src/features/app-windows/tabs/profileTabRecordBoundary.test.ts` from the real
-    /// renderer code.
     const RECORDS: &str = include_str!("testdata/renderer_records.json");
 
     fn collection(name: &str) -> Vec<Value> {

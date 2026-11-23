@@ -1,19 +1,14 @@
-//! Clearing a profile's website data.
 use super::*;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserClearDataRequest {
-    /// Any of "cookies" (cookies and site storage) and "cache".
     pub kinds: Vec<String>,
-    /// Data changed at or after this time (ms).
     pub since: i64,
 }
 
-/// Which website data to clear.
 #[derive(Clone, Copy, Default)]
 struct ClearKinds {
-    /// Cookies and every kind of site storage.
     cookies: bool,
     cache: bool,
 }
@@ -35,7 +30,6 @@ pub async fn browser_clear_website_data(
     if !kinds.cookies && !kinds.cache {
         return Ok(());
     }
-    // Always the store of the window asking.
     let profile = crate::browser::app_windows::profile_for_window(webview.window().label())
         .ok_or("This window has no profile.")?;
     let store = crate::browser::app_windows::store_for_profile(&profile)?;
@@ -51,6 +45,29 @@ pub async fn browser_clear_website_data(
     {
         let _ = (app, identifier, store);
         Err("Clearing website data is not available on this platform.".to_owned())
+    }
+}
+
+pub(crate) async fn clear_all_store_data(
+    app: &AppHandle,
+    store: Option<&str>,
+) -> Result<(), String> {
+    let kinds = ClearKinds {
+        cookies: true,
+        cache: true,
+    };
+    let identifier = webkit_store_identifier(store)?;
+    #[cfg(target_os = "macos")]
+    return clear_webkit_website_data(app, identifier, kinds, 0).await;
+    #[cfg(windows)]
+    {
+        let _ = identifier;
+        clear_webview2_website_data(app, store, kinds, 0).await
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (app, identifier, kinds);
+        Err("Signing out of apps is not available on this platform.".to_owned())
     }
 }
 
@@ -85,8 +102,6 @@ async fn clear_webkit_website_data(
         .await
 }
 
-/// Clears through a hidden page in the profile: WebView2 removes data only
-/// through a live view's profile.
 #[cfg(windows)]
 async fn clear_webview2_website_data(
     app: &AppHandle,

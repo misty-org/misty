@@ -1,10 +1,5 @@
-//! omp's commands that run in a fork of the session or as its own subcommands.
-
 use super::*;
 
-/// omp's TUI mode that lives in its interactive input loop (`InteractiveMode`) with no rpc
-/// command, so a fresh rpc process per turn can't hold it. Goal, guided goal and loop are Misty's
-/// own goal runner's to run instead.
 pub(super) fn omp_tui_only(name: &str) -> Option<Output> {
     let why = match name {
         "vibe" => {
@@ -16,7 +11,6 @@ pub(super) fn omp_tui_only(name: &str) -> Option<Output> {
     Some(Output::done(why))
 }
 
-/// The usage line omp's TUI shows when a flow is given nothing to work on.
 pub(super) fn omp_usage(name: &str, args: &str) -> Option<String> {
     let empty = match name {
         "omfg" => omfg_args(args).1.is_empty(),
@@ -30,7 +24,6 @@ pub(super) fn omp_usage(name: &str, args: &str) -> Option<String> {
     })
 }
 
-/// omp's `btw-user.md`, the side question as its TUI sends it.
 pub(super) fn btw_prompt(question: &str) -> String {
     format!(
         "<btw>\nEphemeral side question for current interactive session.\nAnswer briefly, \
@@ -40,8 +33,6 @@ pub(super) fn btw_prompt(question: &str) -> String {
     )
 }
 
-/// `/btw <question>`: answered in a throwaway fork with no tools, which is discarded after, so
-/// the chat's session never sees it (omp's TUI runs it as an ephemeral turn).
 pub(super) async fn btw(folder: &Path, session: &str, question: &str) -> Result<Output, String> {
     let answer = side_reply(folder, session, &btw_prompt(question)).await?;
     Ok(Output::info(
@@ -54,7 +45,15 @@ pub(super) async fn btw(folder: &Path, session: &str, question: &str) -> Result<
     ))
 }
 
-/// One reply to `prompt` from a no-tools fork of the session, which is removed afterwards.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "removes the side session omp forked, in omp's own session folder wherever it keeps it"
+)]
+async fn drop_fork(file: &Path) {
+    let _ = tokio::fs::remove_file(file).await;
+    let _ = tokio::fs::remove_dir_all(file.with_extension("")).await;
+}
+
 pub(super) async fn side_reply(
     folder: &Path,
     session: &str,
@@ -90,19 +89,16 @@ pub(super) async fn side_reply(
     }
     .await;
     rpc.close().await;
-    // Removed as the TUI removes a /tan clone it drops: the file and its artifacts folder.
     if forked.as_deref() != Some(session) {
         if let Some(file) =
             fork_file.filter(|file| file.extension().is_some_and(|ext| ext == "jsonl"))
         {
-            let _ = tokio::fs::remove_file(&file).await;
-            let _ = tokio::fs::remove_dir_all(file.with_extension("")).await;
+            drop_fork(&file).await;
         }
     }
     result
 }
 
-/// omp's `tan-context-switch.md`, which its TUI puts before the work in the fork.
 const TAN_CONTEXT_SWITCH: &str = "<system-notice cause=\"fork\">
 Above conversation: parent session.
 Fork solely handles user's request below.
@@ -115,12 +111,10 @@ Parent still working original task; no responsibility or obligations from prior 
 - After request: STOP. NEVER work on ANY OTHER TASK.
 </system-notice>";
 
-/// The fork's first message: the context switch, then the work.
 pub(super) fn tan_prompt(work: &str) -> String {
     format!("{TAN_CONTEXT_SWITCH}\n\n{}", work.trim())
 }
 
-/// The TUI's label for a tan: the work on one line, 80 characters at most.
 pub(super) fn tan_title(work: &str) -> String {
     let line = work.split_whitespace().collect::<Vec<_>>().join(" ");
     if line.chars().count() <= 80 {
@@ -131,9 +125,6 @@ pub(super) fn tan_title(work: &str) -> String {
     short
 }
 
-/// `/tan <work>`: a fork of the whole session, opened as a new chat that runs the work beside
-/// this one. The fork's todo list is cleared first, as the TUI clears it, so it doesn't pick up
-/// this chat's task; `/todo rm` runs in omp without the model.
 pub(super) async fn tan(folder: &Path, session: &str, work: &str) -> Result<Output, String> {
     let mut rpc = RpcSession::fork("omp", folder, session, &[]).await?;
     let result = async {
@@ -154,8 +145,6 @@ pub(super) async fn tan(folder: &Path, session: &str, work: &str) -> Result<Outp
         prompt: Some(tan_prompt(work)),
     })
 }
-/// The TUI's `/cleanse` arguments (`parseCleanseArgs`) as `omp cleanse` takes them: the words
-/// that aren't flags are the request.
 pub(super) fn cleanse_args(args: &str) -> Result<Vec<String>, String> {
     const USAGE: &str = "Usage: /cleanse [request] [--all] [--tests] [-n <agents>] [-m <model>]";
     let mut tokens = args.split_whitespace();
@@ -194,9 +183,6 @@ pub(super) fn cleanse_args(args: &str) -> Result<Vec<String>, String> {
     Ok(argv)
 }
 
-/// `/cleanse`: omp's own `omp cleanse` in the chat's folder. Without a terminal it runs every
-/// checker it finds (its picker needs one), dispatches its subagents, and prints its board,
-/// which comes back here when it ends.
 pub(super) async fn cleanse(folder: &Path, args: &str) -> Result<Output, String> {
     let argv = cleanse_args(args)?;
     let (mut cmd, bin) = crate::engines::pi_family::cli_command("omp", folder)?;

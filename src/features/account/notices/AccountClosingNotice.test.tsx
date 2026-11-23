@@ -1,7 +1,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useAccountClosing } from "@/api/client/accountLimits";
+import { useAccountClosing } from "@/api/client/account_limits";
 
 const mocks = vi.hoisted(() => ({
   user: { id: "u1", email: "me@example.com", username: "me" } as {
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   dialog: vi.fn(),
 }));
 
-vi.mock("../sessions/authState", () => ({ useAuth: () => ({ user: mocks.user }) }));
+vi.mock("../sessions/auth_state", () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock("@/features/account/api/api", () => ({
   accountApi: { me: async () => ({ provider: "google" }) },
 }));

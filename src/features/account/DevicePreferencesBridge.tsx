@@ -1,19 +1,13 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "./sessions/authState";
+import { useAuth } from "./sessions/auth_state";
 import { useSettingsStore } from "@/features/settings";
 import { useDevicePreferences } from "@/features/settings";
 import { mutateState } from "@/features/settings";
-import { useDockingLayoutStore } from "@/app/shell/dockingLayout";
-import { writeDevicePreference } from "@/features/settings/preferenceAccess";
+import { useDockingLayoutStore } from "@/app/shell/docking_layout";
+import { writeDevicePreference } from "@/features/settings/preference_access";
 
-// Settings were namespaced by deployment while self-hosting existed; Hosted is the one left.
 const scope = "hosted";
 
-/**
- * Older builds kept the cursor companion's choices per account in the webview's storage. Once that
- * account is known here they move into this device's settings, filling only what is still unset,
- * and the old key goes.
- */
 function importLegacyCompanion(accountId: string) {
   const key = `misty.cursor-companion:${accountId}`;
   let saved: Record<string, unknown> | null = null;
@@ -21,9 +15,7 @@ function importLegacyCompanion(accountId: string) {
     const raw = localStorage.getItem(key);
     if (raw === null) return;
     saved = JSON.parse(raw);
-  } catch {
-    /* Corrupt legacy preferences are dropped. */
-  }
+  } catch {}
   const values = useDevicePreferences.getState().state?.values;
   const legacy = [
     ["agents.companion.size", saved?.size, "number"],
@@ -55,8 +47,6 @@ export function DevicePreferencesBridge() {
     if (!loaded || !available || transitioning) return;
     let active = true;
     const initialize = async () => {
-      // A frozen installation baseline prevents a newly selected account from
-      // importing the previous account's preferences.
       const seed = await mutateState<Record<string, unknown>>(
         `settings-baseline:${scope}`,
         () => {
@@ -70,7 +60,6 @@ export function DevicePreferencesBridge() {
           };
         },
         (s) => {
-          // Extend an older frozen baseline only with previously separate installation caches.
           const document = useSettingsStore.getState().settings?.document ?? {};
           const shortcuts = (s.shortcuts ?? {}) as Record<string, unknown>;
           const appearance = (s.appearance ?? {}) as Record<string, unknown>;
@@ -93,8 +82,6 @@ export function DevicePreferencesBridge() {
         },
       );
       if (!active) return;
-      // Settings belong to this device, not to an account: they stay put when someone else
-      // signs in, and they apply on the sign-in screen too.
       await useDevicePreferences.getState().configure(JSON.stringify([scope]), seed);
     };
     void initialize().catch((error) => useDevicePreferences.setState({ error: String(error) }));
@@ -102,11 +89,9 @@ export function DevicePreferencesBridge() {
       active = false;
       useDevicePreferences.getState().disconnect();
     };
-    // Settings belong to the device, so the signed-in account's id is not a separate trigger.
   }, [loaded, available, transitioning, retry]);
   const accountId = user?.id;
   const ready = useDevicePreferences((s) => s.ready);
-  // Runs once someone is signed in and the settings are ready, not only at startup.
   useEffect(() => {
     if (accountId && ready) importLegacyCompanion(accountId);
   }, [accountId, ready]);

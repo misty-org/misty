@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { AgentMessageChecklist } from "./AgentChecklist";
 import { useCollaborationStore } from "./store";
-import type { AgentChecklist, ConversationCollaboration } from "./planTypes";
+import type { AgentChecklist, ConversationCollaboration } from "./plan_types";
 
 const checklist: AgentChecklist = {
   invocationId: "inv_1",

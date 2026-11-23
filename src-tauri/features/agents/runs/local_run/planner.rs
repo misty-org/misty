@@ -1,4 +1,3 @@
-//! Builds what a local run starts from: its prompt and tools, out of the request the app sent.
 use std::{collections::HashMap, sync::Arc};
 
 use chrono::SecondsFormat;
@@ -24,11 +23,22 @@ impl PromptPlanner {
         let device_names: HashMap<String, String> = request
             .get("device_names")
             .and_then(Value::as_object)
-            .map(|names| names.iter().filter_map(|(id, name)| Some((id.clone(), name.as_str()?.to_owned()))).collect())
+            .map(|names| {
+                names
+                    .iter()
+                    .filter_map(|(id, name)| Some((id.clone(), name.as_str()?.to_owned())))
+                    .collect()
+            })
             .unwrap_or_default();
         CatalogInputs {
-            signed_in: request.get("signed_in").and_then(Value::as_bool).unwrap_or(false),
-            apps_connected: request.get("apps_connected").and_then(Value::as_bool).unwrap_or(false),
+            signed_in: request
+                .get("signed_in")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            apps_connected: request
+                .get("apps_connected")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
             search: self.models.search().map(|saved| saved.provider),
             device_names,
         }
@@ -42,10 +52,15 @@ impl PromptPlanner {
 impl RunPlanner for PromptPlanner {
     fn context(&self, request: &Value, _device: &Value) -> Result<Value, RuntimeError> {
         let parsed = RunRequest::from_json(request);
-        let tools: Vec<String> = self.tools(request).into_iter().map(|tool| tool.name).collect();
-        // The app sends its own clock in the person's timezone: the prompt's dates are read in it.
+        let tools: Vec<String> = self
+            .tools(request)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect();
         let now = match text(request, "now") {
-            "" => chrono::DateTime::from_timestamp_millis(now_ms()).map(|at| at.to_rfc3339_opts(SecondsFormat::Secs, true)).unwrap_or_default(),
+            "" => chrono::DateTime::from_timestamp_millis(now_ms())
+                .map(|at| at.to_rfc3339_opts(SecondsFormat::Secs, true))
+                .unwrap_or_default(),
             now => now.to_owned(),
         };
         let built = build_prompt(&parsed, &tools, &now);
@@ -66,7 +81,6 @@ impl RunPlanner for PromptPlanner {
         if let Some(window) = built.context_window_tokens {
             context["context_window_tokens"] = json!(window);
         }
-        // Handed to the loop as the app sent them.
         for name in ["capture", "display_captures", "attachments"] {
             if let Some(value) = request.get(name).filter(|value| !value.is_null()) {
                 context[name] = value.clone();

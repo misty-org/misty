@@ -4,12 +4,9 @@ use std::cell::Cell;
 #[test]
 fn restores_only_when_nobody_else_wrote() {
     assert!(should_restore(41, 41));
-    // Another app (or the person) copied something after Misty's write.
     assert!(!should_restore(41, 42));
 }
 
-/// A clipboard whose change count rises on every write, with an optional
-/// writer that copies something while the paste is in flight.
 struct Fake {
     contents: std::cell::RefCell<String>,
     count: Cell<u64>,

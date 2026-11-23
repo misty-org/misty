@@ -1,12 +1,9 @@
-// Most of these paths are Unix paths, so the Windows build uses fewer of the imports.
 #![cfg_attr(windows, allow(unused_imports))]
 use std::{fs as std_fs, io::ErrorKind, path::PathBuf};
 
 use super::fs;
 use super::{policy::Policy, policy::Shape, Access, Reach};
 
-/// A policy with `.misty` under a scratch folder as its only rule. The process-wide policy allows
-/// the whole temp folder in tests, for fixtures, so refusals are tested on this one.
 fn scratch() -> (tempfile::TempDir, PathBuf, Policy) {
     let directory = tempfile::tempdir().unwrap();
     let root = std_fs::canonicalize(directory.path()).unwrap();
@@ -141,7 +138,6 @@ fn names_starting_covers_only_those_entries() {
     assert!(!policy.allows_path(&root, Access::Write));
 }
 
-// The process-wide gate, on a path outside the temp folder every test may use.
 #[cfg(unix)]
 #[test]
 fn the_wrappers_refuse_with_permission_denied() {
@@ -219,8 +215,6 @@ fn the_wrappers_work_inside() {
 
 const GRANTS: &str = include_str!("../../tauri-permissions/grants/grants.toml");
 
-/// The grant behind each place Misty can reach. It's an exhaustive match, so a new place has to say
-/// here whether it's one.
 fn grants_for(reach: Reach) -> &'static [&'static str] {
     match reach {
         Reach::DownloadsFolder => &["grant-downloads"],
@@ -269,8 +263,6 @@ fn the_list_matches_grants_toml() {
     ]
     .into_iter()
     .flat_map(|reach| grants_for(reach).iter().copied())
-    // The disk grant isn't a place in the policy: it is its own switch (`disk.rs`), which only
-    // Files reaches through.
     .chain(["grant-disk"])
     .collect();
     assert_eq!(listed, declared);

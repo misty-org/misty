@@ -5,7 +5,6 @@ interface ParsedUsage {
   cacheRead: number;
   cacheWrite: number;
   total: number;
-  /** Engine-reported window (Codex `model_context_window`). */
   contextWindow?: number;
 }
 
@@ -35,7 +34,6 @@ function reportedWindow(...sources: Array<Record<string, unknown> | null>): numb
   return undefined;
 }
 
-/** Window metadata is useful even before any tokens have been reported. */
 export function reportedContextWindow(usage: unknown): number | undefined {
   const raw = asRecord(usage);
   const info = asRecord(raw?.info);
@@ -47,33 +45,18 @@ export function reportedContextWindow(usage: unknown): number | undefined {
   );
 }
 
-/** Engines whose cache counters sit *inside* `input_tokens`. Codex reports
- *  `cached_input_tokens` / `cache_write_input_tokens` as parts of the prompt
- *  it bills (`total_tokens` = input + output), while Claude and the pi family
- *  report `cache_read_input_tokens` / `cacheRead` outside it. */
 function cacheInsideInput(u: Record<string, unknown>): boolean {
   return typeof u.cached_input_tokens === "number";
 }
 
-/** Normalize the per-engine usage shapes (snake_case for Claude and Codex, bare
- * keys for Pi and the `usage.updated` event, camelCase for others) into one token breakdown. Returns null when no tokens
- * were reported at all. */
 export function parseUsage(usage: unknown): ParsedUsage | null {
   const raw = asRecord(usage);
   if (!raw) return null;
-  // Codex token_count info: occupancy is last_token_usage; the sibling
-  // total_token_usage is session-billed cumulative and must not fill the bar.
   const info = asRecord(raw.info) ?? raw;
   const nested = asRecord(info.last_token_usage);
   const u = nested ?? info;
-  // camelCase counters (inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens) are
-  // disjoint like Claude's: inputTokens is uncached input only. Without these aliases all four
-  // buckets read 0 and only a total is left.
   const reportedInput = num(u, "input_tokens") || num(u, "input") || num(u, "inputTokens");
   const output = num(u, "output_tokens") || num(u, "output") || num(u, "outputTokens");
-  // Codex names its cache fields differently (cached_input_tokens /
-  // cache_write_input_tokens): without them a codex report's cache hits land
-  // in the ledger as zero.
   const cacheRead =
     num(u, "cache_read_input_tokens") ||
     num(u, "cacheRead") ||
@@ -84,9 +67,6 @@ export function parseUsage(usage: unknown): ParsedUsage | null {
     num(u, "cacheWrite") ||
     num(u, "cache_write_input_tokens") ||
     num(u, "cacheWriteTokens");
-  // Fold codex's cache counters out of its input so the four parts never
-  // overlap. Adding them on top inflated every total by the whole cache
-  // volume (a cache-heavy codex turn counted ~3x its real prompt).
   const input = cacheInsideInput(u)
     ? Math.max(0, reportedInput - cacheRead - cacheWrite)
     : reportedInput;

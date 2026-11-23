@@ -1,13 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Writing toggles: offered only for sources whose semantics were checked on the real CLI (grok,
-//! opencode, omp).
-//!
-//! Three invariants: compare the file hash before writing (a change made elsewhere refuses),
-//! change only the target entry's one field, and read the file back after the atomic replace as
-//! the returned state.
-
 use super::read::{is_jsonc, read_dsh_profile, read_json_source, read_toml_source, string_array};
 use super::{
     candidate_paths, first_existing, omp_server_lists, source_spec, Source, Toggle,
@@ -42,7 +35,6 @@ pub(crate) fn write_enabled(
     let path = first_existing(candidate_paths(source_id, workspace)).ok_or_else(|| {
         McpError::not_found("The config file doesn't exist; nothing was changed".to_string())
     })?;
-    // The same rule as the list (apply_omp_server_lists): names on the lists can't be changed through `enabled`.
     if source.engine == "omp" {
         if let Some(user_path) = first_existing(candidate_paths("omp_user", workspace)) {
             let (disabled, enabled_list) = omp_server_lists(&user_path);
@@ -100,7 +92,6 @@ pub(super) fn verify_version(raw: &str, expected_version: &str) -> Result<(), Mc
     Ok(())
 }
 
-/// JSON sources: changes only that entry's toggle field in the server table, no other keys.
 pub(super) fn set_json_enabled(
     source: &Source,
     path: &Path,
@@ -152,8 +143,6 @@ pub(super) fn set_json_enabled(
     crate::engine_config::support::atomic_write(path, &text).map_err(McpError::internal)
 }
 
-/// Grok user level: `[mcp_servers.<name>] enabled` plus the `disabled_mcp_servers` list (both are
-/// what the CLI itself writes; changing only one would leave a false state).
 fn set_grok_user_enabled(
     path: &Path,
     name: &str,

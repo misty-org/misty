@@ -8,13 +8,12 @@ import {
   settingsGroups,
   settingsPage,
   settingsPageTitle,
-} from "../settingsRegistry";
-import type { SettingsSection } from "../settingsTypes";
+} from "../SettingsRegistry";
+import type { SettingsSection } from "../settings_types";
 export interface SettingsSearchResult {
   key: string;
   label: string;
   page: SettingsSection;
-  /** The row to focus once the page opens; empty for whole-page matches. */
   focus: string;
 }
 export function searchSettings(query: string): SettingsSearchResult[] {
@@ -58,7 +57,6 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     </>
   );
 }
-/** Replaces the section list while the user types in the settings search box. */
 export function SettingsSearchResults(props: {
   query: string;
   results: SettingsSearchResult[];
@@ -78,11 +76,11 @@ export function SettingsSearchResults(props: {
             className="grid gap-0.5 rounded-md px-2.5 py-1.5 text-left"
             onClick={() => props.onSelect(result)}
           >
-            <Text tone="default" className="text-sm" full={result.label}>
+            <Text size="control" tone="default" full={result.label}>
               <Highlighted text={result.label} query={props.query} />
             </Text>
             {result.focus ? (
-              <Text tone="muted" className="text-2xs">
+              <Text size="meta" tone="muted">
                 {settingsPageTitle(page)}
               </Text>
             ) : null}
@@ -90,7 +88,7 @@ export function SettingsSearchResults(props: {
         );
       })}
       {!props.results.length ? (
-        <Text as="p" tone="muted" className="px-2.5 py-1.5 text-xs">
+        <Text as="p" size="meta" tone="muted" className="px-2.5 py-1.5">
           No settings match “{props.query.trim()}”
         </Text>
       ) : null}

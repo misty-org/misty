@@ -6,7 +6,7 @@ import AuthCard from "../components/AuthCard";
 import AuthShell from "../components/AuthShell";
 import RegisterForm from "../components/RegisterForm";
 import { ServerStep, useNeedsServer } from "../setup/ServerStep";
-import { useFinishSignIn } from "../sign-in-sheet/useFinishSignIn";
+import { useFinishSignIn } from "../sign-in-sheet/use_finish_sign_in";
 
 export default function RegisterPage() {
   const location = useLocation();

@@ -5,10 +5,6 @@ mod close;
 pub(in crate::browser) use close::forget_close_handler;
 use close::{close_after_download_wait, install_close_handler};
 
-/// Answers a page's request for a new window. No person adopts a window here, so the page opens in
-/// its opener's own view, where the agent's next look finds it. The one exception is the first
-/// popup of a download an agent asked for: it opens hidden, keeps its opener and the website data
-/// store, and hands its file to the agent's task.
 pub(in crate::browser) fn open_popup_in_place(
     app: &AppHandle,
     source_id: &str,
@@ -24,7 +20,6 @@ pub(in crate::browser) fn open_popup_in_place(
     if let Some(response) = download_popup(app, source_id, url, features) {
         return response;
     }
-    // A blank popup the page would write into has nowhere to go; the page itself stays.
     if !matches!(url.scheme(), "https" | "http") {
         return NewWindowResponse::Deny;
     }
@@ -33,7 +28,6 @@ pub(in crate::browser) fn open_popup_in_place(
         .and_then(|label| app.get_webview(&label))
     {
         let url = url.clone();
-        // Leave the engine's callback before navigating its view.
         tauri::async_runtime::spawn(async move {
             let _ = view.navigate(url);
         });
@@ -41,17 +35,12 @@ pub(in crate::browser) fn open_popup_in_place(
     NewWindowResponse::Deny
 }
 
-/// The hidden popup of an agent's expected download, or `None` when the page has no download
-/// waiting on one.
 fn download_popup(
     app: &AppHandle,
     source_id: &str,
     url: &Url,
     features: tauri::webview::NewWindowFeatures,
 ) -> Option<NewWindowResponse<tauri::Wry>> {
-    // Creating a webview pumps messages while it waits for WebView2. A popup requested in
-    // that pump cannot be built there (it would wait on a lock its own thread holds), so
-    // it opens in place instead.
     #[cfg(windows)]
     if crate::browser::pages::creation_guard::in_flight() {
         return None;
@@ -71,7 +60,6 @@ fn download_popup(
         )
     };
     let _lifecycle = crate::browser::profiles::popup_lifecycle_lease()?;
-    // Do not fall back to a fresh view: it would discard the opener and profile.
     Some(
         create_popup(
             app,
@@ -97,11 +85,6 @@ fn create_popup(
     origin_space_id: Option<String>,
 ) -> Option<NewWindowResponse<tauri::Wry>> {
     let state = app.state::<BrowserSessionState>();
-    // WebKit's target configuration shares the opener's user-content controller.
-    // Give this tab its own scripts and IPC handlers without replacing the required
-    // configuration or its website data store. Otherwise the opener's shortcut token
-    // and native message handler can leak into the popup (and vice versa).
-    // WebView2 gives every popup its own view and scripts already.
     #[cfg(target_os = "macos")]
     {
         let main_thread = objc2::MainThreadMarker::new()?;
@@ -117,8 +100,6 @@ fn create_popup(
     let id = format!("tab-popup-{}", uuid::Uuid::new_v4());
     let label = webview_label(&id).ok()?;
     register_session(&state, &id, "").ok()?;
-    // Only the first popup from an outstanding, explicitly requested task
-    // download can return a receipt to that task. It receives no browser grants.
     {
         let mut sessions = state.sessions.lock().ok()?;
         let pending = sessions
@@ -156,7 +137,6 @@ fn create_popup(
             &popup_bindings,
         ))
         .initialization_script(browser_status_script(&shortcut_token))
-        // Misty's page scripts report over Kiri's host channel, never by navigating.
         .on_navigation(move |url| external_url(url.as_str()).is_ok())
         .on_download(move |_window, event| {
             if matches!(&event, DownloadEvent::Requested { .. }) {
@@ -177,8 +157,6 @@ fn create_popup(
             } else if !download_started.load(std::sync::atomic::Ordering::SeqCst) {
                 return false;
             }
-            // The source owns both the expected-download wait and verified
-            // file receipt. Never grant control of the auxiliary page.
             handle_download_event(&download_app, &download_source, event)
         })
         .on_new_window(move |url, features| {

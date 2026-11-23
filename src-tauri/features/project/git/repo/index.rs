@@ -8,9 +8,6 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use super::status::open_repo;
 
-/// One lock per repository for everything that writes its index or refs. Two clicks in the panel
-/// (stage while an unstage is still running) would otherwise overlap, and libgit2 fails the
-/// second with "the index is locked". Worktrees have their own index, so their own lock.
 pub(crate) fn repo_write_gate(path: &Path) -> Arc<tokio::sync::Mutex<()>> {
     type Gates = Mutex<HashMap<PathBuf, Arc<tokio::sync::Mutex<()>>>>;
     static GATES: OnceLock<Gates> = OnceLock::new();
@@ -70,14 +67,12 @@ pub(crate) fn git_unstage_blocking(path: &Path, files: &[String]) -> Result<(), 
                             path: file.as_bytes().to_vec(),
                         })
                         .map_err(|error| error.to_string())?,
-                    // Not in HEAD: a newly staged file leaves the index.
                     Err(_) => {
                         let _ = index.remove_path(file_path);
                     }
                 }
             }
         }
-        // No commit yet: taking the files out of the index unstages them.
         Err(_) => {
             for file in files {
                 let _ = index.remove_path(Path::new(file));
@@ -87,9 +82,6 @@ pub(crate) fn git_unstage_blocking(path: &Path, files: &[String]) -> Result<(), 
     index.write().map_err(|error| error.to_string())
 }
 
-/// Throws away a file's changes in the folder, like `git restore --worktree` and `git clean -f`:
-/// a file the index holds goes back to its staged content (so what was staged survives), and an
-/// untracked file is deleted.
 pub(crate) fn git_discard_blocking(path: &Path, files: &[String]) -> Result<(), String> {
     let gate = repo_write_gate(path);
     let _queued = gate.blocking_lock();

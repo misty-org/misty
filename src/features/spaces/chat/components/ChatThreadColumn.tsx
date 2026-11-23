@@ -3,7 +3,7 @@ import { ArrowLeft, X } from "lucide-react";
 import type { SpaceMessage } from "../../api/dto/entities";
 import { IconButton, PaneLoading, Separator, Surface, Text, Textarea } from "@misty/ui";
 import { formatChatMessageTime } from "./ChatDisplay";
-import { useChatSidePanel } from "../chatSidePanelStore";
+import { useChatSidePanel } from "../chat_side_panel_store";
 
 const plain = (message: SpaceMessage) =>
   message.content
@@ -12,11 +12,6 @@ const plain = (message: SpaceMessage) =>
     )
     .join("");
 
-/**
- * A thread, in a panel to the right of the chat as in Slack and Discord: the message it hangs from, how
- * many replies it has, the replies oldest first, and a box to reply. A reply sent here is the thread's;
- * it never appears in the channel itself.
- */
 export function ChatThreadColumn({
   root,
   replies,
@@ -32,7 +27,6 @@ export function ChatThreadColumn({
   onLoadOlder,
   onSend,
 }: {
-  /** The message the thread hangs from; none when it is no longer there. */
   root: SpaceMessage | undefined;
   replies: SpaceMessage[];
   loading: boolean;
@@ -41,7 +35,6 @@ export function ChatThreadColumn({
   error: string;
   canWrite: boolean;
   typingLabel: string;
-  /** The chat the thread is in, named in the header. */
   channelName: string;
   onTypingInput: (text: string) => void;
   onStopTyping: () => void;
@@ -52,7 +45,6 @@ export function ChatThreadColumn({
   const listRef = useRef<HTMLOListElement>(null);
   const pagingRef = useRef(false);
   const fromList = useChatSidePanel((panel) => panel.threadFromList);
-  // A new reply scrolls into view, as in a chat.
   const latestReplyId = replies.at(-1)?.id;
   useEffect(() => {
     const list = listRef.current;
@@ -84,14 +76,14 @@ export function ChatThreadColumn({
       data-delivery={message.local_delivery_state}
     >
       <div className="flex items-baseline gap-2">
-        <Text bare as="strong" tone="default" className="text-sm">
+        <Text bare as="strong" size="control" tone="default" weight="medium">
           {message.sender_name}
         </Text>
-        <Text bare as="time" tone="muted" className="text-2xs tabular-nums">
+        <Text bare as="time" size="meta" tone="muted" className="tabular-nums">
           {formatChatMessageTime(message.created_at)}
         </Text>
         {message.local_delivery_state === "failed" ? (
-          <Text bare tone="failed" className="text-2xs">
+          <Text bare size="meta" tone="failed">
             Not sent
           </Text>
         ) : null}
@@ -100,7 +92,8 @@ export function ChatThreadColumn({
         bare
         as="p"
         tone={message.local_delivery_state === "sending" ? "muted" : "default"}
-        className="m-0 whitespace-pre-wrap text-sm leading-5 [overflow-wrap:anywhere]"
+        size="body"
+        className="m-0 whitespace-pre-wrap [overflow-wrap:anywhere]"
       >
         {plain(message)}
       </Text>
@@ -122,9 +115,16 @@ export function ChatThreadColumn({
             <ArrowLeft />
           </IconButton>
         ) : null}
-        <Text bare as="h2" tone="bright" className="m-0 min-w-0 flex-1 text-sm font-medium">
+        <Text
+          bare
+          as="h2"
+          size="control"
+          tone="bright"
+          weight="medium"
+          className="m-0 min-w-0 flex-1"
+        >
           Thread
-          <Text bare tone="muted" className="ml-2 font-normal">
+          <Text bare tone="muted" weight="regular" className="ml-2">
             {channelName}
           </Text>
         </Text>
@@ -145,7 +145,7 @@ export function ChatThreadColumn({
           <>
             {entry(root)}
             <li className="flex items-center gap-3 px-3 py-1">
-              <Text bare tone="muted" className="shrink-0 text-xs">
+              <Text bare size="meta" tone="muted" className="shrink-0">
                 {(root.reply_count ?? replies.length) === 1
                   ? "1 reply"
                   : `${root.reply_count ?? replies.length} replies`}
@@ -154,7 +154,7 @@ export function ChatThreadColumn({
             </li>
           </>
         ) : (
-          <Text bare as="li" tone="muted" className="p-3 text-sm">
+          <Text bare as="li" size="control" tone="muted" className="p-3">
             This message is no longer here.
           </Text>
         )}
@@ -170,18 +170,19 @@ export function ChatThreadColumn({
         ) : null}
         {replies.map((message) => entry(message))}
         {error && !loading ? (
-          <Text bare as="li" tone="failed" className="p-3 text-sm">
+          <Text bare as="li" size="control" tone="failed" className="p-3">
             {error}
           </Text>
         ) : null}
       </ol>
       {canWrite && root ? (
-        <form onSubmit={submit} className="border-t p-3">
+        <form onSubmit={submit} className="p-3">
           {typingLabel ? (
             <Text
               as="p"
+              size="meta"
               tone="muted"
-              className="m-0 mb-1 min-h-4 text-xs"
+              className="m-0 mb-1"
               role="status"
               aria-live="polite"
             >

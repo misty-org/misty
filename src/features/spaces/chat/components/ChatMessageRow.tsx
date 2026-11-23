@@ -27,20 +27,22 @@ import {
   MenuItem,
   MenuSeparator,
   ReactionChip,
+  Text,
   ThreadRepliesButton,
   useNotice,
 } from "@misty/ui";
 import { AgentMark } from "@/features/agents";
+import { useSpacesStore } from "../../list/use_spaces_store";
 import { LinkPreviews } from "@/features/files";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import { MessageAttachments } from "./MessageAttachments";
 import { ChatAvatar } from "./ChatAvatar";
 import { PinMenuItem } from "./PinMenuItem";
-import { isAgentAuthoredMessage, spansToText } from "./messageText";
-import { useChatSidePanel } from "../chatSidePanelStore";
+import { isAgentAuthoredMessage, spansToText } from "./message_text";
+import { useChatSidePanel } from "../chat_side_panel_store";
 import { SpacePostCard } from "../../handoffs/SpacePostCard";
-import { readSpacePost } from "../../handoffs/spacePosts";
+import { readSpacePost } from "../../handoffs/space_posts";
 import { ChatEmojiPicker, isJumbo, useQuickEmoji } from "../emoji/ChatEmojiPicker";
 import { messageTextForLinks, Span, ReplyLine, EditBox } from "./ChatMessageParts";
 
@@ -64,7 +66,6 @@ const fullDateTime = new Intl.DateTimeFormat(undefined, {
 
 const sameDay = (left: Date, right: Date) => left.toDateString() === right.toDateString();
 
-/** "Today at 3:45 PM", "Yesterday at 3:45 PM", else the date and time. */
 function relativeStamp(value: string): string {
   const date = new Date(value);
   const now = new Date();
@@ -99,7 +100,6 @@ const rowFields = [
   "myRoleIds",
 ] as const satisfies readonly (keyof SpaceChatMessagesProps)[];
 
-/** Memoized so typing in the composer doesn't re-render the history; the edit draft only matters to its row. */
 export const MessageRow = memo(MessageRowView, (previous, next) => {
   if (
     previous.message !== next.message ||
@@ -136,6 +136,21 @@ function MessageRowView({
   const [pickerOpen, setPickerOpen] = useState(false);
   const quick = useQuickEmoji(3);
   const agent = isAgentAuthoredMessage(message);
+  const ownerName = useSpacesStore((state) =>
+    agent
+      ? state.membersBySpace[props.spaceId]?.find(
+          (member) => member.user_id === message.sender_user_id,
+        )?.name
+      : undefined,
+  );
+  const whose =
+    agent && message.sender_kind === "agent" && message.sender_user_id
+      ? message.sender_user_id === props.currentUserId
+        ? "your agent"
+        : ownerName?.trim()
+          ? `${ownerName.trim().split(/\s+/)[0]}’s agent`
+          : undefined
+      : undefined;
   const color = props.memberColors?.get(message.sender_user_id);
   const mentionsMe =
     message.sender_user_id !== props.currentUserId &&
@@ -178,7 +193,6 @@ function MessageRowView({
       .catch(() => props.onError("Could not copy this message. Try selecting its text."));
   const openThread = () => useChatSidePanel.getState().openThread(message.id);
   const edit = () => requestAnimationFrame(() => props.onBeginEditing(message));
-  // The same rows in the ⋯ menu and on a right-click.
   const menuRows = (
     <>
       {props.canWrite ? (
@@ -304,7 +318,15 @@ function MessageRowView({
           />
         )
       }
-      badge={agent ? <Badge variant="secondary">Agent</Badge> : undefined}
+      badge={
+        whose ? (
+          <Text size="caption" tone="muted" className="shrink-0">
+            {whose}
+          </Text>
+        ) : agent ? (
+          <Badge variant="secondary">Agent</Badge>
+        ) : undefined
+      }
       time={relativeStamp(message.created_at)}
       timeFull={fullDateTime.format(new Date(message.created_at))}
       shortTime={time.format(new Date(message.created_at))}

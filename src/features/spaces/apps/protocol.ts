@@ -1,8 +1,9 @@
 // The wire protocol of the SDK channel, as the host speaks it. misty-sdk (MIT) owns the other end in
 // `packages/sdk/src/protocol.ts`; keep the two in step. The host's end never imports the SDK's code; only Misty's
-// own pages do, as the SDK's clients (`pageMisty.ts`).
+// own pages do, as the SDK's clients (`page_misty.ts`).
 
 export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSIONS: readonly number[] = [1];
 export const INIT_MESSAGE = "misty:init";
 
 export type ErrorCode =
@@ -30,7 +31,6 @@ export type Frame =
   | { t: "end"; id: number; error?: WireError }
   | { t: "mcp"; message: unknown };
 
-/** An error a handler throws to answer a call with a code the app can act on. */
 export class HostError extends Error {
   readonly code: ErrorCode;
   constructor(code: ErrorCode, message: string) {

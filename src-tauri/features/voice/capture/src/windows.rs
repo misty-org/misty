@@ -1,6 +1,3 @@
-//! WASAPI capture: the default microphone, the desktop mix (optionally without
-//! this process tree) and per-process loopback.
-
 #[path = "windows_sources.rs"]
 mod sources;
 
@@ -32,8 +29,6 @@ impl Running {
 }
 
 pub(crate) fn capabilities() -> Capabilities {
-    // Process loopback needs Windows 10 2004 or later, which every supported
-    // Windows release already is; an older system fails at start instead.
     Capabilities {
         mic: true,
         system_audio: true,
@@ -98,7 +93,6 @@ fn open_streams(source: &AudioSource) -> Result<Vec<Stream>, CaptureError> {
             vec![(device.get_iaudioclient().map_err(device_error)?, 1)]
         }
         AudioSource::System { exclude_self: true } => {
-            // Excluding our own process tree keeps our playback out of the mix.
             vec![(
                 AudioClient::new_application_loopback_client(std::process::id(), false)
                     .map_err(device_error)?,
@@ -145,8 +139,6 @@ fn open_streams(source: &AudioSource) -> Result<Vec<Stream>, CaptureError> {
     Ok(streams)
 }
 
-/// How many times a microphone capture reopens on a changed device within [`REOPEN_WINDOW`]
-/// before it gives up.
 const REOPEN_MOST: usize = 4;
 const REOPEN_WINDOW: Duration = Duration::from_secs(10);
 
@@ -188,8 +180,6 @@ fn capture_loop(
                 stream.resampler.push_f32(&floats, &mut stream.pcm);
             }
             if let Some(error) = lost {
-                // The microphone went away (a headset unplugged, Bluetooth dropped): carry on
-                // with whatever input is the default now, unless it keeps changing.
                 let now = Instant::now();
                 reopened.retain(|at| now.duration_since(*at) < REOPEN_WINDOW);
                 if !matches!(source, AudioSource::Mic) || reopened.len() >= REOPEN_MOST {
@@ -221,7 +211,6 @@ fn capture_loop(
     result
 }
 
-/// Sums what every stream has in common, keeping the rest for the next pass.
 fn mix(streams: &mut [Stream]) -> Vec<i16> {
     let ready = streams.iter().map(|s| s.pcm.len()).min().unwrap_or(0);
     let mut mixed = vec![0i32; ready];

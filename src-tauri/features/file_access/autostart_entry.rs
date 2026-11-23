@@ -1,4 +1,3 @@
-//! Where the launch-on-login entry lives, which the file gate lets Misty write.
 use std::path::PathBuf;
 
 #[cfg(target_os = "macos")]

@@ -1,9 +1,5 @@
-//! Agent tabs: sleeping one, waiting for its first load and a small picture of its page.
 use crate::browser::*;
 
-/// Puts an agent's tab to sleep: reads where its
-/// page is, then closes the page through the one close path, so its page process goes too. The
-/// tab wakes later from what this returns.
 #[tauri::command]
 pub async fn browser_webview_sleep(
     app: AppHandle,
@@ -19,8 +15,6 @@ pub async fn browser_webview_sleep(
     Ok(json!({ "closed": true, "url": url, "title": title }))
 }
 
-/// Waits for a new agent tab's first page to load before the agent reads it
-/// (page_agent/navigation.rs, `first_load`). True once it loaded; false after the wait ran out.
 #[tauri::command]
 pub async fn browser_webview_await_load(
     app: AppHandle,
@@ -32,7 +26,6 @@ pub async fn browser_webview_await_load(
 #[derive(serde::Deserialize)]
 pub struct BrowserWebviewPictureRequest {
     id: String,
-    /// How wide to make it, for a reader who needs the page's words. Small otherwise.
     #[serde(default)]
     width: Option<f64>,
 }
@@ -40,8 +33,6 @@ pub struct BrowserWebviewPictureRequest {
 const PICTURE_WIDTH: f64 = 480.0;
 const LARGEST_PICTURE_WIDTH: f64 = 1280.0;
 
-/// A picture of a page. Small for an agent's tab, which the PiP and the view
-/// switcher show instead of a second live page, or larger for a model to read.
 #[tauri::command]
 pub async fn browser_webview_picture(
     app: AppHandle,

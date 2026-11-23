@@ -11,14 +11,9 @@ import {
 } from "@misty/ui";
 import { spacesApi } from "../api/api";
 import type { Space, SpaceMember } from "../api/dto/entities";
-import { useSpacesStore } from "../list/useSpacesStore";
-import { spaceCan, useSpaceRoles } from "./useSpaceRoles";
+import { useSpacesStore } from "../list/use_spaces_store";
+import { spaceCan, useSpaceRoles } from "./use_space_roles";
 
-/**
- * A member's roles to give or take, opened from their row in the member list, as Discord's
- * profile does. Only for those who manage roles, and only roles below their own highest one;
- * for anyone else the row opens nothing.
- */
 export function MemberRolesMenu(props: {
   space: Space;
   member: SpaceMember;

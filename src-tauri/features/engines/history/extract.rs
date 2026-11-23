@@ -10,8 +10,6 @@ pub struct ParsedSession {
     pub messages: Vec<Message>,
 }
 
-/// Parse a native session file into the minimal message list. Bad lines are
-/// skipped individually.
 pub fn parse_session_file(engine: &str, path: &Path) -> Result<ParsedSession, String> {
     if engine == "agy" {
         return Ok(super::agy::parse_agy_session(path));
@@ -29,9 +27,6 @@ pub fn parse_session_file(engine: &str, path: &Path) -> Result<ParsedSession, St
     ))
 }
 
-/// Everything the sidebar needs from a scan: title/preview/timestamps/count.
-/// Derived in one streaming pass without materializing the message list or
-/// any image data URLs.
 pub struct ScanSummary {
     pub title: String,
     pub preview: String,
@@ -40,10 +35,6 @@ pub struct ScanSummary {
     pub message_count: i64,
 }
 
-/// The scan-time parse: same line walk as `parse_session_file`, but folds
-/// each row into a bounded accumulator instead of a Vec<Message>. Image-only
-/// user turns (whose data URLs are skipped here) fall out of the count —
-/// the sidebar counts text, and the reader path stays authoritative.
 pub fn scan_summary_file(engine: &str, path: &Path) -> Result<ScanSummary, String> {
     if engine == "agy" {
         return Ok(super::agy::scan_agy_summary(path));
@@ -66,14 +57,12 @@ pub fn scan_summary_file(engine: &str, path: &Path) -> Result<ScanSummary, Strin
     Ok(acc.finish())
 }
 
-/// dsh session files are zstd-compressed NDJSON; everything else is plain.
-///
-/// dsh's compression is not optional: `Decoder` concatenates frames up to EOF by default
-/// (`single_frame()` reads only the first), and a real transcript's first frame usually holds
-/// just the header line (measured: 7.4 MB / 3,887 frames / first frame 216 B).
+#[allow(
+    clippy::disallowed_types,
+    reason = "reads the engine's own session file in place, wherever the engine keeps it"
+)]
 fn open_line_reader(engine: &str, path: &Path) -> Result<Box<dyn BufRead>, String> {
     if engine == "gemini" {
-        // Gemini rewrites a chat by appending edits; its lines are read as they stand after them.
         let replayed = super::gemini_family::replayed_gemini_chat(path)?;
         return Ok(Box::new(std::io::Cursor::new(replayed.into_bytes())));
     }
@@ -87,7 +76,6 @@ fn open_line_reader(engine: &str, path: &Path) -> Result<Box<dyn BufRead>, Strin
     }
 }
 
-/// Image payloads: the reader renders them, the scanner must not build them.
 #[derive(Clone, Copy, PartialEq)]
 pub(super) enum ImageMode {
     Collect,
@@ -102,8 +90,6 @@ fn extractor_for(engine: &str, images: ImageMode) -> LineExtractor<'static> {
     } else if engine == "codebuddy" {
         Box::new(move |value| extract_codebuddy_line(value, images))
     } else if engine == "claude" {
-        // Local slash commands span several user lines. `Fn` extractors can't
-        // capture `&mut`, so the window lives in a Cell across calls.
         let local_command = std::cell::Cell::new(false);
         Box::new(move |value| {
             let mut open = local_command.get();
@@ -120,7 +106,6 @@ fn extractor_for(engine: &str, images: ImageMode) -> LineExtractor<'static> {
     }
 }
 
-/// Plain text of a Claude user turn, ignoring tool results and images.
 fn claude_plain_user_text(value: &Value) -> Option<String> {
     if type_str(value) != "user" {
         return None;
@@ -156,12 +141,6 @@ fn wrapped_tag_only(text: &str, tag: &str) -> bool {
     !body.contains(&open)
 }
 
-/// Claude Code logs local slash commands (`/model`, `/login`, `/clear`) as
-/// CLI chrome: a `<local-command-caveat>` line, the command envelope, and
-/// sometimes `<local-command-stdout>`. None of that belongs in the
-/// conversation. The caveat opens a window that swallows the envelope until
-/// the next real user turn. Skill commands have no caveat, so `/name args`
-/// still shows as what was typed.
 fn claude_drop_local_command(value: &Value, open: &mut bool) -> bool {
     let Some(text) = claude_plain_user_text(value) else {
         return false;
@@ -175,15 +154,12 @@ fn claude_drop_local_command(value: &Value, open: &mut bool) -> bool {
         return true;
     }
     if *open {
-        // Tool-result turns carry no plain text. Leave them for the extractor
-        // and keep the window open until the next real prompt.
         if trimmed.is_empty() {
             return false;
         }
         if super::slash_command_envelope_only(trimmed) {
             return true;
         }
-        // isMeta expansions inside the window are not the user's next prompt.
         if value.get("isMeta").and_then(Value::as_bool) == Some(true) {
             return true;
         }
@@ -192,8 +168,6 @@ fn claude_drop_local_command(value: &Value, open: &mut bool) -> bool {
     false
 }
 
-/// Line-loop skeleton shared by the full parse and the scan summary: decode
-/// one NDJSON line, extract rows, normalize, hand each to `consume`.
 fn walk_lines(reader: impl BufRead, extract: &LineExtractor<'_>, mut consume: impl FnMut(LineRow)) {
     for text in reader.lines() {
         let Ok(text) = text else { continue };
@@ -219,20 +193,12 @@ fn collect_session(reader: impl BufRead, extract: &LineExtractor<'_>) -> ParsedS
     fold_rows(rows)
 }
 
-/// Shared fold over extracted rows (usage markers, tool-result pairing,
-/// durations, seq numbering) — opencode feeds it from its storage-tree walk
-/// instead of an NDJSON line reader.
 fn fold_rows(rows: Vec<LineRow>) -> ParsedSession {
     let mut messages = Vec::<Message>::new();
     let mut seq = 0i64;
     let mut last_user_ts: Option<i64> = None;
-    // tool call id -> index in `messages`. Results arrive in completion order,
-    // so pairing them back up by the latest row still missing one mislabels
-    // parallel calls; the id is what actually names the call.
     let mut call_rows: HashMap<String, usize> = HashMap::new();
     for row in rows {
-        // Usage-only marker (codex token_count or claude compact_boundary): fold
-        // onto the last assistant message instead of creating an empty row.
         if row.role == "__usage__" {
             if let Some(last) = messages.iter_mut().rev().find(|m| m.role == "assistant") {
                 let mut new_usage = row.usage;
@@ -249,9 +215,6 @@ fn fold_rows(rows: Vec<LineRow>) -> ParsedSession {
             }
             continue;
         }
-        // Tool result marker: fold onto its named call when the transcript
-        // carries toolCallId, else retain the legacy latest-unresolved
-        // fallback used by Claude transcripts.
         if row.role == "__tool_result__" {
             if let Some(res) = row.result {
                 let index = match row.tool_call_id.as_deref() {
@@ -315,7 +278,6 @@ fn fold_rows(rows: Vec<LineRow>) -> ParsedSession {
     ParsedSession { messages }
 }
 
-/// Bounded scan accumulator: keeps only what the sessions table stores.
 #[derive(Default)]
 struct ScanAcc {
     count: i64,
@@ -341,8 +303,6 @@ impl ScanAcc {
         self.last_ts = row.ts.clone();
         match row.role.as_str() {
             "user" => {
-                // Mirrors strip_title_noise: first non-noise user body wins, the
-                // first user row (even noise) is the fallback.
                 if self.title.is_none() {
                     let body = super::strip_title_noise(&row.text);
                     if !body.is_empty() {
@@ -376,26 +336,15 @@ impl ScanAcc {
     }
 }
 
-/// Whether a user row is visible (is folded into a `Message`): a row with no text and no
-/// image is not.
-///
-/// This is the one definition of a visible user row, shared by `fold_rows` and the codex
-/// extractor.
 fn user_row_is_visible(text: &str, has_images: bool) -> bool {
-    !(text.trim().is_empty() && !has_images)
+    !text.trim().is_empty() || has_images
 }
 
-/// The text the person actually typed in a dsh `user/message`; injected runtime context and
-/// empty text return `None` (that line is not a visible user message).
-///
-/// This test must have exactly one definition: the extractor (`extract_dsh_line`) uses it to
-/// decide which lines produce visible user messages.
 pub(crate) fn dsh_user_message_text(value: &Value) -> Option<String> {
     if type_str(value) != "user/message" {
         return None;
     }
     let text = content_text(value.get("data").and_then(|d| d.get("content")));
-    // Skip injected runtime context / system reminders — not user text.
     let trimmed = text.trim();
     if trimmed.starts_with("<system-reminder>") || trimmed.starts_with("Current runtime context") {
         return None;
@@ -436,8 +385,6 @@ fn extract_dsh_line(value: &Value) -> LineRows {
     }
 }
 
-/// Paths embedded by `kimi_prompt_with_images` after the marker block, one
-/// `<image path="...">` tag per attachment.
 fn kimi_image_paths(block: &str) -> Vec<String> {
     const TAG: &str = "<image path=\"";
     let mut out = Vec::new();
@@ -455,7 +402,6 @@ fn kimi_image_paths(block: &str) -> Vec<String> {
     out
 }
 
-/// Claude image content block -> data URL for direct WebView rendering.
 fn claude_image_data_url(block: &Value) -> Option<String> {
     let source = block.get("source")?;
     let data = source.get("data").and_then(Value::as_str)?;
@@ -469,14 +415,6 @@ fn claude_image_data_url(block: &Value) -> Option<String> {
     Some(format!("data:{mime};base64,{data}"))
 }
 
-/// pi/omp image content part (`{type:"image", data, mimeType}`) -> data URL.
-///
-/// pi stores inline base64, but omp (its fork) writes a content-addressed
-/// reference instead — `blob:sha256:<hex>`, the shape every image this app
-/// sends over its rpc prompt lands in — and keeps the bytes in the CLI's own
-/// blob store. Resolving those is what lets a reopened session render the
-/// picture it sent; without it the reference became a `data:` URL with the
-/// reference as payload, i.e. a broken image.
 fn pi_image_part(part: &Value, engine: &str) -> Option<String> {
     if part.get("type").and_then(Value::as_str) != Some("image") {
         return None;
@@ -498,19 +436,14 @@ fn pi_image_part(part: &Value, engine: &str) -> Option<String> {
     }
 }
 
-/// Content-addressed image references in omp transcripts.
 const PI_BLOB_PREFIX: &str = "blob:sha256:";
 
-/// Cap for inlining a resolved blob into a history page. The composer refuses
-/// attachments above this same 8 MiB, so every image a send can carry still
-/// resolves; an oversized blob yields no image instead of megabytes of base64
-/// in the page payload and the parse cache.
 const MAX_BLOB_IMAGE_BYTES: u64 = 8 * 1024 * 1024;
 
-/// The CLI's blob file for one reference: `<agent dir>/blobs/<hex>`, with the
-/// extension-suffixed sibling some writers keep as a fallback. `None` when the
-/// id is not a bare 64-char lowercase hex digest (any option suffix must never
-/// reach the filesystem) or no file exists.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "finds an image pi stored with its history, in its agent folder, which PI_CODING_AGENT_DIR may move outside the gate"
+)]
 fn pi_blob_path(engine: &str, hash: &str, mime: &str) -> Option<PathBuf> {
     if hash.len() != 64
         || !hash
@@ -536,10 +469,10 @@ fn pi_blob_path(engine: &str, hash: &str, mime: &str) -> Option<PathBuf> {
     with_ext.is_file().then_some(with_ext)
 }
 
-/// Base64 payload of one referenced blob, or `None` when it is unreadable or
-/// above the inline cap — the message keeps its text, and a reference that
-/// cannot be resolved locally (e.g. a remote session's transcript) degrades to
-/// a missing image rather than a broken one.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an image pi stored with its history, in its agent folder, which PI_CODING_AGENT_DIR may move outside the gate"
+)]
 fn pi_blob_base64(engine: &str, hash: &str, mime: &str) -> Option<String> {
     let path = pi_blob_path(engine, hash, mime)?;
     if std::fs::metadata(&path).ok()?.len() > MAX_BLOB_IMAGE_BYTES {
@@ -549,9 +482,6 @@ fn pi_blob_base64(engine: &str, hash: &str, mime: &str) -> Option<String> {
     Some(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
-/// Codex token_count `info` → occupancy + the window the CLI actually used.
-/// last_token_usage is this request; total_token_usage is session-billed
-/// cumulative and must not fill the context bar.
 fn usage_from_codex_token_info(info: Option<&Value>) -> Option<Value> {
     let info = info?;
     let mut usage = info
@@ -566,7 +496,6 @@ fn usage_from_codex_token_info(info: Option<&Value>) -> Option<Value> {
     Some(usage)
 }
 
-/// Codex `input_image` content part -> its `image_url` (data URL or path).
 fn codex_image_part(part: &Value) -> Option<String> {
     if part.get("type").and_then(Value::as_str) != Some("input_image") {
         return None;
@@ -579,21 +508,16 @@ fn codex_image_part(part: &Value) -> Option<String> {
     }
 }
 
-/// `value["type"]` as a string slice, empty when absent.
 fn type_str(value: &Value) -> &str {
     value.get("type").and_then(Value::as_str).unwrap_or("")
 }
 
-/// First string-valued timestamp among `keys` (engines disagree on the
-/// field name; grok alone has used three).
 fn ts_string(value: &Value, keys: &[&str]) -> Option<String> {
     keys.iter()
         .find_map(|k| value.get(k).and_then(Value::as_str))
         .map(str::to_string)
 }
 
-/// Join the `text` payloads of content parts; `typed_only` keeps only
-/// `type == "text"` parts.
 fn text_of_parts(parts: &[Value], typed_only: bool, sep: &str) -> String {
     parts
         .iter()
@@ -603,7 +527,6 @@ fn text_of_parts(parts: &[Value], typed_only: bool, sep: &str) -> String {
         .join(sep)
 }
 
-/// One extracted row from a native session line.
 struct LineRow {
     role: String,
     text: String,
@@ -621,7 +544,6 @@ struct LineRow {
 }
 
 impl LineRow {
-    /// A plain row without usage/model metadata.
     fn new(role: &str, text: String, ts: Option<String>) -> Self {
         Self {
             role: role.to_string(),
@@ -647,9 +569,6 @@ const INTERNAL_PROMPT_MARKERS: [&str; 2] = [
     "\n\n[CCGUI internal request-tail]\n",
 ];
 
-/// agy records the full effective prompt (internal tail included) in its own
-/// history, so its user turns strip through the same helper every other
-/// engine's user rows already pass through.
 pub(super) fn strip_internal_prompt_tail(text: &str) -> &str {
     INTERNAL_PROMPT_MARKERS
         .iter()
@@ -658,7 +577,6 @@ pub(super) fn strip_internal_prompt_tail(text: &str) -> &str {
         .map_or(text, |index| &text[..index])
 }
 
-/// Remove host-only prompt tails from the person's rows.
 fn normalize_extracted_row(mut row: LineRow) -> Option<LineRow> {
     if row.role != "user" {
         return Some(row);
@@ -675,7 +593,6 @@ fn normalize_extracted_row(mut row: LineRow) -> Option<LineRow> {
     Some(row)
 }
 
-/// Per-engine NDJSON line -> zero or more (role, text, ts, usage, model) tuples.
 fn extract_line_messages(engine: &str, value: &Value, images: ImageMode) -> LineRows {
     match engine {
         "claude" => extract_claude_line(value, images),
@@ -692,12 +609,6 @@ fn extract_line_messages(engine: &str, value: &Value, images: ImageMode) -> Line
     }
 }
 
-// ==================== Gemini CLI and Qwen Code ====================
-
-/// Gemini CLI chat lines (`chats/session-*.jsonl`): `{id, timestamp, type:
-/// "user"|"gemini", content, model?}`, where `content` is a string or a list of
-/// `{text}` parts. Metadata and edit lines (`sessionId`, `$set`, `$patch`,
-/// `$rewindTo`) carry no message.
 fn extract_gemini_line(value: &Value) -> LineRows {
     let ts = ts_string(value, &["timestamp"]);
     let text = super::content_text(value.get("content"));
@@ -717,9 +628,6 @@ fn extract_gemini_line(value: &Value) -> LineRows {
     }
 }
 
-/// Qwen Code chat records (`chats/<sessionId>.jsonl`): `{sessionId, timestamp,
-/// type: "user"|"assistant"|"tool_result"|"system", cwd, message: {role, parts},
-/// model?}`. A part marked `thought` is the model's thinking.
 fn extract_qwen_line(value: &Value) -> LineRows {
     let ts = ts_string(value, &["timestamp"]);
     let parts = value
@@ -772,14 +680,6 @@ fn extract_qwen_line(value: &Value) -> LineRows {
     }
 }
 
-// ==================== MiniMax Code ====================
-
-/// MiniMax Code transcript lines: `{message_id, turn_id, message:{role,
-/// content:[parts], timestamp(ms), usage?, model?, toolCallId?, toolName?}}`
-/// (shape verified against a live install's
-/// `~/.minimax/v2/sessions/<…>/messages.jsonl`). Content parts spell
-/// `text` / `thinking` / `toolCall`; a `toolResult` message resolves the
-/// matching call by its `toolCallId`.
 fn extract_minimax_line(value: &Value) -> LineRows {
     let Some(message) = value.get("message") else {
         return Vec::new();
@@ -792,8 +692,6 @@ fn extract_minimax_line(value: &Value) -> LineRows {
     match role {
         "user" => {
             let text = minimax_text_of_content(message.get("content"));
-            // Strip the ACP image-injection marker block (same `<image
-            // path>` tag format as kimi, so one tag parser serves both).
             let (display, images) = match text.find(crate::engines::images::MINIMAX_IMAGE_MARKER) {
                 Some(idx) => (
                     text[..idx].trim_end().to_string(),
@@ -884,7 +782,6 @@ fn extract_minimax_line(value: &Value) -> LineRows {
     }
 }
 
-/// Join the `text` payloads of a minimax content block list.
 fn minimax_text_of_content(content: Option<&Value>) -> String {
     content
         .and_then(Value::as_array)
@@ -899,8 +796,6 @@ fn minimax_text_of_content(content: Option<&Value>) -> String {
         .unwrap_or_default()
 }
 
-/// minimax usage `{input, output, totalTokens, cacheRead…}` → the snake_case
-/// keys the history ledger stores.
 fn minimax_usage(usage: Option<&Value>) -> Option<Value> {
     let usage = usage?.as_object()?;
     let get = |key: &str| usage.get(key).and_then(Value::as_u64);
@@ -915,10 +810,6 @@ fn minimax_usage(usage: Option<&Value>) -> Option<Value> {
     }))
 }
 
-// ==================== OpenCode ====================
-
-/// Codex rollout lines: {timestamp, type, payload}. Messages are
-/// response_item payloads of type "message".
 fn extract_codex_line(value: &Value, images: ImageMode) -> LineRows {
     let line_type = type_str(value);
     let ts = ts_string(value, &["timestamp"]);
@@ -927,8 +818,6 @@ fn extract_codex_line(value: &Value, images: ImageMode) -> LineRows {
             let Some(payload) = value.get("payload") else {
                 return Vec::new();
             };
-            // Reasoning items persist the visible summary; encrypted
-            // content is skipped.
             if payload.get("type").and_then(Value::as_str) == Some("reasoning") {
                 let text = match payload.get("summary") {
                     Some(Value::Array(parts)) => text_of_parts(parts, false, "\n"),
@@ -951,7 +840,6 @@ fn extract_codex_line(value: &Value, images: ImageMode) -> LineRows {
             if role != "user" && role != "assistant" {
                 return Vec::new();
             }
-            // content blocks: input_text / output_text
             let content = payload.get("content");
             let text = match content {
                 Some(Value::Array(parts)) => text_of_parts(parts, false, ""),
@@ -990,16 +878,12 @@ fn extract_codex_line(value: &Value, images: ImageMode) -> LineRows {
     }
 }
 
-/// Flush buffered assistant text ahead of a toolCall/thinking part so the
-/// timeline keeps calls where they actually happened.
 fn pi_flush_text(out: &mut LineRows, text: &mut String, ts: &Option<String>, role: &str) {
     if !text.trim().is_empty() {
         out.push(LineRow::new(role, std::mem::take(text), ts.clone()));
     }
 }
 
-/// One pi/omp assistant content part -> rows appended to `out`, with plain
-/// text accumulating into `text`.
 fn pi_assistant_part(part: &Value, out: &mut LineRows, text: &mut String, ts: &Option<String>) {
     match part.get("type").and_then(Value::as_str) {
         Some("text") => {
@@ -1016,7 +900,6 @@ fn pi_assistant_part(part: &Value, out: &mut LineRows, text: &mut String, ts: &O
                 path: arguments.and_then(crate::engines::tool_path_arg),
                 args: arguments.and_then(crate::engines::parse_tool_args_value),
                 tool_call_id: part.get("id").and_then(Value::as_str).map(str::to_string),
-                // Session files store `arguments` as an already-parsed object.
                 todos: arguments.and_then(crate::engines::parse_todo_args),
                 ..LineRow::new(
                     "tool",
@@ -1035,7 +918,6 @@ fn pi_assistant_part(part: &Value, out: &mut LineRows, text: &mut String, ts: &O
     }
 }
 
-/// pi/omp session lines: {type:"message", timestamp, message:{role, content, usage?}}
 fn extract_pi_family_line(engine: &str, value: &Value, images: ImageMode) -> LineRows {
     if value.get("type").and_then(Value::as_str) != Some("message") {
         return Vec::new();
@@ -1080,8 +962,6 @@ fn extract_pi_family_line(engine: &str, value: &Value, images: ImageMode) -> Lin
                 }]
             }
         }
-        // Assistant content interleaves text and toolCall parts; walk it in
-        // order so the timeline shows tool calls where they actually happened.
         "assistant" => match message.get("content") {
             Some(Value::Array(parts)) => {
                 let mut out: LineRows = Vec::new();
@@ -1140,7 +1020,6 @@ fn extract_pi_family_line(engine: &str, value: &Value, images: ImageMode) -> Lin
     }
 }
 
-/// Flush buffered claude text as a row carrying the line's usage/model/effort.
 fn claude_flush_text(
     out: &mut LineRows,
     text: &mut String,
@@ -1160,7 +1039,7 @@ fn claude_flush_text(
     }
 }
 
-/// One claude content block; text accumulates, thinking/tool_use flush it.
+#[allow(clippy::too_many_arguments)]
 fn claude_block_rows(
     block: &Value,
     images: ImageMode,
@@ -1192,11 +1071,6 @@ fn claude_block_rows(
                 path: input.and_then(crate::engines::tool_path_arg),
                 args: input.and_then(crate::engines::parse_tool_args_value),
                 todos: input.and_then(crate::engines::parse_todo_args),
-                // The CLI stamps every call with the id its result comes
-                // back on. Without it `fold_rows` can only guess at the
-                // pairing (latest unanswered row), and parallel calls of
-                // one tool — four `TaskCreate` in a row, say — hand their
-                // results to whichever row happened to be last.
                 tool_call_id: block.get("id").and_then(Value::as_str).map(str::to_string),
                 ..LineRow::new("tool", name, ts.clone())
             });
@@ -1253,8 +1127,6 @@ fn extract_claude_line(value: &Value, images: ImageMode) -> LineRows {
     if line_type != "user" && line_type != "assistant" {
         return Vec::new();
     }
-    // Slash-command expansions and other CLI-internal turns are logged with
-    // `isMeta`; Claude Code itself never renders them in the transcript.
     if value.get("isMeta").and_then(Value::as_bool) == Some(true) {
         return Vec::new();
     }
@@ -1281,8 +1153,6 @@ fn extract_claude_line(value: &Value, images: ImageMode) -> LineRows {
     let mut out = Vec::new();
     match content {
         Some(Value::Array(blocks)) => {
-            // Walk content blocks in order so thinking and tool calls land
-            // where they actually happened relative to the text.
             let mut text = String::new();
             let mut collected: Vec<String> = Vec::new();
             for block in blocks {
@@ -1329,16 +1199,6 @@ fn extract_claude_line(value: &Value, images: ImageMode) -> LineRows {
     out
 }
 
-// ==================== CodeBuddy ====================
-
-/// CodeBuddy transcripts are NOT Claude-shaped. Conversation lines are
-/// `{"type":"message","role":"user|assistant","content":[{"type":"input_text"|
-/// "output_text","text":...}],"sessionId":...,"cwd":...,"timestamp":<ms>}`
-/// (user parts are `input_text`, assistant parts `output_text`); tool
-/// activity arrives as `function_call` / `function_call_output` items (both
-/// top-level and, defensively, inside message content); `file-history-snapshot`
-/// and `ai-title` lines are CLI bookkeeping. Verified against real CLI
-/// v2.175.0 transcripts.
 fn extract_codebuddy_line(value: &Value, images: ImageMode) -> LineRows {
     let ts = codebuddy_ts(value);
     match type_str(value) {
@@ -1349,8 +1209,6 @@ fn extract_codebuddy_line(value: &Value, images: ImageMode) -> LineRows {
     }
 }
 
-/// CodeBuddy stamps milliseconds-since-epoch (numeric); accept the stringly
-/// forms too so a schema tweak degrades instead of zeroing timestamps.
 fn codebuddy_ts(value: &Value) -> Option<String> {
     for key in ["timestamp", "ts"] {
         if let Some(n) = value.get(key).and_then(Value::as_i64) {
@@ -1422,8 +1280,6 @@ fn codebuddy_message_rows(value: &Value, images: ImageMode, ts: Option<String>) 
     let mut out: LineRows = Vec::new();
     let mut text = String::new();
     let mut collected: Vec<String> = Vec::new();
-    // Flush buffered text/images before every tool row so the transcript keeps
-    // its content order (the history view renders rows in emission order).
     let flush_text = |out: &mut LineRows, text: &mut String, collected: &mut Vec<String>| {
         if !text.trim().is_empty() {
             out.push(LineRow {
@@ -1463,9 +1319,6 @@ fn codebuddy_message_rows(value: &Value, images: ImageMode, ts: Option<String>) 
         }
     }
     flush_text(&mut out, &mut text, &mut collected);
-    // usage/model belong to the turn, not to one block: attach them to the
-    // message's last content row, or to its last row when the content holds
-    // only tool blocks (otherwise a tool-only turn loses its usage entirely).
     let target = out
         .iter()
         .rposition(|row| row.role == role)
@@ -1487,7 +1340,6 @@ fn extract_kimi_line(value: &Value) -> LineRows {
     match line_type {
         "turn.prompt" => {
             let text = content_text(value.get("input"));
-            // Strip our image-injection marker block.
             let (display, images) = match text.find(crate::engines::images::KIMI_IMAGE_MARKER) {
                 Some(idx) => (
                     text[..idx].trim_end().to_string(),
@@ -1557,8 +1409,6 @@ fn extract_grok_line(value: &Value) -> LineRows {
     let ts = ts_string(value, &["timestamp", "created_at", "createdAt"]);
     match line_type {
         "user" => {
-            // Envelope stripping (`<user_info>` / `<user_query>`) lives in
-            // `normalize_extracted_row` so it is shared across engines.
             if value.get("synthetic_reason").is_some() {
                 return Vec::new();
             }
@@ -1618,12 +1468,6 @@ fn extract_grok_line(value: &Value) -> LineRows {
     }
 }
 
-// ==================== Qoder ====================
-
-/// Qoder jsonl records are Claude-shaped (`type`, `message.content`, `uuid`,
-/// `timestamp`) with three extras (reference engine/qoder_history.rs):
-/// `isSidechain` marks subagent transcripts, `toolUseResult` envelopes carry
-/// tool output, and the typed prompt is mirrored under `humanInput.text`.
 fn qoder_is_sidechain(value: &Value) -> bool {
     match value.get("isSidechain") {
         Some(Value::Bool(true)) => true,
@@ -1632,8 +1476,6 @@ fn qoder_is_sidechain(value: &Value) -> bool {
     }
 }
 
-/// A `toolUseResult` user record: forward its tool_result blocks, keeping the
-/// call id so results pair with their call instead of arrival order.
 fn qoder_tool_result_rows(value: &Value, ts: &Option<String>) -> LineRows {
     let mut out = Vec::new();
     let Some(blocks) = value
@@ -1674,9 +1516,6 @@ fn extract_qoder_line(value: &Value, images: ImageMode) -> LineRows {
     }
     let mut rows = extract_claude_line(value, images);
     if line_type == "assistant" {
-        // Stamp tool rows with their tool_use block ids (emitted in block
-        // order by the claude walk) so qoder's id-keyed toolUseResult
-        // envelopes pair by id, not arrival order.
         let mut call_ids = value
             .get("message")
             .and_then(|m| m.get("content"))
@@ -1694,8 +1533,6 @@ fn extract_qoder_line(value: &Value, images: ImageMode) -> LineRows {
     if !rows.is_empty() || line_type != "user" {
         return rows;
     }
-    // The typed prompt also lives under humanInput.text; use it when the
-    // claude-shaped message.content carried nothing.
     match value
         .get("humanInput")
         .and_then(|input| input.get("text"))
@@ -1707,16 +1544,6 @@ fn extract_qoder_line(value: &Value, images: ImageMode) -> LineRows {
     }
 }
 
-// ==================== OpenCode ====================
-
-/// OpenCode stores one session as a JSON tree under `<data>/storage/`:
-/// `session/<projectId>/<sessionId>.json` (metadata: id, directory, title,
-/// time), `message/<sessionId>/<messageId>.json` (role, time, model), and
-/// `part/<messageId>/<partId>.json` (text / reasoning / tool / step-finish).
-/// Shapes verified against ~/.local/share/opencode/storage (opencode 1.1.16)
-/// and the reference delete path (commands_opencode_catalog.rs removes
-/// `storage/<parent>/<id>[.json]`). The db row points at the session
-/// metadata file; everything else hangs off it.
 fn opencode_storage_root(session_meta: &Path) -> Option<PathBuf> {
     let project_dir = session_meta.parent()?;
     let session_dir = project_dir.parent()?;
@@ -1726,16 +1553,14 @@ fn opencode_storage_root(session_meta: &Path) -> Option<PathBuf> {
     Some(session_dir.parent()?.to_path_buf())
 }
 
-// Tree-walk budgets: a real session is tens of messages; the caps keep a
-// corrupt/huge tree from turning one sidebar refresh into a disk crawl.
 const MAX_OPENCODE_MESSAGES: usize = 4096;
 const MAX_OPENCODE_PARTS_PER_MESSAGE: usize = 512;
-/// Scan-mode cap on one part file — tool outputs run to MB and the scanner
-/// only keeps title/preview/count.
 const SCAN_OPENCODE_PART_BYTES: u64 = 256 * 1024;
 
-/// Read one small JSON file; `byte_cap` bounds the read (truncated JSON
-/// fails to parse and is skipped).
+#[allow(
+    clippy::disallowed_types,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn read_json_file(path: &Path, byte_cap: Option<u64>) -> Option<Value> {
     use std::io::Read;
     let mut file = std::fs::File::open(path).ok()?;
@@ -1751,7 +1576,10 @@ fn read_json_file(path: &Path, byte_cap: Option<u64>) -> Option<Value> {
     serde_json::from_str(&buf).ok()
 }
 
-/// Sorted `.json` entries of `dir`, capped.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn opencode_list_json(dir: &Path, cap: usize) -> Vec<PathBuf> {
     let mut paths: Vec<PathBuf> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -1762,21 +1590,17 @@ fn opencode_list_json(dir: &Path, cap: usize) -> Vec<PathBuf> {
             }
         }
     }
-    // msg_/prt_ ids are timestamp-prefixed, so name order is chronological.
     paths.sort();
     paths.truncate(cap);
     paths
 }
 
-/// Epoch-millis field as the string form `LineRow.ts` carries.
 fn opencode_ts(value: &Value, keys: &[&str]) -> Option<String> {
     keys.iter()
         .find_map(|k| value.get(k).and_then(Value::as_i64))
         .map(|ms| ms.to_string())
 }
 
-/// `step-finish` tokens → the claude-shaped usage object the context bar reads. OpenCode's input
-/// leaves out the cache, so the total adds it back, or a cached turn reads as a few hundred tokens.
 fn opencode_usage(part: &Value) -> Option<Value> {
     let tokens = part.get("tokens")?;
     let input = tokens.get("input").and_then(Value::as_i64).unwrap_or(0);
@@ -1801,10 +1625,6 @@ fn opencode_usage(part: &Value) -> Option<Value> {
     }))
 }
 
-/// Walk one OpenCode session into extracted rows. `part_byte_cap` bounds
-/// per-part reads (scan mode); None reads fully (reader mode). The session is
-/// addressed either by a legacy storage-tree metadata path or by the virtual
-/// SQLite address emitted by `discover_opencode`.
 fn opencode_rows(session_path: &Path, images: ImageMode, part_byte_cap: Option<u64>) -> LineRows {
     let messages = match super::split_opencode_db_path(session_path) {
         Some((db, session_id)) => opencode_db_messages(&db, &session_id, part_byte_cap),
@@ -1817,8 +1637,6 @@ fn opencode_rows(session_path: &Path, images: ImageMode, part_byte_cap: Option<u
     out
 }
 
-/// One session's `(message, parts)` pairs from the legacy JSON storage tree:
-/// `message/<sessionId>/<messageId>.json` plus `part/<messageId>/<partId>.json`.
 fn opencode_tree_messages(
     session_meta: &Path,
     part_byte_cap: Option<u64>,
@@ -1830,8 +1648,6 @@ fn opencode_tree_messages(
         return Vec::new();
     };
     let message_dir = storage.join("message").join(session_id);
-    // Sort by time.created (name order only works while ids stay
-    // timestamp-prefixed); stable fallback is the filename.
     let mut messages: Vec<(i64, PathBuf, Value)> =
         opencode_list_json(&message_dir, MAX_OPENCODE_MESSAGES)
             .into_iter()
@@ -1860,11 +1676,10 @@ fn opencode_tree_messages(
         .collect()
 }
 
-/// One session's `(message, parts)` pairs from the OpenCode ≥1.18 SQLite
-/// database. `message.data` / `part.data` hold the same JSON shapes the tree
-/// files did; ids and ordering live in columns. `part_byte_cap` skips
-/// oversized parts in scan mode — the tree reader truncates such a file and
-/// fails to parse it, so both paths drop the part.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn opencode_db_messages(
     db: &Path,
     session_id: &str,
@@ -1920,8 +1735,6 @@ fn opencode_db_messages(
     out
 }
 
-/// Project one OpenCode `(message, parts)` pair onto extracted rows. Shared by
-/// the tree reader and the SQLite reader.
 fn opencode_message_rows(message: &Value, parts: &[Value], images: ImageMode) -> LineRows {
     let mut out = Vec::new();
     let role = message.get("role").and_then(Value::as_str).unwrap_or("");
@@ -1936,22 +1749,15 @@ fn opencode_message_rows(message: &Value, parts: &[Value], images: ImageMode) ->
         .and_then(Value::as_i64)
         .zip(created_ms)
         .and_then(|(completed, created)| (completed >= created).then_some(completed - created));
-    // Tree files nest `model.modelID`; the db stores a flat `modelID`.
     let model = message
         .get("model")
         .and_then(|m| m.get("modelID"))
         .or_else(|| message.get("modelID"))
         .and_then(Value::as_str)
         .map(str::to_string);
-    // Parts carry the content. Text accumulates per message so several
-    // text parts land as one row; reasoning/tool parts flush it first,
-    // keeping calls where they happened.
     let mut text = String::new();
     let mut collected_images: Vec<String> = Vec::new();
     let mut message_rows: Vec<LineRow> = Vec::new();
-    // step-finish usage lands after the message's own text row exists;
-    // buffered here and attached below (a mid-loop __usage__ row would
-    // fold onto the *previous* message's assistant row).
     let mut pending_usage: Option<Value> = None;
     for part in parts {
         let part_ts = part
@@ -2006,8 +1812,6 @@ fn opencode_message_rows(message: &Value, parts: &[Value], images: ImageMode) ->
                     pending_usage = Some(usage);
                 }
             }
-            // [INFERENCE] shape from upstream opencode: image attachments
-            // arrive as `{type:"file", mime, url}` with a data URL.
             Some("file") if images == ImageMode::Collect => {
                 let is_image = part
                     .get("mime")
@@ -2030,9 +1834,6 @@ fn opencode_message_rows(message: &Value, parts: &[Value], images: ImageMode) ->
             ..LineRow::new(role, text, created)
         });
     }
-    // A compaction summary's tokens are the summarizing call's, so what it read is the context
-    // from before. The live path reports it as `used: 0`, the size unknown until the next reply;
-    // the total that would read as the context's size goes.
     let pending_usage = match pending_usage {
         Some(mut usage) if crate::engines::opencode_session::is_compaction_summary(message) => {
             if let Some(fields) = usage.as_object_mut() {
@@ -2044,8 +1845,6 @@ fn opencode_message_rows(message: &Value, parts: &[Value], images: ImageMode) ->
         other => other,
     };
     if let Some(usage) = pending_usage {
-        // Attach to this message's own last content row (the flushed text
-        // when present); fall back to the shared __usage__ fold.
         match message_rows
             .iter_mut()
             .rev()
@@ -2134,8 +1933,6 @@ mod tests {
         assert_eq!(normalized.text, "visible request");
     }
 
-    /// An assistant row keeps its own bytes, spacing included, and is never dropped for looking
-    /// empty.
     #[test]
     fn assistant_rows_are_untouched() {
         let padded = LineRow::new("assistant", "  spaced reply\n".into(), None);
@@ -2177,10 +1974,6 @@ mod tests {
         assert_eq!(rows[3].path, None);
     }
 
-    /// Results pair with their call by id, not by arrival order: parallel tool
-    /// calls finish in whatever order they finish, and the fallback (attach to
-    /// the latest row still without a result) mislabels them when they do.
-    /// The `details` payload is what the subagent panel reads for job status.
     #[test]
     fn pi_tool_results_pair_with_their_call_ids() {
         let call = |id: &str| {
@@ -2206,12 +1999,10 @@ mod tests {
                 }
             })
         };
-        let lines = vec![
+        let lines = [
             call("call_a"),
             call("call_b"),
-            // Out of order: `a` answers first even though `b` was called later.
             result("call_a", "## Still Running (1)", "running"),
-            // Replayed or unmatched results must not consume another call.
             result("call_a", "duplicate", "failed"),
             result("unknown_call", "unmatched", "failed"),
             result("call_b", "done", "completed"),
@@ -2350,10 +2141,6 @@ mod tests {
         assert_eq!(todos.items[1].content, "write code");
     }
 
-    /// A batch of parallel TaskCreate calls
-    /// settles by id. Pairing on "the latest unanswered row" instead hands
-    /// every result to the last call of the batch, which is what left the
-    /// run-status task list stuck on "pending".
     #[test]
     fn claude_parallel_tool_results_pair_with_their_call_ids() {
         let call = |id: &str, subject: &str| {
@@ -2373,10 +2160,9 @@ mod tests {
                 ]}
             })
         };
-        let lines = vec![
+        let lines = [
             call("call-a", "实测 Python 版"),
             call("call-b", "打包 exe"),
-            // Results arrive in completion order, not call order.
             result("call-b", "Task #2 created successfully: 打包 exe"),
             result("call-a", "Task #1 created successfully: 实测 Python 版"),
         ];
@@ -2402,15 +2188,12 @@ mod tests {
             second.result,
             Some(serde_json::json!("Task #2 created successfully: 打包 exe"))
         );
-        // The result also teaches the row the id every later TaskUpdate names.
         let first_todos = first.todos.as_ref().expect("create payload");
         assert_eq!(first_todos.items[0].id.as_deref(), Some("1"));
         let second_todos = second.todos.as_ref().expect("create payload");
         assert_eq!(second_todos.items[0].id.as_deref(), Some("2"));
     }
 
-    /// Reading a task back (TaskGet) is not an update: its row carries no todo
-    /// patch, so replaying history cannot reset a finished task to pending.
     #[test]
     fn claude_task_get_row_carries_no_todo_patch() {
         let call = |id: &str, name: &str, input: Value| {
@@ -2429,7 +2212,7 @@ mod tests {
                 ]}
             })
         };
-        let lines = vec![
+        let lines = [
             call(
                 "call-c",
                 "TaskCreate",
@@ -2615,7 +2398,6 @@ mod tests {
         assert_eq!(rows[0].role, "thinking");
         assert_eq!(rows[0].text, "plan step one\nplan step two");
 
-        // Encrypted reasoning carries no visible summary -> no row.
         let encrypted: Value = serde_json::json!({
             "type": "response_item",
             "timestamp": "2026-09-05T11:12:16.469Z",
@@ -2639,9 +2421,6 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].role, "user");
         assert_eq!(rows[0].text, "what is this");
-        // `PathBuf::join` normalizes "/"-rooted refs per platform ("/tmp/a.png"
-        // stays verbatim, "b.jpg" joins with the platform separator), so
-        // compare Path equality instead of string equality.
         let got: Vec<std::path::PathBuf> = rows[0]
             .images
             .iter()
@@ -2674,7 +2453,6 @@ mod tests {
         assert_eq!(rows[0].text, "这是什么?");
         assert_eq!(rows[0].images, ["data:image/png;base64,aGk="]);
 
-        // Image-only message still yields a row.
         let image_only: Value = serde_json::json!({
             "type": "user",
             "message": {
@@ -2708,17 +2486,10 @@ mod tests {
         assert_eq!(rows[0].images, ["data:image/webp;base64,aGk="]);
     }
 
-    /// omp writes `blob:sha256:<hex>` where pi writes inline base64 (every
-    /// image the app sends over the rpc prompt lands there). The referenced
-    /// bytes must come back as a renderable data URL — the bug this guards was
-    /// the reference itself being wrapped as payload, so the reopened session
-    /// showed a broken image.
     #[test]
     fn omp_blob_image_ref_resolves_against_the_cli_blob_store() {
         let agent = blob_scratch("resolve");
         let _env = BlobDirGuard::set(&agent);
-        // A real 1x1 PNG: the assertion below compares bytes, so the fixture
-        // must be a decodable image rather than a header prefix.
         let png = base64::engine::general_purpose::STANDARD
             .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=")
             .unwrap();
@@ -2752,7 +2523,6 @@ mod tests {
             png
         );
 
-        // The extension-suffixed sibling a pruned store may keep still works.
         std::fs::remove_file(blobs.join(hash)).unwrap();
         std::fs::write(blobs.join(format!("{hash}.png")), png).unwrap();
         let rows = extract_pi_family_line("omp", &line, ImageMode::Collect);
@@ -2760,8 +2530,6 @@ mod tests {
         assert!(rows[0].images[0].starts_with("data:image/png;base64,"));
     }
 
-    /// A reference that cannot be resolved must yield no image at all: the
-    /// alternative (wrapping the reference as base64) is what rendered broken.
     #[test]
     fn unresolvable_blob_refs_yield_no_image_instead_of_a_broken_data_url() {
         let agent = blob_scratch("missing");
@@ -2769,10 +2537,7 @@ mod tests {
         let hash = "f".repeat(64);
 
         for data in [
-            // Blob file absent (swept / GC'd store, remote session transcript).
             format!("blob:sha256:{hash}"),
-            // Not a bare digest: a relative or suffixed id must never reach
-            // the filesystem.
             "blob:sha256:../../../../etc/passwd".to_string(),
             "blob:sha256:".to_string(),
         ] {
@@ -2793,8 +2558,6 @@ mod tests {
         }
     }
 
-    /// The scan path never builds image payloads, blob refs included: the
-    /// sidebar counts text, and a scan must not read image bytes at all.
     #[test]
     fn scan_mode_skips_blob_refs_entirely() {
         let agent = blob_scratch("scan");
@@ -2827,10 +2590,6 @@ mod tests {
         dir
     }
 
-    /// Steer `PI_CODING_AGENT_DIR` (what the CLI and `agent_dir` both read)
-    /// at a scratch agent dir for the duration of a test. Held under the
-    /// crate-wide env lock: HOME-steering tests elsewhere share it, since two
-    /// tests mutating engine-home env in parallel would clobber each other.
     struct BlobDirGuard {
         _lock: parking_lot::MutexGuard<'static, ()>,
         prev: Option<std::ffi::OsString>,
@@ -2874,9 +2633,6 @@ mod tests {
         assert_eq!(rows[0].images, ["data:image/png;base64,aGk="]);
     }
 
-    /// Real CLI v2.175.0 transcript schema: message lines with input_text /
-    /// output_text parts, top-level function_call / function_call_output,
-    /// file-history-snapshot / ai-title bookkeeping, ms epoch timestamps.
     fn codebuddy_fixture_file(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
             "ccgui-codebuddy-extract-{tag}-{}",
@@ -2922,7 +2678,6 @@ mod tests {
         let tool = &parsed.messages[2];
         assert_eq!(tool.text, "Read");
         assert_eq!(tool.path.as_deref(), Some("/tmp/ws/a.rs"));
-        // function_call_output pairs back onto its call by call_id.
         assert_eq!(
             tool.result.as_ref().unwrap(),
             &serde_json::json!("file bytes")
@@ -2966,7 +2721,6 @@ mod tests {
         assert_eq!(kinds, ["assistant", "tool", "assistant"]);
         assert_eq!(rows[0].text, "先读文件");
         assert_eq!(rows[2].text, "读完了");
-        // usage/model ride the message's last content row, not the tool row.
         assert!(rows[0].usage.is_none());
         assert_eq!(
             rows[2].usage.as_ref().unwrap()["input_tokens"],
@@ -2974,7 +2728,6 @@ mod tests {
         );
         assert_eq!(rows[2].model.as_deref(), Some("hy4-preview"));
 
-        // Tool-only content must not lose the turn's usage/model.
         let tool_only = serde_json::json!({
             "type": "message",
             "role": "assistant",
@@ -3201,8 +2954,6 @@ mod tests {
         assert_eq!(rows[0].text, "typed body");
     }
 
-    /// qoder's toolUseResult envelope pairs with its tool_use call by id —
-    /// parallel calls finishing out of order must not cross-label.
     #[test]
     fn qoder_tool_result_pairs_with_call_id() {
         let call = |id: &str| {
@@ -3222,7 +2973,7 @@ mod tests {
                 ]}
             })
         };
-        let lines = vec![
+        let lines = [
             call("tool-a"),
             call("tool-b"),
             result("tool-b", "body b"),
@@ -3241,8 +2992,6 @@ mod tests {
         assert_eq!(parsed.messages[1].result, Some(serde_json::json!("body b")));
     }
 
-    /// OpenCode fixture tree: storage/session + message + part jsons, shaped
-    /// like opencode 1.1.16 on disk.
     fn opencode_fixture() -> (PathBuf, PathBuf) {
         let dir = std::env::temp_dir().join(format!("ccgui-extract-{}", uuid::Uuid::new_v4()));
         let storage = dir.join("storage");
@@ -3319,7 +3068,6 @@ mod tests {
         assert_eq!(answer.text, "done");
         assert_eq!(answer.model.as_deref(), Some("claude-sonnet-4-5"));
         assert_eq!(answer.duration_ms, Some(1000));
-        // step-finish tokens fold onto the last assistant message.
         let usage = answer.usage.as_ref().expect("usage folded");
         assert_eq!(usage.get("input_tokens").and_then(Value::as_i64), Some(10));
         assert_eq!(
@@ -3332,8 +3080,6 @@ mod tests {
 
     #[test]
     fn an_opencode_compaction_summary_leaves_the_context_size_unknown() {
-        // A 1.x compaction summary (`summary: true` on its `compaction` agent): its step read the
-        // whole old context, so its tokens aren't the compacted size.
         let parts = [
             serde_json::json!({"type": "text", "text": "## Goal\nShip it."}),
             serde_json::json!({"type": "step-finish", "tokens": {
@@ -3353,7 +3099,6 @@ mod tests {
             crate::engines::bridge::context_usage(usage),
             (Some(0), None)
         );
-        // An ordinary reply keeps its total as the context size.
         let reply = serde_json::json!({"id": "msg_4", "role": "assistant", "agent": "build"});
         let rows = opencode_message_rows(&reply, &parts, ImageMode::Collect);
         assert_eq!(
@@ -3364,7 +3109,6 @@ mod tests {
 
     #[test]
     fn opencode_usage_total_counts_the_cache() {
-        // A cached turn: OpenCode's input leaves the cache out, so most of the prompt is there.
         let part = serde_json::json!({"type": "step-finish", "tokens": {
             "input": 82, "output": 75, "reasoning": 3, "cache": {"read": 5376, "write": 10}}});
         assert_eq!(
@@ -3375,7 +3119,6 @@ mod tests {
                 "total_tokens": 5546,
             }))
         );
-        // Older parts without a cache still total what they have.
         let part = serde_json::json!({"tokens": {"input": 10, "output": 5}});
         assert_eq!(opencode_usage(&part).unwrap()["total_tokens"], 15);
         assert_eq!(
@@ -3396,9 +3139,6 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// minimax transcript line: content parts spell text/thinking/toolCall,
-    /// usage rides the assistant message, toolResult resolves by toolCallId,
-    /// and the ACP image-injection marker is stripped from user turns.
     #[test]
     fn minimax_lines_project_roles_parts_usage_and_images() {
         let rows = extract_line_messages(
@@ -3458,10 +3198,6 @@ mod tests {
         assert_eq!(rows[0].result.as_ref().unwrap()["text"], "文件内容");
     }
 
-    /// OpenCode ≥1.18 SQLite fixture: `message.data` / `part.data` carry the
-    /// same JSON shapes the tree files held; ids and order live in columns.
-    /// Also covers the flat `modelID` the db rows use versus the tree's nested
-    /// `model.modelID`.
     fn opencode_db_fixture() -> (PathBuf, PathBuf) {
         let dir = std::env::temp_dir().join(format!("ccgui-extract-db-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();

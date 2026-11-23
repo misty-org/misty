@@ -1,6 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 
-/** Local, git-ignored evidence for each live acceptance case. */
 const root = new URL("../../../.misty/acceptance/", import.meta.url);
 
 export function writeAcceptanceReport(name: string, report: Record<string, unknown>) {

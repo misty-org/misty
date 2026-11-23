@@ -13,12 +13,7 @@ export interface CliVersionStatus {
   localVersion: string | null;
   latestVersion: string | null;
   updateAvailable: boolean;
-  /** How install and update run, always inside the app: "npm", or "native" for the maker's own
-   *  build or installer; null when Misty can't install it. */
   updateKind: "npm" | "native" | null;
-  /** How Uninstall removes the copy found: the one Misty installed in `~/.misty/shared/engines`,
-   *  npm's or Homebrew's copy through them, or the maker's installer copy. null when Misty can't
-   *  tell how it was installed, and then it isn't offered. */
   removeKind?: CliRemoveKind | null;
 }
 
@@ -26,11 +21,8 @@ export interface CliUpdatePlan {
   engine: string;
   action: "install" | "update";
   kind: "npm" | "native" | "none";
-  /** What runs or is downloaded, one line per step, for Show details. */
   steps: string[];
-  /** Node.js is fetched into Misty's folder first. */
   needsHelper: boolean;
-  /** Apple's developer tools are installed first: running the plan opens their installer. */
   needsDeveloperTools: boolean;
   canRun: boolean;
   blockers: string[];
@@ -42,7 +34,6 @@ interface CliUpdateResult {
   version: string | null;
 }
 
-/** Whether the person is signed in to the CLI, as the CLI itself says. null when it can't say. */
 export interface CliSignInStatus {
   engine: string;
   installed: boolean;
@@ -53,7 +44,6 @@ export interface CliSignInStatus {
 interface CliUpdateProgressEvent {
   runId: string;
   engine: string;
-  /** "step" names what the run does now in `line`: "helper" (Node.js) or "engine". */
   phase: "started" | "stdout" | "stderr" | "finished" | "step";
   line: string | null;
   exitOk: boolean | null;
@@ -70,7 +60,6 @@ export const cliApi = {
   remove: (engine: string) => invoke<void>("engine_cli_remove", { engine }),
 };
 
-/** Streams install output; each event is a batch of lines. */
 export function listenCliUpdateProgress(
   onEvents: (events: CliUpdateProgressEvent[]) => void,
 ): Promise<UnlistenFn> {

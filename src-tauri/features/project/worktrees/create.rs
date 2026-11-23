@@ -3,11 +3,6 @@
 
 use super::*;
 
-// ---------------------------------------------------------------------------
-// Creating
-// ---------------------------------------------------------------------------
-
-/// Where progress goes: to the window that asked, or nowhere in tests.
 pub(super) type Report<'a> = &'a (dyn Fn(CreateProgress) + Send + Sync);
 
 pub(super) fn progress(
@@ -26,7 +21,6 @@ pub(super) fn progress(
     });
 }
 
-/// The create pipeline up to the worktree on disk. Linking it is the command's job.
 pub(super) async fn run_create(
     report: Report<'_>,
     creation_id: &str,
@@ -42,7 +36,6 @@ pub(super) async fn run_create(
         }
     };
 
-    // ---- validate ----
     progress(report, creation_id, "validate", None);
     let branch = args.branch.trim().to_string();
     let target = worktree_path(repo_path, &branch).map_err(|e| fail("invalid_branch", e))?;
@@ -58,8 +51,6 @@ pub(super) async fn run_create(
     }
     let (branch_exists, remote_base) = {
         let repo = open_repo(repo_path).map_err(|error| {
-            // Only a folder that really isn't a repository says so; one Git can't open (owned
-            // by another user, damaged) keeps Git's own words.
             if error == NOT_A_REPO {
                 fail("not_a_repo", error)
             } else {
@@ -87,7 +78,6 @@ pub(super) async fn run_create(
         ));
     }
 
-    // A previous attempt may have made the worktree and stopped before linking it.
     let mut resume = false;
     if file_access::fs::exists(&target) {
         let list = list_worktrees_cli(repo_path)
@@ -116,7 +106,6 @@ pub(super) async fn run_create(
     }
     check_cancel()?;
 
-    // ---- fetch ----
     if let Some(number) = args.pr_number.filter(|_| !resume) {
         progress(
             report,
@@ -146,7 +135,6 @@ pub(super) async fn run_create(
             .map(str::trim)
             .filter(|base| !base.is_empty() && !base.starts_with('-'))
             .ok_or_else(|| fail("invalid_args", "Choose a branch to start from."))?;
-        // Refresh a remote base first; a failed fetch only matters if the base doesn't resolve.
         if let Some((remote, rest)) = &remote_base {
             progress(report, creation_id, "fetch", Some(base.to_string()));
             let (_, cancelled) = run_git(repo_path, &["fetch", remote, rest], Some(cancel))
@@ -172,7 +160,6 @@ pub(super) async fn run_create(
     }
     check_cancel()?;
 
-    // ---- add ----
     if !resume {
         progress(report, creation_id, "add", Some(branch.clone()));
         let base = args.base_ref.as_deref().map(str::trim).unwrap_or("HEAD");
@@ -211,8 +198,6 @@ pub(super) async fn run_create(
         ensure_push_auto_setup(repo_path).await;
     }
 
-    // Sparse-checkout rules that leave out every path make `worktree add` succeed with an
-    // empty folder, which nobody can work in.
     if worktree_is_empty_checkout(&target) {
         if !resume {
             cleanup_partial_add(repo_path, &target).await;
@@ -226,15 +211,12 @@ pub(super) async fn run_create(
     Ok(target)
 }
 
-/// Lets the file gate reach the folder that holds a linked repository's worktrees. It is worked
-/// out from a folder the person linked, never named by a window.
 pub(super) fn reach_worktrees(repo: &Path) {
     if let Ok(root) = worktrees_root(repo) {
         file_access::allow_linked_folder(&root);
     }
 }
 
-/// The repository folder a command names, as its main checkout, once it is known to be linked.
 pub(super) async fn linked_repository(
     app: &tauri::AppHandle,
     webview: &tauri::Webview,

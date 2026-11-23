@@ -1,13 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { IconButton, IndicatorDot, spaceIcons } from "@misty/ui";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
-import { spaceChatPath } from "./chatRoute";
-import { useSpaceConversationList, useSpaceEveryoneUnread } from "./spaceConversationsResource";
+import { spaceChatPath } from "./chat_route";
+import { useSpaceConversationList, useSpaceEveryoneUnread } from "./space_conversations_resource";
 
-/**
- * The way into the Space's chat from its home: one icon, no label, with a dot while anything in
- * its channels or direct messages is unread.
- */
 export function SpaceChatButton({ spaceId }: { spaceId: string }) {
   const navigate = useNavigate();
   const everyone = useSpaceEveryoneUnread(spaceId);

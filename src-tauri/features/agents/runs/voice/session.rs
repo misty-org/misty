@@ -1,8 +1,3 @@
-//! The companion's spoken conversation, on the desktop's own models. One
-//! session is one push-to-talk session in the protocol `companionConversation.ts` speaks: a turn is
-//! heard (audio, or typed text), answered on the fast model, which may hand work to the app as a tool
-//! call, and spoken sentence by sentence. Context and task status come from the app, which keeps the
-//! chat. A session is never reconnected: work is never replayed.
 use std::sync::{Mutex, MutexGuard};
 
 use futures_util::future::{pending, select, BoxFuture, Either};
@@ -17,8 +12,6 @@ use super::super::{
 use crate::logger::process_log;
 use crate::model_calls::Message;
 
-/// The reply: words to say, or one tool to call. A field is `None` when the model didn't write it as
-/// text, which ends the turn in a session failure when the turn needs that field.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VoiceDecision {
     pub say: Option<String>,
@@ -26,21 +19,26 @@ pub struct VoiceDecision {
     pub instruction: Option<String>,
 }
 
-/// The models a voice session runs on. Dropping a future cancels the call.
 pub trait VoiceModels: Send + Sync {
-    /// What was said in 24 kHz 16-bit mono PCM.
     fn transcribe<'a>(&'a self, pcm: &'a [u8]) -> BoxFuture<'a, Result<String, CallError>>;
-    /// The reply: words to say, or one tool to call.
-    fn reply<'a>(&'a self, system: &'a str, messages: Vec<Message>, tools: &'a [String]) -> BoxFuture<'a, Result<VoiceDecision, CallError>>;
-    /// One sentence as 24 kHz 16-bit mono PCM; its neighbours keep the delivery continuous.
-    fn speak<'a>(&'a self, text: &'a str, previous: &'a str, next: &'a str) -> BoxFuture<'a, Result<Vec<u8>, CallError>>;
+    fn reply<'a>(
+        &'a self,
+        system: &'a str,
+        messages: Vec<Message>,
+        tools: &'a [String],
+    ) -> BoxFuture<'a, Result<VoiceDecision, CallError>>;
+    fn speak<'a>(
+        &'a self,
+        text: &'a str,
+        previous: &'a str,
+        next: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<u8>, CallError>>;
 }
 
 const MAX_TURNS: u32 = 8;
 const MAX_PCM_BYTES: usize = 24_000 * 2 * 60;
 const STOPPED: &str = "The voice session stopped. Your tasks and saved conversation are still available. Try voice again.";
 
-/// A protocol error or a failed call: either ends what's going on with the one message.
 #[derive(Debug)]
 pub(super) enum Stop {
     Protocol(&'static str),
@@ -60,7 +58,6 @@ pub(super) struct Pending {
 }
 
 pub(super) struct Turn {
-    /// Which `begin` this is. An object's identity did this job in the TypeScript.
     pub(super) number: u32,
     pub(super) id: String,
     pub(super) prompt: String,
@@ -92,13 +89,16 @@ pub(crate) struct VoiceSession<'m> {
     state: Mutex<State>,
 }
 
-/// `value.length > limit ? value.slice(0, limit) : value`.
 pub(super) fn clip(value: &str, limit: usize) -> &str {
     js_prefix(value, limit)
 }
 
 impl<'m> VoiceSession<'m> {
-    pub(crate) fn new(sid: &str, send: UnboundedSender<Value>, models: &'m dyn VoiceModels) -> Self {
+    pub(crate) fn new(
+        sid: &str,
+        send: UnboundedSender<Value>,
+        models: &'m dyn VoiceModels,
+    ) -> Self {
         let session = Self {
             sid: sid.to_owned(),
             send,
@@ -117,12 +117,13 @@ impl<'m> VoiceSession<'m> {
     }
 
     pub(super) fn emit(&self, event: Value) {
-        // A gone receiver is the app closing the session, which `close` deals with.
         let _ = self.send.send(event);
     }
 
     pub(super) fn state(&self) -> MutexGuard<'_, State> {
-        self.state.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     pub(crate) fn close(&self) {
@@ -133,7 +134,6 @@ impl<'m> VoiceSession<'m> {
         }
     }
 
-    /// One event from the app. A protocol error reports its message and leaves the session open.
     pub(crate) async fn handle(&self, event: &JsValue) {
         if let Err(stop) = self.dispatch(event).await {
             self.fail(&stop);
@@ -148,22 +148,30 @@ impl<'m> VoiceSession<'m> {
                 Ok(())
             }
             Some("context") => {
-                // The chat's recent turns (JSON) and its current task, kept by the app.
                 let mut state = self.state();
                 let history = clip(text("history"), 24_000);
-                state.context = if history.is_empty() { "[]".to_owned() } else { history.to_owned() };
+                state.context = if history.is_empty() {
+                    "[]".to_owned()
+                } else {
+                    history.to_owned()
+                };
                 state.task = clip(text("task"), 200).to_owned();
                 Ok(())
             }
             Some("turn.begin") => self.begin(),
             Some("audio.append") => {
-                let sequence = event.get("sequence").map_or(f64::NAN, JsValue::to_js_number);
+                let sequence = event
+                    .get("sequence")
+                    .map_or(f64::NAN, JsValue::to_js_number);
                 self.append(sequence, text("audio"))
             }
             Some("audio.commit") => self.commit_audio().await,
             Some("text.commit") => self.commit_text(text("text")).await,
             Some("task.read") => self.read_task(text("invocationId"), text("result")).await,
-            Some("tool.result") => self.tool_result(text("callId"), text("invocationId"), text("result")).await,
+            Some("tool.result") => {
+                self.tool_result(text("callId"), text("invocationId"), text("result"))
+                    .await
+            }
             Some("playback.done") => {
                 self.finish();
                 Ok(())
@@ -224,7 +232,6 @@ impl<'m> VoiceSession<'m> {
         Ok(())
     }
 
-    /// Marks the open turn as submitted, and gives back what the steps after it need.
     pub(super) fn commit(&self) -> Result<u32, Stop> {
         let mut state = self.state();
         let turn = state.turn.as_mut().ok_or(Stop::Protocol("no voice turn"))?;
@@ -235,15 +242,17 @@ impl<'m> VoiceSession<'m> {
         Ok(turn.number)
     }
 
-    /// Runs a model call until it answers or the turn is aborted, which reads as a failed call.
-    pub(super) async fn abortable<T>(&self, number: u32, call: BoxFuture<'_, Result<T, CallError>>) -> Result<T, Stop> {
+    pub(super) async fn abortable<T>(
+        &self,
+        number: u32,
+        call: BoxFuture<'_, Result<T, CallError>>,
+    ) -> Result<T, Stop> {
         let mut aborted = {
             let state = self.state();
             let turn = state.turn.as_ref().filter(|turn| turn.number == number);
             turn.ok_or(Stop::Aborted)?.abort.subscribe()
         };
         let abort = Box::pin(async move {
-            // A turn that ended without an abort lets its call finish, and then says nothing.
             if aborted.wait_for(|stopped| *stopped).await.is_err() {
                 pending::<()>().await;
             }
@@ -282,10 +291,13 @@ impl<'m> VoiceSession<'m> {
         }));
     }
 
-    /// A turn the person interrupted, or a closed session, says nothing more.
     pub(super) fn stale(&self, number: u32) -> bool {
         let state = self.state();
-        state.closed || state.turn.as_ref().map_or(true, |turn| turn.number != number || turn.interrupted)
+        state.closed
+            || state
+                .turn
+                .as_ref()
+                .map_or(true, |turn| turn.number != number || turn.interrupted)
     }
 
     fn fail(&self, stop: &Stop) {

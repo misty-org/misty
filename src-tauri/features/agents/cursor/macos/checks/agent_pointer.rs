@@ -1,9 +1,3 @@
-//! Live check of Misty's desktop actions: opens a text file in TextEdit, then
-//! clicks into it, types and selects through Accessibility while the person's
-//! pointer stays where it is. Run with `npm run check:desktop-agent` (macOS,
-//! Accessibility allowed for the terminal). It edits only a scratch file. The
-//! pointer and mist drawings need the app's main thread, so they are not part
-//! of this check.
 use std::{
     io::Write,
     sync::atomic::{AtomicI32, Ordering},

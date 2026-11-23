@@ -1,11 +1,7 @@
-//! The Tauri plugins and the app-wide menu and window event handlers.
-
 use crate::app::shell_plugins;
 use tauri::{Builder, Wry};
 
 pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
-    // Register this first so duplicate launches are rejected before any other
-    // plugin or application service can initialize a second Misty runtime.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
         if !crate::app::macos_window_effects::mac_rounded_corners::main_window_ready() {
@@ -20,12 +16,9 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         }
     }));
 
-    // Web APIs that website tabs reach natively; see features/kiri/src/lib.rs.
     #[cfg(desktop)]
     let builder = builder.plugin(crate::browser::kiri_link::kiri_host::plugin());
 
-    // WebKit can end a page's process while Misty is in the background; reload
-    // it as Tauri would, and log which page it was.
     #[cfg(target_os = "macos")]
     let builder = builder
         .on_web_content_process_terminate(crate::browser::pages::process_ended::page_process_ended);
@@ -34,23 +27,18 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
 
     let builder = builder
-        // Keeps privileged windows on the bundled app; see navigation_guard.rs.
         .plugin(crate::app::trusted_windows::navigation_guard::init())
-        // Replaces Tauri's asset handler so website views cannot read local files.
         .register_asynchronous_uri_scheme_protocol("asset", |context, request, responder| {
             crate::app::trusted_windows::asset_protocol::handle(context, request, responder)
         })
-        // A linked folder's images for the editor, checked against the account's folders.
         .register_asynchronous_uri_scheme_protocol(
             crate::project::file_protocol::SCHEME,
             crate::project::file_protocol::handle,
         )
-        // Files' thumbnails and Quick Look's media, under the disk grant, to a person's window only.
         .register_asynchronous_uri_scheme_protocol(
             crate::files::protocol::SCHEME,
             crate::files::protocol::handle,
         )
-        // A Space app's bundle for its sandboxed frame, from the installed copy only.
         .register_asynchronous_uri_scheme_protocol(
             crate::apps::scheme::SCHEME,
             crate::apps::scheme::handle,
@@ -61,11 +49,9 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         .plugin(shell_plugins::ShellScriptPlugin(tauri_plugin_opener::init()))
         .plugin(crate::app::platform_info::plugin());
 
-    // Draws each window's title bar and taskbar icon at the size Windows shows it.
     #[cfg(windows)]
     let builder = builder.plugin(crate::app::windows::window_icon::plugin());
 
-    // Run notices on Windows and Linux; macOS sends them through mac-notification-sys.
     #[cfg(not(target_os = "macos"))]
     let builder = builder.plugin(shell_plugins::ShellScriptPlugin(
         tauri_plugin_notification::init(),
@@ -81,9 +67,6 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
         crate::app::tray::handle_menu_event(app, id);
     });
 
-    // With Tauri's `unstable` feature every webview, a window's own included, is a child webview,
-    // so a file drop arrives as a webview event; the window-event handler below also takes the
-    // drop in case a window's content webview reports it there instead.
     let builder = builder.on_webview_event(|webview, event| {
         crate::app::dropped_files::webview_event(webview, event);
     });
@@ -120,8 +103,5 @@ pub fn register(builder: Builder<Wry>) -> Builder<Wry> {
                 size: tauri::Size::Physical(*size),
             });
         }
-        // macOS owns live window layout. Traffic lights are positioned
-        // during window setup; rewriting their frames on every resize
-        // competes with AppKit and makes the titlebar controls jitter.
     })
 }

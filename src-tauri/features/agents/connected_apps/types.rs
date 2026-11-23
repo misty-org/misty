@@ -1,8 +1,6 @@
-//! What an app tool search and a tool's identity hold, as the agent tools pass them on.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// The parts of a session search Misty passes to the model.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct SearchResult {
@@ -42,7 +40,6 @@ pub struct SearchSchema {
     pub has_full_schema: bool,
 }
 
-/// A tool's identity and its behavior tags.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct ToolInfo {

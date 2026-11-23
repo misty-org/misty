@@ -1,15 +1,15 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@misty/ui";
 import { FilesFrame } from "./FilesFrame";
 import { FilesPane } from "./FilesPane";
 import type { FileItem, FilesPlace } from "./model";
-import type { FilesPick } from "./useFilesBrowser";
-
-const nothing = () => undefined;
+import { TransfersView } from "./TransfersView";
+import type { FilesPick } from "./use_files_browser";
 
 /**
- * Files in one pane, with no tabs or workspaces: the picker apps open (`pick`, with its `footer` of
- * buttons where the bottom bar would be). The Files page is `FilesWindow`.
+ * Files in one pane: the Files page, or the picker apps open (`pick`, with its `footer` of buttons
+ * where the bottom bar would be). Transfers, outside the picker, open in a dialog over it.
  */
 export function FilesBrowser({
   granted,
@@ -25,17 +25,31 @@ export function FilesBrowser({
   /** The picker's buttons, from what is picked now; `open` goes into a folder or picks a file. */
   footer?: (picked: FileItem[], open: (item: FileItem) => void) => ReactNode;
 }) {
+  const [transfers, setTransfers] = useState(false);
   return (
-    <FilesFrame picking={Boolean(pick)}>
-      {(slots) => (
-        <FilesPane
-          granted={granted}
-          start={start}
-          pick={pick}
-          footer={footer}
-          host={{ active: true, slots, count: 1, onFocus: nothing, onPlace: nothing }}
-        />
-      )}
-    </FilesFrame>
+    <>
+      <FilesFrame picking={Boolean(pick)}>
+        {(slots) => (
+          <FilesPane
+            granted={granted}
+            start={start}
+            pick={pick}
+            footer={footer}
+            slots={slots}
+            onTransfers={pick ? undefined : () => setTransfers(true)}
+          />
+        )}
+      </FilesFrame>
+      <Dialog open={transfers} onOpenChange={setTransfers}>
+        <DialogContent size="media">
+          <DialogHeader>
+            <DialogTitle>Transfers</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <TransfersView />
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

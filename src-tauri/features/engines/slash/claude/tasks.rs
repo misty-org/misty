@@ -1,26 +1,18 @@
-//! `/tasks`: the background tasks of the chat's live turn, listed and stopped.
-
 use super::*;
 
-/// The live process of this chat's turn, when one runs: its registry entry, which holds its
-/// stdin. A turn's process stays alive past its reply while a background task runs (it parks for
-/// the follow-up turn Claude Code opens when the task ends), and closes its stdin once it ends.
 async fn live_turn(session: &str) -> Option<crate::engines::ChildEntry> {
     let entry = crate::engines::support::state()?.processes.get(session)?;
     let open = entry.stdin.as_ref()?.lock().await.is_some();
     open.then_some(entry)
 }
 
-/// The tasks the live process listed. A list from an earlier process is gone with it, and a new
-/// process lists nothing until its first task starts.
 fn live_tasks(session: &str, turn: &crate::engines::ChildEntry) -> Vec<BackgroundTask> {
     claude::background_tasks(session)
-        .filter(|listed| listed.pid.map_or(true, |pid| pid == turn.pid))
+        .filter(|listed| listed.pid.is_none_or(|pid| pid == turn.pid))
         .map(|listed| listed.tasks)
         .unwrap_or_default()
 }
 
-/// What a task is, in the words of Claude Code's own `/tasks` dialog.
 fn task_kind(task: &BackgroundTask) -> String {
     let kind = match task.kind.as_str() {
         "local_bash" => "Shell",
@@ -47,11 +39,6 @@ fn task_status(status: &str) -> String {
     }
 }
 
-/// `/tasks` (`/bashes`) lists the background tasks of the chat's live turn, and `/tasks stop
-/// <id>` stops one. Claude Code's tasks live in that turn's process, so the list comes from its
-/// own `background_tasks_changed` events (`claude_tasks.rs`), and a stop goes onto its stdin as the
-/// `stop_task` control request, the same way a question's answer does. A short-lived control
-/// process would be a different process, with none of them.
 pub(super) async fn tasks(context: &Context) -> Result<Output, String> {
     let mut words = context.args.split_whitespace();
     match (words.next(), words.next(), words.next()) {
@@ -117,8 +104,6 @@ async fn stop_task(context: &Context, id: &str) -> Result<Output, String> {
             "No background task has the ID {id}. /tasks lists the ones running."
         ));
     };
-    // Claude Code answers on the turn's stdout, where the reader passes control responses by;
-    // the task's `task_updated` and the next task list show it stopped.
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let request_id = format!(
         "misty-stop-{}",
@@ -141,10 +126,6 @@ async fn stop_task(context: &Context, id: &str) -> Result<Output, String> {
     if !stopped(session, &turn, &task.id).await {
         return Ok(Output::done(format!("Stopping {name}")));
     }
-    // The turn's process stayed only for its background tasks. A stopped task opens no
-    // follow-up turn (2.1.322 reports it and goes quiet), so with none left the process would
-    // idle until the app quits: closing its stdin ends it the way a finished turn does. A
-    // send that already took the parked process keeps it.
     if live_tasks(session, &turn).is_empty() {
         if let Some(parked) = state.processes.take_awaiting_followup(session) {
             state.processes.close_stdin(&parked.run_id);
@@ -153,11 +134,8 @@ async fn stop_task(context: &Context, id: &str) -> Result<Output, String> {
     Ok(Output::done(format!("Stopped {name}")))
 }
 
-/// How long Claude Code may take to report a stopped task; it answers within a moment.
 const STOP_REPORT: std::time::Duration = std::time::Duration::from_secs(10);
 
-/// Waits until Claude Code reports task `id` no longer running: its `task_updated` status
-/// changes, or the next `background_tasks_changed` leaves it out.
 async fn stopped(session: &str, turn: &crate::engines::ChildEntry, id: &str) -> bool {
     let deadline = tokio::time::Instant::now() + STOP_REPORT;
     loop {

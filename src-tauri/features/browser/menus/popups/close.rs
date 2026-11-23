@@ -1,8 +1,5 @@
-//! Closing a download popup: when its page asks to, and when the agent's wait for its file is over.
 use super::*;
 
-/// A download popup closes, with its session and token, once the agent's bounded wait for its file
-/// is over. Export popups may spend time generating a file before it downloads.
 pub(super) fn close_after_download_wait(app: &AppHandle, id: String) {
     let cleanup_app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -15,10 +12,7 @@ pub(super) fn close_after_download_wait(app: &AppHandle, id: String) {
     });
 }
 
-/// Closes the popup's tab the way the tab strip would, once the page itself
-/// asks to close (OAuth popups do this when they finish).
 fn close_from_page(app: AppHandle, id: String) {
-    // Leave the engine's callback before destroying its window and view.
     tauri::async_runtime::spawn(async move {
         let close_app = app.clone();
         let _ = app.run_on_main_thread(move || {
@@ -31,7 +25,6 @@ fn close_from_page(app: AppHandle, id: String) {
     });
 }
 
-/// WebView2 reports `window.close()` as WindowCloseRequested.
 #[cfg(windows)]
 pub(super) fn install_close_handler(
     app: &AppHandle,
@@ -64,9 +57,6 @@ pub(super) fn install_close_handler(
 #[cfg(windows)]
 pub(in crate::browser) fn forget_close_handler(_id: &str) {}
 
-// Wry 0.55 supplies popup creation but omits WKUIDelegate.webViewDidClose.
-// Handle WebKit's actual close notification, including OAuth completion, without
-// injecting a replacement window.close or guessing which URL means success.
 #[cfg(target_os = "macos")]
 use std::sync::OnceLock;
 #[cfg(target_os = "macos")]
@@ -110,8 +100,6 @@ pub(super) fn install_close_handler(
         .with_webview(move |native| unsafe {
             let view = native.inner() as *mut objc::runtime::Object;
             let delegate: *mut objc::runtime::Object = msg_send![view, UIDelegate];
-            // Add a same-layout subclass so existing file dialogs and popup handling
-            // continue to use Wry's delegate; only this window gains the close hook.
             let class_name = "MistyIntegrationPopupUIDelegate";
             let subclass = objc::runtime::Class::get(class_name).unwrap_or_else(|| {
                 let mut declaration =
@@ -135,8 +123,6 @@ pub(super) fn install_close_handler(
                 ) -> *const objc::runtime::Class;
             }
             object_setClass(delegate, subclass);
-            // WebKit caches optional delegate selectors when the delegate is set.
-            // Reassign it after adding webViewDidClose so the new method is observed.
             let _: () =
                 msg_send![view, setUIDelegate: std::ptr::null_mut::<objc::runtime::Object>()];
             let _: () = msg_send![view, setUIDelegate: delegate];
@@ -147,7 +133,6 @@ pub(super) fn install_close_handler(
         .map_err(|error| error.to_string())
 }
 
-/// WebKitGTK reports `window.close()` as the view's close signal.
 #[cfg(target_os = "linux")]
 pub(super) fn install_close_handler(
     app: &AppHandle,
@@ -166,6 +151,5 @@ pub(super) fn install_close_handler(
         .map_err(|error| error.to_string())
 }
 
-/// The close signal goes with the view, so nothing outlives it.
 #[cfg(target_os = "linux")]
 pub(in crate::browser) fn forget_close_handler(_id: &str) {}

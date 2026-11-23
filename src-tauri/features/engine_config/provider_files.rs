@@ -20,14 +20,10 @@ use toml_edit::{DocumentMut, Item};
 
 use super::support;
 
-// ── Official files ──────────────────────────────────────────────────────────
-
 pub(crate) struct Target {
     pub(crate) path: PathBuf,
 }
 
-/// The CLI's own config files the official editor shows, in pane order. Codex's `auth.json` is
-/// left out: it holds the person's ChatGPT sign-in, which Misty never reads.
 pub(crate) fn targets(engine: &str) -> Vec<Target> {
     let home = support::engine_home;
     let target = |path: PathBuf| Target { path };
@@ -48,7 +44,6 @@ pub(crate) fn targets(engine: &str) -> Vec<Target> {
     }
 }
 
-/// Where a write to an official file keeps the version it replaced.
 fn backup_path(engine: &str, target: &Target) -> PathBuf {
     let name = target
         .path
@@ -61,8 +56,6 @@ fn backup_path(engine: &str, target: &Target) -> PathBuf {
         .join(format!("{name}.{}", support::now_ms()))
 }
 
-/// Native config files of `engine` (the official editor's panes). Empty for engines whose
-/// official state lives elsewhere.
 pub fn provider_file_paths(engine: &str) -> Vec<String> {
     targets(engine)
         .iter()
@@ -75,20 +68,14 @@ pub async fn engine_channels_official_paths(engine: String) -> Vec<String> {
     provider_file_paths(&engine)
 }
 
-/// One editable file of an engine's official config, one pane of the edit dialog.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct OfficialConfigFile {
-    /// Absolute path: the pane label, and the write-back key.
     pub path: String,
-    /// Editor language mode, from the extension.
     pub format: &'static str,
-    /// Live file content; "" when absent (`exists` tells them apart).
     pub content: String,
     pub exists: bool,
 }
 
-/// An edited official file, matched back to a declared target by exact path so the window can
-/// never name another file.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct OfficialConfigDraft {
     pub path: String,
@@ -131,9 +118,6 @@ pub async fn engine_channels_official_read(
         .map_err(|e| e.to_string())?
 }
 
-/// Overwrites official files, only when the person saves them in the editor. Everything is
-/// validated before anything is written, and each replaced file is kept in
-/// `~/.misty/engine-config/provider-backups`.
 pub fn official_config_write(engine: &str, files: Vec<OfficialConfigDraft>) -> Result<(), String> {
     super::channels::checked_engine(engine)?;
     let _guard = super::channels::lock();
@@ -193,16 +177,6 @@ fn write_official(engine: &str, target: &Target, content: &str) -> Result<(), St
     support::atomic_write(&target.path, content)
 }
 
-// ── Channel value extraction ────────────────────────────────────────────────
-
-/// Loader, hook and interception variables a stored channel must never put into a CLI's
-/// environment: they hand code execution or traffic to whoever wrote the channel. Prefix families
-/// (DYLD_/LD_, GIT_CONFIG_KEY/VALUE) match by prefix, the rest exactly, without regard to case.
-///
-/// Beyond loader hooks: PATH hijacks the git and rg the CLI starts; a proxy with
-/// NODE_EXTRA_CA_CERTS intercepts the CLI's HTTPS; GIT_CONFIG_*, GIT_TEMPLATE_DIR and
-/// GIT_EXEC_PATH turn git calls into code execution; EDITOR and GIT_PAGER run when the CLI pages
-/// or opens an editor. The proxy itself comes from Settings › Network.
 pub(crate) fn is_blocked_env_key(key: &str) -> bool {
     let upper = key.to_ascii_uppercase();
     if upper.starts_with("DYLD_")
@@ -245,8 +219,6 @@ pub(crate) fn is_blocked_env_key(key: &str) -> bool {
     )
 }
 
-/// baseUrl/apiKey/model to environment variable, per engine: the variables an imported CC Switch
-/// channel carries its fields under, and what a flat channel is started with.
 pub(crate) fn env_mapping(engine: &str) -> [(&'static str, &'static str); 3] {
     match engine {
         "claude" => [
@@ -264,7 +236,6 @@ pub(crate) fn env_mapping(engine: &str) -> [(&'static str, &'static str); 3] {
             ("apiKey", "GROK_API_KEY"),
             ("model", "GROK_MODEL"),
         ],
-        // Codex reads OpenAI-compatible variables for its default provider.
         "codex" => [
             ("baseUrl", "OPENAI_BASE_URL"),
             ("apiKey", "OPENAI_API_KEY"),
@@ -275,7 +246,6 @@ pub(crate) fn env_mapping(engine: &str) -> [(&'static str, &'static str); 3] {
             ("apiKey", "CODEBUDDY_API_KEY"),
             ("model", "CODEBUDDY_MODEL"),
         ],
-        // Gemini CLI and Qwen Code read these for a custom endpoint and key.
         "gemini" => [
             ("baseUrl", "GOOGLE_GEMINI_BASE_URL"),
             ("apiKey", "GEMINI_API_KEY"),
@@ -298,7 +268,6 @@ pub(crate) fn non_empty_str(value: Option<&Value>) -> Option<String> {
         .map(str::to_string)
 }
 
-/// A channel's raw environment maps: CC Switch's `settingsConfig.env` first, then the flat `env`.
 fn channel_env_maps(
     provider: &Value,
 ) -> impl Iterator<Item = &serde_json::Map<String, Value>> + '_ {
@@ -311,8 +280,6 @@ fn channel_env_maps(
     .filter_map(Value::as_object)
 }
 
-/// One field (baseUrl/apiKey/model): the flat field wins, then the engine's variable in the raw
-/// environment maps.
 pub(crate) fn channel_field(engine: &str, provider: &Value, field: &str) -> Option<String> {
     if let Some(v) = non_empty_str(provider.get(field)) {
         return Some(v);
@@ -324,11 +291,6 @@ pub(crate) fn channel_field(engine: &str, provider: &Value, field: &str) -> Opti
     channel_env_maps(provider).find_map(|map| non_empty_str(map.get(var)))
 }
 
-/// The environment a CLI is started with for `provider`: the raw maps first (blocked keys and
-/// empty values refused), then the flat fields where the raw maps have no value.
-///
-/// Codex also lifts `settingsConfig.auth.OPENAI_API_KEY` when there is no other key: that is
-/// where CC Switch keeps a Codex channel's key.
 pub(crate) fn channel_env(
     engine: &str,
     provider: &Value,
@@ -377,8 +339,6 @@ pub(crate) fn channel_env(
         }
     }
     if engine == "grok" {
-        // GROK_BASE_URL and GROK_API_KEY are channel aliases, not the CLI's own variables.
-        // Translate them, keeping native variables the channel set itself.
         if let Some(base) = out.remove("GROK_BASE_URL") {
             let base = base.trim_end_matches('/');
             for key in [
@@ -396,10 +356,6 @@ pub(crate) fn channel_env(
         }
     }
     if engine == "codebuddy" && !seen.contains("CODEBUDDY_INTERNET_ENVIRONMENT") {
-        // CodeBuddy needs CODEBUDDY_INTERNET_ENVIRONMENT to pick its sign-in and endpoint family
-        // (China "internal", iOA "ioa", dedicated "cloudhosted", self-hosted "selfhosted");
-        // without it a key channel signs in against the wrong service and fails with 401. The
-        // two that can be told from the base URL are derived; a raw variable still wins.
         if let Some(edition) = out
             .get("CODEBUDDY_BASE_URL")
             .and_then(|base| codebuddy_edition_for(base))
@@ -413,8 +369,6 @@ pub(crate) fn channel_env(
     Ok(out)
 }
 
-/// The CodeBuddy edition for a base URL, or `None`. The parsed host must match exactly: a
-/// substring match also took look-alike domains and proxy paths for Tencent's endpoint.
 fn codebuddy_edition_for(base_url: &str) -> Option<&'static str> {
     let rest = base_url
         .split_once("://")
@@ -443,8 +397,6 @@ pub(crate) fn codex_api_key(provider: &Value) -> Option<String> {
         .or_else(|| channel_field("codex", provider, "apiKey"))
 }
 
-/// The fields a model-list probe needs. Never sent to a window: the endpoint and key are used
-/// only for the request the person asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SafeProviderProbeConfig {
     pub name: String,
@@ -590,18 +542,15 @@ mod tests {
             edition("https://copilot.tencent.com/v1", None).as_deref(),
             Some("internal")
         );
-        // The iOA endpoint wins over the copilot.tencent.com suffix.
         assert_eq!(
             edition("https://tencent.sso.copilot.tencent.com/v1", None).as_deref(),
             Some("ioa")
         );
-        // A raw variable wins over the derivation.
         assert_eq!(
             edition("https://copilot.tencent.com/v1", Some("cloudhosted")).as_deref(),
             Some("cloudhosted")
         );
         assert_eq!(edition("https://selfhosted.example.com", None), None);
-        // Look-alike domains and proxy paths carrying the real host derive nothing.
         for base in [
             "https://copilot.tencent.com.example.org/v1",
             "copilot.tencent.com.example.org/v1",
@@ -610,7 +559,6 @@ mod tests {
         ] {
             assert_eq!(edition(base, None), None, "{base}");
         }
-        // A port on the real host, and a base without a scheme, still match.
         assert_eq!(
             edition("https://copilot.tencent.com:8443/v1", None).as_deref(),
             Some("internal")
@@ -631,7 +579,6 @@ mod tests {
         };
         assert!(validate_official(&json_target, r#"{"env":{}}"#).is_ok());
         assert!(validate_official(&json_target, "{not json").is_err());
-        // Scalars and arrays parse as JSON but are not a settings file.
         assert!(validate_official(&json_target, "[1,2]").is_err());
         assert!(validate_official(&toml_target, "[providers]\nx=1").is_ok());
         assert!(validate_official(&toml_target, "key = = 1").is_err());
@@ -680,7 +627,6 @@ mod tests {
                 .map(|entry| std::fs::read_to_string(entry.path()).unwrap())
                 .collect();
         assert_eq!(backups, vec![first.to_string()]);
-        // A file that isn't the engine's is refused, and a bad draft writes nothing.
         assert!(official_config_write(
             "codebuddy",
             vec![OfficialConfigDraft {

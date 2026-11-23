@@ -1,14 +1,10 @@
-/* The terminal tab: a quiet strip of the folder's shells, then the open one. */
 .terminal-panel {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  /* Clipped, not hidden: xterm focuses a text field at the cursor, and the browser scrolls any
-     scrollable box to bring it into view, which slid the whole terminal up and sideways. */
   overflow: clip;
 }
-/* The strip is the side panel's header row: no inset or line of its own. */
 .terminal-tabs {
   display: flex;
   flex: 1;
@@ -70,8 +66,6 @@
   flex: 1;
   overflow: clip;
 }
-/* The shell fills the panel's body on the panel's own fill, with no box or margin around it; its
-   text starts where the header's does (12px in), and the last line runs to the bottom edge. */
 .terminal-host {
   position: absolute;
   inset: calc(var(--spacing) * 2) var(--spacing) 0 calc(var(--spacing) * 3);

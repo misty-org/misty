@@ -12,11 +12,11 @@ import {
 } from "@misty/ui";
 import { checklistForInvocation } from "../../../plans/checklists";
 import { useCollaborationStore } from "../../../plans/store";
-import type { ChecklistItem } from "../../../plans/planTypes";
-import type { AgentSubagent } from "../../../runs/invocations/invocationTypes";
-import type { GlobalAiMessage } from "../../state/conversationTypes";
+import type { ChecklistItem } from "../../../plans/plan_types";
+import type { AgentSubagent } from "../../../runs/invocations/invocation_types";
+import type { GlobalAiMessage } from "../../state/conversation_types";
 import { RollingStat } from "./RollingStat";
-import { createEditedFilesBuilder, latestReply, type EditedFile } from "./runStatus";
+import { createEditedFilesBuilder, latestReply, type EditedFile } from "./run_status";
 
 type SectionId = "todo" | "subagent" | "files";
 
@@ -50,7 +50,6 @@ function Pill(props: {
   onClick: () => void;
 }) {
   return (
-    // Muted at rest; the wash brightens it under the pointer, and the open one stays bright.
     <Text bare tone={props.selected ? "default" : "muted"} className="flex">
       <Pressable
         role="tab"
@@ -85,9 +84,7 @@ const todoDot: Record<ChecklistItem["status"], StepDotState> = {
   blocked: "failed",
 };
 
-/** A pill's list, in the panel over the strip. */
 const rowsClass = "m-0 grid list-none gap-0.5 p-1";
-/** A row of a pill's list: its mark, its name fading at the end, and what's after it. */
 const rowClass = rowShapeWrap;
 
 const todoState: Record<ChecklistItem["status"], string> = {
@@ -166,13 +163,6 @@ function FileRows({ files }: { files: EditedFile[] }) {
   );
 }
 
-/**
- * Above the composer: pills for its checklist, its
- * sub-agents and the files the chat edited (with +/- counts that roll as they grow). A pill opens
- * its list in a panel that floats above the strip, so the transcript never moves; another pill
- * switches, the same pill or Escape closes. Counts stay after a run ends until a newer one adds to
- * them, and the strip is absent while there's nothing to report.
- */
 export const RunStatusStrip = memo(function RunStatusStrip({
   conversationId,
   messages = EMPTY,
@@ -197,7 +187,6 @@ export const RunStatusStrip = memo(function RunStatusStrip({
   );
   const subagents = reply?.subagents ?? [];
   const [section, setSection] = useState<SectionId | null>(null);
-  // A section whose data went away closes, during render so the stale panel never paints.
   const sizes: Record<SectionId, number> = {
     todo: todos.length,
     subagent: subagents.length,
@@ -218,7 +207,6 @@ export const RunStatusStrip = memo(function RunStatusStrip({
   const childrenDone = subagents.filter((child) => child.state === "completed");
   return (
     <div className="relative">
-      {/* The panel floats above the strip and folds open with its rows. */}
       <div
         className={
           "pointer-events-none absolute right-0 bottom-full left-0 z-[var(--stack-float)] grid " +
@@ -245,7 +233,6 @@ export const RunStatusStrip = memo(function RunStatusStrip({
           </Surface>
         </div>
       </div>
-      {/* What the run is doing now is said in the transcript, at the end of the live reply. */}
       <div className="flex min-h-7 items-center gap-2 px-1 pb-2">
         <Text
           bare

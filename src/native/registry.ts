@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
-import { invoke } from "@/native/invoke";
+import { invoke } from "@/shared/platform/native_invoke";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import bundled from "@/shared/registry/registry.json";
 
@@ -21,8 +21,7 @@ export const useRegistry = create<RegistryDocument>(() => first);
 async function load() {
   try {
     useRegistry.setState(await invoke<RegistryDocument>("registry_get"));
-  } catch {
-  }
+  } catch {}
 }
 
 let followed = false;

@@ -1,5 +1,3 @@
-//! `test/live-relay.test.ts`. The ticket tests went with the tickets, and the key tests are in
-//! `credential_tests.rs`.
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -17,11 +15,13 @@ use super::{
 };
 
 fn fixture_results() -> Vec<Value> {
-    let fixture: Value = serde_json::from_str(include_str!("../tests/fixtures/runtime_device/soniox-live-two-speakers.json")).unwrap();
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../tests/fixtures/runtime_device/soniox-live-two-speakers.json"
+    ))
+    .unwrap();
     fixture["results"].as_array().unwrap().clone()
 }
 
-/// Replays recorded Soniox results as audio arrives, like the provider.
 struct ReplayStream {
     heard: Vec<SonioxResult>,
     next: Mutex<usize>,
@@ -60,7 +60,11 @@ impl SttStream for ReplayStream {
     }
 
     fn finish(&self) -> BoxFuture<'_, Result<(), SttError>> {
-        async move { while self.play() {} Ok(()) }.boxed()
+        async move {
+            while self.play() {}
+            Ok(())
+        }
+        .boxed()
     }
 
     fn close(&self) {}
@@ -69,7 +73,6 @@ impl SttStream for ReplayStream {
 #[derive(Default)]
 struct Replay {
     results: Vec<Value>,
-    /// Streams open in channel order; only this one hears the recording.
     channel: usize,
     configs: Mutex<Vec<SonioxConfig>>,
 }
@@ -78,13 +81,31 @@ impl SttFactory for Replay {
     fn open(&self, config: &SonioxConfig, events: SttEvents) -> Arc<dyn SttStream> {
         let mut configs = self.configs.lock().unwrap();
         configs.push(config.clone());
-        let heard = if configs.len() - 1 == self.channel { self.results.iter().map(|result| parse_message(&result.to_string()).unwrap().result).collect() } else { Vec::new() };
-        Arc::new(ReplayStream { heard, next: Mutex::new(0), events, audio: Mutex::new(0) })
+        let heard = if configs.len() - 1 == self.channel {
+            self.results
+                .iter()
+                .map(|result| parse_message(&result.to_string()).unwrap().result)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Arc::new(ReplayStream {
+            heard,
+            next: Mutex::new(0),
+            events,
+            audio: Mutex::new(0),
+        })
     }
 }
 
 pub(super) fn spec(max_ms: u64) -> LiveSessionSpec {
-    LiveSessionSpec { sid: "s1".to_owned(), channels: vec![LiveChannel::Mic, LiveChannel::System], max_ms, language: None, model: "soniox/stt-rt-v4".to_owned() }
+    LiveSessionSpec {
+        sid: "s1".to_owned(),
+        channels: vec![LiveChannel::Mic, LiveChannel::System],
+        max_ms,
+        language: None,
+        model: "soniox/stt-rt-v4".to_owned(),
+    }
 }
 
 fn frame(channel: u8, ms: usize) -> Vec<u8> {
@@ -102,7 +123,10 @@ fn drained(receiver: &mut UnboundedReceiver<Value>) -> Vec<Value> {
 }
 
 fn finals(sent: &[Value]) -> Vec<&Value> {
-    sent.iter().filter(|message| message["type"] == "segment" && message["segment"]["final"] == true).map(|message| &message["segment"]).collect()
+    sent.iter()
+        .filter(|message| message["type"] == "segment" && message["segment"]["final"] == true)
+        .map(|message| &message["segment"])
+        .collect()
 }
 
 fn start_message(value: Value) -> JsValue {
@@ -111,7 +135,11 @@ fn start_message(value: Value) -> JsValue {
 
 #[tokio::test]
 async fn relays_diarized_segments_per_channel() {
-    let replay = Arc::new(Replay { results: fixture_results(), channel: 1, ..Replay::default() });
+    let replay = Arc::new(Replay {
+        results: fixture_results(),
+        channel: 1,
+        ..Replay::default()
+    });
     let (sender, mut receiver) = mpsc::unbounded_channel();
     let session = LiveSession::new(spec(60_000), sender, replay.clone());
     session.start(&start_message(json!({ "type": "start", "language": "en", "context": { "terms": ["Misty"], "text": "Design review" } }))).await;
@@ -123,11 +151,17 @@ async fn relays_diarized_segments_per_channel() {
         assert_eq!(config["enable_speaker_diarization"], true);
         assert_eq!(config["enable_endpoint_detection"], true);
         assert_eq!(config["sample_rate"], 16000);
-        assert_eq!(config["context"], json!({ "terms": ["Misty"], "text": "Design review" }));
+        assert_eq!(
+            config["context"],
+            json!({ "terms": ["Misty"], "text": "Design review" })
+        );
         assert!(config.get("translation").is_none());
     }
     let mut sent = drained(&mut receiver);
-    assert_eq!(sent[0], json!({ "type": "ready", "channels": ["mic", "system"], "maxMs": 60_000 }));
+    assert_eq!(
+        sent[0],
+        json!({ "type": "ready", "channels": ["mic", "system"], "maxMs": 60_000 })
+    );
     for _ in 0..5 {
         session.audio(&frame(1, 100));
     }
@@ -137,18 +171,40 @@ async fn relays_diarized_segments_per_channel() {
     let finals = finals(&sent);
     let summary: Vec<(String, String, String)> = finals
         .iter()
-        .map(|segment| (segment["channel"].as_str().unwrap().to_owned(), segment["speaker"].as_str().unwrap().to_owned(), segment["sourceText"].as_str().unwrap().to_owned()))
+        .map(|segment| {
+            (
+                segment["channel"].as_str().unwrap().to_owned(),
+                segment["speaker"].as_str().unwrap().to_owned(),
+                segment["sourceText"].as_str().unwrap().to_owned(),
+            )
+        })
         .collect();
     assert_eq!(
         summary,
         [
-            ("system".to_owned(), "1".to_owned(), "Can we ship Thursday?".to_owned()),
-            ("system".to_owned(), "2".to_owned(), "Yes, after review.".to_owned()),
+            (
+                "system".to_owned(),
+                "1".to_owned(),
+                "Can we ship Thursday?".to_owned()
+            ),
+            (
+                "system".to_owned(),
+                "2".to_owned(),
+                "Yes, after review.".to_owned()
+            ),
         ]
     );
-    let words: Vec<&str> = finals[0]["words"].as_array().unwrap().iter().map(|word| word["text"].as_str().unwrap()).collect();
+    let words: Vec<&str> = finals[0]["words"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|word| word["text"].as_str().unwrap())
+        .collect();
     assert_eq!(words, ["Can", "we", "ship", "Thursday?"]);
-    assert_eq!(sent.last().unwrap(), &json!({ "type": "finished", "usedMs": 500 }));
+    assert_eq!(
+        sent.last().unwrap(),
+        &json!({ "type": "finished", "usedMs": 500 })
+    );
 }
 
 #[tokio::test]
@@ -157,11 +213,29 @@ async fn translates_only_when_the_start_asks_for_another_language() {
         { "text": "Hola", "is_final": true, "translation_status": "original" },
         { "text": "Hello", "is_final": true, "translation_status": "translation" },
     ] })];
-    let replay = Arc::new(Replay { results, channel: 0, ..Replay::default() });
+    let replay = Arc::new(Replay {
+        results,
+        channel: 0,
+        ..Replay::default()
+    });
     let (sender, mut receiver) = mpsc::unbounded_channel();
-    let session = LiveSession::new(LiveSessionSpec { channels: vec![LiveChannel::System], ..spec(60_000) }, sender, replay.clone());
-    session.start(&start_message(json!({ "type": "start", "language": "auto", "target": "en" }))).await;
-    assert_eq!(serde_json::to_value(&replay.configs.lock().unwrap()[0]).unwrap()["translation"], json!({ "type": "one_way", "target_language": "en" }));
+    let session = LiveSession::new(
+        LiveSessionSpec {
+            channels: vec![LiveChannel::System],
+            ..spec(60_000)
+        },
+        sender,
+        replay.clone(),
+    );
+    session
+        .start(&start_message(
+            json!({ "type": "start", "language": "auto", "target": "en" }),
+        ))
+        .await;
+    assert_eq!(
+        serde_json::to_value(&replay.configs.lock().unwrap()[0]).unwrap()["translation"],
+        json!({ "type": "one_way", "target_language": "en" })
+    );
     session.audio(&frame(1, 100));
     session.finish().await;
     let sent = drained(&mut receiver);
@@ -175,15 +249,28 @@ async fn translates_only_when_the_start_asks_for_another_language() {
 async fn stops_at_the_limit_and_counts_only_what_was_sent() {
     let (sender, mut receiver) = mpsc::unbounded_channel();
     let session = LiveSession::new(spec(250), sender, Arc::new(Replay::default()));
-    session.start(&start_message(json!({ "type": "start" }))).await;
+    session
+        .start(&start_message(json!({ "type": "start" })))
+        .await;
     session.audio(&frame(0, 200));
     session.audio(&frame(0, 200));
     session.audio(&frame(0, 200));
     let mut sent = Vec::new();
-    while !sent.iter().any(|message: &Value| message["type"] == "finished") {
-        sent.push(tokio::time::timeout(Duration::from_secs(5), receiver.recv()).await.unwrap().unwrap());
+    while !sent
+        .iter()
+        .any(|message: &Value| message["type"] == "finished")
+    {
+        sent.push(
+            tokio::time::timeout(Duration::from_secs(5), receiver.recv())
+                .await
+                .unwrap()
+                .unwrap(),
+        );
     }
-    assert_eq!(sent.last().unwrap(), &json!({ "type": "finished", "usedMs": 250 }));
+    assert_eq!(
+        sent.last().unwrap(),
+        &json!({ "type": "finished", "usedMs": 250 })
+    );
     assert!(sent.iter().any(|message| message["type"] == "limit"));
     assert_eq!(session.used_ms(), 250);
 }
@@ -191,8 +278,17 @@ async fn stops_at_the_limit_and_counts_only_what_was_sent() {
 #[tokio::test]
 async fn ignores_audio_for_channels_the_session_wasnt_given() {
     let (sender, _receiver) = mpsc::unbounded_channel();
-    let session = LiveSession::new(LiveSessionSpec { channels: vec![LiveChannel::Mic], ..spec(60_000) }, sender, Arc::new(Replay::default()));
-    session.start(&start_message(json!({ "type": "start" }))).await;
+    let session = LiveSession::new(
+        LiveSessionSpec {
+            channels: vec![LiveChannel::Mic],
+            ..spec(60_000)
+        },
+        sender,
+        Arc::new(Replay::default()),
+    );
+    session
+        .start(&start_message(json!({ "type": "start" })))
+        .await;
     session.audio(&frame(1, 100));
     session.audio(&frame(7, 100));
     session.close();
@@ -203,7 +299,6 @@ struct FailingStream;
 
 impl SttStream for FailingStream {
     fn connect(&self) -> BoxFuture<'_, Result<(), SttError>> {
-        // A real failure might read "401 api key sk-secret rejected", and none of it goes further.
         async { Err(SttError) }.boxed()
     }
 
@@ -230,10 +325,16 @@ impl SttFactory for Failing {
 async fn reports_a_provider_failure_without_its_details() {
     let (sender, mut receiver) = mpsc::unbounded_channel();
     let session = LiveSession::new(spec(60_000), sender, Arc::new(Failing));
-    session.start(&start_message(json!({ "type": "start" }))).await;
+    session
+        .start(&start_message(json!({ "type": "start" })))
+        .await;
     let sent = drained(&mut receiver);
-    assert_eq!(sent, [json!({ "type": "error", "message": "Live transcription couldn't start. Try again in a moment." })]);
-    // Nothing more comes of it, and a finish after a failure says nothing.
+    assert_eq!(
+        sent,
+        [
+            json!({ "type": "error", "message": "Live transcription couldn't start. Try again in a moment." })
+        ]
+    );
     session.finish().await;
     assert!(drained(&mut receiver).is_empty());
 }
@@ -243,20 +344,38 @@ async fn a_malformed_context_leaves_the_session_with_no_streams() {
     let replay = Arc::new(Replay::default());
     let (sender, mut receiver) = mpsc::unbounded_channel();
     let session = LiveSession::new(spec(60_000), sender, replay.clone());
-    session.start(&start_message(json!({ "type": "start", "context": { "terms": "Misty" } }))).await;
+    session
+        .start(&start_message(
+            json!({ "type": "start", "context": { "terms": "Misty" } }),
+        ))
+        .await;
     assert!(replay.configs.lock().unwrap().is_empty());
     assert!(drained(&mut receiver).is_empty());
     session.finish().await;
-    assert_eq!(drained(&mut receiver), [json!({ "type": "finished", "usedMs": 0 })]);
+    assert_eq!(
+        drained(&mut receiver),
+        [json!({ "type": "finished", "usedMs": 0 })]
+    );
 }
 
 #[tokio::test]
 async fn context_stays_within_its_bounds() {
     let replay = Arc::new(Replay::default());
     let (sender, _receiver) = mpsc::unbounded_channel();
-    let session = LiveSession::new(LiveSessionSpec { channels: vec![LiveChannel::Mic], ..spec(60_000) }, sender, replay.clone());
-    let terms: Vec<String> = (0..205).map(|index| format!("  term{index}{}  ", "x".repeat(200))).collect();
-    let general: Vec<Value> = (0..12).map(|index| json!({ "key": format!("k{index}"), "value": "v" })).collect();
+    let session = LiveSession::new(
+        LiveSessionSpec {
+            channels: vec![LiveChannel::Mic],
+            ..spec(60_000)
+        },
+        sender,
+        replay.clone(),
+    );
+    let terms: Vec<String> = (0..205)
+        .map(|index| format!("  term{index}{}  ", "x".repeat(200)))
+        .collect();
+    let general: Vec<Value> = (0..12)
+        .map(|index| json!({ "key": format!("k{index}"), "value": "v" }))
+        .collect();
     session.start(&start_message(json!({ "type": "start", "language": "cmn", "context": {
         "terms": terms, "general": general, "text": "t".repeat(5000),
         "translation_terms": [{ "source": " a ", "target": " b " }, { "source": " ", "target": "b" }, 3],
@@ -267,7 +386,10 @@ async fn context_stays_within_its_bounds() {
     assert_eq!(config["context"]["terms"][0].as_str().unwrap().len(), 160);
     assert_eq!(config["context"]["general"].as_array().unwrap().len(), 10);
     assert_eq!(config["context"]["text"].as_str().unwrap().len(), 4000);
-    assert_eq!(config["context"]["translation_terms"], json!([{ "source": "a", "target": "b" }]));
+    assert_eq!(
+        config["context"]["translation_terms"],
+        json!([{ "source": "a", "target": "b" }])
+    );
 }
 
 #[test]

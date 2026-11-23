@@ -18,11 +18,11 @@ import {
   TreeRow,
 } from "@misty/ui";
 import { FileNameIcon } from "@/features/files";
-import { formatDriveBytes } from "../drive/driveEntries";
-import type { DriveEntry } from "../drive/driveNative";
-import { folderNative, type FolderScan } from "./folderNative";
-import { buildTree, toggledIgnore, visibleRows, type FolderNode } from "./folderTree";
-import { copyFolderIntoSpace, folderNameFromPath } from "./shareFolder";
+import { formatDriveBytes } from "../drive/drive_entries";
+import type { DriveEntry } from "../drive/drive_native";
+import { folderNative, type FolderScan } from "./folder_native";
+import { buildTree, toggledIgnore, visibleRows, type FolderNode } from "./folder_tree";
+import { copyFolderIntoSpace, folderNameFromPath } from "./share_folder";
 
 export function errorText(cause: unknown, fallback: string): string {
   if (cause instanceof Error && cause.message.trim()) return cause.message;
@@ -30,11 +30,6 @@ export function errorText(cause: unknown, fallback: string): string {
   return fallback;
 }
 
-/**
- * Copies a folder the person picked into the Space's drive: the folder's tree with a checkbox on
- * each file and folder (unchecking writes a `.mistyignore` rule), the `.mistyignore` itself to
- * edit, then the copy. Once copied, the folder is the Space's, and the drive keeps it in sync.
- */
 export function CopyFolderDialog({
   open,
   onOpenChange,
@@ -45,14 +40,12 @@ export function CopyFolderDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   spaceId: string;
-  /** The folder on this computer, picked in the system's dialog. */
   localFolder: string;
   onCopied: (folder: DriveEntry) => void;
 }) {
   const [scan, setScan] = useState<FolderScan | null>(null);
   const [ignore, setIgnore] = useState("");
   const ignoreRef = useRef("");
-  /** The `.mistyignore` box's text while it is open. */
   const [draft, setDraft] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -116,7 +109,6 @@ export function CopyFolderDialog({
     setBusy(true);
     setError("");
     try {
-      // Rules still in the box count.
       if (draft !== null && draft !== ignoreRef.current) {
         ignoreRef.current = draft;
         setIgnore(draft);

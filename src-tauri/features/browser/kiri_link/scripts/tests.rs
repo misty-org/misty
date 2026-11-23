@@ -4,7 +4,6 @@ use super::{
 };
 use tauri::LogicalPosition;
 
-/// The viewport script with its window-drag part, before the runtime placeholders are filled.
 fn viewport() -> String {
     BROWSER_VIEWPORT_SCRIPT.replace(
         "__MISTY_WINDOW_DRAG_PLACEHOLDER__",

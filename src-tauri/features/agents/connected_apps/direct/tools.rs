@@ -1,9 +1,3 @@
-//! A direct connection's tools as agents see them: found by `integration_search`, listed by
-//! `integration_connected` and run by `integration_execute`, through the approval rules
-//! (`execute::approve_and_run`).
-//!
-//! A tool's slug is `MCP_<APP>_<TOOL>` in upper snake case (`MCP_NOTION_NOTION_SEARCH`); the server's
-//! own tool name is looked up again from the slug, never taken from the model.
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -19,14 +13,11 @@ use super::oauth;
 use super::store::{self, Connection};
 
 pub const SLUG_PREFIX: &str = "MCP_";
-/// A server's tool list is asked again after this long.
 const TOOLS_KEPT: Duration = Duration::from_secs(10 * 60);
-/// A token this close to expiring is refreshed first.
 const REFRESH_EARLY: i64 = 60;
 const RESULT_LIMIT: usize = 48 << 10;
 const PRIMARY: usize = 6;
 
-/// One tool of one connection.
 #[derive(Clone, Debug)]
 pub struct DirectTool {
     pub slug: String,
@@ -78,7 +69,6 @@ pub fn tool_of(app: &str, tool: &Value) -> Option<DirectTool> {
     })
 }
 
-/// Each connection's tools and when they were listed.
 type ToolCache = Mutex<HashMap<String, (Vec<DirectTool>, Instant)>>;
 
 fn tool_cache() -> &'static ToolCache {
@@ -106,8 +96,6 @@ pub async fn connections(account: &str) -> Result<Vec<Connection>, Failure> {
         .map_err(storage)
 }
 
-/// A token for this connection that the app should still take, refreshed first when it is about
-/// to run out.
 async fn fresh_token(
     account: &str,
     connection: &Connection,
@@ -159,7 +147,6 @@ fn signed_out(connection: &Connection) -> Failure {
     )
 }
 
-/// Runs `work` with a fresh token, refreshing once if the app turns it down.
 async fn with_token<T, F, Fut>(
     account: &str,
     connection: &Connection,
@@ -184,7 +171,6 @@ where
     }
 }
 
-/// A connection's tools, from the cache while it is fresh.
 pub async fn tools_of(account: &str, connection: &Connection) -> Result<Vec<DirectTool>, Failure> {
     if let Some((tools, at)) = tool_cache()
         .lock()
@@ -221,7 +207,6 @@ pub fn forget_tools(connection_id: &str) {
         .remove(connection_id);
 }
 
-/// The connections as `integration_connected` lists them.
 pub fn active(connections: &[Connection]) -> Vec<ActiveAccount> {
     connections
         .iter()
@@ -242,7 +227,6 @@ fn words(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// How well a tool fits a query: the query's words found in its app, name and description.
 fn score(query: &[String], connection: &Connection, tool: &DirectTool) -> usize {
     let name = format!("{} {} {}", tool.name, tool.title, connection.app).to_lowercase();
     let description = tool.description.to_lowercase();
@@ -260,7 +244,6 @@ fn score(query: &[String], connection: &Connection, tool: &DirectTool) -> usize 
         .sum()
 }
 
-/// Adds the direct connections' tools that fit each query to the search's answer.
 pub async fn search_into(
     account: &str,
     queries: &[String],
@@ -321,7 +304,6 @@ pub async fn search_into(
     active(&list)
 }
 
-/// The full input schemas of direct tools named in `slugs`.
 pub async fn schemas(account: &str, slugs: &[String]) -> BTreeMap<String, Value> {
     let mut out = BTreeMap::new();
     let Ok(list) = connections(account).await else {
@@ -345,8 +327,6 @@ pub async fn schemas(account: &str, slugs: &[String]) -> BTreeMap<String, Value>
     out
 }
 
-/// The connection and tool a slug names, among this account's connections. `requested` picks one
-/// connection when several have the tool.
 async fn resolve(
     account: &str,
     slug: &str,
@@ -398,7 +378,6 @@ async fn resolve(
     }
 }
 
-/// The model's view of a tool result: structured content when the app gave it, else its text.
 fn shaped(slug: &str, result: &Value) -> Result<Value, Failure> {
     let text: Vec<String> = result["content"]
         .as_array()
@@ -433,7 +412,6 @@ fn shaped(slug: &str, result: &Value) -> Result<Value, Failure> {
     })
 }
 
-/// Runs a direct tool through the approval rules.
 pub async fn execute(account: &str, store: &Store, call: ExecuteCall) -> Result<Executed, Failure> {
     let (connection, tool) = resolve(account, &call.tool_slug, &call.account).await?;
     let mut tags = Vec::new();

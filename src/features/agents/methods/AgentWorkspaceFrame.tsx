@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, type ComponentType, type ReactNode } from "react";
 import type { MistyActivityEntry } from "../conversations/state/activity";
 import type { AgentProfile } from "@/shared/schemas";
-import { useSessionGoalRunner } from "../goals/sessionGoals";
+import { useSessionGoalRunner } from "../goals/session_goals";
 import { ContextRail } from "../context-panel/ContextRail";
-import { useRailShown } from "../context-panel/railLayoutStore";
+import { useRailShown } from "../context-panel/rail_layout_store";
 import { ChatSessionCard, ChatSidePanels } from "../context-panel/ChatSidePanels";
-import { isUnread, markConversationRead } from "./conversationReads";
+import { isUnread, markConversationRead } from "./conversation_reads";
 import { cn, Separator, Surface } from "@misty/ui";
 import { AgentMemoryPage } from "../memory/AgentMemoryPage";
 import { createPort } from "@/shared/lib/seams";
@@ -128,7 +128,11 @@ export function AgentWorkspaceFrame({
         <>
           <Separator orientation="vertical" />
           <Surface tone="sidebar" className="flex min-h-0 flex-none">
-            <ContextRail conversationId={conversationId} disabled={disabled} onNewTask={onNewTask} />
+            <ContextRail
+              conversationId={conversationId}
+              disabled={disabled}
+              onNewTask={onNewTask}
+            />
           </Surface>
         </>
       ) : null}

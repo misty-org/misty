@@ -19,9 +19,7 @@ use super::{asked_path, blocking, failed, person_window};
 
 pub const EVENT: &str = "files://changed";
 
-/// Quiet time after the last change before a folder is told.
 const DEBOUNCE: Duration = Duration::from_millis(150);
-/// A folder that never goes quiet is still told this often.
 const MAX_DELAY: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Serialize)]
@@ -30,24 +28,23 @@ struct FolderChange {
 }
 
 struct Watched {
-    /// The path as the window named it, which the event carries back.
     asked: String,
     count: usize,
 }
 
 struct State {
     watcher: RecommendedWatcher,
-    /// By the folder's real path, which is what the system reports changes under.
     folders: HashMap<PathBuf, Watched>,
 }
 
 static STATE: LazyLock<Mutex<Option<State>>> = LazyLock::new(Mutex::default);
 
 fn state() -> std::sync::MutexGuard<'static, Option<State>> {
-    STATE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    STATE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Starts the watcher and the thread that tells the windows, the first time a folder is watched.
 fn started(app: &AppHandle) -> Result<(), String> {
     let mut guard = state();
     if guard.is_some() {
@@ -60,8 +57,6 @@ fn started(app: &AppHandle) -> Result<(), String> {
             return;
         }
         for path in event.paths {
-            // A change to an item refreshes the folder listing it; a change to the folder itself
-            // (renamed, removed) refreshes it too.
             if let Some(parent) = path.parent() {
                 let _ = sender.send(parent.to_path_buf());
             }
@@ -81,7 +76,6 @@ fn started(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Collects changed paths until they go quiet, then tells each watched folder among them once.
 fn coalesce(receiver: mpsc::Receiver<PathBuf>, app: &AppHandle) {
     while let Ok(first) = receiver.recv() {
         let started = Instant::now();
@@ -101,7 +95,9 @@ fn coalesce(receiver: mpsc::Receiver<PathBuf>, app: &AppHandle) {
         }
         let told: Vec<String> = {
             let guard = state();
-            let Some(state) = guard.as_ref() else { continue };
+            let Some(state) = guard.as_ref() else {
+                continue;
+            };
             changed
                 .iter()
                 .filter_map(|path| state.folders.get(path))
@@ -122,7 +118,6 @@ fn real_folder(path: &Path) -> std::io::Result<PathBuf> {
     fs_disk::canonicalize(path)
 }
 
-/// Starts telling `files://changed` for this folder. Watching it again only counts once more.
 #[tauri::command]
 pub async fn files_watch(
     app: tauri::AppHandle,
@@ -147,13 +142,18 @@ pub async fn files_watch(
             .watcher
             .watch(&real, RecursiveMode::NonRecursive)
             .map_err(|error| failed(&folder, error))?;
-        state.folders.insert(real, Watched { asked: path, count: 1 });
+        state.folders.insert(
+            real,
+            Watched {
+                asked: path,
+                count: 1,
+            },
+        );
         Ok(())
     })
     .await
 }
 
-/// Stops one `files_watch` of this folder; the last one stops watching it.
 #[tauri::command]
 pub async fn files_unwatch(webview: tauri::Webview, path: String) -> Result<(), String> {
     person_window(&webview)?;
@@ -163,7 +163,6 @@ pub async fn files_unwatch(webview: tauri::Webview, path: String) -> Result<(), 
         let Some(state) = guard.as_mut() else {
             return Ok(());
         };
-        // The folder may be gone by now, so it is found by the path it was watched under too.
         let real = fs_disk::canonicalize(&folder)
             .ok()
             .filter(|real| state.folders.contains_key(real));

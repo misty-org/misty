@@ -28,7 +28,6 @@ const folderText: Record<Exclude<CompareState, "same">, string> = {
   "only-right": "A folder only in the second",
 };
 
-/** What differs about a row, in words: its state, then its size in each folder that has it. */
 const differenceText = (row: CompareRow) => {
   const state = row.state as Exclude<CompareState, "same">;
   if (row.folder) return folderText[state];
@@ -38,8 +37,15 @@ const differenceText = (row: CompareRow) => {
   return left || right ? `${stateText[state]}, ${left || right}` : stateText[state];
 };
 
-/** Two folders side by side by content: what differs, and what only one of them has. */
-export function CompareDialog({ left, right, onClose }: { left: string; right: string; onClose(): void }) {
+export function CompareDialog({
+  left,
+  right,
+  onClose,
+}: {
+  left: string;
+  right: string;
+  onClose(): void;
+}) {
   const [rows, setRows] = useState<CompareRow[] | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -69,7 +75,11 @@ export function CompareDialog({ left, right, onClose }: { left: string; right: s
               inline
               title="The folders couldn't be compared"
               line={error}
-              action={{ label: "Try again", variant: "secondary", onClick: () => setAttempt((n) => n + 1) }}
+              action={{
+                label: "Try again",
+                variant: "secondary",
+                onClick: () => setAttempt((n) => n + 1),
+              }}
             />
           ) : rows === null ? (
             <ListRowSkeleton label="Comparing folders" lines={2} />
@@ -79,10 +89,7 @@ export function CompareDialog({ left, right, onClose }: { left: string; right: s
             <ul className="m-0 grid list-none gap-0.5 p-0" aria-label="Differences">
               {differing.map((row) => (
                 <li key={row.relative}>
-                  <ListRow
-                    label={row.relative}
-                    description={differenceText(row)}
-                  />
+                  <ListRow label={row.relative} description={differenceText(row)} />
                 </li>
               ))}
             </ul>

@@ -1,6 +1,3 @@
-//! This computer's own device identity: the key that signs an agent run's grants, and the checks
-//! every job passes before it acts. Nothing here talks to a server.
-
 #[cfg(desktop)]
 pub mod agent_grants;
 #[cfg(desktop)]

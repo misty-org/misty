@@ -1,9 +1,3 @@
-//! The windows Misty shows while it controls the desktop or its own window
-//! on Windows: the control island, and the mist that rings what Misty
-//! controls and carries Misty's own pointer
-//! Both render `desktop.html`, are
-//! kept out of screen captures, and never take focus by being shown. The
-//! mist ignores the mouse; the island takes it only when the person clicks.
 use std::sync::Mutex;
 
 use serde_json::{json, Value};
@@ -14,7 +8,6 @@ pub const MIST: &str = "misty-desktop-mist";
 const ISLAND_WIDTH: f64 = 560.0;
 const ISLAND_HEIGHT: f64 = 124.0;
 
-/// A rectangle in physical screen pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Frame {
     pub x: i32,
@@ -23,7 +16,6 @@ pub struct Frame {
     pub height: i32,
 }
 
-/// What the island shows and which presses it offers.
 #[derive(Clone, Debug, Default)]
 pub struct Island {
     pub status: String,
@@ -69,8 +61,6 @@ fn window(app: &AppHandle, label: &str, focusable: bool) -> Result<WebviewWindow
                 style |= WS_EX_TRANSPARENT as isize;
             }
             SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style);
-            // Misty's own controls never show in a capture, the agent's
-            // included, so the agent can't act on them.
             SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
         }
     }
@@ -89,7 +79,6 @@ fn place(window: &WebviewWindow, frame: Frame) {
     crate::agents::cursor::show_overlay(window);
 }
 
-/// The work area (the display minus the taskbar) of the display holding `frame`.
 fn work_area(frame: Frame) -> Frame {
     use windows_sys::Win32::{
         Foundation::POINT,
@@ -117,8 +106,6 @@ fn work_area(frame: Frame) -> Frame {
     }
 }
 
-/// Rings `frame` (a display, or Misty's window). `waiting` thins the mist
-/// while the task waits for the person.
 pub fn show_mist(app: &AppHandle, frame: Frame, waiting: bool) -> Result<(), String> {
     let mist = window(app, MIST, false)?;
     place(&mist, frame);
@@ -137,8 +124,6 @@ fn mist_payload() -> Value {
     json!({ "waiting": MIST_WAITING.load(std::sync::atomic::Ordering::Acquire) })
 }
 
-/// Moves Misty's own pointer to a point in physical screen pixels inside the
-/// mist, and pulses there when it acts.
 pub fn point(app: &AppHandle, x: f64, y: f64) {
     let Some(mist) = app.get_webview_window(MIST) else {
         return;
@@ -160,8 +145,6 @@ pub fn hide_pointer(app: &AppHandle) {
     let _ = app.emit_to(MIST, "misty://desktop-pointer", Value::Null);
 }
 
-/// Shows the island at the bottom of the display holding `frame`, above the
-/// taskbar.
 pub fn show_island(app: &AppHandle, frame: Frame) -> Result<(), String> {
     let island = window(app, ISLAND, true)?;
     let scale = island.scale_factor().unwrap_or(1.0);
@@ -183,7 +166,6 @@ pub fn show_island(app: &AppHandle, frame: Frame) -> Result<(), String> {
     Ok(())
 }
 
-/// What the island says. `waiting` switches it to Done.
 pub fn set_island(app: &AppHandle, island: Island, waiting: bool) {
     if let Ok(mut state) = ISLAND_STATE.lock() {
         *state = Some((island, waiting));
@@ -212,8 +194,6 @@ fn island_payload() -> Value {
     json!({ "status": status, "meta": if waiting { "" } else { island.meta.as_str() }, "waiting": waiting })
 }
 
-/// What a desktop overlay shows now, for a page that just loaded and missed
-/// the updates sent before it listened.
 #[tauri::command]
 pub fn agent_desktop_overlay_state(webview: tauri::Webview) -> Result<Value, String> {
     match webview.label() {
@@ -231,7 +211,6 @@ fn non_empty<'a>(text: &'a str, fallback: &'a str) -> &'a str {
     }
 }
 
-/// Hides the island and the mist.
 pub fn hide_all(app: &AppHandle) {
     for label in [ISLAND, MIST] {
         if let Some(window) = app.get_webview_window(label) {
@@ -249,8 +228,6 @@ pub fn hide_mist(app: &AppHandle) {
     }
 }
 
-/// A press on the island: Stop ends control here; the rest go to Misty's
-/// island, which performs them for the task that holds control.
 #[tauri::command]
 pub fn agent_desktop_island_press(
     webview: tauri::Webview,

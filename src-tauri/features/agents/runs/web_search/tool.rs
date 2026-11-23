@@ -1,17 +1,14 @@
-//! web.search as the model sees it, and what a device call leaves in the conversation.
 use crate::js_json::{text_or_empty, JsValue};
+use crate::model_calls::RawJson;
 use crate::model_tools::CatalogTool;
 use crate::text::{js_len, js_prefix};
 use crate::tool_transport::{object, string};
 use crate::web_fetch::tool::{web_fetch_descriptor, WEB_FETCH_TOOL};
-use crate::model_calls::RawJson;
 
 use super::provider::SearchProviderId;
 
-/// The tool's name, the same as when it ran on the server.
 pub(crate) const WEB_SEARCH_TOOL: &str = "web.search";
 
-// How each kind reads to the model; the tool lists only the kinds the device's provider offers.
 const KIND_PHRASES: [(&str, &str); 10] = [
     ("web", "web (default)"),
     ("news", "news"),
@@ -26,14 +23,17 @@ const KIND_PHRASES: [(&str, &str); 10] = [
 ];
 
 fn phrases(provider: SearchProviderId) -> String {
-    let listed: Vec<&str> = KIND_PHRASES.iter().filter(|(kind, _)| provider.kinds().contains(kind)).map(|(_, phrase)| *phrase).collect();
+    let listed: Vec<&str> = KIND_PHRASES
+        .iter()
+        .filter(|(kind, _)| provider.kinds().contains(kind))
+        .map(|(_, phrase)| *phrase)
+        .collect();
     match listed.split_last() {
         Some((last, others)) if !others.is_empty() => format!("{} or {last}", others.join(", ")),
         _ => listed.join(""),
     }
 }
 
-/// web.search as the model sees it, for the device's provider.
 pub(crate) fn web_search_descriptor(id: SearchProviderId) -> CatalogTool {
     let mut kinds = id.kinds().to_vec();
     kinds.sort_unstable();
@@ -59,22 +59,26 @@ pub(crate) fn web_search_descriptor(id: SearchProviderId) -> CatalogTool {
         ),
         input_schema: RawJson::from_text(schema).unwrap_or_else(|_| RawJson::empty_object()),
         read_only: true,
-        // It holds no durable wait, so it may run alongside other reads.
         concurrent: true,
         local: true,
     }
 }
 
-/// The run's catalog with the tools this device runs itself: web.fetch, and web.search when the
-/// device has a search key. Without one that tool isn't offered, and the server's prompt doesn't name it.
-pub(crate) fn with_device_tools(descriptors: Vec<CatalogTool>, device_search: Option<SearchProviderId>) -> Vec<CatalogTool> {
-    let mut tools: Vec<CatalogTool> = device_search.map(web_search_descriptor).into_iter().collect();
+pub(crate) fn with_device_tools(
+    descriptors: Vec<CatalogTool>,
+    device_search: Option<SearchProviderId>,
+) -> Vec<CatalogTool> {
+    let mut tools: Vec<CatalogTool> = device_search
+        .map(web_search_descriptor)
+        .into_iter()
+        .collect();
     tools.push(web_fetch_descriptor());
-    tools.extend(descriptors.into_iter().filter(|descriptor| descriptor.name != WEB_SEARCH_TOOL && descriptor.name != WEB_FETCH_TOOL));
+    tools.extend(descriptors.into_iter().filter(|descriptor| {
+        descriptor.name != WEB_SEARCH_TOOL && descriptor.name != WEB_FETCH_TOOL
+    }));
     tools
 }
 
-/// How much of a call's output its checkpoint carries; the conversation stores it for its owner.
 const DEVICE_OUTPUT_LIMIT: usize = 64_000;
 
 fn device_output(output: &JsValue) -> JsValue {
@@ -82,37 +86,62 @@ fn device_output(output: &JsValue) -> JsValue {
     if js_len(&text) <= DEVICE_OUTPUT_LIMIT {
         return output.clone();
     }
-    object([("text", string(js_prefix(&text, DEVICE_OUTPUT_LIMIT))), ("truncated", JsValue::Bool(true))])
+    object([
+        ("text", string(js_prefix(&text, DEVICE_OUTPUT_LIMIT))),
+        ("truncated", JsValue::Bool(true)),
+    ])
 }
 
 fn cut(value: Option<&JsValue>, limit: usize) -> JsValue {
     string(js_prefix(&text_or_empty(value), limit))
 }
 
-/// What the conversation keeps of a device call: for its timeline, the query and the links found or
-/// the page read, and the call's output. The server never sees the call itself, so the finished
-/// checkpoint carries this.
 pub(crate) fn device_tool_activity(input: &JsValue, output: Option<&JsValue>) -> JsValue {
     let field = |name: &str| output.and_then(|output| output.get(name));
     let mut fields = if input.get("url").and_then(JsValue::as_str).is_some() {
-        let read_url = field("url").filter(|url| !matches!(url, JsValue::Null)).or(input.get("url"));
+        let read_url = field("url")
+            .filter(|url| !matches!(url, JsValue::Null))
+            .or(input.get("url"));
         let url = cut(read_url, 2000);
         vec![
-            ("device_arguments".to_owned(), object([("url", url.clone())])),
-            ("device_result".to_owned(), object([("results", JsValue::Array(vec![object([("title", cut(field("title"), 200)), ("url", url)])]))])),
+            (
+                "device_arguments".to_owned(),
+                object([("url", url.clone())]),
+            ),
+            (
+                "device_result".to_owned(),
+                object([(
+                    "results",
+                    JsValue::Array(vec![object([
+                        ("title", cut(field("title"), 200)),
+                        ("url", url),
+                    ])]),
+                )]),
+            ),
         ]
     } else {
-        let query = input.get("query").and_then(JsValue::as_str).map_or_else(|| string(""), |query| string(js_prefix(query, 400)));
+        let query = input
+            .get("query")
+            .and_then(JsValue::as_str)
+            .map_or_else(|| string(""), |query| string(js_prefix(query, 400)));
         let rows = field("results")
             .and_then(JsValue::as_array)
             .unwrap_or_default()
             .iter()
             .take(10)
-            .map(|hit| object([("title", cut(hit.get("title"), 200)), ("url", cut(hit.get("url"), 2000))]))
+            .map(|hit| {
+                object([
+                    ("title", cut(hit.get("title"), 200)),
+                    ("url", cut(hit.get("url"), 2000)),
+                ])
+            })
             .collect();
         vec![
             ("device_arguments".to_owned(), object([("query", query)])),
-            ("device_result".to_owned(), object([("results", JsValue::Array(rows))])),
+            (
+                "device_result".to_owned(),
+                object([("results", JsValue::Array(rows))]),
+            ),
         ]
     };
     if let Some(output) = output {

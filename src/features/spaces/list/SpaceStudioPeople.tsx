@@ -1,19 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useUserStore } from "@/features/account/core";
 import { useStudioOpen, useTeamMembers, type TeamMember } from "@/features/agents";
-import { useWindowSpace } from "../components/space-row/useWindowSpace";
+import { useWindowSpace } from "../components/space-row/use_window_space";
 import { notesApi } from "../journal/notes/api/api";
-import { memberPicture } from "../members/memberPictures";
-import { useSpacesStore } from "./useSpacesStore";
+import { memberPicture } from "../members/member_pictures";
+import { useSpacesStore } from "./use_spaces_store";
 
-/** A Lab notebook's doc is titled with this, the way the Lab finds them among a Space's docs. */
 const NOTEBOOK_PREFIX = "Notebook: ";
 
-/**
- * While something that shows the Space's members is open (the Lab), tells it who else is in the
- * window's Space and which notebook each has open, from the Space's live presence. Nothing is
- * read while nothing shows them.
- */
 export function SpaceStudioPeople() {
   const open = useStudioOpen((state) => state.open > 0);
   const space = useWindowSpace();
@@ -45,7 +39,6 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
           name: member.name || member.email,
           picture: faces[viewer.user_id] ?? undefined,
           place: viewer.place === "lab" ? ("lab" as const) : undefined,
-          // The notebook they have open in the Lab.
           notebook: viewer.place === "lab" && viewer.item_id ? titles[viewer.item_id] : undefined,
           notebookDoc: (viewer.place === "lab" && viewer.item_id) || undefined,
           active: viewer.active,
@@ -59,7 +52,6 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
   }, [people]);
   useEffect(() => () => useTeamMembers.getState().show([]), []);
 
-  // Pictures, once members say which of them have one.
   useEffect(() => {
     if (!members) return;
     let live = true;
@@ -75,8 +67,6 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
     };
   }, [people, members, faces, spaceId]);
 
-  // A notebook someone has open is named from the Space's docs, read again only for a new one.
-  // Only the Lab's ids are notebooks.
   const unknown = (viewers ?? []).some(
     (viewer) => viewer.place === "lab" && viewer.item_id && !(viewer.item_id in titles),
   );
@@ -92,7 +82,6 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
           named[note.id] = note.title.startsWith(NOTEBOOK_PREFIX)
             ? note.title.slice(NOTEBOOK_PREFIX.length)
             : note.title;
-        // Ids that aren't docs here stay unnamed, so they aren't asked about again.
         for (const viewer of useSpacesStore.getState().presenceBySpace[spaceId] ?? [])
           if (viewer.place === "lab" && viewer.item_id && !(viewer.item_id in named))
             named[viewer.item_id] = "";

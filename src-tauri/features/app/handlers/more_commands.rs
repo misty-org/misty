@@ -1,7 +1,3 @@
-//! The second half of the command table. `tauri::generate_handler!` must see
-//! every command in one invocation, so this macro takes the first half and
-//! expands to the whole list.
-
 macro_rules! with_more_commands {
     ($($first:tt)*) => {
         tauri::generate_handler![
@@ -402,6 +398,18 @@ macro_rules! with_more_commands {
             crate::apps::commands::space_app_session_open,
             crate::apps::commands::space_app_session_check,
             crate::apps::commands::space_app_session_close,
+            crate::apps::frames::space_app_page_post,
+            crate::apps::frames::space_app_page_put_bytes,
+            crate::apps::frames::space_app_page_take_bytes,
+            crate::browser::pages::app_pages::space_app_page_open,
+            crate::browser::pages::app_pages::space_app_page_place,
+            crate::browser::pages::app_pages::space_app_page_hide,
+            crate::browser::pages::app_pages::space_app_page_close,
+            crate::browser::pages::app_pages::space_app_page_lower,
+            crate::browser::pages::app_pages::space_app_page_snapshot,
+            crate::browser::pages::app_pages::space_app_page_permission_answer,
+            crate::browser::pages::app_pages::space_apps_forget_permissions,
+            crate::browser::pages::app_pages::space_apps_sign_out,
             crate::project::worktrees::project_worktree_list,
             crate::project::worktrees::project_worktree_create,
             crate::project::worktrees::project_worktree_create_cancel,

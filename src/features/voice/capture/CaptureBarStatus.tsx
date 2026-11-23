@@ -1,12 +1,8 @@
 import { Square } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button, StateMark, Tooltip } from "@misty/ui";
-import { useCaptureStore } from "./useCaptureStore";
+import { useCaptureStore } from "./use_capture_store";
 
-/**
- * The window's bottom bar item for a capture (Settings › Interface › Bottom bar): while one
- * records, how long it has gone, and a click that stops it. It draws nothing otherwise.
- */
 export function CaptureBarStatus() {
   const phase = useCaptureStore((state) => state.phase);
   const live = phase === "live";

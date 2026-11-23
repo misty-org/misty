@@ -7,7 +7,7 @@ import {
 } from "@misty/ui";
 import { MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import type { AiSuggestedAction } from "../invocations/invocationTypes";
+import type { AiSuggestedAction } from "../invocations/invocation_types";
 
 export function AiSelectionMenu({
   actions,

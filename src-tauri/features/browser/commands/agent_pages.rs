@@ -1,6 +1,3 @@
-//! Browser commands for agent pages, named here so the command table can list them with their
-//! hidden `__cmd__*` macros.
-
 pub(crate) use crate::browser::agent_pages::action_confirm::{
     __cmd__agent_action_confirm, __tauri_command_name_agent_action_confirm, agent_action_confirm,
 };

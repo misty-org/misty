@@ -1,24 +1,16 @@
 (() => {
   const shortcutToken = __MISTY_SHORTCUT_TOKEN_PLACEHOLDER__;
-  // Page scripts share this JavaScript world and run after this one. They can
-  // replace globals, prototype methods (postMessage, URLSearchParams) and
-  // Object.prototype.toJSON, so nothing that carries the token may reach them.
-  // Capture what the messages need now and build them by concatenation.
   const encode = encodeURIComponent;
   const stringify = JSON.stringify;
-  // Kiri's host channel: the engine's native message handler, bound here.
   const bindChannel = __KIRI_HOST_SENDER_PLACEHOLDER__;
   let postToHost = bindChannel();
   const sendToHost = (message) => {
-    // The handler is normally installed before the first document starts.
     postToHost = postToHost || bindChannel();
     if (!postToHost) return false;
     postToHost(message);
     return true;
   };
   const finite = (value) => (typeof value === 'number' && value === value && value !== Infinity && value !== -Infinity ? value : 0);
-  // Host navigations are posted through the captured channel: a page can
-  // observe its own navigations, but not a bound native function call.
   const sendHostNavigation = (url) => {
     sendToHost('{"navigate":"' + url + '"}');
   };
@@ -31,17 +23,10 @@
   __MISTY_FULLSCREEN_PLACEHOLDER__
   let pointerTrackingEnabled = __MISTY_POINTER_TRACKING_PLACEHOLDER__;
 
-  // External pages own their layout and scrolling behavior. Page zoom is
-  // handled by the native WebView; never emulate it with DOM observers,
-  // overflow overrides, or scroll-position corrections here.
-
   let pendingEvent = null;
   let frame = 0;
   let lastPointerReport = 0;
 
-  // Pointer coordinates are needed only while the explicitly summoned Misty
-  // companion is present. Keeping this off otherwise avoids forcing every
-  // page selection drag through DOM mutation, navigation, and native IPC.
   window.__MISTY_SET_POINTER_TRACKING__ = (enabled) => {
     pointerTrackingEnabled = Boolean(enabled);
     if (!pointerTrackingEnabled) {
@@ -52,8 +37,6 @@
     }
   };
 
-  // Only bindings supplied by Misty's trusted shell are intercepted. Page
-  // typing and ordinary browser shortcuts remain owned by the page.
   const initialBindings = __MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__;
   window.__MISTY_APP_SHORTCUTS__ = window.__MISTY_APP_SHORTCUTS__ || new Map(
     (Array.isArray(initialBindings) ? initialBindings : []).map((binding) => [
@@ -77,8 +60,6 @@
       ArrowDown: 'ArrowDown', PageUp: 'PageUp', PageDown: 'PageDown',
       Escape: 'Escape', Esc: 'Escape', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace'
     })[key] || (event.key?.length === 1 ? event.key.toUpperCase() : event.key);
-    // `+` already implies Shift on the main keyboard. Match the renderer's
-    // canonical form (Cmd+Plus rather than Cmd+Shift+Plus).
     return [event.ctrlKey && 'Ctrl', event.altKey && 'Alt',
       event.shiftKey && key !== 'Plus' && 'Shift',
       event.metaKey && 'Cmd', key].filter(Boolean).join('+');
@@ -101,9 +82,6 @@
     event.stopImmediatePropagation();
   }, true);
 
-  // A native child WebView sits outside the renderer's DOM event tree. Send
-  // one trusted focus signal on pointer-down so the owning split becomes the
-  // active workspace pane before shell shortcuts are evaluated.
   document.addEventListener('pointerdown', (event) => {
     if (!event.isTrusted) return;
     sendFocus();
@@ -151,8 +129,6 @@ __MISTY_WINDOW_DRAG_PLACEHOLDER__
       isLeftClick && (event.metaKey || event.ctrlKey);
     const anchor = event.target?.closest?.('a[href]');
     if (!anchor) return;
-    // Let the site's router and WebKit handle ordinary links and named targets.
-    // Only explicit new-tab gestures need host assistance.
     if (!isMiddleClick && !isModifierClick) return;
 
     const href = anchor.getAttribute('href');

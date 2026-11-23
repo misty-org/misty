@@ -1,8 +1,3 @@
-//! UI Automation: what a control on screen is, and acting on it the way an
-//! assistive tool does, the Windows counterpart of the Accessibility API.
-//!
-//! Every call reaches into another app, which can be slow or hung, so each
-//! has a short timeout. Misty's own windows are never a target.
 use windows::{
     core::{Interface, BSTR},
     Win32::{
@@ -17,11 +12,8 @@ use windows::{
 
 mod actions;
 
-/// How long one call into another app may take.
 const TIMEOUT_MS: u32 = 250;
 
-/// A UI Automation client for the current thread. COM stays initialized for
-/// as long as it lives.
 pub struct Automation {
     client: IUIAutomation,
     walker: IUIAutomationTreeWalker,
@@ -54,7 +46,6 @@ impl Automation {
         })
     }
 
-    /// The control at a point in physical screen pixels, unless it is Misty's.
     pub fn element_at(&self, x: i32, y: i32) -> Option<Element> {
         // SAFETY: a plain query; the element owns its reference.
         let element = unsafe { self.client.ElementFromPoint(POINT { x, y }) }.ok()?;
@@ -62,7 +53,6 @@ impl Automation {
         (!element.is_misty()).then_some(element)
     }
 
-    /// The control that has keyboard focus, unless it is Misty's.
     pub fn focused(&self) -> Option<Element> {
         // SAFETY: a plain query.
         let element = Element(unsafe { self.client.GetFocusedElement() }.ok()?);
@@ -86,10 +76,8 @@ impl Drop for Automation {
     }
 }
 
-/// One control in another app.
 pub struct Element(IUIAutomationElement);
 
-/// A control's bounds in physical screen pixels.
 #[derive(Clone, Copy, Debug)]
 pub struct Bounds {
     pub x: f64,
@@ -123,7 +111,6 @@ impl Element {
         unsafe { self.0.CurrentControlType() }.map_or(0, |kind| kind.0)
     }
 
-    /// The control type as a short role name, such as "Button".
     pub fn role(&self) -> &'static str {
         role_name(self.control_type())
     }
@@ -133,7 +120,6 @@ impl Element {
         text(unsafe { self.0.CurrentName() })
     }
 
-    /// Name, help text, automation ID and value together, for matching words.
     pub fn description(&self) -> String {
         // SAFETY: plain property reads.
         let (help, id) = unsafe {
@@ -171,7 +157,6 @@ impl Element {
         unsafe { self.0.CurrentIsEnabled() }.is_ok_and(|value| value.as_bool())
     }
 
-    /// The text in a field, never a password's.
     pub fn value(&self) -> Option<String> {
         if self.is_password() {
             return None;
@@ -194,7 +179,6 @@ impl Element {
     }
 }
 
-/// Compares two runtime-ID arrays and frees them.
 unsafe fn safe_array_equal(
     left: *mut windows::Win32::System::Com::SAFEARRAY,
     right: *mut windows::Win32::System::Com::SAFEARRAY,
@@ -226,7 +210,6 @@ unsafe fn safe_array_equal(
     equal
 }
 
-/// Short names for the control types a person points at or acts on.
 const ROLES: [(UIA_CONTROLTYPE_ID, &str); 20] = [
     (UIA_ButtonControlTypeId, "Button"),
     (UIA_SplitButtonControlTypeId, "SplitButton"),
@@ -257,7 +240,6 @@ fn role_name(kind: i32) -> &'static str {
         .map_or("Other", |(_, name)| name)
 }
 
-/// Roles a person points at; containers such as panes and windows are not.
 pub fn is_target_role(role: &str) -> bool {
     !matches!(role, "Window" | "Pane" | "MenuBar" | "Other")
 }

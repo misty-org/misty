@@ -1,6 +1,3 @@
-//! WebView2 on Windows: the PermissionRequested event, answered with a refusal for everything a
-//! page asks for, so WebView2 never asks the person.
-
 use std::cell::RefCell;
 use tauri::Webview;
 use webview2_com::{
@@ -10,14 +7,10 @@ use webview2_com::{
 };
 use windows::core::HSTRING;
 
-// Native views that already have Kiri's handler. Holding them keeps a closed view's address from
-// passing for a new one; closed views, whose calls fail, are dropped as new ones are added. Used
-// on the UI thread only.
 thread_local! {
     static HANDLED: RefCell<Vec<ICoreWebView2>> = RefCell::default();
 }
 
-/// Records `core`; false when it was already there.
 fn first_install(core: &ICoreWebView2) -> bool {
     HANDLED.with(|views| {
         let mut views = views.borrow_mut();
@@ -49,8 +42,6 @@ pub(super) fn deny_permission_requests(webview: &Webview) -> Result<(), String> 
         .map_err(|error| error.to_string())
 }
 
-/// WebView2 has no editing-command call; the DevTools Protocol runs the same
-/// editor commands a key binding would, without a user gesture.
 pub(super) fn edit(webview: &Webview, command: super::EditCommand) -> Result<(), String> {
     let name = match command {
         super::EditCommand::Copy => "copy",

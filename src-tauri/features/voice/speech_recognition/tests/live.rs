@@ -1,11 +1,3 @@
-//! The speech pipeline end to end on real models, run by hand: it needs Parakeet TDT 0.6B v3
-//! (int8), Kokoro v1.0 (int8) and Silero VAD unpacked in one folder, named by
-//! `MISTY_SPEECH_MODELS`, as Misty's catalog pins them.
-//!
-//! ```bash
-//! MISTY_SPEECH_MODELS=/path/to/models cargo test -p voice_speech --test live -- --ignored --nocapture
-//! ```
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
@@ -75,7 +67,10 @@ fn hears_a_recording_phrase_by_phrase_with_word_times() {
     println!("heard: {text:?}");
     assert!(!phrases.is_empty(), "no speech found");
     assert!(phrases.iter().all(|phrase| phrase.end > phrase.start));
-    assert!(phrases.iter().any(|phrase| !phrase.words.is_empty()), "Parakeet times its words");
+    assert!(
+        phrases.iter().any(|phrase| !phrase.words.is_empty()),
+        "Parakeet times its words"
+    );
 }
 
 #[test]
@@ -87,7 +82,6 @@ fn hears_live_audio_and_tells_what_was_said_once_closed() {
         let _ = told.send(event);
     });
     let samples = decode_file(&english_recording()).expect("decoded");
-    // Fed as a microphone would, a tenth of a second at a time.
     for chunk in samples.chunks(1_600) {
         hearing.push("mic", chunk).expect("fed");
     }
@@ -95,7 +89,10 @@ fn hears_live_audio_and_tells_what_was_said_once_closed() {
     let mut started = false;
     let mut heard = String::new();
     loop {
-        match events.recv_timeout(Duration::from_secs(60)).expect("closed in time") {
+        match events
+            .recv_timeout(Duration::from_secs(60))
+            .expect("closed in time")
+        {
             HearingEvent::Started { input } => {
                 assert_eq!(input, "mic");
                 started = true;
@@ -118,8 +115,10 @@ fn speaks_in_a_voice_and_is_heard_back() {
         .speak("Hello from Misty. This is how I sound.", 3, 1.0)
         .expect("spoken");
     assert_eq!(speech.rate, 24_000);
-    assert!(speech.samples.len() > 24_000, "less than a second of speech");
-    // What it said, heard again by the hearing model.
+    assert!(
+        speech.samples.len() > 24_000,
+        "less than a second of speech"
+    );
     let recognizer = Recognizer::open(&parakeet(), None).expect("Parakeet opens");
     let samples = resample(&speech.samples, speech.rate as i32);
     let phrases = recognize_samples(&recognizer, &vad(), &samples).expect("recognized");

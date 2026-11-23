@@ -17,8 +17,6 @@ impl Drop for Scratch {
     }
 }
 
-/// Every trash goes through `move_to_trash`: the trash crate's own `delete` asks Finder
-/// through osascript on macOS.
 #[test]
 fn trash_calls_go_through_move_to_trash() {
     let needle = ["trash", "::delete("].concat();
@@ -99,7 +97,10 @@ fn reads_text_images_and_binaries_apart() {
     assert_eq!(text.size, 5);
     let image = read_file_blocking(&scratch.0.join("b.png")).unwrap();
     assert_eq!(image.kind, "image");
-    assert!(image.text.is_none(), "an image's bytes load by URL, not here");
+    assert!(
+        image.text.is_none(),
+        "an image's bytes load by URL, not here"
+    );
     assert_eq!(image.size, 4);
     assert!(image.mtime_ms > 0);
     assert_eq!(

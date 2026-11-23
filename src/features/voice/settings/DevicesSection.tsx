@@ -3,13 +3,9 @@ import {
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/features/settings";
 import { DropdownControl } from "../../settings/SettingsControls";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
-import { savedInputDevice, useInputDevices } from "../inputDevice";
+import type { SettingsContentProps } from "../../settings/settings_types";
+import { savedInputDevice, useInputDevices } from "../input_device";
 
-/**
- * Settings › Input › Devices: the microphone for voice input in chats. Empty is the
- * computer's own choice. Device-only.
- */
 export function DevicesSection(props: SettingsContentProps) {
   const chosen = savedInputDevice((state) => state.value);
   const { devices } = useInputDevices();

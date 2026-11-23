@@ -11,19 +11,15 @@ use tauri::{AppHandle, Manager};
 
 pub(crate) const LABEL: &str = "misty-computer-cursor";
 const SIZE: f64 = 64.0;
-/// The pointer's tip inside the 64px window (src/app/computer-cursor.html).
 const HOTSPOT: (f64, f64) = (22.0, 17.0);
-/// Fast but capped, so a far jump reads as motion, not a teleport.
 const GLIDE_PX_PER_SEC: f64 = 2000.0;
 const GLIDE_MAX_SECS: f64 = 0.5;
-/// A run that stops acting without saying so leaves no cursor behind.
 const IDLE_HIDE_SECS: u64 = 30;
 
 struct Inner {
     visible: bool,
     pos: (f64, f64),
     target: (f64, f64),
-    /// Bumped on every new target or hide; an older glide stops itself.
     generation: u64,
     last_event: Instant,
 }
@@ -62,8 +58,6 @@ pub(crate) fn init(app: &AppHandle) {
     });
 }
 
-/// AppKit aborts when a window is made or moved off the main thread, and actions arrive on tokio
-/// threads, so every window call goes through here.
 fn on_main(op: impl FnOnce() + Send + 'static) {
     if let Some(app) = APP.get() {
         let _ = app.run_on_main_thread(op);
@@ -93,7 +87,6 @@ fn ensure_window() -> Result<(), String> {
         .inner_size(SIZE, SIZE)
         .visible(false)
         .build()
-        // Click-through: the cursor never takes a click meant for what it hovers.
         .map(|window| {
             #[cfg(target_os = "linux")]
             let _ = crate::agents::desktop_control::linux::overlay::prepare(&window);
@@ -109,11 +102,9 @@ fn ensure_window() -> Result<(), String> {
         .map_err(|_| "The cursor window never answered.".to_string())?
 }
 
-/// Moves the window's corner to a point in the driver's global coordinates.
 fn place(window: &tauri::WebviewWindow, x: f64, y: f64) {
     #[cfg(target_os = "linux")]
     {
-        // The driver's points are X pixels on X11, which GTK places in its own logical units.
         let scale = if crate::agents::desktop_control::linux::wayland_session() {
             1.0
         } else {
@@ -127,7 +118,6 @@ fn place(window: &tauri::WebviewWindow, x: f64, y: f64) {
     }
 }
 
-/// Shows the window above everything without taking focus.
 fn present(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "linux")]
     crate::agents::desktop_control::linux::overlay::show(window);
@@ -137,7 +127,6 @@ fn present(window: &tauri::WebviewWindow) {
     }
 }
 
-/// Moves the cursor to a point in global logical coordinates, gliding from where it was.
 pub(crate) fn show_at(x: f64, y: f64) {
     if ensure_window().is_err() {
         return;
@@ -182,7 +171,6 @@ pub(crate) fn show_at(x: f64, y: f64) {
                 inner().pos = to;
                 return;
             }
-            // Ease out: a share of the remaining distance each frame.
             let total = (distance / GLIDE_PX_PER_SEC).min(GLIDE_MAX_SECS);
             let frame = 1.0 / 60.0;
             let share = (frame / total).min(1.0);

@@ -1,10 +1,5 @@
-//! Between Codex and the rest: `/import` from Claude Code, `/feedback` to Codex's maintainers,
-//! and `/app`, which opens the chat's folder in the Codex desktop app.
-
 use super::*;
 
-/// What Codex can bring over from Claude Code. Without `yes` this only shows it; `yes` imports
-/// all of it, as found again right then.
 pub(super) async fn import(context: &Context) -> Result<Output, String> {
     let confirmed = match context.args.trim() {
         "" => false,
@@ -63,7 +58,6 @@ async fn import_in(rpc: &mut Session, detect: Value, confirmed: bool) -> Result<
         .await
         .map_err(text)?;
     let import_id = started["importId"].as_str().unwrap_or_default().to_string();
-    // The import runs inside the app-server and reports when it's done.
     rpc.allow(IMPORT_TIMEOUT);
     let results = loop {
         let message = rpc.next_notification().await.map_err(text)?;
@@ -115,7 +109,6 @@ fn kind_name(kind: &str) -> String {
     }
 }
 
-/// Sends feedback, with Codex's logs and this chat's thread, to Codex's maintainers.
 pub(super) async fn feedback(context: &Context) -> Result<Output, String> {
     let args = context.args.trim();
     let (first, rest) = split_first(args);
@@ -147,9 +140,6 @@ pub(super) async fn feedback(context: &Context) -> Result<Output, String> {
     }))
 }
 
-/// Opens the chat's folder in the Codex desktop app (`codex app`, which offers to install the
-/// app when it's missing). The CLI hands off to the app and exits; it is reaped in the
-/// background, out of Misty's process group.
 pub(super) fn desktop_app(context: &Context) -> Result<Output, String> {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = crate::engines::engine_bin(&settings, "codex");

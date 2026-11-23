@@ -3,6 +3,7 @@ import {
   Button,
   cn,
   MistyMark,
+  notify,
   SearchField,
   Skeleton,
   SkeletonControl,
@@ -21,18 +22,16 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
-  DesktopSettingsNotice,
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/features/settings";
 import { booleanSetting, DropdownControl, SwitchControl } from "../../settings/SettingsControls";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import type { SettingsContentProps } from "../../settings/settings_types";
 import { ShortcutCommandRow, type ShortcutConflict } from "./ShortcutCommandRow";
-import { findShortcutConflict, groupShortcutsByCategory } from "./shortcutSettingsModel";
-import { settingsDisabledControlClass } from "../../settings/settingsConstants";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { findShortcutConflict, groupShortcutsByCategory } from "./shortcut_settings_model";
+import { settingsDisabledControlClass } from "../../settings/settings_constants";
+import { confirmAction } from "@/shared/lib/confirm_action";
 
-/** A recorded shortcut that another command already uses, waiting for Reassign. */
 interface PendingConflict {
   commandId: string;
   value: string;
@@ -41,7 +40,6 @@ interface PendingConflict {
   message: string;
 }
 
-/** While a shortcut is recorded, the app's own shortcuts stand aside (runtime.tsx reads this). */
 function holdAppShortcuts(recording: boolean) {
   if (recording) document.documentElement.dataset.shortcutCapture = "true";
   else delete document.documentElement.dataset.shortcutCapture;
@@ -49,18 +47,12 @@ function holdAppShortcuts(recording: boolean) {
 
 const skeletonWidths = ["w-32", "w-40", "w-28", "w-36"];
 
-/**
- * Command rows on a first load, in ShortcutCommandRow's shape: a name over its description line,
- * then the 192px shortcut field and the restore button. The first row names what is loading for
- * screen readers, as the panel insets only its direct rows.
- */
 function ShortcutRowsSkeleton() {
   return (
     <>
       {Array.from({ length: 8 }, (_, index) => (
         <div
           key={index}
-          // An empty label keeps the panel's padding and hairlines without naming a command.
           data-setting-label=""
           role={index === 0 ? "status" : undefined}
           aria-label={index === 0 ? "Shortcuts" : undefined}
@@ -85,11 +77,6 @@ function ShortcutRowsSkeleton() {
   );
 }
 
-/**
- * Each shortcut category wears the icon its subject wears elsewhere in Misty: the layout button
- * for View, "New tab" for Tabs, the back and forward pair for Navigation, the Space's own icons.
- * A category named later by a feature falls back to the keyboard.
- */
 const categoryIcons: Record<string, MenuIcon> = {
   Misty: <MistyMark size={16} />,
   View: LayoutPanelLeft,
@@ -107,7 +94,18 @@ export function ShortcutsSection(props: SettingsContentProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [conflict, setConflict] = useState<PendingConflict | null>(null);
-  const [lastUndo, setLastUndo] = useState<UpdateShortcutRequest[] | null>(null);
+  const offerUndo = (requests: UpdateShortcutRequest[]) =>
+    notify({
+      message: "Shortcut changed",
+      action: {
+        label: "Undo",
+        onSelect: () =>
+          void requests.reduce(
+            (pending, request) => pending.then(() => props.onShortcutChange(request)),
+            Promise.resolve(),
+          ),
+      },
+    });
 
   const definitions = useMemo(
     () => snapshot?.commandDefinitions ?? [],
@@ -140,7 +138,6 @@ export function ShortcutsSection(props: SettingsContentProps) {
 
   useEffect(() => () => holdAppShortcuts(false), []);
 
-  /** Each command has one shortcut, recorded in its field; the field already left recording. */
   const record = (commandId: string, value: string | null) => {
     const previous = bindingsById.get(commandId)?.primary ?? null;
     if (value) {
@@ -162,13 +159,13 @@ export function ShortcutsSection(props: SettingsContentProps) {
       }
     }
     setConflict(null);
-    setLastUndo([{ commandId, slot: "primary", value: previous }]);
+    offerUndo([{ commandId, slot: "primary", value: previous }]);
     void props.onShortcutChange({ commandId, slot: "primary", value });
   };
 
   const reassign = (pending: PendingConflict) => {
     const conflicting = bindingsById.get(pending.conflictingCommandId);
-    setLastUndo([
+    offerUndo([
       {
         commandId: pending.commandId,
         slot: "primary",
@@ -200,7 +197,6 @@ export function ShortcutsSection(props: SettingsContentProps) {
     [definitions],
   );
   const shownCategory = categories.includes(category) ? category : (categories[0] ?? "");
-  // Searching spans every category; otherwise one category shows at a time.
   const shown = query.trim()
     ? filtered
     : filtered.filter((definition) => definition.category === shownCategory);
@@ -253,32 +249,10 @@ export function ShortcutsSection(props: SettingsContentProps) {
             Restore all
           </Button>
         </div>
-        {lastUndo ? (
-          <DesktopSettingsNotice
-            action={
-              <Button
-                type="button"
-                variant="quiet"
-                onClick={() => {
-                  const requests = lastUndo;
-                  setLastUndo(null);
-                  void requests.reduce(
-                    (pending, request) => pending.then(() => props.onShortcutChange(request)),
-                    Promise.resolve(),
-                  );
-                }}
-              >
-                Undo
-              </Button>
-            }
-          >
-            Shortcut changed.
-          </DesktopSettingsNotice>
-        ) : null}
         {!snapshot ? (
           <ShortcutRowsSkeleton />
         ) : shown.length === 0 ? (
-          <Text bare as="p" tone="muted" className="py-2 text-sm">
+          <Text as="p" size="control" tone="muted" className="py-2">
             No matching commands.
           </Text>
         ) : (

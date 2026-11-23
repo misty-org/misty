@@ -43,10 +43,8 @@ const sections = [
   { id: "archive", name: "Archive" },
 ];
 
-// RowActions finds its row by the group/row class.
 const tileClass = "group/row flex h-8 w-72 items-center gap-2 px-2 text-control";
 
-/** One tree of rows, rendered in a dropdown, a right-click menu and a row's ⋯ alike. */
 function ItemMenuRows() {
   const [pinned, setPinned] = useState(true);
   const [section, setSection] = useState("today");

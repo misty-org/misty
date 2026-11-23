@@ -1,5 +1,3 @@
-//! `tar`, `zip`, `unzip`, `gzip` and `gunzip`, which uutils doesn't have in a finished form yet. Only
-//! the forms people actually use, and anything else says so rather than guessing.
 use std::{
     ffi::{OsStr, OsString},
     fs::File,
@@ -21,8 +19,6 @@ fn report(tool: &str, result: io::Result<()>) -> i32 {
     }
 }
 
-// tar
-
 #[derive(Default)]
 struct TarArgs {
     create: bool,
@@ -41,7 +37,6 @@ fn parse_tar(args: &[OsString]) -> Result<TarArgs, String> {
     let mut first = true;
     while let Some(arg) = rest.next() {
         let text = arg.to_string_lossy();
-        // `tar czf x.tgz` and `tar -czf x.tgz` mean the same; only the first word can drop the dash.
         let letters = match text.strip_prefix('-') {
             Some(letters) if !letters.starts_with('-') && !letters.is_empty() => Some(letters),
             _ if first && !text.starts_with('-') => Some(text.as_ref()),
@@ -140,7 +135,6 @@ pub fn tar(args: &[OsString]) -> i32 {
             Ok(())
         })
     } else {
-        // `unpack` refuses anything that would land outside `base`, like `../x` or a link out.
         tar_reader(archive, parsed.gzip).and_then(|mut tar| {
             if parsed.verbose {
                 for entry in tar.entries()? {
@@ -156,8 +150,6 @@ pub fn tar(args: &[OsString]) -> i32 {
     };
     report("tar", result)
 }
-
-// zip
 
 fn add_to_zip<W: Write + io::Seek>(writer: &mut zip::ZipWriter<W>, path: &Path) -> Result<(), String> {
     let options = zip::write::SimpleFileOptions::default()
@@ -177,11 +169,9 @@ fn add_to_zip<W: Write + io::Seek>(writer: &mut zip::ZipWriter<W>, path: &Path) 
         let mut file = File::open(path).map_err(|error| format!("{name}: {error}"))?;
         io::copy(&mut file, writer).map_err(|error| format!("{name}: {error}"))?;
     }
-    // A link is left out: following it could copy something from outside the folder being zipped.
     Ok(())
 }
 
-/// `zip [-r] out.zip paths...`. Folders are always added whole, whether or not `-r` is given.
 pub fn zip(args: &[OsString]) -> i32 {
     let mut names = args.iter().filter(|arg| !matches!(arg.to_str(), Some("-r" | "-q")));
     let Some(archive) = names.next() else {
@@ -206,7 +196,6 @@ pub fn zip(args: &[OsString]) -> i32 {
     }
 }
 
-/// `unzip [-q] [-o] file.zip [-d folder]`.
 pub fn unzip(args: &[OsString]) -> i32 {
     let mut archive: Option<&OsStr> = None;
     let mut into = PathBuf::from(".");
@@ -228,7 +217,6 @@ pub fn unzip(args: &[OsString]) -> i32 {
     let run = || -> Result<(), String> {
         let file = File::open(archive).map_err(|error| error.to_string())?;
         let mut zip = zip::ZipArchive::new(BufReader::new(file)).map_err(|error| error.to_string())?;
-        // `extract` keeps every file inside the folder, whatever names the archive holds.
         zip.extract(&into).map_err(|error| error.to_string())
     };
     match run() {
@@ -237,9 +225,6 @@ pub fn unzip(args: &[OsString]) -> i32 {
     }
 }
 
-// gzip
-
-/// `gzip file`, `gzip -k file`, `gzip -c file` or `gzip` on a pipe.
 fn gzip_args(args: &[OsString]) -> (bool, bool, Vec<&OsString>) {
     let (mut keep, mut to_stdout, mut files) = (false, false, Vec::new());
     for arg in args {
@@ -326,8 +311,6 @@ mod tests {
         OsString::from(text)
     }
 
-    /// Writes one file under `name` without the checks a normal archive writer makes, as a malicious
-    /// archive would.
     fn hostile_tar(path: &Path, name: &str) {
         let mut header = tar::Header::new_old();
         header.as_old_mut().name[..name.len()].copy_from_slice(name.as_bytes());

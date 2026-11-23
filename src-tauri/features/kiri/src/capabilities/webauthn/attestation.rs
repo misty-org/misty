@@ -1,13 +1,8 @@
-//! Reads the attestation object an authenticator returns, so the page gets
-//! `getAuthenticatorData()`, `getPublicKey()` and `getPublicKeyAlgorithm()`
-//! like it would in a full browser.
-
 use super::options::{EDDSA, ES256, RS256};
 use ciborium::Value;
 
 pub(super) struct Attested {
     pub authenticator_data: Vec<u8>,
-    /// SubjectPublicKeyInfo DER, when the algorithm is one Kiri can encode.
     pub public_key: Option<Vec<u8>>,
     pub algorithm: Option<i64>,
 }
@@ -51,7 +46,6 @@ pub(super) fn read(attestation_object: &[u8]) -> Option<Attested> {
     })
 }
 
-/// rpIdHash(32) flags(1) signCount(4) aaguid(16) idLength(2) id(n) COSE key.
 fn credential_key(data: &[u8]) -> Option<(Option<Vec<u8>>, Option<i64>)> {
     const ATTESTED: u8 = 0x40;
     if data.get(32)? & ATTESTED == 0 {
@@ -73,7 +67,6 @@ fn spki(cose: &[(Value, Value)], algorithm: i64) -> Option<Vec<u8>> {
             if x.len() != 32 || y.len() != 32 {
                 return None;
             }
-            // SEQUENCE { id-ecPublicKey, prime256v1 } BIT STRING 04 || x || y
             let mut der = hex("3059301306072a8648ce3d020106082a8648ce3d03010703420004");
             der.extend_from_slice(x);
             der.extend_from_slice(y);
@@ -93,7 +86,6 @@ fn spki(cose: &[(Value, Value)], algorithm: i64) -> Option<Vec<u8>> {
             let key = der(0x30, &[der_integer(n), der_integer(e)].concat());
             let mut bit_string = vec![0];
             bit_string.extend_from_slice(&key);
-            // SEQUENCE { rsaEncryption, NULL }
             let algorithm = hex("300d06092a864886f70d0101010500");
             Some(der(0x30, &[algorithm, der(0x03, &bit_string)].concat()))
         }
@@ -145,7 +137,6 @@ fn hex(text: &str) -> Vec<u8> {
 pub(super) mod tests {
     use super::*;
 
-    /// An attestation object holding one ES256 credential.
     pub(crate) fn es256_attestation(credential_id: &[u8]) -> Vec<u8> {
         let key = Value::Map(vec![
             (Value::Integer(1.into()), Value::Integer(2.into())),
@@ -155,7 +146,7 @@ pub(super) mod tests {
             (Value::Integer((-3).into()), Value::Bytes(vec![0x22; 32])),
         ]);
         let mut data = vec![0xaa; 32];
-        data.push(0x45); // UP | UV | AT
+        data.push(0x45);
         data.extend([0, 0, 0, 0]);
         data.extend([0; 16]);
         data.extend((credential_id.len() as u16).to_be_bytes());

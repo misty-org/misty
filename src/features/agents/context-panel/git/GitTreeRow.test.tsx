@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildGitTree, type GitTreeDirNode } from "./git-tree";
+import { buildGitTree, type GitTreeDirNode } from "./git_tree";
 import { DirectoryRow, FileRow } from "./GitTreeRow";
 
 afterEach(cleanup);

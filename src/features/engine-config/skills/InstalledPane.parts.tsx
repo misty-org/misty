@@ -1,9 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * What Explore's Skills section shares from the old pane: the update map, the confirm state and
- * the destructive-confirm dialog.
- */
 
 import {
   AlertDialog,
@@ -21,10 +17,8 @@ import {
 import { t } from "./strings";
 import type { SkillRow } from "./types";
 
-/** The update map is keyed by skill id; local (unmanaged) entries never have upstream updates. */
 export type UpdateMap = Record<string, boolean>;
 
-/** Engine toggle currently in flight: only that row's icon is disabled. */
 export type BusyTarget = { skillId: string; targetId: string };
 
 export type ConfirmState =
@@ -32,7 +26,6 @@ export type ConfirmState =
   | { kind: "deleteLocal"; skill: SkillRow }
   | { kind: "overwrite"; skill: SkillRow };
 
-/** Uninstall, local delete and overwrite confirmation. */
 export function SkillConfirmDialog({
   confirm,
   onCancel,
@@ -65,8 +58,8 @@ export function SkillConfirmDialog({
         {confirm.kind === "deleteLocal" && confirm.skill.targetPaths ? (
           <Surface as="ul" tone="page" radius="md" className="flex flex-col gap-1 p-2">
             {Object.values(confirm.skill.targetPaths).map((path) => (
-              <li key={path} className="break-all text-xs">
-                <Text bare tone="muted">
+              <li key={path} className="break-all">
+                <Text bare size="meta" tone="muted">
                   {path}
                 </Text>
               </li>

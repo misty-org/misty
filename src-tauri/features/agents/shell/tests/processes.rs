@@ -1,10 +1,8 @@
-//! Commands that outlive, crash or time out: nothing they start may keep running.
 use super::*;
 
 #[tokio::test]
 async fn commands_have_no_network_and_a_clean_environment() {
     let scene = scene();
-    // The only way out left to a shell is its own network redirect.
     let network = shell(&scene, "chat", "echo hi > /dev/tcp/1.1.1.1/80", None).await;
     assert_ne!(network.exit_code, Some(0), "{}", network.stdout);
     let missing = shell(&scene, "chat", "curl -sS https://example.com", None).await;
@@ -20,7 +18,6 @@ async fn commands_have_no_network_and_a_clean_environment() {
         .stdout
         .lines()
         .filter_map(|line| line.split('=').next())
-        // The system adds its own text encoding to every process.
         .filter(|name| {
             !matches!(
                 *name,
@@ -38,7 +35,6 @@ async fn nothing_it_started_outlives_a_timeout() {
         &scene.misty,
         ShellRequest {
             workspace_key: "chat".into(),
-            // brush leaves `$!` empty, so the background command says who it is itself.
             command: "sh -c 'echo $$ > background.pid; exec sleep 300' & wait".into(),
             timeout: Some(Duration::from_secs(2)),
             folder: None,
@@ -63,8 +59,6 @@ async fn nothing_it_started_outlives_a_timeout() {
     );
 }
 
-/// Not a test of its own: `a_crash_stops_running_commands` runs this in a second process and kills
-/// that process, which is the only honest way to see what a crash leaves behind.
 #[tokio::test]
 #[ignore = "started by a_crash_stops_running_commands"]
 async fn crash_victim() {
@@ -94,7 +88,6 @@ fn read_pid(path: &Path) -> Option<i32> {
 fn a_crash_stops_running_commands() {
     let scene = scene();
     let workspace = workspace::prepare(&scene.misty, "chat").unwrap();
-    // Test names leave out the crate, which `module_path!` starts with.
     let module = module_path!().split_once("::").unwrap().1;
     let mut victim = std::process::Command::new(std::env::current_exe().unwrap())
         .args(["--exact", &format!("{module}::crash_victim"), "--ignored"])

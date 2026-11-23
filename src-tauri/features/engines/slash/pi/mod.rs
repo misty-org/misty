@@ -1,23 +1,3 @@
-//! The pi and Oh My Pi commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Oh My Pi runs most of its built-in commands from a prompt in rpc mode: they print their text
-//! (`command_output`) and answer `agentInvoked: false`, which the adapter turns into the reply
-//! and the turn's end (`pi_family.rs`). They are listed here as `Runs::Turn`, so the menu has them
-//! before omp first reports its own list. Its branching flows have no prompt form, only rpc
-//! calls.
-//!
-//! omp's TUI-only flows (`handleTui`, which rpc mode never runs; a typed `/btw` there would reach
-//! the model as plain text) are ported here: `/btw` and `/omfg` ask in a throwaway `--fork` with
-//! no tools, as the TUI's ephemeral turn does; `/tan` opens a fork as a new chat with the TUI's
-//! context-switch notice; `/cleanse` runs `omp cleanse`. `/goal`, `/guided-goal` and `/loop` are
-//! run by Misty's own goal runner, which sends the next turns as omp's TUI would. `/vibe` swaps
-//! the session's tools in the TUI's input loop with no rpc command, so it only says so.
-//!
-//! pi's rpc prompt runs none of its built-in commands, only extension commands, prompt templates
-//! and skills. Its built-ins are rpc calls, which Misty makes out of turn on a short-lived pi
-//! process opened on the chat's session (`pi_family::RpcSession`); `/compact` is the adapter's,
-//! inside the turn.
-
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -34,9 +14,7 @@ use omfg::{omfg, omfg_args};
 use omp::{btw, cleanse, omp_tui_only, omp_usage, side_reply, tan};
 use session::{clone, export, fork, rename, session_info, tree, Flavor};
 
-/// How long a side question or rule forge may take: one model reply, no tools.
 const SIDE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
-/// `omp cleanse` runs checkers and a swarm of subagents until the project is clean.
 const CLEANSE_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
 const PI: &[Command] = &[
@@ -53,9 +31,6 @@ const PI: &[Command] = &[
     misty("export", "Export session to an HTML file").hint("[path]"),
 ];
 
-/// omp's commands with a prompt form (those its rpc mode runs), with omp's own descriptions and
-/// hints. Left out: `model` and `fast` (the composer's pickers), `stats` (it serves a dashboard
-/// from the turn's process, which exits when the turn ends).
 const OMP: &[Command] = &[
     turn("context", "Show context usage"),
     turn("compact", "Compact the conversation").hint("[soft|remote|snapcompact] [focus]"),
@@ -140,8 +115,6 @@ const OMP: &[Command] = &[
         "Detect and fix project diagnostics with weighted parallel subagents",
     )
     .hint("[request] [--all] [--tests] [-n <agents>] [-m <model>]"),
-    // goal, guided-goal and loop are run by Misty's own goal runner, which re-sends the turns
-    // omp's terminal app would (`mistyCommands.ts`), so they have no row here.
     misty(
         "vibe",
         "Toggle vibe mode (direct persistent fast/good worker sessions; read-only toolset)",
@@ -158,7 +131,6 @@ pub fn commands(engine: &str) -> &'static [Command] {
 }
 
 pub async fn run(context: Context, name: &str) -> Result<Output, String> {
-    // Arguments are checked before a process is started for nothing.
     let args = context.args.as_str();
     match name {
         "name" | "rename" if args.is_empty() => {
@@ -213,10 +185,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
 #[cfg(test)]
 mod tests;
 
-/// The ported commands run against the installed pi and Oh My Pi, on a scratch agent folder
-/// (`PI_CODING_AGENT_DIR`) whose only model is a provider on a closed localhost port: the one
-/// prompt that makes the session fails to connect, so nothing reaches a model and nothing is
-/// spent. Run with `--ignored --test-threads=1 --nocapture`.
 #[cfg(test)]
 #[path = "live_tests.rs"]
 mod live;

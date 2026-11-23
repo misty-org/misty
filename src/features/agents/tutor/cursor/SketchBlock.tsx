@@ -3,39 +3,28 @@ import { Play, Shapes } from "lucide-react";
 import { openReading } from "@/features/voice";
 import { Button, notify, SetupState, sketchInk, Surface, Text } from "@misty/ui";
 import { spacesSnapshot, windowSpace } from "@/features/app-windows";
-import { spacesGateway } from "../../spaces-gateway/spacesGateway";
-import { withPictures } from "./companionPictures";
-import { parseSketch, sketchSkeleton } from "./companionSketch";
-import { createModelView, type ModelView } from "./modelView";
-import { renderSketch } from "./sketchRender";
+import { spacesGateway } from "../../spaces-gateway/spaces_gateway";
+import { withPictures } from "./companion_pictures";
+import { parseSketch, sketchSkeleton } from "./companion_sketch";
+import { createModelView, type ModelView } from "./model_view";
+import { renderSketch } from "./sketch_render";
 
-/**
- * A reply's drawing in the transcript (companionSketch.ts): the whiteboard itself, the
- * marks Misty drew over the screen without the screenshot under them, or a 3D model that
- * can be dragged around. Save to Files keeps a board or marks in the Space's Files as an
- * `.excalidraw` file, which any whiteboard app the Space adds can open and keep editing.
- */
 export function SketchBlock({ source }: { source: string }) {
   const sketch = useMemo(() => parseSketch("```misty-sketch\n" + source + "\n```"), [source]);
   const canvas = useRef<HTMLDivElement>(null);
   const [drawn, setDrawn] = useState(false);
-  // The drawing or model couldn't be shown: the notice says so, and nothing is still setting up.
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const count = sketch?.elements.length ?? 0;
   const isModel = sketch?.header.surface === "model";
-  // Bumped as each picture in the drawing arrives, to draw it again with the picture.
   const [pictures, setPictures] = useState(0);
   const model = useRef<Promise<ModelView | undefined> | undefined>(undefined);
-  // While a replay runs, how many elements are back on the board; undefined shows them all.
   const [replay, setReplay] = useState<number | undefined>(undefined);
-  // What was said as it was drawn, so the drawing still explains itself when read.
   const narration = sketch?.elements
     .map((e) => e.say)
     .filter(Boolean)
     .join(" ");
-  // Redraw when a line completes, not on every token of the reply.
   const latest = useRef(sketch);
   latest.current = sketch;
 
@@ -59,7 +48,6 @@ export function SketchBlock({ source }: { source: string }) {
     });
   }, [count, replay]);
 
-  // The model goes with the block.
   useEffect(
     () => () => {
       void model.current?.then((view) => view?.dispose());
@@ -82,7 +70,6 @@ export function SketchBlock({ source }: { source: string }) {
       .then((result) => {
         if (!current || !result || !canvas.current) return;
         result.svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-        // The drawing itself (not a glyph) fills the board.
         result.svg.classList.add("size-full");
         canvas.current.replaceChildren(result.svg);
         setDrawn(true);
@@ -99,11 +86,9 @@ export function SketchBlock({ source }: { source: string }) {
 
   if (!sketch) return null;
 
-  /** Draws it again from nothing while its narration is read, each part as its sentence begins. */
   const play = async () => {
     const elements = sketch.elements;
     const reading = openReading();
-    // Which sentence brings in each element: a narrated one starts the next sentence.
     const sentenceOf: number[] = [];
     let said = -1;
     for (const element of elements) {
@@ -114,7 +99,6 @@ export function SketchBlock({ source }: { source: string }) {
       sentenceOf.push(Math.max(said, 0));
     }
     setReplay(0);
-    // Each part comes in as the voice begins its sentence.
     const unfollow = reading.onBegin((started) =>
       setReplay(sentenceOf.filter((sentence) => sentence < started).length),
     );
@@ -136,7 +120,6 @@ export function SketchBlock({ source }: { source: string }) {
       const elements = convertToExcalidrawElements(
         sketchSkeleton(sketch.elements) as Parameters<typeof convertToExcalidrawElements>[0],
       );
-      // Excalidraw's own file format, so a whiteboard app opens it as it is.
       const file = JSON.stringify({
         type: "excalidraw",
         version: 2,
@@ -170,7 +153,6 @@ export function SketchBlock({ source }: { source: string }) {
         radius="xl"
         className="relative grid h-70 place-items-center overflow-hidden p-3"
       >
-        {/* The drawing is put in here by hand, so it shares no parent with what React draws. */}
         <div ref={canvas} className="grid size-full place-items-center" />
         {!drawn && !failed && (
           <div className="absolute inset-0">

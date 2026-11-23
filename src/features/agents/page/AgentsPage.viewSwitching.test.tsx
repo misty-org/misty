@@ -9,12 +9,10 @@ import {
   WorkspaceViewRouteScope,
   type WorkspaceLayout,
 } from "@/features/app-windows";
-import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
-import { agentChatRoute, openWorkspaceRoute } from "@/app/layouts/DesktopLayout/spaceNavigation";
+import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
+import { agentChatRoute, openWorkspaceRoute } from "@/app/layouts/DesktopLayout/space_navigation";
 import AgentsPage from "./AgentsPage";
 
-/** The Agents page in a real workspace view, as a window shows it, so the view writes its own
- * address back the way it does in the app. */
 function View() {
   const view = useWorkspaceStore((state) => allLayoutViews(state.layout)[0]);
   return view ? (
@@ -24,7 +22,6 @@ function View() {
   ) : null;
 }
 
-/** Follows a link from the window's sidebar into the focused view. */
 const follow = (route: string) => act(() => openWorkspaceRoute(route, () => undefined));
 const page = () => document.querySelector(".agent-studio")?.getAttribute("data-page");
 const route = () => allLayoutViews(useWorkspaceStore.getState().layout)[0]?.route;
@@ -95,7 +92,6 @@ it("switches chats while another agent's run is still working", () => {
   expect(route()).toBe(agentChatRoute("research", "second"));
 });
 
-/** One pane of a split, showing whichever view it holds, as `DockLeafView` does. */
 function PaneView(props: { paneId: string }) {
   const view = useWorkspaceStore((state) => viewIn(state.layout, props.paneId));
   return view ? (
@@ -126,7 +122,6 @@ it("sends the sidebar's links to the focused pane of a split, and leaves the oth
   const pageIn = (paneId: string) =>
     screen.getByTestId(paneId).querySelector(".agent-studio")?.getAttribute("data-page");
 
-  // The new pane has focus: a chat and then a page open there.
   follow(agentChatRoute("research", "second"));
   expect(routeIn(right)).toBe(agentChatRoute("research", "second"));
   expect(routeIn(left)).toBe(agentChatRoute("communications", "first"));
@@ -134,7 +129,6 @@ it("sends the sidebar's links to the focused pane of a split, and leaves the oth
   expect(pageIn(right)).toBe("files");
   expect(pageIn(left)).toBe("task");
 
-  // Focusing the first pane sends the next link there.
   act(
     () =>
       void useWorkspaceStore

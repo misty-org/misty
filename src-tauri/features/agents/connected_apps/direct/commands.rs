@@ -1,5 +1,3 @@
-//! The native commands behind connecting apps directly. Only a person's window may call them; the
-//! tokens never leave native code.
 use std::collections::HashMap;
 
 use serde::Serialize;
@@ -10,13 +8,10 @@ use tauri::{Emitter, Manager};
 use super::super::tools::{rejected, Failure};
 use super::{catalog, oauth, store, tools};
 
-/// Sent to the window when a sign-in that began there ends.
 pub const CHANGED_EVENT: &str = "direct-apps://changed";
 const MAX_CHECKS: usize = 40;
-/// Apps per catalog page.
 const PAGE: usize = 60;
 const ICON_LIMIT: usize = 512 << 10;
-/// How long a logo that couldn't be fetched is left alone before it is asked for again.
 const MISS_RETRY: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
 
 fn person(webview: &tauri::Webview) -> Result<String, Failure> {
@@ -42,12 +37,9 @@ fn storage(message: String) -> Failure {
 #[derive(Serialize)]
 pub struct CatalogPage {
     apps: Vec<catalog::CatalogApp>,
-    /// How many shipped apps match, for paging.
     total: usize,
 }
 
-/// One page of the apps to connect, matching `search`. The first page of a search also brings the
-/// registry's makers that are newer than this build's catalog.
 #[tauri::command]
 pub async fn direct_apps_catalog(
     webview: tauri::Webview,
@@ -61,7 +53,6 @@ pub async fn direct_apps_catalog(
     }
     let (mut apps, total) = catalog::page(search, offset, PAGE);
     if !search.is_empty() && offset == 0 {
-        // The directory being away only means nothing newer is found.
         if let Ok(newer) = catalog::search_registry(&http()?, search).await {
             apps.extend(newer);
         }
@@ -69,8 +60,6 @@ pub async fn direct_apps_catalog(
     Ok(CatalogPage { apps, total })
 }
 
-/// A maker's logo as a `data:` address, fetched once by native code and kept on this computer,
-/// so pages never load it from the maker's site themselves.
 #[tauri::command]
 pub async fn direct_apps_icon(app: tauri::AppHandle, url: String) -> Result<String, Failure> {
     let unusable = || rejected("invalid_request", "That logo can't be shown.");
@@ -84,13 +73,11 @@ pub async fn direct_apps_icon(app: tauri::AppHandle, url: String) -> Result<Stri
         .join("app-logos");
     let name = format!("{:x}", sha2::Sha256::digest(url.as_bytes()));
     let file = folder.join(&name);
-    if let Ok(saved) = tokio::fs::read_to_string(&file).await {
+    if let Ok(saved) = file_access::fs_async::read_to_string(&file).await {
         if !saved.is_empty() {
             return Ok(saved);
         }
-        // A miss is asked again after a day, so one bad fetch doesn't leave an app without its
-        // logo for good.
-        let fresh = tokio::fs::metadata(&file)
+        let fresh = file_access::fs_async::metadata(&file)
             .await
             .and_then(|meta| meta.modified())
             .ok()
@@ -121,14 +108,11 @@ pub async fn direct_apps_icon(app: tauri::AppHandle, url: String) -> Result<Stri
         })
     }
     .await;
-    // A logo that couldn't be had is remembered as empty for a day, so it isn't asked for on
-    // every view.
-    let _ = tokio::fs::create_dir_all(&folder).await;
-    let _ = tokio::fs::write(&file, fetched.as_deref().unwrap_or_default()).await;
+    let _ = file_access::fs_async::create_dir_all(&folder).await;
+    let _ = file_access::fs_async::write(&file, fetched.as_deref().unwrap_or_default()).await;
     fetched.ok_or_else(unusable)
 }
 
-/// What a sign-in to each server takes: `keyless`, `open`, `needs_app` or `unreachable`.
 #[tauri::command]
 pub async fn direct_apps_check(
     webview: tauri::Webview,
@@ -153,7 +137,6 @@ pub async fn direct_apps_check(
         .collect())
 }
 
-/// This account's direct connections, without their tokens.
 #[tauri::command]
 pub async fn direct_apps_list(
     webview: tauri::Webview,
@@ -168,8 +151,6 @@ pub struct Started {
     url: String,
 }
 
-/// The page to end a sign-in on, when it is a plain web address: https, or http on this computer
-/// while developing the website, with no query or fragment that could carry anything along.
 fn plain_page(address: &str) -> Option<String> {
     let page = url::Url::parse(address).ok()?;
     let local = matches!(page.host_str(), Some("localhost" | "127.0.0.1"));
@@ -178,8 +159,6 @@ fn plain_page(address: &str) -> Option<String> {
         .then(|| page.into())
 }
 
-/// Starts a sign-in: returns the address to open in the browser and finishes in the background,
-/// telling the window when it is done.
 #[tauri::command]
 pub async fn direct_apps_connect(
     app: tauri::AppHandle,
@@ -264,8 +243,6 @@ pub async fn direct_apps_connect(
     Ok(Started { url: authorize_url })
 }
 
-/// Forgets a connection on this computer. The app may keep its record of the sign-in until the
-/// person removes it there.
 #[tauri::command]
 pub async fn direct_apps_disconnect(webview: tauri::Webview, id: String) -> Result<(), Failure> {
     let account = person(&webview)?;

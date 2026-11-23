@@ -7,11 +7,6 @@ function formatCap(cap: NonNullable<AppRequest["paymentCap"]>) {
   return `${amount} ${cap.currency.toUpperCase()}`;
 }
 
-/**
- * The answers to an approval card. "Accept and remember" appears only when the
- * server says this action can be remembered, and names the exact scope it
- * would cover. Remembered approvals only apply in Auto; Ask always asks.
- */
 export function ApprovalActions({
   request,
   busy,

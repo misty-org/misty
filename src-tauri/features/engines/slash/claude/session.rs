@@ -1,17 +1,11 @@
-//! The session's own commands: `/rename`, `/branch` and `/fork`, `/btw` and `/feedback`.
-
 use super::*;
 
-/// How long a side question may take: it is a model call of its own.
 const SIDE_QUESTION: std::time::Duration = std::time::Duration::from_secs(300);
 
-/// Collapses a title to one line, as Claude Code stores it.
 fn one_line(title: &str) -> String {
     title.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// Renames Claude Code's session (as a rename made in the host app), and the chat with it. A
-/// chat Claude hasn't run in yet has no session, so only the chat is renamed.
 pub(super) async fn rename(context: &Context) -> Result<Output, String> {
     let title = one_line(&context.args);
     if title.is_empty() {
@@ -27,12 +21,6 @@ pub(super) async fn rename(context: &Context) -> Result<Output, String> {
     Ok(Output::Rename { title })
 }
 
-/// `/branch [name]` and `/fork <directive>`: a new Claude Code session copied from this one,
-/// opened as a new chat. Claude Code's `fork_conversation` request needs its cloud
-/// remote-control server, so the copy is made the way `--fork-session` makes one: a process
-/// resuming the session as a new one, which writes the copy when its first message is
-/// recorded. That message is `/rename <title>`, a local command that calls no model and names
-/// the copy as Claude Code's own `/branch` does ("<title> (Branch)").
 pub(super) async fn branch(context: &Context, fork: bool) -> Result<Output, String> {
     let session = session(context)?;
     let args = context.args.trim().to_string();
@@ -87,8 +75,6 @@ async fn branch_with(
     })
 }
 
-/// `/btw <question>`: Claude Code's side question, answered from the session's history without
-/// adding to it. It is a model call, which is what the person asked for.
 pub(super) async fn side_question(context: &Context) -> Result<Output, String> {
     let question = context.args.trim();
     if question.is_empty() {
@@ -111,8 +97,6 @@ pub(super) async fn side_question(context: &Context) -> Result<Output, String> {
     ))
 }
 
-/// `/feedback <text>` and `/bug <text>`: Claude Code's own feedback report to Anthropic, which
-/// carries this session's conversation.
 pub(super) async fn feedback(context: &Context) -> Result<Output, String> {
     let description = context.args.trim();
     if description.is_empty() {

@@ -11,7 +11,7 @@ import {
 import { Button, CodeBlock, Skeleton } from "@misty/ui";
 import { SwitchControl } from "../../settings/SettingsControls";
 import { exportPerformanceReport } from "./export";
-import { appVersion, performanceApi } from "./nativeApi";
+import { appVersion, performanceApi } from "./native_api";
 import {
   getPerformancePreference,
   setPerformanceEnabled,
@@ -23,12 +23,6 @@ import { summarizePerformanceReport, type PerformanceReport } from "./summary";
 
 const COPY_FEEDBACK_MS = 1500;
 
-/**
- * Settings › Advanced › Performance: the last five minutes of Misty's CPU and memory, kept only in
- * memory and only on this computer. Copy a short summary after a slowdown, or save the whole
- * report as JSON. Only numbers and process roles are recorded: no chats, code, paths, arguments
- * or keys, and nothing is sent anywhere.
- */
 export function PerformanceSection() {
   const enabled = useSyncExternalStore(subscribePerformancePreference, getPerformancePreference);
   const [report, setReport] = useState<PerformanceReport | null>(null);
@@ -141,7 +135,6 @@ export function PerformanceSection() {
               {report === null ? (
                 <Skeleton className="h-52 w-full" aria-label="Report" />
               ) : (
-                // Copying stays with the buttons under it, so the block draws no copy of its own.
                 <CodeBlock
                   aria-label="Performance summary"
                   code={text}

@@ -1,16 +1,20 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Track } from "livekit-client";
 import {
+  Captions,
+  CaptionsOff,
   Eye,
   EyeOff,
+  Hand,
+  Headphones,
+  HeadphoneOff,
   LogOut,
   Maximize,
-  Maximize2,
   Mic,
   MicOff,
   Minimize,
-  Minimize2,
   MonitorUp,
   PhoneOff,
   PictureInPicture2,
@@ -22,29 +26,39 @@ import {
   AvatarFallback,
   Button,
   CallBar,
+  CallCaptions,
+  CallControl,
+  CallReactions,
   CallStage,
   CallTile,
   FloatingPip,
   IconButton,
+  MenuCheckItem,
+  MenuItem,
+  MenuSeparator,
   Surface,
   Text,
   ToolbarDivider,
   ViewHeader,
   ViewportLayer,
+  ZoomControl,
 } from "@misty/ui";
 import { AgentAvatar } from "@/features/agents";
-import { personTone } from "@/shared/lib/personTone";
-import { personInitials } from "@/shared/lib/personInitials";
+import { useSpaceCan } from "@/features/spaces";
+import { personTone } from "@/shared/lib/person_tone";
+import { personInitials } from "@/shared/lib/person_initials";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useCallStore, type ActiveCall } from "./callStore";
-import { callPath, useCallSession } from "./callSessionStore";
-import type { CallAgentView } from "./callAgents";
-import type { CallPerson } from "./useLiveKitCall";
+import { useCallStore } from "./call_store";
+import { callPath, useCallSession } from "./call_session_store";
+import type { CallAgentView } from "./call_agents";
+import type { CallPerson } from "./use_live_kit_call";
+import { DeviceChoices, SpeakerChoices } from "./DeviceChoices";
+import { callReactions } from "./call_signals";
+import { CallPersonMenu } from "./CallPersonMenu";
+import { featured, useCallTitle, useStableOrder } from "./call_stage_order";
 
-/** Every video playing now, by its track, so the call's featured one can go picture in picture. */
 const playing = new Map<Track, HTMLVideoElement>();
 
-/** A camera or a shared screen. Its sound plays at the window's root (`CallSession`). */
 function TrackVideo({ track, self }: { track: Track; self: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -68,45 +82,26 @@ function Face({ person, name }: { person: CallPerson; name: string }) {
   );
 }
 
-/** What the call is called: its voice channel, else who else is in it. */
-function useCallTitle(call: ActiveCall | null): string {
-  const people = useCallSession((state) => state.controls?.people);
-  const nameOf = useCallSession((state) => state.nameOf);
-  if (!call) return "";
-  if (call.place.kind === "voice") return call.place.name;
-  const others = (people ?? []).filter((person) => !person.self);
-  return others.length ? others.map((person) => nameOf(person.id)).join(", ") : "Call";
-}
+const zoomLevels = [1, 1.5, 2, 3];
 
-/** The picture the call is about now: a watched screen, a picked person, else someone's camera. */
-function featured(people: CallPerson[], pinned: string | null): Track | undefined {
-  const pick = people.find((person) => person.id === pinned);
-  const screen = people.find((person) => !person.self && person.screen);
-  return (
-    pick?.screen ??
-    pick?.camera ??
-    screen?.screen ??
-    people.find((person) => !person.self && person.camera)?.camera ??
-    people.find((person) => person.self)?.camera
-  );
-}
-
-/**
- * The call this window is in, in full: everyone's tile on the stage (a shared screen, or the person
- * picked, large with the rest beside it), then the call's controls. It fills its parent, so a voice
- * channel's page, a DM and full screen all draw it the same way. A screen someone shares is received
- * only once Watch is pressed.
- */
 export function CallStageView() {
   const controls = useCallSession((state) => state.controls);
   const agent = useCallSession((state) => state.agent);
   const nameOf = useCallSession((state) => state.nameOf);
   const pinned = useCallSession((state) => state.pinned);
   const fullscreen = useCallSession((state) => state.fullscreen);
+  const devicesOpen = useCallSession((state) => state.devicesOpen);
+  const screenZoom = useCallSession((state) => state.screenZoom);
   const live = useCallStore((state) => state.active?.state === "live");
+  const place = useCallStore((state) => state.active?.place);
+  const moderator = useSpaceCan(place?.kind === "voice" ? place.spaceId : "", "members.remove");
+  const everyone = controls?.people ?? [];
+  const pickedNow = everyone.find((person) => person.id === pinned);
+  const sharingNow = everyone.some((person) => !person.self && person.sharing);
+  const ordered = useStableOrder(everyone, Boolean(pickedNow || sharingNow));
   if (!controls) return null;
-  const { people } = controls;
-  const { pin, setFullscreen } = useCallSession.getState();
+  const people = ordered;
+  const { pin, setFullscreen, setDevicesOpen, setScreenZoom } = useCallSession.getState();
   const label = (person: CallPerson) => (person.self ? "You" : nameOf(person.id));
 
   const tile = (person: CallPerson, focused: boolean) => (
@@ -115,26 +110,27 @@ export function CallStageView() {
       name={label(person)}
       speaking={person.speaking}
       muted={!person.micOn}
+      deafened={person.deafened}
+      weak={person.weak}
+      hand={person.hand}
+      handPlace={person.handPlace}
+      reaction={person.reaction}
       picture={person.camera ? <TrackVideo track={person.camera} self={person.self} /> : undefined}
       face={<Face person={person} name={label(person)} />}
       actions={
         people.length > 1 ? (
-          focused ? (
-            <IconButton label="Show everyone" onClick={() => pin(null)}>
-              <Minimize2 />
-            </IconButton>
-          ) : (
-            <IconButton label="Focus" onClick={() => pin(person.id)}>
-              <Maximize2 />
-            </IconButton>
-          )
+          <CallPersonMenu
+            person={person}
+            controls={controls}
+            focused={focused}
+            onFocus={() => pin(focused ? null : person.id)}
+            moderator={moderator && place?.kind === "voice"}
+          />
         ) : undefined
       }
     />
   );
 
-  // An agent's tile: its own picture for this person's agents, else its initials, ringed while it
-  // speaks. Only this person's own agents can be sent away from here.
   const remove = agent?.remove;
   const agentTile = (agent: CallAgentView) => {
     const name = agent.mine ? agent.name : `${agent.name}, ${nameOf(agent.owner)}’s agent`;
@@ -168,7 +164,6 @@ export function CallStageView() {
     );
   };
 
-  // Someone else's screen comes first; the person picked replaces it.
   const sharer = people.find((person) => !person.self && person.sharing);
   const picked = people.find((person) => person.id === pinned);
   let focus: ReactNode;
@@ -178,11 +173,33 @@ export function CallStageView() {
       <CallTile
         name={`${label(sharer)}’s screen`}
         fit="contain"
+        zoom={screenZoom}
         picture={<TrackVideo track={sharer.screen} self={false} />}
         actions={
-          <IconButton label="Stop watching" onClick={() => controls.watch(sharer.id, false)}>
-            <EyeOff />
-          </IconButton>
+          <>
+            <ZoomControl
+              value={`${Math.round(screenZoom * 100)}%`}
+              canZoomOut={screenZoom > zoomLevels[0]}
+              canZoomIn={screenZoom < zoomLevels[zoomLevels.length - 1]}
+              onZoomOut={() =>
+                setScreenZoom([...zoomLevels].reverse().find((level) => level < screenZoom) ?? 1)
+              }
+              onZoomIn={() =>
+                setScreenZoom(zoomLevels.find((level) => level > screenZoom) ?? screenZoom)
+              }
+            >
+              {zoomLevels.map((level) => (
+                <MenuItem
+                  key={level}
+                  label={`${level * 100}%`}
+                  onSelect={() => setScreenZoom(level)}
+                />
+              ))}
+            </ZoomControl>
+            <IconButton label="Stop watching" onClick={() => controls.watch(sharer.id, false)}>
+              <EyeOff />
+            </IconButton>
+          </>
         }
       />
     );
@@ -210,30 +227,74 @@ export function CallStageView() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">
-      <CallStage focus={focus}>
+      <CallStage focus={focus} dimmed={controls.reconnecting}>
         {rest.map((person) => tile(person, false))}
         {(agent?.agents ?? []).map(agentTile)}
       </CallStage>
+      {controls.captionsOn ? (
+        <CallCaptions
+          lines={controls.captions.map((line) => ({
+            key: line.key,
+            name:
+              line.person === people.find((person) => person.self)?.id
+                ? "You"
+                : nameOf(line.person),
+            text: line.text,
+          }))}
+        />
+      ) : null}
       {agent?.rows}
       <CallBar>
-        <IconButton
+        <CallControl
           label={controls.micOn ? "Mute" : "Unmute"}
-          variant="secondary"
-          aria-pressed={!controls.micOn}
+          off={!controls.micOn}
           disabled={!live}
           onClick={controls.toggleMic}
+          menuLabel="Audio devices"
+          menuOpen={devicesOpen === "audio"}
+          onMenuOpenChange={(open) => setDevicesOpen(open ? "audio" : null)}
+          menu={
+            <>
+              <DeviceChoices
+                kind="audioinput"
+                title="Microphone"
+                value={controls.activeDevice("audioinput")}
+                onPick={(deviceId) => controls.pickDevice("audioinput", deviceId)}
+              />
+              <SpeakerChoices
+                value={controls.activeDevice("audiooutput")}
+                onPick={(deviceId) => controls.pickDevice("audiooutput", deviceId)}
+              />
+              <MenuSeparator />
+              <MenuCheckItem
+                label="Noise reduction"
+                checked={controls.noiseReduction}
+                onCheckedChange={controls.setNoiseReduction}
+              />
+            </>
+          }
         >
           {controls.micOn ? <Mic /> : <MicOff />}
-        </IconButton>
-        <IconButton
+        </CallControl>
+        <CallControl
           label={controls.cameraOn ? "Turn camera off" : "Turn camera on"}
-          variant="secondary"
-          aria-pressed={controls.cameraOn}
+          off={!controls.cameraOn}
           disabled={!live}
           onClick={controls.toggleCamera}
+          menuLabel="Cameras"
+          menuOpen={devicesOpen === "camera"}
+          onMenuOpenChange={(open) => setDevicesOpen(open ? "camera" : null)}
+          menu={
+            <DeviceChoices
+              kind="videoinput"
+              title="Camera"
+              value={controls.activeDevice("videoinput")}
+              onPick={(deviceId) => controls.pickDevice("videoinput", deviceId)}
+            />
+          }
         >
           {controls.cameraOn ? <Video /> : <VideoOff />}
-        </IconButton>
+        </CallControl>
         <IconButton
           label={controls.screenOn ? "Stop sharing" : "Share screen"}
           variant="secondary"
@@ -242,6 +303,34 @@ export function CallStageView() {
           onClick={controls.toggleScreen}
         >
           <MonitorUp />
+        </IconButton>
+        <IconButton
+          label={controls.handUp ? "Lower hand" : "Raise hand"}
+          variant="secondary"
+          aria-pressed={controls.handUp}
+          disabled={!live}
+          onClick={controls.toggleHand}
+        >
+          <Hand />
+        </IconButton>
+        <CallReactions reactions={callReactions} onPick={controls.react} disabled={!live} />
+        <IconButton
+          label={controls.captionsOn ? "Turn captions off" : "Turn captions on"}
+          variant="secondary"
+          aria-pressed={controls.captionsOn}
+          disabled={!live}
+          onClick={controls.toggleCaptions}
+        >
+          {controls.captionsOn ? <Captions /> : <CaptionsOff />}
+        </IconButton>
+        <IconButton
+          label={controls.deafened ? "Undeafen" : "Deafen"}
+          variant="secondary"
+          aria-pressed={controls.deafened}
+          disabled={!live}
+          onClick={controls.toggleDeafen}
+        >
+          {controls.deafened ? <HeadphoneOff /> : <Headphones />}
         </IconButton>
         {agent?.trigger}
         <ToolbarDivider />
@@ -267,21 +356,15 @@ export function CallStageView() {
 
 function setWindowFullscreen(on: boolean) {
   if (!hasTauriInternals()) return;
-  void import("@tauri-apps/api/window")
-    .then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(on))
+  void getCurrentWindow()
+    .setFullscreen(on)
     .catch(() => undefined);
 }
 
-/**
- * The call over the whole window, and the window over the whole screen, while full screen is on.
- * Escape, or the bar's button, puts both back.
- */
 export function CallFullscreen() {
   const fullscreen = useCallSession((state) => state.fullscreen);
   const active = useCallStore((state) => state.active);
   const title = useCallTitle(active);
-  // The window follows the call into full screen and back out, and only then: a window the person
-  // made full screen themselves stays as it is when a call starts.
   const windowFull = useRef(false);
   useEffect(() => {
     if (fullscreen === windowFull.current) return;
@@ -313,11 +396,6 @@ export function CallFullscreen() {
   );
 }
 
-/**
- * The call in a corner of the window while the person is elsewhere in it: whoever matters now (a
- * watched screen, the person picked, else a camera), or their face. A press goes back to the call;
- * Mute and Leave show on hover. It hides on the call's own page and while it is full screen.
- */
 export function CallMiniPlayer() {
   const active = useCallStore((state) => state.active);
   const controls = useCallSession((state) => state.controls);
@@ -338,7 +416,6 @@ export function CallMiniPlayer() {
   const picture = video ? (
     <TrackVideo track={video} self={false} />
   ) : speaker ? (
-    // The frame makes its picture a block; the face is centered inside it.
     <span>
       <span className="grid size-full place-items-center">
         <Face person={speaker} name={speaker.name} />

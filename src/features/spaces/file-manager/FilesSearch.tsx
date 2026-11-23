@@ -1,12 +1,18 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useState, type KeyboardEvent, type ReactElement, type ReactNode, type RefObject } from "react";
+import {
+  useEffect,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { SearchField, SuggestionItem, SuggestionList, Text } from "@misty/ui";
 import { disk, type FileEntry } from "@/features/files";
 import { itemIcon } from "./FileItems";
 import { diskItem, parentOf, type FilesPlace } from "./model";
 
-/** A place the search can jump to: a sidebar place, a drive, a Space's drive. */
 export interface SearchLocation {
   id: string;
   label: string;
@@ -15,17 +21,13 @@ export interface SearchLocation {
   place: FilesPlace;
 }
 
-/** What the search dropdown needs: the places to match, where results land, and whether the index is there. */
 export interface SearchSuggest {
   locations: SearchLocation[];
-  /** The whole disk is indexed (the disk grant is on). */
   indexed: boolean;
   onPlace(place: FilesPlace): void;
-  /** An indexed file or folder picked: its folder opens with it picked, a folder opens itself. */
   onEntry(entry: FileEntry): void;
 }
 
-/** Kura's fuzzy match: the letters in order, not necessarily side by side. */
 function fuzzy(haystack: string, needle: string) {
   if (haystack.includes(needle)) return true;
   let at = 0;
@@ -37,7 +39,6 @@ function fuzzy(haystack: string, needle: string) {
   return true;
 }
 
-/** Indexed hits for what is typed, a moment after typing stops. */
 function useIndexHits(query: string, on: boolean) {
   const [hits, setHits] = useState<FileEntry[]>([]);
   useEffect(() => {
@@ -59,13 +60,13 @@ function useIndexHits(query: string, on: boolean) {
   return hits;
 }
 
-type Row = { key: string; group: "Locations" | "Files"; run(): void; node: (selected: boolean) => ReactNode };
+type Row = {
+  key: string;
+  group: "Locations" | "Files";
+  run(): void;
+  node: (selected: boolean) => ReactNode;
+};
 
-/**
- * Kura's search box: typing narrows the open folder as before, and a list drops under the box with
- * the places whose names match (Locations) and what the disk's index found (Files). The arrows move
- * through it, Enter opens the picked row, Escape closes it; a press on a row opens it.
- */
 export function FilesSearch({
   query,
   onQuery,
@@ -103,7 +104,12 @@ export function FilesSearch({
           close();
         },
         node: (selected) => (
-          <SuggestionItem selected={selected} icon={location.icon} label={location.label} detail={location.detail} />
+          <SuggestionItem
+            selected={selected}
+            icon={location.icon}
+            label={location.label}
+            detail={location.detail}
+          />
         ),
       });
     for (const hit of hits)
@@ -115,7 +121,12 @@ export function FilesSearch({
           close();
         },
         node: (selected) => (
-          <SuggestionItem selected={selected} icon={itemIcon(diskItem(hit))} label={hit.name} detail={parentOf(hit.path)} />
+          <SuggestionItem
+            selected={selected}
+            icon={itemIcon(diskItem(hit))}
+            label={hit.name}
+            detail={parentOf(hit.path)}
+          />
         ),
       });
   }

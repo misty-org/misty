@@ -1,8 +1,5 @@
-//! The rounded corners: the clipping region and the layered caps that smooth its edge pixels.
 use super::*;
 
-/// Lays a cap over each rounded corner, above the page, or hides
-/// it when the corner is square or its chrome color is unknown.
 pub(super) fn apply_caps(host: HWND, frame: &mut Frame, width: i32, height: i32, radii: [i32; 4]) {
     let radii = radii.map(|radius| radius.clamp(0, width.min(height).max(0) / 2));
     for (corner, radius) in radii.into_iter().enumerate() {
@@ -44,8 +41,6 @@ pub(super) fn apply_caps(host: HWND, frame: &mut Frame, width: i32, height: i32,
     }
 }
 
-/// How much of the pixel at (`x`, `y`) of a top-left corner square of side
-/// `radius` lies inside the corner's arc, from 0 to 1.
 pub(super) fn arc_coverage(radius: i32, x: i32, y: i32) -> f32 {
     const SAMPLES: i32 = 8;
     let center = radius as f32;
@@ -62,7 +57,6 @@ pub(super) fn arc_coverage(radius: i32, x: i32, y: i32) -> f32 {
     inside as f32 / (SAMPLES * SAMPLES) as f32
 }
 
-/// A pixel of `corner`'s cap in the top-left orientation `arc_coverage` uses.
 pub(super) fn top_left_pixel(corner: usize, radius: i32, x: i32, y: i32) -> (i32, i32) {
     let flip_x = corner == 1 || corner == 2;
     let flip_y = corner >= 2;
@@ -72,7 +66,6 @@ pub(super) fn top_left_pixel(corner: usize, radius: i32, x: i32, y: i32) -> (i32
     )
 }
 
-/// Paints the chrome `color` over the part of each pixel outside the arc.
 pub(super) fn paint_cap(cap: HWND, corner: usize, radius: i32, color: [u8; 3]) {
     if radius <= 0 {
         return;
@@ -83,7 +76,6 @@ pub(super) fn paint_cap(cap: HWND, corner: usize, radius: i32, color: [u8; 3]) {
             bmiHeader: BITMAPINFOHEADER {
                 biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
                 biWidth: radius,
-                // Negative: rows run top to bottom.
                 biHeight: -radius,
                 biPlanes: 1,
                 biBitCount: 32,
@@ -110,7 +102,6 @@ pub(super) fn paint_cap(cap: HWND, corner: usize, radius: i32, color: [u8; 3]) {
                 let (tx, ty) = top_left_pixel(corner, radius, x, y);
                 let alpha = 1.0 - arc_coverage(radius, tx, ty);
                 let premultiply = |channel: u8| (f32::from(channel) * alpha).round() as u32;
-                // Premultiplied BGRA.
                 pixels[(y * radius + x) as usize] = ((alpha * 255.0).round() as u32) << 24
                     | premultiply(color[0]) << 16
                     | premultiply(color[1]) << 8
@@ -147,12 +138,6 @@ pub(super) fn paint_cap(cap: HWND, corner: usize, radius: i32, color: [u8; 3]) {
     }
 }
 
-/// A notice's box with rounded corners, keeping only the pixels the notice
-/// wholly covers. The page keeps the rest, so nothing behind the page shows
-/// through the notice's corners.
-///
-/// # Safety
-/// Returns a region the caller must hand to the system or delete.
 pub(super) unsafe fn notice_hole(
     left: i32,
     top: i32,
@@ -163,7 +148,6 @@ pub(super) unsafe fn notice_hole(
     let region = CreateRectRgn(left, top, right, bottom);
     let radius = radius.clamp(0, (right - left).min(bottom - top) / 2);
     for row in 0..radius {
-        // Pixels not wholly inside the arc, counted in from the outer edge.
         let kept = (0..radius)
             .take_while(|&x| arc_coverage(radius, x, row) < 1.0)
             .count() as i32;
@@ -181,12 +165,6 @@ pub(super) unsafe fn notice_hole(
     region
 }
 
-/// The client area minus the pixels wholly outside each rounded corner's arc,
-/// or null (no clipping) when every corner is square. Pixels the arc crosses
-/// stay, for the corner caps to smooth.
-///
-/// # Safety
-/// Returns a region the caller must hand to the system or delete.
 pub(super) unsafe fn rounded_region(width: i32, height: i32, radii: [i32; 4]) -> HRGN {
     if radii.iter().all(|&radius| radius <= 0) || width <= 0 || height <= 0 {
         return std::ptr::null_mut();
@@ -195,7 +173,6 @@ pub(super) unsafe fn rounded_region(width: i32, height: i32, radii: [i32; 4]) ->
     let radii = radii.map(|radius| radius.clamp(0, width.min(height) / 2));
     for (corner, radius) in radii.into_iter().enumerate() {
         for row in 0..radius {
-            // Pixels wholly outside the arc, counted in from the outer edge.
             let cut = (0..radius)
                 .take_while(|&x| arc_coverage(radius, x, row) == 0.0)
                 .count() as i32;

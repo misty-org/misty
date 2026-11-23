@@ -1,18 +1,12 @@
-//! What a page may ask for. The shim sends `PublicKeyCredential*Options` with
-//! every BufferSource encoded as base64url; this turns them into requests the
-//! authenticator can run, and refuses relying parties the caller does not own.
-
 use super::{Attachment, CreateRequest, GetRequest};
 use crate::{Caller, KiriError};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Deserializer};
 
-/// Signature algorithms Kiri can describe back to the page (COSE identifiers).
 pub(super) const ES256: i64 = -7;
 pub(super) const EDDSA: i64 = -8;
 pub(super) const RS256: i64 = -257;
 
-/// Bytes the page sent as base64url.
 #[derive(Debug, Clone, Default)]
 struct Bytes(Vec<u8>);
 
@@ -100,8 +94,6 @@ fn invalid(what: &str) -> KiriError {
     KiriError::type_error(format!("Invalid {what}."))
 }
 
-/// The RP ID must be the caller's host or a registrable suffix of it, never a
-/// public suffix such as `co.uk`.
 pub(super) fn relying_party(
     caller: &Caller,
     requested: Option<String>,

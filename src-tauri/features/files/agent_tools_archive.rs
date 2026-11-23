@@ -1,7 +1,3 @@
-//! `files.zip` and `files.extract`: zip archives only, written beside what they hold under a name
-//! that is free. Nothing an agent couldn't open goes into a zip (secrets, Misty's data, links),
-//! and nothing it couldn't write comes out of one: every entry is checked where it lands, kept
-//! inside the folder it unpacks into, and never written over an item that is there already.
 use std::{
     io::{self, Read, Seek, Write},
     path::{Component, Path},
@@ -17,7 +13,6 @@ use crate::files::{
     display_name, failed,
 };
 
-/// How much one call may pack or unpack, against archives that unpack without end.
 const ENTRIES_MOST: usize = 100_000;
 const BYTES_MOST: u64 = 8 << 30;
 
@@ -54,7 +49,6 @@ fn add<W: Write + Seek>(
         .compression_method(CompressionMethod::Deflated)
         .large_file(meta.len() >= u64::from(u32::MAX));
     if meta.file_type().is_symlink() {
-        // Following a link could pack something from outside what was asked for.
         tally.skipped += 1;
     } else if meta.is_dir() {
         tally.room(0)?;
@@ -96,7 +90,9 @@ pub(super) fn zip(input: &Value) -> Result<Value, String> {
             target
         }
         None => {
-            let folder = first.parent().ok_or("That item has no folder to zip into.")?;
+            let folder = first
+                .parent()
+                .ok_or("That item has no folder to zip into.")?;
             let name = if sources.len() == 1 {
                 format!("{}.zip", display_name(first))
             } else {
@@ -111,9 +107,13 @@ pub(super) fn zip(input: &Value) -> Result<Value, String> {
     let packed = sources
         .iter()
         .try_for_each(|source| add(&mut writer, source, &display_name(source), &mut tally))
-        .and_then(|()| writer.finish().map(|_| ()).map_err(|error| failed(&target, error)));
+        .and_then(|()| {
+            writer
+                .finish()
+                .map(|_| ())
+                .map_err(|error| failed(&target, error))
+        });
     if let Err(error) = packed {
-        // The half-written archive is this call's own, never something that was there.
         let _ = fs_disk::remove_file(&target);
         return Err(error);
     }
@@ -124,7 +124,6 @@ pub(super) fn zip(input: &Value) -> Result<Value, String> {
     }))
 }
 
-/// Makes each folder of `relative` inside `into`, checking each one where it lands.
 fn make_folders(into: &Path, relative: &Path) -> Result<(), String> {
     let mut current = into.to_path_buf();
     for part in relative.components() {
@@ -141,7 +140,6 @@ fn make_folders(into: &Path, relative: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// A link inside an archive (its unix mode says so), which is never unpacked.
 fn is_link(mode: Option<u32>) -> bool {
     mode.is_some_and(|mode| mode & 0o170000 == 0o120000)
 }
@@ -155,13 +153,21 @@ pub(super) fn extract(input: &Value) -> Result<Value, String> {
     let into = match optional(input, "to") {
         Some(to) => admit(to, Access::Write)?,
         None => {
-            let folder = archive.parent().ok_or("That archive has no folder to unpack into.")?;
-            let stem = name.get(..name.len() - 4).filter(|stem| !stem.is_empty()).unwrap_or("Archive");
+            let folder = archive
+                .parent()
+                .ok_or("That archive has no folder to unpack into.")?;
+            let stem = name
+                .get(..name.len() - 4)
+                .filter(|stem| !stem.is_empty())
+                .unwrap_or("Archive");
             admit_path(&free_name(folder, stem), Access::Write)?
         }
     };
     if fs_disk::exists(&into) && !fs_disk::is_dir(&into) {
-        return Err(format!("{} is there already, and it isn't a folder.", display_name(&into)));
+        return Err(format!(
+            "{} is there already, and it isn't a folder.",
+            display_name(&into)
+        ));
     }
     if !fs_disk::exists(&into) {
         fs_disk::create_dir(&into).map_err(|error| failed(&into, error))?;
@@ -169,11 +175,15 @@ pub(super) fn extract(input: &Value) -> Result<Value, String> {
     let file = fs_disk::open(&archive).map_err(|error| failed(&archive, error))?;
     let mut zip = ZipArchive::new(file).map_err(|error| failed(&archive, error))?;
     if zip.len() > ENTRIES_MOST {
-        return Err(format!("{name} holds more items than can be unpacked here."));
+        return Err(format!(
+            "{name} holds more items than can be unpacked here."
+        ));
     }
     let mut tally = Tally::default();
     for index in 0..zip.len() {
-        let mut entry = zip.by_index(index).map_err(|error| failed(&archive, error))?;
+        let mut entry = zip
+            .by_index(index)
+            .map_err(|error| failed(&archive, error))?;
         let Some(relative) = entry.enclosed_name() else {
             tally.skipped += 1;
             continue;
@@ -192,9 +202,10 @@ pub(super) fn extract(input: &Value) -> Result<Value, String> {
         let target = into.join(&relative);
         let open = make_folders(&into, parent)
             .and_then(|()| admit_path(&target, Access::Write))
-            .and_then(|target| fs_disk::create_new(&target).map_err(|error| failed(&target, error)));
+            .and_then(|target| {
+                fs_disk::create_new(&target).map_err(|error| failed(&target, error))
+            });
         let Ok(mut output) = open else {
-            // A secret's name, somewhere it can't write, or a name that is taken: left out.
             tally.skipped += 1;
             continue;
         };
@@ -227,7 +238,6 @@ mod tests {
     fn an_archive_has_a_ceiling() {
         let mut tally = Tally::default();
         assert!(tally.room(10).is_ok());
-        // What was written is counted by the caller once it is in.
         tally.bytes = 10;
         assert!(tally.room(BYTES_MOST).is_err());
     }

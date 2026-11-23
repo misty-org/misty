@@ -1,16 +1,8 @@
-//! Gemini CLI and Qwen Code chats, for Misty's history of past chats.
-
 use std::path::Path;
 
 use super::discovery::peek_head_json_lines;
 use super::{same_or_child, SessionFile};
 
-/// Gemini CLI and Qwen Code (a fork of it) keep each chat as JSONL under
-/// `<home>/tmp/<project>/chats/`. Gemini's first line is the session's metadata
-/// (`sessionId`, `projectHash` = sha256 of the project folder, `directories`);
-/// Qwen's records each carry `sessionId` and `cwd`. A chat belongs to the
-/// workspace when any of those names it. Subagent chats sit one folder deeper and
-/// are left out.
 pub(super) fn discover_gemini_family(engine: &'static str, workspace: &Path) -> Vec<SessionFile> {
     let home = match engine {
         "qwen" => crate::engines::engine_home(None, ".qwen"),
@@ -79,10 +71,6 @@ pub(super) fn discover_gemini_family_in(
     out
 }
 
-/// A Gemini chat's lines as they stand after its edits: `{"$rewindTo": id}` drops that message
-/// and everything after it, and `$set` / `$patch` lines (metadata and in-place changes) are left
-/// out. What `$patch` changes inside a message isn't applied, so a patched message reads as first
-/// written.
 pub(super) fn replayed_gemini_chat(path: &Path) -> Result<String, String> {
     let text = file_access::fs::read_to_string(path)
         .map_err(|error| format!("open {}: {error}", path.display()))?;

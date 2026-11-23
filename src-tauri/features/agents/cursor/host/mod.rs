@@ -37,7 +37,6 @@ struct Data {
     task: String,
     presentation: Value,
     displays: Vec<Display>,
-    /// The overlay windows' own handles, so the window in front is never one of them.
     overlays: Vec<isize>,
 }
 #[derive(Default)]
@@ -48,27 +47,18 @@ pub struct CursorCompanionState {
     turn: AtomicU64,
     started: AtomicBool,
     capture: AtomicBool,
-    /// Whether the window in front fills its display (a full-screen app or video), read by the
-    /// sampler, so Misty steps out of the way there.
     fullscreen: AtomicBool,
-    /// Click positions leave the native hook only while a walkthrough step waits.
     watch_clicks: AtomicBool,
     click_turn: AtomicU64,
-    /// Tutor's text box is open, so the overlays hold the pointer for pictures (`ask.rs`).
     asking: AtomicBool,
-    /// Where the pointer went while the talk keys were held, in global units: the person can
-    /// circle or scribble over what they mean while they ask (`cursor_companion_trail`).
     trail: Mutex<Vec<(f64, f64)>>,
 }
 
-/// The most of a trail kept: about a minute of the pointer moving.
 const TRAIL_POINTS: usize = 4_000;
 pub enum Shortcut {
     Held(bool),
     Click(f64, f64),
-    /// Control tapped twice: open the text box.
     Type,
-    /// Escape pressed: Tutor's tour gives way, while its line is on screen.
     Escape,
     Error(String),
 }
@@ -78,8 +68,6 @@ fn require_main(webview: &Webview) -> Result<(), String> {
     }
     Ok(())
 }
-/// The overlay windows (one full web view per display, about 46 MB each) are built the first time
-/// the companion has something to show, not at sign-in: most sessions never show it.
 static OVERLAYS_WANTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 fn host_state(app: &AppHandle) -> Arc<CursorCompanionState> {
@@ -89,8 +77,8 @@ fn current(state: &CursorCompanionState, turn: u64) -> bool {
     state.enabled.load(Ordering::SeqCst) && state.turn.load(Ordering::SeqCst) == turn
 }
 fn error(app: &AppHandle, turn: u64, message: String) {
-    let _ = crate::browser::app_windows::emit_to_primary(
-        &app,
+    crate::browser::app_windows::emit_to_primary(
+        app,
         "misty://cursor-error",
         json!({"turn":turn,"error":message}),
     );
@@ -120,7 +108,6 @@ pub async fn cursor_companion_configure(
     rebuild(&app).await?;
     Ok(state.turn.load(Ordering::SeqCst))
 }
-/// Also called at the native account boundary, before renderer teardown completes.
 pub fn stop(app: &AppHandle) {
     let Some(managed) = app.try_state::<Arc<CursorCompanionState>>() else {
         return;
@@ -213,7 +200,6 @@ pub async fn cursor_companion_present(
                     let state = state.clone();
                     tauri::async_runtime::spawn(async move {
                         tokio::time::sleep(Duration::from_millis(400)).await;
-                        // Tutor's text box keeps them up, for dragging out pictures.
                         let still = shown(&state.data.lock().unwrap().presentation)
                             || state.asking.load(Ordering::SeqCst);
                         if current(&state, turn) && !still {
@@ -229,7 +215,6 @@ pub async fn cursor_companion_present(
     })
     .await
 }
-/// Only an overlay window (one per display, `misty-cursor-<n>`) may ask for itself.
 fn require_overlay(webview: &Webview) -> Result<(), String> {
     let overlay = webview
         .label()
@@ -243,20 +228,16 @@ fn require_overlay(webview: &Webview) -> Result<(), String> {
     }
 }
 
-/// Lets this overlay take the pointer while the pointer is over Misty, so a click or a dropped
-/// file reaches her, or gives the pointer back to the app underneath (`over` false).
 #[tauri::command]
 pub fn cursor_companion_hit(webview: Webview, app: AppHandle, over: bool) -> Result<(), String> {
     require_overlay(&webview)?;
     if over {
         ask::note_front(&app);
     }
-    // While the text box is open the overlays keep the pointer, for dragging out pictures.
     let asking = host_state(&app).asking.load(Ordering::SeqCst);
     platform::take_pointer(&webview.window(), over || asking)
 }
 
-/// Opens Tutor's text box beside the pointer, for a click on Misty.
 #[tauri::command]
 pub fn cursor_companion_ask_open(webview: Webview, app: AppHandle) -> Result<(), String> {
     require_overlay(&webview)?;
@@ -267,8 +248,6 @@ pub fn cursor_companion_ask_open(webview: Webview, app: AppHandle) -> Result<(),
     Ok(())
 }
 
-/// Asks Tutor about a part of the 3D model on the overlay's card, picked with a click: a typed
-/// question of its own turn, as the text box sends one (`ask.rs`).
 #[tauri::command]
 pub fn cursor_companion_ask_part(
     webview: Webview,
@@ -284,7 +263,7 @@ pub fn cursor_companion_ask_part(
     }
     state.trail.lock().unwrap().clear();
     let turn = state.turn.fetch_add(1, Ordering::SeqCst) + 1;
-    let _ = crate::browser::app_windows::emit_to_primary(
+    crate::browser::app_windows::emit_to_primary(
         &app,
         "misty://cursor-ask",
         json!({"turn": turn, "text": format!("Tell me about the {part} in the model.")}),
@@ -292,8 +271,6 @@ pub fn cursor_companion_ask_part(
     Ok(())
 }
 
-/// Whether the overlays are on screen: while Tutor shows something, and all the time while Misty
-/// sits beside the cursor (Settings › Tutor › Show Misty at the cursor). They never take clicks.
 pub(super) fn shown(presentation: &Value) -> bool {
     presentation["visible"].as_bool().unwrap_or(false)
         || presentation["sprite"].as_bool().unwrap_or(false)

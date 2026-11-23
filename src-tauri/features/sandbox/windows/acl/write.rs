@@ -1,11 +1,5 @@
-//! Writing a DACL, built one entry at a time.
 use super::*;
 
-/// Writes `acl` as the DACL of `path`. Only when `spread` does Windows also
-/// recompute what everything below inherits, which walks the whole tree: a
-/// rule that isn't inherited never needs that, and walking a folder such as
-/// the person's profile would take minutes. Without `spread`, `acl` is
-/// stored exactly as given, with the auto-inheritance flag of `control`.
 pub(super) fn write_dacl(
     path: &Path,
     acl: *const ACL,
@@ -63,9 +57,6 @@ pub(super) fn write_dacl(
         Protection::Protect => kept |= SE_DACL_PROTECTED,
         Protection::Unprotect => kept &= !SE_DACL_PROTECTED,
     }
-    // Windows clears "auto-inherited" on a direct write unless it is also
-    // requested, and children inherit differently without it; requesting it
-    // does not reach existing children.
     if kept & SE_DACL_AUTO_INHERITED != 0 {
         kept |= SE_DACL_AUTO_INHERIT_REQ;
     }
@@ -91,7 +82,6 @@ pub(super) fn write_dacl(
     }
 }
 
-/// Builds a new ACL one entry at a time.
 pub(super) struct AclBuilder {
     buffer: Vec<u8>,
 }
@@ -114,7 +104,6 @@ impl AclBuilder {
         self.buffer.as_mut_ptr().cast()
     }
 
-    /// Appends `dacl`'s explicit entries that `keep` accepts, denials first.
     pub(super) fn explicit(
         &mut self,
         dacl: &Dacl,
@@ -134,7 +123,6 @@ impl AclBuilder {
         Ok(())
     }
 
-    /// Appends a copy of `ace` with the `clear` flags removed.
     pub(super) fn copy(&mut self, ace: &Ace, clear: u8) -> Result<(), String> {
         // SAFETY: `ace` points into a live ACL and is `AceSize` bytes long.
         let mut bytes = unsafe {

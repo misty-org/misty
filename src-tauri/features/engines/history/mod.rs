@@ -26,19 +26,12 @@ pub struct Message {
     pub role: String,
     pub text: String,
     pub ts: Option<String>,
-    /// Target file of a tool call (read/edit/write/...); drives the file
-    /// chip in the timeline. None for non-tool rows and path-less tools.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
-    /// Full tool-call arguments (object / array / string). Rendered in the
-    /// expandable tool-call panel. None when the engine only recorded a name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub args: Option<Value>,
-    /// Tool execution result/output (string / object / array).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<Value>,
-    /// Todo-list snapshot/patch from a todo tool call (claude TodoWrite,
-    /// omp todo op); feeds the run-status strip's task pill.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub todos: Option<TodosPayload>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -49,8 +42,6 @@ pub struct Message {
     pub effort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<i64>,
-    /// Image attachments on user messages: data URLs (claude/pi/omp) or
-    /// absolute paths (kimi/codex). Empty for every other row.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<String>,
 }
@@ -73,7 +64,6 @@ pub struct SessionMeta {
     pub custom_title: Option<String>,
 }
 
-/// A native session file discovered on disk, matched to a workspace.
 pub struct SessionFile {
     pub engine: &'static str,
     pub session_id: String,
@@ -82,8 +72,6 @@ pub struct SessionFile {
 }
 
 pub fn stat_signature(path: &Path) -> Option<(i64, i64)> {
-    // OpenCode ≥1.18 keeps every session in one SQLite file; the virtual
-    // address below carries the session id, so stat the shared database.
     let target = split_opencode_db_path(path).map(|(db, _)| db);
     let shared_db = target.is_some();
     let path = target.as_deref().unwrap_or(path);
@@ -91,9 +79,6 @@ pub fn stat_signature(path: &Path) -> Option<(i64, i64)> {
     if !shared_db {
         return Some((size, mtime_ms));
     }
-    // OpenCode writes through SQLite's write-ahead log, so new turns land in `<db>-wal` and the
-    // database file itself only changes at a checkpoint. The log counts too, or new activity
-    // would wait for the next checkpoint to show.
     let mut wal = path.as_os_str().to_owned();
     wal.push("-wal");
     Some(match file_stat(Path::new(&wal)) {
@@ -102,7 +87,10 @@ pub fn stat_signature(path: &Path) -> Option<(i64, i64)> {
     })
 }
 
-/// A file's size and modified time in milliseconds.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "stats the engine's own session file in place, wherever the engine keeps it"
+)]
 fn file_stat(path: &Path) -> Option<(i64, i64)> {
     let meta = std::fs::metadata(path).ok()?;
     let mtime_ms = meta
@@ -114,15 +102,8 @@ fn file_stat(path: &Path) -> Option<(i64, i64)> {
     Some((meta.len() as i64, mtime_ms))
 }
 
-/// Separator between the OpenCode SQLite database path and the session id in
-/// a history row's `file_path`. The record separator is illegal in filenames
-/// on Windows and vanishingly rare elsewhere, so it cannot collide with a
-/// real on-disk path — the virtual address is never opened directly.
 const OPENCODE_DB_SEP: char = '\u{1f}';
 
-/// Virtual history address for one SQLite-backed OpenCode session:
-/// `<…/opencode.db>\u{1f}<sessionId>`. Keeps the path-keyed scan/read/delete
-/// pipeline working while the transcript itself lives in one shared db.
 pub(crate) fn opencode_db_session_path(db: &Path, session_id: &str) -> PathBuf {
     let mut address = db.to_string_lossy().into_owned();
     address.push(OPENCODE_DB_SEP);
@@ -130,8 +111,6 @@ pub(crate) fn opencode_db_session_path(db: &Path, session_id: &str) -> PathBuf {
     PathBuf::from(address)
 }
 
-/// Split a virtual address back into `(db_path, session_id)`. None for every
-/// real on-disk path (the OpenCode storage-tree layout included).
 pub(crate) fn split_opencode_db_path(path: &Path) -> Option<(PathBuf, String)> {
     let text = path.to_str()?;
     let (db, session_id) = text.split_once(OPENCODE_DB_SEP)?;
@@ -141,8 +120,6 @@ pub(crate) fn split_opencode_db_path(path: &Path) -> Option<(PathBuf, String)> {
     Some((PathBuf::from(db), session_id.to_string()))
 }
 
-/// &str entry point: skips the `Value::String` wrapper allocation the
-/// timestamp hot path used to pay per call.
 pub fn parse_ts_ms_str(text: &str) -> Option<i64> {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -158,8 +135,6 @@ pub fn parse_ts_ms_str(text: &str) -> Option<i64> {
     chrono_like_rfc3339_ms(trimmed)
 }
 
-/// Minimal RFC3339 parse without a chrono dependency: handles
-/// `YYYY-MM-DDTHH:MM:SS[.frac](Z|±HH:MM)`.
 fn chrono_like_rfc3339_ms(s: &str) -> Option<i64> {
     let (date_part, rest) = s.split_once('T')?;
     let mut it = date_part.split('-');
@@ -194,7 +169,6 @@ fn chrono_like_rfc3339_ms(s: &str) -> Option<i64> {
     Some(civil_to_epoch_ms(year, month, day, hour, minute, second) - offset_minutes * 60_000)
 }
 
-/// Days-from-civil algorithm (Howard Hinnant), no external deps.
 fn civil_to_epoch_ms(year: i64, month: i64, day: i64, hour: i64, minute: i64, second: i64) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = if y >= 0 { y } else { y - 399 } / 400;
@@ -210,7 +184,6 @@ pub fn same_or_child(candidate: &Path, workspace: &Path) -> bool {
     candidate == workspace || candidate.starts_with(workspace)
 }
 
-/// Claude encodes a workspace path: all non-alphanumeric except '-' become '-'.
 pub fn claude_encode_project_path(path: &str) -> String {
     path.chars()
         .map(|c| {
@@ -223,8 +196,6 @@ pub fn claude_encode_project_path(path: &str) -> String {
         .collect()
 }
 
-/// Extract display text from a message `content` value that may be a string
-/// or an array of typed parts.
 pub fn content_text(value: Option<&Value>) -> String {
     match value {
         Some(Value::String(s)) => s.clone(),
@@ -263,8 +234,6 @@ pub fn truncate_chars(text: &str, max: usize) -> String {
     trimmed.chars().take(max).collect()
 }
 
-/// Injected runtime-context turns, not typed input. Shared across engines so
-/// a new CLI that reuses these envelopes does not need a per-engine title patch.
 pub(crate) fn is_injected_user_context(text: &str) -> bool {
     let t = text.trim_start();
     t.starts_with("<user_info>")
@@ -274,9 +243,6 @@ pub(crate) fn is_injected_user_context(text: &str) -> bool {
         || t.starts_with("<workspace_path>")
 }
 
-/// Prefer the `<user_query>` body when the turn is a Grok-style envelope.
-/// Only the prefix is an envelope — a typed body that *mentions*
-/// `<user_query>` must stay intact.
 pub(crate) fn unwrap_user_turn(text: &str) -> String {
     const OPEN: &str = "<user_query>";
     const CLOSE: &str = "</user_query>";
@@ -295,8 +261,6 @@ pub(crate) fn unwrap_user_turn(text: &str) -> String {
     source.trim().to_string()
 }
 
-/// Strip one leading `<tag>…</tag>`. An unterminated block is left intact
-/// so a following `<user_query>` is not swallowed.
 fn strip_leading_named_block<'a>(text: &'a str, tag: &str) -> &'a str {
     let trimmed = text.trim_start();
     let open = format!("<{tag}>");
@@ -309,12 +273,6 @@ fn strip_leading_named_block<'a>(text: &'a str, tag: &str) -> &'a str {
         None => trimmed,
     }
 }
-/// Claude Code slash-command envelope: the CLI logs the typed command as
-/// `<command-message>/<command-name>/<command-args>` tags and the expanded
-/// prompt as a separate `isMeta` user turn. Rebuild what was typed
-/// (`/name args`) so neither the tags nor the expansion are shown.
-/// Tag order varies between versions; both machine tags must be present so
-/// a typed body merely mentioning one tag stays intact.
 pub(crate) fn slash_command_display(text: &str) -> Option<String> {
     tagged_body(text, "command-message")?;
     let name = tagged_body(text, "command-name")?;
@@ -329,8 +287,6 @@ pub(crate) fn slash_command_display(text: &str) -> Option<String> {
     })
 }
 
-/// The turn is nothing but the command tags. Extra typed text stays a real
-/// user message even when it mentions the tags.
 pub(crate) fn slash_command_envelope_only(text: &str) -> bool {
     if slash_command_display(text).is_none() {
         return false;
@@ -359,8 +315,6 @@ fn strip_one_tag_pair(text: &str, tag: &str) -> String {
     out
 }
 
-/// Body of the first `<tag>…</tag>` pair, trimmed. None when absent or
-/// unterminated.
 fn tagged_body<'a>(text: &'a str, tag: &str) -> Option<&'a str> {
     let open = format!("<{tag}>");
     let close = format!("</{tag}>");
@@ -369,10 +323,6 @@ fn tagged_body<'a>(text: &'a str, tag: &str) -> Option<&'a str> {
     let end = rest.find(&close)?;
     Some(rest[..end].trim())
 }
-/// Codex-style first-turn injections: the CLI prepends its instructions,
-/// environment context, and skill envelopes to (or ahead of) the typed
-/// body. Stripped from the front of a user turn; a typed tail after the
-/// last block is real user text and stays.
 const INJECTED_LEADING_TAGS: &[&str] = &[
     "INSTRUCTIONS",
     "environment_context",
@@ -382,9 +332,6 @@ const INJECTED_LEADING_TAGS: &[&str] = &[
     "recommended_plugins",
 ];
 
-/// Clean a user turn down to the typed body: drop leading injected blocks
-/// (codex instructions / environment / skills), then unwrap the Grok-style
-/// `<user_query>` envelope. Noise-only turns come back empty.
 pub(crate) fn clean_user_turn(text: &str) -> String {
     let mut rest = text.trim_start();
     if let Some(display) = slash_command_display(rest) {
@@ -392,12 +339,8 @@ pub(crate) fn clean_user_turn(text: &str) -> String {
     }
     loop {
         let prev_len = rest.len();
-        // The `# AGENTS.md instructions` heading precedes the `<INSTRUCTIONS>`
-        // block; drop it only when that block actually follows.
         if let Some(after) = rest.strip_prefix("# AGENTS.md instructions") {
             let after = after.trim_start();
-            // Codex appends the workspace path: `# AGENTS.md instructions for
-            // <path>\n\n<INSTRUCTIONS>` — skip the heading line first.
             let after = match after.strip_prefix("for ") {
                 Some(tail) => match tail.find('\n') {
                     Some(nl) => tail[nl + 1..].trim_start(),
@@ -423,8 +366,6 @@ pub(crate) fn clean_user_turn(text: &str) -> String {
 }
 
 fn strip_title_noise(text: &str) -> String {
-    // Remove every `<file …>…</file>` envelope; an unterminated one loses
-    // just its opening tag (truncated content is still user-visible text).
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(start) = rest.find("<file ") {
@@ -439,10 +380,6 @@ fn strip_title_noise(text: &str) -> String {
         }
     }
     out.push_str(rest);
-    // Drop `[Image #N, WxH]` placeholders wherever they appear — they sit
-    // inline before the typed body. A `[Image #` run whose bracket body is
-    // neither dimension digits nor a `#N: path` payload is user text and
-    // stays.
     let mut cleaned = String::with_capacity(out.len());
     let mut rest = out.as_str();
     const MARK: &str = "[Image #";
@@ -458,8 +395,6 @@ fn strip_title_noise(text: &str) -> String {
                     return false;
                 }
                 let tail = &body[digits..];
-                // `[Image #N, WxH]` dimensions, or the composer's
-                // `[Image #N: /path/to/file]` form.
                 tail.chars()
                     .all(|c| c.is_ascii_digit() || matches!(c, ',' | ' ' | 'x'))
                     || tail.strip_prefix(": ").is_some_and(|p| !p.is_empty())
@@ -484,7 +419,6 @@ fn strip_title_noise(text: &str) -> String {
 mod tests {
     use super::*;
 
-    /// Title derivation = strip noise, then truncate (mirrors ScanAcc::accept).
     fn stripped(text: &str) -> String {
         truncate_chars(&strip_title_noise(text), 80)
     }

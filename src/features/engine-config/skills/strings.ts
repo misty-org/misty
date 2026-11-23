@@ -1,10 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * The Skills page's English text, from desktop-cc-gui's `en.ts` (`skills.*`), in Misty's
- * sentence case. `t()` reads a dotted key and fills `{{name}}` placeholders, so the panes keep
- * the shape of the code they came from without an i18n library.
- */
 
 const strings = {
   tabs: {
@@ -154,6 +149,7 @@ const strings = {
     calls: "Calls",
     tokens: "Tokens",
     lastUsed: "Last used",
+    callsLine: "{{calls}} calls, {{tokens}} tokens",
     today: "Today",
     daysAgo: "{{days}}d ago",
     monthsAgo: "{{months}}mo ago",
@@ -197,7 +193,6 @@ const strings = {
 
 type Vars = Record<string, string | number>;
 
-/** The text at a dotted key such as `feedback.installed`, with `{{name}}` filled from `vars`. */
 export function t(key: string, vars: Vars = {}): string {
   let node: unknown = strings;
   for (const part of key.split(".")) {

@@ -35,8 +35,6 @@ fn commit_file(repo: &git2::Repository, root: &Path, name: &str, content: &str) 
         .unwrap()
 }
 
-/// A repository on `trunk` with one commit, in its own folder inside the scratch folder so
-/// its worktrees folder lands in the scratch folder too.
 fn init_repo(scratch: &Scratch) -> (PathBuf, git2::Repository) {
     let dir = scratch.join("repo");
     std::fs::create_dir_all(&dir).unwrap();
@@ -150,12 +148,10 @@ async fn creates_a_new_branch_worktree_and_resumes_a_finished_one() {
     assert!(list
         .iter()
         .any(|w| w.branch.as_deref() == Some("feat/one") && !w.is_main));
-    // The branch exists now, so the same request is refused rather than resumed.
     let again = run_create(&report, "c2", &dir, &create_args("feat/one"), &cancel)
         .await
         .unwrap_err();
     assert_eq!(again.kind, "branch_exists");
-    // Checking out the existing branch where it already lives resumes instead.
     let mut existing = create_args("feat/one");
     existing.existing_branch = true;
     let resumed = run_create(&report, "c3", &dir, &existing, &cancel).await;
@@ -224,7 +220,6 @@ async fn removes_a_worktree_with_its_branch_and_a_lost_one() {
     assert!(removed.branch_deleted);
     assert!(!one.exists());
 
-    // A worktree whose registration was pruned by hand is removed as a lost folder.
     let two = run_create(&report, "c", &dir, &create_args("two"), &cancel)
         .await
         .unwrap();
@@ -235,7 +230,6 @@ async fn removes_a_worktree_with_its_branch_and_a_lost_one() {
     assert!(lost.orphan_directory);
     assert!(!two.exists());
 
-    // An unrelated folder is never deleted.
     let plain = scratch.join("plain");
     std::fs::create_dir_all(plain.join("keep")).unwrap();
     assert!(remove_worktree(&dir, &plain.to_string_lossy(), None, false)
@@ -251,9 +245,7 @@ fn merged_check_follows_the_commit_graph() {
     let head = repo.head().unwrap().peel_to_commit().unwrap();
     repo.branch("fresh", &head, false).unwrap();
     repo.branch("ahead", &head, false).unwrap();
-    // A fresh branch on the base is merged.
     assert!(branch_merged(&dir, "fresh", "trunk").unwrap());
-    // A commit only on `ahead` makes it unmerged; moving trunk to it merges it.
     repo.set_head("refs/heads/ahead").unwrap();
     let tip = commit_file(&repo, &dir, "more.txt", "two\n");
     assert!(!branch_merged(&dir, "ahead", "trunk").unwrap());

@@ -1,5 +1,3 @@
-//! One page action: find its control, check it, then click or type natively
-//! when the tab is visible, or through the page script otherwise.
 use super::{
     call, call_at, frame_of, native_input, poll, resolve_agent_webview, BrowserAgentExecuteRequest,
     BrowserSessionState, Step,
@@ -12,8 +10,6 @@ use tauri::{AppHandle, Webview};
 mod checked;
 use checked::run_step_checked;
 
-/// Native click or key through the same checks as Midscene's native input.
-/// Ok(None) means native input was unavailable before anything was sent.
 async fn native(
     app: &AppHandle,
     state: &BrowserSessionState,
@@ -48,7 +44,6 @@ async fn native(
     .await
     {
         Ok(result) => Ok(Some(result)),
-        // Hidden or background tabs cannot take native input; nothing was sent.
         Err(error) if error.contains("must be visible") => Ok(None),
         Err(error) => Err(error),
     }
@@ -72,8 +67,6 @@ async fn prepare(
 ) -> Result<Value, String> {
     let args = json!({"documentId": document, "ref": step.reference, "action": action, "key": key, "modifiers": step.modifiers});
     let mut prepared = call_at(view, frame, "prepare", args.clone(), false).await?;
-    // A popup over the control is closed first, as a person would (page_read.js), then the
-    // control is measured again; anything else covering it still fails back to the agent.
     if prepared["errorCode"] == "browser_target_covered" {
         let closed = call_at(view, None, "dismissPopup", json!({}), false).await;
         if closed.is_ok_and(|closed| {
@@ -85,14 +78,12 @@ async fn prepare(
         }
     }
     if prepared["ok"] == true && prepared["scrolled"] == true {
-        // Let a smooth-scrolling page come to rest, then measure again.
         tokio::time::sleep(Duration::from_millis(120)).await;
         prepared = call_at(view, frame, "prepare", args, false).await?;
     }
     Ok(prepared)
 }
 
-/// How long the cursor glides to a control (kiri_link/scripts/agent_cursor.js) before the click.
 pub(crate) const CURSOR_GLIDE_MS: u64 = 320;
 
 fn cursor_script(prepared: &Value) -> Option<String> {
@@ -100,7 +91,6 @@ fn cursor_script(prepared: &Value) -> Option<String> {
         prepared["point"]["x"].as_f64()?,
         prepared["point"]["y"].as_f64()?,
     );
-    // The cursor installs itself the first time (it is idempotent), so every agent tab shows it.
     Some(format!(
         "{}\nwindow[Symbol.for('misty.browser.agent.cursor')]?.move({:.4}*innerWidth,{:.4}*innerHeight,{{hold:true}});",
         include_str!("../../kiri_link/scripts/agent_cursor.js"),
@@ -109,8 +99,6 @@ fn cursor_script(prepared: &Value) -> Option<String> {
     ))
 }
 
-/// Runs one step, first finding a replayed step's control by its locator, and
-/// reports the control's locator so a successful run can be replayed later.
 pub(super) async fn run_step(
     app: &AppHandle,
     state: &BrowserSessionState,
@@ -135,7 +123,6 @@ pub(super) async fn run_step(
         resolved.reference = found["ref"].as_str().map(str::to_owned);
         resolved.locator = None;
     }
-    // A ref inside a cross-origin frame runs there, against that frame's document.
     let frame = frame_of(view, resolved.reference.as_deref());
     let document = frame
         .as_ref()

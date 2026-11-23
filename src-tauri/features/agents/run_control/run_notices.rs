@@ -1,7 +1,3 @@
-//! System notices for a chat whose run finished, failed or waits on its person while Misty is in the
-//! background. Every person's window follows runs and asks for the same notice; one goes out for all
-//! of them, and none while a Misty window is in front. A notice carries the agent's name and the
-//! chat's title, never what was asked or answered.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock, PoisonError},
@@ -11,11 +7,9 @@ use std::{
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, Webview};
 
-/// Windows ask about the same change within moments of each other.
 const SAME_NOTICE: Duration = Duration::from_secs(60);
 const TITLE_CHARS: usize = 120;
 const BODY_CHARS: usize = 200;
-/// Tells the window that asked to open the chat, once its notice is clicked.
 const OPEN_EVENT: &str = "misty://agent-run-notice-open";
 
 fn sent() -> &'static Mutex<HashMap<String, Instant>> {
@@ -23,7 +17,6 @@ fn sent() -> &'static Mutex<HashMap<String, Instant>> {
     SENT.get_or_init(Default::default)
 }
 
-/// Whether this is the first ask about a change. Later ones, from other windows, are the same notice.
 fn first_ask(sent: &mut HashMap<String, Instant>, key: &str, now: Instant) -> bool {
     sent.retain(|_, at| now.saturating_duration_since(*at) < SAME_NOTICE);
     if sent.contains_key(key) {
@@ -51,7 +44,6 @@ fn misty_in_front(app: &AppHandle) -> bool {
 
 fn open_chat(app: &AppHandle, label: &str, route: &str) {
     let Some(window) = app.get_webview(label).map(|webview| webview.window()) else {
-        // The window that asked has closed; bring Misty forward at least.
         if let Some(window) = crate::browser::app_windows::primary(app) {
             let _ = window.show();
             let _ = window.unminimize();
@@ -67,14 +59,12 @@ fn open_chat(app: &AppHandle, label: &str, route: &str) {
 
 #[cfg(target_os = "macos")]
 fn show(app: &AppHandle, label: String, title: String, body: String, route: String) {
-    // An app run outside its bundle has no identity of its own, as the notification plugin knows.
     let identifier = if tauri::is_dev() {
         "com.apple.Terminal".to_owned()
     } else {
         app.config().identifier.clone()
     };
     let app = app.clone();
-    // Waiting for the click holds this thread until the person clicks or clears the notice.
     std::thread::spawn(move || {
         let _ = mac_notification_sys::set_application(&identifier);
         let response = mac_notification_sys::Notification::new()
@@ -97,8 +87,6 @@ fn show(app: &AppHandle, _label: String, title: String, body: String, _route: St
     let _ = app.notification().builder().title(title).body(body).show();
 }
 
-/// Shows a notice for a chat's run, unless another window already asked or Misty is in front.
-/// True when it went out.
 #[tauri::command]
 pub fn agent_run_notify(
     app: AppHandle,
@@ -135,9 +123,6 @@ pub fn agent_run_notify(
     Ok(true)
 }
 
-/// Shows a notice for a chat message in a Space or a DM, unless another window already asked or
-/// Misty is in front. The title is who wrote it and where; the body is a clipped line of the
-/// message. True when it went out.
 #[tauri::command]
 pub fn chat_message_notify(
     app: AppHandle,

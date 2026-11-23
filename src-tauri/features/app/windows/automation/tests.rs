@@ -3,7 +3,6 @@ use super::*;
 #[test]
 fn automation_reads_what_is_on_screen() {
     let automation = Automation::new().unwrap();
-    // The taskbar or desktop is always somewhere; reading never acts.
     let found = automation
         .element_at(5, 5)
         .or_else(|| automation.element_at(400, 400));

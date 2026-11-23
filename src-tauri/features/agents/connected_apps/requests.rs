@@ -1,6 +1,3 @@
-//! What an agent needs from the person (connect an app, approve one exact action) and the approvals
-//! they remembered. Rows in `agent_chats` under kinds the renderer's chat commands refuse, so a window
-//! can't write an approval except by answering one through `decide`.
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
@@ -15,9 +12,7 @@ const REQUEST_KIND: &str = "app_request";
 const LOCAL_REQUEST_PREFIX: &str = "localapprq_";
 
 const REQUEST_TTL_MS: i64 = 15 * 60 * 1000;
-/// A recent decline of the same exact need is the answer, so the person isn't asked again.
 const DECLINE_MEMORY_MS: i64 = 15 * 60 * 1000;
-/// An answered card only matters while its chat is being read.
 const REQUEST_KEPT_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
 pub(super) fn now_ms() -> i64 {
@@ -44,7 +39,6 @@ pub struct Request {
     pub grant: Option<Remember>,
 }
 
-/// What remembering an approval would grant, recorded when the action paused.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Remember {
     pub action: String,
@@ -66,7 +60,6 @@ impl Remember {
     }
 }
 
-/// A new request's fields. The state and times are this file's to set.
 pub struct Draft {
     pub run_id: String,
     pub kind: &'static str,
@@ -115,7 +108,6 @@ fn read_one(account: &str, connection: &Connection, id: &str) -> rusqlite::Resul
     Ok(document.and_then(|text| serde_json::from_str(&text).ok()))
 }
 
-/// A request past its time is expired. The caller's transaction saves that.
 fn expire(
     account: &str,
     connection: &Connection,
@@ -129,7 +121,6 @@ fn expire(
     Ok(())
 }
 
-/// The live request for one exact need, or a new one.
 pub fn open(store: &Store, draft: Draft) -> Result<Request, String> {
     let account = store.account();
     let mut connection = store.connect().map_err(storage)?;
@@ -214,8 +205,6 @@ pub fn get(store: &Store, id: &str) -> Result<Option<Request>, String> {
     Ok(request)
 }
 
-/// Records the person's answer: `continue` approves this one action, `remember` also stores the grant
-/// the card named, and `deny` declines. A Connect card can only be dismissed.
 pub fn decide(store: &Store, id: &str, decision: &str) -> Result<Request, String> {
     let account = store.account();
     const STALE: &str = "That request has already been answered or has expired.";
@@ -248,8 +237,6 @@ pub fn decide(store: &Store, id: &str, decision: &str) -> Result<Request, String
     Ok(request)
 }
 
-/// Uses up an approval for this exact action, if one is waiting. A remembered approval runs the action
-/// by itself, and its card mustn't stay behind to let the same action through once more in Ask.
 pub fn use_matching(store: &Store, subject: &str, arguments_hash: &str) -> Result<(), String> {
     let account = store.account();
     let mut connection = store.connect().map_err(storage)?;
@@ -285,7 +272,6 @@ pub fn use_matching(store: &Store, subject: &str, arguments_hash: &str) -> Resul
     transaction.commit().map_err(storage)
 }
 
-/// Moves a request on exactly once: a Connect card to connected, an approval to used.
 pub fn resolve(store: &Store, id: &str, from: &str, to: &str) -> Result<Option<Request>, String> {
     let account = store.account();
     let mut connection = store.connect().map_err(storage)?;
@@ -305,7 +291,6 @@ pub fn resolve(store: &Store, id: &str, from: &str, to: &str) -> Result<Option<R
     Ok(Some(request))
 }
 
-/// Whether any card, for anyone on this computer, is waiting for its answer.
 pub(crate) fn any_pending(store: &database::store::Store) -> bool {
     let read = || -> rusqlite::Result<bool> {
         let connection = store.connect()?;

@@ -1,6 +1,3 @@
-//! Batches of page actions (browser.steps, browser.fill_form), skills and
-//! uploads by ref, under the batch rules: stop at a failure, a navigation or
-//! a new dialog, and re-check Stop and grants between steps.
 use super::step::run_step;
 use super::{
     call, page_error, rejected, resolve_agent_webview, steps, webview, BrowserAgentExecuteRequest,
@@ -19,11 +16,8 @@ fn request_document(request: &BrowserAgentExecuteRequest) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// The compact state's size after a batch that stayed on its page (page_effects.js).
 const COMPACT_STATE_CHARS: u64 = 4_000;
 
-/// The page after a batch: the compact state, with controls new since the last read marked, when
-/// every step stayed on the batch's document; a full snapshot after a navigation.
 async fn after_snapshot(
     view: &Webview,
     request: &BrowserAgentExecuteRequest,
@@ -75,7 +69,6 @@ pub(super) async fn run_steps(
             "Pass the documentId from the latest browser_snapshot.",
         ));
     };
-    // Set by the server only after the person approved, when the account asks.
     let allow_consequential = request.input["allowConsequential"] == true;
     let mut output = run_batch(
         app,
@@ -91,7 +84,6 @@ pub(super) async fn run_steps(
     Ok(output)
 }
 
-/// Runs steps in order under the batch rules; no trailing snapshot.
 async fn run_batch(
     app: &AppHandle,
     state: &BrowserSessionState,
@@ -108,7 +100,6 @@ async fn run_batch(
     let mut stopped = Value::Null;
     let mut dispatched = false;
     for (index, step) in steps.iter().enumerate() {
-        // Stop, takeover and revocation apply between every step.
         crate::agents::task_scopes::authorize_scope(
             app,
             &request.scope_id,
@@ -116,14 +107,12 @@ async fn run_batch(
             task,
         )?;
         resolve_agent_webview(app, state, request)?;
-        // Arms the step's verdict (page_effects.js); read after the step settles.
         let armed = call(view, "effectStart", json!({"ref": step.reference}), false)
             .await
             .ok();
         let token = armed
             .as_ref()
             .and_then(|armed| armed["token"].as_str().map(str::to_owned));
-        // The element the step acts on, named as a person would (`button "Search"`).
         let target = armed
             .as_ref()
             .and_then(|armed| armed["target"].as_str().map(str::to_owned));
@@ -144,7 +133,6 @@ async fn run_batch(
             }
             Err(error) => json!({"ok": false, "error": error}),
         };
-        // Anything not explicitly unattempted may have reached the page.
         dispatched |= outcome["attempted"] != false;
         let mut record =
             json!({"index": index + 1, "action": step.action, "ok": outcome["ok"] == true});
@@ -201,7 +189,6 @@ async fn run_batch(
             )
             .await;
         }
-        // What the step did: navigated, page changed, or no change (a click the page ignored).
         if let Some(token) = &token {
             if let (Ok(effect), Some(record)) = (
                 call(view, "effectEnd", json!({"token": token}), false).await,
@@ -236,7 +223,6 @@ async fn run_batch(
     let page = call(view, "observe", json!({}), false).await?;
     let mut output = json!({"ran": results.len(), "completed": completed, "steps": results, "stopped": stopped, "page": page});
     if !dispatched && completed < steps.len() {
-        // Nothing reached the page: report a failure the model can correct.
         let first = output["steps"][0]["error"]
             .as_str()
             .unwrap_or("The step did not run.")
@@ -248,7 +234,6 @@ async fn run_batch(
     Ok(output)
 }
 
-/// Attaches a task file to a file input named by a snapshot ref.
 pub(in crate::browser) async fn upload(
     app: &AppHandle,
     state: &BrowserSessionState,
@@ -257,7 +242,6 @@ pub(in crate::browser) async fn upload(
     input: &Value,
 ) -> Result<Value, String> {
     let view = webview(app, id)?;
-    // Reading a file must not extend a revoked task or execution grant.
     crate::agents::task_scopes::authorize_scope(
         app,
         &request.scope_id,

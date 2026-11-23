@@ -5,7 +5,6 @@ pub mod misty_profiles;
 pub mod retired_coding_data;
 pub mod store;
 
-/// Tests never reach the person's real data, whatever they exercise.
 #[cfg(test)]
 #[ctor::ctor]
 fn isolate_tests() {

@@ -8,14 +8,12 @@ import {
   MenuItem,
 } from "@misty/ui";
 import { useSpeechSupport } from "../speech";
-import { captureMicrophone, captureSystemAudio } from "./startCapture";
-import { useCaptureStore } from "./useCaptureStore";
+import { captureMicrophone, captureSystemAudio } from "./start_capture";
+import { useCaptureStore } from "./use_capture_store";
 
-/** "Listen" beside New note: hear what's said and turn it into a Note. */
 export function CaptureMenu() {
   const phase = useCaptureStore((state) => state.phase);
   const speech = useSpeechSupport();
-  // What's heard is recognized by this computer; where it can't, there's nothing to listen with.
   if (!hasTauriInternals() || !speech?.recognition) return null;
   const busy = phase !== "idle" && phase !== "done";
   return (

@@ -1,8 +1,3 @@
-//! Misty-window control on Windows, the counterpart of `MistyAutopilot.m`:
-//! the whole Misty window is captured with every webview in it, and each
-//! action goes to the webview under the point as trusted DevTools input, so
-//! no global input is posted and the person's pointer and keyboard stay
-//! theirs. Typing and keys go to the webview Misty last pointed at.
 use std::sync::Mutex;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -12,17 +7,14 @@ use tauri::{AppHandle, Manager, Webview};
 use crate::agents::desktop_control::windows::overlays::{self as overlays, Frame};
 use crate::browser::pages::windows::webview2::{self, MouseButton};
 
-/// The longest edge of a window frame the agent sees, as on macOS.
 const MAX_EDGE: u32 = 2000;
 
-/// The label of the webview Misty last pointed at.
 static TARGET: Mutex<Option<String>> = Mutex::new(None);
 
 fn main_window(app: &AppHandle) -> Result<tauri::Window, String> {
     crate::browser::app_windows::primary(app).ok_or_else(|| "Misty window closed".into())
 }
 
-/// The window's rectangle in physical screen pixels.
 fn frame_of(window: &tauri::Window) -> Result<Frame, String> {
     let position = window.outer_position().map_err(|e| e.to_string())?;
     let size = window.outer_size().map_err(|e| e.to_string())?;
@@ -34,7 +26,6 @@ fn frame_of(window: &tauri::Window) -> Result<Frame, String> {
     })
 }
 
-/// Why control can't continue while another window is in front.
 pub fn focus_reason() -> String {
     use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowTextW};
     let mut title = [0u16; 256];
@@ -55,8 +46,6 @@ pub fn focus_reason() -> String {
     format!("Misty lost focus to {name}. Bring Misty to the front, then resume.")
 }
 
-/// One capture of the display under control, or of the Misty window, off
-/// the UI thread.
 pub async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Result<Value, String> {
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -70,7 +59,6 @@ pub async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Res
     .map_err(|e| e.to_string())?
 }
 
-/// Performs an action on the desktop under control, or in the Misty window.
 pub async fn perform(app: &AppHandle, desktop: bool, input: Value) -> Result<Value, String> {
     if !desktop {
         return action(app, &input).await;
@@ -82,7 +70,6 @@ pub async fn perform(app: &AppHandle, desktop: bool, input: Value) -> Result<Val
     .map_err(|e| e.to_string())?
 }
 
-/// Captures the whole Misty window. Called on a worker thread.
 pub fn capture(app: &AppHandle) -> Result<Value, String> {
     let window = main_window(app)?;
     if !window.is_focused().unwrap_or(false)
@@ -116,7 +103,6 @@ pub fn capture(app: &AppHandle) -> Result<Value, String> {
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 85)
         .encode_image(&image.to_rgb8())
         .map_err(|_| "Window capture failed".to_owned())?;
-    // The window is ringed while Misty controls it, as on macOS.
     let _ = overlays::show_mist(app, frame, false);
     Ok(json!({
         "image": {
@@ -129,14 +115,11 @@ pub fn capture(app: &AppHandle) -> Result<Value, String> {
     }))
 }
 
-/// The Misty webview under a point in physical screen pixels, and the point
-/// in its CSS pixels.
 fn webview_at(app: &AppHandle, x: f64, y: f64) -> Option<(Webview, f64, f64)> {
     let window = main_window(app).ok()?;
     let origin = window.inner_position().ok()?;
     let scale = window.scale_factor().ok()?;
     let (local_x, local_y) = (x - f64::from(origin.x), y - f64::from(origin.y));
-    // Page webviews sit above the main one; the topmost containing the point wins.
     let mut candidates: Vec<Webview> = window.webviews();
     candidates.sort_by_key(|view| crate::browser::app_windows::is_app_window(view.label()));
     candidates.into_iter().find_map(|view| {
@@ -158,7 +141,6 @@ fn target_view(app: &AppHandle) -> Option<Webview> {
         .or_else(|| crate::browser::app_windows::primary_webview(app))
 }
 
-/// Performs one validated action in the Misty window.
 pub async fn action(app: &AppHandle, input: &Value) -> Result<Value, String> {
     let window = main_window(app)?;
     if !window.is_focused().unwrap_or(false) || window.is_minimized().unwrap_or(true) {
@@ -231,7 +213,6 @@ pub async fn action(app: &AppHandle, input: &Value) -> Result<Value, String> {
 }
 
 async fn press_key(view: &Webview, key: &str) -> Result<(), String> {
-    // (DOM key, Windows virtual key code, with Ctrl).
     let (name, code, control) = match key {
         "Enter" => ("Enter", 13, false),
         "Escape" => ("Escape", 27, false),
@@ -270,7 +251,6 @@ async fn press_key(view: &Webview, key: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Control of the Misty window ended or paused: its ring and pointer go.
 pub fn release(app: &AppHandle) {
     overlays::hide_pointer(app);
     overlays::hide_mist(app);

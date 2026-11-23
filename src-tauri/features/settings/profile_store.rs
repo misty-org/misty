@@ -1,5 +1,3 @@
-//! This device's preference state, with a revision so two windows cannot overwrite each
-//! other. It lives in `misty.db` and never leaves the device.
 use crate::error::{Error as ApiError, Result as ApiResult};
 use database::store::Store;
 use rusqlite::{params, OptionalExtension};
@@ -13,11 +11,7 @@ pub struct ProfileStateSnapshot {
     pub state: Option<Value>,
 }
 
-/// Scopes only native code writes: what the person has granted. Windows reach `profile_state`, and a
-/// window must not be able to grant itself anything or read what it's been granted this way.
 pub fn is_protected_scope(scope: &str) -> bool {
-    // `drive:` holds this computer's Space drive id and the drive's device settings
-    // (`spaces_drive/device.rs`); `files:` holds Files' (`files/thumbnail_cache.rs`).
     scope.starts_with("grant:")
         || scope.starts_with("permission:")
         || scope.starts_with("drive:")
@@ -84,7 +78,6 @@ mod tests {
             profile_state(&store, "scope-a", None).unwrap().state,
             Some(state.clone())
         );
-        // A stale revision is refused, so two windows cannot overwrite each other.
         assert!(profile_state(&store, "scope-a", Some((0, state))).is_err());
         assert!(profile_state(&store, "scope-b", None)
             .unwrap()

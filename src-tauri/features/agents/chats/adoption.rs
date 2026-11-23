@@ -1,10 +1,6 @@
-//! Handing chats kept signed out to the account that signs in.
-
 use super::*;
 
 impl AgentChatsService {
-    /// What adopting would hand over that someone would want asked about first: chats.
-    /// Built-in rows and approvals go or stay without a question.
     pub async fn adoptable(&self, from: String, to: String) -> Result<u64, String> {
         check(&from, "conversation", "adopt")?;
         let store = self.store.clone();
@@ -26,9 +22,6 @@ impl AgentChatsService {
         .map_err(|e| e.to_string())?
     }
 
-    /// What was kept signed out goes to the account that signs in, once it's said yes. Its remembered
-    /// site approvals stay behind. A row the account already has stays as it is, and the signed-out
-    /// copy stays behind it.
     pub async fn adopt(&self, from: String, to: String) -> Result<u64, String> {
         check(&from, "conversation", "adopt")?;
         check(&to, "conversation", "adopt")?;
@@ -82,8 +75,6 @@ impl AgentChatsService {
                     rusqlite::params![from, to],
                 )
                 .map_err(|e| e.to_string())?;
-            // Recall's FTS rows carry the account and agent as searchable metadata, so rebuild only
-            // the rows for conversations that actually moved to the new account.
             let mut chats = transaction
                 .prepare(
                     "SELECT c.id, c.document FROM agent_chats c
@@ -92,7 +83,9 @@ impl AgentChatsService {
                 )
                 .map_err(|e| e.to_string())?;
             let rows = chats
-                .query_map([&to], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+                .query_map([&to], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
                 .map_err(|e| e.to_string())?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|e| e.to_string())?;
@@ -109,7 +102,9 @@ impl AgentChatsService {
                     )
                     .map_err(|e| e.to_string())?;
                 let messages = statement
-                    .query_map(rusqlite::params![to, conversation], |row| row.get::<_, String>(0))
+                    .query_map(rusqlite::params![to, conversation], |row| {
+                        row.get::<_, String>(0)
+                    })
                     .map_err(|e| e.to_string())?
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|e| e.to_string())?;

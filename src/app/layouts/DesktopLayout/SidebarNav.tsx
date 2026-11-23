@@ -11,7 +11,6 @@ function NavButtons(props: {
   onForward: () => void;
 }) {
   return (
-    // Sidebar chrome: the two arrows sit side by side as one pair, the toggle's size.
     <div className="flex items-center" data-browser-toolbar data-sidebar>
       <IconButton label="Back" disabled={!props.canBack} onClick={props.onBack}>
         <ArrowLeft />
@@ -23,7 +22,6 @@ function NavButtons(props: {
   );
 }
 
-/** Back and forward through the focused pane's own pages, as the router's own `go` does. */
 function PaneHistoryNav() {
   const navigate = useNavigate();
   const history = useFocusedPaneHistory();
@@ -46,7 +44,6 @@ function PaneHistoryNav() {
   );
 }
 
-/** The sidebar head's back and forward buttons. */
 export function SidebarNav() {
   const routed = useInRouterContext();
   return routed ? (

@@ -1,8 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Tests for `sources` (reading, writing, path resolution). Every case uses a scratch home or a
-//! scratch folder and never reads or writes the person's real config.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use super::read::{read_dsh_profile, read_json_source, read_toml_source};
@@ -12,9 +10,6 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
-/// A scratch home for the test (`support::TestHome` holds the shared home lock, so tests that
-/// change the home folder at the same time can't send this one's grok home to another scratch
-/// folder).
 struct HomeGuard(#[allow(dead_code)] crate::engine_config::support::TestHome);
 impl HomeGuard {
     fn new(home: &Path) -> Self {
@@ -57,7 +52,6 @@ fn every_declared_source_is_registered_and_consistent() {
             assert!(!entry.readonly_reason_code.is_empty());
         }
     }
-    // Only sources without cross-file semantics like `disabled_mcp_servers` are writable.
     assert!(source("grok_user").writable);
     assert!(!source("grok_project").writable);
 }
@@ -159,7 +153,6 @@ fn opencode_toggle_writes_enabled_and_round_trips() {
     set_json_enabled(source("opencode_project"), &path, "local", true, &version).unwrap();
     assert!(read_json_source(source("opencode_project"), &path).unwrap()[0].enabled);
 
-    // A version conflict refuses the write; an unknown server is not_found.
     let error =
         set_json_enabled(source("opencode_project"), &path, "local", false, "stale").unwrap_err();
     assert_eq!(error.code, "conflict");
@@ -172,7 +165,6 @@ fn opencode_toggle_writes_enabled_and_round_trips() {
 
 #[test]
 fn omp_toggle_writes_the_enabled_field_and_round_trips() {
-    // OMP's own mcp.json: `enabled: false` is the off field `/mcp disable` writes.
     let scratch = Scratch::new("omp-write");
     let path = scratch.path().join("mcp.json");
     let original = "{\n  \"mcpServers\": {\n    \"rea\": {\n      \"command\": \"cmd.exe\",\n      \"args\": [\"/c\", \"rea\"]\n    }\n  }\n}\n";
@@ -195,7 +187,6 @@ fn omp_toggle_writes_the_enabled_field_and_round_trips() {
         written["mcpServers"]["rea"]["enabled"],
         serde_json::json!(false)
     );
-    // Every other field stays as it was.
     assert_eq!(written["mcpServers"]["rea"]["command"], "cmd.exe");
     set_json_enabled(
         source("omp_user"),
@@ -238,7 +229,6 @@ fn grok_disabled_list_and_enabled_field_combine_for_both_scopes() {
     );
     assert_eq!(entries[0].format, "toml");
 
-    // A same-named project server is affected by the user disabled list too.
     let workspace = scratch.path().join("ws");
     std::fs::create_dir_all(workspace.join(".grok")).unwrap();
     let project_path = workspace.join(".grok").join("config.toml");
@@ -359,7 +349,6 @@ fn jsonc_sources_parse_comments_and_stay_readonly() {
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].command.as_deref(), Some("npx"));
     assert_eq!(entries[0].args_count, 2);
-    // Comments would be lost, so JSONC is always read-only (even when the source could be written).
     assert!(!entries[0].writable);
     assert_eq!(
         entries[0].readonly_reason_code.as_deref(),
@@ -368,7 +357,6 @@ fn jsonc_sources_parse_comments_and_stay_readonly() {
     assert!(source("opencode_user").writable);
     let error = set_json_enabled(source("opencode_user"), &path, "local", false, "").unwrap_err();
     assert_eq!(error.code, "readonly");
-    // The original file wasn't rewritten (the comment is still there).
     assert!(std::fs::read_to_string(&path)
         .unwrap()
         .contains("global config"));
@@ -404,9 +392,6 @@ fn candidate_paths_follow_cli_homes() {
 
 #[test]
 fn omp_server_lists_decide_the_state_and_make_the_entry_readonly() {
-    // omp 18.12 suppress rules: the user disabledServers list turns a server off; an
-    // enabled:false entry on enabledServers is still on. Names on the lists can't be changed
-    // through the enabled field alone.
     let scratch = Scratch::new("omp-lists");
     let path = scratch.path().join("mcp.json");
     let text = r#"{
@@ -451,7 +436,6 @@ fn omp_server_lists_decide_the_state_and_make_the_entry_readonly() {
         "only OMP follows OMP's lists"
     );
 
-    // The write refuses too (not only the greyed-out switch); entries off the lists stay writable.
     let _guard = crate::engine_config::support::HOME_ENV_LOCK.lock();
     std::env::set_var("OMP_CODING_AGENT_DIR", scratch.path());
     let version = file_hash(text.as_bytes());
@@ -462,10 +446,6 @@ fn omp_server_lists_decide_the_state_and_make_the_entry_readonly() {
     assert!(plain_written.unwrap().enabled);
 }
 
-/// A source is "in the workspace" exactly when its config file lives under
-/// the workspace directory — i.e. a cloned repo can ship it. That decides
-/// auto-probing, the confirmation and `${ENV}` expansion, so it must follow
-/// the real file locations, not a hand-kept list.
 #[test]
 fn workspace_sources_are_exactly_the_files_inside_the_workspace() {
     let workspace = Path::new("/ws-probe-classification");
@@ -480,8 +460,6 @@ fn workspace_sources_are_exactly_the_files_inside_the_workspace() {
             source.id
         );
     }
-    // Claude / Codex live in config.rs: `.mcp.json` and `.codex/config.toml`
-    // are repo files; `claude_local` is per-project but in ~/.claude.json.
     for (source, expected) in [
         (SOURCE_CLAUDE_PROJECT, true),
         (SOURCE_CODEX_PROJECT, true),
@@ -495,7 +473,6 @@ fn workspace_sources_are_exactly_the_files_inside_the_workspace() {
             "{source}"
         );
     }
-    // Unknown sources are treated as untrusted.
     assert!(crate::engine_config::mcp::source_in_workspace(
         "someone_else"
     ));

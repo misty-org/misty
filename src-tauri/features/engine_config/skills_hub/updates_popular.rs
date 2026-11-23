@@ -10,7 +10,6 @@ use super::fsutil::*;
 use super::http::*;
 use super::registry::*;
 use super::scan::*;
-/// A cache hit: `fingerprint` matches, the `<key>` timestamp is within the TTL, and the named field has the right type.
 pub(super) fn cache_hit(
     cached: &Value,
     fingerprint: &str,
@@ -34,8 +33,6 @@ pub(super) fn cache_hit(
     }
 }
 
-/// upstream checkUpdates: candidates are `!trashedAt && repoOwner && repoName && sourceSignature`;
-/// grouped by `"owner/name@branch".toLowerCase()`, trees fetched 2 at a time; a null sig writes no key.
 pub(super) async fn check_updates(force: bool) -> SkillResult<Value> {
     let registry = read_registry();
     let managed: Vec<Value> = registry
@@ -79,7 +76,6 @@ pub(super) async fn check_updates(force: bool) -> SkillResult<Value> {
         }
     }
 
-    // Group by repo (in insertion order).
     let mut groups: Vec<(String, String, String, Vec<Value>)> = Vec::new();
     let mut group_index: HashMap<String, usize> = HashMap::new();
     for skill in &managed {
@@ -119,7 +115,6 @@ pub(super) async fn check_updates(force: bool) -> SkillResult<Value> {
                         if error.is_rate_limited() {
                             return Err(error);
                         }
-                        // A failure other than a rate limit is skipped quietly (that repo's skills get no key).
                         return Ok(Vec::new());
                     }
                 };
@@ -160,7 +155,6 @@ pub(super) async fn check_updates(force: bool) -> SkillResult<Value> {
     Ok(json!({"updates": Value::Object(updates), "checkedAt": checked_at, "cached": false}))
 }
 
-/// upstream searchSkillsSh: a `q.trim()` shorter than 2 returns early; parses the skills.sh response.
 pub(super) async fn search_skills_sh(
     client: &reqwest::Client,
     query: &str,
@@ -168,7 +162,6 @@ pub(super) async fn search_skills_sh(
     offset: f64,
 ) -> SkillResult<Value> {
     let q = query.trim().to_string();
-    // JavaScript's length counts UTF-16 code units, so encode_utf16 matches it.
     if q.encode_utf16().count() < 2 {
         return Ok(json!({"query": q, "totalCount": 0, "skills": []}));
     }
@@ -211,7 +204,6 @@ pub(super) async fn search_skills_sh(
     Ok(json!({"query": query_out, "totalCount": total_count, "skills": skills}))
 }
 
-/// upstream searchSkillsSh's entry mapping: `source` split on `/` into owner/repo (entries with `.` dropped).
 pub(super) fn parse_search_entry(entry: &Value) -> Option<Value> {
     let source = js_string(entry.get("source"));
     let mut parts = source.split('/');
@@ -268,8 +260,6 @@ pub(super) fn parse_search_entry(entry: &Value) -> Option<Value> {
     }))
 }
 
-/// upstream fetchPopularSkillsSh: 12 seed queries 4 at a time, merged by lowercased key keeping the
-/// larger installs, sorted by installs descending, the top 200 cached (6h TTL).
 pub(super) async fn fetch_popular_skills_sh(force: bool, limit: f64) -> SkillResult<Value> {
     let cap = {
         let n = if limit == 0.0 || limit.is_nan() {
@@ -318,7 +308,6 @@ pub(super) async fn fetch_popular_skills_sh(force: bool, limit: f64) -> SkillRes
                         if error.is_rate_limited() {
                             Err(error)
                         } else {
-                            // A failure other than a rate limit counts as an empty list.
                             Ok(Vec::new())
                         }
                     }

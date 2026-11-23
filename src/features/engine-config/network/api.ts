@@ -10,7 +10,6 @@ export interface ProxySettings {
 
 export const proxyApi = {
   get: () => invoke<ProxySettings>("engine_proxy_get"),
-  /** Saves and returns what was saved; refuses a URL that isn't http, https or socks5. */
   set: (enabled: boolean, url: string | null) =>
     invoke<ProxySettings>("engine_proxy_set", { enabled, url }),
 };

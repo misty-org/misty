@@ -1,11 +1,3 @@
-/**
- * Explore › Engines: every engine Misty's catalog knows (Claude Code, Codex and the rest), as a
- * store's shelves: the ones on this computer first, each with its sign-in as its CLI says, then the
- * rest with Install. It's how an engine is added after setup. Installing, updating and signing in
- * run the same flow as Settings › Agents › Setup (`engine-config/clis`); what an engine offers (its
- * models, modes, plugins, skills and connectors) stays the engine's own. Versions are checked as the
- * section opens, never on a timer.
- */
 import { ArrowUp, BookOpen, ExternalLink, RefreshCw } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { ENGINE_DOCS_URLS, ENGINE_IDS, type EngineId } from "@/features/engine-config/channels";
@@ -19,26 +11,26 @@ import {
   useCliVersionStatus,
   versionText,
 } from "@/features/engine-config/clis";
-import { EngineMark } from "@/features/engine-config/EngineMark";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
   CatalogDone,
   EmptyState,
   LogoTile,
+  Mark,
   MenuItem,
   Shelf,
   ShelfItem,
   StoreDetail,
 } from "@misty/ui";
-import { listEngines } from "../engines/enginesApi";
+import { listEngines } from "../engines/engines_api";
 import {
   engineMatches,
   installRouteText,
   useRegistryEngineIds,
   useRegistryEngines,
   type CatalogEngine,
-} from "./engineCatalog";
+} from "./engine_catalog";
 import { MarketShelf, MarketShelvesSkeleton } from "./MarketShelf";
 import { sourceLabel } from "./PluginMaker";
 
@@ -49,7 +41,6 @@ export function EnginesSection({ query }: { query: string }) {
   const { statuses, settled } = useCliStatuses(useRegistryEngineIds());
   const shown = engines.filter((engine) => engineMatches(engine, query));
   if (!shown.length) return <EmptyState inline title="No engines found" line="Try other words." />;
-  // Until every engine has answered once, the shelves can't say which are installed.
   if (!settled && shown.every((engine) => statuses[engine.id] === null))
     return <MarketShelvesSkeleton label="Engines" />;
   const installed = shown.filter((engine) => statuses[engine.id]?.installed);
@@ -65,30 +56,26 @@ export function EnginesSection({ query }: { query: string }) {
   );
 }
 
-/** An engine's mark at a shelf's tile size, standing bare as engine marks do. */
 export function EngineTile({ engine }: { engine: CatalogEngine }) {
   return (
     <LogoTile size="tile">
-      <EngineMark engine={engine.id} name={engine.name} size={40} />
+      <Mark of={`engine:${engine.id}`} label={engine.name} size={40} aria-hidden />
     </LogoTile>
   );
 }
 
 function EngineItem({ engine }: { engine: CatalogEngine }) {
   const { status, signIn, loading, updating, refresh } = useCliVersionStatus(engine.id);
-  // After an install every screen listing engines learns of it.
   const flow = useCliUpdateFlow(engine.id, { onSuccess: () => void listEngines() });
   const [signingIn, setSigningIn] = useState<{ provider?: string } | null>(null);
   const [open, setOpen] = useState(false);
   const installed = status?.installed === true;
   const busy =
     updating || loading || flow.state.status === "planning" || flow.state.status === "running";
-  // Misty installs it only where the catalog has a route and its CLI check agrees.
   const canInstall =
     !installed &&
     engine.install.route !== "none" &&
     (status === null || status.updateKind !== null);
-  // DeepSeek Harness keeps its providers in its own page (Settings › Agents › Channels).
   const canSignIn = installed && signIn !== null && signIn.signedIn !== true && engine.id !== "dsh";
   const canUpdate = installed && hasCliUpdate(status);
   const updateLabel = `Update to ${status?.latestVersion ? versionText(status.latestVersion) : "latest"}`;

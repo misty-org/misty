@@ -15,8 +15,6 @@ pub use linux::{cursor, foreground_window, position_overlay, x11_window_id};
 #[cfg(target_os = "macos")]
 fn overlay_frame(display: &super::Display, main_height: f64) -> objc2_foundation::NSRect {
     use objc2_foundation::{NSPoint, NSRect, NSSize};
-    // CG display/cursor coordinates start at the main display's top-left;
-    // AppKit window frames start at its bottom-left. Both are display points.
     NSRect::new(
         NSPoint::new(display.x, main_height - display.y - display.height),
         NSSize::new(display.width, display.height),
@@ -36,9 +34,6 @@ pub fn position_overlay(
     let frame = overlay_frame(display, CGDisplay::main().bounds().size.height);
     unsafe {
         let native = &*(window.ns_window().map_err(|e| e.to_string())? as *const NSWindow);
-        // Apply origin and size together. Resizing after positioning preserves
-        // the bottom edge and lifts the top edge away from the cursor's origin.
-        // Use the same display-point bounds as cursor samples on every screen.
         native.setFrame_display(frame, true);
     }
     Ok(())
@@ -70,12 +65,9 @@ pub fn cursor() -> Option<(f64, f64)> {
         }
     }
 }
-/// Whether the system is drawing the pointer now. Apps hide it while the person types or a video
-/// plays full screen, and Misty beside it hides with it.
 #[cfg(target_os = "macos")]
 pub fn cursor_shown() -> bool {
     extern "C" {
-        /// CoreGraphics (linked in build.rs): whether the cursor is visible, as a boolean_t.
         fn CGCursorIsVisible() -> u32;
     }
     // SAFETY: a plain query with no arguments.
@@ -98,11 +90,9 @@ pub fn cursor_shown() -> bool {
     true
 }
 
-/// Whether the main mouse button is held down now: the person is dragging something.
 #[cfg(target_os = "macos")]
 pub fn button_held() -> bool {
     extern "C" {
-        /// CoreGraphics (linked in build.rs): whether a mouse button is down in an event state.
         fn CGEventSourceButtonState(state: i32, button: u32) -> bool;
     }
     // kCGEventSourceStateCombinedSessionState and kCGMouseButtonLeft.
@@ -120,17 +110,15 @@ pub fn button_held() -> bool {
     false
 }
 
-/// Lets one overlay window take the pointer (`over`), so Misty there can be clicked or have a
-/// file dropped on her, or hands it back to the app underneath.
 #[cfg(target_os = "macos")]
 pub fn take_pointer(window: &tauri::Window, over: bool) -> Result<(), String> {
-    window.set_ignore_cursor_events(!over).map_err(|e| e.to_string())
+    window
+        .set_ignore_cursor_events(!over)
+        .map_err(|e| e.to_string())
 }
 #[cfg(windows)]
 pub fn take_pointer(window: &tauri::Window, over: bool) -> Result<(), String> {
     use windows_sys::Win32::UI::WindowsAndMessaging::*;
-    // Only the click-through bit changes: the overlay keeps never taking focus (WS_EX_NOACTIVATE),
-    // so a click on Misty leaves the person's app in front.
     let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as _;
     // SAFETY: a live window handle; only its extended style changes.
     unsafe {
@@ -151,8 +139,6 @@ pub fn take_pointer(_window: &tauri::Window, _over: bool) -> Result<(), String> 
     Err("Misty can't take the pointer here.".into())
 }
 
-/// Control+Option for the agent at your cursor, through the shared global
-/// hotkey hook so dictation's chord can run beside it.
 pub fn shortcut(tx: Sender<Shortcut>) {
     use crate::voice::hold_to_talk::{subscribe, Chord, HotkeyEvent};
     let subscription = subscribe(Chord::companion());
@@ -174,7 +160,6 @@ mod access;
 pub use access::{microphone_access, screen_access};
 
 pub fn configure_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
-    // Unfocusable, click-through and above everything (desktop_control/linux/overlay.rs).
     #[cfg(target_os = "linux")]
     crate::agents::desktop_control::linux::overlay::prepare(window)?;
     #[cfg(not(target_os = "linux"))]
@@ -207,17 +192,11 @@ pub fn configure_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
                 | WS_EX_TOOLWINDOW as isize
                 | WS_EX_TRANSPARENT as isize,
         );
-        // Kept out of every screen capture, Misty's own included, as macOS
-        // keeps these panels out (Windows 10 2004 and later).
         SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
     }
     Ok(())
 }
 
-/// Shows an overlay above every other window, fullscreen apps included,
-/// without taking focus. Windows applies "always on top" once, and an app
-/// that goes fullscreen afterwards can cover it, so it is asserted again on
-/// every show.
 pub fn show_overlay(window: &tauri::WebviewWindow) {
     #[cfg(target_os = "linux")]
     crate::agents::desktop_control::linux::overlay::show(window);

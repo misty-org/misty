@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { spacesApi } from "../../api/api";
 import type { SpaceConversation, SpaceMember } from "../../api/dto/entities";
-import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import {
   Button,
   Dialog,
@@ -12,12 +12,10 @@ import {
   ListRow,
   Text,
 } from "@misty/ui";
-import type { MentionableAgent } from "../useSpaceMessageSpansStore";
+import type { MentionableAgent } from "../use_space_message_spans_store";
 
-/** The most people a group DM holds, the one who made it included. */
 const maxMembers = 10;
 
-/** Adds people from the Space to a group DM. They see all of its history. */
 export function AddPeopleDialog({
   spaceId,
   conversation,
@@ -94,7 +92,12 @@ export function AddPeopleDialog({
           <Button variant="secondary" size="lg" type="button" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="lg" type="button" disabled={saving || !picked.length} onClick={() => void add()}>
+          <Button
+            size="lg"
+            type="button"
+            disabled={saving || !picked.length}
+            onClick={() => void add()}
+          >
             Add
           </Button>
         </DialogFooter>
@@ -103,10 +106,6 @@ export function AddPeopleDialog({
   );
 }
 
-/**
- * Lists the person's own agents in a DM, or takes them out. An agent there answers only when its owner
- * mentions it; what it writes in the chat is a message everyone in it can read.
- */
 export function ConversationAgentsDialog({
   spaceId,
   conversation,

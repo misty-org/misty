@@ -10,33 +10,66 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// The deepest a walk goes below the home folder.
 pub(super) const MAX_DEPTH: usize = 18;
 
-/// A walk runs in bursts of this long, then rests for half as long, so it uses at most about two
-/// thirds of one core.
 const BURST: Duration = Duration::from_millis(40);
 const PAUSE: Duration = Duration::from_millis(20);
 
-/// Folder names skipped wherever they appear: build output, dependency stores and caches.
 const GENERATED_DIR_NAMES: &[&str] = &[
-    ".git", "node_modules", "target", "dist", "build", ".next", ".cache", ".nuxt", ".svelte-kit",
-    ".turbo", ".parcel-cache", ".gradle", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache",
-    ".tox", "DerivedData", "Pods", "bower_components", ".terraform",
+    ".git",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    ".next",
+    ".cache",
+    ".nuxt",
+    ".svelte-kit",
+    ".turbo",
+    ".parcel-cache",
+    ".gradle",
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".tox",
+    "DerivedData",
+    "Pods",
+    "bower_components",
+    ".terraform",
 ];
 
-/// Areas right under the home folder that hold application data rather than documents.
 const GENERATED_HOME_DIRS: &[&str] = &[
-    ".Trash", ".cache", ".npm", ".pnpm-store", ".yarn", ".bun", ".deno", ".cargo", ".rustup",
-    ".gradle", ".m2", ".ivy2", ".nvm", ".pyenv", ".rbenv", ".gem", ".cocoapods", ".android",
-    ".docker", ".vscode", ".cursor", ".local", ".colima", ".orbstack", ".misty", "AppData",
+    ".Trash",
+    ".cache",
+    ".npm",
+    ".pnpm-store",
+    ".yarn",
+    ".bun",
+    ".deno",
+    ".cargo",
+    ".rustup",
+    ".gradle",
+    ".m2",
+    ".ivy2",
+    ".nvm",
+    ".pyenv",
+    ".rbenv",
+    ".gem",
+    ".cocoapods",
+    ".android",
+    ".docker",
+    ".vscode",
+    ".cursor",
+    ".local",
+    ".colima",
+    ".orbstack",
+    ".misty",
+    "AppData",
 ];
 
-/// Inside ~/Library only these hold the person's documents (iCloud Drive and other cloud drives).
 const LIBRARY_DOCUMENT_DIRS: &[&str] = &["Mobile Documents", "CloudStorage"];
 
-/// Other apps' private data on macOS: walking it in the background would ask the person to
-/// let Misty into each app's data.
 fn protected_app_data(home: &Path) -> Vec<PathBuf> {
     if !cfg!(target_os = "macos") {
         return Vec::new();
@@ -61,7 +94,6 @@ fn protected_app_data(home: &Path) -> Vec<PathBuf> {
     .collect()
 }
 
-/// What one walk of the home folder skips.
 pub(super) struct ScanFilter {
     names: HashSet<OsString>,
     absolute: Vec<PathBuf>,
@@ -71,7 +103,6 @@ pub(super) struct ScanFilter {
 impl ScanFilter {
     pub(super) fn new(home: &Path) -> Self {
         let mut absolute = protected_app_data(home);
-        // Misty's own data, wherever this build keeps it, never mind the home folder's name for it.
         if let Some(root) = file_access::paths::misty_root_dir() {
             absolute.push(root);
         }
@@ -83,7 +114,10 @@ impl ScanFilter {
     }
 
     pub(super) fn excludes(&self, path: &Path) -> bool {
-        if path.file_name().is_some_and(|name| self.names.contains(name)) {
+        if path
+            .file_name()
+            .is_some_and(|name| self.names.contains(name))
+        {
             return true;
         }
         if self.absolute.iter().any(|root| path.starts_with(root)) {
@@ -97,9 +131,6 @@ impl ScanFilter {
         generated_home_area(path, &self.home)
     }
 
-    /// The depth of `path` below the home folder, if a walk would reach it: inside the home
-    /// folder, no deeper than a walk goes, and nothing on the way excluded. The home folder itself
-    /// is depth 0.
     pub(super) fn reach(&self, path: &Path) -> Option<usize> {
         let relative = path.strip_prefix(&self.home).ok()?;
         let mut current = self.home.clone();
@@ -130,14 +161,14 @@ fn generated_home_area(path: &Path, home: &Path) -> bool {
         if !LIBRARY_DOCUMENT_DIRS.iter().any(|keep| second == *keep) {
             return true;
         }
-        // A Space drive's own File Provider folder is Misty's, not the person's other files.
         return second == "CloudStorage"
-            && components.next().is_some_and(|third| third.to_string_lossy().starts_with("Misty"));
+            && components
+                .next()
+                .is_some_and(|third| third.to_string_lossy().starts_with("Misty"));
     }
     GENERATED_HOME_DIRS.iter().any(|name| first == *name)
 }
 
-/// The walk's duty cycle.
 pub(super) struct Pacer {
     burst_started: Instant,
     entries: u32,
@@ -145,7 +176,10 @@ pub(super) struct Pacer {
 
 impl Default for Pacer {
     fn default() -> Self {
-        Self { burst_started: Instant::now(), entries: 0 }
+        Self {
+            burst_started: Instant::now(),
+            entries: 0,
+        }
     }
 }
 
@@ -160,7 +194,6 @@ impl Pacer {
     }
 }
 
-/// Runs the indexing thread at background priority (CPU and disk) while it lives.
 pub(super) struct BackgroundPriority;
 
 impl BackgroundPriority {

@@ -1,12 +1,12 @@
 import "@/tests/ports/spaces";
-import type * as Actual1 from "../personal/agentAccount";
-import type * as Actual2 from "@/features/agents/conversations/state/localChats";
-import "../personal/agentCloudAvatars.testFixtures";
-import type * as AgentsRuntimeModule from "../AgentsRuntime";
+import type * as Actual1 from "../personal/agent_account";
+import type * as Actual2 from "@/features/agents/conversations/state/local_chats";
+import "../personal/agent_cloud_avatars.test_fixtures";
+import type * as AgentsRuntimeModule from "../agents_runtime";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
-import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
+import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
 import AgentsPage from "./AgentsPage";
 
 const fixture = vi.hoisted(() => ({
@@ -27,11 +27,11 @@ const fixture = vi.hoisted(() => ({
   },
 }));
 vi.mock("@/features/account", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
-vi.mock("../personal/agentAccount", async (original) => ({
+vi.mock("../personal/agent_account", async (original) => ({
   ...(await original<typeof Actual1>()),
   useAgentAccountId: () => "owner",
 }));
-vi.mock("@/features/agents/conversations/state/localChats", async (original) => {
+vi.mock("@/features/agents/conversations/state/local_chats", async (original) => {
   const actual = await original<typeof Actual2>();
   return {
     ...actual,
@@ -39,17 +39,17 @@ vi.mock("@/features/agents/conversations/state/localChats", async (original) => 
       ...actual.localChats,
       conversations: async () =>
         (
-          await import("@/features/agents/conversations/state/useMistyStore")
+          await import("@/features/agents/conversations/state/use_misty_store")
         ).useMistyStore.getState().conversations,
     },
   };
 });
-vi.mock("../AgentsRuntime", async (original) => ({
+vi.mock("../agents_runtime", async (original) => ({
   ...(await original<typeof AgentsRuntimeModule>()),
   useAgentsAuth: () => ({ user: { id: "owner" } }),
   runtimeAiApi: { activity: async () => ({ entries: [] }) },
 }));
-vi.mock("../personal/personalAgentsStore", () => ({
+vi.mock("../personal/personal_agents_store", () => ({
   defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
     agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
   usePersonalAgentsStore: () => ({
@@ -62,7 +62,7 @@ vi.mock("../personal/personalAgentsStore", () => ({
     load: fixture.load,
   }),
 }));
-vi.mock("@/features/agents/personal/personalAgentsApi", () => ({
+vi.mock("@/features/agents/personal/personal_agents_api", () => ({
   personalAgentsApi: {
     save: fixture.save,
     apps: async () => ({ app_ids: [] }),

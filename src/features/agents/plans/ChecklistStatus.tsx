@@ -1,4 +1,4 @@
-import type { PlanStepStatus } from "./planTypes";
+import type { PlanStepStatus } from "./plan_types";
 
 export const statusText: Record<PlanStepStatus, string> = {
   pending: "Not started",

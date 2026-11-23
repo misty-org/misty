@@ -1,12 +1,11 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
-import { refreshCachedResource, useCachedResource } from "@/api/cache/cached-resource";
-import { EngineMark } from "../EngineMark";
-import { Button, cn, Progress, Skeleton, SkeletonControl, Text } from "@misty/ui";
+import { refreshCachedResource, useCachedResource } from "@/api/cache/cached_resource";
+import { Button, cn, Mark, Progress, Skeleton, SkeletonControl, Text } from "@misty/ui";
 import { useCallback, useState } from "react";
-import { type ProviderLimits } from "./usageApi";
-import { engineName, formatReset, limitsStatusText, windowName } from "./usageFormat";
-import { LIMITS_KEY, loadLimits, message, useNow, useReportError } from "./usageShared";
+import { type ProviderLimits } from "./usage_api";
+import { engineName, formatReset, limitsStatusText, windowName } from "./usage_format";
+import { LIMITS_KEY, loadLimits, message, useNow, useReportError } from "./usage_shared";
 
 export function LimitsBlock(props: { onError: (error: string | null) => void }) {
   const { onError } = props;
@@ -15,7 +14,6 @@ export function LimitsBlock(props: { onError: (error: string | null) => void }) 
   const [refreshing, setRefreshing] = useState(false);
   const now = useNow();
   useReportError(saved.error, onError);
-  // Checking again asks the CLI afresh, keeping the last limits on screen until it answers.
   const checkAgain = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -47,10 +45,6 @@ export function LimitsBlock(props: { onError: (error: string | null) => void }) 
   );
 }
 
-/**
- * The plan limits' first load: Claude's and Codex's rows, each with its name and status line,
- * two windows (a caption over a bar) and, for Codex, its Check again button.
- */
 function ProviderRowsSkeleton() {
   return (
     <>
@@ -108,9 +102,9 @@ function ProviderRow(props: {
           const reset = formatReset(window.resetsAt, now);
           return (
             <div key={window.id} className="grid gap-1.5">
-              <div className="flex items-baseline justify-between gap-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3 text-control">
                 <Text bare tone="default" className="flex items-center gap-2">
-                  <EngineMark engine={limits.id} size={12} />
+                  <Mark of={`engine:${limits.id}`} size={12} />
                   {windowName(window)}
                   {window.status === "rejected" ? (
                     <Text bare tone="bright">
@@ -119,7 +113,8 @@ function ProviderRow(props: {
                   ) : null}
                 </Text>
                 <Text bare tone="muted" className="tabular-nums">
-                  {Math.round(window.usedPercent)}% used{reset ? `, ${reset.charAt(0).toLowerCase()}${reset.slice(1)}` : ""}
+                  {Math.round(window.usedPercent)}% used
+                  {reset ? `, ${reset.charAt(0).toLowerCase()}${reset.slice(1)}` : ""}
                 </Text>
               </div>
               <Progress value={window.usedPercent} aria-label={`${windowName(window)} used`} />
@@ -127,13 +122,13 @@ function ProviderRow(props: {
           );
         })}
         {limits.credits && (limits.credits.hasCredits || limits.credits.unlimited) ? (
-          <Text bare tone="muted" className="text-sm">
+          <Text size="meta" bare tone="muted">
             Credits:{" "}
             {limits.credits.unlimited ? "Unlimited" : (limits.credits.balance ?? "Available")}
           </Text>
         ) : null}
         {limits.usingOverage ? (
-          <Text bare tone="muted" className="text-sm">
+          <Text size="meta" bare tone="muted">
             Using extra usage beyond the plan
           </Text>
         ) : null}

@@ -1,5 +1,3 @@
-//! What a tool hands back from somewhere the person doesn't control is data. Page tools already say so;
-//! these say it on every result, in one place, so a new one can't forget.
 use serde_json::{json, Value};
 
 const NOTE: &str =
@@ -18,9 +16,7 @@ const MARKED: &[&str] = &[
     "thread.read",
 ];
 
-/// The result as the model should read it. Other tools' results keep their bytes.
 pub(super) fn marked(name: &str, result: Value) -> Value {
-    // An app's tools answer with the app's own content, which the person doesn't control either.
     if !MARKED.contains(&name) && !name.starts_with("app.") {
         return result;
     }

@@ -1,5 +1,3 @@
-//! A local provider for device calls: it answers each request by what the request says, as a stream
-//! of chat-completion events, and keeps each request's text so key order can be checked.
 #![allow(dead_code)]
 
 use std::{
@@ -25,10 +23,13 @@ pub struct Answer {
 
 impl Answer {
     pub fn json(status: u16, value: Value) -> Self {
-        Self { status, content_type: "application/json".to_owned(), body: value.to_string().into_bytes() }
+        Self {
+            status,
+            content_type: "application/json".to_owned(),
+            body: value.to_string().into_bytes(),
+        }
     }
 
-    /// One chat completion as a stream: its text, or its tool calls.
     pub fn completion(message: &Value) -> Self {
         let mut events = Vec::new();
         let mut finish = "stop";
@@ -48,7 +49,11 @@ impl Answer {
             body.push_str(&format!("data: {event}\n\n"));
         }
         body.push_str("data: [DONE]\n\n");
-        Self { status: 200, content_type: "text/event-stream".to_owned(), body: body.into_bytes() }
+        Self {
+            status: 200,
+            content_type: "text/event-stream".to_owned(),
+            body: body.into_bytes(),
+        }
     }
 }
 
@@ -78,10 +83,12 @@ impl Provider {
 }
 
 fn head_end(bytes: &[u8]) -> Option<usize> {
-    bytes.windows(4).position(|window| window == b"\r\n\r\n").map(|at| at + 4)
+    bytes
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|at| at + 4)
 }
 
-/// Serves until the test ends. `answer` hears each request.
 pub async fn provider(answer: impl Fn(&Seen) -> Answer + Send + Sync + 'static) -> Provider {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
@@ -116,7 +123,10 @@ pub async fn provider(answer: impl Fn(&Seen) -> Answer + Send + Sync + 'static) 
                         headers.insert(name.trim().to_lowercase(), value.trim().to_owned());
                     }
                 }
-                let length: usize = headers.get("content-length").and_then(|value| value.parse().ok()).unwrap_or(0);
+                let length: usize = headers
+                    .get("content-length")
+                    .and_then(|value| value.parse().ok())
+                    .unwrap_or(0);
                 while buffer.len() < end + length {
                     let read = socket.read(&mut chunk).await.unwrap_or(0);
                     if read == 0 {
@@ -125,7 +135,12 @@ pub async fn provider(answer: impl Fn(&Seen) -> Answer + Send + Sync + 'static) 
                     buffer.extend_from_slice(&chunk[..read]);
                 }
                 let text = String::from_utf8_lossy(&buffer[end..]).to_string();
-                let request = Seen { method, path, headers, text };
+                let request = Seen {
+                    method,
+                    path,
+                    headers,
+                    text,
+                };
                 log.lock().unwrap().push(request.clone());
                 let reply = answer(&request);
                 let head = format!(
@@ -143,7 +158,6 @@ pub async fn provider(answer: impl Fn(&Seen) -> Answer + Send + Sync + 'static) 
     Provider { base_url, seen }
 }
 
-/// A device's document of models and keys.
 #[derive(Default)]
 pub struct Device {
     pub models: HashMap<&'static str, String>,
@@ -158,7 +172,10 @@ impl Device {
     }
 
     pub fn with_key(mut self, provider: ProviderId, key: &str, base_url: &str) -> Self {
-        self.keys.insert(provider.as_str().to_owned(), (key.to_owned(), Some(base_url.to_owned())));
+        self.keys.insert(
+            provider.as_str().to_owned(),
+            (key.to_owned(), Some(base_url.to_owned())),
+        );
         self
     }
 }
@@ -172,18 +189,29 @@ impl DeviceModels for Device {
             DeviceRole::Transcription => "transcription",
             DeviceRole::Speech => "speech",
         };
-        self.models.get(name).cloned().or_else(|| (name == "fast").then(|| self.models.get("agent").cloned()).flatten())
+        self.models.get(name).cloned().or_else(|| {
+            (name == "fast")
+                .then(|| self.models.get("agent").cloned())
+                .flatten()
+        })
     }
 
     fn route(&self, model_id: &str) -> Result<ModelRoute, ModelError> {
         let (provider, _) = parse_model_id(model_id)?;
-        let (key, base_url) = self.keys.get(provider.as_str()).ok_or_else(|| ModelError::Setup {
-            code: "model_key_needed",
-            detail: "Add a model key in Settings → Models.".to_owned(),
-        })?;
+        let (key, base_url) =
+            self.keys
+                .get(provider.as_str())
+                .ok_or_else(|| ModelError::Setup {
+                    code: "model_key_needed",
+                    detail: "Add a model key in Settings → Models.".to_owned(),
+                })?;
         Ok(ModelRoute {
             reasoning: self.reasoning.clone().or_else(|| Some("low".to_owned())),
-            credential: Credential { provider, api_key: key.clone(), base_url: base_url.clone() },
+            credential: Credential {
+                provider,
+                api_key: key.clone(),
+                base_url: base_url.clone(),
+            },
         })
     }
 }

@@ -16,14 +16,9 @@ pub mod settings;
 
 use std::sync::{Arc, OnceLock};
 
-/// The engine layer's shared state, managed by the Tauri app (ccgui's `AppState`, less what Misty
-/// leaves out). Every field is shared, so a clone is the same state.
 #[derive(Clone)]
 pub struct EngineState {
     pub db: Arc<db::Db>,
-    /// Engine events, as desktop-cc-gui's wire payloads. In Misty they go to the run bridge
-    /// (`engines/bridge.rs`), which turns them into the run's events; nothing reaches a webview
-    /// directly.
     pub sink: Arc<event_sink::EventSink>,
     pub processes: Arc<crate::engines::ProcessRegistry>,
     pub dsh_host: Arc<dsh_host::DshHostState>,
@@ -32,13 +27,11 @@ pub struct EngineState {
 
 static STATE: OnceLock<EngineState> = OnceLock::new();
 
-/// The engine state, once the app has opened it.
 pub fn state() -> Option<&'static EngineState> {
     STATE.get()
 }
 
 impl EngineState {
-    /// Opens the engine tables in misty.db and wires the sink to `emit`.
     pub fn open(
         store: &database::store::Store,
         misty_root: &std::path::Path,

@@ -1,7 +1,5 @@
-//! What a new page's webview does when it asks for a window and as it loads.
 use super::*;
 
-/// Answers a page's request for a new window: it opens in the page's own view.
 pub(super) fn new_window(
     popup_app: &AppHandle,
     popup_id: &str,
@@ -11,8 +9,6 @@ pub(super) fn new_window(
     open_popup_in_place(popup_app, popup_id, &url, features)
 }
 
-/// Follows a page through a load: input locks, the agent ring, shortcuts and
-/// the events the workspace shows.
 pub(super) fn page_load(
     page_app: &AppHandle,
     page_id: &str,
@@ -31,7 +27,6 @@ pub(super) fn page_load(
         })
         .unwrap_or(false);
     let _ = apply_agent_input_lock(&webview, locked);
-    // An agent's page answers its cookie banner as it loads (page_agent/consent.rs).
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
         && page_app
             .state::<BrowserSessionState>()

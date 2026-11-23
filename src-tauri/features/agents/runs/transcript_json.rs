@@ -1,12 +1,10 @@
-//! `JSON.stringify` of a transcript, in the shape the TypeScript runtime held it. Budgets are tuned
-//! on these sizes and some of this text reaches the model, so it isn't `sdk::Message`'s own JSON: a
-//! plain user message is a string, and call inputs are parsed and written back without spaces.
-use crate::model_calls::{AssistantPart, FileData, Message, OutputItem, RawJson, ToolOutput, ToolResultPart, UserPart};
+use crate::model_calls::{
+    AssistantPart, FileData, Message, OutputItem, RawJson, ToolOutput, ToolResultPart, UserPart,
+};
 
 use super::js_json::JsValue;
 use super::transcript::user_string;
 
-/// `JSON.stringify(input)`.
 pub(crate) fn stringify_raw(raw: &RawJson) -> String {
     JsValue::from_raw(raw).map_or_else(|| raw.get().to_owned(), |value| value.stringify())
 }
@@ -29,8 +27,6 @@ fn push_field(out: &mut String, name: &str, value: &str) {
     push_quoted(out, value);
 }
 
-/// `JSON.stringify(output)`, in the shape the TypeScript runtime held. A screenshot there is an
-/// `image-data` item, which the AI SDK only turned into a file part on its way to the provider.
 pub(crate) fn stringify_output(output: &ToolOutput) -> String {
     let mut out = String::from("{");
     match output {
@@ -84,7 +80,6 @@ pub(crate) fn stringify_output(output: &ToolOutput) -> String {
     out
 }
 
-/// A file item's type in the TypeScript runtime's transcript.
 pub(crate) fn output_item_kind(media_type: &str) -> &'static str {
     if media_type.starts_with("image/") {
         "image-data"
@@ -128,17 +123,28 @@ pub(crate) fn stringify_user_part(part: &UserPart) -> String {
 pub(crate) fn stringify_assistant_part(part: &AssistantPart) -> String {
     let mut out = String::from("{");
     let options = match part {
-        AssistantPart::Text { text, provider_options } => {
+        AssistantPart::Text {
+            text,
+            provider_options,
+        } => {
             out.push_str(r#""type":"text""#);
             push_field(&mut out, "text", text);
             provider_options
         }
-        AssistantPart::Reasoning { text, provider_options } => {
+        AssistantPart::Reasoning {
+            text,
+            provider_options,
+        } => {
             out.push_str(r#""type":"reasoning""#);
             push_field(&mut out, "text", text);
             provider_options
         }
-        AssistantPart::ToolCall { tool_call_id, tool_name, input, provider_options } => {
+        AssistantPart::ToolCall {
+            tool_call_id,
+            tool_name,
+            input,
+            provider_options,
+        } => {
             out.push_str(r#""type":"tool-call""#);
             push_field(&mut out, "toolCallId", tool_call_id);
             push_field(&mut out, "toolName", tool_name);
@@ -155,7 +161,6 @@ pub(crate) fn stringify_assistant_part(part: &AssistantPart) -> String {
     out
 }
 
-/// A message's role, as the TypeScript names it.
 pub(crate) fn role(message: &Message) -> &'static str {
     match message {
         Message::System { .. } => "system",
@@ -171,22 +176,36 @@ fn write_message(out: &mut String, message: &Message) {
     out.push_str(r#","content":"#);
     let join = |parts: Vec<String>| format!("[{}]", parts.join(","));
     let options = match message {
-        Message::System { content, provider_options } => {
+        Message::System {
+            content,
+            provider_options,
+        } => {
             push_quoted(out, content);
             provider_options
         }
-        Message::User { content, provider_options } => {
+        Message::User {
+            content,
+            provider_options,
+        } => {
             match user_string(message) {
                 Some(text) => push_quoted(out, text),
                 None => out.push_str(&join(content.iter().map(stringify_user_part).collect())),
             }
             provider_options
         }
-        Message::Assistant { content, provider_options } => {
-            out.push_str(&join(content.iter().map(stringify_assistant_part).collect()));
+        Message::Assistant {
+            content,
+            provider_options,
+        } => {
+            out.push_str(&join(
+                content.iter().map(stringify_assistant_part).collect(),
+            ));
             provider_options
         }
-        Message::Tool { content, provider_options } => {
+        Message::Tool {
+            content,
+            provider_options,
+        } => {
             out.push_str(&join(content.iter().map(stringify_tool_result).collect()));
             provider_options
         }
@@ -198,7 +217,6 @@ fn write_message(out: &mut String, message: &Message) {
     out.push('}');
 }
 
-/// `JSON.stringify(messages)`. Budgets are tuned on this size, so it has the TypeScript's shape.
 pub(crate) fn stringify_messages(messages: &[Message]) -> String {
     let mut out = String::from("[");
     for (index, message) in messages.iter().enumerate() {
@@ -238,9 +256,13 @@ mod tests {
     fn a_screenshot_is_image_data_as_the_runtime_held_it() {
         let output = ToolOutput::Content {
             value: vec![
-                OutputItem::Text { text: "seen".to_owned() },
+                OutputItem::Text {
+                    text: "seen".to_owned(),
+                },
                 OutputItem::File {
-                    data: FileData::Data { data: "AAAA".to_owned() },
+                    data: FileData::Data {
+                        data: "AAAA".to_owned(),
+                    },
                     media_type: "image/png".to_owned(),
                 },
             ],

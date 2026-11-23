@@ -1,7 +1,3 @@
-//! Folders the person shares with agents, read-only. Sharing happens only here,
-//! through the system picker in Misty's main window: nothing else can add one.
-#![cfg(desktop)]
-
 use serde_json::Value;
 use tauri::State;
 
@@ -18,7 +14,6 @@ fn require_main(webview: &tauri::Webview) -> ApiResult<()> {
     }
 }
 
-/// Shares the folder the person picks, or nothing if they cancel.
 #[tauri::command]
 pub async fn agents_share_folder(
     app: tauri::AppHandle,
@@ -50,7 +45,6 @@ pub async fn agents_share_folder(
         .map(Some)
 }
 
-/// A chat or new chat's key, which only ever names those things.
 fn folder_changes_key(key: &str) -> ApiResult<()> {
     if key.is_empty() || key.len() > 200 {
         return Err(ApiError::Message("That chat can't be given this.".into()));
@@ -58,8 +52,6 @@ fn folder_changes_key(key: &str) -> ApiResult<()> {
     Ok(())
 }
 
-/// "Allow changes": asks the person natively, so nothing in a window can answer for them, and
-/// remembers the answer for this chat and folder. Returns whether they said yes.
 #[tauri::command]
 pub async fn agents_allow_folder_changes(
     app: tauri::AppHandle,
@@ -96,7 +88,6 @@ pub async fn agents_allow_folder_changes(
     Ok(true)
 }
 
-/// Takes "Allow changes" back, for one folder or all of a chat's. It holds from the next command.
 #[tauri::command]
 pub async fn agents_stop_folder_changes(
     webview: tauri::Webview,
@@ -109,7 +100,6 @@ pub async fn agents_stop_folder_changes(
     state.agents.stop_folder_changes(key, scope_id).await
 }
 
-/// A new chat takes on its draft's answer.
 #[tauri::command]
 pub async fn agents_adopt_folder_changes(
     webview: tauri::Webview,
@@ -122,7 +112,6 @@ pub async fn agents_adopt_folder_changes(
     state.agents.adopt_folder_changes(from, chat).await
 }
 
-/// Stops sharing a folder. Its files stay where they are.
 #[tauri::command]
 pub async fn agents_forget_folder(
     webview: tauri::Webview,

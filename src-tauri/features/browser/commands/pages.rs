@@ -1,6 +1,3 @@
-//! Browser commands for pages, named here so the command table can list them with their
-//! hidden `__cmd__*` macros.
-
 #[cfg(desktop)]
 pub(crate) use crate::browser::input::shortcuts::{
     __cmd__browser_shortcuts_update, __tauri_command_name_browser_shortcuts_update,

@@ -1,10 +1,9 @@
 import { Check, Hand, Play, Square } from "lucide-react";
 import { formatShortcutLabel, detectShortcutPlatform } from "@/shared/shortcuts/bindings";
 import { Button, Text } from "@misty/ui";
-import { finishLocalExecution, type Execution } from "../runs/local-execution/localExecution";
-import { autopilotStopShortcut } from "../runs/jobs/workspaceAutopilot";
+import { finishLocalExecution, type Execution } from "../runs/local-execution/local_execution";
+import { autopilotStopShortcut } from "../runs/jobs/workspace_autopilot";
 
-/** The island's button row: Take over or Resume, the autopilot hint, and Done or Stop. */
 export function AgentControlTaskControls({
   execution,
   running,
@@ -45,7 +44,7 @@ export function AgentControlTaskControls({
       )}
       <span className="flex-1" />
       {execution.autopilot && running && !execution.desktopControl && (
-        <kbd className="text-xs">
+        <kbd className="text-meta">
           <Text bare tone="muted">
             {formatShortcutLabel(autopilotStopShortcut(), detectShortcutPlatform())}
           </Text>

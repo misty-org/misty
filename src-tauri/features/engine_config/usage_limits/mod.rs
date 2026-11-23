@@ -46,20 +46,12 @@ const MAX_ECHOED_ID_CHARS: usize = 32;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LimitWindow {
-    /// "five_hour" | "seven_day" | "seven_day_opus" | "seven_day_sonnet" |
-    /// "seven_day_overage_included" (Claude); "session" | "weekly" | "other:<…>" (Codex), with
-    /// "<limit id>:" in front for a Codex bucket other than the main one.
     pub id: String,
-    /// "session" | "weekly" | "other".
     pub kind: String,
-    /// Model or bucket name for scoped windows ("Opus", "Sonnet", …).
     pub label: Option<String>,
-    /// 0..=100.
     pub used_percent: f64,
     pub window_seconds: Option<i64>,
-    /// Epoch ms.
     pub resets_at: Option<i64>,
-    /// Claude's own verdict for the window: "allowed" | "allowed_warning" | "rejected".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
 }
@@ -69,28 +61,20 @@ pub struct LimitWindow {
 pub struct Credits {
     pub has_credits: bool,
     pub unlimited: bool,
-    /// As the CLI reports it, e.g. "12.50".
     pub balance: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderLimits {
-    /// "claude" | "codex".
     pub id: String,
-    /// "ok" | "noData" | "notInstalled" | "signedOut" | "offline" | "error".
     pub status: String,
     pub plan: Option<String>,
     pub windows: Vec<LimitWindow>,
     pub credits: Option<Credits>,
-    /// Claude: whether the person is drawing on extra usage beyond the plan.
     pub using_overage: Option<bool>,
-    /// When `windows` were seen (epoch ms); older than now when a failed lookup serves the last
-    /// good data.
     pub fetched_at: Option<i64>,
-    /// Short, secret-free reason for `error`.
     pub error: Option<String>,
-    /// How the limits are read: "codex app-server" or "Claude Code runs".
     pub source: String,
 }
 
@@ -151,7 +135,6 @@ impl Status {
     }
 }
 
-/// Injected dependencies; production starts the real CLI and reads the wall clock.
 pub(crate) struct Env<'a> {
     pub codex: &'a dyn CodexSource,
     pub now: &'a (dyn Fn() -> i64 + Send + Sync),
@@ -159,8 +142,6 @@ pub(crate) struct Env<'a> {
 
 static STORE: LazyLock<Store> = LazyLock::new(|| Store::new(true));
 
-/// Look up the requested providers (`None` = all) concurrently. Unknown ids are rejected.
-/// `refresh` skips the 60 s cache (but reuses an answer younger than 20 s).
 pub async fn get(providers: Option<Vec<String>>, refresh: bool) -> Result<LimitsResponse, String> {
     let ids = resolve_ids(providers)?;
     let env = Env {
@@ -170,7 +151,6 @@ pub async fn get(providers: Option<Vec<String>>, refresh: bool) -> Result<Limits
     Ok(lookup(&env, &STORE, &ids, refresh).await)
 }
 
-/// What is known without starting anything: the last limits each CLI reported.
 #[cfg(test)]
 fn cached_from(store: &Store) -> LimitsResponse {
     LimitsResponse {
@@ -184,15 +164,10 @@ fn cached_from(store: &Store) -> LimitsResponse {
     }
 }
 
-/// Claude Code's `rate_limit_event`, from its stream-json output. The engine adapter calls this
-/// with each such line (the whole event, or its `rate_limit_info`). Anything else is ignored.
 pub fn record_claude_rate_limit(event: &Value) {
     record_claude_into(&STORE, event, system_now_ms());
 }
 
-/// Codex's `account/rateLimits/updated` notification params (`{ "rateLimits": … }`), or a
-/// `rate_limits` object from a `token_count` event, seen during a run. The engine adapter calls
-/// this; the update is merged into the last snapshot, as the protocol asks.
 pub fn record_codex_rate_limits(params: &Value) {
     record_codex_into(&STORE, params, system_now_ms());
 }
@@ -256,9 +231,6 @@ async fn lookup(env: &Env<'_>, store: &Store, ids: &[ProviderId], refresh: bool)
     }
 }
 
-/// One provider. Claude's limits only arrive with its runs, so they come from the store. Codex:
-/// cache, then the CLI. The slot lock is held across the request, so concurrent callers queue
-/// and reuse the result.
 async fn resolve(
     env: &Env<'_>,
     store: &Store,
@@ -304,7 +276,6 @@ fn cached_result(
     let fresh = |at: i64| now >= at && now - at < max_age_ms;
     match last_result {
         Some((result, at)) => fresh(*at).then(|| result.clone()),
-        // Right after a restart only the stored copy exists.
         None => store
             .last_good(provider)
             .filter(|good| fresh(good.fetched_at))
@@ -340,7 +311,6 @@ async fn fetch_codex(env: &Env<'_>, store: &Store) -> ProviderLimits {
     View::new(provider, Status::Ok).data(Some(&good)).build()
 }
 
-/// Builds a `ProviderLimits` from the last good data, if any.
 struct View<'a> {
     provider: ProviderId,
     status: Status,
@@ -424,7 +394,6 @@ pub(crate) fn title_case(raw: &str) -> Option<String> {
     Some(label)
 }
 
-/// Epoch ms from a JSON number in seconds or milliseconds, or an ISO-8601 string.
 pub(crate) fn timestamp_ms(value: &Value) -> Option<i64> {
     match value {
         Value::Number(n) => {

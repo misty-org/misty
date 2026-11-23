@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { BrandIcon, Button, useNotice } from "@misty/ui";
+import { Button, Mark, useNotice } from "@misty/ui";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { appsApi, type AppRequest, type AppRequestDecision } from "./api";
 import { ApprovalActions } from "./ApprovalActions";
-import { useNow } from "@/shared/hooks/useNow";
+import { useNow } from "@/shared/hooks/use_now";
 
 function stateLabel(request: AppRequest, expired: boolean) {
   if (expired) return "Expired";
@@ -21,10 +21,6 @@ function stateLabel(request: AppRequest, expired: boolean) {
   }
 }
 
-/**
- * In-chat card for something the agent needs: approve one action in a connected app.
- * `onResolved` hears every answer, so the conversation can continue.
- */
 export function AppRequestCard({
   request,
   onResolved,
@@ -61,11 +57,7 @@ export function AppRequestCard({
     act(async () => answered((await appsApi.decide(current.id, decision)).request));
 
   const logo = current.subject ? (
-    <BrandIcon
-      brand={current.subject}
-      size={16}
-      className="mr-1.5 inline-block align-[-0.1875rem]"
-    />
+    <Mark of={current.subject} size={16} className="mr-1.5 inline-block align-[-0.1875rem]" />
   ) : null;
   const row: StatusState = pending
     ? "waiting"
@@ -75,7 +67,6 @@ export function AppRequestCard({
         ? "skipped"
         : "failed";
   const actions = pending ? (
-    // A Connect card from before apps were only connected directly can only be put aside.
     current.kind === "connect" ? (
       <Button variant="quiet" disabled={busy} onClick={() => void decide("deny")}>
         Not now

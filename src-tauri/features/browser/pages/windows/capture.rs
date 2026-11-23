@@ -1,15 +1,10 @@
-//! Page captures on WebView2. Chromium renders them, so cross-origin frames,
-//! video and canvas look exactly as they do on screen.
 use serde_json::{json, Value};
 use tauri::Webview;
 
 use crate::browser::pages::windows::webview2::{self, CdpError};
 
-/// Tab previews and agent screenshots are lossless, up to this many pixels on
-/// their longest side.
 const MAX_SIDE: f64 = 2560.0;
 
-/// The visible page, as `{ dataUrl, width, height }`.
 pub async fn capture(webview: Webview) -> Result<Value, String> {
     let view = &webview;
     let metrics = webview2::cdp(view, "Page.getLayoutMetrics", &json!({})).await?;
@@ -25,12 +20,7 @@ pub async fn capture(webview: Webview) -> Result<Value, String> {
         .map(|device| device / viewport_width.max(1.0))
         .filter(|ratio| *ratio > 0.0)
         .unwrap_or(1.0);
-    // Never upscale; keep the longest side within the limit.
     let scale = (MAX_SIDE / (viewport_width.max(viewport_height) * device_ratio)).min(1.0);
-    // A clip makes Chromium resize the page's viewport for the shot and
-    // restore it after, which repaints the page's scrollbar white for a frame
-    // after every preview. The visible viewport needs no clip; only a shot
-    // that must be scaled down does.
     let parameters = if scale >= 1.0 {
         json!({ "fromSurface": true, "format": "png" })
     } else {
@@ -47,7 +37,6 @@ pub async fn capture(webview: Webview) -> Result<Value, String> {
         })
     };
 
-    // Misty's own overlay is drawn into the page; leave it out of the picture.
     let _ = webview2::evaluate(view, OVERLAY_HIDE.to_owned(), None).await;
     let shot = webview2::cdp(view, "Page.captureScreenshot", &parameters).await;
     let _ = webview2::evaluate(view, OVERLAY_SHOW.to_owned(), None).await;
@@ -60,11 +49,9 @@ pub async fn capture(webview: Webview) -> Result<Value, String> {
     }))
 }
 
-// Misty's companion and control ring are drawn into the page on WebView2.
 const OVERLAY_HIDE: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e) { e.dataset.mistyCaptureDisplay = e.style.display; e.style.setProperty('display', 'none', 'important'); } } })()";
 const OVERLAY_SHOW: &str = "(() => { for (const id of ['misty-native-companion', 'misty-agent-ring']) { const e = document.getElementById(id); if (e && 'mistyCaptureDisplay' in e.dataset) { e.style.display = e.dataset.mistyCaptureDisplay; delete e.dataset.mistyCaptureDisplay; } } })()";
 
-/// The pixel size of a base64 PNG, read from its header only.
 fn dimensions(base64_data: &str) -> Option<(u32, u32)> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD

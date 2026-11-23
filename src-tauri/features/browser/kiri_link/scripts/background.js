@@ -1,4 +1,3 @@
-// Report only a solid background color; never send page content or pixels.
 if (window === window.top) {
   let backgroundTimer = 0;
   let lastBackground = '';
@@ -20,7 +19,6 @@ if (window === window.top) {
     const channels = context.getImageData(0, 0, 1, 1).data;
     const background = '#' + Array.from(channels.slice(0, 3), v => v.toString(16).padStart(2, '0')).join('');
     if (background === lastBackground) return;
-    // Built by concatenation: a page-defined toJSON must never see the token.
     if (!sendToHost('{"token":"' + shortcutToken + '","background":"' + background + '"}')) return;
     lastBackground = background;
   };

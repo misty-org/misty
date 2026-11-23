@@ -1,7 +1,5 @@
-//! Reading a live DACL and walking its entries.
 use super::*;
 
-/// A DACL, owned through the security descriptor it lives in.
 pub(super) struct Dacl {
     pub(super) acl: *mut ACL,
     descriptor: PSECURITY_DESCRIPTOR,
@@ -34,7 +32,6 @@ impl Dacl {
         Ok(dacl)
     }
 
-    /// Takes ownership of a LocalAlloc'd descriptor.
     pub(super) fn from_descriptor(descriptor: PSECURITY_DESCRIPTOR) -> Self {
         let (mut present, mut defaulted, mut acl) = (0, 0, ptr::null_mut());
         let (mut control, mut revision) = (0u16, 0u32);
@@ -75,13 +72,11 @@ impl Dacl {
         })
     }
 
-    /// The explicit entries naming `sid`.
     pub(super) fn ours(&self, sid: PSID) -> impl Iterator<Item = Ace> + '_ {
         self.aces()
             .filter(move |ace| ace.is_for(sid) && !ace.inherited())
     }
 
-    /// Whether the entries naming `sid` are exactly `rules`, and all explicit.
     pub(super) fn has(&self, sid: PSID, rules: &[(u32, u8)]) -> bool {
         if self.aces().any(|ace| ace.is_for(sid) && ace.inherited()) {
             return false;
@@ -129,7 +124,6 @@ impl Drop for Dacl {
     }
 }
 
-/// One ACE inside a live [`Dacl`].
 pub(super) struct Ace {
     pub(super) header: *const ACE_HEADER,
 }
@@ -149,7 +143,6 @@ impl Ace {
         self.flags() & INHERITED_ACE as u8 != 0
     }
 
-    /// Allowed and denied ACEs share one layout: a mask, then a SID.
     pub(super) fn simple(&self) -> bool {
         matches!(
             self.kind(),
@@ -165,7 +158,6 @@ impl Ace {
         unsafe { (*self.header.cast::<ACCESS_ALLOWED_ACE>()).Mask }
     }
 
-    /// Whether this is an allowed or denied ACE naming `sid`.
     pub(super) fn is_for(&self, sid: PSID) -> bool {
         if !self.simple() {
             return false;

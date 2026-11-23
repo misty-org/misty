@@ -21,21 +21,13 @@ impl Engine for DshEngine {
         true
     }
 
-    /// Never invoked on the virtual path (`send_host_stream` branches before
-    /// the process spawn); a stub keeps the trait contract honest.
     fn supports_images(&self) -> bool {
-        // Images go out as `session/prompt` image content parts (base64) —
-        // that IS the dsh image transport; `dsh_images` declares the
-        // input modality on hand-declared llm-pi-ai routes first.
         true
     }
     fn supports_effort(&self) -> bool {
         true
     }
 
-    /// DSH's human plan review enters through commands/execute "/plan" and waits on a
-    /// plan-review presentation intent (the full protocol is confirmed in the 0.1.5-rc.1
-    /// source; the adapter is dsh_session::park_plan_review / enter_plan_mode).
     fn plan_approval(&self) -> super::plan_review::PlanApproval {
         super::plan_review::PlanApproval::Typed {
             review_kind: super::plan_review::PlanReviewKind::NativeRequest,
@@ -44,7 +36,6 @@ impl Engine for DshEngine {
         }
     }
 
-    /// DeepSeek Harness works on its own, or plans through its `/plan` command.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[

@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { aiSurfaceApi } from "./api";
-import { aiPaneSession, aiSessionKey } from "./invocationSessions";
-import { artifactActions } from "./storeArtifacts";
-import { patchSession } from "./storeRuntime";
+import { aiPaneSession, aiSessionKey } from "./invocation_sessions";
+import { artifactActions } from "./store_artifacts";
+import { patchSession } from "./store_runtime";
 import type {
   AiArtifact,
   AiCaptureAttachment,
@@ -12,7 +12,7 @@ import type {
   AiSuggestedAction,
   MistyApprovalPrompt,
   MistyUndoReceipt,
-} from "./invocationTypes";
+} from "./invocation_types";
 import { openMisty } from "../../conversations/ask/handoff";
 import { mistyContextRef } from "../../conversations/context/context";
 
@@ -39,7 +39,6 @@ interface AiPaneRegistration {
   element: HTMLElement;
 }
 
-/** The pane whose change waits on approval, and the last change that can be undone. */
 interface MistyCompanionSession {
   accountId?: string;
   paneId?: string;

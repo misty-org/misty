@@ -1,5 +1,3 @@
-//! Listen-only CGEventTap. Needs Input Monitoring, which macOS asks for the
-//! first time a chord is registered.
 use super::{Input, Modifiers};
 use core_foundation::runloop::{kCFRunLoopCommonModes, kCFRunLoopDefaultMode, CFRunLoop};
 use core_graphics::event::*;
@@ -11,7 +9,6 @@ extern "C" {
     fn CGEventSourceFlagsState(state: i32) -> u64;
 }
 
-// Device-dependent bits (IOKit's NX_DEVICE*KEYMASK) tell the sides apart.
 const LEFT_CONTROL: u64 = 0x0000_0001;
 const LEFT_COMMAND: u64 = 0x0000_0008;
 const RIGHT_COMMAND: u64 = 0x0000_0010;
@@ -19,8 +16,6 @@ const LEFT_OPTION: u64 = 0x0000_0020;
 const RIGHT_OPTION: u64 = 0x0000_0040;
 const RIGHT_CONTROL: u64 = 0x0000_2000;
 
-/// Reads modifier flags. When a synthetic event carries no side bits, the
-/// generic flag counts as the left key.
 pub(crate) fn modifiers_from_flags(flags: u64) -> Modifiers {
     let has = |flag: CGEventFlags| flags & flag.bits() != 0;
     let side = |generic: bool, left: u64, right: u64| {
@@ -55,7 +50,6 @@ pub(crate) fn modifiers_from_flags(flags: u64) -> Modifiers {
 }
 
 pub(crate) fn current_modifiers() -> Modifiers {
-    // kCGEventSourceStateCombinedSessionState
     modifiers_from_flags(unsafe { CGEventSourceFlagsState(0) })
 }
 
@@ -82,8 +76,6 @@ pub(crate) fn run(dispatch: fn(Input)) {
                         let p = event.location();
                         dispatch(Input::Click(p.x, p.y));
                     }
-                    // Control+C or Control and a scroll is a shortcut, not a tap. Escape (key code
-                    // 53) is told apart, so Tutor's tour can give way to it.
                     CGEventType::KeyDown => dispatch(
                         if event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) == 53 {
                             Input::Escape
@@ -92,21 +84,18 @@ pub(crate) fn run(dispatch: fn(Input)) {
                         },
                     ),
                     CGEventType::ScrollWheel => dispatch(Input::Scroll),
-                    // Only modifier changes move chords: arrow keys also carry
-                    // the Fn flag, but on KeyDown, never on FlagsChanged.
                     CGEventType::FlagsChanged => dispatch(Input::Modifiers(modifiers_from_flags(
                         event.get_flags().bits(),
                     ))),
                     _ => {}
                 }
-                None // Listen-only taps always preserve the original event.
+                None
             },
         );
         match tap {
             Ok(tap) => unsafe {
                 if let Ok(source) = tap.mach_port.create_runloop_source(0) {
                     CFRunLoop::get_current().add_source(&source, kCFRunLoopCommonModes);
-                    // Re-enable after OS tap timeouts; the monitor never consumes input.
                     loop {
                         tap.enable();
                         CFRunLoop::run_in_mode(kCFRunLoopDefaultMode, std::time::Duration::from_secs(1), false);

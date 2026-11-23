@@ -1,5 +1,17 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import { Bot, Clock, Download, FileText, HardDrive, House, Monitor, Star, Trash2, Usb, type LucideIcon } from "lucide-react";
+import {
+  Bot,
+  Clock,
+  Download,
+  FileText,
+  HardDrive,
+  House,
+  Monitor,
+  Star,
+  Trash2,
+  Usb,
+  type LucideIcon,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ListRowSkeleton,
@@ -13,12 +25,18 @@ import {
   tagToneName,
 } from "@misty/ui";
 import { folderName, useProjectFolders } from "@/features/agents";
-import { disk, type AgentTrashUsage, type Drive, type FinderTag, type FreeSpace, type Places } from "@/features/files";
+import {
+  disk,
+  type AgentTrashUsage,
+  type Drive,
+  type FinderTag,
+  type FreeSpace,
+  type Places,
+} from "@/features/files";
 import { SpaceDriveSection } from "../drive";
 import { formatBytes } from "./format";
 import { samePlace, type FilesPlace } from "./model";
 
-/** One place in the sidebar: its icon (when it has one of its own), its name and what sits at its end. */
 function PlaceRow({
   place,
   current,
@@ -31,7 +49,6 @@ function PlaceRow({
 }: {
   place: FilesPlace;
   current: FilesPlace | null;
-  /** Overrides whether it is the open place, for a row that stands for everything under it. */
   here?: boolean;
   icon?: LucideIcon;
   mark?: ReactNode;
@@ -40,7 +57,10 @@ function PlaceRow({
   onGo(place: FilesPlace): void;
 }) {
   return (
-    <NavRow current={here ?? (current !== null && samePlace(place, current))} onClick={() => onGo(place)}>
+    <NavRow
+      current={here ?? (current !== null && samePlace(place, current))}
+      onClick={() => onGo(place)}
+    >
       {Icon ? <Icon aria-hidden="true" /> : mark}
       <OverflowFadeText full className="min-w-0 flex-1">
         {label}
@@ -54,7 +74,6 @@ function PlaceRow({
   );
 }
 
-/** One of Kura's sidebar sections: its heading folds what's under it, remembered for the device. */
 function Section({
   id,
   title,
@@ -84,7 +103,6 @@ function Section({
   );
 }
 
-/** A drive's room, read once as its row shows. */
 function useRoomOn(path: string) {
   const [room, setRoom] = useState<FreeSpace | null>(null);
   useEffect(() => {
@@ -100,12 +118,21 @@ function useRoomOn(path: string) {
   return room;
 }
 
-/** A drive as Kura's Devices shows it: its name, how much of it is used, and a bar of how full it is. */
-function DeviceRow({ drive, current, onGo }: { drive: Drive; current: FilesPlace | null; onGo(place: FilesPlace): void }) {
+function DeviceRow({
+  drive,
+  current,
+  onGo,
+}: {
+  drive: Drive;
+  current: FilesPlace | null;
+  onGo(place: FilesPlace): void;
+}) {
   const room = useRoomOn(drive.path);
   const Icon = drive.removable ? Usb : HardDrive;
   const used = room ? Math.max(0, room.total - room.free) : 0;
-  const here = current?.kind === "disk" && (current.path === drive.path || current.path.startsWith(`${drive.path.replace(/\/$/, "")}/`));
+  const here =
+    current?.kind === "disk" &&
+    (current.path === drive.path || current.path.startsWith(`${drive.path.replace(/\/$/, "")}/`));
   return (
     <NavRow tall current={here} onClick={() => onGo({ kind: "disk", path: drive.path })}>
       <Icon aria-hidden="true" />
@@ -124,8 +151,13 @@ function DeviceRow({ drive, current, onGo }: { drive: Drive; current: FilesPlace
   );
 }
 
-/** The person's projects, all Files reaches on this computer while the disk grant is off. */
-function ProjectRows({ current, onGo }: { current: FilesPlace | null; onGo(place: FilesPlace): void }) {
+function ProjectRows({
+  current,
+  onGo,
+}: {
+  current: FilesPlace | null;
+  onGo(place: FilesPlace): void;
+}) {
   const projects = useProjectFolders();
   if (projects === null) return <ListRowSkeleton label="Projects" rows={3} />;
   return (
@@ -144,13 +176,6 @@ function ProjectRows({ current, onGo }: { current: FilesPlace | null; onGo(place
   );
 }
 
-/**
- * Files' sidebar, as Kura's: the Space drives first, then Quick access (Home, Desktop, Documents,
- * Downloads, Recent, Starred, the Trash and Agent trash), Finder's tags (macOS) and the drives under
- * Devices. Each
- * section folds under its heading. Without the disk grant it lists the person's projects and the Space
- * drives.
- */
 export function FilesSidebar({
   current,
   granted,
@@ -170,7 +195,6 @@ export function FilesSidebar({
   tags: FinderTag[];
   agentTrash: AgentTrashUsage | null;
   macos: boolean;
-  /** The sections folded shut. */
   folded: readonly string[];
   onFold(section: string, fold: boolean): void;
   onGo(place: FilesPlace): void;
@@ -183,7 +207,8 @@ export function FilesSidebar({
         [places.downloads, "Downloads", Download],
       ]
     : [];
-  const drivePlace = current?.kind === "space-drive" || current?.kind === "space-drive-trash" ? current : undefined;
+  const drivePlace =
+    current?.kind === "space-drive" || current?.kind === "space-drive-trash" ? current : undefined;
   const sectionProps = { folded, onFold };
 
   return (
@@ -200,20 +225,47 @@ export function FilesSidebar({
           <NavList>
             {fixed.map(([path, label, icon]) =>
               path ? (
-                <PlaceRow key={label} place={{ kind: "disk", path }} current={current} icon={icon} label={label} onGo={onGo} />
+                <PlaceRow
+                  key={label}
+                  place={{ kind: "disk", path }}
+                  current={current}
+                  icon={icon}
+                  label={label}
+                  onGo={onGo}
+                />
               ) : null,
             )}
-            <PlaceRow place={{ kind: "recent" }} current={current} icon={Clock} label="Recent" onGo={onGo} />
-            <PlaceRow place={{ kind: "starred" }} current={current} icon={Star} label="Starred" onGo={onGo} />
+            <PlaceRow
+              place={{ kind: "recent" }}
+              current={current}
+              icon={Clock}
+              label="Recent"
+              onGo={onGo}
+            />
+            <PlaceRow
+              place={{ kind: "starred" }}
+              current={current}
+              icon={Star}
+              label="Starred"
+              onGo={onGo}
+            />
             {!picking ? (
               <>
-                <PlaceRow place={{ kind: "trash" }} current={current} icon={Trash2} label="Trash" onGo={onGo} />
+                <PlaceRow
+                  place={{ kind: "trash" }}
+                  current={current}
+                  icon={Trash2}
+                  label="Trash"
+                  onGo={onGo}
+                />
                 <PlaceRow
                   place={{ kind: "agent-trash" }}
                   current={current}
                   icon={Bot}
                   label="Agent trash"
-                  end={agentTrash && agentTrash.items > 0 ? formatBytes(agentTrash.bytes) : undefined}
+                  end={
+                    agentTrash && agentTrash.items > 0 ? formatBytes(agentTrash.bytes) : undefined
+                  }
                   onGo={onGo}
                 />
               </>

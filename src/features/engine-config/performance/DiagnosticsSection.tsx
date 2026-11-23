@@ -2,10 +2,6 @@ import { Button, notify } from "@misty/ui";
 import { invoke } from "@/native/invoke";
 import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
 
-/**
- * Settings › Advanced › Diagnostics: where Misty keeps its crash log, which holds a panic's
- * thread and backtrace and never leaves this computer.
- */
 export function DiagnosticsSection() {
   return (
     <Section title="Diagnostics">

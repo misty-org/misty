@@ -1,9 +1,5 @@
-//! Session commands: rename, fork, undo and redo, and sharing.
-
 use super::*;
 
-/// `PATCH /session/:id {title}` (2.x: `/api/session/:id`, which answers 204, so the title
-/// stays as given); the chat takes the title OpenCode kept.
 pub(super) async fn rename(server: &Server, session: &str, title: &str) -> Result<Output, String> {
     let info = server
         .call(
@@ -19,8 +15,6 @@ pub(super) async fn rename(server: &Server, session: &str, title: &str) -> Resul
     Ok(Output::Rename { title })
 }
 
-/// `POST /session/:id/fork` copies the whole session into a new one, which opens as a new chat
-/// and gets `message` there when one was given.
 pub(super) async fn fork(server: &Server, session: &str, message: &str) -> Result<Output, String> {
     let info = server
         .call(
@@ -41,10 +35,6 @@ pub(super) async fn fork(server: &Server, session: &str, message: &str) -> Resul
     })
 }
 
-/// Reverts the session to before the last message the person sent that is still in place,
-/// restoring the files it changed, as OpenCode's terminal app does: a reply still running is
-/// stopped first, since a busy session can't be reverted. The messages leave the session with
-/// the next message; until then `/redo` brings them back.
 pub(super) async fn undo(server: &Server, session: &str) -> Result<Output, String> {
     let _ = server
         .call(Method::POST, &format!("/session/{session}/abort"), None)
@@ -76,15 +66,12 @@ pub(super) async fn undo(server: &Server, session: &str) -> Result<Output, Strin
     }))
 }
 
-/// Brings back one message undo took, as OpenCode's terminal app does: the revert point moves
-/// to the next message the person sent, and once none is left the session is restored whole.
 pub(super) async fn redo(server: &Server, session: &str) -> Result<Output, String> {
     let info = server.get(&format!("/session/{session}")).await?;
     let Some(reverted_at) = text_at(&info, "/revert/messageID").map(str::to_owned) else {
         return Ok(Output::done("There's nothing to redo."));
     };
     let messages = server.messages(session).await?;
-    // Message ids sort in the order they were made.
     let next = messages.iter().find(|message| {
         opencode_session::is_user_message(message)
             && message_id(message).is_some_and(|id| id > reverted_at.as_str())
@@ -111,9 +98,6 @@ pub(super) async fn redo(server: &Server, session: &str) -> Result<Output, Strin
     }
 }
 
-/// 2.x's undo, as its terminal app does it: the session is stopped and waited on, then a revert
-/// is staged before the last message the person typed that is still in place, restoring its
-/// files. It is committed when the next message is sent; until then `/redo` clears it.
 pub(super) async fn undo_v2(server: &Server, session: &str) -> Result<Output, String> {
     let base = format!("/api/session/{session}");
     let _ = server
@@ -154,8 +138,6 @@ pub(super) async fn undo_v2(server: &Server, session: &str) -> Result<Output, St
     )))
 }
 
-/// 2.x's redo clears the staged revert, bringing back everything undo took, as its terminal app
-/// does.
 pub(super) async fn redo_v2(server: &Server, session: &str) -> Result<Output, String> {
     let base = format!("/api/session/{session}");
     let info = server.get(&base).await?;
@@ -168,7 +150,6 @@ pub(super) async fn redo_v2(server: &Server, session: &str) -> Result<Output, St
     Ok(Output::done("Brought back everything undo took."))
 }
 
-/// `POST /session/:id/share` puts the session on a public link, which the notice gives.
 pub(super) async fn share(server: &Server, session: &str) -> Result<Output, String> {
     let info = server
         .call(Method::POST, &format!("/session/{session}/share"), None)

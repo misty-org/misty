@@ -1,7 +1,3 @@
-//! Connected apps on this computer: apps whose makers run their own MCP server, which the person signs
-//! in to directly (`direct`), with no key of Misty's and no middleman. Each Misty account on this
-//! computer keeps its own connections, app requests and remembered approvals, so one person's never
-//! serve another.
 pub mod api;
 pub mod apps;
 pub mod commands;
@@ -20,19 +16,15 @@ mod tests;
 
 use crate::agents::run_control::windows::account_of_window;
 
-/// The account agents run under signed out.
 pub(crate) const SIGNED_OUT: &str = "local";
-/// What was asked and remembered signed out, from before each account had its own.
 const SIGNED_OUT_ROWS: &str = "this_computer";
 
-/// Whose connections a call acts on: the run's account for a tool, the window's for a person's page.
 pub(crate) fn window_account(label: &str) -> String {
     account_of_window(label)
         .filter(|account| !account.is_empty())
         .unwrap_or_else(|| SIGNED_OUT.to_owned())
 }
 
-/// `misty.db`, as one account sees its app requests and remembered approvals.
 #[derive(Clone)]
 pub struct AccountStore {
     store: database::store::Store,

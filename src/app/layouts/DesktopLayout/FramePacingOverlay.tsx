@@ -82,7 +82,14 @@ export function FramePacingOverlay(props: { enabled: boolean }) {
       className={frameOverlayBaseClass}
       aria-label="Frame pacing overlay"
     >
-      <Text bare as="strong" tone="default" className="col-span-full text-xs font-extrabold">
+      <Text
+        bare
+        as="strong"
+        size="caption"
+        weight="semibold"
+        tone="default"
+        className="col-span-full"
+      >
         {label}
       </Text>
       <Text bare tone="muted" className="whitespace-nowrap tabular-nums">

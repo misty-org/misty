@@ -1,16 +1,9 @@
-//! Gemini CLI's commands that read or open what its terminal app would.
-
 use super::*;
 
-// ==================== Gemini CLI ====================
-
 pub(super) const DOCS_URL: &str = "https://goo.gle/gemini-cli-docs";
-/// Gemini CLI's own `/upgrade` page (`UPGRADE_URL_PAGE`).
 const UPGRADE_URL: &str = "https://goo.gle/set-up-gemini-code-assist";
-/// Gemini CLI's `/bug` page, filled the way its `{title}`, `{info}` and `{problem}` slots are.
 const BUG_URL: &str = "https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml&title={title}&info={info}&problem={problem}";
 
-/// What JavaScript's `encodeURIComponent` leaves as it is.
 const URI_COMPONENT: &AsciiSet = &NON_ALPHANUMERIC
     .remove(b'-')
     .remove(b'_')
@@ -26,7 +19,6 @@ pub(super) fn encode_component(text: &str) -> String {
     utf8_percent_encode(text, URI_COMPONENT).to_string()
 }
 
-/// `~/.gemini/settings.json`.
 pub(super) fn user_settings_path() -> Option<PathBuf> {
     adapter::gemini_dir().map(|dir| dir.join("settings.json"))
 }
@@ -37,15 +29,12 @@ fn user_setting(pointer: &str) -> Option<Value> {
         .cloned()
 }
 
-/// The sign-in Gemini CLI uses (`security.auth.selectedType`): `oauth-personal`,
-/// `gemini-api-key`, `vertex-ai`, …
 fn auth_type() -> Option<String> {
     user_setting("/security/auth/selectedType")?
         .as_str()
         .map(str::to_string)
 }
 
-/// `/commands`: the custom commands from `.toml` files, user and project.
 pub(super) fn custom_commands(folder: Option<&Path>) -> Output {
     let commands = adapter::custom_commands(folder);
     let mut sections = Vec::new();
@@ -72,21 +61,18 @@ pub(super) fn custom_commands(folder: Option<&Path>) -> Output {
     }
     let mut empty = "No custom commands. Gemini CLI reads `.toml` files from `~/.gemini/commands` and the project's `.gemini/commands`.".to_string();
     if let Some(folder) = folder.filter(|folder| !adapter::workspace_trusted(folder)) {
-        if folder.join(".gemini").join("commands").is_dir() {
+        if file_access::fs::is_dir(folder.join(".gemini").join("commands")) {
             empty.push_str(" This folder isn't trusted, so its own commands don't load.");
         }
     }
     files::info_or("Gemini CLI custom commands", sections, empty)
 }
 
-/// The `commands` folder a command file sits in.
 fn commands_dir(path: &Path) -> Option<PathBuf> {
     path.ancestors()
         .find(|dir| dir.file_name().is_some_and(|name| name == "commands"))
         .map(Path::to_path_buf)
 }
-/// `/bug`: Gemini CLI's issue form, with the description as its title and this computer's
-/// system in the info field; `advanced.bugCommand.urlTemplate` replaces the form, as in the CLI.
 pub(super) fn bug(description: &str) -> Output {
     let template = user_setting("/advanced/bugCommand/urlTemplate")
         .and_then(|value| value.as_str().map(str::to_string))
@@ -103,9 +89,6 @@ pub(super) fn bug(description: &str) -> Output {
     Output::open(format!("url:{url}"))
 }
 
-/// The privacy notice for the way Gemini CLI signs in: the Gemini API terms for an API key
-/// (and for no choice, which its ACP mode treats as one), Google Cloud's service terms for
-/// Vertex AI, Gemini Code Assist's privacy notices for a Google account.
 pub(super) fn privacy_url() -> &'static str {
     match auth_type().as_deref() {
         Some("vertex-ai") => "https://cloud.google.com/terms/service-terms",
@@ -116,7 +99,6 @@ pub(super) fn privacy_url() -> &'static str {
     }
 }
 
-/// `/upgrade`, which Gemini CLI offers only to a Google account sign-in.
 pub(super) fn upgrade() -> Output {
     match auth_type().as_deref() {
         Some("oauth-personal") => Output::open(format!("url:{UPGRADE_URL}")),
@@ -124,8 +106,6 @@ pub(super) fn upgrade() -> Output {
     }
 }
 
-/// `/permissions` alone opens Misty's mode picker, as for every engine; `/permissions trust
-/// [dir]` shows what Gemini CLI's folder trust says about a folder, and every rule it keeps.
 pub(super) fn permissions(folder: Option<&Path>, args: &str) -> Result<Output, String> {
     let (sub, rest) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
     match sub {
@@ -137,6 +117,10 @@ pub(super) fn permissions(folder: Option<&Path>, args: &str) -> Result<Output, S
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves the folder the person named to check its trust, which need not be linked"
+)]
 fn trust(folder: Option<&Path>, dir: &str) -> Result<Output, String> {
     let target = match dir {
         "" => folder
@@ -147,7 +131,6 @@ fn trust(folder: Option<&Path>, dir: &str) -> Result<Output, String> {
     if !target.is_dir() {
         return Err(format!("Path is not a directory: {}", target.display()));
     }
-    // Shown, and judged, as the folder it is (`..` and links resolved), as the CLI judges it.
     let target = std::fs::canonicalize(&target).unwrap_or(target);
     let state = match adapter::trust_of(&target) {
         Some(true) => "Trusted",
@@ -174,9 +157,6 @@ fn trust(folder: Option<&Path>, dir: &str) -> Result<Output, String> {
     Ok(Output::info("Gemini CLI folder trust", sections))
 }
 
-/// A folder in `trustedFolders.json` with the home folder as `~`. On macOS and Windows Gemini
-/// CLI writes the paths there in lower case (`/users/…`), so the home folder matches without
-/// case there.
 fn display_rule_path(rule: &str) -> String {
     let shown = display_path(Path::new(rule));
     if shown != rule || !cfg!(any(target_os = "macos", windows)) {
@@ -201,7 +181,6 @@ fn display_rule_path(rule: &str) -> String {
     }
 }
 
-/// A folder the person typed: `~` for home, relative to the chat's folder.
 fn resolve_dir(folder: Option<&Path>, dir: &str) -> PathBuf {
     if let Some(rest) = dir
         .strip_prefix("~/")
@@ -218,8 +197,6 @@ fn resolve_dir(folder: Option<&Path>, dir: &str) -> PathBuf {
     }
 }
 
-/// `/hooks`: the hooks in Gemini CLI's system, user and project settings, and the switches
-/// in `hooksConfig` that stop some or all of them.
 pub(super) fn hooks(folder: Option<&Path>) -> Output {
     let mut layers = Vec::new();
     if let Some(path) = adapter::system_settings_path() {
@@ -269,8 +246,10 @@ pub(super) fn hooks(folder: Option<&Path>) -> Output {
         "No hooks configured in the system, user or project settings.",
     )
 }
-/// `/policies`: the rules in Gemini CLI's policy files (`[[rule]]` tables in the system, user
-/// and project `policies` folders). Its built-in defaults apply under them.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Gemini CLI's policy files in place, including the system's, which lie outside what the gate grants"
+)]
 pub(super) fn policies(folder: Option<&Path>) -> Output {
     let mut dirs = vec![("System", adapter::system_config_dir().join("policies"))];
     if let Some(dir) = adapter::gemini_dir() {
@@ -313,7 +292,10 @@ pub(super) fn policies(folder: Option<&Path>) -> Output {
     )
 }
 
-/// One row per `[[rule]]`: what it matches, and its decision, priority and modes.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Gemini CLI's policy files in place, including the system's, which lie outside what the gate grants"
+)]
 fn policy_rows(path: &Path) -> Vec<Row> {
     let Ok(text) = std::fs::read_to_string(path) else {
         return vec![row("Unreadable", display_path(path))];

@@ -1,15 +1,15 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type * as GitApiModule from "./gitApi";
+import type * as GitApiModule from "./git_api";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const api = vi.hoisted(() => ({ diff: vi.fn(), diffImages: vi.fn() }));
 
-vi.mock("./gitApi", async (importOriginal) => ({
+vi.mock("./git_api", async (importOriginal) => ({
   ...(await importOriginal<typeof GitApiModule>()),
   gitApi: api,
 }));
-vi.mock("../files/filesStore", () => ({
+vi.mock("../files/files_store", () => ({
   useFilesStore: { getState: () => ({ openFile: vi.fn() }) },
 }));
 

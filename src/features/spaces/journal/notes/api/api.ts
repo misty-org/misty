@@ -18,7 +18,6 @@ export interface ServerSpaceNote {
   created_at?: string;
   updated_at?: string;
   backlink_count?: number;
-  /** A private note opens only for its creator. */
   visibility?: ItemVisibility;
 }
 
@@ -42,10 +41,6 @@ export const notesApi = {
       method: "POST",
       body: JSON.stringify({ title }),
     }),
-  /**
-   * A doc made with a body, as a Lab notebook is. `visibility` puts it on a layer from its first
-   * moment ("private" for a person's Lab questions); unset takes the Space's default.
-   */
   createWithMarkdown: (
     spaceId: string,
     title: string,
@@ -56,7 +51,6 @@ export const notesApi = {
       method: "POST",
       body: JSON.stringify({ title, markdown, ...(visibility ? { visibility } : {}) }),
     }),
-  /** Replaces a doc's title and body, as a shared notebook keeps its doc up to date. */
   replaceContent: (spaceId: string, noteId: string, title: string, markdown: string) =>
     spaceRequest<ServerSpaceNote>(`/spaces/${part(spaceId)}/notes/${part(noteId)}/content`, {
       method: "PUT",

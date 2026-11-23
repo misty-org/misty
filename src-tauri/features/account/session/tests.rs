@@ -16,9 +16,6 @@ fn token(user: &str, kind: &str, exp: u64) -> String {
     )
 }
 
-/// The credential store's root is set once per process, so this directory lives as long as it.
-/// Turning on a new database's write-ahead log fails at once if another connection is opening it
-/// too, whatever the busy timeout, so the first test creates it while the others wait here.
 fn credentials() {
     static DIRECTORY: OnceLock<tempfile::TempDir> = OnceLock::new();
     DIRECTORY.get_or_init(|| {
@@ -73,7 +70,6 @@ fn a_row_saved_when_these_were_cookies_still_loads() {
     let url = server("https://old-row.misty.test/v1").unwrap();
     let access = token("ada", "access", now() + 60);
     let refresh = token("ada", "refresh", now() + 3600);
-    // Written out by hand: this is what's on people's computers, whatever the struct becomes.
     let raw = format!(
         r#"{{"account_id":"ada","origin":"https://old-row.misty.test","access":"{access}","refresh":"{refresh}"}}"#
     );
@@ -189,14 +185,12 @@ fn tokens_are_taken_from_headers_and_stripped_for_the_renderer() {
         .unwrap()
         .is_some());
 
-    // A response about nothing changes nothing.
     assert!(matches!(
         client.capture(&url, &HeaderMap::new()).unwrap(),
         Captured::Nothing
     ));
     assert!(client.access_header().is_some());
 
-    // The server ended the session: the tokens and the saved row go.
     let mut ended = HeaderMap::new();
     ended.insert(SESSION_ENDED_HEADER, "1".parse().unwrap());
     assert!(matches!(
@@ -209,7 +203,6 @@ fn tokens_are_taken_from_headers_and_stripped_for_the_renderer() {
         .is_none());
 }
 
-/// Answers every request with `head`, slowly enough for callers to pile up, and counts them.
 async fn fixture_server(
     head: impl Fn() -> String + Send + 'static,
 ) -> (url::Url, Arc<AtomicUsize>, Arc<std::sync::Mutex<String>>) {
@@ -260,7 +253,6 @@ async fn two_callers_refused_together_send_one_refresh() {
     assert!(request.contains(&format!("authorization: {}", refresh.to_lowercase())));
     assert!(request.contains("x-misty-token-transport: bearer"));
     assert!(request.contains("x-misty-csrf: 1"));
-    // A later refresh sends the rotated token.
     client.refresh(&base).await.unwrap();
     assert_eq!(posts.load(Ordering::SeqCst), 2);
     assert!(seen
@@ -288,7 +280,6 @@ async fn a_refused_refresh_ends_the_session() {
     assert!(misty_credential_store::account::load(&key(&base, "ada"))
         .unwrap()
         .is_none());
-    // With nothing to present it answers without asking the server.
     assert_eq!(client.refresh_after(&base, None).await.unwrap().status, 401);
 }
 

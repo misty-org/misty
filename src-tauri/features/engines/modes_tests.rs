@@ -46,7 +46,6 @@ fn an_old_choice_takes_the_closest_mode_that_asks_no_less() {
         "default"
     );
     let no_asks = &ENGINE[1..3];
-    // An engine that can't ask runs an old Ask in its own first mode.
     assert_eq!(
         chosen(no_asks, "", ModeKind::of_legacy("ask")).unwrap().id,
         "accept"
@@ -75,7 +74,6 @@ fn a_mode_reaches_the_app_as_id_label_and_kind() {
 
 #[test]
 fn reads_each_cli_help_list_of_modes() {
-    // Claude Code: quoted, in parentheses, wrapped over lines.
     let claude = r#"
   --permission-mode <mode>              Permission mode to use for the session
                                         (choices: "acceptEdits", "auto",
@@ -94,7 +92,6 @@ fn reads_each_cli_help_list_of_modes() {
             "plan"
         ]
     );
-    // CodeBuddy: one sentence, with longer flags that start the same name after it.
     let codebuddy = "  --permission-mode <mode>   Default permission mode. Choices: acceptEdits, \
         bypassPermissions, default, plan, dontAsk, auto. Does not write settings.\n  \
         --permission-mode-before-plan <mode>   Mode to restore\n";
@@ -109,7 +106,6 @@ fn reads_each_cli_help_list_of_modes() {
             "auto"
         ]
     );
-    // Qoder: unquoted, wrapped.
     let qoder = "  --permission-mode <mode>   Set the permission mode (choices:\n         \
         default, accept_edits,\n         bypass_permissions, dont_ask, auto)\n  \
         --dangerously-skip-permissions   Bypass\n";

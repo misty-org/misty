@@ -1,6 +1,6 @@
 import { invokeShortcutCommand } from "@/features/shortcuts";
 import { ShortcutRuntime } from "@/app/ShortcutRuntime";
-import "@/app/featureSeams";
+import "@/app/feature_seams";
 import {
   allLayoutViews,
   dockLeaves,
@@ -25,7 +25,7 @@ vi.mock("./WorkspaceDockTree", () => ({
     </div>
   ),
 }));
-vi.mock("./dockSplitFit", () => ({
+vi.mock("./dock_split_fit", () => ({
   minimumForWorkspaceViews: () => ({ width: 280, height: 180 }),
 }));
 
@@ -107,7 +107,6 @@ describe("WorkspaceCanvas virtual window shortcuts", () => {
     expect(views).toHaveLength(2);
     expect(new Set(views.map((tab) => tab.instanceKey)).size).toBe(2);
     expect(views.every((tab) => tab.surfaceId === "agents")).toBe(true);
-    // The new tab waits idle on the Agents route; it doesn't start a chat.
     expect(views.find((tab) => tab.id !== initial.id)).toMatchObject({
       placeholder: true,
       route: "/agents",

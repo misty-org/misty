@@ -26,7 +26,6 @@ pub enum CompareState {
     OnlyRight,
 }
 
-/// `CompareRow` in `disk.ts`.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompareRow {
@@ -48,7 +47,6 @@ pub(super) enum Item {
 
 pub(super) type Inventory = BTreeMap<String, Item>;
 
-/// Everything under `root`, by its path inside it with `/` between the parts.
 fn inventory(root: &Path) -> Result<Inventory, String> {
     check_disk(root, Access::Read).map_err(|error| failed(root, error))?;
     if !fs_disk::is_dir(root) {
@@ -60,7 +58,9 @@ fn inventory(root: &Path) -> Result<Inventory, String> {
         if entry.file_name() == ".DS_Store" {
             continue;
         }
-        let Ok(relative) = entry.path().strip_prefix(root) else { continue };
+        let Ok(relative) = entry.path().strip_prefix(root) else {
+            continue;
+        };
         let relative = relative
             .components()
             .map(|part| part.as_os_str().to_string_lossy().into_owned())
@@ -79,9 +79,10 @@ fn inventory(root: &Path) -> Result<Inventory, String> {
     Ok(items)
 }
 
-/// The folders `relative` is inside, nearest last.
 fn ancestors(relative: &str) -> impl Iterator<Item = &str> {
-    relative.match_indices('/').map(move |(at, _)| &relative[..at])
+    relative
+        .match_indices('/')
+        .map(move |(at, _)| &relative[..at])
 }
 
 fn size(item: Option<&Item>) -> Option<u64> {
@@ -91,8 +92,11 @@ fn size(item: Option<&Item>) -> Option<u64> {
     }
 }
 
-/// The rows for two inventories. `same_content` is asked only about files of equal size in both.
-pub(super) fn rows(left: &Inventory, right: &Inventory, mut same_content: impl FnMut(&str) -> bool) -> Vec<CompareRow> {
+pub(super) fn rows(
+    left: &Inventory,
+    right: &Inventory,
+    mut same_content: impl FnMut(&str) -> bool,
+) -> Vec<CompareRow> {
     let paths: BTreeSet<&String> = left.keys().chain(right.keys()).collect();
     let mut lone_folders: HashSet<&str> = HashSet::new();
     let mut rows = Vec::new();
@@ -107,7 +111,11 @@ pub(super) fn rows(left: &Inventory, right: &Inventory, mut same_content: impl F
             (None, Some(_)) => CompareState::OnlyRight,
             (Some(Item::Folder), Some(Item::Folder)) => CompareState::Same,
             (Some(Item::File(a)), Some(Item::File(b))) if a == b => {
-                if same_content(relative) { CompareState::Same } else { CompareState::Changed }
+                if same_content(relative) {
+                    CompareState::Same
+                } else {
+                    CompareState::Changed
+                }
             }
             (Some(Item::Link(a)), Some(Item::Link(b))) if a == b => CompareState::Same,
             _ => CompareState::Changed,
@@ -123,11 +131,14 @@ pub(super) fn rows(left: &Inventory, right: &Inventory, mut same_content: impl F
             right_size: size(r),
         });
     }
-    // A folder in both is changed when anything under it isn't the same.
     let changed: HashSet<String> = rows
         .iter()
         .filter(|row| row.state != CompareState::Same)
-        .flat_map(|row| ancestors(&row.relative).map(str::to_owned).collect::<Vec<_>>())
+        .flat_map(|row| {
+            ancestors(&row.relative)
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        })
         .collect();
     for row in &mut rows {
         if row.folder && row.state == CompareState::Same && changed.contains(&row.relative) {
@@ -140,7 +151,8 @@ pub(super) fn rows(left: &Inventory, right: &Inventory, mut same_content: impl F
 pub(super) fn compare(left: &Path, right: &Path) -> Result<Vec<CompareRow>, String> {
     let left_items = inventory(left)?;
     let right_items = inventory(right)?;
-    let hash = |root: &Path, relative: &str| sha256_of(&root.join(relative), |_| true).ok().flatten();
+    let hash =
+        |root: &Path, relative: &str| sha256_of(&root.join(relative), |_| true).ok().flatten();
     Ok(rows(&left_items, &right_items, |relative| {
         let one = hash(left, relative);
         one.is_some() && one == hash(right, relative)
@@ -152,7 +164,10 @@ mod tests {
     use super::*;
 
     fn inventory_of(items: &[(&str, Item)]) -> Inventory {
-        items.iter().map(|(path, item)| ((*path).to_owned(), item.clone())).collect()
+        items
+            .iter()
+            .map(|(path, item)| ((*path).to_owned(), item.clone()))
+            .collect()
     }
 
     #[test]
@@ -176,10 +191,11 @@ mod tests {
             ("same/s.txt", Item::File(2)),
             ("link", Item::Link(PathBuf::from("docs"))),
         ]);
-        // a.txt has the same size on both sides but different contents.
         let rows = rows(&left, &right, |relative| relative != "docs/a.txt");
-        let states: Vec<(&str, CompareState)> =
-            rows.iter().map(|row| (row.relative.as_str(), row.state)).collect();
+        let states: Vec<(&str, CompareState)> = rows
+            .iter()
+            .map(|row| (row.relative.as_str(), row.state))
+            .collect();
         assert_eq!(
             states,
             [
@@ -193,7 +209,10 @@ mod tests {
                 ("same/s.txt", CompareState::Same),
             ]
         );
-        let b = rows.iter().find(|row| row.relative == "docs/b.txt").expect("b");
+        let b = rows
+            .iter()
+            .find(|row| row.relative == "docs/b.txt")
+            .expect("b");
         assert_eq!((b.left_size, b.right_size), (Some(5), Some(6)));
     }
 
@@ -209,7 +228,11 @@ mod tests {
         fs_disk::write(left.join("sub/changed.txt"), b"abc").expect("write");
         fs_disk::write(right.join("sub/changed.txt"), b"abd").expect("write");
         let rows = compare(&left, &right).expect("compare");
-        let state = |relative: &str| rows.iter().find(|row| row.relative == relative).map(|row| row.state);
+        let state = |relative: &str| {
+            rows.iter()
+                .find(|row| row.relative == relative)
+                .map(|row| row.state)
+        };
         assert_eq!(state("sub/same.txt"), Some(CompareState::Same));
         assert_eq!(state("sub/changed.txt"), Some(CompareState::Changed));
         assert_eq!(state("sub"), Some(CompareState::Changed));

@@ -1,5 +1,3 @@
-//! OpenCode 2.x event projection: one event-stream frame into the turn's events.
-
 use reqwest::Method;
 use serde_json::{json, Value};
 
@@ -38,7 +36,6 @@ pub(super) async fn handle_event(
         }
         "session.step.started" => view.model = model_of(&event),
         "session.step.ended" | "session.compaction.ended" => {
-            // A compaction runs no step, so its model comes with its end.
             if let Some(model) = model_of(&event) {
                 view.model = Some(model);
             }
@@ -56,8 +53,6 @@ pub(super) async fn handle_event(
                 } else {
                     usage
                 };
-                // Each step reports what it alone cost (from the model's price list), and the
-                // message keeps the last report, so the report carries the turn's total so far.
                 if let Some(cost) = event
                     .get("cost")
                     .and_then(Value::as_f64)
@@ -123,7 +118,6 @@ pub(super) async fn handle_event(
         }
         "session.execution.started" => {
             view.started = true;
-            // Clears any retry line on the run status.
             core.dispatch_event(
                 state,
                 EngineEvent::Retry {
@@ -200,16 +194,12 @@ pub(super) async fn handle_event(
     }
 }
 
-/// The `provider/model` an event names.
 fn model_of(event: &Value) -> Option<String> {
     let provider = event.pointer("/model/providerID").and_then(Value::as_str)?;
     let model = event.pointer("/model/id").and_then(Value::as_str)?;
     Some(format!("{provider}/{model}"))
 }
 
-/// A step's `tokens` (`{input, output, reasoning, cache: {read, write}}`, input not counting the
-/// cache) as the usage the context bar reads. Passed through as they come, the cache sits one
-/// level down where the bar doesn't look, and a cached turn read as a few hundred tokens.
 pub(crate) fn usage_of(tokens: &Value, window: Option<u64>) -> Value {
     let count = |pointer: &str| tokens.pointer(pointer).and_then(Value::as_u64).unwrap_or(0);
     let mut usage = json!({
@@ -225,10 +215,6 @@ pub(crate) fn usage_of(tokens: &Value, window: Option<u64>) -> Value {
     usage
 }
 
-/// A compaction's usage with the context count cleared. Its tokens are the summarizing call's,
-/// so what it read is the context from before, and OpenCode reports no compacted size (2.3.0's
-/// `session.compaction.ended` carries only that call's tokens). `used: 0` tells the bar the size
-/// is unknown until the next step reports one; the tokens still count toward what the chat spent.
 pub(crate) fn after_compaction(mut usage: Value) -> Value {
     usage["used"] = json!(0);
     usage
@@ -242,7 +228,6 @@ fn tool_name(view: &View, id: &str) -> String {
         .unwrap_or_else(|| "tool".to_string())
 }
 
-/// A tool's text output: its text contents, a file content as its name or address.
 pub(super) fn tool_text(event: &Value) -> String {
     event
         .get("content")
@@ -263,7 +248,6 @@ pub(super) fn tool_text(event: &Value) -> String {
         .join("\n")
 }
 
-/// A 2.x structured error's message (`{error: {type, message}}`).
 fn error_message(event: &Value) -> Option<String> {
     event
         .pointer("/error/message")

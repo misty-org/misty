@@ -1,6 +1,3 @@
-//! Device job commands: signing run grants natively, and checking a job's grant before acting.
-#![cfg(desktop)]
-
 use file_access::fs;
 use serde::Deserialize;
 use serde_json::Value;
@@ -12,8 +9,6 @@ use crate::devices::agent_jobs;
 use crate::devices::commands::{local_device_id, require_device_window};
 use crate::devices::records::SignedRecord;
 
-/// The largest file a `folder.send` job hands to the Space's Library, the
-/// same limit as any upload from the app.
 const MAX_SENT_FILE_BYTES: u64 = 128 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
@@ -21,14 +16,12 @@ const MAX_SENT_FILE_BYTES: u64 = 128 * 1024 * 1024;
 pub struct RunGrantRequest {
     #[serde(default)]
     pub agent_id: String,
-    /// The chat or scheduled run. A grant with no chat can't run commands.
     #[serde(default)]
     pub chat_key: String,
     pub capabilities: Vec<String>,
     pub scopes: Vec<String>,
 }
 
-/// Signs run grants for an agent chat. They need no account: an agent works on this computer.
 #[tauri::command]
 pub async fn device_sign_run_grants(
     webview: tauri::Webview,
@@ -39,7 +32,6 @@ pub async fn device_sign_run_grants(
     sign_run_grants(&state, grants).await
 }
 
-/// The one signing path chats use.
 pub(crate) async fn sign_run_grants(
     state: &MistyRuntime,
     grants: Vec<RunGrantRequest>,
@@ -64,7 +56,6 @@ pub(crate) async fn sign_run_grants(
         .collect()
 }
 
-/// Checks a device job's grant before this device acts on it.
 #[tauri::command]
 pub async fn device_verify_job(
     webview: tauri::Webview,
@@ -85,9 +76,6 @@ pub async fn device_verify_job(
     agent_grants::verify(&device, &grant, &scope_id, &operation).map(|_| ())
 }
 
-/// Reads the file a `folder.send` job names: checks its grant and resolves the
-/// file inside the shared folder. The app then saves it to the conversation's
-/// Space Library, where the person's other devices open it.
 #[tauri::command]
 pub async fn device_read_shared_file(
     webview: tauri::Webview,

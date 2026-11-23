@@ -1,59 +1,23 @@
-//! `~/.misty/misty.conf`: which data folder this install opens, and the defaults new settings
-//! start from. It is mostly for developing Misty; most people never open it.
-//!
-//! ```text
-//! [metadata]
-//! misty.manifest = v1
-//! misty.root = ~/.misty/dev/default
-//!
-//! [defaults]
-//! general.auto_update_enabled = false
-//! ```
-//!
-//! - `misty.manifest` is the layout the folders follow. `v1` is `dev/<kind>` for debug builds,
-//!   `rel/<version>` for releases and `shared/` for what they share (see `paths`).
-//! - `misty.root` is the data folder to open. It is always a folder inside `~/.misty/dev` or
-//!   `~/.misty/rel`, never anywhere else and never a link: anything else stops Misty at launch.
-//! - `[defaults]` takes a settings key (`section.key`, as in `misty.db`) in place of Misty's own
-//!   default when a folder's settings fill in a key they don't have yet. A value already there is
-//!   never changed, so it seeds new folders and new settings and overrides nothing.
-//! - `[client]`, `[server]` and `[cli]` are environment defaults for the desktop app,
-//!   misty-server and misty-cli: a name there is used only when neither the process nor the
-//!   folder's `.env` sets it, so each works without a `.env` at all. Never secrets: those stay in
-//!   `.env`, and a name that looks like one (`*_KEY`, `*_TOKEN`, `*_SECRET`, `*_PASSWORD`,
-//!   `PRIVATE…`) makes the file one Misty won't read.
-//!
-//! Lines are `key = value`; `#` starts a comment. Unknown sections and keys are left alone.
 use std::path::{Component, Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::paths;
 
-/// The file's name in `~/.misty`.
 pub const FILE_NAME: &str = "misty.conf";
-/// The layout this build reads and writes.
 pub const MANIFEST: &str = "v1";
 
-/// What `misty.conf` says.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Conf {
-    /// `[metadata] misty.manifest`.
     pub manifest: Option<String>,
-    /// `[metadata] misty.root`, as written.
     pub root: Option<String>,
-    /// `[defaults]`, in order: `("general.auto_update_enabled", "false")`.
     pub defaults: Vec<(String, String)>,
-    /// `[client]`, `[server]` and `[cli]`, each in order, in the order they first appear.
     pub overrides: Vec<(String, Vec<(String, String)>)>,
 }
 
-/// The sections holding one program's environment defaults each.
 pub const OVERRIDE_SECTIONS: &[&str] = &["client", "server", "cli"];
 
-/// Names the desktop app settles from `misty.conf` itself, never from `[client]`.
 const OWN_NAMES: &[&str] = &["MISTY_PROFILE", "MISTY_DATA_ROOT"];
 
-/// Whether an environment name reads like a secret, which belongs in `.env`, never here.
 pub fn looks_secret(name: &str) -> bool {
     let name = name.to_ascii_uppercase();
     ["_KEY", "_TOKEN", "_SECRET", "_PASSWORD", "_PASS"]
@@ -65,7 +29,6 @@ pub fn looks_secret(name: &str) -> bool {
 }
 
 impl Conf {
-    /// One program's environment defaults (`client`, `server` or `cli`).
     pub fn overrides_for(&self, section: &str) -> &[(String, String)] {
         self.overrides
             .iter()
@@ -73,7 +36,6 @@ impl Conf {
             .map_or(&[], |(_, entries)| entries.as_slice())
     }
 
-    /// The `[defaults]` value for a settings key, if it has one.
     pub fn default_for(&self, section: &str, key: &str) -> Option<&str> {
         let name = format!("{section}.{key}");
         self.defaults
@@ -84,7 +46,6 @@ impl Conf {
     }
 }
 
-/// Reads `misty.conf`'s text. Malformed lines are errors, so a typo never goes unnoticed.
 pub fn parse(text: &str) -> Result<Conf, String> {
     let mut conf = Conf::default();
     let mut section = String::new();
@@ -149,7 +110,6 @@ fn unquote(value: &str) -> &str {
     value
 }
 
-/// `misty.conf`'s text for `conf`.
 pub fn render(conf: &Conf) -> String {
     let mut text = String::from(
         "# Which data folder Misty opens, and the defaults new settings start from.\n\
@@ -174,12 +134,10 @@ pub fn render(conf: &Conf) -> String {
     text
 }
 
-/// Where `misty.conf` is: `~/.misty/misty.conf`, whatever folder it names.
 pub fn path(misty_root: &Path) -> PathBuf {
     misty_root.join(FILE_NAME)
 }
 
-/// `misty.conf` under `misty_root`; `None` when there is none yet.
 pub fn read(misty_root: &Path) -> Result<Option<Conf>, String> {
     let file = path(misty_root);
     if !crate::fs::exists(&file) {
@@ -190,8 +148,6 @@ pub fn read(misty_root: &Path) -> Result<Option<Conf>, String> {
     parse(&text).map(Some)
 }
 
-/// Writes `misty.conf` naming `folder` (relative to `~/.misty`, such as `rel/0.2.0`) as the data
-/// folder, keeping its `[defaults]`. It goes through a temporary file, so it is never half-written.
 pub fn write_root(misty_root: &Path, folder: &Path) -> std::io::Result<()> {
     let mut conf = read(misty_root).ok().flatten().unwrap_or_default();
     conf.manifest = Some(MANIFEST.to_owned());
@@ -202,9 +158,6 @@ pub fn write_root(misty_root: &Path, folder: &Path) -> std::io::Result<()> {
     crate::fs::rename(&staging, &file)
 }
 
-/// The data folder `misty.root` names, relative to `~/.misty` (`dev/default`, `rel/0.2.0`), once
-/// it is checked to be one: `~/.misty/dev/<kind>` or `~/.misty/rel/<version>` exactly, no `..`, and
-/// no link on the way, so `misty.conf` can never point Misty's data somewhere else.
 pub fn folder_of(root: &str, misty_root: &Path) -> Result<PathBuf, String> {
     let refuse = || {
         format!(
@@ -239,8 +192,6 @@ pub fn folder_of(root: &str, misty_root: &Path) -> Result<PathBuf, String> {
     Ok(Path::new(kind).join(name))
 }
 
-/// Sets each `[client]` name this process doesn't already have, before anything reads them. The
-/// app calls it first thing, while it is still the only thread.
 pub fn apply_client_defaults() {
     for (name, value) in current().overrides_for("client") {
         if OWN_NAMES.contains(&name.as_str()) || std::env::var_os(name).is_some() {
@@ -251,7 +202,6 @@ pub fn apply_client_defaults() {
     }
 }
 
-/// This install's `misty.conf`, read once per process; an unreadable or missing one reads as empty.
 pub fn current() -> &'static Conf {
     static CURRENT: OnceLock<Conf> = OnceLock::new();
     CURRENT.get_or_init(|| {

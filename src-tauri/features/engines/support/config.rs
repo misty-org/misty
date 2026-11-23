@@ -5,7 +5,6 @@
 
 use serde_json::Value;
 
-/// Every engine the layer drives, by id.
 pub const ENGINES: [&str; 16] = [
     "claude",
     "kimi",
@@ -25,7 +24,6 @@ pub const ENGINES: [&str; 16] = [
     "hermes",
 ];
 
-/// Launch gate. Misty has no disabled pseudo-channel, so every known engine may start.
 pub fn ensure_engine_enabled(engine: &str) -> Result<(), String> {
     if ENGINES.contains(&engine) {
         crate::engines::channels::ensure_enabled(engine)
@@ -34,9 +32,6 @@ pub fn ensure_engine_enabled(engine: &str) -> Result<(), String> {
     }
 }
 
-/// The channel one launch uses: the record the person chose for this engine, or None for the
-/// engine's own sign-in and files. A session-scoped id is not kept by Misty; the store's
-/// current choice applies.
 pub(crate) fn resolve_provider(
     engine: &str,
     _provider_id: Option<&str>,

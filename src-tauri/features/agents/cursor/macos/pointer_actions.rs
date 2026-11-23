@@ -1,6 +1,3 @@
-//! The Accessibility actions Misty performs for desktop control, on the main
-//! thread after Rust checks the task, grant and snapshot. Coordinates are
-//! global display points with a top-left origin.
 use std::cell::{Cell, RefCell};
 
 use objc2_core_graphics::{CGEvent, CGEventField, CGEventFlags, CGScrollEventUnit};
@@ -9,10 +6,8 @@ use serde_json::{json, Value};
 
 use super::{accessibility::Element, pointer::pointer_move, ring};
 
-/// Marks input Misty sends, so its own Escape never reads as the person stopping it.
 pub(crate) const AGENT_EVENT_TAG: i64 = 0x4d49535459414754;
 
-// Carbon virtual key codes (HIToolbox/Events.h).
 const VK_RETURN: u16 = 0x24;
 const VK_TAB: u16 = 0x30;
 const VK_DELETE: u16 = 0x33;
@@ -32,7 +27,6 @@ thread_local! {
     static TARGET_PID: Cell<i32> = const { Cell::new(0) };
 }
 
-/// Forgets the field Misty focused and the app it clicked into.
 pub(super) fn forget_target() {
     FOCUSED.with(|slot| *slot.borrow_mut() = None);
     TARGET_PID.with(|pid| pid.set(0));
@@ -46,7 +40,6 @@ fn editable(role: &str) -> bool {
     ["AXTextField", "AXTextArea", "AXComboBox", "AXSearchField"].contains(&role)
 }
 
-/// Presses or focuses the control under a point without moving the real pointer.
 fn point_at(x: f64, y: f64) -> Value {
     let Some(element) = Element::system_wide().at_position(x, y) else {
         return error("Nothing Misty can use is at that point. Choose a visible control.");
@@ -90,7 +83,6 @@ fn point_at(x: f64, y: f64) -> Value {
     })
 }
 
-/// Inserts at the field Misty focused, replacing any selection, like typing.
 fn insert_text(text: &str) -> Value {
     let Some(target) = FOCUSED.with(|slot| slot.borrow().clone()) else {
         return error("Click a text field before typing.");
@@ -194,8 +186,6 @@ fn integer(action: &Value, key: &str) -> i32 {
         .unwrap_or(0)
 }
 
-/// Called on the main queue after Rust checks the task, grant and snapshot.
-/// `(x, y)` is in global display coordinates.
 pub(crate) fn desktop_action(action: &Value, x: f64, y: f64) -> Value {
     if matches!(action["kind"].as_str(), Some("point" | "scroll")) {
         pointer_move(x, y);
@@ -204,7 +194,6 @@ pub(crate) fn desktop_action(action: &Value, x: f64, y: f64) -> Value {
     perform(action, x, y)
 }
 
-/// The Accessibility and key-event half of an action, with nothing drawn.
 pub(crate) fn perform(action: &Value, x: f64, y: f64) -> Value {
     match action["kind"].as_str().unwrap_or("") {
         "point" => point_at(x, y),

@@ -1,7 +1,3 @@
-//! One row per run on this computer, whatever engine ran it, for a Space's timeline: the mode it
-//! started in (read from the same facts the gate decides with), how it ended, how many tools it
-//! used and which files it wrote. It holds no prompt, answer or tool result, lives in `misty.db`
-//! and never syncs.
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
@@ -11,11 +7,8 @@ use super::tool_policy::RunFacts;
 use super::windows::account_of_window;
 use database::store::Store;
 
-/// Rows older than this go when a run starts.
 const KEPT_DAYS: i64 = 90;
-/// Files kept per run; the timeline shows a count and the first few.
 const KEPT_FILES: usize = 50;
-/// Rows a timeline asks for at most.
 const MAX_ROWS: usize = 200;
 
 fn now_ms() -> i64 {
@@ -31,15 +24,11 @@ fn store(app: &AppHandle) -> Store {
         .store()
 }
 
-/// When this launch of the app first touched the ledger: before any run it starts is written.
 fn session_started() -> i64 {
     static AT: std::sync::OnceLock<i64> = std::sync::OnceLock::new();
     *AT.get_or_init(now_ms)
 }
 
-/// A row from an earlier launch that still says its run is going, when nothing in this app runs
-/// it: the app closed under it (an outside engine's CLI goes with the app), so its end was never
-/// written. It reads as stopped, or it would show as working for good.
 fn settle_cut_off(rows: &mut [LedgerRow], session_started: i64, going: impl Fn(&str) -> bool) {
     for row in rows {
         let open = matches!(row.state.as_str(), "running" | "needs-you");
@@ -49,8 +38,6 @@ fn settle_cut_off(rows: &mut [LedgerRow], session_started: i64, going: impl Fn(&
     }
 }
 
-/// The database, once the app has set up its runtime. A run that resumes as the app starts can
-/// report before that, and those reports only leave a gap.
 fn store_if_ready(app: &AppHandle) -> Option<Store> {
     Some(
         app.try_state::<crate::app::runtime::MistyRuntime>()?
@@ -59,7 +46,6 @@ fn store_if_ready(app: &AppHandle) -> Option<Store> {
     )
 }
 
-/// The engine a request names, or Misty's own.
 fn engine_of(body: &Value) -> String {
     body["engine"]["id"]
         .as_str()
@@ -75,7 +61,6 @@ pub(super) fn record_start(
     now: i64,
 ) -> rusqlite::Result<()> {
     let facts = RunFacts::of_request(run_id, body);
-    // A sub-agent's run is part of the run that started it.
     if !facts.parent_run_id.is_empty() {
         return Ok(());
     }
@@ -101,7 +86,6 @@ pub(super) fn record_start(
     Ok(())
 }
 
-/// Whether a tool changes the file it names; the same reading the claims use.
 fn writes_file(tool: &str) -> bool {
     let name = tool
         .rsplit("__")
@@ -157,7 +141,6 @@ pub(super) fn record_event(
                     files.push(path.to_owned());
                 }
             }
-            // A tool starting means the run is past any question it asked.
             connection.execute(
                 "UPDATE agent_run_ledger SET tools = tools + 1, files = ?2, updated_at = ?3,
                      state = CASE state WHEN 'needs-you' THEN 'running' ELSE state END
@@ -188,7 +171,6 @@ pub(super) fn record_event(
     Ok(())
 }
 
-/// Whether an event changes a run's row, so the rest never reach the database.
 fn matters(kind: &str) -> bool {
     matches!(
         kind,
@@ -200,8 +182,6 @@ fn matters(kind: &str) -> bool {
     )
 }
 
-/// Runs database writes one after another on a thread of their own, so a run's start is written
-/// before its first step and its steps in the order they happened.
 fn in_order(job: impl FnOnce() + Send + 'static) {
     type Job = Box<dyn FnOnce() + Send>;
     static QUEUE: std::sync::OnceLock<std::sync::Mutex<std::sync::mpsc::Sender<Job>>> =
@@ -223,8 +203,6 @@ fn in_order(job: impl FnOnce() + Send + 'static) {
         .send(Box::new(job));
 }
 
-/// Notes a run's start, off the caller's thread. A row that can't be written only leaves a gap in
-/// the timeline.
 pub(super) fn note_start(app: &AppHandle, run_id: &str, body: &Value) {
     session_started();
     let Some(store) = store_if_ready(app) else {
@@ -244,7 +222,6 @@ pub(super) fn note_start(app: &AppHandle, run_id: &str, body: &Value) {
     });
 }
 
-/// Notes what an event changes about its run and its steps.
 pub(super) fn note_event(app: &AppHandle, run_id: &str, event: &Value) {
     let kind = event["type"].as_str().unwrap_or("");
     let (ledger, steps) = (matters(kind), super::run_steps::matters(kind));
@@ -319,8 +296,6 @@ pub(super) fn rows(
     rows.collect()
 }
 
-/// A Space's timeline: the runs in these chats, newest first. The window passes the Space's chats,
-/// since a chat's Space is known there; rows of another account never come back.
 #[tauri::command]
 pub async fn agent_run_timeline(
     app: AppHandle,

@@ -1,11 +1,5 @@
 import type { MistyActivityEntry } from "../conversations/state/activity";
 
-/**
- * The first prefix a tool's name starts with wins, so a narrow one sits above a wide one
- * (`file.create` above `file.`, Misty's own server tools above `mcp__misty__`). An engine names
- * Misty's tools its own way: `studio_go`, `mcp__misty__studio_go`. The codes are the few a Space's
- * other members may be told, so the studio's own moves count as plain work.
- */
 const toolWords: [prefix: string, words: string, code: string][] = [
   ["studio.", "Moving in the studio", "working"],
   ["studio_", "Moving in the studio", "working"],
@@ -36,13 +30,11 @@ const toolWords: [prefix: string, words: string, code: string][] = [
 
 type Events = Pick<MistyActivityEntry, "events">;
 
-/** A tool as a few plain words, and as a fixed code. */
 export function wordsOf(tool: string): { words: string; code: string } {
   const known = toolWords.find(([prefix]) => tool.startsWith(prefix));
   return known ? { words: known[1], code: known[2] } : { words: "Working", code: "working" };
 }
 
-/** A run's latest tool as a few plain words, and as a fixed code. */
 export function doingOf(entry: Events): { words: string; code: string } {
   for (let index = entry.events.length - 1; index >= 0; index -= 1) {
     const tool = entry.events[index]?.toolName ?? entry.events[index]?.tool_name;
@@ -51,10 +43,8 @@ export function doingOf(entry: Events): { words: string; code: string } {
   return { words: "Thinking", code: "thinking" };
 }
 
-/** Codes that say nothing about what kind of work a run was. */
 const plainCodes = new Set(["working", "thinking"]);
 
-/** The kind of work a run did most, as a fixed code, or "" when its tools say none. */
 export function mainKindOf(entry: Events): string {
   const counts = new Map<string, number>();
   for (const event of entry.events) {
@@ -68,8 +58,6 @@ export function mainKindOf(entry: Events): string {
   return main;
 }
 
-/** The last few things a run did, newest first, in the same plain words. Doing the same kind of
- * thing several times in a row counts once. */
 export function stepsOf(entry: Events, most = 4): string[] {
   const steps: string[] = [];
   for (let index = entry.events.length - 1; index >= 0 && steps.length < most; index -= 1) {

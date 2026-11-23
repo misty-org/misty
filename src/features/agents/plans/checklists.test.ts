@@ -5,7 +5,7 @@ import {
   nestChildren,
   upsertChecklist,
 } from "./checklists";
-import type { AgentChecklist } from "./planTypes";
+import type { AgentChecklist } from "./plan_types";
 
 const list = (overrides: Partial<AgentChecklist>): AgentChecklist => ({
   invocationId: "inv_parent",

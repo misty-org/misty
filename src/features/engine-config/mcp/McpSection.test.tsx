@@ -23,21 +23,18 @@ vi.mock("./api", () => ({
   mcpApi: api,
 }));
 
-vi.mock("../EngineMark", () => ({ EngineMark: () => null, hasEngineMark: () => false }));
-
 import { engineConfigHost } from "../host";
 
-import { setCachedResource } from "@/api/cache/cached-resource";
-import { useMcpProbeStore } from "./probe-store";
+import { setCachedResource } from "@/api/cache/cached_resource";
+import { useMcpProbeStore } from "./probe_store";
 import { McpSection } from "./McpSection";
-import { mcpInventoryKey } from "./useMcpInventory";
+import { mcpInventoryKey } from "./use_mcp_inventory";
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-// The Space's linked folders: one folder, chosen.
 engineConfigHost.provide({
   useLinkedFolders: () => ({ folders: ["/ws"], picked: "/ws" }),
   Markdown: ({ children }) => children,
@@ -118,7 +115,6 @@ function noSession(): McpRuntimeSection {
   };
 }
 
-/** One engine partition; defaults to a plain native engine with no config. */
 function engine(
   id: McpEngineInventory["id"],
   overrides: Partial<McpEngineInventory> = {},
@@ -201,8 +197,6 @@ beforeEach(() => {
   api.setEnabled.mockResolvedValue(claudeProject());
   api.probe.mockResolvedValue(connectedProbe());
   useMcpProbeStore.setState({ results: {}, pending: {}, runningAll: false, error: null });
-  // The inventory is kept for the session; each test starts from an empty one, so no test sees
-  // (or checks) the entries the one before it read.
   setCachedResource(mcpInventoryKey("/ws"), null);
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -224,28 +218,18 @@ function row(name: string): HTMLLIElement | undefined {
   return [...document.querySelectorAll("li")].find((item) => item.textContent?.includes(name));
 }
 
-function buttonExact(text: string): HTMLButtonElement {
-  const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find(
-    (item) => item.textContent?.trim() === text,
-  );
-  if (!button) throw new Error(`button not found: ${text}`);
-  return button;
-}
-
 describe("McpSection", () => {
   it("reads the chosen folder's config and keeps config and runtime apart", async () => {
     await renderSection();
     expect(api.inventory).toHaveBeenCalledWith("/ws");
     expect(document.body.textContent).toContain("alpha");
     expect(document.body.textContent).toContain("beta");
-    // The runtime section says why it's empty instead of claiming there are no servers.
     expect(document.body.textContent).toContain("At runtime");
     expect(document.body.textContent).toContain("No session is running");
   });
 
   it("offers no switch for a read-only entry, and says why in its details", async () => {
     await renderSection();
-    // alpha is on and read-only: its shelf item shows it's on, with nothing to press.
     expect(row("alpha")?.textContent).toContain("On");
     expect(
       [...(row("alpha")?.querySelectorAll("button") ?? [])].some((button) =>
@@ -306,11 +290,9 @@ describe("McpSection", () => {
   it("checks on open, reuses fresh results, and checks again only on request", async () => {
     api.probe.mockResolvedValue(connectedProbe(["a", "b"]));
     await renderSection();
-    // Only the current engine's entries that are on and checkable (beta is off in the fixture).
     await vi.waitFor(() => expect(document.body.textContent).toContain("Connected with 2 tools"));
     expect(api.probe.mock.calls.map((call) => call[0].name)).toEqual(["alpha"]);
 
-    // Mount again (opening quickly again): fresh results are reused and nothing starts.
     act(() => root.unmount());
     root = createRoot(container);
     api.probe.mockClear();
@@ -320,7 +302,6 @@ describe("McpSection", () => {
     });
     expect(api.probe).not.toHaveBeenCalled();
 
-    // Check all forces a new run (still only for entries that are on).
     await act(async () =>
       document.querySelector<HTMLButtonElement>('button[aria-label="Check all"]')!.click(),
     );
@@ -361,14 +342,11 @@ describe("McpSection", () => {
     });
     await renderSection();
     await vi.waitFor(() => expect(row("alpha")?.textContent).toContain("Failed"));
-    // The reason is the chip's tooltip, which keyboard focus opens. A later probe render may
-    // replace the chip, so each try focuses the one on screen.
     const chip = () => row("alpha")?.querySelector<HTMLElement>('span[tabindex="0"]');
     await vi.waitFor(
       async () => {
         await act(async () => {
           chip()?.blur();
-          // A Tab press first, so the focus reads as the keyboard's even after earlier clicks.
           document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
           chip()?.focus();
           await new Promise((resolve) => setTimeout(resolve, 100));

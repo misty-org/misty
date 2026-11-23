@@ -1,17 +1,3 @@
-// The makers' published builds Misty downloads itself, because their installers can't be pointed
-// at Misty's folder or would change the person's shell profile: Claude Code's `install.sh` always
-// runs `claude install` into `~/.local`, OpenCode's always writes `~/.opencode/bin`, and Codex's
-// and Antigravity's scripts add their folder to the shell profile with no way to skip it. Each
-// comes from the same place its script fetches it, with the same check or a stronger one:
-//
-// - Claude Code: `downloads.claude.ai/claude-code-releases/<version>/<platform>/claude`, checked
-//   against the SHA-256 in that version's `manifest.json`, as `install.sh` and `install.ps1` do.
-// - OpenCode: the npm registry's `@opencode/cli-<target>` tarball its script fetches, checked
-//   against the registry's SHA-512 integrity (the script itself checks nothing).
-// - Codex: its release's `codex-package-<target>.tar.gz` (`codex_build.rs`).
-// - Antigravity: the build its release manifest names, checked against its SHA-512
-//   (`antigravity_build.rs`).
-
 use std::path::{Path, PathBuf};
 
 use super::downloads::{self, Checksum};
@@ -27,14 +13,11 @@ const CLAUDE_RELEASES: &str = "https://downloads.claude.ai/claude-code-releases"
 const OPENCODE_LATEST: &str = "https://opencode.ai/update/api/latest/cli/npm";
 const NPM_REGISTRY: &str = "https://registry.npmjs.org";
 
-/// The system a build is picked for.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Target<'a> {
     pub(super) os: &'a str,
     pub(super) arch: &'a str,
-    /// Linux on musl (Alpine and the like).
     pub(super) musl: bool,
-    /// An x86-64 CPU with AVX2; OpenCode has a baseline build for ones without.
     pub(super) avx2: bool,
 }
 
@@ -49,7 +32,7 @@ impl Target<'static> {
     }
 }
 
-#[allow(clippy::disallowed_methods)] // Only whether the C library is there; nothing is read.
+#[allow(clippy::disallowed_methods)]
 fn is_musl() -> bool {
     cfg!(target_os = "linux")
         && (Path::new("/lib/libc.musl-x86_64.so.1").exists()
@@ -68,7 +51,6 @@ fn has_avx2() -> bool {
     }
 }
 
-/// Claude Code's platform name in its manifest.
 pub(super) fn claude_platform(target: Target) -> Option<String> {
     let arch = match target.arch {
         "aarch64" => "arm64",
@@ -84,7 +66,6 @@ pub(super) fn claude_platform(target: Target) -> Option<String> {
     }
 }
 
-/// The SHA-256 `manifest.json` gives for `platform`.
 pub(super) fn claude_checksum(manifest: &serde_json::Value, platform: &str) -> Option<Checksum> {
     manifest
         .get("platforms")?
@@ -94,8 +75,6 @@ pub(super) fn claude_checksum(manifest: &serde_json::Value, platform: &str) -> O
         .and_then(Checksum::sha256_hex)
 }
 
-/// OpenCode's build name (`darwin-arm64`, `linux-x64-baseline-musl`, …). Windows isn't offered
-/// here: OpenCode publishes no Windows script, so Windows installs it through npm.
 pub(super) fn opencode_target(target: Target) -> Option<String> {
     let os = match target.os {
         "macos" => "darwin",
@@ -125,18 +104,15 @@ fn program_name(base: &str) -> String {
     }
 }
 
-/// Where Misty keeps an engine's downloaded program.
 pub(super) fn program_path(engine: &str) -> PathBuf {
     program_path_in(&InstallRoot::here(), engine)
 }
 
-/// [`program_path`] for Misty's folder at `root`.
 pub(super) fn program_path_in(root: &InstallRoot, engine: &str) -> PathBuf {
     let base = super::cli_binary_name(engine);
     root.engine_dir(engine).join("bin").join(program_name(base))
 }
 
-/// What a plan says this route does, for Show details.
 pub(super) fn plan_step(engine: &str) -> String {
     let into = super::shown_path(&engine_install_dir(engine).join("bin"));
     match engine {
@@ -160,7 +136,6 @@ pub(super) fn plan_step(engine: &str) -> String {
     }
 }
 
-/// Whether Misty can download this engine's build for this computer.
 pub(super) fn available(engine: &str, target: Target) -> bool {
     match engine {
         "claude" => claude_platform(target).is_some(),
@@ -171,7 +146,6 @@ pub(super) fn available(engine: &str, target: Target) -> bool {
     }
 }
 
-/// Downloads and checks the engine's build into its folder, replacing an older one.
 pub(super) async fn install(engine: &str, reporter: &ProgressReporter) -> Result<(), String> {
     let target = Target::this_computer();
     match engine {
@@ -267,7 +241,6 @@ async fn install_opencode(target: Target<'_>, reporter: &ProgressReporter) -> Re
     placed
 }
 
-/// Moves an unpacked program to `dest`, where Misty keeps the engine's program.
 fn place(unpacked: &Path, dest: &Path) -> Result<(), String> {
     if !file_access::fs::is_file(unpacked) {
         return Err("The download didn't hold the program Misty expected.".into());

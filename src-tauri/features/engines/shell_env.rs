@@ -36,6 +36,10 @@ pub(super) fn login_probe() -> Option<Probe> {
     })
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "looks for the system's login shell, which lives outside the gate"
+)]
 fn allowed_shell() -> Option<PathBuf> {
     if let Some(shell) = std::env::var_os("SHELL") {
         return allowlisted_shell(Path::new(&shell)).map(Path::to_path_buf);
@@ -70,8 +74,6 @@ pub(super) fn env_name_eq(name: &std::ffi::OsStr, key: &str) -> bool {
 }
 
 pub(super) fn env_has_non_empty_value(command: &Command, key: &str) -> bool {
-    // An explicit value, an empty value and a removal are all this launch's decision; the
-    // login shell's value never overrides them.
     command
         .as_std()
         .get_envs()
@@ -106,8 +108,6 @@ pub(super) async fn resolve_from_shell(
         .await
         .ok()?
         .ok()?;
-    // A failed start, an rc file that exits early or a timeout yields nothing; the caller may
-    // retry on the next send.
     if !output.status.success() {
         return None;
     }

@@ -1,6 +1,3 @@
-//! WebView2 on Windows: `chrome.webview.postMessage`, marked with
-//! `WIRE_PREFIX` because Tauri's IPC listens on the same event.
-
 use super::{deliver, WIRE_PREFIX};
 use std::{
     collections::HashSet,
@@ -13,13 +10,11 @@ use windows::Win32::System::Com::CoTaskMemFree;
 
 pub(super) const SENDER_SCRIPT: &str = "() => { const view = window.chrome?.webview; if (!view || typeof view.postMessage !== 'function') return null; const post = view.postMessage.bind(view); return (message) => post('\\u0001kiri-host\\u0001' + message); }";
 
-/// Native views that already have the handler.
 fn installed() -> &'static Mutex<HashSet<usize>> {
     static INSTALLED: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
     INSTALLED.get_or_init(Mutex::default)
 }
 
-// Frees native strings even when the call fails after allocating them.
 unsafe fn take_string(
     read: impl FnOnce(*mut PWSTR) -> windows::core::Result<()>,
 ) -> Option<String> {
@@ -55,7 +50,6 @@ pub(super) fn install(webview: &Webview) -> Result<(), String> {
                     return Ok(());
                 };
                 let text = take_string(|pointer| args.TryGetWebMessageAsString(pointer));
-                // Only top-level documents reach this event.
                 if let Some(body) = text
                     .as_deref()
                     .and_then(|text| text.strip_prefix(WIRE_PREFIX))

@@ -1,5 +1,3 @@
-//! Small notes kept beside the records.
-
 use super::*;
 
 impl LocalStore {

@@ -45,8 +45,6 @@ use target_sync::*;
 use updates_popular::*;
 use usage::*;
 
-/// Grants the file gate every engine skills folder the hub syncs into, following each CLI's own
-/// home variable. Runs once as the app starts.
 pub fn allow_skill_targets() {
     for target in TARGETS.iter() {
         for home in target_home_dirs(target) {
@@ -55,13 +53,10 @@ pub fn allow_skill_targets() {
     }
 }
 
-/// Repoints engines' skill links left leading into another of Misty's folders (an older version's,
-/// or the layout from before profiles). Runs once at launch, after `allow_skill_targets`.
 pub fn repoint_skill_links() {
     target_sync::repoint_links_from_other_folders();
 }
 
-/// A normalized error: Tauri hands the serialized `Err` to the renderer (not a string).
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HubError {
@@ -85,12 +80,10 @@ impl From<SkillError> for HubError {
     }
 }
 
-/// A query's `force` counts only as the string "1" (as upstream `get("force") === "1"`).
 fn param_force(params: &Value) -> bool {
     params.get("force").and_then(Value::as_str) == Some("1")
 }
 
-/// A string array from the payload; a missing or non-array key is None (the caller picks the default).
 fn string_array_param(payload: &Value, key: &str) -> Option<Vec<String>> {
     payload.get(key).and_then(Value::as_array).map(|arr| {
         arr.iter()
@@ -100,7 +93,6 @@ fn string_array_param(payload: &Value, key: &str) -> Option<Vec<String>> {
     })
 }
 
-/// Reads from the skills hub.
 #[tauri::command]
 pub async fn engine_skills_query(mode: String, params: Value) -> Result<Value, HubError> {
     let mode = if mode.is_empty() {
@@ -161,7 +153,6 @@ pub async fn engine_skills_query(mode: String, params: Value) -> Result<Value, H
                 .map_err(HubError::from)?;
             Ok(payload)
         }
-        // skills.sh gives only name / repo / installs: the details come from the repo's SKILL.md.
         "remote_skill_content" => {
             let owner = js_string(params.get("owner"));
             let name = js_string(params.get("name"));
@@ -194,7 +185,6 @@ pub async fn engine_skills_query(mode: String, params: Value) -> Result<Value, H
     }
 }
 
-/// Changes the skills hub.
 #[tauri::command]
 pub async fn engine_skills_mutate(action: String, payload: Value) -> Result<Value, HubError> {
     match action.as_str() {
@@ -202,8 +192,6 @@ pub async fn engine_skills_mutate(action: String, payload: Value) -> Result<Valu
             let skill = payload.get("skill").cloned().unwrap_or(Value::Null);
             let targets = string_array_param(&payload, "targets")
                 .unwrap_or_else(|| vec!["claude".to_string(), "codex".to_string()]);
-            // `force` acknowledges that a locally modified managed copy will
-            // be overwritten (updates); without it the backend refuses.
             let force = payload
                 .get("force")
                 .and_then(Value::as_bool)

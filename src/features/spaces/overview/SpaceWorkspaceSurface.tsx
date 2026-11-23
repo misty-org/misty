@@ -3,18 +3,17 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewFocused } from "@/features/app-windows";
 import type { WorkspaceView } from "@/features/app-windows/core";
-import { Button, Surface, Text, useNotice } from "@misty/ui";
+import { Button, EmptyState, Surface, Text, useNotice } from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../create/GlobalCreateSpaceDialog";
 import { SpaceSectionView } from "./SpaceSectionView";
-import { preferredDefaultSpace, windowSpace } from "../routes/defaultSpace";
+import { preferredDefaultSpace, windowSpace } from "../routes/default_space";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { defaultSpaceRoute } from "../routes/defaultSpaceRoute";
-import { useSpacesStore } from "../list/useSpacesStore";
-import { renamedSectionPath, useSpaceRoute } from "../routes/spaceRoute";
+import { defaultSpaceRoute } from "../routes/default_space_route";
+import { useSpacesStore } from "../list/use_spaces_store";
+import { renamedSectionPath, useSpaceRoute } from "../routes/space_route";
 import { SpacePageLoadingPlaceholder } from "../components/SpacePageLoadingPlaceholder";
 import { SpacePageShortcuts } from "../components/SpacePageShortcuts";
 import { SpaceInvitationsNotice } from "../create/SpaceInvitationsNotice";
-/** Each Space pane owns its navigation and content. */
 export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -28,7 +27,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   const invitations = useSpacesStore((state) => state.invitations);
   const respondInvite = useSpacesStore((state) => state.respondInvite);
   const space = spaces.find((item) => item.id === route.activeSpaceId);
-  // Any Space opens here, in this tab; a bare route lands on the window's current one.
   const fallback = hasTauriInternals() ? windowSpace(spaces) : preferredDefaultSpace(spaces);
   const [inviteError, setInviteError] = useState("");
   useNotice(Boolean(user) && !ready && Boolean(error), {
@@ -52,16 +50,12 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
     if (location.pathname === base) {
       navigate(`${base}/home${location.search}${location.hash}`, { replace: true });
     }
-    // A link to a page by its old name (the Library) opens the page under its new one.
     const renamed = renamedSectionPath(location.pathname);
     if (renamed) navigate(`${renamed}${location.search}${location.hash}`, { replace: true });
   }, [location.hash, location.pathname, location.search, navigate, route.activeSpaceId]);
 
-  // Signed out, the window shows only the sign-in pages.
   if (!user) return null;
 
-  // The Spaces are read for the first time, with nothing saved: the page the route opens, in
-  // that page's own shape (the home's top bar, page tiles and panels, a chat, a doc, …).
   if (!ready)
     return (
       <Surface tone="page" className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -74,8 +68,10 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       <GlobalCreateSpaceDialog>
         {(create) => (
           <div className="grid h-full place-content-center gap-4 p-6 text-center">
-            <h1 className="text-xl font-semibold">Your project Spaces</h1>
-            <Text tone="muted" wrap className="text-sm">
+            <Text as="h1" size="display" tone="bright" weight="semibold" wrap className="m-0">
+              Your project Spaces
+            </Text>
+            <Text as="p" size="page" tone="muted" wrap className="m-0">
               Chat, plan, and keep project materials together.
             </Text>
             <SpaceInvitationsNotice
@@ -88,7 +84,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
                 );
               }}
             />
-            <Button size="lg" onClick={create}>
+            <Button variant="primary" size="lg" onClick={create}>
               Create Space
             </Button>
           </div>
@@ -96,12 +92,7 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
       </GlobalCreateSpaceDialog>
     );
 
-  if (!space)
-    return (
-      <Text tone="muted" wrap className="p-6 text-sm">
-        This Space is unavailable.
-      </Text>
-    );
+  if (!space) return <EmptyState title="This Space is unavailable" />;
   return (
     <>
       <ViewingSpace spaceId={space.id} onView={setViewingSpace} />
@@ -112,7 +103,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
         data-space-workspace={route.activeSpaceId}
         aria-label={`${space?.name ?? "Space"} workspace`}
       >
-        {/* The Space row in the sidebar carries the Space's controls; the page has no bar. */}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <SpacePageShortcuts space={space} />
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -129,10 +119,6 @@ export function SpaceWorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   );
 }
 
-/**
- * Marks the Space as the one being viewed while this tab has focus. Focus is read here rather
- * than by the page, so a tab gaining or losing focus renders this alone, not the whole Space.
- */
 function ViewingSpace(props: { spaceId: string; onView(spaceId: string): void }) {
   const focused = useWorkspaceViewFocused();
   const { spaceId, onView } = props;

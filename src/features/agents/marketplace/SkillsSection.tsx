@@ -26,7 +26,7 @@ import {
   type SkillTargetId,
   type UpdateMap,
 } from "@/features/engine-config/skills";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
   CatalogDone,
@@ -39,25 +39,17 @@ import {
   ShelfItem,
   useConfirmDelete,
 } from "@misty/ui";
-import { openAgentsHub } from "../hub/agentsHubStore";
+import { openAgentsHub } from "../hub/agents_hub_store";
 import { failureText, skillTargetOf } from "./api";
 import { EnginePicker, MarketShelf, MarketShelvesSkeleton, MarketSkeleton } from "./MarketShelf";
-import { useMarketEngines } from "./marketView";
-import { entryMatches, skillEntries, useSkillCatalog, type SkillEntry } from "./skillCatalog";
+import { useMarketEngines } from "./market_view";
+import { entryMatches, skillEntries, useSkillCatalog, type SkillEntry } from "./skill_catalog";
 import { SkillStoreDetail } from "./SkillStoreDetail";
 
-/** How long the trash keeps an uninstalled skill (native `skills` trash): Undo lasts as long. */
 const TRASH_KEEPS_MS = 5 * 60 * 1000;
 
 type SkillsTab = "all" | "usage";
 
-/**
- * Explore's Skills: Agent Skills for one engine, from the skills hub, which keeps one copy of each
- * skill and syncs it into each engine's own skills folder. The control row picks the engine, the
- * catalog or Claude Code's usage, and holds Check for updates, Import and the hub's repositories.
- * The shelves are what the engine has, then each repository's skills (skills.sh as the person
- * types), then skills only other engines have. The rail's search arrives as `query`.
- */
 export function SkillsSection({ query }: { query: string }) {
   const { engines, engine, name, error, reload, pick } = useMarketEngines("skills", (id) =>
     Boolean(skillTargetOf(id)),
@@ -125,8 +117,6 @@ function EngineSkillShelves({
   const usageStore = useSkillUsage(Boolean(opened?.row));
   const targetLabel = (id: string) => store.targets.find((info) => info.id === id)?.label ?? id;
 
-  // The hub's actions, as its own page runs them; what they report shows as a notice, and an
-  // uninstall's notice offers Undo while the trash keeps it.
   const restoreId = useRef<string | null>(null);
   const undo = (id: string) =>
     void store.restore(id).then(
@@ -144,7 +134,6 @@ function EngineSkillShelves({
       action: trashed
         ? { label: t("feedback.restoreNow"), onSelect: () => undo(trashed) }
         : undefined,
-      // Undo lasts as long as the trash keeps the skill.
       duration: trashed ? TRASH_KEEPS_MS : undefined,
     });
   };
@@ -187,7 +176,6 @@ function EngineSkillShelves({
     }
   };
 
-  /** Takes the skill out of this engine; the last engine's copy goes with the hub's own. */
   const removeHere = (row: SkillRow) => {
     if (!row.targets.some((id) => id !== target)) {
       setConfirm({ kind: "uninstall", skill: row });
@@ -305,7 +293,6 @@ function EngineSkillShelves({
           entry.row && !entry.found && (entry.row.targetStates?.[target] ?? "off") === "off",
       )
     : [];
-  // Each repository is a shelf, in the order the catalog lists them.
   const shelves = new Map<string, SkillEntry[]>();
   for (const entry of matching)
     if (entry.found && entry.repo)

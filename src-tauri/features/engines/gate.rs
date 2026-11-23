@@ -1,18 +1,9 @@
-//! Every permission ask an engine raises (Claude Code's `can_use_tool`, Codex's approval
-//! requests, ACP's `session/request_permission`, OpenCode's `permission.asked`) comes here, and
-//! Misty's own gate answers it under the mode the run started with. Nothing in the engine layer
-//! decides a permission by itself; the answer is written back on the engine's own channel.
-//!
-//! The decision is made in `runs.rs` (it knows the run's mode and account). This module only
-//! routes: an engine asks with its run id, the installed decider answers.
-
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 
 use serde_json::{json, Value};
 
-/// The answer to one ask.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Decision {
     Allow,
@@ -24,7 +15,6 @@ type Decide =
 
 static DECIDER: OnceLock<Arc<Decide>> = OnceLock::new();
 
-/// Installs the decider, once, as the app starts.
 pub(crate) fn install(
     decide: impl Fn(String, String, Value) -> Pin<Box<dyn Future<Output = Decision> + Send>>
         + Send
@@ -34,8 +24,6 @@ pub(crate) fn install(
     let _ = DECIDER.set(Arc::new(decide));
 }
 
-/// Asks whether the run may go ahead with `tool` and its `input`. With no decider installed (a
-/// test, or before the app is up) the answer is no.
 pub(crate) async fn ask(run_id: &str, tool: &str, input: Value) -> Decision {
     match DECIDER.get() {
         Some(decide) => decide(run_id.to_string(), tool.to_string(), input).await,
@@ -43,7 +31,6 @@ pub(crate) async fn ask(run_id: &str, tool: &str, input: Value) -> Decision {
     }
 }
 
-/// Answers a Claude Code / CodeBuddy control-protocol permission ask on the run's stdin.
 pub(crate) fn answer_control_permission(
     registry: Arc<super::ProcessRegistry>,
     run_id: String,
@@ -66,7 +53,6 @@ pub(crate) fn answer_control_permission(
     });
 }
 
-/// The option an ACP permission ask offers for `decision`, in the order a person would choose.
 pub(crate) fn acp_outcome(params: &Value, decision: &Decision) -> Value {
     let wanted: &[&str] = match decision {
         Decision::Allow => &["allow_once", "allow_always"],
@@ -88,7 +74,6 @@ pub(crate) fn acp_outcome(params: &Value, decision: &Decision) -> Value {
     json!({ "outcome": { "outcome": "cancelled" } })
 }
 
-/// What an ACP permission ask is about: the tool call's title and raw input.
 fn acp_subject(params: &Value) -> (String, Value) {
     let call = &params["toolCall"];
     let tool = call["title"]
@@ -104,8 +89,6 @@ fn acp_subject(params: &Value) -> (String, Value) {
     (tool, input)
 }
 
-/// Answers an ACP `session/request_permission` later, on the run's stdin, once the gate has
-/// decided. The ACP read loop returns `None` for the request so it is not answered twice.
 pub(crate) fn answer_acp_permission(
     registry: Arc<super::ProcessRegistry>,
     run_id: String,
@@ -121,8 +104,6 @@ pub(crate) fn answer_acp_permission(
     });
 }
 
-/// What an ACP driver needs to send its agent's requests to the gate: the run they belong to,
-/// and whether the run is in Bypass, where the engine's own asks are allowed as they come.
 #[derive(Clone)]
 pub(crate) struct AcpGate {
     registry: Arc<super::ProcessRegistry>,
@@ -140,9 +121,6 @@ impl AcpGate {
     }
 }
 
-/// Answers an agent-initiated ACP request. A permission ask, and a file write the agent asks
-/// the client to make, go to the gate and are answered later on the run's stdin (`None`); file
-/// reads inside the folder and anything unknown are answered at once.
 pub(crate) fn acp_agent_request(
     gate: Option<&AcpGate>,
     workspace: &std::path::Path,
@@ -193,9 +171,6 @@ pub(crate) fn acp_agent_request(
     }
 }
 
-/// Misty's Space server, and an agent's own servers, in ACP's own shape: a list of servers, env
-/// and headers as name and value pairs. Every ACP agent takes a stdio server; an HTTP or SSE one
-/// only when it says it can, and is left out otherwise.
 pub(crate) fn acp_mcp_servers(req: &super::SendRequest, agent: &Value) -> Value {
     let can = |transport: &str| {
         agent["agentCapabilities"]["mcpCapabilities"][transport]

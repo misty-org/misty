@@ -1,6 +1,3 @@
-//! Sites agents may read but never act on. Banking, brokerage, crypto and adult sites are blocked by default,
-//! as Claude in Chrome does; the account can turn that off and add its own
-//! sites. The device enforces this before any input reaches the page.
 use serde::Deserialize;
 use url::Url;
 
@@ -26,12 +23,9 @@ impl Default for SiteBlocks {
     }
 }
 
-/// Top-level domains reserved for banks or adult content.
 const SENSITIVE_TLDS: &[&str] = &["bank", "insurance", "xxx", "adult", "porn", "sex"];
 
-/// Well-known banks, brokerages, payment and crypto services, and adult sites.
 const SENSITIVE_DOMAINS: &[&str] = &[
-    // Banks and brokerages
     "chase.com",
     "bankofamerica.com",
     "wellsfargo.com",
@@ -68,13 +62,11 @@ const SENSITIVE_DOMAINS: &[&str] = &[
     "monzo.com",
     "n26.com",
     "wise.com",
-    // Payments
     "paypal.com",
     "venmo.com",
     "cash.app",
     "zellepay.com",
     "stripe.com",
-    // Crypto exchanges and wallets
     "coinbase.com",
     "binance.com",
     "binance.us",
@@ -91,7 +83,6 @@ const SENSITIVE_DOMAINS: &[&str] = &[
     "uniswap.org",
     "opensea.io",
     "phantom.app",
-    // Adult
     "pornhub.com",
     "xvideos.com",
     "xnxx.com",
@@ -102,8 +93,6 @@ const SENSITIVE_DOMAINS: &[&str] = &[
     "youporn.com",
 ];
 
-/// A site the account listed: a bare host such as example.com, which also
-/// covers its subdomains. Anything else is ignored rather than guessed at.
 fn normalize(site: &str) -> Option<String> {
     let site = site.trim().trim_end_matches('.').to_ascii_lowercase();
     let host = site
@@ -130,7 +119,6 @@ fn matches(host: &str, domain: &str) -> bool {
     host == domain || host.ends_with(&format!(".{domain}"))
 }
 
-/// Why an agent may not act on this page, or None when it may.
 pub fn blocked(url: &Url, blocks: &SiteBlocks) -> Option<String> {
     if !matches!(url.scheme(), "http" | "https") {
         return None;

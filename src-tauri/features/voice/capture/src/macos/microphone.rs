@@ -1,6 +1,3 @@
-//! The default input device through AVAudioEngine. When the device changes mid-capture (AirPods
-//! taken out, the lid closed, another mic picked), the capture carries on with the new default.
-
 use super::{convert_and_send, output_format, Delivery, StartFailure};
 use crate::Format;
 use block2::RcBlock;
@@ -18,13 +15,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
-/// The default input device as 16 kHz mono PCM16, delivered
-/// straight to the caller rather than the main queue.
 pub(super) struct MicrophoneCapture {
     engine: Retained<AVAudioEngine>,
     delivery: Arc<Delivery>,
-    // Shared with the configuration observer, which only reports a change
-    // while the tap is installed.
     installed: Arc<AtomicBool>,
     observer: Option<Retained<ProtocolObject<dyn NSObjectProtocol>>>,
 }
@@ -40,10 +33,6 @@ impl MicrophoneCapture {
             let engine = engine.clone();
             let reopened = Mutex::new(Vec::<Instant>::new());
             RcBlock::new(move |_notification: NonNull<NSNotification>| {
-                // The input device changed under us: AirPods went away, the lid closed, another
-                // mic was picked. The engine has stopped, so it is opened again on whatever
-                // input is the default now (macOS falls back to the built-in mic by itself), and
-                // only a device that can't be opened, or one that keeps changing, ends the capture.
                 if !installed.swap(false, Ordering::AcqRel) {
                     return;
                 }
@@ -84,9 +73,6 @@ impl MicrophoneCapture {
         }
     }
 
-    // Every failure stops, not only a failed engine start: the configuration
-    // observer holds the delivery itself rather than a weak reference to the
-    // capture, so it has to be removed even when the format check fails.
     fn start(&mut self) -> Result<(), StartFailure> {
         let result = tap_input(&self.engine, &self.delivery, &self.installed);
         if result.is_err() {
@@ -112,12 +98,9 @@ impl MicrophoneCapture {
     }
 }
 
-/// How many times a capture reopens on a changed device within [`REOPEN_WINDOW`] before it gives
-/// up: a device that keeps coming and going ends the capture instead of looping.
 const REOPEN_MOST: usize = 4;
 const REOPEN_WINDOW: Duration = Duration::from_secs(10);
 
-/// Taps the engine's input node, the default input device as it is now, and starts the engine.
 fn tap_input(
     engine: &AVAudioEngine,
     delivery: &Arc<Delivery>,
@@ -148,16 +131,18 @@ fn tap_input(
     // SAFETY: the format is the node's own output format, and the engine
     // copies the block before this returns.
     unsafe {
-        input.installTapOnBus_bufferSize_format_block(0, 1024, Some(&*format), RcBlock::as_ptr(&tap));
+        input.installTapOnBus_bufferSize_format_block(
+            0,
+            1024,
+            Some(&*format),
+            RcBlock::as_ptr(&tap),
+        );
     }
     installed.store(true, Ordering::Release);
     // SAFETY: starting an engine whose only graph is the tapped input.
     unsafe { engine.startAndReturnError() }.map_err(|_| StartFailure::Device)
 }
 
-/// Asks for microphone access when needed. Off the main thread this waits
-/// for the user's answer; on the main thread it never blocks and reports
-/// "denied" until access is granted.
 fn microphone_allowed() -> bool {
     // SAFETY: AVFoundation's own constant, set before any code runs.
     let Some(audio) = (unsafe { AVMediaTypeAudio }) else {

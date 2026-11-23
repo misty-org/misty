@@ -1,6 +1,5 @@
 use super::*;
 
-/// agy 1.5.9's `elicitation/create` for a `/grill-me` question (captured; path shortened).
 const GRILL_ME_FORM: &str = r#"{"sessionId":"12284063-2e04-453e-816d-3dfe1ab05637","toolCallId":"call_17883791242525095433","mode":"form","message":"The agent has a question.","requestedSchema":{"type":"object","properties":{"q1":{"type":"string","title":"What should the filename and initial content of this tiny text file be?","oneOf":[{"const":"1","title":"(Recommended) hello.txt with \"Hello, world!\""},{"const":"2","title":"notes.txt with a brief placeholder"},{"const":"3","title":"README.md with a project title"}]},"q1_other":{"type":"string","title":"Other","description":"Optional free-form answer to: What should the filename and initial content of this tiny text file be?"}}}}"#;
 
 const QUESTION: &str = "What should the filename and initial content of this tiny text file be?";
@@ -25,7 +24,6 @@ fn a_captured_question_form_becomes_one_card_question() {
     assert_eq!(field["other"], "q1_other");
 }
 
-/// The reply agy 1.5.9 took for that form: the picked option's value under its key.
 #[test]
 fn a_picked_label_answers_with_its_value() {
     let fields = Value::Array(form());
@@ -78,7 +76,6 @@ fn a_form_misty_cannot_read_is_declined() {
     assert!(answer_frame(&json!(1), &fields, Some(&json!("x"))).is_err());
 }
 
-/// agy 1.5.9's `config_option_update` (trimmed): the model's family and its thinking level.
 #[test]
 fn a_reported_model_is_named_as_agy_models_names_it() {
     let update = json!({"sessionId": "s", "update": {"sessionUpdate": "config_option_update",

@@ -1,4 +1,3 @@
-//! The shape of a batch of page actions, checked before anything runs.
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -7,8 +6,6 @@ pub(super) const MAX_FORM_FIELDS: usize = 30;
 const MAX_TEXT: usize = 20_000;
 pub(super) const MAX_WAIT_MS: u64 = 20_000;
 
-/// A ref-free target: role, accessible name and
-/// which of the same-named controls it is.
 #[derive(Debug, Clone, Deserialize, serde::Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Locator {
@@ -24,7 +21,6 @@ pub(super) struct Step {
     pub action: String,
     #[serde(rename = "ref", default)]
     pub reference: Option<String>,
-    /// Replays name their target by locator instead of a ref.
     #[serde(default)]
     pub locator: Option<Locator>,
     #[serde(default)]
@@ -68,7 +64,6 @@ impl Step {
             && self.text.is_none())
     }
 
-    /// The key input native dispatch would receive, validated the same way.
     pub fn native_key(&self) -> Value {
         json!({"kind": "key", "key": self.key, "modifiers": self.modifiers.clone().unwrap_or_default()})
     }
@@ -179,7 +174,6 @@ impl Step {
     }
 }
 
-/// Reads browser.steps input: 1–10 steps, all valid, before any of them runs.
 pub(super) fn parse_steps(input: &Value) -> Result<Vec<Step>, String> {
     let steps: Vec<Step> =
         serde_json::from_value(input.get("steps").cloned().unwrap_or(Value::Null))
@@ -194,8 +188,6 @@ pub(super) fn parse_steps(input: &Value) -> Result<Vec<Step>, String> {
     Ok(steps)
 }
 
-/// Turns browser.fill_form fields into steps: text fills, list choices and
-/// checkbox states, in the order given.
 pub(super) fn form_steps(input: &Value) -> Result<Vec<Step>, String> {
     let fields = input
         .get("fields")

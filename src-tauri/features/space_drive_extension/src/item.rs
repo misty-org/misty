@@ -1,5 +1,3 @@
-//! One file or folder of the drive (a Space's folder, or something in one), as macOS asks about it (`NSFileProviderItem`), made from
-//! what Misty says (`link::ItemInfo`).
 use objc2::{define_class, msg_send, rc::Retained, AnyThread, DefinedClass, Message};
 use objc2_file_provider::{
     NSFileProviderItemCapabilities, NSFileProviderItemIdentifier, NSFileProviderItemProtocol,
@@ -11,15 +9,13 @@ use objc2_uniform_type_identifiers::{UTType, UTTypeData, UTTypeFolder};
 
 use crate::link::ItemInfo;
 
-// `NSFileProviderItemCapabilities`, from the SDK's NSFileProviderItem.h.
 const READING: usize = 1 << 0;
-const WRITING: usize = 1 << 1; // also "adding sub-items" on a folder
+const WRITING: usize = 1 << 1;
 const REPARENTING: usize = 1 << 2;
 const RENAMING: usize = 1 << 3;
 const TRASHING: usize = 1 << 4;
 const DELETING: usize = 1 << 5;
 
-/// The system's own identifiers, and the names Misty uses for them.
 pub fn to_misty(identifier: &NSString) -> String {
     // SAFETY: framework constants.
     let (root, trash, working) = unsafe {
@@ -123,11 +119,6 @@ impl DriveItem {
     }
 }
 
-/// What macOS may do with an item: everything, even with a file someone else is editing (saves
-/// merge or the last one wins). A trashed item can be put back (reparented) or forgotten here
-/// (deleted from this Mac's view; it stays in the Space's trash on the server). The drive's
-/// layout holds still: the root takes nothing but the Spaces' folders, and a Space's folder
-/// takes new items but is never renamed, moved or deleted.
 fn capabilities(info: &ItemInfo) -> usize {
     if info.id == "root" {
         return READING;
@@ -141,7 +132,6 @@ fn capabilities(info: &ItemInfo) -> usize {
     READING | WRITING | REPARENTING | RENAMING | TRASHING | DELETING
 }
 
-/// A folder's type, else the type its name's extension says, else plain data.
 fn content_type(info: &ItemInfo) -> Retained<UTType> {
     // SAFETY: framework constants.
     if info.is_folder() {
@@ -158,8 +148,6 @@ fn date(ms: i64) -> Option<Retained<NSDate>> {
     (ms > 0).then(|| NSDate::dateWithTimeIntervalSince1970(ms as f64 / 1000.0))
 }
 
-/// An item's version: its content and its name and place, so a rename never makes macOS fetch the
-/// file again.
 pub fn version(content: &str, meta: &str) -> Retained<NSFileProviderItemVersion> {
     let content = NSData::with_bytes(content.as_bytes());
     let meta = NSData::with_bytes(meta.as_bytes());
@@ -173,7 +161,6 @@ pub fn version(content: &str, meta: &str) -> Retained<NSFileProviderItemVersion>
     }
 }
 
-/// The text of a version macOS hands back (`baseVersion`), as Misty wrote it.
 pub fn version_parts(version: &NSFileProviderItemVersion) -> (String, String) {
     // SAFETY: plain getters.
     let (content, meta): (Retained<NSData>, Retained<NSData>) =

@@ -1,5 +1,3 @@
-// Midscene's report and cache helpers import node:fs. In the desktop webview
-// nothing is written to disk: writes are dropped and reads fail.
 const unavailable = (name: string) => () => {
   throw new Error(`${name} is unavailable in the Misty app`);
 };

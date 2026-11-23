@@ -1,11 +1,8 @@
-//! The shell: `sh -c "..."`, `sh script.sh`, or commands read from standard input. It's brush, a shell
-//! written in Rust that follows bash, so scripts behave the same on every computer.
 use std::ffi::OsString;
 
 use brush_builtins::{BuiltinSet, ShellBuilderExt};
 use brush_core::{ProfileLoadBehavior, RcLoadBehavior, Shell};
 
-/// What a person who ran the program with the wrong arguments gets, by the shell's convention.
 const USAGE_ERROR: i32 = 2;
 
 enum Asked {

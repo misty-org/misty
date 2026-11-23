@@ -15,7 +15,6 @@ import { GalleryRow, GallerySection } from "./GalleryLayout";
 
 const command = "claude mcp add misty -- misty mcp serve --space notes --mode auto";
 
-/** Shortcut keycaps, copying, code, renaming in place, paragraphs and avatar tones. */
 export function KeysAndCodeSection() {
   const [title, setTitle] = useState("Launch plan");
   const [view, setView] = useState<"month" | "agenda">("month");

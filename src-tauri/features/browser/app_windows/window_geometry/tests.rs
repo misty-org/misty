@@ -158,7 +158,6 @@ fn records_travel_with_the_open_window() {
     assert!(text.contains("\"geometry\":{\"width\":1600"));
     let back: super::super::OpenWindow = serde_json::from_str(&text).unwrap();
     assert_eq!(back, window);
-    // A list saved before geometry was kept still reads.
     let old: super::super::OpenWindow =
         serde_json::from_str(r#"{"profile":"personal","windowId":"w"}"#).unwrap();
     assert_eq!(old.geometry, None);
@@ -170,7 +169,6 @@ fn records_travel_with_the_open_window() {
 
 #[test]
 fn minimum_size_follows_the_target_display_scale() {
-    // Physical pixels (Windows): main screen at 150%, the one to its right at 100%.
     let displays = [
         display_from(monitor(0, 0, 2880, 1680).area, 1.5, false),
         display_from(monitor(2880, 0, 1920, 1040).area, 1.0, false),
@@ -206,8 +204,6 @@ fn default_size_scales_with_the_main_display() {
 
 #[test]
 fn mac_mixed_scale_restores_on_the_saved_display_in_points() {
-    // A 2x built-in screen and a 1x screen to its right: their physical areas overlap, and
-    // only in points do they lie on one grid.
     let displays = [
         display_from(
             Rect {

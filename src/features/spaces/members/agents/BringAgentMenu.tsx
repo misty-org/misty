@@ -11,7 +11,6 @@ import {
 import { UserPlus } from "lucide-react";
 import { useEffect } from "react";
 
-/** Your agents that aren't in this Space yet; picking one brings it in. */
 export function BringAgentMenu({
   agents,
   currentUserId,

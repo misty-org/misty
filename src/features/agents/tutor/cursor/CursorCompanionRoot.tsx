@@ -1,13 +1,11 @@
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useRef } from "react";
-// The companion's window draws with the app's own classes; its page stays transparent
-// (companion.html), so only the marks show over the screen.
 import "@/styles/styles.css";
 import { CursorOverlayMarkup } from "./CursorOverlayMarkup";
-import { startCursorOverlayLoop } from "./cursorOverlayLoop";
+import { startCursorOverlayLoop } from "./cursor_overlay_loop";
 import { TutorShotLayer } from "./TutorShotLayer";
-import { usePresentation } from "./usePresentation";
+import { usePresentation } from "./use_presentation";
 
 export function CursorCompanionRoot() {
   return <CursorOverlay />;
@@ -25,8 +23,6 @@ function CursorOverlay() {
   const sketch = useRef<HTMLDivElement>(null);
   const trail = useRef<HTMLDivElement>(null);
   const caption = useRef<HTMLDivElement>(null);
-  // Files dropped on Misty (the overlay takes the pointer only while it's on her) go to Tutor's
-  // next turn: the main window reads them back from the paths the system dropped.
   useEffect(() => {
     const stop = getCurrentWebview().onDragDropEvent(({ payload }) => {
       if (payload.type === "drop" && payload.paths.length)
@@ -62,7 +58,6 @@ function CursorOverlay() {
         bubble={bubble}
         meter={meter}
       />
-      {/* Over the rest while Tutor's text box is open: a drag there takes a picture for it. */}
       <TutorShotLayer />
     </>
   );

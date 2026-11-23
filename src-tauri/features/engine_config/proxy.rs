@@ -17,7 +17,6 @@ use super::support;
 
 const STORE_KEY: &str = "proxy";
 const DEFAULT_NO_PROXY: &str = "localhost,127.0.0.1,::1";
-/// Schemes Settings offers (HTTP, HTTPS and SOCKS5) and the engine CLIs accept.
 const ALLOWED_SCHEMES: [&str; 4] = ["http", "https", "socks5", "socks5h"];
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,8 +44,6 @@ fn append_no_proxy_values(values: &mut Vec<String>, raw: &str) {
     }
 }
 
-/// The NO_PROXY Misty was started with plus the loopback defaults: Misty's own local MCP server
-/// and any local service must never go through the proxy.
 fn merged_no_proxy_value(inherited: &[Option<String>]) -> String {
     let mut values = Vec::new();
     for existing in inherited.iter().flatten() {
@@ -107,7 +104,6 @@ pub fn save_settings(settings: &ProxySettings) -> Result<(), String> {
     support::save_value(STORE_KEY, &settings)
 }
 
-/// The variables for `settings`, both spellings, or nothing when the proxy is off.
 fn env_for_settings(
     settings: &ProxySettings,
     inherited: &[Option<String>],
@@ -135,14 +131,10 @@ fn env_for_settings(
     env
 }
 
-/// The proxy variables for programs Misty starts: HTTP(S)_PROXY, ALL_PROXY and NO_PROXY in both
-/// spellings while the proxy is on, nothing while it is off (they then inherit Misty's own).
 pub fn proxy_env() -> HashMap<String, String> {
     env_for_settings(&read_settings(), &inherited_no_proxy())
 }
 
-/// `builder` with the proxy from Settings applied: HTTP, HTTPS or SOCKS5 (reqwest's `socks`
-/// feature), with the loopback addresses and the inherited NO_PROXY left direct.
 pub fn apply_to_client(builder: reqwest::ClientBuilder) -> reqwest::ClientBuilder {
     let settings = read_settings();
     if !settings.enabled || validate_proxy_settings(&settings).is_err() {
@@ -226,7 +218,6 @@ mod tests {
         assert!(no_proxy.contains("corp.local"));
         assert!(no_proxy.contains("127.0.0.1"));
         assert_eq!(env.get("no_proxy"), env.get("NO_PROXY"));
-        // Off, or not valid: nothing, so the engine inherits Misty's own environment.
         assert!(env_for_settings(&proxy_settings(false, Some("http://x:1")), &[]).is_empty());
         assert!(env_for_settings(&proxy_settings(true, Some("ftp://x")), &[]).is_empty());
     }

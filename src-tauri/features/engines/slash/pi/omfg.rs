@@ -1,8 +1,5 @@
-//! omp's `/omfg`: a rule forged from a complaint, in a fork of the session.
-
 use super::*;
 
-/// `--global` (the TUI's "Global — all projects" choice) and the complaint.
 pub(super) fn omfg_args(args: &str) -> (bool, String) {
     let mut global = false;
     let words: Vec<&str> = args
@@ -16,7 +13,6 @@ pub(super) fn omfg_args(args: &str) -> (bool, String) {
     (global, words.join(" "))
 }
 
-/// omp's `omfg-user.md`, with the failed attempts so far when there are any.
 pub(super) fn omfg_prompt(complaint: &str, feedback: &[String], previous: Option<&str>) -> String {
     let mut text = String::from(OMFG_PROMPT_HEAD);
     text.push_str("\nComplaint:\n");
@@ -74,16 +70,12 @@ Example shape:
 }
 "#;
 
-/// A generated rule: its kebab-case name and the markdown file omp reads.
 #[derive(Debug, PartialEq)]
 pub(super) struct ForgedRule {
     pub(super) name: String,
     pub(super) file: String,
 }
 
-/// omp's `parseGeneratedRule` (`omfg-rule.ts`): the reply's JSON object, checked and assembled
-/// into the rule file. omp also compiles each condition as a JavaScript regex; that check is
-/// omp's own when it loads the rule.
 pub(super) fn parse_rule(reply: &str) -> Result<ForgedRule, String> {
     let trimmed = reply.trim();
     let fenced = trimmed.find("```").and_then(|start| {
@@ -163,7 +155,6 @@ pub(super) fn parse_rule(reply: &str) -> Result<ForgedRule, String> {
     Ok(ForgedRule { name, file })
 }
 
-/// The first `{…}` with its braces balanced, strings skipped.
 pub(super) fn balanced_object(text: &str) -> Option<&str> {
     let start = text.find('{')?;
     let (mut depth, mut in_string, mut escaped) = (0usize, false, false);
@@ -192,7 +183,6 @@ pub(super) fn balanced_object(text: &str) -> Option<&str> {
     None
 }
 
-/// omp's `sanitizeRuleName`: lowercase, quotes dropped, runs of anything else one dash.
 pub(super) fn rule_name(raw: &str) -> String {
     let mut name = String::new();
     for char in raw.trim().to_lowercase().chars() {
@@ -215,8 +205,6 @@ pub(super) fn rule_name(raw: &str) -> String {
         .to_string()
 }
 
-/// omp's agent folder (`~/.omp/agent`, or the person's `PI_CODING_AGENT_DIR`, the only name omp
-/// 18 reads for it), where its global rules are.
 fn omp_agent_dir() -> PathBuf {
     let engine_env = crate::engine_config::engine_env::env_for("omp").unwrap_or_default();
     if let Some(dir) = engine_env
@@ -230,10 +218,19 @@ fn omp_agent_dir() -> PathBuf {
     crate::engine_config::support::engine_home(None, ".omp").join("agent")
 }
 
-/// `/omfg [--global] <complaint>`: omp's rule forge. The model writes one TTSR rule in a
-/// throwaway no-tools fork (up to three tries, each told why the last failed, as the TUI does)
-/// and Misty saves it where omp loads rules: this project's `.omp/rules`, or with `--global`
-/// the agent folder's `rules` (the TUI asks which). A rule already there isn't overwritten.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "saves the rule in omp's rules folder, global or in the person's project, which PI_CODING_AGENT_DIR may move outside what the gate grants"
+)]
+async fn save_rule(dir: &Path, path: &Path, contents: &str) -> Result<(), String> {
+    tokio::fs::create_dir_all(dir)
+        .await
+        .map_err(|error| format!("Couldn't create {}: {error}", dir.display()))?;
+    tokio::fs::write(path, contents)
+        .await
+        .map_err(|error| format!("Couldn't write {}: {error}", path.display()))
+}
+
 pub(super) async fn omfg(folder: &Path, session: &str, args: &str) -> Result<Output, String> {
     let (global, complaint) = omfg_args(args);
     let mut feedback: Vec<String> = Vec::new();
@@ -275,12 +272,7 @@ pub(super) async fn omfg(folder: &Path, session: &str, args: &str) -> Result<Out
             path.display()
         ));
     }
-    tokio::fs::create_dir_all(&dir)
-        .await
-        .map_err(|error| format!("Couldn't create {}: {error}", dir.display()))?;
-    tokio::fs::write(&path, &rule.file)
-        .await
-        .map_err(|error| format!("Couldn't write {}: {error}", path.display()))?;
+    save_rule(&dir, &path, &rule.file).await?;
     Ok(Output::info(
         "TTSR rule saved",
         vec![Section {

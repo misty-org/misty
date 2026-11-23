@@ -12,7 +12,6 @@
 //!
 //! The renderer's side is `src/features/files/api/disk.ts`, which names every command and shape.
 
-// The person's own Files.
 pub mod clipboard;
 pub mod entry;
 pub mod info;
@@ -31,7 +30,6 @@ pub mod trash;
 pub mod undo;
 pub mod watch;
 
-// Finder's extras.
 pub mod archive;
 pub mod db;
 pub mod power;
@@ -39,7 +37,6 @@ pub mod search;
 pub mod starred;
 pub mod tags;
 
-// What agents may do, and the trash they use instead of deleting.
 pub mod agent_delete;
 pub mod agent_paths;
 pub mod agent_trash;
@@ -52,7 +49,6 @@ use std::path::{Path, PathBuf};
 
 pub(crate) use crate::project::person_window;
 
-/// Runs blocking file work off the async runtime.
 pub(crate) async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -61,7 +57,6 @@ pub(crate) async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-/// A path a window named: absolute and local, or refused before anything looks at it.
 pub(crate) fn asked_path(path: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(path);
     if !path.is_absolute() {
@@ -73,14 +68,12 @@ pub(crate) fn asked_path(path: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// An item's name for messages: its last part, or the path when it has none.
 pub(crate) fn display_name(path: &Path) -> String {
     path.file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.display().to_string())
 }
 
-/// An error for the interface, naming the item, never the full path.
 pub(crate) fn failed(path: &Path, error: impl std::fmt::Display) -> String {
     format!("{}: {error}", display_name(path))
 }

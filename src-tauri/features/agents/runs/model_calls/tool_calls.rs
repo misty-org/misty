@@ -1,12 +1,9 @@
-//! Follows tool calls as they stream in pieces. Ported from the Vercel AI SDK's
-//! `StreamingToolCallTracker`.
 use std::collections::HashMap;
 
 use serde_json::{json, Value};
 
 use super::stream::StreamPart;
 
-/// One piece of a streaming tool call.
 #[derive(Default)]
 pub(crate) struct ToolCallDelta {
     pub index: Option<u64>,
@@ -33,9 +30,11 @@ pub(crate) struct ToolCallTracker {
 }
 
 impl ToolCallTracker {
-    /// Takes a piece, emitting the parts it completes. A piece that can't belong to anything is an
-    /// invalid response, reported as the error part it returns.
-    pub(crate) fn process(&mut self, delta: ToolCallDelta, out: &mut Vec<StreamPart>) -> Result<(), Value> {
+    pub(crate) fn process(
+        &mut self,
+        delta: ToolCallDelta,
+        out: &mut Vec<StreamPart>,
+    ) -> Result<(), Value> {
         let known = match (&delta.id, delta.index) {
             (Some(id), _) if !id.is_empty() => self.by_id.get(id).copied(),
             (_, Some(index)) => self.by_index.get(&index).copied(),
@@ -56,14 +55,16 @@ impl ToolCallTracker {
         Ok(())
     }
 
-    /// Finishes every call still open, at the end of the stream.
     pub(crate) fn flush(&mut self, out: &mut Vec<StreamPart>) {
         for call in &mut self.calls {
             if call.finished {
                 continue;
             }
             call.finished = true;
-            out.push(StreamPart::ToolInputEnd { id: call.id.clone(), provider_metadata: None });
+            out.push(StreamPart::ToolInputEnd {
+                id: call.id.clone(),
+                provider_metadata: None,
+            });
             out.push(StreamPart::ToolCall {
                 tool_call_id: call.id.clone(),
                 tool_name: call.name.clone(),
@@ -74,10 +75,11 @@ impl ToolCallTracker {
     }
 
     fn begin(&mut self, delta: ToolCallDelta, out: &mut Vec<StreamPart>) -> Result<usize, Value> {
-        let invalid = |message: &str| {
-            json!({ "name": "AI_InvalidResponseDataError", "message": message })
-        };
-        let id = delta.id.ok_or_else(|| invalid("Expected 'id' to be a string."))?;
+        let invalid =
+            |message: &str| json!({ "name": "AI_InvalidResponseDataError", "message": message });
+        let id = delta
+            .id
+            .ok_or_else(|| invalid("Expected 'id' to be a string."))?;
         let name = delta
             .name
             .ok_or_else(|| invalid("Expected 'function.name' to be a string."))?;

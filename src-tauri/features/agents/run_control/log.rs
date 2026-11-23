@@ -1,7 +1,3 @@
-//! `<data>/runtime.log`, where the runtime's `[misty-agent-runtime]` lines go for benchmarks and for
-//! finding out why a run failed. Nothing else here writes a log that grows, so this sets its own
-//! limit: past 20 MiB it moves to `runtime.log.1`, over any older one, and starts again. Nothing that
-//! goes wrong here reaches a run.
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -69,7 +65,6 @@ fn sink_with_limit(path: PathBuf, limit: u64) -> LogSink {
     })
 }
 
-/// Where the crate's log lines go.
 pub(super) fn sink(path: PathBuf) -> LogSink {
     sink_with_limit(path, MAX_BYTES)
 }

@@ -17,12 +17,8 @@ use super::shell_env::{
 };
 
 pub(crate) async fn apply(command: &mut Command) {
-    let config_path = crate::engines::codex_home().join("config.toml");
-    let contents = tokio::fs::read_to_string(config_path)
-        .await
-        .unwrap_or_default();
+    let contents = read_codex_config().await;
     let mut keys = collect_env_keys(&contents);
-    // A channel can introduce an env_key via -c without changing config.toml.
     let args: Vec<_> = command.as_std().get_args().collect();
     for pair in args.windows(2) {
         if pair[0] == "-c" {
@@ -36,9 +32,6 @@ pub(crate) async fn apply(command: &mut Command) {
     if missing.is_empty() {
         return;
     }
-    // Misty: what the login shell said, for a while. Asking it starts an interactive login
-    // shell, which took up to its five-second limit before every Codex message; a variable the
-    // shell doesn't have is remembered too, so it isn't asked again each time.
     let mut known = HashMap::new();
     let mut unknown = Vec::new();
     {
@@ -78,13 +71,22 @@ pub(crate) async fn apply(command: &mut Command) {
     }
 }
 
-/// As long as a warm process keeps what it was started with (`warm.rs`).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Codex's own config in place, which may sit outside the engine folders the gate grants"
+)]
+async fn read_codex_config() -> String {
+    let config_path = crate::engines::codex_home().join("config.toml");
+    tokio::fs::read_to_string(config_path)
+        .await
+        .unwrap_or_default()
+}
+
 const CACHE_TTL: Duration = super::registry::WARM_IDLE;
 
-/// The login shell's answer per variable name: its value, or None when it has none. In memory
-/// only, never written or logged.
-static CACHE: LazyLock<Mutex<HashMap<String, (Instant, Option<String>)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+type ResolvedEnv = HashMap<String, (Instant, Option<String>)>;
+
+static CACHE: LazyLock<Mutex<ResolvedEnv>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn collect_env_keys(contents: &str) -> BTreeSet<String> {
     let Ok(value) = toml::from_str::<toml::Value>(contents) else {
@@ -112,7 +114,6 @@ mod tests {
         let mut command = Command::new("codex");
         command.env("CCGUI_TEST_CHANNEL_KEY", "channel-key");
         assert!(env_has_non_empty_value(&command, "CCGUI_TEST_CHANNEL_KEY"));
-        // An explicit removal is also intentional, not a missing inherited key.
         command.env_remove("CCGUI_TEST_CHANNEL_KEY");
         assert!(env_has_non_empty_value(&command, "CCGUI_TEST_CHANNEL_KEY"));
     }

@@ -1,14 +1,9 @@
-//! Keep shell plugin DOM integrations out of embedded websites and their popups.
 use tauri::{
     ipc::Invoke, plugin::Plugin, webview::PageLoadPayload, AppHandle, RunEvent, Runtime, Webview,
     Window,
 };
 use url::Url;
 
-/// Notification (Windows and Linux) replaces `window.Notification` and Opener intercepts link clicks.
-/// Tauri injects plugin scripts into every webview, even when its ACL denies the
-/// plugin commands there. Run these integrations only in the shell's main frame.
-/// Native setup, commands and lifecycle hooks remain owned by the original plugin.
 pub(crate) struct ShellScriptPlugin<P>(pub P);
 
 impl<R: Runtime, P: Plugin<R>> Plugin<R> for ShellScriptPlugin<P> {
@@ -26,10 +21,6 @@ impl<R: Runtime, P: Plugin<R>> Plugin<R> for ShellScriptPlugin<P> {
 
     fn initialization_script(&self) -> Option<String> {
         self.0.initialization_script_2().map(|script| {
-            // Tauri sets currentWebview metadata before running plugin scripts.
-            // Child webviews share their window, so check the webview label.
-            // The explicit frame guard also covers WebView2's subframe injection.
-            // This is DOM scoping; command authorization still comes from the ACL.
             format!(
                 r#"(() => {{
   if (window !== window.top || !/^space-/.test(window.__TAURI_INTERNALS__?.metadata?.currentWebview?.label ?? '')) return;
@@ -82,7 +73,6 @@ mod tests {
             "windows": cfg!(windows),
             "opener": opener.initialization_script_2().unwrap().script,
         });
-        // Notification is a plugin only where macOS's own notices aren't used.
         #[cfg(not(target_os = "macos"))]
         {
             let notification = ShellScriptPlugin(tauri_plugin_notification::init::<tauri::Wry>());
@@ -93,12 +83,10 @@ mod tests {
                 .script
                 .into();
         }
-        // Execute the actual dependency scripts, so upgrades exercise the same
-        // DOM and IPC behavior that will be injected by the native application.
         let mut child = Command::new("node")
             .arg(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../tasks/tauri-shell-plugins.fixture.ts"
+                "/../tasks/tauri_shell_plugins.fixture.ts"
             ))
             .stdin(Stdio::piped())
             .spawn()

@@ -10,7 +10,6 @@
 //! crates. Everything is a no-op error on other platforms — the MCP tools
 //! stay registered everywhere and report the platform limit honestly.
 
-// Everything but the error stubs is macOS FFI.
 #[cfg(target_os = "macos")]
 use std::ffi::{c_void, CString};
 #[cfg(target_os = "macos")]
@@ -18,8 +17,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 #[cfg(target_os = "macos")]
 use std::sync::Mutex;
-
-// ==================== CF / AX FFI ====================
 
 #[cfg(target_os = "macos")]
 #[allow(non_snake_case, non_camel_case_types)]
@@ -96,9 +93,6 @@ mod imp {
     use super::ffi::*;
     use super::*;
 
-    /// A retained AX element handle. Send/Sync is safe here: the handles are
-    /// only touched from the MCP server's single-threaded runtime, and CF
-    /// ref-counting is atomic.
     struct RawElement(AXUIElementRef);
     unsafe impl Send for RawElement {}
     unsafe impl Sync for RawElement {}
@@ -134,8 +128,6 @@ mod imp {
         }
     }
 
-    /// Same as copy_attr but keeps the AXError so callers can tell "no such
-    /// attribute" apart from "the API is not available to this process".
     fn copy_attr_result(element: AXUIElementRef, name: &str) -> Result<CFTypeRef, AXError> {
         let attr = cfstring(name);
         let mut value: CFTypeRef = std::ptr::null();
@@ -150,12 +142,8 @@ mod imp {
         Ok(value)
     }
 
-    /// kAXErrorAPIDisabled: AXIsProcessTrusted can answer for a stale or
-    /// parent identity while real AX calls are still refused — this is the
-    /// check that cannot lie.
     const AX_ERROR_API_DISABLED: AXError = -25204;
 
-    /// Copy an attribute; caller releases. Returns null on any error.
     fn copy_attr(element: AXUIElementRef, name: &str) -> CFTypeRef {
         copy_attr_result(element, name).unwrap_or(std::ptr::null())
     }
@@ -257,8 +245,6 @@ mod imp {
         out
     }
 
-    /// Element categories worth a ref. Everything else is still walked but
-    /// contributes no line — grouping containers are noise to the model.
     fn actions_for(role: &str) -> Option<&'static [&'static str]> {
         match role {
             "AXButton" | "AXCheckBox" | "AXRadioButton" | "AXMenuItem" | "AXLink"
@@ -277,8 +263,6 @@ mod imp {
     struct Walk<'a> {
         lines: Vec<String>,
         nodes: &'a mut Vec<AxNode>,
-        /// Hard caps so a pathological tree (browser DOMs expose thousands
-        /// of nodes) stays a fast, small read.
         budget: usize,
     }
 
@@ -292,7 +276,6 @@ mod imp {
             };
             if let Some(actions) = actions_for(&role) {
                 if role == "AXStaticText" && string_attr(element, "AXValue").is_none() {
-                    // Empty labels are pure layout noise.
                 } else if bool_attr(element, "AXEnabled") || actions.is_empty() {
                     let title = string_attr(element, "AXTitle")
                         .or_else(|| string_attr(element, "AXDescription"))
@@ -311,7 +294,6 @@ mod imp {
                     if !actions.is_empty() {
                         line.push_str(&format!("  [{}]", actions.join(", ")));
                     }
-                    // Retain a handle for press/set_value resolution.
                     unsafe { CFRetain(element as CFTypeRef) };
                     self.nodes.push(AxNode {
                         element: RawElement(element),
@@ -358,8 +340,6 @@ mod imp {
     pub fn app_state() -> Result<String, String> {
         let (app, _pid) = focused_app_element()?;
         let app_name = string_attr(app, "AXTitle").unwrap_or_else(|| "unknown app".into());
-        // Scope to the front window when the app exposes one; the whole app
-        // tree otherwise (menu bar extras have no windows at all).
         let root = {
             let windows = copy_attr(app, "AXWindows");
             if windows.is_null() || unsafe { CFArrayGetCount(windows as CFArrayRef) } == 0 {
@@ -405,8 +385,6 @@ mod imp {
             id: id.clone(),
             nodes,
         });
-        // The front window element was borrowed from AXWindows / is the app
-        // itself; only the app handle (a Copy) needs releasing.
         release(app as CFTypeRef);
         Ok(text)
     }
@@ -511,9 +489,6 @@ pub use imp::{app_state, press, set_value};
 mod tests {
     use super::*;
 
-    /// Live smoke against whatever app is focused; needs Accessibility.
-    /// Ignored by default: environment-dependent, run manually with
-    /// `cargo test -- --ignored ax_tree_smoke`.
     #[test]
     #[ignore]
     fn ax_tree_smoke() {

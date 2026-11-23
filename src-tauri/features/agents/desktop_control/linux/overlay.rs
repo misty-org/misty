@@ -1,20 +1,7 @@
-//! Misty's overlay windows on Linux (the cursor companion's displays and the computer-use cursor):
-//! transparent, never focused, click-through and above every other window.
-//!
-//! - X11 (and XWayland): an override-redirect window, which the window manager neither frames
-//!   nor stacks, raised again on every show, with an empty input shape so clicks pass through.
-//! - Wayland: a wlr-layer-shell surface on the overlay layer, through gtk-layer-shell when the
-//!   library is installed and the compositor offers the protocol (KDE, Sway, Hyprland and other
-//!   wlroots compositors). GNOME has no such protocol for apps; there the overlay is an ordinary
-//!   undecorated, unfocusable, click-through window, which the compositor places and stacks.
-//!
-//! Every function here runs on the GTK thread.
 use std::{ffi::c_void, sync::OnceLock};
 
 use gtk::{gdk, glib::translate::ToGlibPtr, prelude::*};
 
-/// Whether the person's session is Wayland, whatever backend Misty's own windows use: global
-/// input and capture go through the compositor there.
 pub(crate) fn wayland_session() -> bool {
     std::env::var("XDG_SESSION_TYPE").is_ok_and(|kind| kind.eq_ignore_ascii_case("wayland"))
         || std::env::var_os("WAYLAND_DISPLAY").is_some()
@@ -24,7 +11,6 @@ fn on_wayland(display: &gdk::Display) -> bool {
     display.type_().name().contains("Wayland")
 }
 
-/// gtk-layer-shell's entry points, loaded at run time so Misty starts without it.
 struct LayerShell {
     _library: libloading::Library,
     is_supported: Option<unsafe extern "C" fn() -> i32>,
@@ -58,11 +44,9 @@ fn layer_shell() -> Option<&'static LayerShell> {
         .get_or_init(|| {
             // SAFETY: loading a GTK3 library into a GTK3 process; symbols are typed to its C API.
             unsafe {
-                // From 0.9 the library has to be in the process before libwayland-client, which
-                // a library opened now can't be; it works only when the session preloads it.
                 let preloaded = libloading::os::unix::Library::open(
                     Some(LIBRARY),
-                    libloading::os::unix::RTLD_NOW | 0x4, /* RTLD_NOLOAD */
+                    libloading::os::unix::RTLD_NOW | 0x4,
                 )
                 .is_ok();
                 let library = libloading::Library::new(LIBRARY).ok()?;
@@ -139,10 +123,8 @@ fn layered(window: &gtk::ApplicationWindow) -> Option<&'static LayerShell> {
     (unsafe { (shell.is_layer_window)(raw(window)) } != 0).then_some(shell)
 }
 
-/// Marks a window already made an overlay.
 const PREPARED: &str = "misty-overlay";
 
-/// Makes `window` an overlay, once; later calls do nothing. Call it while the window is hidden.
 pub(crate) fn prepare(window: &tauri::WebviewWindow) -> Result<(), String> {
     let gtk_window = window.gtk_window().map_err(|error| error.to_string())?;
     // SAFETY: the key only ever holds `bool`.
@@ -160,7 +142,6 @@ pub(crate) fn prepare(window: &tauri::WebviewWindow) -> Result<(), String> {
     let display = gtk::prelude::WidgetExt::display(&gtk_window);
     if on_wayland(&display) {
         if let Some(shell) = layer_shell() {
-            // A layer surface has to be set up before GTK makes the window's Wayland surface.
             if gtk_window.is_realized() {
                 gtk_window.hide();
                 gtk_window.unrealize();
@@ -185,14 +166,12 @@ pub(crate) fn prepare(window: &tauri::WebviewWindow) -> Result<(), String> {
         .window()
         .ok_or("The overlay has no native window.")?;
     if !on_wayland(&display) {
-        // Unmanaged: no frame, no focus, no taskbar entry, and stacked by Misty itself.
         gdk_window.set_override_redirect(true);
     }
     pass_clicks_through(&gtk_window);
     Ok(())
 }
 
-/// An empty input shape: every click lands on what is under the overlay.
 fn pass_clicks_through(window: &gtk::ApplicationWindow) {
     if let Some(gdk_window) = window.window() {
         let empty = gtk::cairo::Region::create();
@@ -200,14 +179,12 @@ fn pass_clicks_through(window: &gtk::ApplicationWindow) {
     }
 }
 
-/// The GDK monitor holding a point in logical coordinates.
 fn monitor_at(display: &gdk::Display, x: i32, y: i32) -> Option<gdk::Monitor> {
     display
         .monitor_at_point(x, y)
         .or_else(|| display.primary_monitor())
 }
 
-/// Places the overlay over a rectangle in GTK's logical coordinates.
 pub(crate) fn place(window: &tauri::WebviewWindow, x: f64, y: f64, width: f64, height: f64) {
     let Ok(gtk_window) = window.gtk_window() else {
         return;
@@ -245,7 +222,6 @@ pub(crate) fn place(window: &tauri::WebviewWindow, x: f64, y: f64, width: f64, h
     }
 }
 
-/// Moves the overlay's top-left corner, keeping its size.
 pub(crate) fn move_to(window: &tauri::WebviewWindow, x: f64, y: f64) {
     let Ok(gtk_window) = window.gtk_window() else {
         return;
@@ -254,21 +230,18 @@ pub(crate) fn move_to(window: &tauri::WebviewWindow, x: f64, y: f64) {
     place(window, x, y, f64::from(width), f64::from(height));
 }
 
-/// Shows the overlay above every other window without taking focus.
 pub(crate) fn show(window: &tauri::WebviewWindow) {
     let Ok(gtk_window) = window.gtk_window() else {
         let _ = window.show();
         return;
     };
     gtk_window.show_all();
-    // A mapped window can get a fresh input region; keep it click-through.
     pass_clicks_through(&gtk_window);
     if let Some(gdk_window) = gtk_window.window() {
         gdk_window.raise();
     }
 }
 
-/// GTK's scale for the display: X and Wayland report physical pixels, GTK places in logical ones.
 pub(crate) fn scale(window: &tauri::WebviewWindow) -> f64 {
     window
         .gtk_window()

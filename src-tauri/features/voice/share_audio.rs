@@ -1,8 +1,3 @@
-//! The sound of a shared screen in a call. WebKit's screen capture brings no sound, so while a
-//! window shares its screen this captures everything the computer plays except Misty (so the
-//! call's own voices never go back into it) as 48 kHz stereo and sends it to that window, which
-//! publishes it as the screen's audio track. It starts only when the person shares their screen
-//! and stops with it.
 use std::sync::Mutex;
 use tauri::{
     ipc::{Channel, InvokeResponseBody},
@@ -10,8 +5,6 @@ use tauri::{
 };
 use voice_capture::Capture;
 
-/// About 20ms of 48 kHz stereo: the capture's own buffers are smaller, so they are gathered
-/// into chunks this size before they cross to the page.
 const CHUNK_SAMPLES: usize = 1_920;
 
 #[derive(Default)]
@@ -19,8 +12,6 @@ pub struct ShareAudioState {
     running: Mutex<Option<Capture>>,
 }
 
-/// Starts the shared screen's sound. Each chunk arrives on `audio` as little-endian PCM16,
-/// interleaved left and right; if the device stops mid-call, `ended` gets why, once.
 #[tauri::command]
 pub async fn voice_share_audio_start(
     webview: Webview,

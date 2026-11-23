@@ -1,8 +1,5 @@
-//! Capturing a region of a Browser page as an image.
-
 use tauri::Webview;
 
-/// WebKit owns rasterization; the shell does not need a second DOM renderer.
 #[cfg(target_os = "macos")]
 pub(crate) async fn capture_webview_region(
     webview: Webview,
@@ -60,7 +57,6 @@ pub(crate) async fn capture_webview_region_sized(
         let view: &WKWebView = &*platform.inner().cast();
         let config = WKSnapshotConfiguration::new(mtm);
         config.setRect(NSRect::new(NSPoint::new(x,y), NSSize::new(width,height)));
-        // Native screenshots retain text detail; the 640px agent captures keep their old budget.
         config.setSnapshotWidth(Some(&NSNumber::new_f64(width * (max_dimension / width.max(height)).min(if max_dimension > 640.0 { 2.0 } else { 1.0 }))));
         config.setAfterScreenUpdates(true);
         let handler = RcBlock::new(move |image: *mut NSImage, error: *mut NSError| {

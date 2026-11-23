@@ -1,11 +1,5 @@
-// An agent's own MCP servers, looked up in the person's MCP configs on this computer and mounted
-// beside Misty's.
-
 use serde_json::{json, Value};
 
-/// The user-level config files an agent's servers are looked up in, the engine's own scope order
-/// kept (`engine_config/mcp/launch.rs`). Files inside the project folder are left out: they came
-/// with the repository, and starting a server from one is the person's call in the engine itself.
 const AGENT_SERVER_SOURCES: &[&str] = &[
     "claude_local",
     "claude_user",
@@ -16,7 +10,6 @@ const AGENT_SERVER_SOURCES: &[&str] = &[
     "agy_user",
 ];
 
-/// An MCP client accepts a server name of letters, digits, `_` and `-`.
 fn plain_server_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 64
@@ -25,11 +18,6 @@ fn plain_server_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
-/// An agent's own MCP servers (`engine.mcp_servers`, by name), as the engine-neutral config the
-/// adapters mount beside Misty's (`{"type": "stdio", "command", "args", "env", "cwd"}` or
-/// `{"type": "http", "url", "headers"}`). Each name is looked up in the person's MCP configs on
-/// this computer. One the engine's own config already has is left to the engine, which starts it
-/// by itself; a name found nowhere is left out.
 pub(crate) fn agent_servers(
     engine: &str,
     workspace: &str,
@@ -47,7 +35,6 @@ pub(crate) fn agent_servers(
                 || (matches!(engine, "gemini" | "qwen") && source.starts_with("agy_"))
         };
         let mut found = None;
-        // The engine's own files first: a server it already has is its own to start.
         let ordered = AGENT_SERVER_SOURCES
             .iter()
             .filter(|source| own(source))

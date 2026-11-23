@@ -8,8 +8,6 @@ use std::sync::OnceLock;
 
 static ENGINES_HOME: OnceLock<PathBuf> = OnceLock::new();
 
-/// Points the engine layer at `~/.misty/shared/engines`, which every build shares (the programs
-/// there only run from where they were installed). Called once while the app starts.
 pub fn init(misty_root: &std::path::Path) {
     let _ = ENGINES_HOME.set(engines_in(misty_root));
 }
@@ -20,11 +18,6 @@ fn engines_in(misty_root: &std::path::Path) -> PathBuf {
         .join("engines")
 }
 
-/// Home dir without panicking: a headless/odd environment falls back to the
-/// current directory so startup degrades instead of crashing.
-///
-/// Tests steer it through HOME / USERPROFILE, because `dirs` ignores the
-/// environment on Windows and would read the real profile.
 pub(crate) fn home_dir() -> PathBuf {
     #[cfg(test)]
     {
@@ -40,12 +33,9 @@ pub(crate) fn home_dir() -> PathBuf {
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
 }
 
-/// Serialize tests that steer process-global HOME / USERPROFILE (read by the
-/// cfg(test) branch above): every HOME-mutating test across the crate holds this one lock.
 #[cfg(test)]
 pub(crate) static HOME_ENV_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
-/// The engine layer's own folder: staging files, pasted images, host credentials.
 pub fn app_home() -> PathBuf {
     #[cfg(test)]
     {
@@ -58,34 +48,24 @@ pub fn app_home() -> PathBuf {
         .unwrap_or_else(|| engines_in(&home_dir().join(".misty")))
 }
 
-/// Where Misty keeps what it installs, rooted at the engine layer's folder (`~/.misty/shared/engines`).
-/// Tests root it in a scratch folder of their own instead of moving the process-wide `HOME`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InstallRoot {
     engines: PathBuf,
 }
 
 impl InstallRoot {
-    /// Misty's own folder on this computer.
     pub fn here() -> Self {
         Self::at(app_home())
     }
 
-    /// A root whose engine folders are inside `engines`.
     pub fn at(engines: PathBuf) -> Self {
         Self { engines }
     }
 
-    /// Where Misty installs an engine: `~/.misty/shared/engines/<engine>`, beside the engine layer's own
-    /// staging folders, none of which is named after an engine. Only the program lives here; the
-    /// engine's sign-in and settings stay in its own folder (`~/.claude`, `~/.codex` and the like).
     pub fn engine_dir(&self, engine: &str) -> PathBuf {
         self.engines.join(engine)
     }
 
-    /// The folders inside an engine's folder that hold its program: `bin` for a maker's own
-    /// build, `node_modules/.bin` for an npm install (`npm install --prefix`), and for Hermes
-    /// Agent the launcher its installer keeps inside its source checkout.
     pub fn program_dirs(&self, engine: &str) -> Vec<PathBuf> {
         let dir = self.engine_dir(engine);
         let mut dirs = vec![dir.join("bin"), dir.join("node_modules").join(".bin")];
@@ -95,12 +75,10 @@ impl InstallRoot {
         dirs
     }
 
-    /// Where an installer that works from a source checkout (Hermes Agent's) puts it.
     pub fn checkout_dir(&self, engine: &str) -> PathBuf {
         self.engine_dir(engine).join(format!("{engine}-agent"))
     }
 
-    /// Misty's own Node.js, fetched only when an engine needs it: `~/.misty/runtime/node`.
     pub fn node_dir(&self) -> PathBuf {
         self.engines
             .parent()
@@ -109,7 +87,6 @@ impl InstallRoot {
             .join("node")
     }
 
-    /// The folder holding `node` and `npm` in Misty's Node.js.
     pub fn node_bin_dir(&self) -> PathBuf {
         if cfg!(windows) {
             self.node_dir()
@@ -118,9 +95,6 @@ impl InstallRoot {
         }
     }
 
-    /// Every folder of programs Misty installed: each engine's, then its Node.js. They go last
-    /// on the engines' search PATH, so a copy already on the computer is found first. Never
-    /// added to the person's own PATH.
     pub fn all_program_dirs(&self) -> Vec<PathBuf> {
         let mut dirs: Vec<PathBuf> = super::config::ENGINES
             .iter()
@@ -131,22 +105,13 @@ impl InstallRoot {
     }
 }
 
-/// What an engine's program gets in its environment when it is Misty's own copy: Claude Code's
-/// auto-updater turned off (`DISABLE_AUTOUPDATER`, as Claude Code documents it), since it would
-/// install a new version into `~/.local` instead of Misty's folder. Misty updates its copy itself,
-/// the way it installed it. A copy that was on the computer before gets nothing.
 pub fn own_copy_env(bin: &str) -> Vec<(&'static str, &'static str)> {
     own_copy_env_in(&InstallRoot::here(), bin)
 }
 
-/// [`own_copy_env`] for Misty's folder at `root`.
 pub fn own_copy_env_in(root: &InstallRoot, bin: &str) -> Vec<(&'static str, &'static str)> {
     let path = std::path::Path::new(bin);
     let folder = root.engine_dir("claude");
-    // The real paths too, so a link elsewhere that leads into Misty's folder still counts. The
-    // folder is Misty's own and goes through the gate; the program usually sits in a program
-    // folder outside it (`/opt/homebrew/bin`), so its link is followed outside the gate, as when
-    // Misty finds a program to run. Going through the gate there refused, and logged, every start.
     let inside = path.is_absolute()
         && (path.starts_with(&folder)
             || file_access::fs::canonicalize(&folder).is_ok_and(|folder| {
@@ -159,44 +124,37 @@ pub fn own_copy_env_in(root: &InstallRoot, bin: &str) -> Vec<(&'static str, &'st
     }
 }
 
-/// Where a program's links lead. Only the links are followed; nothing in the file is read.
 #[allow(clippy::disallowed_methods)]
 fn program_real_path(path: &std::path::Path) -> Option<std::path::PathBuf> {
     std::fs::canonicalize(path).ok()
 }
 
-/// A command for `bin`, with [`own_copy_env`] set.
 pub(crate) fn own_copy_command(bin: &str) -> tokio::process::Command {
     let mut command = tokio::process::Command::new(bin);
     command.envs(own_copy_env(bin));
     command
 }
 
-/// [`InstallRoot::engine_dir`] on this computer.
 pub fn engine_install_dir(engine: &str) -> PathBuf {
     InstallRoot::here().engine_dir(engine)
 }
 
-/// [`InstallRoot::node_dir`] on this computer.
 pub fn node_runtime_dir() -> PathBuf {
     InstallRoot::here().node_dir()
 }
 
-/// [`InstallRoot::node_bin_dir`] on this computer.
 pub fn node_runtime_bin_dir() -> PathBuf {
     InstallRoot::here().node_bin_dir()
 }
 
-/// [`InstallRoot::all_program_dirs`] on this computer.
 pub fn installed_program_dirs() -> Vec<PathBuf> {
     InstallRoot::here().all_program_dirs()
 }
 
-/// desktop-cc-gui's own home. Its sessions are listed for import like any CLI's.
 pub fn legacy_home() -> PathBuf {
     home_dir().join(".ccgui")
 }
 
 pub fn ensure_dirs() -> std::io::Result<()> {
-    std::fs::create_dir_all(app_home())
+    file_access::fs::create_dir_all(app_home())
 }

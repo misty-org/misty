@@ -1,14 +1,13 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { isLocalGrant, localAppsApi, localGrantHolder } from "../connected-apps/localApi";
-import { personalAgentsApi } from "../personal/personalAgentsApi";
+import { isLocalGrant, localAppsApi, localGrantHolder } from "../connected-apps/local_api";
+import { personalAgentsApi } from "../personal/personal_agents_api";
 import {
   localSiteGrants,
   namedGrants,
   revokeAgentSiteGrants,
   revokeSiteGrant,
-} from "./localSiteGrants";
+} from "./local_site_grants";
 
-/** A remembered approval: this agent may take this action on this one resource in Auto. */
 export interface AgentGrant {
   id: string;
   agent_id: string;
@@ -16,21 +15,18 @@ export interface AgentGrant {
   action: string;
   scope_kind: string;
   scope_id: string;
-  /** Plain words, e.g. "Push to misty-org/misty". */
   label: string;
   created_at: string;
   last_used_at?: string;
   use_count: number;
 }
 
-/** Approvals remembered for connected apps on this computer, none outside the app. */
 async function localGrants(): Promise<AgentGrant[]> {
   if (!hasTauriInternals()) return [];
   return (await localAppsApi.grants()).grants;
 }
 
 export const grantsApi = {
-  /** Both lists. One that fails hides only itself unless there's nothing else to show. */
   list: async () => {
     const [sites, local, agents] = await Promise.allSettled([
       localSiteGrants(),
@@ -53,7 +49,6 @@ export const grantsApi = {
     agentId === localGrantHolder ? localAppsApi.revokeAllGrants() : revokeAgentSiteGrants(agentId),
 };
 
-/** Grants grouped by agent, agents in name order, newest grant first within each. */
 export function groupGrants(grants: AgentGrant[]) {
   const groups = new Map<string, { agentId: string; agentName: string; grants: AgentGrant[] }>();
   for (const grant of grants) {
@@ -68,7 +63,6 @@ export function groupGrants(grants: AgentGrant[]) {
   return [...groups.values()].sort((a, b) => a.agentName.localeCompare(b.agentName));
 }
 
-/** "Last used 3 days ago", "Last used today" or "Not used yet". */
 export function lastUsedText(grant: Pick<AgentGrant, "last_used_at">, now = Date.now()) {
   if (!grant.last_used_at) return "Not used yet";
   const days = Math.floor((now - Date.parse(grant.last_used_at)) / 86_400_000);

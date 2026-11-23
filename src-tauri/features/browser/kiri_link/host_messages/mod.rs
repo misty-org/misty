@@ -1,7 +1,3 @@
-//! Messages from Misty's own page scripts (focus, shortcuts, context menu,
-//! companion pointer, page color, Escape-to-stop), delivered over Kiri's host
-//! channel on every engine. Each carries the tab's token, which only those
-//! scripts hold; anything else is dropped.
 use crate::browser::*;
 use kiri::channel::{HostChannel, HostMessage};
 
@@ -28,6 +24,16 @@ struct Channel {
 impl HostChannel for Channel {
     fn receive(&self, message: HostMessage<'_>) {
         let app = &self.app;
+        if crate::apps::frames::is_app_page(message.webview) {
+            let _ = crate::apps::frames::receive(
+                app,
+                message.webview,
+                message.main_frame,
+                None,
+                message.body,
+            );
+            return;
+        }
         let Some(id) = message.webview.strip_prefix("misty-browser-") else {
             return;
         };
@@ -72,8 +78,6 @@ impl HostChannel for Channel {
             crate::browser::report_first_paint_background(app, id);
             return;
         }
-        // Companion tracking shares the authenticated channel with focus.
-        // URL-based telemetry cancels WebKit loads while the user moves the mouse.
         if let Some(pointer) = pointer_message(raw) {
             if trusted(app, id, &pointer.token) {
                 crate::browser::emit_browser_pointer(
@@ -119,7 +123,6 @@ impl HostChannel for Channel {
                         BrowserFocusEvent { id: id.to_owned() },
                     );
                 }
-                // A finished document ends the load even when WebKit never reports it finished.
                 StatusChange::Loaded if message.main_frame => {
                     let _ = app.emit_to(
                         owner,
@@ -150,7 +153,6 @@ impl HostChannel for Channel {
     }
 }
 
-/// Routes Kiri's host channel to Misty. Called once at plugin setup.
 pub(crate) fn init(app: &AppHandle) {
     kiri::channel::set_host_channel(Channel { app: app.clone() });
 }

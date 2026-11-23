@@ -1,5 +1,3 @@
-//! `browser.interact`: an agent's action on an inspected element, scroll, point
-//! or native input in a granted browser tab.
 use crate::browser::*;
 
 pub(in crate::browser) async fn interact_browser(

@@ -1,14 +1,10 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import { PanelLeft, PanelRight, X } from "lucide-react";
+import { PanelLeft, PanelRight, Settings } from "lucide-react";
 import { BottomBar, Button, IconButton, Progress, Text } from "@misty/ui";
 import type { FreeSpace, Progress as FilesProgress } from "@/features/files";
+import { openSettings } from "@/features/settings";
 import { countText, formatBytes } from "./format";
 
-/**
- * The foot of the file list, as Kura's: how many items the folder holds (or how many are picked,
- * with their size) at its start; the operation running now with its progress and Cancel, and how
- * much room is left on the folder's disk, at its end.
- */
 export function FilesListFooter({
   count,
   selected,
@@ -16,7 +12,6 @@ export function FilesListFooter({
   free,
   progress,
   onCancel,
-  onClosePane,
 }: {
   count: number | null;
   selected: number;
@@ -24,10 +19,11 @@ export function FilesListFooter({
   free: FreeSpace | null;
   progress: FilesProgress | null;
   onCancel(): void;
-  /** Closes this pane, while its tab is split. */
-  onClosePane?: () => void;
 }) {
-  const share = progress && progress.totalBytes > 0 ? Math.min(100, (progress.doneBytes / progress.totalBytes) * 100) : 0;
+  const share =
+    progress && progress.totalBytes > 0
+      ? Math.min(100, (progress.doneBytes / progress.totalBytes) * 100)
+      : 0;
   const summary =
     count === null
       ? ""
@@ -35,7 +31,10 @@ export function FilesListFooter({
         ? `${selected} selected${selectedBytes > 0 ? `, ${formatBytes(selectedBytes)}` : ""}`
         : countText(count);
   return (
-    <footer aria-label="Folder" className="flex h-8 min-w-0 shrink-0 items-center justify-between gap-3 px-3">
+    <footer
+      aria-label="Folder"
+      className="flex h-8 min-w-0 shrink-0 items-center justify-between gap-3 px-3"
+    >
       <Text size="meta" tone="muted">
         {summary}
       </Text>
@@ -56,17 +55,11 @@ export function FilesListFooter({
             {`${formatBytes(free.free)} available`}
           </Text>
         ) : null}
-        {onClosePane ? (
-          <IconButton label="Close pane" size="sm" onClick={onClosePane}>
-            <X />
-          </IconButton>
-        ) : null}
       </div>
     </footer>
   );
 }
 
-/** Kura's bottom bar: the sidebar's toggle at its start, the inspector's at its end. */
 export function FilesBottomBar({
   sidebar,
   onSidebar,
@@ -75,7 +68,6 @@ export function FilesBottomBar({
 }: {
   sidebar: boolean;
   onSidebar(on: boolean): void;
-  /** The inspector's toggle; left out where there is no inspector (the picker). */
   inspector?: boolean;
   onInspector?: (on: boolean) => void;
 }) {
@@ -83,9 +75,18 @@ export function FilesBottomBar({
     <BottomBar
       aria-label="Files"
       start={
-        <IconButton label={sidebar ? "Hide sidebar" : "Show sidebar"} aria-pressed={sidebar} onClick={() => onSidebar(!sidebar)}>
-          <PanelLeft />
-        </IconButton>
+        <>
+          <IconButton
+            label={sidebar ? "Hide sidebar" : "Show sidebar"}
+            aria-pressed={sidebar}
+            onClick={() => onSidebar(!sidebar)}
+          >
+            <PanelLeft />
+          </IconButton>
+          <IconButton label="Files settings" onClick={() => openSettings("drive")}>
+            <Settings />
+          </IconButton>
+        </>
       }
     >
       {onInspector ? (

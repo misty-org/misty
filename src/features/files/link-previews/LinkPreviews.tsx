@@ -1,22 +1,16 @@
 import { useEffect, useState } from "react";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import { Pressable, Skeleton, Surface, Text, Tooltip } from "@misty/ui";
 import { knownLinkPreview, loadLinkPreview, type LinkPreview } from "./api";
 import { extractLinks } from "./links";
 import { useLinkPreviewSetting } from "./settings";
 
-/**
- * A card under a message for each link in it, like the unfurls in Discord or Instagram:
- * thumbnail, site, title and a line of description. A link with no preview shows nothing,
- * since the message already holds the link itself.
- */
 export function LinkPreviews({
   text,
   enabled = true,
   max = 3,
 }: {
   text: string;
-  /** False while a message is still being written, so half a link is never fetched. */
   enabled?: boolean;
   max?: number;
 }) {
@@ -65,15 +59,15 @@ function LinkPreviewCard({ url }: { url: string }) {
           ) : null}
           <span className="grid min-w-0 content-center gap-0.5 py-2 pl-3 pr-3">
             {preview.siteName ? (
-              <Text tone="muted" className="text-xs">
+              <Text size="meta" tone="muted">
                 {preview.siteName}
               </Text>
             ) : null}
-            <Text tone="bright" lines={2} className="text-sm font-medium leading-snug">
+            <Text size="control" weight="medium" tone="bright" lines={2}>
               {preview.title || url}
             </Text>
             {preview.description ? (
-              <Text tone="muted" className="text-xs">
+              <Text size="meta" tone="muted">
                 {preview.description}
               </Text>
             ) : null}

@@ -1,27 +1,20 @@
-//! Running JavaScript in a person's own app window (debug builds only), for the acceptance specs.
-//! It reaches the app's real modules the way the interface does, so sign-in, keys and messages
-//! take their real paths. Website tabs are refused.
 use super::*;
 
 const MAX_WAIT: Duration = Duration::from_secs(600);
 const DEFAULT_WAIT: Duration = Duration::from_secs(60);
 const POLL: Duration = Duration::from_millis(50);
-/// How long one look at the window may take. A window that is reloading never answers.
 const LOOK: Duration = Duration::from_secs(5);
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WindowEval {
-    /// The body of an async function: `return` gives the result.
     script: String,
-    /// A window label; the first app window when absent.
     #[serde(default)]
     window: Option<String>,
     #[serde(default)]
     timeout_ms: Option<u64>,
 }
 
-/// Runs the script and answers with what it returned, once its promise settles.
 pub(super) async fn window_eval(
     AxumState(bridge): AxumState<Bridge>,
     headers: HeaderMap,
@@ -42,7 +35,6 @@ pub(super) async fn window_eval(
     reply(run(&view, &body.script, wait).await)
 }
 
-/// Windows with the full interface.
 fn is_person_window(label: &str) -> bool {
     label.starts_with("window-")
 }
@@ -68,8 +60,6 @@ fn person_window(app: &AppHandle, named: Option<&str>) -> Result<Webview, String
         .ok_or_else(|| "No Misty window is open.".to_owned())
 }
 
-/// Starts the script without waiting on it, because a callback only sees a synchronous result,
-/// then looks at its slot until it settles.
 async fn run(view: &Webview, script: &str, wait: Duration) -> Result<Value, String> {
     let slot = uuid::Uuid::new_v4().to_string();
     let started = look(view, start_script(&slot, script)).await?;
@@ -81,7 +71,6 @@ async fn run(view: &Webview, script: &str, wait: Duration) -> Result<Value, Stri
         tokio::time::sleep(POLL).await;
         let answer = match look(view, poll_script(&slot)).await {
             Ok(answer) => answer,
-            // Busy for a moment, which a long synchronous task makes it. The deadline still holds.
             Err(_) => continue,
         };
         match answer.as_str() {

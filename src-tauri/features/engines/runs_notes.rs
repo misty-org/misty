@@ -1,17 +1,11 @@
-//! What the bridge reports about an outside engine's run (`runs.rs`): its engine session, which
-//! a chat keeps for its next turn, and the run being parked, kept warm, resumed or over.
-
 use tauri::Manager;
 
 use super::bridge::RunNote;
 use super::*;
 
-/// What the bridge reports about a run: its engine session, and its end.
 pub(super) fn note(run_id: &str, note: RunNote) {
     match note {
         RunNote::Session(session) => {
-            // The cursor companion's turn keeps no session for the chat (`start`); Tutor's spoken
-            // conversation keeps its own.
             let companion = |run: &LiveRun| {
                 run.body["mode"].as_str() == Some("companion") && !tutor_voice(&run.body)
             };
@@ -63,9 +57,8 @@ pub(super) fn note(run_id: &str, note: RunNote) {
         RunNote::Ended => {
             if let Some(run) = live().remove(run_id) {
                 for image in run.images {
-                    let _ = std::fs::remove_file(image);
+                    let _ = file_access::fs::remove_file(image);
                 }
-                // A run with no chat worked in a scratch folder of its own (`chat_folder.rs`).
                 if run.conversation.is_empty() {
                     if let Some(app) = APP.get() {
                         let db = app.state::<MistyRuntime>().environment.store();

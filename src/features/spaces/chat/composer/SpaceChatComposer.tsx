@@ -19,13 +19,13 @@ import {
 } from "@misty/ui";
 import type { MistyPickerSource } from "@/features/files";
 import { AgentMark } from "@/features/agents";
-import type { ChatComposerSuggestion } from "../../api/dto/space-chat";
+import type { ChatComposerSuggestion } from "../../api/dto/space_chat";
 import type { SpaceMessage } from "../../api/dto/entities";
-import type { SpaceChatDraft } from "./useSpaceChatDraft";
+import type { SpaceChatDraft } from "./use_space_chat_draft";
 import { SpaceChatPicker } from "./SpaceChatPicker";
-import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
-import type { useComposerInput } from "../hooks/useComposerInput";
-import type { useSpaceChatTyping } from "../hooks/useSpaceChatTyping";
+import type { ChatSuggestionsState } from "../hooks/use_chat_suggestions";
+import type { useComposerInput } from "../hooks/use_composer_input";
+import type { useSpaceChatTyping } from "../hooks/use_space_chat_typing";
 import { ChatEmojiPicker } from "../emoji/ChatEmojiPicker";
 import { ChatAvatar } from "../components/ChatAvatar";
 
@@ -37,11 +37,6 @@ const groupTitles: Record<ChatComposerSuggestion["kind"], string> = {
   agent: "Agents",
 };
 
-/**
- * Space chat's message box: @misty/ui's MessageComposer in its channel look. The + adds files or
- * media, a reply shows as a row at the top of the box, files waiting to go sit above the text,
- * and @ opens the suggestions over the box. Who is typing shows under it.
- */
 export function SpaceChatComposer(props: {
   spaceId: string;
   canWrite: boolean;
@@ -56,7 +51,6 @@ export function SpaceChatComposer(props: {
   onOpenPicker(source: MistyPickerSource): void;
   onClosePicker(): void;
   onSubmit(event: FormEvent): void;
-  /** Up in an empty box edits the person's last message. */
   onEditLast?: () => void;
   placeholder: string;
 }) {
@@ -124,7 +118,6 @@ export function SpaceChatComposer(props: {
   };
   const remaining = MAX_MESSAGE_LENGTH - draft.text.length;
   const noSlots = draft.attachmentSlotsLeft === 0;
-  // The same rows in the + menu and, once the bar has folded it, in its ⋯.
   const addRows = (
     <>
       <MenuItem

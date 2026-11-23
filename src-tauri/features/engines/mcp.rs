@@ -1,11 +1,3 @@
-// A local MCP server, so an outside engine can use its agent's home Space: read and write
-// notes, files and threads, and hand browser work to Misty's own agent.
-//
-// It listens on 127.0.0.1 only, and each run gets its own token for as long as it lasts. Every
-// call goes through the same journal and gate as a tool call from Misty's own agent
-// (`run_control/local_tools.rs`), with the mode the run started in: nothing here decides what a
-// run may do.
-
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
@@ -35,16 +27,11 @@ mod tools;
 pub(crate) use tools::names_misty_tool;
 use tools::*;
 
-/// The tools Misty's own agent is offered, in MCP's shape already.
 const CATALOG: &str = include_str!("../agents/runs/local_prompt/catalog.json");
 
-/// The families of tools that work on a Space. An outside engine brings its own tools for files
-/// on disk, the shell and the web; these are what only Misty has. `integration.` is the person's
-/// connected apps (`agents/connected_apps`), signed in once in Misty for every engine.
 const SPACE_TOOLS: [&str; 9] = [
     "space.",
     "file.",
-    // The person's own disk, behind the disk grant (`files/agent_tools.rs`).
     "files.",
     "thread.",
     "message.",
@@ -54,9 +41,6 @@ const SPACE_TOOLS: [&str; 9] = [
     "integration.",
 ];
 
-/// Misty's browser, as an engine drives it: a tab of its own that the person watches and can take
-/// over. Left out are the tools that read a page with Misty's own model (`browser.act`,
-/// `browser.extract`), since the engine is the model here.
 const BROWSER_TOOLS: [&str; 13] = [
     "screen.open",
     "screen.close",
@@ -80,20 +64,15 @@ and can take it over; it carries their signed-in sites. Calling it again with a 
 opened returns that tab. When a page needs the person (a sign-in, a CAPTCHA, a confirmation), call \
 browser_request_user_action instead of asking in text.";
 
-/// The person's apps, connected once in Misty and shared by every engine.
 const RECALL_INSTRUCTIONS: &str = "The recall tool searches your own memory: your notes and your \
 earlier chat with this person. Use it before saying you don't remember.";
 const APPS_INSTRUCTIONS: &str = "The integration_* tools reach the apps the user connected in \
 Misty (such as Notion, Linear or Gmail), signed in as them: find a tool with integration_search, \
 then run it with integration_execute. Prefer them to the app's web page.";
-/// The tools of an app that runs on this computer (`apps/program.rs`, such as SoundCraft's): they work in the
-/// chat's folder, and what they make is kept by saving it to the Space.
 const APP_PROGRAM_INSTRUCTIONS: &str = "Some app_* tools belong to an app that runs on this computer, \
 such as SoundCraft: they work only in your working folder, so give them paths there, and their open \
 session stays from one call and turn to the next. To keep what one makes (a bounced mix, a saved \
 session), add the file to the Space with file_upload.";
-/// browser_run's file for an engine: the program's value is written in the run's folder, so page
-/// data reaches a file without the model typing it out again.
 const SAVE_AS: &str = "saveAs";
 const SAVE_AS_HINT: &str = " To keep what a program collects, pass saveAs with a file in your \
 working folder (such as \"outputs/listings.json\"): the whole return value is written there (a string \
@@ -101,12 +80,9 @@ as text, anything else as JSON) and you get back its path, size and a short prev
 data. Use it for any data you would otherwise copy into a file yourself; read the file with your \
 own tools. To visit many pages, loop in one tab with goto(url) rather than openTab for each: every \
 tab you open stays open, and each one costs the person's computer memory, until you close() it.";
-/// How much of a saved value comes back to the engine.
 const SAVED_PREVIEW_CHARS: usize = 1_200;
 const ASK_MISTY: &str = "ask_misty";
 const MISTY_WAIT: &str = "misty_wait";
-/// Offers the person "Open in Code" for this chat (`engines/open_in_code.rs`): the app shows a card
-/// under the reply, and the person decides. Nothing moves until they do.
 const OPEN_IN_CODE: &str = "open_in_code";
 
 const INSTRUCTIONS: &str = "These tools reach the Misty Space this chat belongs to: its notes, \
@@ -114,7 +90,6 @@ files, drawings and threads, shared with the people in it. Save anything worth k
 Space. Keep the files you make inside your working folder: writes elsewhere, such as /tmp, may be \
 refused.";
 
-/// The person attached Misty's browser to this message: they want the work done there.
 const INSTRUCTIONS_WITH_BROWSER: &str = "These tools reach the Misty Space this chat belongs to: \
 its notes, files, drawings and threads, shared with the people in it. Save anything worth keeping \
 to the Space. Keep the files you make inside your working folder: writes elsewhere, such as /tmp, \
@@ -156,10 +131,6 @@ fn json_response(body: Value) -> Response {
         .into_response()
 }
 
-/// Who is calling: a run Misty started on an outside engine. It has Misty's browser only when the
-/// person attached it to the message (the Browser attachment or `/browser`), so an engine never
-/// reaches for it by default, and screen control (`features/computer_use`) only when the person
-/// turned it on for this send.
 struct Caller {
     run_id: String,
     browser: bool,
@@ -192,7 +163,6 @@ impl Caller {
         }
     }
 
-    /// Screen control is offered only to a run the person sent with it turned on.
     fn computer(&self) -> bool {
         cfg!(any(target_os = "macos", windows, target_os = "linux")) && self.computer
     }
@@ -204,8 +174,6 @@ fn caller_of(headers: &HeaderMap) -> Option<Caller> {
         .to_str()
         .ok()?
         .strip_prefix("Bearer ")?;
-    // A prompt written into a parked process (`bridge::redirect`) runs under the chat's new
-    // turn: its calls are that turn's.
     let run_id = super::bridge::chat_run_of(&tokens().get(token).cloned()?);
     let request = super::runs::request_of(&run_id);
     let flag = |name: &str| {
@@ -227,13 +195,15 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
         let arguments = params["arguments"].clone();
         return crate::computer_use::tools::call(app, &caller.run_id, name, arguments).await;
     }
-    // An agent searching its own memory: read in this process, never another agent's.
     if name == super::recall::RECALL {
         let Some(body) = super::runs::request_of(&caller.run_id) else {
             return tool_error("Recall needs your chat's run, and Misty can't find it.".into());
         };
         let text = |key: &str| body[key].as_str().unwrap_or("").to_string();
-        let query = params["arguments"]["query"].as_str().unwrap_or("").to_string();
+        let query = params["arguments"]["query"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
         if query.trim().is_empty() {
             return tool_error("Say what to look for.".into());
         }
@@ -265,25 +235,21 @@ async fn call_tool(app: &AppHandle, caller: &Caller, params: &Value) -> Value {
             Err(message) => tool_error(message),
         };
     }
-    // The offer is the card the app draws from this call; the person answers it there.
     if name == OPEN_IN_CODE {
         return json!({
             "content": [{
                 "type": "text",
                 "text": "Misty showed the person an Open in Code card. They choose where the \
-project goes and confirm it; until then, carry on in this chat and don't move any files.",
+        project goes and confirm it; until then, carry on in this chat and don't move any files.",
             }],
         });
     }
-    // Claude Code names its own id for the call; the chat's row for it is found by that id even
-    // when the engine's stream never showed the call start (a helper agent's).
     let wire = params["_meta"]["claudecode/toolUseId"]
         .as_str()
         .filter(|id| !id.is_empty());
     if let Some(wire) = wire {
         super::bridge::note_mcp_call(wire, &format!("mcp__misty__{name}"), &params["arguments"]);
     }
-    // A tool of an app's own MCP server: the same journal and gate as any other, under its internal name.
     if let Some((internal, _)) = crate::apps::mcp::resolve(name) {
         let host = AppToolHost { app: app.clone() };
         let outcome = host
@@ -312,7 +278,6 @@ project goes and confirm it; until then, carry on in this chat and don't move an
     let Some((tool, input)) = found else {
         return tool_error(format!("There is no tool named {name}."));
     };
-    // browser_run with saveAs: the file is checked before the program runs, and written after.
     let save_to = match input[SAVE_AS].as_str().filter(|_| tool == "browser.run") {
         None => None,
         Some(file) => {
@@ -334,8 +299,6 @@ project goes and confirm it; until then, carry on in this chat and don't move an
     let outcome = host
         .call(LocalToolCall {
             run_id,
-            // The engine's own id when it gave one, so the browser log's rows for this call line
-            // up with the chat's row for it (activity steps are keyed by that id).
             call_id: wire
                 .map(str::to_string)
                 .unwrap_or_else(|| format!("mcp_{}", uuid::Uuid::new_v4().simple())),
@@ -374,7 +337,6 @@ async fn serve(AxumState(app): AxumState<AppHandle>, headers: HeaderMap, body: B
         return refusal(&Value::Null, -32700, "That isn't JSON.");
     };
     let id = &message["id"];
-    // A notification expects no answer.
     if id.is_null() {
         return StatusCode::ACCEPTED.into_response();
     }
@@ -394,7 +356,9 @@ async fn serve(AxumState(app): AxumState<AppHandle>, headers: HeaderMap, body: B
         "tools/list" => {
             let mut tools: Vec<Value> = space_tools()
                 .iter()
-                .filter(|tool| caller.offers(tool) && files_offered(&app, tool["name"].as_str().unwrap_or("")))
+                .filter(|tool| {
+                    caller.offers(tool) && files_offered(&app, tool["name"].as_str().unwrap_or(""))
+                })
                 .cloned()
                 .collect();
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
@@ -402,7 +366,6 @@ async fn serve(AxumState(app): AxumState<AppHandle>, headers: HeaderMap, body: B
                 tools.extend(crate::computer_use::tools::offered());
             }
             tools.push(super::recall::tool());
-            // What the apps open in Misty offer, over their own MCP servers (`apps/mcp.rs`).
             tools.extend(crate::apps::mcp::offered());
             reply(id, json!({ "tools": tools }))
         }
@@ -411,7 +374,6 @@ async fn serve(AxumState(app): AxumState<AppHandle>, headers: HeaderMap, body: B
     }
 }
 
-/// The port a connected agent's config names, kept the same across launches when it is free.
 const USUAL_PORT: u16 = 47600;
 
 async fn port(app: &AppHandle) -> Option<u16> {
@@ -438,15 +400,12 @@ async fn port(app: &AppHandle) -> Option<u16> {
     .copied()
 }
 
-/// The server's address on this computer, starting it if needed.
 pub(crate) async fn address(app: &AppHandle) -> Option<String> {
     port(app)
         .await
         .map(|port| format!("http://127.0.0.1:{port}/mcp"))
 }
 
-/// The server as an engine's own MCP config names it, with a token only this run holds. Nothing
-/// when the server could not start; the turn then goes on without the Space's tools.
 pub(crate) async fn servers_for(app: &AppHandle, run_id: &str) -> Option<Value> {
     let url = address(app).await?;
     let token = uuid::Uuid::new_v4().simple().to_string();
@@ -460,7 +419,6 @@ pub(crate) async fn servers_for(app: &AppHandle, run_id: &str) -> Option<Value> 
     }))
 }
 
-/// The token a run's `misty` server entry carries ([`servers_for`]).
 pub(crate) fn token_in(servers: Option<&Value>) -> Option<String> {
     servers?["misty"]["headers"]["Authorization"]
         .as_str()?
@@ -468,19 +426,14 @@ pub(crate) fn token_in(servers: Option<&Value>) -> Option<String> {
         .map(str::to_string)
 }
 
-/// A warm process (`warm.rs`) keeps calling with the token its session was opened with: the
-/// turn that takes the process takes that token too, so its calls are that turn's. Between
-/// turns the token is forgotten with the run that had it, and the idle process reaches nothing.
 pub(crate) fn rebind(token: &str, run_id: &str) {
     tokens().insert(token.to_string(), run_id.to_string());
 }
 
-/// A warm process ended: its token goes with it.
 pub(crate) fn drop_token(token: &str) {
     tokens().remove(token);
 }
 
-/// Ends a run's access, as the run ends.
 pub(crate) fn forget(run_id: &str) {
     tokens().retain(|_, run| run != run_id);
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]

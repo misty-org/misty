@@ -8,7 +8,6 @@ fn info(output: Output) -> (String, Vec<Section>) {
     }
 }
 
-/// `/usage` as agy 1.5.9 prints it signed in (trimmed): its rows, and the quota's own words.
 #[test]
 fn usage_shows_each_limit_as_a_row() {
     let result = json!({"conversation_id": "", "status": "SUCCESS",
@@ -88,8 +87,6 @@ fn local_commands_run_in_print_mode_and_grill_me_is_listed() {
     );
 }
 
-/// Misty's out-of-turn commands against the installed, signed-in CLI; none calls a model:
-/// `cargo test --lib agy_local_commands_live -- --ignored --nocapture`.
 #[cfg(unix)]
 #[tokio::test]
 #[ignore = "runs the installed Antigravity CLI"]

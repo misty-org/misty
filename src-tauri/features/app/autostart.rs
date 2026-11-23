@@ -9,14 +9,11 @@ use std::{
 #[cfg(target_os = "windows")]
 use crate::app::windows::registry;
 
-/// Where Windows lists programs to start at sign-in for the current user.
 #[cfg(target_os = "windows")]
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 #[cfg(target_os = "windows")]
 const RUN_VALUE: &str = "Misty";
 
-/// The command line Windows runs at sign-in: the quoted executable path, so
-/// spaces in "Program Files" or a user name never split it.
 #[cfg(target_os = "windows")]
 fn run_command(target: &Path) -> String {
     format!("\"{}\"", target.display())

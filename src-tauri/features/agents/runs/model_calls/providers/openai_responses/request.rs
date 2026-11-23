@@ -1,5 +1,3 @@
-//! The Responses request body. Ported from `getArgs` and `prepareResponsesTools` in `@ai-sdk/openai`,
-//! for function tools and the options Misty sets.
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -90,7 +88,6 @@ enum ToolChoiceBody<'a> {
     },
 }
 
-/// Tool names the API reads as its own built-in tools when one is chosen.
 const BUILT_IN_TOOLS: [&str; 9] = [
     "code_interpreter",
     "file_search",
@@ -111,7 +108,10 @@ fn tool_choice_body(choice: &ToolChoice) -> ToolChoiceBody<'_> {
         ToolChoice::Tool { tool_name } if BUILT_IN_TOOLS.contains(&tool_name.as_str()) => {
             ToolChoiceBody::Named { kind: tool_name }
         }
-        ToolChoice::Tool { tool_name } => ToolChoiceBody::Function { kind: "function", name: tool_name },
+        ToolChoice::Tool { tool_name } => ToolChoiceBody::Function {
+            kind: "function",
+            name: tool_name,
+        },
     }
 }
 
@@ -126,7 +126,12 @@ fn function_tool(tool: &ToolDefinition) -> FunctionTool<'_> {
 }
 
 fn text_settings(format: Option<&ResponseFormat>) -> Option<TextSettings<'_>> {
-    let Some(ResponseFormat::Json { name, description, schema }) = format else {
+    let Some(ResponseFormat::Json {
+        name,
+        description,
+        schema,
+    }) = format
+    else {
         return None;
     };
     Some(TextSettings {
@@ -142,13 +147,19 @@ fn text_settings(format: Option<&ResponseFormat>) -> Option<TextSettings<'_>> {
     })
 }
 
-/// Whether the call asked OpenAI to store its response, or left that to OpenAI's default.
 pub(super) fn store_option(options: &CallOptions) -> Option<bool> {
-    options.provider_options.as_ref()?.get("openai")?.get("store")?.as_bool()
+    options
+        .provider_options
+        .as_ref()?
+        .get("openai")?
+        .get("store")?
+        .as_bool()
 }
 
-/// Builds the request, and the warnings the stream starts with.
-pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<(ResponsesRequest<'a>, Vec<Value>), ModelError> {
+pub(super) fn build<'a>(
+    model: &'a str,
+    options: &'a CallOptions,
+) -> Result<(ResponsesRequest<'a>, Vec<Value>), ModelError> {
     let mut warnings = Vec::new();
     let store = store_option(options);
     if options.seed.is_some() {
@@ -158,16 +169,24 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<(Res
         warnings.push(json!({ "type": "unsupported", "feature": "stopSequences" }));
     }
     let capabilities = get_capabilities(model);
-    let effort = options.reasoning.as_deref().filter(|effort| *effort != "provider-default");
-    let summary = effort.filter(|effort| *effort != "none").map(|_| "detailed");
-    let role = if capabilities.is_reasoning_model { "developer" } else { "system" };
+    let effort = options
+        .reasoning
+        .as_deref()
+        .filter(|effort| *effort != "provider-default");
+    let summary = effort
+        .filter(|effort| *effort != "none")
+        .map(|_| "detailed");
+    let role = if capabilities.is_reasoning_model {
+        "developer"
+    } else {
+        "system"
+    };
     let input = convert_input(&options.prompt, role, store.unwrap_or(true), &mut warnings)?;
-    // Reasoning can only come back on the next turn as its encrypted content when nothing is stored.
-    let include = (store == Some(false) && capabilities.is_reasoning_model).then_some(["reasoning.encrypted_content"]);
+    let include = (store == Some(false) && capabilities.is_reasoning_model)
+        .then_some(["reasoning.encrypted_content"]);
 
     let mut temperature = options.temperature;
     let mut top_p = options.top_p;
-    // With reasoning off, GPT-5.1 and later take sampling settings again.
     let keeps_sampling = effort == Some("none") && capabilities.supports_non_reasoning_parameters;
     if capabilities.is_reasoning_model && !keeps_sampling {
         let refused = |feature: &str, name: &str| {
@@ -184,7 +203,8 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<(Res
             warnings.push(refused("topP", "topP"));
         }
     }
-    let reasoning = (capabilities.is_reasoning_model && effort.is_some()).then_some(ReasoningSettings { effort, summary });
+    let reasoning = (capabilities.is_reasoning_model && effort.is_some())
+        .then_some(ReasoningSettings { effort, summary });
     let has_tools = !options.tools.is_empty();
     Ok((
         ResponsesRequest {
@@ -198,7 +218,11 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<(Res
             include,
             reasoning,
             tools: has_tools.then(|| options.tools.iter().map(function_tool).collect()),
-            tool_choice: options.tool_choice.as_ref().filter(|_| has_tools).map(tool_choice_body),
+            tool_choice: options
+                .tool_choice
+                .as_ref()
+                .filter(|_| has_tools)
+                .map(tool_choice_body),
             stream: true,
         },
         warnings,
@@ -209,7 +233,6 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<(Res
 mod tests {
     use super::*;
 
-    /// A `Value` would sort these, and the next turn would then miss OpenAI's prompt cache.
     #[test]
     fn keys_keep_their_order_all_the_way_to_the_wire() {
         let options: CallOptions = serde_json::from_str(

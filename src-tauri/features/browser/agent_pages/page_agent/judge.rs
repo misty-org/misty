@@ -1,6 +1,3 @@
-//! A click planned from a screenshot, judged natively before it lands. The vision model's own word on
-//! whether it matters is one signal and never the only one: the page says what's under the point, and
-//! `confirm::ask` holds the input until the person answers, as a page step's stop does.
 use super::{call, call_at, frame_of, BrowserAgentExecuteRequest, BrowserSessionState};
 use crate::agents::run_control::tool_policy::kind_of;
 use crate::agents::run_control::tool_question::{Control, Controls};
@@ -9,7 +6,6 @@ use crate::browser::webview_label;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, Webview};
 
-/// What the page says this input would do. A page that can't answer leaves only the model's word.
 async fn judged(view: &Webview, input: &Value) -> Value {
     let answer = match input["kind"].as_str().unwrap_or("") {
         "click" => {
@@ -35,7 +31,6 @@ async fn judged(view: &Webview, input: &Value) -> Value {
     answer.unwrap_or(Value::Null)
 }
 
-/// The kind of stop this needs, from what's under the point and then from what the model said.
 fn stop_kind<'a>(page: &'a Value, consequential: bool, description: &str) -> &'a str {
     match page["consequenceKind"]
         .as_str()
@@ -57,7 +52,6 @@ fn describe<'a>(page: &'a Value, description: &'a str) -> &'a str {
         .unwrap_or("this control")
 }
 
-/// `Err` holds what the goal hears when the person said no, or nobody answered. Nothing was sent.
 pub(crate) async fn judge_point(
     app: &AppHandle,
     view: &Webview,
@@ -93,7 +87,6 @@ fn view_of_scope(app: &AppHandle, scope: &str) -> Option<Webview> {
     app.get_webview(&webview_label(&id).ok()?)
 }
 
-/// Which site a tab is on, for a question's words.
 pub(crate) fn scope_site(app: &AppHandle, scope: &str) -> String {
     view_of_scope(app, scope)
         .and_then(|view| view.url().ok())
@@ -101,7 +94,6 @@ pub(crate) fn scope_site(app: &AppHandle, scope: &str) -> String {
         .unwrap_or_default()
 }
 
-/// What the page calls the controls a call names, so a question says more than `e12`.
 pub(crate) async fn page_controls(app: &AppHandle, scope: &str, refs: &[String]) -> Controls {
     let mut controls = Controls::new();
     let Some(view) = view_of_scope(app, scope) else {
@@ -140,10 +132,8 @@ mod tests {
 
     #[test]
     fn what_is_under_the_point_decides_and_the_models_word_only_adds_to_it() {
-        // The model calling a Send button harmless changes nothing.
         let send = json!({"consequenceKind": "send", "describe": "button \"Send\""});
         assert_eq!(stop_kind(&send, false, "click the button"), "send");
-        // A plain button stays plain unless the model says otherwise.
         let plain = json!({"consequenceKind": "", "describe": "button \"Next\""});
         assert_eq!(stop_kind(&plain, false, "go on"), "");
         assert_eq!(stop_kind(&plain, true, "delete the row"), "delete");

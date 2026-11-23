@@ -83,8 +83,16 @@ pub enum ManifestFrom {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "result", rename_all = "lowercase")]
 pub enum Resolved {
-    App { repo: String, listed: bool, manifest_from: ManifestFrom, entry: AppEntry },
-    Incompatible { repo: String, reason: String },
+    App {
+        repo: String,
+        listed: bool,
+        manifest_from: ManifestFrom,
+        entry: Box<AppEntry>,
+    },
+    Incompatible {
+        repo: String,
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -176,15 +184,20 @@ pub fn repo_of(link: &str) -> Option<(String, String)> {
             && part.len() <= 100
             && part != "."
             && part != ".."
-            && part.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+            && part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
     };
     (part_ok(&owner) && part_ok(&name)).then_some((owner, name))
 }
 
 fn reviewed_in(catalog: &str, repo: &str) -> Result<Option<AppEntry>, String> {
-    let catalog: Catalog =
-        serde_json::from_str(catalog).map_err(|error| format!("Misty's app catalog isn't valid: {error}"))?;
-    Ok(catalog.apps.into_iter().find(|app| app.upstream.eq_ignore_ascii_case(repo)))
+    let catalog: Catalog = serde_json::from_str(catalog)
+        .map_err(|error| format!("Misty's app catalog isn't valid: {error}"))?;
+    Ok(catalog
+        .apps
+        .into_iter()
+        .find(|app| app.upstream.eq_ignore_ascii_case(repo)))
 }
 
 fn id_from(name: &str) -> String {
@@ -202,7 +215,11 @@ fn id_from(name: &str) -> String {
     }
     id.truncate(63);
     let id = id.trim_end_matches('-').to_owned();
-    if id.len() < 2 { "app".to_owned() } else { id }
+    if id.len() < 2 {
+        "app".to_owned()
+    } else {
+        id
+    }
 }
 
 fn version_of(tag: &str) -> String {
@@ -212,7 +229,7 @@ fn version_of(tag: &str) -> String {
 fn web_asset_of(assets: &[Asset]) -> Option<&Asset> {
     let mut web = assets.iter().filter(|asset| {
         let name = asset.name.to_ascii_lowercase();
-        name.ends_with(".zip") && name.contains("web")
+        (name.ends_with(".zip") && name.contains("web")) || name.ends_with(".war")
     });
     let first = web.next()?;
     web.next().is_none().then_some(first)
@@ -220,127 +237,16 @@ fn web_asset_of(assets: &[Asset]) -> Option<&Asset> {
 
 fn sha256_of(asset: &Asset) -> Option<String> {
     let digest = asset.digest.as_deref()?.strip_prefix("sha256:")?;
-    (digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit())).then(|| digest.to_ascii_lowercase())
+    (digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()))
+        .then(|| digest.to_ascii_lowercase())
 }
 
 fn open_source(spdx: Option<&str>) -> Option<String> {
     let spdx = spdx?;
-    OPEN_SOURCE_LICENSES.iter().any(|known| known.eq_ignore_ascii_case(spdx)).then(|| spdx.to_owned())
-}
-
-fn entry_from(
-    repo: &Repo,
-    release: &Release,
-    maker_manifest: Option<RepoManifest>,
-) -> Result<(AppEntry, ManifestFrom), String> {
-    let upstream = format!("{}/{}", repo.owner.login, repo.name);
-    let license = open_source(repo.license.as_ref().and_then(|license| license.spdx_id.as_deref())).ok_or_else(|| {
-        "Its license isn't an open-source one GitHub recognizes, so Misty can't add it.".to_owned()
-    })?;
-    if release.draft || release.prerelease {
-        return Err("Its latest release is a draft or a pre-release.".into());
-    }
-    let version = version_of(&release.tag_name);
-    if !valid_version(&version) {
-        return Err("Its latest release's tag isn't a version Misty can name a folder after.".into());
-    }
-    let raw = format!("https://raw.githubusercontent.com/{upstream}/{}", release.tag_name);
-    let picture = repo.owner.avatar_url.clone().unwrap_or_else(|| format!("https://github.com/{}.png", repo.owner.login));
-    let (from, id, name, description, maker, asset, logo, mut manifest, add_copies, strip_top, auto_top) =
-        match maker_manifest {
-            Some(theirs) => {
-                let file = theirs.web_asset.replace("{version}", &version);
-                let asset = release
-                    .assets
-                    .iter()
-                    .find(|asset| asset.name == file)
-                    .ok_or_else(|| format!("Its latest release has no {file}, which its misty-app.json names."))?;
-                let logo = theirs.icon.as_deref().map_or(picture, |icon| format!("{raw}/{icon}"));
-                (
-                    ManifestFrom::Maker,
-                    theirs.id.unwrap_or_else(|| id_from(&repo.name)),
-                    theirs.name,
-                    theirs.description,
-                    theirs.maker.unwrap_or_else(|| repo.owner.login.clone()),
-                    asset.clone(),
-                    logo,
-                    theirs.manifest,
-                    theirs.add_copies,
-                    theirs.strip_top,
-                    false,
-                )
-            }
-            None => {
-                let asset = web_asset_of(&release.assets).ok_or_else(|| {
-                    "There's no web build in its latest release: Misty looks for one .zip with \"web\" in its name."
-                        .to_owned()
-                })?;
-                let manifest = json!({
-                    "name": repo.name,
-                    "logo": "logo.png",
-                    "entry": "index.html",
-                    "own_origin": true,
-                    "shim": true,
-                    "permissions": ["files"],
-                })
-                .as_object()
-                .cloned()
-                .unwrap_or_default();
-                (
-                    ManifestFrom::Basic,
-                    id_from(&repo.name),
-                    repo.name.clone(),
-                    repo.description.clone(),
-                    repo.owner.login.clone(),
-                    asset.clone(),
-                    picture,
-                    manifest,
-                    Vec::new(),
-                    false,
-                    true,
-                )
-            }
-        };
-    if !valid_id(&id) {
-        return Err("The app's id isn't one Misty can use.".into());
-    }
-    let sha256 = sha256_of(&asset).ok_or_else(|| format!("GitHub reports no checksum for {}.", asset.name))?;
-    if !asset.browser_download_url.starts_with(&format!("https://github.com/{upstream}/releases/download/")) {
-        return Err("Its web build isn't one of its own release's files.".into());
-    }
-    manifest.insert("license".into(), Value::String(license.clone()));
-    let mut checked = manifest.clone();
-    checked.insert("id".into(), Value::String(id.clone()));
-    checked.insert("version".into(), Value::String(version.clone()));
-    let parsed = AppManifest::parse(Value::Object(checked).to_string().as_bytes())?;
-    let permissions = parsed
-        .permissions
+    OPEN_SOURCE_LICENSES
         .iter()
-        .map(|permission| {
-            serde_json::to_value(permission).ok().and_then(|value| value.as_str().map(str::to_owned)).unwrap_or_default()
-        })
-        .collect();
-    let entry = AppEntry {
-        id,
-        name,
-        description,
-        maker,
-        upstream,
-        license,
-        version,
-        tag: release.tag_name.clone(),
-        url: asset.browser_download_url,
-        sha256,
-        size: asset.size,
-        logo,
-        permissions,
-        manifest: Value::Object(manifest),
-        add_copies,
-        strip_top,
-        auto_top,
-        extra: serde_json::Map::new(),
-    };
-    Ok((entry, from))
+        .any(|known| known.eq_ignore_ascii_case(spdx))
+        .then(|| spdx.to_owned())
 }
 
 fn client() -> Result<reqwest::Client, String> {
@@ -352,17 +258,26 @@ fn client() -> Result<reqwest::Client, String> {
         .map_err(|error| error.to_string())
 }
 
-async fn get_json<T: serde::de::DeserializeOwned>(client: &reqwest::Client, url: &str) -> Result<Option<T>, String> {
+async fn get_json<T: serde::de::DeserializeOwned>(
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<Option<T>, String> {
     let response = client
         .get(url)
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
         .send()
         .await
-        .map_err(|_| "Misty couldn't reach GitHub. Check your connection and try again.".to_owned())?;
+        .map_err(|_| {
+            "Misty couldn't reach GitHub. Check your connection and try again.".to_owned()
+        })?;
     match response.status().as_u16() {
         404 => Ok(None),
-        403 | 429 => Err("GitHub is limiting how often Misty asks. Try again in a few minutes.".into()),
-        status if !(200..300).contains(&status) => Err(format!("GitHub answered {status}. Try again later.")),
+        403 | 429 => {
+            Err("GitHub is limiting how often Misty asks. Try again in a few minutes.".into())
+        }
+        status if !(200..300).contains(&status) => {
+            Err(format!("GitHub answered {status}. Try again later."))
+        }
         _ => response
             .json::<T>()
             .await
@@ -371,20 +286,27 @@ async fn get_json<T: serde::de::DeserializeOwned>(client: &reqwest::Client, url:
     }
 }
 
-async fn maker_manifest(client: &reqwest::Client, upstream: &str) -> Result<Option<RepoManifest>, String> {
+async fn maker_manifest(
+    client: &reqwest::Client,
+    upstream: &str,
+) -> Result<Option<RepoManifest>, String> {
     let url = format!("https://raw.githubusercontent.com/{upstream}/HEAD/misty-app.json");
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|_| "Misty couldn't reach GitHub. Check your connection and try again.".to_owned())?;
+    let response = client.get(&url).send().await.map_err(|_| {
+        "Misty couldn't reach GitHub. Check your connection and try again.".to_owned()
+    })?;
     if response.status().as_u16() == 404 {
         return Ok(None);
     }
     if !response.status().is_success() {
-        return Err(format!("GitHub answered {} for its misty-app.json. Try again later.", response.status().as_u16()));
+        return Err(format!(
+            "GitHub answered {} for its misty-app.json. Try again later.",
+            response.status().as_u16()
+        ));
     }
-    let bytes = response.bytes().await.map_err(|_| "Misty couldn't read its misty-app.json.".to_owned())?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|_| "Misty couldn't read its misty-app.json.".to_owned())?;
     if bytes.len() > MAX_REPO_MANIFEST_BYTES {
         return Err("Its misty-app.json is too large.".into());
     }
@@ -394,37 +316,78 @@ async fn maker_manifest(client: &reqwest::Client, upstream: &str) -> Result<Opti
 }
 
 pub async fn resolve(link: &str) -> Result<Resolved, String> {
-    let (owner, name) = repo_of(link).ok_or_else(|| "That isn't a link to a GitHub repository.".to_owned())?;
+    let (owner, name) =
+        repo_of(link).ok_or_else(|| "That isn't a link to a GitHub repository.".to_owned())?;
     let asked = format!("{owner}/{name}");
     let listed_apps = crate::registry::current().apps_json();
     if let Some(entry) = reviewed_in(&listed_apps, &asked)? {
-        return Ok(Resolved::App { repo: entry.upstream.clone(), listed: true, manifest_from: ManifestFrom::Reviewed, entry });
+        return Ok(Resolved::App {
+            repo: entry.upstream.clone(),
+            listed: true,
+            manifest_from: ManifestFrom::Reviewed,
+            entry: Box::new(entry),
+        });
     }
     let client = client()?;
-    let Some(repo) = get_json::<Repo>(&client, &format!("https://api.github.com/repos/{asked}")).await? else {
-        return Ok(Resolved::Incompatible { repo: asked, reason: "There's no public repository at that link.".into() });
+    let Some(repo) =
+        get_json::<Repo>(&client, &format!("https://api.github.com/repos/{asked}")).await?
+    else {
+        return Ok(Resolved::Incompatible {
+            repo: asked,
+            reason: "There's no public repository at that link.".into(),
+        });
     };
     let upstream = format!("{}/{}", repo.owner.login, repo.name);
     if let Some(entry) = reviewed_in(&listed_apps, &upstream)? {
-        return Ok(Resolved::App { repo: upstream, listed: true, manifest_from: ManifestFrom::Reviewed, entry });
+        return Ok(Resolved::App {
+            repo: upstream,
+            listed: true,
+            manifest_from: ManifestFrom::Reviewed,
+            entry: Box::new(entry),
+        });
     }
     if repo.archived {
-        return Ok(Resolved::Incompatible { repo: upstream, reason: "The repository is archived.".into() });
+        return Ok(Resolved::Incompatible {
+            repo: upstream,
+            reason: "The repository is archived.".into(),
+        });
     }
     let theirs = match maker_manifest(&client, &upstream).await {
         Ok(found) => found,
-        Err(reason) => return Ok(Resolved::Incompatible { repo: upstream, reason }),
+        Err(reason) => {
+            return Ok(Resolved::Incompatible {
+                repo: upstream,
+                reason,
+            })
+        }
     };
-    let Some(release) =
-        get_json::<Release>(&client, &format!("https://api.github.com/repos/{upstream}/releases/latest")).await?
+    let Some(release) = get_json::<Release>(
+        &client,
+        &format!("https://api.github.com/repos/{upstream}/releases/latest"),
+    )
+    .await?
     else {
-        return Ok(Resolved::Incompatible { repo: upstream, reason: "It has no release to add.".into() });
+        return Ok(Resolved::Incompatible {
+            repo: upstream,
+            reason: "It has no release to add.".into(),
+        });
     };
     Ok(match entry_from(&repo, &release, theirs) {
-        Ok((entry, manifest_from)) => Resolved::App { repo: upstream, listed: false, manifest_from, entry },
-        Err(reason) => Resolved::Incompatible { repo: upstream, reason },
+        Ok((entry, manifest_from)) => Resolved::App {
+            repo: upstream,
+            listed: false,
+            manifest_from,
+            entry: Box::new(entry),
+        },
+        Err(reason) => Resolved::Incompatible {
+            repo: upstream,
+            reason,
+        },
     })
 }
 
+mod entry;
 #[cfg(test)]
 mod tests;
+
+use entry::entry_from;

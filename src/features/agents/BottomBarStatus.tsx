@@ -12,40 +12,33 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, Text, Tooltip } from "@misty/ui";
-import { runtimeAiApi } from "./AgentsRuntime";
-import { useSpaceRuns } from "./activity/useSpaceRuns";
-import { setBrowserExpanded, useAgentBrowser } from "./agent-browser/agentBrowserStore";
-import { useChatChoices } from "./conversations/composer/controls/composerChoices";
+import { runtimeAiApi } from "./agents_runtime";
+import { useSpaceRuns } from "./activity/use_space_runs";
+import { setBrowserExpanded, useAgentBrowser } from "./agent-browser/agent_browser_store";
+import { useChatChoices } from "./conversations/composer/controls/composer_choices";
 import {
   useChatContextUsage,
   watchContextUsage,
-} from "./conversations/composer/controls/contextUsage";
-import { isChatUnread } from "./conversations/state/chatOrganizing";
-import { useMistyStore } from "./conversations/state/useMistyStore";
-import { resolveContextMax } from "./conversations/view/meta/contextWindowMemory";
-import { usageBreakdown } from "./conversations/view/meta/usageBreakdown";
-import { chatUsage, formatCost } from "./context-panel/chatUsage";
-import { useContextPanel } from "./context-panel/contextPanelStore";
+} from "./conversations/composer/controls/context_usage";
+import { isChatUnread } from "./conversations/state/chat_organizing";
+import { useMistyStore } from "./conversations/state/use_misty_store";
+import { resolveContextMax } from "./conversations/view/meta/context_window_memory";
+import { usageBreakdown } from "./conversations/view/meta/usage_breakdown";
+import { chatUsage, formatCost } from "./context-panel/chat_usage";
+import { useContextPanel } from "./context-panel/context_panel_store";
 import { LineCounts } from "./context-panel/git/LineCounts";
 import { useGitStore } from "./context-panel/git/store";
-import { mistyEngine } from "./engines/enginesApi";
-import { usePersonalAgentsStore } from "./personal/personalAgentsStore";
-import { watchAllRunEvents } from "./runs/local-run/localRunEvents";
-import { useChatFolder } from "./shared-folders/chatFolder";
-import { setCompanionOn, useCompanionOn } from "./tutor/cursor/companionOn";
-import { useCompanionState } from "./tutor/cursor/companionState";
-import { useLessonStore } from "./tutor/lessons/lessonStore";
-
-/*
- * The agents' items for the window's bottom bar (Settings › Interface › Bottom bar). Each draws
- * nothing until it has something to say. The window-wide ones open a chat through `onOpenChat`;
- * the chat ones read the focused pane's chat (`conversationId`) and open its context panel.
- */
+import { mistyEngine } from "./engines/engines_api";
+import { usePersonalAgentsStore } from "./personal/personal_agents_store";
+import { watchAllRunEvents } from "./runs/local-run/local_run_events";
+import { useChatFolder } from "./shared-folders/chat_folder";
+import { setCompanionOn, useCompanionOn } from "./tutor/cursor/companion_on";
+import { useCompanionState } from "./tutor/cursor/companion_state";
+import { useLessonStore } from "./tutor/lessons/lesson_store";
 
 type OpenChat = (agentId: string, conversationId: string) => void;
 type FocusedChat = { conversationId: string };
 
-/** A chat's agent: its own, or Misty for a chat with none. */
 function useChatAgent(conversationId: string) {
   const agentId = useMistyStore(
     (state) => state.conversations.find((chat) => chat.id === conversationId)?.agentId,
@@ -63,7 +56,6 @@ function agentOf(conversationId: string): string {
   return usePersonalAgentsStore.getState().agents.find((agent) => agent.system_managed)?.id ?? "";
 }
 
-/** Every chat's newest top-level run state, kept current as runs report. */
 function useRunStates(): Record<string, string> {
   const [states, setStates] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -98,7 +90,6 @@ function useRunStates(): Record<string, string> {
   return states;
 }
 
-/** Runs waiting for the person to approve a tool. Opens the first. */
 export function ApprovalsStatus({ onOpenChat }: { onOpenChat: OpenChat }) {
   const states = useRunStates();
   const waiting = Object.keys(states).filter((id) => states[id] === "awaiting_approval");
@@ -114,7 +105,6 @@ export function ApprovalsStatus({ onOpenChat }: { onOpenChat: OpenChat }) {
   );
 }
 
-/** An agent driving its browser, in a chat that may not be in view. Opens it, browser and all. */
 export function AgentBrowsingStatus({ onOpenChat }: { onOpenChat: OpenChat }) {
   const chats = useAgentBrowser((state) => state.chats);
   const browsing = Object.keys(chats).filter((id) =>
@@ -132,16 +122,12 @@ export function AgentBrowsingStatus({ onOpenChat }: { onOpenChat: OpenChat }) {
   );
 }
 
-/** Chats with replies not yet read, as the sidebar counts them. Opens the newest. */
 export function UnreadStatus({ onOpenChat }: { onOpenChat: OpenChat }) {
   const conversations = useMistyStore((state) => state.conversations);
   const lessons = useLessonStore((state) => state.lessons);
   const unread = useMemo(() => {
     return conversations
-      .filter(
-        (chat) =>
-          chat.messages.length > 0 && !lessons[chat.id] && isChatUnread(chat),
-      )
+      .filter((chat) => chat.messages.length > 0 && !lessons[chat.id] && isChatUnread(chat))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [conversations, lessons]);
   if (!unread.length) return null;
@@ -163,7 +149,6 @@ const tutorWords = {
   responding: "Tutor speaking",
 } as const;
 
-/** While the cursor companion is on: what it is doing. Turns it off. */
 export function TutorStatus() {
   const on = useCompanionOn();
   const phase = useCompanionState((state) => state.presentation.phase);
@@ -177,7 +162,6 @@ export function TutorStatus() {
   );
 }
 
-/** The model the focused chat uses. */
 export function ChatModelStatus({ conversationId }: FocusedChat) {
   const choices = useChatChoices(conversationId);
   const agent = useChatAgent(conversationId);
@@ -192,7 +176,6 @@ export function ChatModelStatus({ conversationId }: FocusedChat) {
   );
 }
 
-/** How full the focused chat's context window is. Opens the session card. */
 export function ContextStatus({ conversationId }: FocusedChat) {
   useEffect(() => {
     watchContextUsage();
@@ -222,7 +205,6 @@ export function ContextStatus({ conversationId }: FocusedChat) {
   );
 }
 
-/** What the focused chat has cost on the person's own keys. Opens the session card. */
 export function CostStatus({ conversationId }: FocusedChat) {
   const messages = useMistyStore(
     (state) => state.conversations.find((chat) => chat.id === conversationId)?.messages,
@@ -245,7 +227,6 @@ export function CostStatus({ conversationId }: FocusedChat) {
   );
 }
 
-/** The focused chat's folder, by name. Opens Files. */
 export function FolderStatus({ conversationId }: FocusedChat) {
   const { folder, kind } = useChatFolder(conversationId);
   if (!folder) return null;
@@ -262,7 +243,6 @@ export function FolderStatus({ conversationId }: FocusedChat) {
   );
 }
 
-/** The focused chat's folder's branch and its uncommitted lines. Opens Changes. */
 export function BranchStatus({ conversationId }: FocusedChat) {
   const { folder } = useChatFolder(conversationId);
   const status = useGitStore((state) => (folder ? state.statusByWorkspace[folder] : undefined));
@@ -284,7 +264,6 @@ export function BranchStatus({ conversationId }: FocusedChat) {
   );
 }
 
-/** How long the focused chat's current run has gone, while it runs. */
 export function RunTimeStatus({ conversationId }: FocusedChat) {
   const { runs } = useSpaceRuns();
   const run = runs?.find((row) => row.conversationId === conversationId && row.state === "running");

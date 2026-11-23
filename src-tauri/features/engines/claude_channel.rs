@@ -43,9 +43,6 @@ pub(super) fn resolve_model(
                 .and_then(Value::as_str)
         })
         .filter(|model| !model.trim().is_empty());
-    // "default" (or no selection) means the channel's own default. With no
-    // configured channel model there is nothing to pass: no --model flag is
-    // emitted and stage() masks the native settings.json model key instead.
     let selected = match selected.filter(|s| !s.trim().is_empty()) {
         None | Some("default") => configured?,
         Some(s) => s,
@@ -57,7 +54,6 @@ pub(super) fn resolve_model(
             .get(&format!("ANTHROPIC_DEFAULT_{}_MODEL", raw.to_uppercase()))
             .map(String::as_str)
             .unwrap_or(raw),
-        // Any other channel model id passes through unchanged.
         _ => raw,
     };
     Some(if wants_1m && !resolved.ends_with("[1m]") {
@@ -82,12 +78,6 @@ pub(super) fn apply(
     )
 }
 
-/// settingsConfig keys a channel may keep in the staged overlay. Everything
-/// else is dropped: `hooks` and `apiKeyHelper` are shell commands the CLI
-/// executes and `permissions` rewrites the tool policy, so a pasted or
-/// imported channel config must not smuggle them into a send. Channel env
-/// travels separately through `channel_env`, which filters loader/hook keys
-/// (see provider_files).
 const PASSTHROUGH_SETTINGS_KEYS: &[&str] = &["model", "alwaysThinkingEnabled"];
 
 fn stage(
@@ -105,8 +95,6 @@ fn stage(
             }
         }
     }
-    // Empty values mask native routing/auth settings, while unrelated native
-    // hooks, permissions and managed settings retain the CLI's own precedence.
     let mut overlay: Map<String, Value> = ROUTING_KEYS
         .iter()
         .map(|key| (key.to_string(), Value::String(String::new())))
@@ -116,10 +104,6 @@ fn stage(
             .map(|(key, value)| (key.clone(), Value::String(value.clone()))),
     );
     settings.insert("env".into(), Value::Object(overlay));
-    // An explicit model rides the overlay; without one, "default" (the CLI's
-    // own alias) masks any native settings.json model so the isolated channel
-    // never inherits the native account's model. No --model flag is passed in
-    // that case — resolve_model returns None (see prepare_launch).
     settings.insert(
         "model".into(),
         Value::String(
@@ -129,19 +113,16 @@ fn stage(
                 .to_string(),
         ),
     );
-    // Mask any native apiKeyHelper (a shell command the CLI runs) so channel
-    // auth wins; the channel's own helper is dropped by the whitelist above.
     settings.insert("apiKeyHelper".into(), Value::String(String::new()));
     let content =
         serde_json::to_vec(&settings).map_err(|_| "Cannot serialize Claude channel settings")?;
-    std::fs::create_dir_all(directory)
+    file_access::fs::create_dir_all(directory)
         .map_err(|e| format!("create Claude staging directory: {e}"))?;
     let path = directory.join(format!("channel-{}.json", uuid::Uuid::new_v4()));
-    let mut options = std::fs::OpenOptions::new();
+    let mut options = file_access::fs::OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
     let mut file = options
@@ -192,8 +173,6 @@ mod tests {
             );
         }
         let empty = serde_json::json!({});
-        // No selection and no configured channel model: nothing to pass —
-        // the send goes out without --model (stage masks the native key).
         assert_eq!(resolve_model(None, Some(&empty), &HashMap::new()), None);
         assert_eq!(
             resolve_model(Some("default"), Some(&empty), &HashMap::new()),
@@ -239,7 +218,6 @@ mod tests {
             assert_eq!(settings["env"]["CLAUDE_CODE_USE_BEDROCK"], "");
             assert_eq!(settings["env"]["CUSTOM_VALUE"], "keep");
             assert!(settings["env"].get("NODE_OPTIONS").is_none());
-            // The apiKeyHelper mask is ours, never the channel's command.
             assert_eq!(settings["apiKeyHelper"], "");
             assert_eq!(settings["model"], "selected-model");
             assert_eq!(settings["alwaysThinkingEnabled"], true);
@@ -272,8 +250,6 @@ mod tests {
         assert!(!first.cleanup_files[0].exists());
         assert!(second.cleanup_files[0].exists());
         super::super::cleanup_staged_files(&second.cleanup_files);
-        // No explicit model: the overlay masks the native model key with the
-        // CLI's own "default" alias instead of forcing one onto argv.
         let mut no_model = built();
         stage(
             &mut no_model,

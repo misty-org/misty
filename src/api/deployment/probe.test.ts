@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), fetch: vi.fn() }));
-vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: mocks.invoke }));
-vi.mock("@/api/client/native-account-fetch", () => ({ nativeAccountFetch: mocks.fetch }));
+vi.mock("@/shared/platform/native_invoke", () => ({ invoke: mocks.invoke }));
+vi.mock("@/api/client/native_account_fetch", () => ({ nativeAccountFetch: mocks.fetch }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 
 import { probeServer } from "./probe";
-import { mistyCloudServer } from "./serverChoice";
+import { mistyCloudServer } from "./server_choice";
 
 const server = "https://misty.example.org/v1";
 

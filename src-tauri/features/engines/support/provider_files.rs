@@ -8,17 +8,6 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 use toml_edit::{value, DocumentMut, Item, Table};
 
-/// Loader/hook/hijack env keys a stored channel must never write into a
-/// CLI's environment: they hand code execution or traffic interception to
-/// whoever wrote the config file. Prefix families (DYLD_/LD_, GIT_CONFIG_KEY/
-/// VALUE) are matched by prefix, the rest exactly; comparison is
-/// case-insensitive because launchd/cmd env casing varies.
-///
-/// Beyond loader hooks: PATH hijacks the CLI's spawned git/rg children;
-/// the proxy + NODE_EXTRA_CA_CERTS combo MITMs the CLI's HTTPS traffic;
-/// GIT_CONFIG_* / GIT_TEMPLATE_DIR / GIT_EXEC_PATH turn the app's own git
-/// calls into code execution; EDITOR/GIT_PAGER run when the CLI pages or
-/// opens an editor.
 fn is_blocked_env_key(key: &str) -> bool {
     let upper = key.to_ascii_uppercase();
     if upper.starts_with("DYLD_")
@@ -61,9 +50,6 @@ fn is_blocked_env_key(key: &str) -> bool {
     )
 }
 
-/// Static baseUrl/apiKey/model -> env var mapping per engine: the env keys a
-/// cc-switch-imported channel carries its convention fields under, and (for
-/// claude) the keys written into settings.json.
 fn env_mapping(engine: &str) -> [(&'static str, &'static str); 3] {
     match engine {
         "claude" => [
@@ -81,7 +67,6 @@ fn env_mapping(engine: &str) -> [(&'static str, &'static str); 3] {
             ("apiKey", "GROK_API_KEY"),
             ("model", "GROK_MODEL"),
         ],
-        // codex reads OpenAI-compatible env for its default provider.
         "codex" => [
             ("baseUrl", "OPENAI_BASE_URL"),
             ("apiKey", "OPENAI_API_KEY"),
@@ -104,8 +89,6 @@ fn non_empty_str(value: Option<&Value>) -> Option<String> {
         .map(str::to_string)
 }
 
-/// A channel's raw env maps: cc-switch's `settingsConfig.env` first (the
-/// legacy claude/grok shape), then the flat `env` escape hatch.
 fn channel_env_maps(
     provider: &Value,
 ) -> impl Iterator<Item = &serde_json::Map<String, Value>> + '_ {
@@ -118,8 +101,6 @@ fn channel_env_maps(
     .filter_map(Value::as_object)
 }
 
-/// One convention field (baseUrl/apiKey/model): the flat field wins, then
-/// the engine's env key inside the raw env maps.
 fn channel_field(engine: &str, provider: &Value, field: &str) -> Option<String> {
     if let Some(v) = non_empty_str(provider.get(field)) {
         return Some(v);
@@ -131,13 +112,6 @@ fn channel_field(engine: &str, provider: &Value, field: &str) -> Option<String> 
     channel_env_maps(provider).find_map(|map| non_empty_str(map.get(var)))
 }
 
-/// Channel env for spawn injection (and leftover file-materialize helpers):
-/// raw env maps first (blocked keys and empties refused), convention fields
-/// only where raw env has no value — raw env wins.
-///
-/// Codex additionally lifts `settingsConfig.auth.OPENAI_API_KEY` when the
-/// convention `apiKey` / env maps have none: that is how cc-switch stores
-/// the credential that used to land in `auth.json`.
 pub(crate) fn channel_env(
     engine: &str,
     provider: &Value,
@@ -185,8 +159,6 @@ pub(crate) fn channel_env(
         }
     }
     if engine == "grok" {
-        // GROK_BASE_URL/API_KEY were our stored channel aliases, not native
-        // CLI variables. Translate them, preserving explicit native env.
         if let Some(base) = out.remove("GROK_BASE_URL") {
             let base = base.trim_end_matches('/');
             for key in [
@@ -204,12 +176,6 @@ pub(crate) fn channel_env(
         }
     }
     if engine == "codebuddy" && !seen.contains("CODEBUDDY_INTERNET_ENVIRONMENT") {
-        // CodeBuddy requires CODEBUDDY_INTERNET_ENVIRONMENT to pick the right
-        // auth/endpoint family (China "internal", iOA "ioa", dedicated
-        // "cloudhosted", self-hosted "selfhosted"); without it an API-Key channel
-        // authenticates against the wrong service and fails with 401. Derive
-        // the two derivable editions from the channel's baseUrl; raw env
-        // still wins (checked above) for the editions we cannot infer.
         if let Some(edition) = out
             .get("CODEBUDDY_BASE_URL")
             .and_then(|base| codebuddy_edition_for(base))
@@ -223,12 +189,6 @@ pub(crate) fn channel_env(
     Ok(out)
 }
 
-/// CodeBuddy edition inferred from a channel base URL; `None` when it cannot
-/// be derived. Match the parsed host exactly: a bare `contains` also matched
-/// look-alike domains (`copilot.tencent.com.example.org`) and proxy URLs
-/// (`https://gateway.corp/https://copilot.tencent.com/v1`), silently pinning
-/// them to the wrong auth/endpoint family — the very 401 this derivation is
-/// meant to prevent.
 fn codebuddy_edition_for(base_url: &str) -> Option<&'static str> {
     let rest = base_url
         .split_once("://")
@@ -281,8 +241,6 @@ pub(crate) fn render_grok(base: &str, provider: &Value) -> Result<String, String
         let mut table = existing_table(&doc, &["model", model.as_str()])
             .unwrap_or_else(|| Item::Table(Table::new()));
         upsert_str(&mut table, "model", &model);
-        // Grok keeps credentials per model table — the only place the CLI
-        // reads an api_key from config.
         if let Some(key) = api_key {
             upsert_str(&mut table, "api_key", &key);
         }
@@ -291,12 +249,6 @@ pub(crate) fn render_grok(base: &str, provider: &Value) -> Result<String, String
     Ok(doc.to_string())
 }
 
-// ── toml_edit helpers ───────────────────────────────────────────────────────
-
-/// Read-side indexing panics on a missing key; walk with `get` instead. The
-/// returned table is a detached copy: mutate, then write back under the same
-/// key (toml_edit's `as_table_like_mut` borrows would not outlive the later
-/// document writes).
 fn existing_table(doc: &DocumentMut, path: &[&str]) -> Option<Item> {
     let mut item = doc.as_item();
     for key in path {
@@ -305,16 +257,10 @@ fn existing_table(doc: &DocumentMut, path: &[&str]) -> Option<Item> {
     item.as_table_like().map(clone_table_like)
 }
 
-/// Insert `table` at `path`, creating missing parents as implicit tables so
-/// only the leaf header renders. IndexMut assignment (`doc["a"]["b"] =
-/// Item::Table(..)`) silently drops the child under an auto-created parent —
-/// walk with or_insert + TableLike::insert instead.
 fn upsert_table(doc: &mut DocumentMut, path: &[&str], table: Item) {
     let mut current = doc.as_item_mut();
     for key in &path[..path.len() - 1] {
         if current.get(*key).is_none() {
-            // Indexing a missing key yields an Item::None sentinel that
-            // silently swallows inserts; assignment is what materializes it.
             let mut t = Table::new();
             t.set_implicit(true);
             current[*key] = Item::Table(t);

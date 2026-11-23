@@ -1,4 +1,3 @@
-//! Reloading, showing and hiding a page.
 use super::*;
 
 #[tauri::command]
@@ -27,10 +26,6 @@ pub fn browser_webview_hide(
     let Some(webview) = app.get_webview(&webview_label(&request.id)?) else {
         return Ok(());
     };
-    // Switching tabs on Windows keeps the page in place beneath the renderer
-    // (see `stacked_pages`). WebView2 drops its render surface when hidden and
-    // paints its default color until the first new frame, and a page moved
-    // offscreen redraws when it comes back; either one flashes.
     #[cfg(windows)]
     if request.keep_live {
         park_windows_webview(&webview)?;
@@ -40,8 +35,6 @@ pub fn browser_webview_hide(
     #[cfg(not(windows))]
     {
         if request.keep_live {
-            // A hidden view has no window for the system to return a floating video to. Out of
-            // sight, but still in the window, it keeps one. Reconciling its bounds brings it back.
             webview
                 .set_position(tauri::LogicalPosition::new(-32_000.0, -32_000.0))
                 .map_err(|error| error.to_string())?;

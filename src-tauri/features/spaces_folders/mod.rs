@@ -1,10 +1,3 @@
-//! Picking a local folder to copy into a Space's drive ("Copy into the Space", `drive_copy_in`):
-//! the system's own folder dialog, the tree of what the folder's `.gitignore` and `.mistyignore`
-//! leave out, and editing its `.mistyignore`. A folder a window names is used only if the person
-//! picked it in that dialog while Misty has been running (`space_folder_pick`). Shared folders
-//! themselves became folders in the Space's drive (`space_drive`), so nothing here uploads or
-//! downloads any more.
-
 mod walk;
 
 #[cfg(test)]
@@ -23,19 +16,17 @@ use crate::project::person_window;
 
 pub use walk::Scan;
 
-/// Folders the person picked in the dialog since Misty started, by their real path.
 static PICKED: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 const NOT_PICKED: &str = "Choose that folder again to share it.";
-/// The most a `.mistyignore` may hold.
 const MAX_IGNORE_TEXT: usize = 256 * 1024;
 
 fn picked() -> std::sync::MutexGuard<'static, HashSet<PathBuf>> {
-    PICKED.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    PICKED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The real path of a folder the person picked, or a refusal. "Copy into the Space"
-/// (`drive_copy_in`) takes only these too.
 pub(crate) fn picked_folder(folder: &str) -> Result<PathBuf, String> {
     let asked = PathBuf::from(folder);
     if !asked.is_absolute() {
@@ -57,7 +48,6 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-/// The system's folder dialog, opening on `start` when given, else Documents.
 async fn pick_dialog(app: &AppHandle, start: Option<&str>) -> Result<Option<PathBuf>, String> {
     use tauri_plugin_dialog::DialogExt;
     let (send, receive) = tokio::sync::oneshot::channel();
@@ -85,9 +75,6 @@ async fn pick_dialog(app: &AppHandle, start: Option<&str>) -> Result<Option<Path
         .map_err(|_| "Choose a folder on this computer.".to_string())
 }
 
-/// Lets the person pick a folder to share in the system's dialog, and lets Misty read it. `start`
-/// is where the dialog opens, such as the folder a shared folder last came from. Its real path,
-/// or `None` when they cancel.
 #[tauri::command]
 pub async fn space_folder_pick(
     app: AppHandle,
@@ -102,7 +89,6 @@ pub async fn space_folder_pick(
     let protected = [state.environment.misty_dir()];
     let home = dirs::home_dir();
     check_root(&path, &protected, home.as_deref())?;
-    // The person chose it in the system's own dialog, which is what lets Misty reach it.
     file_access::allow_linked_folder(&path);
     let real = match file_access::fs::canonicalize(&path) {
         Ok(real) => real,
@@ -123,8 +109,6 @@ pub async fn space_folder_pick(
     Ok(Some(real.to_string_lossy().into_owned()))
 }
 
-/// The picker's tree of a picked folder: the files that are shared, and what the folder's
-/// `.gitignore` and `.mistyignore` leave out.
 #[tauri::command]
 pub async fn space_folder_scan(webview: Webview, folder: String) -> Result<Scan, String> {
     person_window(&webview)?;
@@ -132,20 +116,20 @@ pub async fn space_folder_scan(webview: Webview, folder: String) -> Result<Scan,
     blocking(move || Ok(walk::scan(&root))).await
 }
 
-/// The folder's own `.mistyignore`, or nothing when it has none.
 #[tauri::command]
 pub async fn space_folder_ignore_read(webview: Webview, folder: String) -> Result<String, String> {
     person_window(&webview)?;
     let root = picked_folder(&folder)?;
-    blocking(move || match file_access::fs::read_to_string(root.join(walk::IGNORE_FILE)) {
-        Ok(text) => Ok(text),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(String::new()),
-        Err(error) => Err(format!("Misty couldn't read .mistyignore: {error}")),
-    })
+    blocking(
+        move || match file_access::fs::read_to_string(root.join(walk::IGNORE_FILE)) {
+            Ok(text) => Ok(text),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(String::new()),
+            Err(error) => Err(format!("Misty couldn't read .mistyignore: {error}")),
+        },
+    )
     .await
 }
 
-/// Replaces the folder's `.mistyignore`. Blank text removes the file.
 #[tauri::command]
 pub async fn space_folder_ignore_write(
     webview: Webview,
@@ -167,7 +151,11 @@ pub async fn space_folder_ignore_write(
                 _ => Ok(()),
             };
         }
-        let text = if text.ends_with('\n') { text } else { format!("{text}\n") };
+        let text = if text.ends_with('\n') {
+            text
+        } else {
+            format!("{text}\n")
+        };
         file_access::fs::write(&path, text)
             .map_err(|error| format!("Misty couldn't save .mistyignore: {error}"))
     })

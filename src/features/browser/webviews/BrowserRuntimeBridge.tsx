@@ -1,5 +1,5 @@
-import { useBrowserNativeEvents } from "./useBrowserNativeEvents";
-import { useBrowserOverlaySuspension, useBrowserPointerSuspension } from "./useBrowserSuspension";
+import { useBrowserNativeEvents } from "./use_browser_native_events";
+import { useBrowserOverlaySuspension, useBrowserPointerSuspension } from "./use_browser_suspension";
 
 export { browserBlockingOverlayOpen } from "@/features/app-windows";
 

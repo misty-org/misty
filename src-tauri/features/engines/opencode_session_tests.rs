@@ -36,7 +36,6 @@ fn render_questions_maps_multiple_to_multiselect() {
     assert_eq!(rendered[0]["options"][0]["description"], "预发");
     assert_eq!(rendered[1]["multiSelect"], true);
     assert_eq!(rendered[2]["options"], json!([]));
-    // A missing header falls back.
     assert_eq!(
         render_questions(&json!({ "questions": [{ "question": "x" }] }))[0]["header"],
         "Question"
@@ -60,20 +59,13 @@ fn reply_answers_orders_labels_and_free_text_per_question() {
             vec!["周三灰度".to_string()],
         ]
     );
-    // An unanswered question gets an empty array, in place.
     let partial = reply_answers(&asked(), &json!({})).expect("reply");
     assert_eq!(partial, vec![Vec::<String>::new(), Vec::new(), Vec::new()]);
-    // A malformed context isn't silently swallowed.
     assert!(reply_answers(&json!({}), &answers).is_none());
 }
 
-/// End-to-end against a mock `opencode serve` on the default port:
-/// health → session create → prompt_async → SSE (delta + question.asked)
-/// → HTTP reply → idle → Done. Proves the whole driver path without a
-/// live model.
 #[tokio::test]
 async fn serves_a_full_question_turn_against_a_mock_server() {
-    // The HTTP client needs a TLS provider even for plain HTTP; the app installs it at start.
     let _ = rustls::crypto::ring::default_provider().install_default();
     use crate::engines::registry::ChildEntry;
     use crate::engines::support::event_sink::{Emit, EventSink};
@@ -99,9 +91,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
     }
 
     let (reply_seen_tx, mut reply_seen) = mpsc::channel::<String>(1);
-    // The mock server: one connection at a time, scripted responses.
-    // A non-default port, so it never clashes with a real `opencode serve` (4096); the driver
-    // adopts this mock through the same probe port.
     const MOCK_PORT: u16 = 4190;
     let listener = TcpListener::bind(("127.0.0.1", MOCK_PORT))
         .await
@@ -112,8 +101,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
             let (mut socket, _) = listener.accept().await.expect("accept");
             let mut head = Vec::new();
             let mut byte = [0u8; 1];
-            // Read request line + headers (bodies are small; read per
-            // content-length below).
             while !head.windows(4).any(|w| w == b"\r\n\r\n") {
                 if socket.read(&mut byte).await.unwrap_or(0) == 0 {
                     break;
@@ -125,7 +112,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
             }
             let head = String::from_utf8_lossy(&head).to_string();
             let request_line = head.lines().next().unwrap_or("").to_string();
-            // Header names are case-insensitive: a local proxy may rewrite it as Content-Length.
             let content_length: usize = head
                 .lines()
                 .find_map(|l| {
@@ -146,7 +132,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
             } else if request_line.starts_with("POST /session?") {
                 respond_json(&mut socket, r#"{"id":"ses_mock1","slug":"mock"}"#).await;
             } else if request_line.starts_with("GET /event") {
-                // Chunked SSE stream; keep the socket for scripted frames.
                 let _ = socket
                     .write_all(
                         b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n",
@@ -201,7 +186,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
         db: None,
         followup: None,
     };
-    // The virtual registry entry the host path creates at send time.
     registry.insert(
         "oc-test-run".to_string(),
         ChildEntry {
@@ -240,8 +224,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
         4_000_000_201,
         MOCK_PORT,
     ));
-    // Wait for the question to park in the registry, then take answer_question's whole path:
-    // read the parked context → reply_answers → POST /question/:id/reply.
     let mut parked = None;
     for _ in 0..40 {
         tokio::time::sleep(Duration::from_millis(100)).await;
@@ -288,7 +270,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
             ));
         }
     }
-    // Session announced, deltas streamed, question parked, done settled.
     assert!(
         kinds
             .iter()
@@ -314,9 +295,6 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
     assert!(kinds.iter().any(|(k, _)| k == "done"), "{kinds:?}");
     assert!(!kinds.iter().any(|(k, _)| k == "error"), "{kinds:?}");
 
-    // The answered card must be out of the parked map (answer path removes
-    // it before the turn-end drain ever sees it — same contract as the
-    // answer_question command).
     let still_parked = registry.get("oc-test-run").and_then(|entry| {
         entry
             .questions
@@ -324,13 +302,10 @@ async fn serves_a_full_question_turn_against_a_mock_server() {
             .ok()
             .and_then(|q| q.get("que_mock").cloned())
     });
-    // The reply was posted directly (mirroring answer_question), which
-    // does not remove the parked copy; the drain settles it afterwards.
     assert!(
         still_parked.is_none(),
         "drain must settle the parked question"
     );
-    // The mock saw the reply body the driver's mapping produced.
     let reply_body = reply_seen.try_recv().expect("mock saw no reply POST");
     let reply_json: Value = serde_json::from_str(&reply_body).expect("reply body json");
     assert_eq!(reply_json, json!({ "answers": [["prod"]] }));
@@ -356,7 +331,6 @@ fn parses_context_windows_from_merged_config() {
     assert_eq!(windows.get("opencode/big-pickle"), Some(&200_000));
     assert_eq!(windows.get("qf/no-limit"), None);
     assert!(parse_context_windows(&json!({})).is_empty());
-    // The mock server's unmocked reply must not match or panic.
     assert!(parse_context_windows(&json!({ "error": "unmocked" })).is_empty());
 }
 
@@ -369,7 +343,6 @@ fn attaches_the_window_only_when_usage_omits_it() {
     let usage = attach_context_window(json!({ "input": 12018, "output": 50 }), &info, &windows);
     assert_eq!(usage["model_context_window"], 1_048_576);
 
-    // An engine-reported window wins; an unknown model stays untouched.
     let reported = attach_context_window(
         json!({ "input": 1, "model_context_window": 200_000 }),
         &info,
@@ -401,8 +374,6 @@ fn error_messages_come_out_of_nested_shapes() {
 
 #[test]
 fn every_mode_answers_permission_asks_once() {
-    // OpenCode has no folder sandbox, so it offers no Bypass: even a stray
-    // "bypass" approves each ask individually, never "always".
     assert_eq!(permission_reply(Some("bypass")), "once");
     assert_eq!(permission_reply(Some("auto")), "once");
     assert_eq!(permission_reply(Some("plan")), "once");
@@ -418,7 +389,6 @@ fn a_compaction_summary_clears_the_context_count() {
     assert!(!is_compaction_summary(
         &json!({ "agent": "build", "summary": false })
     ));
-    // 1.x tokens come out in the same flat fields as 2.x's, with the cache counted.
     let tokens = json!({ "input": 580, "output": 165, "reasoning": 0,
                          "cache": { "read": 5504, "write": 0 } });
     let usage = v2::after_compaction(v2::usage_of(&tokens, None));

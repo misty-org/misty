@@ -1,5 +1,3 @@
-//! The browser_agent_execute command.
-
 use crate::browser::*;
 
 mod operations;
@@ -12,7 +10,6 @@ pub async fn browser_agent_execute(
     state: State<'_, BrowserSessionState>,
     request: BrowserAgentExecuteRequest,
 ) -> Result<Value, String> {
-    // An incognito window has the rest of this command's set, for browsing; agents aren't part of it.
     if !crate::browser::app_windows::is_person_window(caller.label()) {
         return Err("Only a profile's window can run agents.".to_owned());
     }
@@ -44,9 +41,6 @@ pub(crate) async fn execute_agent_request(
             .unwrap_or(""),
     )?;
     let (id, agent_id) = resolve_agent_webview(&app, &state, &request)?;
-    // Workspace control uses an inert webview as its task/grant carrier. Its
-    // unloaded about:blank URL is unrelated to the desktop being captured;
-    // querying it can fail before ScreenCaptureKit is ever reached.
     if request.operation.starts_with("browser.workspace.") {
         return crate::agents::window_control::execute(&app, &request).await;
     }
@@ -65,7 +59,6 @@ pub(crate) async fn execute_agent_request(
             .ok_or("Browser tab is not running.")?
             .url()
             .map_err(|error| error.to_string())?;
-        // Nothing reaches a blocked site: the device refuses before any input.
         if let Some(reason) = crate::browser::agent_pages::page_agent::site_blocked(
             &url,
             &request.policy.site_blocks.clone().unwrap_or_default(),
@@ -113,7 +106,6 @@ pub(crate) async fn execute_agent_request(
                 .ok_or_else(|| "Browser tab is not running.".to_owned())?;
             let previous = view.url().map_err(|error| error.to_string())?;
             let target = external_url(url)?;
-            // A program builds addresses as it runs, so each is judged as it opens.
             if let Some(active) = request
                 .policy
                 .call
@@ -132,7 +124,6 @@ pub(crate) async fn execute_agent_request(
             view.navigate(target.clone())
                 .map_err(|error| error.to_string())?;
             let mut landed = json!({"ok": true, "url": url});
-            // The page it lands on, read once it has loaded, unless the caller only navigates.
             if snapshot {
                 if let Some(snapshot) = crate::browser::agent_pages::page_agent::landed(
                     &app,

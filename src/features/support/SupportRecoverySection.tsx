@@ -7,9 +7,8 @@ import {
   recoverLastClosedWorkspaceTab,
   reloadMisty,
   resetWorkspaceLayout,
-} from "./recoveryActions";
+} from "./recovery_actions";
 
-/** Help's two lists: getting started again, and the safe fixes for a stuck app. */
 export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {}) {
   const [armed, setArmed] = useState<"reset" | "reload" | null>(null);
   const navigate = useNavigate();
@@ -19,7 +18,6 @@ export function SupportRecoverySection({ onClose }: { onClose?: () => void } = {
     window.dispatchEvent(new CustomEvent("misty:start-tour", { detail: "here" }));
   };
 
-  // The first-run setup page: the person's AI and apps, each one already done shown as ready.
   const reopenSetup = () => {
     onClose?.();
     window.dispatchEvent(new CustomEvent("misty:close-settings"));

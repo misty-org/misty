@@ -1,5 +1,3 @@
-// Multi-run (engines/multirun.rs): Git with an index of its own, and a worktree's changes.
-
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
@@ -20,8 +18,6 @@ fn status_word(code: char) -> &'static str {
 
 const FILE_PATCH_LIMIT: usize = 120_000;
 
-/// Runs the person's `git` in `folder`, never stopping to ask in a terminal. With `index`, Git keeps its index in that file
-/// and leaves the folder's own alone, so a worktree an agent is still working in can be read.
 pub(crate) async fn run(
     folder: &Path,
     index: Option<&Path>,
@@ -54,19 +50,16 @@ pub(crate) async fn run(
     }
 }
 
-/// One file a worktree changed since the commit it started from, with its diff.
 #[derive(Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FileChange {
     pub path: String,
-    /// `modified`, `added` or `deleted`.
     pub status: &'static str,
     pub insertions: u32,
     pub deletions: u32,
     pub patch: String,
 }
 
-/// Reads `git diff --name-status -z --no-renames`: a status letter, then the path.
 fn read_name_status(text: &str) -> Vec<(String, &'static str)> {
     let mut parts = text.split('\0');
     let mut files = Vec::new();
@@ -78,8 +71,6 @@ fn read_name_status(text: &str) -> Vec<(String, &'static str)> {
     files
 }
 
-/// Reads `git diff --numstat -z --no-renames`: `added<TAB>removed<TAB>path`, with `-` for both
-/// counts of a binary file.
 fn read_numstat(text: &str) -> std::collections::HashMap<String, (u32, u32)> {
     text.split('\0')
         .filter_map(|entry| {
@@ -93,7 +84,6 @@ fn read_numstat(text: &str) -> std::collections::HashMap<String, (u32, u32)> {
         .collect()
 }
 
-/// Splits a diff of several files into one diff per file, in the order Git wrote them.
 fn split_patch(patch: &str) -> Vec<String> {
     let mut files: Vec<String> = Vec::new();
     for line in patch.split_inclusive('\n') {
@@ -123,8 +113,6 @@ fn changes_from(names: &str, counts: &str, patch: &str) -> Vec<FileChange> {
     let listed = read_name_status(names);
     let counts = read_numstat(counts);
     let mut patches = split_patch(patch);
-    // Both lists come from the same comparison in the same order; if they ever disagree, the
-    // files are still listed, without a diff that might belong to another file.
     if patches.len() != listed.len() {
         patches = vec![String::new(); listed.len()];
     }
@@ -147,15 +135,11 @@ fn changes_from(names: &str, counts: &str, patch: &str) -> Vec<FileChange> {
         .collect()
 }
 
-/// Everything `worktree` holds that `base` doesn't: what was committed there since, what is
-/// changed but not committed, and new files. It is worked out in `index`, a file outside the
-/// worktree, so the worktree's own index is never written while an agent may be using it.
 pub(crate) async fn changes_since(
     worktree: &Path,
     index: &Path,
     base: &str,
 ) -> Result<Vec<FileChange>, String> {
-    // Starting from the worktree's own index keeps what Git already knows about unchanged files.
     if let Ok(own) = run(worktree, None, &["rev-parse", "--git-path", "index"]).await {
         let _ = file_access::fs::copy(worktree.join(own.trim()), index);
     }

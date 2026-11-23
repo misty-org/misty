@@ -1,5 +1,3 @@
-//! Native WebKit and WebView2 hooks for Browser pages.
-
 #[cfg(target_os = "macos")]
 mod capture;
 #[cfg(target_os = "macos")]

@@ -1,5 +1,3 @@
-//! This device's private key seed, kept in the credential store and cached in
-//! memory. Its public half is the device's identity on the account.
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
@@ -9,8 +7,6 @@ use rand::RngCore;
 use crate::account::credential_store;
 use crate::app::error::{ApiError, ApiResult};
 
-/// The service name predates the device key's current use; it stays so
-/// existing devices keep their identity.
 const DEVICE_KEY_SERVICE: &str = "com.misty.connected-devices.endpoint";
 static DEVICE_KEY_CACHE: LazyLock<Mutex<HashMap<String, [u8; 32]>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));

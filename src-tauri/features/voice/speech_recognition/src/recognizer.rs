@@ -1,5 +1,3 @@
-//! One speech recognition model, opened once and used for every piece of speech handed to it.
-
 use sherpa_onnx::{
     OfflineMoonshineModelConfig, OfflineOmnilingualAsrCtcModelConfig, OfflineQwen3ASRModelConfig,
     OfflineRecognizer, OfflineRecognizerConfig, OfflineRecognizerResult,
@@ -10,22 +8,17 @@ use crate::decode::SAMPLE_RATE;
 use crate::model::{file, threads, HearingFamily, HearingSpec};
 use crate::{reason, Phrase, Word};
 
-/// A recognizer for one model. It decodes one piece of speech at a time, from any thread.
 pub struct Recognizer {
     inner: OfflineRecognizer,
 }
 
 impl Recognizer {
-    /// Opens `spec`. `language` (a code such as "en") narrows a model that takes one (Whisper);
-    /// the rest detect the language themselves, or speak only theirs.
     pub fn open(spec: &HearingSpec, language: Option<&str>) -> Result<Self, String> {
         let config = config(spec, language).ok_or_else(|| reason("model"))?;
         let inner = OfflineRecognizer::create(&config).ok_or_else(|| reason("model"))?;
         Ok(Self { inner })
     }
 
-    /// Recognizes 16 kHz mono samples that begin `offset` seconds into the audio they came from.
-    /// The phrase's words carry their times when the model times its tokens.
     pub fn recognize(&self, samples: &[f32], offset: f64) -> Phrase {
         let end = offset + samples.len() as f64 / SAMPLE_RATE as f64;
         let stream = self.inner.create_stream();
@@ -69,7 +62,6 @@ fn config(spec: &HearingSpec, language: Option<&str>) -> Option<OfflineRecognize
             model.whisper = OfflineWhisperModelConfig {
                 encoder: Some(path("encoder")?),
                 decoder: Some(path("decoder")?),
-                // Empty lets the model detect the language.
                 language: Some(language.unwrap_or("").to_string()),
                 task: Some("transcribe".into()),
                 ..OfflineWhisperModelConfig::default()
@@ -103,9 +95,6 @@ fn config(spec: &HearingSpec, language: Option<&str>) -> Option<OfflineRecognize
     Some(config)
 }
 
-/// The words of a result, each with its time, from its tokens and their start times: a token
-/// that starts with a space (or SentencePiece's `▁`) starts a word, and a word ends where the
-/// next begins. Empty when the model doesn't time its tokens.
 fn words(result: &OfflineRecognizerResult, offset: f64, end: f64) -> Vec<Word> {
     let Some(times) = result.timestamps.as_ref() else {
         return Vec::new();

@@ -1,5 +1,3 @@
-//! Commands under Seatbelt, through the system's `sandbox-exec`, the way the document worker runs. The
-//! shell and its tools are the program in `tools`, and that's the only program the profile can start.
 use std::{
     path::Path,
     process::Stdio,
@@ -19,8 +17,6 @@ use super::{
 
 const BASE_PROFILE: &str = include_str!("../../../tauri-permissions/permissions/agent-shell.sb");
 
-/// Files that hold secrets stay unreadable, even in a shared folder, because a command's output
-/// reaches the model.
 const SECRET_FILES: &str = r#"
 (deny file-read* file-write*
   (regex #"/\.env(\.[^/]*)?$")
@@ -29,11 +25,6 @@ const SECRET_FILES: &str = r#"
   (regex #"\.(pem|key|p12|pfx|keystore|env)$"))
 "#;
 
-/// A shared folder's rules. The refusals come after the write rule, so they win:
-/// - `rm -rf`, `rmdir` and `mv` are refused however they're called, and only overwriting can lose data.
-/// - A hard link would keep write access to a file after the grant is taken back.
-/// - Removing the quarantine flag would let a planted program skip Gatekeeper's check.
-/// - Files that run by themselves stay read-only, because they'd later run outside the sandbox.
 fn folder_rules(writable: bool) -> String {
     let mut rules = String::from("(allow file-read* (subpath (param \"FOLDER\")))\n");
     if writable {
@@ -46,10 +37,8 @@ fn folder_rules(writable: bool) -> String {
     rules
 }
 
-/// From `<sys/proc_info.h>`; the libc crate doesn't name it.
 const PROC_UID_ONLY: u32 = 4;
 
-/// How many processes this person is running now, since the system's limit counts all of them.
 fn running_processes() -> u64 {
     // SAFETY: a null buffer only asks for the size the list would take.
     let bytes =
@@ -57,14 +46,10 @@ fn running_processes() -> u64 {
     (bytes.max(0) as u64) / std::mem::size_of::<libc::pid_t>() as u64
 }
 
-/// A command may start this many processes beyond those, so a fork bomb stops there rather than at
-/// the system's limit, where the person couldn't start anything either.
 const EXTRA_PROCESSES: u64 = 512;
 
-/// How many open files are closed off before a command starts.
 const MAX_INHERITED_FILES: u64 = 1 << 20;
 
-/// Marks the files a command added or edited in a shared folder, which it can't do for itself.
 fn mark_changed_files(root: &Path, since: std::time::SystemTime) {
     use file_access::{fs, quarantine};
     let mut queue = vec![root.to_path_buf()];
@@ -92,7 +77,6 @@ fn mark_changed_files(root: &Path, since: std::time::SystemTime) {
     }
 }
 
-/// How many entries of a shared folder are looked through after a command that can write to it.
 const MAX_MARKED_ENTRIES: usize = 200_000;
 
 pub(super) async fn run(
@@ -101,7 +85,6 @@ pub(super) async fn run(
     timeout: Duration,
     stop: Arc<AtomicBool>,
 ) -> Result<ShellOutcome, String> {
-    // File times can be a little behind the clock.
     let started_at = std::time::SystemTime::now() - Duration::from_secs(2);
     let mut marked_folder = None;
     let max_processes = running_processes() + EXTRA_PROCESSES;
@@ -138,11 +121,8 @@ pub(super) async fn run(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .process_group(0);
-    // Only async-signal-safe resource-limit calls run between fork and exec.
     unsafe {
         command.pre_exec(move || {
-            // Native libraries in Misty's process can leave a file open across exec, and a command
-            // would then hold whatever that file is. The runner's own pipes are already marked.
             let mut open_limit: libc::rlimit = std::mem::zeroed();
             if libc::getrlimit(libc::RLIMIT_NOFILE, &mut open_limit) != 0 {
                 return Err(std::io::Error::last_os_error());
@@ -163,7 +143,6 @@ pub(super) async fn run(
         .spawn()
         .map_err(|_| "shell_start_failed".to_owned())?;
     let pid = child.id().ok_or("shell_start_failed")? as i32;
-    // A command that couldn't be stopped after a crash doesn't run at all.
     let Ok(exit_watcher) = ExitWatcher::start(pid) else {
         unsafe {
             libc::kill(-pid, libc::SIGKILL);
@@ -189,7 +168,6 @@ pub(super) async fn run(
             _ = tokio::time::sleep(Duration::from_millis(50)) => {}
         }
     };
-    // Whatever way it ended, nothing it started outlives it.
     tree.kill_all();
     unsafe {
         libc::kill(-pid, libc::SIGKILL);
@@ -231,7 +209,6 @@ where
     })
 }
 
-/// A process that escaped the group could hold a pipe open forever, so reading has a deadline.
 async fn finished(reader: tokio::task::JoinHandle<CappedOutput>) -> (String, bool) {
     let abort = reader.abort_handle();
     match tokio::time::timeout(Duration::from_secs(2), reader).await {

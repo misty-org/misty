@@ -1,4 +1,3 @@
-// POSIX path helpers for Midscene code paths that only build names.
 export const sep = "/";
 const normalize = (value: string) => {
   const absolute = value.startsWith("/");

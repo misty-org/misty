@@ -18,13 +18,8 @@ import {
   requestAccountExport,
   saveAccountExport,
   type AccountExportProof,
-} from "./accountExport";
+} from "./account_export";
 
-/**
- * Exports the signed-in account (`POST /me/export`) after the person confirms it is them: their
- * Misty password, or a fresh Google sign-in for a Google account. The export is saved as one JSON
- * file with the account's data and a short-lived link to each note, drawing and file.
- */
 export function AccountExportDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -86,7 +81,7 @@ export function AccountExportDialog(props: {
           />
         )}
         {!error && saved ? (
-          <Text bare as="p" tone="muted" className="m-0 text-sm" role="status">
+          <Text bare as="p" size="meta" tone="muted" className="m-0" role="status">
             Saved {saved} to your downloads.
           </Text>
         ) : null}

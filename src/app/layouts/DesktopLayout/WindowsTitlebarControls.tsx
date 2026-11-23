@@ -2,22 +2,12 @@ import { Portal, Pressable, Text, Tooltip } from "@misty/ui";
 import { useCallback, useRef, type ReactNode, type RefObject } from "react";
 import { CloseGlyph, MaximizeGlyph, MinimizeGlyph, RestoreGlyph } from "./RestoreGlyph";
 import * as styles from "./styles";
-import { useNativeMaximizeButton } from "./useNativeMaximizeButton";
+import { useNativeMaximizeButton } from "./use_native_maximize_button";
 
-/** The tab row's slot the buttons are seated in, at its far end. */
 export const windowsCaptionSlotId = "misty-windows-caption-slot";
 
-/**
- * Minimize, maximize and close, at the window's top-right as every Windows app has them: seated at
- * the tab row's end, the height of its buttons and on its line, or over the window's corner where
- * there is no tab row.
- * On Windows they wear the system's own caption glyphs (Segoe Fluent Icons) and close turns red
- * under the pointer; on Linux, where that font isn't there, they draw the same shapes.
- */
 export function WindowsTitlebarControls(props: {
-  /** Windows draws the system's caption glyphs; elsewhere they are drawn. */
   systemGlyphs: boolean;
-  /** The tab row's slot, when the buttons sit in it instead of over the window's corner. */
   slot: HTMLElement | null;
   controlsRef: RefObject<HTMLDivElement | null>;
   scale: number;
@@ -45,8 +35,6 @@ export function WindowsTitlebarControls(props: {
     cancelSnapLayouts();
     void toggleTitlebarMaximize().catch(() => undefined);
   }, [cancelSnapLayouts, toggleTitlebarMaximize]);
-  // Windows sees this button as the window's own, so Snap Layouts opens under it; the pointer
-  // there then reaches the page as these events instead.
   const maximizeHovered = useNativeMaximizeButton(maximizeRef, true, toggleMaximize);
   const glyph = (system: string, drawn: ReactNode) =>
     systemGlyphs ? (
@@ -99,11 +87,7 @@ export function WindowsTitlebarControls(props: {
         </Pressable>
       </Tooltip>
       <Tooltip content="Close" side="bottom">
-        <Pressable
-          aria-label="Close window"
-          className={closeButton}
-          onClick={closeTitlebarWindow}
-        >
+        <Pressable aria-label="Close window" className={closeButton} onClick={closeTitlebarWindow}>
           {glyph("\uE8BB", <CloseGlyph />)}
         </Pressable>
       </Tooltip>

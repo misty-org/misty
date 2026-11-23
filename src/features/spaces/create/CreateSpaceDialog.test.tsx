@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateSpaceDialog } from "./CreateSpaceDialog";
-import { useCreateSpaceDialog } from "./useCreateSpaceDialog";
+import { useCreateSpaceDialog } from "./use_create_space_dialog";
 
 const mocks = vi.hoisted(() => ({
   people: vi.fn(),

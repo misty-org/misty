@@ -1,12 +1,8 @@
-//! One item as Files shows it (`FileEntry` in `src/features/files/api/disk.ts`), read through the
-//! disk gate. Listing, search, Starred, Recent and tags all hand these back.
 use std::path::Path;
 
 use file_access::disk::fs_disk;
 use serde::{Deserialize, Serialize};
 
-/// A Finder tag: its name and Finder's color number (0 none, 1 gray, 2 green, 3 purple, 4 blue,
-/// 5 yellow, 6 red, 7 orange).
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct FinderTag {
     pub name: String,
@@ -46,11 +42,27 @@ pub(crate) fn millis(time: std::io::Result<std::time::SystemTime>) -> i64 {
         .unwrap_or(0)
 }
 
-/// Folder extensions macOS shows as one item (an app, a library, a bundle).
 const PACKAGES: &[&str] = &[
-    "app", "bundle", "framework", "kext", "plugin", "photoslibrary", "musiclibrary", "tvlibrary",
-    "fcpbundle", "logicx", "band", "pages", "numbers", "key", "xcodeproj", "xcworkspace",
-    "playground", "rtfd", "scriptlibrary", "lproj",
+    "app",
+    "bundle",
+    "framework",
+    "kext",
+    "plugin",
+    "photoslibrary",
+    "musiclibrary",
+    "tvlibrary",
+    "fcpbundle",
+    "logicx",
+    "band",
+    "pages",
+    "numbers",
+    "key",
+    "xcodeproj",
+    "xcworkspace",
+    "playground",
+    "rtfd",
+    "scriptlibrary",
+    "lproj",
 ];
 
 pub(crate) fn extension(name: &str) -> Option<String> {
@@ -58,10 +70,8 @@ pub(crate) fn extension(name: &str) -> Option<String> {
     (!stem.is_empty() && !ext.is_empty()).then(|| ext.to_ascii_lowercase())
 }
 
-/// Whether a folder with this name is a package, on macOS (elsewhere every folder is a folder).
 pub(crate) fn is_package_name(name: &str) -> bool {
-    cfg!(target_os = "macos")
-        && extension(name).is_some_and(|ext| PACKAGES.contains(&ext.as_str()))
+    cfg!(target_os = "macos") && extension(name).is_some_and(|ext| PACKAGES.contains(&ext.as_str()))
 }
 
 #[cfg(windows)]
@@ -84,20 +94,24 @@ fn hidden_by_system(_meta: &std::fs::Metadata) -> bool {
     false
 }
 
-/// The entry for one path. A link is described as itself (kind `link`, its target), except that a
-/// link to a folder lists as a folder, as Finder does, so it opens like one.
 pub fn entry_for(path: &Path) -> std::io::Result<FileEntry> {
     let own = fs_disk::symlink_metadata(path)?;
     let name = super::display_name(path);
     let (meta, kind, link_target) = if own.file_type().is_symlink() {
-        let target = fs_disk::read_link(path).ok().map(|target| target.display().to_string());
+        let target = fs_disk::read_link(path)
+            .ok()
+            .map(|target| target.display().to_string());
         match fs_disk::metadata(path) {
             Ok(followed) if followed.is_dir() => (followed, FileKind::Folder, target),
             Ok(followed) => (followed, FileKind::Link, target),
             Err(_) => (own, FileKind::Link, target),
         }
     } else if own.is_dir() {
-        let kind = if is_package_name(&name) { FileKind::Package } else { FileKind::Folder };
+        let kind = if is_package_name(&name) {
+            FileKind::Package
+        } else {
+            FileKind::Folder
+        };
         (own, kind, None)
     } else {
         (own, FileKind::File, None)

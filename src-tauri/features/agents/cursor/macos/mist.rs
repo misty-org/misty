@@ -1,9 +1,3 @@
-//! The control mist: a soft white fog inside the edges of whatever an agent
-//! controls. One mist view for the display, a page and a window. Two inner
-//! fogs: a bright one gray close to the edge and a wide darker-gray one that
-//! still reads on white pages. Each is the shadow of a shape that lies entirely
-//! outside the bounds, so only the shadow falls inward; the view clips to its
-//! own rounded corners.
 use std::cell::{Cell, OnceCell, RefCell};
 
 use block2::RcBlock;
@@ -50,7 +44,6 @@ pub(super) fn waiting_alpha() -> f64 {
 pub(super) struct MistIvars {
     near: OnceCell<Retained<CAShapeLayer>>,
     wide: OnceCell<Retained<CAShapeLayer>>,
-    /// Set for a window or the display; a page mist follows its page's own corners.
     radius: Cell<Option<f64>>,
 }
 
@@ -80,10 +73,6 @@ define_class!(
             self.fit();
         }
 
-        // Core Animation drops a layer's animations when its view leaves a window, and a
-        // docked window's mist is detached and attached again as the window opens and
-        // docks. Starting over each time it joins a window keeps it from freezing at
-        // one glow.
         #[unsafe(method(viewDidMoveToWindow))]
         fn view_did_move_to_window(&self) {
             let _: () = unsafe { msg_send![super(self), viewDidMoveToWindow] };
@@ -110,7 +99,6 @@ fn number(value: f64) -> Retained<AnyObject> {
     Retained::into_super(Retained::into_super(Retained::into_super(
         NSNumber::new_f64(value),
     )))
-    .into()
 }
 
 fn breathe(layer: &CALayer, key: &str, from: &AnyObject, to: &AnyObject, duration: f64) {
@@ -165,7 +153,6 @@ impl MistView {
         self.breathe();
     }
 
-    /// Breathes and drifts while an agent acts; still under Reduce motion.
     fn breathe(&self) {
         let Some((near, wide)) = self.layers() else {
             return;
@@ -175,7 +162,6 @@ impl MistView {
             wide.removeAllAnimations();
             return;
         }
-        // A clear pulse: the glow at the edge swells and fades, and the wide fog breathes with it.
         breathe(near, "shadowOpacity", &number(0.3), &number(1.0), 2.4);
         breathe(near, "shadowRadius", &number(14.0), &number(30.0), 2.4);
         breathe(wide, "shadowOpacity", &number(0.12), &number(0.42), 2.4);
@@ -217,7 +203,6 @@ impl MistView {
         layer.setCornerRadius(radius);
         layer.setMaskedCorners(corners);
         for fog in [near, wide] {
-            // The frame around the bounds, wide enough that its blur never shows a seam.
             let inset = -fog.shadowRadius() * 4.0;
             let path = CGMutablePath::new();
             let outer = NSRect::new(
@@ -225,9 +210,6 @@ impl MistView {
                 NSSize::new(size.width - 2.0 * inset, size.height - 2.0 * inset),
             );
             let corner = radius.min(size.width.min(size.height) / 2.0);
-            // Core Animation fills a shadow path by the nonzero rule, whatever the layer's fill rule:
-            // the hole must wind against the frame, or the shadow covers the whole page in white.
-            // Mirroring the rounded rect across its center line reverses its direction.
             let mirror = CGAffineTransform {
                 a: -1.0,
                 b: 0.0,
@@ -250,7 +232,6 @@ impl MistView {
     }
 }
 
-/// A mist view filling `host`, above its other subviews.
 pub(super) fn mist_in(
     mtm: MainThreadMarker,
     host: &NSView,
@@ -266,7 +247,6 @@ pub(super) fn mist_in(
     mist
 }
 
-/// The mist already inside `host`, if any.
 pub(super) fn mist_of(host: &NSView) -> Option<Retained<MistView>> {
     host.subviews()
         .iter()
@@ -274,7 +254,6 @@ pub(super) fn mist_of(host: &NSView) -> Option<Retained<MistView>> {
         .last()
 }
 
-/// While an agent waits for the person every mist thins instead of disappearing.
 pub(super) fn set_waiting(is_waiting: bool) {
     WAITING.with(|waiting| waiting.set(is_waiting));
     let alpha = if is_waiting {

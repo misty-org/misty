@@ -1,10 +1,7 @@
-//! Antigravity's sub-agents, from agy 1.5.9's own `invoke_subagent` call, sub-agent record and
-//! sub-agent transcript.
 use super::*;
 
 const CHILD: &str = "4985418f-d540-4477-992a-5617b7ae6a52";
 
-/// The `tool_call` update agy sends for `/teamwork reply with just: hi`.
 fn invoke(id: &str) -> Value {
     json!({
         "sessionId": "cd973451-2b50-4748-a026-905672cf6cc9",
@@ -47,7 +44,6 @@ const SPAWNED: &str = r#"{"step_index":0,"source":"SYSTEM","type":"SYSTEM_MESSAG
 "#;
 const REFUSED: &str = r#"{"step_index":2,"source":"MODEL","type":"GENERIC","status":"ERROR","error":"permission check failed for unsandboxed \"ls -la ..\"","content":"Created At: 2026-11-13T23:38:25-08:00\nCompleted At: 2026-11-13T23:38:25-08:00\nEncountered error"}"#;
 
-/// (kind, tool call id, parent) of each event, to read the order off.
 fn shape(events: &[EngineEvent]) -> Vec<String> {
     events
         .iter()
@@ -91,7 +87,6 @@ fn an_invoke_subagent_call_is_named_like_a_task() {
 fn a_sub_agents_steps_nest_under_its_call_as_its_transcript_grows() {
     let dir = tempfile::tempdir().unwrap();
     let brain = dir.path();
-    // A sub-agent an earlier turn started is left alone.
     record(brain, "parent", "earlier", 1);
     append(brain, "earlier", SPAWNED);
     let mut subagents = Subagents::in_brain(brain.to_path_buf(), "parent");
@@ -99,7 +94,6 @@ fn a_sub_agents_steps_nest_under_its_call_as_its_transcript_grows() {
 
     subagents.update(&invoke("call_1"));
     record(brain, "parent", CHILD, 2);
-    // Its result line is still being written.
     append(brain, CHILD, &format!("{SPAWNED}{}", &REFUSED[..40]));
     assert_eq!(
         shape(&subagents.poll(true)),
@@ -156,7 +150,6 @@ fn sub_agents_of_one_call_share_its_row_and_wait_for_theirs() {
     let dir = tempfile::tempdir().unwrap();
     let brain = dir.path();
     let mut subagents = Subagents::in_brain(brain.to_path_buf(), "parent");
-    // Recorded before its call's update arrived: it waits for the row.
     record(brain, "parent", "a", 4);
     record(brain, "parent", "b", 4);
     append(brain, "a", SPAWNED);
@@ -187,7 +180,6 @@ fn a_sub_agent_that_sent_its_message_has_reported_back() {
     assert!(subagents.started_any());
     assert_eq!(subagents.quiet_after(), QUIET_WORKING, "no sub-agent yet");
     record(brain, "parent", CHILD, 2);
-    // agy 1.5.9's teamwork sub-agent answering `/teamwork reply with just: hi`.
     let sent = r#"{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","tool_calls":[{"name":"send_message","args":{"Message":"\"hi\"","Recipient":"\"d2630c75-df0b-4bf3-b9c0-92278a0fbdb4\""}}]}
 "#;
     append(brain, CHILD, sent);

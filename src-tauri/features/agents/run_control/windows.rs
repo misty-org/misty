@@ -1,5 +1,3 @@
-//! Which account each person's window is signed in as. On a shared computer one account's run events,
-//! questions and connected apps never reach another account's window.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock, PoisonError},
@@ -35,8 +33,6 @@ fn labels_for(all: &HashMap<String, String>, account: &str) -> Vec<String> {
         .collect()
 }
 
-/// Tells this account's windows. An empty account is a run nobody can place: every signed-in window of
-/// a person hears it, as a question nobody can answer would only stop the run.
 pub(crate) fn emit_to_account<S: Serialize + Clone>(
     app: &AppHandle,
     account: &str,
@@ -52,7 +48,6 @@ pub(crate) fn emit_to_account<S: Serialize + Clone>(
     }
 }
 
-/// The window's account, once it has said which it is.
 #[tauri::command]
 pub fn agent_window_account(webview: tauri::Webview, account: String) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {

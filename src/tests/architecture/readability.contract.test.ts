@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { repositoryPath, repositoryRoot, walk } from "./repositoryPolicy";
+import { repositoryPath, repositoryRoot, walk } from "./repository_policy";
 
 type BaselineEntry = { length: number; hash: string };
 const maxLength = 160;

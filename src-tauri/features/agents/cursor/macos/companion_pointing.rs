@@ -1,7 +1,3 @@
-//! Precise pointing for the cursor companion. A model's point comes from a
-//! downscaled screenshot. Accessibility can name the real control near it, and
-//! a full-resolution crop lets the model place it again when Accessibility
-//! cannot. Both read the screen only; neither presses or focuses anything.
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use serde_json::{json, Map, Value};
 
@@ -11,7 +7,6 @@ use super::{
     support::macos_at_least,
 };
 
-/// Roles a person points at; containers such as groups and web areas are not.
 fn target_role(role: &str) -> bool {
     [
         "AXButton",
@@ -40,7 +35,6 @@ fn target_role(role: &str) -> bool {
     .contains(&role)
 }
 
-/// Words of the model's label that name the control, without the instruction.
 fn words(label: &str) -> Vec<String> {
     const SKIP: [&str; 28] = [
         "click", "open", "press", "choose", "select", "tap", "the", "a", "an", "on", "to", "in",
@@ -62,9 +56,6 @@ fn contains(frame: &NSRect, x: f64, y: f64) -> bool {
         && y < frame.origin.y + frame.size.height
 }
 
-/// Finds the control a companion point names: the actionable element at or
-/// near the point, preferring one whose text matches the label. Points are
-/// global display points with a top-left origin, like cursor samples.
 pub(crate) fn snap_point(x: f64, y: f64, label: &str) -> Value {
     if !trusted() {
         return json!({ "error": "accessibility" });
@@ -101,7 +92,6 @@ pub(crate) fn snap_point(x: f64, y: f64, label: &str) -> Value {
                     && frame.size.height <= 240.0
             });
             if let Some(frame) = frame {
-                // Neighboring samples often land on the same control; score it once.
                 if seen.iter().any(|other| other.same(&node)) {
                     break;
                 }
@@ -132,8 +122,6 @@ pub(crate) fn snap_point(x: f64, y: f64, label: &str) -> Value {
                     frame.origin.y + frame.size.height / 2.0,
                 );
                 let distance = (mid.0 - x).hypot(mid.1 - y);
-                // A named match anywhere nearby wins; otherwise only the control
-                // under the point itself is trusted.
                 let acceptable = score >= 0.5 || contains(&frame, x, y);
                 if acceptable
                     && (score > best_match || (score == best_match && distance < best_distance))
@@ -157,9 +145,6 @@ pub(crate) fn snap_point(x: f64, y: f64, label: &str) -> Value {
     }
 }
 
-/// Captures a region of one display at its native pixel density, as JPEG.
-/// The rectangle is in that display's local points; companion overlays are
-/// excluded so the crop shows only what the person sees.
 pub(crate) fn capture_region(
     display_id: u32,
     x: f64,

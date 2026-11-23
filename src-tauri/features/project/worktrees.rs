@@ -43,10 +43,6 @@ use remove::*;
 use repo::*;
 pub use types::*;
 
-// ---------------------------------------------------------------------------
-// Cancelling a creation
-// ---------------------------------------------------------------------------
-
 pub struct CreationCancel {
     cancelled: AtomicBool,
     notify: Notify,
@@ -70,7 +66,6 @@ impl CreationCancel {
     }
 }
 
-/// Each running creation, by its id: the window that started it and its cancel switch.
 type Creations = HashMap<String, (String, Arc<CreationCancel>)>;
 
 static CREATIONS: LazyLock<Mutex<Creations>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -81,11 +76,6 @@ fn creations() -> std::sync::MutexGuard<'static, Creations> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-// ---------------------------------------------------------------------------
-// Commands
-// ---------------------------------------------------------------------------
-
-/// The worktrees of the repository a linked folder is in, its branches and current branch.
 #[tauri::command]
 pub async fn project_worktree_list(
     app: tauri::AppHandle,
@@ -123,8 +113,6 @@ pub async fn project_worktree_list(
     })
 }
 
-/// Makes a worktree and links it to the Space. Progress arrives as `misty://worktree-progress`
-/// events in the window that asked; a cancelled creation reports `canceled` and succeeds.
 #[tauri::command]
 pub async fn project_worktree_create(
     app: tauri::AppHandle,
@@ -150,7 +138,6 @@ pub async fn project_worktree_create(
     };
     let mut result = run_create(&report, &id, &repo, &args, &cancel).await;
     if let Ok(target) = &result {
-        // ---- register ----
         progress(&report, &id, "register", None);
         let linked = link_worktree(&app, &account, &space, target).await;
         result = linked.map_err(|error| fail("register_failed", error));
@@ -186,8 +173,6 @@ pub async fn project_worktree_create(
     }
 }
 
-/// Makes a new worktree one of the person's projects, as a folder they picked would be: the file
-/// gate may reach it, and chats and panels can work in it. `space` only names where it was made.
 async fn link_worktree(
     app: &tauri::AppHandle,
     account: &str,
@@ -200,13 +185,11 @@ async fn link_worktree(
     let _ = space;
     let (account, text) = (account.to_string(), real.to_string_lossy().into_owned());
     tokio::task::spawn_blocking(move || crate::engines::store::add_project(&db, &account, &text))
-    .await
-    .map_err(|error| error.to_string())??;
+        .await
+        .map_err(|error| error.to_string())??;
     Ok(real)
 }
 
-/// Asks a running creation to stop; a Git process in flight is killed. False when there was
-/// nothing of this window's to stop.
 #[tauri::command]
 pub async fn project_worktree_create_cancel(
     webview: tauri::Webview,
@@ -226,7 +209,6 @@ pub async fn project_worktree_create_cancel(
     })
 }
 
-/// Removes a worktree of a linked repository, and its branch if asked, then unlinks it.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn project_worktree_remove(
@@ -245,7 +227,6 @@ pub async fn project_worktree_remove(
         .iter()
         .find(|w| same_path(&w.path, &worktree))
         .cloned();
-    // Only one of this repository's own worktrees, or a lost one in its worktrees folder.
     let in_root = worktrees_root(&repo).is_ok_and(|root| Path::new(&worktree).starts_with(root));
     match &entry {
         Some(found) if found.is_main => {
@@ -260,7 +241,6 @@ pub async fn project_worktree_remove(
     }
     let branch = entry.as_ref().and_then(|found| found.branch.clone());
     let result = remove_worktree(&repo, &worktree, branch.as_deref(), delete_branch).await?;
-    // Forget it as a project; the gate forgets it when no account keeps it any more.
     let db = app.state::<MistyRuntime>().environment.store();
     let gone = worktree.clone();
     let canonical = file_access::fs::canonicalize(&worktree)
@@ -281,7 +261,6 @@ pub async fn project_worktree_remove(
     Ok(result)
 }
 
-/// Whether `branch` is fully merged into `base`. A squash merge reads as not merged.
 #[tauri::command]
 pub async fn project_worktree_branch_merged(
     app: tauri::AppHandle,
@@ -297,8 +276,6 @@ pub async fn project_worktree_branch_merged(
         .map_err(|error| error.to_string())?
 }
 
-/// A pull request's preview for the create dialog. Errors are fixed codes the dialog words:
-/// `invalid_pr_input`, `no_origin`, `not_github`.
 #[tauri::command]
 pub async fn project_worktree_resolve_pr(
     app: tauri::AppHandle,

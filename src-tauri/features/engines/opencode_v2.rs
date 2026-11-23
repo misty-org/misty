@@ -1,21 +1,3 @@
-//! The OpenCode 2.x turn driver (declared from `opencode_session.rs`, which keeps 1.x's).
-//!
-//! Wire (checked against a live `opencode serve` 2.3.0 and its `/openapi.json`):
-//! - `POST /api/session {location: {directory}}` → `{data: {id}}`; the session holds its agent
-//!   and model, switched with `POST /api/session/:id/agent {agent}` and
-//!   `POST /api/session/:id/model {model: {providerID, id, variant}}`.
-//! - `GET /api/event` (SSE, every session's events, `{id, type, data}`) must be live before
-//!   `POST /api/session/:id/prompt {text, files: [{uri}]}`; `/command {name, text}` and
-//!   `/compact {}` stand in for it when the message is one of OpenCode's commands.
-//! - The turn streams as `session.text.delta` / `session.reasoning.delta`, tools as
-//!   `session.tool.input.started` → `called` → `success|failed`, usage on `session.step.ended`,
-//!   and settles on `session.execution.succeeded|failed|interrupted`.
-//! - The `question` tool asks through a form: `form.created` → answer card →
-//!   `POST /api/session/:id/form/:formID/reply {answer: {q0: …}}` (or `DELETE` to dismiss).
-//!   `permission.asked` answers at `POST /api/session/:id/permission/:requestID/reply
-//!   {decision: once|always|reject}`.
-//! - Stop sends `POST /api/session/:id/interrupt`.
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -40,23 +22,17 @@ mod forms;
 mod session;
 
 use events::handle_event;
-// The 1.x path reads its tokens the same way.
 pub(super) use events::{after_compaction, usage_of};
 pub(crate) use forms::answer_form;
 pub(crate) use session::messages;
 use session::{add_mcp_servers, choose_agent_and_model, context_windows};
 
-/// Per-turn projection state for the 2.x event stream.
 #[derive(Default)]
 pub(super) struct View {
-    /// Tool call id → tool name; only `session.tool.input.started` names the tool.
     tools: HashMap<String, String>,
-    /// The model the step that is running uses, as `provider/model`.
     model: Option<String>,
     pub(super) last_usage: Option<Value>,
-    /// What the turn's steps cost so far, in dollars, once one reports a cost.
     cost: Option<f64>,
-    /// `provider/model` → context window, from `GET /api/model`.
     context_windows: HashMap<String, u64>,
     started: bool,
     turn_ended: bool,
@@ -72,7 +48,6 @@ async fn call(
     opencode_server::call(method, origin, path, directory, body, CALL_TIMEOUT).await
 }
 
-/// One 2.x turn on the server at `origin`.
 pub(super) async fn turn(
     core: &TurnCore,
     state: &mut TurnState,
@@ -121,8 +96,6 @@ pub(super) async fn turn(
             ),
         );
     }
-    // The send may answer only once the turn is done, so it runs on its own and its failure
-    // comes back here; the event stream carries the turn meanwhile.
     let (sent_tx, mut sent) = tokio::sync::oneshot::channel::<Result<(), String>>();
     {
         let (origin, directory, session_id) =
@@ -180,8 +153,6 @@ pub(super) async fn turn(
     }
 }
 
-/// Where the message goes and with what: OpenCode's `/compact` (`/summarize` too) and its own
-/// commands have their calls, everything else is a prompt with the pictures as data-URL files.
 async fn send_body(
     origin: &str,
     directory: &str,
@@ -215,8 +186,6 @@ async fn send_body(
     Ok((format!("{session}/prompt"), body))
 }
 
-/// The SSE reader for `GET /api/event`, forwarding this session's frames. The oneshot says
-/// whether the stream connected (the server's first frame is `server.connected`).
 fn event_stream(
     origin: &str,
     session_id: String,
@@ -261,7 +230,6 @@ fn event_stream(
     (rx, ready_rx)
 }
 
-/// The session an event belongs to: `data.sessionID`, or the form's for `form.created`.
 fn event_session(value: &Value) -> Option<&str> {
     value
         .pointer("/data/sessionID")

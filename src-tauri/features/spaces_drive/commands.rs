@@ -1,6 +1,3 @@
-//! The drive's Tauri commands (build contract, Appendix B). Each refuses anything but a person's
-//! own window. Paths are drive paths (`/Reports/q3.pdf`); the renderer's camelCase arguments
-//! arrive as these snake_case names.
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -34,9 +31,6 @@ fn node_id(space: &SpaceId, path: &str) -> Result<ItemId, String> {
         .ok_or_else(|| "It isn't there any more.".to_string())
 }
 
-/// Hands the drive the server, the account and its Spaces; native code mounts and unmounts to
-/// match. `person_name` is the signed-in person's name, for what the drive shows as theirs, when
-/// the renderer has it (otherwise the drive asks the server).
 #[tauri::command]
 pub async fn drive_sync_spaces(
     app: AppHandle,
@@ -50,9 +44,6 @@ pub async fn drive_sync_spaces(
     super::sync_spaces(&app, &server, &account_id, spaces, person_name)
 }
 
-/// A realtime `drive.*` event the renderer received, passed on: `drive.changed`,
-/// `drive.in_use_check` (ignored once older than ten seconds, a replay from the cursor) and
-/// `drive.in_use`. `created_at` is the event's own time (RFC 3339), when it has one.
 #[tauri::command]
 pub async fn drive_realtime_event(
     webview: Webview,
@@ -83,9 +74,6 @@ pub async fn drive_status(webview: Webview) -> Result<Vec<DriveStatus>, String> 
     Ok(super::all_statuses())
 }
 
-/// The content cache's limit, a device setting (`drive:cache-limit` in `misty.db`): `bytes`, or
-/// no limit when `None`. Saved from native code, since windows can't write `drive:` settings, and
-/// applied to the running drive at once. Answers the limit in force.
 #[tauri::command]
 pub async fn drive_set_cache_limit(
     app: AppHandle,
@@ -122,7 +110,6 @@ pub async fn drive_list(
         .map_err(error_text)
 }
 
-/// One entry, by `path` or by `item_id`.
 #[tauri::command]
 pub async fn drive_entry(
     webview: Webview,
@@ -142,7 +129,6 @@ pub async fn drive_entry(
     }
 }
 
-/// A file's bytes, fetched first if this computer only has its name.
 #[tauri::command]
 pub async fn drive_read(
     webview: Webview,
@@ -164,8 +150,6 @@ pub struct Replace {
     pub version: i64,
 }
 
-/// What `drive_write` carries besides the file's bytes, in its `x-misty-request` header
-/// (percent-encoded JSON), as `auth_http_start` takes its request head.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WriteHead {
@@ -176,8 +160,6 @@ struct WriteHead {
     replace: Option<Replace>,
 }
 
-/// The bytes of a body that arrived as JSON rather than raw (an array of numbers, or the object a
-/// typed array serializes to), as `account/http.rs` reads them.
 fn bytes_from_json(value: &serde_json::Value) -> Result<Vec<u8>, String> {
     use serde_json::Value;
     let byte = |item: &Value| item.as_u64().and_then(|byte| u8::try_from(byte).ok());
@@ -192,11 +174,6 @@ fn bytes_from_json(value: &serde_json::Value) -> Result<Vec<u8>, String> {
     bytes.ok_or_else(|| "Expected the file's bytes.".to_owned())
 }
 
-/// Writes a file into `folder`. With `replace`, it is new content for that item made against
-/// `version`: a text save merges with what came since, anything else is the last save, the
-/// replaced content kept in the Space's trash. The item's entry comes back. The bytes are the
-/// request's raw body; the rest is the `x-misty-request` header: `{spaceId, folder, name,
-/// replace?}`.
 #[tauri::command]
 pub async fn drive_write(
     webview: Webview,
@@ -246,7 +223,10 @@ pub async fn drive_open(
     person_window(&webview)?;
     let space = space_of(&space_id)?;
     let id = node_id(&space, &path)?;
-    drive()?.open(&space, &id, editing).await.map_err(error_text)
+    drive()?
+        .open(&space, &id, editing)
+        .await
+        .map_err(error_text)
 }
 
 #[tauri::command]
@@ -263,8 +243,6 @@ pub async fn drive_close(
     Ok(())
 }
 
-/// Pauses or resumes syncing for every Space's drive, from Settings. Not kept across a restart.
-/// Answers whether syncing is paused now.
 #[tauri::command]
 pub async fn drive_set_paused(webview: Webview, paused: bool) -> Result<bool, String> {
     person_window(&webview)?;
@@ -273,7 +251,6 @@ pub async fn drive_set_paused(webview: Webview, paused: bool) -> Result<bool, St
     Ok(drive.paused())
 }
 
-/// Whether syncing is paused now.
 #[tauri::command]
 pub async fn drive_paused(webview: Webview) -> Result<bool, String> {
     person_window(&webview)?;
@@ -306,8 +283,6 @@ pub async fn drive_remove_download(
     drive()?.remove_download(&space, &path).map_err(error_text)
 }
 
-/// The person deletes an item: a trash move on the server, after asking whether anyone has it
-/// open. A refusal comes back as the error ("Ben has Report.pdf open").
 #[tauri::command]
 pub async fn drive_trash(webview: Webview, space_id: String, path: String) -> Result<(), String> {
     person_window(&webview)?;
@@ -320,13 +295,15 @@ pub async fn drive_trash(webview: Webview, space_id: String, path: String) -> Re
 }
 
 #[tauri::command]
-pub async fn drive_trash_list(webview: Webview, space_id: String) -> Result<Vec<TrashEntry>, String> {
+pub async fn drive_trash_list(
+    webview: Webview,
+    space_id: String,
+) -> Result<Vec<TrashEntry>, String> {
     person_window(&webview)?;
     let space = space_of(&space_id)?;
     let drive = drive()?;
     let mut out = Vec::new();
     let mut after: Option<String> = None;
-    // The whole trash, page by page, within reason.
     for _ in 0..20 {
         let (entries, next) = drive
             .trash_list(&space, after.as_deref(), 200)
@@ -347,8 +324,6 @@ pub struct Restored {
     pub name: String,
 }
 
-/// Undo for the delete guard: puts back everything a run of deletes from the OS trashed in the
-/// Space before Misty stopped it. Answers how many came back.
 #[tauri::command]
 pub async fn drive_restore_burst(
     webview: Webview,
@@ -363,7 +338,6 @@ pub async fn drive_restore_burst(
         .map_err(error_text)
 }
 
-/// Puts a trashed item back. An agent's trash record of it goes.
 #[tauri::command]
 pub async fn drive_restore(
     app: AppHandle,
@@ -382,8 +356,6 @@ pub async fn drive_restore(
     })
 }
 
-/// Deletes a trashed item for good. The person's own command, the one way anything in a drive is
-/// deleted for good; the server holds it to `drive.purge`.
 #[tauri::command]
 pub async fn drive_purge(
     app: AppHandle,
@@ -399,9 +371,6 @@ pub async fn drive_purge(
     Ok(())
 }
 
-/// Copies a local folder into the Space at `folder` (`/` is the drive's root), under its own
-/// name, following its `.gitignore` and `.mistyignore`. The folder has to be one the person
-/// picked in the system's dialog (`space_folder_pick`).
 #[tauri::command]
 pub async fn drive_copy_in(
     webview: Webview,
@@ -420,7 +389,6 @@ pub async fn drive_copy_in(
         .map_err(error_text)
 }
 
-/// Shows a Space's drive, or an item in it, in the system's file manager.
 #[tauri::command]
 pub async fn drive_reveal(
     app: AppHandle,
@@ -442,7 +410,11 @@ pub async fn drive_reveal(
             .open_path(mount.path.to_string_lossy().into_owned(), None::<&str>)
             .map_err(|error| error.to_string());
     }
-    if drive.node_at(&space, &drive_path).map_err(error_text)?.is_none() {
+    if drive
+        .node_at(&space, &drive_path)
+        .map_err(error_text)?
+        .is_none()
+    {
         return Err("It isn't there any more.".into());
     }
     let local = space_drive::names::local_path(&mount.path, &drive_path);

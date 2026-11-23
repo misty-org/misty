@@ -1,4 +1,4 @@
-import "@/app/featureSeams";
+import "@/app/feature_seams";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -37,7 +37,12 @@ function renderMenu() {
     <MemoryRouter>
       <DropdownMenu open modal={false}>
         <DropdownMenuTrigger>Account</DropdownMenuTrigger>
-        <AccountMenu onClose={vi.fn()} onOpenAccountSettings={vi.fn()} />
+        <AccountMenu
+          onClose={vi.fn()}
+          onOpenAccountSettings={vi.fn()}
+          onChangeBanner={vi.fn()}
+          onCustomStatus={vi.fn()}
+        />
       </DropdownMenu>
     </MemoryRouter>,
   );
@@ -50,10 +55,12 @@ describe("AccountMenu", () => {
     mockAccounts = [];
   });
 
-  it("lists account actions for a signed-in account", () => {
+  it("shows the profile card with status and account actions", () => {
     renderMenu();
     const menu = screen.getByRole("menu", { name: "Account" });
     expect(menu.textContent).toContain("owner@example.com");
+    expect(menu.textContent).toContain("Set a status");
+    expect(screen.getByRole("menuitem", { name: /Online/ })).toBeTruthy();
     for (const label of [/Account settings/, /Switch accounts/, /Help/, /Sign out/]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeTruthy();
     }
@@ -67,7 +74,12 @@ describe("AccountMenu", () => {
       <MemoryRouter>
         <DropdownMenu open modal={false}>
           <DropdownMenuTrigger>Account</DropdownMenuTrigger>
-          <AccountMenu onClose={onClose} onOpenAccountSettings={vi.fn()} />
+          <AccountMenu
+            onClose={onClose}
+            onOpenAccountSettings={vi.fn()}
+            onChangeBanner={vi.fn()}
+            onCustomStatus={vi.fn()}
+          />
         </DropdownMenu>
       </MemoryRouter>,
     );

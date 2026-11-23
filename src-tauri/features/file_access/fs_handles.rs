@@ -1,5 +1,3 @@
-//! The standard library's file types, through the gate. They're wrappers so the only ways to open
-//! a file are the ones checked here.
 use std::{
     fs, io,
     ops::{Deref, DerefMut},
@@ -8,21 +6,15 @@ use std::{
 
 use super::{check, Access};
 
-/// The Windows null device, for a helper's standard error. It isn't anyone's file, so no rule
-/// applies to it.
 #[cfg(windows)]
 pub fn null_device() -> io::Result<File> {
     fs::File::create("NUL").map(File)
 }
 
-/// `std::fs::File`. It's a wrapper so the only ways to open one are the two checked here; once open
-/// it works like the standard type, which `Deref` gives it.
 #[derive(Debug)]
 pub struct File(fs::File);
 
 impl File {
-    /// A file with no name in the temp folder, for a helper's input or output. It has no path, so
-    /// there's nothing to check.
     pub fn unnamed_temp() -> io::Result<Self> {
         tempfile::tempfile().map(Self)
     }
@@ -37,7 +29,6 @@ impl File {
         fs::File::create(path).map(Self)
     }
 
-    /// A file the disk gate (`disk::fs_disk`) has already checked and opened.
     pub(crate) fn from_std(file: fs::File) -> Self {
         Self(file)
     }
@@ -85,7 +76,6 @@ impl From<File> for std::process::Stdio {
     }
 }
 
-/// `std::fs::OpenOptions`, checked as writing when the options can change anything.
 #[derive(Clone, Debug)]
 pub struct OpenOptions {
     options: fs::OpenOptions,
@@ -166,7 +156,6 @@ impl Default for OpenOptions {
     }
 }
 
-/// `std::fs::DirBuilder`, checked as writing.
 #[derive(Debug)]
 pub struct DirBuilder(fs::DirBuilder);
 

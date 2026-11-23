@@ -3,11 +3,6 @@ use super::{EngineCatalog, EngineModel};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-/// qoder has no static catalog and no cheap list subcommand: the only
-/// CLI-sourced list is the ACP session/new handshake (spawns `qodercli
-/// --acp`, seconds). Cache the last successful probe per engine id (Global
-/// and CN handshake their own binaries) so reopening the picker does not
-/// re-handshake every time.
 static CACHE: Mutex<Option<HashMap<&'static str, EngineCatalog>>> = Mutex::new(None);
 
 pub(super) async fn qoder_catalog(
@@ -21,12 +16,8 @@ pub(super) async fn qoder_catalog(
         }
     }
     let (entries, session) = crate::engines::qoder_session::probe_models(bin).await?;
-    // The same handshake says which modes Qoder has, by its own names.
     crate::engines::modes::learn_listed(engine, super::acp_modes(&session));
-    // Qoder's reasoning option is one for the session: every model takes its levels.
     let thought = super::acp_thought_levels(&session);
-    // session/new marks the current model as default: lead with it, since
-    // the frontend auto-selects the first entry when nothing is pinned.
     let default_index = entries.iter().position(|entry| entry.is_default);
     let mut models: Vec<EngineModel> = entries
         .into_iter()

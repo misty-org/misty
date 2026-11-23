@@ -5,15 +5,10 @@ import { useSpacesStore } from "@/features/spaces";
 import { IconButton, ListRow, NavGroupHeading, notify } from "@misty/ui";
 import { chatSectionClass } from "./styles";
 
-/** Whether an invitation to a shared Space waits on the person. */
 export function useSpaceInvitationWaiting(): boolean {
   return useSpacesStore((state) => state.invitations.length > 0);
 }
 
-/**
- * The invitations to shared Spaces that wait on the person, at the top of the sidebar's Spaces
- * side: each Space by name with who sent it, and Accept or Decline. Accepting opens the Space.
- */
 export function SpaceInvitations() {
   const invitations = useSpacesStore((state) => state.invitations);
   const respondInvite = useSpacesStore((state) => state.respondInvite);

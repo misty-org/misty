@@ -31,7 +31,6 @@ interface ThreadMessage {
   created_at: string;
 }
 
-/** Whole seconds in UTC, as these tools have always written times. */
 export function wholeSeconds(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString().replace(/\.\d+Z$/, "Z");

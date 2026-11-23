@@ -1,5 +1,3 @@
-//! Soniox transcription: upload the file, start a job, wait for it, read the transcript, and clean
-//! up after. Ported from `SonioxTranscriptionModel` in `@soniox/vercel-ai-sdk-provider`.
 use std::time::Duration;
 
 use futures_util::future::BoxFuture;
@@ -50,13 +48,16 @@ struct Transcript {
     tokens: Option<Vec<Value>>,
 }
 
-/// `{ message ?? error_type ?? "Soniox API error" }`.
 fn error_message(body: &Value) -> Option<String> {
     if !body.is_object() {
         return None;
     }
     let text = |key: &str| body.get(key).and_then(Value::as_str).map(str::to_owned);
-    Some(text("message").or_else(|| text("error_type")).unwrap_or_else(|| "Soniox API error".to_owned()))
+    Some(
+        text("message")
+            .or_else(|| text("error_type"))
+            .unwrap_or_else(|| "Soniox API error".to_owned()),
+    )
 }
 
 fn failed_job(name: &'static str, message: String) -> ModelError {
@@ -64,13 +65,22 @@ fn failed_job(name: &'static str, message: String) -> ModelError {
 }
 
 impl SonioxTranscriptionModel {
-    pub(super) fn new(client: reqwest::Client, base_url: Option<&str>, api_key: &str, model: &str) -> Result<Self, ModelError> {
+    pub(super) fn new(
+        client: reqwest::Client,
+        base_url: Option<&str>,
+        api_key: &str,
+        model: &str,
+    ) -> Result<Self, ModelError> {
         let base_url = reqwest::Url::parse(base_url.unwrap_or(DEFAULT_BASE_URL))
             .map_err(|_| ModelError::bad_base_url("The model's base URL isn't a valid URL."))?;
-        Ok(Self { client, base_url, api_key: api_key.to_owned(), model: model.to_owned() })
+        Ok(Self {
+            client,
+            base_url,
+            api_key: api_key.to_owned(),
+            model: model.to_owned(),
+        })
     }
 
-    /// `new URL(path, base)`: paths start at the root, whatever path the base has.
     fn url(&self, path: &str) -> Result<String, ModelError> {
         self.base_url
             .join(path)
@@ -121,17 +131,34 @@ impl SonioxTranscriptionModel {
         let status = response.status();
         let reason = status.canonical_reason().unwrap_or("");
         let text = response.text().await.unwrap_or_default();
-        let suffix = if text.is_empty() { String::new() } else { format!(": {text}") };
+        let suffix = if text.is_empty() {
+            String::new()
+        } else {
+            format!(": {text}")
+        };
         Err(format!("HTTP {} {reason}{suffix}", status.as_u16()))
     }
 
     async fn upload(&self, audio: &[u8], media_type: &str) -> Result<String, ModelError> {
         let mut form = Form::new();
-        form.file("file", &format!("audio.{}", extension(media_type)), media_type, audio);
+        form.file(
+            "file",
+            &format!("audio.{}", extension(media_type)),
+            media_type,
+            audio,
+        );
         let content_type = form.content_type();
         let url = self.url("/v1/files")?;
         let headers = [("authorization", self.bearer())];
-        let response = post_body(&self.client, &url, &headers, &content_type, form.finish(), &self.api_key).await?;
+        let response = post_body(
+            &self.client,
+            &url,
+            &headers,
+            &content_type,
+            form.finish(),
+            &self.api_key,
+        )
+        .await?;
         if !response.status().is_success() {
             return Err(failure(response, &self.api_key, error_message).await);
         }
@@ -142,9 +169,14 @@ impl SonioxTranscriptionModel {
         let started = std::time::Instant::now();
         loop {
             if started.elapsed() > TIMEOUT {
-                return Err(failed_job("TranscriptionJobPollingTimedOut", "Transcription job polling timed out".into()));
+                return Err(failed_job(
+                    "TranscriptionJobPollingTimedOut",
+                    "Transcription job polling timed out".into(),
+                ));
             }
-            let status: Status = self.get(&format!("/v1/transcriptions/{transcription_id}")).await?;
+            let status: Status = self
+                .get(&format!("/v1/transcriptions/{transcription_id}"))
+                .await?;
             match status.status.as_str() {
                 "completed" => return Ok(status),
                 "error" => {
@@ -170,11 +202,21 @@ impl SonioxTranscriptionModel {
         let body = job_body(&self.model, &uploaded, options);
         let headers = [("authorization", self.bearer())];
         let url = self.url("/v1/transcriptions")?;
-        let response = post_json(&self.client, &url, &headers, &body, &self.api_key, error_message).await?;
+        let response = post_json(
+            &self.client,
+            &url,
+            &headers,
+            &body,
+            &self.api_key,
+            error_message,
+        )
+        .await?;
         let job = read_json::<Created>(response).await?.id;
         *job_id = Some(job.clone());
         let status = self.wait_for(&job).await?;
-        let transcript: Transcript = self.get(&format!("/v1/transcriptions/{job}/transcript")).await?;
+        let transcript: Transcript = self
+            .get(&format!("/v1/transcriptions/{job}/transcript"))
+            .await?;
         let tokens = transcript
             .tokens
             .unwrap_or_default()
@@ -203,14 +245,31 @@ impl TranscriptionModel for SonioxTranscriptionModel {
         Box::pin(async move {
             let mut file_id = None;
             let mut job_id = None;
-            let result = self.run(audio, media_type, provider_options, &mut file_id, &mut job_id).await;
-            // What was uploaded doesn't stay on Soniox's servers, whether or not the job worked.
+            let result = self
+                .run(
+                    audio,
+                    media_type,
+                    provider_options,
+                    &mut file_id,
+                    &mut job_id,
+                )
+                .await;
             let mut warnings = Vec::new();
             if let Some(job) = &job_id {
-                self.delete(&format!("/v1/transcriptions/{job}"), &format!("transcription {job}"), &mut warnings).await;
+                self.delete(
+                    &format!("/v1/transcriptions/{job}"),
+                    &format!("transcription {job}"),
+                    &mut warnings,
+                )
+                .await;
             }
             if let Some(file) = &file_id {
-                self.delete(&format!("/v1/files/{file}"), &format!("file {file}"), &mut warnings).await;
+                self.delete(
+                    &format!("/v1/files/{file}"),
+                    &format!("file {file}"),
+                    &mut warnings,
+                )
+                .await;
             }
             result.map(|mut response| {
                 response.warnings = warnings;

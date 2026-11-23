@@ -1,10 +1,8 @@
-//! The Messages request body and the warnings its call starts with. Ported from `getArgs` and
-//! `prepareTools` in `@ai-sdk/anthropic`, for function tools and the options Misty sets.
 use serde_json::{json, Value};
 
 use super::{
-    capabilities::{get_model_capabilities, resolve_reasoning, Capabilities, Thinking},
     cache_control::CacheControlValidator,
+    capabilities::{get_model_capabilities, resolve_reasoning, Capabilities, Thinking},
     prompt::convert_prompt,
     schema::sanitize_json_schema,
     tools::prepare_tools,
@@ -26,7 +24,10 @@ pub(super) fn unsupported(feature: &str, details: String) -> Value {
     json!({ "type": "unsupported", "feature": feature, "details": details })
 }
 
-pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<BuiltRequest<'a>, ModelError> {
+pub(super) fn build<'a>(
+    model: &'a str,
+    options: &'a CallOptions,
+) -> Result<BuiltRequest<'a>, ModelError> {
     let mut warnings = Vec::new();
     if options.seed.is_some() {
         warnings.push(json!({ "type": "unsupported", "feature": "seed" }));
@@ -34,7 +35,10 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<Buil
     let mut temperature = clamped_temperature(options.temperature, &mut warnings);
     let mut top_p = options.top_p;
     let schema = match &options.response_format {
-        Some(ResponseFormat::Json { schema: Some(schema), .. }) => Some(schema),
+        Some(ResponseFormat::Json {
+            schema: Some(schema),
+            ..
+        }) => Some(schema),
         Some(ResponseFormat::Json { schema: None, .. }) => {
             warnings.push(unsupported(
                 "responseFormat",
@@ -56,7 +60,12 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<Buil
         }));
     }
     if capabilities.rejects_sampling_parameters {
-        let ignored = |name: &str| unsupported(name, format!("{name} is not supported by {model} and will be ignored"));
+        let ignored = |name: &str| {
+            unsupported(
+                name,
+                format!("{name} is not supported by {model} and will be ignored"),
+            )
+        };
         if temperature.take().is_some() {
             warnings.push(ignored("temperature"));
         }
@@ -78,12 +87,17 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<Buil
         .and_then(|reasoning| resolve_reasoning(reasoning, &capabilities, &mut warnings));
     let (thinking, effort) = match reasoning {
         Some(config) => {
-            let effort = config.effort.filter(|_| config.thinking != Thinking::Disabled);
+            let effort = config
+                .effort
+                .filter(|_| config.thinking != Thinking::Disabled);
             (Some(config.thinking), effort)
         }
         None => (None, None),
     };
-    let is_thinking = matches!(thinking, Some(Thinking::Adaptive | Thinking::Enabled { .. }));
+    let is_thinking = matches!(
+        thinking,
+        Some(Thinking::Adaptive | Thinking::Enabled { .. })
+    );
     let budget = match thinking {
         Some(Thinking::Enabled { budget_tokens }) => Some(budget_tokens),
         _ => None,
@@ -91,18 +105,28 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<Buil
     let requested_max = options.max_output_tokens.map(u64::from);
     let max_tokens = requested_max.unwrap_or(capabilities.max_output_tokens);
     let format = match schema.filter(|_| uses_native_schema) {
-        Some(schema) => Some(OutputFormat { kind: "json_schema", schema: sanitized(schema)? }),
+        Some(schema) => Some(OutputFormat {
+            kind: "json_schema",
+            schema: sanitized(schema)?,
+        }),
         None => None,
     };
-    let output_config = (effort.is_some() || format.is_some()).then_some(OutputConfig { effort, format });
+    let output_config =
+        (effort.is_some() || format.is_some()).then_some(OutputConfig { effort, format });
 
     let mut max_output = max_tokens;
     if is_thinking {
         if temperature.take().is_some() {
-            warnings.push(unsupported("temperature", "temperature is not supported when thinking is enabled".into()));
+            warnings.push(unsupported(
+                "temperature",
+                "temperature is not supported when thinking is enabled".into(),
+            ));
         }
         if top_p.take().is_some() {
-            warnings.push(unsupported("topP", "topP is not supported when thinking is enabled".into()));
+            warnings.push(unsupported(
+                "topP",
+                "topP is not supported when thinking is enabled".into(),
+            ));
         }
         max_output = max_tokens + budget.unwrap_or(0);
     } else if is_anthropic_model && top_p.is_some() && temperature.is_some() {
@@ -112,7 +136,13 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<Buil
         ));
         top_p = None;
     }
-    let max_output = limited_max_tokens(max_output, requested_max, model, &capabilities, &mut warnings);
+    let max_output = limited_max_tokens(
+        max_output,
+        requested_max,
+        model,
+        &capabilities,
+        &mut warnings,
+    );
 
     let (tools, tool_choice, tool_betas, tool_warnings) =
         prepare_tools(options, json_tool_schema, &capabilities, uses_native_schema);
@@ -134,7 +164,9 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<Buil
             stop_sequences: options.stop_sequences.as_deref(),
             thinking: thinking.map(|thinking| match thinking {
                 Thinking::Enabled { budget_tokens } => ThinkingBody::Enabled { budget_tokens },
-                Thinking::Adaptive => ThinkingBody::Adaptive { display: "summarized" },
+                Thinking::Adaptive => ThinkingBody::Adaptive {
+                    display: "summarized",
+                },
                 Thinking::Disabled => ThinkingBody::Disabled,
             }),
             output_config,
@@ -151,8 +183,9 @@ pub(super) fn build<'a>(model: &'a str, options: &'a CallOptions) -> Result<Buil
 }
 
 fn sanitized(schema: &RawJson) -> Result<Ordered, ModelError> {
-    let schema = Ordered::from_text(schema.get())
-        .map_err(|error| ModelError::Unsupported(format!("The schema couldn't be read: {error}")))?;
+    let schema = Ordered::from_text(schema.get()).map_err(|error| {
+        ModelError::Unsupported(format!("The schema couldn't be read: {error}"))
+    })?;
     Ok(sanitize_json_schema(&schema))
 }
 
@@ -176,7 +209,6 @@ fn clamped_temperature(temperature: Option<f64>, warnings: &mut Vec<Value>) -> O
     }
 }
 
-/// Known models are capped, which lets a caller switch models without breaking.
 fn limited_max_tokens(
     max_tokens: u64,
     requested: Option<u64>,
@@ -208,7 +240,6 @@ mod tests {
         serde_json::from_str(text).unwrap()
     }
 
-    /// A `Value` would sort these, and the next turn's prompt would then miss Anthropic's cache.
     #[test]
     fn keys_keep_their_order_all_the_way_to_the_wire() {
         let options = options(
@@ -235,7 +266,9 @@ mod tests {
 
     #[test]
     fn body_keys_are_in_the_sdks_order() {
-        let options = options(r#"{ "prompt": [{ "role": "user", "content": [{ "type": "text", "text": "Hi" }] }] }"#);
+        let options = options(
+            r#"{ "prompt": [{ "role": "user", "content": [{ "type": "text", "text": "Hi" }] }] }"#,
+        );
         let built = build("claude-sonnet-4-6", &options).unwrap();
         assert_eq!(
             serde_json::to_string(&built.body).unwrap(),
@@ -250,6 +283,9 @@ mod tests {
             r#"{ "prompt": [{ "role": "user", "content": [{ "type": "file", "data": { "type": "data", "data": "aGVsbG8=" }, "mediaType": "audio/mpeg" }] }] }"#,
         );
         let error = build("claude-sonnet-4-6", &options).err().unwrap();
-        assert_eq!(error.to_string(), "'media type: audio/mpeg' functionality not supported.");
+        assert_eq!(
+            error.to_string(),
+            "'media type: audio/mpeg' functionality not supported."
+        );
     }
 }

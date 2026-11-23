@@ -16,7 +16,6 @@ use super::{asked_path, blocking, failed, person_window};
 
 mod plist;
 
-/// Finder's own color tags, in its menu order.
 pub const COLOR_TAGS: [(&str, u8); 7] = [
     ("Red", 6),
     ("Orange", 7),
@@ -27,14 +26,11 @@ pub const COLOR_TAGS: [(&str, u8); 7] = [
     ("Gray", 1),
 ];
 
-/// The most items a Spotlight query hands back.
 const MOST_FOUND: usize = 2_000;
 
 #[cfg(target_os = "macos")]
 const TAGS_ATTRIBUTE: &[u8] = b"com.apple.metadata:_kMDItemUserTags\0";
 
-/// The tags on `path`, read from the item itself (a link's own, not its target's). Empty when it
-/// has none, when the gate refuses it, or off macOS.
 pub fn read_tags(path: &Path) -> Vec<FinderTag> {
     if check_disk_link(path, Access::Read).is_err() {
         return Vec::new();
@@ -42,8 +38,6 @@ pub fn read_tags(path: &Path) -> Vec<FinderTag> {
     parse_attribute(path)
 }
 
-/// The tags on the item called `name` in `folder`, at `path`: the same as [`read_tags`], with the
-/// gate's folder resolved once for a whole listing rather than once per item.
 pub fn read_tags_in(folder: &DiskFolder, name: &str, path: &Path) -> Vec<FinderTag> {
     if !folder.allows(name, Access::Read) {
         return Vec::new();
@@ -60,7 +54,6 @@ fn parse_attribute(path: &Path) -> Vec<FinderTag> {
         .collect()
 }
 
-/// Replaces the tags on `path` with `tags`; none removes the attribute. Does nothing off macOS.
 pub fn write_tags(path: &Path, tags: &[FinderTag]) -> std::io::Result<()> {
     check_disk_link(path, Access::Write)?;
     if tags.is_empty() {
@@ -98,8 +91,12 @@ fn parse_tag(text: &str) -> FinderTag {
 #[cfg(target_os = "macos")]
 fn c_path(path: &Path) -> std::io::Result<std::ffi::CString> {
     use std::os::unix::ffi::OsStrExt;
-    std::ffi::CString::new(path.as_os_str().as_bytes())
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "That name can't be tagged."))
+    std::ffi::CString::new(path.as_os_str().as_bytes()).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "That name can't be tagged.",
+        )
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -108,7 +105,14 @@ fn read_attribute(path: &Path) -> Option<Vec<u8>> {
     let name = TAGS_ATTRIBUTE.as_ptr().cast();
     // SAFETY: both strings are NUL-terminated; a null buffer asks for the size.
     let size = unsafe {
-        libc::getxattr(c_path.as_ptr(), name, std::ptr::null_mut(), 0, 0, libc::XATTR_NOFOLLOW)
+        libc::getxattr(
+            c_path.as_ptr(),
+            name,
+            std::ptr::null_mut(),
+            0,
+            0,
+            libc::XATTR_NOFOLLOW,
+        )
     };
     if size <= 0 {
         return None;
@@ -158,7 +162,11 @@ fn remove_attribute(path: &Path) -> std::io::Result<()> {
     let c_path = c_path(path)?;
     // SAFETY: both strings are NUL-terminated.
     let result = unsafe {
-        libc::removexattr(c_path.as_ptr(), TAGS_ATTRIBUTE.as_ptr().cast(), libc::XATTR_NOFOLLOW)
+        libc::removexattr(
+            c_path.as_ptr(),
+            TAGS_ATTRIBUTE.as_ptr().cast(),
+            libc::XATTR_NOFOLLOW,
+        )
     };
     if result == 0 {
         return Ok(());
@@ -186,8 +194,6 @@ fn remove_attribute(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Spotlight's paths for `query` in the home folder, waiting at most `wait`. Nothing when it
-/// can't be asked, takes too long, or this isn't macOS.
 async fn spotlight(query: String, wait: std::time::Duration) -> Vec<PathBuf> {
     if !cfg!(target_os = "macos") {
         return Vec::new();
@@ -214,7 +220,6 @@ async fn spotlight(query: String, wait: std::time::Duration) -> Vec<PathBuf> {
         .collect()
 }
 
-/// A tag's name as a Spotlight query value, with its quotes, wildcards and backslashes escaped.
 fn quoted(name: &str) -> String {
     let mut quoted = String::with_capacity(name.len() + 2);
     quoted.push('"');
@@ -228,11 +233,13 @@ fn quoted(name: &str) -> String {
     quoted
 }
 
-/// Finder's seven color tags, then every other tag in use, by name, each once.
 fn tag_list(found: impl IntoIterator<Item = FinderTag>) -> Vec<FinderTag> {
     let mut tags: Vec<FinderTag> = COLOR_TAGS
         .iter()
-        .map(|(name, color)| FinderTag { name: (*name).to_owned(), color: *color })
+        .map(|(name, color)| FinderTag {
+            name: (*name).to_owned(),
+            color: *color,
+        })
         .collect();
     let mut others: Vec<FinderTag> = Vec::new();
     for tag in found {
@@ -254,18 +261,20 @@ fn tag_list(found: impl IntoIterator<Item = FinderTag>) -> Vec<FinderTag> {
     tags
 }
 
-/// Every tag in use in the home folder, after Finder's own, for the sidebar and the tag menu.
 #[tauri::command]
 pub async fn files_tags(webview: tauri::Webview) -> Result<Vec<FinderTag>, String> {
     person_window(&webview)?;
     if !cfg!(target_os = "macos") {
         return Ok(Vec::new());
     }
-    let paths = spotlight("kMDItemUserTags == *".to_owned(), std::time::Duration::from_secs(2)).await;
+    let paths = spotlight(
+        "kMDItemUserTags == *".to_owned(),
+        std::time::Duration::from_secs(2),
+    )
+    .await;
     blocking(move || Ok(tag_list(paths.iter().flat_map(|path| read_tags(path))))).await
 }
 
-/// Sets exactly `tags` on each item.
 #[tauri::command]
 pub async fn files_set_tags(
     webview: tauri::Webview,
@@ -273,7 +282,10 @@ pub async fn files_set_tags(
     tags: Vec<FinderTag>,
 ) -> Result<(), String> {
     person_window(&webview)?;
-    let paths = paths.iter().map(|path| asked_path(path)).collect::<Result<Vec<_>, _>>()?;
+    let paths = paths
+        .iter()
+        .map(|path| asked_path(path))
+        .collect::<Result<Vec<_>, _>>()?;
     blocking(move || {
         let mut first_failure = None;
         for path in &paths {
@@ -286,7 +298,6 @@ pub async fn files_set_tags(
     .await
 }
 
-/// The items in the home folder with the tag `name`.
 #[tauri::command]
 pub async fn files_tagged(webview: tauri::Webview, name: String) -> Result<Vec<FileEntry>, String> {
     person_window(&webview)?;
@@ -313,10 +324,22 @@ mod tests {
     #[test]
     fn tags_read_back_as_written() {
         let tags = vec![
-            FinderTag { name: "Red".into(), color: 6 },
-            FinderTag { name: "Projects".into(), color: 0 },
-            FinderTag { name: "A rather long tag name".into(), color: 4 },
-            FinderTag { name: "Café ☕".into(), color: 2 },
+            FinderTag {
+                name: "Red".into(),
+                color: 6,
+            },
+            FinderTag {
+                name: "Projects".into(),
+                color: 0,
+            },
+            FinderTag {
+                name: "A rather long tag name".into(),
+                color: 4,
+            },
+            FinderTag {
+                name: "Café ☕".into(),
+                color: 2,
+            },
         ];
         let data = plist::write_strings(&tags.iter().map(tag_text).collect::<Vec<_>>());
         let read: Vec<FinderTag> = plist::parse_strings(&data)
@@ -329,8 +352,20 @@ mod tests {
 
     #[test]
     fn a_bare_color_name_takes_finders_color() {
-        assert_eq!(parse_tag("Orange"), FinderTag { name: "Orange".into(), color: 7 });
-        assert_eq!(parse_tag("Mine\n3"), FinderTag { name: "Mine".into(), color: 3 });
+        assert_eq!(
+            parse_tag("Orange"),
+            FinderTag {
+                name: "Orange".into(),
+                color: 7
+            }
+        );
+        assert_eq!(
+            parse_tag("Mine\n3"),
+            FinderTag {
+                name: "Mine".into(),
+                color: 3
+            }
+        );
     }
 
     #[test]
@@ -341,10 +376,22 @@ mod tests {
     #[test]
     fn the_tag_list_puts_finders_first_and_names_each_once() {
         let found = vec![
-            FinderTag { name: "zeta".into(), color: 0 },
-            FinderTag { name: "red".into(), color: 6 },
-            FinderTag { name: "Zeta".into(), color: 3 },
-            FinderTag { name: "alpha".into(), color: 0 },
+            FinderTag {
+                name: "zeta".into(),
+                color: 0,
+            },
+            FinderTag {
+                name: "red".into(),
+                color: 6,
+            },
+            FinderTag {
+                name: "Zeta".into(),
+                color: 3,
+            },
+            FinderTag {
+                name: "alpha".into(),
+                color: 0,
+            },
         ];
         let names: Vec<String> = tag_list(found).into_iter().map(|tag| tag.name).collect();
         assert_eq!(

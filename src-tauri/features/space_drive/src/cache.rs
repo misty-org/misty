@@ -1,10 +1,3 @@
-//! The content cache: `<drive dir>/blobs/<sha256>`, one file per content, shared by every Space of
-//! the account. On Linux it is where a downloaded file lives (the FUSE face reads from it); on
-//! every OS it holds content staged for upload until the server has it.
-//!
-//! Eviction removes the least lately used blobs until the cache is under the device's limit
-//! (Settings, `misty.db`), and never one that a change not uploaded yet, Keep downloaded, or an
-//! open file still needs.
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -15,8 +8,6 @@ use crate::DriveError;
 
 pub struct Cache {
     root: PathBuf,
-    /// Whether a downloaded file's content is the blob itself (the FUSE face), so evicting the
-    /// blob makes the file online-only. Elsewhere the OS keeps downloaded files on its own.
     holds_files: bool,
 }
 
@@ -36,15 +27,12 @@ impl Cache {
         self.root.join("blobs").join(sha256)
     }
 
-    /// A fresh path for a download or a write in progress, beside the blobs so a rename into
-    /// place never crosses a disk.
     pub fn temp_path(&self) -> PathBuf {
         self.root
             .join("tmp")
             .join(uuid::Uuid::new_v4().simple().to_string())
     }
 
-    /// Where an open file's writes gather until it is closed or synced (the FUSE face).
     pub fn work_path(&self, ino: i64, handle: u64) -> PathBuf {
         self.root.join("work").join(format!("{ino}-{handle}"))
     }
@@ -53,8 +41,6 @@ impl Cache {
         file_access::fs::is_file(self.blob_path(sha256))
     }
 
-    /// Moves (or, across disks, copies) the file at `from` into the cache under its own hash.
-    /// Answers the hash and size.
     pub fn take(&self, store: &Store, from: &Path) -> Result<(String, u64), DriveError> {
         let (sha256, size) = sha256_file(from, |_| ()).map_err(DriveError::io)?;
         let target = self.blob_path(&sha256);
@@ -76,7 +62,6 @@ impl Cache {
         Ok((sha256, size))
     }
 
-    /// Copies the file at `from` into the cache, leaving it where it is.
     pub fn copy_in(&self, store: &Store, from: &Path) -> Result<(String, u64), DriveError> {
         let temp = self.temp_path();
         if let Some(parent) = temp.parent() {
@@ -86,7 +71,6 @@ impl Cache {
         self.take(store, &temp)
     }
 
-    /// Writes `bytes` into the cache.
     pub fn put_bytes(&self, store: &Store, bytes: &[u8]) -> Result<(String, u64), DriveError> {
         let temp = self.temp_path();
         if let Some(parent) = temp.parent() {
@@ -100,8 +84,6 @@ impl Cache {
         store.touch_blob(sha256, size, now_ms())
     }
 
-    /// Evicts until the cache holds at most `limit` bytes. `open` are the items open now.
-    /// Answers the items whose content went, so the face can show them online-only.
     pub fn evict(
         &self,
         store: &Store,
@@ -146,7 +128,6 @@ impl Cache {
         Ok(evicted)
     }
 
-    /// Removes leftovers of downloads and writes cut short by a quit.
     pub fn sweep_temp(&self) {
         for folder in ["tmp", "work"] {
             let dir = self.root.join(folder);

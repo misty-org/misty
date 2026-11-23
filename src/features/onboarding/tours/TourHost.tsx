@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useSetupStore } from "@/features/account";
 import { shownOnScreen, Tour, tourTargetShown, useSplashShowing, type TourStep } from "@misty/ui";
-import { startTourEvent, useTours } from "./tourStore";
+import { startTourEvent, useTours } from "./tour_store";
 import { tours, type TourId } from "./tours";
 
 const SETTLE_MS = 900;
@@ -31,7 +31,7 @@ function openWhenReady(id: TourId, open: (id: TourId) => void, asked = false): (
   return () => window.clearTimeout(timer);
 }
 
-export function tourForPage(pathname: string, _search: string): TourId | null {
+export function tourForPage(pathname: string): TourId | null {
   if (pathname === "/agents") {
     return "welcome";
   }
@@ -52,7 +52,7 @@ export function tourForPage(pathname: string, _search: string): TourId | null {
 
 export function tourForRoute(route: string): TourId | null {
   const url = new URL(route, "misty://app");
-  return tourForPage(url.pathname, url.search);
+  return tourForPage(url.pathname);
 }
 
 export function TourHost() {
@@ -60,7 +60,7 @@ export function TourHost() {
   const welcomed = useSetupStore((state) => state.welcomed);
   const { loaded, seen, active, open, close } = useTours();
   const splash = useSplashShowing();
-  const page = tourForPage(location.pathname, location.search);
+  const page = tourForPage(location.pathname);
 
   useEffect(() => void useTours.getState().load(), []);
 

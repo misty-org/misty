@@ -1,8 +1,3 @@
-/**
- * Adds an MCP server to one engine with the engine's own `mcp add` (native `engine_mcp_add`), so
- * the engine writes its own config. Values typed here (an env var, a header) go only to that
- * engine's CLI; Misty keeps none of them.
- */
 import { useState } from "react";
 import {
   Button,
@@ -22,12 +17,10 @@ import { mcpApi } from "./api";
 import { engineLabel } from "./copy";
 import type { McpEngineId } from "./types";
 
-/** The engines whose CLI adds servers the way the native command speaks it. */
 export const enginesThatAdd: readonly McpEngineId[] = ["claude", "codex"];
 
 type Transport = "stdio" | "http";
 
-/** `KEY=value` (or `Name: value`) lines into pairs; blank lines are skipped. */
 function pairs(text: string, separator: "=" | ":"): [string, string][] | null {
   const out: [string, string][] = [];
   for (const raw of text.split("\n")) {
@@ -40,7 +33,6 @@ function pairs(text: string, separator: "=" | ":"): [string, string][] | null {
   return out;
 }
 
-/** Splits a command line on spaces, keeping "quoted parts" whole. */
 function words(line: string): string[] {
   return [...line.matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map((m) => m[1] ?? m[2] ?? m[3]);
 }

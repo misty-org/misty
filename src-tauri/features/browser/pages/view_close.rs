@@ -1,10 +1,5 @@
-//! Parking, hiding and closing browser page webviews.
-
 use crate::browser::*;
 
-/// Moves the page's window far outside the app and returns keyboard focus to
-/// the renderer, keeping the page live and painted. Reconciling its bounds
-/// brings it back, because the position then differs from the wanted one.
 #[cfg(windows)]
 pub(in crate::browser) fn park_windows_webview(webview: &Webview) -> Result<(), String> {
     use windows_sys::Win32::{
@@ -48,10 +43,6 @@ pub(in crate::browser) fn park_windows_webview(webview: &Webview) -> Result<(), 
         .map_err(|error| error.to_string())
 }
 
-/// Async so it never runs on the UI thread. While the UI thread builds another
-/// webview it holds Tauri's webview-context lock and pumps messages, which can
-/// deliver this very request; closing there would take the lock again and
-/// freeze the app. A worker thread just waits its turn.
 #[tauri::command]
 pub async fn browser_webview_close(
     app: AppHandle,
@@ -90,7 +81,6 @@ pub fn close_browser_webview(
     }
     crate::browser::menus::popups::forget_close_handler(&request.id);
     crate::browser::kiri_link::host_messages::forget(&request.id);
-    // A download popup has a hidden window of its own.
     if let Some(popup_window) = app.get_window(&webview_label(&request.id)?) {
         let _ = popup_window.destroy();
     }
@@ -105,7 +95,6 @@ pub fn close_browser_webview(
     close_page(&webview)
 }
 
-/// A window closed with its pages: forget the pages its renderer can no longer close.
 pub(crate) fn forget_closed_pages(app: &AppHandle) {
     if let Some(state) = app.try_state::<BrowserSessionState>() {
         if let Ok(mut sessions) = state.sessions.lock() {
@@ -117,8 +106,6 @@ pub(crate) fn forget_closed_pages(app: &AppHandle) {
     }
 }
 
-/// Stops a page for good: mutes and pauses its media, stops loading, puts it out of sight and
-/// blanks it.
 pub(in crate::browser) fn silence_page(webview: &Webview) {
     #[cfg(target_os = "macos")]
     let _ = webview.with_webview(|platform_webview| unsafe {
@@ -133,9 +120,6 @@ pub(in crate::browser) fn silence_page(webview: &Webview) {
             let _: () = objc2::msg_send![view, stopLoading];
         }
     });
-    // Out of sight before it is blanked: stopping the page and loading about:blank repaint it
-    // as an empty white page, which shows if it is still anywhere on screen, such as stacked
-    // just beneath the renderer behind a transparent area.
     let _ = webview.hide();
     let _ = webview.eval(
         "try { window.stop(); document.querySelectorAll('audio, video').forEach(el => { el.pause(); el.muted = true; el.src = ''; el.load(); }); } catch (_) {}"
@@ -145,11 +129,7 @@ pub(in crate::browser) fn silence_page(webview: &Webview) {
     }
 }
 
-/// Closes a page and its WebKit page process.
 pub(in crate::browser) fn close_page(webview: &Webview) -> Result<(), String> {
-    // Close the page itself last, which lets go of its WebKit page process. Removing the view
-    // alone left every closed tab's process running (40 to 470 MB each), since something still
-    // held the view; the app reached 250 page processes for 54 open pages.
     #[cfg(target_os = "macos")]
     let _ = webview.with_webview(|platform_webview| unsafe {
         let view: &objc2::runtime::AnyObject = &*platform_webview.inner().cast();

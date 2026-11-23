@@ -1,4 +1,3 @@
-//! WebKit on macOS: a WKScriptMessageHandler named `kiriHost`.
 #![allow(unexpected_cfgs)]
 
 use super::{deliver, HANDLER_NAME};
@@ -15,13 +14,11 @@ const HANDLER_CLASS: &str = "KiriHostChannelHandler";
 
 pub(super) const SENDER_SCRIPT: &str = "() => { const handler = window.webkit?.messageHandlers?.kiriHost; return handler && typeof handler.postMessage === 'function' ? handler.postMessage.bind(handler) : null; }";
 
-/// Handler object → the tab it serves.
 fn targets() -> &'static Mutex<HashMap<usize, String>> {
     static TARGETS: OnceLock<Mutex<HashMap<usize, String>>> = OnceLock::new();
     TARGETS.get_or_init(Mutex::default)
 }
 
-/// Content controllers that already have the handler; adding a name twice throws.
 fn installed() -> &'static Mutex<HashSet<usize>> {
     static INSTALLED: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
     INSTALLED.get_or_init(Mutex::default)

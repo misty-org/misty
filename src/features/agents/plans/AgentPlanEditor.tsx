@@ -13,7 +13,7 @@ import { reorderIds, usePointerReorder } from "@misty/ui";
 import { Button, IconButton, Input, OptionSelect, Textarea, type SelectOption } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { useCollaborationStore } from "./store";
-import type { AgentPlan, AgentPlanStep, PlanRisk } from "./planTypes";
+import type { AgentPlan, AgentPlanStep, PlanRisk } from "./plan_types";
 
 const riskOptions: SelectOption[] = [
   { value: "read", label: "Reads", icon: Eye },
@@ -25,11 +25,6 @@ const riskOptions: SelectOption[] = [
 const maxSteps = 12;
 const moveStepShortcuts = "Alt+Shift+ArrowUp Alt+Shift+ArrowDown";
 
-/**
- * Edits a proposed plan in place: rename, describe, reorder (drag or
- * Alt+Shift+Up/Down), add and remove steps. Saving makes a new version
- * authored by you; the agent sees it on its next planning turn.
- */
 export function AgentPlanEditor({
   plan,
   onCancel,

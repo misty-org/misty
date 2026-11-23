@@ -13,7 +13,6 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub struct GitFileEntry {
     pub path: String,
-    /// `modified`, `added`, `deleted`, `renamed` or `typechange`.
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub additions: Option<usize>,
@@ -28,8 +27,6 @@ pub struct GitStatus {
     pub staged: Vec<GitFileEntry>,
     pub unstaged: Vec<GitFileEntry>,
     pub untracked: Vec<GitFileEntry>,
-    /// Commits the branch is ahead of and behind its upstream; absent when it has none (or HEAD
-    /// is detached or unborn).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ahead: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -40,15 +37,11 @@ pub(crate) fn open_repo(path: &Path) -> Result<Repository, String> {
     Repository::discover(path).map_err(map_open_repo_error)
 }
 
-/// Why a repository couldn't be opened. Only "there is none" is `NOT_A_REPO` (the panel offers
-/// to initialize one); an untrusted owner, a damaged repository or a missing permission keep
-/// their own message, so a person isn't told a repository isn't there when it is.
 pub(crate) fn map_open_repo_error(error: git2::Error) -> String {
     if error.code() == git2::ErrorCode::NotFound {
         return "NOT_A_REPO".to_string();
     }
     let message = error.message().trim().to_string();
-    // libgit2's ownership check fails with GIT_EOWNER; the wording is only a fallback.
     if error.code() == git2::ErrorCode::Owner
         || message.to_lowercase().contains("not owned by current user")
     {
@@ -57,7 +50,6 @@ pub(crate) fn map_open_repo_error(error: git2::Error) -> String {
     format!("GIT_OPEN_FAILED:{message}")
 }
 
-/// The folder Git works in for the repository that holds `path`.
 pub(crate) fn work_folder(path: &Path) -> Result<PathBuf, String> {
     let repo = open_repo(path)?;
     repo.workdir()
@@ -83,8 +75,6 @@ fn status_label(status: git2::Status) -> &'static str {
     }
 }
 
-/// Each file's added and removed lines in one diff. A binary file has no lines, so it stays at
-/// the (0, 0) its delta starts it at.
 fn diff_line_counts(diff: &mut git2::Diff) -> HashMap<String, (usize, usize)> {
     use std::cell::RefCell;
     let counts = RefCell::new(HashMap::<String, (usize, usize)>::new());
@@ -121,8 +111,6 @@ fn diff_line_counts(diff: &mut git2::Diff) -> HashMap<String, (usize, usize)> {
 const MAX_UNTRACKED_BYTES: usize = 1024 * 1024;
 const MAX_UNTRACKED_LINES: usize = 100_000;
 
-/// The exact line count of an untracked regular text file of at most 1 MiB and 100,000 lines.
-/// Anything else leaves the count unknown rather than guessed.
 pub(crate) fn count_untracked_lines(repo: &Repository, file: &str) -> Option<(usize, usize)> {
     let full = repo.workdir()?.join(file);
     let metadata = file_access::fs::symlink_metadata(&full).ok()?;
@@ -131,7 +119,6 @@ pub(crate) fn count_untracked_lines(repo: &Repository, file: &str) -> Option<(us
     }
     let mut options = file_access::fs::OpenOptions::new();
     options.read(true);
-    // A FIFO must never block the read, and a link swapped in meanwhile isn't followed.
     #[cfg(unix)]
     options.custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW);
     let reader = options.open(full).ok()?;
@@ -171,8 +158,6 @@ pub(crate) fn count_untracked_reader(mut reader: impl std::io::Read) -> Option<(
     (lines <= MAX_UNTRACKED_LINES).then_some((lines, 0))
 }
 
-/// libgit2's `GIT_INDEX_ENTRY_SKIP_WORKTREE`: tracked but deliberately absent from the folder
-/// (a sparse checkout). The bindings don't name it.
 pub(crate) const INDEX_ENTRY_SKIP_WORKTREE: u16 = 1 << 14;
 
 pub(crate) fn is_skip_worktree(index: Option<&git2::Index>, path: &str) -> bool {
@@ -183,7 +168,6 @@ pub(crate) fn is_skip_worktree(index: Option<&git2::Index>, path: &str) -> bool 
 
 type Buckets = (Vec<GitFileEntry>, Vec<GitFileEntry>, Vec<GitFileEntry>);
 
-/// Sorts status entries into staged, unstaged and untracked files.
 fn collect_status_entries(index: &git2::Index, statuses: &git2::Statuses) -> Buckets {
     let worktree_side = git2::Status::WT_MODIFIED
         | git2::Status::WT_DELETED
@@ -207,8 +191,6 @@ fn collect_status_entries(index: &git2::Index, statuses: &git2::Statuses) -> Buc
             continue;
         }
         let status = item.status();
-        // libgit2 reports a sparse checkout's absent paths as deleted from the folder; they
-        // aren't the person's edits, so the folder-side lists leave them out.
         let skip_worktree =
             status.intersects(worktree_side) && is_skip_worktree(Some(index), &path);
         if status.contains(git2::Status::WT_NEW) && !status.intersects(git2::Status::INDEX_NEW) {
@@ -225,8 +207,6 @@ fn collect_status_entries(index: &git2::Index, statuses: &git2::Statuses) -> Buc
     (staged, unstaged, untracked)
 }
 
-/// Fills in each file's added and removed lines from one staged and one unstaged diff, and
-/// counts untracked files' lines straight from the folder.
 fn fill_line_stats(
     repo: &Repository,
     staged: &mut [GitFileEntry],
@@ -258,8 +238,6 @@ fn fill_line_stats(
     }
 }
 
-/// How far the branch is ahead of and behind its upstream, or nothing without one, so the panel
-/// hides the count rather than showing a misleading 0 and 0.
 fn ahead_behind(repo: &Repository) -> Option<(usize, usize)> {
     let head = repo.head().ok()?;
     let local = head.target()?;
@@ -271,8 +249,6 @@ fn ahead_behind(repo: &Repository) -> Option<(usize, usize)> {
     repo.graph_ahead_behind(local, upstream).ok()
 }
 
-/// The branch name for the header. A fresh repository with no commit has no HEAD commit yet but
-/// still names its branch, which reads better than a bare "HEAD".
 pub(crate) fn head_branch_label(repo: &Repository) -> String {
     if let Some(name) = repo
         .head()

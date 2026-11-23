@@ -1,6 +1,4 @@
 @import "tailwindcss" source("../../");
-/* Misty's components and their design: the theme, type, popup edges, layers, keyframes, glyphs. */
 @import "@misty/ui/styles.css";
-/* JetBrains Mono, bundled, the code editor's default face (Settings › Appearance › Editor). */
 @import "@fontsource-variable/jetbrains-mono/index.css";
 @import "./base.css";

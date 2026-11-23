@@ -1,10 +1,3 @@
-//! Hermes Agent (Nous Research) over the Agent Client Protocol: `hermes acp`, on the same ACP
-//! driver as Grok, Kimi and Gemini CLI (`grok_acp.rs`). Each permission ask comes back through
-//! `session/request_permission` and Misty's gate answers it. Hermes has no sandbox that keeps its
-//! writes in the folder, so it offers no Bypass (`docs/plans/anyone-can-use-ai.md`). It is Misty's
-//! own adapter; desktop-cc-gui has none. Over ACP Hermes is its gateway's client
-//! (`acp_adapter/gateway_server.py`): modes, models and forks all go through the gateway.
-
 use super::{command_for_binary, BuiltCommand, Engine, SendRequest};
 
 pub struct HermesEngine;
@@ -24,7 +17,6 @@ impl Engine for HermesEngine {
         Ok(BuiltCommand {
             command: cmd,
             stdin_payload: None,
-            // The gate's answers and question replies are written to this pipe for the turn.
             keep_stdin_open: true,
             cleanup_files: Vec::new(),
             preassigned_session_id: None,
@@ -39,11 +31,6 @@ impl Engine for HermesEngine {
         true
     }
 
-    /// Hermes's ACP session modes (`acp_adapter/modes.py`): `default`, which asks before each
-    /// edit, and `accept_edits`, which allows edits inside the folder and the temp dir without
-    /// asking and still asks for sensitive paths and dangerous commands. Its `dont_ask` isn't
-    /// offered: it allows edits anywhere, and Hermes has no sandbox that keeps it inside its
-    /// folder. Hermes has no plan mode of its own (its `/plan` command writes a plan file).
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[
@@ -54,8 +41,6 @@ impl Engine for HermesEngine {
     }
 }
 
-/// Puts the session in the run's mode with ACP's `session/set_mode`, on every turn: a loaded
-/// session keeps the mode it last ran in, and a new one starts in `default`.
 pub(super) async fn set_mode(
     acp: &mut super::qoder_session::AcpProcess,
     session_id: &str,
@@ -78,7 +63,6 @@ pub(super) async fn set_mode(
     .map(|_| ())
 }
 
-/// Picks the session's model, when one was chosen, with ACP's `session/set_model`.
 pub(super) async fn set_model(
     acp: &mut super::qoder_session::AcpProcess,
     session_id: &str,
@@ -105,7 +89,6 @@ pub(super) async fn set_model(
 mod tests {
     use super::*;
 
-    /// Hermes 0.23.1's `session/new` modes and its edit-approval option.
     #[test]
     fn modes_match_the_installed_handshake() {
         let session = serde_json::json!({"modes": {"currentModeId": "default", "availableModes": [

@@ -1,15 +1,10 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/models/codebuddy.rs.
 use super::{run_probe, EngineCatalog, EngineModel};
 
-/// CodeBuddy's catalog: the ids its `--help` says it supports now, each named and described by
-/// the model registry the CLI ships in its own package (`product.json`: name, description,
-/// context window, reasoning levels and default). With no `--help` answer, the registry alone.
-/// Misty names nothing itself: an id the registry doesn't know shows as its id.
 pub(super) async fn codebuddy_catalog(bin: &str) -> EngineCatalog {
     let default_model = read_configured_default_model();
     let registry = shipped_registry(bin);
 
-    // Live probe from the CLI binary
     if let Ok(stdout) = run_probe(bin, &["--help"], "help").await {
         let mut models = parse_help_models(&stdout, &registry);
         if !models.is_empty() {
@@ -18,7 +13,6 @@ pub(super) async fn codebuddy_catalog(bin: &str) -> EngineCatalog {
         }
     }
 
-    // No `--help` answer (CLI missing or slow): the registry the CLI ships, not a list of ours.
     let mut models: Vec<EngineModel> = registry.iter().map(|entry| entry.model()).collect();
     lead_with_default(&mut models, default_model.as_deref(), &registry);
     EngineCatalog {
@@ -28,7 +22,6 @@ pub(super) async fn codebuddy_catalog(bin: &str) -> EngineCatalog {
     }
 }
 
-/// One model as the CLI's shipped registry describes it.
 #[derive(Debug, Clone, Default)]
 pub struct RegistryEntry {
     id: String,
@@ -51,8 +44,10 @@ impl RegistryEntry {
     }
 }
 
-/// The model registry inside the CLI's own package (`product.json` beside its `package.json`),
-/// found from the binary's real path. Empty when the CLI isn't installed that way.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the registry CodeBuddy ships beside its installed program, which lives outside the gate"
+)]
 fn shipped_registry(bin: &str) -> Vec<RegistryEntry> {
     let Some(path) = super::super::resolve::find_cli_binary("codebuddy", Some(bin)) else {
         return Vec::new();
@@ -104,7 +99,6 @@ pub fn parse_registry(content: &str) -> Vec<RegistryEntry> {
                     .get("contextWindow")
                     .or_else(|| row.get("maxInputTokens"))
                     .and_then(serde_json::Value::as_u64),
-                // A model the registry says doesn't reason takes no levels.
                 efforts: efforts.or_else(|| {
                     (row.get("supportsReasoning")
                         .and_then(serde_json::Value::as_bool)
@@ -144,15 +138,12 @@ fn registry_details(
         .collect()
 }
 
-/// Provider key for `custom:` (enterprise) models. The model panel titles
-/// this section through i18n and sinks it below the vendor sections.
 const ENTERPRISE_PROVIDER: &str = "enterprise";
 
 fn is_enterprise(id: &str) -> bool {
     id.starts_with("custom:")
 }
 
-/// A row for an id, named and described by the shipped registry when it knows it.
 fn catalog_entry(id: &str, registry: &[RegistryEntry]) -> EngineModel {
     registry
         .iter()
@@ -167,7 +158,6 @@ fn catalog_entry(id: &str, registry: &[RegistryEntry]) -> EngineModel {
         })
 }
 
-/// Enterprise (`custom:`) models apart; every other row is CodeBuddy's own.
 fn provider_of(id: &str) -> &'static str {
     if is_enterprise(id) {
         ENTERPRISE_PROVIDER
@@ -176,10 +166,6 @@ fn provider_of(id: &str) -> &'static str {
     }
 }
 
-/// The CLI's configured default leads the catalog, enterprise or not: with
-/// nothing stored the picker pins `models[0]` and every send passes it as
-/// `--model`, so the first row must be what the CLI runs unprompted. Section
-/// order on screen is the panel's job (`orderModelGroups`), not the catalog's.
 fn lead_with_default(
     models: &mut Vec<EngineModel>,
     default_model: Option<&str>,
@@ -196,12 +182,13 @@ fn lead_with_default(
 }
 
 fn codebuddy_config_dir() -> std::path::PathBuf {
-    // Same resolver as history/MCP (engine_home): expands `~`, and under
-    // `cfg(test)` honors the HOME the tests set. A local copy ignored both, so
-    // a relocated config dir was found by history/MCP but not here.
     crate::engines::engine_home(Some("CODEBUDDY_CONFIG_DIR"), ".codebuddy")
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads CodeBuddy's own config in place, which CODEBUDDY_CONFIG_DIR may move outside the engine folders the gate grants"
+)]
 fn read_configured_default_model() -> Option<String> {
     let dir = codebuddy_config_dir();
     for name in ["settings.local.json", "settings.json"] {
@@ -261,7 +248,6 @@ pub fn parse_help_models(text: &str, registry: &[RegistryEntry]) -> Vec<EngineMo
         }
     }
 
-    // Public base models lead at the top; enterprise models are grouped at the bottom
     let mut models = public_models;
     models.extend(enterprise_models);
     models
@@ -296,7 +282,6 @@ mod tests {
         assert_eq!(models[0].name.as_deref(), Some("Hunyuan 4 Preview"));
         assert_eq!(models[0].description.as_deref(), Some("Tencent's newest"));
         assert_eq!(models[0].context_window, Some(256_000));
-        // Unknown to the registry: its id, unnamed.
         assert_eq!(models[1].name, None);
         assert_eq!(models[2].provider, "enterprise");
     }
@@ -308,13 +293,11 @@ mod tests {
         let hy = &details["hy4-preview"];
         assert_eq!(hy.efforts.as_ref().map(Vec::len), Some(1));
         assert_eq!(hy.default_effort.as_deref(), Some("high"));
-        // The older shape gives a default and no list.
         assert_eq!(details["balanced-model"].efforts, None);
         assert_eq!(
             details["balanced-model"].default_effort.as_deref(),
             Some("medium")
         );
-        // A model that doesn't reason takes no levels.
         assert_eq!(details["plain"].efforts.as_ref().map(Vec::len), Some(0));
     }
 
@@ -329,9 +312,6 @@ mod tests {
 
     #[test]
     fn configured_enterprise_default_leads_the_catalog() {
-        // With nothing stored the picker pins `models[0]` and every send
-        // passes it as `--model`: an enterprise default sunk to its section
-        // made a fresh install run a public model instead.
         let mut models = parse_help_models(
             "Currently supported: (hy4-preview, glm-5.3, custom:glm-5.3, custom:kimi-k3.1-pro)",
             &[],

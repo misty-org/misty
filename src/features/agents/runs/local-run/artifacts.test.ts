@@ -2,23 +2,24 @@ import type * as Actual1 from "@/shared/platform/tauri";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/core", async () => {
-  const { fakeInvoke } = await import("@/features/agents/tools/run-state/fakeMistyDb.test-support");
+  const { fakeInvoke } =
+    await import("@/features/agents/tools/run-state/fake_misty_db.test_support");
   return { invoke: fakeInvoke };
 });
 vi.mock("@/shared/platform/tauri", async (actual) => ({
   ...(await actual<typeof Actual1>()),
   hasTauriInternals: () => true,
 }));
-vi.mock("@/features/agents/personal/agentAccount", () => ({ agentAccountId: () => "me" }));
+vi.mock("@/features/agents/personal/agent_account", () => ({ agentAccountId: () => "me" }));
 const published = vi.hoisted(() => [] as { type: string; [key: string]: unknown }[]);
-vi.mock("./localRunEvents", () => ({
+vi.mock("./local_run_events", () => ({
   publishLocalRunEvent: (_run: string, event: { type: string }) => published.push(event),
   endProposalRun: async (_run: string, event: { type: string }) => void published.push(event),
 }));
 
-import { rows } from "@/features/agents/tools/run-state/fakeMistyDb.test-support";
-import type { AiSelectionSnapshot } from "../invocations/invocationTypes";
-import { inferredArtifactKind } from "./artifactSpecs";
+import { rows } from "@/features/agents/tools/run-state/fake_misty_db.test_support";
+import type { AiSelectionSnapshot } from "../invocations/invocation_types";
+import { inferredArtifactKind } from "./artifact_specs";
 import {
   ArtifactRefused,
   buildArtifact,

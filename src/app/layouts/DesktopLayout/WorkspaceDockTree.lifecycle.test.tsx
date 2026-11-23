@@ -78,9 +78,7 @@ describe("WorkspaceDockTree tab lifecycle", () => {
     expect(view.container.querySelector(`[data-workspace-surface="${files.id}"]`)).toBe(
       filesElement,
     );
-    expect(view.container.querySelector(`[data-workspace-surface="${chat.id}"]`)).toBe(
-      chatElement,
-    );
+    expect(view.container.querySelector(`[data-workspace-surface="${chat.id}"]`)).toBe(chatElement);
     expect(
       view.container
         .querySelector(`[data-workspace-surface="${files.id}"]`)

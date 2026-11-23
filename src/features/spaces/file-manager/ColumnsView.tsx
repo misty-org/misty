@@ -2,30 +2,32 @@ import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { ColumnBrowser, type ColumnBrowserColumn } from "@misty/ui";
 import { columnRow } from "./FileItems";
 import { foldersBetween, placeInside, placeKey, type FileItem, type FilesPlace } from "./model";
-import { useColumnListings } from "./useColumnListings";
+import { useColumnListings } from "./use_column_listings";
 
-/** The folders from the columns' first one down to the open place, as places. */
 function chain(root: FilesPlace, place: FilesPlace): FilesPlace[] {
   if (place.kind === "disk")
-    return foldersBetween(root.kind === "disk" ? root.path : place.path, place.path).map((path) => ({ kind: "disk", path }));
+    return foldersBetween(root.kind === "disk" ? root.path : place.path, place.path).map(
+      (path) => ({ kind: "disk", path }),
+    );
   if (place.kind === "project")
-    return foldersBetween(place.root, place.path).map((path) => ({ kind: "project", root: place.root, path }));
-  if (place.kind === "space-drive") {
-    const parts = place.path.split("/").filter(Boolean);
-    return ["/", ...parts.map((_, index) => `/${parts.slice(0, index + 1).join("/")}`)].map((path) => ({
-      kind: "space-drive",
-      spaceId: place.spaceId,
+    return foldersBetween(place.root, place.path).map((path) => ({
+      kind: "project",
+      root: place.root,
       path,
     }));
+  if (place.kind === "space-drive") {
+    const parts = place.path.split("/").filter(Boolean);
+    return ["/", ...parts.map((_, index) => `/${parts.slice(0, index + 1).join("/")}`)].map(
+      (path) => ({
+        kind: "space-drive",
+        spaceId: place.spaceId,
+        path,
+      }),
+    );
   }
   return [place];
 }
 
-/**
- * Finder's column view of the open place: one column per folder from where the person started down to
- * the open folder, then the picked folder's contents, then the picked file's preview. A click in an
- * earlier column opens that column's folder in place (no new history step) and picks the row.
- */
 export function ColumnsView({
   root,
   place,
@@ -46,7 +48,6 @@ export function ColumnsView({
   selected: readonly string[];
   cut: ReadonlySet<string>;
   preview?: ReactNode;
-  /** A row picked in a column's folder, with the column's order for ⇧. */
   onPick(folder: FilesPlace, id: string, event: MouseEvent | KeyboardEvent, order: string[]): void;
   onOpen(item: FileItem): void;
   menu(item: FileItem, folder: FilesPlace): ReactNode;
@@ -70,7 +71,10 @@ export function ColumnsView({
     const listing = all[index];
     const next = places[index + 1];
     const items = listing?.items ?? null;
-    const open = next && items ? items.find((item) => placeKey(placeInside(item, folder) ?? folder) === placeKey(next)) : undefined;
+    const open =
+      next && items
+        ? items.find((item) => placeKey(placeInside(item, folder) ?? folder) === placeKey(next))
+        : undefined;
     return {
       id: placeKey(folder),
       rows: items ? items.map((item) => columnRow(item, cut.has(item.id))) : null,

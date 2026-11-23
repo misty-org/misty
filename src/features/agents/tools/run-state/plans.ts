@@ -3,11 +3,9 @@ import type {
   AgentPlanPayload,
   ChecklistItem,
   PlanStepStatus,
-} from "../../plans/planTypes";
-import { nowText, type ConversationState } from "./conversationState";
+} from "../../plans/plan_types";
+import { nowText, type ConversationState } from "./conversation_state";
 import { RunStateError } from "./documents";
-
-/** Plans an agent proposes in Plan mode, their versions and step progress. */
 
 const maxPlanSteps = 12;
 const maxGoalCriteria = 10;
@@ -20,7 +18,6 @@ const runes = (value: string) => [...value].length;
 const bytes = (value: string) => new TextEncoder().encode(value).length;
 const invalid = () => new RunStateError("invalid");
 
-/** Trims a list and drops blanks, refusing one too long. */
 function trimmedList(values: string[] | null | undefined, most: number, longest: number) {
   const list = values ?? [];
   if (list.length > most) throw invalid();
@@ -31,7 +28,6 @@ function trimmedList(values: string[] | null | undefined, most: number, longest:
   });
 }
 
-/** Step ids are unique and stable so progress can follow them; missing ids are assigned in order. */
 function normalizePlan(plan: AgentPlanPayload): AgentPlanPayload {
   const title = plan.title.trim();
   const summary = plan.summary.trim();
@@ -78,7 +74,6 @@ const replacingPlan = (state: ConversationState, plan: AgentPlan): ConversationS
   plans: state.plans.map((item) => (item.id === plan.id ? plan : item)),
 });
 
-/** Saves a new version and supersedes the current one. A repeated proposal from the same run returns it. */
 export function proposePlan(
   state: ConversationState,
   input: {
@@ -131,7 +126,6 @@ function planById(state: ConversationState, id: string): AgentPlan {
   return plan;
 }
 
-/** Approves the exact version the person reviewed, and the chat goes back to acting. */
 export function approvePlan(
   state: ConversationState,
   id: string,
@@ -145,7 +139,6 @@ export function approvePlan(
   return { next: { ...replacingPlan(state, approved), mode: "act" }, result: approved };
 }
 
-/** The person's own edit: a new version, only over the plan still on offer. */
 export function revisePlan(
   state: ConversationState,
   input: { id: string; currentId: string; payload: AgentPlanPayload; now: number },
@@ -162,7 +155,6 @@ export function revisePlan(
   });
 }
 
-/** Sets a proposed plan aside without running it. */
 export function rejectPlan(
   state: ConversationState,
   id: string,
@@ -180,7 +172,6 @@ export interface PlanProgressUpdate {
   note?: string;
 }
 
-/** Records step progress on the approved plan. It completes when every step is done or skipped. */
 export function updatePlanProgress(
   state: ConversationState,
   updates: PlanProgressUpdate[],
@@ -212,13 +203,11 @@ export function updatePlanProgress(
   return { next: replacingPlan(state, updated), result: updated };
 }
 
-/** What a run following a plan may report on: never while planning. */
 export function approvedPlanOf(state: ConversationState): AgentPlan | undefined {
   const plan = state.plans[0];
   return state.mode !== "plan" && plan?.state === "approved" ? plan : undefined;
 }
 
-/** An approved plan's steps with their progress, the starting checklist for a run following it. */
 export function planChecklistSeed(plan: AgentPlan | undefined): ChecklistItem[] {
   return (plan?.plan.steps ?? []).map((step) => {
     const progress = plan?.progress[step.id];

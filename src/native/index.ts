@@ -1,3 +1,3 @@
 export * from "./invoke";
 export * from "./runtime";
-export * from "../features/settings/settings-plugins";
+export * from "../features/settings/settings_plugins";

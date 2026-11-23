@@ -1,5 +1,3 @@
-//! Vercel's AI Gateway, as `createGateway` from the `ai` package talks to it. The Gateway takes a
-//! call's options as they are and answers with the SDK's own stream parts.
 mod decoder;
 
 use futures_util::future::BoxFuture;
@@ -37,7 +35,6 @@ impl GatewayModel {
     }
 }
 
-/// The headers on every Gateway call. The key goes only in `authorization`.
 pub(crate) fn auth_headers(api_key: &str) -> Vec<(&'static str, String)> {
     vec![
         ("authorization", format!("Bearer {api_key}")),
@@ -46,7 +43,6 @@ pub(crate) fn auth_headers(api_key: &str) -> Vec<(&'static str, String)> {
     ]
 }
 
-/// `createGatewayErrorFromResponse`: what the person reads. The class of error stays in the status.
 fn failure_message(body: &str) -> String {
     let invalid = || "Invalid error response format: Gateway request failed".to_owned();
     let Ok(value) = serde_json::from_str::<Value>(body) else {
@@ -58,9 +54,13 @@ fn failure_message(body: &str) -> String {
     let Some(message) = error.get("message").and_then(Value::as_str) else {
         return invalid();
     };
-    let nullish = |field: Option<&Value>, fits: fn(&Value) -> bool| field.map_or(true, |field| field.is_null() || fits(field));
+    let nullish = |field: Option<&Value>, fits: fn(&Value) -> bool| {
+        field.map_or(true, |field| field.is_null() || fits(field))
+    };
     let fits = nullish(error.get("type"), Value::is_string)
-        && nullish(error.get("code"), |code| code.is_string() || code.is_number())
+        && nullish(error.get("code"), |code| {
+            code.is_string() || code.is_number()
+        })
         && nullish(value.get("generationId"), Value::is_string);
     if !fits {
         return invalid();
@@ -75,8 +75,10 @@ fn failure_message(body: &str) -> String {
     }
 }
 
-/// Turns any response the Gateway refused into its error.
-pub(crate) async fn checked(response: reqwest::Response, secret: &str) -> Result<reqwest::Response, ModelError> {
+pub(crate) async fn checked(
+    response: reqwest::Response,
+    secret: &str,
+) -> Result<reqwest::Response, ModelError> {
     if response.status().is_success() {
         return Ok(response);
     }
@@ -94,17 +96,29 @@ pub(crate) async fn checked(response: reqwest::Response, secret: &str) -> Result
 impl LanguageModel for GatewayModel {
     fn stream(&self, options: CallOptions) -> BoxFuture<'_, Result<ModelStream, ModelError>> {
         Box::pin(async move {
-            let body = serde_json::to_vec(&options)
-                .map_err(|error| ModelError::Unsupported(format!("The request couldn't be built: {error}")))?;
+            let body = serde_json::to_vec(&options).map_err(|error| {
+                ModelError::Unsupported(format!("The request couldn't be built: {error}"))
+            })?;
             let mut headers = auth_headers(&self.api_key);
             headers.push(("ai-language-model-specification-version", "4".to_owned()));
             headers.push(("ai-language-model-id", self.model.clone()));
             headers.push(("ai-language-model-streaming", "true".to_owned()));
             let url = format!("{}/language-model", self.base_url);
-            let response =
-                post_body(&self.client, &url, &headers, "application/json", body, &self.api_key).await?;
+            let response = post_body(
+                &self.client,
+                &url,
+                &headers,
+                "application/json",
+                body,
+                &self.api_key,
+            )
+            .await?;
             let response = checked(response, &self.api_key).await?;
-            Ok(decoded_stream(response, decoder::GatewayDecoder::default(), &self.api_key))
+            Ok(decoded_stream(
+                response,
+                decoder::GatewayDecoder::default(),
+                &self.api_key,
+            ))
         })
     }
 }
@@ -115,14 +129,31 @@ mod tests {
 
     #[test]
     fn failure_messages_come_from_the_gateways_shape() {
-        assert_eq!(failure_message(r#"{"error":{"message":"Slow down.","type":"rate_limit_exceeded"}}"#), "Slow down.");
         assert_eq!(
-            failure_message(r#"{"error":{"message":"Nope.","type":"forbidden"},"generationId":"gen_1"}"#),
+            failure_message(r#"{"error":{"message":"Slow down.","type":"rate_limit_exceeded"}}"#),
+            "Slow down."
+        );
+        assert_eq!(
+            failure_message(
+                r#"{"error":{"message":"Nope.","type":"forbidden"},"generationId":"gen_1"}"#
+            ),
             "Nope. [gen_1]",
         );
-        assert!(failure_message(r#"{"error":{"message":"Bad key sk-1","type":"authentication_error"}}"#).starts_with("AI Gateway authentication failed: Invalid API key or token."));
-        for bad in ["", "not json", r#"{"error":"text"}"#, r#"{"error":{"type":"x"}}"#] {
-            assert_eq!(failure_message(bad), "Invalid error response format: Gateway request failed", "{bad}");
+        assert!(failure_message(
+            r#"{"error":{"message":"Bad key sk-1","type":"authentication_error"}}"#
+        )
+        .starts_with("AI Gateway authentication failed: Invalid API key or token."));
+        for bad in [
+            "",
+            "not json",
+            r#"{"error":"text"}"#,
+            r#"{"error":{"type":"x"}}"#,
+        ] {
+            assert_eq!(
+                failure_message(bad),
+                "Invalid error response format: Gateway request failed",
+                "{bad}"
+            );
         }
     }
 }

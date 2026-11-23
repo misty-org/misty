@@ -13,10 +13,9 @@ const state = vi.hoisted(() => ({
 vi.mock("@/features/account", () => ({
   useAuth: () => ({ user: { id: "one" }, accounts: [], transitioning: false }),
 }));
-vi.mock("../list/useSpacesStore", () => ({
+vi.mock("../list/use_spaces_store", () => ({
   useSpacesStore: (selector: (value: typeof state) => unknown) => selector(state),
 }));
-// Files is the same page in every Space, so it takes no Space of its own.
 vi.mock("../file-manager/FilesPage", () => ({
   FilesPage: () => <div>Files in family</div>,
 }));
@@ -26,7 +25,6 @@ vi.mock("../chat/SpaceChatEntry", () => ({
 afterEach(() => {
   cleanup();
 });
-// A Space's own address, and its old settings links, open its chat; Files opens its own page.
 it.each([
   ["home", "Chat"],
   ["settings", "Chat"],

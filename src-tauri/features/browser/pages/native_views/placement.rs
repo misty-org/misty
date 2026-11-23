@@ -1,4 +1,3 @@
-//! Placing a page's native view: its position, stacking and rounded corners.
 use super::*;
 
 #[cfg(target_os = "macos")]
@@ -8,6 +7,7 @@ pub(in crate::browser) fn position_macos_webview(
 ) -> Result<(), String> {
     use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
     let own_renderer = renderer(webview.window().label());
+    let lowered = crate::apps::frames::lowered(webview.label());
     webview
         .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
@@ -20,15 +20,14 @@ pub(in crate::browser) fn position_macos_webview(
             });
             if let Some(parent) = parent {
                 let main_view = own_renderer.native;
-                let below_main = browser_child_should_be_below_renderer(own_renderer.overlay);
+                let below_main =
+                    browser_child_should_be_below_renderer(own_renderer.overlay) || lowered;
                 if main_view == 0
                     || browser_stacking_is_correct(&parent, view, main_view, below_main)
                 {
                     return;
                 }
                 let main_view: &NSView = &*(main_view as *const NSView);
-                // The external page owns its measured rectangle normally. Misty's
-                // renderer moves above it only while app UI needs those pixels.
                 parent.addSubview_positioned_relativeTo(
                     view,
                     if below_main {
@@ -44,8 +43,6 @@ pub(in crate::browser) fn position_macos_webview(
     refresh_browser_cursor_ownership(webview)
 }
 
-/// The page sits above the app renderer, so CSS cannot clip it. Mask its
-/// layer to match the workspace corners it reaches.
 #[cfg(target_os = "macos")]
 pub(in crate::browser) fn round_macos_webview_corners(
     webview: &Webview,
@@ -60,8 +57,6 @@ pub(in crate::browser) fn round_macos_webview_corners(
             let Some(layer) = layer.as_ref() else {
                 return;
             };
-            // CACornerMask names corners by layer coordinates; minimum Y is the
-            // top edge only when the layer's contents are flipped.
             let flipped: bool = objc2::msg_send![layer, contentsAreFlipped];
             let (top, bottom) = if flipped { (0usize, 2usize) } else { (2, 0) };
             let [top_left, top_right, bottom_right, bottom_left] = radii;
@@ -101,6 +96,7 @@ pub(in crate::browser) fn position_windows_webview(
     if reveal {
         webview.show().map_err(|error| error.to_string())?;
     }
+    let below_renderer = below_renderer || crate::apps::frames::lowered(webview.label());
     let own_renderer = renderer(webview.window().label());
     let failure = std::sync::Arc::new(AtomicU32::new(0));
     let callback_failure = failure.clone();

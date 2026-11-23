@@ -1,6 +1,5 @@
 import { Field, Input } from "@misty/ui";
 
-/** One labeled field on a signed-out form: the shared Field and Input, at their own size. */
 export default function AuthField({
   id,
   label,

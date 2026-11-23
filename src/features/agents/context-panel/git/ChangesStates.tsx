@@ -16,10 +16,6 @@ import {
   Textarea,
 } from "@misty/ui";
 
-/**
- * A folder outside any repository: says so, and offers `git init` right there. Nothing else in
- * the panel applies to it, so this is all the panel shows.
- */
 export function NotRepoState({ busy, onInit }: { busy: boolean; onInit: () => void }) {
   return (
     <EmptyState
@@ -35,8 +31,6 @@ export function NotRepoState({ busy, onInit }: { busy: boolean; onInit: () => vo
   );
 }
 
-/** The status couldn't be read at all (Git refused the repository's owner, say). The reason
- * lives here rather than in the dismissible notice, so dismissing it never leaves a blank body. */
 export function StatusErrorState(props: { message: string; busy: boolean; onRetry: () => void }) {
   return (
     <ErrorState
@@ -47,16 +41,13 @@ export function StatusErrorState(props: { message: string; busy: boolean; onRetr
   );
 }
 
-/** A repository whose files all match their last commit. */
 export function NoChangesState() {
   return (
     <EmptyState title="No changes" line="Everything in this folder matches its last commit." />
   );
 }
 
-/** The commit message and button at the panel's foot. */
 export function CommitFooter(props: {
-  /** Files ticked for this commit. */
   selectedCount: number;
   busy: boolean;
   commitMsg: string;
@@ -90,7 +81,6 @@ export function CommitFooter(props: {
   );
 }
 
-/** A question before something that can't be taken back. */
 export function ConfirmDialog(props: {
   open: boolean;
   title: string;

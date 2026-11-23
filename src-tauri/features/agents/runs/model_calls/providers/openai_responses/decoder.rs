@@ -1,4 +1,3 @@
-//! Reads a Responses event stream. Ported from `doStream` in `@ai-sdk/openai`.
 mod items;
 
 use std::collections::{BTreeMap, HashMap};
@@ -33,7 +32,6 @@ struct ActiveReasoning {
 pub(super) struct ResponsesDecoder {
     warnings: Vec<Value>,
     tools: Vec<String>,
-    /// Whether the call asked OpenAI to store the response. Reasoning can end sooner if so.
     stored: bool,
     finish_reason: FinishReason,
     usage: Option<RawUsage>,
@@ -42,8 +40,6 @@ pub(super) struct ResponsesDecoder {
     active_phase: Option<Phase>,
     has_function_call: bool,
     active_reasoning: HashMap<String, ActiveReasoning>,
-    // Compatible providers can rotate opaque item IDs between events, but an output index holds
-    // still for the life of its item.
     active_item_ids: HashMap<u64, String>,
     service_tier: Option<String>,
     reasoning_context: Option<String>,
@@ -57,7 +53,9 @@ fn converted_usage(usage: Option<&RawUsage>) -> Usage {
     let input = usage.input_tokens;
     let output = usage.output_tokens;
     let details = usage.input_tokens_details.as_ref();
-    let cached = details.and_then(|details| details.cached_tokens).unwrap_or(0);
+    let cached = details
+        .and_then(|details| details.cached_tokens)
+        .unwrap_or(0);
     let cache_write = details.and_then(|details| details.cache_write_tokens);
     let reasoning = usage
         .output_tokens_details
@@ -67,7 +65,11 @@ fn converted_usage(usage: Option<&RawUsage>) -> Usage {
     Usage {
         input_tokens: InputTokens {
             total: Some(input),
-            no_cache: Some(input.saturating_sub(cached).saturating_sub(cache_write.unwrap_or(0))),
+            no_cache: Some(
+                input
+                    .saturating_sub(cached)
+                    .saturating_sub(cache_write.unwrap_or(0)),
+            ),
             cache_read: Some(cached),
             cache_write,
         },
@@ -131,7 +133,10 @@ impl ResponsesDecoder {
             warnings,
             tools,
             stored,
-            finish_reason: FinishReason { unified: "other".into(), raw: None },
+            finish_reason: FinishReason {
+                unified: "other".into(),
+                raw: None,
+            },
             usage: None,
             response_id: None,
             ongoing_calls: BTreeMap::new(),
@@ -161,8 +166,9 @@ impl ResponsesDecoder {
             && value.get("choices").is_some_and(Value::is_array)
             && !value.get("type").is_some_and(Value::is_string);
         if is_chat_completion {
-            // Written from the text, because a `Value` would sort its keys.
-            let written = Ordered::from_text(data).map(|chunk| chunk.to_text()).unwrap_or_default();
+            let written = Ordered::from_text(data)
+                .map(|chunk| chunk.to_text())
+                .unwrap_or_default();
             let error = json!({
                 "name": "AI_APICallError",
                 "message": CHAT_COMPLETIONS_MISMATCH,
@@ -173,18 +179,37 @@ impl ResponsesDecoder {
             self.fail(error, out);
             return;
         }
-        let message = format!("Type validation failed: Value: {value}.\nError message: The chunk has no type.");
-        self.fail(json!({ "name": "AI_TypeValidationError", "message": message, "value": value }), out);
+        let message = format!(
+            "Type validation failed: Value: {value}.\nError message: The chunk has no type."
+        );
+        self.fail(
+            json!({ "name": "AI_TypeValidationError", "message": message, "value": value }),
+            out,
+        );
     }
 
-    fn failed(&mut self, sequence_number: u64, response: FailedResponse, out: &mut Vec<StreamPart>) {
-        let reason = response.incomplete_details.as_ref().map(|details| details.reason.clone());
+    fn failed(
+        &mut self,
+        sequence_number: u64,
+        response: FailedResponse,
+        out: &mut Vec<StreamPart>,
+    ) {
+        let reason = response
+            .incomplete_details
+            .as_ref()
+            .map(|details| details.reason.clone());
         self.finish_reason = FinishReason {
             unified: match reason.as_deref() {
-                Some(reason) if !reason.is_empty() => unified_reason(Some(reason), self.has_function_call).into(),
+                Some(reason) if !reason.is_empty() => {
+                    unified_reason(Some(reason), self.has_function_call).into()
+                }
                 _ => "error".into(),
             },
-            raw: Some(reason.filter(|reason| !reason.is_empty()).unwrap_or_else(|| "error".into())),
+            raw: Some(
+                reason
+                    .filter(|reason| !reason.is_empty())
+                    .unwrap_or_else(|| "error".into()),
+            ),
         };
         self.usage = response.usage;
         if let Some(context) = response.reasoning.and_then(|reasoning| reasoning.context) {
@@ -200,7 +225,10 @@ impl ResponsesDecoder {
             own_error.insert("message".into(), json!(error.message));
             echoed.insert("error".into(), Value::Object(own_error));
             if let Some(details) = response.incomplete_details {
-                echoed.insert("incomplete_details".into(), json!({ "reason": details.reason }));
+                echoed.insert(
+                    "incomplete_details".into(),
+                    json!({ "reason": details.reason }),
+                );
             }
             if let Some(tier) = response.service_tier {
                 echoed.insert("service_tier".into(), json!(tier));
@@ -215,12 +243,19 @@ impl ResponsesDecoder {
         match chunk {
             Known::ItemAdded { output_index, item } => self.item_added(output_index, item, out),
             Known::ItemDone { output_index, item } => self.item_done(output_index, item, out),
-            Known::ArgumentsDelta { output_index, delta } => {
+            Known::ArgumentsDelta {
+                output_index,
+                delta,
+            } => {
                 if let Some(call) = self.ongoing_calls.get_mut(&output_index) {
                     if call.suppress_input_streaming {
                         call.buffered_deltas.push(delta);
                     } else {
-                        out.push(StreamPart::ToolInputDelta { id: call.call_id.clone(), delta, provider_metadata: None });
+                        out.push(StreamPart::ToolInputDelta {
+                            id: call.call_id.clone(),
+                            delta,
+                            provider_metadata: None,
+                        });
                     }
                 }
             }
@@ -232,15 +267,32 @@ impl ResponsesDecoder {
                     timestamp: timestamp(response.created_at),
                 });
             }
-            Known::TextDelta { item_id, output_index, delta } => {
+            Known::TextDelta {
+                item_id,
+                output_index,
+                delta,
+            } => {
                 let id = self.resolved_item_id(item_id, output_index);
-                out.push(StreamPart::TextDelta { id, delta, provider_metadata: None });
+                out.push(StreamPart::TextDelta {
+                    id,
+                    delta,
+                    provider_metadata: None,
+                });
             }
-            Known::SummaryPartAdded { item_id, output_index, summary_index } => {
+            Known::SummaryPartAdded {
+                item_id,
+                output_index,
+                summary_index,
+            } => {
                 let item_id = self.resolved_item_id(item_id, output_index);
                 self.summary_part_added(item_id, summary_index, out);
             }
-            Known::SummaryTextDelta { item_id, output_index, summary_index, delta } => {
+            Known::SummaryTextDelta {
+                item_id,
+                output_index,
+                summary_index,
+                delta,
+            } => {
                 let item_id = self.resolved_item_id(item_id, output_index);
                 out.push(StreamPart::ReasoningDelta {
                     id: format!("{item_id}:{summary_index}"),
@@ -248,7 +300,11 @@ impl ResponsesDecoder {
                     provider_metadata: item_metadata(&item_id),
                 });
             }
-            Known::SummaryPartDone { item_id, output_index, summary_index } => {
+            Known::SummaryPartDone {
+                item_id,
+                output_index,
+                summary_index,
+            } => {
                 let item_id = self.resolved_item_id(item_id, output_index);
                 let stored = self.stored;
                 if let Some(active) = self.active_reasoning.get_mut(&item_id) {
@@ -257,10 +313,13 @@ impl ResponsesDecoder {
                             id: format!("{item_id}:{summary_index}"),
                             provider_metadata: item_metadata(&item_id),
                         });
-                        active.summary_parts.insert(summary_index, SummaryState::Concluded);
+                        active
+                            .summary_parts
+                            .insert(summary_index, SummaryState::Concluded);
                     } else {
-                        // Unstored, the part waits for the item's encrypted content.
-                        active.summary_parts.insert(summary_index, SummaryState::CanConclude);
+                        active
+                            .summary_parts
+                            .insert(summary_index, SummaryState::CanConclude);
                     }
                 }
             }
@@ -278,7 +337,10 @@ impl ResponsesDecoder {
                     self.reasoning_context = Some(context);
                 }
             }
-            Known::Failed { sequence_number, response } => self.failed(sequence_number, response, out),
+            Known::Failed {
+                sequence_number,
+                response,
+            } => self.failed(sequence_number, response, out),
             Known::InProgress { .. } | Known::BuiltInToolEvent => {}
         }
     }
@@ -286,7 +348,9 @@ impl ResponsesDecoder {
 
 impl StreamDecoder for ResponsesDecoder {
     fn start(&mut self, out: &mut Vec<StreamPart>) {
-        out.push(StreamPart::StreamStart { warnings: std::mem::take(&mut self.warnings) });
+        out.push(StreamPart::StreamStart {
+            warnings: std::mem::take(&mut self.warnings),
+        });
     }
 
     fn event(&mut self, data: &str, out: &mut Vec<StreamPart>) {
@@ -294,7 +358,10 @@ impl StreamDecoder for ResponsesDecoder {
             Ok(value) => value,
             Err(error) => {
                 let message = format!("JSON parsing failed: Text: {data}.\nError message: {error}");
-                self.fail(json!({ "name": "AI_JSONParseError", "message": message, "text": data }), out);
+                self.fail(
+                    json!({ "name": "AI_JSONParseError", "message": message, "text": data }),
+                    out,
+                );
                 return;
             }
         };
@@ -302,7 +369,10 @@ impl StreamDecoder for ResponsesDecoder {
             None => self.invalid_chunk(value, data, out),
             Some(Chunk::ErrorFrame(frame)) => {
                 self.encountered_error = true;
-                self.finish_reason = FinishReason { unified: "error".into(), raw: Some("error".into()) };
+                self.finish_reason = FinishReason {
+                    unified: "error".into(),
+                    raw: Some("error".into()),
+                };
                 out.push(StreamPart::Error { error: frame });
             }
             Some(Chunk::Known(known)) => self.known(*known, out),
@@ -315,9 +385,17 @@ impl StreamDecoder for ResponsesDecoder {
             if !call.suppress_input_streaming {
                 continue;
             }
-            out.push(StreamPart::ToolInputStart { id: call.call_id.clone(), tool_name: call.name.clone(), provider_metadata: None });
+            out.push(StreamPart::ToolInputStart {
+                id: call.call_id.clone(),
+                tool_name: call.name.clone(),
+                provider_metadata: None,
+            });
             for delta in &call.buffered_deltas {
-                out.push(StreamPart::ToolInputDelta { id: call.call_id.clone(), delta: delta.clone(), provider_metadata: None });
+                out.push(StreamPart::ToolInputDelta {
+                    id: call.call_id.clone(),
+                    delta: delta.clone(),
+                    provider_metadata: None,
+                });
             }
         }
         let mut own = Map::new();

@@ -1,9 +1,3 @@
-//! Native access to a WebView2 page: code that runs against the view's
-//! `ICoreWebView2` on the UI thread, and Chrome DevTools Protocol calls.
-//!
-//! CDP runs in Misty's process and is never exposed to renderers. Callers
-//! choose the method and build the parameters; nothing here forwards page or
-//! renderer input as a method name.
 use std::{
     sync::{Arc, Mutex},
     time::Duration,
@@ -20,23 +14,18 @@ use windows::core::{HSTRING, PWSTR};
 use windows::Win32::System::Com::CoTaskMemFree;
 use zeroize::Zeroizing;
 
-// Spelled out so every caller finds the type the same way.
 #[path = "webview2/page.rs"]
 mod page;
 pub(crate) use page::{click, css_viewport, evaluate, evaluate_in_session, MouseButton};
 
-/// The largest CDP request or reply Misty sends or accepts.
 pub(crate) const MAX_CDP_BYTES: usize = 16 * 1024 * 1024;
 const CDP_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CdpError {
-    /// The view is gone, or WebView2 refused the call.
     Unavailable,
-    /// The page did not answer in time.
     Timeout,
     TooLarge,
-    /// The reply was not the JSON CDP promises, or reported an error.
     Invalid,
 }
 
@@ -51,7 +40,6 @@ impl CdpError {
     }
 }
 
-/// A failed WebView2 call. Native error text is dropped: it can contain page data.
 impl From<windows::core::Error> for CdpError {
     fn from(_: windows::core::Error) -> Self {
         Self::Unavailable
@@ -64,9 +52,6 @@ impl From<CdpError> for String {
     }
 }
 
-/// Runs `body` against the view's WebView2 objects on the UI thread and
-/// returns its result. `body` must not block: completion handlers it starts
-/// run later on the same thread.
 pub(crate) async fn with_core<T: Send + 'static>(
     view: &Webview,
     body: impl FnOnce(&ICoreWebView2, &ICoreWebView2Controller) -> Result<T, CdpError> + Send + 'static,
@@ -84,8 +69,6 @@ pub(crate) async fn with_core<T: Send + 'static>(
     receive.await.map_err(|_| CdpError::Unavailable)?
 }
 
-/// Calls one CDP method on the view. `check` runs first, on the UI thread,
-/// and can refuse the call (for example when the view is in the wrong profile).
 pub(crate) async fn cdp_checked(
     view: &Webview,
     method: &'static str,
@@ -95,8 +78,6 @@ pub(crate) async fn cdp_checked(
     call(view, None, method, parameters, check).await
 }
 
-/// Calls one CDP method in a target session the view attached to, such as a
-/// cross-origin frame's (`Target.setAutoAttach` with `flatten`).
 pub(crate) async fn cdp_in_session(
     view: &Webview,
     session: &str,
@@ -178,7 +159,6 @@ async fn call(
         .map_err(|_| CdpError::Unavailable)?
 }
 
-/// Calls one CDP method on the view.
 pub(crate) async fn cdp(
     view: &Webview,
     method: &'static str,
@@ -187,11 +167,6 @@ pub(crate) async fn cdp(
     cdp_checked(view, method, parameters, |_| Ok(())).await
 }
 
-/// Reads a string WebView2 allocated and frees it, even when the call failed
-/// after allocating. Native error text is never kept: it may contain page data.
-///
-/// # Safety
-/// `read` must be a WebView2 getter that writes a CoTaskMem string to its argument.
 pub(crate) unsafe fn owned_string(
     read: impl FnOnce(*mut PWSTR) -> windows::core::Result<()>,
 ) -> Option<String> {

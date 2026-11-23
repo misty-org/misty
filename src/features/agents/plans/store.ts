@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { setRunStateAccount } from "../tools/run-state/documents";
 import { collaborationApi } from "./api";
 import { upsertChecklist } from "./checklists";
-import { upsertQuestionSet, withVersion } from "./storeLists";
+import { upsertQuestionSet, withVersion } from "./store_lists";
 import type {
   AgentPlan,
   AgentPlanPayload,
@@ -12,7 +12,7 @@ import type {
   ConversationCollaboration,
   ConversationMode,
   PermissionMode,
-} from "./planTypes";
+} from "./plan_types";
 
 const empty = (): ConversationCollaboration => ({
   mode: "act",
@@ -28,13 +28,9 @@ const empty = (): ConversationCollaboration => ({
 interface CollaborationStore {
   accountId: string;
   byConversation: Record<string, ConversationCollaboration>;
-  /** The mode a new conversation starts in, before it exists on the server. */
   draftMode: ConversationMode;
-  /** The account's starting mode for new conversations (Settings → Agents). */
   defaultMode: ConversationMode;
-  /** The composer picked a mode for the next new conversation. */
   draftChosen: boolean;
-  /** The engine mode for the next new conversation; empty follows its agent. */
   draftPermissionMode: PermissionMode | "";
   setDefaultMode(mode: ConversationMode): void;
   error: string;
@@ -42,14 +38,12 @@ interface CollaborationStore {
   load(conversationId: string): Promise<ConversationCollaboration | undefined>;
   modeFor(conversationId?: string): ConversationMode;
   setMode(conversationId: string | undefined, mode: ConversationMode): Promise<void>;
-  /** A new conversation keeps the mode its first message was sent in. */
   adoptDraftMode(conversationId: string): void;
   applyEvent(conversationId: string, event: CollaborationEvent): void;
   answer(set: AgentQuestionSet, answers: AgentQuestionAnswer[]): Promise<string | undefined>;
   approvePlan(plan: AgentPlan): Promise<string>;
   revisePlan(plan: AgentPlan, payload: AgentPlanPayload): Promise<void>;
   rejectPlan(plan: AgentPlan): Promise<void>;
-  /** After a run ends, reloads the chat's state: what the run changed in it. */
   afterRunSettled(conversationId: string): void;
 }
 
@@ -70,7 +64,6 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
         },
       };
     });
-  // Answers from an account that has since signed out must not land in the next one.
   const sameAccount = (accountId: string) => get().accountId === accountId;
   return {
     accountId: "",
@@ -183,8 +176,6 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
     },
     async approvePlan(plan) {
       const result = await collaborationApi.approvePlan(plan);
-      // An approved plan is carried out: a chat that chose its engine's planning mode leaves it
-      // and follows its agent's default again.
       const leavesPlan =
         result.mode !== "plan" &&
         get().byConversation[plan.conversationId]?.permissionMode === "plan";
@@ -215,7 +206,6 @@ export const useCollaborationStore = create<CollaborationStore>((set, get) => {
   };
 });
 
-/** The open question set waiting on the user in a conversation, if any. */
 export function pendingQuestionSet(state: ConversationCollaboration | undefined) {
   return state?.questionSets.find((set) => set.state === "pending");
 }

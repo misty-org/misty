@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { CreateSpaceDialog } from "./CreateSpaceDialog";
-import { useCreateSpaceDialog } from "./useCreateSpaceDialog";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { useCreateSpaceDialog } from "./use_create_space_dialog";
+import { useSpacesStore } from "../list/use_spaces_store";
 
 export function GlobalCreateSpaceDialog(props: {
   children: (openCreateSpaceDialog: () => void) => ReactNode;

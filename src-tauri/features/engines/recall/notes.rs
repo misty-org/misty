@@ -1,5 +1,3 @@
-//! The notes an agent's engine wrote, read in place from each engine's own store.
-
 use super::*;
 
 pub(super) fn home_dir() -> Option<PathBuf> {
@@ -32,6 +30,10 @@ pub(super) fn note_title(path: &Path) -> String {
     parent.map_or(name.clone(), |parent| format!("{parent}/{name}"))
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own memory and the project's instruction files in place, outside what the gate grants"
+)]
 pub(super) fn add_file_note(
     path: &Path,
     source: &str,
@@ -79,6 +81,10 @@ pub(super) fn add_file_note(
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own memory in place, wherever the engine keeps it"
+)]
 pub(super) fn add_markdown_tree(
     root: &Path,
     source: &str,
@@ -101,7 +107,10 @@ pub(super) fn add_markdown_tree(
                 continue;
             }
         };
-        let mut paths = entries.flatten().map(|entry| entry.path()).collect::<Vec<_>>();
+        let mut paths = entries
+            .flatten()
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>();
         paths.sort();
         for path in paths.into_iter().rev() {
             if notes.notes.len() >= MAX_NOTE_FILES {
@@ -125,7 +134,6 @@ pub(super) fn add_markdown_tree(
     }
 }
 
-/// The engine's project instruction files along the working-folder path, closest first.
 pub(super) fn project_instructions(
     folder: Option<&Path>,
     notes: &mut MemoryNotes,
@@ -139,7 +147,6 @@ pub(super) fn project_instructions(
     }
 }
 
-/// Claude Code keys automatic memory to its working folder's slug.
 pub(super) fn claude_memory_dir(folder: &Path) -> Option<PathBuf> {
     let home = home_dir()?;
     let name: String = folder
@@ -163,8 +170,14 @@ pub(super) fn codex_memory_db() -> Option<PathBuf> {
         .map(|home| home.join("memories_1.sqlite"))
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Codex's own memory database in place, wherever CODEX_HOME puts it"
+)]
 pub(super) fn codex_notes(notes: &mut MemoryNotes) {
-    let Some(path) = codex_memory_db() else { return };
+    let Some(path) = codex_memory_db() else {
+        return;
+    };
     if !path.exists() {
         return;
     }
@@ -242,8 +255,10 @@ pub(super) fn grok_slug(folder: &Path) -> Option<String> {
     )
 }
 
-/// Reads each source independently. A changed or inaccessible engine store is reported beside the
-/// available notes instead of making recall or the notes page fail as a whole.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own memory in place, wherever the engine keeps it"
+)]
 pub(crate) fn memory_notes(engine: &str, folder: Option<&Path>) -> MemoryNotes {
     let mut notes = MemoryNotes::default();
     let mut seen = BTreeSet::new();
@@ -399,8 +414,10 @@ pub(crate) fn memory_notes(engine: &str, folder: Option<&Path>) -> MemoryNotes {
     notes
 }
 
-/// Deletes a listed note after a person's explicit confirmation. File paths are resolved again
-/// from the current engine store; the caller cannot name an arbitrary local file to remove.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "deletes the memory note the person chose, in place in the engine's own memory or the project's instruction files, outside what the gate grants"
+)]
 pub(crate) fn delete_memory_note(
     engine: &str,
     folder: Option<&Path>,
@@ -443,7 +460,6 @@ pub(crate) fn delete_memory_note(
         .strip_prefix("file:")
         .map(PathBuf::from)
         .ok_or_else(|| "This memory note is no longer available.".to_string())?;
-    // Protect against a symlink swap between listing and deletion.
     let metadata = std::fs::symlink_metadata(&path)
         .map_err(|_| "This memory note is no longer available.".to_string())?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {

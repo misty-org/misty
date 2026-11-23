@@ -17,22 +17,17 @@ use tauri::Emitter;
 
 use super::{linked_path, person_window};
 
-/// Each shell owns a process and a reader thread, so open tabs are capped.
 const MOST_OPEN: usize = 32;
-/// Output is sent as an array of `{ id, data }`, gathered for this long or until this many bytes,
-/// so a flood (a `cat` of a large file) is a few messages instead of one per read.
 const FLUSH_INTERVAL: Duration = Duration::from_millis(32);
 const FLUSH_BYTES: usize = 64 * 1024;
 const OUTPUT: &str = "misty://terminal-output";
 const CLOSED: &str = "misty://terminal-closed";
-/// What a write to a shell that has ended says; the panel reopens the shell when it sees this.
 const GONE: &str = "That terminal has closed.";
 
 struct Session {
     master: Mutex<Box<dyn MasterPty + Send>>,
     writer: Mutex<Box<dyn Write + Send>>,
     child: Mutex<Box<dyn Child + Send + Sync>>,
-    /// The window that opened it, the only one that may use it.
     window: String,
 }
 
@@ -55,7 +50,6 @@ fn open() -> MutexGuard<'static, HashMap<String, Arc<Session>>> {
     lock(&OPEN)
 }
 
-/// The shell a session runs: the person's login shell, or `cmd.exe` on Windows.
 fn shell() -> String {
     #[cfg(windows)]
     {
@@ -67,8 +61,6 @@ fn shell() -> String {
     }
 }
 
-/// A UTF-8 locale, so tools that print more than ASCII (git, ls, the CLIs) don't fall back to the
-/// C locale and garble it.
 fn locale() -> String {
     let found = std::env::var("LC_ALL")
         .or_else(|_| std::env::var("LANG"))
@@ -94,8 +86,6 @@ fn size(cols: u16, rows: u16) -> PtySize {
     }
 }
 
-/// Turns the bytes a shell prints into text without ever cutting a character in two: a character
-/// split across two reads waits for its other half, and bytes that can never be text are dropped.
 #[derive(Default)]
 struct Utf8Stream {
     held: Vec<u8>,
@@ -117,9 +107,7 @@ impl Utf8Stream {
                     text.push_str(&String::from_utf8_lossy(&self.held[..good]));
                     self.held.drain(..good);
                     match error.error_len() {
-                        // A character cut off at the end: wait for the rest.
                         None => return text,
-                        // Bytes that are not text: drop them and carry on after them.
                         Some(bad) => {
                             self.held.drain(..bad.min(self.held.len()));
                         }
@@ -130,7 +118,6 @@ impl Utf8Stream {
     }
 }
 
-/// Output waiting to be sent to one window, already turned into JSON.
 #[derive(Default)]
 struct Pending {
     events: Vec<String>,
@@ -138,14 +125,10 @@ struct Pending {
     scheduled: bool,
 }
 
-/// What adding output to a window's batch calls for.
 #[derive(Debug, PartialEq, Eq)]
 enum Next {
-    /// Enough is waiting: send it now.
     Flush,
-    /// The first output since the last send: send it after the interval.
     Schedule,
-    /// A send is already on its way.
     Wait,
 }
 
@@ -163,8 +146,6 @@ impl Pending {
         }
     }
 
-    /// The batch as a JSON array, or nothing when it is empty. Either way a new send may be
-    /// scheduled after this.
     fn take(&mut self) -> Option<String> {
         self.scheduled = false;
         if self.events.is_empty() {
@@ -186,7 +167,6 @@ fn flush(app: &tauri::AppHandle, window: &str) {
     }
 }
 
-/// Queues output for the window that owns the terminal.
 fn send(app: &tauri::AppHandle, window: &str, id: &str, data: String) {
     if data.is_empty() {
         return;
@@ -210,8 +190,6 @@ fn send(app: &tauri::AppHandle, window: &str, id: &str, data: String) {
     }
 }
 
-/// Reads what the shell prints on a thread of its own until the shell ends. A read that fails
-/// while the shell still runs ends the shell too, so none is left without an owner.
 fn pump(
     app: tauri::AppHandle,
     id: String,
@@ -235,10 +213,7 @@ fn pump(
         if failed {
             session.kill();
         }
-        // What was still waiting goes out before the window hears the shell ended.
         flush(&app, &session.window);
-        // Only a shell that ended on its own is announced: one closed from the panel, or replaced
-        // by a new shell under the same id (a rerun launch script), is already known there.
         let ended_by_itself = {
             let mut held = open();
             let current = held
@@ -255,7 +230,6 @@ fn pump(
     });
 }
 
-/// The session `id` names, if this window opened it.
 fn owned(webview: &tauri::Webview, id: &str) -> Result<Option<Arc<Session>>, String> {
     let Some(session) = open().get(id).cloned() else {
         return Ok(None);
@@ -266,8 +240,6 @@ fn owned(webview: &tauri::Webview, id: &str) -> Result<Option<Arc<Session>>, Str
     Ok(Some(session))
 }
 
-/// Opens a terminal in a linked folder. Opening one that is already open changes nothing, so a
-/// panel that shows a tab again simply reattaches to its shell.
 #[tauri::command]
 pub async fn project_terminal_open(
     app: tauri::AppHandle,
@@ -302,10 +274,6 @@ pub async fn project_terminal_open(
         .openpty(size(cols, rows))
         .map_err(|error| format!("A terminal could not be opened: {error}"))?;
     let mut command = CommandBuilder::new(shell());
-    // A login shell, interactive, as macOS Terminal and VS Code start one: a login shell reads
-    // /etc/zprofile (path_helper) and the person's ~/.zprofile (Homebrew's `brew shellenv` and
-    // most PATH setup live there), which an app started from the Dock never inherits; interactive
-    // reads ~/.zshrc for their aliases and prompt. cmd.exe has neither flag.
     #[cfg(not(windows))]
     {
         command.arg("-l");
@@ -316,8 +284,6 @@ pub async fn project_terminal_open(
     command.env("TERM", "xterm-256color");
     command.env("COLORTERM", "truecolor");
     command.env("TERM_PROGRAM", "Misty");
-    // Only LANG, and only when what the app was given isn't UTF-8 already: forcing LC_ALL would
-    // override the person's own LC_* choices, which their shell files may set.
     command.env("LANG", locale());
     let child = pair
         .slave
@@ -340,7 +306,6 @@ pub async fn project_terminal_open(
     });
     {
         let mut held = open();
-        // Another open of the same tab won the race: keep its shell and end this one.
         if held.contains_key(&id) {
             drop(held);
             session.kill();
@@ -352,8 +317,6 @@ pub async fn project_terminal_open(
     Ok(())
 }
 
-/// Types into a terminal. A large paste can fill the terminal's buffer and wait, so it is
-/// written off the async workers.
 #[tauri::command]
 pub async fn project_terminal_write(
     webview: tauri::Webview,
@@ -390,7 +353,6 @@ pub fn project_terminal_resize(
         .map_err(|error| error.to_string())
 }
 
-/// Closes a terminal and ends its shell. Closing one that is gone changes nothing.
 #[tauri::command]
 pub fn project_terminal_close(webview: tauri::Webview, id: String) -> Result<(), String> {
     person_window(&webview)?;
@@ -403,7 +365,6 @@ pub fn project_terminal_close(webview: tauri::Webview, id: String) -> Result<(),
     Ok(())
 }
 
-/// What the panel needs to quote input for the shell that really runs it.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostInfo {
@@ -420,7 +381,6 @@ pub fn project_terminal_host_info(webview: tauri::Webview) -> Result<HostInfo, S
     })
 }
 
-/// Ends the shells a window opened, as it closes.
 pub fn close_window(window: &str) {
     let ended: Vec<Arc<Session>> = {
         let mut held = open();
@@ -437,7 +397,6 @@ pub fn close_window(window: &str) {
     lock(&BATCHES).remove(window);
 }
 
-/// Ends every shell, as the app quits.
 pub fn close_all() {
     let ended: Vec<Arc<Session>> = open().drain().map(|(_, session)| session).collect();
     for session in ended {
@@ -454,7 +413,6 @@ mod tests {
         let mut stream = Utf8Stream::default();
         let text = "héllo 中文";
         let bytes = text.as_bytes();
-        // "中" is three bytes; cut inside it.
         let cut = text.find('中').unwrap() + 1;
         let first = stream.feed(&bytes[..cut]);
         let second = stream.feed(&bytes[cut..]);
@@ -477,7 +435,6 @@ mod tests {
         assert_eq!(pending.push("\"b\"".into()), Next::Wait);
         assert_eq!(pending.take().as_deref(), Some("[\"a\",\"b\"]"));
         assert_eq!(pending.take(), None);
-        // After a send, the next output schedules again.
         assert_eq!(pending.push("\"c\"".into()), Next::Schedule);
         let big = format!("\"{}\"", "x".repeat(FLUSH_BYTES));
         assert_eq!(pending.push(big), Next::Flush);

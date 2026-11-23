@@ -1,9 +1,6 @@
 use crate::SAMPLE_RATE;
 use std::collections::VecDeque;
 
-/// Keeps the most recent audio so speech that began a moment before the user
-/// pressed a key is not clipped. It only holds what the open capture already
-/// produced; it never opens a device on its own.
 pub struct PreRoll {
     capacity: usize,
     samples: VecDeque<i16>,
@@ -34,7 +31,6 @@ impl PreRoll {
         }
     }
 
-    /// Hands out the buffered audio, oldest first, and its first frame index.
     pub fn take(&mut self) -> (u64, Vec<i16>) {
         let start = self.end_frame - self.samples.len() as u64;
         (start, self.samples.drain(..).collect())
@@ -59,7 +55,7 @@ mod tests {
 
     #[test]
     fn keeps_only_the_most_recent_window() {
-        let mut preroll = PreRoll::new(1); // 16 samples
+        let mut preroll = PreRoll::new(1);
         preroll.push(&(0..10).collect::<Vec<i16>>());
         preroll.push(&(10..30).collect::<Vec<i16>>());
         let (start, samples) = preroll.take();

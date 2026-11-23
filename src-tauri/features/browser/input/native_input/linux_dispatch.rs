@@ -1,8 +1,5 @@
-//! Linux: trusted GDK input for the granted WebKitGTK page, rechecked against the grant.
 use super::*;
 
-/// Linux: real GDK events delivered to the granted page's widget, rechecked
-/// against the grant before each one lands.
 pub(super) async fn dispatch_linux(
     app: &AppHandle,
     webview: Webview,
@@ -27,7 +24,6 @@ pub(super) async fn dispatch_linux(
     }
     let target = cursor_target(input);
     if let Some(script) = cursor_script(input, &observed["viewport"]) {
-        // Let the user watch the cursor arrive before the input lands.
         let _ = webview.eval(script);
         tokio::time::sleep(std::time::Duration::from_millis(
             crate::browser::agent_pages::page_agent::CURSOR_GLIDE_MS,

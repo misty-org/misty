@@ -1,8 +1,7 @@
 import { CircleAlert, Eye, FilePen, OctagonAlert, PencilLine } from "lucide-react";
 import { Text, Tooltip } from "@misty/ui";
-import type { PlanRisk } from "./planTypes";
+import type { PlanRisk } from "./plan_types";
 
-/** Risk carries an icon and a word, never a color. */
 const planRisks: Record<PlanRisk, { label: string; Icon: typeof Eye }> = {
   read: { label: "Reads", Icon: Eye },
   draft: { label: "Drafts", Icon: FilePen },

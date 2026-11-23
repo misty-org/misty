@@ -32,20 +32,14 @@ use super::{
     support::{macos_at_least, on_screen_windows},
 };
 
-/// Vision providers resize larger images before the model sees them (OpenAI to
-/// a 768px short side, Anthropic to a 1568px long side). Labels state the sent
-/// size, so a resize would shift every point; stay inside both bounds instead.
 pub(crate) fn capture_scale(width: f64, height: f64) -> f64 {
     1.0_f64.min((768.0 / width.min(height)).min(1568.0 / width.max(height)))
 }
 
-/// Misty supports macOS 12; SCScreenshotManager is only available on 14+.
-/// The host keeps its existing CoreGraphics still path on older systems.
 fn legacy() -> Value {
     json!({ "legacy_capture": true })
 }
 
-/// Runs on Rust's blocking worker.
 pub(crate) fn capture_display(display_id: u32) -> Value {
     if !macos_at_least(14, 0) {
         return legacy();
@@ -72,13 +66,6 @@ pub(crate) fn capture_display(display_id: u32) -> Value {
     )
 }
 
-/// The frontmost app's frontmost ordinary window, in CG global display points
-/// (top-left origin, like cursor samples). Window numbers in `ignored` are
-/// Misty's own companion, overlay and panel windows. None when none qualifies.
-/// The document or web page in the frontmost app's focused window, as the app reports it
-/// (AXDocument: a file:// address for a PDF or document, a web address in Safari), so the
-/// companion can read all of it rather than what's on screen. Needs Accessibility; a slow app
-/// gets a quarter second.
 pub(crate) fn front_document() -> Option<String> {
     use super::accessibility::{trusted, Element};
     if !trusted() {
@@ -93,8 +80,6 @@ pub(crate) fn front_document() -> Option<String> {
     let window = app.focused_window()?;
     window.set_timeout(0.25);
     let mut document = window.string("AXDocument");
-    // Chrome and the browsers built on it give no AXDocument: their page's address is the web
-    // area's AXURL, in a tree they only build once an assistive app asks for it.
     if document.is_empty() && chromium(pid) {
         document = chromium_page(&app, &window).unwrap_or_default();
     }
@@ -102,7 +87,6 @@ pub(crate) fn front_document() -> Option<String> {
         .then(|| document.chars().take(2_000).collect())
 }
 
-/// Whether the app is Chrome or a browser built on Chromium.
 fn chromium(pid: i32) -> bool {
     const BROWSERS: &[&str] = &[
         "com.google.Chrome",
@@ -123,13 +107,10 @@ fn chromium(pid: i32) -> bool {
         .is_some_and(|id| BROWSERS.contains(&id.to_string().as_str()))
 }
 
-/// The address of the page in a Chromium browser's window: its web area's AXURL, found from the
-/// keyboard focus upwards, or else in a short walk down the window.
 fn chromium_page(
     app: &super::accessibility::Element,
     window: &super::accessibility::Element,
 ) -> Option<String> {
-    // Chromium builds its accessibility tree for an assistive app that asks this way.
     app.set_bool("AXManualAccessibility", true);
     let page = |element: &super::accessibility::Element| {
         (element.string("AXRole") == "AXWebArea")
@@ -147,7 +128,6 @@ fn chromium_page(
         }
         at = element.parent();
     }
-    // The focus is elsewhere (the address bar, a menu): the first web area under the window.
     let mut queue = std::collections::VecDeque::from([(window.clone(), 0usize)]);
     let mut seen = 0usize;
     while let Some((element, depth)) = queue.pop_front() {
@@ -159,7 +139,12 @@ fn chromium_page(
             return Some(url);
         }
         if depth < 14 {
-            queue.extend(element.children().into_iter().map(|child| (child, depth + 1)));
+            queue.extend(
+                element
+                    .children()
+                    .into_iter()
+                    .map(|child| (child, depth + 1)),
+            );
         }
     }
     None
@@ -191,8 +176,6 @@ pub(crate) fn foreground_window(ignored: &[i64]) -> Option<Value> {
     })
 }
 
-/// One area of a display (display-local points) at its full pixel resolution,
-/// fitted inside the providers' sizes like a display capture.
 pub(crate) fn capture_rect(
     display_id: u32,
     x: f64,

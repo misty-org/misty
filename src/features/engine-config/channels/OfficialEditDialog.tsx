@@ -1,30 +1,25 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * Edit an engine's own config: one pane per native config file (Claude Code's settings.json,
- * Codex's config.toml, Kimi's and Grok's config.toml, …). The panes come from native code, so
- * the window never names a path or format. Native code checks every file before writing any
- * and keeps the version it replaces.
- */
 import { useEffect, useState } from "react";
 import {
   Button,
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
   Skeleton,
   SkeletonControl,
   Text,
   Textarea,
+  DialogFooter,
 } from "@misty/ui";
 import { channelsApi, type OfficialConfigFile } from "./api";
 import { engineName } from "./engines";
-import type { CliConfigState } from "./useCliConfig";
+import type { CliConfigState } from "./use_cli_config";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** A quick JSON check so Save turns off before the round trip; TOML relies on native code. */
 function jsonErrorOf(format: string, content: string): "syntax" | "object" | null {
   if (format !== "json") return null;
   try {
@@ -43,8 +38,6 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
 
-  // A new edit target (reopened, or another engine) starts from fresh panes, set during render
-  // so no stale panes flash.
   const editTarget = officialEditing ? engine : null;
   const [prevEditTarget, setPrevEditTarget] = useState(editTarget);
   if (editTarget !== prevEditTarget) {
@@ -63,7 +56,6 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
       .then((read) => {
         if (cancelled) return;
         setFiles(read);
-        // A missing JSON file starts as an empty object so the first save passes the check.
         setDrafts(
           Object.fromEntries(
             read.map((file) => [
@@ -91,9 +83,7 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
     try {
       const parsed: unknown = JSON.parse(drafts[path] ?? "");
       setDrafts((current) => ({ ...current, [path]: JSON.stringify(parsed, null, 2) + "\n" }));
-    } catch {
-      // Malformed JSON stays as typed; the pane already says so.
-    }
+    } catch {}
   };
 
   const save = async () => {
@@ -112,17 +102,15 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
         aria-describedby={undefined}
         className="flex max-h-[86vh] w-165 max-w-[94vw] flex-col gap-4 p-5"
       >
-        <DialogTitle className="pr-10 text-base">
-          Edit {engineName(engine)}'s own config
-        </DialogTitle>
+        <DialogHeader>
+          <DialogTitle>Edit {engineName(engine)}'s own config</DialogTitle>
+        </DialogHeader>
         <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1">
           {loadError ? (
-            <Text tone="muted" wrap className="text-sm" role="alert">
+            <Text size="meta" tone="muted" wrap role="alert">
               {loadError}
             </Text>
           ) : null}
-          {/* Read afresh on every open, since it's what gets saved: one pane's path line with
-              its Format button over the editor, at their real heights. */}
           {!files && !loadError ? (
             <div
               role="status"
@@ -143,7 +131,7 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
             return (
               <div key={file.path} className="grid gap-2">
                 <div className="flex items-center justify-between gap-2">
-                  <Text tone="muted" full className="min-w-0 flex-1 text-xs">
+                  <Text size="meta" tone="muted" full className="min-w-0 flex-1">
                     {file.path}
                   </Text>
                   {file.format === "json" ? (
@@ -163,7 +151,7 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
                   }
                 />
                 {jsonError ? (
-                  <Text tone="muted" wrap className="text-xs" role="alert">
+                  <Text size="meta" tone="muted" wrap role="alert">
                     {jsonError === "object" ? "Must be a JSON object" : "Invalid JSON"}
                   </Text>
                 ) : null}
@@ -171,13 +159,13 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
             );
           })}
           {saveError ? (
-            <Text tone="muted" wrap className="text-sm" role="alert">
+            <Text size="meta" tone="muted" wrap role="alert">
               {saveError}
             </Text>
           ) : null}
         </div>
-        <div className="flex justify-end gap-2">
-          <Button type="button" onClick={close}>
+        <DialogFooter>
+          <Button type="button" variant="quiet" onClick={close}>
             Cancel
           </Button>
           <Button
@@ -188,7 +176,7 @@ export function OfficialEditDialog({ cli }: { cli: CliConfigState }) {
           >
             Save
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

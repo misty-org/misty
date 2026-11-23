@@ -2,11 +2,13 @@ import {
   openSignInSheet,
   openSignOutSheet,
   SavedAccountSessionUnavailableError,
+  useAccountBannerUrl,
   useAuth,
   useUserStore,
 } from "@/features/account";
-import { reportSystemError } from "@/shared/platform/systemErrors";
-import { isMistyCloud, useServerChoice } from "@/api/deployment/serverChoice";
+import { useStatusStore } from "@/features/direct";
+import { reportSystemError } from "@/shared/platform/system_errors";
+import { isMistyCloud, useServerChoice } from "@/api/deployment/server_choice";
 import { openOnWebsite } from "@/features/account";
 import { routes } from "@/app/shell";
 import { useNativeSessionStore } from "@/features/account";
@@ -16,14 +18,19 @@ import {
   DropdownMenuSeparator,
   MenuItem,
   MenuSubmenu,
+  PresenceFace,
+  ProfileCardBanner,
+  ProfileCardGroup,
+  ProfileCardHeader,
+  ProfileCardName,
+  ProfileCardStatus,
   Spinner,
   Surface,
   Text,
 } from "@misty/ui";
-import { ShortcutText } from "@/features/shortcuts/runtime";
+import { ShortcutText } from "@/features/shortcuts/Runtime";
 import {
   Check,
-  Compass,
   CreditCard,
   LifeBuoy,
   LogOut,
@@ -32,11 +39,12 @@ import {
   Settings,
   UserCircle,
 } from "lucide-react";
-import { startTour } from "@/features/onboarding";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { initialsForProfile } from "./accountMenuText";
+import { emailName, initialsForProfile } from "./account_menu_text";
+import { AccountAvatar } from "./NavRail";
+import { StatusSubmenu, useMyShownPresence } from "./StatusMenu";
 import { useHelpDialog } from "./HelpDialog";
 
 function Initials(props: { children: string }) {
@@ -46,24 +54,24 @@ function Initials(props: { children: string }) {
       tone="active"
       className="grid size-6 shrink-0 place-items-center rounded-full"
     >
-      <Text bare tone="default" className="text-3xs font-bold">
+      <Text bare tone="default" className="text-micro font-bold">
         {props.children}
       </Text>
     </Surface>
   );
 }
 
-/** The account menu's rows: Settings, account actions, a submenu to switch saved accounts, and
- * Help. */
-function AccountMenuItems(props: {
+interface AccountMenuProps {
   onClose: () => void;
   onOpenAccountSettings: () => void;
-  /** Opens Settings; the avatar holds it so the window's corner needs no gear of its own. */
   onOpenSettings?: () => void;
-}) {
+  onChangeBanner: () => void;
+  onCustomStatus: () => void;
+}
+
+function AccountMenuItems(props: AccountMenuProps) {
   const navigate = useNavigate();
   const currentPath = useLocation().pathname;
-  // Misty Cloud's plans are bought and changed on the website.
   const cloud = useServerChoice((state) => isMistyCloud(state.choice));
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const { user, accounts, transitioning, switchAccount } = useAuth();
@@ -72,12 +80,17 @@ function AccountMenuItems(props: {
       id: state.me?.id,
       email: state.me?.email,
       username: state.me?.username,
+      bannerVersion: state.me?.banner_version ?? 0,
     })),
   );
+  const presence = useMyShownPresence();
+  const status = useStatusStore((state) => state.mine);
   const [switchingAccountId, setSwitchingAccountId] = useState("");
   const account = user ?? currentUser;
   const accountMe = me.id === account?.id ? me : null;
   const email = accountMe?.email ?? account?.email ?? "";
+  const name = accountMe?.username || account?.username || emailName(email) || "Misty";
+  const bannerUrl = useAccountBannerUrl(account?.id, accountMe?.bannerVersion);
   const busy = Boolean(switchingAccountId) || transitioning;
 
   const chooseAccount = async (accountId: string) => {
@@ -88,7 +101,6 @@ function AccountMenuItems(props: {
       await switchAccount(accountId);
     } catch (error) {
       if (error instanceof SavedAccountSessionUnavailableError) {
-        // The account stays listed; its session just needs a password again.
         const email = accounts.find((saved) => saved.id === accountId)?.email ?? "";
         openSignInSheet("expired", email);
         return;
@@ -103,13 +115,11 @@ function AccountMenuItems(props: {
     }
   };
 
-  // The menu hands focus back as it closes, so the dialog opens after it.
   const openHelp = () => {
     props.onClose();
     window.setTimeout(() => useHelpDialog.getState().setOpen(true), 0);
   };
 
-  // Plans are bought and changed on the website, which the app opens signed in as this account.
   const openWebsite = (path: string) => {
     props.onClose();
     void openOnWebsite(path).catch((error: unknown) => {
@@ -121,7 +131,6 @@ function AccountMenuItems(props: {
     });
   };
 
-  // Signing out asks first, with an option to remove what's on this computer.
   const signOut = () => {
     props.onClose();
     openSignOutSheet();
@@ -129,93 +138,103 @@ function AccountMenuItems(props: {
 
   return (
     <>
-      <DropdownMenuLabel className="py-1.5 text-xs font-medium">
-        <Text tone="default">{email || "Not signed in"}</Text>
-      </DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      {props.onOpenSettings ? (
-        <>
+      <ProfileCardBanner src={bannerUrl || null} onChange={props.onChangeBanner} />
+      <ProfileCardHeader
+        face={
+          <PresenceFace presence={presence} face="xl">
+            <AccountAvatar size="xl" shape="circle" />
+          </PresenceFace>
+        }
+        status={
+          <ProfileCardStatus
+            emoji={status.custom_emoji}
+            text={status.custom_text}
+            onSelect={() => window.setTimeout(props.onCustomStatus, 0)}
+          />
+        }
+      />
+      <ProfileCardName name={name} line={email || undefined} />
+      <ProfileCardGroup>
+        <MenuItem
+          icon={<UserCircle />}
+          label="Account settings"
+          onSelect={props.onOpenAccountSettings}
+        />
+        <StatusSubmenu onCustomStatus={props.onCustomStatus} />
+        {props.onOpenSettings ? (
           <MenuItem
             icon={<Settings />}
             label="Settings"
             shortcut={<ShortcutText commandId="app.open_settings" />}
             onSelect={props.onOpenSettings}
           />
-          <DropdownMenuSeparator />
-        </>
-      ) : null}
-      <MenuItem
-        icon={<UserCircle />}
-        label="Account settings"
-        onSelect={props.onOpenAccountSettings}
-      />
-      {cloud ? (
-        <MenuSubmenu icon={<CreditCard />} label="Plan and billing">
-          <MenuItem
-            label="Get Misty+ monthly"
-            onSelect={() => openWebsite("/pricing?checkout=plus")}
-          />
-          <MenuItem
-            label="Get Misty+ yearly"
-            onSelect={() => openWebsite("/pricing?checkout=plus_yearly")}
-          />
-          <DropdownMenuSeparator />
-          <MenuItem label="Manage plan" onSelect={() => openWebsite("/settings/subscription")} />
-        </MenuSubmenu>
-      ) : null}
-      <MenuSubmenu icon={<Repeat2 />} label="Switch accounts" width="lg" disabled={transitioning}>
-        <DropdownMenuLabel>Switch accounts</DropdownMenuLabel>
-        {accounts.map((saved) => (
-          <MenuItem
-            key={saved.id}
-            disabled={busy}
-            icon={<Initials>{initialsForProfile(saved.username, saved.email)}</Initials>}
-            label={saved.username || saved.email}
-            shortcut={
-              switchingAccountId === saved.id ? (
-                <Spinner size="sm" label="Switching account" />
-              ) : saved.id === account?.id ? (
-                <Text bare tone="bright">
-                  <Check aria-label="Active account" />
-                </Text>
-              ) : undefined
-            }
-            onSelect={(event) => {
-              event.preventDefault();
-              void chooseAccount(saved.id);
-            }}
-          />
-        ))}
-        {accounts.length === 0 ? (
-          <Text wrap tone="muted" className="m-0 px-2 py-2 text-xs">
-            No saved accounts are available yet.
-          </Text>
         ) : null}
-        <DropdownMenuSeparator />
-        <MenuItem
-          icon={<Plus />}
-          label="Add another account"
-          disabled={busy}
-          onSelect={() =>
-            navigate(routes.welcome, { state: { from: currentPath, addingAccount: true } })
-          }
-        />
-      </MenuSubmenu>
-      <MenuItem icon={<Compass />} label="Show me around" onSelect={() => startTour()} />
-      <MenuItem icon={<LifeBuoy />} label="Help" onSelect={openHelp} />
-      <MenuItem icon={<LogOut />} label="Sign out…" disabled={transitioning} onSelect={signOut} />
+      </ProfileCardGroup>
+      {cloud ? (
+        <ProfileCardGroup>
+          <MenuSubmenu icon={<CreditCard />} label="Plan and billing">
+            <MenuItem
+              label="Get Misty+ monthly"
+              onSelect={() => openWebsite("/pricing?checkout=plus")}
+            />
+            <MenuItem
+              label="Get Misty+ yearly"
+              onSelect={() => openWebsite("/pricing?checkout=plus_yearly")}
+            />
+            <DropdownMenuSeparator />
+            <MenuItem label="Manage plan" onSelect={() => openWebsite("/settings/subscription")} />
+          </MenuSubmenu>
+        </ProfileCardGroup>
+      ) : null}
+      <ProfileCardGroup>
+        <MenuItem icon={<LifeBuoy />} label="Help" onSelect={openHelp} />
+        <MenuSubmenu icon={<Repeat2 />} label="Switch accounts" width="lg" disabled={transitioning}>
+          <DropdownMenuLabel>Switch accounts</DropdownMenuLabel>
+          {accounts.map((saved) => (
+            <MenuItem
+              key={saved.id}
+              disabled={busy}
+              icon={<Initials>{initialsForProfile(saved.username, saved.email)}</Initials>}
+              label={saved.username || saved.email}
+              shortcut={
+                switchingAccountId === saved.id ? (
+                  <Spinner size="sm" label="Switching account" />
+                ) : saved.id === account?.id ? (
+                  <Text bare tone="bright">
+                    <Check aria-label="Active account" />
+                  </Text>
+                ) : undefined
+              }
+              onSelect={(event) => {
+                event.preventDefault();
+                void chooseAccount(saved.id);
+              }}
+            />
+          ))}
+          {accounts.length === 0 ? (
+            <Text wrap size="meta" tone="muted" className="m-0 px-2 py-2">
+              No saved accounts are available yet.
+            </Text>
+          ) : null}
+          <DropdownMenuSeparator />
+          <MenuItem
+            icon={<Plus />}
+            label="Add another account"
+            disabled={busy}
+            onSelect={() =>
+              navigate(routes.welcome, { state: { from: currentPath, addingAccount: true } })
+            }
+          />
+        </MenuSubmenu>
+        <MenuItem icon={<LogOut />} label="Sign out…" disabled={transitioning} onSelect={signOut} />
+      </ProfileCardGroup>
     </>
   );
 }
 
-/** The account button's menu. */
-export function AccountMenu(props: {
-  onClose: () => void;
-  onOpenAccountSettings: () => void;
-  onOpenSettings?: () => void;
-}) {
+export function AccountMenu(props: AccountMenuProps) {
   return (
-    <DropdownMenuContent align="end" sideOffset={10} width="md" aria-label="Account">
+    <DropdownMenuContent kind="card" side="top" align="start" sideOffset={9} aria-label="Account">
       <AccountMenuItems {...props} />
     </DropdownMenuContent>
   );

@@ -4,13 +4,10 @@ use serde_json::Value;
 
 pub(crate) const PROTOCOL_VERSION: u8 = 1;
 
-/// Largest serialized `args` a page may send. Capabilities that move bulk
-/// data (files, media) will need their own channel rather than a bigger limit.
 pub(crate) const MAX_ARGS_BYTES: usize = 16 * 1024;
 
 const MAX_NAME_LEN: usize = 64;
 
-/// One page call: `Kiri.call(cap, method, args)` on the page side.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
@@ -22,8 +19,6 @@ pub struct Request {
 }
 
 impl Request {
-    /// Checks the envelope before anything routes on it. Everything in it is
-    /// page-controlled.
     pub fn validate(&self) -> Result<(), KiriError> {
         if self.v != PROTOCOL_VERSION {
             return Err(KiriError::not_supported(format!(

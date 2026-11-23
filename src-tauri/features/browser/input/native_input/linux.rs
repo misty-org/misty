@@ -1,8 +1,3 @@
-//! Trusted agent input for WebKitGTK pages: real GDK events built by Misty and handed to the
-//! granted page's own widget with `gtk_widget_event`. They reach that view only: never Misty's
-//! window, another tab, another app or the display server, and the person's pointer and keyboard
-//! stay where they are. Typing goes through WebKit's InsertText editing command, as an input
-//! method would commit it.
 use std::{
     cell::Cell,
     collections::HashSet,
@@ -15,14 +10,12 @@ use serde_json::{json, Value};
 use tauri::Webview;
 use webkit2gtk::WebViewExt;
 
-/// Pages whose person-made input is ignored while an agent drives them.
 fn locked_pages() -> &'static Mutex<HashSet<String>> {
     static LOCKED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
     LOCKED.get_or_init(Mutex::default)
 }
 
 thread_local! {
-    /// True on the GTK thread while Misty itself delivers an event, so the lock lets it through.
     static DELIVERING: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -49,7 +42,6 @@ fn is_person_input(kind: gdk::EventType) -> bool {
     )
 }
 
-/// Ignores the person's own input on the page while an agent drives it. Misty's events pass.
 pub(in crate::browser) fn set_locked(webview: &Webview, locked: bool) -> Result<(), String> {
     let label = webview.label().to_owned();
     {
@@ -89,11 +81,8 @@ pub(in crate::browser) fn set_locked(webview: &Webview, locked: bool) -> Result<
         .map_err(|error| error.to_string())
 }
 
-/// A check that runs on the GTK thread right before each event, so an event cannot outlive
-/// revoked ownership, a takeover or a navigation.
 pub(in crate::browser) type Authorize = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
 
-/// One synthesized event, in CSS pixels of the page's viewport.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Synth {
     Motion {
@@ -112,7 +101,6 @@ pub(crate) enum Synth {
         y: f64,
         button: u32,
     },
-    /// Smooth scroll by CSS pixels; positive y scrolls the content down.
     Scroll {
         x: f64,
         y: f64,
@@ -126,15 +114,12 @@ pub(crate) enum Synth {
     },
 }
 
-/// WebKitGTK scrolls a smooth delta of 1.0 by one line step (40 CSS pixels).
 const PIXELS_PER_LINE: f64 = 40.0;
 
 fn event_time() -> u32 {
     (glib::monotonic_time() / 1000) as u32
 }
 
-/// Builds `synth` for `view` (whose GdkWindow it targets) and delivers it to that widget.
-/// Runs on the GTK thread.
 pub(crate) fn deliver(view: &webkit2gtk::WebView, synth: Synth) -> Result<(), String> {
     let window = view
         .window()
@@ -243,14 +228,12 @@ pub(crate) fn deliver(view: &webkit2gtk::WebView, synth: Synth) -> Result<(), St
     Ok(())
 }
 
-/// Commits text into the page's focused field, as an input method would.
 pub(crate) fn insert_text(view: &webkit2gtk::WebView, text: &str) {
     DELIVERING.with(|delivering| delivering.set(true));
     view.execute_editing_command_with_argument("InsertText", text);
     DELIVERING.with(|delivering| delivering.set(false));
 }
 
-/// The keysym and the GDK modifier bits for a validated key action.
 pub(crate) fn key_of(name: &str, modifiers: &Value) -> Option<(u32, u32)> {
     let keyval = match name {
         "Enter" => 0xff0d,
@@ -267,7 +250,6 @@ pub(crate) fn key_of(name: &str, modifiers: &Value) -> Option<(u32, u32)> {
         "PageUp" => 0xff55,
         "PageDown" => 0xff56,
         "Space" => 0x20,
-        // Printable ASCII keysyms are their code points.
         single if single.len() == 1 && single.as_bytes()[0].is_ascii_graphic() => {
             u32::from(single.as_bytes()[0])
         }
@@ -286,7 +268,6 @@ pub(crate) fn key_of(name: &str, modifiers: &Value) -> Option<(u32, u32)> {
     Some((keyval, bits))
 }
 
-/// The page's CSS viewport, `None` while its widget isn't on screen.
 pub(crate) fn css_viewport(view: &webkit2gtk::WebView) -> Option<(f64, f64)> {
     if !view.is_mapped() || view.window().is_none() {
         return None;
@@ -298,7 +279,6 @@ pub(crate) fn css_viewport(view: &webkit2gtk::WebView) -> Option<(f64, f64)> {
     ))
 }
 
-/// Runs `work` on the page's GTK thread after `authorize` passes, and waits for it.
 async fn on_view<T: Send + 'static>(
     webview: &Webview,
     authorize: &Authorize,
@@ -327,7 +307,6 @@ async fn send(webview: &Webview, authorize: &Authorize, events: Vec<Synth>) -> R
     .await
 }
 
-/// The page's CSS viewport as WebKit lays it out now.
 pub(in crate::browser) async fn viewport(webview: &Webview) -> Result<(f64, f64), String> {
     let allow: Authorize = Arc::new(|| Ok(()));
     on_view(webview, &allow, |view| {
@@ -337,7 +316,6 @@ pub(in crate::browser) async fn viewport(webview: &Webview) -> Result<(f64, f64)
     .await
 }
 
-/// Delivers one validated action. Returns the same receipt the other adapters do.
 pub(in crate::browser) async fn act(
     webview: &Webview,
     authorize: Authorize,
@@ -372,7 +350,6 @@ pub(in crate::browser) async fn act(
                     button,
                     double: false,
                 });
-                // GTK reports a second press in a row as a double press too.
                 if click == 2 {
                     events.push(Synth::Press {
                         x,

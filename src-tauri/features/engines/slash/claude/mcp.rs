@@ -1,9 +1,5 @@
-//! `/mcp`: reconnecting, enabling and disabling Claude Code's MCP servers.
-
 use super::*;
 
-/// `/mcp` with Claude Code's own arguments: `reconnect`, `enable` or `disable`, for one server
-/// or `all`. Bare `/mcp` opens Misty's MCP settings.
 pub(super) async fn mcp(context: &Context) -> Result<Output, String> {
     let mut words = context.args.splitn(2, char::is_whitespace);
     let action = words.next().unwrap_or_default().to_ascii_lowercase();
@@ -52,8 +48,6 @@ async fn mcp_with(control: &mut Control, action: &str, target: &str) -> Result<O
                 "enabled": action == "enable",
             }),
         };
-        // Turning a server on saves the choice, then connects it: a server that won't connect
-        // answers with its connection error, though it stays on.
         if let Err(error) = control.request(request, ANSWER).await {
             failed.push(if action == "enable" {
                 format!("{name} is on but couldn't connect: {error}")

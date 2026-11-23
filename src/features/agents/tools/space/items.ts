@@ -1,12 +1,5 @@
 import type { LocalToolHandler, LocalToolRequest } from "../host";
-import {
-  readRoute,
-  refuse,
-  rewordRefusal,
-  segment,
-  spacePath,
-  writeRoute,
-} from "./api";
+import { readRoute, refuse, rewordRefusal, segment, spacePath, writeRoute } from "./api";
 import { onlyFields, text } from "./args";
 import { namedSpace, type SpaceRow } from "./routing";
 

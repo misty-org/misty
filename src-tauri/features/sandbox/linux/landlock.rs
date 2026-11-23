@@ -1,7 +1,3 @@
-//! Landlock, the kernel's own sandbox for unprivileged processes: once a process restricts itself,
-//! it and everything it starts can reach only the files and folders a rule names, and nothing it
-//! does later can widen that. The rules are opened here, in Misty's process, before the confined
-//! process starts; the child only calls `landlock_restrict_self`.
 use std::{
     ffi::CString,
     io,
@@ -12,7 +8,6 @@ use std::{
     path::Path,
 };
 
-// The three Landlock calls have the same numbers on every architecture.
 const SYS_CREATE_RULESET: libc::c_long = 444;
 const SYS_ADD_RULE: libc::c_long = 445;
 const SYS_RESTRICT_SELF: libc::c_long = 446;
@@ -32,22 +27,16 @@ const MAKE_SOCK: u64 = 1 << 9;
 const MAKE_FIFO: u64 = 1 << 10;
 const MAKE_BLOCK: u64 = 1 << 11;
 const MAKE_SYM: u64 = 1 << 12;
-/// ABI 2: linking or renaming a file into another folder.
 const REFER: u64 = 1 << 13;
-/// ABI 3: truncating, `open(O_TRUNC)` included.
 pub(super) const TRUNCATE: u64 = 1 << 14;
-/// ABI 5: `ioctl` on a device file.
 pub(super) const IOCTL_DEV: u64 = 1 << 15;
 
-/// ABI 4: TCP. With no rule for it, neither binding nor connecting is allowed.
 const NET_BIND_TCP: u64 = 1 << 0;
 const NET_CONNECT_TCP: u64 = 1 << 1;
 
-/// ABI 6: abstract Unix sockets and signals reach only processes in the same sandbox.
 const SCOPE_ABSTRACT_UNIX_SOCKET: u64 = 1 << 0;
 const SCOPE_SIGNAL: u64 = 1 << 1;
 
-/// The rights that apply to a file rather than a folder.
 const FILE_RIGHTS: u64 = EXECUTE | WRITE_FILE | READ_FILE | TRUNCATE | IOCTL_DEV;
 
 #[repr(C)]
@@ -63,7 +52,6 @@ struct PathBeneathAttr {
     parent_fd: i32,
 }
 
-/// The Landlock version this kernel speaks, or 0 when Landlock is off or missing.
 pub(super) fn abi() -> u32 {
     // SAFETY: the version query reads no memory.
     let version = unsafe {
@@ -77,8 +65,6 @@ pub(super) fn abi() -> u32 {
     u32::try_from(version).unwrap_or(0)
 }
 
-/// Every filesystem right this ABI knows. Handling all of them means anything without a rule is
-/// refused.
 fn handled_fs(abi: u32) -> u64 {
     let mut rights = EXECUTE
         | WRITE_FILE
@@ -105,12 +91,10 @@ fn handled_fs(abi: u32) -> u64 {
     rights
 }
 
-/// Everything inside a private folder, short of running what's written there.
 pub(super) fn everything_but_running() -> u64 {
     handled_fs(u32::MAX) & !EXECUTE
 }
 
-/// A set of rules, ready for a child to restrict itself with.
 pub(super) struct Ruleset {
     fd: OwnedFd,
     abi: u32,
@@ -151,14 +135,10 @@ impl Ruleset {
         Ok(Self { fd, abi, handled })
     }
 
-    /// Whether signals and abstract sockets stay inside the sandbox (Landlock ABI 6).
     pub(super) fn scopes_signals(&self) -> bool {
         self.abi >= 6
     }
 
-    /// Allows `access` on `path` and everything under it. A link as the last part of `path` is
-    /// never followed: a rule always lands on what is really there. Returns false when nothing is
-    /// at `path` (or it is a link), which callers decide about.
     pub(super) fn allow(&self, path: &Path, access: u64) -> io::Result<bool> {
         let Ok(name) = CString::new(path.as_os_str().as_bytes()) else {
             return Ok(false);
@@ -217,8 +197,6 @@ impl Ruleset {
     }
 }
 
-/// Restricts the calling process to `ruleset`. Async-signal-safe: one system call. No new
-/// privileges must already be set.
 pub(super) fn restrict_self(ruleset: RawFd) -> io::Result<()> {
     // SAFETY: a ruleset descriptor this process inherited from its parent.
     if unsafe { libc::syscall(SYS_RESTRICT_SELF, ruleset, 0u32) } != 0 {

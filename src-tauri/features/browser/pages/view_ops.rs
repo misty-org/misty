@@ -1,5 +1,3 @@
-//! Per-page commands: bounds, navigation, zoom, overlay, companion and hide.
-
 use crate::browser::*;
 
 mod visibility;
@@ -18,7 +16,6 @@ pub fn browser_webview_set_bounds(
     set_webview_bounds_if_changed(&app, &webview, position, size)
 }
 
-/// `#rrggbb` as its channels.
 #[cfg(windows)]
 fn hex_color(value: &str) -> Option<[u8; 3]> {
     let hex = value.strip_prefix('#')?;
@@ -48,10 +45,7 @@ pub fn browser_webview_reconcile(
         request.corner_radii.unwrap_or_default(),
         request.corner_color.as_deref().and_then(hex_color),
     )?;
-    // Reconciliation owns geometry, visibility, and sibling order so a stale
-    // frontend cache cannot leave the page detached from its Browser host.
     present_macos_webview(&webview)?;
-    // A reloaded shell forgot the page's color; the page will not resend it.
     #[cfg(target_os = "macos")]
     crate::browser::kiri_link::host_messages::replay_page_background(&app, &request.id);
     Ok(true)

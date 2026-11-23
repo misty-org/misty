@@ -3,9 +3,7 @@ interface ApiSessionProvider {
   readGeneration: () => number;
   readToken: (path?: string) => Promise<string | null>;
   requestCredentials?: () => RequestCredentials;
-  /** True only when it is known that no account is signed in. */
   isSignedOut?: () => boolean;
-  /** The active account's id, or empty when unknown (saved copies are then not used). */
   readAccountId?: () => string;
 }
 

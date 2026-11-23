@@ -1,9 +1,10 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/models/grok.rs.
 use super::{alias_table_catalog, promote_default, AliasFields, EngineModel};
 
-/// Grok's local catalog: the `[model."<alias>"]` tables in
-/// $GROK_HOME/config.toml — id = alias, which is exactly what `grok -m`
-/// resolves and what the CLI's own /model menu lists.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Grok's own config in place, which GROK_HOME may move outside the engine folders the gate grants"
+)]
 pub(super) fn grok_local_models() -> Vec<EngineModel> {
     let home = crate::engines::engine_home(Some("GROK_HOME"), ".grok");
     let Ok(content) = std::fs::read_to_string(home.join("config.toml")) else {
@@ -12,12 +13,6 @@ pub(super) fn grok_local_models() -> Vec<EngineModel> {
     parse_grok_config_models(&content)
 }
 
-/// `[model."<alias>"]` tables → catalog entries (id = alias, label = the
-/// table's `name`, context window from `context_window`). The CLI's current
-/// pick — `[models].default`, or the top-level `model` scalar — leads the
-/// list; remaining aliases follow sorted. A bare top-level `model` with no
-/// tables still yields that single entry. Malformed TOML yields an empty
-/// catalog (the frontend falls back to provider-config models).
 pub fn parse_grok_config_models(content: &str) -> Vec<EngineModel> {
     const FIELDS: AliasFields = AliasFields {
         name_keys: &["name"],
@@ -37,7 +32,6 @@ pub fn parse_grok_config_models(content: &str) -> Vec<EngineModel> {
         .map(str::to_string);
     let mut models = alias_table_catalog(&root, "model", "grok", &FIELDS);
     if models.is_empty() {
-        // Scalar `model = "…"` and no tables: that id alone is what runs.
         return current
             .into_iter()
             .map(|id| EngineModel {
@@ -82,7 +76,6 @@ context_window = 200000
 
     #[test]
     fn grok_config_models_scalar_model_is_single_entry() {
-        // No [model.*] tables: the top-level scalar is all the CLI can run.
         let models = parse_grok_config_models("model = \"grok-4.6\"\n");
         assert_eq!(models.len(), 1);
         assert_eq!(models[0].id, "grok-4.6");
@@ -98,7 +91,6 @@ name = \"grok-4.6\"
 ";
         let models = parse_grok_config_models(toml);
         assert_eq!(models.len(), 1);
-        // name identical to the alias carries no information — dropped.
         assert_eq!(models[0].name, None);
     }
 }

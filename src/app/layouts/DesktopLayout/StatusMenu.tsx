@@ -1,30 +1,28 @@
 import { Smile, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useMyPresence, useStatusStore, type ChosenStatus } from "@/features/direct";
-import { useDoNotDisturb } from "@/shared/lib/doNotDisturb";
+import { useDoNotDisturb } from "@/shared/lib/do_not_disturb";
 import {
   Button,
   Dialog,
+  type MemberPresence,
   DialogBody,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
   Field,
-  IconButton,
   Input,
   MenuItem,
   MenuRadioGroup,
   MenuRadioItem,
   MenuSeparator,
+  MenuSubmenu,
   notify,
   OptionSelect,
+  PresenceDot,
 } from "@misty/ui";
 
-/** Idle is worked out from this computer, so only these are chosen. */
 const choices: { value: ChosenStatus["chosen"]; label: string }[] = [
   { value: "online", label: "Online" },
   { value: "dnd", label: "Do not disturb" },
@@ -39,7 +37,6 @@ const expiries = [
   { value: "never", label: "Don't clear" },
 ];
 
-/** When a custom status set now clears itself: an ISO time, or null for never. */
 function expiresAt(choice: string): string | null {
   const now = new Date();
   const minutes = { "30m": 30, "1h": 60, "4h": 240 }[choice];
@@ -66,17 +63,12 @@ function save(next: ChosenStatus) {
     });
 }
 
-/** The person's custom status as one line: its emoji and its text. */
 export function useMyCustomStatus(): string {
   return useStatusStore((state) =>
     [state.mine.custom_emoji, state.mine.custom_text].filter(Boolean).join(" "),
   );
 }
 
-/**
- * Keeps this device's Do not disturb (which silences Misty's system notices) in step with the
- * status the account shows, as it loads and as it changes.
- */
 function useDoNotDisturbMirror() {
   useEffect(
     () =>
@@ -92,7 +84,6 @@ function useDoNotDisturbMirror() {
 function CustomStatusDialog(props: { open: boolean; onOpenChange(open: boolean): void }) {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      {/* The form mounts as the dialog opens, so it starts from the status as it is then. */}
       {props.open ? <CustomStatusForm onClose={() => props.onOpenChange(false)} /> : null}
     </Dialog>
   );
@@ -130,7 +121,11 @@ function CustomStatusForm(props: { onClose(): void }) {
         >
           <div className="flex items-end gap-2">
             <Field label="Emoji" className="w-16">
-              <Input value={emoji} maxLength={8} onChange={(event) => setEmoji(event.target.value)} />
+              <Input
+                value={emoji}
+                maxLength={8}
+                onChange={(event) => setEmoji(event.target.value)}
+              />
             </Field>
             <Field label="Status" className="min-w-0 flex-1">
               <Input
@@ -158,57 +153,72 @@ function CustomStatusForm(props: { onClose(): void }) {
   );
 }
 
-/**
- * The person's status, from the profile row: Online, Do not disturb or Invisible (Idle comes by
- * itself after a while without use), then their custom status line.
- */
-export function StatusMenu() {
+export function useMyShownPresence(): MemberPresence {
+  const presence = useMyPresence();
+  const chosen = useStatusStore((state) => state.mine.chosen);
+  return chosen === "invisible" ? "invisible" : presence;
+}
+
+export function useStatusMirror() {
   useDoNotDisturbMirror();
+}
+
+export function StatusSubmenu(props: { onCustomStatus(): void }) {
   const mine = useStatusStore((state) => state.mine);
   const presence = useMyPresence();
+  const shown = useMyShownPresence();
   const custom = useMyCustomStatus();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const later = (run: () => void) => () => window.setTimeout(run, 0);
   return (
-    <>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <IconButton label="Status">
-            <Smile />
-          </IconButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="end">
-          <MenuRadioGroup
-            value={presence === "idle" ? "online" : mine.chosen}
-            onValueChange={(value) => {
-              const chosen = choices.find((choice) => choice.value === value)?.value;
-              if (chosen && chosen !== mine.chosen)
-                void save({ ...useStatusStore.getState().mine, chosen });
-            }}
-          >
-            {choices.map((choice) => (
-              <MenuRadioItem key={choice.value} value={choice.value} label={choice.label} />
-            ))}
-          </MenuRadioGroup>
-          <MenuSeparator />
-          <MenuItem icon={Smile} label="Set custom status" onSelect={later(() => setDialogOpen(true))} />
-          {custom ? (
-            <MenuItem
-              icon={X}
-              label="Clear custom status"
-              onSelect={() =>
-                void save({
-                  ...useStatusStore.getState().mine,
-                  custom_emoji: undefined,
-                  custom_text: undefined,
-                  custom_expires_at: null,
-                })
-              }
-            />
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <CustomStatusDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-    </>
+    <MenuSubmenu icon={<PresenceDot presence={shown} />} label={presenceLabel[shown]}>
+      <MenuRadioGroup
+        value={presence === "idle" ? "online" : mine.chosen}
+        onValueChange={(value) => {
+          const chosen = choices.find((choice) => choice.value === value)?.value;
+          if (chosen && chosen !== mine.chosen)
+            void save({ ...useStatusStore.getState().mine, chosen });
+        }}
+      >
+        {choices.map((choice) => (
+          <MenuRadioItem
+            key={choice.value}
+            value={choice.value}
+            icon={<PresenceDot presence={choice.value} />}
+            label={choice.label}
+          />
+        ))}
+      </MenuRadioGroup>
+      <MenuSeparator />
+      <MenuItem
+        icon={Smile}
+        label={custom ? "Edit custom status" : "Set custom status"}
+        onSelect={() => window.setTimeout(props.onCustomStatus, 0)}
+      />
+      {custom ? (
+        <MenuItem
+          icon={X}
+          label="Clear custom status"
+          onSelect={() =>
+            void save({
+              ...useStatusStore.getState().mine,
+              custom_emoji: undefined,
+              custom_text: undefined,
+              custom_expires_at: null,
+            })
+          }
+        />
+      ) : null}
+    </MenuSubmenu>
   );
 }
+
+const presenceLabel: Record<MemberPresence, string> = {
+  online: "Online",
+  idle: "Idle",
+  dnd: "Do not disturb",
+  invisible: "Invisible",
+  offline: "Offline",
+  working: "Working",
+  waiting: "Waiting",
+};
+
+export { CustomStatusDialog };

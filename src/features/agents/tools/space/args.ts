@@ -1,6 +1,5 @@
 import { BAD_SCHEMA, refuse } from "./api";
 
-/** The same checks the tools' declared input schemas made on the server. */
 type Input = Record<string, unknown>;
 
 const invalid = () => refuse(BAD_SCHEMA);
@@ -73,12 +72,10 @@ export function textList(input: Input, name: string, rule: ListRule): string[] |
   return value as string[];
 }
 
-/** For the tools whose schema refuses anything it doesn't name. */
 export function onlyFields(input: Input, names: readonly string[]) {
   if (Object.keys(input).some((name) => !names.includes(name))) throw invalid();
 }
 
-/** Cuts text to a number of characters, the way the server shortened it. */
 export function clipText(value: string, limit: number): string {
   const characters = Array.from(value);
   if (characters.length <= limit) return value;

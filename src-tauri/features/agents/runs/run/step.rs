@@ -1,18 +1,18 @@
-//! What the Workflow library did around one step: a failed step tries again a second or so later, a
-//! `FatalError` doesn't, and when tries run out the run sees one fatal error that names the step.
 use std::{future::Future, time::Duration};
 
 use crate::runtime_errors::{RuntimeError, StepFailure};
 
-/// `DEFAULT_STEP_MAX_RETRIES` in `@workflow/core`.
 pub(crate) const DEFAULT_STEP_RETRIES: u32 = 3;
 
 fn fatal(message: impl Into<String>) -> RuntimeError {
     RuntimeError::named("FatalError", message)
 }
 
-/// Runs a step until it works, it fails for good, or its tries run out.
-pub(crate) async fn step<T, F, Fut>(name: &str, max_retries: u32, mut attempt: F) -> Result<T, RuntimeError>
+pub(crate) async fn step<T, F, Fut>(
+    name: &str,
+    max_retries: u32,
+    mut attempt: F,
+) -> Result<T, RuntimeError>
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = Result<T, StepFailure>>,
@@ -23,12 +23,17 @@ where
         let (message, wait_ms) = match attempt().await {
             Ok(value) => return Ok(value),
             Err(StepFailure::Fatal(message)) => return Err(fatal(message)),
-            Err(StepFailure::Retryable { message, retry_after_ms }) => (message, retry_after_ms.max(1_000)),
+            Err(StepFailure::Retryable {
+                message,
+                retry_after_ms,
+            }) => (message, retry_after_ms.max(1_000)),
             Err(StepFailure::Unrecognized(error)) => (error.to_string(), 1_000),
         };
         if tries > max_retries {
             let plural = if max_retries == 1 { "retry" } else { "retries" };
-            return Err(fatal(format!("Step \"{name}\" failed after {max_retries} {plural}: {message}")));
+            return Err(fatal(format!(
+                "Step \"{name}\" failed after {max_retries} {plural}: {message}"
+            )));
         }
         tokio::time::sleep(Duration::from_millis(wait_ms)).await;
     }
@@ -45,13 +50,20 @@ mod tests {
         let calls = AtomicU32::new(0);
         let result: Result<(), _> = step("doStreamStep", 3, || {
             calls.fetch_add(1, Ordering::SeqCst);
-            async { Err(StepFailure::Unrecognized(RuntimeError::error("Bad Gateway"))) }
+            async {
+                Err(StepFailure::Unrecognized(RuntimeError::error(
+                    "Bad Gateway",
+                )))
+            }
         })
         .await;
         assert_eq!(calls.load(Ordering::SeqCst), 4);
         let error = result.unwrap_err();
         assert_eq!(error.name(), "FatalError");
-        assert_eq!(error.to_string(), "Step \"doStreamStep\" failed after 3 retries: Bad Gateway");
+        assert_eq!(
+            error.to_string(),
+            "Step \"doStreamStep\" failed after 3 retries: Bad Gateway"
+        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -73,7 +85,10 @@ mod tests {
             let attempt = calls.fetch_add(1, Ordering::SeqCst);
             async move {
                 if attempt == 0 {
-                    Err(StepFailure::Retryable { message: "busy".to_owned(), retry_after_ms: 5_000 })
+                    Err(StepFailure::Retryable {
+                        message: "busy".to_owned(),
+                        retry_after_ms: 5_000,
+                    })
                 } else {
                     Ok(7)
                 }

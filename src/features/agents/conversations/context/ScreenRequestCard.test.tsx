@@ -1,12 +1,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ open: vi.fn(), decline: vi.fn() }));
-vi.mock("./screenRequests", () => ({
+vi.mock("./screen_requests", () => ({
   openScreenAndContinue: mocks.open,
   declineScreenRequest: mocks.decline,
 }));
 import { ScreenRequestCard } from "./ScreenRequestCard";
-import { useMistyStore } from "../state/useMistyStore";
+import { useMistyStore } from "../state/use_misty_store";
 
 afterEach(() => {
   cleanup();

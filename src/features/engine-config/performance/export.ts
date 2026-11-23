@@ -1,10 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-import { performanceApi } from "./nativeApi";
+import { performanceApi } from "./native_api";
 import type { PerformanceReport } from "./summary";
 
-/** Saves the whole report as JSON where the person chooses. */
 export async function exportPerformanceReport(
   report: PerformanceReport,
 ): Promise<"saved" | "cancelled"> {

@@ -1,6 +1,5 @@
-import { accountLimitMessage } from "@/api/client/accountLimits";
+import { accountLimitMessage } from "@/api/client/account_limits";
 
-/** Turns account API responses into payloads or readable errors. */
 export class AccountApiError extends Error {
   name = "AccountApiError";
   constructor(
@@ -65,7 +64,7 @@ export function recordAccountApiDebugEvent(event: {
   if (!import.meta.env.DEV && import.meta.env.VITE_MISTY_DEBUG !== "1") {
     return;
   }
-  void import("@/shared/platform/clientDebug").then(({ recordClientDebugEvent }) => {
+  void import("@/shared/platform/client_debug").then(({ recordClientDebugEvent }) => {
     recordClientDebugEvent(event);
   });
 }

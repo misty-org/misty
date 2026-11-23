@@ -20,7 +20,6 @@ use super::driver::{
 };
 use crate::agents::run_control::tool_gate::{self, Admission};
 
-/// What the server tells an engine about these tools.
 pub(crate) const INSTRUCTIONS: &str = "The computer_ tools see and control the person's real \
 computer with Misty's own cursor, which they watch and can stop with Escape. Loop: screenshot, \
 act, read the screenshot that comes back. Coordinates are always pixels of the latest screenshot \
@@ -60,7 +59,6 @@ fn tool(name: &str, description: &str, input: Value, read_only: bool) -> Value {
     })
 }
 
-/// Every computer tool, in MCP's shape, by the names an engine calls.
 pub(crate) fn offered() -> Vec<Value> {
     let display_only = schema(
         json!({ "display_id": { "type": "integer", "description": DISPLAY } }),
@@ -130,7 +128,6 @@ pub(crate) fn offered() -> Vec<Value> {
     ]
 }
 
-/// Misty's own name for a tool an engine called, if it is one of these.
 pub(crate) fn misty_name(wire: &str) -> Option<String> {
     let action = wire.strip_prefix("computer_")?;
     offered()
@@ -139,7 +136,6 @@ pub(crate) fn misty_name(wire: &str) -> Option<String> {
         .then(|| format!("computer.{action}"))
 }
 
-/// One step of a `sequence` call, in screenshot pixels like the single actions.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum SequenceAction {
@@ -225,7 +221,6 @@ fn error_result(message: impl Into<String>) -> Value {
     json!({ "isError": true, "content": [text_block(message)] })
 }
 
-/// A confirmation and a fresh screenshot, so the engine sees what its action did.
 fn action_result(message: String, display: Option<u32>) -> Value {
     std::thread::sleep(Duration::from_millis(250));
     let mut blocks = vec![text_block(message)];
@@ -274,7 +269,6 @@ fn click(input: &Value, button: Button, label: &str, times: u32) -> Result<Value
     Ok(action_result(message, display))
 }
 
-/// Runs a tool the gate already let through. Blocking: it captures the screen and moves input.
 fn run(name: &str, input: &Value) -> Result<Value, String> {
     let display = display_of(input);
     match name {
@@ -385,7 +379,6 @@ fn run(name: &str, input: &Value) -> Result<Value, String> {
                         ));
                     }
                 }
-                // A short settle between steps so fast interfaces keep up.
                 std::thread::sleep(Duration::from_millis(50));
             }
             let summary = format!("Ran {} actions:\n{}", done.len(), done.join("\n"));
@@ -398,8 +391,6 @@ fn run(name: &str, input: &Value) -> Result<Value, String> {
     }
 }
 
-/// One call from an engine's run: the run's gate decides first, natively, from the mode the run
-/// started with; then the driver acts.
 pub(crate) async fn call(app: &AppHandle, run_id: &str, wire: &str, arguments: Value) -> Value {
     let Some(name) = misty_name(wire) else {
         return error_result(format!("There is no tool named {wire}."));

@@ -1,5 +1,5 @@
-export type * from "./member-types";
-export type * from "./conversation-types";
+export type * from "./member_types";
+export type * from "./conversation_types";
 
 export interface StorageQuotaDimension {
   percentage_used?: number;
@@ -22,7 +22,6 @@ export interface MessageAttachment {
   created_at: string;
 }
 
-/** What an attachment's upload answers with. */
 export interface LibraryUploadResult {
   attachment?: MessageAttachment;
 }

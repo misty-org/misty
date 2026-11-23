@@ -1,8 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Probe tests: fake MCP servers check the stdio and HTTP handshakes, skipped log lines, timeouts
-//! and errors, and how entries map to probe targets (never touching real config).
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use super::*;
@@ -10,7 +8,6 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 
-/// A runnable fake stdio server script (unix: /bin/sh exists everywhere the tests run).
 #[cfg(unix)]
 fn fake_stdio_script(tag: &str, body: &str) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
@@ -55,7 +52,6 @@ fn target_kind_follows_declared_transport_then_fields() {
         ..ProbeTarget::default()
     };
     assert_eq!(remote.kind(), "http");
-    // opencode's local/remote take the same normalization.
     let local = ProbeTarget {
         transport: Some("local".to_string()),
         command: Some("npx".to_string()),
@@ -71,13 +67,10 @@ fn payload_parses_plain_json_and_sse() {
     assert!(response_payload(json, 2).is_some());
     let sse = "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n\n";
     assert!(response_payload(sse, 1).is_some());
-    // A frame with another id isn't a match.
     assert!(response_payload(sse, 2).is_none());
     assert!(response_payload("not json", 1).is_none());
 }
 
-/// Counts on the page must be the number of tools the server declared: the details list only the
-/// first `MAX_TOOLS` names, but the count isn't cut (a server declaring 139 once showed 40).
 #[test]
 fn assemble_reports_the_declared_tool_count_not_the_truncated_list() {
     let tools = json!({
@@ -160,9 +153,6 @@ async fn stdio_probe_reports_exit_before_handshake_and_timeout() {
     let _ = std::fs::remove_file(hanging);
 }
 
-/// The line cap is generous: a valid large response must not be dropped. A real regression: a
-/// `tools/list` of about 1.9 MB on one line hit the old 1 MiB cap, was dropped, and the page said
-/// "connection failed".
 #[tokio::test]
 async fn line_reader_keeps_a_response_larger_than_one_megabyte() {
     let body = format!(
@@ -183,8 +173,6 @@ async fn line_reader_keeps_a_response_larger_than_one_megabyte() {
     assert_eq!(reader.dropped, 0);
 }
 
-/// An overlong line is still dropped (to protect memory), but it mustn't swallow the valid
-/// response right after it, or be reported as "no response Misty recognized".
 #[tokio::test]
 async fn overlong_lines_are_dropped_without_eating_the_next_line() {
     let wire = format!(
@@ -198,8 +186,6 @@ async fn overlong_lines_are_dropped_without_eating_the_next_line() {
     assert_eq!(reader.dropped, 1);
 }
 
-/// When the dropped line is the handshake response, the failure must say it was too long rather
-/// than show an untrue "no response Misty recognized".
 #[tokio::test]
 async fn a_dropped_handshake_response_reports_the_real_cause() {
     let wire = format!("{}\n", "x".repeat(1_200_000));
@@ -210,7 +196,6 @@ async fn a_dropped_handshake_response_reports_the_real_cause() {
     assert_eq!(reader.dropped, 1);
 }
 
-/// A fake HTTP MCP server that answers by request (one reply each for initialize and tools/list).
 fn spawn_fake_http(initialize: String, tools: String, unauthorized: bool) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
@@ -301,7 +286,6 @@ async fn http_probe_maps_auth_and_unreachable_to_distinct_states() {
     assert_eq!(result.status, "needs_auth");
     assert!(result.message.unwrap().contains("authentication"));
 
-    // A port nobody listens on: a connection failure, not "not configured".
     let target = ProbeTarget {
         url: Some("http://127.0.0.1:9/mcp".to_string()),
         ..ProbeTarget::default()
@@ -312,8 +296,6 @@ async fn http_probe_maps_auth_and_unreachable_to_distinct_states() {
     assert!(message.contains("Couldn't connect"), "message={message}");
 }
 
-/// A server that records the first request it receives and answers 401, so
-/// the probe stops after the `initialize` request.
 fn spawn_recording_http() -> (String, std::sync::Arc<std::sync::Mutex<String>>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
@@ -406,7 +388,6 @@ fn declarative_targets_map_engine_specific_fields() {
     let _ = std::fs::remove_dir_all(&scratch);
     std::fs::create_dir_all(&scratch).unwrap();
 
-    // opencode: `command` is a list and the env key is `environment`.
     let opencode = scratch.join("opencode.json");
     std::fs::write(
         &opencode,
@@ -432,7 +413,6 @@ fn declarative_targets_map_engine_specific_fields() {
     );
     assert_eq!(target.kind(), "stdio");
 
-    // agy: the remote address is in serverUrl.
     let agy = scratch.join("mcp_config.json");
     std::fs::write(
         &agy,
@@ -460,9 +440,6 @@ fn declarative_targets_map_engine_specific_fields() {
     let _ = std::fs::remove_dir_all(&scratch);
 }
 
-/// What runs must be what the user confirmed: a workspace target is only
-/// probed with the fingerprint of the exact plan shown, and any change to
-/// the command, its args, env values or URL yields a new fingerprint.
 #[test]
 fn workspace_probe_requires_the_confirmed_plan_fingerprint() {
     let target = ProbeTarget {
@@ -484,7 +461,6 @@ fn workspace_probe_requires_the_confirmed_plan_fingerprint() {
     env_changed.env[0].1 = "two".to_string();
     assert_ne!(plan_for(&env_changed).fingerprint, shown);
 
-    // The user's own servers never needed a confirmation.
     let user = ProbeTarget {
         from_workspace: false,
         ..target

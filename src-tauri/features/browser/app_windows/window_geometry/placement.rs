@@ -3,21 +3,15 @@
 
 use super::*;
 
-/// The window's size from `tauri.conf.json`, in logical pixels.
 pub(super) const DEFAULT_WIDTH: f64 = 1280.0;
 pub(super) const DEFAULT_HEIGHT: f64 = 820.0;
-/// Its `minWidth` and `minHeight`.
 pub(super) const MIN_WIDTH: f64 = 640.0;
 pub(super) const MIN_HEIGHT: f64 = 420.0;
 pub(super) const DEBOUNCE: Duration = Duration::from_millis(500);
-/// How much of a screen a saved window must cover: this many pixels each way, and a fifth of
-/// its area. Less means that screen is gone.
 pub(super) const MIN_INTERSECT_PX: i64 = 120;
 pub(super) const MIN_INTERSECT_RATIO: f64 = 0.2;
-/// Anything larger than this is a damaged record.
 pub(super) const MAX_DIMENSION: u32 = 20_000;
 
-/// The units records use: points on macOS, physical pixels elsewhere (see the module notes).
 pub(super) const LOGICAL_UNITS: bool = cfg!(target_os = "macos");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,7 +32,6 @@ impl Rect {
     pub(super) fn area(&self) -> f64 {
         f64::from(self.width) * f64::from(self.height)
     }
-    /// The overlap's width and height, never below zero.
     pub(super) fn intersection(&self, other: &Rect) -> (i64, i64) {
         let w = self.right().min(other.right()) - i64::from(self.x).max(i64::from(other.x));
         let h = self.bottom().min(other.bottom()) - i64::from(self.y).max(i64::from(other.y));
@@ -46,8 +39,6 @@ impl Rect {
     }
 }
 
-/// A screen's work area, and how many record units one logical pixel is on it: its own scale
-/// in physical pixels, always 1 in points.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Display {
     pub area: Rect,
@@ -62,7 +53,6 @@ pub(super) fn valid_scale(scale_factor: f64) -> f64 {
     }
 }
 
-/// A rectangle Tauri reports in physical pixels, in the units records use.
 pub(super) fn to_record_units(rect: Rect, scale_factor: f64, logical: bool) -> Rect {
     if !logical {
         return rect;
@@ -88,7 +78,6 @@ pub(super) fn display_from(work_area: Rect, scale_factor: f64, logical: bool) ->
     }
 }
 
-/// What is kept for a window: its inner size and outer position, in record units.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedGeometry {
@@ -124,11 +113,7 @@ impl SavedGeometry {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Placement {
-    /// A usable record: its geometry.
     Restore(Rect),
-    /// No record, a damaged one, or one on a screen that's gone: the default size centered on
-    /// the main screen, worked out here rather than left to the system, which places windows
-    /// unreliably across screens of different scale.
     Default(Rect),
 }
 
@@ -139,7 +124,6 @@ pub(crate) struct Resolution {
     pub fullscreen: bool,
 }
 
-/// The default size on the main screen, shrunk to fit its work area, centered.
 pub(super) fn default_placement(displays: &[Display]) -> Rect {
     let scale = displays
         .first()
@@ -175,8 +159,6 @@ impl Resolution {
     }
 }
 
-/// Whether a screen shows enough of the rectangle; a window restored where none does could
-/// never be seen or dragged back.
 pub(super) fn visible_enough(rect: &Rect, displays: &[Display]) -> bool {
     displays.iter().any(|display| {
         let (w, h) = rect.intersection(&display.area);
@@ -188,9 +170,6 @@ pub(super) fn visible_enough(rect: &Rect, displays: &[Display]) -> bool {
     })
 }
 
-/// Fits a restored size between the minimum and the screen it mostly sits on. The minimum is
-/// scaled by that screen's own factor, since the system enforces it there; the work area wins
-/// over the minimum, so a window is never restored larger than its screen.
 pub(super) fn clamp_size(rect: Rect, displays: &[Display]) -> Rect {
     let target = displays
         .iter()
@@ -213,13 +192,10 @@ pub(super) fn clamp_size(rect: Rect, displays: &[Display]) -> Rect {
     }
 }
 
-/// Where a window opens, from its record and the screens there are now. `displays[0]` is the
-/// main screen.
 pub(crate) fn resolve(saved: Option<&SavedGeometry>, displays: &[Display]) -> Resolution {
     let Some(saved) = saved.filter(|state| state.is_plausible()) else {
         return Resolution::fallback(displays);
     };
-    // Without any screen to check against, the window isn't put somewhere unknown either.
     if displays.is_empty() || !visible_enough(&saved.rect(), displays) {
         return Resolution::fallback(displays);
     }
@@ -230,8 +206,6 @@ pub(crate) fn resolve(saved: Option<&SavedGeometry>, displays: &[Display]) -> Re
     }
 }
 
-/// The record after a change. While maximized or full screen only the flags are kept, never the
-/// screen-sized geometry.
 pub(crate) fn state_after_event(
     previous: &SavedGeometry,
     size: (u32, u32),

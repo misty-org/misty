@@ -4,8 +4,6 @@ import { mcpApi } from "./api";
 import { copy, engineLabel, sourceLabel } from "./copy";
 import type { McpEngineInventory, McpSourceInfo } from "./types";
 
-/** Where Misty looks for the engine's config, a shelf of its files. Missing files still show, so
- *  an empty list never reads as "this CLI has no MCP". */
 export function McpSourceHint({
   sources,
   workspacePath = null,
@@ -26,14 +24,12 @@ export function McpSourceHint({
               icon={FolderOpen}
               label={copy.reveal}
               onSelect={() =>
-                void mcpApi
-                  .reveal(info.path, workspacePath)
-                  .catch((error: unknown) =>
-                    notify({
-                      message: error instanceof Error ? error.message : String(error),
-                      tone: "error",
-                    }),
-                  )
+                void mcpApi.reveal(info.path, workspacePath).catch((error: unknown) =>
+                  notify({
+                    message: error instanceof Error ? error.message : String(error),
+                    tone: "error",
+                  }),
+                )
               }
             />
           }
@@ -64,9 +60,8 @@ export function EngineNotices({ engine }: { engine: McpEngineInventory }) {
           as="p"
           key={`${error.source}:${error.path}`}
           role="alert"
-          tone="none"
-          edge="hairline"
-          radius="lg"
+          tone="faint"
+          radius="xl"
           className="m-0 grid gap-0.5 px-3 py-2"
         >
           <Text tone="bright" wrap>

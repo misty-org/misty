@@ -9,39 +9,28 @@ import {
 import releaseVariant from "@jitl/quickjs-wasmfile-release-sync";
 import wasmLocation from "@jitl/quickjs-wasmfile-release-sync/wasm?url";
 
-/**
- * A browser_run program's sandbox: QuickJS compiled to
- * WebAssembly, a separate JavaScript engine that sees nothing of the app, the network or files.
- * Its only ways out are `__op(name, json)`, which the host answers with a promise of JSON, and
- * `__log(text)`. A program that spins is interrupted at its deadline.
- */
-
 let engine: Promise<QuickJSWASMModule> | undefined;
 let wasm = wasmLocation;
 const quickjs = () =>
   (engine ??= newQuickJSWASMModuleFromVariant(newVariant(releaseVariant, { wasmLocation: wasm })));
 
-/** Tests run outside the app, where the bundler's URL for the engine is not a file: they name the file. */
 export function setSandboxWasm(location: string) {
   wasm = location;
   engine = undefined;
 }
 
 interface SandboxLimits {
-  /** When the whole program must have finished. */
   deadline: number;
   memoryBytes?: number;
 }
 
 interface SandboxResult {
   ok: boolean;
-  /** The program's return value, as JSON. */
   value?: unknown;
   error?: string;
   logs: string[];
 }
 
-/** Host calls: a name and its arguments, answered with JSON-able data or an error. */
 type Host = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 
 const MAX_LOGS = 200;
@@ -111,7 +100,6 @@ export async function runInSandbox(
     const loaded = vm.evalCode(prelude, "prelude.js");
     if (loaded.error) return failed(vm, loaded.error, logs);
     loaded.value.dispose();
-    // The program body runs as an async function, so it can await page calls and return a value.
     const started = vm.evalCode(`(async () => {\n${code}\n})()`, "program.js");
     if (started.error) return failed(vm, started.error, logs, code);
     const settled = vm.resolvePromise(started.value);
@@ -134,7 +122,6 @@ export async function runInSandbox(
     outcome.value.dispose();
     return { ok: true, value, logs };
   } finally {
-    // Page calls still running end with the job's own lease; the sandbox goes when they do.
     finished = true;
     if (!pending) release();
   }
@@ -148,8 +135,6 @@ function failed(
 ): SandboxResult {
   const dumped = vm.dump(error) as { name?: string; message?: string; stack?: string } | string;
   error.dispose();
-  // A program that doesn't parse gets its own line back with a caret, so the next try fixes that
-  // spot instead of repeating it: the bare message names a token, not where it went wrong.
   const at =
     code && typeof dumped !== "string" && dumped?.name === "SyntaxError"
       ? /program\.js:(\d+):(\d+)/.exec(dumped.stack ?? "")

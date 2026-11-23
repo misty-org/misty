@@ -1,11 +1,8 @@
-//! Reads a generate-content event stream. Ported from `GoogleLanguageModel.doStream`. Misty uses no
-//! provider-defined tools, so their parts aren't read, and the partial function arguments that only
-//! Vertex AI sends aren't either.
 use serde_json::{json, Value};
 
 use super::chunk::{
-    converted_usage, google_metadata, mapped_reason, pick, picked_feedback, picked_ratings, picked_usage,
-    signature_metadata, valid_chunk, GROUNDING_FIELDS,
+    converted_usage, google_metadata, mapped_reason, pick, picked_feedback, picked_ratings,
+    picked_usage, signature_metadata, valid_chunk, GROUNDING_FIELDS,
 };
 use crate::model_calls::ids::generate_id;
 use crate::model_calls::model::StreamDecoder;
@@ -31,7 +28,10 @@ impl GoogleDecoder {
     pub(super) fn new(warnings: Vec<Value>) -> Self {
         Self {
             warnings,
-            finish_reason: FinishReason { unified: "other".into(), raw: None },
+            finish_reason: FinishReason {
+                unified: "other".into(),
+                raw: None,
+            },
             usage: None,
             provider_metadata: None,
             grounding: Value::Null,
@@ -52,22 +52,31 @@ impl GoogleDecoder {
 
     fn end_text(&mut self, out: &mut Vec<StreamPart>) {
         if let Some(id) = self.text_block.take() {
-            out.push(StreamPart::TextEnd { id, provider_metadata: None });
+            out.push(StreamPart::TextEnd {
+                id,
+                provider_metadata: None,
+            });
         }
     }
 
     fn end_reasoning(&mut self, out: &mut Vec<StreamPart>) {
         if let Some(id) = self.reasoning_block.take() {
-            out.push(StreamPart::ReasoningEnd { id, provider_metadata: None });
+            out.push(StreamPart::ReasoningEnd {
+                id,
+                provider_metadata: None,
+            });
         }
     }
 
     fn text_part(&mut self, part: &Value, text: &str, out: &mut Vec<StreamPart>) {
         let metadata = signature_metadata(part);
         if text.is_empty() {
-            // Gemini can send a signature alone, after the text it belongs to.
             if let (Some(_), Some(id)) = (&metadata, &self.text_block) {
-                out.push(StreamPart::TextDelta { id: id.clone(), delta: String::new(), provider_metadata: metadata });
+                out.push(StreamPart::TextDelta {
+                    id: id.clone(),
+                    delta: String::new(),
+                    provider_metadata: metadata,
+                });
             }
         } else if part.get("thought") == Some(&Value::Bool(true)) {
             self.end_text(out);
@@ -76,11 +85,18 @@ impl GoogleDecoder {
                 None => {
                     let id = self.next_block();
                     self.reasoning_block = Some(id.clone());
-                    out.push(StreamPart::ReasoningStart { id: id.clone(), provider_metadata: metadata.clone() });
+                    out.push(StreamPart::ReasoningStart {
+                        id: id.clone(),
+                        provider_metadata: metadata.clone(),
+                    });
                     id
                 }
             };
-            out.push(StreamPart::ReasoningDelta { id, delta: text.to_owned(), provider_metadata: metadata });
+            out.push(StreamPart::ReasoningDelta {
+                id,
+                delta: text.to_owned(),
+                provider_metadata: metadata,
+            });
         } else {
             self.end_reasoning(out);
             let id = match &self.text_block {
@@ -88,18 +104,29 @@ impl GoogleDecoder {
                 None => {
                     let id = self.next_block();
                     self.text_block = Some(id.clone());
-                    out.push(StreamPart::TextStart { id: id.clone(), provider_metadata: metadata.clone() });
+                    out.push(StreamPart::TextStart {
+                        id: id.clone(),
+                        provider_metadata: metadata.clone(),
+                    });
                     id
                 }
             };
-            out.push(StreamPart::TextDelta { id, delta: text.to_owned(), provider_metadata: metadata });
+            out.push(StreamPart::TextDelta {
+                id,
+                delta: text.to_owned(),
+                provider_metadata: metadata,
+            });
         }
     }
 
     fn inline_part(&mut self, part: &Value, data: &Value, out: &mut Vec<StreamPart>) {
         self.end_text(out);
         self.end_reasoning(out);
-        let kind = if part.get("thought") == Some(&Value::Bool(true)) { "reasoning-file" } else { "file" };
+        let kind = if part.get("thought") == Some(&Value::Bool(true)) {
+            "reasoning-file"
+        } else {
+            "file"
+        };
         let mut file = json!({
             "type": kind,
             "mediaType": data.get("mimeType"),
@@ -111,13 +138,22 @@ impl GoogleDecoder {
         out.push(StreamPart::Other(file));
     }
 
-    /// A call with its arguments whole, which is the only form the Gemini API sends.
-    fn function_call(&mut self, call: &Value, ordered: Option<&Ordered>, part: &Value, out: &mut Vec<StreamPart>) {
+    fn function_call(
+        &mut self,
+        call: &Value,
+        ordered: Option<&Ordered>,
+        part: &Value,
+        out: &mut Vec<StreamPart>,
+    ) {
         let continuing = call.get("willContinue") == Some(&Value::Bool(true));
         let Some(name) = call.get("name").and_then(Value::as_str) else {
             return;
         };
-        if continuing || call.get("partialArgs").is_some_and(|value| !value.is_null()) {
+        if continuing
+            || call
+                .get("partialArgs")
+                .is_some_and(|value| !value.is_null())
+        {
             return;
         }
         let metadata = signature_metadata(part);
@@ -126,10 +162,13 @@ impl GoogleDecoder {
             .and_then(Value::as_str)
             .filter(|id| !id.is_empty())
             .map_or_else(generate_id, str::to_owned);
-        let arguments = call.get("args").filter(|args| !args.is_null()).map(|args| match args {
-            Value::String(text) => text.clone(),
-            other => ordered.map_or_else(|| other.to_string(), Ordered::to_text),
-        });
+        let arguments = call
+            .get("args")
+            .filter(|args| !args.is_null())
+            .map(|args| match args {
+                Value::String(text) => text.clone(),
+                other => ordered.map_or_else(|| other.to_string(), Ordered::to_text),
+            });
         out.push(StreamPart::ToolInputStart {
             id: id.clone(),
             tool_name: name.to_owned(),
@@ -142,7 +181,10 @@ impl GoogleDecoder {
                 provider_metadata: metadata.clone(),
             });
         }
-        out.push(StreamPart::ToolInputEnd { id: id.clone(), provider_metadata: metadata.clone() });
+        out.push(StreamPart::ToolInputEnd {
+            id: id.clone(),
+            provider_metadata: metadata.clone(),
+        });
         out.push(StreamPart::ToolCall {
             tool_call_id: id,
             tool_name: name.to_owned(),
@@ -159,37 +201,54 @@ impl GoogleDecoder {
 
 impl StreamDecoder for GoogleDecoder {
     fn start(&mut self, out: &mut Vec<StreamPart>) {
-        out.push(StreamPart::StreamStart { warnings: std::mem::take(&mut self.warnings) });
+        out.push(StreamPart::StreamStart {
+            warnings: std::mem::take(&mut self.warnings),
+        });
     }
 
     fn event(&mut self, data: &str, out: &mut Vec<StreamPart>) {
-        // Parsed with its key order kept, because call arguments go back to the model as they came.
         let Ok(tree) = Ordered::from_text(data) else {
             self.fail(json!({ "name": "AI_JSONParseError", "text": data }), out);
             return;
         };
         let chunk = tree.to_value();
         if !valid_chunk(&chunk) {
-            self.fail(json!({ "name": "AI_TypeValidationError", "value": chunk }), out);
+            self.fail(
+                json!({ "name": "AI_TypeValidationError", "value": chunk }),
+                out,
+            );
             return;
         }
         if !self.metadata_sent {
             if let Some(id) = chunk.get("responseId").and_then(Value::as_str) {
                 self.metadata_sent = true;
-                out.push(StreamPart::ResponseMetadata { id: Some(id.to_owned()), model_id: None, timestamp: None });
+                out.push(StreamPart::ResponseMetadata {
+                    id: Some(id.to_owned()),
+                    model_id: None,
+                    timestamp: None,
+                });
             }
         }
-        let usage_here = chunk.get("usageMetadata").filter(|usage| !usage.is_null()).map(picked_usage);
+        let usage_here = chunk
+            .get("usageMetadata")
+            .filter(|usage| !usage.is_null())
+            .map(picked_usage);
         if let Some(usage) = &usage_here {
             self.usage = Some(usage.clone());
         }
         let Some(candidate) = chunk.get("candidates").and_then(|list| list.get(0)) else {
             return;
         };
-        if let Some(grounding) = candidate.get("groundingMetadata").filter(|value| !value.is_null()) {
+        if let Some(grounding) = candidate
+            .get("groundingMetadata")
+            .filter(|value| !value.is_null())
+        {
             self.grounding = pick(grounding, &GROUNDING_FIELDS);
         }
-        if let Some(context) = candidate.get("urlContextMetadata").filter(|value| !value.is_null()) {
+        if let Some(context) = candidate
+            .get("urlContextMetadata")
+            .filter(|value| !value.is_null())
+        {
             self.url_context = pick(context, &["urlMetadata"]);
         }
         let parts = candidate
@@ -199,26 +258,32 @@ impl StreamDecoder for GoogleDecoder {
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         for part in parts {
-            // Which schema a part fits decides which of its fields count, in this order.
             let has_object = |key: &str| part.get(key).is_some_and(Value::is_object);
             if has_object("functionCall") || has_object("toolCall") || has_object("toolResponse") {
                 continue;
             }
             if let Some(inline) = part.get("inlineData").filter(|inline| {
-                inline.get("mimeType").is_some_and(Value::is_string) && inline.get("data").is_some_and(Value::is_string)
+                inline.get("mimeType").is_some_and(Value::is_string)
+                    && inline.get("data").is_some_and(Value::is_string)
             }) {
                 self.inline_part(part, inline, out);
                 continue;
             }
-            let runs_code = part.pointer("/executableCode/code").and_then(Value::as_str).is_some_and(|code| !code.is_empty());
-            if runs_code || part.get("codeExecutionResult").is_some_and(Value::is_object) {
+            let runs_code = part
+                .pointer("/executableCode/code")
+                .and_then(Value::as_str)
+                .is_some_and(|code| !code.is_empty());
+            if runs_code
+                || part
+                    .get("codeExecutionResult")
+                    .is_some_and(Value::is_object)
+            {
                 continue;
             }
             if let Some(text) = part.get("text").and_then(Value::as_str) {
                 self.text_part(part, text, out);
             }
         }
-        // Calls come after the text of the same chunk, as the SDK reads them in a second pass.
         let ordered_parts = tree
             .get("candidates")
             .and_then(OrderedExt::as_array)

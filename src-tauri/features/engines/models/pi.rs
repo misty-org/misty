@@ -60,8 +60,6 @@ pub(super) fn merge_configured_models(
     discovered
 }
 
-/// `<bin> models --json` → {"models":[{provider,id,selector,name,contextWindow,thinking,…}]}:
-/// the rows, and each model's own thinking levels (`thinking`, empty for one that doesn't reason).
 pub(super) async fn run_models_json(
     bin: &str,
 ) -> Result<
@@ -78,7 +76,6 @@ pub(super) async fn run_models_json(
     ))
 }
 
-/// The thinking levels each model in `models --json` takes, keyed by the same id the rows use.
 pub fn parse_models_json_details(
     stdout: &str,
 ) -> std::collections::HashMap<String, super::ModelDetails> {
@@ -113,7 +110,6 @@ pub fn parse_models_json_details(
                     .map(super::EffortLevel::bare)
                     .collect::<Vec<_>>()
             });
-        // A model the engine marks as not reasoning takes no levels.
         let efforts = match (
             levels,
             row.get("reasoning").and_then(serde_json::Value::as_bool),
@@ -172,8 +168,6 @@ pub(super) async fn run_list_models(bin: &str, extra: &[&str]) -> Result<Vec<Eng
     ))
 }
 
-/// Parse the `--list-models` table: strips ANSI escapes, skips the header
-/// and separator rows, dedupes on the `provider/model` selector.
 pub fn parse_list_models(stdout: &str) -> Vec<EngineModel> {
     let mut models = Vec::new();
     let mut seen = std::collections::HashSet::new();
@@ -190,7 +184,6 @@ pub fn parse_list_models(stdout: &str) -> Vec<EngineModel> {
         if provider == "provider" && model == "model" {
             continue;
         }
-        // Skip separators and other noise; provider names may be Unicode.
         if provider
             .chars()
             .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
@@ -232,7 +225,6 @@ fn strip_ansi(raw: &str) -> String {
     out.trim().to_string()
 }
 
-/// "131.1K" -> 131_100, "1M" -> 1_000_000, "8192" -> 8192.
 fn parse_token_count(raw: &str) -> Option<u64> {
     let raw = raw.trim();
     let (digits, mult) = match raw.chars().last()? {
@@ -277,7 +269,6 @@ kimi-code      k3             262.1K    32.8K    yes       no
         assert_eq!(models[0].id, "fufei/kimi-k3");
         assert_eq!(models[0].name.as_deref(), Some("Kimi K3 (fufei)"));
         assert_eq!(models[0].context_window, Some(262_144));
-        // No selector: id falls back to provider/model.
         assert_eq!(models[1].id, "kimi-code/k3");
     }
 

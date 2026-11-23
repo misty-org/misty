@@ -1,6 +1,3 @@
-//! The permission asks an engine raises during a run, answered from the mode the run started
-//! with: allowed, refused, or put to the person through the same question Misty's own agent asks.
-
 use serde_json::Value;
 use tauri::AppHandle;
 
@@ -8,16 +5,11 @@ use crate::agents::run_control::tool_policy::RunFacts;
 use crate::browser::agent_pages::action_confirm::{ask_tool, Answer, ToolAsk};
 use crate::engines::gate::Decision;
 
-/// Whether the engine may go ahead with what it asked for. Auto runs don't stop for ordinary
-/// work, a plan changes nothing, Bypass never asks (the engine skips its own asks), and in Ask
-/// the person answers the same question Misty's own agent would raise.
 pub(super) async fn decide(app: &AppHandle, run_id: &str, tool: &str, input: &Value) -> Decision {
     let Some(body) = super::request_of(run_id) else {
         return Decision::Deny("This run has ended.".into());
     };
     let facts = RunFacts::of_request(run_id, &body);
-    // A call into Misty's own server is journaled and gated there, under this run's mode, so the
-    // person isn't asked once here and once more by the tool itself. A plan still changes nothing.
     let misty = crate::engines::mcp::names_misty_tool(tool, input);
     if misty && !facts.planning {
         return Decision::Allow;
@@ -59,9 +51,6 @@ pub(super) async fn decide(app: &AppHandle, run_id: &str, tool: &str, input: &Va
     }
 }
 
-/// What a permission ask is about, in one line. Engines spell the same field differently
-/// (`file_path`, `filePath`, Antigravity's `Path` and `CommandLine`), so keys are matched without
-/// case or underscores.
 pub(super) fn summarize(input: &Value) -> String {
     let fields = input.as_object();
     let named = |name: &str| {

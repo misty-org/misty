@@ -1,5 +1,4 @@
 use crate::browser::*;
-// Swipes and protected-video reports share the menu's token.
 mod page_signals;
 mod selection;
 #[cfg(test)]
@@ -61,7 +60,6 @@ pub(in crate::browser) fn forward(app: &AppHandle, id: &str, url: &Url) -> bool 
     let Some(view) = app.get_webview(&label) else {
         return true;
     };
-    // The page can supply content, never the native scope, account, or Space.
     if view.url().ok().as_ref().map(Url::as_str) != Some(page.url.as_str())
         || external_url(&page.url).is_err()
     {
@@ -122,7 +120,6 @@ fn menu_actions(context: &AskContext) -> Vec<String> {
         }
         actions.push("paste");
     }
-    // Page commands belong to the page itself, not to a link, image, or selection under the pointer.
     if !page.selection && !page.editable && page.link.is_empty() && page.image.is_empty() {
         actions.extend(["back", "forward", "reload", "separator", "copy-page-link"]);
     }
@@ -151,7 +148,6 @@ fn show(app: &AppHandle, context: AskContext) -> Result<(), String> {
     let cursor = window.cursor_position().map_err(|e| e.to_string())?;
     let origin = window.inner_position().map_err(|e| e.to_string())?;
     let size = window.inner_size().map_err(|e| e.to_string())?;
-    // Fractions of the host client area survive renderer zoom and display scale.
     let x = ((cursor.x - origin.x as f64) / size.width.max(1) as f64).clamp(0.0, 1.0);
     let y = ((cursor.y - origin.y as f64) / size.height.max(1) as f64).clamp(0.0, 1.0);
     app.state::<BrowserSessionState>()
@@ -175,7 +171,6 @@ fn show(app: &AppHandle, context: AskContext) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// Misty's menu for a page in `window` is on its way or open.
 #[cfg(windows)]
 pub(in crate::browser) fn menu_pending(app: &AppHandle, window: &str) -> bool {
     app.state::<BrowserSessionState>()

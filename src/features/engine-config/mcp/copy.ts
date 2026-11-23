@@ -1,10 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * The words of Agents › MCP servers, from desktop-cc-gui's English strings. Kept in one
- * place so the settings block and the dialogs say the same thing.
- */
 import type { McpConfigEntry, McpConfigSource, McpRuntimeStatus } from "./types";
 
 const engineNames: Record<string, string> = {
@@ -84,7 +80,6 @@ const readonlyReasons: Record<string, string> = {
     "This name is on the disabledServers or enabledServers list of OMP's user mcp.json, which decides whether it runs. Use /mcp enable or /mcp disable in OMP.",
 };
 
-/** Why an entry is read-only: its reason code first, then the text the source sent, then a fallback. */
 export function readonlyReasonText(entry: McpConfigEntry): string {
   const code = entry.readonlyReasonCode;
   if (code && readonlyReasons[code]) return readonlyReasons[code];
@@ -170,7 +165,8 @@ export const copy = {
   probeLastChecked: (time: string) => `checked at ${time}`,
   probePending: "Checking",
   probeConnected: "Connected",
-  probeConnectedTools: (count: number) => `Connected with ${count} ${count === 1 ? "tool" : "tools"}`,
+  probeConnectedTools: (count: number) =>
+    `Connected with ${count} ${count === 1 ? "tool" : "tools"}`,
   probeNeedsAuth: "Needs sign-in",
   probeFailed: "Failed",
   probeDetailTitle: "Connection check",

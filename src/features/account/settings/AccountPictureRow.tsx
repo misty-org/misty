@@ -1,11 +1,11 @@
 import { accountApi } from "../api/api";
-import type { AccountMeResponse } from "../api/accountTypes";
-import { useAccountAvatarUrl } from "../hooks/useAccountAvatarUrl";
-import { useUserStore } from "../sessions/useUserStore";
+import type { AccountMeResponse } from "../api/account_types";
+import { useAccountAvatarUrl } from "../hooks/use_account_avatar_url";
+import { useUserStore } from "../sessions/use_user_store";
 import { Avatar, AvatarFallback, AvatarImage, Button, FileInput, useNotice } from "@misty/ui";
 import { useRef, useState } from "react";
 import { DesktopSettingsRow as Row } from "@/features/settings";
-import { MAX_PICTURE_BYTES, PICTURE_TYPES, toSquarePng } from "@/shared/lib/squarePng";
+import { MAX_PICTURE_BYTES, PICTURE_TYPES, toSquarePng } from "@/shared/lib/square_png";
 
 export function AccountPictureRow({ account }: { account: AccountMeResponse }) {
   const input = useRef<HTMLInputElement>(null);
@@ -23,7 +23,6 @@ export function AccountPictureRow({ account }: { account: AccountMeResponse }) {
       setError(cause instanceof Error ? cause.message : "Your picture couldn't be changed.");
     } finally {
       setWorking(false);
-      // Lets the same file be picked again after a failure.
       if (input.current) input.current.value = "";
     }
   };

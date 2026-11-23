@@ -1,20 +1,14 @@
-//! Clicks and hover around a notice. The renderer draws notices, so pages sit beneath it while
-//! one shows, but only the notice's own box belongs to the renderer: everywhere else over a page
-//! the renderer stands aside and the page stays live.
 use super::*;
 use objc2::rc::Retained;
 use objc2_foundation::NSPoint;
 
 struct NoticeRegion {
     renderer: Retained<NSView>,
-    /// Left, top, right and bottom of each notice, in the renderer's points from its top left.
     rects: Vec<[f64; 4]>,
-    /// The renderer last saw the pointer, so it hasn't yet learned the pointer left.
     pointer_on_renderer: bool,
 }
 
 thread_local! {
-    /// AppKit hit tests and delivers tracking events on the main thread, where these are set too.
     static NOTICE_REGIONS: RefCell<Vec<NoticeRegion>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -22,7 +16,6 @@ pub(super) fn rect_contains([left, top, right, bottom]: [f64; 4], x: f64, y: f64
     x >= left && y >= top && x < right && y < bottom
 }
 
-/// Replaces where a renderer's notices are; none hands every click back to the renderer.
 pub(crate) unsafe fn set_notice_rects(renderer: &NSView, rects: Vec<[f64; 4]>) {
     NOTICE_REGIONS.with(|regions| {
         let mut regions = regions.borrow_mut();
@@ -43,7 +36,6 @@ pub(crate) unsafe fn set_notice_rects(renderer: &NSView, rects: Vec<[f64; 4]>) {
 pub(super) unsafe fn install_notice_hit_test(renderer: &NSView) {
     let selector = objc2::sel!(hitTest:);
     let object = &*std::ptr::from_ref(renderer).cast::<AnyObject>();
-    // This class or one above it already has it; installing again would call itself.
     if original_pointer_event_implementation(object, selector, None).is_some() {
         return;
     }
@@ -52,11 +44,13 @@ pub(super) unsafe fn install_notice_hit_test(renderer: &NSView) {
     install_method_override(
         AnyObject::class(object),
         selector,
-        std::mem::transmute(replacement),
+        std::mem::transmute::<
+            unsafe extern "C-unwind" fn(&NSView, Sel, NSPoint) -> *mut NSView,
+            objc2::runtime::Imp,
+        >(replacement),
     );
 }
 
-/// `point` is in the superview's coordinates. Returning nothing lets AppKit try the view beneath.
 unsafe extern "C-unwind" fn renderer_hit_test(
     this: &NSView,
     command: Sel,
@@ -87,7 +81,6 @@ unsafe extern "C-unwind" fn renderer_hit_test(
 }
 
 unsafe fn point_reaches_page(region: &NoticeRegion, parent: &NSView, point: NSPoint) -> bool {
-    // WKWebView is flipped, so this is already measured from the top.
     let local = region.renderer.convertPoint_fromView(point, Some(parent));
     if region
         .rects
@@ -141,20 +134,14 @@ unsafe fn with_event_region<T>(
     })
 }
 
-/// A page beneath the renderer still gets hover and cursor events past the notices.
 pub(super) unsafe fn notice_passes_event_to_page(event: &NSEvent) -> bool {
     with_event_region(event, |_, reaches_page| reaches_page).unwrap_or(false)
 }
 
-/// The renderer loses hover and cursor events past the notices, but gets the first one after the
-/// pointer leaves it: without that, its hover state would stay on the notice it last touched.
 pub(super) unsafe fn notice_hides_event_from_renderer(event: &NSEvent) -> bool {
     with_event_region(event, |region, reaches_page| {
         let was_on_renderer = std::mem::replace(&mut region.pointer_on_renderer, !reaches_page);
         if !was_on_renderer && !reaches_page {
-            // The page owned the cursor while the pointer was over it (a page can even hide it).
-            // The renderer believes its own cursor never changed, so it would leave the page's
-            // in place everywhere: take it back.
             restore_arrow_cursor();
         }
         reaches_page && !was_on_renderer
@@ -162,7 +149,6 @@ pub(super) unsafe fn notice_hides_event_from_renderer(event: &NSEvent) -> bool {
     .unwrap_or(false)
 }
 
-/// Puts the arrow back and shows the cursor; the renderer then sets its own on the next move.
 pub(super) unsafe fn restore_arrow_cursor() {
     let arrow: *mut AnyObject = objc2::msg_send![objc2::class!(NSCursor), arrowCursor];
     let _: () = objc2::msg_send![arrow, set];

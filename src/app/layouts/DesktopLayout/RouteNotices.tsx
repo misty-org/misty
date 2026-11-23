@@ -1,15 +1,10 @@
 import type { AppNoticeEntry, AppNoticeSource } from "@/app/layouts/desktop-state";
-import { reportSystemError } from "@/shared/platform/systemErrors";
+import { reportSystemError } from "@/shared/platform/system_errors";
 import { useAppStore } from "@/app/shell";
 import { useSettingsStore } from "@/features/settings";
 import { notify } from "@misty/ui";
 import { memo, useEffect, useRef } from "react";
 
-/**
- * What the app and settings stores have to say. A message is a notice that leaves on its own; an
- * error goes to the system error report, which says what failed. Each is said once, then cleared:
- * a message when its notice leaves, an error a few seconds after it was reported.
- */
 export const AppNoticePublisher = memo(function AppNoticePublisher() {
   const appError = useAppStore((state) => state.error);
   const appMessage = useAppStore((state) => state.message);

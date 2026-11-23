@@ -1,5 +1,3 @@
-//! Answers in `settings_state`. Only this folder writes these scopes: `profile_state`, which windows
-//! can reach, refuses them (`is_protected_scope`), so a window can't grant itself anything.
 use rusqlite::{params, Connection, OptionalExtension};
 use tauri::{AppHandle, Manager};
 
@@ -30,7 +28,6 @@ fn connect(app: &AppHandle) -> Option<Connection> {
     backing.0.connect().ok()
 }
 
-/// Off when the database can't answer: a failure must never read as a yes.
 pub(super) fn read(app: &AppHandle, scope: &str) -> bool {
     connect(app).is_some_and(|connection| read_answer(&connection, scope).unwrap_or(false))
 }

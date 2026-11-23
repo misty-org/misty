@@ -1,12 +1,8 @@
-//! `/tasks` and `/tasks stop` on a real turn: Claude Code (haiku) starts a background shell,
-//! and while its process stays alive for that shell, Misty lists the task and stops it.
-
 use std::time::Duration;
 
 use super::super::super::live_turn;
 use super::*;
 
-/// A command no other program on the machine runs, so `pgrep` finds only the test's shell.
 const SHELL: &str = "sleep 127";
 
 fn shell_running() -> bool {
@@ -29,7 +25,6 @@ fn pending_tasks(events: &[(String, serde_json::Value)]) -> Option<u64> {
 async fn tasks_lists_and_stops_a_background_shell() {
     let scratch = scratch();
     assert!(!shell_running(), "`{SHELL}` is already running elsewhere");
-    // Claude Code asks for Bash in its acceptEdits mode; Misty's gate allows it here.
     live_turn::engines(true);
     let prompt = format!(
         "Use your Bash tool with run_in_background set to true to run `{SHELL}`. Don't wait \
@@ -45,7 +40,6 @@ async fn tasks_lists_and_stops_a_background_shell() {
         "auto",
     )
     .await;
-    // The turn settles in the chat while the shell runs; its process stays for the follow-up.
     let events = live_turn::wait_for(
         &run,
         Duration::from_secs(180),
@@ -89,8 +83,6 @@ async fn tasks_lists_and_stops_a_background_shell() {
         "{stopped:?}"
     );
 
-    // Claude Code says so in its own events: the task's status changes (`task_updated`) or
-    // the next list leaves it out (`background_tasks_changed`).
     let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     let task_state = loop {
         let state = crate::engines::claude::background_tasks(&session)
@@ -115,7 +107,6 @@ async fn tasks_lists_and_stops_a_background_shell() {
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
 
-    // With nothing left in the background the parked process ends, as a finished turn's does.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     let state = live_turn::engines(true);
     while state.processes.get(&session).is_some() && tokio::time::Instant::now() < deadline {

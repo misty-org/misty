@@ -1,6 +1,3 @@
-//! Paste on Linux: the clipboard through arboard and Control+V through XTEST, so it reaches X11
-//! apps (and XWayland ones on Wayland). X11 has no clipboard change count, so the text itself
-//! stands in for one: the saved contents come back only while Misty's text is still there.
 use crate::voice::hold_to_talk::{held_modifiers, Modifiers};
 use crate::voice::insert::{Desktop, PasteKeys};
 use crate::voice::linux::Display;
@@ -10,7 +7,6 @@ use std::{
     time::Duration,
 };
 
-/// What was on the clipboard before Misty pasted.
 pub enum Saved {
     Text(String),
     Image(arboard::ImageData<'static>),
@@ -18,8 +14,6 @@ pub enum Saved {
 }
 
 pub struct System {
-    /// The clipboard stays open while a paste runs, since on X11 the contents live as long as the
-    /// process that put them there serves them.
     clipboard: Mutex<Option<arboard::Clipboard>>,
 }
 
@@ -39,7 +33,6 @@ impl System {
 fn fingerprint(text: &str) -> u64 {
     let mut hasher = DefaultHasher::new();
     text.hash(&mut hasher);
-    // Zero means "unknown", so a real fingerprint never is.
     hasher.finish() | 1
 }
 

@@ -29,12 +29,9 @@ const SOUL_FILE: &str = "SOUL.md";
 const INSTRUCTIONS_FILE: &str = "AGENTS.md";
 const META_FILE: &str = "bot.json";
 
-/// A bundle's avatar: a generated paper look (fold shape, expression and colour), an emoji, or an
-/// image file inside the bundle.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct BotAvatar {
-    /// "generated", "emoji" or "image".
     #[serde(rename = "type", default)]
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -54,7 +51,6 @@ pub struct BotAvatar {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct BotCapabilities {
-    /// Skill names enabled for this bot; `["*"]` means every skill.
     #[serde(default)]
     pub skills: Vec<String>,
     #[serde(default)]
@@ -66,7 +62,6 @@ pub struct BotCapabilities {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct BotRuntime {
-    /// "direct" (Misty's own runtime) or an outside engine's id, such as "claude-code" or "codex".
     #[serde(default)]
     pub kind: String,
     #[serde(default)]
@@ -75,7 +70,6 @@ pub struct BotRuntime {
     pub cwd: Option<String>,
     #[serde(default)]
     pub extra_args: Vec<String>,
-    /// "ask", "auto-safe" or "full".
     #[serde(default)]
     pub permission_mode: String,
 }
@@ -92,7 +86,6 @@ impl Default for BotRuntime {
     }
 }
 
-/// `bot.json`: everything but the soul and the instructions, which have their own files.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BotMeta {
@@ -131,7 +124,6 @@ fn schema_version() -> u32 {
     SCHEMA_VERSION
 }
 
-/// A whole bundle, as the renderer maps it onto a Misty agent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BotBundle {
@@ -164,8 +156,6 @@ fn now_millis() -> u64 {
         .map(|elapsed| elapsed.as_millis() as u64)
         .unwrap_or(0)
 }
-
-// ---- validation ----
 
 fn validate_name(name: &str) -> Result<String, String> {
     let trimmed = name.trim();
@@ -204,8 +194,6 @@ fn validate_prose(value: String) -> Result<String, String> {
     Ok(value)
 }
 
-/// ASCII letters and digits are kept and everything else collapses to `-`. A name with no ASCII
-/// at all falls back to a short suffix of the id, so the slug is always usable.
 fn slug_base(name: &str, id: &str) -> String {
     let mut out = String::new();
     let mut dash = false;
@@ -254,8 +242,6 @@ fn validate_slug(slug: &str) -> Result<String, String> {
     Ok(trimmed)
 }
 
-/// The nine paper silhouettes and sixteen expressions. An unknown value is dropped rather than
-/// refused: a bundle from a newer version falls back to the default look.
 const FOLD_SHAPES: [&str; 9] = [
     "slender", "pocket", "petal", "flower", "star", "heart", "cloud", "diamond", "shield",
 ];
@@ -307,8 +293,6 @@ fn validate_avatar(avatar: &BotAvatar) -> BotAvatar {
     out.hue = clamp_range(out.hue, 0.0, 360.0);
     out.saturation = clamp_range(out.saturation, 0.0, 100.0);
     out.lightness = clamp_range(out.lightness, 5.0, 95.0);
-    // An image lives in the bundle, and Misty keeps agent avatars its own way; an emoji or image
-    // with nothing to show falls back to the generated look.
     if out.kind == "image" || (out.kind == "emoji" && out.value.is_none()) {
         out.kind = "generated".to_string();
         out.value = None;
@@ -373,7 +357,6 @@ fn sanitize_capabilities(caps: &BotCapabilities) -> BotCapabilities {
     }
 }
 
-/// A bundle checked the way ccgui checks a bot before it is stored.
 fn validated(bundle: BotBundle) -> Result<BotBundle, String> {
     let name = validate_name(&bundle.name)?;
     let slug = if bundle.slug.trim().is_empty() {
@@ -396,16 +379,12 @@ fn validated(bundle: BotBundle) -> Result<BotBundle, String> {
     })
 }
 
-// ---- files ----
-
 fn file_name(path: &Path) -> String {
     path.file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default()
 }
 
-/// Writes a bundle into `<parent>/<slug>/`. Each path is allowed for writing because the person
-/// picked the parent folder; an existing bundle folder of that name is never overwritten.
 fn write_bundle(parent: &Path, bundle: &BotBundle) -> Result<PathBuf, String> {
     let mut folder = parent.join(&bundle.slug);
     let mut attempt = 1;
@@ -446,8 +425,6 @@ fn write_bundle(parent: &Path, bundle: &BotBundle) -> Result<PathBuf, String> {
         .map_err(|error| format!("Couldn't write the bot: {error}"))?;
     fs::write(&files[0], format!("{meta}\n"))
         .map_err(|error| format!("Couldn't write {META_FILE}: {error}"))?;
-    // The prose files are always written, even empty: an empty SOUL.md reads as "nothing here yet"
-    // to someone browsing the folder.
     fs::write(&files[1], &bundle.soul)
         .map_err(|error| format!("Couldn't write {SOUL_FILE}: {error}"))?;
     fs::write(&files[2], &bundle.instructions)
@@ -473,8 +450,6 @@ async fn pick_folder(app: &AppHandle, title: &str) -> Result<Option<PathBuf>, St
         .map_err(|_| "Choose a folder on this computer.".to_string())
 }
 
-/// Writes an agent out as a bot folder inside the folder the person picks. Returns the folder's
-/// name, or `None` when they cancel.
 #[tauri::command]
 pub async fn bot_bundle_export(
     app: AppHandle,
@@ -565,7 +540,6 @@ mod tests {
             fs::read_to_string(folder.join(INSTRUCTIONS_FILE)).unwrap(),
             "Work carefully."
         );
-        // A second export of the same name never overwrites the first.
         let again = write_bundle(&parent, &clean).unwrap();
         assert_ne!(again, folder);
         let _ = fs::remove_dir_all(&parent);

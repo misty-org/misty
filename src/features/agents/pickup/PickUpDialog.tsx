@@ -14,19 +14,14 @@ import {
   Textarea,
 } from "@misty/ui";
 import type { AgentProfile } from "@/shared/schemas";
-import { folderName, mistyEngine, useEnginesList } from "../engines/enginesApi";
-import { useChatFolder } from "../shared-folders/chatFolder";
-import { draftPickUp, pickUpMarkdown, pickUpTitle, sendPickUp } from "./pickUp";
+import { folderName, mistyEngine, useEnginesList } from "../engines/engines_api";
+import { useChatFolder } from "../shared-folders/chat_folder";
+import { draftPickUp, pickUpMarkdown, pickUpTitle, sendPickUp } from "./pick_up";
 
-/**
- * Save where it left off: the chat's agent writes the note in its chat, the person reads and edits
- * it here, and "Send to Space" is the only step that puts it on the server.
- */
 export function PickUpDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;
   spaceId: string;
-  /** Only the person is in this Space: the note is saved private, not shared with members. */
   solo: boolean;
   conversationId: string;
   chatTitle: string;
@@ -39,9 +34,7 @@ export function PickUpDialog(props: {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  // The engine's name for the note, from the list this computer last read.
   const engines = useEnginesList();
-  // The project the chat works in, named in the note; a scratch folder is named by nothing.
   const chatFolder = useChatFolder(props.conversationId);
   const project = chatFolder.kind === "project" ? chatFolder.folder : "";
 
@@ -52,7 +45,6 @@ export function PickUpDialog(props: {
     setText("");
     setError("");
     setDrafting(true);
-    // The note fills in as the agent writes it, so a slow agent is plainly still at work.
     draftPickUp(props.conversationId, (sofar) => live && setText(sofar))
       .then((draft) => live && setText(draft))
       .catch((reason: unknown) => {
@@ -94,20 +86,16 @@ export function PickUpDialog(props: {
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-w-140">
         <DialogHeader>
-          <DialogTitle className="text-sm">Save where it left off</DialogTitle>
-          {/* Sending saves a Space doc, which takes the Space's default layer: say who sees it. */}
+          <DialogTitle className="text-control">Save where it left off</DialogTitle>
           <DialogDescription>
             {props.solo
               ? "Saved as a doc only you can see."
               : "Saved as a doc everyone in the Space can see and pick up."}
           </DialogDescription>
         </DialogHeader>
-        {/* The title is known at once; only the note waits on the agent writing it. */}
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="pick-up-title" className="text-2xs">
-              Title
-            </Label>
+            <Label htmlFor="pick-up-title">Title</Label>
             <Input
               id="pick-up-title"
               value={title}
@@ -116,9 +104,7 @@ export function PickUpDialog(props: {
             />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="pick-up-text" className="text-2xs">
-              Note
-            </Label>
+            <Label htmlFor="pick-up-text">Note</Label>
             {drafting && !text ? (
               <Skeleton className="h-75 rounded-lg" />
             ) : (
@@ -126,7 +112,6 @@ export function PickUpDialog(props: {
                 id="pick-up-text"
                 value={text}
                 rows={14}
-                // Read-only while the agent is still writing it.
                 readOnly={drafting}
                 aria-busy={drafting || undefined}
                 onChange={(event) => setText(event.target.value)}

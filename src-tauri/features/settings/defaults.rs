@@ -1,5 +1,3 @@
-//! Defaults backfilled into the settings document, and the schema-version bump.
-
 use serde_json::{json, Map, Value};
 
 use super::migration::{prune_retired_settings, SETTINGS_SCHEMA_VERSION};
@@ -12,16 +10,11 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
     }
 
     let root = document.as_object_mut().expect("settings document object");
-    // Monotonic: a document already at the current version is left alone, and
-    // a newer document (a user who downgraded) is not mangled by this build.
     let stored_version = root
         .get("schema_version")
         .and_then(Value::as_i64)
         .unwrap_or(0);
     if stored_version < SETTINGS_SCHEMA_VERSION {
-        // Prune before backfilling, or the defaults pass would re-add keys this
-        // pass is about to remove. The return value is ignored because bumping
-        // the version below already marks the document dirty.
         prune_retired_settings(root);
         root.insert("schema_version".to_owned(), json!(SETTINGS_SCHEMA_VERSION));
         changed = true;
@@ -55,8 +48,6 @@ pub(super) fn normalize_settings_document(document: &mut Value) -> bool {
     if let Some(shortcuts) = root.get_mut("shortcuts").and_then(Value::as_object_mut) {
         changed |= shortcuts.remove("custom_shortcuts_enabled").is_some();
     }
-    // Voice. Dictation's shortcut is empty
-    // for the platform default: Fn/Globe on macOS, Right Alt on Windows.
     changed |= ensure_section_defaults(
         root,
         "voice",
@@ -104,8 +95,6 @@ fn ensure_section_defaults(
     changed
 }
 
-/// The value a missing key starts with: `misty.conf`'s `[defaults]` entry for it, read as the
-/// built-in default's type, else the built-in default. It seeds; it never changes a set value.
 fn seeded(section: &str, key: &str, built_in: &Value) -> Value {
     file_access::conf::current()
         .default_for(section, key)
@@ -113,7 +102,6 @@ fn seeded(section: &str, key: &str, built_in: &Value) -> Value {
         .unwrap_or_else(|| built_in.clone())
 }
 
-/// `text` as a value of `like`'s type, when it reads as one.
 fn as_type_of(like: &Value, text: &str) -> Option<Value> {
     match like {
         Value::Bool(_) => match text {

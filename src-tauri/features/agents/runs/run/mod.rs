@@ -1,11 +1,9 @@
-//! The durable agent run: `workflows/*.ts`, with the Workflow library's durability in [`store`] and its
-//! agent's one model turn in [`agent_step`].
 pub(crate) mod agent_run;
 pub(crate) mod agent_step;
 pub(crate) mod context;
 pub(crate) mod deps;
-mod json_error;
 mod finish_review;
+mod json_error;
 pub(crate) mod model_call;
 pub(crate) mod model_stream;
 mod page_state;
@@ -28,11 +26,11 @@ mod turn_prepare;
 #[allow(clippy::disallowed_methods)]
 mod loop_tests;
 #[cfg(test)]
+#[allow(clippy::disallowed_methods)]
+mod parity_tests;
+#[cfg(test)]
 mod run_resume_tests;
 #[cfg(test)]
 mod workflow_more_tests;
 #[cfg(test)]
 mod workflow_tests;
-#[cfg(test)]
-#[allow(clippy::disallowed_methods)]
-mod parity_tests;

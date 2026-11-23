@@ -55,8 +55,6 @@ fn overrides(command: &tokio::process::Command) -> toml::Table {
     result
 }
 
-/// Codex declares typed next_turn plan review, and plan is back in its supported list (so
-/// resolve_permission no longer silently falls back to auto).
 #[test]
 fn plan_approval_is_typed_next_turn_and_advertised() {
     assert!(CodexEngine.supported_permissions().contains(&"plan"));
@@ -79,8 +77,6 @@ fn plan_approval_is_typed_next_turn_and_advertised() {
 
 #[test]
 fn toml_string_escapes_paths_that_would_read_as_escapes() {
-    // codex parses the value as TOML: a bare quoted Windows path would
-    // turn \t into a tab and \U into an escape.
     assert_eq!(toml_string(r"C:\tmp\x"), r#""C:\\tmp\\x""#);
     assert_eq!(toml_string("a\"b"), r#""a\"b""#);
 }
@@ -204,11 +200,6 @@ fn host_command_carries_effort_override() {
     assert!(args.iter().any(|a| a == "model_reasoning_effort=\"high\""));
 }
 
-/// Native identity makes Codex treat the app-server client as first-party,
-/// which unlocks skill MCP-dependency auto-install. Under approval "never"
-/// plus full access it writes the skill's MCP servers into the global
-/// config.toml without asking (verified on codex 0.167, repo-provided
-/// skills included), so every app-server launch must keep it off.
 #[test]
 fn host_command_disables_skill_mcp_dependency_install() {
     for permission in [Some("bypass"), Some("auto"), Some("plan"), None] {

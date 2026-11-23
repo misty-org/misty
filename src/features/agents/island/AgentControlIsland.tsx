@@ -3,27 +3,19 @@ import { OverflowFadeText, Surface, Text } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { interventionLabels } from "../interventions/api";
 import { useAgentInterventions } from "../interventions/store";
-import { useMistyStore } from "../conversations/state/useMistyStore";
+import { useMistyStore } from "../conversations/state/use_misty_store";
 import { AgentActionQuestions } from "./AgentActionQuestions";
 import { AgentControlComposer } from "./AgentControlComposer";
 import { AgentControlQuestions } from "./AgentControlQuestions";
 import { AgentControlTaskControls } from "./AgentControlTaskControls";
-import { listenForActionQuestions, useIslandQuestions } from "./actionQuestions";
-import { useLocalExecution } from "../runs/local-execution/localExecution";
-import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
-import { islandClass, liveStep, settled, statusText, liveReply } from "./agentControlStatus";
-import { useAgentControlActions } from "./useAgentControlActions";
-import { useAgentControlAutopilot } from "./useAgentControlAutopilot";
-import { useAgentControlDesktop } from "./useAgentControlDesktop";
+import { listenForActionQuestions, useIslandQuestions } from "./action_questions";
+import { useLocalExecution } from "../runs/local-execution/local_execution";
+import { usePersonalAgentsStore } from "../personal/personal_agents_store";
+import { islandClass, liveStep, settled, statusText, liveReply } from "./agent_control_status";
+import { useAgentControlActions } from "./use_agent_control_actions";
+import { useAgentControlAutopilot } from "./use_agent_control_autopilot";
+import { useAgentControlDesktop } from "./use_agent_control_desktop";
 
-/**
- * The control island: the one place to
- * see and steer what an agent is doing, at the bottom of the window. It shows
- * the task's status and sub-agents, takes a message that steers the task or
- * queues a new one, and holds Take over, Resume, Stop and Done. With no task
- * here it shows only agents' questions. During desktop control the native island outside Misty mirrors it and sends its
- * presses back here.
- */
 export function AgentControlIsland() {
   const execution = useLocalExecution((state) => state.execution);
   const questions = useIslandQuestions().length;
@@ -71,8 +63,6 @@ export function AgentControlIsland() {
   useAgentControlDesktop(execution, status, meta, questions, { resume, takeOver, send });
 
   if (!execution) {
-    // Agents working in tabs of their own show in their chat's agent browser and its picture
-    // not here; the island keeps only their questions.
     if (!questions) return null;
     return <AgentControlQuestions />;
   }
@@ -89,20 +79,20 @@ export function AgentControlIsland() {
       <div className="flex min-w-0 items-center gap-2 px-2 pt-1">
         <OverflowFadeText
           as="p"
-          className={`min-w-0 flex-1 text-sm ${running && !questions ? "misty-shimmer" : ""}`}
+          className={`min-w-0 flex-1 text-control ${running && !questions ? "misty-shimmer" : ""}`}
           role="status"
         >
           {status}
         </OverflowFadeText>
         {meta && (
-          <Text bare tone="muted" className="shrink-0 text-xs">
+          <Text size="meta" bare tone="muted" className="shrink-0">
             {meta}
           </Text>
         )}
       </div>
       <ErrorNotice message={error} onDismiss={() => setError("")} />
       {!error && notice && (
-        <Text bare as="p" tone="muted" className="px-2 text-xs">
+        <Text size="meta" bare as="p" tone="muted" className="px-2">
           {notice}
         </Text>
       )}

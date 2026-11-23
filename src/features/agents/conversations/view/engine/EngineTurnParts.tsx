@@ -1,43 +1,34 @@
 import { useEffect } from "react";
-import { Text, Tooltip } from "@misty/ui";
 import { EnginePlanReview } from "./EnginePlanReview";
 import { EngineQuestionCard } from "./EngineQuestionCard";
-import { EngineSubagents } from "./EngineSubagents";
-import { EngineThinking } from "./EngineThinking";
-import { EngineTodos } from "./EngineTodos";
-import { restoreEngineTurn, useEngineTurnStore, watchEngineTurns } from "./engineTurnStore";
+import {
+  restoreEngineTurn,
+  useEngineTurnStore,
+  watchEngineTurns,
+  type EngineTurn,
+} from "./engine_turn_store";
 
-/**
- * What an outside engine's turn shows beyond Misty's own progress: its reasoning, its todo list,
- * its sub-agents, the questions it asks, the plan it wants reviewed, and a status line for
- * compaction and retries. The model that answered is said once, in the reply's footer.
- */
-export function EngineTurnParts(props: {
+export function useEngineTurn(runId: string | undefined, live: boolean): EngineTurn | undefined {
+  const turn = useEngineTurnStore((state) => (runId ? state.byRun[runId] : undefined));
+  useEffect(() => {
+    if (!runId) return;
+    watchEngineTurns();
+    if (!live) void restoreEngineTurn(runId);
+  }, [runId, live]);
+  return turn;
+}
+
+export function EngineAsks(props: {
   runId: string;
-  live: boolean;
+  turn: EngineTurn;
   conversationId?: string;
   onSend?: (prompt: string) => void;
 }) {
-  const turn = useEngineTurnStore((state) => state.byRun[props.runId]);
-  useEffect(() => {
-    watchEngineTurns();
-    if (!props.live) void restoreEngineTurn(props.runId);
-  }, [props.runId, props.live]);
-  if (!turn) return null;
-  const status = turn.ended
-    ? ""
-    : turn.compacting
-      ? "Compacting the conversation"
-      : turn.retry
-        ? `Retrying ${turn.retry.attempt}${turn.retry.max ? ` of ${turn.retry.max}` : ""}`
-        : turn.background
-          ? `Waiting for ${turn.background} background ${turn.background === 1 ? "task" : "tasks"}`
-          : "";
+  const { turn } = props;
+  const draft = turn.planDraft.trim() && !turn.ended;
+  if (!turn.asks.length && !turn.plan && !draft) return null;
   return (
-    <div className="mb-3 grid gap-2.5 empty:hidden">
-      <EngineThinking text={turn.thinking} answering={turn.answering || turn.ended} />
-      <EngineTodos todos={turn.todos} live={props.live} />
-      <EngineSubagents subagents={turn.subagents} />
+    <div className="my-3 grid gap-2.5">
       {turn.asks.map((ask) => (
         <EngineQuestionCard key={ask.requestId} runId={props.runId} ask={ask} />
       ))}
@@ -48,7 +39,7 @@ export function EngineTurnParts(props: {
           conversationId={props.conversationId}
           onSend={props.onSend}
         />
-      ) : turn.planDraft.trim() && !turn.ended ? (
+      ) : draft ? (
         <EnginePlanReview
           draft
           plan={{
@@ -63,13 +54,6 @@ export function EngineTurnParts(props: {
             status: "draft",
           }}
         />
-      ) : null}
-      {status ? (
-        <Tooltip content={turn.retry?.message ?? ""}>
-          <Text bare as="p" size="meta" tone="muted" className="m-0">
-            {status}
-          </Text>
-        </Tooltip>
       ) : null}
     </div>
   );

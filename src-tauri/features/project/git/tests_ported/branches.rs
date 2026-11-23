@@ -84,7 +84,6 @@ fn pull_fast_forward_preserves_unrelated_local_changes() {
             .id,
         staged_blob
     );
-    // Up to date now: a second pull changes nothing.
     pull(&local_path).unwrap();
 }
 
@@ -176,7 +175,6 @@ fn checkout_remote_branch_keeps_existing_local_branch() {
     origin.branch("feature", &base, false).unwrap();
     let local_path = scratch.0.join("local");
     let local = Repository::clone(origin_path.to_str().unwrap(), &local_path).unwrap();
-    // The local `feature` has a commit the remote lacks; switching must never reset it.
     local
         .branch(
             "feature",

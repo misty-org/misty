@@ -4,7 +4,7 @@ import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/
 import { DropdownControl } from "@/features/settings/SettingsControls";
 import { TextControl } from "@/features/settings/SettingsTextControls";
 import type { ChosenStatus } from "../api";
-import { useStatusStore } from "../statusStore";
+import { useStatusStore } from "../status_store";
 
 const clearAfterChoices = [
   { value: "never", label: "Don't clear" },
@@ -13,7 +13,6 @@ const clearAfterChoices = [
   { value: "today", label: "Today" },
 ];
 
-/** When a custom status runs out, counted from now; null keeps it until the person clears it. */
 function expiry(after: string): string | null {
   const now = new Date();
   if (after === "1h") return new Date(now.getTime() + 3_600_000).toISOString();
@@ -32,11 +31,6 @@ const shows = [
   { value: "invisible", label: "Invisible" },
 ];
 
-/**
- * Settings › Profile › Status: how the person shows to others, from the account's status store
- * (the profile menu changes the same one). Online turns Idle by itself after ten minutes without
- * input; Do not disturb also silences notices on this computer. Saved on the account as chosen.
- */
 export function StatusSection() {
   const mine = useStatusStore((state) => state.mine);
   const [clearAfter, setClearAfter] = useState("never");
@@ -44,7 +38,9 @@ export function StatusSection() {
     useStatusStore
       .getState()
       .setMine(next)
-      .catch(() => notify({ message: "Your status couldn't be changed. Try again.", tone: "error" }));
+      .catch(() =>
+        notify({ message: "Your status couldn't be changed. Try again.", tone: "error" }),
+      );
   return (
     <Section title="Status">
       <Row label="Show as">
@@ -52,7 +48,9 @@ export function StatusSection() {
           value={mine.chosen}
           options={shows}
           disabled={false}
-          onValueChange={(chosen) => void save({ ...mine, chosen: chosen as ChosenStatus["chosen"] })}
+          onValueChange={(chosen) =>
+            void save({ ...mine, chosen: chosen as ChosenStatus["chosen"] })
+          }
         />
       </Row>
       <Row label="Custom status">

@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { DictationController as Controller } from "./dictationEngine";
+import { DictationController as Controller } from "./dictation_engine";
 import { useSpeechSupport } from "./speech";
-import { watchSpeechSetup } from "./speechModels";
-import { voiceSettings } from "./voiceSettings";
+import { watchSpeechSetup } from "./speech_models";
+import { voiceSettings } from "./voice_settings";
 
-/**
- * Mounts dictation in the main window while the account is signed in, and keeps speech set up
- * (`speechModels.ts`: Misty's pick of the hearing model, installed in the background). The
- * native shortcut is registered only while Settings › Voice › Dictation is on, and only once the
- * hearing model is on this computer.
- */
 export function DictationController() {
   const document = useSettingsStore((state) => state.settings?.document);
   const speech = useSpeechSupport();

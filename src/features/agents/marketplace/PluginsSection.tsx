@@ -9,7 +9,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
   CatalogDone,
@@ -32,7 +32,7 @@ import {
   ShelfItem,
   useConfirmDelete,
 } from "@misty/ui";
-import { openAgentsHub } from "../hub/agentsHubStore";
+import { openAgentsHub } from "../hub/agents_hub_store";
 import {
   canTurnOff,
   categoriesOf,
@@ -51,28 +51,19 @@ import {
   type MarketSort,
 } from "./api";
 import { EnginePicker, MarketShelf, MarketShelvesSkeleton, MarketSkeleton } from "./MarketShelf";
-import { setMarketSort, useMarketEngines, useMarketView } from "./marketView";
+import { setMarketSort, useMarketEngines, useMarketView } from "./market_view";
 import { SourcesDialog } from "./MarketplaceSources";
 import { MakerTile, pluginMaker } from "./PluginMaker";
 import { PluginStoreDetail } from "./PluginStoreDetail";
-import { useEngineMarket } from "./useEngineMarket";
+import { useEngineMarket } from "./use_engine_market";
 
 const sortOptions = [
   { value: "popular", label: "Most installed", icon: Flame },
   { value: "name", label: "Name", icon: ArrowDownAZ },
 ] as const satisfies readonly { value: MarketSort; label: string; icon: typeof Flame }[];
 
-/** The filter menu's All, among the categories. */
 const allCategories = "all";
 
-/**
- * Explore's Plugins: one engine's own plugins (extensions, for Gemini CLI and Qwen Code), for
- * the engines whose CLI has marketplaces, laid out as a store's shelves. The control row picks
- * the engine and the category and holds the order, Refresh and the marketplaces; the shelves are
- * what's installed, then each marketplace's plugins, then marketplaces to add. Misty keeps no
- * catalog: the engine lists, installs and removes with its own CLI. The rail's search arrives as
- * `query`.
- */
 export function PluginsSection({ query }: { query: string }) {
   const { engines, engine, name, error, reload, pick } = useMarketEngines("plugins", hasPlugins);
   if (!engines)
@@ -123,7 +114,6 @@ function EnginePluginShelves({
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  /** The plugin whose details are open, by id, so they follow it as it's installed or turned off. */
   const [opened, setOpened] = useState<string | null>(null);
   const [pending, setPending] = useState<{
     item: MarketItem;
@@ -135,7 +125,6 @@ function EnginePluginShelves({
     await listing.reload();
   };
 
-  // A list that never came shows why; one that came stays on screen while it's listed again.
   const market: EngineMarket | undefined = useMemo(
     () =>
       listing.data ??
@@ -163,7 +152,6 @@ function EnginePluginShelves({
     [matches, category],
   );
   const installed = shown.filter((item) => item.installed);
-  // Each marketplace is a shelf, the one with the most used plugins first.
   const shelves = useMemo(() => {
     const groups = new Map<string, MarketItem[]>();
     for (const item of shown)

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
-import type { AiProgressItem } from "../runs/invocations/invocationTypes";
+import type { AiProgressItem } from "../runs/invocations/invocation_types";
 import {
   CodeText,
   Text,
@@ -40,12 +40,11 @@ import {
   type ProgressStep,
   type ProgressTool,
   type ToolKind,
-} from "./progressTimeline";
-import { usageLimitNotice, usageLimitNotices } from "./usageLimits";
-import { countEditLines } from "./payload/editLineStats";
+} from "./progress_timeline";
+import { usageLimitNotice, usageLimitNotices } from "./usage_limits";
+import { countEditLines } from "./payload/edit_line_stats";
 import { hasToolPayload, ToolPayloadViewer } from "./payload/ToolPayloadViewer";
 
-/** Each kind of step's icon: what the step is, never a generic sparkle. */
 export const kindIcons: Record<ToolKind, LucideIcon> = {
   command: SquareTerminal,
   read: FileText,
@@ -61,44 +60,26 @@ export const kindIcons: Record<ToolKind, LucideIcon> = {
   other: Wrench,
 };
 
-/** A live turn keeps this many of its latest steps in view; the rest wait behind "+N more". */
 const LIVE_ROWS = 6;
 
 type Entry =
   { type: "note"; key: string; text: string } | { type: "step"; key: string; step: ProgressStep };
 
-/**
- * How a reply got its answer, after OpenChamber's turn: the first thing Misty said (its plan)
- * stays in view, then its steps. While the run is live they show as rows, the latest ones in view;
- * once it ends they fold to one line of what it did ("Read 3 files · ran 2 commands"). Opened,
- * it lists every step in order as one quiet row each, with what Misty wrote
- * between them; a step with output opens under its row. The answer itself follows below.
- */
 export function AgentProgress({ items, live = true }: { items: AiProgressItem[]; live?: boolean }) {
   if (!items.length) return null;
   const groups = groupProgress(items);
   const toolGroups = groups.filter((group) => group.type === "tools");
-  // The first thing Misty said is its plan, and stays in view above the folded work.
   const plan = groups[0]?.type === "note" ? groups[0] : undefined;
   const note = (group: { key: string; text: string }) => (
-    <Text
-      key={group.key}
-      as="div"
-      bare
-      size="control"
-      tone="default"
-      className="w-full leading-[1.6] misty-markdown-message"
-    >
-      <MistyMarkdown>{group.text}</MistyMarkdown>
+    <Text key={group.key} as="div" bare tone="default" className="w-full">
+      <MistyMarkdown size="body">{group.text}</MistyMarkdown>
     </Text>
   );
-  // A used-up monthly allowance stays in view below the folded work, said plainly.
   const limits = usageLimitNotices(items).map((text) => (
     <Text key={text} as="p" bare size="control" tone="default" className="w-full leading-[1.6]">
       {text}
     </Text>
   ));
-  // Narration with no tools is just Misty talking: it stays in the transcript.
   if (!toolGroups.length)
     return (
       <div className="mb-3 grid gap-1">
@@ -139,27 +120,30 @@ function Turn({
   const [chosen, setChosen] = useState<boolean>();
   const [all, setAll] = useState(false);
   const listId = useId();
-  // Folded once the turn ends, unless the person opened it.
   const open = chosen ?? false;
   const hidden = live && !all ? Math.max(0, entries.length - LIVE_ROWS) : 0;
   const shown = hidden ? entries.slice(-LIVE_ROWS) : entries;
   const rows = (
-    <ToolList id={live ? listId : undefined} label="Steps">
-      {shown.map((entry) =>
-        entry.type === "note" ? (
-          <li key={entry.key}>
-            <ToolNote>
-              <MistyMarkdown>{entry.text}</MistyMarkdown>
-            </ToolNote>
-          </li>
+    <div id={live ? listId : undefined}>
+      {runsOf(shown).map((run) =>
+        run.type === "note" ? (
+          <ToolNote key={run.key}>
+            <MistyMarkdown>{run.text}</MistyMarkdown>
+          </ToolNote>
         ) : (
-          <Step key={entry.key} step={entry.step} />
+          <ToolList key={run.key} label="Steps">
+            {exploreGroups(run.steps).map((item) =>
+              item.type === "explore" ? (
+                <Explore key={item.key} steps={item.steps} />
+              ) : (
+                <Step key={item.key} step={item.step} />
+              ),
+            )}
+          </ToolList>
         ),
       )}
-    </ToolList>
+    </div>
   );
-  // A live turn lists its steps as they run, as OpenChamber does: no line over them repeating
-  // the running step (the status above the composer says it). Earlier steps wait behind one line.
   if (live)
     return (
       <div className="agent-turn">
@@ -190,7 +174,107 @@ function Turn({
   );
 }
 
-/** A target that reads as a file path, so its folder can step back. */
+type Run =
+  | { type: "note"; key: string; text: string }
+  | { type: "steps"; key: string; steps: Extract<Entry, { type: "step" }>[] };
+
+function runsOf(entries: Entry[]): Run[] {
+  const runs: Run[] = [];
+  for (const entry of entries) {
+    if (entry.type === "note") {
+      runs.push(entry);
+      continue;
+    }
+    const last = runs[runs.length - 1];
+    if (last?.type === "steps") last.steps.push(entry);
+    else runs.push({ type: "steps", key: entry.key, steps: [entry] });
+  }
+  return runs;
+}
+
+type StepEntry = Extract<Entry, { type: "step" }>;
+type RunItem = StepEntry | { type: "explore"; key: string; steps: ProgressStep[] };
+
+const exploring = (step: ProgressStep) => {
+  const kind = toolKind(step.name);
+  return (kind === "read" || kind === "search") && step.state !== "failed";
+};
+
+function exploreGroups(steps: StepEntry[]): RunItem[] {
+  const items: RunItem[] = [];
+  let group: StepEntry[] = [];
+  const flush = () => {
+    if (group.length > 1)
+      items.push({ type: "explore", key: group[0].key, steps: group.map((entry) => entry.step) });
+    else items.push(...group);
+    group = [];
+  };
+  for (const entry of steps) {
+    if (exploring(entry.step)) group.push(entry);
+    else {
+      flush();
+      items.push(entry);
+    }
+  }
+  flush();
+  return items;
+}
+
+function exploreSummary(steps: ProgressStep[]) {
+  const reads = steps.filter((step) => toolKind(step.name) === "read").length;
+  const searches = steps.length - reads;
+  return [
+    reads ? (reads === 1 ? "1 file" : `${reads} files`) : "",
+    searches ? (searches === 1 ? "1 search" : `${searches} searches`) : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function Explore({ steps }: { steps: ProgressStep[] }) {
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  const running = steps.some((step) => step.state === "running");
+  return (
+    <li>
+      <ToolRow
+        name={running ? "Exploring" : "Explored"}
+        target={exploreSummary(steps)}
+        state={running ? "running" : "done"}
+        open={open}
+        onToggle={() => setOpen(!open)}
+        controls={bodyId}
+      />
+      <Fold id={bodyId} open={open} onReveal={() => setOpen(true)}>
+        <ToolBody>
+          {steps.map((step, index) => {
+            const target = stepTarget(step);
+            return (
+              <Text key={step.id || index} size="meta" tone="muted">
+                {toolParts(step.name, step.state === "running").verb}{" "}
+                <Text as="span" bare size="meta" tone="default">
+                  {target}
+                </Text>
+              </Text>
+            );
+          })}
+        </ToolBody>
+      </Fold>
+    </li>
+  );
+}
+
+function failureLine(step: ProgressStep): string {
+  const notice = usageLimitNotice(step.error);
+  if (notice) return notice;
+  const text = step.error || step.activity?.output || "";
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines[lines.length - 1] ?? "This step didn't finish.";
+}
+
 const looksLikePath = (text: string) =>
   /[\\/]/.test(text) && !/\s/.test(text) && !/^https?:/.test(text);
 
@@ -200,8 +284,8 @@ function Step({ step }: { step: ProgressStep }) {
   const running = step.state === "running";
   const { verb } = toolParts(step.name, running);
   const target = stepTarget(step);
-  const output = stepOutput(step);
-  // An edit's +/- counts, from its own arguments.
+  const failed = step.state === "failed";
+  const output = exploring(step) ? null : stepOutput(step);
   const lines = step.args === undefined ? null : countEditLines(step.args);
   const end =
     step.state === "failed"
@@ -219,25 +303,30 @@ function Step({ step }: { step: ProgressStep }) {
   return (
     <li>
       <ToolRow
-        icon={kindIcons[toolKind(step.name)]}
         name={verb}
         target={target ? looksLikePath(target) ? <ToolPath path={target} /> : target : undefined}
         meta={meta}
-        state={running ? "running" : step.state === "failed" ? "failed" : "done"}
+        state={running ? "running" : failed ? "failed" : "done"}
         open={output ? open : undefined}
         onToggle={output ? () => setOpen(!open) : undefined}
         controls={output ? outputId : undefined}
       />
+      {failed && !open ? (
+        <ToolBody>
+          <Text size="meta" tone="muted">
+            {failureLine(step)}
+          </Text>
+        </ToolBody>
+      ) : null}
       {output ? (
         <Fold id={outputId} open={open} onReveal={() => setOpen(true)}>
-          <ToolBody onFold={() => setOpen(false)}>{output}</ToolBody>
+          <ToolBody>{output}</ToolBody>
         </Fold>
       ) : null}
     </li>
   );
 }
 
-/** What a step got back, when it has something to show. */
 function stepOutput(step: ProgressStep): ReactNode {
   const { activity, error, state } = step;
   const parts: ReactNode[] = [];
@@ -269,7 +358,6 @@ function stepOutput(step: ProgressStep): ReactNode {
         </tbody>
       </table>,
     );
-  // The raw payload, when the run sent it, says more than the summarized output.
   if (hasToolPayload(step.args, step.result))
     parts.push(
       <ToolPayloadViewer

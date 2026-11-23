@@ -1,31 +1,28 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-import { ChevronDown, Cloud, Globe } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { EngineMark, hasEngineMark } from "../EngineMark";
+import { Cloud, Globe } from "lucide-react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import {
-  Avatar,
-  AvatarFallback,
   Button,
-  cn,
-  FieldError,
+  ChoiceList,
+  ChoiceTile,
+  Field,
+  FoldChevron,
   Input,
+  Mark,
   Textarea,
-  Pressable,
-  OverflowFadeText,
   Surface,
   Text,
 } from "@misty/ui";
-import { BrandMark } from "../brands/BrandMark";
 import type { EngineId } from "./engines";
 import {
   CLAUDE_MODEL_SLOTS,
   isOfficialAnthropicEndpoint,
   type ClaudeModelSlot,
   type ProviderPreset,
-} from "./providerPresets";
-import type { ProviderForm } from "./useProviderForm";
+} from "./provider_presets";
+import type { ProviderForm } from "./use_provider_form";
 
 const FETCH_DATALIST_ID = "engine-channel-fetched-models";
 
@@ -38,71 +35,32 @@ const slotLabels: Record<ClaudeModelSlot, { label: string; placeholder: string }
 
 function SectionLabel({ children }: { children: string }) {
   return (
-    <Text as="p" tone="muted" weight="medium" className="text-sm">
+    <Text as="p" size="meta" tone="muted" weight="medium">
       {children}
     </Text>
   );
 }
 
-/** One preset to pick: an edged tile, filled once picked, that washes on hover until then. */
-function Choice({
-  selected,
-  onSelect,
-  className,
+function Labelled({
+  label,
+  error,
   children,
 }: {
-  selected: boolean;
-  onSelect: () => void;
-  className?: string;
-  children: ReactNode;
+  label: string;
+  error?: ReactNode;
+  children: ReactElement<{ id?: string }>;
 }) {
   return (
-    <Surface
-      tone={selected ? "well" : "none"}
-      edge={selected ? "strong" : "hairline"}
-      radius="lg"
-      className="flex min-w-0 overflow-hidden"
-    >
-      <Text bare as="div" tone={selected ? "bright" : "muted"} className="flex min-w-0 flex-1">
-        <Pressable
-          aria-pressed={selected}
-          wash={selected ? undefined : "control"}
-          onClick={onSelect}
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2 text-sm transition-colors",
-            className,
-          )}
-        >
-          {children}
-        </Pressable>
-      </Text>
-    </Surface>
-  );
-}
-
-function Labelled({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <label className="grid min-w-0 gap-1.5">
-      <Text tone="muted" className="text-sm">
-        {label}
-      </Text>
+    <Field label={label} error={error} className="min-w-0">
       {children}
-    </label>
+    </Field>
   );
 }
 
-/** A preset's own mark (never inferred from its default model, which for a relay can be another
- *  brand's), or a neutral monogram when it has no public one. */
 function PresetMark({ preset }: { preset: ProviderPreset }) {
-  if (preset.mark) return <BrandMark mark={preset.mark} size={16} />;
-  return (
-    <Avatar size="xs" aria-hidden>
-      <AvatarFallback>{preset.name.charAt(0).toUpperCase()}</AvatarFallback>
-    </Avatar>
-  );
+  return <Mark of={preset.mark} label={preset.name} size={16} aria-hidden />;
 }
 
-/** The official endpoint card (Claude Code and Codex): it pins the channel to the vendor. */
 function OfficialPresetSection({
   engine,
   official,
@@ -113,29 +71,28 @@ function OfficialPresetSection({
   onSelect: () => void;
 }) {
   const isClaude = engine === "claude";
+  const label = isClaude ? "Anthropic official API" : "OpenAI official API";
   return (
     <div className="grid gap-2">
       <SectionLabel>Official API</SectionLabel>
-      <Choice selected={official} onSelect={onSelect} className="gap-3 p-3">
-        <span className="flex size-8 shrink-0 items-center justify-center">
-          {hasEngineMark(engine) ? <EngineMark engine={engine} size={16} /> : <Globe />}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <Text bare tone="bright">
-            {isClaude ? "Anthropic official API" : "OpenAI official API"}
-          </Text>
-          <Text bare tone="muted" className="text-xs">
-            {isClaude
+      <ChoiceList
+        label="Official API"
+        options={[
+          {
+            value: "official",
+            label,
+            description: isClaude
               ? "Your own key, straight to https://api.anthropic.com."
-              : "Your own OPENAI_API_KEY, straight to https://api.openai.com/v1."}
-          </Text>
-        </span>
-      </Choice>
+              : "Your own OPENAI_API_KEY, straight to https://api.openai.com/v1.",
+          },
+        ]}
+        selected={official ? ["official"] : []}
+        onSelect={onSelect}
+      />
     </div>
   );
 }
 
-/** Third-party presets, with Custom, which unlocks the URL without filling anything in. */
 function RelayPresetSection({
   presets,
   official,
@@ -152,27 +109,33 @@ function RelayPresetSection({
   return (
     <div className="grid gap-2">
       <SectionLabel>Third-party providers</SectionLabel>
-      <div className="grid grid-cols-3 gap-2">
-        <Choice selected={!official && !matchedPreset} onSelect={onSelectCustom}>
-          <Globe className="shrink-0" aria-hidden />
-          <OverflowFadeText full>Custom</OverflowFadeText>
-        </Choice>
+      <div role="radiogroup" aria-label="Third-party providers" className="grid grid-cols-4 gap-1">
+        <ChoiceTile
+          radio
+          label="Custom"
+          caption="Custom"
+          selected={!official && !matchedPreset}
+          onSelect={onSelectCustom}
+        >
+          <Globe aria-hidden />
+        </ChoiceTile>
         {presets.map((preset) => (
-          <Choice
+          <ChoiceTile
             key={preset.name}
+            radio
+            label={preset.name}
+            caption={preset.name}
             selected={matchedPreset?.name === preset.name}
             onSelect={() => onSelectPreset(preset)}
           >
             <PresetMark preset={preset} />
-            <OverflowFadeText full>{preset.name}</OverflowFadeText>
-          </Choice>
+          </ChoiceTile>
         ))}
       </div>
     </div>
   );
 }
 
-/** Fetch models, with what came back or why not; the ids feed the model fields' suggestions. */
 function FetchModelsControl({
   fetching,
   error,
@@ -192,11 +155,11 @@ function FetchModelsControl({
         Fetch models
       </Button>
       {error ? (
-        <Text full role="alert" tone="muted" className="text-xs">
+        <Text full role="alert" size="meta" tone="muted">
           {error}
         </Text>
       ) : count > 0 ? (
-        <Text bare tone="muted" className="text-xs">
+        <Text bare size="meta" tone="muted">
           {count === 1 ? "1 model" : `${count} models`}
         </Text>
       ) : null}
@@ -214,7 +177,6 @@ function FetchedModels({ models }: { models: string[] }) {
   );
 }
 
-/** The official card (Claude Code and Codex) and the third-party presets. */
 export function ProviderPresetSections({ engine, form }: { engine: EngineId; form: ProviderForm }) {
   const isClaude = engine === "claude";
   const isCodex = engine === "codex";
@@ -240,8 +202,6 @@ export function ProviderPresetSections({ engine, form }: { engine: EngineId; for
   );
 }
 
-/** Name and note, the URL, and the key (not for Codex, which keeps it in auth.json). Claude
- *  Code's fields mirror every keystroke into the JSON editor's env; Codex's URL is config.toml's. */
 export function ProviderBasicFields({
   engine,
   form,
@@ -249,7 +209,6 @@ export function ProviderBasicFields({
 }: {
   engine: EngineId;
   form: ProviderForm;
-  /** A key is saved for this channel; an empty field keeps it. */
   hasKey: boolean;
 }) {
   const isClaude = engine === "claude";
@@ -273,14 +232,12 @@ export function ProviderBasicFields({
           onChange={(event) => patch({ remark: event.target.value })}
         />
       </Labelled>
-      <Labelled label="API URL">
+      <Labelled label="API URL" error={form.baseUrlError}>
         <Input
           required
           placeholder="https://…"
           value={form.baseUrl}
           disabled={form.official}
-          aria-invalid={form.baseUrlError ? true : undefined}
-          aria-describedby={form.baseUrlError ? "engine-channel-url-error" : undefined}
           onBlur={form.touchBaseUrl}
           onChange={(event) => {
             const baseUrl = event.target.value;
@@ -292,7 +249,6 @@ export function ProviderBasicFields({
             if (isClaude) form.updateClaudeEnv("ANTHROPIC_BASE_URL", baseUrl);
           }}
         />
-        <FieldError id="engine-channel-url-error" message={form.baseUrlError} />
       </Labelled>
       {!isCodex ? (
         <Labelled label="API key">
@@ -313,7 +269,6 @@ export function ProviderBasicFields({
   );
 }
 
-/** Claude Code only: the relay note, each tier's default model, and the settings.json editor. */
 export function ClaudeFormSections({ engine, form }: { engine: EngineId; form: ProviderForm }) {
   const [jsonOpen, setJsonOpen] = useState(true);
   if (engine !== "claude") return null;
@@ -321,8 +276,8 @@ export function ClaudeFormSections({ engine, form }: { engine: EngineId; form: P
   return (
     <>
       {!isOfficialAnthropicEndpoint(value.baseUrl) ? (
-        <Surface tone="card" edge="hairline" radius="lg" className="px-3 py-2">
-          <Text bare as="div" tone="muted" className="flex items-center gap-2 text-sm">
+        <Surface tone="faint" radius="xl" className="px-3 py-2">
+          <Text bare as="div" size="meta" tone="muted" className="flex items-center gap-2">
             <Cloud className="shrink-0" aria-hidden />
             <span>Requests go to this endpoint instead of Anthropic's own API.</span>
           </Text>
@@ -367,12 +322,9 @@ export function ClaudeFormSections({ engine, form }: { engine: EngineId; form: P
             size="sm"
             aria-expanded={jsonOpen}
             onClick={() => setJsonOpen((open) => !open)}
-            className="-ml-2 text-sm"
+            className="-ml-2"
           >
-            <ChevronDown
-              className={cn("transition-transform", !jsonOpen && "-rotate-90")}
-              aria-hidden
-            />
+            <FoldChevron open={jsonOpen} />
             JSON config
           </Button>
           <Button type="button" size="sm" onClick={form.handleFormatJson}>
@@ -390,7 +342,7 @@ export function ClaudeFormSections({ engine, form }: { engine: EngineId; form: P
               onChange={(event) => form.onJsonChange(event.target.value)}
             />
             {form.jsonError ? (
-              <Text tone="muted" wrap className="text-xs" role="alert">
+              <Text size="meta" tone="muted" wrap role="alert">
                 {form.jsonError}
               </Text>
             ) : null}
@@ -401,7 +353,6 @@ export function ClaudeFormSections({ engine, form }: { engine: EngineId; form: P
   );
 }
 
-/** The flat engines: fetch models, and the model field with the fetched ones offered. */
 export function FlatModelSection({ engine, form }: { engine: EngineId; form: ProviderForm }) {
   if (engine === "claude" || engine === "codex") return null;
   return (
@@ -425,7 +376,6 @@ export function FlatModelSection({ engine, form }: { engine: EngineId; form: Pro
   );
 }
 
-/** Codex only: the config.toml editor and the auth.json editor. */
 export function CodexFormSections({
   engine,
   form,
@@ -467,7 +417,7 @@ export function CodexFormSections({
           }}
         />
         {form.authError ? (
-          <Text tone="muted" wrap className="text-xs" role="alert">
+          <Text size="meta" tone="muted" wrap role="alert">
             {form.authError}
           </Text>
         ) : null}

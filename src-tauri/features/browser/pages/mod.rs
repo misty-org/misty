@@ -1,4 +1,5 @@
 pub(crate) mod account_views;
+pub(crate) mod app_pages;
 pub(crate) mod bounds;
 #[cfg(all(desktop, any(target_os = "macos", windows, target_os = "linux")))]
 pub(crate) mod content_world;

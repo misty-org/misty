@@ -1,8 +1,3 @@
-//! Reads the pages `web.fetch` gets in a worker the OS confines (`permission-page-reader`), so Misty's
-//! own process never parses them: `sandbox-exec` on macOS, an AppContainer on Windows, and Landlock,
-//! seccomp and namespaces on Linux. The worker
-//! runs the same code as `readable_page` (`src-tauri/features/browser/page_text`). If it fails, that fetch
-//! fails. There is no way back to reading in this process.
 use agent_runs::{PageReadError, PageReader, ReadablePage};
 use futures_util::future::BoxFuture;
 use page_text::{
@@ -19,7 +14,6 @@ mod windows;
 #[cfg(windows)]
 use windows as worker;
 
-/// Longer than any honest page takes, and the same as a fetch's own limit.
 const TIME_LIMIT_SECONDS: u64 = 20;
 
 #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
@@ -63,7 +57,6 @@ impl PageReader for ConfinedPageReader {
     }
 }
 
-/// Removes what the reader left on disk, as Misty exits.
 pub(crate) fn clean_up() {
     worker::clean_up();
 }

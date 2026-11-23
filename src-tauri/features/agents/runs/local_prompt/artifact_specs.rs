@@ -1,7 +1,5 @@
-//! Typed drafts a request can ask for (`aiArtifactSpecs`, `inferredAIArtifactKind`).
 use super::request::RunRequest;
 
-/// A kind's prompt and JSON shape.
 pub(super) fn artifact_spec(kind: &str) -> Option<(&'static str, &'static str)> {
     match kind {
         "message_draft" => Some(("Draft a Space message for review. Do not post it.", r#"{"conversation_id":"opaque id","text":"...","reply_to_message_id":"optional opaque id"}"#)),
@@ -22,7 +20,9 @@ pub(super) fn inferred_artifact_kind(request: &RunRequest) -> &'static str {
     match request.surface_id.as_str() {
         "space.chat" if has(&["draft", "reply", "write message"]) => "message_draft",
         "terminal" if has(&["run", "execute", "command", "install"]) => "terminal_command",
-        "browser" if has(&["click", "navigate", "fill", "submit", "upload", "open page"]) => "browser_action",
+        "browser" if has(&["click", "navigate", "fill", "submit", "upload", "open page"]) => {
+            "browser_action"
+        }
         "transfers" if has(&["retry", "resume", "cancel", "recover"]) => "transfer_plan",
         "extensions" if has(&["install", "configure", "run", "enable"]) => "extension_action",
         _ => "",

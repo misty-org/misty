@@ -1,7 +1,4 @@
-//! Page tools for a running page: stop loading and clear website data.
-
 use crate::browser::*;
-// Clearing website data waits on WebView2 with these.
 #[cfg(windows)]
 use std::sync::Mutex;
 #[cfg(windows)]
@@ -29,7 +26,6 @@ pub fn browser_webview_stop(
     webview
         .eval("window.stop();")
         .map_err(|error| error.to_string())?;
-    // A cancelled load never reports that it finished.
     let _ = webview.eval(browser_status_update_script(&json!({ "loading": false })));
     Ok(())
 }

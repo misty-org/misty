@@ -1,13 +1,3 @@
-//! Builds `catalog.json`, the apps Misty offers to connect directly, from the official MCP Registry:
-//! every server run by its app's own maker (`catalog::by_maker`) whose sign-in needs no key of
-//! Misty's (`oauth::discover`), with the logo its maker published. Run it before a release:
-//!
-//! ```text
-//! cargo test --lib -- --ignored generate_direct_catalog --nocapture
-//! ```
-//!
-//! Only public data is read: registry pages, servers' sign-in metadata (nothing is registered) and
-//! makers' home pages for their icons.
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -69,7 +59,6 @@ async fn registry_pages(http: &reqwest::Client) -> Vec<Value> {
     items
 }
 
-/// `<link rel="…icon…" href="…">` on a home page, the largest first.
 fn page_icons(html: &str, base: &url::Url) -> Vec<String> {
     let link = regex::Regex::new(r"(?is)<link\b[^>]*>").unwrap();
     let attribute = |tag: &str, name: &str| {
@@ -113,7 +102,6 @@ fn page_icons(html: &str, base: &url::Url) -> Vec<String> {
     found.into_iter().map(|(_, url)| url).collect()
 }
 
-/// Whether `url` answers with an image of reasonable size.
 async fn is_image(http: &reqwest::Client, url: &str) -> bool {
     let Ok(response) = http.get(url).send().await else {
         return false;
@@ -131,8 +119,6 @@ async fn is_image(http: &reqwest::Client, url: &str) -> bool {
             .is_ok_and(|bytes| !bytes.is_empty() && bytes.len() <= ICON_LIMIT)
 }
 
-/// The maker's own logo: the icon published with the server, else the one the maker's home page
-/// declares, else its `favicon.ico`.
 async fn official_icon(http: &reqwest::Client, server: &Value, url: &str) -> String {
     for icon in server["icons"].as_array().into_iter().flatten() {
         if let Some(src) = icon["src"]
@@ -167,7 +153,6 @@ async fn official_icon(http: &reqwest::Client, server: &Value, url: &str) -> Str
     String::new()
 }
 
-/// A publisher domain with more servers than this lists other companies' apps.
 const MOST_PER_DOMAIN: usize = 5;
 
 fn domain_of(url: &str) -> String {
@@ -176,14 +161,11 @@ fn domain_of(url: &str) -> String {
         .unwrap_or_default()
 }
 
-/// The order apps are browsed in: words before symbols and digits.
 fn sort_key(name: &str) -> (bool, String) {
     let lower = name.trim().to_lowercase();
     (!lower.starts_with(|c: char| c.is_alphabetic()), lower)
 }
 
-/// The named makers first, in their order; then, leaving out publishers that list other companies'
-/// apps, every app with its maker's logo by name, then those without one.
 fn tidy(entries: Vec<Entry>) -> Vec<Entry> {
     let named: Vec<&str> = catalog::MAKERS.iter().map(|(_, url)| *url).collect();
     let named_domains: HashSet<String> = named.iter().map(|url| domain_of(url)).collect();
@@ -207,7 +189,6 @@ fn tidy(entries: Vec<Entry>) -> Vec<Entry> {
     first
 }
 
-/// Applies `tidy` to the catalog as it is, without reading the registry again.
 #[test]
 #[ignore]
 fn tidy_direct_catalog() {
@@ -218,7 +199,6 @@ fn tidy_direct_catalog() {
     println!("kept {} of {before} apps", list.len());
 }
 
-/// `https://notion.com/` for `https://mcp.notion.com/mcp`: the maker's registrable domain.
 fn home_of(url: &str) -> Option<url::Url> {
     let host = url::Url::parse(url).ok()?.host_str()?.to_lowercase();
     let labels: Vec<&str> = host.split('.').collect();
@@ -252,7 +232,6 @@ async fn generate_direct_catalog() {
     let http = crate::engine_config::support::http_client().unwrap();
     let items = registry_pages(&http).await;
     println!("registry: {} entries in all", items.len());
-    // The makers the app names first, then every maker the registry has.
     let mut candidates: Vec<(CatalogApp, Value)> = catalog::MAKERS
         .iter()
         .map(|(name, url)| {
@@ -293,7 +272,7 @@ async fn generate_direct_catalog() {
         if let Some(entry) = entry {
             entries.push((index, entry));
         }
-        if done % 250 == 0 {
+        if done.is_multiple_of(250) {
             println!("checked {done}/{total}, keyless {}", entries.len());
         }
     }

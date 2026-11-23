@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(() => Promise.resolve()) }));
 vi.mock("../../account/components/WelcomeNav", () => ({ WelcomeNav: () => null }));
-vi.mock("@/shared/platform/nativeInvoke", () => ({
+vi.mock("@/shared/platform/native_invoke", () => ({
   invoke: vi.fn(async (command: string, args?: { engine?: string }) => {
     const engine = args?.engine ?? "";
     switch (command) {
@@ -33,7 +33,6 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
         return {
           total: 1,
           apps: [
-            // Shipped and checked when the catalog was built.
             {
               name: "Notion",
               description: "",
@@ -42,7 +41,6 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
               icon: "",
               checked: true,
             },
-            // Newer than the catalog: checked live, and it needs an app of Misty's, so it's hidden.
             {
               name: "Asana",
               description: "",
@@ -60,7 +58,6 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
         };
       case "direct_apps_list":
         return [];
-      // Misty's speech catalog: one voice for the person's language.
       case "speech_catalog":
         return {
           hearing: [],
@@ -88,8 +85,6 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
           machine: { memoryMb: 16_000, cores: 8, appleSilicon: true, diskFreeMb: null },
           installing: [],
         };
-      // What each engine can do: only one with images, Misty's tools and web search can be the
-      // default engine (OpenCode, here, has no web search).
       case "engines_list":
         return ["claude", "codex", "agy", "opencode"].map((id) => ({
           id,
@@ -108,7 +103,7 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
 }));
 
 import { useSetupStore } from "@/features/account";
-import { resetCliStatusForTests } from "@/features/engine-config/clis/useCliVersionStatus";
+import { resetCliStatusForTests } from "@/features/engine-config/clis/use_cli_version_status";
 import { engineSetupState } from "@/features/agents";
 import { SetupPage } from "./SetupPage";
 
@@ -116,7 +111,6 @@ function Where() {
   return <p data-testid="where">{useLocation().pathname}</p>;
 }
 
-/** Opens setup on its first step, How Misty works, and by default moves on to the engines. */
 function renderSetup({ pastIntro = true } = {}) {
   render(
     <MemoryRouter initialEntries={["/setup"]}>
@@ -167,7 +161,6 @@ it("asks for one next step per engine", () => {
   expect(
     engineSetupState("claude", { status: status({}), signIn: signIn(false), error: null }),
   ).toBe("sign-in");
-  // A CLI that can't say (Kimi, Grok, Qoder before Misty saw a sign-in finish) asks for one.
   expect(engineSetupState("kimi", { status: status({}), signIn: signIn(null), error: null })).toBe(
     "sign-in",
   );
@@ -177,7 +170,6 @@ it("asks for one next step per engine", () => {
   expect(engineSetupState("kimi", { status: status({}), signIn: signIn(true), error: null })).toBe(
     "ready",
   );
-  // OpenCode is free with no account, and DeepSeek Harness signs in in its own page.
   expect(
     engineSetupState("opencode", { status: status({}), signIn: signIn(null), error: null }),
   ).toBe("ready");
@@ -208,7 +200,6 @@ it("needs a ready engine that can run Misty to continue, with no way to skip", a
 });
 
 it("doesn't count a ready engine that can't run Misty's own work", async () => {
-  // OpenCode is ready with no account, but brings no web search of its own.
   mocks.installed.add("opencode");
   renderSetup();
   expect(await screen.findByText("Can't run Misty's own work")).toBeTruthy();
@@ -267,7 +258,6 @@ it("offers only the direct sign-ins, which need no key, then ends the welcome", 
     expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
   );
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  // Misty's voice is the person's to pick before moving on.
   expect(await screen.findByRole("heading", { name: "Pick Misty's voice" })).toBeTruthy();
   const amy = await screen.findByRole("button", { name: "Amy (British English)" });
   expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
@@ -276,7 +266,6 @@ it("offers only the direct sign-ins, which need no key, then ends the welcome", 
     expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
   );
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  // Apps that sign in directly come first; one that needs a key of Misty's never shows.
   expect(await screen.findByRole("button", { name: "Connect Notion" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Connect Asana" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Start using Misty" }));

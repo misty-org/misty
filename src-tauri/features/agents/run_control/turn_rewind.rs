@@ -1,8 +1,3 @@
-//! Rewinding a chat with its files (`turn_snapshots.rs` keeps the trees). Every turn on this
-//! computer starts through `agent_run_start`, whatever engine runs it, so the folder it works in is
-//! saved there before it begins and again when its end is published. The window asks what a
-//! rewind would put back, then asks for the files the person agreed to; native code works out the
-//! contents again itself and only ever writes inside the folder the turns worked in.
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -32,7 +27,6 @@ fn root(app: &AppHandle) -> Option<PathBuf> {
     )
 }
 
-/// One snapshot of a folder at a time, so a turn's end and the next turn's start don't race.
 fn folder_lock(folder: &Path) -> Arc<Mutex<()>> {
     static LOCKS: LazyLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
         LazyLock::new(Default::default);
@@ -53,17 +47,12 @@ fn snapshot_locked(root: &Path, folder: &Path) -> Result<git2::Oid, String> {
     snapshots::snapshot(root, folder)
 }
 
-/// The folder a run can change: an engine chat's own folder (or its multi-run worktree), or the
-/// shared folder Misty's own agent was given to write in. Nothing for a run with neither.
 async fn folder_of(app: &AppHandle, account: &str, body: &Value) -> Option<PathBuf> {
     let runtime = app.try_state::<MistyRuntime>()?;
     if crate::engines::runs::wants(body) {
         let named = PathBuf::from(body["engine"]["folder"].as_str().unwrap_or(""));
         let conversation = body["conversation_id"].as_str().unwrap_or("").to_owned();
         let (db, account) = (runtime.environment.store(), account.to_owned());
-        // The folder the engine will work in, as `chat_folder::for_run` decides it: a multi-run
-        // worktree, else the chat's own folder. A chat's first run has none yet, so nothing to
-        // take back.
         let folder = tokio::task::spawn_blocking(move || {
             if !named.as_os_str().is_empty()
                 && crate::engines::multirun::is_worktree(&db, &account, &named)
@@ -90,8 +79,6 @@ async fn folder_of(app: &AppHandle, account: &str, body: &Value) -> Option<PathB
     runtime.agents.folder_root(scope).await.ok()
 }
 
-/// Saves the folder a top-level chat turn works in, before the turn starts. A turn that can't
-/// be saved still runs; its files just can't be put back later.
 pub(super) async fn before_run(app: &AppHandle, run_id: &str, body: &Value) {
     let facts = RunFacts::of_request(run_id, body);
     let conversation = body["conversation_id"].as_str().unwrap_or("").to_owned();
@@ -108,7 +95,6 @@ pub(super) async fn before_run(app: &AppHandle, run_id: &str, body: &Value) {
         PRUNED.call_once(|| {
             snapshots::prune(&root, now_ms() - snapshots::KEPT_DAYS * 24 * 60 * 60 * 1000)
         });
-        // A run that starts again after a restart keeps the tree it first started from.
         if snapshots::read_record(&root, &run_id).is_some() {
             return;
         }
@@ -131,7 +117,6 @@ pub(super) async fn before_run(app: &AppHandle, run_id: &str, body: &Value) {
     .await;
 }
 
-/// Saves the folder again as a turn ends, off the caller's thread.
 pub(super) fn after_run(app: &AppHandle, run_id: &str, event: &Value) {
     let kind = event["type"].as_str().unwrap_or("");
     if !matches!(
@@ -156,7 +141,6 @@ pub(super) fn after_run(app: &AppHandle, run_id: &str, event: &Value) {
     });
 }
 
-/// What a rewind would put back in one folder.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderFiles {
@@ -168,11 +152,9 @@ pub struct FolderFiles {
 #[serde(rename_all = "camelCase")]
 pub struct RewindFiles {
     pub folders: Vec<FolderFiles>,
-    /// Some removed turn's files weren't saved, so they stay as they are.
     pub incomplete: bool,
 }
 
-/// The removed turns' records, grouped by folder in the order the chat ran them.
 fn grouped(root: &Path, account: &str, run_ids: &[String]) -> Vec<(String, Vec<Turn>)> {
     let mut groups: Vec<(String, Vec<Turn>)> = Vec::new();
     for run_id in run_ids {
@@ -203,8 +185,6 @@ fn plans(
         .map(|(folder, turns)| {
             let path = PathBuf::from(&folder);
             let plan = (|| {
-                // A folder Misty may only read (a shared folder, which only the chat's sandboxed
-                // shell writes) can't have its files put back from here.
                 file_access::check(&path, file_access::Access::Write)
                     .map_err(|error| error.to_string())?;
                 let now = snapshot_locked(root, &path)?;
@@ -223,7 +203,6 @@ fn window_account(webview: &Webview) -> Result<String, String> {
     account_of_window(webview.label()).ok_or_else(|| "This window has no account.".into())
 }
 
-/// What rewinding these turns (oldest first) would put back.
 #[tauri::command]
 pub async fn agent_turn_files(
     app: AppHandle,
@@ -268,11 +247,9 @@ pub struct ChosenFile {
 #[serde(rename_all = "camelCase")]
 pub struct RestoredFiles {
     pub restored: usize,
-    /// Files that couldn't be put back, as `folder/path`.
     pub failed: Vec<String>,
 }
 
-/// Puts back the files the person chose from what rewinding these turns would put back.
 #[tauri::command]
 pub async fn agent_turn_restore(
     app: AppHandle,
@@ -290,7 +267,6 @@ pub async fn agent_turn_restore(
         for (folder, plan) in plans(&root, &account, &run_ids) {
             let Ok(plan) = plan else { continue };
             let Some(target) = plan.target else { continue };
-            // Only files this rewind would put back, whatever the window sends.
             let chosen: Vec<String> = plan
                 .files
                 .iter()

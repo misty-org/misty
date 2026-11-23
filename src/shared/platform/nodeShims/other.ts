@@ -1,4 +1,3 @@
-// Builtins Midscene imports for Node-only features the desktop never runs.
 const unavailable = (name: string) => () => {
   throw new Error(`${name} is unavailable in the Misty app`);
 };

@@ -1,23 +1,16 @@
-// The worktrees multi-run made, kept in `misty.db` on this computer only. A row is what lets an
-// engine's turn run in a worktree: nothing else can add a folder to this table.
-
 use std::path::{Path, PathBuf};
 
 use database::store::Store;
 
-/// One agent's lane of a multi-run: its worktree, and the chat its turn runs in.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Row {
     pub account: String,
     pub multirun: String,
     pub lane: i64,
     pub space: String,
-    /// The linked folder the worktree was made from.
     pub folder: String,
-    /// The worktree itself.
     pub path: String,
     pub branch: String,
-    /// The commit every lane started from.
     pub base: String,
     pub agent: String,
     pub conversation: String,
@@ -96,12 +89,10 @@ fn select(store: &Store, filter: &str, values: &[&str]) -> Result<Vec<Row>, Stri
     rows.collect::<Result<_, _>>().map_err(text)
 }
 
-/// A Space's multi-runs, newest first, each one's lanes in order.
 pub fn of_space(store: &Store, account: &str, space: &str) -> Result<Vec<Row>, String> {
     select(store, "account = ?1 AND space = ?2", &[account, space])
 }
 
-/// One multi-run's lanes, in order. Empty when the account has no such multi-run.
 pub fn of_run(store: &Store, account: &str, multirun: &str) -> Result<Vec<Row>, String> {
     select(
         store,
@@ -110,7 +101,6 @@ pub fn of_run(store: &Store, account: &str, multirun: &str) -> Result<Vec<Row>, 
     )
 }
 
-/// Whether multi-run made exactly this folder as a worktree for this account.
 pub fn is_worktree(store: &Store, account: &str, folder: &Path) -> bool {
     let Some(folder) = folder.to_str() else {
         return false;
@@ -127,7 +117,6 @@ pub fn is_worktree(store: &Store, account: &str, folder: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Every worktree on this computer, to let the file gate reach them as the app starts.
 pub fn all_paths(store: &Store) -> Vec<PathBuf> {
     let read = || -> rusqlite::Result<Vec<PathBuf>> {
         let connection = store.connect()?;

@@ -1,10 +1,7 @@
-// A visual receipt of agent pointing, never an input source or permission grant.
 (() => {
   const key = Symbol.for("misty.browser.agent.cursor");
   if (window[key]) return;
   let host, control, ring, timer, placed = false;
-  // A ring pulses where the agent acts. The glowing frame around the page the
-  // agent holds is drawn natively (agents/cursor/macos/ring_views.rs), so page captures leave it out.
   const showControl = (x, y, reduced) => {
     if (!control?.isConnected) {
       control = document.createElement("misty-agent-control");
@@ -58,19 +55,15 @@
         document.documentElement.append(host);
         placed = false;
       }
-      // No idle loops or invented movement. Reduced motion keeps the target
-      // visible but snaps to it rather than travelling across the page.
       const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      // Slow enough to follow (step.rs waits for it before pressing).
       host.style.transition = placed && !reduced ? "transform 320ms cubic-bezier(0.16,1,0.3,1), opacity 100ms" : "opacity 100ms";
       host.style.transform = `translate3d(${x - 2}px,${y - 2}px,0)`;
       host.style.opacity = "1";
       placed = true;
       if (options?.hold) showControl(x, y, reduced);
       clearTimeout(timer);
-      // An acting agent keeps its cursor visible so every screenshot shows it.
       if (!options?.hold) timer = setTimeout(hide, 1600);
-    } catch { /* Visual feedback must never break the real action. */ }
+    } catch {}
   };
   window[key] = { move, hide };
   document.addEventListener("visibilitychange", hide);

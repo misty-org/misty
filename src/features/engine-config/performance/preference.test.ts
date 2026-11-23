@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
 }));
-vi.mock("./nativeApi", () => ({
+vi.mock("./native_api", () => ({
   performanceApi: { enabled: mocks.get, setEnabled: mocks.set },
   listen: mocks.listen,
 }));

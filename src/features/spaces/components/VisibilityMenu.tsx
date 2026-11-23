@@ -10,13 +10,13 @@ import {
   Text,
 } from "@misty/ui";
 
-/** A lock and the word, so the layer never rests on the icon alone. */
 export function PrivateLabel({ className }: { className?: string }) {
   return (
     <Text
       bare
+      size="meta"
       tone="muted"
-      className={cn("inline-flex shrink-0 items-center gap-1 text-xs", className)}
+      className={cn("inline-flex shrink-0 items-center gap-1", className)}
     >
       <Lock aria-hidden />
       Private
@@ -24,12 +24,7 @@ export function PrivateLabel({ className }: { className?: string }) {
   );
 }
 
-/**
- * An item's menu, for its owner. Private keeps the item in the Space but shows it only to
- * them and to their own agents on their own asks; the choice shows as a checkmark.
- */
 export function VisibilityMenu(props: {
-  /** What the menu is for, such as the item's title. */
   label: string;
   visibility: ItemVisibility | undefined;
   onChange: (visibility: ItemVisibility) => void;
@@ -51,7 +46,7 @@ export function VisibilityMenu(props: {
           label={
             <span className="flex flex-col">
               <span>Private</span>
-              <Text bare tone="muted" className="text-xs">
+              <Text bare size="meta" tone="muted">
                 Only you and your agents on your own asks
               </Text>
             </span>

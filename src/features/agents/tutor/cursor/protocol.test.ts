@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { companionReply, resolvePoint } from "./companionReply";
+import { companionReply, resolvePoint } from "./companion_reply";
 import { flight, recordingPower, spring, waveformHeight } from "./motion";
 import { type DisplayCapture } from "./protocol";
 const capture = (

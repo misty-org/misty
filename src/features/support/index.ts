@@ -1,3 +1,3 @@
-export * from "./recoveryActions";
+export * from "./recovery_actions";
 export * from "./SupportRecoverySection";
-export * from "../../shared/platform/systemErrors";
+export * from "../../shared/platform/system_errors";

@@ -1,11 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Incremental log reader: for every discovered file, read only the bytes
-//! appended since the stored cursor (from 0 when the file shrank or its head
-//! changed), stream complete lines through the engine parser and upsert the
-//! events together with the new cursor in one savepoint.
-
 use super::parsers::{FileParser, ParseCtx};
 use super::sources::{discover, FoundFile, SourceSpec};
 use super::store::{self, Cursor};
@@ -16,17 +11,13 @@ use rusqlite::Connection;
 use serde::Serialize;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 
-/// Bytes hashed at the head of a file to notice it was replaced.
 const HEAD_BYTES: i64 = 1024;
-/// A single JSONL line larger than this is skipped (never buffered whole).
 const MAX_LINE_BYTES: usize = 64 * 1024 * 1024;
 const READ_BUFFER: usize = 256 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ScanMode {
     Incremental,
-    /// Wipe everything and rebuild from the logs (one transaction, so
-    /// readers keep the old numbers until the rebuild commits).
     Full,
 }
 
@@ -110,14 +101,12 @@ fn scan_all(
                     files_read += i64::from(outcome.read);
                     changed += outcome.changed;
                 }
-                // Path only: never log file contents.
                 Err(error) => eprintln!("[usage-stats] {id} {}: {error}", found.path.display()),
             }
             seen.push(key);
             done += 1;
             report(done, id, false);
         }
-        // A root that failed to list must not drop the cursors of its files.
         if discovery.complete() {
             store::prune_cursors(conn, id, &seen).map_err(|e| format!("{id} prune: {e}"))?;
         }
@@ -141,8 +130,6 @@ fn process_file(
     found: &FoundFile,
     previous: Option<&Cursor>,
 ) -> Result<FileOutcome, String> {
-    // Defense in depth: discovery only yields regular files under the root,
-    // but the file may have been swapped for a symlink since.
     if !found.path.starts_with(&found.root) {
         return Err("outside its source root".to_string());
     }
@@ -197,8 +184,6 @@ fn process_file(
     })
 }
 
-/// Events, lineage and cursor commit together: the cursor never advances
-/// past events that were not stored.
 fn persist(
     conn: &mut Connection,
     events: &[UsageEvent],
@@ -222,10 +207,6 @@ enum LineRead {
     Oversized { consumed: usize, terminated: bool },
 }
 
-/// Read `[start, len)` line by line; returns the offset after the last
-/// line consumed. An unterminated tail is consumed only if it is already a
-/// complete JSON value — otherwise the writer is mid-line and the next scan
-/// picks it up whole.
 fn read_lines(
     file: &mut File,
     start: i64,
@@ -324,7 +305,6 @@ fn trim_eol(line: &[u8]) -> &[u8] {
     &line[..end]
 }
 
-/// Hash of the first `len` bytes; None when the file is now shorter.
 fn hash_head(file: &mut File, len: i64) -> Result<Option<String>, String> {
     use sha2::{Digest, Sha256};
     let len = usize::try_from(len.clamp(0, HEAD_BYTES)).unwrap_or(0);

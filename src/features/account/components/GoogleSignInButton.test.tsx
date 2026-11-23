@@ -13,7 +13,7 @@ vi.mock("@/features/account/api/api", () => ({ accountApi: { googleAvailable: mo
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => mocks.native }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: mocks.open }));
 vi.mock("../AuthContext", () => ({ useAuth: () => ({ authenticateAccount: mocks.authenticate }) }));
-vi.mock("../sessions/useAccountStore", () => ({
+vi.mock("../sessions/use_account_store", () => ({
   accountGoogleSignIn: mocks.signIn,
   accountGoogleReauthenticate: vi.fn(),
 }));
@@ -88,7 +88,6 @@ describe("Google sign-in entry", () => {
     );
     await render();
     await act(async () => container.querySelector("button")!.click());
-    // The one button turns into Cancel, and leaving says nothing: the person chose it.
     const buttons = container.querySelectorAll("button");
     expect(buttons).toHaveLength(1);
     expect(buttons[0].textContent).toContain("Cancel Google sign-in");

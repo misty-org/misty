@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { continuationEvent } from "../progress/continuationEvent";
+import { continuationEvent } from "../progress/continuation_event";
 import { isOpen, resumePrompt, splitLedger, withLedgerRows, type LedgerRow } from "./ledger";
 
 const rows: LedgerRow[] = [

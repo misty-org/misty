@@ -1,5 +1,3 @@
-//! Configuring a Browser page's native view: identity, resizing, pointer guard and reload.
-
 use tauri::Webview;
 
 #[cfg(target_os = "macos")]
@@ -61,15 +59,18 @@ pub(crate) fn configure_browser_webview(
     native_live_resize: bool,
 ) -> Result<(), String> {
     kiri::engine::deny_permission_requests(webview)?;
+    configure_page_view(webview, native_live_resize)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn configure_page_view(
+    webview: &Webview,
+    native_live_resize: bool,
+) -> Result<(), String> {
     use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSViewLayerContentsRedrawPolicy};
     webview
         .with_webview(move |platform_webview| unsafe {
             let view: &NSView = &*platform_webview.inner().cast();
-            // A responsive Browser page is pinned to the top-left of its
-            // measured host. Let AppKit grow its width and height during the
-            // native live-resize loop, when WebKit pauses renderer resize
-            // events. Fixed device previews remain explicitly positioned by
-            // the workspace because their horizontal margins must stay equal.
             let mask = if native_live_resize {
                 NSAutoresizingMaskOptions::ViewWidthSizable
                     | NSAutoresizingMaskOptions::ViewHeightSizable
@@ -79,8 +80,6 @@ pub(crate) fn configure_browser_webview(
             if view.autoresizingMask() != mask {
                 view.setAutoresizingMask(mask);
             }
-            // Configure the backing hierarchy once. Reconciliation also calls
-            // this function for unchanged bounds; it must not force a repaint.
             if view.layerContentsRedrawPolicy() != NSViewLayerContentsRedrawPolicy::DuringViewResize
             {
                 configure_continuous_live_resize(view);
@@ -88,18 +87,12 @@ pub(crate) fn configure_browser_webview(
             if let Some(parent) = view.superview() {
                 parent.setAutoresizesSubviews(true);
             }
-            // Stop pages at their edges instead of rubber-banding past the
-            // viewport. This is WebKit SPI (_WKRectEdgeNone = 0), so probe for
-            // it; CSS overscroll-behavior on the root blocked wheel scrolling.
             let rubber_banding = objc2::sel!(_setRubberBandingEnabled:);
             let supported: bool = objc2::msg_send![view, respondsToSelector: rubber_banding];
             if supported {
                 let _: () = objc2::msg_send![view, _setRubberBandingEnabled: 0usize];
             }
             if let Some(window) = view.window() {
-                // AppKit normally preserves cached window contents during a
-                // user resize. That optimization produces a frozen WKWebView
-                // snapshot, so make the window redraw its live hierarchy.
                 window.setPreservesContentDuringLiveResize(false);
             }
         })
@@ -109,8 +102,6 @@ pub(crate) fn configure_browser_webview(
 #[cfg(target_os = "macos")]
 use crate::app::macos_window_effects::mac_rounded_corners::configure_continuous_live_resize;
 
-/// Keep Wry unmodified and apply Misty's main-renderer pointer guard after
-/// native geometry, visibility, or sibling-order changes.
 #[cfg(target_os = "macos")]
 pub(crate) fn refresh_browser_cursor_ownership(webview: &Webview) -> Result<(), String> {
     use objc2_app_kit::NSView;
@@ -155,6 +146,14 @@ pub(crate) fn configure_browser_webview(
     _native_live_resize: bool,
 ) -> Result<(), String> {
     kiri::engine::deny_permission_requests(webview)
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn configure_page_view(
+    _webview: &Webview,
+    _native_live_resize: bool,
+) -> Result<(), String> {
+    Ok(())
 }
 
 #[cfg(not(target_os = "macos"))]

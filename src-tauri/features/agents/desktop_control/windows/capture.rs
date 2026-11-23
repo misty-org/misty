@@ -1,8 +1,5 @@
-//! Choosing the display under control, entering control and capturing it.
 use super::*;
 
-/// The display under the person's pointer, or the one already controlled:
-/// moving the pointer never retargets the agent's frame.
 fn target_display() -> Result<(u32, Frame), String> {
     if let Some(display) = with(|control| control.display.filter(|_| control.controlling)) {
         return Ok(display);
@@ -66,8 +63,6 @@ fn begin_control(display: (u32, Frame)) -> Result<(), String> {
     Ok(())
 }
 
-/// Captures the controlled display for the agent, entering control first.
-/// Called on a worker thread.
 pub fn capture(task: &str) -> Result<Value, String> {
     confirm(task)?;
     let display = target_display()?;
@@ -75,7 +70,6 @@ pub fn capture(task: &str) -> Result<Value, String> {
         stop_control(Some(&failure));
         return Err(failure);
     }
-    // The frame shows the effect of the last action.
     if let Some(last) = with(|control| control.last_action) {
         let settle = Duration::from_millis(150).saturating_sub(last.elapsed());
         thread::sleep(settle);

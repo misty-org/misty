@@ -7,17 +7,17 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import { FindBar, Text } from "@misty/ui";
 import { MistyMarkdown } from "../../runs/markdown/MistyMarkdown";
-import { imageFileUrl } from "../files/filesApi";
-import { useFilesStore } from "../files/filesStore";
+import { imageFileUrl } from "../files/files_api";
+import { useFilesStore } from "../files/files_store";
 import {
   clearMarkdownSearchHighlights,
   findMarkdownMatches,
   paintMarkdownSearchHighlights,
   scrollRangeIntoView,
-} from "./markdownSearch";
+} from "./markdown_search";
 
 const IMAGE_RE = /\.(?:apng|avif|bmp|gif|ico|jpe?g|png|svg|webp)(?:[?#].*)?$/i;
 
@@ -38,10 +38,6 @@ export function normalizePathSegments(path: string): string {
   return (/^[a-zA-Z]:/.test(path) ? "" : "/") + joined;
 }
 
-/**
- * A link's target next to the Markdown file (`./docs/x.md`, `../a.png`) as an absolute path;
- * null for a URL, any scheme, an anchor or a folder, none of which the editor may open.
- */
 export function resolveMarkdownLinkPath(href: string, sourceFilePath: string): string | null {
   let cleaned: string;
   try {
@@ -53,7 +49,6 @@ export function resolveMarkdownLinkPath(href: string, sourceFilePath: string): s
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(cleaned)) return null;
   const pathOnly = cleaned.replace(/[?#].*$/, "");
   if (!pathOnly) return null;
-  // A folder link (`./docs/`) or a name without an extension isn't a file.
   const last = pathOnly.split(/[\\/]/).filter(Boolean).pop() ?? "";
   if (!last.includes(".")) return null;
   if (/^([a-zA-Z]:[\\/]|\/|\\\\)/.test(pathOnly)) return normalizePathSegments(pathOnly);
@@ -62,20 +57,10 @@ export function resolveMarkdownLinkPath(href: string, sourceFilePath: string): s
   return normalizePathSegments(`${sourceFilePath.slice(0, separator)}/${pathOnly}`);
 }
 
-/** The parsed document, behind memo: opening the find bar or typing in it never parses again. */
 const MarkdownDocument = memo(function MarkdownDocument({ draft }: { draft: string }) {
-  return (
-    <div className="misty-markdown">
-      <MistyMarkdown>{draft}</MistyMarkdown>
-    </div>
-  );
+  return <MistyMarkdown size="page">{draft}</MistyMarkdown>;
 });
 
-/**
- * A Markdown file rendered as the chat renders replies, from the draft being edited. Images next
- * to the file show (read through the linked-folder gate); links to files open them as tabs, web
- * links open in the browser. Find (⌘F) highlights matches without touching the document.
- */
 export function MarkdownPreview({
   path,
   draft,
@@ -89,7 +74,6 @@ export function MarkdownPreview({
   searchOpen?: boolean;
   onSearchOpenChange?(open: boolean): void;
 }) {
-  // A deferred copy, so parsing the whole document never slows typing.
   const deferredDraft = useDeferredValue(draft);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -100,11 +84,8 @@ export function MarkdownPreview({
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
-  // Highlights live in one registry for the page: only clear them when this preview painted.
   const paintedRef = useRef(false);
 
-  // Images named relative to the file load over `misty-file:`, which checks them natively against
-  // the linked folders; the app's own pages can't load a linked folder's files directly.
   useEffect(() => {
     const root = contentRef.current;
     if (!root) return;
@@ -128,8 +109,6 @@ export function MarkdownPreview({
     return () => cancelAnimationFrame(frame);
   }, [searchOpen]);
 
-  // Matches again on query, content or cursor changes; the observer catches content rendered
-  // late. Frames merge bursts of changes.
   useEffect(() => {
     const root = contentRef.current;
     if (!searchOpen || !active || !root || !query.trim()) {
@@ -178,7 +157,6 @@ export function MarkdownPreview({
     const anchor = (event.target as HTMLElement).closest("a");
     if (!anchor) return;
     const href = anchor.getAttribute("href") ?? "";
-    // The app's own window must never follow a link from a document.
     event.preventDefault();
     if (/^https?:/i.test(href) || /^mailto:/i.test(href)) {
       openExternalLink(href);

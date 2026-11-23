@@ -1,5 +1,3 @@
-//! The overlay windows, one per display, rebuilt when the displays change.
-
 use std::sync::atomic::Ordering;
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -26,13 +24,9 @@ pub(super) async fn rebuild(app: &AppHandle) -> Result<(), String> {
     if !host_state(app).enabled.load(Ordering::SeqCst) {
         return Ok(());
     }
-    // Enumerating monitors makes GDI calls per display (on Windows each
-    // property query opens a device context). Never do that on the UI thread:
-    // this runs every two seconds and on every reload or sign-out.
     let frames = tauri::async_runtime::spawn_blocking(displays)
         .await
         .map_err(|e| e.to_string())??;
-    // Reloads, sign-out and the topology poll can overlap; build one set at a time.
     static REBUILD: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
     let _serialized = REBUILD.lock().await;
     let state = host_state(app);
@@ -53,10 +47,6 @@ pub(super) async fn rebuild(app: &AppHandle) -> Result<(), String> {
     {
         return Ok(());
     }
-    // Create the webviews here, off the UI thread. WebView2 creation needs the
-    // UI thread's message loop to run; building from inside a task on that
-    // thread waits on itself and freezes the app on Windows. The build call
-    // hands the work to the UI thread and waits for it from a worker instead.
     for (label, window) in app.webview_windows() {
         if label.starts_with(PREFIX) && label != "misty-cursor-controls" {
             let _ = window.destroy();
@@ -115,11 +105,7 @@ pub(super) async fn rebuild(app: &AppHandle) -> Result<(), String> {
             data.displays = frames;
             data.overlays = overlays;
         }
-        let _ = crate::browser::app_windows::emit_to_primary(
-            &app,
-            "misty://cursor-displays-changed",
-            (),
-        );
+        crate::browser::app_windows::emit_to_primary(&app, "misty://cursor-displays-changed", ());
         Ok(())
     })
     .await

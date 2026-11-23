@@ -2,13 +2,12 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { useSpacesStore } from "../list/use_spaces_store";
 import { SpaceChatEntry } from "./SpaceChatEntry";
 vi.mock("@/features/account", () => ({ useAuth: () => ({ user: { id: "owner" } }) }));
-vi.mock("./hooks/useSpaceChatAccess", () => ({
+vi.mock("./hooks/use_space_chat_access", () => ({
   useSpaceChatAccess: () => ({ isOwner: false, canWriteMessages: true }),
 }));
-// The chat itself draws the bar it is handed: its controls, then what sits at its end.
 vi.mock("./SpaceChat", () => ({
   SpaceChat: (props: {
     actions?: { id: string; label: string; onSelect?: () => void }[];
@@ -29,7 +28,7 @@ vi.mock("./SpaceChat", () => ({
 vi.mock("./components/PinnedMessagesButton", () => ({
   PinnedMessagesButton: () => <button type="button">Pinned</button>,
 }));
-vi.mock("./sidebar/useSpaceConversations", () => ({
+vi.mock("./sidebar/use_space_conversations", () => ({
   useSpaceConversations: () => ({ conversations: [], loading: false, upsert: vi.fn() }),
 }));
 afterEach(cleanup);

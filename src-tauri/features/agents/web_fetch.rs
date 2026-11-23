@@ -1,8 +1,3 @@
-//! Fetching one public address without cookies or saved sign-ins, for link previews. Every hop
-//! is checked before connecting: http or https, no credentials in the address, and a host that
-//! resolves only to public addresses. The connection is pinned to the checked address so the
-//! name can't be re-resolved somewhere private. An agent's `web.fetch` applies the same rules in
-//! the agent runtime (agents/runs/web_fetch/public_fetch.rs).
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::time::Duration;
 
@@ -12,7 +7,6 @@ const MAX_REDIRECTS: usize = 5;
 const TIMEOUT: Duration = Duration::from_secs(20);
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15 MistyFetch/1";
 
-/// One response as bytes, after the same checks on every hop.
 pub struct RawResponse {
     pub final_url: url::Url,
     pub status: u16,
@@ -21,8 +15,6 @@ pub struct RawResponse {
     pub truncated: bool,
 }
 
-/// Fetches a public address with every hop checked. `allowed` decides from the content type
-/// whether the body is read at all; at most `max_bytes` of it are kept.
 pub async fn fetch_raw(
     address: &str,
     accept: &str,
@@ -97,7 +89,6 @@ pub async fn fetch_raw(
     Err("too_many_redirects".into())
 }
 
-/// The address to connect to, once the URL and every address its host resolves to pass.
 async fn public_target(url: &url::Url) -> Result<SocketAddr, String> {
     if !matches!(url.scheme(), "http" | "https")
         || !url.username().is_empty()
@@ -120,8 +111,6 @@ async fn public_target(url: &url::Url) -> Result<SocketAddr, String> {
     Ok(addresses[0])
 }
 
-/// False when a server's host resolves to any private address. A name that doesn't resolve passes
-/// here and fails when the app tries to reach it, which says so better.
 pub async fn host_resolves_public(host: &str) -> bool {
     let host = host.trim_start_matches('[').trim_end_matches(']');
     match tokio::net::lookup_host((host, 443)).await {
@@ -150,8 +139,8 @@ fn public_v4(ip: Ipv4Addr) -> bool {
         || ip.is_multicast()
         || ip.is_documentation()
         || a == 0
-        || (a == 100 && (64..128).contains(&b)) // carrier-grade NAT
-        || (a == 198 && (18..20).contains(&b)) // benchmarking
+        || (a == 100 && (64..128).contains(&b))
+        || (a == 198 && (18..20).contains(&b))
         || a >= 240)
 }
 
@@ -160,9 +149,9 @@ fn public_v6(ip: Ipv6Addr) -> bool {
     !(ip.is_loopback()
         || ip.is_unspecified()
         || ip.is_multicast()
-        || (first & 0xfe00) == 0xfc00 // unique local
-        || (first & 0xffc0) == 0xfe80 // link local
-        || first == 0x2001 && ip.segments()[1] == 0x0db8) // documentation
+        || (first & 0xfe00) == 0xfc00
+        || (first & 0xffc0) == 0xfe80
+        || first == 0x2001 && ip.segments()[1] == 0x0db8)
 }
 
 #[cfg(test)]

@@ -8,8 +8,6 @@ use std::path::Path;
 use super::repo;
 use super::{blocking, repository_of, run};
 
-/// Commits what is staged, as the person, with their own Git identity, hooks and signing.
-/// Returns the new commit's id.
 #[tauri::command]
 pub async fn project_git_commit(
     app: tauri::AppHandle,
@@ -51,7 +49,6 @@ fn commit_error(error: &str) -> String {
     error.to_string()
 }
 
-/// Network failures as something a person can act on, not Git's raw words.
 fn remote_error(error: &str) -> String {
     let lower = error.to_lowercase();
     if lower.contains("authentication")
@@ -71,8 +68,6 @@ fn remote_error(error: &str) -> String {
     error.to_string()
 }
 
-/// Pushes the current branch to the same branch on `origin`, and makes `origin` its upstream
-/// when it has none yet.
 #[tauri::command]
 pub async fn project_git_push(
     app: tauri::AppHandle,
@@ -107,9 +102,6 @@ pub(crate) async fn push(top: &Path) -> Result<(), String> {
         .map_err(|error| remote_error(&error))
 }
 
-/// Pulls the current branch from `origin`, fast-forward only. Git fetches (with the person's
-/// credentials); the fast-forward itself never touches a file that is changed in the folder,
-/// and names those files instead when they're in the way.
 #[tauri::command]
 pub async fn project_git_pull(
     app: tauri::AppHandle,
@@ -131,7 +123,6 @@ pub(crate) async fn pull(top: &Path) -> Result<(), String> {
     blocking(move || fast_forward(&at, &branch)).await
 }
 
-/// Moves the branch to FETCH_HEAD when that is a fast-forward, with a safe checkout.
 fn fast_forward(top: &Path, branch: &str) -> Result<(), String> {
     let gate = repo::repo_write_gate(top);
     let _queued = gate.blocking_lock();
@@ -161,8 +152,6 @@ fn fast_forward(top: &Path, branch: &str) -> Result<(), String> {
     let target = repo
         .find_commit(fetched.id())
         .map_err(|error| error.to_string())?;
-    // A safe checkout, never forced: uncommitted work is never overwritten. HEAD stays on the
-    // old commit until the checkout succeeds, so nothing is left half moved.
     let mut checkout = git2::build::CheckoutBuilder::new();
     checkout.safe();
     if let Err(error) = repo.checkout_tree(target.as_object(), Some(&mut checkout)) {

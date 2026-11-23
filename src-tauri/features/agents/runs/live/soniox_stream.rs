@@ -1,4 +1,3 @@
-//! The socket to Soniox: `RealtimeSttSession` from `@soniox/node`, with what the relay uses of it.
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -23,7 +22,6 @@ use super::soniox::{parse_message, provider_error_code, SonioxConfig};
 const SONIOX_URL: &str = "wss://stt-rt.soniox.com/transcribe-websocket";
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Opens streams on the device's Soniox key. It deliberately has no `Debug`, which could print it.
 pub struct SonioxFactory {
     url: String,
     api_key: String,
@@ -31,13 +29,18 @@ pub struct SonioxFactory {
 
 impl SonioxFactory {
     pub fn new(api_key: String) -> Self {
-        Self { url: SONIOX_URL.to_owned(), api_key }
+        Self {
+            url: SONIOX_URL.to_owned(),
+            api_key,
+        }
     }
 
-    /// Reaches a local mock in tests. The app always goes to the real address.
     #[doc(hidden)]
     pub fn at(url: &str, api_key: &str) -> Self {
-        Self { url: url.to_owned(), api_key: api_key.to_owned() }
+        Self {
+            url: url.to_owned(),
+            api_key: api_key.to_owned(),
+        }
     }
 }
 
@@ -47,7 +50,12 @@ impl SttFactory for SonioxFactory {
             url: self.url.clone(),
             api_key: self.api_key.clone(),
             config: serde_json::to_string(config).unwrap_or_default(),
-            link: Arc::new(Link { state: Mutex::new(Phase::Idle), finish: Mutex::new(None), out: Mutex::new(None), events }),
+            link: Arc::new(Link {
+                state: Mutex::new(Phase::Idle),
+                finish: Mutex::new(None),
+                out: Mutex::new(None),
+                events,
+            }),
         })
     }
 }
@@ -61,7 +69,6 @@ enum Phase {
     Ended,
 }
 
-/// What the stream and the task running its socket share.
 struct Link {
     state: Mutex<Phase>,
     finish: Mutex<Option<oneshot::Sender<Result<(), SttError>>>>,
@@ -70,7 +77,9 @@ struct Link {
 }
 
 fn locked<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 impl Link {
@@ -88,7 +97,6 @@ impl Link {
         }
     }
 
-    /// Ends the stream: nothing more is reported, and the socket closes.
     fn end(&self) {
         self.set_phase(Phase::Ended);
         if let Some(out) = locked(&self.out).take() {
@@ -96,7 +104,6 @@ impl Link {
         }
     }
 
-    /// Something went wrong with the connection.
     fn failed(&self) {
         if self.phase() == Phase::Ended {
             return;
@@ -106,7 +113,6 @@ impl Link {
         self.end();
     }
 
-    /// `handleMessage`. Control tokens don't reach the result, and become events.
     fn message(&self, text: &str) {
         if self.phase() == Phase::Ended {
             return;
@@ -121,9 +127,11 @@ impl Link {
             self.failed();
             return;
         };
-        parsed.result.tokens.retain(|token| token.text != "<end>" && token.text != "<fin>");
+        parsed
+            .result
+            .tokens
+            .retain(|token| token.text != "<end>" && token.text != "<fin>");
         (self.events)(SttEvent::Result(parsed.result));
-        // The result may have failed the session, which closes this stream.
         if parsed.has_endpoint && self.phase() != Phase::Ended {
             (self.events)(SttEvent::Endpoint);
         }
@@ -134,7 +142,9 @@ impl Link {
     }
 
     fn send(&self, message: Message) -> Result<(), SttError> {
-        let sent = locked(&self.out).as_ref().is_some_and(|out| out.send(message).is_ok());
+        let sent = locked(&self.out)
+            .as_ref()
+            .is_some_and(|out| out.send(message).is_ok());
         if sent {
             Ok(())
         } else {
@@ -153,10 +163,6 @@ struct SonioxStream {
 
 type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-/// Connects with the key in the `Authorization` header, which is what `@soniox/node` picks for Node
-/// because proxies and logs redact it. The TypeScript went through the session class directly, which
-/// defaults to the subprotocol list; tungstenite fails a handshake when the server doesn't echo one.
-/// IPv4 goes first, as `src/network.ts` set for the whole process.
 async fn open_socket(url: &str, api_key: &str) -> Option<Socket> {
     let mut request = url.into_client_request().ok()?;
     let mut bearer = HeaderValue::from_str(&format!("Bearer {api_key}")).ok()?;
@@ -164,17 +170,25 @@ async fn open_socket(url: &str, api_key: &str) -> Option<Socket> {
     request.headers_mut().insert("authorization", bearer);
     let host = request.uri().host()?.trim_matches(['[', ']']).to_owned();
     let tls = request.uri().scheme_str() == Some("wss");
-    let port = request.uri().port_u16().unwrap_or(if tls { 443 } else { 80 });
+    let port = request
+        .uri()
+        .port_u16()
+        .unwrap_or(if tls { 443 } else { 80 });
     let found = SystemLookup.lookup(&host).await.ok()?;
-    let addresses: Vec<SocketAddr> = ipv4_first(found).into_iter().map(|ip| SocketAddr::new(ip, port)).collect();
+    let addresses: Vec<SocketAddr> = ipv4_first(found)
+        .into_iter()
+        .map(|ip| SocketAddr::new(ip, port))
+        .collect();
     let stream = TcpStream::connect(addresses.as_slice()).await.ok()?;
     let (socket, _) = client_async_tls(request, stream).await.ok()?;
     Some(socket)
 }
 
-/// Runs the socket until the stream ends: what the stream sends goes out in order, and what arrives
-/// is reported.
-async fn run_socket(link: Arc<Link>, socket: Socket, mut outgoing: mpsc::UnboundedReceiver<Message>) {
+async fn run_socket(
+    link: Arc<Link>,
+    socket: Socket,
+    mut outgoing: mpsc::UnboundedReceiver<Message>,
+) {
     let (mut write, mut read) = socket.split();
     loop {
         tokio::select! {
@@ -221,7 +235,6 @@ impl SttStream for SonioxStream {
                 self.link.set_phase(Phase::Ended);
                 return Err(SttError);
             };
-            // `close` may have come while this waited.
             let mut state = locked(&self.link.state);
             if *state != Phase::Connecting {
                 return Err(SttError);
@@ -253,7 +266,6 @@ impl SttStream for SonioxStream {
                 *state = Phase::Finishing;
             }
             *locked(&self.link.finish) = Some(sender);
-            // An empty text frame is Soniox's end of audio.
             self.link.send(Message::text(""))?;
             receiver.await.unwrap_or(Err(SttError))
         })

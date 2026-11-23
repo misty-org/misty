@@ -1,7 +1,3 @@
-/**
- * A seam between two features. The lower feature declares it and calls it; the upper feature (or
- * the app, once at startup) fills it in. Features then never import each other in both directions.
- */
 export function createPort<T>(name: string) {
   let implementation: T | undefined;
   return {
@@ -18,7 +14,6 @@ export function createPort<T>(name: string) {
   };
 }
 
-/** Listeners a lower feature runs at a moment it owns; upper features subscribe to it. */
 export function createHooks<Args extends unknown[] = []>() {
   const listeners = new Set<(...args: Args) => void | Promise<void>>();
   return {

@@ -6,8 +6,6 @@ use crate::engines::support::event_sink::{Emit, EventSink};
 use crate::engines::ProcessRegistry;
 use std::sync::Mutex as StdMutex;
 
-/// Keeps the raw event JSON: parking is only observable through what the
-/// frontend receives and what the registry holds for the answer.
 struct CollectingEmitter(StdMutex<Vec<String>>);
 
 impl Emit for CollectingEmitter {
@@ -19,8 +17,6 @@ impl Emit for CollectingEmitter {
 fn test_core() -> (TurnCore, Arc<ProcessRegistry>, Arc<CollectingEmitter>) {
     let emitter = Arc::new(CollectingEmitter(StdMutex::new(Vec::new())));
     let registry = Arc::new(ProcessRegistry::default());
-    // A virtual run: the entry exists before the driver task (which then
-    // hands over its child's stdin) and carries the shared question map.
     registry.insert(
         "test-run".to_string(),
         ChildEntry {
@@ -46,7 +42,6 @@ fn test_core() -> (TurnCore, Arc<ProcessRegistry>, Arc<CollectingEmitter>) {
 }
 
 fn ask_params() -> Value {
-    // The live shape: no `header`, and an explicit null `multiSelect`.
     json!({
         "sessionId": "s-1",
         "toolCallId": "call-1",
@@ -77,8 +72,6 @@ fn normalizes_questions_onto_the_card_contract() {
             ],
         })]
     );
-    // A protocol-sent header wins; multi-select and the first/second index
-    // are honoured; an options-less question still renders an empty list.
     let questions = normalize_questions(&json!({
         "questions": [
             { "question": "a", "header": " Scope ", "multiSelect": true, "options": [] },
@@ -104,8 +97,6 @@ fn answer_frame_round_trips_the_request_id() {
             "result": { "outcome": "accepted", "answers": { "Which drink?": "Coffee" } },
         })
     );
-    // Multi-select answers ride as an array, and a string id round-trips
-    // with its kind intact.
     let parked = json!({ "rpcId": "req-9" });
     let answers = json!({ "Which drinks?": ["Coffee", "Tea"] });
     let frame = answer_frame(&parked, Some(&answers)).unwrap();
@@ -114,7 +105,6 @@ fn answer_frame_round_trips_the_request_id() {
         frame["result"]["answers"]["Which drinks?"],
         json!(["Coffee", "Tea"])
     );
-    // The CLI accepts an accepted outcome with no answers at all.
     let frame = answer_frame(&json!({ "rpcId": 1 }), Some(&json!({}))).unwrap();
     assert_eq!(
         frame["result"],
@@ -129,15 +119,12 @@ fn answer_frame_dismisses_and_rejects_malformed_answers() {
         answer_frame(&parked, None).unwrap(),
         json!({ "jsonrpc": "2.0", "id": 3, "result": { "outcome": "cancelled" } })
     );
-    // A dismissal must never fail the command: the user just wants the
-    // card gone, and `cancelled` is the protocol's way to say so.
     assert!(answer_frame(&json!({}), None).is_err());
     assert!(answer_frame(&json!({ "rpcId": 3 }), Some(&json!(["Coffee"]))).is_err());
     assert!(answer_frame(&parked, Some(&json!({ "Which drink?": 2 }))).is_err());
     assert!(answer_frame(&parked, Some(&json!({ "Which drink?": [1] }))).is_err());
 }
 
-/// The sink schedules its flush on the runtime, so this one needs a reactor.
 #[tokio::test]
 async fn parked_question_answers_through_the_registry_context() {
     let (core, registry, emitter) = test_core();
@@ -152,13 +139,10 @@ async fn parked_question_answers_through_the_registry_context() {
         .get("7")
         .cloned()
         .expect("the ask stays parked until the user answers");
-    // The card payload the frontend renders, plus the context the answer
-    // command reads (`input.get("grokAcp")`).
     assert_eq!(
         parked["questions"],
         json!(normalize_questions(&ask_params()))
     );
-    // The sink batches; flush first or the event would still be pending.
     core.sink.flush();
     let emitted = emitter.0.lock().unwrap().join(" ");
     assert!(emitted.contains("\"question\"") && emitted.contains("\"grokAcp\""));
@@ -166,8 +150,6 @@ async fn parked_question_answers_through_the_registry_context() {
     let frame = answer_frame(acp, Some(&json!({ "Which drink?": "Tea" }))).unwrap();
     assert_eq!(frame["id"], json!(7));
     assert_eq!(frame["result"]["answers"]["Which drink?"], json!("Tea"));
-    // An ask with nothing to render answers itself instead of parking a
-    // card the CLI would wait on until the prompt times out.
     assert!(park_question(&core, &mut state, &json!(8), &json!({ "questions": [] })).is_some());
     assert_eq!(
         registry
@@ -207,9 +189,6 @@ async fn kimi_form_parks_all_questions_with_reply_context() {
     assert_eq!(entry.questions.lock().unwrap().len(), 1);
 }
 
-/// A parked plan review must expire when its run settles: the native
-/// exit_plan_mode request is gone with the child, so the record flips to
-/// `expired` and the frontend is told (the settle duty of ccgui's plan-review design).
 #[tokio::test]
 async fn settle_parked_expires_plan_reviews_under_every_run_key() {
     let dir = std::env::temp_dir().join(format!(
@@ -246,8 +225,6 @@ async fn settle_parked_expires_plan_reviews_under_every_run_key() {
     let (mut core, registry, emitter) = test_core();
     core.db = Some(Arc::new(db));
     let mut state = TurnState::new(None);
-    // Park the review under the run-id key exactly as the reader's
-    // PlanReviewReady dispatch does (revision injected at the top level).
     registry
         .get("test-run")
         .unwrap()
@@ -283,9 +260,6 @@ async fn settle_parked_expires_plan_reviews_under_every_run_key() {
     std::fs::remove_dir_all(&dir).ok();
 }
 
-/// The same settle call still drains pending question cards first and is
-/// a strict no-op for a run with nothing parked — the kimi path only ever
-/// exercises this branch.
 #[tokio::test]
 async fn settle_parked_keeps_the_question_contract_and_no_ops_when_empty() {
     let (mut core, registry, emitter) = test_core();
@@ -314,7 +288,6 @@ async fn settle_parked_keeps_the_question_contract_and_no_ops_when_empty() {
         .unwrap()
         .join(" ")
         .contains("question_settled"));
-    // Nothing parked, no db: settling again must not emit or fail.
     settle_parked(
         &core,
         &mut state,
@@ -324,8 +297,6 @@ async fn settle_parked_keeps_the_question_contract_and_no_ops_when_empty() {
 
 #[test]
 fn session_id_comes_from_the_handshake_shape_grok_returns() {
-    // `session/new` (live): top level. `session/load` (live): only
-    // `_meta.sessionId`, and that one is what later resumes must send.
     assert_eq!(
         extract_session_id(&json!({ "sessionId": "s-new", "models": {} })),
         Some("s-new".to_string())

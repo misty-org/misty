@@ -21,7 +21,6 @@ fn parses_response_notification_and_agent_request() {
         AcpLine::Notification { method, .. } => assert_eq!(method, "session/update"),
         _ => panic!("expected notification"),
     }
-    // method + id = the agent is asking US (permission, fs).
     let request = json!({"jsonrpc":"2.0","id":9,"method":"session/request_permission","params":{}});
     match parse_acp_line(&request) {
         AcpLine::AgentRequest { id, method, .. } => {
@@ -30,7 +29,6 @@ fn parses_response_notification_and_agent_request() {
         }
         _ => panic!("expected agent request"),
     }
-    // String ids key responses too.
     assert_eq!(jsonrpc_id_key(&json!("req-1")).as_deref(), Some("req-1"));
     assert_eq!(jsonrpc_id_key(&json!(7)).as_deref(), Some("7"));
     assert!(matches!(
@@ -79,7 +77,6 @@ fn maps_session_update_kinds() {
             input: Some(json!({"path":"a.rs"})),
         }
     );
-    // A completed snapshot carries the result instead of a start.
     let done = json!({"sessionUpdate":"tool_call","toolCallId":"call-1","title":"read","status":"completed","rawOutput":"ok"});
     assert_eq!(
         map_session_update(&done),
@@ -100,7 +97,6 @@ fn maps_session_update_kinds() {
             error: Some("boom".to_string()),
         }
     );
-    // Updates without a usable id or text are ignored.
     assert_eq!(
         map_session_update(&json!({"sessionUpdate":"tool_call","status":"pending"})),
         QoderSessionUpdate::Ignore
@@ -109,7 +105,6 @@ fn maps_session_update_kinds() {
         map_session_update(&json!({"sessionUpdate":"agent_message_chunk","content":{}})),
         QoderSessionUpdate::Ignore
     );
-    // Notifications wrap the update under params.update.
     let wrapped =
         json!({"update":{"sessionUpdate":"agent_message_chunk","content":{"text":"wrapped"}}});
     assert_eq!(
@@ -207,7 +202,6 @@ fn parses_models_from_session_new() {
     assert!(models[0].is_default);
     assert!(!models[1].is_default);
     assert_eq!(models[1].name, None);
-    // No current model: the first entry becomes the default.
     let result = json!({"models": {"availableModels": [{"modelId": "a"}]}});
     let models = parse_models_from_session_new(&result);
     assert!(models[0].is_default);
@@ -215,14 +209,10 @@ fn parses_models_from_session_new() {
 
 #[test]
 fn bypass_started_session_skips_set_mode() {
-    // qodercli 1.1.78/1.1.79 report the internal "yolo" id for a session
-    // started with --permission-mode bypass_permissions; set_mode on
-    // that id fails with "unknown permission_mode: yolo".
     let started = json!({"sessionId": "s-1", "modes": {"currentModeId": "yolo"}});
     assert!(bypass_mode_active(&started));
     let legacy = json!({"modes": {"currentModeId": "bypassPermissions"}});
     assert!(bypass_mode_active(&legacy));
-    // Trust/policy downgrade or a CLI that ignores the flag: switch.
     let downgraded = json!({"modes": {"currentModeId": "default"}});
     assert!(!bypass_mode_active(&downgraded));
     assert!(!bypass_mode_active(&json!({"sessionId": "s-1"})));
@@ -232,12 +222,6 @@ fn bypass_started_session_skips_set_mode() {
     );
 }
 
-/// session/prompt carries PROMPT_TIMEOUT for every ACP driver (qoder,
-/// grok/kimi, minimax, omp): a prompt silent past 30 minutes must still
-/// end on its own response, not "session/prompt timed out". The paused
-/// clock races the read loop's idle ticks forward; the 31 minutes start
-/// once the CLI has the request, because the loop's clock starts only
-/// after the write.
 #[cfg(unix)]
 #[tokio::test(start_paused = true)]
 async fn a_prompt_silent_past_thirty_minutes_runs_to_its_own_response() {
@@ -284,9 +268,6 @@ async fn a_prompt_silent_past_thirty_minutes_runs_to_its_own_response() {
     assert!(silent_for >= Duration::from_secs(31 * 60), "{silent_for:?}");
 }
 
-/// Without a wall-clock cap, Stop is what ends a hung prompt: the loop
-/// sends session/cancel and, when the CLI never answers, still gives up
-/// after the settle window instead of waiting forever.
 #[cfg(unix)]
 #[tokio::test(start_paused = true)]
 async fn stopping_a_hung_prompt_gives_up_after_the_settle_window() {
@@ -295,8 +276,6 @@ async fn stopping_a_hung_prompt_gives_up_after_the_settle_window() {
     std::fs::create_dir_all(&directory).unwrap();
     let received = directory.join("received");
     let mut command = Command::new("sh");
-    // The shell keeps stdout open (a hung CLI, not an exited one) while
-    // cat records what the driver sends.
     command.args([
         "-c",
         &format!("cat > '{}'; exec sleep 30", received.display()),
@@ -304,8 +283,6 @@ async fn stopping_a_hung_prompt_gives_up_after_the_settle_window() {
     let mut spawned = spawn_piped_acp(&mut command, "sh", &directory).unwrap();
     let killed = AtomicBool::new(false);
     let mut on_update = |_: &Value| {};
-    // A broken settle window would spin forever; the outer bound turns
-    // that into a failure (it costs nothing on the paused clock).
     let (result, stopped_at) = timeout(Duration::from_secs(40 * 60), async {
         tokio::join!(
             spawned.acp.request(
@@ -337,8 +314,6 @@ async fn stopping_a_hung_prompt_gives_up_after_the_settle_window() {
     assert!(sent.contains("\"session/cancel\""), "{sent}");
 }
 
-/// Paused time races past the child process, so wait on the wall clock
-/// for `cat` to record what the driver sent before tearing it down.
 #[cfg(unix)]
 fn recorded(path: &Path, needle: &str) -> String {
     for _ in 0..300 {
@@ -353,7 +328,6 @@ fn recorded(path: &Path, needle: &str) -> String {
 
 #[test]
 fn session_state_follows_only_what_changed() {
-    // qodercli 1.1.89 repeats its whole config after every slash command.
     let config = |model: &str, effort: &str| {
         json!({"update": {"sessionUpdate": "config_option_update", "configOptions": [
             {"type": "select", "id": "mode", "category": "mode", "currentValue": "default", "options": []},

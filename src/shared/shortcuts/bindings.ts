@@ -1,8 +1,7 @@
-import { desktopOs } from "@/shared/platform/desktopOs";
+import { desktopOs } from "@/shared/platform/desktop_os";
 import { shortcutMatchesEvent } from "@misty/ui";
 import type { ShortcutBindingPair, ShortcutPlatform, ShortcutScope } from "./registry";
 
-// Parsing, matching and drawing shortcuts live in @misty/ui, beside ShortcutField and Kbd.
 export {
   formatShortcut,
   formatShortcutLabel,
@@ -15,7 +14,6 @@ export {
   type ShortcutSlot,
 } from "@misty/ui";
 
-/** The operating system, from the native side when Misty runs as the app. */
 export function detectShortcutPlatform(): ShortcutPlatform {
   return desktopOs();
 }

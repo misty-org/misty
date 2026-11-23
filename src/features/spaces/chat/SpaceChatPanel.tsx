@@ -1,40 +1,32 @@
 import { ArrowUpRight, X } from "lucide-react";
 import { useAuth } from "@/features/account";
-import { createDeviceSettingMap } from "@/shared/lib/deviceSettingMap";
+import { createDeviceSettingMap } from "@/shared/lib/device_setting_map";
 import { IconButton, Surface, lazyTool, ToolSuspense } from "@misty/ui";
-import { spaceNavigationName } from "../routes/defaultSpace";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { spaceNavigationName } from "../routes/default_space";
+import { useSpacesStore } from "../list/use_spaces_store";
 import { ChatPanelPicker } from "./ChatPanelPicker";
 import { ChatMessagesLoading } from "./components/ChatMessagesLoading";
-import { useSpaceConversations } from "./sidebar/useSpaceConversations";
-import { homeChatSpace, useOpenSpaceChat } from "./useOpenSpaceChat";
+import { useSpaceConversations } from "./sidebar/use_space_conversations";
+import { homeChatSpace, useOpenSpaceChat } from "./use_open_space_chat";
 
 const SpaceChat = lazyTool(async () => {
   const { SpaceChat } = await import("./SpaceChat");
   return { default: SpaceChat };
 });
 
-/** The conversation the panel last showed in each Space, kept in `misty.db` for this device. */
 const panelConversations = createDeviceSettingMap<string>({
   scope: "spaces.chat.panel",
   normalize: (stored) => (typeof stored === "string" ? stored : undefined),
 });
 
-// The panel's Space is still on its way: its messages' own shape stands in.
 const chatSkeleton = <ChatMessagesLoading framed />;
 
-/**
- * Your Space's chat in the side panel beside the page, the Chat button's view. One header
- * holds the chat switcher (Everyone, channels and conversations) and the open-in-tab and close
- * buttons; "Open full chat" opens a new tab and leaves this panel as it is.
- */
 export function SpaceChatPanel(props: { side: "left" | "right"; onClose: () => void }) {
   const space = useSpacesStore((state) => homeChatSpace(state.spaces));
   const { user } = useAuth();
   const openFullChat = useOpenSpaceChat();
   const data = useSpaceConversations(space?.id ?? "");
   const saved = panelConversations.useEntry(space?.id) ?? "";
-  // A conversation that is gone since opens the Space-wide channel instead.
   const conversationId =
     saved && !data.loading && !data.error && !data.conversations.some((item) => item.id === saved)
       ? ""
@@ -49,7 +41,6 @@ export function SpaceChatPanel(props: { side: "left" | "right"; onClose: () => v
       edge="hairline"
       radius="xl"
       className="flex h-full shrink-0 flex-col overflow-hidden"
-      // The dock sets the width; it stays fixed while the dock slides, like the agent panel.
       style={{ width: "var(--misty-panel-width, calc(var(--spacing) * 100))" }}
       aria-label="Chat"
       data-misty-panel={props.side}
@@ -76,7 +67,6 @@ export function SpaceChatPanel(props: { side: "left" | "right"; onClose: () => v
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
         {space ? (
-          // The chat's own code is still loading: the chat says it is getting ready.
           <ToolSuspense tool="chat">
             <SpaceChat
               spaceId={space.id}

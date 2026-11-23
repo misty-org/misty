@@ -1,9 +1,11 @@
-//! Gemini embeddings. Ported from `GoogleEmbeddingModel` in `@ai-sdk/google`.
 use futures_util::future::BoxFuture;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-use super::{embedding::{EmbedResponse, EmbeddingModel}, http::read_json};
+use super::{
+    embedding::{EmbedResponse, EmbeddingModel},
+    http::read_json,
+};
 use crate::model_calls::error::ModelError;
 use crate::model_calls::http::post_json;
 use crate::model_calls::prompt::ProviderOptions;
@@ -17,10 +19,18 @@ pub(super) struct GoogleEmbeddingModel {
 }
 
 impl GoogleEmbeddingModel {
-    pub(super) fn new(client: reqwest::Client, base_url: Option<&str>, api_key: &str, model: &str) -> Self {
+    pub(super) fn new(
+        client: reqwest::Client,
+        base_url: Option<&str>,
+        api_key: &str,
+        model: &str,
+    ) -> Self {
         Self {
             client,
-            base_url: base_url.unwrap_or(DEFAULT_BASE_URL).trim_end_matches('/').to_owned(),
+            base_url: base_url
+                .unwrap_or(DEFAULT_BASE_URL)
+                .trim_end_matches('/')
+                .to_owned(),
             api_key: api_key.to_owned(),
             model: model.to_owned(),
         }
@@ -32,7 +42,6 @@ impl GoogleEmbeddingModel {
 struct GoogleEmbeddingOptions {
     output_dimensionality: Option<Value>,
     task_type: Option<String>,
-    /// Non-text parts for each value, or `null` for a value that's only text.
     content: Option<Vec<Option<Vec<Value>>>>,
 }
 
@@ -51,7 +60,6 @@ struct Values {
     values: Vec<f64>,
 }
 
-/// A value's parts. With other content, an empty value adds no text of its own.
 fn parts_for(value: &str, content: Option<&Vec<Value>>) -> Vec<Value> {
     match content {
         Some(extra) => {
@@ -88,9 +96,13 @@ impl EmbeddingModel for GoogleEmbeddingModel {
         provider_options: Option<&'a ProviderOptions>,
     ) -> BoxFuture<'a, Result<EmbedResponse, ModelError>> {
         Box::pin(async move {
-            let options: GoogleEmbeddingOptions = match provider_options.and_then(|all| all.get("google")).filter(|value| !value.is_null()) {
-                Some(value) => serde_json::from_value(value.clone())
-                    .map_err(|_| ModelError::Unsupported("invalid google provider options".into()))?,
+            let options: GoogleEmbeddingOptions = match provider_options
+                .and_then(|all| all.get("google"))
+                .filter(|value| !value.is_null())
+            {
+                Some(value) => serde_json::from_value(value.clone()).map_err(|_| {
+                    ModelError::Unsupported("invalid google provider options".into())
+                })?,
                 None => GoogleEmbeddingOptions::default(),
             };
             if let Some(content) = &options.content {
@@ -102,18 +114,37 @@ impl EmbeddingModel for GoogleEmbeddingModel {
                     )));
                 }
             }
-            let content_at = |index: usize| options.content.as_ref().and_then(|content| content[index].as_ref());
+            let content_at = |index: usize| {
+                options
+                    .content
+                    .as_ref()
+                    .and_then(|content| content[index].as_ref())
+            };
             let headers = [("x-goog-api-key", self.api_key.clone())];
             let model_name = format!("models/{}", self.model);
             if let [value] = values {
                 let mut body = Map::new();
                 body.insert("model".into(), json!(model_name));
-                body.insert("content".into(), json!({ "parts": parts_for(value, content_at(0)) }));
+                body.insert(
+                    "content".into(),
+                    json!({ "parts": parts_for(value, content_at(0)) }),
+                );
                 options.apply(&mut body);
                 let url = format!("{}/models/{}:embedContent", self.base_url, self.model);
-                let response = post_json(&self.client, &url, &headers, &body, &self.api_key, error_message).await?;
+                let response = post_json(
+                    &self.client,
+                    &url,
+                    &headers,
+                    &body,
+                    &self.api_key,
+                    error_message,
+                )
+                .await?;
                 let parsed: Single = read_json(response).await?;
-                return Ok(EmbedResponse { embeddings: vec![parsed.embedding.values], ..EmbedResponse::default() });
+                return Ok(EmbedResponse {
+                    embeddings: vec![parsed.embedding.values],
+                    ..EmbedResponse::default()
+                });
             }
             let requests: Vec<Value> = values
                 .iter()
@@ -121,17 +152,32 @@ impl EmbeddingModel for GoogleEmbeddingModel {
                 .map(|(index, value)| {
                     let mut request = Map::new();
                     request.insert("model".into(), json!(model_name));
-                    request.insert("content".into(), json!({ "role": "user", "parts": parts_for(value, content_at(index)) }));
+                    request.insert(
+                        "content".into(),
+                        json!({ "role": "user", "parts": parts_for(value, content_at(index)) }),
+                    );
                     options.apply(&mut request);
                     Value::Object(request)
                 })
                 .collect();
             let body = json!({ "requests": requests });
             let url = format!("{}/models/{}:batchEmbedContents", self.base_url, self.model);
-            let response = post_json(&self.client, &url, &headers, &body, &self.api_key, error_message).await?;
+            let response = post_json(
+                &self.client,
+                &url,
+                &headers,
+                &body,
+                &self.api_key,
+                error_message,
+            )
+            .await?;
             let parsed: Batch = read_json(response).await?;
             Ok(EmbedResponse {
-                embeddings: parsed.embeddings.into_iter().map(|item| item.values).collect(),
+                embeddings: parsed
+                    .embeddings
+                    .into_iter()
+                    .map(|item| item.values)
+                    .collect(),
                 ..EmbedResponse::default()
             })
         })

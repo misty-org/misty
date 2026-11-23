@@ -1,5 +1,3 @@
-//! Where a call meets the policy (`tool_policy`), before it reaches a window: the run's facts, what it
-//! has read, and the person's answer in the island. A window hears only the outcome.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock, PoisonError},
@@ -17,11 +15,8 @@ use super::{
 use crate::browser::agent_pages::action_confirm as confirm;
 use database::store::Store;
 
-/// How far a run's parents are followed. Sub-agents are one level deep today.
 const MAX_FAMILY: usize = 4;
 
-/// A call a window is running, by the id it was asked under. Native page work finds its run through it,
-/// so a window never says what mode it's in.
 #[derive(Clone, Debug)]
 pub(crate) struct ActiveCall {
     pub(crate) facts: RunFacts,
@@ -61,8 +56,6 @@ pub(crate) fn active_call(id: &str) -> Option<ActiveCall> {
         .cloned()
 }
 
-/// The run as it was started, or Ask with nothing known when nobody can say, with what this device
-/// says now about letting agents delete files.
 pub(crate) async fn facts_of_run(app: &AppHandle, run_id: &str) -> RunFacts {
     RunFacts {
         agent_delete: permissions::agent_delete_on(app),
@@ -71,7 +64,6 @@ pub(crate) async fn facts_of_run(app: &AppHandle, run_id: &str) -> RunFacts {
 }
 
 async fn facts_of_request(app: &AppHandle, run_id: &str) -> RunFacts {
-    // A run on an outside engine is known to its adapter, not to Misty's runtime.
     if let Some(body) = crate::engines::runs::request_of(run_id) {
         return RunFacts::of_request(run_id, &body);
     }
@@ -88,7 +80,6 @@ async fn facts_of_request(app: &AppHandle, run_id: &str) -> RunFacts {
     )
 }
 
-/// The run and those it reports to: what any of them read may reach the others.
 async fn family(app: &AppHandle, facts: &RunFacts) -> Vec<String> {
     let mut runs = vec![facts.run_id.clone()];
     let mut parent = facts.parent_run_id.clone();
@@ -106,7 +97,6 @@ fn rejected(code: &str, message: String) -> LocalToolOutcome {
     }
 }
 
-/// Whether the person's answer lets the call go on, and if not what the model hears.
 fn refusal_of(answer: confirm::Answer, title: &str) -> Option<LocalToolOutcome> {
     match answer {
         confirm::Answer::Allowed => None,
@@ -116,7 +106,6 @@ fn refusal_of(answer: confirm::Answer, title: &str) -> Option<LocalToolOutcome> 
 }
 
 pub(crate) enum Admission {
-    /// Go on, with this input.
     Run(Value),
     Done(LocalToolOutcome),
 }
@@ -159,7 +148,6 @@ async fn ask(
     if let Some(refused) = refusal_of(answer, &title) {
         return Some(refused);
     }
-    // What the person saw and allowed: that host may take queries for the rest of the run.
     if let Some(url) = call.input["url"].as_str() {
         run_taint::approve_host(store, runs, url);
     }
@@ -171,14 +159,12 @@ async fn ask(
     None
 }
 
-/// One call's way through the policy. A question ends here, in native code, before a window hears of it.
 pub(crate) async fn admit(
     app: &AppHandle,
     store: &Store,
     facts: &RunFacts,
     call: &LocalToolCall,
 ) -> Admission {
-    // The person holds this run's page: an engine that can't be paused is kept off the browser.
     if let Some(message) = super::take_over::refusal(&call.run_id, &call.name) {
         return Admission::Done(rejected("taken_over", message.to_owned()));
     }
@@ -192,9 +178,11 @@ pub(crate) async fn admit(
             match ask(app, store, facts, &runs, call, kind, &why).await {
                 Some(refused) => Admission::Done(refused),
                 None => {
-                    // A yes to driving an app lasts for the chat; a paid host's ask is never remembered.
                     if call.name.starts_with("app.") && !crate::apps::mcp::is_paid(&call.name) {
-                        crate::apps::mcp::approve_for(&super::tool_policy::chat_of(facts), &call.name);
+                        crate::apps::mcp::approve_for(
+                            &super::tool_policy::chat_of(facts),
+                            &call.name,
+                        );
                     }
                     Admission::Run(input)
                 }
@@ -203,7 +191,6 @@ pub(crate) async fn admit(
     }
 }
 
-/// Notes what a call that ran has read.
 pub(crate) async fn note_result(
     app: &AppHandle,
     store: &Store,
@@ -214,8 +201,6 @@ pub(crate) async fn note_result(
     run_taint::note_call(store, &runs, &call.name, &call.input);
 }
 
-/// A program opening an address at run time, which its text couldn't show. `Err` is what its program
-/// hears; nothing was opened.
 pub(crate) async fn program_opens(
     app: &AppHandle,
     store: &Store,
@@ -249,7 +234,6 @@ pub(crate) async fn program_opens(
     }
 }
 
-/// A program about to open a tab of its own: the window asks here, and hears only the answer.
 #[tauri::command]
 pub async fn agent_program_opens(
     app: AppHandle,
@@ -269,16 +253,13 @@ pub async fn agent_program_opens(
     program_opens(&app, &store, &active, &url).await
 }
 
-/// What the person's settings say about agents on this computer.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct AgentSettings {
     pub(crate) app_actions_ask: bool,
-    /// `None` when they can't be read, which keeps the safe defaults.
     pub(crate) site_blocks: Option<crate::browser::SiteBlocks>,
     pub(crate) confirm_kinds: Option<Vec<String>>,
 }
 
-/// This computer's agent settings, as the app's settings page keeps them.
 pub(crate) fn agent_settings(store: &Store) -> AgentSettings {
     let read = || -> Option<Value> {
         let connection = store.connect().ok()?;
@@ -315,7 +296,6 @@ pub(crate) fn agent_settings(store: &Store) -> AgentSettings {
     }
 }
 
-/// What a person remembered for this agent, on this computer: "Accept and remember" in the island.
 fn site_grants(store: &Store, facts: &RunFacts) -> Vec<confirm::SiteGrant> {
     let read = || -> rusqlite::Result<Vec<Value>> {
         let connection = store.connect()?;
@@ -369,8 +349,6 @@ fn grants_of(documents: &[Value], agent: &str) -> Vec<confirm::SiteGrant> {
         .collect()
 }
 
-/// What native page work goes by for one request, read here and never taken from the window. A request
-/// with no call behind it knows no run: it reads as Ask, with nothing remembered.
 pub(crate) fn page_policy(store: &Store, policy_call: Option<&str>) -> crate::browser::PagePolicy {
     let settings = agent_settings(store);
     let call = policy_call.and_then(active_call);

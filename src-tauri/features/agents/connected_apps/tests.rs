@@ -50,7 +50,6 @@ fn expired_cards_read_as_expired_and_cant_be_answered() {
 
 #[test]
 fn the_chat_commands_cant_write_an_approval() {
-    // `requests` keeps these out of the kinds a window's chat commands accept.
     let source = include_str!("../chats.rs");
     let kinds = source
         .lines()
@@ -275,7 +274,6 @@ fn one_accounts_requests_and_approvals_are_not_anothers() {
     let request = requests::open(&first, draft).unwrap();
     assert!(requests::get(&first, &request.id).unwrap().is_some());
     assert!(requests::get(&second, &request.id).unwrap().is_none());
-    // Signed out keeps the rows the computer always had.
     assert_eq!(
         Store::new(base.clone(), super::SIGNED_OUT).account(),
         "this_computer"

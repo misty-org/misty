@@ -2,7 +2,6 @@ use super::events::{after_compaction, tool_text, usage_of};
 use super::forms::{form_answer, render_form};
 use super::*;
 
-/// The form the question tool makes in 2.3.0 for two questions.
 fn question_form() -> Value {
     json!({
         "id": "frm_1",
@@ -40,7 +39,6 @@ fn card_answers_go_back_by_field_key() {
     )
     .expect("answer");
     assert_eq!(answer, json!({ "q0": "prod", "q1": ["api", "web"] }));
-    // Free text goes as typed; an unanswered question is left out.
     let typed = form_answer(
         &question_form(),
         &json!({ "Where to deploy?": "on Wednesday" }),
@@ -74,8 +72,6 @@ fn events_belong_to_their_session() {
     assert_eq!(event_session(&other), None);
 }
 
-/// Misty's own launch and calls against a real 2.x install, at no cost (no prompt is sent):
-/// `OPENCODE_BIN=/path/to/opencode cargo test --lib live_v2_server -- --ignored`.
 #[tokio::test]
 #[ignore]
 async fn live_v2_server() {
@@ -85,7 +81,6 @@ async fn live_v2_server() {
     std::fs::create_dir_all(&folder).unwrap();
     let directory = folder.to_string_lossy().to_string();
     let state = opencode_server::OpencodeServerState::default();
-    // A port nothing answers on, so Misty starts its own server.
     let origin = opencode_server::ensure_server(&state, &bin, 1)
         .await
         .expect("server");
@@ -168,7 +163,6 @@ async fn live_v2_server() {
 
 #[test]
 fn step_tokens_become_the_usage_the_bar_reads() {
-    // A 2.3.0 `session.step.ended` on a cached turn: most of the prompt is in the cache.
     let tokens = json!({ "input": 82, "output": 75, "reasoning": 3,
                          "cache": { "read": 5376, "write": 10 } });
     assert_eq!(
@@ -184,8 +178,6 @@ fn step_tokens_become_the_usage_the_bar_reads() {
 
 #[test]
 fn a_compaction_reports_no_context_size() {
-    // 2.3.0's `session.compaction.ended` tokens are the summarizing call's: they read the context
-    // from before, so the count clears while the tokens still count as spent.
     let tokens = json!({ "input": 580, "output": 165, "reasoning": 0,
                          "cache": { "read": 5504, "write": 0 } });
     let usage = after_compaction(usage_of(&tokens, Some(200_000)));

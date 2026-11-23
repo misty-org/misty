@@ -1,8 +1,7 @@
 import type { MistyPickerSource, PickedDriveFile } from "@/features/files";
 import { MistyPicker } from "@/features/files";
-import { MAX_CHAT_ATTACHMENTS } from "./chatDraftConstants";
+import { MAX_CHAT_ATTACHMENTS } from "./chat_draft_constants";
 
-/** The shared picker (this computer or the Space's Files), scoped to what this member may attach. */
 export function SpaceChatPicker({
   spaceId,
   source,
@@ -20,7 +19,6 @@ export function SpaceChatPicker({
   canUploadAttachments: boolean;
   onClose: () => void;
   onChooseFiles: (paths: string[]) => void;
-  /** Files of the Space's drive, each sent as an attachment. */
   onChooseDriveFiles: (files: PickedDriveFile[]) => void;
 }) {
   return (

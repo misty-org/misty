@@ -13,12 +13,6 @@ use std::path::Path;
 
 use super::Engine;
 
-/// Qoder ships two distributions with independent binaries and config dirs
-/// (reference qoder_provider_profile.rs): Global (`qodercli`, `~/.qoder`)
-/// and CN (`qoderclicn`, `~/.qoder-cn`). Each is a sibling engine id sharing
-/// the one ACP driver — the pi/omp family pattern: sessions key off the
-/// engine id, so `qoder/<id>` and `qoder-cn/<id>` never collide and no
-/// profile-qualified identity is needed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum QoderDistribution {
     Global,
@@ -33,8 +27,6 @@ impl QoderDistribution {
         }
     }
 
-    /// CLI binary behind the engine id (the `qoder` binary is the IDE
-    /// launcher and speaks no ACP).
     pub(crate) fn cli_name(self) -> &'static str {
         match self {
             Self::Global => "qodercli",
@@ -42,8 +34,6 @@ impl QoderDistribution {
         }
     }
 
-    /// Default config/session home (the CLI's own default; sessions are
-    /// scanned from `<home>/projects`).
     pub(crate) fn default_config_dir_name(self) -> &'static str {
         match self {
             Self::Global => ".qoder",
@@ -71,26 +61,16 @@ impl Engine for QoderEngine {
         true
     }
 
-    /// Never invoked on the virtual path (`send_host_stream` branches before
-    /// the process spawn); a stub keeps the trait contract honest.
     fn supports_images(&self) -> bool {
-        // session/prompt carries image content blocks (base64).
         true
     }
     fn supports_effort(&self) -> bool {
         true
     }
 
-    /// Its help lists the modes this install has (`modes::learn_reported`).
     fn modes_help_flag(&self) -> Option<&'static str> {
         Some("--permission-mode")
     }
-    /// Qoder CLI's permission modes (`--permission-mode default | accept_edits`); each ask
-    /// comes back over ACP and Misty's gate answers it. Its plan review isn't wired
-    /// (`plan_approval`). It lists three more that aren't offered: `bypass_permissions` (no
-    /// sandbox keeps it inside its folder), `auto` (its own reviewer approves commands without
-    /// the person, outside any folder sandbox) and `dont_ask` (it refuses instead of asking,
-    /// while Default already brings every ask to the person).
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[
@@ -103,14 +83,6 @@ impl Engine for QoderEngine {
         true
     }
 
-    /// Qoder's human plan review (ACP session/set_mode plan + the ExitPlanMode
-    /// request_permission) has only documentation and binary-string evidence: the global CLI
-    /// was not installed, the CN evidence comes from the qoderclicn 1.0.41 bundled with
-    /// QoderWork CN.app cross-checked against the official docs, no ACP frames were captured
-    /// live, and that bundled CLI's --help lists no --acp/plan entry (possibly gated). An
-    /// explicit plan request must therefore be refused rather than run silently in another
-    /// mode (wiring it needs a signed-in machine and the old and new CLI entry points
-    /// confirmed). Both distributions stay Unavailable until each is verified.
     fn plan_approval(&self) -> super::plan_review::PlanApproval {
         super::plan_review::PlanApproval::Unavailable {
             reason: match self.distribution {
@@ -121,7 +93,6 @@ impl Engine for QoderEngine {
     }
 }
 
-/// File stem of a bin path, lowercased (`/usr/local/bin/qodercli` → `qodercli`).
 pub(crate) fn binary_file_stem(bin: &str) -> String {
     Path::new(bin.trim())
         .file_stem()
@@ -130,8 +101,6 @@ pub(crate) fn binary_file_stem(bin: &str) -> String {
         .to_ascii_lowercase()
 }
 
-/// The Qoder IDE launcher is also called `qoder` but speaks no ACP; only
-/// the CLI (`qodercli`) works as an engine bin.
 pub(crate) fn is_qoder_ide_launcher_bin(bin: &str) -> bool {
     binary_file_stem(bin) == "qoder"
 }

@@ -33,7 +33,6 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{timeout, Instant};
 
-/// Extract and normalize the context-window field.
 fn attach_context_window(mut usage: Value) -> Value {
     if usage.get("model_context_window").is_some() {
         return usage;
@@ -70,40 +69,21 @@ pub(crate) use framing::{
 
 const ACP_PROTOCOL_VERSION: u32 = 1;
 pub(crate) const RPC_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
-/// session/new scans the workspace on first contact (measured 30s+ in a
-/// large repo), so the setup call needs far more headroom than a plain RPC.
 pub(crate) const SESSION_NEW_TIMEOUT: Duration = Duration::from_secs(90);
-/// session/resume re-attaches without the workspace scan.
 pub(crate) const SESSION_RESUME_TIMEOUT: Duration = Duration::from_secs(30);
-/// A prompt turn has no wall-clock cap: it ends on its own response, the
-/// CLI's EOF, or the user's stop. Long agentic tasks outrun any fixed cap (a
-/// 30-minute one cut them off mid-run as "timed out"), and a hung CLI is
-/// still one Stop away. Shared by every ACP driver's session/prompt and the
-/// codex turn (its turn/start ack and turn pump).
 pub(crate) const PROMPT_TIMEOUT: Option<Duration> = None;
-/// qodercli interleaves the prompt response into the session/update stream:
-/// keep reading after it until the stream goes idle, else the tail is lost.
 const PROMPT_TRAILING_IDLE: Duration = Duration::from_millis(400);
 const PROMPT_TRAILING_CAP: Duration = Duration::from_secs(2);
-/// Grace for the typed cancelled response after session/cancel before the
-/// child is killed anyway.
 const CANCEL_SETTLE_TIMEOUT: Duration = Duration::from_secs(2);
-/// Killed-flag poll cadence inside the read loop.
 pub(crate) const KILL_POLL: Duration = Duration::from_millis(150);
 const POST_TERMINAL_DRAIN: Duration = Duration::from_millis(250);
-/// Catalog probe budget: session/new in the temp dir skips the workspace
-/// scan, so the whole handshake fits in seconds.
 const MODEL_PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const MODEL_PROBE_TOTAL: Duration = Duration::from_secs(20);
 
 pub(crate) const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;
 pub(crate) const JSONRPC_INVALID_PARAMS: i64 = -32602;
 pub(crate) const JSONRPC_INTERNAL_ERROR: i64 = -32603;
-/// Terminal marker for a kill-interrupted request; the driver swallows it
-/// via the killed flag (interrupted runs settle as normal turn ends).
 pub(crate) const CANCELLED: &str = "qoder turn cancelled";
-
-// ==================== session/update mapping ====================
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum QoderSessionUpdate {
@@ -204,10 +184,6 @@ fn extract_tool_content_text(update: &Value) -> String {
     extract_content_text(update.get("output"))
 }
 
-/// qodercli prefixes model-level failures it could not map to an RPC error
-/// ("[Error] Network attempt failed") into the text stream; the driver
-/// holds such chunks back and joins them into the terminal error message
-/// instead of rendering them as assistant text.
 pub(crate) fn is_error_prefixed_text(text: &str) -> bool {
     text.trim_start().starts_with("[Error]")
 }
@@ -247,8 +223,6 @@ pub(crate) fn map_session_update(update: &Value) -> QoderSessionUpdate {
                 .get("rawInput")
                 .cloned()
                 .or_else(|| update.get("input").cloned());
-            // Replay compresses a tool into one status=completed tool_call
-            // snapshot; accepting only pending would drop the block whole.
             if status == "completed" || status == "failed" {
                 let output = update
                     .get("rawOutput")
@@ -297,8 +271,6 @@ pub(crate) fn map_session_update(update: &Value) -> QoderSessionUpdate {
                 error,
             }
         }
-        // plan / available_commands_update / user_message_chunk: UI noise here. The session's
-        // own state (mode, config, title) is read by `session_state_update`.
         _ => QoderSessionUpdate::Ignore,
     }
 }
@@ -308,10 +280,6 @@ pub(crate) fn session_update_from_notification(params: &Value) -> QoderSessionUp
     map_session_update(update)
 }
 
-// ==================== the session's own state ====================
-
-/// What an ACP session says about itself rather than the turn: its title, mode, model and
-/// reasoning effort. A side it didn't mention is None.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub(crate) struct AcpSessionState {
     pub title: Option<String>,
@@ -328,9 +296,6 @@ fn non_empty(value: Option<&Value>) -> Option<String> {
         .map(str::to_string)
 }
 
-/// The session state one `session/update` carries: `session_info_update` (its title),
-/// `current_mode_update` (`currentModeId`) and `config_option_update` (`configOptions`). None
-/// for every other update.
 pub(crate) fn session_state_update(params: &Value) -> Option<AcpSessionState> {
     let update = params.get("update").unwrap_or(params);
     match update.get("sessionUpdate").and_then(Value::as_str)? {
@@ -347,9 +312,6 @@ pub(crate) fn session_state_update(params: &Value) -> Option<AcpSessionState> {
     }
 }
 
-/// The mode, model and effort a list of ACP config options holds, by their category (`mode`,
-/// `model`, `thought_level`) or, for an engine that leaves it out, their id. The handshake's
-/// `session/new` result carries the same list.
 pub(crate) fn config_options_state(options: &Value) -> AcpSessionState {
     let mut state = AcpSessionState::default();
     for option in options.as_array().into_iter().flatten() {
@@ -372,8 +334,6 @@ pub(crate) fn config_options_state(options: &Value) -> AcpSessionState {
 }
 
 impl AcpSessionState {
-    /// The events for what `next` says that differs from what this knew, which it then knows.
-    /// A side `next` doesn't mention stays as it was.
     pub(crate) fn follow(&mut self, next: AcpSessionState) -> Vec<EngineEvent> {
         fn take(known: &mut Option<String>, reported: Option<String>) -> Option<String> {
             let reported = reported?;
@@ -399,8 +359,6 @@ impl AcpSessionState {
     }
 }
 
-/// Reports what a `session/update` says about the session itself as engine events, for the ACP
-/// drivers that keep no record of it (`grok_acp.rs`); the chat skips what it already has.
 pub(crate) fn report_session_state(core: &TurnCore, state: &mut TurnState, params: &Value) {
     if let Some(update) = session_state_update(params) {
         for event in AcpSessionState::default().follow(update) {
@@ -409,8 +367,6 @@ pub(crate) fn report_session_state(core: &TurnCore, state: &mut TurnState, param
     }
 }
 
-/// Misty's id for a mode Qoder's ACP reports. ACP names its internal ids (`acceptEdits`,
-/// `dontAsk`, `yolo`); Misty's are its `--permission-mode` values (`modes()` in `qoder.rs`).
 fn misty_mode_id(mode: &str) -> String {
     match mode {
         "acceptEdits" => "accept_edits",
@@ -421,9 +377,6 @@ fn misty_mode_id(mode: &str) -> String {
     .to_string()
 }
 
-/// What the session holds once the handshake set it up: its own report, then the model, effort
-/// and mode the handshake just set. Qoder repeats its whole config after every slash command, so
-/// only what differs from this is a change the person made in the turn.
 fn handshake_state(session_result: &Value, req: &SendRequest, bypass_set: bool) -> AcpSessionState {
     let mut known = session_result
         .get("configOptions")
@@ -455,11 +408,6 @@ fn handshake_state(session_result: &Value, req: &SendRequest, bypass_set: bool) 
     known
 }
 
-// ==================== agent-initiated requests ====================
-
-/// Headless permission policy: pick the first allow* option (bypassPermissions
-/// mode means the CLI should not ask; when it still does, blocking forever
-/// is worse than allowing).
 pub(crate) fn permission_auto_answer(params: &Value) -> Result<Value, String> {
     let options = params
         .get("options")
@@ -489,8 +437,10 @@ pub(crate) fn permission_auto_answer(params: &Value) -> Result<Value, String> {
     }))
 }
 
-/// Confine an agent-requested path to the workspace root; the fs capability
-/// this client advertises must never read or write outside it.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves paths against the run's own folder, which need not be linked"
+)]
 pub(crate) fn confine_path_to_workspace(
     workspace_root: &Path,
     requested: &str,
@@ -516,10 +466,6 @@ pub(crate) fn confine_path_to_workspace(
         }
     });
     let resolved = if for_write && !absolute.exists() {
-        // Canonicalize the nearest EXISTING ancestor, then re-append the
-        // remainder: the immediate parent may not exist yet either, and a
-        // raw join compares a symlinked ancestor (macOS /var → /private/var)
-        // against the canonical root and falsely rejects in-workspace writes.
         let mut ancestor = absolute.as_path();
         let mut remainder = Vec::new();
         loop {
@@ -555,6 +501,10 @@ pub(crate) fn confine_path_to_workspace(
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "serves Qoder's file requests inside the run's own folder, which need not be linked"
+)]
 pub(crate) fn handle_fs_read(workspace_root: &Path, params: &Value) -> Result<Value, String> {
     let path = params
         .get("path")
@@ -565,6 +515,10 @@ pub(crate) fn handle_fs_read(workspace_root: &Path, params: &Value) -> Result<Va
     Ok(json!({ "content": content }))
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "serves Qoder's file requests inside the run's own folder, which need not be linked"
+)]
 pub(crate) fn handle_fs_write(workspace_root: &Path, params: &Value) -> Result<Value, String> {
     let path = params
         .get("path")
@@ -605,8 +559,6 @@ pub(crate) fn answer_agent_request(
     }
 }
 
-// ACP clientInfo is optional. Omit host identity so each CLI keeps its native
-// request identity; capability negotiation below is independent of branding.
 pub(crate) fn initialize_params() -> Value {
     json!({
         "protocolVersion": ACP_PROTOCOL_VERSION,
@@ -634,8 +586,6 @@ fn session_setting_error(setting: &str, value: &str, error: String) -> String {
     format!("Qoder {setting} `{value}` setup failed: {error}")
 }
 
-/// The CLI's own words from an `rpc:<code>:<method>: <message>` error (`AcpProcess::routed`),
-/// without the code and the method it answered.
 fn parse_rpc_error_message(message: &str) -> String {
     if let Some(rest) = message.strip_prefix("rpc:") {
         if let Some((_, text)) = rest.split_once(':') {
@@ -652,8 +602,6 @@ fn parse_rpc_error_message(message: &str) -> String {
     message.to_string()
 }
 
-/// ACP prompt content blocks: text plus base64 image blocks (the qoder
-/// image transport — supports_images is true because this exists).
 fn assemble_prompt_blocks(
     text: &str,
     images: &[String],
@@ -671,23 +619,13 @@ fn assemble_prompt_blocks(
     Ok(blocks)
 }
 
-// ==================== ACP process ====================
-
 pub(crate) struct AcpProcess {
-    /// Shared with the registry: a parked question is answered by writing
-    /// this child's stdin from `answer_question`, not from the read loop.
     pub(crate) stdin: Arc<TokioMutex<Option<ChildStdin>>>,
     reader: BufReader<ChildStdout>,
-    /// Partial-line bytes survive a cancelled read (KILL_POLL ticks land
-    /// mid-line); read_line_capped only ever appends to it.
     line_buf: Vec<u8>,
     next_id: u64,
     workspace_root: PathBuf,
-    /// Where this run's permission asks and client file writes go (`gate.rs`). None answers
-    /// them at once, as the probes that run no turn do.
     pub(crate) gate: Option<crate::engines::gate::AcpGate>,
-    /// The engine this child runs as, for keeping the commands it announces (`reported.rs`).
-    /// None for probes, whose sessions answer no one.
     pub(crate) reports_as: Option<String>,
 }
 
@@ -725,9 +663,6 @@ impl AcpProcess {
         Ok(())
     }
 
-    /// One JSON-RPC request → its result, with agent-initiated requests
-    /// settled inline (the ACP permission and fs surface): the qoder CLI
-    /// never asks the user anything this client has to park.
     async fn request(
         &mut self,
         method: &str,
@@ -766,16 +701,6 @@ impl AcpProcess {
         .await
     }
 
-    /// The read loop behind [`AcpProcess::request`]: session/update
-    /// notifications stream through `router`, which answers an agent request
-    /// by returning the frame to write — or returns `None` when the driver
-    /// answers it out of band (a question parked for the user).
-    ///
-    /// The read wait is capped at KILL_POLL so an interrupt lands even
-    /// mid-handshake: with a `cancel_session_id` (prompt phase) the loop
-    /// first sends session/cancel and grants the CLI CANCEL_SETTLE_TIMEOUT to
-    /// answer typed; without one the call aborts immediately. A `None`
-    /// timeout waits as long as the CLI keeps the request open.
     pub(crate) async fn routed(
         &mut self,
         method: &str,
@@ -857,8 +782,6 @@ impl AcpProcess {
                     if let Some(result) = settled.take() {
                         return Ok(result);
                     }
-                    // An idle read tick: re-check the deadline and the
-                    // killed flag on the next loop pass.
                     if deadline.is_some_and(|until| until <= Instant::now()) {
                         return Err(format!("{method} timed out"));
                     }
@@ -909,10 +832,6 @@ impl AcpProcess {
         }
     }
 
-    /// Reads one line the agent sends with no request of this client's open, waiting up to
-    /// `wait`, and routes it as [`AcpProcess::routed`] does. Antigravity's sub-agents work on
-    /// after the prompt that started them has answered (`grok_acp::follow_on`). Returns whether a
-    /// line came; a closed stdout is an error.
     pub(crate) async fn listen(
         &mut self,
         wait: Duration,
@@ -961,15 +880,10 @@ pub(crate) struct SpawnedAcp {
     pub(crate) child: Child,
     pub(crate) acp: AcpProcess,
     pub(crate) stderr_buf: Arc<Mutex<String>>,
-    /// Kill-on-close job guard (Windows): drops after teardown, sweeping any
-    /// grandchild the CLI orphaned before `taskkill /T` could see a tree.
     #[cfg(windows)]
     pub(crate) _tree_guard: Option<Arc<super::job::KillOnCloseJob>>,
 }
 
-/// Spawn a prepared ACP command as this driver's own child: piped stdio, own
-/// process group (so teardown sweeps the tree), and a drop backstop — a
-/// dropped driver future must never orphan the CLI.
 pub(crate) fn spawn_piped_acp(
     command: &mut Command,
     label: &str,
@@ -1011,16 +925,8 @@ pub(crate) fn spawn_piped_acp(
     })
 }
 
-/// Start every session in bypass mode via the documented startup flag
-/// (accepted by 1.1.28 through 1.1.79): qodercli 1.1.78/1.1.79 map the ACP
-/// `bypassPermissions` mode to their internal `yolo` id, which their own
-/// set_permission_mode then rejects ("unknown permission_mode: yolo"), so
-/// session/set_mode can no longer switch into bypass after the fact.
 const ACP_LAUNCH_ARGS: [&str; 3] = ["--acp", "--permission-mode", "bypass_permissions"];
 
-/// Bypass starts the session in bypass mode via the documented startup flag; Accept edits starts
-/// it in `accept_edits`; Default starts it in the CLI's default. Each ask comes back through ACP
-/// to Misty's gate.
 async fn spawn_acp(bin: &str, workspace: &Path, launch: &str) -> Result<SpawnedAcp, String> {
     let mut command = super::command_for_binary(bin);
     match launch {
@@ -1037,16 +943,12 @@ async fn spawn_acp(bin: &str, workspace: &Path, launch: &str) -> Result<SpawnedA
     spawn_piped_acp(&mut command, bin, workspace)
 }
 
-/// The launch level this run starts with. Never bypass while Qoder offers no Bypass (it has no
-/// folder sandbox): the engine's own mode list decides, not the raw request.
 fn launch_level(req: &SendRequest) -> &'static str {
     use super::Engine;
     super::qoder::QoderEngine::new(super::qoder::QoderDistribution::Global)
         .resolve_permission(req.permission.as_deref())
 }
 
-/// Whether session/new|resume already reports bypass: older CLIs name it
-/// `bypassPermissions`, 1.1.78/1.1.79 report the internal `yolo` id.
 fn bypass_mode_active(session_result: &Value) -> bool {
     matches!(
         session_result
@@ -1056,8 +958,6 @@ fn bypass_mode_active(session_result: &Value) -> bool {
     )
 }
 
-/// The CLI stays resident after the response (ACP is a session protocol);
-/// every exit path tears the tree down so no run orphans a qodercli.
 pub(crate) async fn teardown(child: &mut Child) {
     if let Some(pid) = child.id() {
         super::kill_process_group(pid);
@@ -1066,28 +966,14 @@ pub(crate) async fn teardown(child: &mut Child) {
     let _ = timeout(POST_TERMINAL_DRAIN, child.wait()).await;
 }
 
-// ==================== turn driver ====================
-
-/// Per-turn projection state.
 #[derive(Default)]
 struct TurnView {
-    /// [Error]-prefixed chunks held back from the text stream; they become
-    /// the terminal error message when the turn fails.
     pending_error_chunks: Vec<String>,
     last_usage: Option<Value>,
-    /// toolCallId → tool name from tool_call starts, so the matching
-    /// tool_call_update patch can find the row it belongs to.
     tool_names: HashMap<String, String>,
-    /// The session's title, mode, model and effort as last known, so only a change the turn
-    /// made (a slash command, say) reaches the chat.
     session: AcpSessionState,
 }
 
-/// Drive one send as a qoder ACP turn. Mirrors run_host_turn's settle
-/// contract: dispatch events until a terminal done/error, then drain this
-/// run's registry entries. Transport/rpc failures surface as
-/// EngineEvent::Error — except on interrupt, which commits partial output
-/// as a normal turn end (the same contract as the SIGKILL'd process path).
 pub(crate) async fn run_acp_turn(
     core: TurnCore,
     req: SendRequest,
@@ -1098,9 +984,6 @@ pub(crate) async fn run_acp_turn(
     let mut state = TurnState::new(req.session_id.clone());
     let mut view = TurnView::default();
     let preassigned_session_id = req.session_id.clone();
-    // Abort-safe backstop: the by-name removals below only run when the task
-    // finishes normally. An abort or a panic would otherwise leave this run's
-    // keys pinning a concurrency slot until app exit.
     let _registry_guard =
         VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
     let result = turn_inner(&core, &mut state, &mut view, &req, &bin, &killed).await;
@@ -1119,10 +1002,6 @@ pub(crate) async fn run_acp_turn(
         core.dispatch_event(&mut state, EngineEvent::Done { session_id, usage });
     }
     core.registry.remove_if_pid(&core.run_id, virtual_pid);
-    // Clean up both the native session id (if the engine reported one) and
-    // the preassigned session id (if we resumed an existing conversation).
-    // A resumed session was keyed at spawn under req.session_id, so we must
-    // remove that alias even if the native id differs or never arrived.
     if let Some(session_id) = state.native_session_id.clone() {
         core.registry.remove_if_pid(&session_id, virtual_pid);
     }
@@ -1145,8 +1024,6 @@ async fn turn_inner(
             "qoderBin must point to qodercli, not the Qoder IDE launcher (`qoder`)".to_string(),
         );
     }
-    // Misty: the chat's qodercli from its last turn, still on this session, takes the prompt
-    // straight away (`warm.rs`): its start-up alone takes seconds.
     let fingerprint = super::warm::claim(&core.run_id);
     let mut warm = match super::warm::take_acp(core, req, fingerprint) {
         Some(warm) => {
@@ -1156,7 +1033,6 @@ async fn turn_inner(
         }
         None => {
             let mut spawned = spawn_acp(bin, &req.workspace, launch_level(req)).await?;
-            // The gate answers asks on this child's stdin, through the registry.
             core.registry
                 .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
             spawned.acp.gate = Some(crate::engines::gate::AcpGate::of(core, req));
@@ -1181,7 +1057,6 @@ async fn turn_inner(
             }
         }
     };
-    // This run's gate answers the asks, on a process this turn started or one it took over.
     warm.item.spawned.acp.gate = Some(crate::engines::gate::AcpGate::of(core, req));
     let session_id = warm.item.session_id.clone();
     let result = match prompt(
@@ -1199,14 +1074,11 @@ async fn turn_inner(
         Err(error) => Err(terminal_message(error, view, &warm.item.spawned.stderr_buf)),
     };
     warm.item.known = view.session.clone();
-    // A clean turn leaves the process warm for the chat's next message; anything else ends it.
     let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
     super::warm::park_acp(core, req, fingerprint, clean, warm);
     result
 }
 
-/// Opens the turn's session on a new qodercli: `initialize`, the session resumed (or a new one),
-/// then its model, effort and mode. Returns the session id.
 async fn handshake(
     acp: &mut AcpProcess,
     core: &TurnCore,
@@ -1227,9 +1099,6 @@ async fn handshake(
         .await?;
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
     let cwd = req.workspace.to_string_lossy().to_string();
-    // The folders the person added (`/add-dir`): qodercli takes them as ACP's
-    // `additionalDirectories` on session/new and session/resume (absolute paths only, which
-    // `prepare_launch` already keeps to).
     let extra = additional_directories(&req.additional_dirs);
     let session_result = match req.session_id.as_deref() {
         Some(session_id) => {
@@ -1299,9 +1168,6 @@ async fn handshake(
         .await
         .map_err(|error| session_setting_error("reasoning effort", effort, error))?;
     }
-    // In Bypass, switch only when the startup flag did not take (folder trust or a settings
-    // policy downgraded to default, or a CLI that ignores it); the CLI's own error then surfaces
-    // instead of a silent non-bypass turn.
     let bypass_set = launch_level(req) == "bypass" && !bypass_mode_active(&session_result);
     if bypass_set {
         acp.request(
@@ -1318,7 +1184,6 @@ async fn handshake(
     Ok(session_id)
 }
 
-/// Runs the turn's prompt on an open session.
 async fn prompt(
     acp: &mut AcpProcess,
     core: &TurnCore,
@@ -1349,7 +1214,10 @@ async fn prompt(
     Ok(())
 }
 
-/// The added folders that still exist; a missing one would only fail the handshake.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "checks the folders the person added to a Qoder run, which need not be linked"
+)]
 fn additional_directories(dirs: &[String]) -> Vec<&str> {
     dirs.iter()
         .map(String::as_str)
@@ -1357,22 +1225,16 @@ fn additional_directories(dirs: &[String]) -> Vec<&str> {
         .collect()
 }
 
-/// One session/update notification projected to engine events.
 fn handle_session_update(
     core: &TurnCore,
     state: &mut TurnState,
     view: &mut TurnView,
     params: &Value,
 ) {
-    // ACP's `usage_update` (how full the context is): the same `usage` event the other ACP
-    // drivers send, which the composer's context meter reads. qodercli 1.1.89 declares it in
-    // its ACP schema without sending it yet; the prompt result's totals still follow.
     if let Some(usage) = super::kimi_acp::usage(params) {
         view.last_usage = Some(usage.clone());
         core.dispatch_event(state, EngineEvent::Usage(usage));
     }
-    // Qoder sends its mode and config after slash commands and its own switches; the chat
-    // follows what changed (`current_mode_update`, `config_option_update`, `session_info_update`).
     if let Some(update) = session_state_update(params) {
         let update = AcpSessionState {
             mode: update.mode.as_deref().map(misty_mode_id),
@@ -1422,8 +1284,6 @@ fn handle_session_update(
     }
 }
 
-/// Terminal message precedence (reference-proven): held-back [Error] chunks
-/// → the rpc error's message part → the stderr tail → the raw error.
 fn terminal_message(raw: String, view: &TurnView, stderr_buf: &Arc<Mutex<String>>) -> String {
     if !view.pending_error_chunks.is_empty() {
         return view.pending_error_chunks.join("\n");
@@ -1443,9 +1303,6 @@ fn terminal_message(raw: String, view: &TurnView, stderr_buf: &Arc<Mutex<String>
     }
 }
 
-// ==================== model catalog probe ====================
-
-/// One availableModels entry from the session/new result.
 pub(crate) struct QoderModelEntry {
     pub id: String,
     pub name: Option<String>,
@@ -1495,12 +1352,6 @@ pub(crate) fn parse_models_from_session_new(result: &Value) -> Vec<QoderModelEnt
     models
 }
 
-/// Live ACP model catalog via a throwaway `qodercli --acp` handshake in the
-/// temp dir (session/new scans the cwd — a real workspace could take 90s).
-/// On-demand only (the model picker); failures degrade to an error so the
-/// frontend keeps whatever catalog it already has.
-/// Returns the models and the whole `session/new` result, which also carries Qoder's own
-/// reasoning option and modes (`models::acp_thought_levels`, `models::acp_modes`).
 pub(crate) async fn probe_models(bin: &str) -> Result<(Vec<QoderModelEntry>, Value), String> {
     if super::qoder::is_qoder_ide_launcher_bin(bin) {
         return Err(
@@ -1545,11 +1396,6 @@ pub(crate) async fn probe_models(bin: &str) -> Result<(Vec<QoderModelEntry>, Val
     Ok((parse_models_from_session_new(&result), result))
 }
 
-// ==================== session fork ====================
-
-/// Copies `session_id` into a new Qoder session without a model call: qodercli's ACP
-/// `session/fork` (the call behind its `--fork-session` and `/branch`) in a throwaway child in
-/// the session's folder. Returns the new session's id.
 pub(crate) async fn fork_session(
     bin: &str,
     workspace: &Path,
@@ -1602,7 +1448,6 @@ pub(crate) async fn fork_session(
     extract_session_id(&result).ok_or_else(|| "Qoder's fork returned no sessionId".to_string())
 }
 
-/// The whole fork: start, handshake, and the copy (which opens the new session in its folder).
 const FORK_TOTAL: Duration = Duration::from_secs(120);
 
 #[cfg(test)]

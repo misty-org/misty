@@ -3,9 +3,6 @@
 
 use super::EffortLevel;
 
-/// An ACP engine's own reasoning levels, from its `session/new` result: the config option of
-/// category `thought_level` (or id `reasoning_effort`), its options as levels with the engine's
-/// names and lines, and its current value. None when the engine offers no such option.
 pub(crate) fn acp_thought_levels(
     session: &serde_json::Value,
 ) -> Option<(Vec<EffortLevel>, Option<String>)> {
@@ -41,8 +38,6 @@ pub(crate) fn acp_thought_levels(
     (!levels.is_empty()).then(|| (levels, text(option.get("currentValue"))))
 }
 
-/// An ACP engine's own modes, with its names for them, from its `session/new` result
-/// (`modes.availableModes`).
 pub(crate) fn acp_modes(session: &serde_json::Value) -> Vec<super::super::modes::ListedMode> {
     session
         .pointer("/modes/availableModes")
@@ -70,7 +65,6 @@ mod tests {
 
     #[test]
     fn reads_an_acp_engine_own_levels_and_modes() {
-        // Oh My Pi's live `session/new` shape.
         let session = serde_json::json!({
             "configOptions": [
                 {"id": "model", "category": "model", "options": []},
@@ -97,7 +91,6 @@ mod tests {
             levels[1].description.as_deref(),
             Some("Auto-detect per prompt")
         );
-        // A name that only repeats the id says nothing more.
         assert_eq!(levels[2].name, None);
         assert_eq!(current.as_deref(), Some("high"));
         let modes = acp_modes(&session);

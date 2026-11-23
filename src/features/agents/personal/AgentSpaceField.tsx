@@ -18,14 +18,10 @@ import {
   Skeleton,
   useNotice,
 } from "@misty/ui";
-import { useAgentAccountId } from "./agentAccount";
-import { moveAgentHome } from "./agentHomeSpace";
-import { usePersonalAgentsStore } from "./personalAgentsStore";
+import { useAgentAccountId } from "./agent_account";
+import { moveAgentHome } from "./agent_home_space";
+import { usePersonalAgentsStore } from "./personal_agents_store";
 
-/**
- * The Space an agent calls home, as its person's Spaces know it: its own, or the person's own
- * Space for one that has none yet. Null while the Spaces load; `gone` once its Space is.
- */
 export function useAgentHomeSpace(agent: Pick<AgentProfile, "id" | "space_id"> | undefined) {
   const spaces = useSpacesDirectory((state) => state.spaces);
   const saved = usePersonalAgentsStore(
@@ -47,10 +43,6 @@ export function useAgentHomeSpace(agent: Pick<AgentProfile, "id" | "space_id"> |
   };
 }
 
-/**
- * The agent's home Space in its settings, to move it to another of the person's Spaces. Its next
- * run works and saves there. The change saves itself.
- */
 export function AgentSpaceField({ agent }: { agent: AgentProfile }) {
   const account = useAgentAccountId();
   const home = useAgentHomeSpace(agent);
@@ -88,10 +80,6 @@ export function AgentSpaceField({ agent }: { agent: AgentProfile }) {
   );
 }
 
-/**
- * Where an agent works, as one quiet line: its home Space. Nothing until the Spaces load, and
- * nothing when it is the Space the window shows, where the agent's home goes without saying.
- */
 export function AgentHomeSpaceLine({ agent }: { agent: AgentProfile | undefined }) {
   const home = useAgentHomeSpace(agent);
   const here = useSpaceWindowStore((state) => state.identity);

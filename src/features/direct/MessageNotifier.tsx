@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect } from "react";
 import { useSpacesStore } from "@/features/spaces";
-import { chatMuteId, useMessageNotices } from "@/shared/lib/messageNotices";
+import { chatMuteId, useMessageNotices } from "@/shared/lib/message_notices";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { dmName, dmPath, peekDm } from "./directData";
-import { isDoNotDisturb } from "./statusStore";
+import { dmName, dmPath, peekDm } from "./direct_data";
+import { isDoNotDisturb } from "./status_store";
 
 interface MessageLike {
   id?: unknown;
@@ -15,12 +15,13 @@ interface MessageLike {
   content?: unknown;
 }
 
-/** The message's text with its mentions as typed, for the notice's line. */
 function lineOf(content: unknown): string {
   if (!Array.isArray(content)) return "";
   return content
     .map((span: { text?: unknown; label?: unknown; type?: unknown }) =>
-      span.type === "mention" ? `@${String(span.label ?? "")}` : String(span.text ?? span.label ?? ""),
+      span.type === "mention"
+        ? `@${String(span.label ?? "")}`
+        : String(span.text ?? span.label ?? ""),
     )
     .join("")
     .replace(/\s+/g, " ")
@@ -37,12 +38,6 @@ function mentions(content: unknown, userId: string): boolean {
   );
 }
 
-/**
- * Tells the person through the system when a message arrives in a DM or a Space while Misty isn't
- * in front: every DM message, and in a Space the ones that name them (or every one, or none, as
- * Settings › Profile › Notifications says). Muted chats and Do not disturb stay quiet. Native code
- * shows one notice for all windows and never while one is focused. Mounted once per window.
- */
 export function MessageNotifier({ accountId }: { accountId: string }) {
   useEffect(() => {
     if (!hasTauriInternals()) return;
@@ -61,7 +56,6 @@ export function MessageNotifier({ accountId }: { accountId: string }) {
       if (message.thread_root_id || typeof message.id !== "string") return;
       if (isDoNotDisturb()) return;
       const prefs = useMessageNotices.getState().value;
-      // A muted Space or DM, or one muted channel of a Space, stays quiet.
       if (prefs.muted.includes(spaceId)) return;
       if (prefs.muted.includes(chatMuteId(spaceId, detail.conversationId))) return;
       const dm = peekDm(spaceId);

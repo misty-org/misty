@@ -22,7 +22,6 @@ pub enum At {
     After,
 }
 
-/// `RenameRule` in `disk.ts`.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum RenameRule {
@@ -44,7 +43,6 @@ pub(super) struct Plan {
     pub preview: RenamePreview,
 }
 
-/// The name split into the part a rule changes and the extension it keeps (with its dot).
 fn split(name: &str, folder: bool) -> (&str, &str) {
     if folder && !is_package_name(name) {
         return (name, "");
@@ -55,14 +53,21 @@ fn split(name: &str, folder: bool) -> (&str, &str) {
     }
 }
 
-/// The new name for the item at `position` in the batch.
 pub(super) fn new_name(rule: &RenameRule, name: &str, folder: bool, position: u64) -> String {
     let (stem, ext) = split(name, folder);
     let stem = match rule {
-        RenameRule::Replace { find, replace } if !find.is_empty() => stem.replace(find.as_str(), replace),
+        RenameRule::Replace { find, replace } if !find.is_empty() => {
+            stem.replace(find.as_str(), replace)
+        }
         RenameRule::Replace { .. } => stem.to_owned(),
-        RenameRule::Add { text, at: At::Before } => format!("{text}{stem}"),
-        RenameRule::Add { text, at: At::After } => format!("{stem}{text}"),
+        RenameRule::Add {
+            text,
+            at: At::Before,
+        } => format!("{text}{stem}"),
+        RenameRule::Add {
+            text,
+            at: At::After,
+        } => format!("{stem}{text}"),
         RenameRule::Format { base, start, at } => {
             let number = start.saturating_add(position);
             match at {
@@ -74,7 +79,6 @@ pub(super) fn new_name(rule: &RenameRule, name: &str, folder: bool, position: u6
     format!("{stem}{ext}")
 }
 
-/// Whether `name` can be a name on this system.
 fn valid_name(name: &str) -> bool {
     let trimmed = name.trim();
     if trimmed.is_empty() || trimmed == "." || trimmed == ".." || name.contains(['/', '\0']) {
@@ -84,19 +88,18 @@ fn valid_name(name: &str) -> bool {
         let reserved = ['\\', ':', '*', '?', '"', '<', '>', '|'];
         return !name.contains(reserved) && !name.ends_with(['.', ' ']);
     }
-    // Finder shows a colon as a slash; on the disk it can't be used.
     !(cfg!(target_os = "macos") && name.contains(':'))
 }
 
-/// How two names in one folder compare on this system's disks, which ignore case on macOS and
-/// Windows.
 fn key(dir: &Path, name: &str) -> (PathBuf, String) {
-    let name = if cfg!(any(target_os = "macos", windows)) { name.to_lowercase() } else { name.to_owned() };
+    let name = if cfg!(any(target_os = "macos", windows)) {
+        name.to_lowercase()
+    } else {
+        name.to_owned()
+    };
     (dir.to_path_buf(), name)
 }
 
-/// The batch's new names, each marked if it clashes. `taken` says whether a name is already
-/// used in a folder by some other item.
 pub(super) fn mark_clashes(
     items: Vec<(PathBuf, String, String)>,
     taken: impl Fn(&Path, &str, &str) -> bool,
@@ -116,14 +119,17 @@ pub(super) fn mark_clashes(
         .map(|(path, from, to)| {
             let dir = path.parent().unwrap_or(&path).to_path_buf();
             let clash = from != to
-                && (!valid_name(&to) || doubled.contains(&key(&dir, &to)) || taken(&dir, &from, &to));
-            Plan { preview: RenamePreview { from, to, clash }, path }
+                && (!valid_name(&to)
+                    || doubled.contains(&key(&dir, &to))
+                    || taken(&dir, &from, &to));
+            Plan {
+                preview: RenamePreview { from, to, clash },
+                path,
+            }
         })
         .collect()
 }
 
-/// Whether `to` is used in `dir` by something other than the item called `from` (a change of
-/// case alone renames the same item).
 fn taken_on_disk(dir: &Path, from: &str, to: &str) -> bool {
     if key(dir, from) == key(dir, to) {
         return false;
@@ -154,24 +160,38 @@ pub(super) fn rename_many(paths: &[PathBuf], rule: &RenameRule) -> TransferResul
             continue;
         }
         let error = if preview.clash {
-            Some(if valid_name(&preview.to) { "that name is taken".to_owned() } else { "that isn't a name a file can have".to_owned() })
+            Some(if valid_name(&preview.to) {
+                "that name is taken".to_owned()
+            } else {
+                "that isn't a name a file can have".to_owned()
+            })
         } else {
             let target = path.with_file_name(&preview.to);
-            fs_disk::rename(&path, &target).err().map(|error| error.to_string()).or_else(|| {
-                super::super::search::note_renamed(&path, &target);
-                created.push(target.display().to_string());
-                moved.push((path.clone(), target));
-                None
-            })
+            fs_disk::rename(&path, &target)
+                .err()
+                .map(|error| error.to_string())
+                .or_else(|| {
+                    super::super::search::note_renamed(&path, &target);
+                    created.push(target.display().to_string());
+                    moved.push((path.clone(), target));
+                    None
+                })
         };
         if let Some(error) = error {
-            failures.push(Failure { path: path.display().to_string(), error: failed(&path, error) });
+            failures.push(Failure {
+                path: path.display().to_string(),
+                error: failed(&path, error),
+            });
         }
     }
     if !moved.is_empty() {
         record("Rename Items", Change::Moved(moved));
     }
-    TransferResult { created, failed: failures, cancelled: false }
+    TransferResult {
+        created,
+        failed: failures,
+        cancelled: false,
+    }
 }
 
 #[cfg(test)]
@@ -179,22 +199,42 @@ mod tests {
     use super::*;
 
     fn replace(find: &str, replace: &str) -> RenameRule {
-        RenameRule::Replace { find: find.into(), replace: replace.into() }
+        RenameRule::Replace {
+            find: find.into(),
+            replace: replace.into(),
+        }
     }
 
     #[test]
     fn rules_change_the_name_and_keep_the_extension() {
-        assert_eq!(new_name(&replace("IMG", "Trip"), "IMG_0042.JPG", false, 0), "Trip_0042.JPG");
+        assert_eq!(
+            new_name(&replace("IMG", "Trip"), "IMG_0042.JPG", false, 0),
+            "Trip_0042.JPG"
+        );
         assert_eq!(new_name(&replace("jpg", "png"), "a.jpg", false, 0), "a.jpg");
         assert_eq!(new_name(&replace("", "x"), "a.txt", false, 0), "a.txt");
-        let add = RenameRule::Add { text: " copy".into(), at: At::After };
+        let add = RenameRule::Add {
+            text: " copy".into(),
+            at: At::After,
+        };
         assert_eq!(new_name(&add, "Report.pdf", false, 0), "Report copy.pdf");
-        let before = RenameRule::Add { text: "Draft ".into(), at: At::Before };
+        let before = RenameRule::Add {
+            text: "Draft ".into(),
+            at: At::Before,
+        };
         assert_eq!(new_name(&before, ".bashrc", false, 0), "Draft .bashrc");
-        let format = RenameRule::Format { base: "Photo ".into(), start: 1, at: At::After };
+        let format = RenameRule::Format {
+            base: "Photo ".into(),
+            start: 1,
+            at: At::After,
+        };
         assert_eq!(new_name(&format, "IMG_1.heic", false, 0), "Photo 1.heic");
         assert_eq!(new_name(&format, "IMG_9.heic", false, 2), "Photo 3.heic");
-        let numbered = RenameRule::Format { base: " Scan".into(), start: 7, at: At::Before };
+        let numbered = RenameRule::Format {
+            base: " Scan".into(),
+            start: 7,
+            at: At::Before,
+        };
         assert_eq!(new_name(&numbered, "x.pdf", false, 0), "7 Scan.pdf");
     }
 
@@ -210,7 +250,11 @@ mod tests {
             (dir.join("a.txt"), "a.txt".to_owned(), "b.txt".to_owned()),
             (dir.join("c.txt"), "c.txt".to_owned(), "b.txt".to_owned()),
             (dir.join("d.txt"), "d.txt".to_owned(), ".txt".to_owned()),
-            (dir.join("e.txt"), "e.txt".to_owned(), "taken.txt".to_owned()),
+            (
+                dir.join("e.txt"),
+                "e.txt".to_owned(),
+                "taken.txt".to_owned(),
+            ),
             (dir.join("f.txt"), "f.txt".to_owned(), "fine.txt".to_owned()),
             (dir.join("g.txt"), "g.txt".to_owned(), "g.txt".to_owned()),
             (dir.join("h.txt"), "h.txt".to_owned(), "x/y.txt".to_owned()),

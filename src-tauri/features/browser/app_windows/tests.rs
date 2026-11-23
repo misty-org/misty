@@ -14,7 +14,6 @@ fn window(profile: &str) -> WindowState {
 fn labels_name_a_window_and_its_profile_is_kept_natively() {
     let label = new_label();
     assert!(is_person_window(&label));
-    // A window has no profile until it is given one.
     assert_eq!(profile_for_window(&label), None);
     set_current(&label, window(PERSONAL));
     assert_eq!(profile_for_window(&label).as_deref(), Some(PERSONAL));

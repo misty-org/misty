@@ -25,28 +25,17 @@ use std::sync::Arc;
 
 use super::{parse_session_file, parse_ts_ms_str};
 
-/// Bump when index derivation changes (what text is indexed, tokenizer) so
-/// every session re-indexes exactly once on upgrade.
 const INDEX_VERSION: &str = "1";
 
-/// Stamp written when a session's file cannot be parsed. Bound to
-/// INDEX_VERSION, so an index-format upgrade retries every failure once;
-/// the stat check in PENDING_FROM retries sooner when the file changes.
 fn failed_version() -> String {
     format!("failed:{INDEX_VERSION}")
 }
 
-/// Default/ceiling for one search page. The palette pages with LIMIT+1.
 const DEFAULT_LIMIT: u32 = 20;
 const MAX_LIMIT: u32 = 100;
 
-/// Chars of context kept on each side of the first match in a LIKE-path
-/// snippet (agentsview uses the same radius for its content search).
 const SNIPPET_RADIUS: usize = 60;
 
-/// snippet() marker bytes: control chars cannot appear in a chat message in
-/// practice, so unlike agentsview's literal `<mark>` these can never be
-/// forged by message content into a spurious highlight.
 const MARK_OPEN: char = '\u{1}';
 const MARK_CLOSE: char = '\u{2}';
 
@@ -76,26 +65,11 @@ pub struct MessageSearchHit {
 pub struct MessageSearchPage {
     pub hits: Vec<MessageSearchHit>,
     pub has_more: bool,
-    /// Sessions still awaiting (re)indexing at query time. While >0 the hit
-    /// list can grow without the query changing.
     pub pending: i64,
-    /// Microseconds spent on the query itself (FTS/LIKE scan + snippet
-    /// build). The bookkeeping counts (pending sessions, corpus size) run
-    /// outside this clock: they measure the index, not the search, and the
-    /// palette's stats line quotes this number as the search time.
     pub elapsed_us: u64,
-    /// Messages in the content index — the corpus the query ran against.
-    /// Paired with `elapsed_us` in the palette's "searched N messages" line.
     pub total_messages: i64,
 }
 
-// ==================== Indexer ====================
-
-/// Sessions whose stored file stat disagrees with the index stamp (or that
-/// were never indexed). Shared by the indexer loop and the `pending` count.
-/// A failure stamp (?2) clears the session until its stat moves or
-/// INDEX_VERSION bumps — otherwise deleted/moved transcript files would
-/// re-fail every pass and stay pending forever.
 const PENDING_FROM: &str = "
     FROM cli_sessions s
     LEFT JOIN cli_fts_state f ON f.engine = s.engine AND f.session_id = s.session_id
@@ -113,7 +87,6 @@ struct PendingSession {
     message_count: i64,
 }
 
-/// All sessions awaiting (re)indexing, in one snapshot.
 fn pending_batch(db: &crate::engines::support::db::Db) -> Result<Vec<PendingSession>, String> {
     let conn = db.read();
     let mut stmt = conn
@@ -149,8 +122,6 @@ fn pending_count(db: &crate::engines::support::db::Db) -> Result<i64, String> {
     .map_err(|e| e.to_string())
 }
 
-/// Messages currently in the content index: the corpus a query runs
-/// against, reported next to the search duration.
 fn message_count(db: &crate::engines::support::db::Db) -> Result<i64, String> {
     let conn = db.read();
     conn.query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| {
@@ -159,7 +130,6 @@ fn message_count(db: &crate::engines::support::db::Db) -> Result<i64, String> {
     .map_err(|e| e.to_string())
 }
 
-/// Write the fts_state row shared by the success and failure paths.
 fn upsert_stamp(
     conn: &rusqlite::Connection,
     row: &PendingSession,
@@ -190,8 +160,6 @@ fn upsert_stamp(
     Ok(())
 }
 
-/// Sessions-row stat, re-checked under SCAN_LOCK before any stamp: a file
-/// rewritten mid-parse must not be stamped at the new stat.
 fn stat_unchanged(conn: &rusqlite::Connection, row: &PendingSession) -> Result<bool, String> {
     let current: Option<(i64, i64)> = conn
         .query_row(
@@ -204,11 +172,6 @@ fn stat_unchanged(conn: &rusqlite::Connection, row: &PendingSession) -> Result<b
     Ok(current == Some((row.file_size, row.file_mtime_ms)))
 }
 
-/// Mark an unparseable session as attempted at its current stat. Previously
-/// indexed messages stay (last-good content remains searchable); the stat
-/// and version checks in PENDING_FROM re-pend the session when the file
-/// changes or INDEX_VERSION bumps. Same SCAN_LOCK + stat re-check as the
-/// success path.
 fn stamp_failure(db: &crate::engines::support::db::Db, row: &PendingSession) -> Result<(), String> {
     let _scan_guard = super::scanner::SCAN_LOCK.lock();
     let conn = db.0.lock();
@@ -218,11 +181,6 @@ fn stamp_failure(db: &crate::engines::support::db::Db, row: &PendingSession) -> 
     Ok(())
 }
 
-/// (Re)index one session. Returns true when the index now reflects the
-/// file. A lost stat race leaves the session pending for the next pass; a
-/// parse failure is failure-stamped so a permanently unparseable file
-/// (e.g. deleted transcript) neither retries nor counts as pending until
-/// its stat moves.
 fn index_one(db: &crate::engines::support::db::Db, row: &PendingSession) -> Result<bool, String> {
     let parsed = if row.message_count > 0 {
         match parse_session_file(&row.engine, Path::new(&row.file_path)) {
@@ -243,27 +201,17 @@ fn index_one(db: &crate::engines::support::db::Db, row: &PendingSession) -> Resu
     write_index(db, row, &parsed)
 }
 
-/// Publish one parsed session. A file whose stat moved while it was parsed returns `false`
-/// without writing, leaving the session pending for the next pass.
 fn write_index(
     db: &crate::engines::support::db::Db,
     row: &PendingSession,
     parsed: &super::ParsedSession,
 ) -> Result<bool, String> {
-    // Deletion paths hold SCAN_LOCK, so under it the sessions row cannot
-    // vanish mid-write; the stat re-check keeps a file rewritten mid-parse
-    // from being stamped as indexed at the new stat.
     let _scan_guard = super::scanner::SCAN_LOCK.lock();
     let mut conn = db.0.lock();
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     if !stat_unchanged(&tx, row)? {
         return Ok(false);
     }
-    // Replace-then-insert made every turn rebuild the whole session's FTS
-    // index (41 s for a 10k-message transcript). Transcripts are append-mostly,
-    // so update only rows whose text/role/timestamp actually changed: the
-    // upsert's WHERE suppresses the UPDATE trigger (and its FTS re-tokenize)
-    // for identical rows. Deletes are limited to seqs that disappeared.
     let existing: Vec<i64> = {
         let mut stmt = tx
             .prepare("SELECT seq FROM cli_session_messages WHERE engine=?1 AND session_id=?2")
@@ -326,18 +274,9 @@ fn write_index(
     Ok(true)
 }
 
-/// Drain every pending session in one up-front snapshot: sessions
-/// discovered mid-pass wait for the next pass (spawn_index follows every
-/// scan), and each snapshot row is attempted exactly once — a corrupt file
-/// can never clog a refetch loop's head batch and stall the whole pass.
-/// Each session's parse is lock-free and its write transaction its own
-/// short db-lock+SCAN_LOCK section, so a big first-time index never
-/// starves ⌘L searches or scans.
 pub fn index_pending(db: &crate::engines::support::db::Db) -> Result<usize, String> {
     let mut indexed = 0usize;
     for row in pending_batch(db)? {
-        // One bad session (e.g. FK race with workspace removal) must not
-        // abort the pass for everyone behind it.
         match index_one(db, &row) {
             Ok(true) => indexed += 1,
             Ok(false) => {}
@@ -350,12 +289,6 @@ pub fn index_pending(db: &crate::engines::support::db::Db) -> Result<usize, Stri
     Ok(indexed)
 }
 
-/// Background index pass, collapse-safe like spawn_scan: a pass already in
-/// flight makes the new call a no-op — but it must not lose the request. A
-/// pass takes its pending snapshot up front, and work created after that
-/// snapshot (a recorded frame deleting an fts stamp) would otherwise wait for
-/// the next unrelated scan; a raced request therefore asks the running pass to
-/// drain once more before it exits.
 pub fn spawn_index(db: Arc<crate::engines::support::db::Db>) {
     use std::sync::atomic::{AtomicBool, Ordering};
     static INDEX_RUNNING: AtomicBool = AtomicBool::new(false);
@@ -376,8 +309,6 @@ pub fn spawn_index(db: Arc<crate::engines::support::db::Db>) {
         }
         let _guard = ResetOnDrop;
         loop {
-            // Reset before draining: a request landing during this drain sets
-            // the flag and is caught by the check below.
             INDEX_RERUN.store(false, Ordering::SeqCst);
             if let Err(error) = index_pending(&db) {
                 eprintln!("[search] index pass failed: {error}");
@@ -385,10 +316,6 @@ pub fn spawn_index(db: Arc<crate::engines::support::db::Db>) {
             if INDEX_RERUN.swap(false, Ordering::SeqCst) {
                 continue;
             }
-            // Release the slot, then re-check so a request that observed
-            // RUNNING=true and could not start a pass is never dropped: either
-            // this loop reclaims the slot, or the requester's CAS wins and its
-            // own pass drains the work.
             INDEX_RUNNING.store(false, Ordering::SeqCst);
             if !INDEX_RERUN.swap(false, Ordering::SeqCst) {
                 if matches!(pending_count(&db), Ok(0)) {
@@ -406,16 +333,10 @@ pub fn spawn_index(db: Arc<crate::engines::support::db::Db>) {
     });
 }
 
-// ==================== Query ====================
-
-/// A token is FTS-safe when trigram can see it whole: 3+ chars. Shorter
-/// tokens silently match nothing in FTS5, so they route to LIKE instead.
 fn fts_safe(tokens: &[&str]) -> bool {
     !tokens.is_empty() && tokens.iter().all(|t| t.chars().count() >= 3)
 }
 
-/// AND of quoted terms: quoting literalizes FTS5 operators and punctuation
-/// (agentsview's PrepareFTSQuery), so user input can never 500 the query.
 fn fts_query(tokens: &[&str]) -> String {
     tokens
         .iter()
@@ -437,9 +358,6 @@ fn like_pattern(token: &str) -> String {
     out
 }
 
-/// Split a snippet() result on the control-char markers into render-safe
-/// segments. Manual scan (not str::split) so marker parity survives empty
-/// or forged marker runs.
 fn split_marks(snippet: &str) -> Vec<SnippetPart> {
     fn flush(parts: &mut Vec<SnippetPart>, buf: &mut String, marked: bool) {
         if !buf.is_empty() {
@@ -469,9 +387,6 @@ fn split_marks(snippet: &str) -> Vec<SnippetPart> {
     parts
 }
 
-/// Case-insensitive char compare with index alignment preserved: one char
-/// in, one char out (multi-char case folds like ẞ→ss compare by their first
-/// char — highlight-only approximation, never affects matching itself).
 fn lower_chars(text: &str) -> Vec<char> {
     text.chars()
         .map(|c| c.to_lowercase().next().unwrap_or(c))
@@ -485,14 +400,10 @@ fn find_from(haystack: &[char], needle: &[char], from: usize) -> Option<usize> {
     (from..=haystack.len() - needle.len()).find(|&i| haystack[i..i + needle.len()] == *needle)
 }
 
-/// Rust-side snippet for the LIKE path: window around the earliest match,
-/// every token occurrence marked. Same ±60-char radius as agentsview's
-/// Go-side content snippet.
 fn like_snippet(text: &str, needles: &[Vec<char>]) -> Vec<SnippetPart> {
     let lower = lower_chars(text);
     let first = needles.iter().filter_map(|n| find_from(&lower, n, 0)).min();
     let Some(first) = first else {
-        // Row matched in SQL but not here (exotic case fold): show the head.
         let head: String = text.chars().take(SNIPPET_RADIUS * 2).collect();
         return vec![SnippetPart {
             text: head,
@@ -504,9 +415,6 @@ fn like_snippet(text: &str, needles: &[Vec<char>]) -> Vec<SnippetPart> {
     let window: String = text.chars().skip(start).take(end - start).collect();
     let window_lower = lower_chars(&window);
 
-    // Mark every occurrence of every token inside the window; overlaps keep
-    // the earliest match (later token starting inside a marked run resumes
-    // after it).
     let mut marks: Vec<(usize, usize)> = Vec::new();
     for needle in needles {
         let mut from = 0;
@@ -578,8 +486,7 @@ fn fts_search(
     limit: u32,
     offset: u32,
 ) -> Result<Vec<RawHit>, String> {
-    let sql = format!(
-        "WITH matched AS (
+    let sql = "WITH matched AS (
              SELECT rowid, bm25(cli_messages_fts) AS rank
              FROM cli_messages_fts WHERE cli_messages_fts MATCH ?1
          ),
@@ -600,10 +507,9 @@ fn fts_search(
          LEFT JOIN cli_workspaces w ON w.path = s.workspace_path
          WHERE b.rn = 1
          ORDER BY b.rank ASC, s.updated_at DESC, b.engine, b.session_id
-         LIMIT ?2 OFFSET ?3"
-    );
+         LIMIT ?2 OFFSET ?3";
     let conn = db.read();
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(
             rusqlite::params![fts_query(tokens), limit as i64 + 1, offset as i64],
@@ -683,10 +589,6 @@ fn like_search(
     Ok(rows)
 }
 
-/// Blocking search body (spawn_blocking in the command): FTS with bm25 +
-/// snippet() for 3+-char tokens, LIKE with a Rust-side snippet otherwise.
-/// Order is fixed: bm25 relevance (recency as the tie-break) on the FTS
-/// path, recency on the LIKE path (short tokens carry no ranking signal).
 pub fn search(
     db: &crate::engines::support::db::Db,
     query: &str,
@@ -696,8 +598,6 @@ pub fn search(
     let trimmed = query.trim();
     let limit = limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT);
     let offset = offset.unwrap_or(0);
-    // Reporting, not searching: the corpus count happens before the elapsed
-    // clock starts (same for the pending count after it stops).
     let total_messages = message_count(db)?;
     if trimmed.is_empty() {
         return Ok(MessageSearchPage {
@@ -714,7 +614,6 @@ pub fn search(
     let raw = if fts_safe(&tokens) {
         fts_search(db, &tokens, limit, offset)?
     } else {
-        // Short tokens have no ranking signal; recency is the honest order.
         like_search(db, &tokens, limit, offset)?
     };
     let has_more = raw.len() as u32 > limit;
@@ -834,7 +733,6 @@ mod tests {
         assert_eq!(page.hits[0].session_id, "s1");
         assert_eq!(page.total_messages, 1, "corpus count the query ran against");
         assert!(marked_text(&page.hits[0]).contains("已生成"));
-        // Substring across punctuation is a trigram strength.
         let page = search(&db, "1.0.5", None, None).unwrap();
         assert_eq!(page.hits.len(), 1);
     }
@@ -850,7 +748,6 @@ mod tests {
         insert_session(&db, "s3", 300);
         insert_message(&db, "s3", 1, "user", "只有提交这个词");
 
-        // 2-char tokens would silently match nothing in trigram FTS.
         let page = search(&db, "提交 代码", None, None).unwrap();
         let ids: Vec<&str> = page.hits.iter().map(|h| h.session_id.as_str()).collect();
         assert_eq!(ids, ["s2", "s1"], "recency order, both tokens required");
@@ -871,8 +768,6 @@ mod tests {
         insert_session(&db, "new", 200);
         insert_message(&db, "new", 1, "user", "搜索目标关键词 only");
 
-        // All three matches score identically, so bm25 ties and the
-        // updated_at tie-break decides: newest session first.
         let page = search(&db, "搜索目标关键词", None, None).unwrap();
         let ids: Vec<&str> = page.hits.iter().map(|h| h.session_id.as_str()).collect();
         assert_eq!(
@@ -962,10 +857,8 @@ mod tests {
         assert_eq!(page.hits.len(), 1);
         assert!(page.pending == 0);
 
-        // Second pass with no change: nothing re-parses.
         assert_eq!(index_pending(&db).unwrap(), 0);
 
-        // Appending to the file and refreshing the stat re-indexes.
         let mut lines = vec![claude_user_line("索引管道里的中文内容")];
         lines.push(claude_user_line("追加的新消息内容"));
         std::fs::write(&path, lines.join("\n") + "\n").unwrap();
@@ -973,7 +866,6 @@ mod tests {
         assert_eq!(index_pending(&db).unwrap(), 1);
         let page = search(&db, "追加的新消息", None, None).unwrap();
         assert_eq!(page.hits.len(), 1);
-        // Old content stays (replace-then-insert keeps one copy).
         let count: i64 =
             db.0.lock()
                 .query_row("SELECT COUNT(*) FROM cli_session_messages", [], |r| {
@@ -1006,8 +898,6 @@ mod tests {
             rows.collect::<Result<Vec<_>, _>>().unwrap()
         };
 
-        // Force a pass over the same content: a replace-then-insert would
-        // allocate new ids (and retokenize every message in the FTS index).
         db.0.lock()
             .execute("DELETE FROM cli_fts_state", [])
             .unwrap();
@@ -1043,7 +933,6 @@ mod tests {
         assert_eq!(index_pending(&db).unwrap(), 1);
         assert_eq!(search(&db, "旧内容", None, None).unwrap().hits.len(), 1);
 
-        // Edit the middle message in place (same seq) and remove nothing yet.
         std::fs::write(
             &path,
             [
@@ -1065,7 +954,6 @@ mod tests {
             1
         );
 
-        // Drop the middle message: its index row must not survive a pass.
         std::fs::write(
             &path,
             [
@@ -1111,12 +999,9 @@ mod tests {
                 .unwrap();
         };
         register(10, 10);
-        // Parse fails → failure stamp: nothing indexed, nothing left pending.
         assert_eq!(index_pending(&db).unwrap(), 0);
         assert_eq!(pending_count(&db).unwrap(), 0);
-        // A stable stat never retries…
         assert_eq!(index_pending(&db).unwrap(), 0);
-        // …but a changed file re-pends the session for one fresh attempt.
         register(11, 11);
         assert_eq!(pending_count(&db).unwrap(), 1);
         assert_eq!(index_pending(&db).unwrap(), 0);
@@ -1127,8 +1012,6 @@ mod tests {
     fn index_pending_survives_a_head_batch_of_permanent_failures() {
         let scratch = Scratch::new();
         let db = crate::engines::support::db::Db::open_at(&scratch.0.join("app.db")).unwrap();
-        // More dead rows than one batch used to hold, inserted first so the
-        // old refetch loop met them at the head of every pending query.
         for i in 0..24 {
             db.0
                 .lock()
@@ -1139,7 +1022,6 @@ mod tests {
                 )
                 .unwrap();
         }
-        // Good sessions behind the failures must still be indexed.
         for i in 0..4 {
             let path = write_session_file(
                 &scratch,
@@ -1174,8 +1056,6 @@ mod tests {
                 },
             ]
         );
-        // Marker chars already present in content cannot forge highlight
-        // state beyond their own toggle.
         let parts = split_marks("\u{1}\u{2}x");
         assert_eq!(
             parts,

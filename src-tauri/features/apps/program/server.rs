@@ -1,8 +1,5 @@
-//! A running app server, spoken to over its stdio.
-
 use super::*;
 
-/// A running server, spoken to over its stdio, one message per line.
 pub(super) struct Server {
     pub(super) _child: Child,
     pub(super) stdin: ChildStdin,
@@ -11,16 +8,20 @@ pub(super) struct Server {
     pub(super) last_used: Instant,
 }
 
-/// What went wrong talking to a server: `Refused` before it did anything, `Lost` once it may have.
 pub(super) enum Trouble {
     Refused(String),
     Lost(String),
 }
 
 impl Server {
-    pub(super) async fn start(program: &Path, spec: &McpProgram, work: &Path) -> Result<Self, String> {
+    pub(super) async fn start(
+        program: &Path,
+        spec: &McpProgram,
+        work: &Path,
+    ) -> Result<Self, String> {
         let (mut command, keep) = confined(program, work)?;
-        let real_work = fs::canonicalize(work).map_err(|error| format!("Couldn't open the chat's folder: {error}"))?;
+        let real_work = fs::canonicalize(work)
+            .map_err(|error| format!("Couldn't open the chat's folder: {error}"))?;
         command
             .args(&spec.args)
             .arg(&spec.read_root_flag)
@@ -38,13 +39,26 @@ impl Server {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .kill_on_drop(true);
-        let mut child = command.spawn().map_err(|error| format!("Couldn't start the app's tools: {error}"))?;
-        // The confinement is needed only until the program has started (Linux); elsewhere there is none.
+        let mut child = command
+            .spawn()
+            .map_err(|error| format!("Couldn't start the app's tools: {error}"))?;
         #[cfg_attr(not(target_os = "linux"), allow(dropping_copy_types))]
         drop(keep);
-        let stdin = child.stdin.take().ok_or_else(|| "Couldn't talk to the app's tools.".to_owned())?;
-        let stdout = child.stdout.take().ok_or_else(|| "Couldn't talk to the app's tools.".to_owned())?;
-        let mut server = Self { _child: child, stdin, stdout: BufReader::new(stdout), next_id: 1, last_used: Instant::now() };
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "Couldn't talk to the app's tools.".to_owned())?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| "Couldn't talk to the app's tools.".to_owned())?;
+        let mut server = Self {
+            _child: child,
+            stdin,
+            stdout: BufReader::new(stdout),
+            next_id: 1,
+            last_used: Instant::now(),
+        };
         let hello = json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
@@ -71,8 +85,6 @@ impl Server {
         self.stdin.flush().await
     }
 
-    /// One request and its answer. Requests the server makes of Misty are answered on the way: a ping, and no
-    /// roots or sampling (Misty has no model of its own).
     pub(super) async fn request(&mut self, method: &str, params: Value) -> Result<Value, Trouble> {
         let id = self.next_id;
         self.next_id += 1;
@@ -88,10 +100,14 @@ impl Server {
                 .await
                 .map_err(|_| Trouble::Lost("The app's tools stopped while working.".into()))?;
             if read == 0 {
-                return Err(Trouble::Lost("The app's tools stopped while working.".into()));
+                return Err(Trouble::Lost(
+                    "The app's tools stopped while working.".into(),
+                ));
             }
             if line.last() != Some(&b'\n') && read as u64 >= MAX_LINE_BYTES {
-                return Err(Trouble::Lost("The app's tools answered with more than Misty reads.".into()));
+                return Err(Trouble::Lost(
+                    "The app's tools answered with more than Misty reads.".into(),
+                ));
             }
             let Ok(answer) = serde_json::from_slice::<Value>(&line) else {
                 continue;
@@ -100,15 +116,17 @@ impl Server {
                 if let Some(asked) = answer.get("id").filter(|asked| !asked.is_null()) {
                     let reply = match answer["method"].as_str() {
                         Some("ping") => json!({ "jsonrpc": "2.0", "id": asked, "result": {} }),
-                        Some("roots/list") => json!({ "jsonrpc": "2.0", "id": asked, "result": { "roots": [] } }),
+                        Some("roots/list") => {
+                            json!({ "jsonrpc": "2.0", "id": asked, "result": { "roots": [] } })
+                        }
                         _ => json!({
                             "jsonrpc": "2.0", "id": asked,
                             "error": { "code": -32601, "message": "Misty doesn't offer that." },
                         }),
                     };
-                    self.send(&reply)
-                        .await
-                        .map_err(|_| Trouble::Lost("The app's tools stopped while working.".into()))?;
+                    self.send(&reply).await.map_err(|_| {
+                        Trouble::Lost("The app's tools stopped while working.".into())
+                    })?;
                 }
                 continue;
             }
@@ -116,7 +134,9 @@ impl Server {
                 continue;
             }
             if let Some(error) = answer.get("error") {
-                let text = error["message"].as_str().unwrap_or("The app's tools refused the call.");
+                let text = error["message"]
+                    .as_str()
+                    .unwrap_or("The app's tools refused the call.");
                 return Err(Trouble::Refused(text.chars().take(2_000).collect()));
             }
             return Ok(answer.get("result").cloned().unwrap_or(Value::Null));
@@ -131,13 +151,18 @@ impl Server {
                 Some(cursor) => json!({ "cursor": cursor }),
                 None => json!({}),
             };
-            let page = match tokio::time::timeout(START_LIMIT, self.request("tools/list", params)).await {
+            let page = match tokio::time::timeout(START_LIMIT, self.request("tools/list", params))
+                .await
+            {
                 Ok(Ok(page)) => page,
                 Ok(Err(Trouble::Refused(message) | Trouble::Lost(message))) => return Err(message),
                 Err(_) => return Err("The app's tools took too long to list themselves.".into()),
             };
             tools.extend(page["tools"].as_array().cloned().unwrap_or_default());
-            cursor = page["nextCursor"].as_str().filter(|next| !next.is_empty()).map(str::to_owned);
+            cursor = page["nextCursor"]
+                .as_str()
+                .filter(|next| !next.is_empty())
+                .map(str::to_owned);
             if cursor.is_none() {
                 return Ok(tools);
             }

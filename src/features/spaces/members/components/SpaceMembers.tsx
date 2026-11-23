@@ -2,19 +2,19 @@ import type { SpaceMember } from "../../api/dto/entities";
 
 export type MemberAction = { kind: "transfer" | "remove"; member: SpaceMember };
 
-import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import { useAuth } from "@/features/account";
-import { Button, Skeleton, Surface, Text } from "@misty/ui";
+import { Button, RowGroupStack, Surface } from "@misty/ui";
 import { UserPlus } from "lucide-react";
 import { BringAgentMenu } from "../agents/BringAgentMenu";
-import { useSpaceAgentMembers } from "../agents/useSpaceAgentMembers";
+import { useSpaceAgentMembers } from "../agents/use_space_agent_members";
 import { InviteMemberDialog } from "./InviteMemberDialog";
 import { MemberActionDialog } from "./MemberActionDialog";
 import { MemberList } from "./MemberList";
 import { PendingInvitationsCard } from "./PendingInvitationsCard";
 import { SpaceBoosts } from "./SpaceBoosts";
-import { useMemberDialogs } from "./useMemberDialogs";
-import { useSpaceMembers } from "./useSpaceMembers";
+import { useMemberDialogs } from "./use_member_dialogs";
+import { useSpaceMembers } from "./use_space_members";
 
 export function SpaceMembers({
   spaceId,
@@ -23,7 +23,6 @@ export function SpaceMembers({
 }: {
   spaceId: string;
   embedded?: boolean;
-  /** Opens the invite dialog straight away (People's Invite). */
   invite?: boolean;
 }) {
   const { user } = useAuth();
@@ -31,48 +30,23 @@ export function SpaceMembers({
   const dialogs = useMemberDialogs(spaceId, state, invite);
   const { space, members, error } = state;
   const spaceAgents = useSpaceAgentMembers(spaceId);
-  // The count is said only once the list has been read, never "0" before it arrives.
-  const membersRead = Boolean(state.membersBySpace[spaceId]);
-  const counts = [
-    membersRead ? `${members.length} active member${members.length === 1 ? "" : "s"}` : "",
-    space?.pending_count ? `${space.pending_count} pending` : "",
-  ].filter(Boolean);
-
   return (
     <Surface
       tone={embedded ? "none" : "page"}
       className={embedded ? "min-w-0" : "h-full min-h-0 overflow-auto px-5 py-5 sm:px-6"}
     >
-      <div className={embedded ? "w-full" : "mx-auto w-full max-w-5xl"}>
-        <div className="mb-4 flex min-w-0 items-center justify-between gap-3">
-          <div>
-            {!embedded ? (
-              <Text as="h2" tone="default" className="m-0 text-sm font-semibold">
-                Members
-              </Text>
-            ) : null}
-            {state.membersLoading ? (
-              <div className={`${embedded ? "" : "mt-1"} flex h-4 items-center`} aria-hidden="true">
-                <Skeleton className="h-3 w-28" />
-              </div>
-            ) : counts.length ? (
-              <Text as="p" tone="muted" className={`${embedded ? "m-0" : "mb-0 mt-1"} text-xs`}>
-                {counts.join(" and ")}
-              </Text>
-            ) : null}
-          </div>
-          <div className="flex min-w-0 items-center gap-2">
-            <BringAgentMenu
-              agents={spaceAgents.agents}
-              currentUserId={user?.id}
-              onBring={(agentId) => void spaceAgents.bring(agentId)}
-            />
-            {state.canInvite ? (
-              <Button type="button" onClick={dialogs.openInvite}>
-                <UserPlus /> Invite member
-              </Button>
-            ) : null}
-          </div>
+      <RowGroupStack className={embedded ? "w-full" : "mx-auto w-full max-w-5xl"}>
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          <BringAgentMenu
+            agents={spaceAgents.agents}
+            currentUserId={user?.id}
+            onBring={(agentId) => void spaceAgents.bring(agentId)}
+          />
+          {state.canInvite ? (
+            <Button type="button" variant="primary" icon={UserPlus} onClick={dialogs.openInvite}>
+              Invite people
+            </Button>
+          ) : null}
         </div>
 
         <SpaceBoosts spaceId={spaceId} />
@@ -109,7 +83,7 @@ export function SpaceMembers({
             onLink={dialogs.showInviteLink}
           />
         ) : null}
-      </div>
+      </RowGroupStack>
 
       <InviteMemberDialog dialogs={dialogs} spaceName={space?.name ?? "Space"} />
       <MemberActionDialog dialogs={dialogs} />

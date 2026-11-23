@@ -1,15 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Claude Code transcripts: `<claude home>/projects/**/*.jsonl`, subagent
-//! (`<session>/subagents/agent-*.jsonl`) and sidechain files included.
-//!
-//! Claude Code writes one API response as several lines (one per content
-//! block) that all repeat the same `message.usage`. Every line maps to the
-//! same key — `message.id` + `requestId` — so the store upserts them into a
-//! single event (last write wins). The same key also collapses the copies
-//! that `--resume` / fork write into a new session file.
-
 use super::{clean, de_count, de_opt_string, model_or_unknown, UsageEvent};
 use crate::engine_config::usage_stats::time::parse_iso_ms;
 use crate::engine_config::usage_stats::types::Tokens;
@@ -55,8 +46,6 @@ struct Usage {
     cache_read_input_tokens: i64,
 }
 
-/// Placeholder model Claude Code stamps on locally generated messages
-/// (interrupts, API errors); never a billed response.
 const SYNTHETIC_MODEL: &str = "<synthetic>";
 
 pub(crate) struct ClaudeParser;
@@ -93,7 +82,6 @@ fn parse_line(line: &[u8]) -> Option<UsageEvent> {
         output: usage.output_tokens,
         cache_read: usage.cache_read_input_tokens,
         cache_write: usage.cache_creation_input_tokens,
-        // Claude Code logs no thinking-token split; thinking is inside output.
         reasoning: 0,
     };
     if tokens.is_zero() {
@@ -105,8 +93,6 @@ fn parse_line(line: &[u8]) -> Option<UsageEvent> {
             "claude:{id}:{}",
             parsed.request_id.as_deref().unwrap_or_default()
         ),
-        // No response id: the line uuid is still stable across re-reads and
-        // resume copies, so at least re-scans stay idempotent.
         (None, Some(uuid)) => format!("claude:uuid:{uuid}"),
         (None, None) => return None,
     };

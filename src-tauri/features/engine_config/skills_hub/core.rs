@@ -22,35 +22,29 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::fsutil::*;
-// ===== Limits (matching upstream skills-manager.js / skill-usage.js) =====
 
-pub(super) const FETCH_TIMEOUT: Duration = Duration::from_secs(20); // upstream FETCH_TIMEOUT_MS
-pub(super) const DISCOVER_CONCURRENCY: usize = 4; // upstream DISCOVER_CONCURRENCY
-pub(super) const DISCOVER_CACHE_TTL_MS: i64 = 60 * 60 * 1000; // 1 hour
-pub(super) const UPDATE_CACHE_TTL_MS: i64 = 60 * 60 * 1000; // 1 hour
-pub(super) const UPDATE_CHECK_CONCURRENCY: usize = 2; // upstream UPDATE_CHECK_CONCURRENCY
-pub(super) const POPULAR_CACHE_TTL_MS: i64 = 6 * 60 * 60 * 1000; // 6 hours
-pub(super) const TRASH_TTL_MS: i64 = 5 * 60 * 1000; // 5 minutes
-pub(super) const ACTIVITY_MAX: usize = 500; // upstream ACTIVITY_MAX
-pub(super) const ACTIVITY_TRIM_BYTES: u64 = 256 * 1024; // past this, keep only the last ACTIVITY_MAX lines
-pub(super) const USAGE_CACHE_TTL_MS: i64 = 10 * 60 * 1000; // 10 minutes
-pub(super) const MAX_LOCAL_SKILL_SCAN_DEPTH: usize = 3; // upstream MAX_LOCAL_SKILL_SCAN_DEPTH
-pub(super) const DISCOVER_MAX_SKILLS_PER_REPO: usize = 200; // upstream discover stops at 200 per repo
+pub(super) const FETCH_TIMEOUT: Duration = Duration::from_secs(20);
+pub(super) const DISCOVER_CONCURRENCY: usize = 4;
+pub(super) const DISCOVER_CACHE_TTL_MS: i64 = 60 * 60 * 1000;
+pub(super) const UPDATE_CACHE_TTL_MS: i64 = 60 * 60 * 1000;
+pub(super) const UPDATE_CHECK_CONCURRENCY: usize = 2;
+pub(super) const POPULAR_CACHE_TTL_MS: i64 = 6 * 60 * 60 * 1000;
+pub(super) const TRASH_TTL_MS: i64 = 5 * 60 * 1000;
+pub(super) const ACTIVITY_MAX: usize = 500;
+pub(super) const ACTIVITY_TRIM_BYTES: u64 = 256 * 1024;
+pub(super) const USAGE_CACHE_TTL_MS: i64 = 10 * 60 * 1000;
+pub(super) const MAX_LOCAL_SKILL_SCAN_DEPTH: usize = 3;
+pub(super) const DISCOVER_MAX_SKILLS_PER_REPO: usize = 200;
 pub(super) const POPULAR_SEED_QUERIES: [&str; 12] = [
     "agent", "code", "test", "review", "git", "web", "design", "data", "docs", "python", "api",
     "deploy",
 ];
 pub(super) const HASH_IGNORE: [&str; 4] = [".git", ".DS_Store", "Thumbs.db", ".gitignore"];
-/// What usage counts: Claude Code session transcripts (which include Skill tool calls).
 pub(super) const USAGE_SCOPE_CLAUDE_TRANSCRIPTS: &str = "claude_code_transcripts";
-
-// ===== Errors: a rate limit has to be told apart in allSettled-style results and surfaced =====
 
 #[derive(Debug)]
 pub(super) enum SkillError {
-    /// GitHub / skills.sh rate limiting (HTTP 429|403); the wording matches upstream.
     RateLimited(String),
-    /// A failure with a code, which the renderer turns into the matching way out.
     Coded(&'static str, String),
     Other(String),
 }
@@ -91,8 +85,6 @@ impl From<std::io::Error> for SkillError {
 
 pub(super) type SkillResult<T> = Result<T, SkillError>;
 
-// ===== Paths: the SSOT root (overridable) and the engine targets the hub manages =====
-
 pub(super) fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -100,8 +92,6 @@ pub(super) fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// The SSOT root: `MISTY_SKILLS_HUB_HOME` when set (for tests), else
-/// `~/.misty/engine-config/skills-hub` (Misty's own data folder).
 pub(super) fn skills_root() -> PathBuf {
     if let Some(override_dir) = std::env::var_os("MISTY_SKILLS_HUB_HOME") {
         if !override_dir.is_empty() {
@@ -145,17 +135,6 @@ pub(super) fn is_dir(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-// ===== Target engines: each CLI's own user-level skills root =====
-//
-// Only folders a CLI really reads are listed: a copy written anywhere else is invisible to the
-// engine, which would be a fake sync. Each folder follows the CLI's own environment variable
-// (Claude's `CLAUDE_CONFIG_DIR`, Codex's `CODEX_HOME`, Grok's `GROK_HOME`…), and a target whose
-// engine home doesn't exist (the CLI isn't installed) is marked unavailable and hidden, so no
-// empty folders are made out of nothing.
-
-/// pi / omp keep user skills in their agent folder (`$PI_CODING_AGENT_DIR` /
-/// `$OMP_CODING_AGENT_DIR`, else `~/.pi/agent`, `~/.omp/agent`), not the config root; omp is a
-/// fork of pi and reads both variables.
 fn coding_agent_home(env_keys: &[&str], home_dir_name: &str) -> PathBuf {
     for key in env_keys {
         if let Some(dir) = std::env::var_os(key).filter(|value| !value.is_empty()) {
@@ -165,8 +144,6 @@ fn coding_agent_home(env_keys: &[&str], home_dir_name: &str) -> PathBuf {
     crate::engine_config::support::engine_home(None, home_dir_name).join("agent")
 }
 
-/// One Antigravity target covers three homes: the `agy` CLI, the Antigravity app and the
-/// Antigravity IDE (the reference implementation's scan range).
 fn antigravity_homes() -> Vec<PathBuf> {
     let mut homes = vec![crate::engine_config::support::engine_home(
         Some("ANTIGRAVITY_HOME"),
@@ -178,9 +155,6 @@ fn antigravity_homes() -> Vec<PathBuf> {
     homes
 }
 
-/// The sync targets the hub manages. `agents` is the shared cross-agent skills root (Claude,
-/// Codex, Kimi, dsh and others read it), a hidden target as in the reference implementation: not
-/// in the engine list, but scanned, classified and synced, so "remove one engine's copy" stays whole.
 pub(super) enum TargetKind {
     Claude,
     Codex,
@@ -203,12 +177,10 @@ pub(super) enum TargetKind {
 pub(super) struct Target {
     pub(super) id: &'static str,
     pub(super) label: &'static str,
-    pub(super) visible: bool, // visible=false stays out of targetList
+    pub(super) visible: bool,
     pub(super) kind: TargetKind,
 }
 
-/// The user-level skills root of every CLI that has one, in the engine list's order, with Gemini
-/// CLI and Hermes at the end.
 pub(super) static TARGETS: [Target; 16] = [
     Target {
         id: "claude",
@@ -316,7 +288,6 @@ fn skills_dirs_for_id(id: &str) -> Vec<PathBuf> {
     target_by_id(id).map(target_dirs).unwrap_or_default()
 }
 
-/// A target's engine home (the skills root's parent); a multi-folder target (Antigravity) has several.
 pub(super) fn target_home_dirs(target: &Target) -> Vec<PathBuf> {
     match target.kind {
         TargetKind::Claude => vec![crate::engine_config::support::engine_home(
@@ -357,7 +328,6 @@ pub(super) fn target_home_dirs(target: &Target) -> Vec<PathBuf> {
             None,
             ".qoder-cn",
         )],
-        // Both read `<home>/skills` (Qwen Code's and CodeBuddy's skills docs).
         TargetKind::Qwen => vec![crate::engine_config::support::engine_home(None, ".qwen")],
         TargetKind::Codebuddy => vec![crate::engine_config::support::engine_home(
             None,
@@ -371,7 +341,6 @@ pub(super) fn target_home_dirs(target: &Target) -> Vec<PathBuf> {
     }
 }
 
-/// Target folders are resolved from env and home at call time (tests steer them through env).
 pub(super) fn target_dirs(target: &Target) -> Vec<PathBuf> {
     target_home_dirs(target)
         .into_iter()
@@ -379,20 +348,16 @@ pub(super) fn target_dirs(target: &Target) -> Vec<PathBuf> {
         .collect()
 }
 
-/// upstream targetPrimaryDir (a multi-folder target shows its first in the UI).
 pub(super) fn target_primary_dir(target: &Target) -> PathBuf {
     target_dirs(target).into_iter().next().unwrap_or_default()
 }
 
-/// Whether the engine is installed (its home exists): the UI hides the ones that aren't. Copies that
-/// already exist (including orphans whose copy is gone) still show: uninstalling a CLI mustn't hide the way to clean up.
 fn target_available(target: &Target) -> bool {
     target_dirs(target)
         .iter()
         .any(|dir| is_dir(dir) || dir.parent().is_some_and(is_dir))
 }
 
-/// upstream targetList: visible targets only. `available` is Misty's addition.
 pub(super) fn target_list() -> Vec<Value> {
     TARGETS
         .iter()
@@ -409,16 +374,10 @@ pub(super) fn target_list() -> Vec<Value> {
         .collect()
 }
 
-// ===== Read-only sources: skill folders the hub doesn't manage and only lists =====
-
-/// The kind of a read-only source. The UI tells built-in, system and plugin apart by it and turns off every delete.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum ReadonlyKind {
-    /// A skill shipped with the app (Misty ships none today).
     Builtin,
-    /// Codex's own `.system` skills.
     System,
-    /// Skills that come with a plugin in Codex's plugin cache.
     Plugin,
 }
 
@@ -437,14 +396,10 @@ pub(super) struct ReadonlySource {
     pub(super) dir: PathBuf,
 }
 
-/// Folder names of the skills shipped with the app. They count as built-in wherever they appear,
-/// even in a managed target root: read-only, never deleted or imported. Misty ships none.
 pub(super) fn bundled_skill_names() -> HashSet<String> {
     HashSet::new()
 }
 
-/// The read-only source folders that exist now. The engines' own `.system` (Codex / dsh) and plugin
-/// cache folders are missing until installed, and only existing ones are returned.
 pub(super) fn readonly_sources() -> Vec<ReadonlySource> {
     let mut out: Vec<ReadonlySource> = Vec::new();
     let mut push_system = |dir: PathBuf| {
@@ -457,7 +412,6 @@ pub(super) fn readonly_sources() -> Vec<ReadonlySource> {
     };
     let codex_home = crate::engine_config::support::codex_home();
     push_system(codex_home.join("skills").join(".system"));
-    // dsh's user skills root has a `.system` folder too (shipped with the CLI).
     for dir in skills_dirs_for_id("dsh") {
         push_system(dir.join(".system"));
     }
@@ -470,12 +424,9 @@ pub(super) fn readonly_sources() -> Vec<ReadonlySource> {
     out
 }
 
-/// The source kind of a skill folder (for the UI's badge and to gate writes).
 pub(super) fn readonly_kind_for_dir(directory: &str) -> Option<ReadonlyKind> {
     let leaf = install_name_from_directory(directory)?;
     if bundled_skill_names().contains(&leaf) {
-        // A built-in skill's name is reserved everywhere: a folder of the same name is protected as
-        // built-in, so a stray copy isn't deleted by the general path or overwritten by a sync.
         return Some(ReadonlyKind::Builtin);
     }
     for source in readonly_sources() {
@@ -486,7 +437,6 @@ pub(super) fn readonly_kind_for_dir(directory: &str) -> Option<ReadonlyKind> {
     None
 }
 
-/// Whether the folder has a built-in skill's name (wherever it is; checked before import and delete).
 pub(super) fn is_bundled_skill_name(directory: &str) -> bool {
     install_name_from_directory(directory)
         .map(|leaf| bundled_skill_names().contains(&leaf))

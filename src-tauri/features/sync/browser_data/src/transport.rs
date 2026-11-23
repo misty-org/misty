@@ -1,11 +1,7 @@
-//! The one check of a server address that names where an account's data on this computer is
-//! filed.
 use url::Url;
 
 use crate::{Error, Result};
 
-/// A server address as this computer files an account's data under it: HTTPS, or HTTP on this
-/// computer, with no credentials, query or fragment, and no trailing slash.
 pub fn deployment(base: &str) -> Result<String> {
     let base = Url::parse(base).map_err(|_| Error::Invalid)?;
     let loopback = match base.host() {

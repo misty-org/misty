@@ -21,16 +21,16 @@ import {
   usePointerReorder,
 } from "@misty/ui";
 import { SidebarRow } from "./SidebarRow";
-import { useSidebarPins, type SidebarPlaceId } from "./sidebarPinsStore";
+import { useSidebarPins, type SidebarPlaceId } from "./sidebar_pins_store";
 
 export interface SidebarPlace {
   label: string;
+  command?: string;
   icon: LucideIcon;
   current: boolean;
   open(): void;
 }
 
-/** The pinned places, in the person's order, as sidebar rows. */
 export function SidebarPinnedPlaces({ places }: { places: Record<SidebarPlaceId, SidebarPlace> }) {
   const order = useSidebarPins((state) => state.order);
   const pinned = useSidebarPins((state) => state.pinned);
@@ -39,11 +39,12 @@ export function SidebarPinnedPlaces({ places }: { places: Record<SidebarPlaceId,
       {order
         .filter((id) => pinned.includes(id))
         .map((id) => {
-          const { label, icon: Icon, current, open } = places[id];
+          const { label, icon: Icon, current, open, command } = places[id];
           return (
             <SidebarRow
               key={id}
               label={label}
+              command={command}
               icon={<Icon aria-hidden="true" />}
               current={current}
               onOpen={open}
@@ -55,16 +56,10 @@ export function SidebarPinnedPlaces({ places }: { places: Record<SidebarPlaceId,
   );
 }
 
-/**
- * The last of the sidebar's places: More lists every place that is not pinned. Right-clicking it,
- * or its own last item, opens the list of all places to pin and reorder.
- */
 export function SidebarMore({ places }: { places: Record<SidebarPlaceId, SidebarPlace> }) {
   const order = useSidebarPins((state) => state.order);
   const pinned = useSidebarPins((state) => state.pinned);
   const [reordering, setReordering] = useState(false);
-  // The list opens once the menu that asked for it has closed, so the menu handing focus back
-  // to More cannot close the list again.
   const opening = useRef(false);
   const rest = order.filter((id) => !pinned.includes(id));
   const startReordering = () => {
@@ -121,10 +116,6 @@ export function SidebarMore({ places }: { places: Record<SidebarPlaceId, Sidebar
   );
 }
 
-/**
- * Every place with a box to pin it. A row drags into place from anywhere but its box, as lists
- * do across Misty; its grip also moves it with the arrow keys.
- */
 function ReorderPins({ places }: { places: Record<SidebarPlaceId, SidebarPlace> }) {
   const saved = useSidebarPins();
   const save = (order: SidebarPlaceId[], pinned = saved.pinned) => saved.set({ order, pinned });

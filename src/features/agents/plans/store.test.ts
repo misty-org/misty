@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AgentPlan, AgentQuestionSet, ConversationCollaboration } from "./planTypes";
+import type { AgentPlan, AgentQuestionSet, ConversationCollaboration } from "./plan_types";
 
 const api = vi.hoisted(() => ({
   get: vi.fn(),
@@ -74,7 +74,6 @@ it("keeps a new conversation's mode in the draft until it exists, then follows t
   store.setDefaultMode("plan");
   expect(useCollaborationStore.getState().draftMode).toBe("plan");
   await store.setMode(undefined, "act");
-  // An explicit choice beats the default until a conversation adopts it.
   store.setDefaultMode("plan");
   expect(useCollaborationStore.getState().modeFor()).toBe("act");
   store.adoptDraftMode("c1");

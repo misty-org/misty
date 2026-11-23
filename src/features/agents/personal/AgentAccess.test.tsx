@@ -1,9 +1,9 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const appsList = vi.hoisted(() => vi.fn());
-vi.mock("../connected-apps/directApi", () => ({ directAppsApi: { list: appsList } }));
+vi.mock("../connected-apps/direct_api", () => ({ directAppsApi: { list: appsList } }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => false }));
-vi.mock("@/api/account-events", () => ({
+vi.mock("@/api/account_events", () => ({
   observeAccountChanges: (id: string, _topics: string[], refresh: () => Promise<void>) => {
     if (id) void refresh();
     return () => {};

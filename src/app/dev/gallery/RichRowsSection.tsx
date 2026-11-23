@@ -72,7 +72,6 @@ const tiles = [
   { id: "leaf", label: "Leaf", glyph: "🍃" },
 ];
 
-/** Rows, cards and pickers that carry what an item is: icons, avatars, a second line, tiles. */
 export function RichRowsSection() {
   const [installed, setInstalled] = useState(false);
   const [tile, setTile] = useState("sun");

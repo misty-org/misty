@@ -32,13 +32,9 @@ use super::support;
 
 const OUTPUT: &str = "engine-cli://sign-in-output";
 const CLOSED: &str = "engine-cli://sign-in-closed";
-/// A sign-in is one dialog at a time; a few cover a dialog reopened before its CLI ended.
 const MOST_OPEN: usize = 4;
-/// The CLI's screen counts as up once output has paused this long...
 const SCREEN_QUIET: Duration = Duration::from_millis(450);
-/// ...or has kept drawing (a spinner) this long after it began.
 const SCREEN_BUSY: Duration = Duration::from_secs(3);
-/// A CLI that has drawn nothing by then never gets the command typed into it.
 const SCREEN_DEADLINE: Duration = Duration::from_secs(20);
 
 #[path = "sign_in_plans.rs"]
@@ -50,8 +46,6 @@ use plans::{
     sign_in_plan, Found, GoogleChoice, Plan,
 };
 
-/// Between a pasted code and its Return, so a screen that reads a burst of keys as a paste
-/// still takes the Return as Enter.
 const CODE_PAUSE: Duration = Duration::from_millis(120);
 
 struct Session {
@@ -59,16 +53,11 @@ struct Session {
     writer: Mutex<Box<dyn Write + Send>>,
     child: Mutex<Box<dyn Child + Send + Sync>>,
     window: String,
-    /// Output so far and when it last came, for typing the command once the screen is up.
     printed: AtomicUsize,
     first_output: Mutex<Option<Instant>>,
     last_output: Mutex<Option<Instant>>,
     ended: AtomicBool,
-    /// For an engine with no status command: the engine, and whether this is its sign-in (true)
-    /// or sign-out, recorded when the CLI exits cleanly.
     remember: Option<(String, bool)>,
-    /// What the person does meanwhile: a pasted code is typed only into one that asks for it,
-    /// and one whose own screen asks is remembered when the person says they're done.
     asks: Asks,
 }
 
@@ -87,7 +76,6 @@ impl Session {
 
     fn type_line(&self, line: &str) -> Result<(), String> {
         let mut writer = lock(&self.writer);
-        // A terminal's Enter is CR.
         writer
             .write_all(format!("{line}\r").as_bytes())
             .and_then(|()| writer.flush())
@@ -127,7 +115,6 @@ fn size(cols: u16, rows: u16) -> PtySize {
     }
 }
 
-/// Bytes into text without cutting a character in two.
 fn take_text(held: &mut Vec<u8>) -> String {
     match std::str::from_utf8(held) {
         Ok(text) => {
@@ -206,8 +193,6 @@ fn pump(
     });
 }
 
-/// Types `line` once the CLI's screen is up: after its output pauses, or keeps going past
-/// [`SCREEN_BUSY`]. A CLI that ended or drew nothing gets nothing typed.
 fn type_when_ready(session: Arc<Session>, line: String) {
     std::thread::spawn(move || {
         let started = Instant::now();
@@ -232,14 +217,10 @@ fn type_when_ready(session: Arc<Session>, line: String) {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignInStarted {
-    /// What runs, for the dialog to show.
     pub command: String,
-    /// What the person does during the sign-in.
     pub asks: Asks,
 }
 
-/// Starts an engine's own sign-in (or, with `sign_out`, its sign-out) in a terminal the dialog
-/// shows. `provider` picks Pi's or Oh My Pi's provider, or MiniMax's region (`global` or `cn`).
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub async fn engine_cli_sign_in(
@@ -286,8 +267,6 @@ pub async fn engine_cli_sign_in(
     })
 }
 
-/// Makes Gemini CLI's own settings pick "Login with Google", as its `/auth` menu would, unless
-/// they name another way or can't be read as plain JSON. Whether Google sign-in is now chosen.
 fn choose_google_sign_in() -> bool {
     let home = std::env::var_os("GEMINI_CLI_HOME")
         .filter(|home| !home.is_empty())
@@ -306,9 +285,6 @@ fn choose_google_sign_in() -> bool {
     }
 }
 
-/// Starts `program` with the plan's arguments in a new pseudo-terminal the window `webview` shows
-/// as `id`, with the search PATH and the proxy from Settings; the plan's line is typed once its
-/// screen is up. `name` is what an error calls the program.
 #[allow(clippy::too_many_arguments)]
 fn spawn_session(
     app: &tauri::AppHandle,
@@ -392,7 +368,6 @@ fn spawn_session(
     Ok(())
 }
 
-/// What the person types into the sign-in terminal.
 #[tauri::command]
 pub async fn engine_cli_sign_in_write(
     webview: tauri::Webview,
@@ -411,9 +386,6 @@ pub async fn engine_cli_sign_in_write(
     .map_err(|error| error.to_string())?
 }
 
-/// A code the person pasted into the sign-in dialog's field: typed into the CLI, then Return.
-/// Only a sign-in that waits for a code takes one. The code is written to the pty and dropped;
-/// it is never logged, kept or put into an error.
 #[tauri::command]
 pub async fn engine_cli_sign_in_code(
     webview: tauri::Webview,
@@ -436,12 +408,10 @@ pub async fn engine_cli_sign_in_code(
     .map_err(|error| error.to_string())?
 }
 
-/// Writes `code`, then Return on its own after `pause`.
 fn send_code(writer: &mut dyn Write, code: &str, pause: Duration) -> std::io::Result<()> {
     writer.write_all(code.as_bytes())?;
     writer.flush()?;
     std::thread::sleep(pause);
-    // A terminal's Enter is CR.
     writer.write_all(b"\r")?;
     writer.flush()
 }
@@ -462,9 +432,6 @@ pub fn engine_cli_sign_in_resize(
         .map_err(|error| error.to_string())
 }
 
-/// Ends a sign-in's CLI, as its dialog closes. One that has ended changes nothing. `done` says
-/// the person pressed Done on a sign-in answered in the CLI's own screen (which never ends by
-/// itself), so an engine with no status command counts it as finished.
 #[tauri::command]
 pub fn engine_cli_sign_in_close(
     webview: tauri::Webview,

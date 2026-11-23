@@ -4,7 +4,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const opener = vi.hoisted(() => ({ openUrl: vi.fn() }));
 const router = vi.hoisted(() => ({ navigate: vi.fn(), state: { addingAccount: true } }));
 vi.mock("@tauri-apps/plugin-opener", () => opener);
-vi.mock("@/features/app-windows", () => ({ MistyBrandIcon: () => null }));
 vi.mock("@/app/shell", () => ({ routes: { welcome: "/welcome" } }));
 vi.mock("react-router-dom", () => ({
   useNavigate: () => router.navigate,

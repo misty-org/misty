@@ -1,7 +1,6 @@
 import { Text } from "@misty/ui";
-import type { GitStatus } from "./gitApi";
+import type { GitStatus } from "./git_api";
 
-/** Lines added and removed across the folder's changed files, in their own colors. */
 export function LineCounts({ git }: { git: GitStatus }) {
   let added = 0;
   let removed = 0;

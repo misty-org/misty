@@ -1,16 +1,11 @@
-//! The table of what's allowed, kept apart from the disk so its rules can be tested by themselves.
 use std::path::{Path, PathBuf};
 
 use super::{real_path, Access, Reach};
 
-/// What a rule covers beside its root.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum Shape {
-    /// The folder and everything in it.
     Folder,
-    /// That path alone: one file, or a folder's own listing without what's inside.
     Exact,
-    /// Whatever is inside the entries of the folder whose names start this way.
     NamesStarting(&'static str),
 }
 
@@ -25,7 +20,6 @@ struct Rule {
 impl Rule {
     fn covers(&self, real: &Path) -> bool {
         match self.shape {
-            // Compares whole path parts, so `/x/.misty-evil` isn't inside `/x/.misty`.
             Shape::Folder => real.starts_with(&self.root),
             Shape::Exact => real == self.root,
             Shape::NamesStarting(start) => real
@@ -47,8 +41,6 @@ pub(super) struct Policy {
 }
 
 impl Policy {
-    /// Adds a rule on `root`'s real location. A second rule for the same place and reach replaces
-    /// the first, so a read grant can become a write grant and back.
     pub fn add(&mut self, reach: Reach, root: &Path, shape: Shape, access: Access) {
         let Ok(root) = real_path::resolve(root) else {
             return;
@@ -73,21 +65,18 @@ impl Policy {
         self.rules.retain(|rule| rule.reach != reach);
     }
 
-    /// `real` has to be a real path already, from `real_path`.
     pub fn allows(&self, real: &Path, access: Access) -> bool {
         self.rules
             .iter()
             .any(|rule| rule.gives(access) && rule.covers(real))
     }
 
-    /// Whether a rule of `reach` covers `real`, whatever access it gives.
     pub fn reach_covers(&self, reach: Reach, real: &Path) -> bool {
         self.rules
             .iter()
             .any(|rule| rule.reach == reach && rule.covers(real))
     }
 
-    /// Whether the person picked exactly this file in a system dialog.
     pub fn was_picked(&self, real: &Path) -> bool {
         self.rules
             .iter()

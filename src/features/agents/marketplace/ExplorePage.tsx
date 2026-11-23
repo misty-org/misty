@@ -13,7 +13,7 @@ import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { McpSection } from "@/features/engine-config/mcp";
 import { PromptsSection } from "@/features/engine-config/prompts";
-import { exploreApps } from "./exploreApps";
+import { exploreApps } from "./explore_apps";
 import {
   appIcons,
   FramedPage,
@@ -38,11 +38,6 @@ import {
   useSpeechUpdates,
 } from "./UpdatesSection";
 
-/**
- * What Explore offers, as the `?tab=` it opens on. `agents` is the templates (the persona pack),
- * `engines` the catalog's engines, `speech` its hearing models and voices, `mcp` the connectors, and
- * `connections` opens Connectors (the apps agents sign in to are connectors).
- */
 export const marketTabs = [
   "all",
   "apps",
@@ -58,7 +53,6 @@ export const marketTabs = [
 ] as const;
 export type MarketTab = (typeof marketTabs)[number];
 
-/** The rail's sections, in order; Updates sits apart under a hairline. */
 type Section = Exclude<MarketTab, "connections">;
 const rail: { value: Section; label: string; icon: LucideIcon }[] = [
   { value: "all", label: "All", icon: Compass },
@@ -72,7 +66,6 @@ const rail: { value: Section; label: string; icon: LucideIcon }[] = [
   { value: "mcp", label: "Connectors", icon: Cable },
 ];
 
-/** The personas All shows on its one agents shelf, by the last part of their id. */
 const pickedPersonas = [
   "engineering-frontend-developer",
   "engineering-backend-architect",
@@ -90,12 +83,6 @@ interface ExplorePageProps {
 const isMarketTab = (value: string | null): value is MarketTab =>
   marketTabs.some((tab) => tab === value);
 
-/**
- * The Space's store, after the App Store, in a FramedPage: a rail of sections on the left on the
- * frame's color (search, All, the kinds of thing, then Updates), and the open section's shelves
- * beside it on the page's. Apps come first, as Misty's
- * backbone; agents and what they use follow.
- */
 export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,7 +93,6 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
   const { useAppUpdates, ExploreAppsSection } = exploreApps();
   const appUpdates = useAppUpdates(spaceId).updates.length;
   const skillUpdates = useSkillUpdates().rows?.length ?? 0;
-  // Engines count from what their last check said; this rail starts no check of its own.
   const engineUpdates = useEngineUpdates({ probe: false }).rows.length;
   const speechUpdates = useSpeechUpdates()?.length ?? 0;
   const updates = (canManageApps ? appUpdates : 0) + skillUpdates + engineUpdates + speechUpdates;
@@ -143,8 +129,6 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
     plugins: () => <PluginsSection query={query} />,
     skills: () => <SkillsSection query={query} />,
     prompts: () => <PromptsSection query={query} />,
-    // What agents use, for the picked engine: its own apps, then its MCP servers; last, the apps
-    // Misty connects directly, which every engine shares.
     mcp: () => (
       <McpSection
         query={query}
@@ -156,7 +140,10 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
   };
 
   const railColumn = (
-    <nav aria-label="Explore" className="grid size-full content-start gap-3 overflow-y-auto px-3 py-4">
+    <nav
+      aria-label="Explore"
+      className="grid size-full content-start gap-3 overflow-y-auto px-3 py-4"
+    >
       <SearchField
         aria-label="Search Explore"
         placeholder="Search"
@@ -187,11 +174,17 @@ export function ExplorePage({ spaceId, canManageApps }: ExplorePageProps) {
     </nav>
   );
 
-  // A FramedPage, as every page is: the rail on the frame's color, the shelves on the page's.
   return (
     <FramedPage
       autoSaveId="explore"
-      start={{ id: "explore-rail", label: "Resize the rail", defaultSize: 18, minSize: 14, maxSize: 30, content: railColumn }}
+      start={{
+        id: "explore-rail",
+        label: "Resize the rail",
+        defaultSize: 18,
+        minSize: 14,
+        maxSize: 30,
+        content: railColumn,
+      }}
     >
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-8 pt-4 pb-10">

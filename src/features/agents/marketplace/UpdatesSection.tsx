@@ -1,11 +1,3 @@
-/**
- * Explore › Updates: everything with a newer version, in one place. The Space's apps whose
- * pin moved on (a mod updates them), the skills whose repository changed since they were
- * installed (skills hub's own check), the engines whose CLI has a newer release (the same check
- * as Settings › Agents › Setup and the launch prompt, run as this opens), and the speech models
- * and voices whose catalog pin is newer than the one on this computer. Plugins update through
- * their engine's own CLI, which keeps them current itself, so they don't show here.
- */
 import { useEffect, useState } from "react";
 import {
   hasCliUpdate,
@@ -26,8 +18,8 @@ import {
   notify,
 } from "@misty/ui";
 import { skillsHubApi, type SkillRow, type SkillTargetId } from "@/features/engine-config/skills";
-import { exploreApps, type ExploreCatalogApp } from "./exploreApps";
-import { useRegistryEngineIds, useRegistryEngines, type CatalogEngine } from "./engineCatalog";
+import { exploreApps, type ExploreCatalogApp } from "./explore_apps";
+import { useRegistryEngineIds, useRegistryEngines, type CatalogEngine } from "./engine_catalog";
 import { EngineTile } from "./EnginesSection";
 import { MakerTile, pluginMaker } from "./PluginMaker";
 import { progressLine, type SpeechEntry } from "./SpeechSection";
@@ -35,7 +27,6 @@ import { progressLine, type SpeechEntry } from "./SpeechSection";
 const failureText = (reason: unknown, fallback: string) =>
   reason instanceof Error && reason.message ? reason.message : fallback;
 
-/** The installed skills that have an update, from the hub's last check (it caches the answer). */
 export function useSkillUpdates() {
   const [rows, setRows] = useState<SkillRow[] | null>(null);
   const [error, setError] = useState("");
@@ -57,10 +48,6 @@ export function useSkillUpdates() {
   return { rows, error, reload: () => setRound((value) => value + 1) };
 }
 
-/**
- * The installed engines that have a newer release. With `probe` each engine is checked as the
- * screen opens; without, only what is already known counts (the rail's number).
- */
 export function useEngineUpdates(options: { probe?: boolean } = {}) {
   const engines = useRegistryEngines();
   const { statuses, settled } = useCliStatuses(useRegistryEngineIds(), options);
@@ -70,14 +57,12 @@ export function useEngineUpdates(options: { probe?: boolean } = {}) {
   return { rows, settled };
 }
 
-/** An engine update's line: "Engine, from v1.2.0 to v1.3.0". */
 function engineLine(status: CliVersionStatus) {
   const from = status.localVersion ? versionText(status.localVersion) : "the version here";
   const to = status.latestVersion ? versionText(status.latestVersion) : "the latest";
   return `Engine, from ${from} to ${to}`;
 }
 
-/** The speech models and voices with a newer pin in the catalog than the one here. */
 export function useSpeechUpdates(): SpeechEntry[] | null {
   const catalog = useSpeechModels((state) => state.catalog);
   useEffect(() => {
@@ -217,10 +202,8 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
               for (const { app } of appRows) void updateApp(app);
               for (const skill of skillRows) void updateSkill(skill);
               void (async () => {
-                // Engines one after another, as the launch prompt runs them.
                 for (const { engine } of engineRows) await updateEngine(engine);
               })();
-              // Voices that share a download update together.
               const packages = new Set<string>();
               for (const entry of speechRows) {
                 if (packages.has(entry.packageKey)) continue;
@@ -237,7 +220,14 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
       {appRows.map(({ app, from, source }) => (
         <ShelfItem
           key={`app:${app.id}`}
-          logo={<AppLogoImage src={catalogLogoUrl(app)} name={app.name} size="tile" />}
+          logo={
+            <AppLogoImage
+              src={catalogLogoUrl(app)}
+              name={app.name}
+              size="tile"
+              render={app.icon_render}
+            />
+          }
           title={app.name}
           line={`App, from ${from} to ${app.version}`}
           action={

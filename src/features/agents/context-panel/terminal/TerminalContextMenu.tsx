@@ -10,8 +10,8 @@ import {
   ContextMenuTrigger,
 } from "@misty/ui";
 import { isMacPlatform, isPathUnder, probePath } from "./links";
-import { openTerminalPath, resolveTerminalPath } from "./openTarget";
-import { filesApi } from "../files/filesApi";
+import { openTerminalPath, resolveTerminalPath } from "./open_target";
+import { filesApi } from "../files/files_api";
 
 const revealLabel = () =>
   isMacPlatform()
@@ -20,12 +20,6 @@ const revealLabel = () =>
       ? "Show in Explorer"
       : "Show in file manager";
 
-/**
- * The terminal's right-click menu: copy, paste, select all and clear, then, when the selection
- * is a path in the folder, opening it in the editor or showing it in Finder, and closing the tab.
- * The path rows show at once and stay disabled until the probe confirms the path, so the menu
- * never changes shape under the pointer. Paths outside the folder are never probed.
- */
 export function TerminalContextMenu({
   getTerminal,
   cwd,

@@ -19,8 +19,6 @@ mod keys;
 
 pub(crate) use keys::parse_key_chord;
 
-// ==================== OS permission preflight ====================
-
 pub(crate) fn accessibility_granted() -> bool {
     #[cfg(target_os = "macos")]
     {
@@ -59,7 +57,6 @@ pub(crate) fn require_screen_recording() -> Result<(), String> {
     }
 }
 
-/// Stops before an action once the person pressed Escape (mod.rs).
 fn require_running() -> Result<(), String> {
     if super::stopped() {
         Err("The person stopped screen control with Escape. Stop and ask them how to go on.".into())
@@ -68,17 +65,13 @@ fn require_running() -> Result<(), String> {
     }
 }
 
-// ==================== Driver: displays & screenshots ====================
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DisplayInfo {
     pub id: u32,
     pub name: String,
-    /// Origin in the global logical (point) coordinate space.
     pub x: i32,
     pub y: i32,
-    /// Physical pixel size.
     pub width: u32,
     pub height: u32,
     pub scale: f64,
@@ -115,12 +108,8 @@ fn pick_display(display_id: Option<u32>) -> Result<(Monitor, DisplayInfo), Strin
     Ok((picked, info))
 }
 
-/// Long-edge cap for frames sent to the model: large enough to read UI text,
-/// small enough to stay inside vision-token budgets.
 const MAX_FRAME_EDGE: u32 = 1568;
 
-/// Encoded-frame pixel dimensions for a display. Deterministic, so action
-/// coordinates map back with the same math without re-capturing.
 pub(crate) fn frame_dims(display: &DisplayInfo) -> (u32, u32) {
     let (w, h) = (display.width.max(1), display.height.max(1));
     let shrink = MAX_FRAME_EDGE as f64 / w.max(h) as f64;
@@ -134,9 +123,6 @@ pub(crate) fn frame_dims(display: &DisplayInfo) -> (u32, u32) {
     }
 }
 
-/// Map a point in screenshot-image pixels to global logical points (the
-/// coordinate space enigo injects in): image px → display physical px →
-/// logical points via the scale factor, offset by the display origin.
 #[cfg_attr(target_os = "linux", allow(dead_code))]
 pub(crate) fn frame_to_logical(
     x: f64,
@@ -176,8 +162,6 @@ pub(crate) fn capture_frame(display_id: Option<u32>) -> Result<CapturedFrame, St
     } else {
         raw
     };
-    // JPEG (no alpha) keeps vision payloads small; quality 78 is plenty for
-    // UI text the model has to read.
     let rgb = image::DynamicImage::ImageRgba8(resized).to_rgb8();
     let mut buf = Cursor::new(Vec::new());
     rgb.write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(
@@ -195,14 +179,10 @@ pub(crate) fn capture_frame(display_id: Option<u32>) -> Result<CapturedFrame, St
     })
 }
 
-// ==================== Driver: input ====================
-
 fn new_enigo() -> Result<Enigo, String> {
     Enigo::new(&Settings::default()).map_err(|e| format!("init input driver: {e}"))
 }
 
-/// Where input goes: enigo (CoreGraphics, SendInput, or XTest on X11), or the RemoteDesktop
-/// portal on a Wayland session, where no app may post global input itself (portal.rs).
 enum Input {
     Enigo(Enigo),
     #[cfg(target_os = "linux")]
@@ -246,7 +226,6 @@ impl Input {
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String> {
         match self {
             Input::Enigo(enigo) => enigo.scroll(amount, axis).map_err(|e| e.to_string()),
-            // enigo's sign (positive scrolls up or right) back to the wheel's.
             #[cfg(target_os = "linux")]
             Input::Portal => match axis {
                 Axis::Vertical => super::portal::scroll(0, -amount),
@@ -278,7 +257,6 @@ impl Input {
         }
     }
 
-    /// Where the pointer is; Wayland doesn't say.
     fn location(&self) -> Option<(i32, i32)> {
         match self {
             Input::Enigo(enigo) => enigo.location().ok(),
@@ -288,9 +266,6 @@ impl Input {
     }
 }
 
-// ---- The virtual cursor ----
-
-/// Shows the virtual cursor where the next action lands. A missing window never fails an action.
 pub(crate) fn notify_cursor(x: i32, y: i32) {
     super::overlay::show_at(f64::from(x), f64::from(y));
 }
@@ -306,8 +281,6 @@ fn logical_point(x: f64, y: f64, display_id: Option<u32>) -> Result<(i32, i32), 
     Ok(point)
 }
 
-/// Linux: xcap reports displays in logical units. XTest places the pointer in X pixels, the
-/// logical units times the desktop's scale; the portal takes the compositor's logical units.
 #[cfg(target_os = "linux")]
 fn linux_point(x: f64, y: f64, frame_w: u32, frame_h: u32, display: &DisplayInfo) -> (i32, i32) {
     let logical_x = f64::from(display.x) + x * f64::from(display.width) / f64::from(frame_w.max(1));
@@ -378,8 +351,6 @@ pub(crate) fn action_drag(
     input
         .button(Button::Left, Direction::Press)
         .map_err(|e| format!("press button: {e}"))?;
-    // Interpolate so drop targets that highlight under a moving cursor
-    // (lists, canvases) see a natural drag instead of a teleport.
     const STEPS: i32 = 16;
     for step in 1..=STEPS {
         let nx = sx + (ex - sx) * step / STEPS;
@@ -411,8 +382,6 @@ pub(crate) fn action_scroll(
             .move_mouse(lx, ly)
             .map_err(|e| format!("move mouse: {e}"))?;
     }
-    // enigo scrolls up/right for positive values; the tool's deltas follow
-    // the wheel convention (positive y = scroll content down).
     let dy = -delta_y.clamp(-20, 20);
     let dx = delta_x.clamp(-20, 20);
     if dy != 0 {
@@ -428,7 +397,6 @@ pub(crate) fn action_scroll(
     Ok(format!("Scrolled by ({delta_x}, {delta_y})."))
 }
 
-/// Cap so a runaway tool call cannot dump a novel into a focused field.
 const MAX_TYPE_CHARS: usize = 4096;
 
 pub(crate) fn action_type(text: &str) -> Result<String, String> {
@@ -468,8 +436,6 @@ pub(crate) fn action_key(chord: &str) -> Result<String, String> {
     result.map_err(|e| format!("press key: {e}"))?;
     Ok(format!("Pressed {chord}."))
 }
-
-// ==================== Tests ====================
 
 #[cfg(test)]
 #[path = "driver_tests.rs"]

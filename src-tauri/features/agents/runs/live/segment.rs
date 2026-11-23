@@ -1,9 +1,7 @@
-//! One phrase of a live transcript, as the desktop reads it (`live/segment.ts`).
 use serde::{Serialize, Serializer};
 
 use super::super::device::zod::number_value;
 
-/// Which capture stream a segment came from. The mic is the local person.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LiveChannel {
@@ -20,7 +18,6 @@ impl LiveChannel {
     }
 }
 
-/// A number as `JSON.stringify` writes it.
 fn js_number<S: Serializer>(number: &f64, serializer: S) -> Result<S::Ok, S::Error> {
     number_value(*number).serialize(serializer)
 }
@@ -28,7 +25,6 @@ fn js_number<S: Serializer>(number: &f64, serializer: S) -> Result<S::Ok, S::Err
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct Word {
     pub(crate) text: String,
-    /// Milliseconds from the start of the stream.
     #[serde(serialize_with = "js_number")]
     pub(crate) t0: f64,
     #[serde(serialize_with = "js_number")]
@@ -37,8 +33,6 @@ pub(crate) struct Word {
     pub(crate) speaker: Option<String>,
 }
 
-/// One phrase of a live transcript. A segment is revised in place (same `id`, higher `revision`)
-/// until it is final; a final segment never changes again.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Segment {
@@ -57,12 +51,10 @@ pub(crate) struct Segment {
     #[serde(rename = "final")]
     pub(crate) is_final: bool,
     pub(crate) state: &'static str,
-    /// Provider speaker label within this channel ("1", "2", …).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) speaker: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) channel: Option<LiveChannel>,
-    /// Final words with timings; absent while provisional.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) words: Option<Vec<Word>>,
 }

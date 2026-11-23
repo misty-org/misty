@@ -23,7 +23,6 @@ pub mod skills_hub;
 pub mod usage_limits;
 pub mod usage_stats;
 
-/// Runs once as the app starts, after the file gate is configured.
 pub fn setup(app: &tauri::AppHandle) {
     support::set_app(app);
     support::allow_engine_config_locations();
@@ -32,7 +31,6 @@ pub fn setup(app: &tauri::AppHandle) {
     metrics::init();
 }
 
-/// Runs once as the app exits.
 pub fn shutdown() {
     metrics::shutdown();
 }

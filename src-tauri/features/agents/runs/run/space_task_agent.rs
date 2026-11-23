@@ -1,8 +1,3 @@
-//! One durable agent run. The model sees every tool in the run's catalog under its real name; Misty's
-//! gateway authorizes, journals and executes each call. The model reports the outcome with agent_finish.
-//!
-//! The loop's state lives in [`LoopState`], saved after each model turn, before its tools run, and after
-//! each tool result. A run that resumes continues from its saved [`Stage`].
 use std::sync::{atomic::Ordering, Arc};
 
 use tokio::sync::Mutex as AsyncMutex;
@@ -10,6 +5,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use crate::control_plane_steps::{checkpoint, HarnessCompletion};
 use crate::js_json::JsValue;
 use crate::model_budget::model_turn_limit;
+use crate::model_calls::Message;
 use crate::model_input::initial_messages;
 use crate::model_tools::CatalogTool;
 use crate::requirements_review::{ledger_note, requirements_ledger, worth_ledger};
@@ -19,7 +15,6 @@ use crate::tool_outcomes::final_text;
 use crate::tool_transport::{object, string, CheckpointState, HarnessCheckpoint};
 use crate::toolsets::{tool_state, ToolState};
 use crate::transcript::user_message;
-use crate::model_calls::Message;
 
 use super::{
     agent_run::{locked, RunShared},
@@ -32,7 +27,6 @@ use super::{
     store::StoredRun,
 };
 
-/// How a run ended. The runtime only needs that it did; the loop tests read the rest.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct RunResult {
     pub(crate) text: String,
@@ -45,21 +39,17 @@ pub(crate) struct RunLoop {
     pub(super) order: SerialToolLifecycle,
     pub(super) tools: RunTools,
     pub(super) state: LoopState,
-    // The agent swallows errors thrown from its step hooks, so a failed checkpoint is held here and
-    // rethrown once the call returns.
     pub(super) hook_failure: Option<RuntimeError>,
     stored: StoredRun,
     save_lock: AsyncMutex<()>,
 }
 
-/// What a turn decided.
 pub(super) enum Flow {
     Next,
     Leave,
 }
 
 impl RunLoop {
-    /// Writes the run's file. `Stage::Tools` carries the transcript itself.
     pub(super) async fn save(&self, stage: Stage) -> Result<(), RuntimeError> {
         let _order = self.save_lock.lock().await;
         let mut state = self.state.clone();
@@ -85,7 +75,9 @@ impl RunLoop {
         let saved = tokio::task::spawn_blocking(move || store.save(&stored)).await;
         match saved {
             Ok(Ok(())) => Ok(()),
-            _ => Err(RuntimeError::error("run_store_failed: the run could not be saved")),
+            _ => Err(RuntimeError::error(
+                "run_store_failed: the run could not be saved",
+            )),
         }
     }
 
@@ -94,8 +86,6 @@ impl RunLoop {
         self.state.plain_tail += 1;
     }
 
-    /// The transcript just got rewritten. What the stop path reads stays what it was, as the array the
-    /// TypeScript kept a reference to did.
     pub(super) fn replace_messages(&mut self, next: Vec<Message>) {
         if self.state.transcript.is_none() {
             self.state.transcript = Some(std::mem::take(&mut self.state.messages));
@@ -107,17 +97,28 @@ impl RunLoop {
         self.tools.toolsets().visible(&self.tools.tool_names, state)
     }
 
-    /// The model call and its tools, from wherever a restart left them.
     async fn stream_and_run(&mut self, resumed: Stage) -> Result<TurnOutcome, RuntimeError> {
         let reply = match resumed {
             Stage::Tools(turn) => {
-                // What the stop path reads, if the run ends before the turn does.
                 self.state.messages.clone_from(&turn.messages);
                 ModelReply::Turn(turn)
             }
-            Stage::Outage { outage, wait_started_ms, wake_at_ms, budget } => {
+            Stage::Outage {
+                outage,
+                wait_started_ms,
+                wake_at_ms,
+                budget,
+            } => {
                 let messages = self.state.messages.clone();
-                resume_outage(self, &messages, &budget, outage, wait_started_ms, wake_at_ms).await?
+                resume_outage(
+                    self,
+                    &messages,
+                    &budget,
+                    outage,
+                    wait_started_ms,
+                    wake_at_ms,
+                )
+                .await?
             }
             other => {
                 let budget = self.prepare_turn(other).await?;
@@ -128,7 +129,14 @@ impl RunLoop {
         let turn = match reply {
             ModelReply::Turn(turn) => turn,
             ModelReply::Aborted(messages) => {
-                return Ok(TurnOutcome { messages, steps: Vec::new(), tool_results: Vec::new(), finish_reason: "other".to_owned(), usage: SavedUsage::of_turn(0, 0), aborted: true });
+                return Ok(TurnOutcome {
+                    messages,
+                    steps: Vec::new(),
+                    tool_results: Vec::new(),
+                    finish_reason: "other".to_owned(),
+                    usage: SavedUsage::of_turn(0, 0),
+                    aborted: true,
+                });
             }
         };
         self.save(Stage::Tools(turn.clone())).await?;
@@ -150,11 +158,12 @@ impl RunLoop {
         Ok(())
     }
 
-    /// The turns, from where the run is now.
     async fn run_turns(&mut self) -> Result<(), RuntimeError> {
         let mut resumed = std::mem::take(&mut self.state.stage);
         while self.state.model_turn < self.state.limit {
-            self.shared.model_turn.store(self.state.model_turn, Ordering::SeqCst);
+            self.shared
+                .model_turn
+                .store(self.state.model_turn, Ordering::SeqCst);
             let current = self.stream_and_run(std::mem::take(&mut resumed)).await?;
             match self.after_turn(current).await? {
                 Flow::Leave => return Ok(()),
@@ -170,20 +179,23 @@ impl RunLoop {
         Ok(())
     }
 
-    /// What's done on a fresh run's first pass, before its first turn. `Some` ends the run here.
     async fn before_first_turn(&mut self) -> Result<Option<RunResult>, RuntimeError> {
         let mut messages = initial_messages(&self.shared.context.task_input());
         self.state.plain_tail = messages.len();
-        // A long request's requirements, listed once before work starts (requirements_review.rs).
         let context = &self.shared.context;
         if worth_ledger(&context.prompt) {
-            let listed = requirements_ledger(self.shared.as_ref(), self.shared.deps.access.as_ref(), &context.model_id, &context.prompt).await;
+            let listed = requirements_ledger(
+                self.shared.as_ref(),
+                self.shared.deps.access.as_ref(),
+                &context.model_id,
+                &context.prompt,
+            )
+            .await;
             if !listed.is_empty() {
                 messages.push(user_message(ledger_note(&listed)));
                 self.state.plain_tail += 1;
             }
         }
-        // agent.tool survives a summary that drops the calls that chose it.
         self.state.toolset = SavedToolState::of(&tool_state(&messages, self.tools.initial));
         self.state.messages = messages;
         self.save(Stage::BeforeTurn).await?;
@@ -213,20 +225,43 @@ impl RunLoop {
         }
         let failure = classify_runtime_error(&error);
         if failure.code == "usage_limit_reached" {
-            // Held back by a rate limit mid-task is a pause, not a failure: keep what was done.
-            let texts: Vec<Option<String>> = self.state.steps.iter().map(|step| Some(step.text.clone())).collect();
+            let texts: Vec<Option<String>> = self
+                .state
+                .steps
+                .iter()
+                .map(|step| Some(step.text.clone()))
+                .collect();
             let so_far = final_text(&texts);
-            let text = [so_far.as_str(), failure.message].iter().filter(|part| !part.is_empty()).copied().collect::<Vec<_>>().join("\n\n");
-            return self.finish(HarnessCompletion::ended("incomplete", text, failure.code, failure.message)).await;
+            let text = [so_far.as_str(), failure.message]
+                .iter()
+                .filter(|part| !part.is_empty())
+                .copied()
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            return self
+                .finish(HarnessCompletion::ended(
+                    "incomplete",
+                    text,
+                    failure.code,
+                    failure.message,
+                ))
+                .await;
         }
-        self.finish(HarnessCompletion::ended("failed", "", failure.code, failure.message)).await?;
+        self.finish(HarnessCompletion::ended(
+            "failed",
+            "",
+            failure.code,
+            failure.message,
+        ))
+        .await?;
         Err(RuntimeError::named("FatalError", failure.message))
     }
 }
 
-/// The run from start to end, fresh or resumed. A value is a run that ended normally, an error one
-/// the Workflow library would call failed.
-pub(crate) async fn run_space_task_agent(deps: Arc<super::deps::RunDeps>, mut stored: StoredRun) -> Result<RunResult, RuntimeError> {
+pub(crate) async fn run_space_task_agent(
+    deps: Arc<super::deps::RunDeps>,
+    mut stored: StoredRun,
+) -> Result<RunResult, RuntimeError> {
     let shared = match start_run(deps.clone(), &mut stored).await? {
         RunStart::Done(result) => return Ok(result),
         RunStart::Agent(shared) => shared,
@@ -238,7 +273,11 @@ pub(crate) async fn run_space_task_agent(deps: Arc<super::deps::RunDeps>, mut st
         None => deps.gateway.discover(&shared.identity).await?,
     };
     let order = match &saved {
-        Some(state) => SerialToolLifecycle::restored(state.stopped_reason.clone(), state.paused_reason.clone(), state.declined.clone()),
+        Some(state) => SerialToolLifecycle::restored(
+            state.stopped_reason.clone(),
+            state.paused_reason.clone(),
+            state.declined.clone(),
+        ),
         None => SerialToolLifecycle::new(),
     };
     let tools = assemble_tools(&shared, &order, remote.clone());
@@ -247,8 +286,18 @@ pub(crate) async fn run_space_task_agent(deps: Arc<super::deps::RunDeps>, mut st
     }
     let context = &shared.context;
     if fresh {
-        let missing = context.allowed_tools.iter().filter(|name| !tools.advertised.contains(*name)).map(|name| string(name.as_str())).collect();
-        let omitted = tools.catalog.omitted.iter().map(|name| string(name.as_str())).collect();
+        let missing = context
+            .allowed_tools
+            .iter()
+            .filter(|name| !tools.advertised.contains(*name))
+            .map(|name| string(name.as_str()))
+            .collect();
+        let omitted = tools
+            .catalog
+            .omitted
+            .iter()
+            .map(|name| string(name.as_str()))
+            .collect();
         let event = HarnessCheckpoint {
             node_id: "mcp:catalog".to_owned(),
             state: CheckpointState::Completed,
@@ -256,7 +305,10 @@ pub(crate) async fn run_space_task_agent(deps: Arc<super::deps::RunDeps>, mut st
             progress: 8,
             input: None,
             output: Some(object([
-                ("advertised_tool_count", JsValue::Number(tools.advertised.len() as f64)),
+                (
+                    "advertised_tool_count",
+                    JsValue::Number(tools.advertised.len() as f64),
+                ),
                 ("missing_allowed_tools", JsValue::Array(missing)),
                 ("omitted_tools", JsValue::Array(omitted)),
             ])),
@@ -266,16 +318,30 @@ pub(crate) async fn run_space_task_agent(deps: Arc<super::deps::RunDeps>, mut st
     }
     let limit = match &saved {
         Some(state) => state.limit,
-        None => model_turn_limit(context.model_turn_limit.as_ref()).map_err(|error| RuntimeError::error(error.to_string()))?,
+        None => model_turn_limit(context.model_turn_limit.as_ref())
+            .map_err(|error| RuntimeError::error(error.to_string()))?,
     };
     shared.limit.store(limit, Ordering::SeqCst);
     let state = saved.unwrap_or_else(|| LoopState {
         catalog: remote.iter().map(Into::into).collect(),
         limit,
         transcript: Some(Vec::new()),
-        pacing: super::state::SavedPacing { started_at_ms: (deps.clock)(), paused_ms: 0, estimate: None, research_scale: 1 },
+        pacing: super::state::SavedPacing {
+            started_at_ms: (deps.clock)(),
+            paused_ms: 0,
+            estimate: None,
+            research_scale: 1,
+        },
         ..LoopState::default()
     });
-    let mut run = RunLoop { shared, order, tools, state, hook_failure: None, stored, save_lock: AsyncMutex::new(()) };
+    let mut run = RunLoop {
+        shared,
+        order,
+        tools,
+        state,
+        hook_failure: None,
+        stored,
+        save_lock: AsyncMutex::new(()),
+    };
     run.drive(fresh).await
 }

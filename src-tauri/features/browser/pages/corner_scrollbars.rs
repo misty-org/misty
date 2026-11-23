@@ -1,10 +1,3 @@
-//! Lets web scrollbars run into the window's rounded corners. Since macOS 26,
-//! WKWebView reads its window's corner configuration and shortens its native
-//! scroll track by the corner radius (24pt at the bottom-right of a Misty
-//! window), so a page's scrollbar stops well short of the corner. Misty draws
-//! its own pane corners, so every web view in the process reports no corner
-//! configuration instead. Earlier macOS versions lack the method and are left alone.
-
 use objc2::runtime::{AnyClass, AnyObject, Sel};
 use objc2::{class, sel};
 use std::ffi::c_void;

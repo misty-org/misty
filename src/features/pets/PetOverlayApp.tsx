@@ -11,18 +11,16 @@ import {
   type PetAnimation,
   type PetPackage,
   type PetStatus,
-} from "./petAtlas";
-import type { PetActivity } from "./petState";
+} from "./pet_atlas";
+import type { PetActivity } from "./pet_state";
 import {
   DEFAULT_PET_SCALE,
   normalizePetScale,
   PET_BASE_SCALE,
   PET_SCALE_OPTIONS,
-} from "./petScale";
-import { petScaleEvent, petStateEvent, petsApi, type NativePetState } from "./petsApi";
+} from "./pet_scale";
+import { petScaleEvent, petStateEvent, petsApi, type NativePetState } from "./pets_api";
 import { cn, OverflowFadeText, screenMarkClass, Surface } from "@misty/ui";
-// The pet's window draws with the app's own classes; its page stays transparent (pet.html), so
-// only the sprite and its bubble show over the desktop.
 import "@/styles/styles.css";
 
 const DEFAULT_STATE: NativePetState = {
@@ -38,7 +36,6 @@ const DEFAULT_STATE: NativePetState = {
 
 const IDLE_ANIMATIONS: readonly PetAnimation[] = ["stand", "rest", "lay"];
 
-/** The bubble's words for what the agent is doing; idle has none. */
 const activityLabels: Record<PetActivity, string> = {
   idle: "",
   thinking: "Thinking",
@@ -49,8 +46,6 @@ const activityLabels: Record<PetActivity, string> = {
   completed: "Done",
 };
 
-/** Native pet state, the chosen package and its size. Size lives here because native code
- * pushes it on its own event. */
 function usePetOverlayState() {
   const [pet, setPet] = useState<PetPackage | null>(null);
   const [state, setState] = useState(DEFAULT_STATE);
@@ -74,7 +69,6 @@ function usePetOverlayState() {
       try {
         const [settings, current] = await Promise.all([petsApi.settings(), petsApi.overlayState()]);
         const petId = settings.petId.trim();
-        // Native code opens this window only with a pet chosen; without one there is nothing to draw.
         if (!petId) return;
         const packageData = await petsApi.getPackage(petId);
         if (cancelled) return;
@@ -92,7 +86,6 @@ function usePetOverlayState() {
     };
   }, [applyScale]);
 
-  /** Steps to the next size; a failed native call puts the old one back. */
   const cycleScale = useCallback(async () => {
     const current = scaleRef.current;
     const currentIndex = PET_SCALE_OPTIONS.findIndex((value) => Math.abs(value - current) < 0.001);
@@ -120,7 +113,6 @@ function usePrefersReducedMotion(): boolean {
   return reducedMotion;
 }
 
-/** A random idle pose while nothing is going on, changed on a slow timer. */
 function useIdleAnimation(active: boolean): PetAnimation {
   const [idleAnimation, setIdleAnimation] = useState<PetAnimation>("stand");
   useEffect(() => {
@@ -141,8 +133,6 @@ function useIdleAnimation(active: boolean): PetAnimation {
   return idleAnimation;
 }
 
-/** The sprite's frame. It starts over when what the pet is doing changes, and steps at a pace
- * that suits the animation. */
 function usePetFrame(input: {
   animation: PetAnimation;
   reducedMotion: boolean;
@@ -155,7 +145,6 @@ function usePetFrame(input: {
   const contextKey = `${activity}|${cursorNearby}|${cursorOver}|${status}`;
   const [frame, setFrame] = useState(0);
   const [prevContextKey, setPrevContextKey] = useState(contextKey);
-  // Adjusting state while rendering, so a new context never paints one stale frame first.
   if (contextKey !== prevContextKey) {
     setPrevContextKey(contextKey);
     setFrame(0);
@@ -203,8 +192,6 @@ function PetBubble(props: { text: string; activityText: string; sessionName: str
   );
 }
 
-/** The pet. It acts as a button, so changing its size works from the keyboard too; the drag
- * region still moves the window. */
 function PetSprite(props: {
   pet: PetPackage;
   renderScale: number;
@@ -246,7 +233,6 @@ function PetSprite(props: {
   );
 }
 
-/** The pet window: the sprite, and a bubble saying what the person's agents are doing. */
 export function PetOverlayApp() {
   const { pet, state, scale, cycleScale } = usePetOverlayState();
   const reducedMotion = usePrefersReducedMotion();
@@ -285,9 +271,7 @@ export function PetOverlayApp() {
         x: position.x / dpi + ((PET_BUBBLE_WIDTH - PET_CELL_WIDTH) / 2) * renderScale,
         y: position.y / dpi + PET_BUBBLE_HEIGHT,
       });
-    } catch {
-      // The pet stays where it is; it just won't be there next launch.
-    }
+    } catch {}
   };
 
   if (!pet) return null;

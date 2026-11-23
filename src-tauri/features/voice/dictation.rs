@@ -1,8 +1,3 @@
-//! Hold-to-talk dictation with a double-tap hands-free lock.
-//!
-//! Hold the chord to talk and release to finish. Tap it twice quickly to keep
-//! listening hands-free; tap once more to finish. A single short tap does
-//! nothing, so brushing the key never inserts text.
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) mod pill;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
@@ -10,35 +5,22 @@ pub(crate) mod session;
 
 use std::time::{Duration, Instant};
 
-/// A press shorter than this is a tap, not a hold.
 pub const TAP: Duration = Duration::from_millis(250);
-/// The second tap of a double-tap must start within this of the first release.
 pub const DOUBLE_TAP: Duration = Duration::from_millis(350);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
     Idle,
-    /// The key is held and the microphone is open.
-    Holding {
-        since: Instant,
-    },
-    /// A short tap: keep listening briefly in case a second tap locks it.
-    Tapped {
-        released: Instant,
-    },
-    /// Hands-free: listening until the next press.
+    Holding { since: Instant },
+    Tapped { released: Instant },
     Locked,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
-    /// Open the microphone and start streaming (with pre-roll).
     Start,
-    /// Hands-free is on; show the lock in the pill.
     Lock,
-    /// Stop listening, finalize the transcript and insert it.
     Finish,
-    /// Stop listening and discard: it was only a tap.
     Cancel,
 }
 
@@ -72,7 +54,6 @@ impl Dictation {
                 Some(Action::Lock)
             }
             Phase::Tapped { .. } => {
-                // Too late for a double-tap: treat as a fresh hold.
                 self.phase = Phase::Holding { since: now };
                 None
             }
@@ -102,7 +83,6 @@ impl Dictation {
         }
     }
 
-    /// Call periodically: a lone tap expires into a cancel.
     pub fn tick(&mut self, now: Instant) -> Option<Action> {
         match self.phase {
             Phase::Tapped { released } if now.duration_since(released) > DOUBLE_TAP => {
@@ -113,7 +93,6 @@ impl Dictation {
         }
     }
 
-    /// Mute, an error or the window closing: stop without inserting.
     pub fn abort(&mut self) -> Option<Action> {
         (self.phase != Phase::Idle).then(|| {
             self.phase = Phase::Idle;

@@ -1,13 +1,12 @@
-//! The interface every provider's client implements.
 use std::{collections::VecDeque, pin::Pin};
 
 use futures_util::{future::BoxFuture, stream, Stream, StreamExt};
 use serde_json::json;
 
 use super::{
-    generate::{collect_turn, stream_failure, CollectedTurn},
     call::CallOptions,
     error::{scrub, scrub_value, ModelError},
+    generate::{collect_turn, stream_failure, CollectedTurn},
     sse::SseDecoder,
     stream::StreamPart,
 };
@@ -15,11 +14,8 @@ use super::{
 pub type ModelStream = Pin<Box<dyn Stream<Item = StreamPart> + Send>>;
 
 pub trait LanguageModel: Send + Sync {
-    /// Starts a call. Dropping the stream cancels it.
     fn stream(&self, options: CallOptions) -> BoxFuture<'_, Result<ModelStream, ModelError>>;
 
-    /// A whole answer, for callers that don't follow along. Reading the stream to its end does it
-    /// for most providers, and one whose whole answers come another way can say so.
     fn generate(&self, options: CallOptions) -> BoxFuture<'_, Result<CollectedTurn, ModelError>> {
         Box::pin(async move {
             let turn = collect_turn(self.stream(options).await?).await;
@@ -31,15 +27,12 @@ pub trait LanguageModel: Send + Sync {
     }
 }
 
-/// Turns one provider's event stream into [`StreamPart`]s.
 pub(crate) trait StreamDecoder: Send + 'static {
     fn start(&mut self, out: &mut Vec<StreamPart>);
     fn event(&mut self, data: &str, out: &mut Vec<StreamPart>);
-    /// The stream ended, however it ended. Closes what's open and reports the finish.
     fn finish(&mut self, out: &mut Vec<StreamPart>);
 }
 
-/// A response body as it arrives.
 pub(crate) type BodyStream = Pin<Box<dyn Stream<Item = Result<Vec<u8>, String>> + Send>>;
 
 struct Decoding<D> {
@@ -55,7 +48,6 @@ impl<D: StreamDecoder> Decoding<D> {
     fn handle(&mut self, events: Vec<String>) {
         let mut out = Vec::new();
         for event in events {
-            // Providers end with `[DONE]`, which is a marker rather than an event.
             if event != "[DONE]" {
                 self.decoder.event(&event, &mut out);
             }
@@ -69,7 +61,6 @@ impl<D: StreamDecoder> Decoding<D> {
         self.deliver(out);
     }
 
-    /// A provider's failure can echo the key it was sent, so errors are cleaned on the way out.
     fn deliver(&mut self, parts: Vec<StreamPart>) {
         for mut part in parts {
             if let StreamPart::Error { error } = &mut part {
@@ -80,16 +71,14 @@ impl<D: StreamDecoder> Decoding<D> {
     }
 }
 
-/// A response's body, in the form [`decoded_body`] takes.
 pub(crate) fn body_of(response: reqwest::Response) -> BodyStream {
-    Box::pin(
-        response
-            .bytes_stream()
-            .map(|chunk| chunk.map(|bytes| bytes.to_vec()).map_err(|error| error.to_string())),
-    )
+    Box::pin(response.bytes_stream().map(|chunk| {
+        chunk
+            .map(|bytes| bytes.to_vec())
+            .map_err(|error| error.to_string())
+    }))
 }
 
-/// Decodes a response's event stream as it arrives.
 pub(crate) fn decoded_stream<D: StreamDecoder>(
     response: reqwest::Response,
     decoder: D,
@@ -98,8 +87,11 @@ pub(crate) fn decoded_stream<D: StreamDecoder>(
     decoded_body(body_of(response), decoder, secret)
 }
 
-/// Decodes a body a client has already started reading.
-pub(crate) fn decoded_body<D: StreamDecoder>(body: BodyStream, mut decoder: D, secret: &str) -> ModelStream {
+pub(crate) fn decoded_body<D: StreamDecoder>(
+    body: BodyStream,
+    mut decoder: D,
+    secret: &str,
+) -> ModelStream {
     let mut started = Vec::new();
     decoder.start(&mut started);
     let state = Decoding {
@@ -124,7 +116,6 @@ pub(crate) fn decoded_body<D: StreamDecoder>(body: BodyStream, mut decoder: D, s
                     state.handle(events);
                 }
                 Some(Err(message)) => {
-                    // The connection dropped mid-answer: say so, and report what arrived.
                     state.ended = true;
                     state.ready.push_back(StreamPart::Error {
                         error: json!({
@@ -137,7 +128,6 @@ pub(crate) fn decoded_body<D: StreamDecoder>(body: BodyStream, mut decoder: D, s
                 }
                 None => {
                     state.ended = true;
-                    // An event with no blank line after it was never finished, so it doesn't count.
                     state.finish();
                 }
             }

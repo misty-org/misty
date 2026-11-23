@@ -1,15 +1,9 @@
-//! A site's icon, fetched by the app instead of an image tag in its windows. Sites such as X and
-//! Gmail send `Cross-Origin-Resource-Policy`, so WebKit refuses to show their icons in any other
-//! origin's page. The fetch sends no cookies and takes the same checks as a link preview: the
-//! address comes from the page, so every hop must be public. The answer is decided from the bytes,
-//! never the site's content type.
 use base64::Engine;
 
 use crate::agents::web_fetch::fetch_raw;
 
 const ICON_BYTES: usize = 512 * 1024;
 
-/// Sites serve icons under many content types, some of them wrong. A web page never is one.
 fn may_be_icon(content_type: &str) -> bool {
     content_type.is_empty()
         || content_type.starts_with("image/")
@@ -18,7 +12,6 @@ fn may_be_icon(content_type: &str) -> bool {
         || content_type.starts_with("text/plain")
 }
 
-/// The image type these bytes are, or None when they aren't an image.
 fn image_kind(body: &[u8]) -> Option<&'static str> {
     if body.starts_with(b"\x89PNG\r\n\x1a\n") {
         return Some("image/png");
@@ -47,8 +40,6 @@ fn image_kind(body: &[u8]) -> Option<&'static str> {
     None
 }
 
-/// The icon at this address as a data URL. Fails with `private_address` for a site on this
-/// computer or network, which the window may still reach itself.
 #[tauri::command]
 pub async fn browser_site_icon(url: String) -> Result<String, String> {
     let response = fetch_raw(&url, "image/*,*/*;q=0.5", ICON_BYTES, may_be_icon).await?;

@@ -1,14 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * Settings › Advanced › Network: the proxy for the engines Misty starts and its requests for
- * engine config (skills from GitHub, versions from npm, a channel's models, the price table).
- * The switch saves at once; the address is a draft until saved. Engines already running keep
- * what they started with. Kept on this computer only.
- */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow,
@@ -17,15 +11,10 @@ import {
 import { Button, ErrorState, Input, Skeleton, Switch } from "@misty/ui";
 import { proxyApi, type ProxySettings } from "./api";
 
-/** The draft when no proxy has been set yet. */
 const DEFAULT_PROXY_URL = "http://127.0.0.1:7890";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/**
- * The saved proxy, kept for this session only: its address can carry a user name and password,
- * so it is never copied to the cache on disk.
- */
 const PROXY_KEY = "engine-config/proxy";
 
 export function NetworkSection() {
@@ -38,8 +27,6 @@ export function NetworkSection() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // The drafts follow each answer that arrives (the session's copy first, then the fresh one),
-  // unless the person has started changing them: an answer never overwrites what they're typing.
   const synced = useRef(settings);
   const drafts = useRef({ enabled: enabledDraft, url: urlDraft });
   useEffect(() => {
@@ -57,10 +44,8 @@ export function NetworkSection() {
     setEnabledDraft(settings.enabled);
     setUrlDraft(settings.url ?? DEFAULT_PROXY_URL);
   }, [settings]);
-  // A proxy never read says so in place of its rows, with Try again.
   const loadError = proxy.error && !settings && !proxy.loading ? errorText(proxy.error) : null;
 
-  // The saved notice goes away by itself; an error stays until the next edit.
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(null), 2600);
@@ -152,7 +137,6 @@ export function NetworkSection() {
                 <Skeleton className="h-5 w-9 rounded-full" />
               )}
             </DesktopSettingsRow>
-            {/* The address only applies while the proxy is on, so it shows only then. */}
             {enabledDraft ? (
               <DesktopSettingsRow
                 label="Proxy address"

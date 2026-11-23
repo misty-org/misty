@@ -1,17 +1,17 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, CircleAlert, Copy, CornerDownRight, FileDiff, Terminal } from "lucide-react";
+import { memo, useMemo, useState, type ReactNode } from "react";
+import { CircleAlert, CornerDownRight, FileDiff, Terminal } from "lucide-react";
 import {
   CodeDiff,
   CodeText,
-  IconButton,
+  CopyButton,
   Pressable,
   Surface,
   Text,
   type CodeDiffLine,
   type CodeDiffLineKind,
 } from "@misty/ui";
-import { indentedJson } from "../../runs/markdown/readableJson";
+import { indentedJson } from "../../runs/markdown/readable_json";
 import {
   computeDiffLines,
   isEditToolName,
@@ -19,7 +19,7 @@ import {
   parsePatchLines,
   type DiffLine,
   type EditArgs,
-} from "./editLineStats";
+} from "./edit_line_stats";
 
 interface ToolPayloadViewerProps {
   toolName: string;
@@ -28,7 +28,6 @@ interface ToolPayloadViewerProps {
   result?: unknown;
 }
 
-/** Whether the tool runs a shell command. */
 function isBashTool(name: string): boolean {
   const lower =
     name
@@ -45,37 +44,6 @@ function isBashTool(name: string): boolean {
   );
 }
 
-function useCopied() {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1500);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-  return {
-    copied,
-    copy: (text: string) => void navigator.clipboard.writeText(text).then(() => setCopied(true)),
-  };
-}
-
-function CopyButton({
-  text,
-  label,
-  className,
-}: {
-  text: string;
-  label: string;
-  className?: string;
-}) {
-  const { copied, copy } = useCopied();
-  return (
-    <IconButton label={label} className={className} onClick={() => copy(text)}>
-      {copied ? <Check /> : <Copy />}
-    </IconButton>
-  );
-}
-
-/** The frame every payload sits in: the page's fill inside a hairline, in full-color text. */
 function PayloadFrame({ children }: { children: ReactNode }) {
   return (
     <Surface tone="page" edge="hairline" radius="lg" className="overflow-hidden">
@@ -86,7 +54,6 @@ function PayloadFrame({ children }: { children: ReactNode }) {
   );
 }
 
-/** A payload's head: its icon, its name in full color, then muted details and a copy button. */
 function PayloadHeader({ children }: { children: ReactNode }) {
   return (
     <Text
@@ -108,7 +75,6 @@ const diffKind: Record<DiffLine["type"], CodeDiffLineKind> = {
   header: "header",
 };
 
-/** A file change as a diff, with line numbers on both sides and its +/- counts. */
 const FileDiffViewer = memo(function FileDiffViewer({
   filePath,
   oldString,
@@ -136,16 +102,7 @@ const FileDiffViewer = memo(function FileDiffViewer({
     return { addCount: add, delCount: del };
   }, [diffLines]);
   const copyText = newString ?? content ?? patch ?? oldString ?? "";
-  const rows = useMemo<CodeDiffLine[]>(
-    () =>
-      diffLines.map((line) => ({
-        kind: diffKind[line.type],
-        text: line.text,
-        oldNumber: line.oldLineNo,
-        newNumber: line.newLineNo,
-      })),
-    [diffLines],
-  );
+  const rows = useMemo<CodeDiffLine[]>(() => foldUnchanged(diffLines), [diffLines]);
   return (
     <PayloadFrame>
       <PayloadHeader>
@@ -154,7 +111,7 @@ const FileDiffViewer = memo(function FileDiffViewer({
           {filePath || "Edited file"}
         </Text>
         <LineCounts additions={addCount} deletions={delCount} />
-        <CopyButton text={copyText} label="Copy" className="ml-auto" />
+        <CopyButton value={copyText} className="ml-auto" />
       </PayloadHeader>
       <div className="max-h-72 overflow-auto py-1">
         {rows.length === 0 ? (
@@ -169,7 +126,48 @@ const FileDiffViewer = memo(function FileDiffViewer({
   );
 });
 
-/** A diff's added and removed line counts, colored as Git colors them. */
+const KEEP_AROUND = 3;
+const FOLD_FROM = 8;
+
+function foldUnchanged(lines: DiffLine[]): CodeDiffLine[] {
+  const rows: CodeDiffLine[] = [];
+  let run: DiffLine[] = [];
+  const flush = (atEnd: boolean) => {
+    const start = rows.length === 0;
+    if (run.length < FOLD_FROM) rows.push(...run.map(toRow));
+    else {
+      const head = start ? 0 : KEEP_AROUND;
+      const tail = atEnd ? 0 : KEEP_AROUND;
+      const hidden = run.length - head - tail;
+      rows.push(...run.slice(0, head).map(toRow));
+      rows.push({
+        kind: "header",
+        text: hidden === 1 ? "1 unchanged line" : `${hidden} unchanged lines`,
+      });
+      rows.push(...run.slice(run.length - tail).map(toRow));
+    }
+    run = [];
+  };
+  for (const line of lines) {
+    if (line.type === "ctx") run.push(line);
+    else {
+      if (run.length) flush(false);
+      rows.push(toRow(line));
+    }
+  }
+  if (run.length) flush(true);
+  return rows;
+}
+
+function toRow(line: DiffLine): CodeDiffLine {
+  return {
+    kind: diffKind[line.type],
+    text: line.text,
+    oldNumber: line.oldLineNo,
+    newNumber: line.newLineNo,
+  };
+}
+
 export function LineCounts({ additions, deletions }: { additions: number; deletions: number }) {
   if (!additions && !deletions) return null;
   return (
@@ -204,7 +202,6 @@ function parseBashArgs(args: unknown): BashArgs | null {
     const raw = [record.command, record.cmd, record.script].find(
       (value) => typeof value === "string" || Array.isArray(value),
     );
-    // Codex sends the command as an argument list.
     const command = Array.isArray(raw) ? raw.map(String).join(" ") : (raw as string | undefined);
     const description = typeof record.description === "string" ? record.description : undefined;
     if (command?.trim()) return { command: command.trim(), description };
@@ -212,7 +209,6 @@ function parseBashArgs(args: unknown): BashArgs | null {
   return null;
 }
 
-/** A tool's result as text, and whether it reads as a failure. */
 function formatExecutionResult(result: unknown): { text: string; isError: boolean } | null {
   if (result == null) return null;
   if (typeof result === "string") {
@@ -237,7 +233,6 @@ function formatExecutionResult(result: unknown): { text: string; isError: boolea
   return { text: String(result), isError: false };
 }
 
-/** A payload's raw text (a result, the parameters): small, muted code that scrolls past 240px. */
 function PayloadOutput({ failed = false, children }: { failed?: boolean; children: ReactNode }) {
   return (
     <CodeText
@@ -279,7 +274,6 @@ function ResultToggle({
   );
 }
 
-/** A shell command as a terminal shows it: the prompt line, then what it printed. */
 const BashCommandViewer = memo(function BashCommandViewer({
   toolName,
   command,
@@ -305,7 +299,7 @@ const BashCommandViewer = memo(function BashCommandViewer({
             {description}
           </Text>
         )}
-        <CopyButton text={command} label="Copy command" className="ml-auto" />
+        <CopyButton value={command} label="Copy command" className="ml-auto" />
       </PayloadHeader>
       <div className="flex items-start gap-2 px-3 py-2">
         <CodeText tone="muted" aria-hidden="true" className="leading-[1.55] select-none">
@@ -327,7 +321,6 @@ const BashCommandViewer = memo(function BashCommandViewer({
   );
 });
 
-/** Any other tool: its raw parameters, then its raw result. */
 const GenericToolViewer = memo(function GenericToolViewer({
   args,
   result,
@@ -359,7 +352,7 @@ const GenericToolViewer = memo(function GenericToolViewer({
             className="flex items-center justify-between pt-0.5 pr-1.5 pl-2.5 text-micro"
           >
             <span>Parameters</span>
-            <CopyButton text={formattedArgs} label="Copy parameters" />
+            <CopyButton value={formattedArgs} label="Copy parameters" />
           </Text>
           <PayloadOutput>{formattedArgs}</PayloadOutput>
         </div>
@@ -378,13 +371,10 @@ const GenericToolViewer = memo(function GenericToolViewer({
   );
 });
 
-/** Whether a tool call carries anything the viewer can show. */
 export function hasToolPayload(args: unknown, result: unknown): boolean {
   return args != null || result != null;
 }
 
-/** Shows a tool call's raw payload: an edit as a diff, a shell command as a terminal, anything
- * else as its parameters and result. */
 export const ToolPayloadViewer = memo(function ToolPayloadViewer({
   toolName,
   path,

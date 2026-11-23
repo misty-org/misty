@@ -1,5 +1,3 @@
-//! Kura's terminal button: the system terminal opened in the folder Files shows.
-
 use std::path::Path;
 
 use file_access::disk::check_disk;
@@ -8,8 +6,6 @@ use file_access::Access;
 use super::listing::io_text;
 use super::{asked_path, blocking, failed, person_window};
 
-/// Opens the system terminal in a folder: Terminal on macOS, Windows Terminal (else a command
-/// prompt) on Windows, the first of the usual terminals on Linux.
 #[tauri::command]
 pub async fn files_open_terminal(webview: tauri::Webview, path: String) -> Result<(), String> {
     person_window(&webview)?;

@@ -47,8 +47,6 @@ fn named_key(name: &str) -> Option<Key> {
     Some(key)
 }
 
-/// Parse "cmd+shift+t" into held modifiers + the final key. A lone modifier
-/// name ("alt") is itself a pressable key.
 pub(crate) fn parse_key_chord(chord: &str) -> Result<(Vec<Key>, Key), String> {
     let parts: Vec<&str> = chord
         .split('+')

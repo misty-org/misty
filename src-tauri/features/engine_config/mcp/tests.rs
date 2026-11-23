@@ -35,7 +35,6 @@ fn runtime_snapshot_is_workspace_scoped_and_marks_session_end() {
     assert_eq!(ended.status, "session_ended");
     assert_eq!(ended.entries.len(), 2);
 
-    // A run that was never registered writes no snapshot.
     runtime::record_from_run("unknown-run", None, vec![("x".to_string(), None)], vec![]);
     let other = runtime::claude_section(Some("/tmp/ws-mcp-other"));
     assert_eq!(other.status, "no_session");

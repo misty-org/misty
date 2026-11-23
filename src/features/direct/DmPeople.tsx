@@ -10,10 +10,9 @@ import {
 import { ChatAvatar, useMemberPicture } from "@/features/spaces";
 import type { DirectConversation, Person } from "./api";
 import { CallButton } from "./calls/CallButtons";
-import { useFriends } from "./directData";
-import { useCustomStatus, usePresence } from "./statusStore";
+import { useFriends } from "./direct_data";
+import { useCustomStatus, usePresence } from "./status_store";
 
-/** What a one-to-one DM's side panel is: the other person's profile. */
 export const profileIcon = CircleUserRound;
 
 const longDate = new Intl.DateTimeFormat(undefined, {
@@ -22,7 +21,6 @@ const longDate = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
 });
 
-/** Someone in a DM as their face: their picture (or initials in their tone) with their status. */
 export function DmFace({
   dmId,
   person,
@@ -35,7 +33,7 @@ export function DmFace({
   const presence = usePresence(person.user_id);
   const picture = useMemberPicture(dmId, person.user_id, person.avatar_version);
   return (
-    <PresenceFace presence={presence} size={size === "xl" ? "lg" : "default"}>
+    <PresenceFace presence={presence} face={size ?? "default"}>
       <ChatAvatar
         id={person.user_id}
         name={person.username}
@@ -46,7 +44,6 @@ export function DmFace({
   );
 }
 
-/** The opening of a DM's history: the person it's with, or the group and its people. */
 export function DmWelcome({
   dm,
   name,
@@ -76,7 +73,6 @@ export function DmWelcome({
   );
 }
 
-/** The other person's profile beside a one-to-one DM, where a group lists its people. */
 export function DmProfile({ dm, person }: { dm: DirectConversation; person: Person }) {
   const custom = useCustomStatus(person.user_id);
   const friends = useFriends();

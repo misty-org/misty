@@ -36,9 +36,6 @@ impl Engine for MiniMaxEngine {
     fn supports_mcp(&self) -> bool {
         true
     }
-    /// MiniMax Code's `permissionMode` option (`default` "Ask", `auto`) and its ACP plan mode.
-    /// Its Full access (`bypassPermissions`) isn't offered: MiniMax has no sandbox that keeps it
-    /// inside its folder.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[

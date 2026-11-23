@@ -2,13 +2,13 @@ import { registerPreferenceWriter } from "@/features/settings/device-preferences
 import {
   editPreference,
   initialPreferencesState,
-} from "@/features/settings/device-preferences/settingResolution";
+} from "@/features/settings/device-preferences/setting_resolution";
 import { useDevicePreferences } from "@/features/settings/device-preferences/store";
 import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { CursorCompanionController } from "./CursorCompanionController";
-import type { CompanionConversation } from "./companionConversation";
-import type * as TutorConversationModule from "./tutorConversation";
+import type { CompanionConversation } from "./companion_conversation";
+import type * as TutorConversationModule from "./tutor_conversation";
 import type * as MistyUi from "@misty/ui";
 const mocks = vi.hoisted(() => ({
   listeners: new Map<string, (e: { payload: unknown }) => void>(),
@@ -28,9 +28,7 @@ const mocks = vi.hoisted(() => ({
   taskId: "desktop-task",
   submit: vi.fn(),
   steer: vi.fn(),
-  /** Settles once the voice session has opened Tutor's conversation. */
   conversationReady: Promise.resolve() as Promise<unknown>,
-  /** The agent Tutor hands work to. */
   agent: { id: "ada", name: "Ada", engine: "claude", avatar: {} },
   openThread: vi.fn(),
   loadConversations: vi.fn(async () => {}),
@@ -47,7 +45,7 @@ const mocks = vi.hoisted(() => ({
   },
   subscribers: new Set<() => void>(),
 }));
-vi.mock("../../runs/local-execution/localExecution", () => ({
+vi.mock("../../runs/local-execution/local_execution", () => ({
   useLocalExecution: { getState: () => ({ execution: { taskId: mocks.taskId } }) },
   pauseLocalExecution: mocks.pause,
 }));
@@ -67,18 +65,15 @@ vi.mock("@tauri-apps/api/window", () => ({
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
 }));
-// Notices aren't what these tests check; drawing their host isn't needed.
 vi.mock("@misty/ui", async (original) => ({
   ...(await original<typeof MistyUi>()),
   notify: vi.fn(),
 }));
-// Tutor's own conversation is the fixture's one conversation.
-vi.mock("./tutorConversation", async (original) => ({
+vi.mock("./tutor_conversation", async (original) => ({
   ...(await original<typeof TutorConversationModule>()),
   tutorConversation: async () => "conversation",
 }));
-// Work goes to one agent, Ada, whose thread is the fixture's conversation, through submitAnswer.
-vi.mock("./tutorHandoff", () => ({
+vi.mock("./tutor_handoff", () => ({
   handoffAgents: () => [mocks.agent],
   agentNamed: (name?: string) =>
     name && mocks.agent.name.toLowerCase().startsWith(name.toLowerCase()) ? mocks.agent : undefined,
@@ -112,7 +107,7 @@ vi.mock("./tutorHandoff", () => ({
     return { invocationId: mocks.state.invocationId ?? "", conversationId: "conversation" };
   },
 }));
-vi.mock("./companionConversation", () => ({
+vi.mock("./companion_conversation", () => ({
   CompanionConversation: class {
     constructor(private options: ConstructorParameters<typeof CompanionConversation>[0]) {
       mocks.conversationOpen();
@@ -132,7 +127,7 @@ vi.mock("./companionConversation", () => ({
     close = mocks.conversationClose;
   },
 }));
-vi.mock("@/features/agents/conversations/state/useMistyStore", () => ({
+vi.mock("@/features/agents/conversations/state/use_misty_store", () => ({
   useMistyStore: {
     setState: (update: (state: typeof mocks.state) => Partial<typeof mocks.state>) =>
       Object.assign(mocks.state, update(mocks.state)),
@@ -158,7 +153,6 @@ const emit = (event: string, payload: unknown) =>
       payload,
     });
   });
-/** Waits for the voice session to open Tutor's conversation. */
 const opened = () =>
   act(async () => {
     await mocks.conversationReady;
@@ -167,7 +161,6 @@ const presentations = () =>
   mocks.invoke.mock.calls
     .filter(([name]) => name === "cursor_companion_present")
     .map(([, args]) => args.presentation);
-/** Leaves the companion's device preferences (`agents.companion.*`) as a person set them. */
 function saveCompanion(companion: Record<string, unknown>) {
   useDevicePreferences.setState({ state: initialPreferencesState({ companion }) });
 }

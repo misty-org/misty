@@ -1,5 +1,3 @@
-//! Gemini through the Generative Language API. Ported from `@ai-sdk/google`. The key travels in the
-//! `x-goog-api-key` header and never in a URL.
 mod capabilities;
 mod chunk;
 mod decoder;
@@ -37,10 +35,11 @@ impl GoogleModel {
     }
 }
 
-/// The failure shape Google documents. Anything else falls back to the status text.
 pub(crate) fn error_message(body: &Value) -> Option<String> {
     let error = body.get("error")?;
-    let code_fits = error.get("code").is_some_and(|code| code.is_number() || code.is_null());
+    let code_fits = error
+        .get("code")
+        .is_some_and(|code| code.is_number() || code.is_null());
     let status_fits = error.get("status").is_some_and(Value::is_string);
     if !code_fits || !status_fits {
         return None;
@@ -60,10 +59,26 @@ impl LanguageModel for GoogleModel {
     fn stream(&self, options: CallOptions) -> BoxFuture<'_, Result<ModelStream, ModelError>> {
         Box::pin(async move {
             let (body, warnings) = request::build(&self.model, &options)?;
-            let url = format!("{}/{}:streamGenerateContent?alt=sse", self.base_url, model_path(&self.model));
+            let url = format!(
+                "{}/{}:streamGenerateContent?alt=sse",
+                self.base_url,
+                model_path(&self.model)
+            );
             let headers = [("x-goog-api-key", self.api_key.clone())];
-            let response = post_json(&self.client, &url, &headers, &body, &self.api_key, error_message).await?;
-            Ok(decoded_stream(response, decoder::GoogleDecoder::new(warnings), &self.api_key))
+            let response = post_json(
+                &self.client,
+                &url,
+                &headers,
+                &body,
+                &self.api_key,
+                error_message,
+            )
+            .await?;
+            Ok(decoded_stream(
+                response,
+                decoder::GoogleDecoder::new(warnings),
+                &self.api_key,
+            ))
         })
     }
 }
@@ -82,6 +97,9 @@ mod tests {
     fn only_googles_failure_shape_gives_a_message() {
         let body = serde_json::json!({ "error": { "code": 400, "message": "Bad.", "status": "INVALID_ARGUMENT" } });
         assert_eq!(error_message(&body).as_deref(), Some("Bad."));
-        assert_eq!(error_message(&serde_json::json!({ "error": { "message": "Bad." } })), None);
+        assert_eq!(
+            error_message(&serde_json::json!({ "error": { "message": "Bad." } })),
+            None
+        );
     }
 }

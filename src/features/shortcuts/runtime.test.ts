@@ -1,8 +1,8 @@
-import "@/app/featureSeams";
-import { useSettingsStore } from "@/features/settings/preferences/useSettingsStore";
-import { useWorkspaceStore } from "@/features/app-windows/tabs/useWorkspaceStore";
+import "@/app/feature_seams";
+import { useSettingsStore } from "@/features/settings/preferences/use_settings_store";
+import { useWorkspaceStore } from "@/features/app-windows/tabs/use_workspace_store";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { dispatchShortcutEvent, invokeShortcutCommand, registerShortcutHandler } from "./runtime";
+import { dispatchShortcutEvent, invokeShortcutCommand, registerShortcutHandler } from "./Runtime";
 import { detectShortcutPlatform } from "../../shared/shortcuts/bindings";
 
 describe("shortcut dispatcher", () => {
@@ -157,7 +157,9 @@ describe("shortcut dispatcher", () => {
     const remove = registerShortcutHandler("app.zoom_out", handler);
 
     expect(
-      dispatchShortcutEvent(new KeyboardEvent("keydown", { key: "-", code: "Minus", metaKey: true })),
+      dispatchShortcutEvent(
+        new KeyboardEvent("keydown", { key: "-", code: "Minus", metaKey: true }),
+      ),
     ).toBe(true);
     expect(handler).toHaveBeenCalledOnce();
     expect(
@@ -218,7 +220,6 @@ describe("shortcut dispatcher", () => {
       metaKey: platform === "macos",
       ctrlKey: platform !== "macos",
     });
-    // A page forwards the keys it doesn't take itself, saying whether a field had focus.
     expect(dispatchShortcutEvent(event, false)).toBe(true);
     expect(settingsHandler).toHaveBeenCalledOnce();
 

@@ -1,23 +1,21 @@
 import { useState } from "react";
 import { aiSurfaceApi } from "../../runs/invocations/api";
-import type { AgentSubagent } from "../../runs/invocations/invocationTypes";
-import { Button } from "@misty/ui";
-import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
-import { WorkGroup } from "../../progress/WorkGroup";
+import type { AgentSubagent } from "../../runs/invocations/invocation_types";
+import { Button, Text, ToolBody, ToolList, ToolRow } from "@misty/ui";
 
 const running = new Set(["queued", "running", "awaiting_approval", "awaiting_intervention"]);
 
-/** Status as an icon, a word and, for waiting or failed, color; never color alone. */
-function status(state: string): { label: string; row: StatusState } {
+type RowState = "running" | "done" | "failed" | "waiting";
+
+function status(state: string): { label: string; row: RowState } {
   if (state === "completed") return { label: "Done", row: "done" };
   if (state === "failed") return { label: "Didn’t finish", row: "failed" };
-  if (state === "canceled") return { label: "Stopped", row: "stopped" };
-  if (state === "queued") return { label: "Starting", row: "next" };
+  if (state === "canceled") return { label: "Stopped", row: "done" };
+  if (state === "queued") return { label: "Starting", row: "running" };
   if (state.startsWith("awaiting")) return { label: "Waiting", row: "waiting" };
   return { label: "Working", row: "running" };
 }
 
-/** The sub-agents a run started, as one group line over a table, each with its own Stop. */
 export function AgentSubagents({ subagents }: { subagents: AgentSubagent[] }) {
   const [stopping, setStopping] = useState<Record<string, boolean>>({});
   if (!subagents.length) return null;
@@ -25,40 +23,42 @@ export function AgentSubagents({ subagents }: { subagents: AgentSubagent[] }) {
     setStopping((current) => ({ ...current, [id]: true }));
     await aiSurfaceApi.cancelInvocation(id).catch(() => undefined);
   };
-  const live = subagents.filter((subagent) => running.has(subagent.state)).length;
-  const total = subagents.length;
-  const noun = total === 1 ? "helper" : "helpers";
   return (
-    <WorkGroup
-      summary={live ? `Running ${live} of ${total} ${noun}` : `Ran ${total} ${noun}`}
-      running={live > 0}
-    >
-      <StatusTable label="Sub-agents">
+    <div className="my-3">
+      <ToolList label="Sub-agents">
         {subagents.map((subagent) => {
           const { label, row } = status(subagent.state);
-          const stoppingNow = stopping[subagent.invocationId] && running.has(subagent.state);
+          const live = running.has(subagent.state);
+          const stoppingNow = stopping[subagent.invocationId] && live;
           return (
-            <StatusRow
-              key={subagent.invocationId}
-              state={row}
-              verb={stoppingNow ? "Stopping" : label}
-              sub={subagent.summary || undefined}
-              actions={
-                running.has(subagent.state) && !stoppingNow ? (
-                  <Button
-                    aria-label={`Stop sub-agent: ${subagent.goal}`}
-                    onClick={() => void stop(subagent.invocationId)}
-                  >
-                    Stop
-                  </Button>
-                ) : undefined
-              }
-            >
-              {subagent.goal}
-            </StatusRow>
+            <li key={subagent.invocationId}>
+              <ToolRow
+                name={stoppingNow ? "Stopping" : label}
+                target={subagent.goal}
+                state={row}
+                meta={
+                  live && !stoppingNow ? (
+                    <Button
+                      size="sm"
+                      aria-label={`Stop sub-agent: ${subagent.goal}`}
+                      onClick={() => void stop(subagent.invocationId)}
+                    >
+                      Stop
+                    </Button>
+                  ) : undefined
+                }
+              />
+              {subagent.summary ? (
+                <ToolBody>
+                  <Text wrap size="meta" tone="muted">
+                    {subagent.summary}
+                  </Text>
+                </ToolBody>
+              ) : null}
+            </li>
           );
         })}
-      </StatusTable>
-    </WorkGroup>
+      </ToolList>
+    </div>
   );
 }

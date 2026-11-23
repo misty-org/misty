@@ -1,12 +1,3 @@
-//! Confined helper processes on Windows, the counterpart of `sandbox-exec`
-//! on macOS (see the `sandbox` crate). A helper runs in an AppContainer
-//! with no capabilities, so it has no network and no access to the person's
-//! files, registry or other processes. It can read and write only its own
-//! working folder. Its job bounds its memory, CPU time and process count and
-//! ends it when the job closes.
-//!
-//! The helper speaks through two files the supervisor opens: a request it
-//! reads as standard input and a response it writes as standard output.
 use file_access::fs;
 use file_access::fs::File;
 use std::{
@@ -21,28 +12,21 @@ use super::{
     environment_block, spawn, system_variables, Access, Container, Job, JobLimits, Launch,
 };
 
-/// What a confined helper may use, and for how long.
 pub struct Limits {
     pub memory_bytes: usize,
     pub cpu: Duration,
     pub wall: Duration,
-    /// The most it may write to its standard output.
     pub output_bytes: u64,
-    /// The most its working folder may hold.
     pub work_bytes: u64,
-    /// The most processes it may run at once, itself included.
     pub processes: u32,
 }
 
-/// A helper's private working folder, granted to its AppContainer.
 pub struct Workspace {
     folder: tempfile::TempDir,
     container: Container,
 }
 
 impl Workspace {
-    /// Creates an empty folder that only this account, SYSTEM and the named
-    /// AppContainer may use. Files written into it afterwards inherit that.
     pub fn new(container_name: &str) -> Result<Self, String> {
         let container = Container::open(container_name)?;
         let folder = tempfile::Builder::new()
@@ -57,8 +41,6 @@ impl Workspace {
         self.folder.path()
     }
 
-    /// Writes the helper, runs it with `request` as its standard input, and
-    /// returns its standard output once it exits successfully.
     pub fn run(
         &self,
         helper: &[u8],
@@ -71,8 +53,6 @@ impl Workspace {
         }
         let executable = self.path().join("helper.exe");
         fs::write(&executable, helper).map_err(|_| "Could not stage the helper.")?;
-        // Both files live outside the helper's folder; it reaches them only
-        // through the handles it inherits.
         let mut input = File::unnamed_temp().map_err(|_| "Could not stage the request.")?;
         input
             .write_all(request)
@@ -142,7 +122,6 @@ impl Workspace {
     }
 }
 
-/// The bytes held by the files under `folder`, without following links.
 fn folder_bytes(folder: &Path) -> u64 {
     fs::read_dir(folder)
         .into_iter()
@@ -158,8 +137,6 @@ fn folder_bytes(folder: &Path) -> u64 {
 
 impl Drop for Workspace {
     fn drop(&mut self) {
-        // The folder goes with its rules; the container's profile stays for
-        // the next helper.
         let _ = self.container.forget(self.folder.path());
     }
 }

@@ -15,11 +15,9 @@ import {
   Text,
 } from "@misty/ui";
 import { copy } from "./copy";
-import { answerProbeConfirm, currentProbeConfirm, subscribeProbeConfirm } from "./probe-confirm";
+import { answerProbeConfirm, currentProbeConfirm, subscribeProbeConfirm } from "./probe_confirm";
 import type { McpProbePlan } from "./types";
 
-/** An argument as a shell would need it: quoted when it holds whitespace or quotes, so the line
- *  reads as one unambiguous command. */
 function displayArg(arg: string): string {
   return /[\s"'\\]/.test(arg) || arg === "" ? JSON.stringify(arg) : arg;
 }
@@ -53,12 +51,6 @@ function PlanDetails({ plan }: { plan: McpProbePlan }) {
   );
 }
 
-/**
- * Asks before checking MCP servers whose config came with the folder (probe-confirm.ts), listing
- * the exact command or address of each so the person sees what would run. Mounted once in the
- * app. Opens without focusing Run check: running commands from a repository takes a deliberate
- * click.
- */
 export function McpProbeConfirmHost() {
   const request = useSyncExternalStore(subscribeProbeConfirm, currentProbeConfirm);
   if (!request) return null;
@@ -71,11 +63,17 @@ export function McpProbeConfirmHost() {
         </AlertDialogHeader>
         <ul className="grid max-h-72 gap-2 overflow-y-auto">
           {request.items.map(({ entry, plan }) => (
-            <Surface as="li" key={entry.id} tone="well" radius="lg" className="px-3 py-2 text-sm">
+            <Surface
+              as="li"
+              key={entry.id}
+              tone="well"
+              radius="lg"
+              className="px-3 py-2 text-control"
+            >
               <Text bare tone="bright" weight="medium">
                 {entry.name}
               </Text>
-              <Text bare tone="muted" className="block break-all text-xs">
+              <Text size="meta" bare tone="muted" className="block break-all">
                 {entry.path}
               </Text>
               {plan ? (

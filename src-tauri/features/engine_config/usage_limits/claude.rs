@@ -1,20 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Claude subscription windows from Claude Code's own `rate_limit_event` lines (stream-json
-//! output), which it sends when its limits change:
-//!
-//! ```json
-//! { "type": "rate_limit_event", "session_id": "…", "uuid": "…",
-//!   "rate_limit_info": { "status": "allowed_warning", "rateLimitType": "five_hour",
-//!     "resetsAt": 1793188800, "utilization": 0.82, "isUsingOverage": false,
-//!     "unifiedWindows": { "five_hour": { "utilization": 0.82, "resetsAt": 1793188800 },
-//!                         "seven_day": { "utilization": 0.31, "resetsAt": 1793491200 } } } }
-//! ```
-//!
-//! `utilization` is the fraction of the window used and `resetsAt` is in epoch seconds. The
-//! window ids and labels match the ones desktop-cc-gui maps from Claude's usage endpoint.
-
 use serde_json::Value;
 
 use super::{
@@ -22,7 +8,6 @@ use super::{
     WEEKLY_WINDOW_SECONDS,
 };
 
-/// Claude's window names: (id, kind, window seconds, label).
 const WINDOWS: [(&str, &str, i64, Option<&str>); 5] = [
     ("five_hour", KIND_SESSION, SESSION_WINDOW_SECONDS, None),
     ("seven_day", KIND_WEEKLY, WEEKLY_WINDOW_SECONDS, None),
@@ -53,7 +38,6 @@ pub(crate) struct ClaudeUpdate {
     pub using_overage: bool,
 }
 
-/// The windows one event reports. `None` when it is not a rate-limit event.
 pub(crate) fn parse_event(event: &Value) -> Option<ClaudeUpdate> {
     let info = match event.get("rate_limit_info") {
         Some(info) => info,
@@ -78,7 +62,6 @@ pub(crate) fn parse_event(event: &Value) -> Option<ClaudeUpdate> {
     }
     if let Some(id) = info.get("rateLimitType").and_then(Value::as_str) {
         if !windows.iter().any(|w| w.id == id) {
-            // The top level carries the same field names as a unified window.
             if let Some(window) = window(id, info_value, status) {
                 windows.push(window);
             }
@@ -174,7 +157,6 @@ mod tests {
         assert_eq!(opus.label.as_deref(), Some("Opus"));
         assert_eq!(opus.used_percent, 100.0);
         assert_eq!(opus.resets_at, Some(1_793_491_200_000));
-        // The bare info object is accepted too.
         assert!(parse_event(&info).is_some());
     }
 

@@ -2,9 +2,6 @@ import { WelcomeNav } from "./WelcomeNav";
 import type { ReactNode } from "react";
 import { PageEnter, Text } from "@misty/ui";
 
-/** A signed-out page: the floating nav, then the page's heading and its card in one centered
- * column. The signed-out window grows to fit the column (`data-signed-out-page` and
- * `data-signed-out-content`, useSignedOutWindow); it scrolls only past the screen's height. */
 export default function AuthShell({ title, description, children }: AuthShellProps) {
   return (
     <div

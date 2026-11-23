@@ -1,18 +1,13 @@
 import { Check } from "lucide-react";
 import { useEffect, type KeyboardEvent } from "react";
-import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
-import { cn, SetupState, Surface, Text } from "@misty/ui";
-import { useEngineReadiness } from "./engineReadiness";
+import { cn, hasMark, LogoInitial, Mark, SetupState, Surface, Text } from "@misty/ui";
+import { useEngineReadiness } from "./engine_readiness";
 import { EngineNextStep } from "./EngineNextStep";
 
-export { engineSetupState, type EngineSetupState } from "./engineReadiness";
-import type { EngineSetupState } from "./engineReadiness";
+export { engineSetupState, type EngineSetupState } from "./engine_readiness";
+import type { EngineSetupState } from "./engine_readiness";
 
-/**
- * How each featured engine is paid for, in the words of someone who has never used one: the free
- * ones say so, the others name the account they use. Nothing here asks anyone to buy anything.
- */
 const ACCOUNT_HINTS: Partial<Record<EngineId, string>> = {
   agy: "Free with a Google account",
   opencode: "Free, no account",
@@ -20,11 +15,6 @@ const ACCOUNT_HINTS: Partial<Record<EngineId, string>> = {
   claude: "With a Claude plan",
 };
 
-/**
- * One engine on the setup page: its mark and name, then the single thing to do next. Install runs
- * the same plan as Agents › CLIs (npm in the app, the vendor's installer in a terminal
- * the person watches), and sign-in is the CLI's own login in a terminal.
- */
 export function EngineSetupRow({
   engine,
   onState,
@@ -34,10 +24,8 @@ export function EngineSetupRow({
 }: {
   engine: EngineId;
   onState(engine: EngineId, state: EngineSetupState): void;
-  /** With `onChoose`, a ready engine can be picked, as for a new agent; the pick has a check. */
   chosen?: boolean;
   onChoose?(engine: EngineId): void;
-  /** It can't be the default engine (no images, Misty's tools or web search), so isn't picked. */
   unfit?: boolean;
 }) {
   const { view, state } = useEngineReadiness(engine);
@@ -69,10 +57,10 @@ export function EngineSetupRow({
         : {})}
     >
       <Text bare tone="bright" className="flex size-9 shrink-0 items-center justify-center">
-        {hasEngineMark(engine) ? (
-          <EngineMark engine={engine} size={18} />
+        {hasMark(`engine:${engine}`) ? (
+          <Mark of={`engine:${engine}`} size={18} />
         ) : (
-          <span className="text-sm font-semibold">{name.charAt(0)}</span>
+          <LogoInitial name={name} size={18} />
         )}
       </Text>
       <span className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -98,19 +86,22 @@ export function EngineSetupRow({
           Can't run Misty's own work
         </Text>
       ) : onChoose ? (
-        // A ready engine that can be picked shows the check only once it is the pick.
         chosen ? (
           <Text bare tone="bright" className="flex shrink-0">
             <Check aria-label={`${name} chosen`} />
           </Text>
         ) : null
       ) : (
-        <Text bare tone="bright" className="inline-flex h-8 items-center gap-1.5 px-2 text-sm">
+        <Text
+          bare
+          size="control"
+          tone="bright"
+          className="inline-flex h-8 items-center gap-1.5 px-2"
+        >
           <Check aria-hidden="true" />
           Ready
         </Text>
       )}
-      {/* Always mounted, so an install or sign-in dialog stays open as the state moves on. */}
       <EngineNextStep engine={engine} view={view} state={state} />
     </Surface>
   );

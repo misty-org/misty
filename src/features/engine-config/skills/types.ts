@@ -1,19 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * Skills hub IPC types — mirror `src-tauri/features/engine_config/skills_hub/mod.rs` (camelCase).
- *
- * The query/mutate commands are a transport detail: pages consume these
- * discriminated shapes, never `any`.
- */
 
-/** Where a skill comes from. `managed` = the app's own copy (SSOT); the
- *  others are read-only sources the app merely displays. */
 export type SkillSourceKind = "managed" | "local" | "builtin" | "system" | "plugin";
 
-/** Sync targets the engine adapters implement: every CLI the app drives,
- *  plus the shared cross-agent root. `agents` stays hidden from the engine
- *  list but is part of the state (`~/.agents/skills` is read by several CLIs). */
 export type SkillTargetId =
   | "claude"
   | "codex"
@@ -39,8 +28,6 @@ export interface SkillTargetInfo {
   label: string;
   path: string;
   readonly: boolean;
-  /** The CLI's home exists on this machine. Targets that are not installed are
-   *  hidden by the UI unless a copy (or a missing copy) already lives there. */
   available: boolean;
 }
 
@@ -139,7 +126,6 @@ export interface SkillUsageEntry {
 }
 
 export interface SkillUsageResult {
-  /** Statistics scope; currently always Claude Code transcripts. */
   engine: "claude";
   scope: "claude_code_transcripts";
   generatedAt: number | null;
@@ -150,10 +136,6 @@ export interface SkillUsageResult {
   unusedInstalled: { skillId: string | null; directory: string | null; name: string | null }[];
 }
 
-/** Per-target outcome of a multi-target operation.
- *  `kept` marks a target whose copy is the user's own source directory: the app
- *  never deletes it, so a "remove" that keeps it is a correct outcome — but the
- *  UI must not report it as "removed". */
 export interface SkillTargetResult {
   target: string;
   ok: boolean;
@@ -177,15 +159,11 @@ export interface SkillContentResult {
   truncated: boolean;
 }
 
-/** A skills.sh entry has only name / repo / installs; the details are the repo's SKILL.md. */
 export interface SkillRemoteContent {
   name: string;
   description: string;
-  /** The folder in the repo (`skills/react-best-practices`). */
   directory: string;
-  /** The file's path in the repo (`skills/react-best-practices/SKILL.md`). */
   path: string;
-  /** Where the file can be read on GitHub. */
   url: string;
   repoUrl: string;
   markdown: string;
@@ -193,13 +171,9 @@ export interface SkillRemoteContent {
   branch: string;
 }
 
-/** Mutation actions of `engine_skills_mutate`: the action plus everything the
- *  backend reads out of the `payload` it receives. `mutate()` in `api.ts`
- *  splits the two. */
 export type SkillsMutation =
   | {
       action: "install";
-      /** Acknowledges overwriting a locally modified managed copy (updates). */
       force?: boolean;
       skill: {
         name: string;
@@ -219,7 +193,6 @@ export type SkillsMutation =
   | { action: "add_repo"; repo: { owner: string; name: string; branch: string } }
   | { action: "remove_repo"; owner: string; name: string };
 
-/** Error codes the hub backend normalizes to. */
 export type SkillErrorCode =
   | "rate_limited"
   | "invalid_input"

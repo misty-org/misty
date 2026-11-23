@@ -3,7 +3,6 @@ use crate::engines::modes::{offered, ModeKind};
 use crate::engines::{engine_by_id, SendRequest};
 use serde_json::json;
 
-/// Every flag an engine takes to stop asking for permission.
 const SKIP_FLAGS: &[&str] = &[
     "--dangerously-skip-permissions",
     "--dangerously-bypass-approvals-and-sandbox",
@@ -34,7 +33,6 @@ fn request(permission: &str) -> SendRequest {
     }
 }
 
-/// The command line the engine is started with for this permission level, local folder.
 fn argv(engine: &dyn Engine, permission: &str) -> Option<Vec<String>> {
     let req = request(permission);
     let built = if engine.drives_own_transport() {
@@ -57,7 +55,6 @@ fn argv(engine: &dyn Engine, permission: &str) -> Option<Vec<String>> {
     Some(args)
 }
 
-/// The launch level for an engine mode id, as a run body names it.
 fn launch(engine: &dyn Engine, id: &str) -> Result<&'static str, String> {
     launch_for(
         engine,
@@ -86,7 +83,6 @@ fn only_a_no_asking_mode_passes_an_engines_skip_permissions_flag() {
     }
 }
 
-/// The engines with a folder sandbox of their own; no other engine may list a no-asking mode.
 const FOLDER_SANDBOXED: &[&str] = &["claude", "gemini", "qwen"];
 
 #[test]
@@ -171,13 +167,11 @@ fn an_old_request_maps_to_the_engines_closest_mode() {
             "auto"
         })
     );
-    // Kimi Code has its own Auto mode, which works without asking for safe operations.
     let kimi = engine_by_id("kimi").unwrap();
     assert_eq!(
         launch_for(kimi.as_ref(), &json!({ "permission_mode": "auto" })),
         Ok("auto")
     );
-    // Antigravity asks over ACP: an old Ask takes its Default.
     let agy = engine_by_id("agy").unwrap();
     assert_eq!(
         launch_for(agy.as_ref(), &json!({ "permission_mode": "ask" })),
@@ -200,7 +194,6 @@ fn every_engine_offers_a_mode_with_one_kind_each_label() {
                 "{id}: {} repeats an id or launch level",
                 mode.id
             );
-            // Sentence case: only the first letter (or a whole acronym) is upper case.
             let rest: String = mode.label.chars().skip(1).collect();
             assert!(
                 mode.label == mode.label.to_uppercase() || rest == rest.to_lowercase(),

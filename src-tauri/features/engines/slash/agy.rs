@@ -1,31 +1,9 @@
-//! The agy commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Antigravity runs over ACP (`agy acp`, `agy.rs`), and its server names the commands and skills
-//! it runs from a prompt in `available_commands_update` (`reported.rs`): on 1.5.9 `goal`,
-//! `compact`, `schedule`, `browser`, `plan`, `grill-me`, `teamwork`, `learn`, `boost` and the
-//! skills (`agy-customizations`, `antigravity-guide`, `run-workflow`, `swarm`, the person's own).
-//! The `Runs::Turn` rows here are those, with the descriptions from Antigravity's slash command
-//! docs (antigravity.google/docs/slash-commands), so the menu has them before the first run.
-//! `/grill-me` is back: its `ask_question` calls reach the person as question cards over ACP.
-//!
-//! The `Runs::Misty` rows are the ones the terminal app answers itself, without the model, which
-//! the ACP server doesn't run (sent there, they'd reach the model as plain text). Misty runs each
-//! the way print mode answers it, `agy --print /<name>`, which streams a `result` whose
-//! `response` is the answer and makes no model call (checked on 1.5.9: `num_turns` 0, no tokens);
-//! `/plugin` is the `agy plugin` subcommand.
-//!
-//! Left out on purpose: `/btw` (no turn runs between Misty's turns to interject into),
-//! `/automation` and `/generative_ui` (the desktop app only), and the terminal app's own
-//! `/rename`, `/fork` and `/context`, which work on a conversation store (sqlite with protobuf
-//! steps) that isn't documented, so the composer's own versions answer them.
-
 use std::time::Duration;
 
 use serde_json::Value;
 
 use super::{misty, row, turn, Command, Context, Output, Section};
 
-/// How long an out-of-turn print-mode answer may take; each is local or one account lookup.
 const LOCAL_TIMEOUT: Duration = Duration::from_secs(90);
 
 pub const COMMANDS: &[Command] = &[
@@ -137,7 +115,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     shown(title, &result)
 }
 
-/// `/name args` as print mode answers it, in plan mode so nothing could be changed.
 fn print_args(name: &str, args: &str) -> Vec<String> {
     let prompt = format!("/{name} {args}").trim().to_string();
     [
@@ -183,8 +160,6 @@ async fn run_agy(context: &Context, args: &[String]) -> Result<String, String> {
     Ok(stdout)
 }
 
-/// A print-mode `result` as facts: its tab-separated lines as rows (`Gemini Models · Weekly
-/// Limit Remaining · 98% · …`), the rest as text, and the command's own description.
 pub(super) fn shown(title: &str, result: &Value) -> Result<Output, String> {
     let status = result["status"].as_str().unwrap_or("");
     if !status.is_empty() && !status.eq_ignore_ascii_case("success") {

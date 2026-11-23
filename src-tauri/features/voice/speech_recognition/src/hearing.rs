@@ -1,9 +1,3 @@
-//! Live hearing: audio from one or more inputs (the person's microphone, each person in a call)
-//! goes through a voice activity detector of its own, and each stretch of speech it finds is
-//! recognized on a worker thread. What happens is pushed to the caller as it happens: speech
-//! started, speech stopped (being recognized), and what was heard, with its time. Nothing is
-//! polled; the caller feeds audio as it arrives.
-
 use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
@@ -14,11 +8,8 @@ use crate::decode::SAMPLE_RATE;
 use crate::model::VadSpec;
 use crate::{Phrase, Recognizer};
 
-/// Samples the detector takes at a time (Silero VAD at 16 kHz).
 pub(crate) const WINDOW: usize = 512;
 
-/// The detector, set for speech said to Misty: a pause of 0.4 seconds ends what was said, and a
-/// long stretch is cut every 20 seconds so it never waits for the speaker to stop.
 pub(crate) fn detector(vad: &VadSpec) -> Option<VoiceActivityDetector> {
     let config = VadModelConfig {
         silero_vad: SileroVadModelConfig {
@@ -38,25 +29,18 @@ pub(crate) fn detector(vad: &VadSpec) -> Option<VoiceActivityDetector> {
     VoiceActivityDetector::create(&config, 60.0)
 }
 
-/// What a hearing session tells its caller, for one input.
 #[derive(Clone, Debug)]
 pub enum HearingEvent {
-    /// Someone started speaking.
     Started { input: String },
-    /// They stopped; what they said is being recognized.
     Stopped { input: String },
-    /// What they said, with its time in seconds from when the input was first fed.
     Heard { input: String, phrase: Phrase },
-    /// The session closed and everything said before has been recognized and told.
     Closed,
 }
 
 struct Input {
     detector: VoiceActivityDetector,
-    /// Samples short of a full window, kept for the next feed.
     pending: Vec<f32>,
     speaking: bool,
-    /// Bumped by a reset, so speech queued before it is dropped.
     generation: u64,
 }
 
@@ -69,21 +53,16 @@ struct Job {
 
 type Notify = Arc<dyn Fn(HearingEvent) + Send + Sync>;
 
-/// A live hearing session over any number of inputs, each named by the caller.
 pub struct Hearing {
     vad: VadSpec,
     inputs: Mutex<HashMap<String, Input>>,
     jobs: Mutex<Option<Sender<Job>>>,
-    /// The generation each input is at, for the worker to drop speech from before a reset.
     generations: Arc<Mutex<HashMap<String, u64>>>,
-    /// Where generations come from: never reused, so speech queued before a reset or a removal
-    /// can't pass for later speech.
     next_generation: std::sync::atomic::AtomicU64,
     notify: Notify,
 }
 
 impl Hearing {
-    /// Opens a session that recognizes with `recognizer` and tells `notify` what happens.
     pub fn open(
         recognizer: Arc<Recognizer>,
         vad: VadSpec,
@@ -95,7 +74,6 @@ impl Hearing {
         let worker_notify = notify.clone();
         let worker_generations = generations.clone();
         std::thread::spawn(move || {
-            // Speech is recognized in the order it was said, one stretch at a time.
             for job in queue {
                 let current = worker_generations
                     .lock()
@@ -134,7 +112,6 @@ impl Hearing {
             + 1
     }
 
-    /// Feeds 16 kHz mono samples from `input`, opening it on first use.
     pub fn push(&self, input: &str, samples: &[f32]) -> Result<(), String> {
         let mut told = Vec::new();
         {
@@ -166,14 +143,12 @@ impl Hearing {
                 self.step(input, state, &mut told);
             }
         }
-        // Told once the lock is let go, so a caller may feed or reset from what it hears.
         for event in told {
             (self.notify)(event);
         }
         Ok(())
     }
 
-    /// Ends what `input` is saying now and recognizes it, as when it stops for good.
     pub fn flush(&self, input: &str) {
         let mut told = Vec::new();
         {
@@ -201,8 +176,6 @@ impl Hearing {
         }
     }
 
-    /// Forgets what `input` has said so far, recognized or not, such as Misty's own voice heard
-    /// through the speakers.
     pub fn reset(&self, input: &str) {
         let Ok(mut inputs) = self.inputs.lock() else {
             return;
@@ -218,7 +191,6 @@ impl Hearing {
         }
     }
 
-    /// Stops hearing `input`; what it was saying is dropped.
     pub fn remove(&self, input: &str) {
         if let Ok(mut inputs) = self.inputs.lock() {
             inputs.remove(input);
@@ -228,7 +200,6 @@ impl Hearing {
         }
     }
 
-    /// The inputs being heard.
     pub fn inputs(&self) -> Vec<String> {
         self.inputs
             .lock()
@@ -236,8 +207,6 @@ impl Hearing {
             .unwrap_or_default()
     }
 
-    /// Ends the session: what each input was saying is finished and recognized, then the worker
-    /// tells `Closed` once it has nothing left.
     pub fn close(&self) {
         for input in self.inputs() {
             self.flush(&input);
@@ -250,8 +219,6 @@ impl Hearing {
         }
     }
 
-    /// After a window: notes when speech starts, and queues each stretch the detector finished.
-    /// What to tell goes in `told`, told once the lock is let go.
     fn step(&self, input: &str, state: &mut Input, told: &mut Vec<HearingEvent>) {
         let detected = state.detector.detected();
         if detected && !state.speaking {

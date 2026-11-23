@@ -23,7 +23,7 @@ import {
   Text,
 } from "@misty/ui";
 import { PromptEditorDialog, type PromptEditorValue } from "./PromptEditorDialog";
-import { revealPrompts, type CustomPromptEntry, type PromptScope } from "./promptsApi";
+import { revealPrompts, type CustomPromptEntry, type PromptScope } from "./prompts_api";
 import {
   createPrompt,
   deletePrompt,
@@ -31,7 +31,7 @@ import {
   movePrompt,
   updatePrompt,
   usePromptStore,
-} from "./promptStore";
+} from "./prompt_store";
 
 const NO_PROMPTS: CustomPromptEntry[] = [];
 
@@ -40,25 +40,18 @@ const scopeLabel = (scope: PromptScope) => (scope === "workspace" ? "This folder
 const failureText = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
 const reportFailure = (cause: unknown) => notify({ message: failureText(cause), tone: "error" });
 
-/** The person's latest project folder, or "" when they have none. */
 function useCurrentFolder(): string {
   const { folders, picked } = useLinkedFolders();
   return picked && folders.includes(picked) ? picked : (folders[0] ?? "");
 }
 
-/**
- * A prompt's logo: its file glyph on a tile, as a persona's is drawn, since a prompt has no maker
- * and no artwork of its own.
- */
 function PromptLogo(_props: { entry: CustomPromptEntry }) {
   return <PersonaLogo icon={FileText} size="tile" />;
 }
 
-/** A prompt's one line: what it's for, else what it takes, else where it lives. */
 const promptLine = (entry: CustomPromptEntry) =>
   entry.description || entry.argumentHint || scopeLabel(entry.scope);
 
-/** A prompt's ⋯: details, edit, the scope it can move to, its folder, then delete. */
 function PromptMenu({
   entry,
   folderAvailable,
@@ -95,12 +88,6 @@ function PromptMenu({
   );
 }
 
-/**
- * Explore › Prompts: the prompts the composer's `!` menu offers, as shelves. Folder prompts
- * belong to the folder this Space works in; global ones show in every chat. `query` is the
- * Explore rail's search text; the rail owns the field. The store refreshes itself after each
- * change, so the section never asks it to.
- */
 export function PromptsSection({ query = "" }: { query?: string } = {}) {
   const root = useCurrentFolder();
   const cache = usePromptStore((s) => s.byRoot[root]);
@@ -117,7 +104,6 @@ export function PromptsSection({ query = "" }: { query?: string } = {}) {
   const entries = useMemo(() => matchPrompts(all, query), [all, query]);
   const folderPrompts = entries.filter((entry) => entry.scope === "workspace");
   const globalPrompts = entries.filter((entry) => entry.scope === "global");
-  // The details follow the list as read back, so an edit shows at once.
   const open = all.find((entry) => entry.path === openPath) ?? null;
 
   const submitEditor = (value: PromptEditorValue) => {
@@ -227,7 +213,6 @@ export function PromptsSection({ query = "" }: { query?: string } = {}) {
             <Button icon={FolderOpen} onClick={() => reveal("workspace")}>
               Open folder
             </Button>
-            {/* The empty state carries New prompt while it shows. */}
             {empty ? null : (
               <Button variant="primary" icon={Plus} onClick={() => setEditing("new")}>
                 New prompt

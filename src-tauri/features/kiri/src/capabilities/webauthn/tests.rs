@@ -62,7 +62,6 @@ fn call(fake: &Arc<Fake>, origin: &str, method: &str, args: Value) -> Result<Val
     }))
 }
 
-// "challenge" and "user-id" in base64url.
 fn creation(rp_id: Option<&str>) -> Value {
     json!({
         "challenge": "Y2hhbGxlbmdl",

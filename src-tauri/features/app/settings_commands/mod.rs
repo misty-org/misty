@@ -1,4 +1,3 @@
-//! Settings and launch on login.
 use tauri::State;
 
 use crate::app::autostart::LaunchOnLoginSnapshot;
@@ -23,7 +22,6 @@ pub async fn settings_save(
     state: State<'_, MistyRuntime>,
 ) -> ApiResult<SettingsSnapshot> {
     let saved = state.settings.save(request).await;
-    // Model choices are settings; the next account request rebuilds its header.
     crate::agents::models::invalidate();
     Ok(saved?)
 }

@@ -1,11 +1,9 @@
-//! Gemini CLI's `/chat` checkpoints, listed and deleted from its files.
-
 use super::*;
 
-/// The folders under `~/.gemini/tmp` (and `~/.cache/.gemini/tmp`, where a run inside the
-/// Seatbelt sandbox keeps its state) that hold `folder`'s chat checkpoints. Gemini CLI names
-/// them by the short id `projects.json` gives the folder (each carries a `.project_root`
-/// marker), and named them by the SHA-256 of its path before that.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves the person's project folder and finds Gemini CLI's per-project folders, which may sit outside what the gate grants"
+)]
 pub(super) fn project_temp_dirs(folder: &Path) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Some(dir) = adapter::gemini_dir() {
@@ -14,8 +12,6 @@ pub(super) fn project_temp_dirs(folder: &Path) -> Vec<PathBuf> {
     if let Some(home) = adapter::gemini_home() {
         roots.push(home.join(".cache").join(".gemini"));
     }
-    // The CLI names a folder by its real path (its working directory), so a chat folder reached
-    // through a link is looked up by where it leads too.
     let mut wanted = vec![folder.to_path_buf()];
     if let Ok(real) = std::fs::canonicalize(folder) {
         if real != folder {
@@ -50,7 +46,10 @@ pub(super) fn project_temp_dirs(folder: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// The folder under `tmp` whose `.project_root` marker names `folder`.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Gemini CLI's per-project folders in place, which may sit in ~/.cache/.gemini outside the engine folders the gate grants"
+)]
 fn marked_slug(tmp: &Path, folder: &Path) -> Option<String> {
     std::fs::read_dir(tmp).ok()?.flatten().find_map(|entry| {
         let owner = std::fs::read_to_string(entry.path().join(".project_root")).ok()?;
@@ -64,8 +63,6 @@ fn sha256_hex(text: &str) -> String {
     hex::encode(Sha256::digest(text.as_bytes()))
 }
 
-/// `/chat list` and `/chat delete <tag>` over the conversation checkpoints `/chat save` wrote
-/// (`checkpoint-<tag>.json`, the tag URI-encoded).
 pub(super) fn chat(folder: Option<&Path>, args: &str) -> Result<Output, String> {
     let folder = folder.ok_or("This chat has no folder, so it has no Gemini CLI checkpoints.")?;
     let (sub, rest) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
@@ -81,6 +78,10 @@ pub(super) fn chat(folder: Option<&Path>, args: &str) -> Result<Output, String> 
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Gemini CLI's per-project folders in place, which may sit in ~/.cache/.gemini outside the engine folders the gate grants"
+)]
 fn chat_list(folder: &Path) -> Output {
     let mut checkpoints: Vec<(String, std::time::SystemTime)> = Vec::new();
     for dir in project_temp_dirs(folder) {
@@ -120,7 +121,6 @@ fn chat_list(folder: &Path) -> Output {
     )
 }
 
-/// Gemini CLI's `decodeTagName`: URI-decoded, or the tag as it is when it doesn't decode.
 fn decode_tag(tag: &str) -> String {
     percent_decode_str(tag)
         .decode_utf8()
@@ -133,8 +133,10 @@ fn saved_at(modified: std::time::SystemTime) -> String {
     format!("saved {}", at.format("%b %-d, %H:%M"))
 }
 
-/// Deletes the checkpoint file for `tag`, under its encoded name and, as the CLI does, its
-/// older raw one (only for a tag that can't step out of the folder).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "deletes a Gemini CLI checkpoint the person named, in its per-project folder, which may sit outside the engine folders the gate grants"
+)]
 fn chat_delete(folder: &Path, tag: &str) -> Result<Output, String> {
     let mut names = vec![format!("checkpoint-{}.json", encode_component(tag))];
     if !tag.contains(['/', '\\']) && tag != ".." {

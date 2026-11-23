@@ -1,11 +1,3 @@
-//! The codex commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Codex's terminal app runs its commands over its own app-server. `/compact`, `/review` and
-//! `/init` go to the chat's next turn, where `codex_app_native.rs` (`native_command`) turns them into
-//! the app-server's own calls or Codex's own prompt. The rest run out of turn: each starts the
-//! app-server a turn would (`codex_rpc.rs`), makes Codex's own calls against the chat's thread,
-//! the config or the account, and stops it.
-
 use std::path::Path;
 use std::time::Duration;
 
@@ -96,29 +88,18 @@ pub const COMMANDS: &[Command] = &[
     misty("app", "Open this folder in the Codex desktop app"),
 ];
 
-/// Starting the app-server, the handshake and an ordinary command's calls together.
 const CALL_TIMEOUT: Duration = Duration::from_secs(60);
-/// A side question is a whole turn of the model.
 const SIDE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
-/// An import copies skills, plugins and sessions.
 const IMPORT_TIMEOUT: Duration = Duration::from_secs(10 * 60);
-/// How long an MCP sign-in may take in the browser; Codex's own callback lives that long.
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(10 * 60);
-/// Pages read from a paged list, at most.
 const PAGES: usize = 20;
-/// How long Codex may take to write an approval into the thread's rollout file.
 const APPROVAL_SAVE_TIMEOUT: Duration = Duration::from_secs(10);
-/// The start of the note Codex writes into the thread when a denied action is approved
-/// (`AUTO_REVIEW_DENIED_ACTION_APPROVAL_DEVELOPER_PREFIX` in codex-rs/core).
 const APPROVAL_NOTE: &str = "The user has manually approved a specific action that was previously";
 
-/// Where ChatGPT's apps are added; each app's own `installUrl` is a page under it.
 const APP_DIRECTORY: &str = "https://chatgpt.com/apps";
 const NO_THREAD: &str = "This chat has no Codex session yet. Send a message first.";
 const PERSONALITIES: &[&str] = &["none", "friendly", "pragmatic"];
 const FEEDBACK_KINDS: &[&str] = &["bug", "bad_result", "good_result", "safety_check", "other"];
-/// The kinds of thread a subagent runs in (`ThreadSourceKind`); a listing without them shows
-/// only threads people started.
 const SUBAGENT_SOURCES: &[&str] = &[
     "subAgent",
     "subAgentThreadSpawn",
@@ -157,11 +138,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     }
 }
 
-// ==================== the app-server ====================
-
-/// The app-server a turn of this chat would start. The experimental API is on: resuming or
-/// forking without the whole history (`excludeTurns`), subagent listings and some thread calls
-/// need it on codex 0.147.
 async fn open(context: &Context) -> Result<Session, String> {
     let command = codex_rpc::chat_command(context.folder.as_deref())
         .await
@@ -175,7 +151,6 @@ fn text(error: RpcError) -> String {
     error.to_string()
 }
 
-/// Calls `method` and stops the app-server.
 async fn call_once(context: &Context, method: &str, params: Value) -> Result<Value, String> {
     let mut rpc = open(context).await?;
     let result = rpc.call(method, params).await.map_err(text);
@@ -183,9 +158,6 @@ async fn call_once(context: &Context, method: &str, params: Value) -> Result<Val
     result
 }
 
-/// Calls a thread method, loading the thread into this app-server first when Codex says it
-/// isn't loaded: the chat's own app-server ended with its last turn, and some calls only work
-/// on a loaded thread.
 async fn on_thread(
     rpc: &mut Session,
     thread: &str,
@@ -206,7 +178,6 @@ async fn on_thread(
     }
 }
 
-/// [`on_thread`] in an app-server of its own.
 async fn on_thread_once(
     context: &Context,
     thread: &str,
@@ -219,11 +190,6 @@ async fn on_thread_once(
     result
 }
 
-/// The chat's thread, loaded into this app-server, for calls that take a thread id to read its
-/// config or logs (`mcpServerStatus/list`, `app/installed`, `mcpServer/oauth/login`,
-/// `feedback/upload`): they answer "thread not found" for a thread the app-server hasn't
-/// loaded, and a chat's thread never is, since the app-server of its last turn has ended. None
-/// when there is none or it won't load; the call then goes without the thread.
 async fn loaded_thread(rpc: &mut Session, context: &Context) -> Option<String> {
     let thread = context.session.as_deref()?;
     rpc.call(
@@ -235,7 +201,6 @@ async fn loaded_thread(rpc: &mut Session, context: &Context) -> Option<String> {
     Some(thread.to_string())
 }
 
-/// Every item of a paged list (`data` + `nextCursor`).
 async fn all_pages(
     rpc: &mut Session,
     method: &str,
@@ -265,9 +230,6 @@ fn folder(context: &Context) -> Option<String> {
         .map(|folder| folder.to_string_lossy().into_owned())
 }
 
-// ==================== small helpers ====================
-
-/// A trimmed, non-empty string at `pointer`.
 fn text_at<'a>(value: &'a Value, pointer: &str) -> Option<&'a str> {
     value
         .pointer(pointer)
@@ -276,7 +238,6 @@ fn text_at<'a>(value: &'a Value, pointer: &str) -> Option<&'a str> {
         .filter(|text| !text.is_empty())
 }
 
-/// A config value as one line; None when it's unset.
 fn shown(value: &Value) -> Option<String> {
     match value {
         Value::Null => None,
@@ -286,7 +247,6 @@ fn shown(value: &Value) -> Option<String> {
     }
 }
 
-/// The first word and the rest, both trimmed.
 fn split_first(args: &str) -> (&str, &str) {
     match args.split_once(char::is_whitespace) {
         Some((first, rest)) => (first, rest.trim()),
@@ -325,7 +285,6 @@ fn title_case(text: &str) -> String {
     }
 }
 
-/// At most `limit` characters, with an ellipsis when cut.
 fn short(text: &str, limit: usize) -> String {
     let text = text.trim();
     if text.chars().count() <= limit {
@@ -335,12 +294,11 @@ fn short(text: &str, limit: usize) -> String {
     format!("{}…", cut.trim_end())
 }
 
-/// A count with thousands separators.
 fn count(number: i64) -> String {
     let digits = number.unsigned_abs().to_string();
     let mut out = String::new();
     for (index, digit) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index) % 3 == 0 {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
             out.push(',');
         }
         out.push(digit);
@@ -352,7 +310,6 @@ fn count(number: i64) -> String {
     }
 }
 
-/// A credit balance as Codex sends it (`"62419.1123650000"`), to two places with separators.
 fn amount(balance: &str) -> String {
     match balance.parse::<f64>() {
         Ok(value) if value.is_finite() => {
@@ -373,7 +330,6 @@ fn duration(seconds: i64) -> String {
     }
 }
 
-/// An epoch-seconds time in the person's own time zone.
 fn local_time(seconds: i64) -> Option<String> {
     let at = chrono::DateTime::from_timestamp(seconds, 0)?;
     Some(
@@ -383,9 +339,5 @@ fn local_time(seconds: i64) -> Option<String> {
     )
 }
 
-/// Runs Misty's out-of-turn Codex commands against the installed CLI, signed in, and prints
-/// each Output to read. None starts a turn: the scratch thread is made with `thread/start`
-/// alone, and every command is an app-server call that reads, or renames and forks that thread.
-/// `cargo test --lib engines::slash::codex::live_tests -- --ignored --nocapture --test-threads 1`
 #[cfg(all(test, unix))]
 mod live_tests;

@@ -1,9 +1,8 @@
 import { invoke } from "@/native/invoke";
 import { useEffect } from "react";
-import { useTrayHidden } from "@/shared/lib/trayHidden";
+import { useTrayHidden } from "@/shared/lib/tray_hidden";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 
-/** Applies the menu bar icon choice once this device's settings are read, and when it changes. */
 export function TrayVisibility() {
   const hidden = useTrayHidden((state) => state.value);
   const loaded = useTrayHidden((state) => state.loaded);

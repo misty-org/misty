@@ -1,14 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Clock, Pencil, X } from "lucide-react";
 import { ComposerStatusRow, IconButton } from "@misty/ui";
-import { useStableCallback } from "@/shared/hooks/useStableCallback";
-import { useEngineQueue } from "./engineQueue";
+import { useStableCallback } from "@/shared/hooks/use_stable_callback";
+import { useEngineQueue } from "./engine_queue";
 
-/**
- * The messages waiting for the engine's turn to end, as rows at the top of the composer: edit one
- * (it goes back into the composer) or remove it. When the turn ends the oldest is sent. Render it
- * in the composer's `status` so it stays mounted to send them.
- */
 export function EngineQueueChips(props: {
   conversationId?: string;
   working: boolean;

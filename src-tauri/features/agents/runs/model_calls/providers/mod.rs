@@ -1,4 +1,3 @@
-//! One client per wire format.
 pub(crate) mod anthropic;
 pub(crate) mod gateway;
 pub(crate) mod google;

@@ -1,5 +1,3 @@
-//! OpenAI models can wrap several calls in one to a `parallel` tool that nobody declared. Misty sees
-//! the calls inside it, each as its own. Ported from `expand-parallel-tool-call.ts`.
 use serde_json::json;
 
 use crate::model_calls::providers::ordered::Ordered;
@@ -12,7 +10,6 @@ pub(super) fn is_undeclared_parallel_tool_call(tool_name: &str, tools: &[String]
     tool_name == PARALLEL_TOOL_NAME && !tools.iter().any(|tool| tool == PARALLEL_TOOL_NAME)
 }
 
-/// The calls inside a wrapper, or `None` unless every one names a declared tool.
 pub(super) fn expand_parallel_tool_call(
     tool_call_id: &str,
     tool_name: &str,
@@ -33,7 +30,9 @@ pub(super) fn expand_parallel_tool_call(
     let mut expanded = Vec::with_capacity(tool_uses.len());
     for (index, tool_use) in tool_uses.iter().enumerate() {
         let recipient = tool_use.get("recipient_name")?.as_str()?;
-        let parameters = tool_use.get("parameters").filter(|value| matches!(value, Ordered::Object(_)))?;
+        let parameters = tool_use
+            .get("parameters")
+            .filter(|value| matches!(value, Ordered::Object(_)))?;
         let name = recipient.strip_prefix(RECIPIENT_NAME_PREFIX)?;
         if name.is_empty() || !tools.iter().any(|tool| tool == name) {
             return None;
@@ -69,12 +68,22 @@ mod tests {
 
     #[test]
     fn calls_inside_keep_their_key_order() {
-        let input = r#"{"tool_uses":[{"recipient_name":"functions.look","parameters":{"z":1,"a":2}}]}"#;
+        let input =
+            r#"{"tool_uses":[{"recipient_name":"functions.look","parameters":{"z":1,"a":2}}]}"#;
         let parts = expand_parallel_tool_call("c", "parallel", input, &tools(), "i").unwrap();
-        let StreamPart::ToolCall { tool_call_id, tool_name, input, .. } = &parts[0] else {
+        let StreamPart::ToolCall {
+            tool_call_id,
+            tool_name,
+            input,
+            ..
+        } = &parts[0]
+        else {
             panic!("expected a call");
         };
-        assert_eq!((tool_call_id.as_str(), tool_name.as_str(), input.as_str()), ("c_0", "look", r#"{"z":1,"a":2}"#));
+        assert_eq!(
+            (tool_call_id.as_str(), tool_name.as_str(), input.as_str()),
+            ("c_0", "look", r#"{"z":1,"a":2}"#)
+        );
     }
 
     #[test]
@@ -91,7 +100,10 @@ mod tests {
             r#"{"tool_uses":[{"recipient_name":"functions.","parameters":{}}]}"#,
             r#"{"tool_uses":[{"recipient_name":"functions.look","parameters":[]}]}"#,
         ] {
-            assert!(expand_parallel_tool_call("c", "parallel", input, &tools(), "i").is_none(), "{input}");
+            assert!(
+                expand_parallel_tool_call("c", "parallel", input, &tools(), "i").is_none(),
+                "{input}"
+            );
         }
     }
 }

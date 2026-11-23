@@ -3,7 +3,6 @@ import { Button } from "@misty/ui";
 import { useState } from "react";
 import { DesktopSettingsRow } from "@/features/settings";
 
-/** Clears the cookies and cached files of the pages agents open. */
 export function ClearWebsiteDataRow() {
   const [open, setOpen] = useState(false);
   const [cleared, setCleared] = useState(false);

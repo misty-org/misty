@@ -1,10 +1,10 @@
-import { needsDefaultEngine, openEngineSettings } from "../../engines/engineNeeded";
+import { needsDefaultEngine, openEngineSettings } from "../../engines/engine_needed";
 import { ErrorNotice } from "../ErrorNotice";
 import { useAiSurfaceStore } from "../../runs/invocations/store";
-import { runtimeAiApi } from "@/features/agents/AgentsRuntime";
+import { runtimeAiApi } from "@/features/agents/agents_runtime";
 import { useEffect, useState } from "react";
-import { useMistyStore } from "../state/useMistyStore";
-import { requestHostContext } from "../context/contextBridge";
+import { useMistyStore } from "../state/use_misty_store";
+import { requestHostContext } from "../context/context_bridge";
 import { assertMistyAvailable } from "../state/availability";
 import { Button, Text } from "@misty/ui";
 
@@ -30,7 +30,6 @@ export function MistyContextBar() {
     setError("");
     setUndo(undefined);
   }, [accountId, activeConversationId]);
-  // The undo goes away the moment it expires, not at the next unrelated render.
   useEffect(() => {
     if (!undo) return;
     const timer = window.setTimeout(
@@ -41,7 +40,7 @@ export function MistyContextBar() {
   }, [undo]);
   if (!pendingArtifact && !undo && !notice && !error) return null;
   return (
-    <Text bare as="div" tone="muted" className="border-t px-4 py-3 text-xs">
+    <Text size="meta" bare as="div" tone="muted" className="border-t px-4 py-3">
       {working && invocationId && (
         <Button
           variant="quiet"

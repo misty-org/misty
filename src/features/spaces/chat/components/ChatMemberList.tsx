@@ -1,21 +1,19 @@
-// Who is in a Space, grouped as Space chat groups them: whose agents are at work, the hoisted
-// roles, online, offline. Drawn with @misty/ui's MemberList.
 import { Fragment, useMemo } from "react";
 import { MemberGroupHeading, MemberList, MemberRow, type MemberPresence } from "@misty/ui";
 import { useMistyStore, useStudioAgents } from "@/features/agents";
-import { useNow } from "@/shared/hooks/useNow";
+import { useNow } from "@/shared/hooks/use_now";
 import type { Space, SpaceMember, SpaceRoleDef } from "../../api/dto/entities";
 import { MemberRolesMenu } from "../../roles/MemberRolesMenu";
-import { useSpacesStore } from "../../list/useSpacesStore";
-import { doingLabel, memberAgentsIn, useMemberAgents } from "../../list/memberAgents";
+import { useSpacesStore } from "../../list/use_spaces_store";
+import { doingLabel, memberAgentsIn, useMemberAgents } from "../../list/member_agents";
 import { spaceAgentStatuses } from "../../list/SpaceAgentsBroadcast";
-import { memberColor, memberRoles, useSpaceRoles } from "../../roles/useSpaceRoles";
-import { useMemberPicture } from "../../members/memberPictures";
-import { useAccountPresence } from "@/shared/lib/accountPresence";
-import { useVoicePresence } from "../../list/voicePresence";
-import { useSpaceConversations } from "../sidebar/useSpaceConversations";
-import { useSpaceApps } from "../../apps/useSpaceApps";
-import { appEntry } from "../../apps/thirdPartyApps";
+import { memberColor, memberRoles, useSpaceRoles } from "../../roles/use_space_roles";
+import { useMemberPicture } from "../../members/member_pictures";
+import { useAccountPresence } from "@/shared/lib/account_presence";
+import { useVoicePresence } from "../../list/voice_presence";
+import { useSpaceConversations } from "../sidebar/use_space_conversations";
+import { useSpaceApps } from "../../apps/use_space_apps";
+import { appEntry } from "../../apps/third_party_apps";
 import { ChatAvatar } from "./ChatAvatar";
 
 interface Row {
@@ -47,7 +45,6 @@ export function ChatMemberList(props: {
   const viewers = useSpacesStore((state) => state.presenceBySpace[spaceId]);
   const accounts = useAccountPresence((state) => state.byUser);
   const voice = useVoicePresence((state) => state.bySpace[spaceId]);
-  // Channel names only matter while someone is in a voice channel, so they are read only then.
   const inVoice = Object.values(voice ?? {}).some((people) => people.length > 0);
   const { conversations } = useSpaceConversations(inVoice ? spaceId : "");
   const { apps } = useSpaceApps(spaceId);
@@ -62,7 +59,6 @@ export function ChatMemberList(props: {
   const groups = useMemo(() => {
     const here = new Set((viewers ?? []).map((viewer) => viewer.user_id));
     if (props.currentUserId) here.add(props.currentUserId);
-    // What each person is doing in this Space, said only here: a voice channel, then an app, then the Lab.
     const activity = new Map<string, string>();
     for (const [channelId, people] of Object.entries(voice ?? {})) {
       const channel = conversations.find((conversation) => conversation.id === channelId);
@@ -92,9 +88,6 @@ export function ChatMemberList(props: {
       .filter((member) => !props.visibleTo || props.visibleTo(member))
       .map((member) => {
         const agent = working.get(member.user_id);
-        // An agent waiting on its person shows as waiting; at work, as working. Otherwise the
-        // person's account status (online, idle, do not disturb) where the server has one, else
-        // online while they have this Space open.
         const account = accounts[member.user_id];
         const presence: MemberPresence = agent
           ? agent.state === "needs-you"
@@ -105,7 +98,8 @@ export function ChatMemberList(props: {
             : here.has(member.user_id)
               ? "online"
               : "offline";
-        const line = agent?.line ?? (presence === "offline" ? "" : (activity.get(member.user_id) ?? ""));
+        const line =
+          agent?.line ?? (presence === "offline" ? "" : (activity.get(member.user_id) ?? ""));
         return { member, presence, line, working: Boolean(agent) };
       })
       .sort((left, right) => left.member.name.localeCompare(right.member.name));
@@ -129,7 +123,20 @@ export function ChatMemberList(props: {
     rest = take("Online", (item) => item.presence !== "offline", rest);
     take("Offline", () => true, rest);
     return out;
-  }, [heard, people, mine, now, props, roles, spaceId, viewers, accounts, voice, conversations, apps]);
+  }, [
+    heard,
+    people,
+    mine,
+    now,
+    props,
+    roles,
+    spaceId,
+    viewers,
+    accounts,
+    voice,
+    conversations,
+    apps,
+  ]);
 
   return (
     <MemberList label="Members">
@@ -154,7 +161,6 @@ export function ChatMemberList(props: {
   );
 }
 
-/** One person, whose roles open from their row for someone who manages roles. */
 function MemberItem(props: {
   space: Space;
   member: SpaceMember;

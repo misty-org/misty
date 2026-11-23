@@ -21,15 +21,10 @@ import {
 import { useAuth } from "@/features/account";
 import { spacesApi } from "../api/api";
 import type { RoleInput, Space, SpaceRoleDef } from "../api/dto/entities";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { useSpacesStore } from "../list/use_spaces_store";
 import { RoleEditor } from "./RoleEditor";
-import { spaceCan, useSpaceRoles, useSpaceRolesStore } from "./useSpaceRoles";
+import { spaceCan, useSpaceRoles, useSpaceRolesStore } from "./use_space_roles";
 
-/**
- * The Space's roles, after Discord's Roles settings: the list top first with `everyone` last,
- * and the picked role's editor beside it. A person edits only the roles below their own highest
- * one; the owner and administrators edit them all.
- */
 export function RolesDialog(props: {
   space: Space;
   open: boolean;
@@ -77,7 +72,6 @@ export function RolesDialog(props: {
     }
   };
   const update = (role: SpaceRoleDef, input: RoleInput) => {
-    // Shown at once; the server's answer replaces it.
     useSpaceRolesStore.getState().set(
       space.id,
       (roles ?? []).map((item) => (item.id === role.id ? { ...item, ...input } : item)),

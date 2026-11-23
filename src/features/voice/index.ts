@@ -2,12 +2,11 @@ export { DictationController } from "./DictationController";
 export { DictationPill } from "./pill/DictationPill";
 export { CaptureBarStatus, CaptureMenu, CapturePanel, transcribeAudioFile } from "./capture";
 
-// Public surface used by other features.
 export { VoiceSection } from "./settings/VoiceSection";
 export { DevicesSection } from "./settings/DevicesSection";
-export { speechLanguages, voiceLabel, voiceSample } from "./settings/speechChoices";
-export { voiceSettings } from "./voiceSettings";
-export { savedInputDevice } from "./inputDevice";
+export { speechLanguages, voiceLabel, voiceSample } from "./settings/speech_choices";
+export { voiceSettings } from "./voice_settings";
+export { savedInputDevice } from "./input_device";
 export { voiceCleanup, voiceDevice } from "./api";
 export {
   chosenVoice,
@@ -52,9 +51,9 @@ export {
   type InstallProgress,
   type Machine,
   type VoiceView,
-} from "./speechModels";
-export { vocativeRouting } from "./vocativeRoute";
+} from "./speech_models";
+export { vocativeRouting } from "./vocative_route";
 export { matchVocative, type Vocative } from "./vocative";
-export { noteAsk } from "./capture/openNote";
+export { noteAsk } from "./capture/open_note";
 
-export { voiceEngine, type VoiceEngine } from "./voiceEngine";
+export { voiceEngine, type VoiceEngine } from "./voice_engine";

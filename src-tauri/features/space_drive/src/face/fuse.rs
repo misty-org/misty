@@ -20,21 +20,17 @@ use std::{
 
 use fuser::{
     FileAttr, FileType, Filesystem, KernelConfig, MountOption, ReplyAttr, ReplyCreate, ReplyData,
-    ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyOpen, ReplyStatfs, ReplyWrite, Request,
-    TimeOrNow,
+    ReplyDirectory, ReplyEmpty, ReplyEntry, ReplyOpen, ReplyStatfs, ReplyWrite, Request, TimeOrNow,
 };
 
 use crate::{
     lock, Drive, DriveError, Item, ItemId, Kind, NewNode, Node, OsFace, SpaceId, SpaceMount,
 };
 
-/// How long the kernel may keep names and attributes before asking again. Short, so changes from
-/// the server show within a second.
 const TTL: Duration = Duration::from_secs(1);
 const ROOT_INO: u64 = 1;
 const BLOCK: u32 = 4096;
 
-/// The face of every Space on this computer: one FUSE mount each.
 pub struct FuseFace {
     drive: Drive,
     sessions: Mutex<HashMap<SpaceId, fuser::BackgroundSession>>,
@@ -49,8 +45,6 @@ impl FuseFace {
     }
 }
 
-/// A mount left behind by a Misty that didn't quit cleanly answers "transport endpoint is not
-/// connected"; `fusermount3 -u -z` takes it down so the Space can mount again.
 fn clear_stale_mount(path: &std::path::Path) {
     if let Err(error) = file_access::fs::metadata(path) {
         if error.raw_os_error() == Some(libc::ENOTCONN) {
@@ -92,18 +86,14 @@ impl OsFace for FuseFace {
     }
 
     fn unmount(&self, space: &SpaceId) -> Result<(), DriveError> {
-        // Dropping the session unmounts it.
         let session = lock(&self.sessions).remove(space);
         drop(session);
         Ok(())
     }
 
-    fn changed(&self, _space: &SpaceId, _items: &[Item]) {
-        // Names and attributes live for `TTL`, then the kernel asks again.
-    }
+    fn changed(&self, _space: &SpaceId, _items: &[Item]) {}
 
     fn evict(&self, _space: &SpaceId, _item: &ItemId) -> Result<(), DriveError> {
-        // Content lives in the cache, which the drive frees itself.
         Ok(())
     }
 }
@@ -111,7 +101,6 @@ impl OsFace for FuseFace {
 struct Handle {
     id: ItemId,
     file: Option<file_access::fs::File>,
-    /// Writes gather here; `None` for a read.
     work: Option<std::path::PathBuf>,
     dirty: bool,
     editing: bool,
@@ -189,7 +178,6 @@ impl DriveFs {
         }
     }
 
-    /// The node behind an inode, if it is this Space's.
     fn node(&self, ino: u64) -> Result<Node, i32> {
         if ino == ROOT_INO {
             return Err(libc::EISDIR);
@@ -201,7 +189,6 @@ impl DriveFs {
         }
     }
 
-    /// The folder an inode names: `None` for the root.
     fn folder(&self, ino: u64) -> Result<Option<ItemId>, i32> {
         if ino == ROOT_INO {
             return Ok(None);
@@ -230,7 +217,6 @@ impl DriveFs {
         fh
     }
 
-    /// Opens `node` for writing: its content is copied into a work file (empty when truncated).
     fn open_for_writing(&mut self, node: &Node, truncate: bool) -> Result<u64, i32> {
         self.drive
             .block_on(self.drive.open(&self.space, &node.id, true))
@@ -239,7 +225,9 @@ impl DriveFs {
         let work = self.drive.work_path(node.ino, fh);
         let prepared = (|| -> Result<file_access::fs::File, DriveError> {
             if !truncate && node.size > 0 {
-                let cached = self.drive.block_on(self.drive.content(&self.space, &node.id))?;
+                let cached = self
+                    .drive
+                    .block_on(self.drive.content(&self.space, &node.id))?;
                 file_access::fs::copy(&cached, &work).map_err(DriveError::io)?;
             } else {
                 file_access::fs::File::create(&work).map_err(DriveError::io)?;
@@ -266,17 +254,12 @@ impl DriveFs {
         }
     }
 
-    /// `unlink` and `rmdir`: a trash move in the Space. It doesn't wait for the server, since
-    /// `rm -r` unlinks every file one by one and each answer waits on every computer's in-use
-    /// check: the item leaves at once, and if the server refuses (someone has it open) it comes
-    /// back with a notice that says why. Past the delete guard's limit it stays (`EPERM`).
     fn trash(&self, node: &Node) -> Result<(), i32> {
         self.drive
             .trash_from_os(&self.space, &node.id)
             .map_err(|error| Self::errno(&error))
     }
 
-    /// Hands a handle's gathered writes to the drive as the item's new content.
     fn commit(&mut self, fh: u64) -> Result<(), i32> {
         let Some(handle) = self.handles.get_mut(&fh) else {
             return Ok(());
@@ -371,32 +354,29 @@ impl Filesystem for DriveFs {
                     handle.dirty = true;
                     truncated.map(|_| ())
                 }
-                None => {
-                    // `truncate(2)` with no open file: open, cut, commit, close.
-                    match self.open_for_writing(&node, size == 0) {
-                        Ok(fh) => {
-                            let cut = self
-                                .handles
-                                .get_mut(&fh)
-                                .and_then(|handle| {
-                                    handle.dirty = true;
-                                    handle.file.as_ref().map(|file| file.set_len(size))
-                                })
-                                .transpose()
-                                .map_err(|_| libc::EIO)
-                                .and_then(|_| self.commit(fh));
-                            if let Some(handle) = self.handles.remove(&fh) {
-                                if let Some(work) = handle.work {
-                                    let _ = file_access::fs::remove_file(work);
-                                }
+                None => match self.open_for_writing(&node, size == 0) {
+                    Ok(fh) => {
+                        let cut = self
+                            .handles
+                            .get_mut(&fh)
+                            .and_then(|handle| {
+                                handle.dirty = true;
+                                handle.file.as_ref().map(|file| file.set_len(size))
+                            })
+                            .transpose()
+                            .map_err(|_| libc::EIO)
+                            .and_then(|_| self.commit(fh));
+                        if let Some(handle) = self.handles.remove(&fh) {
+                            if let Some(work) = handle.work {
+                                let _ = file_access::fs::remove_file(work);
                             }
-                            self.drive
-                                .block_on(self.drive.close(&self.space, &node.id, true));
-                            cut
                         }
-                        Err(errno) => Err(errno),
+                        self.drive
+                            .block_on(self.drive.close(&self.space, &node.id, true));
+                        cut
                     }
-                }
+                    Err(errno) => Err(errno),
+                },
             };
             if let Err(errno) = result {
                 return reply.error(errno);
@@ -487,7 +467,6 @@ impl Filesystem for DriveFs {
         flags: u32,
         reply: ReplyEmpty,
     ) {
-        // RENAME_EXCHANGE has no meaning for a drive item's identity.
         const RENAME_NOREPLACE: u32 = 1;
         const RENAME_EXCHANGE: u32 = 2;
         if flags & RENAME_EXCHANGE != 0 {
@@ -542,11 +521,12 @@ impl Filesystem for DriveFs {
             .drive
             .block_on(self.drive.open(&self.space, &node.id, false))
         {
-            // Nothing was opened, so there is nothing to close.
             return reply.error(Self::errno(&error));
         }
         let opened = (|| -> Result<file_access::fs::File, DriveError> {
-            let cached = self.drive.block_on(self.drive.content(&self.space, &node.id))?;
+            let cached = self
+                .drive
+                .block_on(self.drive.content(&self.space, &node.id))?;
             file_access::fs::File::open(cached).map_err(DriveError::io)
         })();
         match opened {
@@ -580,7 +560,11 @@ impl Filesystem for DriveFs {
         _lock_owner: Option<u64>,
         reply: ReplyData,
     ) {
-        let Some(file) = self.handles.get(&fh).and_then(|handle| handle.file.as_ref()) else {
+        let Some(file) = self
+            .handles
+            .get(&fh)
+            .and_then(|handle| handle.file.as_ref())
+        else {
             return reply.error(libc::EBADF);
         };
         let mut buffer = vec![0u8; size as usize];
@@ -627,14 +611,28 @@ impl Filesystem for DriveFs {
         }
     }
 
-    fn flush(&mut self, _req: &Request<'_>, _ino: u64, fh: u64, _lock_owner: u64, reply: ReplyEmpty) {
+    fn flush(
+        &mut self,
+        _req: &Request<'_>,
+        _ino: u64,
+        fh: u64,
+        _lock_owner: u64,
+        reply: ReplyEmpty,
+    ) {
         match self.commit(fh) {
             Ok(()) => reply.ok(),
             Err(errno) => reply.error(errno),
         }
     }
 
-    fn fsync(&mut self, _req: &Request<'_>, _ino: u64, fh: u64, _datasync: bool, reply: ReplyEmpty) {
+    fn fsync(
+        &mut self,
+        _req: &Request<'_>,
+        _ino: u64,
+        fh: u64,
+        _datasync: bool,
+        reply: ReplyEmpty,
+    ) {
         match self.commit(fh) {
             Ok(()) => reply.ok(),
             Err(errno) => reply.error(errno),
@@ -751,10 +749,8 @@ impl Filesystem for DriveFs {
             };
             (node.ino + 1, kind, node.name)
         }));
-        for (index, (entry_ino, kind, name)) in entries
-            .into_iter()
-            .enumerate()
-            .skip(offset.max(0) as usize)
+        for (index, (entry_ino, kind, name)) in
+            entries.into_iter().enumerate().skip(offset.max(0) as usize)
         {
             if reply.add(entry_ino, (index + 1) as i64, kind, name) {
                 break;
@@ -763,12 +759,18 @@ impl Filesystem for DriveFs {
         reply.ok();
     }
 
-    fn releasedir(&mut self, _req: &Request<'_>, _ino: u64, _fh: u64, _flags: i32, reply: ReplyEmpty) {
+    fn releasedir(
+        &mut self,
+        _req: &Request<'_>,
+        _ino: u64,
+        _fh: u64,
+        _flags: i32,
+        reply: ReplyEmpty,
+    ) {
         reply.ok();
     }
 
     fn statfs(&mut self, _req: &Request<'_>, _ino: u64, reply: ReplyStatfs) {
-        // The Space's room is the server's to count; this keeps file managers from saying full.
         let blocks = 1u64 << 32;
         reply.statfs(blocks, blocks, blocks, 1 << 24, 1 << 24, BLOCK, 255, BLOCK);
     }

@@ -13,8 +13,6 @@ use crate::windows as platform;
 pub(crate) type Sink = Arc<dyn Fn(PcmChunk) + Send + Sync + 'static>;
 pub(crate) type FailureSink = Arc<dyn Fn(CaptureError) + Send + Sync + 'static>;
 
-/// A running capture. Audio stops when this is stopped or dropped; nothing in
-/// this crate keeps a device open on its own.
 pub struct Capture {
     inner: Option<platform::Running>,
 }
@@ -35,12 +33,6 @@ impl Drop for Capture {
     }
 }
 
-/// Opens `source` and calls `on_chunk` with 16 kHz mono PCM16 until the
-/// returned [`Capture`] is stopped. `on_failure` runs at most once if the
-/// device disappears mid-capture; the capture is already stopped by then.
-///
-/// On macOS, call this off the main thread: it waits for the microphone
-/// permission prompt.
 pub fn start(
     source: AudioSource,
     on_chunk: impl Fn(PcmChunk) + Send + Sync + 'static,
@@ -57,11 +49,6 @@ pub fn start(
     })
 }
 
-/// Opens everything the computer plays except Misty (its own process and the
-/// WebKit processes that play its pages' sound, so a call's voices never go
-/// back into it), for the sound of a shared screen. `on_chunk` gets 48 kHz
-/// stereo PCM16, interleaved, in chunks whose `start_frame` and `samples`
-/// count single samples, not frames. macOS 14.2 or later only.
 pub fn start_share(
     on_chunk: impl Fn(PcmChunk) + Send + Sync + 'static,
     on_failure: impl Fn(CaptureError) + Send + Sync + 'static,
@@ -80,7 +67,6 @@ pub fn start_share(
     }
 }
 
-/// The default microphone's name and the apps currently playing audio.
 pub fn capture_sources() -> Result<CaptureSources, CaptureError> {
     platform::capture_sources()
 }
@@ -89,7 +75,6 @@ pub fn capabilities() -> Capabilities {
     platform::capabilities()
 }
 
-/// Numbers samples per capture so chunks carry continuous frame indices.
 #[cfg_attr(
     not(any(target_os = "macos", target_os = "windows", target_os = "linux")),
     allow(dead_code)

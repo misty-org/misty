@@ -18,7 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createDeviceSetting } from "@/shared/lib/deviceSetting";
+import { createDeviceSetting } from "@/shared/lib/device_setting";
 import {
   Button,
   cn,
@@ -29,11 +29,10 @@ import {
   Text,
   rowShapeWrap,
 } from "@misty/ui";
-import type { RunStep } from "./activityApi";
-import { describeSteps, offsetLabel, type DescribedStep, type StepVerb } from "./stepSentences";
-import { useStepPicture } from "./useRunSteps";
+import type { RunStep } from "./activity_api";
+import { describeSteps, offsetLabel, type DescribedStep, type StepVerb } from "./step_sentences";
+import { useStepPicture } from "./use_run_steps";
 
-/** Whether housekeeping steps are shown, kept for this device in `misty.db`. */
 export const useShowHiddenSteps = createDeviceSetting<boolean>({
   scope: "run-steps-show-hidden",
   defaults: false,
@@ -55,13 +54,8 @@ const verbIcon: Record<StepVerb, LucideIcon> = {
   other: Wrench,
 };
 
-/** How long each picture shows while a run plays back. */
 const PLAY_EVERY_MS = 1200;
 
-/**
- * The picture of the page after a step, or nothing when the step has none: a rounded 16:10 frame,
- * or with `fill` the whole of the frame it sits in, square-cornered.
- */
 export function StepPicture(props: {
   runId: string;
   picture: string;
@@ -89,7 +83,6 @@ export function StepPicture(props: {
   );
 }
 
-/** A step's or the player's small muted figure: a count, a time into the run. */
 function Figure({ children }: { children: ReactNode }) {
   return (
     <Text bare size="caption" tone="muted" className="shrink-0 tabular-nums">
@@ -98,19 +91,12 @@ function Figure({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * "What happened" in one run: every step as a sentence, oldest first, with its time into the run.
- * Steps that pictured a page show it above the list, and the run plays back picture by picture.
- * Housekeeping is hidden behind a count unless the person asks for it.
- */
 export function RunSteps(props: {
   runId: string;
   steps: RunStep[];
   startedAt: number;
   folder?: string;
-  /** Show the pictures and playback; a compact list leaves them out. */
   pictures?: boolean;
-  /** Opens the run's browser log at a browser step's actions; browser steps get a way there. */
   onOpenBrowserLog?: (callId: string) => void;
 }) {
   const showHidden = useShowHiddenSteps((state) => state.value);
@@ -124,7 +110,6 @@ export function RunSteps(props: {
   const [playing, setPlaying] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
 
-  // Playback walks the pictured steps, then stops on the last.
   useEffect(() => {
     if (!playing) return;
     const timer = window.setInterval(() => {
@@ -141,7 +126,6 @@ export function RunSteps(props: {
     return () => window.clearInterval(timer);
   }, [playing, pictured]);
 
-  // The chosen step stays in view in the list's own scroll area.
   useEffect(() => {
     if (chosen === null) return;
     const row = listRef.current?.querySelector<HTMLElement>(`[data-step="${chosen}"]`);
@@ -154,7 +138,6 @@ export function RunSteps(props: {
 
   const play = () => {
     if (playing) return setPlaying(false);
-    // From the start, unless the person picked a step part way through.
     const at = pictured.findIndex((step) => step.seqs[0] === chosen);
     if (at < 0 || at === pictured.length - 1) setChosen(pictured[0]?.seqs[0] ?? null);
     setPlaying(true);
@@ -225,8 +208,6 @@ export function RunSteps(props: {
                   {step.seqs.length > 1 ? <Figure>×{step.seqs.length}</Figure> : null}
                   <Figure>{offsetLabel(step.at, props.startedAt)}</Figure>
                 </Pressable>
-                {/* A browser step points into the browser log, at what it did there. Shown on the
-                    row the pointer is on and on the chosen one. */}
                 {props.onOpenBrowserLog && step.browser && step.calls[0] ? (
                   <IconButton
                     label="Open in browser log"
@@ -270,7 +251,6 @@ export function RunSteps(props: {
   );
 }
 
-/** What a run's steps say while there are none: a muted line in the steps' own inset. */
 export function RunStepsEmpty({ children }: { children: ReactNode }) {
   return (
     <Text wrap size="meta" tone="muted" className="px-2.5 py-1.5">

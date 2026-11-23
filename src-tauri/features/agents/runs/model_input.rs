@@ -1,4 +1,3 @@
-//! The first user turn: the request plus its supplied files and screen captures.
 use crate::model_calls::{FileData, Message, UserPart};
 
 use super::{
@@ -7,7 +6,6 @@ use super::{
     tool_transport::{object, string},
 };
 
-/// The parts of a run's context that go into its first turn (`SpaceTaskContext`).
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct TaskInput<'a> {
     pub(crate) prompt: &'a str,
@@ -16,7 +14,6 @@ pub(crate) struct TaskInput<'a> {
     pub(crate) display_captures: &'a [DisplayCapture],
 }
 
-/// `Buffer.from(text, "base64")`, which skips what isn't base64 and takes the URL-safe alphabet too.
 fn decode_base64(text: &str) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(text.len() / 4 * 3);
     let mut bits = 0u32;
@@ -41,13 +38,17 @@ fn decode_base64(text: &str) -> Vec<u8> {
     bytes
 }
 
-/// What the AI SDK does with a data URL: the base64 after the comma, and the media type it names.
 fn file_part(data_url: &str, media_type: &str) -> UserPart {
     let (header, data) = data_url.split_once(',').unwrap_or((data_url, ""));
     let data = data.split(',').next().unwrap_or(data);
-    let named = header.split(';').next().and_then(|kind| kind.split(':').nth(1));
+    let named = header
+        .split(';')
+        .next()
+        .and_then(|kind| kind.split(':').nth(1));
     UserPart::File {
-        data: FileData::Data { data: data.to_owned() },
+        data: FileData::Data {
+            data: data.to_owned(),
+        },
         media_type: named.unwrap_or(media_type).to_owned(),
     }
 }
@@ -56,18 +57,30 @@ pub(crate) fn initial_messages(input: &TaskInput<'_>) -> Vec<Message> {
     let files = input.attachments.iter().chain(input.capture);
     if files.clone().next().is_none() && input.display_captures.is_empty() {
         return vec![Message::User {
-            content: vec![UserPart::Text { text: input.prompt.to_owned() }],
+            content: vec![UserPart::Text {
+                text: input.prompt.to_owned(),
+            }],
             provider_options: None,
         }];
     }
     let manifest = input
         .attachments
         .iter()
-        .map(|file| object([("attachmentId", string(&file.id)), ("name", string(&file.name)), ("mimeType", string(&file.mime_type))]).stringify())
+        .map(|file| {
+            object([
+                ("attachmentId", string(&file.id)),
+                ("name", string(&file.name)),
+                ("mimeType", string(&file.mime_type)),
+            ])
+            .stringify()
+        })
         .collect::<Vec<_>>()
         .join("\n");
     let mut content = vec![UserPart::Text {
-        text: format!("{}\nSupplied task files (use these IDs for upload):\n{manifest}", input.prompt),
+        text: format!(
+            "{}\nSupplied task files (use these IDs for upload):\n{manifest}",
+            input.prompt
+        ),
     }];
     content.extend(companion_image_parts(input.display_captures));
     for file in files {
@@ -75,19 +88,28 @@ pub(crate) fn initial_messages(input: &TaskInput<'_>) -> Vec<Message> {
             "text/plain" => {
                 let encoded = file.data_url.split(',').nth(1).unwrap_or("");
                 let text = String::from_utf8_lossy(&decode_base64(encoded)).into_owned();
-                content.push(UserPart::Text { text: format!("Attachment {}:\n{text}", file.name) });
+                content.push(UserPart::Text {
+                    text: format!("Attachment {}:\n{text}", file.name),
+                });
             }
-            // The SDK's file part also carries the file's name, and `UserPart::File` has no field for it yet.
             "application/pdf" => content.push(file_part(&file.data_url, "application/pdf")),
             _ => {
                 content.push(UserPart::Text {
-                    text: format!("{} ({} x {} screenshot pixels; top-left origin)", file.name, number_text(file.width), number_text(file.height)),
+                    text: format!(
+                        "{} ({} x {} screenshot pixels; top-left origin)",
+                        file.name,
+                        number_text(file.width),
+                        number_text(file.height)
+                    ),
                 });
                 content.push(file_part(&file.data_url, &file.mime_type));
             }
         }
     }
-    vec![Message::User { content, provider_options: None }]
+    vec![Message::User {
+        content,
+        provider_options: None,
+    }]
 }
 
 #[cfg(test)]
@@ -115,19 +137,40 @@ mod tests {
 
     #[test]
     fn a_plain_request_is_one_text_part() {
-        let parts = user_parts(initial_messages(&TaskInput { prompt: "Go", ..TaskInput::default() }));
-        assert_eq!(serde_json::to_string(&parts).unwrap(), r#"[{"type":"text","text":"Go"}]"#);
+        let parts = user_parts(initial_messages(&TaskInput {
+            prompt: "Go",
+            ..TaskInput::default()
+        }));
+        assert_eq!(
+            serde_json::to_string(&parts).unwrap(),
+            r#"[{"type":"text","text":"Go"}]"#
+        );
     }
 
     #[test]
     fn files_are_listed_and_follow_the_request() {
         let attachments = [
-            file("a1", "notes.txt", "text/plain", "data:text/plain;base64,aMOpbGxv"),
-            file("a2", "plan.pdf", "application/pdf", "data:application/pdf;base64,JVBERg=="),
+            file(
+                "a1",
+                "notes.txt",
+                "text/plain",
+                "data:text/plain;base64,aMOpbGxv",
+            ),
+            file(
+                "a2",
+                "plan.pdf",
+                "application/pdf",
+                "data:application/pdf;base64,JVBERg==",
+            ),
             file("a3", "shot.png", "image/png", "data:image/png;base64,AAAA"),
         ];
         let capture = file("c", "screen", "image/webp", "data:image/webp;base64,BBBB");
-        let parts = user_parts(initial_messages(&TaskInput { prompt: "Go", attachments: &attachments, capture: Some(&capture), display_captures: &[] }));
+        let parts = user_parts(initial_messages(&TaskInput {
+            prompt: "Go",
+            attachments: &attachments,
+            capture: Some(&capture),
+            display_captures: &[],
+        }));
         assert_eq!(
             serde_json::to_value(&parts).unwrap(),
             serde_json::json!([

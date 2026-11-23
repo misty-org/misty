@@ -1,10 +1,3 @@
-//! The `asset:` protocol, served only to Misty's own windows.
-//!
-//! Tauri registers its built-in asset handler on every webview, including the
-//! ones that show websites, and that handler ignores which webview asked. Any
-//! page could then embed or probe files under Documents, Downloads and app
-//! data. Registering this handler replaces the built-in one; it applies the
-//! same configured scope but refuses requests from website views.
 use std::{borrow::Cow, io::SeekFrom, path::PathBuf};
 
 use tauri::{
@@ -15,7 +8,6 @@ use tauri::{
 };
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-/// Open-ended range requests are answered in chunks of this size, like Tauri.
 const RANGE_CHUNK: u64 = 1000 * 1024;
 
 pub fn handle<R: Runtime>(
@@ -37,7 +29,6 @@ pub fn handle<R: Runtime>(
     });
 }
 
-/// The origin Misty's own pages load from, for Access-Control-Allow-Origin.
 pub(crate) fn app_origin<R: Runtime>(app: &tauri::AppHandle<R>) -> String {
     if cfg!(debug_assertions) {
         if let Some(dev) = app.config().build.dev_url.as_ref() {
@@ -59,7 +50,6 @@ fn status(code: StatusCode, origin: &str) -> Response<Cow<'static, [u8]>> {
         .expect("static response")
 }
 
-/// The local path a request names, if it is a valid, in-scope file path.
 pub(crate) fn requested_path(uri_path: &str) -> Option<SafePathBuf> {
     let encoded = uri_path.strip_prefix('/')?;
     let decoded = percent_encoding::percent_decode_str(encoded)
@@ -68,7 +58,6 @@ pub(crate) fn requested_path(uri_path: &str) -> Option<SafePathBuf> {
     SafePathBuf::new(PathBuf::from(decoded.as_ref())).ok()
 }
 
-/// One satisfiable `bytes=start-end` range, clamped like Tauri's handler.
 pub(crate) fn single_range(header: &str, length: u64) -> Option<(u64, u64)> {
     let spec = header.trim().strip_prefix("bytes=")?;
     if spec.contains(',') || length == 0 {

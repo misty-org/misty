@@ -1,8 +1,3 @@
-//! Files' thumbnail cache: the thumbnails `protocol.rs` makes, kept in Misty's cache folder
-//! (`cache/thumbnails`) so each is made once, and held under the size the person picks in
-//! Settings › Files. The limit is a device setting, `files:thumbnail-cache-limit` in `misty.db`'s
-//! `settings_state`, which never syncs and only native code writes. Past it, the thumbnails used
-//! longest ago go first: serving one marks it used.
 use std::{
     path::{Path, PathBuf},
     sync::{
@@ -22,17 +17,12 @@ use super::person_window;
 const LIMIT_SCOPE: &str = "files:thumbnail-cache-limit";
 const MB: u64 = 1024 * 1024;
 pub(crate) const DEFAULT_LIMIT: u64 = 512 * MB;
-/// The least a limit may be, so a folder's worth of thumbnails still fits.
 const MIN_LIMIT: u64 = 16 * MB;
-/// A trim leaves this share of the limit, so the next thumbnail made doesn't trim again.
 const TRIM_TO_PERCENT: u64 = 90;
 
-/// The limit in force; 0 until it is read from `misty.db`.
 static LIMIT: AtomicU64 = AtomicU64::new(0);
-/// What the cache holds, in bytes; counted from the folder the first time it is needed.
 static USED: Mutex<Option<u64>> = Mutex::new(None);
 
-/// Where the thumbnails are kept, and the store that holds the limit.
 pub(crate) struct ThumbnailCache {
     pub dir: PathBuf,
     store: Store,
@@ -58,15 +48,12 @@ impl ThumbnailCache {
         }
     }
 
-    /// A thumbnail was served from the cache: it counts as used now, so it is kept longest.
     pub(crate) fn touched(&self, kept: &Path) {
         if let Ok(file) = file_access::fs::OpenOptions::new().write(true).open(kept) {
             let _ = file.set_modified(SystemTime::now());
         }
     }
 
-    /// A thumbnail of `bytes` was just written: counts it, and trims the cache once it is past
-    /// its limit.
     pub(crate) fn added(&self, bytes: u64) {
         let mut used = USED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let total = match *used {
@@ -74,14 +61,21 @@ impl ThumbnailCache {
             None => held(&self.dir).1,
         };
         let limit = self.limit();
-        *used = Some(if total > limit { trim(&self.dir, limit) } else { total });
+        *used = Some(if total > limit {
+            trim(&self.dir, limit)
+        } else {
+            total
+        });
     }
 
     fn status(&self) -> ThumbnailCacheStatus {
         let mut used = USED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let total = held(&self.dir).1;
         *used = Some(total);
-        ThumbnailCacheStatus { limit: self.limit(), used: total }
+        ThumbnailCacheStatus {
+            limit: self.limit(),
+            used: total,
+        }
     }
 
     fn set_limit(&self, bytes: u64) -> Result<ThumbnailCacheStatus, String> {
@@ -92,17 +86,26 @@ impl ThumbnailCache {
         LIMIT.store(bytes, Ordering::Relaxed);
         let mut used = USED.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let total = held(&self.dir).1;
-        *used = Some(if total > bytes { trim(&self.dir, bytes) } else { total });
-        Ok(ThumbnailCacheStatus { limit: bytes, used: used.unwrap_or(0) })
+        *used = Some(if total > bytes {
+            trim(&self.dir, bytes)
+        } else {
+            total
+        });
+        Ok(ThumbnailCacheStatus {
+            limit: bytes,
+            used: used.unwrap_or(0),
+        })
     }
 }
 
 fn read_limit(store: &Store) -> u64 {
     let saved = store.connect().ok().and_then(|connection| {
         connection
-            .query_row("SELECT document FROM settings_state WHERE scope = ?1", [LIMIT_SCOPE], |row| {
-                row.get::<_, String>(0)
-            })
+            .query_row(
+                "SELECT document FROM settings_state WHERE scope = ?1",
+                [LIMIT_SCOPE],
+                |row| row.get::<_, String>(0),
+            )
             .optional()
             .ok()
             .flatten()
@@ -115,7 +118,9 @@ fn read_limit(store: &Store) -> u64 {
 }
 
 fn write_limit(store: &Store, bytes: u64) -> Result<(), String> {
-    let connection = store.connect().map_err(|_| "Misty couldn't read its settings.".to_string())?;
+    let connection = store
+        .connect()
+        .map_err(|_| "Misty couldn't read its settings.".to_string())?;
     connection
         .execute(
             "INSERT INTO settings_state (scope, revision, document) VALUES (?1, 1, ?2)
@@ -126,7 +131,6 @@ fn write_limit(store: &Store, bytes: u64) -> Result<(), String> {
         .map_err(|_| "Misty couldn't save its settings.".to_string())
 }
 
-/// The cache's thumbnails, oldest used first, and their bytes in all.
 fn held(dir: &Path) -> (Vec<(SystemTime, u64, PathBuf)>, u64) {
     let Ok(entries) = file_access::fs::read_dir(dir) else {
         return (Vec::new(), 0);
@@ -136,7 +140,11 @@ fn held(dir: &Path) -> (Vec<(SystemTime, u64, PathBuf)>, u64) {
         .filter_map(|entry| {
             let meta = entry.metadata().ok()?;
             meta.is_file().then(|| {
-                (meta.modified().unwrap_or(SystemTime::UNIX_EPOCH), meta.len(), entry.path())
+                (
+                    meta.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+                    meta.len(),
+                    entry.path(),
+                )
             })
         })
         .collect();
@@ -145,8 +153,6 @@ fn held(dir: &Path) -> (Vec<(SystemTime, u64, PathBuf)>, u64) {
     (kept, total)
 }
 
-/// Removes the thumbnails used longest ago until the cache is under `limit`'s trim mark, and
-/// answers what it holds after.
 fn trim(dir: &Path, limit: u64) -> u64 {
     let (kept, mut total) = held(dir);
     let goal = limit.saturating_mul(TRIM_TO_PERCENT) / 100;
@@ -164,9 +170,7 @@ fn trim(dir: &Path, limit: u64) -> u64 {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThumbnailCacheStatus {
-    /// The most the cache may hold, in bytes.
     pub limit: u64,
-    /// What it holds now, in bytes.
     pub used: u64,
 }
 
@@ -174,15 +178,18 @@ fn cache(app: &AppHandle) -> Result<ThumbnailCache, String> {
     ThumbnailCache::of(app).ok_or_else(|| "Misty couldn't find its cache folder.".to_string())
 }
 
-/// The thumbnail cache's limit and what it holds, for Settings › Files.
 #[tauri::command]
-pub async fn files_thumbnail_cache(app: AppHandle, webview: Webview) -> Result<ThumbnailCacheStatus, String> {
+pub async fn files_thumbnail_cache(
+    app: AppHandle,
+    webview: Webview,
+) -> Result<ThumbnailCacheStatus, String> {
     person_window(&webview)?;
     let cache = cache(&app)?;
-    tokio::task::spawn_blocking(move || cache.status()).await.map_err(|error| error.to_string())
+    tokio::task::spawn_blocking(move || cache.status())
+        .await
+        .map_err(|error| error.to_string())
 }
 
-/// Keeps the thumbnail cache's limit, at least 16 MB, and trims the cache to it at once.
 #[tauri::command]
 pub async fn files_set_thumbnail_cache_limit(
     app: AppHandle,
@@ -191,7 +198,9 @@ pub async fn files_set_thumbnail_cache_limit(
 ) -> Result<ThumbnailCacheStatus, String> {
     person_window(&webview)?;
     let cache = cache(&app)?;
-    tokio::task::spawn_blocking(move || cache.set_limit(bytes)).await.map_err(|error| error.to_string())?
+    tokio::task::spawn_blocking(move || cache.set_limit(bytes))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[cfg(test)]
@@ -209,14 +218,17 @@ mod tests {
             let path = dir.join(name);
             std::fs::write(&path, vec![0u8; 100]).unwrap();
             let used = now - std::time::Duration::from_secs(300 - 100 * index as u64);
-            file_access::fs::OpenOptions::new().write(true).open(&path).unwrap().set_modified(used).unwrap();
+            file_access::fs::OpenOptions::new()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(used)
+                .unwrap();
         }
-        // A limit of 230 trims to 207 bytes: only the oldest has to go.
         assert_eq!(trim(&dir, 230), 200);
         assert!(!dir.join("old").exists());
         assert!(dir.join("middle").exists());
         assert!(dir.join("new").exists());
-        // A limit of 100 trims to 90: everything goes.
         assert_eq!(trim(&dir, 100), 0);
         std::fs::remove_dir_all(&dir).unwrap();
     }

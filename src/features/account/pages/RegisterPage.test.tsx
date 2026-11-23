@@ -29,15 +29,15 @@ vi.mock("../AuthContext", () => ({
   }),
 }));
 
-vi.mock("../sessions/useAccountStore", () => ({
+vi.mock("../sessions/use_account_store", () => ({
   accountRegister: mocks.accountRegister,
   accountSignIn: mocks.accountSignIn,
   accountWaitForConfirmation: mocks.accountWaitForConfirmation,
 }));
 
-import { ConfirmEmailSent } from "../sessions/confirmEmailSent";
+import { ConfirmEmailSent } from "../sessions/confirm_email_sent";
 import RegisterPage from "./RegisterPage";
-import { useSetupStore } from "../setup/useSetupStore";
+import { useSetupStore } from "../setup/use_setup_store";
 import type * as ReactRouterDomModule from "react-router-dom";
 
 function setInputValue(input: HTMLInputElement, value: string) {
@@ -107,7 +107,6 @@ describe("RegisterPage", () => {
       );
     });
 
-    // Nobody is signed in here, so it isn't "another" account.
     expect(container.textContent).toContain("Create an account");
     expect(container.textContent).not.toContain(
       "Your current account will remain signed in on this device.",
@@ -127,7 +126,6 @@ describe("RegisterPage", () => {
     expect(container.textContent).not.toContain("Create an account on the website");
     expect(container.textContent).not.toContain("Sign in on the website");
 
-    // The page has no back button: the logo in the bar goes to the welcome page.
     expect(backButtonIn(container)).toBeNull();
     expect(container.textContent).not.toContain("Return to app");
   });

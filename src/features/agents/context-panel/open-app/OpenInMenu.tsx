@@ -14,9 +14,9 @@ import {
   SplitButton,
   useNotice,
 } from "@misty/ui";
-import { useFolderSettings } from "../folders/folderSettings";
-import { useFilesStore } from "../files/filesStore";
-import { isWithinDirectory } from "../files/repositorySelection";
+import { useFolderSettings } from "../folders/folder_settings";
+import { useFilesStore } from "../files/files_store";
+import { isWithinDirectory } from "../files/repository_selection";
 import {
   availableTargets,
   chosenTarget,
@@ -24,11 +24,10 @@ import {
   openInTarget,
   useOpenApps,
   type OpenAppTarget,
-} from "./openApp";
+} from "./open_app";
 
 const errorText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason));
 
-/** An app's own icon, or its first letter where the system gave none. */
 function TargetIcon({ target, icon }: { target: OpenAppTarget; icon?: string }) {
   const [broken, setBroken] = useState<string | null>(null);
   if (icon && broken !== icon)
@@ -44,19 +43,11 @@ function TargetIcon({ target, icon }: { target: OpenAppTarget; icon?: string }) 
   return <LogoInitial name={target.label} />;
 }
 
-/** What a target opens: the file shown in the editor, except in the file manager, which shows
- * the folder. */
 function openInPath(target: OpenAppTarget, folder: string, activeFilePath: string | null): string {
   if (target.id === "finder") return folder;
   return activeFilePath && isWithinDirectory(folder, activeFilePath) ? activeFilePath : folder;
 }
 
-/**
- * "Open in" for the panel's head: one button that opens the file shown in the editor (or the
- * folder, when none is) in the app chosen last for the folder, and a menu of every app on this
- * computer (the chosen one checked), the person's own programs, and a way to add one through the
- * system's file dialog.
- */
 export function OpenInMenu({ folder }: { folder: string }) {
   const icons = useOpenApps((s) => s.icons);
   const programs = useOpenApps((s) => s.programs);
@@ -105,7 +96,6 @@ export function OpenInMenu({ folder }: { folder: string }) {
       .catch((reason) => setError(errorText(reason)));
   };
 
-  // Read once a launch: the button and its chevron at their own size until then.
   if (!loaded || !chosen) return <Skeleton className="h-8 w-12.5 shrink-0 rounded-md" />;
 
   return (

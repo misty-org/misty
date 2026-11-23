@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-import { Button, Dialog, DialogContent, DialogTitle } from "@misty/ui";
+import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@misty/ui";
 import type { EngineId } from "./engines";
 import {
   ClaudeFormSections,
@@ -10,12 +10,10 @@ import {
   ProviderBasicFields,
   ProviderPresetSections,
 } from "./ProviderFormSections";
-import { useProviderForm, type ProviderFormValue } from "./useProviderForm";
+import { useProviderForm, type ProviderFormValue } from "./use_provider_form";
 
-export type { ProviderFormValue } from "./useProviderForm";
+export type { ProviderFormValue } from "./use_provider_form";
 
-/** Add or edit one channel. The state lives in useProviderForm and each engine's fields in
- *  ProviderFormSections; this is the dialog around them. */
 export function ProviderDialog({
   engine,
   title,
@@ -28,7 +26,6 @@ export function ProviderDialog({
   engine: EngineId;
   title: string;
   initial?: ProviderFormValue;
-  /** The saved channel being edited. */
   channelId?: string;
   hasKey: boolean;
   onSubmit: (value: ProviderFormValue) => void;
@@ -41,7 +38,9 @@ export function ProviderDialog({
         aria-describedby={undefined}
         className="flex max-h-[86vh] w-145 max-w-[94vw] flex-col gap-4 p-5"
       >
-        <DialogTitle className="pr-10 text-base">{title}</DialogTitle>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
         <form
           className="grid min-h-0 flex-1 gap-5 overflow-y-auto pr-1"
           onSubmit={(event) => {
@@ -54,14 +53,14 @@ export function ProviderDialog({
           <ClaudeFormSections engine={engine} form={form} />
           <FlatModelSection engine={engine} form={form} />
           <CodexFormSections engine={engine} form={form} hasKey={hasKey} />
-          <div className="flex justify-end gap-2">
-            <Button type="button" onClick={onCancel}>
+          <DialogFooter>
+            <Button type="button" variant="quiet" onClick={onCancel}>
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={!form.valid}>
               Save
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

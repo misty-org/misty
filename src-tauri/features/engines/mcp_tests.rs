@@ -12,8 +12,6 @@ fn offers_space_tools_under_names_clients_accept() {
     assert!(names.iter().all(|name| name
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')));
-    // What an engine already does itself is not offered a second time, and neither is a tool
-    // that reads a page with Misty's own model.
     for withheld in ["shell_run", "folder_read", "browser_act", "browser_extract"] {
         assert!(!names.contains(&withheld), "{withheld}");
     }
@@ -32,7 +30,6 @@ fn offers_the_browser_only_to_a_run_it_was_attached_to() {
         computer: false,
     };
     assert!(plain.offers(&json!({ "name": "file_read" })));
-    // Without the Browser attachment a run has no browser at all.
     for name in ["screen_open", "browser_snapshot", "browser_steps"] {
         assert!(!plain.offers(&json!({ "name": name })), "{name}");
     }
@@ -49,7 +46,6 @@ fn offers_the_browser_only_to_a_run_it_was_attached_to() {
         .iter()
         .find(|tool| tool["name"] == "screen_open")
         .unwrap();
-    // An engine's screen is a tab of its own, never the desktop or the person's tab.
     assert!(open["inputSchema"]["properties"]["target"].is_null());
     let (tool, input) = misty_call(
         "screen_open",
@@ -81,7 +77,6 @@ fn knows_its_own_tools_however_an_engine_spells_them() {
     ] {
         assert!(names_misty_tool(spelled, &Value::Null), "{spelled}");
     }
-    // An engine that only gives a title still describes the call it wants to make.
     let call =
         json!({ "title": "Open a tab", "rawInput": { "server": "misty", "tool": "screen_open" } });
     assert!(names_misty_tool("Open a tab", &call));

@@ -1,5 +1,3 @@
-//! Commands for a page's context menu.
-
 use crate::browser::*;
 
 #[tauri::command]

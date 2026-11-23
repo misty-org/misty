@@ -1,12 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Model prices (USD per token) from LiteLLM's public table: a bundled
-//! snapshot (built by desktop-cc-gui's scripts/build-model-prices.mjs) plus an optional newer copy the
-//! user downloaded into `<app home>/model-prices.json`. Download only —
-//! nothing is ever uploaded. Unknown models price as `None`, never as some
-//! other model's rate.
-
 use super::time::{parse_day, utc_today};
 use super::types::{PriceInfo, Tokens};
 use serde::Deserialize;
@@ -19,12 +13,10 @@ use std::sync::{Arc, LazyLock, RwLock};
 const BUNDLED: &str = include_str!("model-prices.json");
 const LITELLM_URL: &str =
     "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
-/// Must match TEXT_MODES in desktop-cc-gui's scripts/build-model-prices.mjs.
 const TEXT_MODES: [&str; 3] = ["chat", "completion", "responses"];
 const MAX_BODY_BYTES: usize = 32 * 1024 * 1024;
 const MIN_MODELS: usize = 100;
 const RESOLVE_CACHE_CAP: usize = 4096;
-/// First-party providers win when several LiteLLM keys share a bare id.
 const PROVIDER_PREFERENCE: [&str; 12] = [
     "anthropic",
     "openai",
@@ -49,8 +41,6 @@ pub(crate) struct ModelPrice {
 }
 
 impl ModelPrice {
-    /// Cache tokens fall back to the input rate when the table has no
-    /// cache price for this model.
     pub fn cost(&self, tokens: &Tokens) -> f64 {
         tokens.input as f64 * self.input
             + tokens.output as f64 * self.output
@@ -64,9 +54,7 @@ pub(crate) struct PriceTable {
     snapshot_date: String,
     updated_at: Option<i64>,
     prices: HashMap<String, ModelPrice>,
-    /// lowercase id → table id
     lower: HashMap<String, String>,
-    /// lowercase id without provider path → provider-prefixed table ids
     bare: HashMap<String, Vec<String>>,
     resolved: parking_lot::Mutex<HashMap<String, Option<ModelPrice>>>,
 }
@@ -146,9 +134,6 @@ impl PriceTable {
         price
     }
 
-    /// Table id for `model`: exact → lowercase → without provider prefix →
-    /// without date suffix → Claude dotted version → provider-prefixed
-    /// table ids → longest prefix ending at a separator.
     pub fn resolve(&self, model: &str) -> Option<String> {
         let raw = model.trim();
         if raw.is_empty() || raw == "unknown" {
@@ -195,7 +180,6 @@ impl PriceTable {
     }
 }
 
-/// Suffixes that pick a mode of one model rather than a different model.
 const MODE_SUFFIXES: &[&str] = &[
     "minimal",
     "low",
@@ -229,11 +213,8 @@ static CLAUDE_DOTTED: LazyLock<regex::Regex> = LazyLock::new(|| {
     regex::Regex::new(r"^claude-(opus|sonnet|haiku|fable)-(\d+)\.(\d+)").expect("static regex")
 });
 
-/// Normalized lookup ids, most specific first, without duplicates.
 fn candidates(raw: &str) -> Vec<String> {
     let lower = raw.to_lowercase();
-    // `anthropic/claude-x`, `openrouter/anthropic/claude-x` → `claude-x`;
-    // a `[1m]`-style context marker is not part of the id.
     let tail = lower.rsplit('/').next().unwrap_or(&lower);
     let bare = tail.split('[').next().unwrap_or(tail).trim().to_string();
     let undated = DATE_SUFFIX.replace(&bare, "").into_owned();
@@ -249,7 +230,6 @@ fn candidates(raw: &str) -> Vec<String> {
     out
 }
 
-/// LiteLLM → compact snapshot models. Same filter as the build script.
 pub(crate) fn compact_litellm(raw: &serde_json::Value) -> BTreeMap<String, [Option<f64>; 4]> {
     let cost = |entry: &serde_json::Value, field: &str| {
         entry
@@ -328,7 +308,6 @@ fn load_cached(path: &Path) -> Option<PriceTable> {
     }
 }
 
-/// Online copy when it is at least as new as the bundled snapshot.
 pub(crate) fn load_preferred(cache: &Path) -> PriceTable {
     let bundled = bundled();
     match load_cached(cache) {
@@ -354,8 +333,6 @@ fn replace_current(table: PriceTable) {
     *guard = Arc::new(table);
 }
 
-/// Download LiteLLM's table, keep the compact form as the online copy and
-/// switch to it. On failure the current table stays in use.
 pub(crate) async fn update() -> Result<PriceInfo, String> {
     let body = download().await?;
     let path = cache_path();
@@ -398,7 +375,6 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .map_err(|e| format!("save price table: {e}"))
 }
 
-/// Plain GET, through the proxy from Settings. Nothing is sent but the request.
 async fn download() -> Result<Vec<u8>, String> {
     let client = crate::engine_config::proxy::apply_to_client(
         reqwest::Client::builder()

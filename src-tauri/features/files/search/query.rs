@@ -13,12 +13,13 @@ use tantivy::{
 
 use super::catalog::{doc_from, Doc, Fields};
 
-/// The most candidates one query gathers before they are scored.
 const CANDIDATES: usize = 10_000;
 
 pub(super) fn split_tokens(value: &str) -> Vec<String> {
     value
-        .split(|character: char| character.is_whitespace() || matches!(character, '.' | '_' | '-' | '/'))
+        .split(|character: char| {
+            character.is_whitespace() || matches!(character, '.' | '_' | '-' | '/')
+        })
         .filter(|segment| !segment.is_empty())
         .map(ToOwned::to_owned)
         .collect()
@@ -36,13 +37,18 @@ fn build_query(fields: &Fields, query: &str) -> Option<Box<dyn Query>> {
     let mut queries: Vec<(Occur, Box<dyn Query>)> = Vec::new();
     for token in tokens {
         let term = Term::from_field_text(fields.name, &token);
-        queries.push((Occur::Should, Box::new(FuzzyTermQuery::new(term.clone(), 2, true))));
-        queries.push((Occur::Should, Box::new(TermQuery::new(term, IndexRecordOption::Basic))));
+        queries.push((
+            Occur::Should,
+            Box::new(FuzzyTermQuery::new(term.clone(), 2, true)),
+        ));
+        queries.push((
+            Occur::Should,
+            Box::new(TermQuery::new(term, IndexRecordOption::Basic)),
+        ));
     }
     Some(Box::new(BooleanQuery::from(queries)))
 }
 
-/// The candidates for `query` (already lowercase).
 fn candidates(reader: &IndexReader, fields: &Fields, query: &str) -> Result<Vec<Doc>, String> {
     let Some(built) = build_query(fields, query) else {
         return Ok(Vec::new());
@@ -58,8 +64,6 @@ fn candidates(reader: &IndexReader, fields: &Fields, query: &str) -> Result<Vec<
         .collect())
 }
 
-/// Matches for `query` inside `scope` (when given), best first, hidden items left out. Each is
-/// scored and those under the bar for the query's length dropped.
 pub(super) fn matches(
     reader: &IndexReader,
     fields: &Fields,
@@ -150,8 +154,6 @@ fn min_score(query_len: usize) -> f32 {
     }
 }
 
-/// Optimal string alignment distance: Levenshtein, with swapping two neighbouring characters as
-/// one edit, so "invioce" is one typo away from "invoice".
 fn edit_distance(first: &str, second: &str) -> usize {
     let a: Vec<char> = first.chars().collect();
     let b: Vec<char> = second.chars().collect();
@@ -162,7 +164,9 @@ fn edit_distance(first: &str, second: &str) -> usize {
         current[0] = i + 1;
         for (j, b_char) in b.iter().enumerate() {
             let cost = usize::from(a_char != b_char);
-            let mut best = (previous[j + 1] + 1).min(current[j] + 1).min(previous[j] + cost);
+            let mut best = (previous[j + 1] + 1)
+                .min(current[j] + 1)
+                .min(previous[j] + cost);
             if i > 0 && j > 0 && *a_char == b[j - 1] && a[i - 1] == *b_char {
                 best = best.min(before_previous[j - 1] + 1);
             }

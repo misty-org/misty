@@ -1,10 +1,9 @@
-// Spoken conversations, delegated voice tasks and stopping audio.
 import "./CompanionController.testFixtures";
 import { act, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { emit, mocks, mounted, opened } from "./CompanionController.testFixtures";
-import { companionControl, useCompanionState } from "./companionState";
-import type { MistyImageAttachment } from "@/features/agents/conversations/state/conversationTypes";
+import { companionControl, useCompanionState } from "./companion_state";
+import type { MistyImageAttachment } from "@/features/agents/conversations/state/conversation_types";
 const attachment: MistyImageAttachment = {
   id: "fixture-file",
   name: "notes.txt",
@@ -109,7 +108,6 @@ it("voice failure preserves an admitted task and saved history", async () => {
   expect(mocks.cancel).not.toHaveBeenCalled();
   expect(mocks.state.working).toBe(true);
   expect(mocks.state.invocationId).toBe("active");
-  // Tutor's failure shows at the cursor, not in whichever chat is open.
   expect(mocks.state.error).toBeNull();
   expect(useCompanionState.getState().presentation.error).toBe("Voice disconnected");
   view.unmount();
@@ -164,7 +162,6 @@ it("sends spoken screen questions with the screens", async () => {
       "conversation",
     );
   });
-  // Every spoken request carries the screens; the run decides what matters.
   expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
   expect(mocks.submit).toHaveBeenCalledWith(
     "Describe the screen without changing anything.",

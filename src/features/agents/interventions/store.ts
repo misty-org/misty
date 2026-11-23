@@ -5,11 +5,10 @@ import {
   listenForLocalWaits,
   localWaits,
   onLocalWaitsChanged,
-} from "./localWaits";
+} from "./local_waits";
 
 type ObservedWait = AgentInterventionWait & { observedAt: string };
 
-/** The waits held on this computer, each keeping when it was first seen. */
 function currentWaits(items: ObservedWait[]): ObservedWait[] {
   const observedAt = new Date().toISOString();
   return localWaits().map((wait) => ({

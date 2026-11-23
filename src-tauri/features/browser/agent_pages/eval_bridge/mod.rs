@@ -1,12 +1,3 @@
-//! A debug-only bridge into a running Misty for the live acceptance specs
-//! (`src/tests/acceptance/mistyClient.ts`). It runs scripts in a person's app
-//! window (`/window-eval`) and follows or cancels a run (`/run-follow`,
-//! `/run-cancel`), so the specs drive the app through its real paths.
-//!
-//! Start the app with `MISTY_BROWSER_EVAL_BRIDGE_PORT` and
-//! `MISTY_BROWSER_EVAL_BRIDGE_TOKEN` set. The bridge listens on 127.0.0.1
-//! only, answers only requests carrying the token, and is not compiled into
-//! release builds.
 use crate::browser::*;
 use axum::{
     body::Bytes,
@@ -28,7 +19,6 @@ struct Bridge {
     token: Arc<String>,
 }
 
-/// Starts the bridge when the environment asks for it; a no-op otherwise.
 pub(crate) fn start_if_requested(app: &AppHandle) {
     let (Ok(port), Ok(token)) = (
         std::env::var("MISTY_BROWSER_EVAL_BRIDGE_PORT"),
@@ -73,7 +63,6 @@ fn authorized(bridge: &Bridge, headers: &HeaderMap) -> bool {
     token_matches(&bridge.token, supplied)
 }
 
-/// Compares in time that depends only on the expected token's length.
 fn token_matches(expected: &str, supplied: &str) -> bool {
     let (expected, supplied) = (expected.as_bytes(), supplied.as_bytes());
     let mut difference = u8::from(supplied.len() != expected.len());
@@ -95,8 +84,7 @@ fn reply(result: Result<Value, String>) -> Response {
         .into_response()
 }
 
-/// The request body, once the caller has shown the token.
-#[allow(clippy::result_large_err)] // The error is the reply itself.
+#[allow(clippy::result_large_err)]
 fn request<T: DeserializeOwned>(
     bridge: &Bridge,
     headers: &HeaderMap,

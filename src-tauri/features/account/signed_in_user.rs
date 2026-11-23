@@ -14,11 +14,6 @@ pub struct CurrentUser {
     username: String,
     email: String,
 }
-/// The account this device last signed in with. The server owns the account; this only
-/// lets the app show who is signed in. Records from earlier builds also carried a
-/// license; it is ignored on read and dropped on the next write.
-/// It lives in `misty.db` with everything else (sign-in already depends on that
-/// database, since the account's tokens are in it).
 #[derive(Default, Serialize, Deserialize)]
 struct StoredSession {
     user: Option<CurrentUser>,
@@ -33,7 +28,6 @@ fn session_store() -> Result<database::store::Store, String> {
 }
 
 fn read_session() -> StoredSession {
-    // A missing or damaged record is a signed-out device, never an error.
     session_store()
         .ok()
         .and_then(|store| store.connect().ok())
@@ -69,7 +63,6 @@ fn session_info() -> Result<NativeSystemInfo, String> {
     })
 }
 
-/// Async so the file work never runs on the UI thread.
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {
@@ -106,6 +99,5 @@ pub async fn save_authenticated_user(user: CurrentUser) -> Result<NativeSystemIn
 }
 
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

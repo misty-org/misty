@@ -11,10 +11,9 @@ import {
   floatingHeaderClass,
   studioBarClass,
 } from "./AgentsTaskContent";
-import { createAgentsPageActions, deriveAgentsPageView } from "./agentsPageActions";
-import { useAgentsPageState } from "./useAgentsPageState";
+import { createAgentsPageActions, deriveAgentsPageView } from "./agents_page_actions";
+import { useAgentsPageState } from "./use_agents_page_state";
 
-/* Agents opens straight into a conversation with the selected agent, which stays mounted across catalogs. */
 export default function NativeAgentsPage() {
   return <AgentsWorkspacePage />;
 }
@@ -45,8 +44,6 @@ function AgentsWorkspacePage() {
   } = state;
   const { setEditorStatus } = guard;
   const { select, closeSettings, saveProfile, removeProfile, openConnections } = actions;
-  // A link opens any agent's settings (?agentSettings=<id>) without moving the page to that
-  // agent's chat.
   const [editingId, setEditingId] = useState<string>();
   useEffect(() => {
     if (!settingsModalOpen) setEditingId(undefined);
@@ -93,8 +90,6 @@ function AgentsWorkspacePage() {
       data-settings-open={settingsModalOpen}
     >
       {showWorkspace && profile ? (
-        // Keyed by account only: switching to another agent's chat keeps the frame (rail, side
-        // panels, pages) mounted instead of building it all again.
         <AgentWorkspaceFrame
           key={user?.id}
           agent={profile}
@@ -137,10 +132,6 @@ function AgentsWorkspacePage() {
 
 const replyWidths = ["w-3/4", "w-full", "w-5/6", "w-2/3", "w-full", "w-1/2"];
 
-/**
- * The page before the person's agents are read: the chat under its bar beside the panels' rail.
- * An open chat shows lines of its conversation over the composer; a new one, the greeting over it.
- */
 function AgentsPageSkeleton({ chat }: { chat: boolean }) {
   const composer = <Skeleton className="h-28 w-full rounded-xl" />;
   return (

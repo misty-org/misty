@@ -7,19 +7,13 @@ import {
   DropdownMenuTrigger,
   MenuItem,
 } from "@misty/ui";
-import { markHandoffHandled } from "./handledHandoffs";
+import { markHandoffHandled } from "./handled_handoffs";
 
-/**
- * A handoff's two answers. "Give to my agent" opens a new chat with one of this person's own
- * agents and puts the words in its composer, unsent, so it becomes their request only when they
- * send it. "Dismiss" just stops it waiting on this device.
- */
 export function HandoffActions(props: {
   spaceId: string;
   me: string;
   handoffId: string;
   text: string;
-  /** The agent the sender asked for, when it is one of this person's own: offered first. */
   agentId?: string;
   onError: (message: string) => void;
 }) {
@@ -30,7 +24,6 @@ export function HandoffActions(props: {
     if (store.accountId !== account || !store.agents.length) void store.load(account);
   }, []);
   const enabled = agents.filter((agent) => agent.enabled);
-  // The agent asked for goes first, so a click on the menu's top row hands it on.
   const asked = enabled.find((agent) => agent.id === props.agentId);
   const mine = asked ? [asked, ...enabled.filter((agent) => agent !== asked)] : enabled;
   const done = () => markHandoffHandled(props.me, props.spaceId, props.handoffId);

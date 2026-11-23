@@ -1,16 +1,16 @@
-import { defaultAgentOf, usePersonalAgentsStore } from "../../personal/personalAgentsStore";
-import { useMistyStore } from "../state/useMistyStore";
+import { defaultAgentOf, usePersonalAgentsStore } from "../../personal/personal_agents_store";
+import { useMistyStore } from "../state/use_misty_store";
 import { workspaceSurfaceFromRoute } from "@/features/app-windows";
 import { useWorkspaceStore } from "@/features/app-windows";
-import { readMistyDraftAttachments, useMistyDraftAttachments } from "../composer/draftAttachments";
+import { readMistyDraftAttachments, useMistyDraftAttachments } from "../composer/draft_attachments";
 import type {
   AiCaptureAttachment,
   AiArtifactKind,
   AiInvocationDeviceContext,
   AiSelectionSnapshot,
   AiSurfaceId,
-} from "../../runs/invocations/invocationTypes";
-import type { GlobalAiContextRef } from "../state/conversationTypes";
+} from "../../runs/invocations/invocation_types";
+import type { GlobalAiContextRef } from "../state/conversation_types";
 
 export interface MistyHandoff {
   agentId?: string;
@@ -39,7 +39,6 @@ function currentConversationRoute() {
   return `/agents${query ? `?${query}` : ""}`;
 }
 
-/** Misty's conversations live on the Agents page; open it on the current one. */
 function showMistyConversation() {
   const route = currentConversationRoute();
   const surface = workspaceSurfaceFromRoute(route);
@@ -66,7 +65,6 @@ async function acceptMistyHandoff(input: MistyHandoff) {
   const changesRequest = Object.keys(input).some(
     (key) => !["accountId", "agentId", "conversationId"].includes(key),
   );
-  // Opening the same conversation is presentation only, including while a run is active.
   if (initial.working) {
     if (
       changesRequest ||
@@ -89,7 +87,6 @@ async function acceptMistyHandoff(input: MistyHandoff) {
     assertCurrent();
   }
   const state = useMistyStore.getState();
-  // Do not retarget a turn that started while the handoff was loading.
   if (state.working) throw new Error("Misty started working. Open its current conversation again.");
   const agentId = input.agentId ?? state.selectedAgentId;
   const defaultId = defaultAgentOf(usePersonalAgentsStore.getState().agents)?.id;
@@ -131,7 +128,6 @@ async function acceptMistyHandoff(input: MistyHandoff) {
     usePersonalAgentsStore.getState().select("", input.agentId);
     useMistyStore.setState({ selectedAgentId: input.agentId });
   }
-  // A Space is attached context, never a reason to fork a conversation.
   if (changesRequest) {
     const current = useMistyStore.getState();
     useMistyStore.setState({

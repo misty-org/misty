@@ -1,9 +1,8 @@
 import type { SpaceMessage, SpaceThread } from "./dto/entities";
 import type { MessageSpan } from "./dto/common";
 
-import type { SpaceRequest } from "./spaceRequestTypes";
+import type { SpaceRequest } from "./space_request_types";
 
-/** How many messages a chat reads at once: its newest page, then each older one as it scrolls back. */
 export const spaceMessagePageSize = 50;
 
 export function createSpaceChatApi(request: SpaceRequest) {
@@ -39,7 +38,6 @@ export function createSpaceChatApi(request: SpaceRequest) {
           client_nonce: clientNonce,
         }),
       }),
-    /** A thread's newest replies, oldest first; pass the first visible seq to read older replies. */
     threadReplies: (spaceId: string, rootId: string, before = 0) =>
       request<{ messages: SpaceMessage[]; has_older: boolean }>(
         `/spaces/${encodeURIComponent(spaceId)}/messages/${encodeURIComponent(rootId)}/replies?before=${before}&limit=50`,
@@ -49,7 +47,6 @@ export function createSpaceChatApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/messages/${encodeURIComponent(rootId)}/thread/read`,
         { method: "POST", body: JSON.stringify({ seq }) },
       ),
-    /** The threads the person follows in the Space, most recently replied to first. */
     threads: (spaceId: string) =>
       request<{ threads: SpaceThread[] }>(`/spaces/${encodeURIComponent(spaceId)}/threads`),
     updateMessage: (

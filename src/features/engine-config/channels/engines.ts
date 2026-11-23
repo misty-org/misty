@@ -1,7 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/** The engines a provider channel or a CLI lifecycle can be set for, in Settings order. */
 export const ENGINE_IDS = [
   "claude",
   "codex",
@@ -41,7 +40,6 @@ export const ENGINE_NAMES: Record<EngineId, string> = {
   hermes: "Hermes Agent",
 };
 
-/** Each engine's official documentation. */
 export const ENGINE_DOCS_URLS: Record<EngineId, string> = {
   claude: "https://code.claude.com/docs/en/cli-reference",
   codex: "https://learn.chatgpt.com/docs/codex/cli",
@@ -61,10 +59,8 @@ export const ENGINE_DOCS_URLS: Record<EngineId, string> = {
   hermes: "https://hermes-agent.nousresearch.com/docs/",
 };
 
-/** Engines whose channels can come from CC Switch. */
 export const CC_SWITCH_ENGINES: readonly EngineId[] = ["claude", "codex", "grok"];
 
-/** Engines whose own config files the official editor can open. */
 export const OFFICIAL_EDITABLE_ENGINES: readonly EngineId[] = [
   "claude",
   "codex",

@@ -1,18 +1,20 @@
-import { Check, ChevronDown, ChevronUp, MessageCircleQuestion } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { BackButton, Button, cn, IconButton, Input, Pressable, Surface, Text } from "@misty/ui";
-import { ErrorNotice } from "../conversations/ErrorNotice";
+import { ChevronDown, ChevronUp, MessageCircleQuestion } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  BackButton,
+  Button,
+  ChoiceList,
+  IconButton,
+  Input,
+  QuestionPanel,
+  Surface,
+  Text,
+} from "@misty/ui";
 import { useCollaborationStore } from "./store";
-import type { AgentQuestionAnswer, AgentQuestionSet } from "./planTypes";
+import type { AgentQuestionAnswer, AgentQuestionSet } from "./plan_types";
 
 const blank = (): AgentQuestionAnswer => ({ selected: [], other: "" });
 
-/**
- * Questions the agent is waiting on, above the composer: one at a time, options
- * as rows with a checkmark, an Other field, then Submit. Number keys pick,
- * Enter advances, Esc collapses to a strip. Typing a message instead answers
- * by superseding the questions.
- */
 export function AgentQuestionCard({
   questionSet,
   agentName,
@@ -20,7 +22,6 @@ export function AgentQuestionCard({
 }: {
   questionSet: AgentQuestionSet;
   agentName: string;
-  /** Sends the turn that carries answers given after the run handed off. */
   onContinue(prompt: string): void;
 }) {
   const questions = questionSet.questions;
@@ -30,8 +31,6 @@ export function AgentQuestionCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const card = useRef<HTMLDivElement>(null);
-  // Only a new question set starts over; refreshed copies of the same set keep
-  // the answers in progress.
   useEffect(() => {
     setIndex(0);
     setAnswers(questionSet.questions.map(blank));
@@ -95,12 +94,7 @@ export function AgentQuestionCard({
   if (!question) return null;
   if (collapsed)
     return (
-      <Surface
-        tone="card"
-        edge="hairline"
-        radius="xl"
-        className="mb-2 flex items-center gap-2 py-1 pr-1 pl-3"
-      >
+      <Surface tone="faint" radius="xl" className="mb-2 flex items-center gap-2 py-1 pr-1 pl-3">
         <Text bare size="meta" tone="muted" className="flex min-w-0 flex-1 items-center gap-2">
           <MessageCircleQuestion aria-hidden="true" />
           <span className="min-w-0 flex-1">
@@ -114,127 +108,53 @@ export function AgentQuestionCard({
         </Button>
       </Surface>
     );
+  const count = questions.length > 1 ? `${index + 1} of ${questions.length}` : "";
+  const aside = [question.header, count].filter(Boolean).join(", ");
   return (
-    <Surface
-      ref={card}
-      tone="card"
-      edge="hairline"
-      radius="xl"
-      className="mb-2 grid gap-2.5 px-3 pt-3 pb-2.5"
-      role="group"
-      aria-label={`${agentName} is asking`}
-      onKeyDown={onKeyDown}
-    >
-      <div className="flex items-center gap-2">
-        <QuestionChip>{question.header}</QuestionChip>
-        <Text bare size="caption" tone="muted" className="flex-1" aria-live="polite">
-          {questions.length > 1 ? `${index + 1} of ${questions.length}` : `${agentName} is asking`}
+    <QuestionPanel
+      panelRef={card}
+      label={`${agentName} is asking`}
+      title={
+        <Text wrap size="control" tone="bright" weight="medium">
+          {question.question}
         </Text>
-        <IconButton label="Collapse questions" onClick={() => setCollapsed(true)}>
+      }
+      aside={aside || undefined}
+      end={
+        <IconButton label="Hide questions" onClick={() => setCollapsed(true)}>
           <ChevronDown />
         </IconButton>
-      </div>
-      <QuestionText>{question.question}</QuestionText>
-      <div
-        className="grid gap-1"
-        role={question.multiSelect ? "group" : "radiogroup"}
-        aria-label={question.question}
-      >
-        {question.options.map((option, optionIndex) => {
-          const selected = answer.selected.includes(option.label);
-          return (
-            <Surface
-              as={Pressable}
-              key={option.label}
-              role={question.multiSelect ? "checkbox" : "radio"}
-              aria-checked={selected}
-              tone={selected ? "active" : "none"}
-              radius="md"
-              wash={selected ? undefined : "control"}
-              className={cn(
-                "grid w-full cursor-pointer grid-cols-[--spacing(5)_minmax(0,1fr)_--spacing(4)] items-start gap-2",
-                "border border-transparent px-2.5 py-2 text-left text-meta leading-[1.4] font-normal whitespace-normal",
-              )}
-              onClick={() => choose(option.label)}
-            >
-              <Surface
-                as="span"
-                tone="none"
-                edge="hairline"
-                radius="sm"
-                className="grid size-4.5 place-items-center text-micro tabular-nums"
-                aria-hidden="true"
-              >
-                <Text bare tone="muted">
-                  {optionIndex + 1}
-                </Text>
-              </Surface>
-              <Text bare tone={selected ? "bright" : "default"} className="grid min-w-0 gap-0.5">
-                <span>{option.label}</span>
-                {option.description && (
-                  <Text as="small" bare size="caption" tone="muted" className="leading-[1.4]">
-                    {option.description}
-                  </Text>
-                )}
-              </Text>
-              <Check
-                className={cn("mt-0.5", selected ? "opacity-100" : "opacity-0")}
-                aria-hidden="true"
-              />
-            </Surface>
-          );
-        })}
-        <Input
-          aria-label="Other answer"
-          placeholder="Other…"
-          value={answer.other ?? ""}
-          maxLength={1000}
-          onChange={(event) => update({ ...answer, other: event.target.value })}
-        />
-      </div>
-      <ErrorNotice message={error} onDismiss={() => setError("")} />
-      <div className="flex items-center gap-1.5">
-        <QuestionHint>
-          {question.multiSelect ? "Choose any that apply" : "Choose one"}, or press Esc to hide
-        </QuestionHint>
-        {index > 0 && <BackButton onClick={() => setIndex(index - 1)} />}
-        <Button
-          variant={last ? "primary" : "secondary"}
-          disabled={!answered(answer) || (last && !answers.every(answered)) || busy}
-          onClick={advance}
-        >
-          {last ? "Submit" : "Next"}
-        </Button>
-      </div>
-    </Surface>
-  );
-}
-
-/** The question's short header, or what the card is about, in a hairline chip. */
-export function QuestionChip({ children }: { children: ReactNode }) {
-  return (
-    <Surface as="span" tone="none" edge="hairline" radius="md" className="px-2 py-0.5 text-caption">
-      <Text bare tone="default">
-        {children}
-      </Text>
-    </Surface>
-  );
-}
-
-/** What is asked, in the person's words. */
-export function QuestionText({ children }: { children: ReactNode }) {
-  return (
-    <Text as="p" wrap size="control" tone="bright" className="m-0 leading-normal">
-      {children}
-    </Text>
-  );
-}
-
-/** The quiet line before the card's buttons, taking the room they leave. */
-export function QuestionHint({ children }: { children: ReactNode }) {
-  return (
-    <Text bare size="caption" tone="muted" className="flex-1">
-      {children}
-    </Text>
+      }
+      error={error}
+      onKeyDown={onKeyDown}
+      actions={
+        <>
+          {index > 0 && <BackButton onClick={() => setIndex(index - 1)} />}
+          <Button
+            variant={last ? "primary" : "secondary"}
+            disabled={!answered(answer) || (last && !answers.every(answered)) || busy}
+            onClick={advance}
+          >
+            {last ? "Answer" : "Next"}
+          </Button>
+        </>
+      }
+    >
+      <ChoiceList
+        label={question.question}
+        multiple={question.multiSelect}
+        options={question.options}
+        selected={answer.selected}
+        onSelect={choose}
+        shortcuts
+      />
+      <Input
+        aria-label="Other answer"
+        placeholder="Something else"
+        value={answer.other ?? ""}
+        maxLength={1000}
+        onChange={(event) => update({ ...answer, other: event.target.value })}
+      />
+    </QuestionPanel>
   );
 }

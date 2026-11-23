@@ -1,9 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-#![allow(clippy::disallowed_methods, clippy::disallowed_types)] // Fixtures are built with the standard library.
-
-//! usage_stats tests. Everything runs on scratch directories and scratch
-//! databases; only `sources` steers the home folder, through `support::TestHome`.
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 mod parsers;
 mod pricing;
@@ -20,7 +17,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static NEXT_SCRATCH: AtomicUsize = AtomicUsize::new(0);
 
-/// Temp directory removed on drop.
 pub(super) struct Scratch(pub PathBuf);
 
 impl Scratch {
@@ -65,7 +61,6 @@ pub(super) fn append_text(path: &Path, text: &str) {
     file.write_all(text.as_bytes()).unwrap();
 }
 
-/// Parse `lines` as one file with a fresh parser and shared `ctx`.
 pub(super) fn feed_with(
     engine: Engine,
     file_name: &str,
@@ -93,9 +88,6 @@ pub(super) fn spec(engine: Engine, root: &Path) -> SourceSpec {
     }
 }
 
-// ── fixture lines ───────────────────────────────────────────────────────────
-
-/// usage = [input, output, cache_read, cache_write]
 pub(super) fn claude_line(
     msg_id: &str,
     req: &str,
@@ -141,7 +133,6 @@ pub(super) fn codex_turn(model: &str) -> String {
     .to_string()
 }
 
-/// [input(incl. cached), cached, output, reasoning]
 fn codex_usage(u: [i64; 4]) -> serde_json::Value {
     json!({"input_tokens": u[0], "cached_input_tokens": u[1], "cache_write_input_tokens": 0,
            "output_tokens": u[2], "reasoning_output_tokens": u[3], "total_tokens": u[0] + u[2]})
@@ -164,7 +155,6 @@ pub(super) fn pi_header(id: &str, cwd: &str) -> String {
     json!({"type": "session", "version": 3, "id": id, "timestamp": "2026-10-25T04:54:29.653Z", "cwd": cwd}).to_string()
 }
 
-/// usage = [input, output, cache_read, cache_write]
 pub(super) fn pi_assistant(
     entry_id: &str,
     ts_ms: i64,

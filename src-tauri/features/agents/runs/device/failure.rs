@@ -1,32 +1,34 @@
-//! How a device call fails: the status and body each `/v1/device/*` route answered with.
 use std::fmt;
 
 use serde_json::{json, Value};
 
 use crate::model_calls::ModelError;
 
-/// What the renderer sees of a failed call: enough to tell a missing key from a provider failure.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeviceCallFailure {
     pub status: u16,
     pub body: Value,
 }
 
-/// Why a call failed, before it becomes a [`DeviceCallFailure`].
 #[derive(Debug)]
 pub enum CallError {
-    /// `ModelCallError`: the call itself was refused, with its status and code.
-    Call { status: u16, code: &'static str, message: String },
+    Call {
+        status: u16,
+        code: &'static str,
+        message: String,
+    },
     Model(ModelError),
-    /// A limit like `AbortSignal.timeout` ran out.
     TimedOut,
-    /// What a `TypeError` was in the TypeScript: reported as a provider failure, with no status.
     Unreadable(&'static str),
 }
 
 impl CallError {
     pub(crate) fn call(status: u16, code: &'static str, message: &str) -> Self {
-        Self::Call { status, code, message: message.to_owned() }
+        Self::Call {
+            status,
+            code,
+            message: message.to_owned(),
+        }
     }
 
     pub(crate) fn invalid() -> Self {
@@ -51,20 +53,30 @@ impl fmt::Display for CallError {
     }
 }
 
-/// `modelCallFailure`. Provider failures keep only a status: response bodies may echo credentials.
 pub fn model_call_failure(error: &CallError) -> DeviceCallFailure {
     let (upstream, setup) = match error {
-        CallError::Call { status, code, message } => {
-            return DeviceCallFailure { status: *status, body: json!({ "code": code, "message": message }) };
+        CallError::Call {
+            status,
+            code,
+            message,
+        } => {
+            return DeviceCallFailure {
+                status: *status,
+                body: json!({ "code": code, "message": message }),
+            };
         }
         CallError::Model(ModelError::Setup { code, detail }) => (0, Some((*code, detail.as_str()))),
-        // A failure inside a stream reads as status 200, which isn't a provider status.
-        CallError::Model(ModelError::Api { status, .. }) if (400..600).contains(status) => (*status, None),
+        CallError::Model(ModelError::Api { status, .. }) if (400..600).contains(status) => {
+            (*status, None)
+        }
         _ => (0, None),
     };
     if let Some((code, detail)) = setup {
         let status = if code == "model_key_needed" { 409 } else { 400 };
-        return DeviceCallFailure { status, body: json!({ "code": code, "message": detail }) };
+        return DeviceCallFailure {
+            status,
+            body: json!({ "code": code, "message": detail }),
+        };
     }
     DeviceCallFailure {
         status: 502,
@@ -76,13 +88,16 @@ pub fn model_call_failure(error: &CallError) -> DeviceCallFailure {
     }
 }
 
-/// What the route did with a finished call: failures from 500 up go to the log, never with a key,
-/// because every `ModelError` is scrubbed where it's made.
-pub(super) fn answered(path: &str, result: Result<Value, CallError>) -> Result<Value, DeviceCallFailure> {
+pub(super) fn answered(
+    path: &str,
+    result: Result<Value, CallError>,
+) -> Result<Value, DeviceCallFailure> {
     result.map_err(|error| {
         let failure = model_call_failure(&error);
         if failure.status >= 500 {
-            super::super::logger::process_log(&format!("device call /v1/device/{path} failed {error}"));
+            super::super::logger::process_log(&format!(
+                "device call /v1/device/{path} failed {error}"
+            ));
         }
         failure
     })
@@ -123,20 +138,36 @@ mod tests {
 
     #[test]
     fn setup_failures_say_what_to_do() {
-        let needed = ModelError::Setup { code: "model_key_needed", detail: "Add a model key in Settings → Models.".into() };
+        let needed = ModelError::Setup {
+            code: "model_key_needed",
+            detail: "Add a model key in Settings → Models.".into(),
+        };
         assert_eq!(
             model_call_failure(&CallError::Model(needed)),
-            DeviceCallFailure { status: 409, body: json!({ "code": "model_key_needed", "message": "Add a model key in Settings → Models." }) }
+            DeviceCallFailure {
+                status: 409,
+                body: json!({ "code": "model_key_needed", "message": "Add a model key in Settings → Models." })
+            }
         );
-        let other = ModelError::Setup { code: "model_unsupported", detail: "No.".into() };
+        let other = ModelError::Setup {
+            code: "model_unsupported",
+            detail: "No.".into(),
+        };
         assert_eq!(model_call_failure(&CallError::Model(other)).status, 400);
     }
 
     #[test]
     fn refused_calls_keep_their_status_and_code() {
         assert_eq!(
-            model_call_failure(&CallError::call(422, "no_speech", "No speech was detected.")),
-            DeviceCallFailure { status: 422, body: json!({ "code": "no_speech", "message": "No speech was detected." }) }
+            model_call_failure(&CallError::call(
+                422,
+                "no_speech",
+                "No speech was detected."
+            )),
+            DeviceCallFailure {
+                status: 422,
+                body: json!({ "code": "no_speech", "message": "No speech was detected." })
+            }
         );
     }
 }

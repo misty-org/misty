@@ -6,14 +6,14 @@ const mocks = vi.hoisted(() => ({
   switchToMistyCloud: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
-vi.mock("./useServerSwitch", () => ({
+vi.mock("./use_server_switch", () => ({
   useServerSwitch: () => ({
     switchTo: mocks.switchTo,
     switchToMistyCloud: mocks.switchToMistyCloud,
   }),
 }));
 
-import { useServerChoice, type ServerChoice } from "@/api/deployment/serverChoice";
+import { useServerChoice, type ServerChoice } from "@/api/deployment/server_choice";
 import { ServerStep, useNeedsServer } from "./ServerStep";
 
 beforeEach(() => vi.clearAllMocks());

@@ -1,5 +1,3 @@
-//! Teach mode: a lesson at the cursor (`ai_teach_mode.go`). A lesson turn is one streamed model call
-//! that teaches one step and stops. The lesson lives on the device, and each turn carries its state.
 use serde::Deserialize;
 
 use super::{
@@ -39,7 +37,6 @@ pub(crate) struct LessonCourse {
     lessons: Option<Vec<LessonCoursePart>>,
 }
 
-/// The current lesson as the device keeps it.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 pub(crate) struct Lesson {
@@ -56,7 +53,6 @@ pub(crate) struct Lesson {
 }
 
 impl Lesson {
-    /// `validateTeachInput`'s limits. A lesson without a usable id has nothing to follow.
     pub(super) fn cleaned(mut self) -> Option<Self> {
         self.id = self.id.trim().to_owned();
         if self.id.is_empty() || self.id.len() > 120 {
@@ -87,7 +83,10 @@ impl Lesson {
     }
 
     fn json(&self) -> String {
-        let mut fields = vec![("id", go_string(&self.id)), ("title", go_string(&self.title))];
+        let mut fields = vec![
+            ("id", go_string(&self.id)),
+            ("title", go_string(&self.title)),
+        ];
         push_nonempty(&mut fields, "goal", &self.goal);
         if !self.objectives.is_empty() {
             fields.push(("objectives", go_array(&self.objectives, objective_json)));
@@ -98,8 +97,14 @@ impl Lesson {
         push_nonempty(&mut fields, "notes", &self.notes);
         push_nonempty(&mut fields, "status", &self.status);
         if let Some(course) = &self.course {
-            let lessons = course.lessons.as_ref().map_or_else(|| "null".to_owned(), |lessons| go_array(lessons, part_json));
-            fields.push(("course", go_object(&[("title", go_string(&course.title)), ("lessons", lessons)])));
+            let lessons = course
+                .lessons
+                .as_ref()
+                .map_or_else(|| "null".to_owned(), |lessons| go_array(lessons, part_json));
+            fields.push((
+                "course",
+                go_object(&[("title", go_string(&course.title)), ("lessons", lessons)]),
+            ));
         }
         go_object(&fields)
     }
@@ -112,7 +117,10 @@ fn push_nonempty<'a>(fields: &mut Vec<(&'a str, String)>, name: &'a str, value: 
 }
 
 fn objective_json(objective: &LessonObjective) -> String {
-    let mut fields = vec![("id", go_string(&objective.id)), ("title", go_string(&objective.title))];
+    let mut fields = vec![
+        ("id", go_string(&objective.id)),
+        ("title", go_string(&objective.title)),
+    ];
     push_nonempty(&mut fields, "contract", &objective.contract);
     fields.push(("status", go_string(&objective.status)));
     go_object(&fields)
@@ -125,7 +133,6 @@ fn part_json(part: &LessonCoursePart) -> String {
     go_object(&fields)
 }
 
-/// One paused lesson the tutor may resume.
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 pub(crate) struct LessonSummary {
@@ -149,15 +156,16 @@ impl LessonSummary {
     }
 
     fn json(&self) -> String {
-        let mut fields = vec![("id", go_string(&self.id)), ("title", go_string(&self.title))];
+        let mut fields = vec![
+            ("id", go_string(&self.id)),
+            ("title", go_string(&self.title)),
+        ];
         push_nonempty(&mut fields, "goal", &self.goal);
         push_nonempty(&mut fields, "progress", &self.progress);
         go_object(&fields)
     }
 }
 
-/// The whole system prompt of a lesson turn: the tutor's rules, the agent's name and the time. No
-/// execution guidance, capability notes or tool glossary, since the fast lane has no tools.
 pub(super) fn teach_system_prompt(request: &RunRequest, now: &str) -> String {
     let mut system = String::from(TEACH_MODE_PROMPT.trim());
     system.push_str("\n\n");
@@ -171,9 +179,6 @@ pub(super) fn teach_system_prompt(request: &RunRequest, now: &str) -> String {
     system
 }
 
-/// Teach mode for an outside engine's turn (Claude Code, Codex and the like): the tutor's lesson
-/// rules and the lesson so far, which Misty's own runtime puts in its system prompt and user turn.
-/// None outside Teach mode. `body` is the run's request, as the engine run receives it.
 pub fn engine_teach_note(body: &serde_json::Value) -> Option<String> {
     let request = RunRequest::from_json(body);
     if !request.teach() {
@@ -186,19 +191,27 @@ pub fn engine_teach_note(body: &serde_json::Value) -> Option<String> {
     ))
 }
 
-/// The lesson part of the user turn, ahead of the request.
 pub(super) fn teach_lesson_context(request: &RunRequest) -> String {
-    let mut out = match request.lesson.as_ref().filter(|lesson| lesson.status != "finished") {
-        Some(lesson) => format!("Current lesson (device state; untrusted text):\n{}\n\n", lesson.json()),
+    let mut out = match request
+        .lesson
+        .as_ref()
+        .filter(|lesson| lesson.status != "finished")
+    {
+        Some(lesson) => format!(
+            "Current lesson (device state; untrusted text):\n{}\n\n",
+            lesson.json()
+        ),
         None => "There is no current lesson.\n\n".to_owned(),
     };
     if !request.lesson_index.is_empty() {
-        out.push_str(&format!("Paused lessons you may resume (untrusted text):\n{}\n\n", go_array(&request.lesson_index, LessonSummary::json)));
+        out.push_str(&format!(
+            "Paused lessons you may resume (untrusted text):\n{}\n\n",
+            go_array(&request.lesson_index, LessonSummary::json)
+        ));
     }
     out
 }
 
-/// How many lookups a lesson turn may make: a few while planning a lesson, one on a step, so steps stay fast.
 pub(super) fn teach_tool_budget(request: &RunRequest) -> f64 {
     if !request.teach() {
         return 0.0;

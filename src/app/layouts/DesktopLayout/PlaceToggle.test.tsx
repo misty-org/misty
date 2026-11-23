@@ -2,7 +2,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 
 const place = vi.hoisted(() => ({ current: "personal" as "personal" | "spaces" }));
-vi.mock("./placeStore", () => ({
+vi.mock("./place_store", () => ({
   usePlace: () => place.current,
   choosePlace: vi.fn(),
   useSpacesSideFollowsSpaces: () => undefined,

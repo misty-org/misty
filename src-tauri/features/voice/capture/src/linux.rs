@@ -1,10 +1,3 @@
-//! PulseAudio capture, which PipeWire serves too through `pipewire-pulse`: the default microphone,
-//! everything the default output plays (its monitor), and what single apps play (monitor streams on
-//! their sink inputs). The server converts every stream to 16 kHz mono PCM16 itself.
-//!
-//! System audio without Misty records each app's stream on its own and mixes them on a clock, so an
-//! app that pauses or starts playing midway never stalls or shifts the others.
-
 use crate::capture::{FailureSink, FrameCounter, Sink};
 use crate::{AudioSource, Capabilities, CaptureError, CaptureSource, CaptureSources, SAMPLE_RATE};
 use libpulse_binding as pulse;
@@ -27,13 +20,9 @@ use std::sync::{
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// How long connecting, or any one request to the sound server, may take.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
-/// How far the mixed system channel runs behind the clock, so every stream has delivered its part.
 const MIX_DELAY: Duration = Duration::from_millis(120);
-/// The most one stream may run ahead of the mix before its oldest audio is dropped.
 const MAX_BACKLOG: usize = SAMPLE_RATE as usize / 2;
-/// About 20 ms of audio per read.
 const FRAGMENT_BYTES: u32 = SAMPLE_RATE / 50 * 2;
 
 pub(crate) struct Running {
@@ -65,7 +54,6 @@ fn device_error(what: &str) -> CaptureError {
     CaptureError::Device(what.to_owned())
 }
 
-/// A connection to the sound server, on the thread that made it.
 struct Connection {
     mainloop: Mainloop,
     context: Context,
@@ -77,8 +65,8 @@ impl Connection {
         let mut properties = Proplist::new().ok_or_else(unavailable)?;
         let _ = properties.set_str(properties::APPLICATION_NAME, "Misty");
         let _ = properties.set_str(properties::APPLICATION_ID, "app.misty");
-        let mut context = Context::new_with_proplist(&mainloop, "Misty", &properties)
-            .ok_or_else(unavailable)?;
+        let mut context =
+            Context::new_with_proplist(&mainloop, "Misty", &properties).ok_or_else(unavailable)?;
         context
             .connect(None, ContextFlags::NOAUTOSPAWN, None)
             .map_err(|_| unavailable())?;
@@ -97,7 +85,6 @@ impl Connection {
         Ok(Self { mainloop, context })
     }
 
-    /// Runs the loop until `operation` is done.
     fn wait<T: ?Sized>(&mut self, operation: &Operation<T>) -> Result<(), CaptureError> {
         let deadline = Instant::now() + REQUEST_TIMEOUT;
         while matches!(operation.get_state(), OperationState::Running) {
@@ -112,7 +99,6 @@ impl Connection {
         Ok(())
     }
 
-    /// The apps playing now, each with the sink it plays to.
     fn sink_inputs(&mut self) -> Result<Vec<SinkInput>, CaptureError> {
         let found = Rc::new(RefCell::new(Vec::new()));
         let collect = found.clone();
@@ -122,10 +108,11 @@ impl Connection {
             .get_sink_input_info_list(move |result| {
                 if let ListResult::Item(info) = result {
                     let read = |key: &str| info.proplist.get_str(key);
-                    let mut pids: Vec<u32> = [properties::APPLICATION_PROCESS_ID, "pipewire.sec.pid"]
-                        .iter()
-                        .filter_map(|key| read(key)?.trim().parse().ok())
-                        .collect();
+                    let mut pids: Vec<u32> =
+                        [properties::APPLICATION_PROCESS_ID, "pipewire.sec.pid"]
+                            .iter()
+                            .filter_map(|key| read(key)?.trim().parse().ok())
+                            .collect();
                     pids.dedup();
                     let name = read(properties::APPLICATION_NAME)
                         .or_else(|| read(properties::APPLICATION_PROCESS_BINARY))
@@ -144,7 +131,6 @@ impl Connection {
         Ok(list)
     }
 
-    /// The source that hears everything `sink` plays.
     fn monitor_of(&mut self, sink: u32) -> Result<String, CaptureError> {
         let found = Rc::new(RefCell::new(None));
         let collect = found.clone();
@@ -153,7 +139,8 @@ impl Connection {
             .introspect()
             .get_sink_info_by_index(sink, move |result| {
                 if let ListResult::Item(info) = result {
-                    *collect.borrow_mut() = info.monitor_source_name.as_ref().map(|n| n.to_string());
+                    *collect.borrow_mut() =
+                        info.monitor_source_name.as_ref().map(|n| n.to_string());
                 }
             });
         self.wait(&operation)?;
@@ -161,9 +148,11 @@ impl Connection {
         name.ok_or_else(|| device_error("that output has no monitor"))
     }
 
-    /// Opens a 16 kHz mono record stream on `device` (the default microphone when `None`), limited
-    /// to one app's sound when `sink_input` is given.
-    fn record(&mut self, device: Option<&str>, sink_input: Option<u32>) -> Result<Stream, CaptureError> {
+    fn record(
+        &mut self,
+        device: Option<&str>,
+        sink_input: Option<u32>,
+    ) -> Result<Stream, CaptureError> {
         let spec = Spec {
             format: Format::S16NE,
             rate: SAMPLE_RATE,
@@ -231,7 +220,6 @@ impl Connection {
     }
 }
 
-/// One pass of the loop without blocking, then a short rest so the thread doesn't spin.
 fn step(mainloop: &mut Mainloop) -> Result<(), CaptureError> {
     match mainloop.iterate(false) {
         IterateResult::Success(0) => thread::sleep(Duration::from_millis(5)),
@@ -250,8 +238,6 @@ struct SinkInput {
     name: String,
 }
 
-/// The parent of `pid`, from `/proc/<pid>/stat` (the field after the command name, which may hold
-/// spaces and parentheses itself). `/proc` is the kernel's view of processes, not anyone's files.
 #[allow(clippy::disallowed_methods)]
 fn parent_of(pid: u32) -> Option<u32> {
     let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
@@ -259,7 +245,6 @@ fn parent_of(pid: u32) -> Option<u32> {
     rest.split_whitespace().nth(1)?.parse().ok()
 }
 
-/// Whether `pid` is one of `roots` or started under one of them, as Windows counts a process tree.
 fn in_tree(pid: u32, roots: &[u32]) -> bool {
     let mut current = pid;
     for _ in 0..64 {
@@ -274,11 +259,8 @@ fn in_tree(pid: u32, roots: &[u32]) -> bool {
     false
 }
 
-/// Which apps' sound a capture hears.
 enum Wanted {
-    /// Every app except Misty and the processes it started (its web content included).
     AllBut(Vec<u32>),
-    /// These processes and the ones they started.
     Only(Vec<u32>),
 }
 
@@ -326,7 +308,6 @@ pub(crate) fn start(
     }
 }
 
-/// Moves whatever `stream` has ready into `samples`.
 fn read(stream: &mut Stream, samples: &mut VecDeque<i16>) -> Result<(), CaptureError> {
     loop {
         match stream.readable_size() {
@@ -334,11 +315,16 @@ fn read(stream: &mut Stream, samples: &mut VecDeque<i16>) -> Result<(), CaptureE
             Some(_) => {}
             None => return Err(device_error("the stream closed")),
         }
-        match stream.peek().map_err(|_| device_error("the stream failed"))? {
+        match stream
+            .peek()
+            .map_err(|_| device_error("the stream failed"))?
+        {
             PeekResult::Empty => return Ok(()),
             PeekResult::Hole(bytes) => {
                 samples.extend(std::iter::repeat(0).take(bytes / 2));
-                stream.discard().map_err(|_| device_error("the stream failed"))?;
+                stream
+                    .discard()
+                    .map_err(|_| device_error("the stream failed"))?;
             }
             PeekResult::Data(bytes) => {
                 samples.extend(
@@ -346,7 +332,9 @@ fn read(stream: &mut Stream, samples: &mut VecDeque<i16>) -> Result<(), CaptureE
                         .chunks_exact(2)
                         .map(|pair| i16::from_ne_bytes([pair[0], pair[1]])),
                 );
-                stream.discard().map_err(|_| device_error("the stream failed"))?;
+                stream
+                    .discard()
+                    .map_err(|_| device_error("the stream failed"))?;
             }
         }
     }
@@ -366,11 +354,12 @@ fn capture_loop(
         AudioSource::System {
             exclude_self: false,
         } => None,
-        AudioSource::System { exclude_self: true } => Some(Wanted::AllBut(vec![std::process::id()])),
+        AudioSource::System { exclude_self: true } => {
+            Some(Wanted::AllBut(vec![std::process::id()]))
+        }
         AudioSource::Processes(pids) => Some(Wanted::Only(pids.clone())),
     };
     let Some(wanted) = wanted else {
-        // One stream: the microphone, or the default output's whole mix.
         let device = match source {
             AudioSource::Mic => None,
             _ => Some("@DEFAULT_MONITOR@"),
@@ -392,17 +381,20 @@ fn capture_loop(
         return Ok(());
     };
 
-    // Apps come and go while a capture runs, so the sound server reports each one.
     let changed = Rc::new(RefCell::new(true));
     let notice = changed.clone();
     connection
         .context
         .set_subscribe_callback(Some(Box::new(move |facility, event, _| {
-            if facility == Some(Facility::SinkInput) && matches!(event, Some(Event::New | Event::Removed)) {
+            if facility == Some(Facility::SinkInput)
+                && matches!(event, Some(Event::New | Event::Removed))
+            {
                 *notice.borrow_mut() = true;
             }
         })));
-    let subscribed = connection.context.subscribe(InterestMaskSet::SINK_INPUT, |_| {});
+    let subscribed = connection
+        .context
+        .subscribe(InterestMaskSet::SINK_INPUT, |_| {});
     connection.wait(&subscribed)?;
 
     let mut streams: HashMap<u32, (Stream, VecDeque<i16>)> = HashMap::new();
@@ -429,7 +421,6 @@ fn capture_loop(
                         monitor
                     }
                 };
-                // An app can stop between the list and the stream; the next change brings it back.
                 if let Ok(stream) = connection.record(Some(&monitor), Some(input.index)) {
                     streams.insert(input.index, (stream, VecDeque::new()));
                     opened_any = true;
@@ -446,7 +437,6 @@ fn capture_loop(
         step(&mut connection.mainloop)?;
         streams.retain(|_, (stream, _)| stream.get_state().is_good());
         for (stream, samples) in streams.values_mut() {
-            // A stream that fails is dropped above on the next pass; the rest keep going.
             let _ = read(stream, samples);
         }
         let due = (clock.elapsed().saturating_sub(MIX_DELAY).as_micros() as u64
@@ -468,13 +458,15 @@ fn capture_loop(
             }
         }
         emitted += due as u64;
-        sink(frames.chunk(
-            channel,
-            mixed
-                .into_iter()
-                .map(|sample| sample.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16)
-                .collect(),
-        ));
+        sink(
+            frames.chunk(
+                channel,
+                mixed
+                    .into_iter()
+                    .map(|sample| sample.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16)
+                    .collect(),
+            ),
+        );
     }
     for (mut stream, _) in streams.into_values() {
         let _ = stream.disconnect();
@@ -482,7 +474,6 @@ fn capture_loop(
     Ok(())
 }
 
-/// The default microphone's name and the apps playing sound now, Misty's own left out.
 pub(crate) fn capture_sources() -> Result<CaptureSources, CaptureError> {
     let mut connection = Connection::open()?;
     let microphone = connection.default_source_description()?;

@@ -1,4 +1,3 @@
-//! Match page animation updates to the display instead of WebKit's 60 Hz preference.
 use objc2::{
     msg_send,
     runtime::{AnyObject, Bool},
@@ -7,11 +6,6 @@ use objc2::{
 use objc2_foundation::{NSArray, NSString};
 use objc2_web_kit::WKWebView;
 
-/// WebKit currently exposes this only through its feature SPI. Misty's macOS
-/// build already opts into private WebKit APIs. Check availability and discover
-/// the named feature; unsupported releases retain their default behavior.
-/// Call on the main thread while configuring a newly created WKWebView, before
-/// the first document commits. Changing it on a loaded page needs a navigation.
 pub(crate) unsafe fn prefer_display_refresh_rate(view: &WKWebView) -> bool {
     let preferences = view.configuration().preferences();
     let class = objc2::class!(WKPreferences);

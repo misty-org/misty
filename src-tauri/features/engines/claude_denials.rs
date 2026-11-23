@@ -4,9 +4,6 @@
 
 use serde_json::Value;
 
-/// Phrases the CLI uses when a tool call is denied by the permission
-/// system in headless mode (matched case-insensitively against the
-/// tool_result error text).
 const DENIAL_PHRASES: &[&str] = &[
     "requested permissions",
     "haven't granted it yet",
@@ -22,9 +19,6 @@ const DENIAL_PHRASES: &[&str] = &[
     "outside workspace",
 ];
 
-/// A declined or skipped question is the user's own answer, not a permission
-/// the user could grant here: never surface it as a grant card (CodeBuddy
-/// lists a declined AskUserQuestion in the result's `permission_denials`).
 pub(super) fn is_question_tool(tool: Option<&str>) -> bool {
     tool == Some("AskUserQuestion")
 }
@@ -34,8 +28,6 @@ pub(super) fn looks_like_permission_denial(message: &str) -> bool {
     !normalized.is_empty() && DENIAL_PHRASES.iter().any(|p| normalized.contains(p))
 }
 
-/// First absolute-path-looking token in free text: Windows `C:\…` / `C:/…`
-/// or POSIX `/…`, with surrounding quotes and punctuation trimmed.
 pub(super) fn extract_absolute_path(text: &str) -> Option<String> {
     for token in text.split_whitespace() {
         let cleaned = token.trim_matches(|c: char| {
@@ -59,8 +51,6 @@ pub(super) fn extract_absolute_path(text: &str) -> Option<String> {
     None
 }
 
-/// Text payload of a single tool_result block: plain string or joined text
-/// parts.
 pub(super) fn tool_result_block_text(block: &Value) -> String {
     match block.get("content") {
         Some(Value::String(s)) => s.clone(),
@@ -74,8 +64,6 @@ pub(super) fn tool_result_block_text(block: &Value) -> String {
     }
 }
 
-/// (tool_use id, error text) pairs of tool_result blocks in a "user" stream
-/// line. Content may be a plain string or an array of text blocks.
 pub(super) fn tool_result_error_blocks(value: &Value) -> Vec<(Option<String>, String)> {
     let mut out = Vec::new();
     let Some(content) = value

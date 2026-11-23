@@ -1,12 +1,10 @@
 import { IconButton } from "@misty/ui";
 import { ArrowLeft, ArrowRight, RotateCw, X } from "lucide-react";
-import { browserToolbarStyles } from "./browserToolbarStyles";
+import { browserToolbarStyles } from "./browser_toolbar_styles";
 
-/** Back, forward and reload (or stop while loading) at the start of the toolbar. */
 export function BrowserNavigationButtons(props: {
   canGoBack: boolean;
   canGoForward: boolean;
-  /** The page is loading and can be stopped. */
   showStop: boolean;
   reloadDisabled: boolean;
   onTravel(direction: -1 | 1): void;

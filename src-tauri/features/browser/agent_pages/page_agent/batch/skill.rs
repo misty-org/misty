@@ -1,9 +1,5 @@
-//! Running one page skill action, and the steps it returns.
 use super::*;
 
-/// Runs a pattern or app skill (page_skills.js). A skill acts in the page or
-/// hands back steps, which run under the same rules as browser.steps; a skill
-/// may then continue once those steps have run (selecting a cell, then pasting).
 pub(in crate::browser::agent_pages::page_agent) async fn run_skill(
     app: &AppHandle,
     state: &BrowserSessionState,
@@ -27,7 +23,6 @@ pub(in crate::browser::agent_pages::page_agent) async fn run_skill(
     let allow_consequential = input["allowConsequential"] == true;
     let task = input["__mistyTaskId"].as_str().unwrap_or("");
     let mut next = json!({"skill": skill, "action": action, "args": input.get("args").cloned().unwrap_or(json!({}))});
-    // A skill on a control inside a cross-origin frame (a document editor) runs there.
     let frame = super::super::frame_of(view, next["args"]["ref"].as_str());
     let skill_document = frame
         .as_ref()

@@ -1,12 +1,9 @@
-//! Where prompt caching breakpoints are allowed. Ported from `get-cache-control.ts`.
 use serde_json::{json, Value};
 
 use crate::model_calls::prompt::ProviderOptions;
 
-/// Anthropic allows four cache breakpoints in a request.
 const MAX_CACHE_BREAKPOINTS: u32 = 4;
 
-/// Counts breakpoints across a request, so a fifth one is dropped rather than refused by the API.
 #[derive(Default)]
 pub(super) struct CacheControlValidator {
     count: u32,
@@ -14,13 +11,17 @@ pub(super) struct CacheControlValidator {
 }
 
 impl CacheControlValidator {
-    pub(super) fn get(&mut self, options: Option<&ProviderOptions>, kind: &str, can_cache: bool) -> Option<Value> {
+    pub(super) fn get(
+        &mut self,
+        options: Option<&ProviderOptions>,
+        kind: &str,
+        can_cache: bool,
+    ) -> Option<Value> {
         let anthropic = options?.get("anthropic")?;
         let value = anthropic
             .get("cacheControl")
             .filter(|value| !value.is_null())
             .or_else(|| anthropic.get("cache_control"))?;
-        // The SDK tests truthiness here.
         let falsy = value.is_null()
             || value == &Value::Bool(false)
             || value.as_str() == Some("")

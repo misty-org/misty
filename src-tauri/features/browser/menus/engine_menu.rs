@@ -1,11 +1,5 @@
-//! Keeps WebView2's own context menu from racing Misty's page menu.
-//!
-//! Browser pages handle non-editable context menus in the page script. Suppress
-//! WebView2's native menu immediately, before the page's host message arrives.
-//! Editable fields keep the engine menu for spelling, AutoFill and passwords.
 use crate::browser::*;
 
-/// `renderer` is Misty's own view; otherwise `webview` is a browser page.
 #[cfg(windows)]
 pub(in crate::browser) fn install(webview: &Webview, renderer: bool) {
     use webview2_com::{
@@ -20,7 +14,6 @@ pub(in crate::browser) fn install(webview: &Webview, renderer: bool) {
             // SAFETY: event arguments are valid for the handler's duration.
             unsafe { args.ContextMenuTarget()?.IsEditable(&mut editable)? };
             if !editable.as_bool() && suppressed(&target, renderer) {
-                // Handled with no menu of our own: the engine shows nothing.
                 unsafe { args.SetHandled(true)? };
             }
             Ok(())
@@ -38,9 +31,6 @@ pub(in crate::browser) fn install(webview: &Webview, renderer: bool) {
 
 #[cfg(windows)]
 fn suppressed(webview: &Webview, renderer: bool) -> bool {
-    // Browser pages route their non-editable context menus through Misty. Do
-    // not wait for that asynchronous request to reach the host: WebView2 can
-    // present its own menu first, then flash it away when the renderer takes focus.
     if !renderer {
         return true;
     }

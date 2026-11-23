@@ -22,7 +22,7 @@ The agent browser:
 - Agents browse in their own browser beside the chat; the person watches. "Shrink to a picture" makes it a small picture over the chat. "Take over" pauses the run and hands the person the page, for example to sign in, and "Hand back" returns it to the agent.
 
 The window:
-- "Split right" opens a page beside the current one; closing a pane leaves the others open. Cmd+Shift+S hides the sidebar, Cmd+W closes the active tab and Cmd+Shift+N opens another window.
+- "Split right" opens a page beside the current one; closing a pane leaves the others open. Cmd+W closes the active tab and Cmd+Shift+N opens another window.
 - On the Code page, Cmd+P finds a file in its folder by name.
 
 Settings:

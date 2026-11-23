@@ -23,8 +23,6 @@ use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-/// Names among `dir`'s direct children (`(name, is_dir)`) that Git ignores,
-/// for a file tree rooted at `tree_root`. Outside any work tree nothing is.
 pub(crate) fn ignored_names<'a>(
     dir: &Path,
     tree_root: &Path,
@@ -46,8 +44,6 @@ pub(crate) fn ignored_names<'a>(
     if level.root_ignored(&root) {
         return HashSet::new();
     }
-    // One check settles a listing inside an ignored directory (with nothing
-    // tracked under it): `node_modules/` sized levels skip the per-entry walk.
     let all_ignored = !level.prefix.is_empty() && level.ignored(&level.prefix, true);
     children
         .filter(|&(name, is_dir)| {
@@ -61,21 +57,16 @@ pub(crate) fn ignored_names<'a>(
         .collect()
 }
 
-/// `dir` lies inside a `.git` directory somewhere below the tree root.
 fn inside_git_dir(dir: &Path, root: &Path) -> bool {
     dir.strip_prefix(root)
         .is_ok_and(|rel| rel.components().any(|c| c.as_os_str() == ".git"))
 }
 
-/// One listed directory and the repository whose work tree holds it.
 struct Level {
     repo: Repository,
     workdir: PathBuf,
-    /// The listed directory, canonical.
     dir: PathBuf,
-    /// `dir` relative to the work tree: "" at its root, `/`-separated.
     prefix: String,
-    /// Opened on the first rule hit; most entries never need it.
     index: OnceCell<Option<Index>>,
 }
 
@@ -93,20 +84,16 @@ impl Level {
         })
     }
 
-    /// The tree root sits strictly inside this work tree and is ignored.
     fn root_ignored(&self, root: &Path) -> bool {
         root.strip_prefix(&self.workdir)
             .map(slash_path)
             .is_ok_and(|rel| !rel.is_empty() && self.ignored(&rel, true))
     }
 
-    /// Git's verdict for a work-tree path: a rule matches and nothing
-    /// tracked keeps it.
     fn ignored(&self, rel: &str, is_dir: bool) -> bool {
         matches_rule(&self.repo, rel, is_dir) && !self.tracked(rel, is_dir)
     }
 
-    /// `rel` is in the index (a directory: something under it is).
     fn tracked(&self, rel: &str, is_dir: bool) -> bool {
         let Some(index) = self.index.get_or_init(|| self.repo.index().ok()) else {
             return false;
@@ -114,8 +101,6 @@ impl Level {
         if is_dir {
             return index.find_prefix(format!("{rel}/")).is_ok();
         }
-        // Index paths sort bytewise, so an exact entry precedes every longer
-        // path sharing its prefix (`app.log` < `app.log.d/x`).
         index
             .find_prefix(rel)
             .ok()
@@ -137,8 +122,6 @@ fn join(prefix: &str, name: &str) -> String {
 }
 
 fn matches_rule(repo: &Repository, rel: &str, is_dir: bool) -> bool {
-    // A trailing slash tells libgit2 the path is a directory, so dir-only
-    // patterns (`build/`) match without it stat-ing the entry again.
     let path = if is_dir {
         format!("{rel}/")
     } else {
@@ -181,7 +164,6 @@ mod tests {
         }
     }
 
-    /// Children of `dir` as the tree lists them: `(name, is_dir)`.
     fn listing(dir: &Path) -> Vec<(String, bool)> {
         std::fs::read_dir(dir)
             .unwrap()
@@ -193,7 +175,6 @@ mod tests {
             .collect()
     }
 
-    /// Ignored children of `dir` in a tree rooted at `tree_root`, sorted.
     fn ignored_in_tree(dir: &Path, tree_root: &Path) -> Vec<String> {
         let children = listing(dir);
         let mut names: Vec<String> = ignored_names(
@@ -209,8 +190,6 @@ mod tests {
         names
     }
 
-    /// Same, for a tree rooted at the repository that holds `dir`'s scratch
-    /// (`dir` itself or an ancestor named `misty-git-ignore-*`).
     fn ignored_in(dir: &Path) -> Vec<String> {
         let root = dir
             .ancestors()
@@ -222,7 +201,6 @@ mod tests {
         ignored_in_tree(dir, root)
     }
 
-    /// Stage `rel` in the repository at `root` (`git add -f`: rules skipped).
     fn force_add(root: &Path, rel: &str) {
         let repo = Repository::open(root).unwrap();
         let mut index = repo.index().unwrap();
@@ -332,9 +310,6 @@ mod tests {
         force_add(&scratch.0, "fixture.log");
         force_add(&scratch.0, "dist/index.js");
         force_add(&scratch.0, "app.log.d/keep.txt");
-        // `dist/` holds tracked content, so it stays; only the untracked rule
-        // hits are ignored — `app.log` too, although the tracked
-        // `app.log.d/keep.txt` shares its name as a prefix.
         assert_eq!(ignored_in(&scratch.0), [".git", "app.log", "debug.log"]);
         assert_eq!(ignored_in(&scratch.0.join("dist")), ["chunk.js"]);
     }
@@ -348,7 +323,6 @@ mod tests {
         Repository::init(scratch.dir("vendor/lib")).unwrap();
         scratch.file("vendor/notes.txt", "");
         assert_eq!(ignored_in(&scratch.0), [".git", "vendor"]);
-        // Inside an ignored directory the nested repository still stands out.
         assert_eq!(ignored_in(&scratch.0.join("vendor")), ["notes.txt"]);
     }
 
@@ -361,8 +335,6 @@ mod tests {
         scratch.file("tmp/experiment/run.log", "");
         let workspace = scratch.0.join("tmp/experiment");
         assert!(ignored_in_tree(&workspace, &workspace).is_empty());
-        // The same folder seen from a tree rooted at the repository is
-        // ignored territory.
         assert_eq!(ignored_in(&workspace), ["main.py", "run.log"]);
     }
 

@@ -1,10 +1,7 @@
-//! What the agent tools get back (`src/features/agents/tools/appsTools.ts`), other than running a tool
-//! (`execute`).
 use serde::Serialize;
 
 use super::api::SearchResult;
 
-/// Why a call didn't produce a result. `uncertain` means it may have taken effect.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Failure {
     pub code: String,
@@ -27,7 +24,6 @@ pub(super) fn storage_failure(message: String) -> Failure {
     rejected("apps_storage", message)
 }
 
-/// An app account the person connected, as the agent sees it.
 #[derive(Debug, PartialEq, Serialize)]
 pub struct ActiveAccount {
     pub app: String,
@@ -36,7 +32,6 @@ pub struct ActiveAccount {
     pub status: String,
 }
 
-/// What a search found: matching tools, and the accounts they can run as.
 #[derive(Debug, Serialize)]
 pub struct Search {
     pub found: SearchResult,

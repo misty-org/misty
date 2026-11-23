@@ -1,5 +1,3 @@
-//! Device-local encrypted workspace recovery: the windows and tabs a crash or quit left open,
-//! sealed with a key kept on this computer. Nothing here leaves it.
 use crate::{
     crypto::{RecoveryKey, RecoveryScope},
     Error, Result,
@@ -13,7 +11,6 @@ pub(crate) const MAX_BYTES: usize = 16 << 20;
 const MAX_TOTAL_BYTES: u64 = 128 << 20;
 const MAX_RECORDS: u64 = 128;
 const MAX_ARCHIVES: u64 = 32;
-/// The most revisions a record can reach, the largest integer JSON carries exactly.
 const MAX_REVISION: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -21,8 +18,6 @@ const MAX_REVISION: u64 = 9_007_199_254_740_991;
 pub struct RecoveryRecord {
     pub revision: u64,
     pub value: String,
-    /// Kept in the encrypted pending slot because the database write failed.
-    /// `revision` is still the saved one; the next write retries from it.
     #[serde(default)]
     pub pending: bool,
 }
@@ -31,7 +26,6 @@ pub struct RecoveryStore {
     connection: Connection,
     pub(crate) scope: RecoveryScope,
     pub(crate) root: RecoveryKey,
-    /// Encrypted pending saves beside the database; see `recovery_pending`.
     pub(crate) pending: PathBuf,
 }
 
@@ -104,12 +98,10 @@ impl RecoveryStore {
             root,
             pending,
         };
-        // Saves that could not reach the database last time land now if they can.
         let _ = store.replay_pending();
         Ok(store)
     }
 
-    /// The database copy only; `read` also sees pending saves.
     pub(crate) fn read_saved(&self, key: &str) -> Result<Option<RecoveryRecord>> {
         validate_key(key)?;
         let row: Option<(u64, String)> = self
@@ -140,9 +132,6 @@ impl RecoveryStore {
         }))
     }
 
-    /// The database write only; `write` falls back to a pending slot.
-    /// Exact retry after a lost response performs no write. Revision checking
-    /// prevents a delayed renderer from overwriting a newer local record.
     pub(crate) fn write_saved(
         &mut self,
         key: &str,
@@ -188,9 +177,6 @@ impl RecoveryStore {
             return Err(Error::Sequence);
         }
         if actual.is_none() {
-            // Archives are preserved originals, added on every restore. Only the
-            // newest few matter, so retire the rest instead of letting them fill
-            // the store and block every later save.
             let keep = MAX_ARCHIVES - u64::from(key.starts_with("archive:"));
             tx.execute(
                 "DELETE FROM recovery_records WHERE substr(record_key,1,8)='archive:' AND rowid NOT IN (SELECT rowid FROM recovery_records WHERE substr(record_key,1,8)='archive:' ORDER BY rowid DESC LIMIT ?1)",

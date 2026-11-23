@@ -11,20 +11,12 @@ import {
   Skeleton,
   useNotice,
 } from "@misty/ui";
-import { folderName } from "../engines/enginesApi";
-import { useChatFolder, useChatFolders, useProjectFolders } from "../shared-folders/chatFolder";
-import { errorText } from "./projectApi";
+import { folderName } from "../engines/engines_api";
+import { useChatFolder, useChatFolders, useProjectFolders } from "../shared-folders/chat_folder";
+import { errorText } from "./project_api";
 
-/** The Scratch row's value: folder paths are absolute, so none is this. */
 const scratchValue = "scratch";
 
-/**
- * The folder menu both pickers share: Scratch when it is offered, the person's projects by name,
- * most recently used first, with a checkmark on the one in use, then "Choose a folder…" for the
- * system's dialog. The projects are read again each time it opens.
- */
-/** A button (the context panel), quiet text in a row (the session card), or a small button over
- * a file tree (the Code page's sidebar). */
 type PickerLook = "button" | "row" | "heading";
 
 const pickerLook = (compact: boolean, heading: boolean): PickerLook =>
@@ -32,12 +24,9 @@ const pickerLook = (compact: boolean, heading: boolean): PickerLook =>
 
 function FolderMenu(props: {
   label: string;
-  /** The project in use, or "" for scratch (or none). */
   current: string;
-  /** Offers Scratch as a choice. */
   scratch: boolean;
   look: PickerLook;
-  /** A project's path, or "" for Scratch. */
   onPick(path: string): Promise<unknown>;
   onChoose(): Promise<unknown>;
 }) {
@@ -47,7 +36,6 @@ function FolderMenu(props: {
   const report = (work: Promise<unknown>) =>
     void work.catch((reason) => setError(errorText(reason)));
   const paths = projects?.map((project) => project.path) ?? [];
-  // The one in use is listed even before the list has been read, or when it has dropped off it.
   if (props.current && !paths.includes(props.current)) paths.unshift(props.current);
   const value = props.current
     ? folderName(props.current)
@@ -98,12 +86,6 @@ function FolderMenu(props: {
   );
 }
 
-/**
- * Which project a Code chat works in, as a menu: one of the person's projects, or another folder
- * picked in the system's dialog. A new chat with no id yet keeps the choice until it starts.
- * `compact` draws it as quiet text, for the session card's Folder row; `heading` as a small
- * button over a file tree.
- */
 export function ChatFolderPicker({
   conversationId,
   compact = false,
@@ -125,8 +107,6 @@ export function ChatFolderPicker({
     <FolderMenu
       label="Chat folder"
       current={kind === "project" ? folder : ""}
-      // Only Code's chats pick a folder, and they stay in a project: going back to scratch would
-      // move the chat out of Code.
       scratch={false}
       look={pickerLook(compact, heading)}
       onPick={(path) =>
@@ -137,10 +117,6 @@ export function ChatFolderPicker({
   );
 }
 
-/**
- * A project folder as a menu, for a page with no chat (the Code page): the person's projects, or
- * another folder picked in the system's dialog, which becomes one of them. `onPick` gets the path.
- */
 export function ProjectPicker({
   value,
   onPick,

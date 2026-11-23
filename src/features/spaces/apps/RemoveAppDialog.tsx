@@ -1,6 +1,5 @@
 import { ConfirmDeleteDialog } from "@misty/ui";
 
-/** Asks before a mod removes an app from the Space. The Space's files stay in Media. */
 export function RemoveAppDialog({
   appName,
   open,

@@ -1,4 +1,4 @@
-import "@/app/featureSeams";
+import "@/app/feature_seams";
 import { act, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
@@ -85,12 +85,12 @@ const mocks = vi.hoisted(() => {
     resetAgentAccountState: vi.fn(),
   };
 });
-vi.mock("./sessions/useAccountStore", () => ({
+vi.mock("./sessions/use_account_store", () => ({
   accountFetchMe: mocks.accountFetchMe,
   accountLogout: mocks.accountLogout,
   isAccountUnauthorizedError: (error: { status?: number }) => error?.status === 401,
 }));
-vi.mock("./sessions/useAuthTokenStore", () => ({
+vi.mock("./sessions/use_auth_token_store", () => ({
   activateAccountSession: mocks.activateAccountSession,
   clearAccountAuthToken: mocks.clearAccountAuthToken,
   deactivateActiveAccount: mocks.deactivateActiveAccount,
@@ -101,7 +101,7 @@ vi.mock("./sessions/useAuthTokenStore", () => ({
   setAccountSessionTransitioning: mocks.setAccountSessionTransitioning,
   updateSavedAccountSession: mocks.updateSavedAccountSession,
 }));
-vi.mock("./sessions/useUserStore", () => ({
+vi.mock("./sessions/use_user_store", () => ({
   useUserStore: mocks.useUserStore,
 }));
 vi.mock("@/features/account/native-session", () => {
@@ -373,7 +373,6 @@ describe("AuthProvider account switching", () => {
         </StrictMode>,
       );
     });
-    // A dead session no longer signs anyone out: the window keeps browsing.
     expect(mocks.deactivateActiveAccount).not.toHaveBeenCalled();
     expect(mocks.signOut).not.toHaveBeenCalled();
     expect(auth?.user).not.toBeNull();

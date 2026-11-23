@@ -9,15 +9,8 @@ import {
   useCliUpdateFlow,
 } from "@/features/engine-config/clis";
 import { Button } from "@misty/ui";
-import type { EngineSetupState, useEngineReadiness } from "./engineReadiness";
+import type { EngineSetupState, useEngineReadiness } from "./engine_readiness";
 
-/**
- * The one thing left before an engine can run: Install (the same plan as Agents › CLIs), Get it
- * (the maker's page, for an engine Misty can't install), Sign in (the CLI's own login), or Check
- * again after a failed probe. No button once it is ready, or while it is being checked, but keep
- * it mounted there too: its install and sign-in dialogs live here and stay open as the state
- * moves on.
- */
 export function EngineNextStep({
   engine,
   view,

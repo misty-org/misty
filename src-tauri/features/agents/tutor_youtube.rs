@@ -1,10 +1,7 @@
-//! Tutor's YouTube links: a video read as its caption track, picked from the watch page's player
-//! data and fetched through `web_fetch` like any other link.
 use crate::agents::web_fetch::fetch_raw;
 
 use super::{readable_type, ReadLink, PAGE_BYTES};
 
-/// The video id of a YouTube watch, short, embed or youtu.be link.
 pub(super) fn youtube_id(url: &url::Url) -> Option<String> {
     let host = url
         .host_str()?
@@ -34,7 +31,6 @@ pub(super) fn youtube_id(url: &url::Url) -> Option<String> {
     valid.then_some(id)
 }
 
-/// A video as its captions, one line per caption with its time.
 pub(super) async fn video(id: &str) -> Result<ReadLink, String> {
     let watch = format!("https://www.youtube.com/watch?v={id}&hl=en");
     let response = fetch_raw(&watch, "text/html", PAGE_BYTES, readable_type)
@@ -73,12 +69,9 @@ fn page_title(html: &str) -> Option<String> {
     (!title.is_empty()).then_some(title)
 }
 
-/// The caption track to read from the watch page's player data: English when there is one,
-/// written captions before automatic ones, else the first.
 fn caption_track(html: &str) -> Option<String> {
     let at = html.find("\"captionTracks\":")? + "\"captionTracks\":".len();
     let rest = &html[at..];
-    // The array ends at its matching bracket.
     let mut depth = 0usize;
     let mut end = None;
     let mut in_string = false;
@@ -133,7 +126,6 @@ fn caption_track(html: &str) -> Option<String> {
     (host == "www.youtube.com" || host == "youtube.com").then(|| base.to_owned())
 }
 
-/// "[m:ss] words" lines from a timedtext XML document.
 fn caption_lines(xml: &str) -> Vec<String> {
     let mut lines = Vec::new();
     let mut rest = xml;

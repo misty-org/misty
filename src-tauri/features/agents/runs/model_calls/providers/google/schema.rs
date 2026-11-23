@@ -1,5 +1,3 @@
-//! Tool and output schemas in the OpenAPI form Google takes. Ported from
-//! `convertJSONSchemaToOpenAPISchema`, on a tree that keeps property order.
 use std::collections::BTreeSet;
 
 use super::schema_enum::add_enum;
@@ -12,7 +10,6 @@ struct Context<'a> {
     dollar_definitions: Option<&'a Ordered>,
 }
 
-/// The converted schema, or nothing for an empty root object, which Google wants left out.
 pub(super) fn to_openapi(schema: &Ordered) -> Result<Option<Ordered>, ModelError> {
     let context = Context {
         definitions: schema.get("definitions"),
@@ -32,10 +29,11 @@ fn is_empty_object_schema(schema: &Ordered) -> bool {
             Some(Ordered::Object(fields)) => fields.is_empty(),
             _ => false,
         }
-        && !schema.get("additionalProperties").is_some_and(Ordered::is_truthy)
+        && !schema
+            .get("additionalProperties")
+            .is_some_and(Ordered::is_truthy)
 }
 
-/// `undefined` in an array reaches the wire as `null`.
 fn convert_list(
     items: &[Ordered],
     context: &Context,
@@ -64,7 +62,10 @@ fn convert(
         result.put("properties", Ordered::empty_object());
         return Ok(Some(result));
     }
-    if let Some(reference) = schema.get("$ref").filter(|value| !matches!(value, Ordered::Null)) {
+    if let Some(reference) = schema
+        .get("$ref")
+        .filter(|value| !matches!(value, Ordered::Null))
+    {
         return convert_reference(schema, reference, is_root, context, resolving);
     }
     if is_empty_object_schema(schema) {
@@ -88,7 +89,10 @@ fn convert(
     match kind {
         Some(Ordered::Array(types)) => {
             let has_null = types.iter().any(|kind| kind.as_str() == Some("null"));
-            let others: Vec<&Ordered> = types.iter().filter(|kind| kind.as_str() != Some("null")).collect();
+            let others: Vec<&Ordered> = types
+                .iter()
+                .filter(|kind| kind.as_str() != Some("null"))
+                .collect();
             if others.is_empty() {
                 result.put("type", Ordered::text("null"));
             } else {
@@ -159,7 +163,11 @@ fn convert_any_of(
         result.put("anyOf", convert_list(list, context, resolving)?);
         return Ok(());
     }
-    let others: Vec<Ordered> = list.iter().filter(|schema| !is_null(schema)).cloned().collect();
+    let others: Vec<Ordered> = list
+        .iter()
+        .filter(|schema| !is_null(schema))
+        .cloned()
+        .collect();
     if let [only] = others.as_slice() {
         if let Some(Ordered::Object(fields)) = convert(Some(only), false, context, resolving)? {
             result.put("nullable", Ordered::Bool(true));
@@ -184,7 +192,9 @@ fn convert_reference(
     let text = reference.as_str().unwrap_or_default();
     let (definition, key) = referenced_definition(text, context)?;
     if resolving.contains(&key) {
-        return Err(unsupported("Google schema conversion does not support recursive JSON Schema references."));
+        return Err(unsupported(
+            "Google schema conversion does not support recursive JSON Schema references.",
+        ));
     }
     let mut resolving = resolving.clone();
     resolving.insert(key);
@@ -215,7 +225,10 @@ fn referenced_definition<'a>(
     context: &Context<'a>,
 ) -> Result<(&'a Ordered, String), ModelError> {
     let unsupported = unsupported_reference;
-    let sources = [("#/$defs/", context.dollar_definitions), ("#/definitions/", context.definitions)];
+    let sources = [
+        ("#/$defs/", context.dollar_definitions),
+        ("#/definitions/", context.definitions),
+    ];
     let (prefix, definitions) = sources
         .into_iter()
         .find(|(prefix, _)| reference.starts_with(prefix))
@@ -231,7 +244,9 @@ fn referenced_definition<'a>(
     if decoded.contains('/') || bad_escape {
         return Err(unsupported());
     }
-    let definitions = definitions.filter(|value| !matches!(value, Ordered::Null)).ok_or_else(unsupported)?;
+    let definitions = definitions
+        .filter(|value| !matches!(value, Ordered::Null))
+        .ok_or_else(unsupported)?;
     let name = decoded.replace("~1", "/").replace("~0", "~");
     let definition = definitions.get(&name).ok_or_else(unsupported)?;
     Ok((definition, format!("{prefix}{name}")))
@@ -259,13 +274,18 @@ mod tests {
     use super::*;
 
     fn converted(text: &str) -> Option<String> {
-        to_openapi(&Ordered::from_text(text).unwrap()).unwrap().map(|schema| schema.to_text())
+        to_openapi(&Ordered::from_text(text).unwrap())
+            .unwrap()
+            .map(|schema| schema.to_text())
     }
 
     #[test]
     fn an_empty_root_object_is_left_out() {
         assert_eq!(converted(r#"{"type":"object","properties":{}}"#), None);
-        assert_eq!(converted(r#"{"type":"object","properties":{"a":{"type":"object"}}}"#).unwrap(), r#"{"type":"object","properties":{"a":{"type":"object"}}}"#);
+        assert_eq!(
+            converted(r#"{"type":"object","properties":{"a":{"type":"object"}}}"#).unwrap(),
+            r#"{"type":"object","properties":{"a":{"type":"object"}}}"#
+        );
     }
 
     #[test]
@@ -278,21 +298,43 @@ mod tests {
 
     #[test]
     fn nullable_forms() {
-        assert_eq!(converted(r#"{"type":["string","null"]}"#).unwrap(), r#"{"anyOf":[{"type":"string"}],"nullable":true}"#);
-        assert_eq!(converted(r#"{"anyOf":[{"type":"string"},{"type":"null"}]}"#).unwrap(), r#"{"nullable":true,"type":"string"}"#);
         assert_eq!(
-            converted(r#"{"anyOf":[{"type":"string"},{"type":"number"},{"type":"null"}]}"#).unwrap(),
+            converted(r#"{"type":["string","null"]}"#).unwrap(),
+            r#"{"anyOf":[{"type":"string"}],"nullable":true}"#
+        );
+        assert_eq!(
+            converted(r#"{"anyOf":[{"type":"string"},{"type":"null"}]}"#).unwrap(),
+            r#"{"nullable":true,"type":"string"}"#
+        );
+        assert_eq!(
+            converted(r#"{"anyOf":[{"type":"string"},{"type":"number"},{"type":"null"}]}"#)
+                .unwrap(),
             r#"{"anyOf":[{"type":"string"},{"type":"number"}],"nullable":true}"#,
         );
     }
 
     #[test]
     fn enums_take_one_primitive_type() {
-        assert_eq!(converted(r#"{"enum":["a","b"]}"#).unwrap(), r#"{"type":"string","enum":["a","b"]}"#);
-        assert_eq!(converted(r#"{"const":"a"}"#).unwrap(), r#"{"type":"string","enum":["a"]}"#);
-        assert_eq!(converted(r#"{"enum":[1,2]}"#).unwrap(), r#"{"type":"number","format":"enum","enum":["1","2"]}"#);
-        assert_eq!(converted(r#"{"enum":["a",null]}"#).unwrap(), r#"{"type":"string","nullable":true,"enum":["a"]}"#);
-        assert_eq!(converted(r#"{"const":null}"#).unwrap(), r#"{"type":"null"}"#);
+        assert_eq!(
+            converted(r#"{"enum":["a","b"]}"#).unwrap(),
+            r#"{"type":"string","enum":["a","b"]}"#
+        );
+        assert_eq!(
+            converted(r#"{"const":"a"}"#).unwrap(),
+            r#"{"type":"string","enum":["a"]}"#
+        );
+        assert_eq!(
+            converted(r#"{"enum":[1,2]}"#).unwrap(),
+            r#"{"type":"number","format":"enum","enum":["1","2"]}"#
+        );
+        assert_eq!(
+            converted(r#"{"enum":["a",null]}"#).unwrap(),
+            r#"{"type":"string","nullable":true,"enum":["a"]}"#
+        );
+        assert_eq!(
+            converted(r#"{"const":null}"#).unwrap(),
+            r#"{"type":"null"}"#
+        );
         assert!(to_openapi(&Ordered::from_text(r#"{"enum":["a",1]}"#).unwrap()).is_err());
     }
 
@@ -304,6 +346,9 @@ mod tests {
         );
         let recursive = r##"{"$ref":"#/definitions/node","definitions":{"node":{"type":"object","properties":{"next":{"$ref":"#/definitions/node"}}}}}"##;
         assert!(to_openapi(&Ordered::from_text(recursive).unwrap()).is_err());
-        assert!(to_openapi(&Ordered::from_text(r##"{"$ref":"https://example.com/x"}"##).unwrap()).is_err());
+        assert!(
+            to_openapi(&Ordered::from_text(r##"{"$ref":"https://example.com/x"}"##).unwrap())
+                .is_err()
+        );
     }
 }

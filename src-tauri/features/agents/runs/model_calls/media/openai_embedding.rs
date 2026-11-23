@@ -1,5 +1,3 @@
-//! Embeddings from OpenAI, the compatible servers and the Gateway. Ported from `@ai-sdk/openai`,
-//! `@ai-sdk/openai-compatible` and `@ai-sdk/gateway`.
 use futures_util::future::BoxFuture;
 use serde::Deserialize;
 use serde_json::{json, Map, Number, Value};
@@ -46,8 +44,14 @@ impl DimensionOptions {
     }
 }
 
-fn dimension_options(options: Option<&ProviderOptions>, name: &str) -> Result<Option<DimensionOptions>, ModelError> {
-    let Some(value) = options.and_then(|options| options.get(name)).filter(|value| !value.is_null()) else {
+fn dimension_options(
+    options: Option<&ProviderOptions>,
+    name: &str,
+) -> Result<Option<DimensionOptions>, ModelError> {
+    let Some(value) = options
+        .and_then(|options| options.get(name))
+        .filter(|value| !value.is_null())
+    else {
         return Ok(None);
     };
     serde_json::from_value(value.clone())
@@ -55,7 +59,6 @@ fn dimension_options(options: Option<&ProviderOptions>, name: &str) -> Result<Op
         .map_err(|_| ModelError::Unsupported(format!("invalid {name} provider options")))
 }
 
-/// `/[_-]([a-z])/g` to the letter in upper case.
 fn to_camel_case(name: &str) -> String {
     let mut camel = String::with_capacity(name.len());
     let mut characters = name.chars().peekable();
@@ -71,18 +74,20 @@ fn to_camel_case(name: &str) -> String {
     camel
 }
 
-/// Chat-completions style embeddings, which OpenAI and the compatible servers share.
 pub(super) struct OpenAiStyleEmbeddingModel {
     pub(super) client: reqwest::Client,
     pub(super) url: String,
     pub(super) api_key: String,
     pub(super) model: String,
-    /// `None` for OpenAI itself, or the compatible provider's name.
     pub(super) compatible_name: Option<String>,
 }
 
 impl OpenAiStyleEmbeddingModel {
-    fn options(&self, options: Option<&ProviderOptions>, warnings: &mut Vec<Value>) -> Result<DimensionOptions, ModelError> {
+    fn options(
+        &self,
+        options: Option<&ProviderOptions>,
+        warnings: &mut Vec<Value>,
+    ) -> Result<DimensionOptions, ModelError> {
         let Some(name) = &self.compatible_name else {
             return Ok(dimension_options(options, "openai")?.unwrap_or_default());
         };
@@ -95,7 +100,11 @@ impl OpenAiStyleEmbeddingModel {
             }));
         }
         let camel = to_camel_case(name);
-        if camel != *name && options.and_then(|options| options.get(name)).is_some_and(|value| !value.is_null()) {
+        if camel != *name
+            && options
+                .and_then(|options| options.get(name))
+                .is_some_and(|value| !value.is_null())
+        {
             warnings.push(json!({
                 "type": "deprecated",
                 "setting": format!("providerOptions key '{name}'"),
@@ -134,12 +143,18 @@ impl EmbeddingModel for OpenAiStyleEmbeddingModel {
                 body.insert("user".into(), json!(user));
             }
             let mut headers = Vec::new();
-            // A local server may run without a key.
             if !self.api_key.is_empty() {
                 headers.push(("authorization", format!("Bearer {}", self.api_key)));
             }
-            let response =
-                post_json(&self.client, &self.url, &headers, &body, &self.api_key, openai_error_message).await?;
+            let response = post_json(
+                &self.client,
+                &self.url,
+                &headers,
+                &body,
+                &self.api_key,
+                openai_error_message,
+            )
+            .await?;
             let parsed: OpenAiEmbeddings = read_json(response).await?;
             Ok(EmbedResponse {
                 embeddings: parsed.data.into_iter().map(|item| item.embedding).collect(),
@@ -189,12 +204,21 @@ impl EmbeddingModel for GatewayEmbeddingModel {
             if let Some(options) = provider_options {
                 body["providerOptions"] = Value::Object(options.clone());
             }
-            let bytes = serde_json::to_vec(&body)
-                .map_err(|error| ModelError::Unsupported(format!("The request couldn't be built: {error}")))?;
+            let bytes = serde_json::to_vec(&body).map_err(|error| {
+                ModelError::Unsupported(format!("The request couldn't be built: {error}"))
+            })?;
             let mut headers = auth_headers(&self.api_key);
             headers.push(("ai-embedding-model-specification-version", "4".to_owned()));
             headers.push(("ai-model-id", self.model.clone()));
-            let response = post_body(&self.client, &self.url, &headers, "application/json", bytes, &self.api_key).await?;
+            let response = post_body(
+                &self.client,
+                &self.url,
+                &headers,
+                "application/json",
+                bytes,
+                &self.api_key,
+            )
+            .await?;
             let response = checked(response, &self.api_key).await?;
             let parsed: GatewayEmbeddings = read_json(response).await?;
             Ok(EmbedResponse {

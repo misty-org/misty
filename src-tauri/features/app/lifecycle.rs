@@ -1,10 +1,6 @@
-//! App quit and main-window close. Both wait while workspace saves exist only in
-//! the renderer (they reached neither the recovery database nor its pending
-//! slot): the main window retries them and asks before anything is lost.
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, Window, WindowEvent};
 
-/// Set once the person chose to quit with unsaved changes.
 static QUIT_CONFIRMED: AtomicBool = AtomicBool::new(false);
 const UNSAVED_BEFORE_QUIT: &str = "misty://unsaved-before-quit";
 
@@ -16,11 +12,9 @@ fn must_ask() -> bool {
 #[derive(Clone, serde::Serialize)]
 struct UnsavedBeforeQuit {
     unsaved: usize,
-    /// Only the main window is closing; the app keeps running.
     closing: bool,
 }
 
-/// Asks in the closing window, or when quitting in the last focused one.
 fn ask(app: &AppHandle, closing: Option<&str>) {
     let unsaved = crate::browser::app_windows::workspace_recovery::unsaved_count();
     let payload = UnsavedBeforeQuit {
@@ -39,8 +33,6 @@ fn ask(app: &AppHandle, closing: Option<&str>) {
 }
 
 pub fn run_event(app: &AppHandle, event: RunEvent) {
-    // Dock activation must work even if the frontend is still loading
-    // or failed before it could report readiness.
     #[cfg(target_os = "macos")]
     if matches!(event, RunEvent::Reopen { .. }) {
         if let Err(error) = crate::app::tray::show_main_window(app) {
@@ -49,31 +41,23 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
     }
     if let RunEvent::ExitRequested { code, api, .. } = &event {
         if code.is_none() && !crate::app::tray::hidden() {
-            // The last window closed (only that asks with no code). Misty stays in the tray or
-            // menu bar, where it keeps the Space drives in sync; Quit (`app.exit`) carries a code,
-            // and macOS's own Quit and logout end the app without asking here.
             api.prevent_exit();
         } else if must_ask() && crate::browser::app_windows::primary(app).is_some() {
             api.prevent_exit();
             ask(app, None);
         } else {
-            // The windows open now reopen at the next launch.
             crate::browser::app_windows::quitting();
         }
     }
     if matches!(event, RunEvent::Exit) {
-        // Its runs wait in their files for the next launch.
         crate::agents::run_control::stop();
-        // Outside engines and terminals are this app's own processes and end with it.
         crate::project::terminal::close_all();
         tauri::async_runtime::block_on(crate::engines::shutdown());
         crate::engine_config::shutdown();
-        // Space drives unmount; what they hold stays for the next launch.
         crate::spaces_drive::shutdown();
     }
 }
 
-/// Closing the main window would take its unsaved changes with it.
 pub fn window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
         if crate::browser::app_windows::is_person_window(window.label()) && must_ask() {
@@ -83,7 +67,6 @@ pub fn window_event(window: &Window, event: &WindowEvent) {
     }
 }
 
-/// Starts Misty again, after an update or a change of server. The main workspace asks.
 #[tauri::command]
 pub fn app_relaunch(webview: tauri::Webview, app: AppHandle) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
@@ -92,8 +75,6 @@ pub fn app_relaunch(webview: tauri::Webview, app: AppHandle) -> Result<(), Strin
     app.restart()
 }
 
-/// Finishes the quit or close that was held: after the changes saved, or
-/// because the person chose to go ahead without them.
 #[tauri::command]
 pub fn app_quit_confirmed(
     webview: tauri::Webview,
@@ -104,7 +85,6 @@ pub fn app_quit_confirmed(
         return Err("Only the main workspace can confirm quitting".into());
     }
     if closing {
-        // Destroying skips the close check; the app keeps running.
         return webview
             .window()
             .destroy()

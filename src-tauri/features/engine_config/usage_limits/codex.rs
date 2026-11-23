@@ -1,23 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Codex windows, read through the person's own Codex CLI: `codex app-server` answers
-//! `account/rateLimits/read` from its own sign-in, and sends `account/rateLimits/updated` during
-//! runs. Misty never sees the sign-in.
-//!
-//! The protocol's snapshot (camelCase, v2):
-//!
-//! ```json
-//! { "rateLimits": { "limitId": "codex", "limitName": null, "planType": "pro",
-//!     "primary":   { "usedPercent": 8,  "windowDurationMins": 300,   "resetsAt": 1790014520 },
-//!     "secondary": { "usedPercent": 71, "windowDurationMins": 10080, "resetsAt": 1790183600 },
-//!     "credits": { "hasCredits": true, "unlimited": false, "balance": "12.50" } },
-//!   "rateLimitsByLimitId": { "codex": { … } } }
-//! ```
-//!
-//! The older `token_count` events of `codex exec` carry the same windows in snake_case
-//! (`used_percent`, `window_minutes`, `resets_in_seconds`); both are read.
-
 use std::future::Future;
 use std::pin::Pin;
 use std::time::Duration;
@@ -29,9 +12,7 @@ use super::{
     KIND_WEEKLY, SESSION_WINDOW_SECONDS, WEEKLY_WINDOW_SECONDS,
 };
 
-/// The whole exchange (start, handshake, read) gives up after this long.
 const READ_TIMEOUT: Duration = Duration::from_secs(20);
-/// The main bucket's id; other buckets get their id in front of their windows'.
 const MAIN_LIMIT_ID: &str = "codex";
 
 pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -39,18 +20,15 @@ pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum CodexFailure {
     NotInstalled,
-    /// The CLI has no ChatGPT sign-in (none, or an API key, which has no plan limits).
     SignedOut,
     Offline,
     Error(String),
 }
 
-/// Where the `account/rateLimits/read` result comes from; tests answer without a CLI.
 pub(crate) trait CodexSource: Send + Sync {
     fn read_rate_limits(&self) -> BoxFuture<'_, Result<Value, CodexFailure>>;
 }
 
-/// The person's own `codex app-server`, started for one read and stopped after it.
 pub(crate) struct CodexAppServer;
 
 impl CodexSource for CodexAppServer {
@@ -98,7 +76,6 @@ async fn read_through_app_server() -> Result<Value, CodexFailure> {
     read.map_err(failure)
 }
 
-/// A JSON-RPC error as a failure. Only a short, secret-free reason is kept.
 pub(crate) fn classify_error(error: &Value) -> CodexFailure {
     let message = error
         .get("message")
@@ -142,7 +119,6 @@ pub(crate) struct CodexLimits {
     pub credits: Option<Credits>,
 }
 
-/// An `account/rateLimits/read` result. `None` when it is not an object with a snapshot.
 pub(crate) fn parse_read(result: &Value, now_ms: i64) -> Option<CodexLimits> {
     let main = result.get("rateLimits").filter(|v| v.is_object())?;
     let mut limits = parse_snapshot(main, None, now_ms);
@@ -167,8 +143,6 @@ pub(crate) fn parse_read(result: &Value, now_ms: i64) -> Option<CodexLimits> {
     Some(limits)
 }
 
-/// An `account/rateLimits/updated` params object, a bare snapshot, or a `token_count` event's
-/// `rate_limits`. `None` when nothing in it is a window or a plan.
 pub(crate) fn parse_update(params: &Value, now_ms: i64) -> Option<CodexLimits> {
     let snapshot = params
         .get("rateLimits")
@@ -247,8 +221,6 @@ fn field<'a>(value: &'a Value, names: &[&str]) -> Option<&'a Value> {
         .filter(|v| !v.is_null())
 }
 
-/// `plus` → "Plus", `free` → "Free" (free plans only carry a weekly window, so the label is
-/// kept rather than hidden).
 pub(crate) fn plan_label(plan_type: &str) -> Option<String> {
     title_case(plan_type)
 }
@@ -281,7 +253,6 @@ fn window(slot: &str, value: &Value, now_ms: i64) -> Option<LimitWindow> {
     })
 }
 
-/// `resetsAt` is epoch seconds; fall back to a count of seconds from now.
 fn reset_ms(value: &Value, now_ms: i64) -> Option<i64> {
     if let Some(at) = field(value, &["resetsAt", "resets_at", "reset_at"]).and_then(timestamp_ms) {
         return Some(at);
@@ -289,7 +260,6 @@ fn reset_ms(value: &Value, now_ms: i64) -> Option<i64> {
     let after = field(value, &["resets_in_seconds", "reset_after_seconds"])
         .and_then(Value::as_f64)
         .filter(|s| s.is_finite() && *s >= 0.0)?;
-    // Cap absurd values (a year) and never overflow the clock.
     Some(now_ms.saturating_add((after.min(31_536_000.0) * 1000.0) as i64))
 }
 

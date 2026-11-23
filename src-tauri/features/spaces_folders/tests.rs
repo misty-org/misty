@@ -11,9 +11,6 @@ fn write(root: &Path, path: &str, text: &str) {
     std::fs::write(file, text).unwrap();
 }
 
-/// A folder with a `.gitignore`, a `.mistyignore` that adds a rule and takes one back, a dotfile
-/// and a `.git` folder. The names are odd on purpose, so a global Git excludes file on the
-/// machine running the tests is unlikely to match them.
 fn fixture() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
@@ -26,7 +23,11 @@ fn fixture() -> tempfile::TempDir {
     write(root, "zqprivate.txt", "left out by .mistyignore");
     write(root, ".zqdotfile", "dotfiles count");
     write(root, "zqsub/zqb.txt", "b");
-    write(root, "zqsub/zqprivate.txt", "left out too: the rule has no slash");
+    write(
+        root,
+        "zqsub/zqprivate.txt",
+        "left out too: the rule has no slash",
+    );
     write(root, ".git/config", "[core]");
     dir
 }
@@ -58,7 +59,11 @@ fn scan_lists_what_rules_leave_out_without_git() {
     let dir = fixture();
     let root = std::fs::canonicalize(dir.path()).unwrap();
     let found = scan(&root);
-    let included: Vec<&str> = found.included.iter().map(|file| file.path.as_str()).collect();
+    let included: Vec<&str> = found
+        .included
+        .iter()
+        .map(|file| file.path.as_str())
+        .collect();
     assert!(included.contains(&"zqkeep.zqskip"));
     assert!(included.contains(&".zqdotfile"));
     assert_eq!(
@@ -71,8 +76,13 @@ fn scan_lists_what_rules_leave_out_without_git() {
         ]
     );
     assert!(!found.truncated);
-    let everything = included.iter().copied().chain(found.excluded.iter().map(String::as_str));
-    assert!(everything.into_iter().all(|path| !path.starts_with(".git/")));
+    let everything = included
+        .iter()
+        .copied()
+        .chain(found.excluded.iter().map(String::as_str));
+    assert!(everything
+        .into_iter()
+        .all(|path| !path.starts_with(".git/")));
 }
 
 #[cfg(unix)]

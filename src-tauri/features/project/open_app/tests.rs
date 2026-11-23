@@ -86,7 +86,7 @@ mod macos_tests {
 }
 
 #[cfg(test)]
-mod tests {
+mod presets {
     use super::*;
 
     #[test]

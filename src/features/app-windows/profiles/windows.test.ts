@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createDockLeaf, dockLeaves, findDockLeaf, insertDockSplit } from "../panes/dockTree";
-import { useWorkspaceStore } from "../tabs/useWorkspaceStore";
+import { createDockLeaf, dockLeaves, findDockLeaf, insertDockSplit } from "../panes/dock_tree";
+import { useWorkspaceStore } from "../tabs/use_workspace_store";
 import { currentWindows } from "./windows";
-import { currentWindowId } from "./profileWindow";
-import { followSpaceWindow, spaceWindow } from "../tabs/spaceWindow";
-import { parseWorkspaceRecord } from "../tabs/workspaceRecord";
-import { migrateWorkspaceStore, partialWorkspaceStore } from "../tabs/workspaceStorePersistence";
-import { allLayoutViews } from "../panes/layoutTabs";
-import { openPage } from "@/tests/workspacePage";
-import { browserWorkspaceStoreVersion } from "../recovery/workspaceRecoveryStorage";
+import { currentWindowId } from "./profile_window";
+import { followSpaceWindow, spaceWindow } from "../tabs/space_window";
+import { parseWorkspaceRecord } from "../tabs/workspace_record";
+import { migrateWorkspaceStore, partialWorkspaceStore } from "../tabs/workspace_store_persistence";
+import { allLayoutViews } from "../panes/layout_tabs";
+import { openPage } from "@/tests/workspace_page";
+import { browserWorkspaceStoreVersion } from "../recovery/workspace_recovery_storage";
 
 const record = (state: unknown) => JSON.stringify({ version: browserWorkspaceStoreVersion, state });
 
@@ -40,7 +40,6 @@ describe("a window of one profile", () => {
   it("caps the window at a two by two grid", () => {
     const first = useWorkspaceStore.getState().layout.focusedPaneId;
     const second = useWorkspaceStore.getState().splitPane(first, "right")!;
-    // A third pane beside the pair would be a row of three, which a window never has.
     expect(useWorkspaceStore.getState().splitPane(second, "right")).toBeNull();
     useWorkspaceStore.getState().splitPane(first, "down")!;
     const fourth = useWorkspaceStore.getState().splitPane(second, "down")!;

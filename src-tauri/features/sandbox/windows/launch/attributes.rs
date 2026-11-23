@@ -1,9 +1,5 @@
-//! Handles made inheritable for one spawn, and the attribute list that
-//! limits the child to them.
 use super::*;
 
-/// Marks handles inheritable for the length of one spawn. The attribute list
-/// limits this process's child to exactly these handles.
 pub(super) struct Inheritable<'a>(&'a [HANDLE]);
 
 impl<'a> Inheritable<'a> {
@@ -30,7 +26,6 @@ impl Drop for Inheritable<'_> {
     }
 }
 
-/// Owns a process-thread attribute list.
 pub(super) struct Attributes {
     buffer: Vec<u8>,
 }
@@ -55,8 +50,6 @@ impl Attributes {
         self.buffer.as_mut_ptr().cast()
     }
 
-    /// # Safety
-    /// `value` must stay alive and unmoved until the list is dropped.
     pub(super) unsafe fn set<T>(
         &mut self,
         attribute: usize,

@@ -7,14 +7,12 @@ use serde_json::{json, Map, Value};
 
 use super::core::*;
 use super::fsutil::*;
-// ===== Registry reads and writes, and trash purging =====
 
 pub(super) struct Registry {
     pub(super) repos: Vec<Value>,
     pub(super) skills: Vec<Value>,
 }
 
-/// upstream DEFAULT_REPOS。
 pub(super) fn default_repos() -> Vec<Value> {
     vec![
         json!({"owner": "anthropics", "name": "skills", "branch": crate::known_names::DEFAULT_BRANCH, "enabled": true}),
@@ -24,8 +22,6 @@ pub(super) fn default_repos() -> Vec<Value> {
     ]
 }
 
-/// upstream readRegistry: a missing or unreadable file → defaults; repos not an array → DEFAULT_REPOS;
-/// skills not an array → [].
 pub(super) fn read_registry() -> Registry {
     if let Some(value) = read_json(&registry_path()) {
         if value.is_object() {
@@ -55,7 +51,6 @@ pub(super) fn save_registry(registry: &Registry) -> SkillResult<()> {
     )
 }
 
-/// An entry's trashedAt (JavaScript truthiness: only a non-zero number counts as trashed).
 pub(super) fn trashed_at_of(skill: &Value) -> Option<f64> {
     skill
         .get("trashedAt")
@@ -63,8 +58,6 @@ pub(super) fn trashed_at_of(skill: &Value) -> Option<f64> {
         .filter(|n| *n != 0.0)
 }
 
-/// upstream purgeExpiredTrash: trashedAt at least TRASH_TTL_MS ago → delete the trash folder and the
-/// registry entry; best-effort throughout.
 pub(super) fn purge_expired_trash() {
     let now = now_ms();
     let mut registry = read_registry();
@@ -89,10 +82,6 @@ pub(super) fn purge_expired_trash() {
     }
 }
 
-// ===== Activity log (best-effort, never blocks a mutation) =====
-
-/// upstream appendActivity: appends `{ts, ...event}` as one JSON line (0o600); past 256KB keeps
-/// only the last 500 lines; swallows every error.
 pub(super) fn append_activity(event: Value) {
     let _ = (|| -> std::io::Result<()> {
         ensure_dir(&skills_root())?;
@@ -117,7 +106,6 @@ pub(super) fn append_activity(event: Value) {
     })();
 }
 
-/// upstream readActivity: the last `limit` lines (clamped to [1,500], 0 → 100), unreadable lines dropped, newest first.
 pub(super) fn read_activity(limit: i64) -> Vec<Value> {
     let want = (if limit == 0 { 100 } else { limit }).clamp(1, ACTIVITY_MAX as i64) as usize;
     let Some(raw) = read_text(&activity_path()) else {

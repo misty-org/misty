@@ -17,16 +17,10 @@ import {
 import { ImagePlus, Plus, ScanLine, X } from "lucide-react";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { useRef } from "react";
-import { useFileDropZone } from "@/shared/hooks/useFileDropZone";
-import { validateMistyImage } from "./mistyImageValues";
-import type { MistyImageAttachment } from "../state/conversationTypes";
+import { useFileDropZone } from "@/shared/hooks/use_file_drop_zone";
+import { validateMistyImage } from "./misty_image_values";
+import type { MistyImageAttachment } from "../state/conversation_types";
 
-/**
- * The chat's message box: the text, then one bar under it that never wraps. The + menu leads the
- * bar (attach files, capture part of the screen, and whatever the chat adds), then the chat's own
- * controls as ActionBar items, which give way by priority; the end holds what never folds and the
- * send button (or what replaces it, such as Stop). Where the chat works is in the context panel.
- */
 export function MistyComposer(props: {
   value: string;
   onChange: (value: string) => void;
@@ -37,26 +31,17 @@ export function MistyComposer(props: {
   onRemoveAttachment: (attachment: MistyImageAttachment) => void | Promise<void>;
   onSubmit: () => void;
   onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
-  /** Captures part of the screen; it is offered in the + menu. */
   onCapture?: () => void;
-  /** More rows for the + menu, after attach and capture. */
   addMenuItems?: ReactNode;
-  /** The bar's controls after the + menu, which give way by their priorities. */
   items?: ActionBarItem[];
-  /** Controls at the bar's end before the send button; they never fold. */
   end?: ReactNode;
-  /** Replaces the send button, such as Stop while a reply runs. */
   sendControl?: ReactNode;
   disabled?: boolean;
   busy?: boolean;
   placeholder?: string;
-  /** A menu anchored above the text, such as the `@`, `/` and `$` suggestions. */
   popup?: ReactNode;
-  /** Attachments that aren't files, shown before the files (Misty's browser). */
   attachedChips?: ReactNode;
-  /** A taller box in body type, for a chat with nothing in it yet. */
   roomy?: boolean;
-  /** Rows about the chat's state at the top of the box, such as queued messages. */
   status?: ReactNode;
   className?: string;
   onError?: (message: string) => void;
@@ -83,8 +68,6 @@ export function MistyComposer(props: {
       );
     }
   };
-  // Files dropped from the computer's file manager, on every desktop system and in a browser,
-  // anywhere on the content area around the composer that is marked to take them.
   const dropZone = useFileDropZone<HTMLDivElement>(accept, {
     disabled: props.disabled,
     onError: props.onError,
@@ -107,7 +90,6 @@ export function MistyComposer(props: {
     id: "add",
     icon: Plus,
     label: "Add",
-    // The + menu is the last thing to fold: it is how files and captures get in.
     priority: 100,
     disabled: props.disabled,
     menu: addRows,
@@ -202,7 +184,6 @@ export function MistyComposer(props: {
   );
 }
 
-/** One attached file above the text: its picture or name, its upload, and a remove button. */
 function AttachmentTile({
   attachment,
   onRemove,
@@ -221,7 +202,7 @@ function AttachmentTile({
         <img src={attachment.previewUrl} alt={attachment.name} className="size-full object-cover" />
       ) : (
         <Tooltip content={attachment.name}>
-          <span className="grid size-full place-items-center break-all p-1 text-xs">
+          <span className="grid size-full place-items-center break-all p-1 text-meta">
             {attachment.name}
           </span>
         </Tooltip>
@@ -229,7 +210,7 @@ function AttachmentTile({
       {attachment.state !== "ready" ? (
         <div className="absolute inset-0 grid place-items-center bg-black/60">
           {attachment.state === "failed" ? (
-            <Text bare tone="default" className="text-3xs">
+            <Text bare tone="default" className="text-micro">
               Failed
             </Text>
           ) : (

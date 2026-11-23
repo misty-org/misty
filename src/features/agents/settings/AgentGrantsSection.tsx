@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import { grantsApi, groupGrants, lastUsedText } from "../grants/api";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmAction } from "@/shared/lib/confirm_action";
 import { Button } from "@misty/ui";
 import {
   DesktopSettingsNotice,
@@ -10,14 +10,7 @@ import {
   DesktopSettingsSection as Section,
 } from "@/features/settings";
 
-/**
- * Approvals you remembered, grouped by agent. Each lets one agent skip the pause
- * for one action on one of your resources while a chat is in Auto; Ask always
- * asks. Revoking applies to the agent's next action.
- */
 export function AgentGrantsSection() {
-  // Kept on this computer, where the approvals are: plain labels and agent names, no key or
-  // token. The last list paints at once and is read again behind it.
   const listing = useCachedResource("agents/grants", () => grantsApi.list(), { persist: "device" });
   const grants = listing.data?.grants ?? null;
   const [working, setWorking] = useState("");

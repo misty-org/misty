@@ -1,4 +1,3 @@
-//! Opening, restoring and closing profile windows.
 use super::*;
 use std::sync::atomic::Ordering;
 
@@ -28,7 +27,6 @@ fn build_window<R: Runtime>(
     entry: &ProfileEntry,
 ) -> Result<(), String> {
     let config = window_config(app, label)?;
-    // The app reads who this window is before it first renders.
     let state = window_state(label).ok_or("This window has no profile.")?;
     let opening = serde_json::json!({
         "windowId": state.window_id,
@@ -41,8 +39,6 @@ fn build_window<R: Runtime>(
         .title(title)
         .build()
         .map_err(|error| error.to_string())?;
-    // The traffic lights wait hidden until the layout places them, so they never show in
-    // AppKit's spot first, however the window comes to be shown.
     #[cfg(target_os = "macos")]
     if let Some(view) = app.get_webview(label) {
         let _ = view.with_webview(|view| unsafe {
@@ -60,8 +56,6 @@ fn build_window<R: Runtime>(
 }
 
 fn focus<R: Runtime>(window: &Window<R>) {
-    // A new window shows itself once its first frame is ready (`reveal_main_window`), which
-    // also brings it forward; showing it sooner shows an empty window.
     if !crate::app::macos_window_effects::mac_rounded_corners::window_revealed(window.label()) {
         return;
     }
@@ -100,7 +94,6 @@ fn open_window<R: Runtime>(app: &AppHandle<R>, window: OpenWindow) -> Result<(),
         forget_current(&label);
         return Err(error);
     }
-    // Before it is first shown, so it never appears at its default size and then jumps.
     if let Some(built) = app.get_window(&label) {
         window_geometry::apply_and_track(&built, &window_id);
     }
@@ -110,8 +103,6 @@ fn open_window<R: Runtime>(app: &AppHandle<R>, window: OpenWindow) -> Result<(),
     Ok(())
 }
 
-/// Opens a new window of a profile. If a closed window of the profile left tabs waiting, this
-/// window takes up where that one was.
 pub fn open_profile_window<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<(), String> {
     if !valid_key(key) {
         return Err("Unknown profile.".into());
@@ -134,14 +125,12 @@ pub fn open_profile_window<R: Runtime>(app: &AppHandle<R>, key: &str) -> Result<
     )
 }
 
-/// Opens the windows the last launch left open, or the first profile's.
 pub fn restore<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let open = lock_registry()
         .map(|state| state.open.clone())
         .unwrap_or_default();
     let mut opened = false;
     for window in open {
-        // A profile that no longer opens (deleted elsewhere) is skipped.
         opened |= open_window(app, window).is_ok();
     }
     if !opened {
@@ -153,7 +142,6 @@ pub fn restore<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     Ok(())
 }
 
-/// Window lifecycle: remembers focus and leaves a closed window's tabs in its profile.
 pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
     let label = window.label();
     let Some(parsed) = parse(label) else { return };
@@ -161,7 +149,6 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
         if let Ok(mut last) = LAST_FOCUSED.lock() {
             *last = Some(label.to_owned());
         }
-        // Alt+Tab focuses the window but none of its webviews; give focus back.
         #[cfg(windows)]
         crate::browser::app_windows::windows::focus::window_activated(window);
     }
@@ -178,9 +165,6 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
     }
     match event {
         tauri::WindowEvent::Focused(true) => {
-            // A saved maximize or full screen lands when the window is revealed
-            // (`reveal_main_window`), never here: a window that opened without focus would
-            // otherwise resize the first time it is clicked.
             if let Ok(mut state) = lock_registry() {
                 state.last_focused = Some(label.into());
             }
@@ -220,7 +204,6 @@ pub fn window_event(window: &Window, event: &tauri::WindowEvent) {
     }
 }
 
-/// Quitting keeps the windows open for the next launch.
 pub fn quitting() {
     QUITTING.store(true, Ordering::SeqCst);
     window_geometry::flush_all();

@@ -1,8 +1,3 @@
-//! One real chat turn on Misty's own path, for the ignored live tests of the slash commands
-//! that act on a turn's process or thread (`/tasks`, `/approve`): `send_message_inner`, the
-//! engine's adapter, and its reader or app-server driver, as a chat's send runs them. The
-//! engine events land here instead of in the run bridge.
-
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -14,9 +9,7 @@ use crate::engines::gate::{self, Decision};
 use crate::engines::support::event_sink::{Emit, ENGINE_EVENT_NAME};
 use crate::engines::support::{self, EngineState};
 
-/// Every engine event of every run, in the order the sink flushed them.
 static EVENTS: LazyLock<Mutex<Vec<Value>>> = LazyLock::new(Default::default);
-/// What Misty's gate answers every permission ask an engine raises in these tests.
 static ALLOW: AtomicBool = AtomicBool::new(false);
 
 struct Collect;
@@ -33,9 +26,6 @@ impl Emit for Collect {
     }
 }
 
-/// The engine layer, opened once for the test binary on a scratch database, as the app opens
-/// it. Its gate answers every ask with `allow`, so a test decides what an engine may do
-/// without a person to ask.
 pub(super) fn engines(allow: bool) -> &'static EngineState {
     ALLOW.store(allow, Ordering::SeqCst);
     if let Some(state) = support::state() {
@@ -61,8 +51,6 @@ pub(super) fn engines(allow: bool) -> &'static EngineState {
     support::state().expect("the engine state")
 }
 
-/// Sends `prompt` as a chat's message on `engine`, in `folder`, the way the composer does.
-/// Returns the run id.
 pub(super) async fn send(
     engine: &str,
     folder: &Path,
@@ -97,7 +85,6 @@ pub(super) async fn send(
     sent.run_id
 }
 
-/// The run's events so far, as `(kind, data)`.
 pub(super) fn events(run: &str) -> Vec<(String, Value)> {
     EVENTS
         .lock()
@@ -111,7 +98,6 @@ pub(super) fn events(run: &str) -> Vec<(String, Value)> {
         .collect()
 }
 
-/// Prints the run's events, delta text joined, for reading a live run.
 pub(super) fn print(run: &str) {
     let mut text = String::new();
     for (kind, data) in events(run) {
@@ -130,7 +116,6 @@ pub(super) fn print(run: &str) {
     }
 }
 
-/// Waits until `ready` holds for the run's events, and returns them. Fails after `limit`.
 pub(super) async fn wait_for(
     run: &str,
     limit: Duration,
@@ -151,14 +136,12 @@ pub(super) async fn wait_for(
     }
 }
 
-/// Whether the run settled its turn in the chat.
 pub(super) fn settled(events: &[(String, Value)]) -> bool {
     events
         .iter()
         .any(|(kind, _)| kind == "done" || kind == "error")
 }
 
-/// The engine session (thread) id the run announced.
 pub(super) fn session_of(events: &[(String, Value)]) -> Option<String> {
     events
         .iter()

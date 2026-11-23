@@ -1,6 +1,5 @@
 import { AudioLines, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
 import type { AgentProfile } from "@/shared/schemas";
 import {
@@ -16,7 +15,9 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   FieldError,
+  hasMark,
   Input,
+  Mark,
   MenuItem,
   MenuTrigger,
   RenameItemDialog,
@@ -28,24 +29,20 @@ import {
   Skeleton,
 } from "@misty/ui";
 import type { EngineId } from "@/features/engine-config/channels";
-import { blocksAgent, useEngineReadiness } from "../engines/engineReadiness";
+import { blocksAgent, useEngineReadiness } from "../engines/engine_readiness";
 import { EngineNextStep } from "../engines/EngineNextStep";
-import { mistyEngine, useEnginesList, type EngineInfo } from "../engines/enginesApi";
-import { useMistyStore } from "../conversations/state/useMistyStore";
-import { personalAgentsApi } from "../personal/personalAgentsApi";
+import { mistyEngine, useEnginesList, type EngineInfo } from "../engines/engines_api";
+import { useMistyStore } from "../conversations/state/use_misty_store";
+import { personalAgentsApi } from "../personal/personal_agents_api";
 import { AgentAvatar } from "../personal/AgentAvatar";
-import { freshAgentName } from "../personal/agentNames";
-import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
-import { saveAgent, updateAgent } from "../personal/saveAgent";
+import { freshAgentName } from "../personal/agent_names";
+import { usePersonalAgentsStore } from "../personal/personal_agents_store";
+import { saveAgent, updateAgent } from "../personal/save_agent";
 import { AgentVoicePicker } from "../personal/AgentVoicePicker";
-import { openAgentsHub } from "./agentsHubStore";
+import { openAgentsHub } from "./agents_hub_store";
 
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/**
- * The engines Misty can start, the ones installed here first: the last list paints at once and a
- * fresh one follows. Null only on the very first load, with nothing saved.
- */
 function useEngines() {
   const { data, loading } = useEnginesList();
   return useMemo(
@@ -63,17 +60,12 @@ function useEngines() {
 
 const agentNameWidths = ["w-32", "w-40", "w-28"];
 
-/**
- * Agent rows on their first load, in DesktopSettingsRow's compact shape: the 40px avatar, the name
- * and engine lines, and the New chat button.
- */
 function AgentRowsSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <>
       {Array.from({ length: rows }, (_, index) => (
         <div
           key={index}
-          // An empty label keeps the panel's padding and hairlines without naming a setting.
           data-setting-label=""
           role={index === 0 ? "status" : undefined}
           aria-label={index === 0 ? "Your agents" : undefined}
@@ -99,16 +91,11 @@ function AgentRowsSkeleton({ rows = 3 }: { rows?: number }) {
 }
 
 function engineIcon(engine: EngineInfo) {
-  return hasEngineMark(engine.id) ? (
-    <EngineMark engine={engine.id} name={engine.name} size={14} />
+  return hasMark(`engine:${engine.id}`) ? (
+    <Mark of={`engine:${engine.id}`} label={engine.name} size={14} aria-hidden />
   ) : undefined;
 }
 
-/**
- * A new agent: the engine it runs on and its name, one of its own (`freshAgentName`) until the
- * person gives another, never the engine's. An engine that isn't installed can't be picked; its
- * CLI is installed from the CLIs page.
- */
 function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
   const engines = useEngines();
   const agents = usePersonalAgentsStore((state) => state.agents);
@@ -191,7 +178,6 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
           }}
         />
       </DesktopSettingsRow>
-      {/* Its own voice, picked by the person as part of making it. */}
       <DesktopSettingsRow label="Voice" density="compact" stacked>
         <AgentVoicePicker
           name={name.trim() || suggested}
@@ -216,11 +202,6 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
   );
 }
 
-/**
- * Changes an agent's own voice: the same list it was picked from when it was made. The pick saves
- * at once; a voice not on this computer yet starts downloading, and the agent says "Setting up
- * Ada's voice" where it would speak until it's here.
- */
 function AgentVoiceDialog({ agent, onClose }: { agent: AgentProfile; onClose(): void }) {
   const [error, setError] = useState("");
   return (
@@ -248,10 +229,6 @@ function AgentVoiceDialog({ agent, onClose }: { agent: AgentProfile; onClose(): 
   );
 }
 
-/**
- * Deletes an agent and its chats: a chat can't be opened without its agent, so none is left
- * behind. The chats go first, so a failure part way leaves the agent to try again with.
- */
 async function deleteAgent(agent: AgentProfile) {
   const store = useMistyStore.getState();
   for (const chat of store.conversations.filter((chat) => chat.agentId === agent.id))
@@ -263,11 +240,6 @@ async function deleteAgent(agent: AgentProfile) {
   }));
 }
 
-/**
- * One of the person's agents. Until its engine is installed and signed in it stays disabled:
- * New chat gives way to the engine's next step (Install, Get it or Sign in), so a chat never
- * starts on an engine that can't answer.
- */
 function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: string }) {
   const engine = agent.engine && agent.engine !== mistyEngine ? agent.engine : "";
   const { view, state } = useEngineReadiness(engine);
@@ -281,14 +253,9 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
   return (
     <DesktopSettingsRow
       label={agent.name}
-      // The engine under the agent, by name (its mark is already the agent's picture), and what
-      // keeps an agent that isn't ready from working.
       description={
-        held
-          ? `${engineName} isn't ${state === "sign-in" ? "signed in" : "installed"}`
-          : engineName
+        held ? `${engineName} isn't ${state === "sign-in" ? "signed in" : "installed"}` : engineName
       }
-      // Not ready yet (its engine isn't installed or signed in): shown dimmed beside its next step.
       muted={held}
       leading={<AgentAvatar agent={agent} />}
       density="compact"
@@ -332,15 +299,9 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
   );
 }
 
-/**
- * Settings › Agents › Team: the person's agents, each with its engine and what it still needs,
- * and making another. A new agent becomes the one New starts a chat with; any agent is picked for
- * a chat in the composer.
- */
 export function HubAgentsPage() {
   const agents = usePersonalAgentsStore((state) => state.agents);
   const loading = usePersonalAgentsStore((state) => state.loading);
-  // Misty's own runtime stays in the code, never offered as an agent to pick.
   const listed = agents.filter((agent) => agent.enabled && !agent.system_managed);
   const engines = useEngines();
   const engineName = (id?: string) => engines?.find((item) => item.id === id)?.name ?? "";

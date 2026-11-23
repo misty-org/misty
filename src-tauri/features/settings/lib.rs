@@ -15,8 +15,6 @@ use database::environment::AppEnvironmentService;
 
 use database::store::Store;
 
-/// This device's settings: one JSON document (sections and keys) in `misty.db`. Settings
-/// never leave the device; nothing here talks to the server.
 #[derive(Debug, Clone)]
 pub struct SettingsService {
     store: Store,
@@ -70,7 +68,6 @@ impl SettingsService {
         saved
     }
 
-    /// The saved sections-and-keys document, read without normalizing.
     pub async fn document(&self) -> ApiResult<Value> {
         let store = self.store.clone();
         blocking(move || load_settings_document(&store)).await
@@ -142,7 +139,6 @@ pub mod shortcuts;
 #[cfg(test)]
 mod tests;
 
-/// Tests never reach the person's real data, whatever they exercise.
 #[cfg(test)]
 #[ctor::ctor]
 fn isolate_tests() {

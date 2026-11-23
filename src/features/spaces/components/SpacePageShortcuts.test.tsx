@@ -7,10 +7,10 @@ import {
   useWorkspaceStore,
   workspaceSurfaceFromRoute,
 } from "@/features/app-windows";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { useSpacesStore } from "../list/use_spaces_store";
 import { SpacePageShortcuts } from "./SpacePageShortcuts";
 import { WorkspaceViewRouteScope } from "@/features/app-windows/tabs/WorkspaceViewRouteScope";
-import { useSpaceRoute } from "../routes/spaceRoute";
+import { useSpaceRoute } from "../routes/space_route";
 
 const { preload, shortcuts } = vi.hoisted(() => ({
   preload: vi.fn(async () => {}),

@@ -1,2 +1,1 @@
-// The commands features add, which ⌘K search lists and runs.
-export { useCommands } from "./useCommands";
+export { useCommands } from "./use_commands";

@@ -52,7 +52,6 @@ async fn real_clis_send_shell_credential_to_loopback_server() {
                 "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0}}]
         }}})
         .to_string();
-        // JSON is also valid YAML; each file still goes through the production PI/OMP parser.
         std::fs::write(
             agent.join(if engine == "pi" {
                 "models.json"
@@ -77,7 +76,6 @@ async fn real_clis_send_shell_credential_to_loopback_server() {
                     let (name, value) = line.split_once(':')?;
                     name.eq_ignore_ascii_case("authorization").then(|| value.trim().to_owned())
                 });
-                // The auth header is enough to decide; end the request at once, no model or tool runs.
                 stream.write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.unwrap();
                 authorization
             }).await.expect("CLI did not reach the loopback server")

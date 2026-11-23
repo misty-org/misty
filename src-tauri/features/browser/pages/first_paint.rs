@@ -1,6 +1,3 @@
-//! Views created but not yet painted stay parked offscreen, so Misty's own
-//! canvas (or the previous page) shows instead of the engine's blank surface,
-//! like a browser that holds the previous frame until the new page paints.
 use serde_json::json;
 use std::{
     collections::HashMap,
@@ -8,11 +5,9 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, LogicalPosition, Webview};
 
-/// Where a held or inactive page waits, far outside the app's window.
 pub(in crate::browser) const PARKED_POSITION: LogicalPosition<f64> =
     LogicalPosition::new(-32_000.0, -32_000.0);
 
-/// A page that never paints must still appear.
 #[cfg(windows)]
 const HOLD_TIMEOUT_MS: u64 = 2000;
 
@@ -51,7 +46,6 @@ pub(in crate::browser) fn hold_until_first_paint(app: &AppHandle, id: &str) {
     });
 }
 
-/// The page is ready to appear once navigation and its real background are both known.
 pub(in crate::browser) fn report_first_paint_background(app: &AppHandle, id: &str) {
     let ready = held_views().lock().is_ok_and(|mut held| {
         let Some(state) = held.get_mut(id) else {
@@ -78,7 +72,6 @@ pub(in crate::browser) fn finish_first_paint_load(app: &AppHandle, id: &str) {
     }
 }
 
-/// Lets a held view appear. Safe to call for any view, any number of times.
 pub(in crate::browser) fn release_first_paint(app: &AppHandle, id: &str) {
     let was_held = held_views()
         .lock()

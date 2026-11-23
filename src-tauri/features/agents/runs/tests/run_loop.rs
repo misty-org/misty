@@ -1,6 +1,3 @@
-//! A run from start to end through the public API the app calls, with a stand-in for the app's run
-//! host and tool host, and for an OpenAI-compatible model. Nothing else is on the network.
-// Tests build their fixtures on disk directly.
 #![allow(clippy::disallowed_methods)]
 
 mod support;
@@ -12,12 +9,12 @@ use std::{
     time::Duration,
 };
 
-use futures_util::future::BoxFuture;
 use agent_runs::{
     local_run::LocalRunHost,
     local_tools::{LocalToolCall, LocalToolHost, LocalToolOutcome},
     AgentRuntime, AgentRuntimeOptions, InProcessPageReader, Logger, RuntimeApiError, ToolHook,
 };
+use futures_util::future::BoxFuture;
 use serde_json::{json, Value};
 use support::run_backend::{backend, calls, finish_call};
 
@@ -30,16 +27,24 @@ const ONE: &str = r#"{"section":"findings","content":"one"}"#;
 const TWO: &str = r#"{"section":"findings","content":"two"}"#;
 
 fn folder() -> PathBuf {
-    std::env::temp_dir().join(format!("misty-run-loop-{}-{}", std::process::id(), rand::random::<u64>()))
+    std::env::temp_dir().join(format!(
+        "misty-run-loop-{}-{}",
+        std::process::id(),
+        rand::random::<u64>()
+    ))
 }
 
 fn logged() -> (Logger, Arc<Mutex<Vec<String>>>) {
     let lines = Arc::new(Mutex::new(Vec::new()));
     let sink = lines.clone();
-    (Logger::to(Arc::new(move |line: &str| sink.lock().unwrap().push(line.to_owned()))), lines)
+    (
+        Logger::to(Arc::new(move |line: &str| {
+            sink.lock().unwrap().push(line.to_owned())
+        })),
+        lines,
+    )
 }
 
-/// The app's run host: keeps every run's events.
 #[derive(Default)]
 struct Host {
     events: Mutex<Vec<(String, Value)>>,
@@ -57,15 +62,19 @@ impl LocalRunHost for Host {
 
 impl Host {
     fn of(&self, run: &str, kind: &str) -> Vec<Value> {
-        self.events.lock().unwrap().iter().filter(|(id, event)| id == run && event["type"] == kind).map(|(_, event)| event.clone()).collect()
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(id, event)| id == run && event["type"] == kind)
+            .map(|(_, event)| event.clone())
+            .collect()
     }
 }
 
-/// The app's tool host: runs `log.work.write` and keeps what it was asked.
 #[derive(Default)]
 struct Tools {
     calls: Mutex<Vec<LocalToolCall>>,
-    /// Calls that never answer, the first time they're made.
     hang_on: Mutex<HashSet<String>>,
 }
 
@@ -88,12 +97,23 @@ impl LocalToolHost for Tools {
 
 impl Tools {
     fn ids(&self) -> Vec<String> {
-        self.calls.lock().unwrap().iter().map(|call| call.call_id.clone()).collect()
+        self.calls
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|call| call.call_id.clone())
+            .collect()
     }
 
     async fn until_called(&self, id: &str) {
         for _ in 0..2000 {
-            if self.calls.lock().unwrap().iter().any(|call| call.call_id == id) {
+            if self
+                .calls
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|call| call.call_id == id)
+            {
                 return;
             }
             tokio::time::sleep(Duration::from_millis(5)).await;
@@ -147,7 +167,12 @@ impl Drop for Fixture {
 }
 
 fn fixture(base: String) -> Fixture {
-    Fixture { data: folder(), base, host: Arc::default(), tools: Arc::default() }
+    Fixture {
+        data: folder(),
+        base,
+        host: Arc::default(),
+        tools: Arc::default(),
+    }
 }
 
 fn request() -> Value {
@@ -165,50 +190,81 @@ async fn status_is(runtime: &AgentRuntime, run: &str, wanted: &str) {
 }
 
 fn tool_results(request: &support::Captured) -> Vec<String> {
-    request.body["messages"].as_array().unwrap().iter().filter(|message| message["role"] == "tool").map(|message| message["tool_call_id"].as_str().unwrap().to_owned()).collect()
+    request.body["messages"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|message| message["role"] == "tool")
+        .map(|message| message["tool_call_id"].as_str().unwrap().to_owned())
+        .collect()
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_run_goes_through_its_tools_to_its_finish() {
     let (backend, base) = backend().await;
-    backend.model.lock().unwrap().extend([calls(&[("one", WRITE, ONE), ("two", WRITE, TWO)]), finish_call()]);
+    backend.model.lock().unwrap().extend([
+        calls(&[("one", WRITE, ONE), ("two", WRITE, TWO)]),
+        finish_call(),
+    ]);
     let run = fixture(base);
     let (logger, lines) = logged();
     let runtime = run.runtime(logger, None);
     runtime.start_local(RUN, request()).await.unwrap();
     status_is(&runtime, RUN, "completed").await;
 
-    // Whoever follows the run: it started once, and ended with the answer.
     assert_eq!(run.host.of(RUN, "invocation.started").len(), 1);
     let answers = run.host.of(RUN, "assistant.message");
     assert_eq!(answers.len(), 1);
     assert_eq!(answers[0]["text"], "All done.");
     assert_eq!(run.host.of(RUN, "invocation.completed").len(), 1);
     assert!(run.host.of(RUN, "invocation.failed").is_empty());
-    assert_eq!(run.host.of(RUN, "tool.completed").iter().filter(|event| event["toolName"] == "log.work.write").count(), 2);
+    assert_eq!(
+        run.host
+            .of(RUN, "tool.completed")
+            .iter()
+            .filter(|event| event["toolName"] == "log.work.write")
+            .count(),
+        2
+    );
 
-    // The tools: each call with its identity, and its input as the model wrote it.
     assert_eq!(run.tools.ids(), ["one", "two"]);
     let first = run.tools.calls.lock().unwrap()[0].clone();
-    assert_eq!(first, LocalToolCall { run_id: RUN.to_owned(), call_id: "one".to_owned(), turn: 0, name: "log.work.write".to_owned(), input: json!({ "section": "findings", "content": "one" }) });
+    assert_eq!(
+        first,
+        LocalToolCall {
+            run_id: RUN.to_owned(),
+            call_id: "one".to_owned(),
+            turn: 0,
+            name: "log.work.write".to_owned(),
+            input: json!({ "section": "findings", "content": "one" })
+        }
+    );
 
-    // The model: on the device's key, with the tools, then the results.
     let model = backend.model_requests();
     assert_eq!(model.len(), 2);
-    assert_eq!(model[0].headers["authorization"], format!("Bearer {MODEL_KEY}"));
+    assert_eq!(
+        model[0].headers["authorization"],
+        format!("Bearer {MODEL_KEY}")
+    );
     assert_eq!(model[0].body["model"], "test-model");
-    let tools: Vec<&str> = model[0].body["tools"].as_array().unwrap().iter().map(|tool| tool["function"]["name"].as_str().unwrap()).collect();
+    let tools: Vec<&str> = model[0].body["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["function"]["name"].as_str().unwrap())
+        .collect();
     assert!(tools.contains(&WRITE) && tools.contains(&"agent_finish"));
     assert_eq!(tool_results(&model[1]), ["one", "two"]);
-    // And the model is all that reached the network.
     assert!(backend.others().is_empty(), "{:?}", backend.others());
 
-    // The run's files go when it ends.
     assert!(!run.run_file(RUN).exists());
     assert!(!run.request_file(RUN).exists());
     let log = lines.lock().unwrap().join("\n");
     assert!(log.contains("[misty-agent-runtime] tool_timing"), "{log}");
-    assert!(log.contains("[misty-agent-runtime] context_breakdown"), "{log}");
+    assert!(
+        log.contains("[misty-agent-runtime] context_breakdown"),
+        "{log}"
+    );
     assert!(log.contains("[misty-agent-runtime] run_finish"), "{log}");
     assert!(!log.contains(MODEL_KEY), "{log}");
 }
@@ -216,14 +272,16 @@ async fn a_run_goes_through_its_tools_to_its_finish() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_run_stopped_mid_turn_continues_after_a_restart_with_the_same_call_ids() {
     let (backend, base) = backend().await;
-    backend.model.lock().unwrap().extend([calls(&[("one", WRITE, ONE), ("two", WRITE, TWO)]), finish_call()]);
+    backend.model.lock().unwrap().extend([
+        calls(&[("one", WRITE, ONE), ("two", WRITE, TWO)]),
+        finish_call(),
+    ]);
     let run = fixture(base);
     run.tools.hang_on.lock().unwrap().insert("two".to_owned());
     let first = run.runtime(Logger::default(), None);
     first.start_local(RUN, request()).await.unwrap();
     run.tools.until_called("two").await;
 
-    // Misty closes. The run's file says where it was, with no model key.
     drop(first);
     let saved = std::fs::read_to_string(run.run_file(RUN)).unwrap();
     assert!(!saved.contains(MODEL_KEY));
@@ -231,22 +289,30 @@ async fn a_run_stopped_mid_turn_continues_after_a_restart_with_the_same_call_ids
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        assert_eq!(std::fs::metadata(run.run_file(RUN)).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            std::fs::metadata(run.run_file(RUN))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
     }
 
-    // Misty opens again.
     let second = run.runtime(Logger::default(), None);
     let resumed = second.resume_unfinished().await.unwrap();
     assert_eq!(resumed.resumed, [RUN]);
     status_is(&second, RUN, "completed").await;
 
-    // The unfinished call ran again as itself, and the finished one didn't.
     assert_eq!(run.tools.ids(), ["one", "two", "two"]);
     let model = backend.model_requests();
-    assert_eq!(model.len(), 2, "the turn already received isn't asked for again");
+    assert_eq!(
+        model.len(),
+        2,
+        "the turn already received isn't asked for again"
+    );
     assert_eq!(tool_results(&model[1]), ["one", "two"]);
     assert_eq!(run.host.of(RUN, "invocation.completed").len(), 1);
-    // Activation isn't repeated: the run keeps its context and its models.
     assert_eq!(run.host.of(RUN, "invocation.started").len(), 1);
     assert!(!run.run_file(RUN).exists());
     assert!(!run.request_file(RUN).exists());
@@ -255,7 +321,11 @@ async fn a_run_stopped_mid_turn_continues_after_a_restart_with_the_same_call_ids
 #[tokio::test(flavor = "multi_thread")]
 async fn cancel_stops_a_run_and_forgets_it() {
     let (backend, base) = backend().await;
-    backend.model.lock().unwrap().push_back(calls(&[("one", WRITE, ONE)]));
+    backend
+        .model
+        .lock()
+        .unwrap()
+        .push_back(calls(&[("one", WRITE, ONE)]));
     let run = fixture(base);
     run.tools.hang_on.lock().unwrap().insert("one".to_owned());
     let runtime = run.runtime(Logger::default(), None);
@@ -268,20 +338,28 @@ async fn cancel_stops_a_run_and_forgets_it() {
     assert!(!runtime.local_run_live(RUN));
     assert!(!run.run_file(RUN).exists());
     assert!(!run.request_file(RUN).exists());
-    // Cancelling again, or a run nobody knows, changes nothing, and nothing else happens to the run.
     runtime.cancel_local(RUN).unwrap();
     runtime.cancel_local(OTHER_RUN).unwrap();
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert_eq!(run.host.of(RUN, "invocation.canceled").len(), 1);
     assert!(run.host.of(RUN, "invocation.completed").is_empty());
     assert!(run.host.of(RUN, "invocation.failed").is_empty());
-    assert!(runtime.resume_unfinished().await.unwrap().resumed.is_empty());
+    assert!(runtime
+        .resume_unfinished()
+        .await
+        .unwrap()
+        .resumed
+        .is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_panic_in_a_tool_fails_that_run_and_leaves_the_others() {
     let (backend, base) = backend().await;
-    backend.model.lock().unwrap().push_back(calls(&[("boom", "agent_ledger", r#"{"rows":[{"requirement":"Part","state":"pending"}]}"#)]));
+    backend.model.lock().unwrap().push_back(calls(&[(
+        "boom",
+        "agent_ledger",
+        r#"{"rows":[{"requirement":"Part","state":"pending"}]}"#,
+    )]));
     let run = fixture(base);
     let (logger, lines) = logged();
     let tripped = Arc::new(Mutex::new(false));
@@ -305,7 +383,6 @@ async fn a_panic_in_a_tool_fails_that_run_and_leaves_the_others() {
     let log = lines.lock().unwrap().join("\n");
     assert!(log.contains("run_panicked"), "{log}");
     assert!(!log.contains("sk-a-secret"), "{log}");
-    // The runtime carries on with other runs.
     backend.model.lock().unwrap().push_back(finish_call());
     runtime.start_local(OTHER_RUN, request()).await.unwrap();
     status_is(&runtime, OTHER_RUN, "completed").await;
@@ -315,7 +392,11 @@ async fn a_panic_in_a_tool_fails_that_run_and_leaves_the_others() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_file_that_does_not_read_fails_only_its_own_run() {
     let (backend, base) = backend().await;
-    backend.model.lock().unwrap().extend([calls(&[("one", WRITE, ONE)]), finish_call()]);
+    backend
+        .model
+        .lock()
+        .unwrap()
+        .extend([calls(&[("one", WRITE, ONE)]), finish_call()]);
     let run = fixture(base);
     run.tools.hang_on.lock().unwrap().insert("one".to_owned());
     let first = run.runtime(Logger::default(), None);
@@ -323,8 +404,9 @@ async fn a_file_that_does_not_read_fails_only_its_own_run() {
     run.tools.until_called("one").await;
     drop(first);
 
-    // One file cut off after its identity, one with nothing readable at all.
-    let cut = format!(r#"{{"version":1,"misty_run_id":"{OTHER_RUN}","runtime_run_id":"wrun_cut","context":"#);
+    let cut = format!(
+        r#"{{"version":1,"misty_run_id":"{OTHER_RUN}","runtime_run_id":"wrun_cut","context":"#
+    );
     std::fs::write(run.run_file(OTHER_RUN), cut).unwrap();
     std::fs::write(run.run_file(GARBLED_RUN), "garbage").unwrap();
     let second = run.runtime(Logger::default(), None);
@@ -335,7 +417,6 @@ async fn a_file_that_does_not_read_fails_only_its_own_run() {
     assert_eq!(failed, [GARBLED_RUN, OTHER_RUN]);
     status_is(&second, RUN, "completed").await;
 
-    // The readable identity was reported; the other couldn't be.
     assert_eq!(run.host.of(OTHER_RUN, "invocation.failed").len(), 1);
     assert!(run.host.of(GARBLED_RUN, "invocation.failed").is_empty());
     assert_eq!(second.status(OTHER_RUN), "failed");
@@ -348,15 +429,36 @@ async fn the_api_refuses_with_its_codes_and_a_repeated_start_starts_nothing() {
     let (backend, base) = backend().await;
     let run = fixture(base);
     let runtime = run.runtime(Logger::default(), None);
-    assert_eq!(runtime.start_local("run_short", request()).await, Err(RuntimeApiError::InvalidRunId));
+    assert_eq!(
+        runtime.start_local("run_short", request()).await,
+        Err(RuntimeApiError::InvalidRunId)
+    );
     assert_eq!(runtime.status(""), "missing");
     assert_eq!(runtime.status(RUN), "missing");
-    assert_eq!(runtime.resume_device("", true).unwrap_err().code(), "invalid_device_resume");
-    assert_eq!(runtime.resume_device("misty-device:gone:call:wait:0", true).unwrap_err().code(), "device_resume_failed");
-    assert_eq!(runtime.set_device_models(&json!({ "version": 2 })).unwrap_err().code(), "invalid_models");
+    assert_eq!(
+        runtime.resume_device("", true).unwrap_err().code(),
+        "invalid_device_resume"
+    );
+    assert_eq!(
+        runtime
+            .resume_device("misty-device:gone:call:wait:0", true)
+            .unwrap_err()
+            .code(),
+        "device_resume_failed"
+    );
+    assert_eq!(
+        runtime
+            .set_device_models(&json!({ "version": 2 }))
+            .unwrap_err()
+            .code(),
+        "invalid_models"
+    );
 
-    // A run's own ID decides duplicates: a start while it runs changes nothing.
-    backend.model.lock().unwrap().extend([calls(&[("one", WRITE, ONE)]), finish_call()]);
+    backend
+        .model
+        .lock()
+        .unwrap()
+        .extend([calls(&[("one", WRITE, ONE)]), finish_call()]);
     run.tools.hang_on.lock().unwrap().insert("one".to_owned());
     runtime.start_local(RUN, request()).await.unwrap();
     run.tools.until_called("one").await;

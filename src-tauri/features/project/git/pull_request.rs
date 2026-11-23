@@ -1,7 +1,3 @@
-//! The open branch's pull request, for the session card's context sources: its number, title,
-//! state, how its checks stand, and the issues it closes. Read through the person's own GitHub
-//! CLI, so a missing, signed-out or slow `gh`, or a branch with no pull request, is simply none.
-
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
@@ -10,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use super::folder_of;
 
-/// The most closing issues the card names; each costs one more `gh` call.
 const MOST_ISSUES: usize = 3;
 
 #[derive(Debug, Serialize)]
@@ -18,11 +13,9 @@ const MOST_ISSUES: usize = 3;
 pub struct BranchPullRequest {
     pub number: u64,
     pub title: String,
-    /// `OPEN`, `CLOSED` or `MERGED`, as GitHub says.
     pub state: String,
     pub url: String,
     pub draft: bool,
-    /// `passing`, `failing` or `pending`; absent when the pull request has no checks.
     pub checks: Option<&'static str>,
     pub issues: Vec<LinkedIssue>,
 }
@@ -32,7 +25,6 @@ pub struct BranchPullRequest {
 pub struct LinkedIssue {
     pub number: u64,
     pub title: Option<String>,
-    /// `OPEN` or `CLOSED`; absent when `gh` could not say.
     pub state: Option<String>,
     pub url: Option<String>,
 }
@@ -52,7 +44,6 @@ struct GhPr {
     closing_issues_references: Vec<GhIssueRef>,
 }
 
-/// A check run (`status`, `conclusion`) or a commit status (`state`).
 #[derive(Debug, Deserialize)]
 struct GhCheck {
     status: Option<String>,
@@ -72,8 +63,6 @@ struct GhIssue {
     state: Option<String>,
 }
 
-/// One summary for all of a pull request's checks: any failure fails it, then anything still
-/// running keeps it pending.
 fn checks_summary(checks: &[GhCheck]) -> Option<&'static str> {
     if checks.is_empty() {
         return None;
@@ -96,7 +85,6 @@ fn checks_summary(checks: &[GhCheck]) -> Option<&'static str> {
     Some(if waiting { "pending" } else { "passing" })
 }
 
-/// `gh` with its arguments in `folder`, under a hard deadline; its JSON output, or none.
 async fn gh_json<T: for<'de> Deserialize<'de>>(folder: &Path, args: &[&str]) -> Option<T> {
     let program = crate::engines::resolve::find_program("gh")?;
     let mut command = crate::engines::resolve::command_for(&program);
@@ -119,7 +107,6 @@ async fn gh_json<T: for<'de> Deserialize<'de>>(folder: &Path, args: &[&str]) -> 
     serde_json::from_slice(&output.stdout).ok()
 }
 
-/// The pull request for the branch checked out in a linked folder, or none.
 #[tauri::command]
 pub async fn project_branch_pull_request(
     app: tauri::AppHandle,

@@ -1,7 +1,6 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 //! The one binary property list Finder tags need: an array of strings, read and written.
 
-/// Reads a binary property list whose top object is an array of strings.
 pub(super) fn parse_strings(data: &[u8]) -> Option<Vec<String>> {
     if data.len() < 40 || &data[..8] != b"bplist00" {
         return None;
@@ -29,7 +28,10 @@ pub(super) fn parse_strings(data: &[u8]) -> Option<Vec<String>> {
             let index = read_uint(data.get(start..start.checked_add(ref_size)?)?)?;
             let (marker, length, body) = object_header(data, object_offset(index)?)?;
             match marker {
-                0x5 => Some(String::from_utf8_lossy(data.get(body..body.checked_add(length)?)?).into_owned()),
+                0x5 => Some(
+                    String::from_utf8_lossy(data.get(body..body.checked_add(length)?)?)
+                        .into_owned(),
+                ),
                 0x6 => {
                     let units: Vec<u16> = data
                         .get(body..body.checked_add(length.checked_mul(2)?)?)?
@@ -44,14 +46,12 @@ pub(super) fn parse_strings(data: &[u8]) -> Option<Vec<String>> {
         .collect()
 }
 
-/// An object's type nibble, its length and where its contents start.
 fn object_header(data: &[u8], offset: usize) -> Option<(u8, usize, usize)> {
     let byte = *data.get(offset)?;
     let (marker, low) = (byte >> 4, (byte & 0x0F) as usize);
     if low != 0x0F {
         return Some((marker, low, offset + 1));
     }
-    // A length of 15 or more follows as an integer object.
     let int_marker = *data.get(offset + 1)?;
     if int_marker >> 4 != 0x1 {
         return None;
@@ -65,11 +65,13 @@ fn read_uint(bytes: &[u8]) -> Option<usize> {
     if bytes.is_empty() || bytes.len() > 8 {
         return None;
     }
-    Some(bytes.iter().fold(0u64, |value, byte| (value << 8) | *byte as u64) as usize)
+    Some(
+        bytes
+            .iter()
+            .fold(0u64, |value, byte| (value << 8) | *byte as u64) as usize,
+    )
 }
 
-/// Writes `strings` as a binary property list holding one array, as Finder writes tags: ASCII
-/// strings as such, anything else as UTF-16.
 pub(super) fn write_strings(strings: &[String]) -> Vec<u8> {
     let count = strings.len() + 1;
     let ref_size = if count <= 0xFF { 1 } else { 2 };
@@ -107,7 +109,6 @@ pub(super) fn write_strings(strings: &[String]) -> Vec<u8> {
     data
 }
 
-/// An object's marker and length, the length following as an integer object from 15 up.
 fn write_header(data: &mut Vec<u8>, marker: u8, length: usize) {
     if length < 0x0F {
         data.push((marker << 4) | length as u8);
@@ -119,7 +120,6 @@ fn write_header(data: &mut Vec<u8>, marker: u8, length: usize) {
     push_uint(data, length as u64, width);
 }
 
-/// The fewest of 1, 2, 4 or 8 bytes that hold `value`.
 fn width_for(value: u64) -> usize {
     match value {
         0..=0xFF => 1,
@@ -137,7 +137,6 @@ fn push_uint(data: &mut Vec<u8>, value: u64, width: usize) {
 mod tests {
     use super::*;
 
-    /// `["Red\n6", "Projects"]`, as written by Finder.
     fn finders_plist() -> Vec<u8> {
         let mut data = b"bplist00".to_vec();
         let array_offset = data.len();
@@ -168,7 +167,9 @@ mod tests {
 
     #[test]
     fn long_and_many_strings_round_trip() {
-        let strings: Vec<String> = (0..300).map(|n| format!("Tag number {n} with a long name")).collect();
+        let strings: Vec<String> = (0..300)
+            .map(|n| format!("Tag number {n} with a long name"))
+            .collect();
         assert_eq!(parse_strings(&write_strings(&strings)), Some(strings));
         assert_eq!(parse_strings(&write_strings(&[])), Some(Vec::new()));
     }

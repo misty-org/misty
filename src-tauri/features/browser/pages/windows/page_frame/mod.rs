@@ -1,22 +1,3 @@
-//! The frame of a browser page on Windows: rounded corners where the page
-//! meets a rounded workspace corner.
-//!
-//! WebView2 draws a page in windows under a host window Misty owns. The
-//! corners clip that host window with a region, so nothing is injected into
-//! the page. A subclass of the host window reapplies it whenever it is
-//! resized, whichever path resized it, and lets go of it when the window is
-//! destroyed.
-//!
-//! A region keeps or cuts whole pixels, so on its own a curve comes out as a
-//! staircase. The region therefore keeps every pixel the curve touches, and a
-//! small layered window over each rounded corner paints the window chrome
-//! over the part of those edge pixels that lies outside the curve, with
-//! smooth alpha. Pixels wholly outside stay cut, so the renderer's own chrome
-//! shows there and only the one-pixel fringe uses the reported color.
-//!
-//! The same region cuts out the renderer's notices. A window region stops the
-//! mouse as well as drawing, so a notice shows and takes clicks in its own box
-//! while the page around it stays on top and keeps working.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
@@ -47,16 +28,13 @@ use windows_sys::Win32::{
 mod corners;
 use corners::*;
 
-const SUBCLASS: usize = 0x4D50_4652; // "MPFR"
+const SUBCLASS: usize = 0x4D50_4652;
 const OVERLAY_CLASS: &str = "MistyPaneDim";
 
 #[derive(Default)]
 struct Frame {
-    /// Top-left, top-right, bottom-right, bottom-left, in logical pixels.
     radii: [f64; 4],
-    /// The chrome color around the page's rounded corners, when it is known.
     corner_color: Option<[u8; 3]>,
-    /// Each corner's cap window and the radius and color it last painted.
     caps: [Option<(isize, i32, [u8; 3])>; 4],
 }
 
@@ -65,23 +43,17 @@ fn frames() -> &'static Mutex<HashMap<isize, Frame>> {
     FRAMES.get_or_init(Default::default)
 }
 
-/// One app window's notices: the renderer's host window, and the notices'
-/// corner radius and boxes (left, top, right, bottom) in that host's pixels.
 struct NoticeHoles {
     main: isize,
     radius: i32,
     boxes: Vec<[i32; 4]>,
 }
 
-/// Each app window's notices, by its top-level window. Pages read these when
-/// they apply, so a new tab starts with its holes cut.
 fn notice_holes() -> &'static Mutex<HashMap<isize, NoticeHoles>> {
     static HOLES: OnceLock<Mutex<HashMap<isize, NoticeHoles>>> = OnceLock::new();
     HOLES.get_or_init(Default::default)
 }
 
-/// Records where the renderer hosted in `main` draws its notices. Call
-/// `reapply` on the window's pages afterwards.
 pub(in crate::browser) fn set_notice_holes(main: isize, radius: i32, boxes: Vec<[i32; 4]>) {
     // SAFETY: a plain query; a stale handle only returns null.
     let root = unsafe { GetAncestor(main as HWND, GA_ROOT) } as isize;
@@ -101,13 +73,10 @@ pub(in crate::browser) fn set_notice_holes(main: isize, radius: i32, boxes: Vec<
     }
 }
 
-/// Applies the page's frame again, for a change kept outside it.
 pub(in crate::browser) fn reapply(webview: &Webview) -> Result<(), String> {
     update(webview, true, |_| {})
 }
 
-/// Rounds the page's corners by `radii` (logical pixels; zero is square),
-/// smoothing them with `color`, the window chrome around them, when given.
 pub(in crate::browser) fn set_corners(
     webview: &Webview,
     radii: [f64; 4],
@@ -126,8 +95,6 @@ pub(in crate::browser) fn set_corners(
     })
 }
 
-/// Records a change for the page's host window and applies its frame, on
-/// the window's own thread.
 fn change(webview: &Webview, edit: impl FnOnce(&mut Frame) + Send + 'static) -> Result<(), String> {
     update(webview, false, edit)
 }
@@ -158,8 +125,6 @@ fn update(
             } else {
                 false
             };
-            // Every reconcile restates the frame; only a change is reapplied. A
-            // resize reapplies it through the subclass.
             if changed || force {
                 apply(host);
             }
@@ -167,7 +132,6 @@ fn update(
         .map_err(|error| error.to_string())
 }
 
-/// Whether any notice is cut out of the app window holding `host`.
 fn has_notice_holes(host: HWND) -> bool {
     // SAFETY: a plain query on a live window.
     let root = unsafe { GetAncestor(host, GA_ROOT) } as isize;
@@ -177,12 +141,6 @@ fn has_notice_holes(host: HWND) -> bool {
         .unwrap_or(false)
 }
 
-/// `region` minus the notices that overlap `host`, creating it if it was null
-/// (no clipping) and a notice overlaps.
-///
-/// # Safety
-/// `region` is null or owned by the caller, who gets back a region to hand to
-/// the system or delete.
 unsafe fn cut_notice_holes(host: HWND, mut region: HRGN, width: i32, height: i32) -> HRGN {
     let root = GetAncestor(host, GA_ROOT) as isize;
     let Ok(all) = notice_holes().lock() else {
@@ -217,7 +175,6 @@ unsafe fn cut_notice_holes(host: HWND, mut region: HRGN, width: i32, height: i32
     region
 }
 
-/// Clips `host` to its rounded corners and notices and lays the caps over them.
 fn apply(host: HWND) {
     let Ok(mut frames) = frames().lock() else {
         return;
@@ -245,7 +202,6 @@ fn apply(host: HWND) {
     apply_caps(host, frame, width, height, radii);
 }
 
-/// A black layered child window that takes no clicks or focus.
 fn create_overlay(host: HWND) -> Option<HWND> {
     static REGISTERED: OnceLock<bool> = OnceLock::new();
     let class: Vec<u16> = OVERLAY_CLASS.encode_utf16().chain([0]).collect();
@@ -294,10 +250,8 @@ unsafe extern "system" fn on_message(
     let result = DefSubclassProc(window, message, wparam, lparam);
     match message {
         WM_SIZE => apply(window),
-        // A notice stays put in the app window, so its hole shifts when the page moves.
         WM_MOVE if has_notice_holes(window) => apply(window),
         WM_NCDESTROY => {
-            // The caps are child windows and go with it.
             if let Ok(mut frames) = frames().lock() {
                 frames.remove(&(window as isize));
             }

@@ -2,31 +2,19 @@ import { listen as listenEvent, type UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { useSettingsStore } from "@/features/settings";
 import { invoke } from "@/native/invoke";
-import { voiceSettings } from "./voiceSettings";
-
-/**
- * Speech on this computer through open models from Misty's catalog (`speechModels.ts` picks
- * them), with no key: hearing what the person says and speaking in a voice. Native code runs the
- * models (`src-tauri/features/voice/speech.rs`) and pushes what happens as events; nothing here
- * polls. The chat microphone, dictation, recordings, captions, Tutor and agents in calls all go
- * through here.
- */
+import { voiceSettings } from "./voice_settings";
 
 export interface SpeechSupport {
-  /** The hearing model in use is on this computer: microphones show only then. */
   recognition: boolean;
-  /** Misty's voice is on this computer. */
   speaking: boolean;
 }
 
 const none: SpeechSupport = { recognition: false, speaking: false };
 
-/** What this computer can do with speech now. Asked afresh: a model may have just arrived. */
 export function speechSupport(): Promise<SpeechSupport> {
   return invoke<SpeechSupport>("speech_support").catch(() => none);
 }
 
-/** Speech support for a component, asked again whenever the models change; null until known. */
 export function useSpeechSupport(): SpeechSupport | null {
   const [support, setSupport] = useState<SpeechSupport | null>(null);
   useEffect(() => {
@@ -42,10 +30,8 @@ export function useSpeechSupport(): SpeechSupport | null {
   return support;
 }
 
-/** Fired in the window when the models in use change (`speechModels.ts`). */
 export const SPEECH_CHANGED = "misty:speech-changed";
 
-/** A region for each language Settings offers. */
 const regions: Record<string, string> = {
   en: "en-US",
   es: "es-ES",
@@ -65,16 +51,11 @@ function chosen() {
   return voiceSettings(useSettingsStore.getState().settings?.document);
 }
 
-/** The recognition language from Settings › Voice; undefined is the system's own. */
 export function recognitionLanguage(): string | undefined {
   const language = chosen().language;
   return language === "auto" ? undefined : (regions[language] ?? language);
 }
 
-/**
- * The languages the person speaks, as Settings › Voice has them: the main one, then the second
- * when it's set and differs. Each is a region, or undefined for the system's own.
- */
 export function recognitionLanguages(): (string | undefined)[] {
   const first = recognitionLanguage();
   const second = chosen().secondLanguage;
@@ -82,12 +63,10 @@ export function recognitionLanguages(): (string | undefined)[] {
   return extra && extra !== first ? [first, extra] : [first];
 }
 
-/** Recognizes a recorded audio file on this computer. */
 export function recognizeFile(path: string): Promise<string> {
   return invoke<string>("speech_recognize_file", { path });
 }
 
-/** A recording's bytes as base64, the way the recognizer commands take them. */
 async function base64Of(audio: Blob): Promise<string> {
   const bytes = new Uint8Array(await audio.arrayBuffer());
   let binary = "";
@@ -96,7 +75,6 @@ async function base64Of(audio: Blob): Promise<string> {
   return btoa(binary);
 }
 
-/** Recognizes a recording held in memory, such as the chat microphone's. */
 export async function recognizeAudio(audio: Blob): Promise<string> {
   return invoke<string>("speech_recognize_audio", {
     audio: await base64Of(audio),
@@ -104,14 +82,12 @@ export async function recognizeAudio(audio: Blob): Promise<string> {
   });
 }
 
-/** A word heard in a recording, and when: seconds from the recording's start. */
 export interface HeardWord {
   text: string;
   start: number;
   end: number;
 }
 
-/** Recognizes a recording held in memory word by word, with each word's time, for captions. */
 export async function recognizeAudioWords(audio: Blob): Promise<HeardWord[]> {
   return invoke<HeardWord[]>("speech_recognize_audio_words", {
     audio: await base64Of(audio),
@@ -119,7 +95,6 @@ export async function recognizeAudioWords(audio: Blob): Promise<HeardWord[]> {
   });
 }
 
-/** What a hearing session tells, for one of its inputs. */
 export type HearingEvent =
   | { kind: "started"; input: string }
   | { kind: "stopped"; input: string }
@@ -137,25 +112,14 @@ interface SpeechPayload {
   error?: string;
 }
 
-/**
- * A live hearing session over named inputs: the person's microphone (`mic`), or audio the window
- * feeds (`push`, such as each person in a call). The voice activity detector finds where each
- * input speaks; what it says arrives through `onEvent` once they pause.
- */
 export interface HearingSession {
-  /** Hears this computer's microphone directly, as `input`. */
   mic(input: string): Promise<void>;
-  /** Feeds 16 kHz mono PCM16 little-endian samples, as base64, from `input`. */
   push(input: string, pcm: string): void;
-  /** Forgets what `input` has said so far, such as Misty's own voice through the speakers. */
   reset(input: string): void;
-  /** Stops hearing `input`. */
   remove(input: string): void;
-  /** Ends the session; settles once everything said before has been told. */
   stop(): Promise<void>;
 }
 
-/** Opens a hearing session. Fails with why when the hearing model isn't set up here. */
 export async function hear(onEvent: (event: HearingEvent) => void): Promise<HearingSession> {
   let session = 0;
   let closed: () => void = () => {};
@@ -196,7 +160,6 @@ export async function hear(onEvent: (event: HearingEvent) => void): Promise<Hear
   }
   for (const payload of early) if (payload.session === session) handle(payload);
   let stopping: Promise<void> | null = null;
-  // Audio goes over in the order it came, and stop waits for the last of it.
   let pushing: Promise<unknown> = Promise.resolve();
   const stop = () => {
     stopping ??= (async () => {
@@ -211,7 +174,6 @@ export async function hear(onEvent: (event: HearingEvent) => void): Promise<Hear
     })();
     return stopping;
   };
-  // A page that goes away (a reload) closes its session, and the microphone with it.
   window.addEventListener("pagehide", stop);
   return {
     mic: (input) => invoke<void>("speech_hear_mic", { session, input }),
@@ -227,16 +189,10 @@ export async function hear(onEvent: (event: HearingEvent) => void): Promise<Hear
   };
 }
 
-/** The microphone, heard as it's spoken. */
 export interface Listening {
-  /** Stops and answers everything heard. */
   stop(): Promise<string>;
 }
 
-/**
- * Hears the microphone until stopped; `onHeard` gets everything said so far each time more is
- * heard (once the person pauses), and once more with `final` when it's stopped.
- */
 export async function listen(
   onHeard: (heard: { text: string; final: boolean; error?: string }) => void,
 ): Promise<Listening> {
@@ -265,8 +221,6 @@ export async function listen(
   };
 }
 
-/** Says `text` aloud in `voice` (a catalog id; Misty's own when left out) at the pace from
- * Settings › Voice; settles when done or stopped. */
 export function say(text: string, voice?: string): Promise<void> {
   return invoke<void>("speech_say", {
     text,
@@ -275,14 +229,11 @@ export function say(text: string, voice?: string): Promise<void> {
   });
 }
 
-/** Plays a voice's sample, for picking one. */
 export function previewVoice(voice: string, text: string): Promise<void> {
   return invoke<void>("speech_preview", { voice, text });
 }
 
-/** Speech made from text without playing it, for an agent's voice in a call. */
 export interface RenderedSpeech {
-  /** Mono PCM16 little-endian, as base64. */
   pcm: string;
   rate: number;
 }
@@ -295,19 +246,9 @@ export function renderSpeech(text: string, voice?: string): Promise<RenderedSpee
   });
 }
 
-/**
- * A reply read aloud while it's still being written, in `voice` (Misty's own when left out) at
- * the pace from Settings › Voice: each sentence handed to `add` is read straight after the one
- * before. The voice is set up as soon as this is called, so open it before the first sentence
- * exists. `end` settles once everything has been read, or it was stopped (`stopSaying`, or
- * anything else said).
- */
 export interface Reading {
   add(sentence: string): void;
-  /** How many sentences the voice has begun, as native code has told; every one, as a very
-   * large number, once it's over. Read locally: nothing is asked. */
   started(): number;
-  /** Runs `listener` with the count each time another sentence begins; returns its removal. */
   onBegin(listener: (begun: number) => void): () => void;
   end(): Promise<void>;
 }
@@ -350,7 +291,6 @@ export function openReading(voice?: string): Reading {
     tell();
     stopListening();
   });
-  // Sentences go over in order, each after the one before has been handed on.
   let sent: Promise<unknown> = opened;
   return {
     add(sentence) {
@@ -371,7 +311,6 @@ export function openReading(voice?: string): Reading {
         const id = await opened;
         await invoke("speech_reading_end", { reading: id });
       } catch {
-        // A voice that never opened holds nothing back.
       } finally {
         over = true;
         tell();
@@ -381,25 +320,18 @@ export function openReading(voice?: string): Reading {
   };
 }
 
-/** Whether this computer's sound is off, so a spoken answer would go unheard. */
 export const outputMuted = () => invoke<boolean>("speech_output_muted").catch(() => false);
 
-/** Whether another app is using the microphone, as on a call: no unasked-for speech then. */
 export const onCall = () => invoke<boolean>("speech_on_call").catch(() => false);
 
-/** Turns the sound back on, at half if it was all the way down (macOS). */
 export const soundOn = () => invoke<void>("speech_sound_on");
 
-/** Puts an answer that couldn't be heard on the clipboard. */
 export const copyAnswer = (text: string) => invoke<void>("speech_copy_answer", { text });
 
-/** Stops whatever Misty is saying. */
 export function stopSaying(): Promise<void> {
   return invoke<void>("speech_stop").catch(() => undefined);
 }
 
-/** Misty's own voice from Settings › Voice (a catalog id), for audio overviews; undefined when
- * none is picked yet. */
 export function chosenVoice(): string | undefined {
   return chosen().voice || undefined;
 }

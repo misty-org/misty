@@ -3,16 +3,16 @@ import type { IDisposable, Terminal } from "@xterm/xterm";
 import type { FitAddon } from "@xterm/addon-fit";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { cn, SetupState } from "@misty/ui";
-import { errorText } from "../projectApi";
+import { errorText } from "../project_api";
 import {
   TERMINAL_FONT_SIZE,
   terminalFontFamily,
   terminalTheme,
 } from "@/shared/lib/terminal/appearance";
-import { attachInputBridge } from "./inputBridge";
-import { createInputQueue } from "./inputQueue";
+import { attachInputBridge } from "./input_bridge";
+import { createInputQueue } from "./input_queue";
 import { createPathLinkProvider, createUrlLinkProvider, isMacPlatform } from "./links";
-import { openTerminalPath, openTerminalUrl } from "./openTarget";
+import { openTerminalPath, openTerminalUrl } from "./open_target";
 import {
   ensureTerminalOutputListener,
   hasTerminalSession,
@@ -22,17 +22,12 @@ import {
   terminalBacklog,
 } from "./sessions";
 import { TerminalContextMenu } from "./TerminalContextMenu";
-import { TERMINAL_GONE, terminalApi } from "./terminalApi";
-import { loadXterm, type XtermModules } from "@/shared/lib/terminal/xtermLoader";
+import { TERMINAL_GONE, terminalApi } from "./terminal_api";
+import { loadXterm, type XtermModules } from "@/shared/lib/terminal/xterm_loader";
 import { uiPx } from "@misty/ui";
 
-/** The shell hears a new size this long after the last change: one call per frame stalled the
- * native side and made dragging feel sticky. */
 const PTY_RESIZE_DEBOUNCE_MS = 150;
 
-/** xterm measures glyphs when it opens or its font changes; a webfont that hasn't loaded yet
- * would bake the fallback's cell size into the canvas. `document.fonts.load` takes a CSS font
- * shorthand. */
 function waitForFontLoad(family: string, size: number): Promise<void> {
   const fonts = typeof document !== "undefined" ? document.fonts : undefined;
   if (!fonts || typeof fonts.load !== "function") return Promise.resolve();
@@ -42,16 +37,10 @@ function waitForFontLoad(family: string, size: number): Promise<void> {
       () => undefined,
     );
   } catch {
-    // A shorthand the browser can't parse: nothing to wait on; the caller measures anyway.
     return Promise.resolve();
   }
 }
 
-/**
- * One xterm for the open tab, made again for each tab (keyed by its id). The shell itself lives
- * on across mounts and its kept output replays into the new view, so closing the panel or
- * switching tabs loses nothing. Memoized so the panel's own renders never redraw the terminal.
- */
 export const TerminalView = memo(function TerminalView({
   id,
   cwd,
@@ -63,17 +52,12 @@ export const TerminalView = memo(function TerminalView({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
-  // Until the shell answers, lines stand in for its first output; a tab with kept output has it.
   const [ready, setReady] = useState(() => Boolean(terminalBacklog(id)));
-  // Trying again builds the view and asks for the shell once more.
   const [attempt, setAttempt] = useState(0);
   const [xterm, setXterm] = useState<XtermModules | null>(null);
-  // The live xterm, for the context menu outside the setup effect.
   const liveTermRef = useRef<Terminal | null>(null);
   const getTerminal = useCallback(() => liveTermRef.current, []);
 
-  // xterm loads on first mount; the module-level promise keeps it for every later tab. A failed
-  // load is tried again with the rest of the setup.
   useEffect(() => {
     if (xterm) return;
     let cancelled = false;
@@ -105,12 +89,9 @@ export const TerminalView = memo(function TerminalView({
     const safeFit = () => {
       try {
         fitRef?.fit();
-      } catch {
-        // A zero-size host in the middle of layout; the next resize refits.
-      }
+      } catch {}
     };
 
-    // Fit every frame so the canvas follows a drag, and tell the shell once it settles.
     const schedulePtyResize = () => {
       clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(() => {
@@ -121,9 +102,6 @@ export const TerminalView = memo(function TerminalView({
       }, PTY_RESIZE_DEBOUNCE_MS);
     };
 
-    // xterm ignores setting the same family again, so a face that finished loading after the
-    // first measure would never be picked up. Passing through a probe value takes xterm down its
-    // public option path (measure the cells, reset the glyph atlas), then the real family returns.
     const remeasureFont = (family: string) => {
       const term = termRef;
       if (!term) return;
@@ -131,8 +109,6 @@ export const TerminalView = memo(function TerminalView({
       term.options.fontFamily = family;
     };
 
-    // Waits for the face, then measures again. A late arrival (after unmount, or after a newer
-    // font) leaves the view alone.
     const refitAfterFontLoad = (family: string, size: number) => {
       const version = ++fontLoadVersion;
       void waitForFontLoad(family, size).then(() => {
@@ -152,10 +128,7 @@ export const TerminalView = memo(function TerminalView({
         cursorBlink: true,
         scrollback: 5000,
         theme: terminalTheme("panel"),
-        // Option as meta, so word jumps (⌥← and ⌥→) reach readline on macOS.
         macOptionIsMeta: true,
-        // ⌥-click opens a link on macOS (links.ts); xterm's own ⌥-click would also move the
-        // shell's cursor to the clicked cell. Keep it where the two can't meet.
         altClickMovesCursor: !isMacPlatform(),
       });
       termRef = term;
@@ -165,20 +138,13 @@ export const TerminalView = memo(function TerminalView({
       term.loadAddon(fit);
       term.open(host);
       try {
-        // GPU rendering; when the GPU context is lost xterm goes back to its DOM renderer.
         const webgl = new WebglAddon();
         webgl.onContextLoss(() => webgl.dispose());
         term.loadAddon(webgl);
-      } catch {
-        // No WebGL here: the DOM renderer stays.
-      }
+      } catch {}
       try {
-        // Pictures a program prints: Sixel and iTerm2's inline images (imgcat, chafa,
-        // `fastfetch --logo-type iterm`). Loaded before the backlog, so images in it draw too.
         if (ImageAddon) term.loadAddon(new ImageAddon());
-      } catch {
-        // Without it, image data shows as nothing rather than breaking the terminal.
-      }
+      } catch {}
 
       const backlog = terminalBacklog(id);
       if (backlog) term.write(backlog);
@@ -188,11 +154,8 @@ export const TerminalView = memo(function TerminalView({
         terminalApi
           .open(id, cwd, term.cols, term.rows)
           .then(() => {
-            // Unmounted before the shell was ready: the shell outlives the view by design, so
-            // leave it, but touch nothing of a view that is gone.
             if (disposed) return;
             markTerminalOpened(id);
-            // The font may have refitted while the shell was starting: send the latest size.
             schedulePtyResize();
             setError(null);
             setReady(true);
@@ -201,10 +164,6 @@ export const TerminalView = memo(function TerminalView({
             if (!disposed) setError(errorText(reason));
           });
 
-      // The shell starts at its final size: what the person's shell files print at once
-      // (fastfetch, a banner) is laid out for the rows it is told, and a tool that draws upward
-      // over a shorter screen loses its top lines. So wait for the face (briefly) and for the
-      // panel's layout to settle, measure, then start it.
       safeFit();
       void Promise.race([
         waitForFontLoad(fontFamily, uiPx(TERMINAL_FONT_SIZE)),
@@ -223,7 +182,6 @@ export const TerminalView = memo(function TerminalView({
         });
       refitAfterFontLoad(fontFamily, uiPx(TERMINAL_FONT_SIZE));
 
-      // Absolute paths and web addresses in output open with a modifier-click (links.ts).
       disposables.push(
         term.registerLinkProvider(
           createPathLinkProvider({ term, cwd, onActivate: openTerminalPath }),
@@ -231,8 +189,6 @@ export const TerminalView = memo(function TerminalView({
         term.registerLinkProvider(createUrlLinkProvider({ term, onActivate: openTerminalUrl })),
       );
 
-      // One ordered channel for what is typed: xterm's onData plus the WKWebView input-method
-      // fallback (inputBridge.ts).
       const inputQueue = createInputQueue({
         write: (data) => terminalApi.write(id, data),
         reopen: () => {
@@ -249,7 +205,6 @@ export const TerminalView = memo(function TerminalView({
       });
       resizeObserver.observe(host);
 
-      // Follow the window's theme as it changes.
       themeObserver = new MutationObserver(() => {
         term.options.theme = terminalTheme("panel");
       });
@@ -280,8 +235,6 @@ export const TerminalView = memo(function TerminalView({
       <div className="terminal-view">
         <div
           ref={hostRef}
-          // Out of sight until the shell answers, so its cursor doesn't blink behind the setup line;
-          // still laid out, so xterm measures the panel and the shell starts at its final size.
           className={cn("terminal-host", !ready && "invisible")}
           data-testid="terminal-host"
           hidden={Boolean(error)}

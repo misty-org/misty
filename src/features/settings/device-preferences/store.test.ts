@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import type { DevicePreferencesState } from "./settingResolution";
+import type { DevicePreferencesState } from "./setting_resolution";
 
 const mocks = vi.hoisted(() => ({
   disk: new Map<string, unknown>(),
@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   apply: vi.fn(async (_values: unknown, _valid?: () => boolean) => {}),
   preview: vi.fn((_values: unknown) => {}),
 }));
-vi.mock("../preferences/useSettingsStore", () => ({
+vi.mock("../preferences/use_settings_store", () => ({
   useSettingsStore: {
     getState: () => ({
       applyPreferenceValues: mocks.apply,
@@ -25,7 +25,7 @@ vi.mock("./persistence", () => ({
   },
 }));
 import { useDevicePreferences as store } from "./store";
-import { resolveSetting } from "./settingResolution";
+import { resolveSetting } from "./setting_resolution";
 
 const key = "voice.dictionary";
 async function setup(scope = "device", values: Record<string, unknown> = { [key]: "old" }) {
@@ -90,7 +90,6 @@ describe("device settings controller", () => {
     mocks.apply.mockClear();
     await store.getState().refresh();
     await store.getState().refresh();
-    // Nothing changed, so nothing is applied again.
     expect(mocks.apply).not.toHaveBeenCalled();
   });
 

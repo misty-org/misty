@@ -3,12 +3,12 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { recoverDeadPages } from "../tasks/dead-page-watchdog.ts";
+import { recoverDeadPages } from "../tasks/dead_page_watchdog.ts";
 import { whenStranded } from "../tasks/stranded.ts";
 
 const nodeShims: Record<string, string> = {
   fs: "fs",
-  "fs/promises": "fsPromises",
+  "fs/promises": "fs_promises",
   path: "path",
   os: "os",
   util: "util",
@@ -21,7 +21,6 @@ const nodeShims: Record<string, string> = {
   string_decoder: "other",
 };
 
-// Only VITE_ names reach the renderer, so private settings stay out of the bundle.
 function publicAppEnv(env: NodeJS.ProcessEnv) {
   return Object.fromEntries(
     Object.entries(env)
@@ -30,8 +29,6 @@ function publicAppEnv(env: NodeJS.ProcessEnv) {
   );
 }
 
-// A terminal, the Tauri CLI or a preview that is killed outright sends nothing on, and the server
-// would keep its port. Vite watches the processes above it and stops once one of them is gone.
 function stopWhenStranded(): Plugin {
   const watch = (server: { close(): Promise<void> }) =>
     whenStranded(() => {
@@ -62,7 +59,6 @@ export default defineConfig(({ command, mode }) => {
   const publicApiUrl = (env.MISTY_PUBLIC_API_URL ?? env.VITE_MISTY_PUBLIC_API_URL)?.trim();
   const isDev =
     command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
-  // The server's website is named per build; a release that names none links to no website.
   const defaultPublicUrl = isDev ? "http://localhost:5174" : "";
   const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
 
@@ -76,31 +72,20 @@ export default defineConfig(({ command, mode }) => {
         ["darwin", "macos"].includes(process.env.TAURI_ENV_PLATFORM || process.platform),
       ),
       ...publicAppEnv(env),
-      // MISTY_PUBLIC_API_URL is the shared server/frontend deployment contract.
-      // Vite's internal alias keeps non-VITE server secrets out of the bundle.
       "import.meta.env.VITE_MISTY_PUBLIC_API_URL": JSON.stringify(publicApiUrl ?? ""),
       "import.meta.env.VITE_MISTY_PUBLIC_URL": JSON.stringify(publicUrl ?? ""),
     },
     clearScreen: false,
-    // Keep each app runtime separate from other Vite servers and temporary previews.
-    // Sharing optimized dependencies can invalidate imports in an already-open webview.
     cacheDir: resolve(
       process.cwd(),
       "node_modules/.vite",
       command === "serve" ? `misty-${mode}-${desktopDevPort}` : `misty-${mode}`,
     ),
     optimizeDeps: {
-      // Scan the real app (including its lazy imports), not stray HTML elsewhere in the
-      // repository. An unresolved import there aborts Vite's scan; opening Explorer then
-      // discovers dependencies late and reloads the host.
       entries: ["index.html"],
-      // Photon (Midscene's screenshot resizer) loads its .wasm next to its own
-      // module; pre-bundling moves the module and the file is no longer found.
       exclude: ["@silvia-odwyer/photon", "@misty/ui"],
     },
     resolve: {
-      // @misty/ui is linked from ../misty-ui as source: its React and icons are this app's own. @misty/sdk is
-      // read as source from ../misty-sdk too, for Code and Lab, with this app's one copy of Yjs.
       dedupe: ["react", "react-dom", "lucide-react", "yjs", "y-protocols"],
       alias: [
         { find: "@", replacement: fileURLToPath(new URL("../src", import.meta.url)) },
@@ -108,7 +93,6 @@ export default defineConfig(({ command, mode }) => {
           find: /^@misty\/sdk$/,
           replacement: fileURLToPath(new URL("../../misty-sdk/packages/sdk/src/index.ts", import.meta.url)),
         },
-        // Midscene's planner runs in the app; its Node-only helpers get browser stubs.
         ...Object.entries(nodeShims).map(([name, file]) => ({
           find: new RegExp(`^node:${name}$`),
           replacement: fileURLToPath(
@@ -134,17 +118,18 @@ export default defineConfig(({ command, mode }) => {
           "computer-cursor": resolve(process.cwd(), "src/app/computer-cursor.html"),
           desktop: resolve(process.cwd(), "src/app/desktop.html"),
         },
+        output: {
+          manualChunks(id) {
+            if (id.includes("/src/features/agents/runs/local-execution/")) return "local_execution";
+          },
+        },
       },
       assetsInlineLimit: 0,
       sourcemap: false,
-      // Vite's 500 kB warning is a guide for pages fetched over a network. Misty loads its
-      // bundle from disk inside the desktop app, where the main bundle is about 5.1 MB, so the
-      // limit sits just above today's largest and warns only if one grows past it.
       chunkSizeWarningLimit: 6 * 1024,
     },
     server: {
       fs: {
-        // ../misty-ui and ../misty-sdk, where @misty/ui and @misty/sdk are linked from during development.
         allow: [
           process.cwd(),
           fileURLToPath(new URL("../../misty-ui", import.meta.url)),
@@ -162,13 +147,9 @@ export default defineConfig(({ command, mode }) => {
             },
           }
         : undefined,
-      // MISTY_DEV_FROZEN=1 serves the app as it was when the server started: no file watching and no
-      // reloads, so a benchmark or long agent run isn't cut off when someone edits the checkout.
       watch: frozen
         ? null
         : {
-            // Backend tsconfigs and generated review HTML are outside the frontend
-            // graph. Watching them makes Vite reload every open development app.
             ignored: [
               resolve(import.meta.dirname, "../dist/**"),
               "**/target/**",

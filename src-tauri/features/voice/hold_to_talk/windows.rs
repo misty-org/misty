@@ -1,5 +1,3 @@
-//! Low-level keyboard and mouse hooks. Injected input (including Misty's own
-//! paste) is ignored.
 use super::{Input, Modifiers};
 use std::{cell::RefCell, ptr::null_mut};
 use windows_sys::Win32::{
@@ -7,12 +5,8 @@ use windows_sys::Win32::{
     UI::{Input::KeyboardAndMouse::*, WindowsAndMessaging::*},
 };
 
-/// AltGr sends a fake Left Ctrl with this scan code before Right Alt; it must
-/// not satisfy a Control chord.
 const ALTGR_FAKE_CONTROL_SCAN: u32 = 0x21D;
 
-/// Applies one key event to the held modifiers. Returns false for keys that
-/// aren't modifiers.
 pub(crate) fn apply(modifiers: &mut Modifiers, vk: u16, scan: u32, down: bool) -> bool {
     match vk {
         VK_LCONTROL if scan == ALTGR_FAKE_CONTROL_SCAN => {}
@@ -42,7 +36,6 @@ pub(crate) fn current_modifiers() -> Modifiers {
     }
 }
 
-/// The dispatcher and the modifiers it last saw, owned by the hook thread.
 type HookState = Option<(fn(Input), Modifiers)>;
 
 thread_local! {
@@ -56,10 +49,6 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
             let down = matches!(message as u32, WM_KEYDOWN | WM_SYSKEYDOWN);
             STATE.with(|state| {
                 if let Some((dispatch, modifiers)) = state.borrow_mut().as_mut() {
-                    // A key-up the hook never saw (another hook swallowed it, or focus moved
-                    // while Alt was down) would leave a modifier "held" for good, and the chord
-                    // could not be pressed again. Drop any modifier the system says is up. The
-                    // system's state never sets one: AltGr's fake Control must stay out.
                     let system = current_modifiers();
                     modifiers.left_control &= system.left_control;
                     modifiers.right_control &= system.right_control;
@@ -71,7 +60,6 @@ unsafe extern "system" fn keyboard(code: i32, message: WPARAM, data: LPARAM) -> 
                     if apply(modifiers, event.vkCode as u16, event.scanCode, down) {
                         dispatch(Input::Modifiers(*modifiers));
                     } else if down {
-                        // Control+C is a shortcut, not a tap.
                         dispatch(Input::Key);
                     }
                 }
@@ -105,7 +93,6 @@ pub(crate) fn run(dispatch: fn(Input)) {
             ));
             return;
         }
-        // Walkthroughs fall back to "next" by voice or text without click hints.
         let clicks = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse), null_mut(), 0);
         let mut message: MSG = std::mem::zeroed();
         while GetMessageW(&mut message, null_mut(), 0, 0) > 0 {

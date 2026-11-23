@@ -1,6 +1,3 @@
-//! V8's words for `JSON.parse` of text it can't read. A tool call cut off mid-JSON goes back to the
-//! model with these, so it knows where its input broke. A scan of the grammar in V8's own order,
-//! because `JsValue::parse` only says whether text parsed.
 const CONTEXT: usize = 10;
 
 enum Fault {
@@ -33,7 +30,6 @@ impl Scan {
         }
     }
 
-    /// A token where something else was needed: V8's reason when it has one, or the token itself.
     fn unexpected(&self, reason: Option<&'static str>) -> Fault {
         if let Some(reason) = reason {
             return Fault::At(reason, self.at);
@@ -59,7 +55,10 @@ impl Scan {
                 return Ok(());
             }
             if unit < 0x20 {
-                return Err(Fault::At("Bad control character in string literal in JSON", self.at));
+                return Err(Fault::At(
+                    "Bad control character in string literal in JSON",
+                    self.at,
+                ));
             }
             self.at += 1;
             if unit == u16::from(b'\\') {
@@ -71,7 +70,9 @@ impl Scan {
                         for _ in 0..4 {
                             match self.peek() {
                                 Some(digit) if digit.is_ascii_hexdigit() => self.at += 1,
-                                None => return Err(Fault::At("Unterminated string in JSON", self.at)),
+                                None => {
+                                    return Err(Fault::At("Unterminated string in JSON", self.at))
+                                }
                                 _ => return Err(Fault::At("Bad Unicode escape in JSON", self.at)),
                             }
                         }
@@ -117,7 +118,10 @@ impl Scan {
                 self.at += 1;
             }
             if !self.digits() {
-                return Err(Fault::At("Exponent part is missing a number in JSON", self.at));
+                return Err(Fault::At(
+                    "Exponent part is missing a number in JSON",
+                    self.at,
+                ));
             }
         }
         Ok(())
@@ -166,11 +170,17 @@ impl Scan {
                     self.at += 1;
                     self.skip_space();
                     if self.peek() != Some('"') {
-                        return Err(self.unexpected(Some("Expected double-quoted property name in JSON")));
+                        return Err(
+                            self.unexpected(Some("Expected double-quoted property name in JSON"))
+                        );
                     }
                     self.property()?;
                 }
-                _ => return Err(self.unexpected(Some("Expected ',' or '}' after property value in JSON"))),
+                _ => {
+                    return Err(
+                        self.unexpected(Some("Expected ',' or '}' after property value in JSON"))
+                    )
+                }
             }
         }
     }
@@ -191,7 +201,11 @@ impl Scan {
                     return Ok(());
                 }
                 Some(',') => self.at += 1,
-                _ => return Err(self.unexpected(Some("Expected ',' or ']' after array element in JSON"))),
+                _ => {
+                    return Err(
+                        self.unexpected(Some("Expected ',' or ']' after array element in JSON"))
+                    )
+                }
             }
         }
     }
@@ -211,11 +225,19 @@ impl Scan {
     }
 }
 
-/// `at` as V8 writes a position.
 fn position(units: &[u16], at: usize) -> String {
     let before = &units[..at.min(units.len())];
-    let line = before.iter().filter(|unit| **unit == u16::from(b'\n')).count() + 1;
-    let column = at - before.iter().rposition(|unit| *unit == u16::from(b'\n')).map_or(0, |index| index + 1) + 1;
+    let line = before
+        .iter()
+        .filter(|unit| **unit == u16::from(b'\n'))
+        .count()
+        + 1;
+    let column = at
+        - before
+            .iter()
+            .rposition(|unit| *unit == u16::from(b'\n'))
+            .map_or(0, |index| index + 1)
+        + 1;
     format!("at position {at} (line {line} column {column})")
 }
 
@@ -224,27 +246,44 @@ fn token_message(units: &[u16], at: usize) -> String {
     let text = |from: usize, to: usize| String::from_utf16_lossy(&units[from..to.min(units.len())]);
     let length = units.len();
     if length <= CONTEXT * 2 {
-        return format!("Unexpected token '{token}', \"{}\" is not valid JSON", text(0, length));
+        return format!(
+            "Unexpected token '{token}', \"{}\" is not valid JSON",
+            text(0, length)
+        );
     }
     if at < CONTEXT {
-        format!("Unexpected token '{token}', \"{}\"... is not valid JSON", text(0, at + CONTEXT))
+        format!(
+            "Unexpected token '{token}', \"{}\"... is not valid JSON",
+            text(0, at + CONTEXT)
+        )
     } else if at < length - CONTEXT {
-        format!("Unexpected token '{token}', ...\"{}\"... is not valid JSON", text(at - CONTEXT, at + CONTEXT))
+        format!(
+            "Unexpected token '{token}', ...\"{}\"... is not valid JSON",
+            text(at - CONTEXT, at + CONTEXT)
+        )
     } else {
-        format!("Unexpected token '{token}', ...\"{}\" is not valid JSON", text(at - CONTEXT, length))
+        format!(
+            "Unexpected token '{token}', ...\"{}\" is not valid JSON",
+            text(at - CONTEXT, length)
+        )
     }
 }
 
-/// The message `JSON.parse(text)` throws, for text that doesn't parse.
 pub(super) fn json_syntax_error(text: &str) -> String {
     if matches!(text, "undefined" | "NaN" | "Infinity" | "[object Object]") {
         return format!("\"{text}\" is not valid JSON");
     }
-    let mut scan = Scan { units: text.encode_utf16().collect(), at: 0 };
+    let mut scan = Scan {
+        units: text.encode_utf16().collect(),
+        at: 0,
+    };
     let scanned = scan.value().and_then(|()| {
         scan.skip_space();
         if scan.peek().is_some() {
-            return Err(Fault::At("Unexpected non-whitespace character after JSON", scan.at));
+            return Err(Fault::At(
+                "Unexpected non-whitespace character after JSON",
+                scan.at,
+            ));
         }
         Ok(())
     });
@@ -254,7 +293,6 @@ pub(super) fn json_syntax_error(text: &str) -> String {
         Err(Fault::Number(at)) => format!("Unexpected number in JSON {}", position(units, at)),
         Err(Fault::String(at)) => format!("Unexpected string in JSON {}", position(units, at)),
         Err(Fault::At(reason, at)) => format!("{reason} {}", position(units, at)),
-        // Text that reads fine holds a forbidden key instead (`secureJsonParse`).
         Err(Fault::End) => "Unexpected end of JSON input".to_owned(),
         Ok(()) => "Object contains forbidden prototype property".to_owned(),
     }
@@ -264,7 +302,6 @@ pub(super) fn json_syntax_error(text: &str) -> String {
 mod tests {
     use super::*;
 
-    // Each message as Node gave it (`JSON.parse`), run by hand when this was ported.
     const NODE: &str = include_str!("../tests/fixtures/run_parity/v8_json_errors.json");
 
     #[test]

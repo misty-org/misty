@@ -1,5 +1,3 @@
-//! The current user's registry (HKEY_CURRENT_USER), for the settings Windows
-//! reads from there: launch at login, URL handlers and default-app capabilities.
 use std::io;
 
 use windows_sys::Win32::{
@@ -20,8 +18,6 @@ fn status(code: u32) -> io::Result<()> {
     }
 }
 
-/// Reads a string value; `None` when the key or value does not exist.
-/// `value` of `""` reads the key's default value.
 pub fn read_string(key: &str, value: &str) -> io::Result<Option<String>> {
     let key = wide(key);
     let value = wide(value);
@@ -60,8 +56,6 @@ pub fn read_string(key: &str, value: &str) -> io::Result<Option<String>> {
     ))
 }
 
-/// Writes a string value, creating the key if needed. `value` of `""` writes
-/// the key's default value.
 pub fn write_string(key: &str, value: &str, data: &str) -> io::Result<()> {
     let key = wide(key);
     let value = wide(value);
@@ -93,7 +87,6 @@ pub fn write_string(key: &str, value: &str, data: &str) -> io::Result<()> {
     }
 }
 
-/// Deletes a value; succeeds when it is already gone.
 pub fn delete_value(key: &str, value: &str) -> io::Result<()> {
     let key = wide(key);
     let value = wide(value);

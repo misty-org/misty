@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-/** The caption glyphs share the 16px box and 1.5 stroke of the icons beside them. */
 function Glyph({ children }: { children: ReactNode }) {
   return (
     <svg

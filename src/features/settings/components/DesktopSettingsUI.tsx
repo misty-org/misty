@@ -1,4 +1,7 @@
 import {
+  RowGroupLabel,
+  SettingsRow,
+  SettingsSection,
   BottomBar,
   cn,
   IconButton,
@@ -24,11 +27,9 @@ import {
   SettingsNavigation,
 } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
-/** The page's title, as the frame's top bar shows it; a section named the same doesn't repeat it. */
 const SettingsPageTitleContext = createContext("");
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
-  // With no pages to list there is no sidebar: an empty column only reads as a missing nav.
   const navigation = Boolean(
     props.groups.length ||
     props.navigationHeader ||
@@ -51,19 +52,15 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
           : "grid-cols-[minmax(0,1fr)]",
       )}
     >
-      {/* The grid sets the column's width and the separator column draws its edge. */}
       <WorkspaceSidebar
         hidden={!navigation}
         data-tour={props.navigationTour}
         className={cn(
           "w-auto gap-0 overflow-hidden border-r-0 p-0",
-          // With a header band, 4px above it, as the divided top bar across from it has, so the
-          // search centers on the same line as the page's title and close button.
           props.navigationHeader ? "pt-1 pb-3" : "py-3",
         )}
       >
         <Text bare as="div" tone="muted" className="flex min-h-0 flex-1 flex-col">
-          {/* The search sits on the header band, level with the content's top bar and its title. */}
           {props.navigationHeader ? (
             <div className="mb-2 flex h-(--ui-header) shrink-0 items-center px-3 *:w-full max-[748px]:px-2">
               {props.navigationHeader}
@@ -89,10 +86,6 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       {navigation ? <Separator orientation="vertical" /> : null}
 
       <Surface as="main" tone="page" className="relative flex min-h-0 min-w-0 flex-col">
-        {/* An overlay's close button has a bar of its own along the top, a FramedPage toolbar row
-            on the frame's color closed by its hairline, and the page scrolls beneath it. The bar
-            names the page at its start, lined up with the content's own edge (its px-6 / px-4)
-            under the bar's px-3. */}
         {overlay ? (
           <Surface tone="sidebar" className="shrink-0">
             <TopBar
@@ -104,7 +97,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
                     size="title"
                     weight="semibold"
                     tone="bright"
-                    className="min-w-0 pl-3 max-[792px]:pl-1"
+                    className="min-w-0 pl-3.5 max-[792px]:pl-1"
                   >
                     {props.title}
                   </Text>
@@ -117,15 +110,13 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
             </TopBar>
           </Surface>
         ) : null}
-        {/* The scrollbar floats inset from the panel edge, clear of the rounded corners. */}
         <div
           data-settings-scroller
           className="misty-scrollbar misty-scrollbar-floating mb-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
         >
           <div
             className={cn(
-              "w-full max-w-240 px-6 pb-12 text-md leading-6 max-[792px]:px-4",
-              // Under an overlay's top bar the page starts a step below its hairline.
+              "w-full max-w-180 px-6 pb-12 max-[792px]:px-4",
               overlay ? "pt-4" : "pt-6",
             )}
           >
@@ -138,168 +129,90 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
           </div>
         </div>
         {props.saveBar}
-        {/* The bar keeps its room while the save bar hides the "i", so the page doesn't jump. */}
         {props.corner !== undefined ? <BottomBar>{props.corner}</BottomBar> : null}
       </Surface>
     </Surface>
   );
 }
-/**
- * One panel: whatever a section holds gets the same inset and a hairline between items, and rows
- * wrapped in another element keep their hairlines too. The website's settings use the same panel.
- */
-const settingsPanelClass = cn(
-  "min-w-0 overflow-hidden empty:hidden",
-  "[&>*]:px-5 [&>*:empty]:hidden [&>*:not([data-setting-label])]:py-3",
-  // Bare edges take the theme's hairline.
-  "[&>*+*]:border-t",
-  "[&_[data-setting-label]+[data-setting-label]]:border-t",
-);
-/**
- * A group of rows in one panel under a plain header, with an optional muted line of context. The
- * compact density, used inside the setup wizard, stays a plain list because the wizard is its own
- * card.
- */
 export function DesktopSettingsSection(props: {
   title: string;
   description?: ReactNode;
   children: ReactNode;
   density?: "normal" | "compact";
 }) {
-  // The top bar already names the page; a section with the same name starts without a header.
   const repeatsPage = useContext(SettingsPageTitleContext) === props.title;
-  return (
-    <section
-      aria-label={props.title}
-      className={cn("@container/settings min-w-0 last:mb-0", "mb-8")}
-    >
-      {repeatsPage && !props.description ? null : (
-        <div className={cn("min-w-0", props.density === "compact" ? "mb-1.5" : "mb-3")}>
-          {repeatsPage ? null : (
-            <Text
-              bare
-              as="h2"
-              tone="bright"
-              weight="semibold"
-              className={props.density === "compact" ? "text-base leading-6" : "text-md leading-6"}
-            >
-              {props.title}
-            </Text>
-          )}
-          {props.description ? (
-            <Text
-              bare
-              as="p"
-              tone="muted"
-              className={cn("max-w-170 text-md leading-6", !repeatsPage && "mt-1")}
-            >
-              {props.description}
-            </Text>
-          ) : null}
-        </div>
-      )}
-      {props.density === "compact" ? (
+  if (props.density === "compact")
+    return (
+      <section aria-label={props.title} className="mb-5 grid min-w-0 gap-1.5 last:mb-0">
+        {repeatsPage ? null : <RowGroupLabel title={props.title} />}
+        {props.description ? (
+          <Text as="p" size="meta" tone="muted" wrap className="px-0.5">
+            {props.description}
+          </Text>
+        ) : null}
         <div className="min-w-0">{props.children}</div>
-      ) : (
-        <Surface tone="card" edge="hairline" radius="lg" className={settingsPanelClass}>
-          {props.children}
-        </Surface>
-      )}
-    </section>
+      </section>
+    );
+  return (
+    <SettingsSection
+      title={repeatsPage ? undefined : props.title}
+      description={props.description}
+      className="mb-5 last:mb-0"
+    >
+      {props.children}
+    </SettingsSection>
   );
 }
-/**
- * Label and optional description on the left, the control right-aligned so every page
- * shares one right edge. Reset appears after the description only while the value differs from
- * its default.
- */
 export function DesktopSettingsRow(props: {
   label: string;
   description?: ReactNode;
   children: ReactNode;
-  /**
-   * Unavailable right now: its picture, name and line fade to the shared disabled look (half
-   * strength, pictures in grey), while its controls stay at full strength to set it up.
-   */
   muted?: boolean;
-  /** Depends on the row above it and is drawn as its indented sub-row. */
   indent?: boolean;
-  /** The control needs the full width (lists, text areas) and sits under the label. */
   stacked?: boolean;
   density?: "normal" | "compact";
-  /** A picture before the label, such as the feature a page sets up (Tutor's sprite). */
   leading?: ReactNode;
 }) {
   const reset = useSettingReset(props.label);
+  const description =
+    props.description || reset ? (
+      <>
+        {props.description}
+        {reset ? (
+          <>
+            {props.description ? " " : null}
+            <Text bare tone="default">
+              <InlineLink aria-label={`Reset ${props.label} to default`} onClick={reset}>
+                Reset
+              </InlineLink>
+            </Text>
+          </>
+        ) : null}
+      </>
+    ) : undefined;
   return (
-    <Surface
-      tone="none"
+    <SettingsRow
+      label={props.label}
+      description={description}
+      leading={props.leading}
+      sub={props.indent}
+      disabled={props.muted}
+      stacked={props.stacked}
       data-setting-label={props.label}
       tabIndex={-1}
-      aria-disabled={props.muted || undefined}
-      className={cn(
-        "group/setting-row grid items-center gap-y-3 outline-none",
-        props.density === "compact" ? "min-h-14 gap-x-6 py-3" : "min-h-14 gap-x-8 py-3",
-        "transition-colors duration-700 data-[flash=true]:duration-0",
-        props.stacked
-          ? "grid-cols-1"
-          : "grid-cols-[minmax(0,1fr)_auto] @max-[35rem]/settings:grid-cols-1",
-        // The panel owns the row's own padding, so the indent goes on its contents.
-        props.indent && "[&>:first-child]:pl-5",
-      )}
+      className="outline-none"
     >
-      <div
-        className={cn(
-          "flex min-w-0 items-center",
-          props.leading ? "gap-4" : null,
-          props.muted && "opacity-50 grayscale",
-        )}
-      >
-        {props.leading}
-        <div className="grid min-w-0 gap-1">
-          <Text bare tone="bright" weight="medium" className="text-md leading-6">
-            {props.label}
-          </Text>
-          {props.description || reset ? (
-            <Text bare as="p" tone="muted" className="max-w-180 text-sm leading-6">
-              {props.description}
-              {reset ? (
-                <>
-                  {props.description ? " " : null}
-                  <Text bare tone="default">
-                    <InlineLink aria-label={`Reset ${props.label} to default`} onClick={reset}>
-                      Reset
-                    </InlineLink>
-                  </Text>
-                </>
-              ) : null}
-            </Text>
-          ) : null}
-        </div>
-      </div>
       <SettingsControlLabelContext.Provider value={props.label}>
-        <div
-          data-setting-control
-          className={cn(
-            "flex min-w-0 items-center gap-2",
-            props.stacked ? "justify-start" : "justify-end @max-[35rem]/settings:justify-start",
-          )}
-        >
+        <div data-setting-control className="flex min-w-0 items-center gap-2">
           {props.children}
         </div>
       </SettingsControlLabelContext.Provider>
-    </Surface>
+    </SettingsRow>
   );
 }
 const settingsSkeletonWidths = ["w-32", "w-40", "w-28", "w-36"];
 
-/**
- * Placeholder settings rows for a section's first load, with DesktopSettingsRow's own grid,
- * padding and hairlines, a label (and a description line when the real rows have one), and the
- * row's real control at the right. Render it where the rows go, inside the section.
- */
 export function DesktopSettingsRowSkeleton(props: {
-  /** What is loading, for screen readers. */
   label: string;
   rows?: number;
   description?: boolean;
@@ -312,25 +225,24 @@ export function DesktopSettingsRowSkeleton(props: {
       {Array.from({ length: props.rows ?? 1 }, (_, index) => (
         <div
           key={index}
-          // An empty label keeps the panel's padding and hairlines without naming a setting.
           data-setting-label=""
           role={index === 0 ? "status" : undefined}
           aria-label={index === 0 ? props.label : undefined}
           aria-busy={index === 0 || undefined}
-          className={cn(
-            "grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center py-3",
-            props.density === "compact" ? "gap-x-6" : "gap-x-8",
-          )}
+          className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 rounded-lg py-1.5 pr-2 pl-3"
         >
           <div className="grid min-w-0 gap-1">
-            <div className="flex h-6 items-center">
+            <div className="flex h-5 items-center">
               <Skeleton
-                className={cn("h-4", settingsSkeletonWidths[index % settingsSkeletonWidths.length])}
+                className={cn(
+                  "h-3.5",
+                  settingsSkeletonWidths[index % settingsSkeletonWidths.length],
+                )}
               />
             </div>
             {props.description ? (
-              <div className="flex h-6 items-center">
-                <Skeleton className="h-3.5 w-2/3" />
+              <div className="flex h-5 items-center">
+                <Skeleton className="h-3 w-2/3" />
               </div>
             ) : null}
           </div>
@@ -345,7 +257,6 @@ export function DesktopSettingsRowSkeleton(props: {
   );
 }
 
-/** The words of a node, for a notice, which is one line of text. */
 function textOf(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(textOf).join("");
@@ -353,7 +264,6 @@ function textOf(node: ReactNode): string {
   return "";
 }
 
-/** A notice's one action, read from the button a page hands over: its label and its click. */
 function noticeAction(action: ReactNode): NoticeAction | undefined {
   const button = Children.toArray(action).find((child) =>
     isValidElement<{ children?: ReactNode; onClick?: () => void }>(child),
@@ -364,7 +274,6 @@ function noticeAction(action: ReactNode): NoticeAction | undefined {
   return label && onClick ? { label, onSelect: () => onClick() } : undefined;
 }
 
-/** A failure for a whole page, e.g. a save that failed, shown as a notice in the corner. */
 export function DesktopSettingsNotice(props: { children: ReactNode; action?: ReactNode }) {
   const message = textOf(props.children).trim();
   useNotice(Boolean(message), { message, tone: "error", action: noticeAction(props.action) });
@@ -377,25 +286,16 @@ interface DesktopSettingsFrameProps<Id extends string> {
   groups: readonly DesktopSettingsNavGroup<Id>[];
   navigationLabel: string;
   onClose?: () => void;
-  /** Pinned to the content's bottom right, over the scrolling page. */
   saveBar?: ReactNode;
-  /**
-   * The end of the content's bottom bar, such as the popup's tour button. Null keeps the bar
-   * (and its room) with nothing in it; leave it out for no bar.
-   */
   corner?: ReactNode;
-  /** The `data-tour` name of the navigation column, for a tour to point at. */
   navigationTour?: string;
   onSelect: (id: Id) => void;
-  /** The open page's sections, listed under its row in the sidebar (a long page only). */
   sections?: readonly DesktopSettingsPageSection[];
   activeSection?: string;
   onSection?: (id: string) => void;
   presentation?: "page" | "overlay";
-  /** The page we're on, in the header over the content. */
   title: ReactNode;
   navigationHeader?: ReactNode;
-  /** Replaces the section list, e.g. with search results while the user types. */
   navigationOverride?: ReactNode;
   navigationFooter?: ReactNode;
   contentHeader?: ReactNode;

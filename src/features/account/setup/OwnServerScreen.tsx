@@ -3,15 +3,11 @@ import AuthMessage from "../components/AuthMessage";
 import { Button, InlineLink, Text } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState, type FormEvent } from "react";
-import { parseServerAddress } from "./serverAddress";
-import { useServerSwitch } from "./useServerSwitch";
+import { parseServerAddress } from "./server_address";
+import { useServerSwitch } from "./use_server_switch";
 
-/** The docs' guide to running a Misty server. */
 const selfHostingDocsUrl = "https://docs.mistysys.com/self-hosting";
 
-/** A Misty server you run: its address first, then the usual sign-in on that server. The field
- * starts empty and shows an https address: an address without a scheme is taken as https, and
- * only a development build takes plain http, typed by hand, on this computer. */
 export function OwnServerScreen(props: {
   onConnected: () => void;
   onBusy: (busy: boolean) => void;

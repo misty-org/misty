@@ -1,8 +1,8 @@
-import { useState } from "react";
-import type { EngineQuestion } from "../../../runs/invocations/invocationTypes";
-import { Button, Input, Pressable, Surface, Text } from "@misty/ui";
-import { answerEngineQuestion, type EngineAnswers } from "./engineApi";
-import type { EngineAsk } from "./engineTurnStore";
+import { useState, type KeyboardEvent } from "react";
+import type { EngineQuestion } from "../../../runs/invocations/invocation_types";
+import { Button, ChoiceList, Input, QuestionPanel, Text } from "@misty/ui";
+import { answerEngineQuestion, type EngineAnswers } from "./engine_api";
+import type { EngineAsk } from "./engine_turn_store";
 
 type Choice = { picked: string[]; own: string };
 
@@ -16,11 +16,6 @@ function answerOf(question: EngineQuestion, choice: Choice | undefined): string 
   return own || picked[0] || null;
 }
 
-/**
- * A question an outside engine asks the person (Claude's AskUserQuestion, Codex's
- * `requestUserInput`, an ACP form): its options, several when it allows that, and the person's
- * own words. The turn waits until it is answered or skipped.
- */
 export function EngineQuestionCard({ runId, ask }: { runId: string; ask: EngineAsk }) {
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [sending, setSending] = useState(false);
@@ -71,112 +66,87 @@ export function EngineQuestionCard({ runId, ask }: { runId: string; ask: EngineA
     }
   };
 
-  return (
-    <Surface
-      as="section"
-      tone="card"
-      edge="hairline"
-      radius="xl"
-      className="grid gap-3 px-4 py-3.5 data-closed:opacity-70"
-      data-closed={closed || undefined}
-      aria-label="Question"
-    >
-      {ask.questions.map((question) => {
-        const choice = choices[question.question];
-        return (
-          <fieldset
-            key={question.question}
-            className="m-0 grid min-w-0 gap-2 border-0 p-0"
+  const single = ask.questions.length === 1 ? ask.questions[0] : undefined;
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (closed || !single || (event.target as HTMLElement).closest("input")) return;
+    const number = Number(event.key);
+    if (number >= 1 && number <= Math.min(single.options.length, 9)) {
+      event.preventDefault();
+      pick(single, single.options[number - 1]!.label);
+    }
+  };
+  const [first, ...rest] = ask.questions;
+  const answers = (question: EngineQuestion) => {
+    const choice = choices[question.question];
+    return (
+      <>
+        {question.options.length ? (
+          <ChoiceList
+            label={question.question}
+            multiple={question.multiSelect}
+            options={question.options}
+            selected={choice?.picked ?? []}
+            onSelect={(label) => pick(question, label)}
+            shortcuts={question === single}
             disabled={closed}
-          >
-            <Text bare as="legend" size="control" tone="default" className="p-0 leading-normal">
-              {question.header ? (
-                <Surface
-                  as="span"
-                  tone="active"
-                  radius="sm"
-                  className="mr-2 inline-block px-2 py-px"
-                >
-                  <Text bare size="caption" tone="muted">
-                    {question.header}
-                  </Text>
-                </Surface>
-              ) : null}
-              {question.question}
-            </Text>
-            {question.options.length ? (
-              <Text
-                bare
-                as="div"
-                size="meta"
-                tone="default"
-                className="grid gap-1.5"
-                role={question.multiSelect ? "group" : "radiogroup"}
-              >
-                {question.options.map((option) => {
-                  const on = choice?.picked.includes(option.label) ?? false;
-                  return (
-                    <Pressable
-                      key={option.label}
-                      type="button"
-                      role={question.multiSelect ? "checkbox" : "radio"}
-                      aria-checked={on}
-                      wash="control"
-                      selected={on}
-                      className="rounded-lg"
-                      onClick={() => pick(question, option.label)}
-                    >
-                      <Surface
-                        as="span"
-                        tone="none"
-                        edge={on ? "bright" : "hairline"}
-                        radius="lg"
-                        className="grid gap-0.5 px-3 py-2"
-                      >
-                        <span>{option.label}</span>
-                        {option.description ? (
-                          <Text bare size="caption" tone="muted">
-                            {option.description}
-                          </Text>
-                        ) : null}
-                      </Surface>
-                    </Pressable>
-                  );
-                })}
-              </Text>
-            ) : null}
-            <Input
-              aria-label={`Your own answer: ${question.question}`}
-              placeholder={question.options.length ? "Something else" : "Your answer"}
-              value={choice?.own ?? ""}
-              onChange={(event) => write(question, event.target.value)}
-            />
-          </fieldset>
-        );
-      })}
-      {closed ? (
-        <Text wrap size="meta" tone="muted" className="m-0">
-          {sent === "skipped" ? "Skipped" : sent === "answered" ? "Answered" : "No longer waiting"}
+          />
+        ) : null}
+        <Input
+          aria-label={`Your own answer: ${question.question}`}
+          placeholder={question.options.length ? "Something else" : "Your answer"}
+          value={choice?.own ?? ""}
+          disabled={closed}
+          onChange={(event) => write(question, event.target.value)}
+        />
+      </>
+    );
+  };
+  if (!first) return null;
+  return (
+    <QuestionPanel
+      label="Question"
+      title={
+        <Text wrap size="control" tone="bright" weight="medium">
+          {first.question}
         </Text>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            disabled={!answered || sending}
-            onClick={() => void send(false)}
-          >
-            Send answer
-          </Button>
-          <Button variant="quiet" disabled={sending} onClick={() => void send(true)}>
-            Skip
-          </Button>
+      }
+      aside={first.header || undefined}
+      error={error}
+      onKeyDown={onKeyDown}
+      actions={
+        closed ? (
+          <Text size="meta" tone="muted">
+            {sent === "skipped"
+              ? "Skipped"
+              : sent === "answered"
+                ? "Answered"
+                : "No longer waiting"}
+          </Text>
+        ) : (
+          <>
+            <Button variant="quiet" disabled={sending} onClick={() => void send(true)}>
+              Skip
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!answered || sending}
+              onClick={() => void send(false)}
+            >
+              Answer
+            </Button>
+          </>
+        )
+      }
+    >
+      {answers(first)}
+      {rest.map((question) => (
+        <div key={question.question} className="grid min-w-0 gap-2 pt-2">
+          <Text wrap size="control" tone="bright" weight="medium">
+            {question.question}
+          </Text>
+          {answers(question)}
         </div>
-      )}
-      {error ? (
-        <Text wrap size="meta" tone="danger" className="m-0" role="alert">
-          {error}
-        </Text>
-      ) : null}
-    </Surface>
+      ))}
+    </QuestionPanel>
   );
 }

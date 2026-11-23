@@ -1,19 +1,12 @@
-import { AppLogoImage, BrandIcon, LogoTile, brandIconAsset } from "@misty/ui";
+import { AppLogoImage, LogoTile, Mark, markFor } from "@misty/ui";
 
-/** A GitHub user or organization's name, as GitHub allows it. */
 const githubLogin = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 
-/** The owner in a github.com link: `obra` in `https://github.com/obra/superpowers`. */
 export function githubOwner(link: string | null | undefined) {
   const match = /^https:\/\/github\.com\/([^/?#]+)/.exec(link ?? "");
   return match && githubLogin.test(match[1]) ? match[1] : undefined;
 }
 
-/**
- * The short line a card shows for where a plugin comes from: `owner/repo` on GitHub, with the
- * plugin's own folder when it lives inside its marketplace's repository
- * (`claude-plugins-official/code-review`); the host and path anywhere else.
- */
 export function sourceLabel(link: string) {
   try {
     const url = new URL(link);
@@ -31,7 +24,6 @@ export function sourceLabel(link: string) {
   }
 }
 
-/** Misty's own artwork for a maker, by the names it goes by: `Anthropic`, `anthropics`, `Microsoft`. */
 function brandOf(name: string) {
   const plain = name.trim().toLowerCase();
   const candidates = [
@@ -40,28 +32,20 @@ function brandOf(name: string) {
     plain.replace(/s$/, ""),
     plain.replace(/,?\s*(?:inc|llc|ltd)\.?$/, "").replace(/[^a-z0-9]+/g, ""),
   ];
-  return candidates.find((candidate) => candidate && brandIconAsset(candidate));
+  return candidates.find((candidate) => candidate && markFor(candidate));
 }
 
 export interface PluginMaker {
-  /** Who made it, as the catalog names them, else its GitHub owner. */
   name?: string;
-  /** Misty's own artwork for the maker, when it has some. */
   brand?: string;
-  /** Otherwise, the maker's GitHub picture. */
   avatar?: string;
 }
 
-/**
- * Who made a plugin and the logo to show for them: Misty's own brand artwork for the maker (by
- * the name its catalog gives, then its repository's owner), else the owner's GitHub picture.
- */
 export function pluginMaker(item: { author?: string | null; link: string | null }): PluginMaker {
   const author = item.author?.trim() || undefined;
   const owner = githubOwner(item.link);
   const brand = (author && brandOf(author)) || (owner && brandOf(owner)) || undefined;
   if (brand) return { name: author ?? owner, brand };
-  // A maker named like a GitHub login is that login; otherwise the repository's owner.
   const login = author && githubLogin.test(author) ? author : owner;
   return {
     name: author ?? owner,
@@ -69,15 +53,11 @@ export function pluginMaker(item: { author?: string | null; link: string | null 
   };
 }
 
-/**
- * A plugin's or skill's logo on a store shelf, at the tile size: its maker's artwork, else their
- * GitHub picture, else the initial.
- */
 export function MakerTile({ maker, name }: { maker: PluginMaker; name: string }) {
   if (maker.brand) {
     return (
       <LogoTile size="tile">
-        <BrandIcon brand={maker.brand} label={maker.name ?? name} size={40} />
+        <Mark of={maker.brand} label={maker.name ?? name} size={40} />
       </LogoTile>
     );
   }

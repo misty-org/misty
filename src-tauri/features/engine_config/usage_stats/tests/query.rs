@@ -67,7 +67,6 @@ fn prices() -> crate::engine_config::usage_stats::pricing::PriceTable {
 #[test]
 fn local_day_buckets_follow_the_offset_across_midnight() {
     let scratch = Scratch::new("query-tz");
-    // UTC 15:30 / 16:30 on the 27th = 23:30 on the 27th / 00:30 on the 28th at UTC+8.
     let conn = seeded(
         &scratch,
         &[
@@ -122,7 +121,6 @@ fn local_day_buckets_follow_the_offset_across_midnight() {
     let hours: Vec<&str> = hourly.rows.iter().map(|r| r.bucket.as_str()).collect();
     assert_eq!(hours, ["2026-10-27T23", "2026-10-28T00"]);
 
-    // Same data in UTC: one day, and UTC−5 moves the first day back.
     let utc = run(
         &conn,
         &validate(&request("2026-10-27", "2026-10-27", None, 0)).unwrap(),
@@ -272,7 +270,6 @@ fn invalid_requests_are_rejected() {
     for req in bad {
         assert!(validate(&req).is_err(), "{req:?} should be rejected");
     }
-    // 3700 days inclusive is the limit.
     assert!(validate(&request("2016-01-01", "2026-02-17", None, 0)).is_err());
     let ok = validate(&request("2016-01-01", "2026-02-16", Some("hour"), -720)).unwrap();
     assert!(ok.hourly);

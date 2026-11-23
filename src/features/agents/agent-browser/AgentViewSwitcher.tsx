@@ -1,5 +1,5 @@
 import { Pressable, Surface, Text } from "@misty/ui";
-import { showView, type AgentBrowserChat, type AgentViewStatus } from "./agentBrowserStore";
+import { showView, type AgentBrowserChat, type AgentViewStatus } from "./agent_browser_store";
 
 export const statusWord: Record<AgentViewStatus, string> = {
   working: "Working",
@@ -7,10 +7,6 @@ export const statusWord: Record<AgentViewStatus, string> = {
   done: "Done",
 };
 
-// The label and status take their role's font size alone and keep the line height around them,
-// so the switcher stays the height the live page under it is placed by.
-
-/** A view's label: one line that fades when long. */
 export function AgentViewLabel({ children }: { children: string }) {
   return (
     <Text tone="default" className="max-w-30 text-(length:--text-caption)">
@@ -19,7 +15,6 @@ export function AgentViewLabel({ children }: { children: string }) {
   );
 }
 
-/** A view's status word, brighter while the agent works in it. */
 export function AgentViewStatusWord({ status }: { status: AgentViewStatus }) {
   return (
     <Text
@@ -32,11 +27,9 @@ export function AgentViewStatusWord({ status }: { status: AgentViewStatus }) {
   );
 }
 
-/** A chat's views as small pictures with their labels and status words; one shows at a time. */
 export function AgentViewSwitcher({ chat }: { chat: AgentBrowserChat }) {
   if (chat.views.length < 2) return null;
   return (
-    // Its height is part of the page's place: the live page sits under it (agent browser stage).
     <div className="flex shrink-0 gap-1" role="tablist" aria-label="Views">
       {chat.views.map((view) => {
         const selected = view.id === chat.shownView;

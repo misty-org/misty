@@ -22,7 +22,6 @@ fn recovery_encrypts_database_and_wal_and_skips_unchanged_writes() {
     db.execute_batch("CREATE TRIGGER forbid_write BEFORE INSERT ON recovery_records BEGIN SELECT RAISE(FAIL,'unexpected write'); END;").unwrap();
     assert_eq!(store.write("workspace", 0, secret).unwrap().revision, 1);
     assert_eq!(store.write("workspace", 1, secret).unwrap().revision, 1);
-    // The database refuses this write, so it waits encrypted in a pending slot.
     let waiting = store.write("workspace", 1, "new value").unwrap();
     assert!(waiting.pending);
     assert_eq!(waiting.revision, 1);
@@ -84,10 +83,8 @@ fn old_archives_are_retired_so_saving_never_stops_at_the_record_cap() {
             .write(&format!("archive:{n:04}"), 0, &format!("original {n}"))
             .unwrap();
     }
-    // The newest originals survive; the oldest were retired to make room.
     assert!(store.read("archive:0299").unwrap().is_some());
     assert!(store.read("archive:0000").unwrap().is_none());
-    // Live records keep saving and a new live key still fits.
     assert_eq!(store.write("workspace", 1, "second").unwrap().revision, 2);
     assert_eq!(store.write("before-sync", 0, "kept").unwrap().revision, 1);
     let db = rusqlite::Connection::open(&path).unwrap();
@@ -131,7 +128,6 @@ fn failed_saves_wait_in_one_encrypted_slot_per_key_and_replay_once() {
         assert!(record.pending);
         assert_eq!(record.revision, 1);
     }
-    // Repeated failures replace one slot; they never pile up.
     assert_eq!(slots(dir.path()), 1);
     assert_eq!(store.pending_keys().unwrap(), vec!["workspace".to_string()]);
     let bytes = std::fs::read_dir(dir.path().join("recovery-pending"))
@@ -144,7 +140,6 @@ fn failed_saves_wait_in_one_encrypted_slot_per_key_and_replay_once() {
     assert!(read.pending);
     assert_eq!((read.revision, read.value.as_str()), (1, secret));
     failing_inserts(&path, false);
-    // Replay on the next write lands the pending save exactly once.
     let landed = store.write("workspace", 1, secret).unwrap();
     assert!(!landed.pending);
     assert_eq!(landed.revision, 2);

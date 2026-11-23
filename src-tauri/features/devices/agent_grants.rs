@@ -1,7 +1,3 @@
-//! What an agent may reach on this computer. A run is signed for and
-//! checked here, by a key of this computer's own that no account or server is part of, so a run works
-//! signed out and with the server blocked. Native code signs when a person's window asks, and checks
-//! before every action, so nothing a page or the model sends can widen a grant.
 use super::{
     identity::DeviceIdentity,
     records::{RunGrant, SignedRecord},
@@ -14,9 +10,7 @@ fn now() -> i64 {
         .unwrap_or_default()
 }
 
-/// What a grant files under. It's fixed, so a chat keeps its shell workspace across signing in and out.
 pub const AGENT_SCOPE: &str = "local";
-/// What a grant lasts. The app asks again for each run.
 const GRANT_SECONDS: i64 = 6 * 3600;
 
 pub struct GrantRequest {
@@ -26,7 +20,6 @@ pub struct GrantRequest {
     pub scopes: Vec<String>,
 }
 
-/// Signs one grant, from this computer to itself.
 pub fn sign(device_id: &str, request: GrantRequest) -> Result<SignedRecord, String> {
     let identity =
         DeviceIdentity::load(AGENT_SCOPE, device_id).map_err(|error| error.to_string())?;
@@ -65,8 +58,6 @@ fn sign_with(
     Ok(SignedRecord::new(&payload, signature))
 }
 
-/// A job's grant, checked before this computer acts: signed by this computer, naming it, covering the
-/// scope and the operation, and unexpired.
 pub fn verify(
     device_id: &str,
     record: &SignedRecord,

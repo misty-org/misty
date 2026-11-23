@@ -12,12 +12,8 @@ import {
   PopoverTrigger,
   Textarea,
 } from "@misty/ui";
-import { useSessionGoals } from "./sessionGoals";
+import { useSessionGoals } from "./session_goals";
 
-/**
- * Sets the open chat's goal. While one is set the button stays pressed and the chat keeps its
- * agent going until the goal is met; clearing it lets the chat rest after each reply again.
- */
 export function SessionGoalButton({ conversationId }: { conversationId: string }) {
   const goal = useSessionGoals((state) => state.goals[conversationId]);
   const [open, setOpen] = useState(false);
@@ -36,12 +32,6 @@ export function SessionGoalButton({ conversationId }: { conversationId: string }
           tooltipSide="left"
           aria-pressed={Boolean(goal)}
           disabled={!conversationId}
-          // While open, pressing this button must not move focus. WebKit doesn't focus a clicked
-          // button, so focus falls to the workspace pane around the rail (tabIndex 0); the popover
-          // reads that as focus leaving it and closes, and since the rail's reorder handler stops
-          // the pointerdown Radix would otherwise use to recognise its own trigger, the click then
-          // toggles it open again, or not, depending on whether React re-rendered in between.
-          // Keeping focus in the popover leaves the click as the only thing that closes it.
           onMouseDown={(event) => {
             if (open) event.preventDefault();
           }}

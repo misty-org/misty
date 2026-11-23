@@ -1,4 +1,3 @@
-//! What a model call gives back, piece by piece.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -18,86 +17,124 @@ pub enum StreamPart {
     },
     TextStart {
         id: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     TextDelta {
         id: String,
         delta: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     TextEnd {
         id: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     ReasoningStart {
         id: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     ReasoningDelta {
         id: String,
         delta: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     ReasoningEnd {
         id: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     ToolInputStart {
         id: String,
         #[serde(rename = "toolName")]
         tool_name: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     ToolInputDelta {
         id: String,
         delta: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     ToolInputEnd {
         id: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
-    /// A finished call. `input` is the JSON text the model wrote, which may be invalid.
     ToolCall {
         #[serde(rename = "toolCallId")]
         tool_call_id: String,
         #[serde(rename = "toolName")]
         tool_name: String,
         input: String,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
     Finish {
         #[serde(rename = "finishReason")]
         finish_reason: FinishReason,
         usage: Usage,
-        #[serde(default, rename = "providerMetadata", skip_serializing_if = "Option::is_none")]
+        #[serde(
+            default,
+            rename = "providerMetadata",
+            skip_serializing_if = "Option::is_none"
+        )]
         provider_metadata: Option<Value>,
     },
-    /// A failure inside the stream. It doesn't end the stream, as with the SDK: parts may follow.
     Error {
         error: Value,
     },
-    /// Anything else a provider sent that Misty doesn't read, such as a file or a source. It stays
-    /// as it came, so nothing is lost in passing it on.
     #[serde(untagged)]
     Other(Value),
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct FinishReason {
-    /// `stop`, `length`, `content-filter`, `tool-calls`, `error` or `other`.
     pub unified: String,
-    /// What the provider actually said.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raw: Option<String>,
 }

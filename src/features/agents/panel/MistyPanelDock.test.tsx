@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { settleDeviceSettings } from "@/tests/fakeDeviceSettings";
+import { settleDeviceSettings } from "@/tests/fake_device_settings";
 import { MistyPanelDock } from "./MistyPanelDock";
 import { remCss } from "@misty/ui";
 import {
@@ -8,14 +8,14 @@ import {
   MISTY_PANEL_MIN_WIDTH,
   MISTY_PANEL_WIDTH,
   useMistyPanelStore,
-} from "./mistyPanelStore";
+} from "./misty_panel_store";
 
 const suspend = vi.hoisted(() => vi.fn());
 const db = await vi.hoisted(async () =>
-  (await import("@/tests/fakeDeviceSettings")).fakeDeviceSettings(),
+  (await import("@/tests/fake_device_settings")).fakeDeviceSettings(),
 );
-vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
-vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
+vi.mock("@/shared/platform/native_invoke", () => ({ invoke: db.invoke }));
+vi.mock("@/features/app-windows/page-runtime/browser_overlay_runtime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setBrowserWebviewsSuspended: suspend,
 }));
@@ -45,18 +45,14 @@ describe("Chat panel width", () => {
 
   it("follows the pointer: dragging toward the page widens the panel", async () => {
     render(<MistyPanelDock views={["chat"]} side="right" chat={chat} />);
-    // Let the opening slide finish; only opening and closing animate.
     await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
     const edge = screen.getByRole("separator", { name: "Resize chat panel" });
     pointer(edge, "pointerdown", { clientX: 600 });
     expect(edge.dataset.dragging).toBe("true");
-    // Pages pause while the edge moves, so a native page cannot swallow the drag.
     expect(suspend).toHaveBeenLastCalledWith(true, "misty-panel-resize");
     pointer(window, "pointermove", { clientX: 500 });
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH + 100);
-    // A drag never animates: the width follows the pointer at once.
     const dock = edge.closest<HTMLElement>("[data-misty-panel-dock]")!;
-    // The dock is the panel plus the margin of window chrome beside it.
     expect(dock.style.width).toBe(remCss(MISTY_PANEL_WIDTH + 100 + 6));
     expect(dock.style.transitionDuration).toBe("");
     pointer(window, "pointermove", { clientX: 640 });
@@ -64,7 +60,6 @@ describe("Chat panel width", () => {
     pointer(window, "pointerup", { clientX: 640 });
     expect(edge.dataset.dragging).toBeUndefined();
     expect(suspend).toHaveBeenLastCalledWith(false, "misty-panel-resize");
-    // After release, moving the pointer no longer resizes.
     pointer(window, "pointermove", { clientX: 100 });
     expect(useMistyPanelStore.getState().width).toBe(MISTY_PANEL_WIDTH - 40);
   });
@@ -72,7 +67,6 @@ describe("Chat panel width", () => {
   it("resizes from the panel's inner edge", () => {
     render(<MistyPanelDock views={["chat"]} side="right" chat={chat} />);
     const edge = screen.getByRole("separator", { name: "Resize chat panel" });
-    // On the right, the edge faces left: moving it left widens the panel.
     act(() => {
       fireEvent.keyDown(edge, { key: "ArrowLeft" });
     });

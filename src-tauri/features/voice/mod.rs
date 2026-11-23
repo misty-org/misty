@@ -1,8 +1,5 @@
-//! Voice: dictation into any app, captures, and speech on this computer through open models from
-//! Misty's catalog (hearing and speaking, with no key).
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 mod audio_capture;
-mod share_audio;
 pub mod commands;
 pub mod dictation;
 pub mod hold_to_talk;
@@ -11,14 +8,13 @@ pub mod insert;
 pub(crate) mod linux;
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
+mod share_audio;
 pub mod speech;
 pub mod speech_models;
 pub mod speech_words;
 
-// Glob re-exports carry the `__cmd__*` macros that #[tauri::command] generates
-// beside each function; naming the functions alone leaves generate_handler! blind.
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub use audio_capture::*;
-pub use share_audio::*;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub use dictation::session::*;
+pub use share_audio::*;

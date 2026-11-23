@@ -1,4 +1,3 @@
-//! The threads a running companion keeps: shortcut and audio events, and the cursor sampler.
 use super::*;
 use base64::{engine::general_purpose::STANDARD, Engine};
 
@@ -15,19 +14,16 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             }
             match event {
                 Shortcut::Click(x, y) => forward_click(&events_app, &events_state, x, y),
-                // Not while the talk keys are held: that's a spoken turn.
                 Shortcut::Type if !events_state.held.load(Ordering::SeqCst) => {
                     ask::open(&events_app)
                 }
                 Shortcut::Type => {}
-                // Only while a tour line is on screen, so not every Escape anywhere wakes the window.
                 Shortcut::Escape => {
-                    let tip = events_state
-                        .data
-                        .lock()
-                        .is_ok_and(|data| data.presentation["caption"]["tip"].as_bool() == Some(true));
+                    let tip = events_state.data.lock().is_ok_and(|data| {
+                        data.presentation["caption"]["tip"].as_bool() == Some(true)
+                    });
                     if tip {
-                        let _ = crate::browser::app_windows::emit_to_primary(
+                        crate::browser::app_windows::emit_to_primary(
                             &events_app,
                             "misty://cursor-escape",
                             json!({}),
@@ -52,7 +48,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                             let _ = window.hide();
                         }
                     }
-                    let _ = crate::browser::app_windows::emit_to_primary(
+                    crate::browser::app_windows::emit_to_primary(
                         &events_app,
                         "misty://cursor-shortcut",
                         json!({"turn":turn,"held":held}),
@@ -81,7 +77,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
             if let Some((turn, _, record)) = recording.as_mut() {
                 if let Some((sequence, pcm)) = record.drain() {
                     if current(&audio_state, *turn) {
-                        let _ = crate::browser::app_windows::emit_to_primary(
+                        crate::browser::app_windows::emit_to_primary(
                             &audio_app,
                             "misty://cursor-audio",
                             json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
@@ -100,7 +96,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         continue;
                     }
                     if !audio_state.held.load(Ordering::SeqCst) {
-                        let _ = crate::browser::app_windows::emit_to_primary(
+                        crate::browser::app_windows::emit_to_primary(
                             &audio_app,
                             "misty://cursor-recorded",
                             json!({"turn":turn,"durationMs":0}),
@@ -116,7 +112,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         }
                         Ok(_) => {
                             if current(&audio_state, turn) {
-                                let _ = crate::browser::app_windows::emit_to_primary(
+                                crate::browser::app_windows::emit_to_primary(
                                     &audio_app,
                                     "misty://cursor-recorded",
                                     json!({"turn":turn,"durationMs":0}),
@@ -140,13 +136,13 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         let (sequence, pcm, duration) = record.finish();
                         if current(&audio_state, turn) {
                             if !pcm.is_empty() {
-                                let _ = crate::browser::app_windows::emit_to_primary(
+                                crate::browser::app_windows::emit_to_primary(
                                     &audio_app,
                                     "misty://cursor-audio",
                                     json!({"turn":turn,"sequence":sequence,"audio":STANDARD.encode(pcm)}),
                                 );
                             }
-                            let _ = crate::browser::app_windows::emit_to_primary(
+                            crate::browser::app_windows::emit_to_primary(
                                 &audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":duration}),
@@ -154,7 +150,7 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                         }
                     } else if let Ok((turn, false)) = event {
                         if current(&audio_state, turn) {
-                            let _ = crate::browser::app_windows::emit_to_primary(
+                            crate::browser::app_windows::emit_to_primary(
                                 &audio_app,
                                 "misty://cursor-recorded",
                                 json!({"turn":turn,"durationMs":0}),
@@ -169,8 +165,9 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     });
     std::thread::spawn(move || {
         let mut topology = Instant::now();
-        // Looked at on the first pass, then every FRONT_EVERY.
-        let mut front = Instant::now().checked_sub(FRONT_EVERY).unwrap_or_else(Instant::now);
+        let mut front = Instant::now()
+            .checked_sub(FRONT_EVERY)
+            .unwrap_or_else(Instant::now);
         loop {
             if state.enabled.load(Ordering::SeqCst) {
                 if front.elapsed() >= FRONT_EVERY {
@@ -184,19 +181,16 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
                     state.fullscreen.store(full, Ordering::SeqCst);
                 }
                 if let Some((x, y)) = platform::cursor() {
-                    // The trail the person draws while they ask, skipping a pointer at rest.
                     if state.held.load(Ordering::SeqCst) {
                         let mut trail = state.trail.lock().unwrap();
                         let moved = trail
                             .last()
-                            .map_or(true, |(lx, ly)| (x - lx).hypot(y - ly) >= 2.0);
+                            .is_none_or(|(lx, ly)| (x - lx).hypot(y - ly) >= 2.0);
                         if moved && trail.len() < TRAIL_POINTS {
                             trail.push((x, y));
                         }
                     }
                     let displays = state.data.lock().unwrap().displays.clone();
-                    // What Misty beside the pointer steps away for: typing, a drag, a full-screen
-                    // app. Only the facts, never the keys typed.
                     let payload = json!({
                         "x": x,
                         "y": y,
@@ -225,10 +219,8 @@ pub(super) fn start(app: AppHandle, state: Arc<CursorCompanionState>) {
     });
 }
 
-/// How often the sampler looks at the window in front, which costs more than the pointer.
 const FRONT_EVERY: Duration = Duration::from_millis(500);
 
-/// Whether a window covers a whole display, give or take a point at the edges.
 fn fills_a_display(window: &platform::ForegroundWindow, displays: &[Display]) -> bool {
     displays.iter().any(|d| {
         (window.x - d.x).abs() <= 1.

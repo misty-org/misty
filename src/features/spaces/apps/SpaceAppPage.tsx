@@ -1,22 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { leaveViewingPlace, setViewingPlace } from "../list/createSpacesRealtimeActions";
+import { leaveViewingPlace, setViewingPlace } from "../list/create_spaces_realtime_actions";
 import { useLocation, useNavigate } from "react-router-dom";
 import { driveEntryById } from "../drive";
-import { driveFileRef } from "../drive/driveAppFiles";
+import { driveFileRef } from "../drive/drive_app_files";
 import { useAuth } from "@/features/account";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { EmptyState, notify, Skeleton } from "@misty/ui";
 import type { Space } from "../api/dto/entities";
 import { FilePickerDialog } from "./file-picker/FilePickerDialog";
 import { SpaceAppFrame } from "./SpaceAppFrame";
-import type { AppFileRef } from "./spaceAppFiles";
-import { createSpaceAppHandlers, type Source } from "./spaceAppHandlers";
-import { themeSource } from "./themeSource";
-import { appEntry, catalogSource, runsHere } from "./thirdPartyApps";
-import { useSpaceApps } from "./useSpaceApps";
+import type { AppFileRef } from "./space_app_files";
+import { createSpaceAppHandlers, type Source } from "./space_app_handlers";
+import { themeSource } from "./theme_source";
+import { appEntry, catalogSource, isSiteApp, runsHere, siteManifest } from "./third_party_apps";
+import { useSpaceApps } from "./use_space_apps";
 
 type AppRoute = { path: string; params: Record<string, string> };
-/** The route an app starts at: `/`, with the file Open with opened it with as `file`. */
 const fixedRoute = (file: string): Source<AppRoute> => {
   const route: AppRoute = { path: "/", params: file ? { file } : {} };
   return { get: () => route, subscribe: () => () => {} };
@@ -28,10 +27,6 @@ interface PickRequest {
   resolve(files: AppFileRef[]): void;
 }
 
-/**
- * An app running in a Space, in a sandboxed frame, with the SDK calls answered here, as this person, in this Space.
- * It runs at the version the Space added, with what its mod approved, and its first open downloads the bundle.
- */
 export function SpaceAppPage({
   space,
   appId,
@@ -44,25 +39,20 @@ export function SpaceAppPage({
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  // Open with: the Space's file the app was opened with. An SDK app reads it from its route; for one that knows
-  // only its own Open, it is the answer to the first time it asks for a file.
   const openedWith = new URLSearchParams(location.search).get("file") ?? "";
   const handed = useRef("");
-  // The Space's members see which app the person is in ("In DeckCraft"), and nothing more about it.
   useEffect(() => {
     setViewingPlace({ spaceId: space.id, place: "app", itemId: appId });
     return () => leaveViewingPlace("app", appId);
   }, [space.id, appId]);
   const { apps } = useSpaceApps(space.id);
   const [pick, setPick] = useState<PickRequest | null>(null);
-  // The latest picker request, so a second one answers the first with nothing instead of leaving it waiting.
   const pending = useRef<PickRequest | null>(null);
   const installed = apps?.find((app) => app.app_id === appId);
   const catalog = installed ? appEntry(installed) : undefined;
   const name = catalog?.name ?? appId;
   useWorkspaceViewTitle(workspaceTabId, name);
   const isMod = Boolean(space.permissions?.includes("apps.manage"));
-  // A file opened with the app starts it afresh, so its route says that file.
   const spaceKey = `${space.id}:${space.name}:${isMod}:${user?.id}:${installed?.version ?? ""}:${openedWith}`;
 
   if (!user) return null;
@@ -75,7 +65,6 @@ export function SpaceAppPage({
       />
     );
 
-  // An app made only for other computers isn't downloaded here.
   if (catalog && !runsHere(catalog))
     return (
       <EmptyState
@@ -91,7 +80,7 @@ export function SpaceAppPage({
   };
 
   return (
-    <div className="size-full min-h-0">
+    <div className="flex size-full min-h-0 flex-col">
       <SpaceAppFrame
         key={spaceKey}
         spaceId={space.id}
@@ -99,7 +88,8 @@ export function SpaceAppPage({
         appName={name}
         version={installed.version}
         approved={installed.permissions ?? []}
-        source={catalog ? catalogSource(catalog) : undefined}
+        source={catalog && !isSiteApp(catalog) ? catalogSource(catalog) : undefined}
+        site={catalog && isSiteApp(catalog) ? siteManifest(catalog) : undefined}
         makeHandlers={(manifest) =>
           createSpaceAppHandlers({
             appId,
@@ -114,13 +104,11 @@ export function SpaceAppPage({
             permissions: manifest.permissions,
             theme: themeSource,
             route: fixedRoute(openedWith),
-            // An app opens Space pages of the host (a file in Files) with a path; it keeps no page of its own.
             navigate: (route, replace) => navigate(route.path, { replace }),
             files: {
               pickFiles: async (options) => {
                 if (openedWith && handed.current !== openedWith) {
                   handed.current = openedWith;
-                  // The drive's file Open with opened the app with (a `DriveEntry` id).
                   const file = await driveEntryById(space.id, openedWith).then(
                     (entry) => (entry ? driveFileRef(entry) : undefined),
                     () => undefined,

@@ -17,7 +17,6 @@ const searchAll: LocalToolHandler = async (request) => {
   const reference = spaceArgument(input);
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   if (kinds.length > 0) params.set("kinds", kinds.join(","));
-  // A run searches only its agent's home Space.
   const [space] = spaceTargets(await listSpaces(request), reference, "read");
   params.set("space_id", space.id);
   return readRoute(request, `/search?${params}`);

@@ -1,7 +1,7 @@
 import { Unplug } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { useCachedResource } from "@/api/cache/cached_resource";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
   CatalogDone,
@@ -23,18 +23,11 @@ import {
   type DirectAccess,
   type DirectCatalogApp,
   type DirectConnection,
-} from "./directApi";
+} from "./direct_api";
 
 const message = (reason: unknown, fallback: string) =>
   reason instanceof Error ? reason.message : fallback;
 
-/**
- * The apps a person can connect directly: each one signs in on the app maker's own page, and every
- * engine can then use it. Only apps whose sign-in needs no key of Misty's are shown: the shipped
- * catalog was checked when it was built, and anything newer is checked before it appears. Apps
- * load a page at a time; `limit` shows that many until the person asks for more. They are one
- * store shelf; with `query` the page's own search finds them and the shelf draws no field.
- */
 export function DirectApps({
   limit,
   find = "",
@@ -46,11 +39,9 @@ export function DirectApps({
 }) {
   const [typed, setQuery] = useState(find);
   const query = outside ?? typed;
-  // A new link's search replaces what was typed.
   useEffect(() => {
     if (find) setQuery(find);
   }, [find]);
-  // A typed search waits for a pause; browsing loads at once.
   const [term, setTerm] = useState(() => query.trim());
   useEffect(() => {
     const next = query.trim();
@@ -58,9 +49,6 @@ export function DirectApps({
     const timer = window.setTimeout(() => setTerm(next), next ? 300 : 0);
     return () => window.clearTimeout(timer);
   }, [query, term]);
-  // The first page of each search, and the connected apps (names only: the tokens stay in the
-  // keychain), paint from the last copy and are asked again behind it. Only the unsearched page
-  // and the connections are kept between launches.
   const firstPage = useCachedResource(
     `direct-apps/catalog:${term}`,
     () => directAppsApi.catalog(term, 0),
@@ -69,11 +57,9 @@ export function DirectApps({
   const connectionsList = useCachedResource("direct-apps/connections", () => directAppsApi.list(), {
     persist: "device",
   });
-  // A new search keeps the last apps on screen until its own arrive.
   const [lastPage, setLastPage] = useState(firstPage.data);
   if (firstPage.data && firstPage.data !== lastPage) setLastPage(firstPage.data);
   const page = firstPage.data ?? lastPage;
-  /** Pages past the first, loaded with Show more, for the search they were loaded for. */
   const [more, setMore] = useState<{
     term: string;
     apps: DirectCatalogApp[];
@@ -93,7 +79,6 @@ export function DirectApps({
   const [pending, setPending] = useState<{ url: string; name: string } | null>(null);
   const [opened, setOpened] = useState(false);
   const [error, setError] = useState("");
-  // A list that never came says so in its place; one on screen stays beside a failed refresh.
   const loadError =
     (!connectionsList.data && !connectionsList.loading && connectionsList.error
       ? message(connectionsList.error, "Connected apps could not be loaded.")
@@ -107,7 +92,6 @@ export function DirectApps({
   };
   const loadConnections = connectionsList.reload;
 
-  // The shipped apps loaded so far: the next page starts after them.
   const loadedShipped = (catalog ?? []).filter((app) => app.checked).length;
   const loadMore = async () => {
     if (loadingMore || !catalog) return;
@@ -130,8 +114,6 @@ export function DirectApps({
     }
   };
 
-  // An app newer than the shipped catalog is checked once; one that would need a key of Misty's
-  // never shows.
   useEffect(() => {
     const unchecked = (catalog ?? [])
       .filter((app) => !app.checked && !(app.url in access))
@@ -191,7 +173,6 @@ export function DirectApps({
     [catalog],
   );
   const connectedUrls = new Set((connections ?? []).map((item) => item.url));
-  // Connected apps lead, then the ones that take a keyless sign-in.
   const offered = (catalog ?? []).filter(
     (app) => !connectedUrls.has(app.url) && (app.checked || access[app.url] === "keyless"),
   );
@@ -202,7 +183,6 @@ export function DirectApps({
   );
   const folded = Boolean(limit) && !opened && !needle;
   const shown = folded ? offered.slice(0, Math.max(0, (limit ?? 0) - own.length)) : offered;
-  // What isn't on screen yet: the rest of this page, then the catalog's unloaded matches.
   const notShown = offered.length - shown.length + Math.max(0, total - loadedShipped);
   const loading = catalog === null || connections === null;
 

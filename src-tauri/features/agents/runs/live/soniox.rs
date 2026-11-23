@@ -1,4 +1,3 @@
-//! Soniox's realtime config and the captions its tokens become (`live/soniox.ts`).
 use serde::Serialize;
 use serde_json::Value;
 
@@ -18,14 +17,12 @@ pub struct SonioxResult {
     pub total_audio_proc_ms: f64,
 }
 
-/// One message from Soniox, as `parseResultMessage` reads it.
 pub(crate) struct ParsedMessage {
     pub(crate) result: SonioxResult,
     pub(crate) has_endpoint: bool,
     pub(crate) finished: bool,
 }
 
-/// `Boolean(value)`.
 fn truthy(value: Option<&Value>) -> bool {
     match value {
         None | Some(Value::Null) => false,
@@ -36,15 +33,14 @@ fn truthy(value: Option<&Value>) -> bool {
     }
 }
 
-/// The numeric code of an error message from the provider, and nothing else it said.
 pub(crate) fn provider_error_code(text: &str) -> Option<u32> {
     let raw: Value = serde_json::from_str(text).ok()?;
     let code = raw.as_object()?.get("error_code")?;
-    code.as_u64().map(|code| code as u32).or_else(|| code.as_str()?.parse().ok())
+    code.as_u64()
+        .map(|code| code as u32)
+        .or_else(|| code.as_str()?.parse().ok())
 }
 
-/// `None` for an error from the provider or a message that can't be read, both of which fail the
-/// stream. What the failure said goes no further, since provider errors can echo request details.
 pub(crate) fn parse_message(text: &str) -> Option<ParsedMessage> {
     let raw: Value = serde_json::from_str(text).ok()?;
     let fields = raw.as_object()?;
@@ -58,7 +54,11 @@ pub(crate) fn parse_message(text: &str) -> Option<ParsedMessage> {
     let tokens: Vec<SonioxToken> = tokens
         .iter()
         .map(|token| SonioxToken {
-            text: token.get("text").and_then(Value::as_str).unwrap_or("").to_owned(),
+            text: token
+                .get("text")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_owned(),
             is_final: truthy(token.get("is_final")),
             translation_status: token
                 .get("translation_status")
@@ -67,7 +67,10 @@ pub(crate) fn parse_message(text: &str) -> Option<ParsedMessage> {
                 .map(str::to_owned),
             start_ms: token.get("start_ms").and_then(Value::as_f64),
             end_ms: token.get("end_ms").and_then(Value::as_f64),
-            speaker: token.get("speaker").and_then(Value::as_str).map(str::to_owned),
+            speaker: token
+                .get("speaker")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         })
         .collect();
     Some(ParsedMessage {
@@ -75,7 +78,10 @@ pub(crate) fn parse_message(text: &str) -> Option<ParsedMessage> {
         finished: fields.get("finished") == Some(&Value::Bool(true)),
         result: SonioxResult {
             tokens,
-            total_audio_proc_ms: fields.get("total_audio_proc_ms").and_then(Value::as_f64).unwrap_or(0.0),
+            total_audio_proc_ms: fields
+                .get("total_audio_proc_ms")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0),
         },
     })
 }
@@ -92,7 +98,6 @@ pub struct TranslationTerm {
     pub target: String,
 }
 
-/// Soniox's own context shape: general key/values, free text and terms.
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct SonioxContext {
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -112,7 +117,6 @@ pub struct SonioxTranslation {
     pub target_language: String,
 }
 
-/// The first message on the socket, with the fields in the order `buildConfigMessage` writes them.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct SonioxConfig {
     pub model: String,
@@ -132,8 +136,6 @@ pub struct SonioxConfig {
     pub translation: Option<SonioxTranslation>,
 }
 
-/// How long Soniox waits in silence before it ends a phrase and settles its translation. Its own
-/// default is 2000, which made subtitles sit on a finished sentence; 500 is the shortest it takes.
 const MAX_ENDPOINT_DELAY_MS: u32 = 600;
 
 fn soniox_language(language: &str) -> &str {
@@ -146,12 +148,18 @@ fn soniox_language(language: &str) -> &str {
 }
 
 fn has_context(context: &SonioxContext) -> bool {
-    !context.general.is_empty() || context.text.is_some() || !context.terms.is_empty() || !context.translation_terms.is_empty()
+    !context.general.is_empty()
+        || context.text.is_some()
+        || !context.terms.is_empty()
+        || !context.translation_terms.is_empty()
 }
 
-/// Realtime session config for 16 kHz mono PCM16, always diarized. Translation only when the
-/// languages differ.
-pub(crate) fn soniox_config(source: &str, target: &str, model: &str, context: Option<SonioxContext>) -> SonioxConfig {
+pub(crate) fn soniox_config(
+    source: &str,
+    target: &str,
+    model: &str,
+    context: Option<SonioxContext>,
+) -> SonioxConfig {
     SonioxConfig {
         model: model.to_owned(),
         audio_format: "pcm_s16le",
@@ -163,7 +171,9 @@ pub(crate) fn soniox_config(source: &str, target: &str, model: &str, context: Op
         enable_endpoint_detection: true,
         max_endpoint_delay_ms: MAX_ENDPOINT_DELAY_MS,
         context: context.filter(has_context),
-        translation: (source != target && target != "auto")
-            .then(|| SonioxTranslation { kind: "one_way", target_language: soniox_language(target).to_owned() }),
+        translation: (source != target && target != "auto").then(|| SonioxTranslation {
+            kind: "one_way",
+            target_language: soniox_language(target).to_owned(),
+        }),
     }
 }

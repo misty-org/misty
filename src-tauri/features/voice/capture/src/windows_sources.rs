@@ -2,8 +2,6 @@ use crate::{CaptureError, CaptureSource, CaptureSources};
 use std::collections::BTreeMap;
 use wasapi::{DeviceEnumerator, Direction, SessionState};
 
-/// Read-only metadata: the default microphone's name and the apps with an
-/// active audio session on the default output.
 pub(crate) fn capture_sources() -> Result<CaptureSources, CaptureError> {
     wasapi::initialize_mta()
         .ok()

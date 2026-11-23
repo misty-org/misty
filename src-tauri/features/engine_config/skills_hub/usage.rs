@@ -13,11 +13,6 @@ use super::core::*;
 use super::fsutil::*;
 use super::target_sync::*;
 use super::updates_popular::*;
-// ===== Skill usage (upstream skill-usage.js): scans Claude Code session transcripts =====
-//
-// Only Claude Code is counted: `<claude home>/projects/**/*.jsonl` (following
-// `CLAUDE_CONFIG_DIR`). Codex keeps no reliable record of Skill calls; Misty doesn't guess, and
-// doesn't pass install records off as calls.
 
 pub(super) fn claude_projects_dir() -> PathBuf {
     crate::engine_config::support::engine_home(Some("CLAUDE_CONFIG_DIR"), ".claude")
@@ -30,7 +25,6 @@ pub(super) struct TranscriptFile {
     pub(super) mtime_ms: i64,
 }
 
-/// upstream listTranscriptFiles: collects .jsonl at any depth (a failed stat is skipped), sorted by path.
 pub(super) fn list_transcript_files(root_dir: &Path) -> Vec<TranscriptFile> {
     fn walk(dir: &Path, out: &mut Vec<TranscriptFile>) {
         let Ok(read_dir) = fs::read_dir(dir) else {
@@ -68,7 +62,6 @@ pub(super) fn list_transcript_files(root_dir: &Path) -> Vec<TranscriptFile> {
     out
 }
 
-/// upstream fingerprintFiles: `"<count>:" + sha256hex(each file's "<path>:<size>:<mtimeMs>\n")`.
 pub(super) fn fingerprint_files(files: &[TranscriptFile]) -> String {
     let mut hasher = Sha256::new();
     for file in files {
@@ -77,7 +70,6 @@ pub(super) fn fingerprint_files(files: &[TranscriptFile]) -> String {
     format!("{}:{:x}", files.len(), hasher.finalize())
 }
 
-/// upstream toInt: the floor of a finite positive number, else 0.
 pub(super) fn to_int(value: f64) -> i64 {
     if value.is_finite() && value > 0.0 {
         value.floor() as i64
@@ -86,7 +78,6 @@ pub(super) fn to_int(value: f64) -> i64 {
     }
 }
 
-/// The five columns of upstream SKILL_TOKEN_KEYS (summed internally as f64 shares).
 #[derive(Default)]
 pub(super) struct UsageTokens {
     pub(super) input: f64,
@@ -103,7 +94,6 @@ pub(super) struct UsageEntry {
     pub(super) tokens: UsageTokens,
 }
 
-/// upstream normalizeUsage (columns mapped as the Claude parser's normalizeClaudeUsage).
 pub(super) fn normalize_usage(usage: Option<&Value>) -> UsageTokens {
     let get = |key: &str| usage.and_then(|u| u.get(key)).map(js_f64).unwrap_or(0.0);
     UsageTokens {
@@ -115,8 +105,6 @@ pub(super) fn normalize_usage(usage: Option<&Value>) -> UsageTokens {
     }
 }
 
-/// upstream scanFile: lines are pre-filtered on the substring `"name":"Skill"` and only those parsed;
-/// tool_use/Skill/id deduped across files, input.skill non-empty; a turn's tokens split evenly by block.
 pub(super) fn scan_transcript_file(
     path: &str,
     skills: &mut Vec<UsageEntry>,
@@ -145,7 +133,6 @@ pub(super) fn scan_transcript_file(
         else {
             continue;
         };
-        // Collect this turn's fresh Skill calls first, then split the usage.
         let mut blocks: Vec<String> = Vec::new();
         for block in content {
             if block.get("type").and_then(Value::as_str) != Some("tool_use") {
@@ -199,7 +186,7 @@ pub(super) fn scan_transcript_file(
                 }
             };
             let entry = &mut skills[entry_index];
-            entry.invocations += 1; // invocations aren't split
+            entry.invocations += 1;
             if let Some(ts) = &ts {
                 if entry
                     .last_used_at
@@ -219,7 +206,6 @@ pub(super) fn scan_transcript_file(
     }
 }
 
-/// upstream roundTokens: rounded to integers, total_tokens = the sum of the five columns.
 pub(super) fn round_tokens(tokens: &UsageTokens) -> Value {
     let input = tokens.input.round() as i64;
     let output = tokens.output.round() as i64;
@@ -236,7 +222,6 @@ pub(super) fn round_tokens(tokens: &UsageTokens) -> Value {
     })
 }
 
-/// upstream serialize: skills by invocations, descending (models left out).
 pub(super) fn serialize_usage(skills: &[UsageEntry]) -> Vec<Value> {
     let mut entries: Vec<Value> = skills
         .iter()
@@ -257,12 +242,10 @@ pub(super) fn serialize_usage(skills: &[UsageEntry]) -> Vec<Value> {
     entries
 }
 
-/// upstream scanSkillUsage: fingerprint plus a 10-minute cache.
 pub(super) fn scan_skill_usage(force: bool) -> Value {
     scan_skill_usage_in(&claude_projects_dir(), force)
 }
 
-/// The scan itself, with the folder passed in so tests stay isolated.
 pub(super) fn scan_skill_usage_in(projects_dir: &Path, force: bool) -> Value {
     let files = list_transcript_files(projects_dir);
     let fingerprint = fingerprint_files(&files);
@@ -297,7 +280,6 @@ pub(super) fn scan_skill_usage_in(projects_dir: &Path, force: bool) -> Value {
         "totalInvocations": total_invocations,
         "skills": serialize_usage(&skills),
     });
-    // A best-effort cache write (0o600, one JSON line and a newline).
     let _ = ensure_dir(&skills_root());
     if let Ok(text) = serde_json::to_string(&result) {
         let _ = write_file_private(&usage_cache_path(), &format!("{text}\n"));
@@ -307,8 +289,6 @@ pub(super) fn scan_skill_usage_in(projects_dir: &Path, force: bool) -> Value {
     Value::Object(out)
 }
 
-/// upstream local-api.js's skill_usage join: exact directory → unique directory leaf → unique
-/// name; unusedInstalled = installed skills nothing matched. Neither cost nor models are returned.
 pub(super) fn skill_usage_query(force: bool) -> Value {
     let usage = scan_skill_usage(force);
     let installed = list_installed_skills();

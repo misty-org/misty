@@ -1,9 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! `query` validation and aggregation: local-day range → UTC ms window,
-//! SQL grouping, then per-row cost from the price table.
-
 use super::pricing::PriceTable;
 use super::store;
 use super::time::{format_day, local_day, parse_day, DAY_MS};
@@ -12,7 +9,6 @@ use rusqlite::Connection;
 use std::collections::BTreeSet;
 
 const MAX_RANGE_DAYS: i64 = 3700;
-/// Real UTC offsets span −12:00…+14:00; leave headroom, reject nonsense.
 const MAX_TZ_OFFSET_MINUTES: i32 = 18 * 60;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,8 +48,6 @@ pub(crate) fn validate(req: &QueryRequest) -> Result<ValidQuery, String> {
     })
 }
 
-/// Rows plus history start; `scanned_at` / `scanning` are filled in by the
-/// caller, which owns the scan state.
 pub(crate) fn run(
     conn: &Connection,
     query: &ValidQuery,

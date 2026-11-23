@@ -24,8 +24,6 @@ fn output_of(conn: &rusqlite::Connection, key: &str) -> i64 {
     .unwrap()
 }
 
-/// A first line longer than the head hash window, so in-place edits further
-/// down do not look like a replaced file.
 fn padding_line() -> String {
     serde_json::json!({"type": "summary", "summary": "p".repeat(1500)}).to_string()
 }
@@ -49,8 +47,6 @@ fn incremental_scan_reads_only_appended_bytes() {
     let (first, _) = run(&mut conn, &specs, ScanMode::Incremental);
     assert_eq!((first.files_scanned, first.events_added), (1, 1));
 
-    // Rewrite A in place (same length, beyond the head window) and append B.
-    // Reading only the appended bytes means A keeps its first value.
     let edited = line_a.replace("111", "999");
     let line_b = claude_line(
         "msg_b",
@@ -103,13 +99,11 @@ fn shrunk_or_replaced_file_is_reread_without_double_counting() {
     let mut conn = scratch.db();
     run(&mut conn, &specs, ScanMode::Incremental);
 
-    // Shrunk: re-read from 0; A upserts onto itself, B's history stays.
     write_lines(&file, &[line_a]);
     let (summary, _) = run(&mut conn, &specs, ScanMode::Incremental);
     assert_eq!((summary.files_scanned, summary.events_added), (1, 0));
     assert_eq!(store::event_count(&conn), 2);
 
-    // Replaced by a different, longer file: head hash differs → from 0.
     let line_c = claude_line(
         "msg_c",
         "r",
@@ -359,8 +353,6 @@ fn readers_keep_old_numbers_while_a_rebuild_is_open() {
         ScanMode::Incremental,
     );
 
-    // What a full rescan does first: reset cursors inside one open write
-    // transaction.
     writer.execute_batch("BEGIN IMMEDIATE").unwrap();
     store::reset_cursors(&writer).unwrap();
     let reader = scratch.db();

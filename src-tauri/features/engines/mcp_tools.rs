@@ -1,9 +1,5 @@
-// The tools the local MCP server offers and how their calls and results are shaped: Misty's
-// own catalog in MCP's names, browser and Space tools told apart, results turned into MCP content
-// (pictures as image blocks, a program's output saved to a file when asked).
 use super::*;
 
-/// MCP clients accept only letters, digits, `_` and `-` in a tool's name.
 pub(super) fn wire_name(name: &str) -> String {
     name.replace('.', "_")
 }
@@ -12,8 +8,6 @@ pub(super) fn is_space_tool(name: &str) -> bool {
     SPACE_TOOLS.iter().any(|family| name.starts_with(family))
 }
 
-/// Files' tools are offered only while the person's disk grant is on, and `files_delete` only
-/// while they let agents delete files. Native code checks both again on every call.
 pub(super) fn files_offered(app: &AppHandle, name: &str) -> bool {
     crate::files::agent_paths::tools::offered(app, name)
 }
@@ -22,8 +16,6 @@ pub(super) fn is_browser_tool(name: &str) -> bool {
     BROWSER_TOOLS.contains(&name)
 }
 
-/// A tool as an engine sees it. Opening a screen is described for an engine and always opens a tab
-/// of the run's own: the desktop and the person's tabs are not offered here.
 pub(super) fn offered_tool(tool: &Value) -> Value {
     let name = tool["name"].as_str().unwrap_or("");
     let mut offered = json!({
@@ -58,8 +50,10 @@ pub(super) fn offered_tool(tool: &Value) -> Value {
     offered
 }
 
-/// Where `saveAs` writes: a relative path inside the run's folder, never one that leaves it.
-pub(super) fn save_path(folder: &std::path::Path, name: &str) -> Result<std::path::PathBuf, String> {
+pub(super) fn save_path(
+    folder: &std::path::Path,
+    name: &str,
+) -> Result<std::path::PathBuf, String> {
     let relative = std::path::Path::new(name.trim());
     let inside = !name.trim().is_empty()
         && relative
@@ -74,8 +68,6 @@ pub(super) fn save_path(folder: &std::path::Path, name: &str) -> Result<std::pat
     Ok(folder.join(relative))
 }
 
-/// Writes a finished program's value (or its notes, when it returned nothing) to `path`, and puts
-/// the path, size and a preview where the value was.
 pub(super) fn save_value(path: &std::path::Path, output: &mut Value) -> Result<(), String> {
     let saved = match &output["value"] {
         Value::Null => output["notes"].clone(),
@@ -105,7 +97,6 @@ pub(super) fn save_value(path: &std::path::Path, output: &mut Value) -> Result<(
     Ok(())
 }
 
-/// A picture in a result (`data:image/...;base64,...`) as an MCP image block.
 pub(super) fn image_block(url: &str) -> Option<Value> {
     let (media_type, data) = url.strip_prefix("data:")?.split_once(";base64,")?;
     media_type
@@ -113,10 +104,6 @@ pub(super) fn image_block(url: &str) -> Option<Value> {
         .then(|| json!({ "type": "image", "data": data, "mimeType": media_type }))
 }
 
-/// A tool's result as MCP content. Pictures (`browser_visual`'s `image`, a step's
-/// `displayCaptures`) go as image blocks the engine sees, as Misty's own agent gets them
-/// (`agents/runs/model_tools.rs`, `visual_tool_output`); as text they were a base64 string far
-/// over an engine's limit for one result, which it set aside unread.
 pub(super) fn result_content(mut value: Value) -> Value {
     let mut pictures = Vec::new();
     if let Some(image) = value.get_mut("image").and_then(Value::as_object_mut) {
@@ -226,10 +213,6 @@ pick the place and confirm, then the chat's files move there. Don't move or copy
     &TOOLS
 }
 
-/// Whether an engine's request names one of this server's tools. Each engine spells it its own
-/// way (`mcp__misty__note_read`, `misty_note_read`, a title with the server beside it), so this
-/// looks for the server's name together with a tool this server offers, in the name the engine
-/// gave or in the call it described.
 pub(crate) fn names_misty_tool(tool: &str, call: &Value) -> bool {
     let named = |text: &str| {
         let text = text.to_ascii_lowercase();
@@ -242,7 +225,6 @@ pub(crate) fn names_misty_tool(tool: &str, call: &Value) -> bool {
     named(tool) || named(&call.to_string())
 }
 
-/// Misty's own name for a tool an engine called, and the input Misty's tool takes.
 pub(super) fn misty_call(name: &str, arguments: Value) -> Option<(String, Value)> {
     if name == ASK_MISTY {
         let mut task = json!({ "goal": arguments["goal"] });
@@ -267,7 +249,6 @@ pub(super) fn misty_call(name: &str, arguments: Value) -> Option<(String, Value)
             return None;
         }
         let mut input = arguments.clone();
-        // A screen an engine opens is always a tab of its own.
         if known == "screen.open" {
             if let Some(fields) = input.as_object_mut() {
                 fields.remove("target");

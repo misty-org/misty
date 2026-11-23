@@ -6,13 +6,8 @@ import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { AgentPlanEditor } from "./AgentPlanEditor";
 import { PlanRiskTag } from "./PlanRiskTag";
 import { useCollaborationStore } from "./store";
-import type { AgentPlan, AgentPlanVersion } from "./planTypes";
+import type { AgentPlan, AgentPlanVersion } from "./plan_types";
 
-/**
- * The proposed plan in the transcript. Run plan approves this exact version and
- * starts it in Act mode; Edit saves your changes as a new version; Keep planning
- * hands the conversation back to the composer.
- */
 export function AgentPlanCard({
   plan,
   history = [],
@@ -21,7 +16,6 @@ export function AgentPlanCard({
   onKeepPlanning,
 }: {
   plan: AgentPlan;
-  /** Every version of this conversation's plan, newest first. */
   history?: AgentPlanVersion[];
   working: boolean;
   onRun(prompt: string): void;
@@ -82,13 +76,7 @@ export function AgentPlanCard({
               step.detail ? (
                 <details>
                   <summary>Details</summary>
-                  <Text
-                    as="div"
-                    bare
-                    size="meta"
-                    tone="muted"
-                    className="misty-markdown-message mt-1.5"
-                  >
+                  <Text as="div" bare size="meta" tone="muted" className="mt-1.5">
                     <MistyMarkdown>{step.detail}</MistyMarkdown>
                   </Text>
                 </details>
@@ -160,7 +148,6 @@ export function AgentPlanCard({
   );
 }
 
-/** A short list under the plan (its assumptions, what done looks like) with a quiet heading. */
 function PlanList({ title, items }: { title: string; items: string[] }) {
   return (
     <div>

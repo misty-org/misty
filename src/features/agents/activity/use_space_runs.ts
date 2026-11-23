@@ -1,0 +1,39 @@
+import { useEffect, useMemo, useState } from "react";
+import { conversationInSpace } from "../conversations/state/conversation_space";
+import type { GlobalAiConversation } from "../conversations/state/conversation_types";
+import { useMistyStore } from "../conversations/state/use_misty_store";
+import { activityApi, type RunRow } from "./activity_api";
+import { useRunEvents } from "./use_run_steps";
+
+function useSpaceChats(): GlobalAiConversation[] {
+  const conversations = useMistyStore((state) => state.conversations);
+  return useMemo(
+    () => conversations.filter((conversation) => conversationInSpace(conversation)),
+    [conversations],
+  );
+}
+
+export function useSpaceRuns(limit = 200): {
+  runs: RunRow[] | null;
+  chats: GlobalAiConversation[];
+  reload(): void;
+} {
+  const chats = useSpaceChats();
+  const [runs, setRuns] = useState<RunRow[] | null>(null);
+  const [round, setRound] = useState(0);
+  const reload = useMemo(() => () => setRound((value) => value + 1), []);
+  const ids = useMemo(() => chats.map((chat) => chat.id).join("\n"), [chats]);
+  useEffect(() => {
+    let live = true;
+    const chatIds = ids ? ids.split("\n") : [];
+    void activityApi
+      .timeline(chatIds, limit)
+      .then((rows) => live && setRuns(rows))
+      .catch(() => live && setRuns((known) => known ?? []));
+    return () => {
+      live = false;
+    };
+  }, [ids, limit, round]);
+  useRunEvents(null, reload);
+  return { runs, chats, reload };
+}

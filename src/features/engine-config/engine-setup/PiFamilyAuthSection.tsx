@@ -2,24 +2,9 @@
 // PiFamilyOauthSection.tsx, PiFamilyApiKeySection.tsx and PiFamilyCustomSection.tsx.
 // See NOTICE.
 
-/**
- * Pi's and Oh My Pi's providers in Agents › Channels:
- *
- * - Subscriptions: which are signed in, as the CLI's own store says, and signing in or out. The
- *   CLI does that itself (Pi's `/login`, `omp auth-broker login`) in the sign-in terminal; Misty
- *   never sees the token it gets.
- * - API keys: search, featured or all, set, replace or remove. A key goes from the field straight
- *   into the CLI's own store (0600); reads carry only its masked ends.
- * - Custom providers: models.json (Pi) or models.yml (Oh My Pi), edited as text with a loose check
- *   before it is written: the whole file, or one provider's block at a time, or a provider
- *   removed, with the rest of the file left as written.
- *
- * Read when the page opens and after each change here, never on a timer. Every change tells the
- * model menus to read again, since the CLIs list models by the credentials they hold.
- */
 import { LogIn, LogOut } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import { DesktopSettingsSection as Section } from "@/features/settings";
 import {
   AlertDialog,
@@ -30,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  cn,
+  Mark,
   SearchField,
   SecretField,
   Skeleton,
@@ -40,10 +25,9 @@ import {
   Text,
   Tooltip,
 } from "@misty/ui";
-import { BrandTile } from "../brands/BrandMark";
 import { notifyCliConfigChanged } from "../channels/providers";
 import { SignInDialog } from "../clis/SignInDialog";
-import type { SignInRequest } from "../clis/signInApi";
+import type { SignInRequest } from "../clis/sign_in_api";
 import {
   piFamilyApi,
   type PiFamilyAuthListResult,
@@ -55,12 +39,10 @@ import {
   PI_FAMILY_OAUTH_PROVIDERS,
   type PiFamilyAuthUiProvider,
   type PiFamilyOauthProvider,
-} from "./piFamilyAuthCatalog";
+} from "./pi_family_auth_catalog";
 
 import { errorText, ROW, RowsCard, State, type PiEngine } from "./PiFamilyParts";
 import { CustomProviders } from "./PiFamilyCustomProviders";
-
-// ── Subscriptions ───────────────────────────────────────────────────────────
 
 function OauthRows({
   engine,
@@ -71,7 +53,6 @@ function OauthRows({
 }: {
   engine: PiEngine;
   active: ReadonlySet<string>;
-  /** The CLI's store is still being read for the first time, so no state is known yet. */
   reading: boolean;
   onSignIn: (provider: PiFamilyOauthProvider) => void;
   onSignOut: (provider: PiFamilyOauthProvider) => void;
@@ -83,12 +64,17 @@ function OauthRows({
           const signedIn = provider.statusIds.some((id) => active.has(id));
           return (
             <div className={ROW} key={provider.id}>
-              <BrandTile mark={provider.mark} />
-              <Text as="p" full={provider.detail} tone="bright" className="min-w-0 flex-1 text-sm">
+              <Text
+                bare
+                tone={provider.mark ? "default" : "muted"}
+                className="flex size-8 shrink-0 items-center justify-center"
+              >
+                <Mark of={provider.mark} label={provider.name} size={20} aria-hidden />
+              </Text>
+              <Text size="control" as="p" full={provider.detail} className="min-w-0 flex-1">
                 {provider.name}
               </Text>
               {reading ? (
-                // Not "Signed out" before the store says so: a placeholder the state's size.
                 <Skeleton className="h-3.5 w-18 shrink-0" />
               ) : (
                 <State on={signedIn} label={signedIn ? "Signed in" : "Signed out"} />
@@ -118,8 +104,6 @@ function OauthRows({
     </Section>
   );
 }
-
-// ── API keys ────────────────────────────────────────────────────────────────
 
 function ApiKeyRows({
   engine,
@@ -153,7 +137,6 @@ function ApiKeyRows({
   }, [query, showAll, byId]);
 
   const name = engine === "pi" ? "Pi" : "Oh My Pi";
-  // A key goes straight into the CLI's own store; the field shows a failure under itself.
   const changed = async () => {
     notifyCliConfigChanged();
     await onChanged();
@@ -172,9 +155,9 @@ function ApiKeyRows({
   };
 
   return (
-    <section aria-label="API keys" className="mb-8">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <Text bare as="h2" size="body" weight="semibold" tone="bright">
+    <section aria-label="API keys" className="mb-8 grid gap-1.5">
+      <div className="flex items-center justify-between gap-3">
+        <Text bare as="h2" size="meta" weight="medium" tone="muted" className="px-0.5">
           API keys
         </Text>
         <SearchField
@@ -187,7 +170,7 @@ function ApiKeyRows({
       </div>
       <RowsCard>
         {loadError ? (
-          <Text bare as="div" role="alert" tone="muted" className={cn(ROW, "text-sm")}>
+          <Text size="meta" bare as="div" role="alert" tone="muted" className={ROW}>
             {loadError}
           </Text>
         ) : null}
@@ -198,9 +181,15 @@ function ApiKeyRows({
             const snap = byId.get(provider.id);
             return (
               <div key={provider.id} className={ROW}>
-                <BrandTile mark={provider.mark} />
+                <Text
+                  bare
+                  tone={provider.mark ? "default" : "muted"}
+                  className="flex size-8 shrink-0 items-center justify-center"
+                >
+                  <Mark of={provider.mark} label={provider.name} size={20} aria-hidden />
+                </Text>
                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <Text as="p" full tone="bright" className="text-sm">
+                  <Text size="control" as="p" full>
                     {provider.name}
                   </Text>
                   {snap?.envVar ? (
@@ -217,7 +206,6 @@ function ApiKeyRows({
                 <SecretField
                   label={`${provider.name} key`}
                   className="w-60 max-w-full"
-                  // The list is read by now: a provider the CLI doesn't list has no key saved.
                   saved={snap?.state === "configured"}
                   placeholder={snap?.envVar ? `Paste ${snap.envVar}` : undefined}
                   savedText={
@@ -232,7 +220,7 @@ function ApiKeyRows({
           })
         )}
         {snapshot && visible.length === 0 ? (
-          <Text bare as="div" tone="muted" className={cn(ROW, "text-sm")}>
+          <Text size="meta" bare as="div" tone="muted" className={ROW}>
             No providers match “{query}”
           </Text>
         ) : null}
@@ -256,13 +244,8 @@ function ApiKeyRows({
   );
 }
 
-/** How many providers the list shows before "Show all". */
 const FEATURED_COUNT = PI_FAMILY_APIKEY_PROVIDERS.filter((provider) => provider.featured).length;
 
-/**
- * The key list's first read: a row per featured provider (its tile, name and key field), then
- * Show all and the store's path, each at its real height.
- */
 function ApiKeyRowsSkeleton() {
   return (
     <>
@@ -272,7 +255,6 @@ function ApiKeyRowsSkeleton() {
         rows={FEATURED_COUNT}
         leading="tile"
         trailing="field"
-        className="border-b"
       />
       <div aria-hidden="true" className="flex h-8 items-center justify-center">
         <Skeleton className="h-3.5 w-24" />
@@ -284,21 +266,14 @@ function ApiKeyRowsSkeleton() {
   );
 }
 
-// ── Section ─────────────────────────────────────────────────────────────────
-
 interface PiFamilyConfig {
   auth: PiFamilyAuthListResult;
   models: PiFamilyModelsConfigReadResult;
 }
 
-/** What Pi's or Oh My Pi's own files say, kept for this session per engine. */
 const piFamilyKey = (engine: PiEngine) => `engine-config/pi-family:${engine}`;
 
-/** Pi's or Oh My Pi's subscriptions, API keys and custom providers. */
 export function PiFamilyAuthSection({ engine }: { engine: PiEngine }) {
-  // Session only: the custom-provider file can hold keys as written, and the key list carries
-  // their masked ends, so neither is copied to the cache on disk. Each engine has its own copy,
-  // so switching between Pi and Oh My Pi shows the right one at once.
   const resource = useCachedResource<PiFamilyConfig>(piFamilyKey(engine), async () => {
     const [auth, models] = await Promise.all([
       piFamilyApi.list(engine),
@@ -324,7 +299,6 @@ export function PiFamilyAuthSection({ engine }: { engine: PiEngine }) {
     if (!target) return;
     const providerId = target.statusIds.find((id) => active.has(id));
     if (!providerId) return;
-    // Pi asks which account in its own `/logout`; Oh My Pi signs out of the provider named.
     setSignIn({ engine, signOut: true, provider: engine === "omp" ? providerId : undefined });
   };
 
@@ -344,7 +318,6 @@ export function PiFamilyAuthSection({ engine }: { engine: PiEngine }) {
         request={signIn}
         onClose={() => {
           setSignIn(null);
-          // The CLI wrote its own store: read it again, and have model menus do the same.
           void refresh().then(notifyCliConfigChanged);
         }}
       />

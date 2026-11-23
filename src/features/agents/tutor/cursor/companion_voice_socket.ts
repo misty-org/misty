@@ -1,0 +1,53 @@
+export interface ConversationTool {
+  callId: string;
+  name: "start_task" | "steer_task" | "cancel_task" | "get_task_status" | "reassign_task";
+  instruction: string;
+  agent?: string;
+  key: string;
+  invocationId: string;
+}
+export interface SavedVoiceTurn {
+  id: string;
+  prompt: string;
+  reply: string;
+  interrupted: boolean;
+  handoff?: { agentId: string; conversationId: string };
+  seen?: string;
+}
+
+export function deferred() {
+  let resolve!: () => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<void>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  void promise.catch(() => {});
+  return { promise, resolve, reject };
+}
+
+export const recordedRate = 24_000;
+export const recognizedRate = 16_000;
+
+export function toRecognizerRate(audio: string): string {
+  const raw = atob(audio);
+  const count = Math.floor(raw.length / 2);
+  const input = new Int16Array(count);
+  for (let at = 0; at < count; at++) {
+    const low = raw.charCodeAt(at * 2);
+    const high = raw.charCodeAt(at * 2 + 1);
+    input[at] = (((high << 8) | low) << 16) >> 16;
+  }
+  const ratio = recordedRate / recognizedRate;
+  const length = Math.floor(count / ratio);
+  let out = "";
+  for (let at = 0; at < length; at++) {
+    const position = at * ratio;
+    const before = Math.floor(position);
+    const after = Math.min(before + 1, count - 1);
+    const weight = position - before;
+    const sample = Math.round(input[before]! * (1 - weight) + input[after]! * weight);
+    out += String.fromCharCode(sample & 0xff, (sample >> 8) & 0xff);
+  }
+  return btoa(out);
+}

@@ -1,5 +1,3 @@
-//! Native webview theming, positioning and presentation per platform.
-
 use crate::browser::*;
 
 mod placement;
@@ -38,9 +36,6 @@ pub(in crate::browser) fn remember_main_macos_webview(
     if crate::browser::app_windows::is_app_window(window_label) {
         configure_main_webview_pointer_guard(&main_webview)?;
     }
-    // Configure the renderer's native background once, before the Browser
-    // child is first presented. Reapplying this during every popup transition
-    // clears WKWebView's backing layer and produces a dark compositor frame.
     if !renderer(window_label).transparent {
         if let Err(error) = main_webview.set_background_color(Some(Color(0, 0, 0, 0))) {
             return Err(error.to_string());
@@ -81,14 +76,6 @@ pub(in crate::browser) fn remember_main_macos_webview(
     if renderer(window_label).native == 0 {
         return Err("Misty's main WebView2 window is unavailable.".to_owned());
     }
-    // Make the renderer transparent once, when the first page is created and
-    // before any is on screen, and leave it that way. Popovers, menus and
-    // dialogs then only move the pages beneath the renderer and back, which
-    // lands in one frame. Changing WebView2's background per overlay instead
-    // reaches the screen frames after the pages move, so the renderer's fill
-    // flashed over the page every time one opened or closed. The window
-    // itself is painted the theme color behind the renderer
-    // (`DesktopWindowReady`), so nothing shows through where no page is.
     if !renderer(window_label).transparent {
         main_webview
             .set_background_color(Some(Color(0, 0, 0, 0)))
@@ -113,8 +100,6 @@ pub(in crate::browser) fn remember_main_macos_webview(
     Ok(())
 }
 
-/// Whether `view` already sits on the correct side of the app renderer inside
-/// `parent`. Restacking is only needed when this is false.
 #[cfg(target_os = "macos")]
 pub(in crate::browser) unsafe fn browser_stacking_is_correct(
     parent: &objc2_app_kit::NSView,
@@ -135,15 +120,12 @@ pub(in crate::browser) unsafe fn browser_stacking_is_correct(
             main_index = Some(index);
         }
     }
-    // A detached child always needs reinserting.
     let Some(view_index) = view_index else {
         return false;
     };
     match main_index {
         Some(main_index) if below_main => view_index < main_index,
         Some(main_index) => view_index > main_index,
-        // Without the app renderer as a reference point, "topmost" is the only
-        // ordering the caller can ask for.
         None => view_index + 1 == subviews.count(),
     }
 }
@@ -153,8 +135,6 @@ pub(in crate::browser) fn present_macos_webview(webview: &Webview) -> Result<(),
     position_macos_webview(webview, true)
 }
 
-/// Whether the page exists but is still parked for its first paint. The
-/// frontend keeps the previous page up until this turns false.
 #[tauri::command]
 pub fn browser_webview_held(request: BrowserWebviewIdRequest) -> bool {
     is_held_id(&request.id)

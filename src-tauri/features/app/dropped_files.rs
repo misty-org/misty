@@ -1,26 +1,14 @@
-//! Files the person drags onto a Misty window from Finder, Explorer or a Linux file manager.
-//!
-//! The webview's own drop handler is on (`dragDropEnabled`), so the operating system hands the
-//! dropped paths to Tauri rather than to the page. The page hears of the drop through Tauri's
-//! drag-drop event and reads each file back here. Tauri emits that event to the page before it
-//! calls the app's own handlers, so the page retries a read that comes in a moment too early. Only paths the system itself dropped on one of
-//! Misty's own windows can be read, and only while they are recent, so the page can't use this to
-//! read any other file on the computer. Dropping a file is the person handing it over, the same as
-//! picking it in a dialog, so each one gets the file gate's picked-file grant, read-only.
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use tauri::{DragDropEvent, Runtime, Webview, WebviewEvent, Window, WindowEvent};
 
-/// How many dropped paths are remembered: a few drops' worth.
 const REMEMBERED: usize = 64;
-/// The largest file read back, matching the composer's own limit for an attachment.
 const LARGEST: u64 = 10 * 1024 * 1024;
 
 static DROPPED: Mutex<VecDeque<PathBuf>> = Mutex::new(VecDeque::new());
 
-/// Notes the paths of a drop on one of Misty's own windows.
 pub fn window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
     let WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event else {
         return;
@@ -28,9 +16,6 @@ pub fn window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
     remember_for(window.label(), paths);
 }
 
-/// Notes the paths of a drop on the webview of one of Misty's own windows. Tauri reports a drop
-/// here, not as a window event, when the webview is a child of its window, which with the
-/// `unstable` feature every webview is. Websites in tabs carry their own labels and are passed over.
 pub fn webview_event<R: Runtime>(webview: &Webview<R>, event: &WebviewEvent) {
     let WebviewEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event else {
         return;
@@ -65,7 +50,6 @@ fn was_dropped(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// The bytes of a file the person just dropped on the window.
 #[tauri::command]
 pub async fn dropped_file_read(path: String) -> Result<tauri::ipc::Response, String> {
     let path = PathBuf::from(path);

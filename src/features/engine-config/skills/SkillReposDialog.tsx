@@ -1,9 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * The repositories the skills hub reads skills from: each engine's Skills catalog on the
- * Plugins page lists what they hold, then skills.sh as the person types.
- */
 import { useState } from "react";
 import {
   Button,
@@ -14,14 +10,15 @@ import {
   DialogTitle,
   Input,
   Label,
-  SkeletonList,
+  ListRow,
+  ListRowSkeleton,
+  RowGroup,
   Text,
 } from "@misty/ui";
 import { t } from "./strings";
 import type { SkillRepo } from "./types";
-import { useSkillDiscovery } from "./useSkillDiscovery";
+import { useSkillDiscovery } from "./use_skill_discovery";
 
-/** The dialog, reading the hub's repositories only while it is open. */
 export function SkillReposDialog({ onClose }: { onClose: () => void }) {
   const discovery = useSkillDiscovery(true);
   return (
@@ -83,34 +80,25 @@ function RepoDialog({
           <DialogTitle>{t("repos.title")}</DialogTitle>
         </DialogHeader>
         {loading ? (
-          // The list's own rows: 36px, a hairline between them, Remove at the end.
-          <SkeletonList
-            label={t("repos.title")}
-            rows={3}
-            trailing="button-sm"
-            className="gap-0 divide-y"
-            rowClassName="min-h-9 py-1.5"
-          />
-        ) : (
-          <ul className="flex max-h-48 flex-col overflow-y-auto">
+          <RowGroup>
+            <ListRowSkeleton label={t("repos.title")} rows={3} lines={2} trailing="button-sm" />
+          </RowGroup>
+        ) : repos.length > 0 ? (
+          <RowGroup className="max-h-48 overflow-y-auto">
             {repos.map((repo) => (
-              <li
+              <ListRow
                 key={`${repo.owner}/${repo.name}`}
-                className="flex items-center justify-between gap-2 border-t py-1.5 first:border-t-0"
-              >
-                <Text full tone="default" className="text-sm">
-                  {repo.owner}/{repo.name}
-                  <Text bare tone="muted" className="ml-1">
-                    @{repo.branch}
-                  </Text>
-                </Text>
-                <Button size="sm" onClick={() => remove(repo)}>
-                  {t("repos.remove")}
-                </Button>
-              </li>
+                label={`${repo.owner}/${repo.name}`}
+                description={`@${repo.branch}`}
+                trailing={
+                  <Button size="sm" onClick={() => remove(repo)}>
+                    {t("repos.remove")}
+                  </Button>
+                }
+              />
             ))}
-          </ul>
-        )}
+          </RowGroup>
+        ) : null}
         <div className="grid grid-cols-[1fr_1fr_--spacing(24)] gap-2">
           {(
             [
@@ -130,7 +118,7 @@ function RepoDialog({
           ))}
         </div>
         {error ? (
-          <Text bare as="p" role="alert" tone="bright" className="text-xs">
+          <Text size="meta" bare as="p" role="alert" tone="bright">
             {error}
           </Text>
         ) : null}

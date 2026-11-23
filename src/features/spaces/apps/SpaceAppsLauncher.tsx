@@ -1,21 +1,15 @@
 import { useMemo, useState } from "react";
 import { create } from "zustand";
 import { AddAppTile, AppLauncher, AppLogoImage, AppTile } from "@misty/ui";
-import { appRoute } from "./appRoutes";
-import { appEntry, catalogLogoUrl } from "./thirdPartyApps";
-import { useSpaceApps } from "./useSpaceApps";
+import { appRoute } from "./app_routes";
+import { appEntry, catalogLogoUrl } from "./third_party_apps";
+import { useSpaceApps } from "./use_space_apps";
 
-/** Whether the apps launcher is open; the sidebar's Apps row opens it. */
 export const useAppLauncher = create<{ open: boolean; setOpen(open: boolean): void }>((set) => ({
   open: false,
   setOpen: (open) => set({ open }),
 }));
 
-/**
- * A Space's apps in @misty/ui's AppLauncher: every open-source app a mod added, however many. A
- * search narrows them; an app opens where `onOpen` takes its route, and "Add app" takes a mod to
- * Explore's Apps list.
- */
 export function SpaceAppsLauncher(props: {
   spaceId: string;
   isMod: boolean;
@@ -32,6 +26,7 @@ export function SpaceAppsLauncher(props: {
         id: app.app_id,
         name: entry?.name ?? app.app_id,
         logo: entry ? catalogLogoUrl(entry) : "",
+        render: entry?.icon_render,
       };
     });
     const words = query.trim().toLocaleLowerCase();
@@ -61,7 +56,14 @@ export function SpaceAppsLauncher(props: {
       {tiles.map((tile) => (
         <AppTile
           key={tile.id}
-          mark={<AppLogoImage src={tile.logo || undefined} name={tile.name} size="launcher" />}
+          mark={
+            <AppLogoImage
+              src={tile.logo || undefined}
+              name={tile.name}
+              size="launcher"
+              render={tile.render}
+            />
+          }
           label={tile.name}
           onClick={() => launch(tile.id)}
         />

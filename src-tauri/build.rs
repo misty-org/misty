@@ -1,4 +1,3 @@
-// A build script runs at compile time, on the source tree, so the app's file gate doesn't apply.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use std::{
@@ -36,8 +35,6 @@ fn main() {
     }
 }
 
-/// The sandbox's actions, grants and permissions. Listing the app's
-/// commands makes Tauri refuse any command no capability allows, for every window.
 fn sandbox_attributes() -> tauri_build::Attributes {
     const APP_COMMANDS: &[&str] = include!("tauri-permissions/app_commands.in");
     tauri_build::Attributes::new()
@@ -49,11 +46,6 @@ fn sandbox_attributes() -> tauri_build::Attributes {
         )
 }
 
-/// Tauri's Windows manifest only asks for Common Controls 6, and only the app
-/// gets it. Every binary that links this crate imports comctl32 v6 entry
-/// points, so unit tests and examples need it too or they fail to start with
-/// STATUS_ENTRYPOINT_NOT_FOUND. The linker embeds it everywhere instead,
-/// with the Windows versions Misty supports (`packaging/windows/compatibility.manifest`).
 fn embed_common_controls_manifest() {
     let compatibility =
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("Cargo manifest directory"))
@@ -77,24 +69,19 @@ fn expose_public_app_configuration() {
         .unwrap_or_else(|| PathBuf::from("."));
     let app_folder = manifest_dir.parent().unwrap_or(Path::new("."));
     let app_env_path = app_folder.join(".env");
-    // Cargo counts a watched file that doesn't exist as changed on every build, which reran this
-    // script and recompiled all of Misty each launch. No `.env` is ever committed, so watch it
-    // only while it exists, and otherwise the folder it would appear in.
-    let watched = if app_env_path.exists() {
-        app_env_path.as_path()
+    if app_env_path.exists() {
+        println!("cargo:rerun-if-changed={}", app_env_path.display());
     } else {
-        app_folder
-    };
-    println!("cargo:rerun-if-changed={}", watched.display());
-    for key in ["MISTY_RELEASE_CHANNEL"] {
-        println!("cargo:rerun-if-env-changed={key}");
-        let value = env::var(key)
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .or_else(|| read_env_value(&app_env_path, key));
-        if let Some(value) = value {
-            println!("cargo:rustc-env={key}={value}");
-        }
+        println!("cargo:rerun-if-changed=build.rs");
+    }
+    let key = "MISTY_RELEASE_CHANNEL";
+    println!("cargo:rerun-if-env-changed={key}");
+    let value = env::var(key)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| read_env_value(&app_env_path, key));
+    if let Some(value) = value {
+        println!("cargo:rustc-env={key}={value}");
     }
 }
 
@@ -113,9 +100,6 @@ fn read_env_value(path: &Path, key: &str) -> Option<String> {
     })
 }
 
-/// Build helpers for the same target and profile as Misty, then embed their
-/// bytes. Keep helpers inside this build's OUT_DIR so neither the parent nor
-/// another desktop profile competes for the same worker build directory.
 fn build_builtin_workers() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if target_os != "macos" && target_os != "windows" && target_os != "linux" {
@@ -123,8 +107,6 @@ fn build_builtin_workers() {
     }
     let windows = target_os == "windows";
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
-    // Linux helpers link against the system's C library, so they build on a Linux host. A check
-    // from another system embeds none, and every request for one fails.
     if target_os == "linux" && !env::var("HOST").unwrap_or_default().contains("linux") {
         std::fs::write(
             out_dir.join("builtin_workers.rs"),
@@ -140,7 +122,6 @@ fn build_builtin_workers() {
     let target = env::var("TARGET").expect("Cargo target");
     let profile = env::var("PROFILE").expect("Cargo profile");
     let mut source = String::from("match (service, protocol) {\n");
-    // The page reader's code is in a crate the agent runtime shares, outside its worker's folder.
     let shared = root.join("browser").join("page_text");
     for input in ["src", "Cargo.toml"] {
         println!("cargo:rerun-if-changed={}", shared.join(input).display());
@@ -159,16 +140,17 @@ fn build_builtin_workers() {
         command
             .current_dir(&directory)
             .args(["build", "--locked", "--target", &target]);
-        let worker_target = out_dir.join("worker-targets").join(service);
+        let worker_target = out_dir
+            .ancestors()
+            .nth(3)
+            .unwrap_or(&out_dir)
+            .join("worker-targets")
+            .join(service);
         command.env("CARGO_TARGET_DIR", &worker_target);
-        // Do not inherit the desktop's intermediate directory: a nested Cargo
-        // build would wait on the lock held by its own parent build.
         command.env("CARGO_BUILD_BUILD_DIR", &worker_target);
         if profile == "release" {
             command.arg("--release");
         }
-        // The confined Windows helper cannot load the Visual C++ runtime from
-        // outside its folder, so it carries the runtime itself.
         if windows {
             let mut flags = env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default();
             if !flags.is_empty() {

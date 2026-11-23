@@ -1,16 +1,20 @@
-//! Overriding the main webview's pointer event methods so events over a page reach the page.
 use super::*;
 
 pub(super) unsafe fn install_pointer_event_overrides(class: &AnyClass) {
-    // `mouseExited:` must still clear hover state when the pointer leaves an
-    // uncovered part of the main renderer.
     for selector in [
         objc2::sel!(mouseMoved:),
         objc2::sel!(mouseEntered:),
         objc2::sel!(cursorUpdate:),
     ] {
-        let replacement: unsafe extern "C-unwind" fn(_, _, _) = pointer_event;
-        install_method_override(class, selector, std::mem::transmute(replacement));
+        let replacement: unsafe extern "C-unwind" fn(&AnyObject, Sel, &NSEvent) = pointer_event;
+        install_method_override(
+            class,
+            selector,
+            std::mem::transmute::<
+                unsafe extern "C-unwind" fn(&AnyObject, Sel, &NSEvent),
+                objc2::runtime::Imp,
+            >(replacement),
+        );
     }
 }
 
@@ -81,7 +85,6 @@ pub(super) unsafe fn browser_child_covers_event(event: &NSEvent) -> bool {
         if browser.isHidden() {
             return false;
         }
-        // Only this window's pages cover this window's renderer.
         let in_window = browser.window().is_some_and(|candidate| {
             std::ptr::eq(
                 &*candidate as *const _ as *const AnyObject,

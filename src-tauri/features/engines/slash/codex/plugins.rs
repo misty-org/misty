@@ -1,9 +1,5 @@
-//! `/apps` and `/plugins`: the ChatGPT apps installed for Codex, and its plugins, listed,
-//! shown, installed and removed.
-
 use super::*;
 
-/// pages through all of it, thousands of apps on codex 0.147, in no order but their names.
 pub(super) async fn apps(context: &Context) -> Result<Output, String> {
     let mut rpc = open(context).await?;
     let mut scope = json!({});
@@ -44,9 +40,6 @@ pub(super) async fn apps(context: &Context) -> Result<Output, String> {
     ))
 }
 
-/// Plugins. Codex's online catalog (`openai-curated-remote`) is searched, never listed: listed
-/// whole it holds thousands of plugins, tens of megabytes in one reply on codex 0.147, more than
-/// a reply may be. The listing shows the local marketplaces and what is installed from any.
 pub(super) async fn plugins(context: &Context) -> Result<Output, String> {
     let args = context.args.trim();
     let (verb, rest) = split_first(args);
@@ -68,7 +61,6 @@ pub(super) async fn plugins(context: &Context) -> Result<Output, String> {
     result
 }
 
-/// `plugin/list` of the local marketplaces only, leaving out the online catalog.
 async fn local_plugins(rpc: &mut Session, scope: &Value) -> Result<Value, String> {
     let mut params = scope.clone();
     params["marketplaceKinds"] = json!(["local"]);
@@ -91,7 +83,6 @@ fn plugin_listing(local: &Value, installed: &Value) -> Output {
         .flatten()
         .filter_map(|marketplace| marketplace["name"].as_str())
         .collect();
-    // The local marketplaces whole, then what is installed from the others (the catalog).
     let remote_installed = installed["marketplaces"]
         .as_array()
         .into_iter()
@@ -154,9 +145,6 @@ fn plugin_listing(local: &Value, installed: &Value) -> Output {
     Output::info("Plugins", sections)
 }
 
-/// Where `plugin` (`name@marketplace`, or a name only one marketplace has) comes from: its
-/// summary, and the fields that name it for `plugin/read` and `plugin/install`. The local
-/// marketplaces come first, then what is installed, then a search of the online catalog.
 async fn locate_plugin(
     rpc: &mut Session,
     scope: &Value,
@@ -173,7 +161,6 @@ async fn locate_plugin(
     if let Some(found) = find_plugin(&installed, plugin)? {
         return Ok(found);
     }
-    // Codex's search matches words, so a hyphenated name is searched as its words.
     let name = plugin.split_once('@').map_or(plugin, |(name, _)| name);
     let mut params = scope.clone();
     params["searchTerm"] = json!(name.replace(['-', '_'], " "));
@@ -183,7 +170,6 @@ async fn locate_plugin(
         .ok_or_else(|| format!("Codex has no plugin {plugin}. See /plugins."))
 }
 
-/// `plugin/search`'s results in `plugin/list`'s shape: marketplaces with their plugins.
 fn search_listing(found: &Value) -> Value {
     let mut marketplaces: Vec<Value> = Vec::new();
     for result in found["data"].as_array().into_iter().flatten() {
@@ -209,7 +195,6 @@ fn search_listing(found: &Value) -> Value {
     json!({ "marketplaces": marketplaces })
 }
 
-/// `plugin` in one listing: None when no marketplace there has it.
 fn find_plugin(listing: &Value, plugin: &str) -> Result<Option<(Value, Value)>, String> {
     let (name, market) = match plugin.split_once('@') {
         Some((name, market)) => (name, Some(market)),
@@ -332,7 +317,6 @@ async fn plugin_uninstall(
     scope: &Value,
     plugin: &str,
 ) -> Result<Output, String> {
-    // A full id is what Codex removes by; a bare name is looked up among the installed ones.
     let id = if plugin.contains('@') {
         plugin.to_string()
     } else {

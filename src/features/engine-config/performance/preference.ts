@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-import { listen, performanceApi } from "./nativeApi";
+import { listen, performanceApi } from "./native_api";
 import { performanceRecorder, type PerformanceContext } from "./diagnostics";
 import { startPerformanceMonitor } from "./monitor";
 

@@ -1,4 +1,4 @@
-import { cn, Surface, Text, windowToolbarClass } from "@misty/ui";
+import { PageHeader, Surface, windowToolbarClass } from "@misty/ui";
 import type { ReactNode } from "react";
 
 export function standaloneWorkspaceRouteTitle(pathname: string): string | null {
@@ -12,17 +12,10 @@ export function StandaloneRouteSurface(props: { title: string; children: ReactNo
     <Surface
       as="section"
       tone="page"
-      className="grid h-full min-h-0 grid-rows-[2.375rem_minmax(0,1fr)] overflow-hidden"
+      className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden"
     >
-      <Surface
-        as="header"
-        tone="workspace"
-        data-window-toolbar
-        className={cn(windowToolbarClass, "flex h-(--ui-header) items-center border-b px-3")}
-      >
-        <Text bare tone="bright" className="text-sm font-medium">
-          {props.title}
-        </Text>
+      <Surface tone="workspace" data-window-toolbar className={windowToolbarClass}>
+        <PageHeader title={props.title} />
       </Surface>
       <div className="min-h-0 overflow-auto">{props.children}</div>
     </Surface>

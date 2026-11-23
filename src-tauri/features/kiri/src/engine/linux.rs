@@ -1,7 +1,3 @@
-//! WebKitGTK on Linux: the permission-request signal, answered with a refusal. WebKitGTK ships
-//! camera, microphone and WebRTC switched off and has no prompt of its own; the handler keeps any
-//! request from waiting on an answer.
-
 use gtk::prelude::*;
 use std::{
     collections::HashSet,
@@ -10,7 +6,6 @@ use std::{
 use tauri::Webview;
 use webkit2gtk::{PermissionRequestExt, WebViewExt};
 
-/// Native views that already have Kiri's handler.
 fn installed() -> &'static Mutex<HashSet<usize>> {
     static INSTALLED: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
     INSTALLED.get_or_init(Mutex::default)
@@ -36,7 +31,6 @@ pub(super) fn deny_permission_requests(webview: &Webview) -> Result<(), String> 
 }
 
 pub(super) fn edit(webview: &Webview, command: super::EditCommand) -> Result<(), String> {
-    // WEBKIT_EDITING_COMMAND_COPY / _CUT / _PASTE.
     let name = match command {
         super::EditCommand::Copy => "Copy",
         super::EditCommand::Cut => "Cut",

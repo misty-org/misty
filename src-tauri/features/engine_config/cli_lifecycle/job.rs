@@ -17,7 +17,6 @@ use windows_sys::Win32::System::JobObjects::{
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 
-/// Owns a kill-on-close job's handle; only `Drop` closes it.
 pub(crate) struct KillOnCloseJob(HANDLE);
 
 unsafe impl Send for KillOnCloseJob {}
@@ -25,15 +24,12 @@ unsafe impl Sync for KillOnCloseJob {}
 
 impl Drop for KillOnCloseJob {
     fn drop(&mut self) {
-        // Closing the last handle is what makes the kernel end the members still running.
         unsafe {
             CloseHandle(self.0);
         }
     }
 }
 
-/// Puts `child` into a new kill-on-close job. `None` (with a log line) when Windows refuses:
-/// the child already exited, or it sits in a job that forbids nesting.
 pub(crate) fn assign_kill_on_close(child: &tokio::process::Child) -> Option<Arc<KillOnCloseJob>> {
     let process = child.raw_handle()? as HANDLE;
     unsafe {

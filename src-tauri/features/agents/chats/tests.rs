@@ -27,9 +27,7 @@ async fn adopting_moves_chats_and_leaves_approvals_behind() {
     let kept = |account: &str| -> Vec<String> {
         let connection = store.connect().unwrap();
         let mut statement = connection
-            .prepare(
-                "SELECT id FROM agent_chats WHERE account = ?1 AND kind = 'agent' ORDER BY id",
-            )
+            .prepare("SELECT id FROM agent_chats WHERE account = ?1 AND kind = 'agent' ORDER BY id")
             .unwrap();
         let ids = statement
             .query_map([account], |row| row.get::<_, String>(0))
@@ -63,7 +61,6 @@ async fn chats_stay_per_account_and_kind() {
         .list("a".into(), "conversation".into())
         .await
         .unwrap();
-    // A listed chat carries the first page of its messages and where the next page starts.
     assert_eq!(
         listed,
         vec![
@@ -130,7 +127,6 @@ async fn a_swap_writes_only_over_what_it_read() {
     let read = || service.get("a".into(), "collaboration".into(), "c1".into());
     assert_eq!(read().await.unwrap(), None);
     assert!(swap(None, r#"{"v":1}"#).await.unwrap());
-    // Someone wrote first: both a second create and a stale update lose.
     assert!(!swap(None, r#"{"v":2}"#).await.unwrap());
     assert!(!swap(Some(r#"{"v":0}"#), r#"{"v":2}"#).await.unwrap());
     assert_eq!(read().await.unwrap().as_deref(), Some(r#"{"v":1}"#));
@@ -210,7 +206,12 @@ async fn an_agents_voice_is_a_short_catalog_id() {
     assert!(put(&format!(r#""{}""#, "a".repeat(65))).await.is_err());
     assert!(put("3").await.is_err());
     assert!(service
-        .put("a".into(), "agent".into(), "agent2".into(), r#"{"name":"Old"}"#.into())
+        .put(
+            "a".into(),
+            "agent".into(),
+            "agent2".into(),
+            r#"{"name":"Old"}"#.into()
+        )
         .await
         .is_ok());
 }

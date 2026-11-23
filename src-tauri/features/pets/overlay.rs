@@ -10,11 +10,9 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use super::{change_settings, read_settings, PetPosition};
 
-/// The pet window's label. Its capability is `tauri-permissions/capabilities/pet-overlay.json`.
 pub const LABEL: &str = "misty-pet";
 const STATE_EVENT: &str = "misty://pet-state";
 const SCALE_EVENT: &str = "misty://pet-scale";
-/// Tells a person's windows that the pet's settings changed.
 pub const SETTINGS_EVENT: &str = "misty://pet-settings-changed";
 
 const WIDTH: f64 = 192.0;
@@ -27,10 +25,7 @@ const MIN_SCALE: f64 = 0.5;
 const MAX_SCALE: f64 = 1.5;
 const HIT_TEST_INTERVAL_MS: u64 = 16;
 const LOOK_DIRECTION_INTERVAL_MS: u64 = 180;
-/// How often the tracker checks while the pet window is closed: it lives as long as Misty does,
-/// and must not spin at the hit-test rate.
 const WINDOW_GONE_SLEEP_MS: u64 = 1000;
-/// How often it checks while the pet window exists but is hidden.
 const HIDDEN_SLEEP_MS: u64 = 500;
 
 const PET_OFFSET_X: f64 = (BUBBLE_WIDTH - WIDTH) / 2.0;
@@ -102,10 +97,7 @@ fn snapshot() -> PetRuntimeState {
         .unwrap_or_default()
 }
 
-/// Shows the pet at launch when it was on. Called once from setup.
 pub fn init(app: &AppHandle) {
-    // A window is built off the UI thread: on Windows, building one from that thread waits on
-    // itself.
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let settings = read_settings(&app);
@@ -117,10 +109,8 @@ pub fn init(app: &AppHandle) {
     });
 }
 
-/// Tells a person's windows the pet's settings changed.
 pub(crate) fn settings_changed(app: &AppHandle) {
     let _ = app.emit(SETTINGS_EVENT, ());
-    // The menu bar's Show Pet item follows the setting, wherever it was changed.
     crate::app::tray::refresh(app);
 }
 
@@ -163,17 +153,12 @@ fn create_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
             .visible(false)
             .build()
             .map_err(|error| format!("The pet window could not open: {error}"))?;
-    // The window is wider than the pet to make room for its bubble. That transparent space stays
-    // click-through; the tracker lets clicks in only while the cursor is over the pet itself.
     window
         .set_ignore_cursor_events(true)
         .map_err(|error| error.to_string())?;
     if let Some(position) = settings.position {
         let x = position.x - PET_OFFSET_X * scale;
         let y = position.y - BUBBLE_HEIGHT;
-        // Restore only while the spot is still on a connected display. A transparent,
-        // click-through window off screen can't be found again (a monitor unplugged, a new
-        // resolution), so it goes back to its default place instead.
         if on_screen(app, position.x, position.y) {
             let _ =
                 window.set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)));
@@ -182,8 +167,6 @@ fn create_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
     Ok(window)
 }
 
-/// Opens or closes the pet window. Closing destroys it, so opening it again loads the chosen
-/// pet afresh.
 pub(crate) fn set_visible(app: &AppHandle, visible: bool) -> Result<(), String> {
     if !visible {
         if let Some(window) = app.get_webview_window(LABEL) {
@@ -201,24 +184,11 @@ pub(crate) fn set_visible(app: &AppHandle, visible: bool) -> Result<(), String> 
     Ok(())
 }
 
-/// Shows the chosen pet again, after the choice changed.
 pub(crate) fn reload(app: &AppHandle) -> Result<(), String> {
     set_visible(app, false)?;
     set_visible(app, true)
 }
 
-/// The cursor in logical desktop points, the space the hit test turns the window into.
-///
-/// Windows: GetCursorPos is in physical pixels; dividing by the window's scale is exact whenever
-/// the cursor and the window share a monitor, the only case the hit test can match.
-///
-/// macOS: NSEvent's mouse location, in points, flipped with the main display's height, the same
-/// convention tao uses for logical window positions.
-///
-/// Linux: the window's cursor position, in physical pixels. Wayland has no global cursor and
-/// answers the origin instead of an error, so the origin counts as unknown.
-///
-/// None of these needs an input grant.
 #[cfg(windows)]
 fn cursor_position(_window: &tauri::WebviewWindow, dpi: f64) -> Option<(f64, f64)> {
     use windows_sys::Win32::Foundation::POINT;
@@ -286,13 +256,9 @@ fn start_look_tracking(app: &AppHandle) {
                 continue;
             };
             let dpi = window.scale_factor().unwrap_or(1.0);
-            // Without a cursor (Wayland) the window stays click-through rather than putting an
-            // invisible interactive area on the desktop.
             let Some((mouse_x, mouse_y)) = cursor_position(&window, dpi) else {
                 continue;
             };
-            // The window holds transparent space above the pet for the bubble. Nearness and hover
-            // use the pet's own rectangle, all in logical points.
             let position: tauri::LogicalPosition<f64> = position.to_logical(dpi);
             let size: tauri::LogicalSize<f64> = size.to_logical(dpi);
             let pet_height = size.height - BUBBLE_HEIGHT;
@@ -348,7 +314,6 @@ fn start_look_tracking(app: &AppHandle) {
     });
 }
 
-/// Turns the pet on or off for this device.
 #[tauri::command]
 pub async fn pet_set_visible(app: AppHandle, visible: bool) -> Result<(), String> {
     if visible && read_settings(&app).pet_id.trim().is_empty() {
@@ -360,7 +325,6 @@ pub async fn pet_set_visible(app: AppHandle, visible: bool) -> Result<(), String
     shown
 }
 
-/// Resizes the pet, keeping its feet where they were.
 #[tauri::command]
 pub fn pet_set_scale(app: AppHandle, scale: f64) -> Result<f64, String> {
     if !scale.is_finite() || !(MIN_SCALE..=MAX_SCALE).contains(&scale) {
@@ -370,8 +334,6 @@ pub fn pet_set_scale(app: AppHandle, scale: f64) -> Result<f64, String> {
             MAX_SCALE * 100.0
         ));
     }
-    // Resize the live window first, and save only once that worked, so a failed resize can't
-    // leave a size saved that the page has already rolled back.
     if let Some(window) = app.get_webview_window(LABEL) {
         let previous = render_scale(read_settings(&app).scale);
         let dpi = window.scale_factor().unwrap_or(1.0);
@@ -403,7 +365,6 @@ pub fn pet_set_scale(app: AppHandle, scale: f64) -> Result<f64, String> {
     Ok(scale)
 }
 
-/// What the person's agents are doing, from one of their windows.
 #[tauri::command]
 pub fn pet_set_state(app: AppHandle, next: PetStateUpdate) -> Result<(), String> {
     if !STATUSES.contains(&next.status.as_str()) || !ACTIVITIES.contains(&next.activity.as_str()) {
@@ -411,7 +372,6 @@ pub fn pet_set_state(app: AppHandle, next: PetStateUpdate) -> Result<(), String>
     }
     {
         let mut current = state().lock().map_err(|_| "The pet is unavailable.")?;
-        // The look direction belongs to the cursor tracker, so it takes no part in this.
         if current.session_key == next.session_key
             && current.session_name == next.session_name
             && current.status == next.status
@@ -434,13 +394,11 @@ pub fn pet_set_state(app: AppHandle, next: PetStateUpdate) -> Result<(), String>
     Ok(())
 }
 
-/// The pet's current state, for the pet window as it loads.
 #[tauri::command]
 pub fn pet_overlay_state() -> PetRuntimeState {
     snapshot()
 }
 
-/// Where the person dropped the pet.
 #[tauri::command]
 pub fn pet_save_position(app: AppHandle, position: PetPosition) -> Result<(), String> {
     if !position.x.is_finite() || !position.y.is_finite() {

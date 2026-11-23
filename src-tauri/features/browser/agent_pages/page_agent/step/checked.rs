@@ -1,7 +1,5 @@
-//! Running one step once its control is found: the consequence gate, then native or script input.
 use super::*;
 
-/// Runs one step after its checks. Err only for faults where an effect is unknown.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn run_step_checked(
     app: &AppHandle,
@@ -13,7 +11,6 @@ pub(super) async fn run_step_checked(
     step: &Step,
     allow_consequential: bool,
 ) -> Result<Value, String> {
-    // Native input lands at a point in the top document; a frame's controls take script input.
     let native = |input: Value, prepared: Value| async move {
         if frame.is_some() {
             return Ok(None);
@@ -27,9 +24,7 @@ pub(super) async fn run_step_checked(
             json!({"ok": waited["met"] == true, "attempted": false, "met": waited["met"], "waitedMs": waited["waitedMs"]}),
         );
     }
-    // A fill or typing that submits is judged by the Enter that follows it.
     let submits = matches!(step.action.as_str(), "fill" | "type") && step.submit == Some(true);
-    // Typing is judged like filling: the same fields (payment, passwords) need the same care.
     let gate = if submits {
         "key"
     } else if step.action == "type" {
@@ -44,8 +39,6 @@ pub(super) async fn run_step_checked(
     };
     let prepared = prepare(view, frame, document, step, gate, key).await?;
     if prepared["ok"] != true {
-        // A link that stays covered after its popup was closed (a sticky video, a chat bubble)
-        // goes where it points, as a person would by opening it: the click cannot reach it.
         if let (true, None, Some(href)) = (
             step.action == "click" && prepared["errorCode"] == "browser_target_covered",
             frame,
@@ -69,7 +62,6 @@ pub(super) async fn run_step_checked(
     let kind = prepared["consequenceKind"].as_str().unwrap_or("");
     let origin = confirm::page_origin(view);
     if confirm::asks(request, kind) && !confirm::covered(request, &origin, kind) {
-        // The account asks before this kind of step: it waits for the person.
         let control = prepared["describe"]
             .as_str()
             .filter(|control| !control.is_empty())
@@ -128,7 +120,6 @@ pub(super) async fn run_step_checked(
             }
             let input = json!({"kind": "click", "x": prepared["point"]["x"], "y": prepared["point"]["y"],
                 "button": step.button.as_deref().unwrap_or("left"), "clickCount": step.click_count.unwrap_or(1)});
-            // A link or form that opens its page in a new tab: the step says so.
             let new_tab = prepared["opensNewTab"] == true;
             if let Some(result) = native(input, prepared.clone()).await? {
                 let mut done = json!({"ok": true, "attempted": true, "input": "native", "cursor": result["cursor"]});
@@ -138,7 +129,6 @@ pub(super) async fn run_step_checked(
                 return Ok(done);
             }
             if let Some(cursor) = cursor_script(&prepared).filter(|_| frame.is_none()) {
-                // The person watching sees the cursor reach the control before it is pressed.
                 if view.eval(cursor).is_ok() {
                     tokio::time::sleep(std::time::Duration::from_millis(CURSOR_GLIDE_MS)).await;
                 }
@@ -162,9 +152,6 @@ pub(super) async fn run_step_checked(
             }
             call_at(view, frame, "perform", step_args(document, step), false).await
         }
-        // Hover with a real pointer as well as the page's own events: the pointer opens CSS
-        // :hover menus while the window is in front (WebKit ignores pointer moves into a window
-        // behind others), and the events open menus built in script either way.
         "hover" => {
             let input =
                 json!({"kind": "move", "x": prepared["point"]["x"], "y": prepared["point"]["y"]});
@@ -178,8 +165,6 @@ pub(super) async fn run_step_checked(
             }
             Ok(result)
         }
-        // Typing as a person types, through the text input path, so suggest-as-you-type fields,
-        // search boxes and editors respond. The field's text is replaced.
         "type" => {
             if step.reference.is_some() {
                 let focused = script("focus").await?;
@@ -217,8 +202,6 @@ pub(super) async fn run_step_checked(
             }
             Ok(result)
         }
-        // A page scroll turns the wheel, so pages that load or move on wheel events respond.
-        // Scrolling a named panel, or text into view, stays with the page script.
         "scroll"
             if step.reference.is_none()
                 && step.text.is_none()
@@ -252,10 +235,6 @@ pub(super) async fn run_step_checked(
         _ => {
             let mut result =
                 call_at(view, frame, "perform", step_args(document, step), false).await?;
-            // An editor that keeps its own model (canvas editors such as OnlyOffice in CryptPad)
-            // drops inserted text and takes only real keystrokes. A fill it did not keep is typed
-            // instead, as a person would; it was reported as done and the document stayed empty
-            // (Odysseys, October 20).
             let text = step.text.as_deref().unwrap_or("");
             if step.action == "fill"
                 && result["ok"] == true

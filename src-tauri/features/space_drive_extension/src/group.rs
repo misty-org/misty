@@ -1,7 +1,3 @@
-//! Where Misty's socket is: the app group the extension and Misty are both signed with
-//! (`<Team ID>.com.misty.desktop`, `.dev` for dev builds; `tasks/drive-extension.ts`). The extension
-//! reads the group from its own entitlement rather than repeating the name, so a build's two halves
-//! always agree.
 use std::{ffi::c_void, path::PathBuf};
 
 use objc2::rc::Retained;
@@ -22,7 +18,6 @@ extern "C" {
     fn CFRelease(object: *const c_void);
 }
 
-/// The first app group in this process's `com.apple.security.application-groups` entitlement.
 fn app_group() -> Option<Retained<NSString>> {
     let key = NSString::from_str("com.apple.security.application-groups");
     // SAFETY: plain Security calls on this process's own task; the task is released below, and the
@@ -44,7 +39,6 @@ fn app_group() -> Option<Retained<NSString>> {
     }
 }
 
-/// The app group's container, which the sandbox lets the extension reach.
 pub fn container() -> Option<PathBuf> {
     let group = app_group()?;
     let url = NSFileManager::defaultManager().containerURLForSecurityApplicationGroupIdentifier(&group)?;

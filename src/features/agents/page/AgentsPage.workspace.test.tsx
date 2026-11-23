@@ -11,7 +11,7 @@ import {
 } from "./AgentsPage.testFixtures";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
-import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
+import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
 
 const nameField = () => screen.getByLabelText("Name") as HTMLInputElement;
 
@@ -19,9 +19,7 @@ it("opens straight into the agent's New task conversation without a directory", 
   renderAgentsPage();
   expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
   expect(screen.getByRole("heading", { name: /What's on your mind\?$/ })).toBeTruthy();
-  // The window's sidebar opens the other pages; the chat's bar has no page tabs.
   expect(screen.queryByRole("navigation", { name: "Agent workspace pages" })).toBeNull();
-  // The bar reads "Agent · chat title", as a direct message does, and it is not a switch.
   expect(screen.getByRole("heading", { name: /^Communications New chat$/ })).toBeTruthy();
   expect(screen.getByRole("heading", { name: /^Communications/ })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^Switch agent/ })).toBeNull();
@@ -37,7 +35,6 @@ it("opens an agent's settings from a link, not from the chat", async () => {
   expect(screen.queryByRole("button", { name: "Communications settings" })).toBeNull();
   openAgentSettings();
   await waitFor(() => expect(nameField().value).toBe("Communications"));
-  // The link is used up once the settings are open, so going back doesn't open them again.
   expect(currentLocation()).not.toContain("agentSettings");
 });
 

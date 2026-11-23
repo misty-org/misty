@@ -24,7 +24,6 @@ import {
   type MarketEngine,
 } from "./api";
 
-/** The marketplaces an engine reads plugins from, with adding and removing one. */
 export function SourcesDialog({
   open,
   onOpenChange,
@@ -42,7 +41,6 @@ export function SourcesDialog({
 }) {
   const [source, setSource] = useState("");
   const [error, setError] = useState<string | null>(null);
-  /** The source being added: the typed one, or a suggestion's. */
   const [adding, setAdding] = useState<string | null>(null);
   const { confirm, dialog } = useConfirmDelete();
   const suggestions = unaddedSuggestions(engine, market.sources);

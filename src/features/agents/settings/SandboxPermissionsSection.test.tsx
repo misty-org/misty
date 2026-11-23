@@ -13,7 +13,7 @@ vi.mock("@/native/sandbox", () => ({
   sandboxPermissionsList: mocks.list,
   sandboxPermissionSet: mocks.set,
 }));
-vi.mock("@/shared/lib/confirmAction", () => ({ confirmAction: mocks.confirm }));
+vi.mock("@/shared/lib/confirm_action", () => ({ confirmAction: mocks.confirm }));
 
 import { SandboxPermissionsSection } from "./SandboxPermissionsSection";
 
@@ -53,6 +53,5 @@ test("the Downloads row only shows once there's something to revoke", async () =
   mocks.list.mockResolvedValue(rows(false));
   render(<SandboxPermissionsSection />);
   await screen.findByRole("switch", { name: "See your screen" });
-  // An earlier list may paint first from the cache; the fresh one drops the row.
   await waitFor(() => expect(screen.queryByText("Downloads folder")).toBeNull());
 });

@@ -1,14 +1,3 @@
-//! The Qoder CLI commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Misty runs Qoder over ACP (`qoder_session.rs`). Its ACP mode reports only `/rewind`,
-//! `/rename` and `/goal`, but it runs every slash command whose action doesn't open a dialog:
-//! the turns here are ones checked in qodercli 1.1.89's bundle to answer without one
-//! (`/compact` its session compacts natively). The terminal app's dialogs (`/agents`, `/hooks`,
-//! `/permissions`, `/memory`) are answered from Qoder's files, and `/branch` through its ACP
-//! `session/fork`. `/init` opens a choice dialog whenever the session is interactive, as ACP
-//! sessions are, and so never returns there; Misty sends the prompt its Quick choice (and its
-//! non-interactive run) submits instead.
-
 use std::path::{Path, PathBuf};
 
 use super::files;
@@ -52,8 +41,6 @@ pub const COMMANDS: &[Command] = &[
     ),
 ];
 
-/// What `/review` reviews when it's given nothing: bare, Qoder's command opens a picker that
-/// its ACP mode can't show, which would hold the turn open.
 const DEFAULT_REVIEW: &str =
     "Review the current changes (staged, unstaged and untracked) and find actionable issues.";
 
@@ -65,7 +52,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     };
     let home = config_dir(distribution).ok_or("No home folder to read Qoder's files from.")?;
     let folder = context.folder.as_deref();
-    // The project's own folder is named like the user one (`.qoder`).
     let project = distribution.default_config_dir_name();
     match name {
         "review" => Ok(Output::send(format!(
@@ -100,13 +86,10 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     }
 }
 
-/// `~/.qoder` (or `~/.qoder-cn`).
 fn config_dir(distribution: QoderDistribution) -> Option<PathBuf> {
     files::home().map(|home| home.join(distribution.default_config_dir_name()))
 }
 
-/// The context files Qoder loads: `AGENTS.md` in its own folder, and `AGENTS.override.md`,
-/// `AGENTS.md` and `AGENTS.local.md` in the project's folders.
 fn memory(home: &Path, folder: Option<&Path>) -> Output {
     Output::info(
         "Qoder memory",
@@ -119,9 +102,6 @@ fn memory(home: &Path, folder: Option<&Path>) -> Output {
     )
 }
 
-/// The prompt qodercli 1.1.89's `/init` submits in its Quick mode, which is also what it runs
-/// when the session isn't interactive (`Xgt({mode: "quick"})` in its bundle), with `{name}` for
-/// the context file's name.
 const INIT_PROMPT: &str = r#"Analyze the codebase and write a minimal {name}. {name} is loaded into every session, so it must be concise — only include what the AI would get wrong without it.
 
 ## Step 1: Explore the codebase
@@ -167,8 +147,6 @@ fn init_prompt(name: &str) -> String {
     INIT_PROMPT.replace("{name}", name)
 }
 
-/// The context file `/init` writes: the first of the settings' `context.fileName` (a name or a
-/// list of them; the project's settings over the user's), else `AGENTS.md`, as Qoder reads it.
 fn context_file_name(settings: &[(&str, PathBuf)]) -> String {
     settings
         .iter()
@@ -189,8 +167,6 @@ fn context_file_name(settings: &[(&str, PathBuf)]) -> String {
         .unwrap_or_else(|| "AGENTS.md".to_string())
 }
 
-/// `/branch [name]` (and `/fork`): qodercli copies the session over ACP (`session/fork`), with
-/// no model call, and the copy opens as a new chat under the given name.
 async fn fork(context: &Context) -> Result<Output, String> {
     let session = context
         .session
@@ -211,20 +187,13 @@ async fn fork(context: &Context) -> Result<Output, String> {
     })
 }
 
-/// Runs Misty's out-of-turn Qoder commands against the installed qodercli and the person's real
-/// `~/.qoder` (read only), with a scratch project holding agents, hooks, rules and context
-/// files, and prints each Output to read. None makes a model call: they read files, and
-/// `/branch` asks qodercli's ACP `session/fork`, which needs Qoder's sign-in.
-/// `cargo test --lib engines::slash::qoder::live_tests -- --ignored --nocapture --test-threads 1`
 #[cfg(all(test, unix))]
 mod live_tests {
-    #![allow(clippy::disallowed_methods)] // Fixtures are built with the standard library.
+    #![allow(clippy::disallowed_methods)]
     use std::path::Path;
 
     use super::super::{run, Context, Output};
 
-    /// The test binary points HOME at a scratch folder (`isolate_for_tests`); Qoder's files live
-    /// in the person's real one, which their account record names.
     fn use_real_home() {
         // SAFETY: getpwuid returns the calling user's static record, read before anything else.
         let home = unsafe {
@@ -339,7 +308,6 @@ mod live_tests {
             "{memory}"
         );
 
-        // `/init` sends the Quick prompt for the context file the settings name first.
         match show(context(&folder, &db, None, ""), "init").await {
             Ok(Output::Send { text }) => {
                 assert!(text.starts_with("Analyze the codebase and write a minimal QODER.md."));
@@ -354,7 +322,6 @@ mod live_tests {
         assert!(show(context(&folder, &db, None, ""), "branch")
             .await
             .is_err());
-        // A real `session/fork`: without Qoder's sign-in it fails with qodercli's own words.
         let fork = show(
             context(
                 &folder,

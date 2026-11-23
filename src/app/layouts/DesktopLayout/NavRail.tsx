@@ -1,6 +1,6 @@
 import { useAccountAvatarUrl, useAuth, useUserStore } from "@/features/account";
 import { useNativeSessionStore } from "@/features/account";
-import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
+import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatar_palette";
 import {
   Avatar,
   AvatarFallback,
@@ -15,10 +15,9 @@ import {
 import { UserCircle } from "lucide-react";
 import { forwardRef, memo, type ButtonHTMLAttributes } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { emailName, initialsForProfile } from "./accountMenuText";
+import { emailName, initialsForProfile } from "./account_menu_text";
 import { profileDockClass } from "./styles";
 
-/** The signed-in account as it shows: its id, name, initials and picture. */
 function useAccountFace() {
   const currentUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const { user } = useAuth();
@@ -40,19 +39,25 @@ function useAccountFace() {
   return { accountId: account?.id, signedIn: Boolean(account), displayName, initials, avatarUrl };
 }
 
-/**
- * The signed-in person's own face: their picture, or their initials in their own tone. The profile
- * row and the sidebar's Personal toggle both wear it.
- */
-export function AccountAvatar(props: { size?: AvatarSize; className?: string }) {
+export function AccountAvatar(props: {
+  size?: AvatarSize;
+  shape?: "circle" | "tile";
+  className?: string;
+}) {
   const face = useAccountFace();
   return (
-    <Avatar shape="tile" size={props.size} className={cn("shrink-0", props.className)}>
+    <Avatar
+      shape={props.shape ?? "tile"}
+      size={props.size}
+      className={cn("shrink-0", props.className)}
+    >
       {face.avatarUrl ? (
         <AvatarImage src={face.avatarUrl} alt={`${face.displayName} profile picture`} />
       ) : null}
       <AvatarFallback
-        className={face.accountId ? cn(avatarColorClass(face.accountId), avatarInkClass) : undefined}
+        className={
+          face.accountId ? cn(avatarColorClass(face.accountId), avatarInkClass) : undefined
+        }
       >
         {face.initials}
       </AvatarFallback>
@@ -65,15 +70,11 @@ export const AccountNavButton = memo(
     HTMLButtonElement,
     Omit<ButtonHTMLAttributes<HTMLButtonElement>, "className"> & {
       open: boolean;
-      /** Overrides the rail dock geometry so the navigator can align it to its rows. */
       className?: string;
       avatarClassName?: string;
       label?: string | null;
-      /** Labels the button with the signed-in account's display name. */
       showAccountName?: boolean;
-      /** How the person shows to others, as a dot on their face. */
       presence?: MemberPresence;
-      /** The person's custom status, a quiet line under their name. */
       line?: string;
     }
   >(function AccountNavButton(
@@ -82,7 +83,11 @@ export const AccountNavButton = memo(
   ) {
     const props = { open, className, avatarClassName, label, showAccountName, presence, line };
     const face = useAccountFace();
-    const avatar = <AccountAvatar className={props.avatarClassName} />;
+    const avatar = props.presence ? (
+      <AccountAvatar size="sm" shape="circle" />
+    ) : (
+      <AccountAvatar className={props.avatarClassName} />
+    );
     const name = props.label ?? (props.showAccountName ? face.displayName : null);
 
     return (
@@ -98,7 +103,7 @@ export const AccountNavButton = memo(
       >
         {face.signedIn ? (
           props.presence ? (
-            <PresenceFace presence={props.presence} ring="sidebar">
+            <PresenceFace presence={props.presence} face="sm">
               {avatar}
             </PresenceFace>
           ) : (

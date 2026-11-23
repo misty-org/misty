@@ -21,11 +21,6 @@ import {
   type VoiceView,
 } from "@/features/voice";
 
-/**
- * The setup step for speech: the person's language, and Misty's own voice beside it (Tutor,
- * read-alouds outside an agent), each voice heard before it's picked. Nothing downloads here:
- * the page writes the picks and starts the downloads in the background once the person moves on.
- */
 export function VoiceStep(props: {
   language: string;
   voice: string;
@@ -86,7 +81,6 @@ function VoiceRow(props: { voice: VoiceView; chosen: boolean; onChoose(): void }
       checked={props.chosen}
       onOpen={props.onChoose}
       trailing={
-        // A voice can be heard once it's on this computer.
         props.voice.installed ? (
           <IconButton
             label={`Hear ${props.voice.name}`}

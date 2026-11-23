@@ -1,21 +1,7 @@
-//! Retirement of settings keys that no longer have a reader.
-//!
-//! Kept separate from the defaults in `defaults.rs` because the two pull in
-//! opposite directions: that file describes the settings that exist, this one
-//! describes the ones that used to.
-
 use serde_json::{Map, Value};
 
-/// Bumped whenever a key is retired, so the prune below runs exactly once per
-/// user rather than on every launch.
 pub(super) const SETTINGS_SCHEMA_VERSION: i64 = 15;
 
-/// Whole sections that no longer exist. `account` and `ai` were never read.
-/// Schema 6: the Code workspace (`editor`, `terminal`), the file manager
-/// (`files`, `transfer_profiles`) and file indexing (`search`) left Misty.
-/// Schema 10: Open With associations went with the file manager.
-/// Schema 12: reading other apps' windows (`screen_memory`) was removed.
-/// Schema 14: Misty's own memory (`recall`) was removed; engines keep their own.
 const RETIRED_SECTIONS: &[&str] = &[
     "account",
     "ai",
@@ -29,7 +15,6 @@ const RETIRED_SECTIONS: &[&str] = &[
     "recall",
 ];
 
-/// Individual keys retired from sections that still exist.
 const RETIRED_KEYS: &[(&str, &str)] = &[
     ("general", "release_channel_index"),
     ("general", "update_available"),
@@ -37,18 +22,12 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     ("general", "last_update_check_label"),
     ("appearance", "custom_fonts"),
     ("privacy", "data_stays_local"),
-    // Schema 3. Each of these persisted happily and was read by nothing:
-    // `ui_scale_index`/`font_size_index`/`reduced_motion_enabled` reached the
-    // DOM as data attributes with no CSS or JS consumer, `theme_index` was
-    // ignored by a dark-only theme store, `keymap_index` was never applied to
-    // any keymap, and `server_address` had no reader at all.
     ("appearance", "theme_index"),
     ("appearance", "ui_scale_index"),
     ("appearance", "font_size_index"),
     ("appearance", "reduced_motion_enabled"),
     ("shortcuts", "keymap_index"),
     ("advanced", "server_address"),
-    // Schema 6: settings with no reader, or for surfaces that left Misty.
     ("general", "confirm_destructive_actions"),
     ("general", "default_file_action_index"),
     ("general", "open_links_externally"),
@@ -58,35 +37,21 @@ const RETIRED_KEYS: &[(&str, &str)] = &[
     ("appearance", "thumbnail_previews_enabled"),
     ("agent", "default_model_id"),
     ("agent", "default_reasoning_effort"),
-    // Schema 7: the video wallpaper and its panel opacity were removed.
     ("appearance", "wallpaper_path"),
     ("appearance", "panel_opacity"),
-    // Schema 8: the optional accent color was removed.
     ("appearance", "accent_color"),
-    // Schema 9: the theme no longer has a schedule; the night light does.
     ("appearance", "theme_light_start"),
     ("appearance", "theme_dark_start"),
-    // Schema 10: the device mount folder went with the file manager, and the
-    // extension tools search path had no reader.
     ("advanced", "mount_path"),
     ("advanced", "extension_tools_path"),
-    // Schema 11: Misty sends no usage analytics or crash reports (PostHog was removed).
     ("privacy", "anonymous_usage_analytics_enabled"),
     ("privacy", "anonymous_error_reporting_enabled"),
-    // Schema 15: the studio has no sounds; its agents speak instead.
     ("agent", "office_sounds"),
     ("agent", "studio_sounds"),
 ];
 
-/// Keys that moved to a new name, as (section, old key, new key). A value already under the new
-/// name wins. None at the moment: the one there was (Schema 13, `office_sounds`) was retired.
 const RENAMED_KEYS: &[(&str, &str, &str)] = &[];
 
-/// Removes retired keys from an existing settings file and moves renamed ones.
-///
-/// Deliberately an allowlist rather than a wholesale rewrite: unknown keys and
-/// extension-owned namespaces must survive untouched, which the round-trip test
-/// asserts by planting a plugin namespace.
 pub(super) fn prune_retired_settings(root: &mut Map<String, Value>) -> bool {
     let mut changed = false;
 
@@ -113,7 +78,6 @@ pub(super) fn prune_retired_settings(root: &mut Map<String, Value>) -> bool {
         if entries.remove(*key).is_some() {
             changed = true;
         }
-        // Do not leave an empty object behind where a section used to be.
         if entries.is_empty() {
             root.remove(*section);
         }
@@ -151,19 +115,14 @@ mod tests {
 
         assert!(prune_retired_settings(&mut root));
 
-        // Whole retired sections go, including the plaintext credential slot
-        // that nothing ever read.
         assert!(!root.contains_key("account"));
         assert!(!root.contains_key("ai"));
         let general = root.get("general").and_then(Value::as_object);
         assert!(general.is_none_or(|general| !general.contains_key("release_channel_index")));
-        // Schema 3: controls that persisted with no reader. `shortcuts` and
-        // `advanced` had nothing else in them here, so the whole section goes.
         let appearance = root.get("appearance").and_then(Value::as_object);
         assert!(appearance.is_none_or(|appearance| !appearance.contains_key("theme_index")));
         assert!(!root.contains_key("shortcuts"));
         assert!(!root.contains_key("advanced"));
-        // A section that still has live keys keeps them.
         assert_eq!(
             root.get("appearance")
                 .and_then(Value::as_object)
@@ -171,7 +130,6 @@ mod tests {
                 .and_then(Value::as_bool),
             Some(true)
         );
-        // Schema 11: the analytics and crash report switches went with PostHog.
         let privacy = root.get("privacy").and_then(Value::as_object).unwrap();
         assert!(!privacy.contains_key("anonymous_usage_analytics_enabled"));
         assert!(!privacy.contains_key("anonymous_error_reporting_enabled"));
@@ -190,13 +148,14 @@ mod tests {
         let agent = root.get("agent").and_then(Value::as_object).unwrap();
         assert!(!agent.contains_key("office_sounds"));
         assert!(!agent.contains_key("studio_sounds"));
-        assert_eq!(agent.get("panel_side").and_then(Value::as_str), Some("left"));
+        assert_eq!(
+            agent.get("panel_side").and_then(Value::as_str),
+            Some("left")
+        );
     }
 
     #[test]
     fn leaves_unknown_namespaces_untouched() {
-        // Extension-owned settings live alongside ours; a wholesale rewrite
-        // would silently delete them on upgrade.
         let mut root = object(json!({
             "plugin_namespace": { "enabled": true },
             "general": { "custom_general_value": "kept" }

@@ -1,19 +1,14 @@
-//! The Lab's media on this computer: recordings recognized on-device, and audio overviews spoken in
-//! the system voice. Misty holds no keys, so nothing here calls a model.
 use serde::Serialize;
 
-/// One recording a Tutor notebook took as a source: who said what, as text.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscribedSource {
     name: String,
     mime_type: String,
     text: String,
-    /// Why it couldn't be read, when it couldn't.
     error: Option<String>,
 }
 
-/// The largest recording read as a source.
 const MAX_MEDIA_BYTES: u64 = 28 << 20;
 
 fn media_type(path: &std::path::Path) -> Option<&'static str> {
@@ -31,9 +26,6 @@ fn media_type(path: &std::path::Path) -> Option<&'static str> {
     })
 }
 
-/// Tutor's audio and video sources: the person picks recordings in the system dialog, and each is
-/// transcribed by Misty's hearing model on this computer (no key; speakers aren't told apart).
-/// The window never names a path. `language` is kept for older windows; the model in use decides.
 #[tauri::command]
 pub async fn tutor_transcribe_sources(
     app: tauri::AppHandle,
@@ -78,7 +70,8 @@ pub async fn tutor_transcribe_sources(
             text: String::new(),
             error: Some(error),
         };
-        let size = std::fs::metadata(&path)
+        file_access::allow_picked_file(&path, file_access::Access::Read);
+        let size = file_access::fs::metadata(&path)
             .map(|meta| meta.len())
             .unwrap_or(u64::MAX);
         if size > MAX_MEDIA_BYTES {
@@ -101,14 +94,12 @@ pub async fn tutor_transcribe_sources(
     Ok(sources)
 }
 
-/// One line of an audio overview's script.
 #[derive(serde::Deserialize)]
 pub struct OverviewLine {
     speaker: u8,
     text: String,
 }
 
-/// Where an overview's audio is kept: Misty's own folder on this computer, never synced.
 fn overview_path(app: &tauri::AppHandle, id: &str) -> Result<std::path::PathBuf, String> {
     use tauri::Manager;
     if id.is_empty() || id.len() > 100 || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
@@ -124,9 +115,6 @@ fn overview_path(app: &tauri::AppHandle, id: &str) -> Result<std::path::PathBuf,
         .join(format!("{id}.wav")))
 }
 
-/// Speaks an audio overview's script in Misty's voices and keeps the audio: Misty holds no speech
-/// key. `voice` is the person's chosen voice (a catalog id), for the first speaker.
-/// Answers how many seconds it runs.
 #[tauri::command]
 pub async fn tutor_overview_make(
     app: tauri::AppHandle,
@@ -146,18 +134,17 @@ pub async fn tutor_overview_make(
         .collect();
     let audio = super::system_speech::speak_dialogue(&app, &lines, voice.as_deref()).await?;
     if let Some(folder) = path.parent() {
-        tokio::fs::create_dir_all(folder)
+        file_access::fs_async::create_dir_all(folder)
             .await
             .map_err(|error| error.to_string())?;
     }
     let seconds = audio.len().saturating_sub(44) as f64 / (24_000.0 * 2.0);
-    tokio::fs::write(&path, audio)
+    file_access::fs_async::write(&path, audio)
         .await
         .map_err(|error| error.to_string())?;
     Ok(seconds)
 }
 
-/// An overview's audio, as raw WAV bytes.
 #[tauri::command]
 pub async fn tutor_overview_audio(
     app: tauri::AppHandle,
@@ -167,7 +154,7 @@ pub async fn tutor_overview_audio(
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only Misty's own windows can play overviews.".into());
     }
-    let bytes = tokio::fs::read(overview_path(&app, &id)?)
+    let bytes = file_access::fs_async::read(overview_path(&app, &id)?)
         .await
         .map_err(|_| "This overview's audio is gone. Make it again.".to_owned())?;
     Ok(tauri::ipc::Response::new(bytes))
@@ -182,7 +169,7 @@ pub async fn tutor_overview_delete(
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only Misty's own windows can delete overviews.".into());
     }
-    let _ = tokio::fs::remove_file(overview_path(&app, &id)?).await;
+    let _ = file_access::fs_async::remove_file(overview_path(&app, &id)?).await;
     Ok(())
 }
 

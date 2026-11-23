@@ -1,10 +1,5 @@
-//! The window the person works in, read from the system.
-
-/// The window the person is working in, in the same global units as
-/// displays and cursor samples.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ForegroundWindow {
-    /// HWND on Windows, the window number on macOS.
     pub handle: isize,
     pub x: f64,
     pub y: f64,
@@ -12,11 +7,9 @@ pub struct ForegroundWindow {
     pub height: f64,
     pub app: String,
     pub title: String,
-    /// The bounds of the display the system places the window on, when it says.
     pub monitor: Option<(f64, f64, f64, f64)>,
 }
 
-/// The document or web page in the window in front, where the system says (macOS Accessibility).
 #[cfg(target_os = "macos")]
 pub fn front_document() -> Option<String> {
     crate::agents::cursor::macos::companion_capture::front_document()
@@ -27,8 +20,6 @@ pub fn front_document() -> Option<String> {
     None
 }
 
-/// A window is usable when it has an area and is not one of Misty's own
-/// companion, overlay or panel windows (`ignored`).
 pub fn usable_foreground(window: ForegroundWindow, ignored: &[isize]) -> Option<ForegroundWindow> {
     (window.width >= 1. && window.height >= 1. && !ignored.contains(&window.handle))
         .then_some(window)
@@ -57,7 +48,6 @@ pub fn foreground_window(ignored: &[isize]) -> Option<ForegroundWindow> {
         if hwnd.is_null() || IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 {
             return None;
         }
-        // The extended frame leaves out the invisible resize borders.
         let mut rect = RECT {
             left: 0,
             top: 0,
@@ -123,7 +113,6 @@ pub fn foreground_window(ignored: &[isize]) -> Option<ForegroundWindow> {
     }
 }
 
-/// The frontmost app's frontmost ordinary window, read from the window list.
 #[cfg(target_os = "macos")]
 pub fn foreground_window(ignored: &[isize]) -> Option<ForegroundWindow> {
     let ignored_numbers: Vec<i64> = ignored.iter().map(|&n| n as i64).collect();

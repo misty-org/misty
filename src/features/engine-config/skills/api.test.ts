@@ -1,17 +1,10 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * IPC shape regression: native `engine_skills_mutate` takes two arguments
- * (`action: String`, `payload: Value`), and queries take (`mode`, `params`).
- * Flattening a mutation's arguments into one object once made every mutation
- * (install / adopt / sync / uninstall) fail with "invalid args `payload` …
- * missing required key payload".
- */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.hoisted(() => vi.fn());
 
-vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke }));
+vi.mock("@/shared/platform/native_invoke", () => ({ invoke }));
 
 import { SkillsHubError, skillsHubApi } from "./api";
 import type { DiscoveredSkill } from "./types";

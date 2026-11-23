@@ -1,15 +1,3 @@
-//! A run owns one durable wait at a time. Hold its tool turn through the entire approval or device
-//! continuation, including checkpoints, before starting another tool proposed in the same model
-//! response. Replaying a run recreates this order.
-//!
-//! A stop ends the run. A pause only declines the rest of the current model response so the model
-//! can plan again from what it saw. Declined calls never execute: their tool reports the declined
-//! reason to the model instead. Start never fails for a declined call, because the adapter would
-//! reject the whole response instead of reporting that one call.
-//!
-//! Concurrent calls (read-only server and provider tools, which hold no durable wait) run alongside
-//! each other: each waits only for the calls before it that were not concurrent, and the next other
-//! call waits for all of them.
 use std::{
     collections::HashMap,
     future::Future,
@@ -27,9 +15,7 @@ use super::runtime_errors::RuntimeError;
 type Settled = Shared<BoxFuture<'static, ()>>;
 
 struct State {
-    // Settles when every call before the latest non-concurrent call has finished.
     tail: Settled,
-    // Concurrent calls started since the latest non-concurrent call.
     reads: Vec<Settled>,
     stopped_reason: String,
     paused_reason: String,
@@ -63,18 +49,23 @@ impl SerialToolLifecycle {
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
-        // The lock is never held across anything that can panic mid-update.
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// A saved run's stop and pause, and the calls they declined. A restart reruns only unfinished
-    /// calls, so the place in line needs no saving.
     pub(crate) fn saved(&self) -> (String, String, HashMap<String, String>) {
         let state = self.state();
-        (state.stopped_reason.clone(), state.paused_reason.clone(), state.declined.clone())
+        (
+            state.stopped_reason.clone(),
+            state.paused_reason.clone(),
+            state.declined.clone(),
+        )
     }
 
-    pub(crate) fn restored(stopped_reason: String, paused_reason: String, declined: HashMap<String, String>) -> Self {
+    pub(crate) fn restored(
+        stopped_reason: String,
+        paused_reason: String,
+        declined: HashMap<String, String>,
+    ) -> Self {
         let this = Self::default();
         {
             let mut state = this.state();
@@ -103,10 +94,12 @@ impl SerialToolLifecycle {
         self.state().stopped_reason.clone()
     }
 
-    /// Clears a pause once its model response has drained, before the next turn.
     pub(crate) fn resume(&self) -> bool {
         let mut state = self.state();
-        if state.paused_reason.is_empty() || !state.stopped_reason.is_empty() || !state.releases.is_empty() {
+        if state.paused_reason.is_empty()
+            || !state.stopped_reason.is_empty()
+            || !state.releases.is_empty()
+        {
             return false;
         }
         state.paused_reason.clear();
@@ -114,7 +107,6 @@ impl SerialToolLifecycle {
         true
     }
 
-    /// The error a declined call reports instead of executing.
     pub(crate) fn declined(&self, id: &str) -> Option<String> {
         self.state().declined.get(id).cloned()
     }
@@ -125,10 +117,12 @@ impl SerialToolLifecycle {
         }
     }
 
-    /// Takes the call's place in line now, and waits for its turn when polled. A promise runs by
-    /// itself and a future doesn't, so the caller has to spawn or join what this returns: whether
-    /// the call was declined is only known once it has run.
-    pub(crate) fn start<F, Fut>(&self, id: &str, checkpoint: F, concurrent: bool) -> impl Future<Output = Result<(), RuntimeError>> + Send + 'static
+    pub(crate) fn start<F, Fut>(
+        &self,
+        id: &str,
+        checkpoint: F,
+        concurrent: bool,
+    ) -> impl Future<Output = Result<(), RuntimeError>> + Send + 'static
     where
         F: FnOnce() -> Fut + Send + 'static,
         Fut: Future<Output = Result<(), RuntimeError>> + Send + 'static,

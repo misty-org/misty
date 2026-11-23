@@ -6,7 +6,7 @@ import { exportPerformanceReport } from "./export";
 import type { PerformanceReport } from "./summary";
 
 const mocks = vi.hoisted(() => ({ save: vi.fn(), write: vi.fn() }));
-vi.mock("./nativeApi", () => ({
+vi.mock("./native_api", () => ({
   performanceApi: { pickSavePath: mocks.save, writeFile: mocks.write },
 }));
 beforeEach(() => {

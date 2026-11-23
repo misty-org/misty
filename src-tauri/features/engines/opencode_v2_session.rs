@@ -1,6 +1,3 @@
-//! OpenCode 2.x session calls: the models' context windows, MCP servers, the agent and model,
-//! and a session's messages.
-
 use std::collections::HashMap;
 
 use reqwest::Method;
@@ -10,10 +7,8 @@ use super::super::opencode_server::data;
 use super::super::SendRequest;
 use super::call;
 
-/// The most messages one page of `GET /api/session/:id/message` holds.
 const PAGE: usize = 200;
 
-/// `provider/model` → context window, from the models the server lists for this folder.
 pub(super) async fn context_windows(origin: &str, directory: &str) -> HashMap<String, u64> {
     let Ok(list) = call(Method::GET, origin, "/api/model", Some(directory), None).await else {
         return HashMap::new();
@@ -31,8 +26,6 @@ pub(super) async fn context_windows(origin: &str, directory: &str) -> HashMap<St
         .collect()
 }
 
-/// Misty's Space server and an agent's own servers, added to this folder's MCP servers
-/// (`PUT /api/experimental/mcp/:name`). A server that won't take one only loses those tools.
 pub(super) async fn add_mcp_servers(req: &SendRequest, origin: &str, directory: &str) {
     let Some(servers) = req.mcp_servers.as_ref().and_then(Value::as_object) else {
         return;
@@ -65,8 +58,6 @@ pub(super) async fn add_mcp_servers(req: &SendRequest, origin: &str, directory: 
     }
 }
 
-/// The session's agent (Plan in Plan mode, else Build) and the chat's model and effort, switched
-/// only when they differ from what the session is on: each switch is a line in its history.
 pub(super) async fn choose_agent_and_model(
     req: &SendRequest,
     origin: &str,
@@ -106,7 +97,6 @@ pub(super) async fn choose_agent_and_model(
     let current = info.get("model").cloned().unwrap_or(Value::Null);
     let base = match req.model.as_deref().and_then(|m| m.split_once('/')) {
         Some((provider, id)) => Some(json!({ "providerID": provider, "id": id })),
-        // An effort alone rides on the session's model, else the server's default one.
         None if effort.is_some() => {
             if current.get("id").is_some() {
                 Some(json!({ "providerID": current["providerID"], "id": current["id"] }))
@@ -147,7 +137,6 @@ pub(super) async fn choose_agent_and_model(
     .map_err(|e| format!("OpenCode didn't switch the model, so the session keeps its own: {e}"))
 }
 
-/// A session's messages, oldest first, page by page.
 pub(crate) async fn messages(origin: &str, session_id: &str) -> Result<Vec<Value>, String> {
     let mut all = Vec::new();
     let mut cursor: Option<String> = None;
@@ -170,7 +159,6 @@ pub(crate) async fn messages(origin: &str, session_id: &str) -> Result<Vec<Value
     }
 }
 
-/// A name as one URL path segment: anything but unreserved characters percent-encoded.
 pub(crate) fn path_segment(name: &str) -> String {
     name.bytes()
         .map(|byte| match byte {

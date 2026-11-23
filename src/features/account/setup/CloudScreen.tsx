@@ -1,28 +1,22 @@
 import { accountApi } from "../api/api";
 import { probeServer } from "@/api/deployment/probe";
-import { currentApiBase } from "@/api/deployment/serverChoice";
-import { useAuth } from "../sessions/authState";
+import { currentApiBase } from "@/api/deployment/server_choice";
+import { useAuth } from "../sessions/auth_state";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { accountFinishSetupKey, accountRedeemSetupKey } from "../sessions/useAccountStore";
+import { accountFinishSetupKey, accountRedeemSetupKey } from "../sessions/use_account_store";
 import { Button } from "@misty/ui";
 import { useEffect, useState, type FormEvent } from "react";
-import { isSetupKey, parseServerAddress, parseSetupLink } from "./serverAddress";
-import { takeSetupLink, useSetupLinkStore } from "./setupLinkStore";
-import { useServerSwitch } from "./useServerSwitch";
+import { isSetupKey, parseServerAddress, parseSetupLink } from "./server_address";
+import { takeSetupLink, useSetupLinkStore } from "./setup_link_store";
+import { useServerSwitch } from "./use_server_switch";
 
-/**
- * Any server's sign-in link: the link holds the server and a one-time setup key.
- * The server address and the key typed apart work too, and a `misty://setup` link fills both
- * in. The key signs in once; the person then chooses a password (`ChoosePasswordScreen`).
- */
 export function CloudScreen(props: {
   onRedeemed: (hasPassword: boolean) => void;
   onBusy: (busy: boolean) => void;
 }) {
   const { authenticateAccount, transitioning } = useAuth();
   const { moveTo } = useServerSwitch();
-  // A misty://setup link fills the fields once; it is let go after the first render.
   const [opened] = useState(() => useSetupLinkStore.getState().link);
   useEffect(() => void takeSetupLink(), []);
   const [link, setLink] = useState(opened?.origin ?? "");
@@ -47,8 +41,6 @@ export function CloudScreen(props: {
         setError("Misty couldn't reach that server. Check the link and your connection.");
         return;
       }
-      // Moving signs out of the current server, so the new one takes the key first: a key it
-      // refuses leaves this device signed in where it was.
       const redeemed =
         currentApiBase() === target.apiBase
           ? null

@@ -1,25 +1,17 @@
-import type { PreviewErrorComponent, PreviewResource } from "./previewTypes";
+import type { PreviewErrorComponent, PreviewResource } from "./preview_types";
 import { errorText } from "@/shared/lib/format";
 import { FileQuestion } from "lucide-react";
 import { useEffect, useState } from "react";
-import { friendlyType, sourceExtension } from "./previewFormat";
+import { friendlyType, sourceExtension } from "./preview_format";
 import {
   audioMimeTypes,
   imageMimeTypes,
   officeExtensions,
   textExtensions,
   videoMimeTypes,
-} from "./previewMediaTables";
+} from "./preview_media_tables";
 import { PreviewMessage } from "./PreviewPrimitives";
-import {
-  cn,
-  PaneLoading,
-  PlaceholderIcon,
-  Surface,
-  Text,
-  lazyTool,
-  ToolSuspense,
-} from "@misty/ui";
+import { cn, PaneLoading, PlaceholderIcon, Surface, Text, lazyTool, ToolSuspense } from "@misty/ui";
 import ReactMarkdown from "react-markdown";
 
 const PdfViewer = lazyTool(() => import("./PdfViewerView"));
@@ -29,10 +21,6 @@ export function EmbeddedUniversalPreviewView(props: {
   name: string;
   mimeType: string;
   url: string;
-  /**
-   * A small picture of an image already at hand (the grid's thumbnail), shown filling the pane at once
-   * until the full image has loaded and decoded, so a picture never waits on a blank pane.
-   */
   placeholder?: string;
   loading?: boolean;
   error?: string;
@@ -64,10 +52,7 @@ export function EmbeddedUniversalPreviewView(props: {
     props.runtime.readBytes,
     props.runtime.extractDocumentText,
   );
-  if (props.loading || documentLoading)
-    return (
-      <PaneLoading label="Loading preview" />
-    );
+  if (props.loading || documentLoading) return <PaneLoading label="Loading preview" />;
   if (props.error || documentError)
     return (
       <>
@@ -167,7 +152,7 @@ export function EmbeddedUniversalPreviewView(props: {
       <article
         className={cn(
           "mx-auto h-full w-full max-w-4xl overflow-auto whitespace-pre-wrap px-10",
-          "py-12 text-left text-base leading-8",
+          "py-12 text-left text-body leading-8",
         )}
       >
         <Text bare tone="muted">
@@ -185,7 +170,6 @@ export function EmbeddedUniversalPreviewView(props: {
   );
 }
 
-/** An image over its small picture: the picture fills the pane until the image is ready to draw. */
 function PreviewImage(props: {
   name: string;
   url: string;
@@ -217,7 +201,6 @@ function PreviewImage(props: {
           src={props.url}
           alt={props.name}
           decoding="async"
-          // Swapped in once decoded, so the pane never shows a blank frame between the two.
           onLoad={(event) => {
             void event.currentTarget
               .decode()
@@ -295,4 +278,3 @@ interface EmbeddedPreviewRuntime {
   Error: PreviewErrorComponent;
   readBytes(url: string, signal: AbortSignal): Promise<ArrayBuffer>;
 }
-

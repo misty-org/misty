@@ -1,9 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/registry.rs.
 use super::*;
 
-/// A send on a session whose process idles for a background follow-up
-/// retires that process exactly once; any other session is untouched, and
-/// a run that settled or resumed no longer counts as idle.
 #[test]
 fn awaiting_followup_is_taken_once_per_session_and_cleared_by_run() {
     let registry = ProcessRegistry::default();
@@ -34,10 +31,6 @@ fn awaiting_followup_is_taken_once_per_session_and_cleared_by_run() {
     assert!(registry.take_awaiting_followup("s-2").is_none());
 }
 
-/// rekey must COPY (not move) so both the session-id and run-id keys
-/// route an interrupt to the same process. A resume whose
-/// thread.started never arrives leaves run id as the only route — a
-/// moving rekey leaked the child (user pressed Stop, nothing died).
 #[tokio::test]
 async fn rekey_keeps_both_keys_and_kill_routes_by_either() {
     let child = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
@@ -65,32 +58,17 @@ async fn rekey_keeps_both_keys_and_kill_routes_by_either() {
     let registry = Arc::new(ProcessRegistry::default());
     registry.insert("run-1".to_string(), entry);
 
-    // Simulate the engine adopting the native session id mid-run.
     registry.rekey("run-1", "session-9".to_string());
 
-    // Both keys route to the same pid; killing by the RUN id (the
-    // fallback route when the session announcement never arrived) must
-    // still find it, and the session key must survive the by-run-id
-    // kill so a second stop also lands (idempotent, pid-deduped).
     assert!(registry.kill("run-1"));
-    // kill does not drain: both keys still map to the (now dying)
-    // child, so a second stop via the session id still lands on the
-    // same entry. Its boolean result is racy (the child may already be
-    // reaped, in which case kill_entry reports false on a SUCCESSFUL
-    // interrupt), so assert the routing — not the return value.
     assert_eq!(registry.len(), 2);
     let _ = registry.kill("session-9");
 
-    // The registry drains the entry from both keys on exit.
     registry.remove_if_pid("session-9", pid);
     registry.remove_if_pid("run-1", pid);
     assert_eq!(registry.len(), 0);
 }
 
-/// A resumed session is registered under its preassigned id at spawn:
-/// the engine's own announcement of that same id equals it, so
-/// adopt_session_id early-returns and never rekeys. Without the alias a
-/// by-session-id Stop found nothing.
 #[tokio::test]
 async fn preassigned_session_alias_routes_stop_before_session_event() {
     let child = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
@@ -125,12 +103,6 @@ async fn preassigned_session_alias_routes_stop_before_session_event() {
     assert_eq!(registry.len(), 0);
 }
 
-/// The real Windows stop bug: engine CLIs run as `cmd /c shim.cmd` and
-/// the model process is a grandchild. Killing must take the WHOLE tree
-/// down synchronously — a fire-and-forget taskkill that raced the direct
-/// child's start_kill orphaned the grandchild (it kept streaming and
-/// burning tokens after the user pressed Stop). This spawns a cmd whose
-/// grandchild outlives it and asserts the grandchild is gone after kill.
 #[cfg(windows)]
 #[tokio::test]
 async fn kill_reaps_windows_grandchild_process_tree() {
@@ -146,7 +118,6 @@ async fn kill_reaps_windows_grandchild_process_tree() {
         .expect("spawn cmd child");
     let cmd_pid = child.id().unwrap_or(0);
 
-    // Let cmd spawn its ping grandchild.
     tokio::time::sleep(std::time::Duration::from_millis(600)).await;
     let mut sys = System::new();
     sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
@@ -175,7 +146,6 @@ async fn kill_reaps_windows_grandchild_process_tree() {
     registry.insert("run-tree".to_string(), entry);
     assert!(registry.kill("run-tree"));
 
-    // Poll: process teardown is observable only after the kernel reaps.
     let targets: HashSet<Pid> = grandchildren
         .iter()
         .copied()
@@ -226,25 +196,18 @@ fn launch_session_alias_upgrades_and_failed_launch_releases_its_alias() {
     assert!(registry.get("edited").is_none());
 }
 
-/// The concurrency limit counts RUNS, not map entries: a run keyed
-/// under both its run id and its session alias is one run — an entry
-/// count halved the real ceiling (16 felt like 8).
 #[test]
 fn active_run_count_dedupes_session_alias_keys() {
     let registry = ProcessRegistry::default();
     registry.insert("run-1".to_string(), stub_entry("run-1", 101));
     registry.insert_alias("session-1".to_string(), stub_entry("run-1", 101));
     registry.insert("run-2".to_string(), stub_entry("run-2", 102));
-    // A pre-spawn reservation (pid 0) is an in-flight run too.
     registry.insert("run-3".to_string(), stub_entry("run-3", 0));
     let map = registry.0.lock().expect("lock registry");
     assert_eq!(map.len(), 4);
     assert_eq!(active_run_count(&map), 3);
 }
 
-/// The kill() abort backstop skips the reader's remove_if_pid cleanup;
-/// remove_run_if_pid must drain BOTH keys of the run so its slots do
-/// not stay pinned until app exit.
 #[test]
 fn remove_run_if_pid_drains_every_key_of_the_run() {
     let registry = ProcessRegistry::default();
@@ -257,9 +220,6 @@ fn remove_run_if_pid_drains_every_key_of_the_run() {
     assert!(registry.get("run-2").is_some());
 }
 
-/// A client retry that reused the run id registers a NEW child with a
-/// different pid; the backstop for the old run must not evict it (same
-/// guard class as remove_if_pid's pid match).
 #[test]
 fn remove_run_if_pid_spares_same_id_successor() {
     let registry = ProcessRegistry::default();

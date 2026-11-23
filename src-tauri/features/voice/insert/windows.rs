@@ -18,11 +18,8 @@ use windows_sys::Win32::{
 };
 
 const CF_UNICODETEXT: u32 = 13;
-// Formats whose handles are GDI objects rather than global memory; Windows
-// synthesizes them from the memory formats we do keep (CF_DIB, CF_TEXT…).
 const NOT_MEMORY: &[u32] = &[2, 3, 9, 14, 0x80];
 
-/// Every global-memory clipboard format, copied.
 pub struct Saved(Vec<(u32, Vec<u8>)>);
 
 struct Open;
@@ -167,7 +164,7 @@ impl Desktop for System {
             },
         };
         let mut inputs: Vec<INPUT> = held.iter().map(|vk| key(*vk, false)).collect();
-        inputs.push(key(0x56, false)); // V
+        inputs.push(key(0x56, false));
         inputs.push(key(0x56, true));
         inputs.extend(held.iter().rev().map(|vk| key(*vk, true)));
         let sent = unsafe {

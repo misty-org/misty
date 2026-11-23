@@ -44,7 +44,6 @@ fn acp_commands_carry_their_description_and_hint() {
     assert_eq!(commands[1].name, "memory");
     assert_eq!(commands[1].argument_hint.as_deref(), Some("show | add"));
     assert_eq!(report.skills.unwrap()[0].name, "review-pr");
-    // Other updates change nothing.
     acp_update(
         "test-acp",
         &json!({"update": {"sessionUpdate": "agent_message_chunk"}}),
@@ -53,8 +52,6 @@ fn acp_commands_carry_their_description_and_hint() {
     forget("test-acp");
 }
 
-/// What Gemini CLI 0.68 sent once `session/new` opened a session (captured from the real
-/// install): its subcommands as two-word entries, folded into their command's hint whole.
 const GEMINI_0_68_COMMANDS: &str = r###"{
  "sessionId": "92522f73-f827-47bf-84ef-e97a910dd17f",
  "update": {
@@ -144,8 +141,6 @@ const GEMINI_0_68_COMMANDS: &str = r###"{
  }
 }"###;
 
-/// Part of what Qwen Code 0.27.3 sent (captured from the real install): hints in
-/// `input.hint` or `_meta.subcommands`, a project `.toml` command, and skills named alone.
 const QWEN_0_27_COMMANDS: &str = r###"{
  "sessionId": "a580addf-cdf0-44e2-9e2b-bce528ea369f",
  "update": {
@@ -391,7 +386,6 @@ fn qwen_hints_and_skill_descriptions_come_from_its_report() {
         .any(|c| c.name == "qfoo" && c.description == "Qwen foo"));
     let skills = report.skills.unwrap();
     assert_eq!(skills.len(), 2);
-    // `loop` from `availableSkillDetails`, `review` from its command.
     assert!(
         skills.iter().all(|s| !s.description.is_empty()),
         "{skills:?}"

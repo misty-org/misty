@@ -32,20 +32,19 @@ pub struct TrashedItem {
     pub id: String,
     pub name: String,
     pub original_path: String,
-    /// Where it is in the Trash (on Windows and Linux, the system's own id for it there).
     pub trashed_path: String,
     pub trashed_at: i64,
     pub kind: FileKind,
     pub size: u64,
 }
 
-/// The app, for the ledger's table. Every command that reaches the Trash attaches it first; the
-/// first one also reads the ledger back from `misty.db`.
 static APP: OnceLock<AppHandle> = OnceLock::new();
 static LEDGER: LazyLock<Mutex<Vec<TrashedItem>>> = LazyLock::new(Mutex::default);
 
 fn ledger() -> std::sync::MutexGuard<'static, Vec<TrashedItem>> {
-    LEDGER.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    LEDGER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn kind_text(kind: FileKind) -> &'static str {
@@ -89,8 +88,6 @@ fn load(app: &AppHandle) -> rusqlite::Result<Vec<TrashedItem>> {
     Ok(items)
 }
 
-/// Hands the ledger the app, and the first time `misty.db` answers, reads back what earlier runs
-/// of Misty trashed.
 pub(crate) fn attach(app: &AppHandle) {
     let _ = APP.set(app.clone());
     if LOADED.load(Ordering::SeqCst) {
@@ -107,7 +104,9 @@ pub(crate) fn attach(app: &AppHandle) {
 }
 
 fn save(item: &TrashedItem) {
-    let Some(connection) = APP.get().and_then(|app| super::db::connect(app).ok()) else { return };
+    let Some(connection) = APP.get().and_then(|app| super::db::connect(app).ok()) else {
+        return;
+    };
     let _ = connection.execute(
         "INSERT OR REPLACE INTO files_trash_ledger \
          (id, original_path, trashed_path, trashed_at, kind, size) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -124,7 +123,9 @@ fn save(item: &TrashedItem) {
 
 fn forget(ids: &[String]) {
     ledger().retain(|item| !ids.contains(&item.id));
-    let Some(connection) = APP.get().and_then(|app| super::db::connect(app).ok()) else { return };
+    let Some(connection) = APP.get().and_then(|app| super::db::connect(app).ok()) else {
+        return;
+    };
     for id in ids {
         let _ = connection.execute("DELETE FROM files_trash_ledger WHERE id = ?1", [id]);
     }
@@ -134,7 +135,6 @@ fn forget(ids: &[String]) {
 mod system {
     use std::path::Path;
 
-    /// Moves `path` to the Trash and returns where it landed.
     pub(super) fn trash(path: &Path) -> Result<String, String> {
         use objc2::rc::autoreleasepool;
         use objc2_foundation::{NSFileManager, NSString, NSURL};
@@ -151,7 +151,6 @@ mod system {
         })
     }
 
-    /// Whether the item is still in the Trash: None while that can't be told.
     pub(super) fn still_there(trashed: &str) -> Option<bool> {
         if trashed.is_empty() {
             return Some(false);
@@ -180,7 +179,6 @@ mod system {
             .find(|item| item.id.to_string_lossy() == id)
     }
 
-    /// Moves `path` to the Trash and returns the system's id for it there.
     pub(super) fn trash(path: &Path) -> Result<String, String> {
         crate::project::files::move_to_trash(path).map_err(|error| error.to_string())?;
         Ok(trash::os_limited::list()
@@ -200,7 +198,11 @@ mod system {
             return Some(false);
         }
         let items = trash::os_limited::list().ok()?;
-        Some(items.iter().any(|item| item.id.to_string_lossy() == trashed))
+        Some(
+            items
+                .iter()
+                .any(|item| item.id.to_string_lossy() == trashed),
+        )
     }
 
     pub(super) fn put_back(trashed: &str, _original: &Path) -> Result<(), String> {
@@ -209,15 +211,16 @@ mod system {
     }
 }
 
-/// Moves each item to the system's Trash and notes where it came from. Returns what went, and
-/// why each of the rest didn't.
 pub fn trash_paths(paths: &[PathBuf]) -> (Vec<TrashedItem>, Vec<Failure>) {
     let mut trashed = Vec::new();
     let mut failures = Vec::new();
     let home = dirs::home_dir();
     for path in paths {
         if path.parent().is_none() || home.as_deref() == Some(path.as_path()) {
-            failures.push(Failure::new(path, "This folder can't be moved to the Trash."));
+            failures.push(Failure::new(
+                path,
+                "This folder can't be moved to the Trash.",
+            ));
             continue;
         }
         if let Err(error) = check_disk_link(path, Access::Write) {
@@ -253,8 +256,6 @@ pub fn trash_paths(paths: &[PathBuf]) -> (Vec<TrashedItem>, Vec<Failure>) {
     (trashed, failures)
 }
 
-/// Puts items the ledger knows back where they came from. Like Finder, it fails rather than
-/// replace something that has taken the name since.
 pub fn put_back_ids(ids: &[String]) -> TransferResult {
     let mut result = TransferResult::default();
     let mut done = Vec::new();
@@ -268,9 +269,10 @@ pub fn put_back_ids(ids: &[String]) -> TransferResult {
         };
         let original = PathBuf::from(&item.original_path);
         if fs_disk::exists(&original) {
-            result
-                .failed
-                .push(Failure::new(&original, "An item with that name is already there."));
+            result.failed.push(Failure::new(
+                &original,
+                "An item with that name is already there.",
+            ));
             continue;
         }
         if let Some(parent) = original.parent() {
@@ -292,7 +294,6 @@ pub fn put_back_ids(ids: &[String]) -> TransferResult {
     result
 }
 
-/// Moves items to the Trash, for Undo to put back.
 #[tauri::command]
 pub async fn files_trash(
     app: tauri::AppHandle,
@@ -319,8 +320,6 @@ pub async fn files_trash(
     .await
 }
 
-/// What Misty moved to the Trash that is still there, newest first. Items emptied from the Trash
-/// or taken out of it elsewhere drop out of the ledger.
 #[tauri::command]
 pub async fn files_trashed(
     app: tauri::AppHandle,
@@ -360,8 +359,6 @@ pub async fn files_put_back(
     .await
 }
 
-/// Deletes items for good. Only the person's window reaches this, after its delete dialog; no
-/// tool or SDK call does. A link goes as itself, never what it points to.
 #[tauri::command]
 pub async fn files_delete_forever(
     app: tauri::AppHandle,

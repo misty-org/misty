@@ -1,43 +1,24 @@
-//! Which tool asks when. Native on purpose: the run's mode (one of its engine's own,
-//! `engines/modes.rs`) comes from the request it was started with, never from the renderer at call
-//! time or from the model, and nothing here reads what a page or a tool result says. Only the mode's
-//! fixed kind counts: a mode that works without asking doesn't stop for ordinary work; what stops
-//! whatever the mode is listed in `decide`.
 use serde_json::Value;
 
 use super::run_taint::{url_asks, Taint};
 use crate::engines::modes::ModeKind;
 
-/// What the run was started as. A run nobody can account for reads as asking, the safe reading.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RunFacts {
     pub(crate) run_id: String,
     pub(crate) account: String,
     pub(crate) agent_id: String,
     pub(crate) task_id: String,
-    /// The engine's own mode id the run started in (`engines/modes.rs`), empty when its request
-    /// named none the engine offers.
     pub(crate) mode_id: String,
-    /// The mode works without asking for ordinary work (its kind is edits or no asking).
     pub(crate) auto: bool,
-    /// The person chose the engine's no-asking mode: it skips its own asks inside its folder
-    /// sandbox, and Misty's own tools go on as when it works without asking.
     pub(crate) bypass: bool,
-    /// The mode is the engine's read-only planning.
     pub(crate) planning: bool,
-    /// What the person asked for. Empty for a sub-agent: its request is another model's words.
     pub(crate) person_prompt: String,
     pub(crate) parent_run_id: String,
-    /// The run is on an outside engine, which drives Misty's browser itself.
     pub(crate) engine: bool,
-    /// The tools this run may use (its agent's list). Empty allows every tool.
     pub(crate) allowed_tools: Vec<String>,
-    /// The person turned on screen and input control for this send.
     pub(crate) computer_use: bool,
-    /// The chat the run answers in, when it has one: what an approval to drive an app lasts for.
     pub(crate) conversation_id: String,
-    /// The person let agents delete files (Settings › Agents › Access), read from this device when
-    /// the call comes (`tool_gate::facts_of_run`), never from the run's request.
     pub(crate) agent_delete: bool,
 }
 
@@ -50,7 +31,6 @@ impl RunFacts {
                 .to_owned()
         };
         let delegated = !text("delegated_from").is_empty() || !text("parent_run_id").is_empty();
-        // The engine's own mode, checked against its list; only its fixed kind is read here.
         let mode = super::engine_modes::of_request(body);
         let kind = mode.map(|mode| mode.kind);
         Self {
@@ -88,7 +68,6 @@ impl RunFacts {
     }
 }
 
-/// What stops in a mode that asks, before it reaches the window. Everything else is a read.
 const ASK_MODE_STOPS: &[&str] = &[
     "agent.configure",
     "browser.act",
@@ -122,7 +101,6 @@ const ASK_MODE_STOPS: &[&str] = &[
     "thread.post",
 ];
 
-/// What a planning mode refuses whatever the catalog offered: tools that change something on this computer.
 const PLAN_REFUSES: &[&str] = &[
     "browser.act",
     "browser.fill_form",
@@ -147,38 +125,32 @@ const PLAN_REFUSES: &[&str] = &[
     "shell.run",
 ];
 
-/// Words in a tool's name that mean it deletes something.
 const DELETE_WORDS: &[&str] = &[
     "delete", "remove", "purge", "unlink", "rm", "rmdir", "erase", "destroy", "wipe", "shred",
 ];
 
-/// Tools named for deleting that delete no file on this computer: `item.delete` takes a Space's
-/// thread, file or shared file away on the server, where its trash keeps what it took.
 const DELETES_NO_FILE: &[&str] = &["item.delete"];
 
-/// The one tool that deletes files for good, and only while the person allows it.
 const FILES_DELETE: &str = "files.delete";
 
-/// Whether a tool deletes, by its name's words (`files.delete`, `folder_remove`, `notes.purge`).
-/// An app's own tools are judged by its manifest instead, and those named in [`DELETES_NO_FILE`]
-/// keep what they take.
 pub(crate) fn deletes(name: &str) -> bool {
     !name.starts_with("app.")
         && !DELETES_NO_FILE.contains(&name)
-        && name
-            .split(['.', '_', '-'])
-            .any(|word| DELETE_WORDS.iter().any(|delete| word.eq_ignore_ascii_case(delete)))
+        && name.split(['.', '_', '-']).any(|word| {
+            DELETE_WORDS
+                .iter()
+                .any(|delete| word.eq_ignore_ascii_case(delete))
+        })
 }
 
-/// Deleting is refused unless it is `files.delete` and the person turned it on; then it asks
-/// every time, the no-asking mode included, and a planning mode refuses it like any change.
 fn delete_decision(facts: &RunFacts, name: &str) -> Decision {
     if name != FILES_DELETE || !facts.agent_delete {
         return Decision::Refuse {
             code: "delete_off",
-            message: "Agents don't delete files. Move what should go into Agent trash with the files \
+            message:
+                "Agents don't delete files. Move what should go into Agent trash with the files \
 trash tool: the person looks it over there and deletes it themselves. Nothing was deleted."
-                .to_owned(),
+                    .to_owned(),
         };
     }
     if facts.planning {
@@ -194,7 +166,6 @@ trash tool: the person looks it over there and deletes it themselves. Nothing wa
     }
 }
 
-/// Screen and input control (`features/computer_use`): what only looks.
 pub(crate) const COMPUTER_READS: &[&str] = &[
     "computer.screenshot",
     "computer.list_displays",
@@ -202,8 +173,6 @@ pub(crate) const COMPUTER_READS: &[&str] = &[
     "computer.wait",
 ];
 
-/// Screen and input control that acts on the person's computer. A mode that asks asks before each
-/// one, one that works without asking goes on, and a planning one refuses them.
 pub(crate) const COMPUTER_ACTS: &[&str] = &[
     "computer.mouse_move",
     "computer.left_click",
@@ -219,8 +188,6 @@ pub(crate) const COMPUTER_ACTS: &[&str] = &[
     "computer.sequence",
 ];
 
-/// Whether a tool is allowed by the run's list. The tools a run needs to talk to the person and
-/// to report are never left out.
 fn allowed_by_list(facts: &RunFacts, name: &str) -> bool {
     const ALWAYS: &[&str] = &["conversation.ask_user", "log.work.write"];
     facts.allowed_tools.is_empty()
@@ -234,10 +201,8 @@ fn allowed_by_list(facts: &RunFacts, name: &str) -> bool {
         })
 }
 
-/// The tools that open an address, and the field that names it.
 pub(crate) const URL_TOOLS: &[&str] = &["browser.navigate", "screen.open", "web.fetch"];
 
-/// What a screen goal may only do with the person's approval, as the model's own flag claims it.
 fn consequential_goal(goal: &str) -> bool {
     static WORDS: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
     WORDS
@@ -248,7 +213,6 @@ fn consequential_goal(goal: &str) -> bool {
         .is_match(goal)
 }
 
-/// Which page kind a description names, for the island's words.
 pub(crate) fn kind_of(description: &str) -> &'static str {
     static KINDS: std::sync::OnceLock<[(regex::Regex, &'static str); 3]> =
         std::sync::OnceLock::new();
@@ -268,20 +232,16 @@ pub(crate) fn kind_of(description: &str) -> &'static str {
 #[derive(Debug, PartialEq)]
 pub(crate) enum Decision {
     Run,
-    /// Asks the person. `kind` is a page kind, or "action" for any other step.
-    Ask {
-        kind: &'static str,
-        why: String,
-    },
-    Refuse {
-        code: &'static str,
-        message: String,
-    },
+    Ask { kind: &'static str, why: String },
+    Refuse { code: &'static str, message: String },
 }
 
-/// What an approval to drive an app lasts for: the run's chat, or the run alone when it has none.
 pub(crate) fn chat_of(facts: &RunFacts) -> String {
-    if facts.conversation_id.is_empty() { format!("run:{}", facts.run_id) } else { facts.conversation_id.clone() }
+    if facts.conversation_id.is_empty() {
+        format!("run:{}", facts.run_id)
+    } else {
+        facts.conversation_id.clone()
+    }
 }
 
 fn ask(why: &str) -> Decision {
@@ -295,8 +255,6 @@ fn text<'a>(input: &'a Value, name: &str) -> &'a str {
     input.get(name).and_then(Value::as_str).unwrap_or("")
 }
 
-/// Clears `allowConsequential` on a goal that names nothing consequential: a model set it on "enter
-/// 55500 and click Calculate", and each time the run stopped. The click itself is still judged natively.
 pub(crate) fn prepared_input(name: &str, input: &Value) -> Value {
     if name == "browser.act"
         && input["allowConsequential"] == true
@@ -320,8 +278,6 @@ fn private_address_refusal(facts: &RunFacts, url: &str) -> Option<Decision> {
     })
 }
 
-/// One call's verdict. Reads whose results an instruction could hide in never stop here, unless a
-/// private read came first.
 pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value) -> Decision {
     if !allowed_by_list(facts, name) {
         return Decision::Refuse {
@@ -329,11 +285,6 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             message: format!("This agent isn't allowed to use {name}. Nothing was done."),
         };
     }
-    // A tool of an app (`apps/mcp.rs`): its own MCP server's, or Misty's screen tools driving it in the
-    // person's window. What the app marks read-only runs without asking and a planning mode refuses the rest.
-    // An app that reaches a paid host (its manifest says so) always asks, whatever the mode. Otherwise the
-    // engine's no-asking modes act freely, and an asking mode asks the first time a chat drives the app; a
-    // yes lasts for that chat (`tool_gate`). What an app answers is data (`untrusted`).
     if name.starts_with("app.") {
         let read_only = crate::apps::mcp::is_read_only(name);
         if facts.planning && !read_only {
@@ -423,16 +374,11 @@ pub(crate) fn decide(facts: &RunFacts, taint: &Taint, name: &str, input: &Value)
             why: String::new(),
         };
     }
-    // Files' changes reach the whole disk, so they ask unless the person chose the engine's
-    // no-asking mode, not only an edits mode.
     if name.starts_with("files.") && ASK_MODE_STOPS.contains(&name) && !facts.bypass {
         return ask("");
     }
-    // An engine opens and reads pages freely and asks before it acts on one; where it may go is
-    // still settled above, by the address.
     let opens_page = name == "browser.navigate" || name == "screen.open";
-    if !facts.auto
-        && !(facts.engine && opens_page)
+    if !(facts.auto || (facts.engine && opens_page))
         && (ASK_MODE_STOPS.contains(&name) || (name == "screen.open" && !url.is_empty()))
     {
         return ask("");

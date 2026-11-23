@@ -1,4 +1,3 @@
-//! Starting a process inside a container and a job.
 use std::{
     ffi::{OsStr, OsString},
     fs::File,
@@ -38,26 +37,19 @@ pub use command::{command_line, environment_block};
 
 const SE_GROUP_ENABLED: u32 = 0x4;
 
-/// One process to start.
 pub struct Launch<'a> {
-    /// The program, by full path: nothing is looked up on PATH.
     pub application: &'a Path,
-    /// The whole command line, already quoted for the program.
     pub command_line: &'a OsStr,
-    /// From [`environment_block`].
     pub environment: &'a [u16],
     pub directory: &'a Path,
-    /// Standard input; `NUL` when absent.
     pub stdin: Option<&'a File>,
     pub stdout: &'a File,
     pub stderr: &'a File,
     pub container: &'a Container,
-    /// Shared identities the process holds besides its container.
     pub capabilities: &'a [&'a Capability],
     pub job: &'a Job,
 }
 
-/// A started process. Dropping it does not end it; its job does.
 pub struct Process {
     handle: OwnedHandle,
     id: u32,
@@ -72,7 +64,6 @@ impl Process {
         self.id
     }
 
-    /// Waits up to `timeout`; the exit code once the process has ended.
     pub fn wait(&self, timeout: Duration) -> Option<u32> {
         let millis = timeout.as_millis().min(u128::from(u32::MAX - 1)) as u32;
         // SAFETY: a live process handle.
@@ -89,7 +80,6 @@ impl Process {
     }
 }
 
-/// An anonymous pipe: (read end, write end), neither inheritable.
 pub fn pipe() -> io::Result<(File, File)> {
     let (mut read, mut write): (HANDLE, HANDLE) = (ptr::null_mut(), ptr::null_mut());
     // SAFETY: plain out-parameters; both handles are owned by the returned files.
@@ -105,10 +95,6 @@ pub fn pipe() -> io::Result<(File, File)> {
     })
 }
 
-/// The variables Windows needs to start an AppContainer process (it places
-/// the container's profile folders from them), taken from this process.
-/// They name locations only; nothing else of the caller's environment, which
-/// can hold tokens, should reach a confined process.
 pub fn system_variables() -> Vec<(OsString, OsString)> {
     const NEEDED: [&str; 6] = [
         "SystemRoot",
@@ -124,8 +110,6 @@ pub fn system_variables() -> Vec<(OsString, OsString)> {
         .collect()
 }
 
-/// Starts the process suspended inside the container, places it in the job
-/// before it runs any code, and passes on only its three standard handles.
 pub fn spawn(launch: &Launch) -> Result<Process, String> {
     let null_input;
     let stdin = match launch.stdin {

@@ -68,7 +68,6 @@ fn review(plan_id: &str, session_id: &str) -> PlanReview {
     }
 }
 
-/// Parks a native_request context and, optionally, attaches a real stdin.
 fn park(
     app: &tauri::App<tauri::test::MockRuntime>,
     key: &str,
@@ -107,10 +106,6 @@ fn park(
     );
 }
 
-/// A child that copies stdin to stdout unchanged; stdout goes to a file. Returns (child, stdin,
-/// output path). Unix uses `cat`; Windows has no `cat`, and `more` pages and expands tabs. These cases
-/// assert the frames the app writes to the native process, and any rewrite would void them, so
-/// PowerShell copies the standard streams byte for byte.
 fn frame_sink_command() -> tokio::process::Command {
     if cfg!(windows) {
         let mut command = tokio::process::Command::new("powershell");
@@ -188,7 +183,6 @@ async fn approve_delivers_the_native_frame_then_conflicts_on_repeat() {
     let written = drain_frames(&app, "sess-a", child, &out_path).await;
     assert!(written.contains("\"outcome\":\"approved\""), "{written}");
 
-    // The parked context was removed; submitting the same revision again conflicts instead of running twice.
     let entry = app
         .state::<crate::engines::support::EngineState>()
         .processes
@@ -243,7 +237,6 @@ async fn request_changes_substitutes_feedback_into_the_frame() {
 async fn a_closed_stdin_reverts_to_pending_and_keeps_the_intent() {
     let (app, db) = build_state("revert");
     plan_review::record_review(&db, &review("plan-c", "sess-c")).unwrap();
-    // stdin is closed: the write fails, so an approval never reads as success.
     park(
         &app,
         "sess-c",
@@ -270,7 +263,6 @@ async fn a_closed_stdin_reverts_to_pending_and_keeps_the_intent() {
     assert_eq!(reverted.execution, plan_review::PlanExecution::NotStarted);
     assert!(reverted.decision_intent_at.is_some());
     assert!(reverted.applied_at.is_none());
-    // The parked context stays, so the person can retry.
     let entry = app
         .state::<crate::engines::support::EngineState>()
         .processes
@@ -284,8 +276,6 @@ async fn a_changed_body_expires_the_revision_instead_of_executing() {
     let (app, db) = build_state("stale-body");
     plan_review::record_review(&db, &review("plan-d", "sess-d")).unwrap();
     let (_child, stdin, _out) = spawn_frame_sink("stale-body");
-    // The body hash recorded with the parked context differs from the stored record: the body changed
-    // during review, so expire first and ask for a fresh review, never running with the old body.
     park(
         &app,
         "sess-d",

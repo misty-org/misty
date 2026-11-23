@@ -2,8 +2,6 @@ import { Skeleton } from "@misty/ui";
 
 const sentenceWidths = ["w-3/5", "w-1/2", "w-2/3", "w-2/5", "w-1/2"];
 
-/** One run's steps before they are first read: rows shaped like its step rows, icon, sentence and
- * time into the run. */
 export function StepRowsSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div role="status" aria-label="Steps" aria-busy="true" className="grid">
@@ -22,8 +20,6 @@ export function StepRowsSkeleton({ rows = 5 }: { rows?: number }) {
   );
 }
 
-/** The Steps panel before this chat's runs are first read: the latest run's head (when it started
- * and its state), then its step rows. */
 export function StepsSkeleton() {
   return (
     <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3">

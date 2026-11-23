@@ -1,4 +1,3 @@
-//! Job objects: limits for a whole process tree, and an end to all of it.
 use std::{
     mem,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
@@ -21,16 +20,12 @@ use windows_sys::Win32::{
     },
 };
 
-/// Limits every process in a job shares. Each process gets its own memory
-/// and CPU allowance; `processes` caps how many run at once.
 pub struct JobLimits {
     pub process_memory: usize,
     pub process_cpu: Duration,
     pub processes: u32,
 }
 
-/// A Job object. Closing it (dropping this) ends every process in it, and
-/// processes started inside it can't leave it.
 pub struct Job(OwnedHandle);
 
 // SAFETY: a job handle may be used from any thread.
@@ -55,7 +50,6 @@ impl Job {
             | JOB_OBJECT_LIMIT_PROCESS_MEMORY
             | JOB_OBJECT_LIMIT_PROCESS_TIME;
         basic.ActiveProcessLimit = limits.processes.max(1);
-        // In 100-nanosecond units.
         basic.PerProcessUserTimeLimit = (limits.process_cpu.as_nanos() / 100) as i64;
         extended.ProcessMemoryLimit = limits.process_memory;
         let ui = JOBOBJECT_BASIC_UI_RESTRICTIONS {
@@ -94,7 +88,6 @@ impl Job {
         self.0.as_raw_handle() as HANDLE
     }
 
-    /// Ends every process in the job now.
     pub fn terminate(&self) {
         // SAFETY: a live job handle.
         unsafe { TerminateJobObject(self.raw(), 1) };

@@ -11,11 +11,9 @@ use serde::Serialize;
 #[serde(rename_all = "camelCase")]
 pub struct ClipboardFileSnapshot {
     pub paths: Vec<String>,
-    /// The clipboard's change count, which tells a stale list from a newer copy made elsewhere.
     pub change_count: Option<u64>,
 }
 
-/// Reads the clipboard on the main thread, where AppKit wants it, and hands the answer back.
 pub(crate) async fn snapshot_on_main_thread(
     app: &tauri::AppHandle,
 ) -> Result<ClipboardFileSnapshot, String> {
@@ -29,10 +27,6 @@ pub(crate) async fn snapshot_on_main_thread(
         .map_err(|_| "The clipboard read was dropped.".to_string())?
 }
 
-/// The clipboard's change count alone. Neither macOS's `changeCount` nor Windows'
-/// `GetClipboardSequenceNumber` opens the clipboard, so this answers while another program holds
-/// it open, which is when a snapshot fails: the tree's Paste can still tell that nothing newer
-/// was copied since its own Copy.
 pub(super) async fn change_count_on_main_thread(
     app: &tauri::AppHandle,
 ) -> Result<Option<u64>, String> {
@@ -46,9 +40,6 @@ pub(super) async fn change_count_on_main_thread(
         .map_err(|_| "The clipboard read was dropped.".to_string())
 }
 
-/// Writes the files to the clipboard (when any still exists) and returns its change count either
-/// way: reading the count doesn't open the clipboard, so it answers even while another program
-/// holds it, and the tree's Paste compares it to tell whether its Copy is still the newest.
 pub(super) async fn set_files_on_main_thread(
     app: &tauri::AppHandle,
     paths: Vec<PathBuf>,
@@ -67,15 +58,17 @@ pub(super) async fn set_files_on_main_thread(
         .map_err(|_| "The clipboard write was dropped.".to_string())
 }
 
-/// Writes paths its caller has already checked (Files, through the disk gate) and returns the
-/// clipboard's change count afterwards, written or not.
 pub(crate) async fn write_checked_paths_on_main_thread(
     app: &tauri::AppHandle,
     paths: Vec<String>,
 ) -> Result<Option<u64>, String> {
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.run_on_main_thread(move || {
-        let written = if paths.is_empty() { Ok(()) } else { platform::set_file_paths(&paths) };
+        let written = if paths.is_empty() {
+            Ok(())
+        } else {
+            platform::set_file_paths(&paths)
+        };
         let _ = sender.send(written.map(|()| platform::change_count()));
     })
     .map_err(|error| format!("Couldn't reach the main thread: {error}"))?;
@@ -84,7 +77,6 @@ pub(crate) async fn write_checked_paths_on_main_thread(
         .map_err(|_| "The clipboard write was dropped.".to_string())?
 }
 
-/// Missing paths are dropped quietly; the answer must not say whether some path exists.
 fn existing_paths(paths: Vec<PathBuf>) -> Vec<String> {
     paths
         .into_iter()
@@ -93,9 +85,6 @@ fn existing_paths(paths: Vec<PathBuf>) -> Vec<String> {
         .collect()
 }
 
-/// The path list of a `DROPFILES` block: each path as UTF-16 and its NUL, then the empty name
-/// that ends the list. Tree paths join children with `/`; the clipboard's readers (Explorer's
-/// paste among them) get the system's own separators.
 #[cfg(any(windows, test))]
 fn hdrop_path_list(paths: &[String]) -> Vec<u16> {
     let mut names: Vec<u16> = Vec::new();
@@ -137,8 +126,6 @@ mod platform {
         write_file_urls(&NSPasteboard::generalPasteboard(), paths)
     }
 
-    /// Replaces the pasteboard's contents with file URLs, Finder's own flavour for a copied item.
-    /// A plain-text path would paste as text in editors, so none is written beside them.
     pub(super) fn write_file_urls(
         pasteboard: &NSPasteboard,
         paths: &[String],
@@ -158,8 +145,6 @@ mod platform {
         }
     }
 
-    /// The file URLs on the pasteboard as absolute paths. Web links sit on the same class and
-    /// drop out, as do promised items with no path.
     pub(super) fn read_file_urls(pasteboard: &NSPasteboard) -> Vec<String> {
         let classes = NSArray::from_slice(&[NSURL::class()]);
         // SAFETY: `classes` holds Objective-C classes; `None` asks for the default options.
@@ -197,12 +182,8 @@ mod platform {
     };
     use windows_sys::Win32::UI::Shell::{DragQueryFileW, DROPFILES};
 
-    /// `CF_HDROP`, the clipboard format of a copied file list.
     const CF_HDROP: u32 = 15;
 
-    /// Another program (a clipboard manager, a remote desktop client) often holds the clipboard
-    /// for a moment; asking again a few times over ~100 ms gets it in most cases. When it still
-    /// can't be opened the caller falls back on the change count, which needs no open.
     unsafe fn open_clipboard() -> bool {
         for attempt in 0..5 {
             if OpenClipboard(std::ptr::null_mut()) != 0 {
@@ -237,7 +218,6 @@ mod platform {
     pub(super) fn change_count() -> Option<u64> {
         // SAFETY: a plain query that doesn't open the clipboard.
         let sequence = unsafe { GetClipboardSequenceNumber() };
-        // Zero means this window station has no clipboard access.
         (sequence != 0).then(|| u64::from(sequence))
     }
 
@@ -261,13 +241,10 @@ mod platform {
                 GlobalFree(handle);
                 return Err("Couldn't set the clipboard.".into());
             }
-            // From here the system owns the block; freeing it would corrupt the clipboard.
             Ok(())
         }
     }
 
-    /// A moveable `DROPFILES` block: the header, then the paths as a double-NUL-ended UTF-16
-    /// list, exactly what Explorer puts on the clipboard for a copied file.
     unsafe fn alloc_hdrop(paths: &[String]) -> Result<*mut core::ffi::c_void, String> {
         let payload = hdrop_bytes(paths);
         let handle = GlobalAlloc(GMEM_MOVEABLE, payload.len());
@@ -315,7 +292,6 @@ mod platform {
         if handle.is_null() {
             return Err("Couldn't read the clipboard's file list.".into());
         }
-        // `u32::MAX` asks for the number of files, not a name.
         let count = DragQueryFileW(handle, u32::MAX, std::ptr::null_mut(), 0);
         let mut paths = Vec::with_capacity(count as usize);
         for index in 0..count {
@@ -334,8 +310,6 @@ mod platform {
 
 #[cfg(not(any(target_os = "macos", windows)))]
 mod platform {
-    /// Linux file lists would need the GTK or X11 selection stack, which Misty doesn't link; the
-    /// tree's own copy still works there.
     pub(super) fn file_snapshot() -> Result<super::ClipboardFileSnapshot, String> {
         Ok(super::ClipboardFileSnapshot {
             paths: Vec::new(),
@@ -391,9 +365,6 @@ mod tests {
 
     type Writing = ProtocolObject<dyn NSPasteboardWriting>;
 
-    /// A private pasteboard keeps the test off the person's clipboard. It is named with a fresh
-    /// UUID: `pasteboardWithUniqueName` can hand tests running at once the same pasteboard (one
-    /// test then reads another's files), which made these tests fail now and then.
     fn private_pasteboard() -> Retained<NSPasteboard> {
         let name = format!("com.misty.tests.clipboard.{}", uuid::Uuid::new_v4());
         let pasteboard = NSPasteboard::pasteboardWithName(&NSString::from_str(&name));

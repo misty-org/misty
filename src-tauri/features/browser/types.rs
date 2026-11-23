@@ -1,4 +1,3 @@
-//! The requests and events the browser commands exchange with the renderer.
 use super::*;
 
 #[derive(Debug, Deserialize)]
@@ -16,7 +15,6 @@ pub struct BrowserWebviewCreateRequest {
     pub scope_id: String,
     #[serde(default)]
     pub native_live_resize: bool,
-    /// The agent run this tab works for, for an agent's own tab.
     #[serde(default)]
     pub agent_run_id: Option<String>,
 }
@@ -31,12 +29,8 @@ pub struct BrowserWebviewBoundsRequest {
     pub height: f64,
     #[serde(default)]
     pub native_live_resize: bool,
-    /// Top-left, top-right, bottom-right and bottom-left radii where the page
-    /// meets a rounded workspace corner.
     #[serde(default)]
     pub corner_radii: Option<[f64; 4]>,
-    /// The window chrome around those corners, as `#rrggbb`, which smooths
-    /// their edge on Windows.
     #[cfg(windows)]
     #[serde(default)]
     pub corner_color: Option<String>,
@@ -52,9 +46,6 @@ pub struct BrowserWebviewIdRequest {
 #[serde(rename_all = "camelCase")]
 pub struct BrowserWebviewHideRequest {
     pub id: String,
-    /// Park the page out of sight instead of hiding it, so it keeps rendering: a video
-    /// floating in picture in picture keeps a page to return to, and an agent's own tab
-    /// keeps drawing the widgets it reads.
     #[serde(default)]
     pub keep_live: bool,
 }
@@ -99,25 +90,17 @@ pub struct BrowserAgentExecuteRequest {
     pub operation: String,
     #[serde(default)]
     pub input: Value,
-    /// The tool call this work belongs to, which is how native code finds the run. A request with none
-    /// knows no run, and reads as Ask.
     #[serde(default)]
     pub policy_call: Option<String>,
-    /// Read natively as the request arrives, never taken from the window.
     #[serde(skip)]
     pub policy: PagePolicy,
 }
 
-/// What page work goes by for one request: the run's mode, the sites agents may not act on and what
-/// was remembered, all from `misty.db` and the run's saved request.
 #[derive(Debug, Clone, Default)]
 pub struct PagePolicy {
     pub(crate) call: Option<crate::agents::run_control::tool_gate::ActiveCall>,
-    /// Absent means the safe default: sensitive categories blocked.
     pub site_blocks: Option<crate::browser::agent_pages::page_agent::SiteBlocks>,
-    /// Absent or empty means the safe default: all of them.
     pub confirm_kinds: Option<Vec<String>>,
-    /// Absent means nothing is remembered.
     pub grant_set: Option<crate::browser::agent_pages::action_confirm::GrantSet>,
 }
 

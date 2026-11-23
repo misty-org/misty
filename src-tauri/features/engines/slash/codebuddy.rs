@@ -1,15 +1,3 @@
-//! The CodeBuddy Code commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Misty runs CodeBuddy headless (`-p --input-format stream-json`), whose `system/init` message
-//! lists every command once a chat has run. The turns here are its prompt and agent commands
-//! (from codebuddy-headless.js's built-in list), so the `/` menu has them before that. Its
-//! terminal-only panels are answered from `~/.codebuddy` and the project's files, and its page
-//! commands open the page.
-//!
-//! Left out: `/doctor` (the `codebuddy doctor` subcommand renders the terminal app's panel and
-//! never finishes without a terminal; headless, the command does nothing) and
-//! `/install-github-app` (its setup isn't in the installed CLI's code to follow).
-
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
@@ -61,8 +49,6 @@ pub const COMMANDS: &[Command] = &[
     misty("upgrade", "Open the upgrade page in your browser"),
 ];
 
-/// The pages from the CLI's `product.json` (`links`), used when the installed one can't be
-/// read.
 const ISSUE_URL: &str = "https://cnb.cool/codebuddy/codebuddy-code/-/issues/new";
 const UPGRADE_URL: &str = "https://www.codebuddy.ai/profile/plan";
 
@@ -97,9 +83,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     }
 }
 
-/// The memory files CodeBuddy loads: `CODEBUDDY.md` (or `.mdc`) in `~/.codebuddy`, and in the
-/// project's folders `CODEBUDDY.md`, `CODEBUDDY.local.md` (each also as `.mdc`),
-/// `.codebuddy/CODEBUDDY.md` and the `AGENTS.md` it falls back to.
 fn memory(home: &Path, folder: Option<&Path>) -> Output {
     Output::info(
         "CodeBuddy memory",
@@ -119,8 +102,6 @@ fn memory(home: &Path, folder: Option<&Path>) -> Output {
     )
 }
 
-/// `/feedback`: CodeBuddy's new-issue page, its body started with the system it runs on (the
-/// CLI also adds the account id, which Misty leaves out).
 fn feedback() -> Result<Output, String> {
     let page = product_link("issueCreation").unwrap_or_else(|| ISSUE_URL.to_string());
     let mut url = url::Url::parse(&page).map_err(|error| format!("Bad feedback page: {error}"))?;
@@ -133,7 +114,6 @@ fn feedback() -> Result<Output, String> {
     Ok(Output::open(format!("url:{url}")))
 }
 
-/// One of the `links` in the installed CLI's `product.json`.
 fn product_link(key: &str) -> Option<String> {
     let product = files::read_json(&package_dir()?.join("product.json"))?;
     product
@@ -142,7 +122,10 @@ fn product_link(key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// The installed CodeBuddy package: the folder with `product.json` above the program.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "finds the package beside CodeBuddy's installed program, which lives outside the gate"
+)]
 fn package_dir() -> Option<PathBuf> {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = crate::engines::engine_bin(&settings, "codebuddy");
@@ -158,19 +141,13 @@ fn package_dir() -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-/// Runs Misty's out-of-turn CodeBuddy commands against the installed CLI's package and the
-/// person's real `~/.codebuddy` (read only), with a scratch project, and prints each Output to
-/// read. None makes a model call or changes anything.
-/// `cargo test --lib engines::slash::codebuddy::live_tests -- --ignored --nocapture --test-threads 1`
 #[cfg(all(test, unix))]
 mod live_tests {
-    #![allow(clippy::disallowed_methods)] // Fixtures are built with the standard library.
+    #![allow(clippy::disallowed_methods)]
     use std::path::Path;
 
     use super::super::{run, Context, Output};
 
-    /// The test binary points HOME at a scratch folder (`isolate_for_tests`); CodeBuddy's files
-    /// live in the person's real one, which their account record names.
     fn use_real_home() {
         // SAFETY: getpwuid returns the calling user's static record, read before anything else.
         let home = unsafe {

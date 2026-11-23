@@ -170,7 +170,6 @@ fn multiline_prompts_do_not_shift_questions_and_answer_fields() {
     );
 }
 
-/// Kimi Code 2.6.2's `session/new` answer (on an env channel), trimmed to its options.
 fn kimi_session() -> Value {
     json!({"sessionId": "session_10d77b63-6ad8-4009-8379-2d91b1d75f63", "configOptions": [
         {"type": "select", "id": "model", "name": "Model", "category": "model",
@@ -197,7 +196,6 @@ fn kimi_modes_and_thinking_match_the_installed_handshake() {
         .map(|mode| mode.id)
         .collect();
     assert_eq!(listed, ["default", "plan", "auto", "yolo"]);
-    // Every mode Misty sets is one Kimi lists; YOLO, with no sandbox, is never one of them.
     for permission in ["manual", "plan", "auto", "bypass"] {
         assert!(listed.iter().any(|id| id == mode(Some(permission))));
     }
@@ -207,7 +205,6 @@ fn kimi_modes_and_thinking_match_the_installed_handshake() {
         .map(|mode| mode.id)
         .collect();
     assert_eq!(adapter, ["default", "plan", "auto"]);
-    // Its thinking option is a switch.
     assert_eq!(supported_effort("high", &session), "on");
     assert_eq!(supported_effort("none", &session), "off");
 }
@@ -219,7 +216,6 @@ fn usage_preserves_context_occupancy_and_window() {
         Some(json!({"input_tokens": 29000, "used": 29000, "model_context_window": 262144}))
     );
     assert!(usage(&json!({"update": {"sessionUpdate": "agent_message_chunk"}})).is_none());
-    // A fresh session's empty context is no compaction: the bar reads no size from it.
     let empty =
         usage(&json!({"update": {"sessionUpdate": "usage_update", "used": 0, "size": 1}})).unwrap();
     assert_eq!(

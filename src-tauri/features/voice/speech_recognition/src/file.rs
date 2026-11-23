@@ -1,6 +1,3 @@
-//! A whole recording recognized at once: the voice activity detector finds where speech is,
-//! and each stretch of it is recognized with its time.
-
 use std::path::Path;
 
 use crate::decode::{decode_file, SAMPLE_RATE};
@@ -8,7 +5,6 @@ use crate::hearing::{detector, WINDOW};
 use crate::model::VadSpec;
 use crate::{reason, Phrase, Recognizer};
 
-/// Recognizes a recorded file, phrase by phrase, each with its time in seconds from the start.
 pub fn recognize_file(
     recognizer: &Recognizer,
     vad: &VadSpec,
@@ -18,7 +14,6 @@ pub fn recognize_file(
     recognize_samples(recognizer, vad, &samples)
 }
 
-/// Recognizes 16 kHz mono samples, phrase by phrase.
 pub fn recognize_samples(
     recognizer: &Recognizer,
     vad: &VadSpec,

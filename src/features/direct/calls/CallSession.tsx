@@ -1,14 +1,15 @@
 import { useEffect, useRef } from "react";
 import type { Track } from "livekit-client";
+import { useNotice } from "@misty/ui";
 import { useSpacesStore } from "@/features/spaces";
-import { useDms } from "../directData";
-import { dmOf, type ActiveCall } from "./callStore";
-import { useCallSession } from "./callSessionStore";
-import { useCallAgent } from "./useCallAgent";
-import { useLiveKitCall } from "./useLiveKitCall";
+import { useDms } from "../direct_data";
+import { dmOf, type ActiveCall } from "./call_store";
+import { useCallSession } from "./call_session_store";
+import { useCallAgent } from "./UseCallAgent";
+import { useLiveKitCall } from "./use_live_kit_call";
+import { useCallShortcuts } from "./use_call_shortcuts";
 
-/** Someone's voice, or their screen's sound. */
-function TrackAudio({ track }: { track: Track }) {
+function TrackAudio({ track, muted }: { track: Track; muted: boolean }) {
   const ref = useRef<HTMLAudioElement>(null);
   useEffect(() => {
     const element = ref.current;
@@ -18,15 +19,9 @@ function TrackAudio({ track }: { track: Track }) {
       track.detach(element);
     };
   }, [track]);
-  return <audio ref={ref} autoPlay hidden />;
+  return <audio ref={ref} autoPlay hidden muted={muted} />;
 }
 
-/**
- * The call this window is in, joined once at the window's root and kept there whatever the window
- * shows: it publishes the call's controls for its page, a DM, full screen and the mini player
- * (`callSession.ts`), and plays everyone's voice here, so the sound never stops as the call moves
- * between them.
- */
 export function CallSession({ call, maxPeople }: { call: ActiveCall; maxPeople: number }) {
   const controls = useLiveKitCall(call, maxPeople);
   const dms = useDms().data;
@@ -34,7 +29,6 @@ export function CallSession({ call, maxPeople }: { call: ActiveCall; maxPeople: 
   const spaceMembers = useSpacesStore((state) =>
     call.place.kind === "voice" ? state.membersBySpace[call.place.spaceId] : undefined,
   );
-  // People are named as the DM or the Space knows them; the token's name otherwise.
   const nameOf = (userId: string) =>
     dmMembers?.find((member) => member.user_id === userId)?.username ??
     spaceMembers?.find((member) => member.user_id === userId)?.name ??
@@ -42,18 +36,36 @@ export function CallSession({ call, maxPeople }: { call: ActiveCall; maxPeople: 
     "Someone";
   const others = controls.people.filter((person) => !person.self).length;
   const agent = useCallAgent({ room: controls.room, call, others, nameOf });
+  useCallShortcuts(controls);
 
-  // After every render: the controls carry the call's live people and tracks.
   useEffect(() => {
     useCallSession.getState().publish({ controls, agent, nameOf });
   });
   useEffect(() => () => useCallSession.getState().clear(), []);
+  useNotice(controls.reconnecting, {
+    message: "Reconnecting. Your audio and video come back on their own.",
+  });
+  useNotice(controls.offerLowerHand, {
+    message: "You’re talking with your hand up.",
+    action: { label: "Lower hand", onSelect: controls.toggleHand },
+  });
+  useNotice(controls.silentMic && controls.micOn && !controls.reconnecting, {
+    message: "Your microphone isn’t picking anything up.",
+    action: {
+      label: "Choose another",
+      onSelect: () => useCallSession.getState().setDevicesOpen("audio"),
+    },
+  });
 
   return (
     <>
       {controls.people.flatMap((person) =>
         person.audio.map((track) => (
-          <TrackAudio key={track.sid ?? track.mediaStreamTrack.id} track={track} />
+          <TrackAudio
+            key={track.sid ?? track.mediaStreamTrack.id}
+            track={track}
+            muted={controls.deafened}
+          />
         )),
       )}
     </>

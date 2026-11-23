@@ -1,20 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { localChats } from "../state/localChats";
-import type { AiArtifact } from "@/features/agents/runs/invocations/invocationTypes";
-import { useMistyStore } from "../state/useMistyStore";
-import { usePersonalAgentsStore } from "@/features/agents/personal/personalAgentsStore";
-import type { GlobalAiConversation } from "../state/conversationTypes";
+import { localChats } from "../state/local_chats";
+import type { AiArtifact } from "@/features/agents/runs/invocations/invocation_types";
+import { useMistyStore } from "../state/use_misty_store";
+import { usePersonalAgentsStore } from "@/features/agents/personal/personal_agents_store";
+import type { GlobalAiConversation } from "../state/conversation_types";
 
 const windowMocks = vi.hoisted(() => ({
   getByLabel: vi.fn(),
   getCurrentWindow: vi.fn(),
 }));
-// Conversations open on the Agents page.
 const workspace = vi.hoisted(() => ({
   openDestination: vi.fn((request: { route: string }) => ({ id: "agents", route: request.route })),
   updateViewRoute: vi.fn(),
 }));
-vi.mock("@/features/app-windows/tabs/useWorkspaceStore", () => ({
+vi.mock("@/features/app-windows/tabs/use_workspace_store", () => ({
   useWorkspaceStore: { getState: () => workspace },
 }));
 const last = <T>(items: T[]) => items[items.length - 1];
@@ -192,15 +191,13 @@ it("restores a pending review and keeps it bound to its saved conversation", asy
     },
     { ...base, id: "other", messages: [] },
   ] as GlobalAiConversation[];
-  const request = vi
-    .spyOn(localChats, "conversations")
-    .mockResolvedValue(
-      conversations.map((item) => ({
-        ...item,
-        messageBeforeSeq: undefined,
-        hasOlderMessages: false,
-      })),
-    );
+  const request = vi.spyOn(localChats, "conversations").mockResolvedValue(
+    conversations.map((item) => ({
+      ...item,
+      messageBeforeSeq: undefined,
+      hasOlderMessages: false,
+    })),
+  );
   useMistyStore.setState({
     accountId: "owner",
     activeConversationId: "files",

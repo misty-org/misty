@@ -1,5 +1,3 @@
-//! Agent input lock, uploads, task downloads and workspace dispatch.
-
 use crate::browser::*;
 
 pub(in crate::browser) fn apply_agent_input_lock(
@@ -15,7 +13,6 @@ pub(in crate::browser) fn apply_agent_input_lock(
     let script = format!(
         "({})({locked}, window, 0, {})",
         include_str!("../kiri_link/scripts/agent_input_guard.js"),
-        // A native lock already keeps the person's own input out.
         cfg!(any(target_os = "macos", windows, target_os = "linux"))
     );
     webview.eval(&script).map_err(|e| e.to_string())
@@ -27,7 +24,6 @@ pub fn browser_agent_set_locked(
     state: State<'_, BrowserSessionState>,
     request: BrowserWebviewIdRequest,
     locked: bool,
-    // Set by the agent browser: whether its run goes on, ringing the tab whether locked or not.
     ring: Option<bool>,
 ) -> Result<(), String> {
     let view = app
@@ -68,7 +64,6 @@ pub(in crate::browser) async fn upload_browser(
             crate::browser::agent_pages::task_files::prepare_upload(app, state, request)?;
     }
     if request.input.get("ref").and_then(Value::as_str).is_some() {
-        // A file input from browser_snapshot rather than browser_inspect.
         return crate::browser::agent_pages::page_agent::upload(app, state, id, request, &input)
             .await;
     }
@@ -95,7 +90,6 @@ pub(in crate::browser) async fn upload_browser(
         .get_webview(&webview_label(id)?)
         .ok_or("browser_context_closed")?;
     let origin = browser_page_origin(&webview.url().map_err(|e| e.to_string())?);
-    // Reading a file must not extend a revoked task or execution grant.
     crate::agents::task_scopes::authorize_scope(
         app,
         &request.scope_id,
@@ -145,7 +139,6 @@ pub(crate) fn resume_task_downloads(
         previous,
         next,
     );
-    // An old delayed download is never attributed to the resumed task.
     session.pending_agent_download = None;
     Ok(())
 }

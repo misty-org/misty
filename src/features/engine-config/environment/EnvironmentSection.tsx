@@ -1,12 +1,6 @@
-/**
- * An engine's environment variables: what its CLI finds in its environment each time Misty
- * starts it, such as a proxy, a region or a feature flag. One engine at a time, picked at the top.
- * A variable whose name looks like a key (KEY, TOKEN, SECRET…) is a secret field that never shows
- * its value again; the rest show and edit their value in place, saving when the field is left.
- */
 import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
 import {
   Button,
@@ -178,10 +172,6 @@ function AddVariable({
   );
 }
 
-/**
- * The variables' first load: one compact row (most engines have none, a few have one) with the
- * value field and its ⋯ at their real sizes.
- */
 function VariableRowSkeleton() {
   return (
     <div
@@ -204,8 +194,6 @@ function VariableRowSkeleton() {
 
 export function EnvironmentSection({ initialEngine = "claude" }: { initialEngine?: EngineId }) {
   const [engine, setEngine] = useState<EngineId>(initialEngine);
-  // Per engine, for this session only: the list carries the plain variables' values and names
-  // the keychain's secrets, so it is never written to the cache on disk.
   const variables = useCachedResource(`engine-config/env:${engine}`, () =>
     engineEnvApi.list(engine),
   );

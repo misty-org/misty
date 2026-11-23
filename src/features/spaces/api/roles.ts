@@ -1,8 +1,7 @@
 import type { SpaceConversation, SpaceMember } from "./dto/entities";
-import type { ChannelOverwrite, RoleInput, SpaceRoleDef } from "./dto/role-types";
-import type { SpaceRequest } from "./spaceRequestTypes";
+import type { ChannelOverwrite, RoleInput, SpaceRoleDef } from "./dto/role_types";
+import type { SpaceRequest } from "./space_request_types";
 
-/** A list the server may send bare or under its name. */
 const listOf = <T>(value: T[] | { roles?: T[] } | null | undefined): T[] =>
   Array.isArray(value) ? value : (value?.roles ?? []);
 
@@ -25,7 +24,6 @@ export function createSpaceRolesApi(request: SpaceRequest) {
       }),
     deleteRole: (spaceId: string, roleId: string) =>
       request(rolePath(spaceId, roleId), { method: "DELETE" }),
-    /** Every role but the default one, top first. */
     reorderRoles: async (spaceId: string, roleIds: string[]) =>
       listOf(
         await request<SpaceRoleDef[] | { roles: SpaceRoleDef[] }>(`${base(spaceId)}/roles/order`, {

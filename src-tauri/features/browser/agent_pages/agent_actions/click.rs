@@ -1,4 +1,3 @@
-//! browser.click: a click on an inspected element, through native input when it can.
 use super::*;
 
 pub(in crate::browser) async fn click_browser(

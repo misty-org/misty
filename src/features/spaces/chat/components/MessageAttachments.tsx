@@ -10,7 +10,6 @@ interface MessageAttachmentsProps {
   onOpenNode: (nodeId: string) => void;
 }
 
-/** Shared-file links and uploads carried by a message. */
 export function MessageAttachments(props: MessageAttachmentsProps) {
   const { message } = props;
 
@@ -22,7 +21,6 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
             <Button
               variant="secondary"
               size="sm"
-              className="text-xs"
               type="button"
               key={nodeId}
               icon={Paperclip}
@@ -40,14 +38,13 @@ export function MessageAttachments(props: MessageAttachmentsProps) {
             <Surface
               tone="card"
               radius="md"
-              className="inline-flex items-center gap-1 p-1 pl-2 text-xs"
+              className="inline-flex items-center gap-1 p-1 pl-2"
               key={attachment.id}
             >
               <Paperclip />
               <Button
                 variant="quiet"
                 size="sm"
-                className="text-xs"
                 type="button"
                 onClick={() =>
                   void spacesApi.downloadAttachment(

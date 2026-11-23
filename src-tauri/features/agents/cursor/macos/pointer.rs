@@ -1,6 +1,3 @@
-//! Misty's own pointer for desktop tasks. It is a drawing above every app that
-//! never takes input; actions reach apps through Accessibility and app-targeted
-//! key events, so the person's pointer and keyboard focus stay theirs.
 use std::cell::RefCell;
 
 use block2::RcBlock;
@@ -39,14 +36,11 @@ define_class!(
 
         #[unsafe(method(drawRect:))]
         fn draw_rect(&self, _rect: NSRect) {
-            // The same arrow as the in-page agent cursor (browser/scripts/agent_cursor.js),
-            // with its tip at this view's corner.
             draw_arrow(1.0);
         }
     }
 );
 
-/// The agent arrow with its tip at `(tip, tip)` of the current flipped view.
 pub(crate) fn draw_arrow(tip: f64) {
     let path = NSBezierPath::bezierPath();
     path.moveToPoint(NSPoint::new(tip, tip));
@@ -74,7 +68,6 @@ pub(crate) fn draw_arrow(tip: f64) {
     path.stroke();
 }
 
-/// An arrow-shaped view that never takes input; the window-control cursor is one too.
 pub(crate) fn arrow_view_frame() -> NSRect {
     NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(26.0, 30.0))
 }
@@ -83,9 +76,6 @@ thread_local! {
     static PANEL: RefCell<Option<Retained<NSPanel>>> = const { RefCell::new(None) };
 }
 
-/// Global display coordinates (top-left origin) to the Cocoa frame whose corner,
-/// where the arrow's tip is, sits one point past the target: Accessibility
-/// hit-testing at the target never lands on the pointer itself.
 fn pointer_frame(x: f64, y: f64) -> NSRect {
     NSRect::new(
         NSPoint::new(x + 1.0, main_display_height() - y - 1.0 - 30.0),
@@ -103,7 +93,6 @@ fn make_panel(mtm: MainThreadMarker, x: f64, y: f64) -> Retained<NSPanel> {
     );
     // SAFETY: the panel is only ordered out, never closed.
     unsafe { panel.setReleasedWhenClosed(false) };
-    // Titled so desktop capture keeps it: every screenshot shows where Misty points.
     panel.setTitle(&NSString::from_str("Misty agent cursor"));
     panel.setLevel(NSStatusWindowLevel + 1);
     panel.setOpaque(false);
@@ -124,7 +113,6 @@ fn make_panel(mtm: MainThreadMarker, x: f64, y: f64) -> Retained<NSPanel> {
     panel
 }
 
-/// Moves Misty's pointer to a global display point, waiting for the main thread.
 pub(crate) fn pointer_move(x: f64, y: f64) {
     on_main(move |mtm| {
         let Some(panel) = PANEL.with(|slot| slot.borrow().clone()) else {
@@ -152,7 +140,6 @@ pub(crate) fn pointer_move(x: f64, y: f64) {
     });
 }
 
-/// Hides Misty's pointer and forgets the control it focused.
 pub(crate) fn pointer_hide() {
     on_main_queued(|_| {
         if let Some(panel) = PANEL.with(|slot| slot.borrow_mut().take()) {

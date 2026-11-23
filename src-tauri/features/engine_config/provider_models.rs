@@ -14,8 +14,6 @@ use std::time::Duration;
 #[serde(rename_all = "camelCase")]
 pub struct ProviderModelList {
     pub models: Vec<String>,
-    /// The candidate URL that answered — shown in the UI so the user can see
-    /// which derivation of their base URL worked.
     pub endpoint: String,
 }
 
@@ -25,9 +23,6 @@ fn push_unique_candidate(candidates: &mut Vec<String>, candidate: String) {
     }
 }
 
-/// Candidate model-list URLs for a channel base URL, most specific first:
-/// the URL itself + /v1/models, then derivations for the common conventions
-/// (trailing /v1, trailing /anthropic, bare origin).
 fn model_list_candidates(base_url: &str) -> Vec<String> {
     let base = base_url.trim().trim_end_matches('/').to_string();
     if base.is_empty() {
@@ -75,8 +70,6 @@ fn push_model_id(models: &mut Vec<String>, value: &Value) {
     }
 }
 
-/// Model ids out of the OpenAI (`data`), bare-array, and Anthropic (`models`)
-/// response shapes.
 fn extract_model_ids(value: &Value) -> Vec<String> {
     let mut models = Vec::new();
 
@@ -103,9 +96,6 @@ fn extract_model_ids(value: &Value) -> Vec<String> {
     models
 }
 
-/// GET the channel's model list. The key rides both auth headers — OpenAI
-/// relays read `Authorization: Bearer`, Anthropic relays read `x-api-key`.
-/// Used by the `engine_channels_models` command.
 pub(crate) async fn fetch_provider_models_inner(
     base_url: String,
     api_key: String,
@@ -174,9 +164,6 @@ pub(crate) async fn fetch_provider_models_inner(
     ))
 }
 
-/// The model list for a channel. With `id`, the saved channel's base URL and key are used (the
-/// key never comes from or goes to the window); `base_url` and `api_key` override them while the
-/// person is still editing.
 #[tauri::command]
 pub async fn engine_channels_models(
     engine: String,

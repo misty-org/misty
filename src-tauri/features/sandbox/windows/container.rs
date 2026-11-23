@@ -1,5 +1,3 @@
-//! The identities a confined process runs with: an AppContainer of its own,
-//! and capabilities it shares with other containers.
 use std::{path::Path, ptr, sync::Mutex};
 
 use windows_sys::Win32::{
@@ -17,7 +15,6 @@ use windows_sys::Win32::{
 
 use crate::windows::{acl, wide, Access};
 
-/// An AppContainer identity, created on first use and kept by Windows.
 pub struct Container {
     sid: PSID,
 }
@@ -28,8 +25,6 @@ unsafe impl Sync for Container {}
 
 impl Container {
     pub fn open(name: &str) -> Result<Self, String> {
-        // Concurrent creation of the same profile fails with errors other
-        // than "already exists", so callers starting together take turns.
         static CREATING: Mutex<()> = Mutex::new(());
         let _turn = CREATING
             .lock()
@@ -48,7 +43,6 @@ impl Container {
             )
         };
         if created < 0 {
-            // HRESULT_FROM_WIN32(ERROR_ALREADY_EXISTS): reuse the profile.
             if created != (0x8007_0000u32 | ERROR_ALREADY_EXISTS) as i32 {
                 return Err("Windows could not create the sandbox.".into());
             }
@@ -66,38 +60,24 @@ impl Container {
         self.sid
     }
 
-    /// Removes the container's profile, once nothing of it is needed again.
-    /// Rules naming it are not touched: forget them first.
     pub fn delete(name: &str) {
         let name = wide(name);
         // SAFETY: a NUL-terminated name; a missing profile is not an error here.
         unsafe { DeleteAppContainerProfile(name.as_ptr()) };
     }
 
-    /// Gives the container `access` to `path`. A no-op when the same rule is
-    /// already there, so an inherited rule isn't spread through a large
-    /// folder again on every run.
     pub fn grant(&self, path: &Path, access: Access) -> Result<(), String> {
         acl::grant(path, self.sid, access)
     }
 
-    /// Removes every rule the container has on `path` itself; inherited rules
-    /// below it go with it.
     pub fn forget(&self, path: &Path) -> Result<(), String> {
         acl::forget(path, self.sid)
     }
 
-    /// Narrows what the container may do with `path` to `access` (nothing,
-    /// when `None`), whatever it inherits from the folder around it: for a
-    /// secret file, or a folder such as `.git` that commands may read but not
-    /// change. Returns the original DACL, to hand back to
-    /// [`Container::restore`], or `None` when `path` was already narrowed.
     pub fn limit(&self, path: &Path, access: Option<Access>) -> Result<Option<String>, String> {
         acl::limit(path, self.sid, access)
     }
 
-    /// Puts back a DACL [`Container::limit`] returned. Restore before
-    /// forgetting the folder around it, so `path` takes that change too.
     pub fn restore(&self, path: &Path, original: &str) -> Result<(), String> {
         acl::restore(path, original)
     }
@@ -110,9 +90,6 @@ impl Drop for Container {
     }
 }
 
-/// A capability SID: a group identity any container can be started with.
-/// A folder granted to a capability is open to every container holding it,
-/// so one grant serves all of them.
 pub struct Capability {
     sid: PSID,
 }
@@ -122,7 +99,6 @@ unsafe impl Send for Capability {}
 unsafe impl Sync for Capability {}
 
 impl Capability {
-    /// The capability Windows derives from `name`, the same on every machine.
     pub fn named(name: &str) -> Result<Self, String> {
         let name = wide(name);
         let (mut groups, mut group_count): (*mut PSID, u32) = (ptr::null_mut(), 0);
@@ -168,7 +144,6 @@ impl Capability {
         self.sid
     }
 
-    /// The SID as text (`S-1-15-3-…`), as `icacls` takes it.
     pub fn sid_string(&self) -> Result<String, String> {
         let mut text: *mut u16 = ptr::null_mut();
         // SAFETY: a valid SID; the string is LocalAlloc'd and freed below.
@@ -185,18 +160,14 @@ impl Capability {
         Ok(value)
     }
 
-    /// Gives holders of the capability `access` to `path`. A no-op when the
-    /// same rule is already there.
     pub fn grant(&self, path: &Path, access: Access) -> Result<(), String> {
         acl::grant(path, self.sid, access)
     }
 
-    /// Whether `path` already carries exactly this rule for the capability.
     pub fn has(&self, path: &Path, access: Access) -> Result<bool, String> {
         acl::has(path, self.sid, access)
     }
 
-    /// Removes every rule the capability has on `path` itself.
     pub fn forget(&self, path: &Path) -> Result<(), String> {
         acl::forget(path, self.sid)
     }

@@ -1,6 +1,3 @@
-//! Streaming HTTP for account requests. Only native code sees JWTs: this layer adds the bearer,
-//! takes tokens from responses and strips them before the renderer reads the headers. It also
-//! drops any `X-Misty-Models` header, so model keys never leave this computer.
 use super::session::{self, AccountClient, Captured, RefreshAnswer};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -10,7 +7,6 @@ use std::{
 use tauri::Manager;
 use tokio::sync::{Mutex as AsyncMutex, Notify};
 
-/// What `auth_http_read` streams: a server's response, or an answer made here.
 enum Answer {
     Remote(reqwest::Response),
     Local(Option<Vec<u8>>),
@@ -52,8 +48,6 @@ pub struct ResponseHead {
     url: String,
 }
 
-/// Sign-ins that make an account this computer's. A setup key is not one of them: it can be
-/// redeemed on a server this device hasn't moved to yet, and the sign-in flow captures it after.
 const LOGIN_PATHS: [&str; 4] = [
     "/login",
     "/register",
@@ -61,8 +55,6 @@ const LOGIN_PATHS: [&str; 4] = [
     "/auth/confirm-email/sign-in",
 ];
 
-/// When a fetch to the IPC protocol fails once, say as a page reloads, Tauri sends that page's later
-/// calls as JSON messages, where a request's bytes arrive as an array or as an object keyed by index.
 fn body_from_json(value: &serde_json::Value) -> Result<Vec<u8>, String> {
     use serde_json::Value;
     let byte = |item: &Value| item.as_u64().and_then(|byte| u8::try_from(byte).ok());
@@ -77,8 +69,6 @@ fn body_from_json(value: &serde_json::Value) -> Result<Vec<u8>, String> {
     bytes.ok_or_else(|| "Expected binary request body".to_owned())
 }
 
-/// Headers only native code decides. Tokens and model keys never come from the renderer, and an
-/// `Origin` would make the server treat this as a page and answer in cookies nobody would keep.
 fn renderer_may_set(name: &str) -> bool {
     !matches!(
         name.to_ascii_lowercase().as_str(),
@@ -93,12 +83,10 @@ fn renderer_may_set(name: &str) -> bool {
             | "x-misty-access-token"
             | "x-misty-refresh-token"
             | "x-misty-session-ended"
-            // Model keys never leave this computer.
             | "x-misty-models"
     )
 }
 
-/// The server ended the session: the windows are nobody's now.
 async fn session_ended(app: &tauri::AppHandle, url: &url::Url) -> Result<(), String> {
     crate::browser::profiles::change_account(Some(app), || {
         session::set_account(url, None);
@@ -145,14 +133,12 @@ pub async fn auth_http_start(
     let login = LOGIN_PATHS.iter().any(|path| posted(path));
     let refresh = posted("/auth/refresh");
     let logout = posted("/logout");
-    // A failed attempt to add another account must not change the active client.
     let client = if login {
         AccountClient::new()?
     } else {
         session::current(&url)?
     };
     let used_access = client.access_header();
-    // Signing out names the session by its refresh token, which outlives an access token.
     let bearer = if logout {
         client.refresh_header(&url).or(used_access.clone())
     } else {
@@ -170,7 +156,6 @@ pub async fn auth_http_start(
             session::authorization(&bearer)?,
         );
     }
-    // Any response may issue or end a session, so every one comes back as headers.
     builder = builder
         .header(session::TOKEN_TRANSPORT.0, session::TOKEN_TRANSPORT.1)
         .header("X-Misty-CSRF", "1");
@@ -178,7 +163,6 @@ pub async fn auth_http_start(
         let total = body.len() as u64;
         let mut sent = 0;
         let mut reported = std::time::Instant::now();
-        // Each poll means the chunk before it was taken, so that's when it counts as sent.
         let stream = futures_util::stream::poll_fn(move |_| {
             if sent > 0 && (sent == total || reported.elapsed().as_millis() >= 50) {
                 let _ = progress.send([sent, total]);
@@ -212,8 +196,6 @@ pub async fn auth_http_start(
         map.active.insert(request_id.clone(), slot.clone());
     }
     let outcome = async {
-        // The renderer asks for a refresh, but the tokens and the lock are native. It goes on
-        // even if this request is cancelled, so what the server rotated to isn't lost.
         if refresh {
             let answer = tokio::select! {
                 answer = client.rotate(url.clone(), used_access) => answer?,

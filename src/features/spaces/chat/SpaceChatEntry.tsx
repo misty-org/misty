@@ -1,21 +1,14 @@
 import { useEffect, useState } from "react";
-import {
-  Bot,
-  LogOut,
-  MoreHorizontal,
-  ShieldCheck,
-  UserPlus,
-  type LucideIcon,
-} from "lucide-react";
+import { Bot, LogOut, MoreHorizontal, ShieldCheck, UserPlus, type LucideIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/account";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { useSpacesStore } from "../list/use_spaces_store";
 import { ChatBarButtons } from "./components/ChatBarButtons";
-import { chatMuteId } from "@/shared/lib/messageNotices";
-import { spaceChatPath } from "./chatRoute";
+import { chatMuteId } from "@/shared/lib/message_notices";
+import { spaceChatPath } from "./chat_route";
 import { AddPeopleDialog, ConversationAgentsDialog } from "./sidebar/GroupDirectDialogs";
-import { isGroupDirectMessage } from "./sidebar/conversationGroups";
-import { useOwnMentionableAgents } from "./ownAgents";
+import { isGroupDirectMessage } from "./sidebar/conversation_groups";
+import { useOwnMentionableAgents } from "./own_agents";
 import { spacesApi } from "../api/api";
 import { SpaceDialogs, type SpaceDialog } from "../components/space-row/SpaceDialogs";
 import { RolesDialog } from "../roles/RolesDialog";
@@ -36,12 +29,11 @@ import {
   SearchField,
   type ActionBarItem,
 } from "@misty/ui";
-import { useSpaceConversations } from "./sidebar/useSpaceConversations";
-import { reloadSpaceConversations } from "./spaceConversationsResource";
+import { useSpaceConversations } from "./sidebar/use_space_conversations";
+import { reloadSpaceConversations } from "./space_conversations_resource";
 import { SpaceChat } from "./SpaceChat";
-import { spaceCan } from "../roles/useSpaceRoles";
+import { spaceCan } from "../roles/use_space_roles";
 
-/** One of the chat's controls: an icon of its own, its label, and what it does. */
 type ChatAction = {
   id: string;
   icon: LucideIcon;
@@ -50,13 +42,6 @@ type ChatAction = {
   onSelect: () => void;
 };
 
-/**
- * A Space's chat, one of its pages, in Discord's layout from @misty/ui's channel pieces: the open
- * channel with its member list beside it. Its channels and direct messages are listed in the
- * window's sidebar, which also makes, edits and deletes them; the chat's controls and message
- * search sit at the end of the chat's own bar under the window's tabs (`ChannelHeader`). Mention an
- * agent in a message to ask it for work.
- */
 export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const { spaceId } = props;
   const { user } = useAuth();
@@ -81,7 +66,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     openDirect && isGroupDirectMessage(openDirect, user?.id) ? openDirect : undefined;
   const [spaceDialog, setSpaceDialog] = useState<SpaceDialog>(null);
   const [rolesOpen, setRolesOpen] = useState(false);
-  // The search Enter ran in the bar, and what is typed there now.
   const [searchText, setSearchText] = useState("");
   const [searchedText, setSearchedText] = useState("");
   const closeSearch = () => {
@@ -91,7 +75,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   useEffect(() => {
     if (!members) void loadMembers(spaceId).catch(() => {});
   }, [members, loadMembers, spaceId]);
-  // Attachments name their files from the Space's nodes, which realtime only refreshes.
   useEffect(() => {
     if (!nodesLoaded) void loadNodes(spaceId).catch(() => {});
   }, [nodesLoaded, loadNodes, spaceId]);
@@ -145,8 +128,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       onSelect: () => setRolesOpen(true),
     });
 
-  // The chat's own buttons stay in view at the end of its bar, beside the search, in Discord's
-  // order (ChatBarButtons); the rest are under ⋯.
   const moreRows = actions.map((action) => (
     <MenuItem key={action.id} icon={action.icon} label={action.label} onSelect={action.onSelect} />
   ));
@@ -158,7 +139,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
             icon: MoreHorizontal,
             label: "More",
             priority: 1,
-            // Folded into the bar's own ⋯, the same rows open as a submenu.
             menu: moreRows,
             render: () => (
               <DropdownMenu>

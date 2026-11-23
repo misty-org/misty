@@ -8,10 +8,8 @@
 
 use std::path::Path;
 
-/// The edge the icon is scaled to: sharp at the menu's 16 px on a 2x screen, and small.
 const ICON_EDGE: u32 = 64;
 
-/// Largest icon edge accepted from the Windows shell (guards the pixel buffer size).
 #[cfg_attr(not(windows), allow(dead_code))]
 const MAX_ICON_EDGE: u32 = 256;
 
@@ -25,7 +23,6 @@ pub(super) fn icon_data_url(path: &Path) -> Option<String> {
     ))
 }
 
-/// Scales a PNG down to `ICON_EDGE`, so a 1024 px app icon doesn't cross into the window.
 fn shrink(png: &[u8]) -> Option<Vec<u8>> {
     let image = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?;
     if image.width() <= ICON_EDGE && image.height() <= ICON_EDGE {
@@ -37,8 +34,6 @@ fn shrink(png: &[u8]) -> Option<Vec<u8>> {
     Some(out.into_inner())
 }
 
-/// Top-down 32bpp BGRA rows to RGBA. Icons without an alpha channel (every alpha byte 0) take
-/// transparency from the AND mask read as 32bpp: a set (white) mask pixel is transparent.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn bgra_to_rgba(color: &[u8], mask: Option<&[u8]>) -> Vec<u8> {
     let has_alpha = color.chunks_exact(4).any(|pixel| pixel[3] != 0);
@@ -67,7 +62,6 @@ pub(crate) fn encode_png(width: u32, height: u32, rgba: Vec<u8>) -> Option<Vec<u
     Some(out.into_inner())
 }
 
-/// The bundle's icon at its largest size up to 512 px, as PNG.
 #[cfg(target_os = "macos")]
 fn program_icon_png(path: &Path) -> Option<Vec<u8>> {
     use objc2::runtime::AnyObject;
@@ -91,7 +85,6 @@ fn program_icon_png(path: &Path) -> Option<Vec<u8>> {
     Some(png.to_vec())
 }
 
-/// The shell's associated (large) icon for `path` as PNG bytes.
 #[cfg(windows)]
 fn program_icon_png(path: &Path) -> Option<Vec<u8>> {
     use std::os::windows::ffi::OsStrExt;
@@ -107,8 +100,6 @@ fn program_icon_png(path: &Path) -> Option<Vec<u8>> {
     let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
     // SAFETY: SHFILEINFOW is plain data; all-zero is its empty value.
     let mut info: SHFILEINFOW = unsafe { std::mem::zeroed() };
-    // SHGetFileInfo needs COM on this (blocking-pool) thread. S_FALSE (already initialized)
-    // still needs its CoUninitialize; RPC_E_CHANGED_MODE (a negative HRESULT) must not get one.
     let com = unsafe { CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32) };
     // SAFETY: `wide` is NUL-terminated and `info` is the size passed.
     let found = unsafe {
@@ -142,8 +133,6 @@ fn icon_to_png(icon: windows_sys::Win32::UI::WindowsAndMessaging::HICON) -> Opti
     if unsafe { GetIconInfo(icon, &mut info) } == 0 {
         return None;
     }
-    // GetIconInfo hands back bitmap copies the caller owns: free them on every path. A
-    // monochrome icon (no color bitmap) gives none, and the menu shows a letter.
     let dc = unsafe { CreateCompatibleDC(std::ptr::null_mut()) };
     let png = if dc.is_null() || info.hbmColor.is_null() {
         None
@@ -171,7 +160,6 @@ fn icon_to_png(icon: windows_sys::Win32::UI::WindowsAndMessaging::HICON) -> Opti
     png
 }
 
-/// A bitmap as top-down 32bpp BGRA rows.
 #[cfg(windows)]
 fn dib_bgra(
     dc: windows_sys::Win32::Graphics::Gdi::HDC,
@@ -202,7 +190,6 @@ fn dib_bgra(
     info.bmiHeader = BITMAPINFOHEADER {
         biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
         biWidth: width as i32,
-        // A negative height asks for top-down rows, the order RgbaImage expects.
         biHeight: -(height as i32),
         biPlanes: 1,
         biBitCount: 32,
@@ -240,7 +227,6 @@ mod tests {
     #[test]
     fn alpha_icons_keep_their_alpha_and_swap_channels() {
         let bgra = [10, 20, 30, 255, 1, 2, 3, 0];
-        // A mask must not override a real alpha channel.
         let mask = [255, 255, 255, 0, 255, 255, 255, 0];
         assert_eq!(
             bgra_to_rgba(&bgra, Some(&mask)),

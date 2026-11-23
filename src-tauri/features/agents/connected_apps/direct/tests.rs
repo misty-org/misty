@@ -14,31 +14,27 @@ fn a_maker_serves_from_the_domain_it_proved() {
         "Linear",
         "https://mcp.linear.app/mcp"
     ));
-    assert!(by_maker("com.neon/mcp", "", "https://mcp.neon.tech/mcp") == false);
+    assert!(!by_maker("com.neon/mcp", "", "https://mcp.neon.tech/mcp"));
     assert!(by_maker("tech.neon/mcp", "", "https://mcp.neon.tech/mcp"));
 }
 
 #[test]
 fn middlemen_are_left_out() {
-    // A GitHub namespace proves no domain.
     assert!(!by_maker(
         "io.github.someone/notion",
         "Notion",
         "https://notion.example.com/mcp"
     ));
-    // Served from another domain than the one proved.
     assert!(!by_maker(
         "com.example/notion",
         "",
         "https://notion.insightfulmcp.com/"
     ));
-    // A publisher that lists other companies' apps.
     assert!(!by_maker(
         "ai.smithery/notion",
         "Notion",
         "https://server.smithery.ai/notion/mcp"
     ));
-    // Another company's brand on someone else's server.
     assert!(!by_maker(
         "com.acme/gmail-helper",
         "Gmail helper",
@@ -49,7 +45,6 @@ fn middlemen_are_left_out() {
         "Acme",
         "https://mcp.acme.com/mcp"
     ));
-    // Plain http is never offered.
     assert!(!by_maker(
         "app.linear/linear",
         "",
@@ -114,7 +109,6 @@ fn a_finished_sign_in_moves_the_tab_off_the_local_address() {
     let moved = test_callback_answer(true, Some("https://example.com/connected"));
     assert!(moved.starts_with("HTTP/1.1 303 See Other\r\n"));
     assert!(moved.contains("\r\nLocation: https://example.com/connected\r\n"));
-    // Without a done page, or when the sign-in failed, the tab stays and says how it went.
     assert!(test_callback_answer(true, None).contains("You're signed in"));
     let failed = test_callback_answer(false, Some("https://example.com/connected"));
     assert!(failed.starts_with("HTTP/1.1 200 OK") && failed.contains("didn't finish"));
@@ -193,7 +187,6 @@ fn two_servers_of_one_app_get_their_own_names() {
     );
 }
 
-/// Reads real servers' sign-in metadata; nothing is registered. `cargo test -- --ignored live_`
 #[tokio::test]
 #[ignore]
 async fn live_makers_take_a_keyless_sign_in() {
@@ -210,7 +203,6 @@ async fn live_makers_take_a_keyless_sign_in() {
     let github = super::oauth::discover(&http, "https://api.githubcopilot.com/mcp/").await;
     println!("github -> {}", github.code());
     assert_eq!(github.code(), "needs_app");
-    // Linear is in the shipped catalog, so the registry adds only what's newer, never a middleman.
     let newer = super::catalog::search_registry(&http, "linear")
         .await
         .unwrap();

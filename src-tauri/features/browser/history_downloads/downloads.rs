@@ -1,5 +1,3 @@
-//! Download events and destinations for browser pages, and each tab's own list of them.
-
 use crate::browser::*;
 use file_access::{self, fs};
 
@@ -39,9 +37,6 @@ pub(in crate::browser) fn handle_download_event(
                 );
                 return false;
             };
-            // The Downloads folder asks the first time. WebKit and WebView2 ask for a
-            // destination on the main thread and expect an answer before returning, so the
-            // wait happens here, in place.
             if !agent_download && !permissions::ensure_downloads_folder(app) {
                 emit_download_failure(app, &state, tab_id, &url, DOWNLOADS_NOT_ALLOWED);
                 return false;
@@ -60,7 +55,6 @@ pub(in crate::browser) fn handle_download_event(
                 .unwrap_or("download");
             let path =
                 reserve_download_path(&state, &download_dir, &sanitize_download_name(suggested));
-            // Finishing this one mustn't depend on the folder's grant staying as it is now.
             file_access::allow_recorded_download(&path);
             *destination = path.clone();
             let record = requested_download(&state, tab_id, &url, &path);
@@ -73,8 +67,6 @@ pub(in crate::browser) fn handle_download_event(
         }
         DownloadEvent::Finished { url, path, success } => {
             let record = finish_download(&state, tab_id, &url, path.as_deref(), success);
-            // This file, for this session: an agent's download is uploaded to its Space through
-            // `asset:`, which covers nothing else until the person picks or drops something.
             if record.success {
                 let _ = app.asset_protocol_scope().allow_file(&record.path);
             }
@@ -170,8 +162,6 @@ pub(in crate::browser) fn finish_download(
     path: Option<&Path>,
     success: bool,
 ) -> BrowserDownload {
-    // Wry's macOS WKDownload delegate returns no path even on success.
-    // Recover only our uniquely recorded destination, never guess a filename.
     let pending = {
         let sessions = state
             .sessions
@@ -263,8 +253,6 @@ pub struct BrowserTabDownloadOpenRequest {
     pub download_id: String,
 }
 
-/// Opens a finished download from a tab's own history, for files an agent downloaded, which stay out
-/// of the person's download list. The path comes from that history, never from the window asking.
 #[tauri::command]
 pub fn browser_tab_download_open(
     app: AppHandle,

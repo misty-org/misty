@@ -1,10 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * Pure helpers for the Skills page: source classification, filtering and
- * per-target result summaries. Kept free of React and IPC so the rules are
- * unit-testable.
- */
 import type {
   SkillRow,
   SkillSourceKind,
@@ -15,15 +10,11 @@ import type {
   SkillUsageResult,
 } from "./types";
 
-/** Legacy payloads (and manage-only entries) carry `managed` but no
- *  `sourceKind`; never show `undefined` as a source badge. */
 export function sourceKindOf(skill: Pick<SkillRow, "managed" | "sourceKind">): SkillSourceKind {
   if (skill.sourceKind) return skill.sourceKind;
   return skill.managed ? "managed" : "local";
 }
 
-/** Managed entries first (the app owns them), then by name — stable across
- *  refreshes because the backend already sorts by name. */
 export function sortSkills(skills: SkillRow[]): SkillRow[] {
   return [...skills].sort((a, b) => {
     const aManaged = sourceKindOf(a) === "managed" ? 0 : 1;
@@ -33,17 +24,10 @@ export function sortSkills(skills: SkillRow[]): SkillRow[] {
   });
 }
 
-/** Engines the row icon strip shows: only the ones that actually hold a copy
- *  (or lost one). Adding an engine happens in the detail panel — a row stays a
- *  state readout, instead of painting 13 faded icons on every one of hundreds
- *  of rows. */
 export function copiedTargets(skill: SkillRow, targets: SkillTargetInfo[]): SkillTargetInfo[] {
   return targets.filter((target) => (skill.targetStates?.[target.id] ?? "off") !== "off");
 }
 
-/** Engines the detail panel's "Sync to" list offers: installed CLIs plus any
- *  engine that already holds a copy (or a missing copy) — an uninstalled CLI
- *  must not hide the cleanup path for its stale copy. */
 export function relevantTargets(skill: SkillRow, targets: SkillTargetInfo[]): SkillTargetInfo[] {
   return targets.filter((target) => {
     if (target.available !== false) return true;
@@ -51,9 +35,6 @@ export function relevantTargets(skill: SkillRow, targets: SkillTargetInfo[]): Sk
   });
 }
 
-/** The next target list after toggling one engine. The backend only reports
- *  `synced` targets in `targets`, so an orphan engine is enabled by adding it
- *  back and disabled only when a copy actually exists. */
 export function nextTargets(
   skill: SkillRow,
   targetId: SkillTargetId,
@@ -64,10 +45,6 @@ export function nextTargets(
   return current.filter((target) => target !== targetId);
 }
 
-/** Usage stats for one skill: the hub already joins transcript names onto
- *  installed skills (`skillId` / `directory`), so re-join on those keys and
- *  only fall back to a unique directory leaf. Ambiguous names stay unmatched
- *  instead of attributing another skill's calls. */
 export function usageForSkill(
   usage: SkillUsageResult | null,
   skill: SkillRow,
@@ -86,7 +63,6 @@ export function usageForSkill(
   return byName.length === 1 ? byName[0] : null;
 }
 
-/** Whole days since an ISO timestamp, or null when it is absent/unparsable. */
 export function daysSince(iso: string | null | undefined, now = Date.now()): number | null {
   if (!iso) return null;
   const then = new Date(iso).getTime();
@@ -99,8 +75,6 @@ interface TargetResultSummary {
   failed: { target: string; error: string | null }[];
 }
 
-/** "All synced" only when every target succeeded; a partial failure keeps
- *  the failed target visible instead of collapsing into a generic error. */
 export function summarizeTargetResults(
   results: SkillTargetResult[] | undefined,
 ): TargetResultSummary {
@@ -110,8 +84,6 @@ export function summarizeTargetResults(
   return { allOk: failed.length === 0, failed };
 }
 
-/** Longest matching root wins, so a nested root never shadows its parent.
- *  Moves an absolute directory picked by the user onto a known skills root. */
 export function relativeToRoot(
   picked: string,
   targets: SkillTargetInfo[],
@@ -133,9 +105,6 @@ export function relativeToRoot(
   return best;
 }
 
-/** Pre-selected engines for the import dialog: the two CLIs the hub has always
- *  defaulted to when they are installed, otherwise whichever installed engines
- *  exist. */
 export function defaultTargets(offered: SkillTargetInfo[]): SkillTargetId[] {
   const preferred = offered
     .filter((target) => target.id === "claude" || target.id === "codex")
@@ -144,7 +113,6 @@ export function defaultTargets(offered: SkillTargetInfo[]): SkillTargetId[] {
   return offered.slice(0, 1).map((target) => target.id as SkillTargetId);
 }
 
-/** Compact token count for the usage table (12.3k / 1.2M). */
 export function formatTokens(value: number | null | undefined): string {
   const tokens = value ?? 0;
   if (tokens < 1000) return String(tokens);

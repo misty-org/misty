@@ -52,7 +52,6 @@ fn takes_images_mcp_and_effort_now() {
     assert!(AgyEngine.supports_effort());
 }
 
-/// agy 1.5.9's `session/new` modes; Misty offers three of them, never a no-asking one.
 #[test]
 fn modes_match_the_installed_handshake() {
     let session = serde_json::json!({"modes": {"currentModeId": "default", "availableModes": [

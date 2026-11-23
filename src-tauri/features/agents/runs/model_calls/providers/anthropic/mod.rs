@@ -1,4 +1,3 @@
-//! Claude over the Messages API. Ported from `@ai-sdk/anthropic`.
 mod cache_control;
 mod capabilities;
 mod chunk;
@@ -30,10 +29,18 @@ pub(crate) struct AnthropicModel {
 }
 
 impl AnthropicModel {
-    pub(crate) fn new(client: reqwest::Client, base_url: Option<&str>, api_key: &str, model: &str) -> Self {
+    pub(crate) fn new(
+        client: reqwest::Client,
+        base_url: Option<&str>,
+        api_key: &str,
+        model: &str,
+    ) -> Self {
         let base = base_url.unwrap_or(API_URL).trim_end_matches('/');
-        // Anthropic's bare address means its versioned API.
-        let base = if base == API_URL { format!("{API_URL}/v1") } else { base.to_owned() };
+        let base = if base == API_URL {
+            format!("{API_URL}/v1")
+        } else {
+            base.to_owned()
+        };
         Self {
             client,
             url: format!("{base}/messages"),
@@ -52,12 +59,9 @@ fn error_message(body: &Value) -> Option<String> {
     Some(error.get("message")?.as_str()?.to_owned())
 }
 
-/// Anthropic can answer 200 and then fail straight away, such as when it's overloaded. That is
-/// still the call failing, so it's reported the way a failed request is.
 fn failure_before_output(error: &Value) -> ModelError {
     let text = |name: &str| error.get(name).and_then(Value::as_str);
     let message = text("message").unwrap_or_default().to_owned();
-    // The connection dropped rather than Anthropic saying anything.
     if text("name") == Some("AI_APICallError") {
         return ModelError::Network(message);
     }
@@ -81,11 +85,18 @@ impl LanguageModel for AnthropicModel {
             if !built.betas.is_empty() {
                 headers.push(("anthropic-beta", built.betas.join(",")));
             }
-            let response =
-                post_json(&self.client, &self.url, &headers, &built.body, &self.api_key, error_message).await?;
-            let decoder = decoder::AnthropicDecoder::new(built.warnings, built.uses_json_response_tool);
+            let response = post_json(
+                &self.client,
+                &self.url,
+                &headers,
+                &built.body,
+                &self.api_key,
+                error_message,
+            )
+            .await?;
+            let decoder =
+                decoder::AnthropicDecoder::new(built.warnings, built.uses_json_response_tool);
             let mut parts = decoded_stream(response, decoder, &self.api_key).fuse();
-            // The first part is always `stream-start`, and the next tells whether this worked.
             let mut seen = Vec::with_capacity(2);
             seen.extend(parts.next().await);
             let second = parts.next().await;
@@ -111,7 +122,13 @@ mod tests {
     #[test]
     fn the_bare_address_means_the_versioned_api() {
         assert_eq!(url_for(None), "https://api.anthropic.com/v1/messages");
-        assert_eq!(url_for(Some("https://api.anthropic.com")), "https://api.anthropic.com/v1/messages");
-        assert_eq!(url_for(Some("https://proxy.example/anthropic")), "https://proxy.example/anthropic/messages");
+        assert_eq!(
+            url_for(Some("https://api.anthropic.com")),
+            "https://api.anthropic.com/v1/messages"
+        );
+        assert_eq!(
+            url_for(Some("https://proxy.example/anthropic")),
+            "https://proxy.example/anthropic/messages"
+        );
     }
 }

@@ -16,36 +16,22 @@ use super::EngineModel;
 mod catalog;
 pub(super) use catalog::account_catalog;
 
-/// The model registry the CLI embeds in its binary (native build or cli.js
-/// bundle alike): per-family alias defaults (`aliases.<family>.default`),
-/// the `best` alias used when nothing is configured, and each model's
-/// human display name. Extracted from raw bytes; the JS object survives
-/// bundling verbatim.
 #[derive(Clone, Debug, Default)]
 pub(super) struct EmbeddedRegistry {
-    /// alias family → resolved first-party model id ("opus" → "claude-opus-5").
     alias_defaults: std::collections::HashMap<String, String>,
     provider_defaults: std::collections::HashMap<(String, String), String>,
-    /// model id → human name ("claude-opus-5" → "Opus 5").
     display_names: std::collections::HashMap<String, String>,
-    /// model id → its effort levels, default effort and context window.
     model_facts: std::collections::HashMap<String, ModelFacts>,
-    /// The CLI's built-in default alias when no model is configured.
     best: Option<String>,
 }
 
-/// What a model's registry record says beyond its name.
 #[derive(Clone, Debug, Default)]
 struct ModelFacts {
-    /// Effort levels it takes, weakest first. None when its record has no
-    /// capabilities list to read.
     efforts: Option<Vec<String>>,
     default_effort: Option<String>,
     context_window: Option<u64>,
 }
 
-/// One model record's facts: `capabilities:["effort","xhigh_effort",…]`,
-/// `default_effort:"medium"` and `context:{window:1e6,…}`.
 fn model_facts(record: &[u8]) -> ModelFacts {
     use regex::bytes::Regex;
     static CAPABILITIES: std::sync::LazyLock<Regex> =
@@ -85,9 +71,6 @@ fn model_facts(record: &[u8]) -> ModelFacts {
 }
 
 impl EmbeddedRegistry {
-    /// "Opus 5 · claude-opus-5" for a known selector (alias or id, with or
-    /// without the [1m] suffix); the selector verbatim when the registry
-    /// can't resolve it.
     fn display_line(&self, selector: &str) -> String {
         let bare = selector.strip_suffix("[1m]").unwrap_or(selector);
         let id = self
@@ -102,11 +85,9 @@ impl EmbeddedRegistry {
     }
 }
 
-/// Parse the embedded registry out of the binary's raw bytes.
 fn parse_registry(bytes: &[u8]) -> EmbeddedRegistry {
     use regex::bytes::Regex;
     let mut registry = EmbeddedRegistry::default();
-    // Models array: `id:"claude-opus-5",family:"opus",display_name:"Opus 5"`.
     let models_re = Regex::new(r#"id:"([^"]+)",family:"[a-z]+",display_name:"([^"]+)""#).unwrap();
     let records: Vec<_> = models_re.captures_iter(bytes).collect();
     for (index, m) in records.iter().enumerate() {
@@ -114,7 +95,6 @@ fn parse_registry(bytes: &[u8]) -> EmbeddedRegistry {
         registry
             .display_names
             .insert(id.clone(), String::from_utf8_lossy(&m[2]).into_owned());
-        // The rest of this record: up to the next one, the array's end, or 4 KB.
         let start = m.get(0).map_or(0, |whole| whole.end());
         let next = records
             .get(index + 1)
@@ -128,9 +108,6 @@ fn parse_registry(bytes: &[u8]) -> EmbeddedRegistry {
             .model_facts
             .insert(id, model_facts(&bytes[start..end]));
     }
-    // `aliases:{opus:{default:"claude-opus-5",per_provider:{…}},…}` followed
-    // by `defaults:{…},best:"fable"` — one compact object, so bound the
-    // window to keep unrelated `{default:"…"}` code from leaking in.
     let aliases_re = Regex::new(r"aliases:\{").unwrap();
     let family_re = Regex::new(r#"([a-z]+):\{default:"([^"]+)""#).unwrap();
     let provider_family_re =
@@ -165,10 +142,10 @@ fn parse_registry(bytes: &[u8]) -> EmbeddedRegistry {
     registry
 }
 
-/// Read the CLI binary's embedded registry, cached per binary content: the
-/// picker re-queries on every open and the scan reads the whole binary.
-/// None for shims/old builds without an extractable registry — the catalog
-/// then degrades to bare family names.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the installed Claude Code program for its model registry, which lives outside the gate"
+)]
 fn embedded_registry(bin: &std::path::Path) -> Option<EmbeddedRegistry> {
     struct CacheEntry {
         len: u64,
@@ -196,11 +173,6 @@ fn embedded_registry(bin: &std::path::Path) -> Option<EmbeddedRegistry> {
     registry
 }
 
-/// Selectors `claude --model` accepts out of the box — exactly the five rows
-/// the CLI's own /model menu lists, in menu order (no [1m] variants, no
-/// extra "configured" row). "fable" only exists on newer CLI builds — the
-/// catalog is advisory, an unresolvable pick fails at launch with the CLI's
-/// own error.
 const CLI_ALIASES: &[(&str, &str)] = &[
     ("default", "Default"),
     ("opus", "Opus"),
@@ -209,7 +181,6 @@ const CLI_ALIASES: &[(&str, &str)] = &[
     ("haiku", "Haiku"),
 ];
 
-/// The CLI's config root: $CLAUDE_CONFIG_DIR when set, else ~/.claude.
 fn claude_config_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("CLAUDE_CONFIG_DIR") {
         if !dir.is_empty() {
@@ -219,41 +190,26 @@ fn claude_config_dir() -> PathBuf {
     dirs::home_dir().expect("no home directory").join(".claude")
 }
 
-/// env keys that remap a built-in alias family to a custom model id,
-/// mirroring the CLI's own /model menu ("Custom Opus model" rows).
 const FAMILY_ENV_KEYS: &[(&str, &str, &str)] = &[
-    // (alias family, env key, display name)
     ("opus", "ANTHROPIC_DEFAULT_OPUS_MODEL", "Opus"),
     ("sonnet", "ANTHROPIC_DEFAULT_SONNET_MODEL", "Sonnet"),
     ("haiku", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "Haiku"),
     ("fable", "ANTHROPIC_DEFAULT_FABLE_MODEL", "Fable"),
 ];
 
-/// The CLI's model configuration from ~/.claude/settings.json, merged per
-/// field with settings.local.json winning (the CLI's own precedence).
 #[derive(Default)]
 struct CliModelConfig {
-    /// env.ANTHROPIC_MODEL — the CLI's effective default model id.
     env_model: Option<String>,
-    /// Top-level `model` key (an alias like "opus" or a raw id).
     model_key: Option<String>,
-    /// env.ANTHROPIC_DEFAULT_<FAMILY>_MODEL overrides, keyed by family.
     overrides: std::collections::HashMap<String, String>,
     provider_flags: std::collections::HashMap<String, String>,
 }
 
 impl CliModelConfig {
-    /// The custom id a family alias resolves to, when overridden.
     fn override_for(&self, family: &str) -> Option<&str> {
         self.overrides.get(family).map(String::as_str)
     }
 
-    /// The CLI's effective default model id: env.ANTHROPIC_MODEL beats the
-    /// `model` key (the CLI applies settings env as real environment
-    /// variables); a bare family alias there resolves through its override.
-    /// A `[1m]` suffix on the raw default survives the override, the same
-    /// contract as the launch selector — otherwise the "default" route
-    /// would silently downgrade a 1M pick.
     fn resolved_default(&self) -> Option<String> {
         let raw = self.env_model.as_deref().or(self.model_key.as_deref())?;
         let family = raw.strip_suffix("[1m]").unwrap_or(raw);
@@ -272,12 +228,6 @@ fn read_cli_config() -> CliModelConfig {
     read_cli_config_from(&claude_config_dir())
 }
 
-/// The model id a picker selector actually runs, for launch: a family alias
-/// resolves through its ANTHROPIC_DEFAULT_<FAMILY>_MODEL override, "default"
-/// through the CLI's configured default; anything unmapped passes through
-/// for the CLI to resolve itself. Relay setups depend on the env remap,
-/// which some CLI builds/shims skip — launching with the id the picker
-/// names makes the request match the display regardless.
 pub(crate) fn resolve_launch_model(selector: &str) -> String {
     resolve_launch_model_from(&read_cli_config(), selector)
 }
@@ -289,12 +239,6 @@ fn resolve_launch_model_from(config: &CliModelConfig, selector: &str) -> String 
             .resolved_default()
             .unwrap_or_else(|| selector.to_string());
     }
-    // The person explicitly chose the 1M variant (`<family>[1m]`): the suffix is only used to
-    // look up the family mapping, and on an override it is put back on the mapped value. This
-    // used to return the override without the suffix, so under the official config the suffix
-    // was silently dropped and a 1M request fell back to the normal window, while the channel
-    // side (claude_channel) kept it. Without an override `unwrap_or_else` already returns the
-    // selector as it is.
     let wants_1m = bare != selector;
     config
         .override_for(bare)
@@ -308,7 +252,6 @@ fn resolve_launch_model_from(config: &CliModelConfig, selector: &str) -> String 
         .unwrap_or_else(|| selector.to_string())
 }
 
-/// Resolve only the comparison evidence; keep the CLI's selector unchanged.
 pub(crate) fn comparison_model(
     selector: &str,
     bin: Option<&std::path::Path>,
@@ -337,7 +280,7 @@ pub(crate) fn comparison_model(
             merge_settings_json(&mut config, &serde_json::json!({"env": env}).to_string());
             for dir in [claude_config_dir(), workspace.join(".claude")] {
                 for name in ["settings.json", "settings.local.json"] {
-                    if let Ok(content) = std::fs::read_to_string(dir.join(name)) {
+                    if let Ok(content) = read_settings_in_place(&dir.join(name)) {
                         merge_settings_json(&mut config, &content);
                     }
                 }
@@ -362,10 +305,6 @@ fn comparison_model_from(
         selector.to_string()
     };
     let bare = selector.strip_suffix("[1m]").unwrap_or(&selector);
-    // The comparison value is the concrete model name, not the launcher: `[1m]` is a
-    // selector/launch convention and the model name the server reports has no such suffix (the
-    // frontend's bareModel strips `[1m]` before comparing too). So this keeps stripping the
-    // suffix; only the launch value needs it put back.
     let mapped = config.override_for(bare).unwrap_or(bare);
     if !CLI_ALIASES.iter().any(|(alias, _)| *alias == mapped) {
         return Some(mapped.to_string());
@@ -393,18 +332,24 @@ fn comparison_model_from(
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Claude Code's settings in place, in its home and in the person's project folder, which need not be linked"
+)]
+fn read_settings_in_place(path: &std::path::Path) -> std::io::Result<String> {
+    std::fs::read_to_string(path)
+}
+
 fn read_cli_config_from(dir: &std::path::Path) -> CliModelConfig {
     let mut config = CliModelConfig::default();
-    // User settings first so the local file overrides per field.
     for name in ["settings.json", "settings.local.json"] {
-        if let Ok(content) = std::fs::read_to_string(dir.join(name)) {
+        if let Ok(content) = file_access::fs::read_to_string(dir.join(name)) {
             merge_settings_json(&mut config, &content);
         }
     }
     config
 }
 
-/// Per-field settings merge (settings.local.json wins).
 fn merge_settings_json(config: &mut CliModelConfig, content: &str) {
     let pick = |value: Option<&serde_json::Value>| {
         value
@@ -439,12 +384,6 @@ fn merge_settings_json(config: &mut CliModelConfig, content: &str) {
     }
 }
 
-/// What the CLI's registry says about the model each of its aliases runs, by
-/// alias: its name ("Opus 5.5"), id, effort levels, default effort and
-/// context window. "default" names what the configured default resolves to.
-/// An alias remapped to a custom model, and every alias when the binary has
-/// no readable registry, is left out: the registry can't speak for it. Used
-/// only when the CLI has no account catalog cached (`account_catalog`).
 pub(super) fn claude_model_details(
     bin: Option<&std::path::Path>,
 ) -> std::collections::HashMap<String, super::ModelDetails> {
@@ -485,7 +424,6 @@ fn claude_model_details_from(
                     } else {
                         id.clone()
                     }),
-                    // The model it runs; the "default" row keeps "Default" as its label.
                     name: Some(name),
                     efforts: facts.efforts.map(|levels| {
                         levels
@@ -503,11 +441,6 @@ fn claude_model_details_from(
         .collect()
 }
 
-/// Claude's picker catalog: the CLI's built-in aliases, default row first.
-/// Aliases remapped via ANTHROPIC_DEFAULT_<FAMILY>_MODEL display the custom
-/// id as the name with the CLI menu's "Custom <Family> model" subtitle;
-/// unremapped aliases name the concrete model the CLI's embedded registry
-/// resolves them to, so the picker shows what a request actually runs.
 pub(super) fn claude_models(bin: Option<&std::path::Path>) -> Vec<EngineModel> {
     claude_models_from(read_cli_config(), bin.and_then(embedded_registry).as_ref())
 }
@@ -516,7 +449,6 @@ fn claude_models_from(
     config: CliModelConfig,
     registry: Option<&EmbeddedRegistry>,
 ) -> Vec<EngineModel> {
-    // Nothing configured: the CLI runs the registry's `best` alias.
     let resolved_default = config
         .resolved_default()
         .or_else(|| registry.and_then(|r| r.best.clone()));

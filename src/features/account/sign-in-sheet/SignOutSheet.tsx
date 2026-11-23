@@ -1,4 +1,4 @@
-import { reportSystemError } from "@/shared/platform/systemErrors";
+import { reportSystemError } from "@/shared/platform/system_errors";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import {
   Button,
@@ -6,32 +6,30 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
+  Label,
   Text,
 } from "@misty/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { create } from "zustand";
 import { useAuth } from "../AuthContext";
 
 const useSignOutSheetStore = create<{ open: boolean }>(() => ({ open: false }));
 
-/** Asks before signing out, with the one choice signing out has. */
 export function openSignOutSheet() {
   useSignOutSheetStore.setState({ open: true });
 }
 
-/**
- * Signing out goes back to the sign-in page. The account's agents and chats stay on this
- * computer for when it signs in again; removing the browsing data is a choice, off by default.
- */
 export function SignOutSheet() {
   const open = useSignOutSheetStore((state) => state.open);
   const { logout } = useAuth();
   const [removeData, setRemoveData] = useState(false);
+  const removeDataId = useId();
 
   useEffect(() => {
     if (open) setRemoveData(false);
-    // Native page views draw above the app, so hide them while the sheet is up.
     setBrowserWebviewsSuspended(open, "sign-out-sheet");
     return () => setBrowserWebviewsSuspended(false, "sign-out-sheet");
   }, [open]);
@@ -47,31 +45,39 @@ export function SignOutSheet() {
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
       <DialogContent aria-describedby="sign-out-description" className="max-w-110">
-        <DialogTitle className="text-lg">Sign out of Misty?</DialogTitle>
-        <DialogDescription id="sign-out-description">
-          Your agents and chats stay on this computer for when you sign in again.
-        </DialogDescription>
-        <Text bare as="label" tone="default" className="flex items-start gap-3 text-sm">
+        <DialogHeader>
+          <DialogTitle>Sign out of Misty?</DialogTitle>
+          <DialogDescription id="sign-out-description">
+            Your agents and chats stay on this computer for when you sign in again.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex items-start gap-3">
           <Checkbox
+            id={removeDataId}
             className="mt-0.5"
+            aria-describedby={`${removeDataId}-detail`}
             checked={removeData}
             onCheckedChange={(checked) => setRemoveData(checked === true)}
           />
-          <span>
-            Also remove my browsing data from this computer
-            <Text bare tone="muted" className="mt-0.5 block text-xs">
+          <div className="grid min-w-0 gap-0.5">
+            <Label htmlFor={removeDataId}>
+              <Text as="span" size="control" tone="default" weight="regular" wrap>
+                Also remove my browsing data from this computer
+              </Text>
+            </Label>
+            <Text id={`${removeDataId}-detail`} size="meta" tone="muted" wrap>
               Erases tabs, bookmarks, passwords, history and website sign-ins here.
             </Text>
-          </span>
-        </Text>
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" size="lg" onClick={close}>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="quiet" size="lg" onClick={close}>
             Cancel
           </Button>
           <Button variant="primary" size="lg" onClick={signOut}>
             Sign out
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

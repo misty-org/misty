@@ -1,6 +1,3 @@
-//! The control island: the in-app island's view outside Misty during desktop
-//! control. Misty's island owns its state and actions; this panel shows them
-//! and sends the person's presses back.
 use std::cell::RefCell;
 
 use objc2::{
@@ -41,7 +38,6 @@ thread_local! {
     static TEXTS: RefCell<Texts> = RefCell::new(Texts::default());
 }
 
-/// Forgets the island's text and sets where its presses go, for a new task.
 pub(super) fn reset(notify: fn(Value)) {
     TEXTS.with(|texts| {
         *texts.borrow_mut() = Texts {
@@ -51,7 +47,6 @@ pub(super) fn reset(notify: fn(Value)) {
     });
 }
 
-/// What Misty's island shows; None falls back to the default text.
 pub(super) fn set_text(status: Option<String>, meta: Option<String>, waiting: Option<String>) {
     TEXTS.with(|texts| {
         let mut texts = texts.borrow_mut();
@@ -72,9 +67,6 @@ fn send_action(action: &str, text: Option<&str>) {
 }
 
 define_class!(
-    // Key only when the person clicks into the field, never by being shown; the
-    // app they work in stays active. Agent input never reaches it: Accessibility
-    // refuses Misty's own process and agent keys go to the other app's process.
     #[unsafe(super(NSPanel))]
     #[thread_kind = MainThreadOnly]
     #[name = "MistyDesktopPanel"]
@@ -179,8 +171,6 @@ fn button(
     button
 }
 
-/// Status, a field to steer or queue, Take over, Stop and Escape; Done while
-/// the task waits for the person. Built once per control session.
 pub(super) fn panel(mtm: MainThreadMarker, display: NSRect) -> Retained<NSPanel> {
     let (width, height) = (560.0, 116.0);
     let top = main_display_height();
@@ -312,7 +302,6 @@ pub(super) fn panel(mtm: MainThreadMarker, display: NSRect) -> Retained<NSPanel>
     Retained::into_super(panel)
 }
 
-/// Working (field and buttons) or waiting for the person (Done).
 pub(super) fn mode(waiting: bool) {
     let (status, meta, waiting_text) = TEXTS.with(|texts| {
         let texts = texts.borrow();

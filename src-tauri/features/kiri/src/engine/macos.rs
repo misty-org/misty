@@ -1,6 +1,3 @@
-//! WebKit on macOS: the UI delegate's media-capture callback, answered with a refusal. Without the
-//! method WebKit asks the person itself. Location needs no hook: WebKit refuses it on macOS unless
-//! the delegate answers its private geolocation callback.
 #![allow(unexpected_cfgs)]
 
 use objc::runtime::{Class, Object, Sel};
@@ -9,7 +6,6 @@ use tauri::Webview;
 
 const DELEGATE_CLASS: &str = "KiriSitePermissionDelegate";
 
-/// WKPermissionDecisionDeny.
 const DENY: usize = 2;
 
 type DecisionBlock = block2::Block<dyn Fn(usize)>;
@@ -48,7 +44,6 @@ pub(super) fn deny_permission_requests(webview: &Webview) -> Result<(), String> 
             extern "C" {
                 fn object_setClass(object: *mut Object, class: *const Class) -> *const Class;
             }
-            // Same-size subclass preserves Wry's upload and popup delegate behavior.
             object_setClass(delegate, subclass);
             let _: () = msg_send![view, setUIDelegate: std::ptr::null_mut::<Object>()];
             let _: () = msg_send![view, setUIDelegate: delegate];

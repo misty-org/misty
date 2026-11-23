@@ -1,4 +1,3 @@
-//! The one way settings fail: a sentence the person can read.
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

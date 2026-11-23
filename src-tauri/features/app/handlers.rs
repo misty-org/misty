@@ -1,5 +1,3 @@
-//! Every command the app's own windows may invoke. `src-tauri/tauri-permissions/` says which window gets which,
-//! and `app::trusted_windows::app_command_policy` holds windows to their exact labels.
 use tauri::ipc::Invoke;
 use tauri::Wry;
 
@@ -109,6 +107,7 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::voice::commands::speech_reading_add,
             crate::voice::commands::speech_reading_end,
             crate::voice::commands::speech_stop,
+            crate::voice::commands::speech_output_device,
             crate::voice::commands::speech_output_muted,
             crate::voice::commands::speech_output_private,
             crate::voice::commands::speech_on_call,

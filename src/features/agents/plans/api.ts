@@ -1,4 +1,4 @@
-import { localCollaborationApi } from "./localApi";
+import { localCollaborationApi } from "./local_api";
 import type {
   AgentPlan,
   AgentPlanPayload,
@@ -7,9 +7,8 @@ import type {
   ConversationCollaboration,
   ConversationMode,
   PermissionMode,
-} from "./planTypes";
+} from "./plan_types";
 
-/** A chat's collaboration state, in misty.db beside the chat. */
 export const collaborationApi = {
   get: (conversationId: string): Promise<ConversationCollaboration> =>
     localCollaborationApi.get(conversationId),

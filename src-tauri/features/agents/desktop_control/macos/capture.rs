@@ -1,4 +1,3 @@
-//! Capture owns one live ScreenCaptureKit stream; pixels never go to disk.
 use std::{
     sync::{Arc, Condvar, Mutex, MutexGuard},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -30,7 +29,6 @@ use crate::agents::cursor::macos::{
     support::{error_json, jpeg, macos_at_least},
 };
 
-/// `kCVPixelFormatType_32BGRA`.
 const PIXEL_FORMAT_BGRA: u32 = 0x4247_5241;
 
 #[derive(Default)]
@@ -164,8 +162,6 @@ impl DesktopStream {
         };
         let shared = &self.ivars().shared;
         if status == SCFrameStatus::Idle.0 {
-            // ScreenCaptureKit explicitly reports an unchanged display; retained pixels
-            // are current, unlike replaying a frame after a stopped/lost stream.
             let mut inner = shared.lock();
             if !inner.stopped && inner.jpeg.is_some() {
                 inner.captured_at = now();
@@ -207,7 +203,6 @@ impl DesktopStream {
 struct Active {
     display: u32,
     shared: Arc<Shared>,
-    /// Keeps the stream's delegate alive for as long as the stream runs.
     #[allow(dead_code)]
     delegate: SendDelegate,
 }
@@ -234,7 +229,6 @@ pub(super) fn capture_stop() {
     }
 }
 
-/// Starts the stream for `display`: finds it, leaves Misty's overlays out, and begins capture.
 fn start(display: u32, shared: Arc<Shared>, delegate: Retained<DesktopStream>) {
     let handler = RcBlock::new(
         move |content: *mut SCShareableContent, error: *mut NSError| {
@@ -312,7 +306,6 @@ fn start(display: u32, shared: Arc<Shared>, delegate: Retained<DesktopStream>) {
     }
 }
 
-/// One frame of the display, captured after `after` (seconds since 1970).
 pub(crate) fn capture_frame(display: u32, after: f64) -> Value {
     if !macos_at_least(14, 0) {
         return error_json("Desktop control requires macOS 14 or later.");

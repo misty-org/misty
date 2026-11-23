@@ -5,9 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("../../account/components/WelcomeNav", () => ({ WelcomeNav: () => null }));
 
-import { useServerChoice } from "@/api/deployment/serverChoice";
+import { useServerChoice } from "@/api/deployment/server_choice";
 import { useSignInSheetStore } from "@/features/account";
-import { useSetupStore } from "@/features/account/setup/useSetupStore";
+import { useSetupStore } from "@/features/account/setup/use_setup_store";
 import { WelcomePage } from "./WelcomePage";
 
 function Where() {

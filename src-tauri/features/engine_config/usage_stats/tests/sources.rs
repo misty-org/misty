@@ -78,7 +78,6 @@ fn unreadable_root_reports_denied_and_absent_root_missing() {
     let locked = spec(Engine::Pi, &root);
     let denied = status_of(&locked, &discover(&locked), None);
     std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755)).unwrap();
-    // uid 0 reads anything; the permission check is meaningless there.
     if denied.status != "ok" {
         assert_eq!(denied.status, "denied");
         assert!(denied.error.unwrap().contains("sessions"));

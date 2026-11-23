@@ -1,5 +1,3 @@
-//! Creating a browser page webview and its favicon probe.
-
 use crate::browser::app_windows;
 use crate::browser::*;
 
@@ -9,8 +7,6 @@ use events::{new_window, page_load};
 use setup::{adopt_existing, record_request};
 
 #[tauri::command]
-// Keep this command asynchronous. WebView2 child creation needs the Windows
-// event loop to remain free while `add_child` finishes initializing the view.
 pub async fn browser_webview_create(
     caller: Webview,
     app: AppHandle,
@@ -28,25 +24,18 @@ pub async fn browser_webview_create(
         }
     };
     trace_create("start");
-    // The page's profile, and with it its website data, comes from the window that asks
-    // for it, never from the request.
     let owner = caller.window().label().to_owned();
     let profile =
         app_windows::profile_for_owner(&owner).ok_or("Only a profile's window can open pages.")?;
-    // Holds the account steady until the view has finished opening.
     let page_store = crate::browser::profiles::page_store(&profile).await?;
     trace_create("lease acquired");
     let store_id = page_store.store.clone();
     let store_identifier = webkit_store_identifier(store_id.as_deref())?;
-    // Integrations use Browser's navigation rules. Provider metadata identifies
-    // the account and automation permissions, not where a person may browse.
     external_url(&request.url)?;
     remember_main_macos_webview(&app, caller.window().label())?;
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
     let window = caller.window();
-    // A live webview's cookie store cannot be changed by updating its metadata.
-    // Account switches must close/reopen through the owning host view.
     if app.get_webview(&label).is_some() {
         let sessions = state
             .sessions
@@ -82,20 +71,11 @@ pub async fn browser_webview_create(
         &app,
         store_id.as_deref(),
     )?;
-    // WebView2 already supplies the browser's default canvas. A Misty-themed
-    // background leaks through transparent website surfaces and can repaint
-    // the native scrollbar during creation.
     #[cfg(not(windows))]
     let builder = builder.background_color(browser_background());
-    // WebView2's own autofill opens a native dropdown under the field, on top of everything the
-    // page draws, so it would cover Misty's saved sign-ins (`PasswordFillMenu`).
     #[cfg(windows)]
     let builder = builder.general_autofill_enabled(false);
     let builder = builder.data_store_identifier(store_identifier);
-    // Bare WKWebView omits Safari's Version/Safari tokens, which makes sites
-    // such as Google serve their legacy compatibility UI. Derive the desktop
-    // Safari identity from the installed Safari bundle instead of pinning a
-    // release in Misty's source.
     let builder = if let Some(user_agent) = native_macos_safari_user_agent() {
         builder.user_agent(&user_agent)
     } else {
@@ -112,13 +92,7 @@ pub async fn browser_webview_create(
         ))
         .initialization_script(browser_status_script(&shortcut_token))
         .initialization_script(kiri::page_script())
-        .on_navigation(move |url| {
-            // Misty's page scripts report over Kiri's host channel, never by
-            // navigating, so every non-web scheme is refused here. This
-            // callback includes frames, redirects and POST submissions.
-            // Never turn these requests into URL-only Browser handoffs.
-            external_url(url.as_str()).is_ok()
-        })
+        .on_navigation(move |url| external_url(url.as_str()).is_ok())
         .on_new_window(move |url, features| new_window(&popup_app, &popup_id, url, features))
         .on_page_load(move |webview, payload| {
             page_load(&page_app, &page_id, webview, payload);
@@ -137,8 +111,6 @@ pub async fn browser_webview_create(
         .on_download(move |_webview, event| {
             handle_download_event(&download_app, &download_id, event)
         });
-    // On Windows a page waits offscreen from the moment it exists: the steps
-    // below take long enough for its blank surface to show over the app.
     #[cfg(windows)]
     let initial_position = {
         hold_until_first_paint(&app, &request.id);
@@ -148,7 +120,6 @@ pub async fn browser_webview_create(
     let initial_position = position;
     trace_create("creating the native webview");
     let created = {
-        // A popup requested while this view is created is opened as a tab (see creation_guard).
         let _creating = super::creation_guard::Creating::enter();
         window.add_child(builder, initial_position, size)
     };

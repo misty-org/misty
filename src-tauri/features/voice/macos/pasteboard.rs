@@ -1,14 +1,10 @@
-//! Dictation insertion borrows the pasteboard: save it, write the text, then put it back.
-
 use objc2::msg_send;
 use objc2::rc::{autoreleasepool, Retained};
 use objc2_app_kit::{NSPasteboard, NSPasteboardItem, NSPasteboardTypeString};
 use objc2_foundation::{NSArray, NSString};
 
-/// A copy of every pasteboard item; released when dropped.
 pub struct Snapshot(Retained<NSArray<NSPasteboardItem>>);
 
-/// Every item and every type, so files, images and rich text survive.
 pub(crate) fn snapshot() -> Snapshot {
     autoreleasepool(|_| {
         let mut copies = Vec::new();
@@ -37,7 +33,6 @@ pub(crate) fn restore(snapshot: Snapshot) {
     });
 }
 
-/// Replaces the pasteboard with `text` and returns its new change count.
 pub(crate) fn write_text(text: &str) -> i64 {
     autoreleasepool(|_| {
         let board = NSPasteboard::generalPasteboard();

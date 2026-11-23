@@ -1,15 +1,10 @@
-//! Key names the agent sends, as the physical key and the characters a Mac keyboard gives them.
-
-/// One key press: Carbon virtual key code, characters, and the characters without modifiers.
 pub(super) struct KeySpec {
     pub code: u16,
     pub characters: String,
     pub unmodified: String,
-    /// Whether Shift is implied (an upper-case letter or shifted symbol).
     pub shift: bool,
 }
 
-/// US ANSI key codes by position: the code of a key is its index in this string.
 const ANSI_KEYS: &str = "asdfhgzxcv§bqweryt123465=97-80]ou[ip\rlj'k;\\,/nm.\t `";
 
 const SHIFTED: [(&str, &str); 21] = [
@@ -37,8 +32,6 @@ const SHIFTED: [(&str, &str); 21] = [
 ];
 
 fn special(key: &str) -> Option<(u16, &'static str)> {
-    // kVK_Return, kVK_Escape, kVK_Tab, kVK_Delete, kVK_ForwardDelete, the arrows, Home, End,
-    // PageUp, PageDown, kVK_Space.
     Some(match key {
         "Enter" => (0x24, "\r"),
         "Escape" => (0x35, "\u{1b}"),
@@ -58,7 +51,6 @@ fn special(key: &str) -> Option<(u16, &'static str)> {
     })
 }
 
-/// The key for `name`, or none when the keyboard has no such key.
 pub(super) fn key_spec(name: &str) -> Option<KeySpec> {
     if let Some((code, characters)) = special(name) {
         return Some(KeySpec {
@@ -72,7 +64,6 @@ pub(super) fn key_spec(name: &str) -> Option<KeySpec> {
     if let Some((_, plain)) = SHIFTED.iter().find(|(shifted, _)| *shifted == name) {
         base = (*plain).to_owned();
     }
-    // Positions count UTF-16 units, as the key codes do.
     let keys: Vec<u16> = ANSI_KEYS.encode_utf16().collect();
     let wanted: Vec<u16> = base.encode_utf16().collect();
     let position = keys

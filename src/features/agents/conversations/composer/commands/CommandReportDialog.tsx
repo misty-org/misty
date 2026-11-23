@@ -8,12 +8,8 @@ import {
   Text,
 } from "@misty/ui";
 import { MistyMarkdown } from "../../../runs/markdown/MistyMarkdown";
-import { useCommandReport } from "./commandOutput";
+import { useCommandReport } from "./command_output";
 
-/**
- * What an engine command reported — `/status`, `/stats`, `/hooks` and the like — shown the way
- * its terminal app prints it: sections of key and value rows, and text under them.
- */
 export function CommandReportDialog() {
   const report = useCommandReport((s) => s.report);
   const close = useCommandReport((s) => s.close);
@@ -42,7 +38,7 @@ export function CommandReportDialog() {
                 />
               ) : null}
               {section.text ? (
-                <Text as="div" bare className="misty-markdown-message">
+                <Text as="div" bare>
                   <MistyMarkdown>{section.text}</MistyMarkdown>
                 </Text>
               ) : null}

@@ -2,15 +2,10 @@
 // See NOTICE.
 
 import { useCallback } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import { invoke } from "@/native/invoke";
 
-/**
- * This device's engine settings as native code keeps them in misty.db (`engine_settings_get`),
- * never synced. Only the fields this page edits are typed; the rest pass through untouched.
- */
 export interface EngineSettings {
-  /** `{engine}Bin` → an absolute path to the program, instead of the one found on PATH. */
   binOverrides?: Record<string, unknown>;
   codexHome?: string | null;
   customModels?: Record<string, string[]>;
@@ -20,17 +15,13 @@ export interface EngineSettings {
   [key: string]: unknown;
 }
 
-/** The settings key of an engine's program path: `{engine}Bin` in camelCase (`qoderCnBin`). */
 export const binKey = (engine: string) =>
   `${engine.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())}Bin`;
 
-/** The cache key of this device's engine settings, shared by every page that shows them. */
 const ENGINE_SETTINGS_KEY = "engine-config/settings";
 
 const engineSettingsApi = {
   get: () => invoke<EngineSettings>("engine_settings_get"),
-  /** Applies `change` to a fresh read, never to a page's older copy, and stores it. Native code
-   *  checks each program path and the Codex home before keeping them. */
   async update(change: (settings: EngineSettings) => EngineSettings): Promise<EngineSettings> {
     const next = change(await invoke<EngineSettings>("engine_settings_get"));
     await invoke("engine_settings_set", { settings: next });
@@ -38,12 +29,6 @@ const engineSettingsApi = {
   },
 };
 
-/**
- * The settings, and a save that reports its error instead of throwing. The last copy is kept on
- * this computer (program paths, models, the DeepSeek Harness address: nothing secret), so the
- * page paints it at once and reads them again behind it. A first read that fails gives
- * `loadError`, never defaults that could be saved over the real ones.
- */
 export function useEngineSettings() {
   const resource = useCachedResource(ENGINE_SETTINGS_KEY, engineSettingsApi.get, {
     persist: "device",
@@ -71,13 +56,10 @@ export function useEngineSettings() {
   return { settings: resource.data ?? null, loadError, retry, save };
 }
 
-// ── Pi and Oh My Pi ─────────────────────────────────────────────────────────
-
 export interface PiFamilyAuthProviderSnapshot {
   id: string;
   envVar: string | null;
   state: "configured" | "none";
-  /** Never the key: its ends with the middle masked. */
   maskedKey?: string | null;
   keySource?: string | null;
 }
@@ -85,7 +67,6 @@ export interface PiFamilyAuthProviderSnapshot {
 export interface PiFamilyAuthListResult {
   store: { path: string; kind: string; exists: boolean };
   providers: PiFamilyAuthProviderSnapshot[];
-  /** Store ids holding a CLI-made sign-in. */
   oauthProviders: string[];
 }
 
@@ -106,8 +87,6 @@ export interface PiFamilyModelsConfigReadResult {
   parseError: string | null;
 }
 
-/** Pi's and Oh My Pi's own credential store and custom-provider file (`pi_family_auth.rs`). A key
- *  goes from the field straight into the CLI's store; reads carry only its masked ends. */
 export const piFamilyApi = {
   list: (engine: "pi" | "omp") => invoke<PiFamilyAuthListResult>("pi_family_auth_list", { engine }),
   setApiKey: (engine: "pi" | "omp", providerId: string, key: string) =>
@@ -120,8 +99,6 @@ export const piFamilyApi = {
     invoke<void>("pi_family_models_config_write", { engine, text }),
 };
 
-// ── DeepSeek Harness ────────────────────────────────────────────────────────
-
 export interface DshHostStatus {
   installed: boolean;
   version: string | null;
@@ -130,14 +107,12 @@ export interface DshHostStatus {
   origin: string;
   autoStart: boolean;
   running: boolean;
-  /** "spawned" when Misty started it, "adopted" when it was already running. */
   ownership: "spawned" | "adopted" | null;
   describe: Record<string, unknown> | null;
   webUrl: string | null;
   error: string | null;
 }
 
-/** The DeepSeek Harness host (`dsh_host.rs`): adopt one that is running, or start `dsh web`. */
 export const dshHostApi = {
   status: () => invoke<DshHostStatus>("dsh_host_status"),
   start: () => invoke<DshHostStatus>("dsh_host_start"),

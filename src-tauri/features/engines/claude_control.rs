@@ -1,9 +1,3 @@
-//! A short-lived Claude Code process for the commands Misty runs out of turn (`slash/claude/`).
-//! It starts like a turn's (the same program, channel and variables) in the chat's folder,
-//! resuming the chat's session, but sends no prompt: Claude Code answers SDK control requests on
-//! stdin (`get_status`, `get_context_usage`, `mcp_toggle`, …) without calling the model, and ends
-//! when stdin closes. Checked against 2.1.322.
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -15,14 +9,10 @@ use tokio::time::Instant;
 
 use crate::engines::{read_line_capped, BuiltCommand, LineRead, SendRequest};
 
-/// How long one answer may take. Most come within a second, but a fresh process loads its
-/// settings, plugins and MCP servers first, and a reconnect waits on the server.
 pub(crate) const ANSWER: Duration = Duration::from_secs(60);
 
-/// How long a running process gets to end on its own once stdin closes.
 const EXIT: Duration = Duration::from_secs(5);
 
-/// The most of the process's error output kept, for a message when it ends early.
 const STDERR_CAP: usize = 64 * 1024;
 
 pub(crate) struct Control {
@@ -36,9 +26,6 @@ pub(crate) struct Control {
 }
 
 impl Control {
-    /// Starts Claude Code in `folder`, resuming `session` when there is one. `fork` resumes it
-    /// as a new session copied from it (`--fork-session`), which Claude Code writes only once a
-    /// message is recorded (`send_text`).
     pub(crate) async fn start(
         folder: &Path,
         session: Option<&str>,
@@ -59,9 +46,7 @@ impl Control {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .kill_on_drop(true)
-            // The same search folders a turn gets, so a shebang shim finds its interpreter.
             .env("PATH", crate::engines::resolve::search_path());
-        // Its own process group, so a stuck one is ended with its MCP servers.
         #[cfg(unix)]
         command.process_group(0);
         #[cfg(windows)]
@@ -96,8 +81,6 @@ impl Control {
         })
     }
 
-    /// Sends one control request (`{"subtype": …, …}`) and waits up to `wait` for its answer:
-    /// the response object (Null when the answer carries none), or Claude Code's error.
     pub(crate) async fn request(
         &mut self,
         request: Value,
@@ -134,8 +117,6 @@ impl Control {
         }
     }
 
-    /// Sends `text` as a user message and waits for the turn's `result` line. Only for local
-    /// commands that run no model turn (`/rename <name>`), which Misty may run on its own.
     pub(crate) async fn send_text(
         &mut self,
         folder: &Path,
@@ -155,15 +136,12 @@ impl Control {
                 .get("result")
                 .and_then(Value::as_str)
                 .is_some_and(|text| !text.trim().is_empty());
-            // A resumed process can first report stopping its predecessor's background task as
-            // an empty result (`claude.rs`); the message's own result follows it.
             if failed || said {
                 return Ok(value);
             }
         }
     }
 
-    /// Closes stdin, which ends the process, and waits briefly for it.
     pub(crate) async fn finish(mut self) {
         self.stdin.take();
         if tokio::time::timeout(EXIT, self.child.wait()).await.is_err() {
@@ -188,9 +166,6 @@ impl Control {
         stdin.flush().await.map_err(|error| error.to_string())
     }
 
-    /// The next JSON line from stdout. A control request from Claude Code itself (a permission
-    /// ask, an MCP elicitation) is refused in place: none should come with no prompt, and an
-    /// unanswered one would park the process.
     async fn next_value(&mut self, deadline: Instant) -> Result<Value, String> {
         loop {
             let read = tokio::time::timeout_at(
@@ -226,7 +201,6 @@ impl Control {
         }
     }
 
-    /// Why the process ended before answering, from the last of its error output.
     async fn ended(&mut self) -> String {
         let said = match self.stderr.take() {
             Some(task) => tokio::time::timeout(Duration::from_secs(2), task)
@@ -236,12 +210,7 @@ impl Control {
                 .unwrap_or_default(),
             None => String::new(),
         };
-        match said
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty())
-            .last()
-        {
+        match said.lines().map(str::trim).rfind(|line| !line.is_empty()) {
             Some(line) => format!(
                 "Claude Code stopped: {}",
                 line.chars().take(300).collect::<String>()
@@ -250,7 +219,6 @@ impl Control {
         }
     }
 
-    /// Ends the process and everything it started.
     fn end(&mut self) {
         if let Some(pid) = self.child.id() {
             crate::engines::kill_process_group(pid);
@@ -268,7 +236,6 @@ impl Drop for Control {
     }
 }
 
-/// Sends one request in a process of its own.
 pub(crate) async fn ask(
     folder: &Path,
     session: Option<&str>,
@@ -281,7 +248,6 @@ pub(crate) async fn ask(
     answer
 }
 
-/// A session id is passed on the command line, so it must read as one and never as a flag.
 fn check_session(session: &str) -> Result<(), String> {
     let fine = !session.is_empty()
         && session.len() <= 128
@@ -296,10 +262,6 @@ fn check_session(session: &str) -> Result<(), String> {
     }
 }
 
-/// Claude Code's command line for a control-only process, set up the way `prepare_launch`
-/// sets up a turn: the program from Settings, the person's own variables, the chosen channel
-/// (its variables and settings overlay) and the device's default model, so `/status` and
-/// `/context` describe what the next turn runs on.
 fn command(folder: &Path, session: Option<&str>, fork: bool) -> Result<BuiltCommand, String> {
     let provider = crate::engines::support::config::resolve_provider("claude", None)?;
     let mut channel_env = match provider.as_ref() {

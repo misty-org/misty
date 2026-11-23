@@ -15,8 +15,6 @@ use super::status::open_repo;
 #[serde(rename_all = "camelCase")]
 pub struct BranchInfo {
     pub name: String,
-    /// A remote-tracking branch (`origin/<name>`). Switching to it makes the local tracking
-    /// branch instead of detaching HEAD.
     pub is_remote: bool,
 }
 
@@ -30,16 +28,12 @@ pub(crate) fn current_branch_name(repo: &Repository) -> Result<String, String> {
 
 pub(crate) fn git_branches_blocking(path: &Path) -> Result<Vec<BranchInfo>, String> {
     let repo = open_repo(path)?;
-    // Local branches first, then remote-tracking ones: a branch only on the remote (right after
-    // a fetch) must still be listed. Which is current comes from the status, never from here,
-    // so a checkout in a terminal can't leave it stale.
     let mut out = Vec::new();
     for kind in [git2::BranchType::Local, git2::BranchType::Remote] {
         let branches = repo
             .branches(Some(kind))
             .map_err(|error| error.to_string())?;
         for (branch, _) in branches.flatten() {
-            // `refs/remotes/origin/HEAD` points at the remote's default branch; it isn't one.
             if branch.get().target().is_none() {
                 continue;
             }
@@ -54,8 +48,6 @@ pub(crate) fn git_branches_blocking(path: &Path) -> Result<Vec<BranchInfo>, Stri
     Ok(out)
 }
 
-/// The local branch Git makes for `origin/release/1.0`: the longest remote name that matches is
-/// taken off (remote names may hold slashes).
 fn local_name_for_remote_branch(repo: &Repository, remote_shorthand: &str) -> Option<String> {
     let remotes = repo.remotes().ok()?;
     let remote = remotes
@@ -69,9 +61,6 @@ fn local_name_for_remote_branch(repo: &Repository, remote_shorthand: &str) -> Op
     Some(remote_shorthand[remote.len() + 1..].to_string())
 }
 
-/// `git checkout <remote>/<branch>`: switch to the local branch of the same name, making it
-/// (tracking the remote) when there isn't one. An existing local branch is used as it is; it may
-/// hold commits of its own, so the remote's tip is never forced onto it.
 fn checkout_remote_branch(
     repo: &Repository,
     remote_shorthand: &str,
@@ -94,13 +83,11 @@ fn checkout_remote_branch(
             true,
         ),
     };
-    // Check out the branch being switched to: an existing local branch's own tip.
     let checkout_commit = local
         .get()
         .peel_to_commit()
         .map_err(|error| error.to_string())?;
     if let Err(error) = repo.checkout_tree(checkout_commit.as_object(), None) {
-        // HEAD stays where it was; don't leave the branch just made behind.
         if created {
             let _ = local.delete();
         }
@@ -119,8 +106,6 @@ pub(crate) fn git_checkout_blocking(path: &Path, branch: &str) -> Result<(), Str
     let gate = repo_write_gate(path);
     let _queued = gate.blocking_lock();
     let repo = open_repo(path)?;
-    // A remote-tracking branch never gets HEAD itself (that would detach it). A local branch
-    // of the same name wins, as with `git checkout`.
     if repo.find_branch(branch, git2::BranchType::Local).is_err() {
         if let Ok(remote) = repo.find_branch(branch, git2::BranchType::Remote) {
             return checkout_remote_branch(&repo, branch, &remote);
@@ -172,17 +157,12 @@ pub(crate) fn git_create_branch_blocking(path: &Path, name: &str) -> Result<(), 
     repo.set_head(&refname).map_err(|error| error.to_string())
 }
 
-/// `git init` for a folder the panel found isn't a repository. The first branch follows the
-/// person's `init.defaultBranch`, as the CLI does.
 pub(crate) fn init_repository(path: &Path) -> Result<(), String> {
     if !file_access::fs::is_dir(path) {
         return Err("That folder is gone.".to_string());
     }
     match Repository::discover(path) {
-        // The panel's answer may be stale (`git init` ran in a terminal meanwhile), and a
-        // repository inside another would hide the outer one's changes.
         Ok(_) => return Ok(()),
-        // Anything but "none found" may hide a repository above this folder.
         Err(error) if error.code() != git2::ErrorCode::NotFound => {
             return Err(error.message().to_string())
         }
@@ -195,7 +175,6 @@ pub(crate) fn init_repository(path: &Path) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-/// The files a fast-forward to `target` would touch that are also changed in the folder.
 pub(crate) fn ff_conflicting_files(repo: &Repository, target: git2::Oid) -> Vec<String> {
     let Ok(head_tree) = repo.head().and_then(|head| head.peel_to_tree()) else {
         return Vec::new();

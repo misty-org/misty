@@ -2,12 +2,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@misty/ui";
 
-/**
- * A number that rolls like an odometer as it changes: each digit is a 0 to 9 strip moved with a
- * plain CSS transition (no masks or blend modes, which misdraw in some web views). It rolls up from
- * 0 on first show, jumps when the person asked for less motion, and its accessible value is always
- * the target number, never the strip.
- */
 const DEFAULT_DURATION_MS = 900;
 const CELLS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -58,12 +52,10 @@ export const RollingStat = memo(function RollingStat({
     let cancelled = false;
     let outer = 0;
     let inner = 0;
-    // A first value of 0 is already shown; there is nothing to roll.
     if (!mountedRef.current && target === 0) {
       mountedRef.current = true;
       return;
     }
-    // Two frames, so the starting value has painted before the transition begins.
     outer = window.requestAnimationFrame(() => {
       inner = window.requestAnimationFrame(() => {
         if (cancelled) return;
@@ -86,7 +78,6 @@ export const RollingStat = memo(function RollingStat({
     >
       {prefix ? <span aria-hidden="true">{prefix}</span> : null}
       {digits.map((digit, index) => (
-        // Keyed from the right, so a new leading digit mounts on the left and the rest keep rolling.
         <DigitColumn key={digits.length - 1 - index} digit={digit} durationMs={durationMs} />
       ))}
     </span>

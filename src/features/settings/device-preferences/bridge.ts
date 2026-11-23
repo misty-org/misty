@@ -1,6 +1,5 @@
 import type { PreferenceValue } from "./registry";
 export interface PreferenceWriteOptions {
-  /** Hold the edit for the settings page's Save changes instead of committing it. */
   stage?: boolean;
 }
 let writer:

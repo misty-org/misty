@@ -1,22 +1,3 @@
-//! Antigravity's part of the shared ACP turn (`grok_acp.rs`): its handshake (resume, model,
-//! thinking level, mode), the model it reports mid-turn, and its question forms.
-//!
-//! Captured from agy 1.5.9:
-//! - `session/set_model {modelId}` takes the ids `agy models` prints (`gemini-3.8-flash-low`),
-//!   and answers `{}` after a `config_option_update`. That update names the model by its family
-//!   (`gemini-3.8-flash`) with the level apart, as `thought_level`; a model with no levels
-//!   (`claude-sonnet-4-6`) lists no `thought_level`, and setting one is refused ("Thinking level
-//!   \"high\" is not offered for model …").
-//! - `session/resume {sessionId, cwd, mcpServers}` reopens a conversation without replaying it.
-//! - An `ask_question` call is a `tool_call`, then `elicitation/create` with `mode: "form"`: one
-//!   `q<n>` property per question, whose `oneOf` lists its options as `{const: "1", title:
-//!   <label>}`, and a `q<n>_other` string for a free-form answer. The reply is
-//!   `{action: "accept", content: {q1: "1"}}`; one declined or cancelled is asked in the chat
-//!   instead. A multi-select question is an `array` whose `items` list the options the same way
-//!   (MCP's titled multi-select).
-//! - `initialize` lists no `mcpCapabilities`, but `session/new` takes an HTTP server and loads it
-//!   ("Preloading 1 MCP servers of the session" in its log).
-
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde_json::{json, Map, Value};
@@ -29,19 +10,14 @@ use crate::engines::qoder_session::{
 };
 use crate::engines::{Engine, EngineEvent, SendRequest, TurnCore, TurnState};
 
-/// The thinking levels a request may name, lowest first, to find the nearest one a model offers.
 const LEVELS: &[&str] = &["minimal", "low", "medium", "high", "xhigh", "max", "ultra"];
 
-/// `initialize` with form elicitation on, so `ask_question` reaches the person as a form instead
-/// of being asked in the chat.
 pub(crate) fn initialization() -> Value {
     let mut params = initialize_params();
     params["clientCapabilities"]["elicitation"] = json!({ "form": {} });
     params
 }
 
-/// The agent's `initialize` answer with HTTP MCP servers allowed, which agy takes without
-/// listing them, so Misty's own server is mounted (`gate::acp_mcp_servers`).
 pub(crate) fn mcp_capable(agent: &Value) -> Value {
     let mut agent = agent.clone();
     if agent.get("agentCapabilities").is_some_and(Value::is_object) {
@@ -50,9 +26,6 @@ pub(crate) fn mcp_capable(agent: &Value) -> Value {
     agent
 }
 
-/// Reopens the chat's conversation (or opens one), then puts it in the run's model, thinking
-/// level and mode. Returns the session id and the thinking level set when it isn't the one asked
-/// for. A conversation Antigravity no longer has opens fresh, so the message isn't lost.
 pub(crate) async fn attach_session(
     acp: &mut AcpProcess,
     req: &SendRequest,
@@ -73,7 +46,6 @@ pub(crate) async fn attach_session(
         .await
         {
             Ok(result) => attached = Some((session_id.to_string(), result)),
-            // An interrupt isn't a failed resume: a new session would start work just cancelled.
             Err(error) if killed.load(Ordering::SeqCst) => return Err(error),
             Err(_) => {}
         }
@@ -95,7 +67,6 @@ pub(crate) async fn attach_session(
     let mut options = result.get("configOptions").cloned().unwrap_or(Value::Null);
     let model = non_empty(req.model.as_deref());
     if let Some(model) = model {
-        // The options the new model has arrive in a `config_option_update` before the answer.
         let mut follow = |line: &AcpLine| {
             if let AcpLine::Notification { params, .. } = line {
                 if params["update"]["sessionUpdate"] == "config_option_update" {
@@ -157,7 +128,6 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
-/// Antigravity's own mode for the run's launch level (`AgyEngine::modes`).
 fn mode_id(permission: Option<&str>) -> &'static str {
     let level = AgyEngine.resolve_permission(permission);
     AgyEngine
@@ -167,7 +137,6 @@ fn mode_id(permission: Option<&str>) -> &'static str {
         .map_or("default", |mode| mode.id)
 }
 
-/// A model id that names its own level (`gemini-3.8-flash-high`) takes no separate one.
 fn encodes_effort(model: &str) -> bool {
     let lower = model.to_ascii_lowercase();
     ["-minimal", "-low", "-medium", "-high", "-xhigh", "-max"]
@@ -175,8 +144,6 @@ fn encodes_effort(model: &str) -> bool {
         .any(|suffix| lower.ends_with(suffix))
 }
 
-/// The session's `thought_level` choice nearest the one asked for, or None when the model has
-/// no levels.
 fn nearest_level(requested: &str, options: &Value) -> Option<String> {
     let choices: Vec<&str> = options
         .as_array()?
@@ -206,10 +173,6 @@ fn nearest_level(requested: &str, options: &Value) -> Option<String> {
         .map(|(_, choice)| choice.to_string())
 }
 
-/// Reports what a `session/update` says about the session, as `qoder_session` does, with the
-/// model named the way `agy models` names it: its family and thinking level joined
-/// (`gemini-3.8-flash` at `low` is `gemini-3.8-flash-low`), so the composer keeps an id Misty's
-/// model list has.
 pub(crate) fn report_session_state(core: &TurnCore, state: &mut TurnState, params: &Value) {
     let Some(update) = session_state_update(params) else {
         return;
@@ -229,7 +192,6 @@ fn with_model_id(mut update: AcpSessionState) -> AcpSessionState {
     update
 }
 
-/// One question of a form, as the card shows it and as the answer needs it.
 fn fields(params: &Value) -> Option<Vec<Value>> {
     if params["mode"] != "form" {
         return None;
@@ -242,7 +204,6 @@ fn fields(params: &Value) -> Option<Vec<Value>> {
                 .is_some_and(|base| properties.contains_key(base))
         })
         .collect();
-    // `q2` before `q10`: the schema's keys come back sorted as text.
     keys.sort_by_key(|key| {
         let digits: String = key.chars().filter(char::is_ascii_digit).collect();
         (digits.parse::<u64>().unwrap_or(u64::MAX), key.to_string())
@@ -299,9 +260,6 @@ fn plain(value: &Value) -> String {
         .map_or_else(|| value.to_string(), str::to_string)
 }
 
-/// Parks one `elicitation/create` as a question card; the answer is written by the shared
-/// driver's `answer_frame` through the `grokAcp` context. A form Misty can't read is declined at
-/// once, and agy asks in the chat instead.
 pub(crate) fn park_question(
     core: &TurnCore,
     state: &mut TurnState,
@@ -336,9 +294,6 @@ pub(crate) fn park_question(
     None
 }
 
-/// The reply to one parked form: each picked label as its option's value, and words of the
-/// person's own in the question's free-form field. A skipped card is `cancel`, which agy follows
-/// by asking in the chat.
 pub(crate) fn answer_frame(
     id: &Value,
     fields: &Value,

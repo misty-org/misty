@@ -13,6 +13,12 @@ pub struct MistyRuntime {
     pub agents: AgentService,
 }
 
+impl Default for MistyRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MistyRuntime {
     pub fn new() -> Self {
         Self::new_with_data_root(None)

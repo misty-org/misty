@@ -1,7 +1,3 @@
-//! Installing a speech package: downloaded from the maker's release as sherpa-onnx publishes it,
-//! hashed as it arrives and kept only when it matches its pinned SHA-256, then unpacked into
-//! `~/.misty/shared/models`, with its progress pushed to the window that asked.
-
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -13,10 +9,6 @@ use tauri::{AppHandle, Emitter, State, Webview};
 
 use super::*;
 
-/// Installs a hearing model or a voice (and the voice activity detector a hearing model needs),
-/// reporting progress as `misty://speech-install` events: `{ id, received, total }` as it
-/// downloads, then `{ id, phase: "unpacking" }`, then `{ id, phase: "done" }` or
-/// `{ id, phase: "failed", error }`. Resolves once it is installed or has failed.
 #[tauri::command]
 pub async fn speech_install(
     app: AppHandle,
@@ -26,7 +18,6 @@ pub async fn speech_install(
 ) -> Result<(), String> {
     require_person(&webview)?;
     let package = package_of(&id).ok_or_else(|| "Misty doesn't know that model.".to_string())?;
-    // One install per download at a time: voices that share a model share its folder.
     let key = package_key(&package);
     {
         let mut installing = state.installing.lock().map_err(|_| "Busy.".to_string())?;
@@ -48,11 +39,15 @@ pub async fn speech_install(
     result
 }
 
-/// Held while the voice activity detector installs, so two hearing installs never fetch it at once.
-static VAD_INSTALL: LazyLock<tokio::sync::Mutex<()>> = LazyLock::new(|| tokio::sync::Mutex::new(()));
+static VAD_INSTALL: LazyLock<tokio::sync::Mutex<()>> =
+    LazyLock::new(|| tokio::sync::Mutex::new(()));
 
-async fn install_all(app: &AppHandle, owner: &str, id: &str, package: &Package) -> Result<(), String> {
-    // A hearing model can't run without the detector, so it comes first, quietly: it's small.
+async fn install_all(
+    app: &AppHandle,
+    owner: &str,
+    id: &str,
+    package: &Package,
+) -> Result<(), String> {
     if hearing(id).is_some() {
         if let Some(vad) = vad_entry() {
             let _held = VAD_INSTALL.lock().await;
@@ -65,14 +60,16 @@ async fn install_all(app: &AppHandle, owner: &str, id: &str, package: &Package) 
     if !installed(package) {
         install_package(app, owner, id, package, true).await?;
     }
-    // Every entry this download brings is now at this pin (voices that share one model).
     for entry in entries_sharing(package) {
         set_pin(&entry, Some(&package.sha256));
     }
     set_pin(id, Some(&package.sha256));
-    // The older pin goes once the newer one is in, unless another entry still uses it.
-    if let Some(previous) = previous.filter(|previous| !previous.eq_ignore_ascii_case(&package.sha256)) {
-        let still_used = pins().values().any(|pin| pin.eq_ignore_ascii_case(&previous));
+    if let Some(previous) =
+        previous.filter(|previous| !previous.eq_ignore_ascii_case(&package.sha256))
+    {
+        let still_used = pins()
+            .values()
+            .any(|pin| pin.eq_ignore_ascii_case(&previous));
         if !still_used {
             let old = Package {
                 sha256: previous,
@@ -94,10 +91,11 @@ async fn install_package(
     report: bool,
 ) -> Result<(), String> {
     let dir = package_dir(package).ok_or_else(|| "Misty has no folder for models.".to_string())?;
-    let parent = dir.parent().ok_or_else(|| "Misty has no folder for models.".to_string())?;
+    let parent = dir
+        .parent()
+        .ok_or_else(|| "Misty has no folder for models.".to_string())?;
     file_access::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    // A half-finished earlier try is started over.
-    if dir.exists() {
+    if file_access::fs::exists(&dir) {
         file_access::fs::remove_dir_all(&dir).map_err(|error| error.to_string())?;
     }
     let file_name = package
@@ -133,7 +131,11 @@ async fn install_package(
         );
     }
     if report {
-        let _ = app.emit_to(owner, INSTALL_EVENT, json!({ "id": id, "phase": "unpacking" }));
+        let _ = app.emit_to(
+            owner,
+            INSTALL_EVENT,
+            json!({ "id": id, "phase": "unpacking" }),
+        );
     }
     file_access::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     let placed = if package.kind == "tar.bz2" {
@@ -152,7 +154,6 @@ async fn install_package(
     Ok(())
 }
 
-/// Streams `url` to `path`, hashing as it arrives; answers the file's SHA-256.
 async fn download_to(
     url: &str,
     path: &Path,
@@ -174,7 +175,10 @@ async fn download_to(
         .await
         .map_err(|_| "Misty couldn't reach where the model is kept. Try again.".to_string())?;
     if !response.status().is_success() {
-        return Err(format!("The model's download answered {}.", response.status()));
+        return Err(format!(
+            "The model's download answered {}.",
+            response.status()
+        ));
     }
     let total = response.content_length().unwrap_or(expected);
     let mut file = file_access::fs::File::create(path).map_err(|error| error.to_string())?;
@@ -189,7 +193,6 @@ async fn download_to(
         hasher.update(&chunk);
         file.write_all(&chunk).map_err(|error| error.to_string())?;
         received += chunk.len() as u64;
-        // Progress at most every quarter second: it's pushed, never asked for.
         if last.elapsed() >= Duration::from_millis(250) {
             last = Instant::now();
             progress(received, total);
@@ -203,8 +206,6 @@ async fn download_to(
     Ok(hex::encode(hasher.finalize()))
 }
 
-/// Unpacks a `.tar.bz2` with the system's own `tar` (bsdtar on macOS and Windows, GNU tar on
-/// Linux; both read bzip2), as engine installs do.
 async fn unpack(archive: &Path, into: &Path) -> Result<(), String> {
     let mut command = tokio::process::Command::new(system_tar());
     command.arg("-xf").arg(archive).arg("-C").arg(into);
@@ -220,6 +221,10 @@ async fn unpack(archive: &Path, into: &Path) -> Result<(), String> {
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "finds the system's own tar program, which lives outside the gate"
+)]
 fn system_tar() -> PathBuf {
     if cfg!(windows) {
         let root = std::env::var("SystemRoot")

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useSettingsStore } from "../../settings/preferences/useSettingsStore";
+import { useSettingsStore } from "../../settings/preferences/use_settings_store";
 import { useDevicePreferences } from "../../settings/device-preferences/store";
 import { registerPreferenceWriter } from "../../settings/device-preferences/bridge";
 import { AgentDefaultsSection } from "./FeatureSections";

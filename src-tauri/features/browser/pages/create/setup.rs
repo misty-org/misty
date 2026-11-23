@@ -1,7 +1,5 @@
-//! Recording a new page's request in its session and adopting a page that already exists.
 use super::*;
 
-/// Stores what the request says about the page in its session.
 pub(super) fn record_request(
     state: &BrowserSessionState,
     request: &BrowserWebviewCreateRequest,
@@ -24,7 +22,6 @@ pub(super) fn record_request(
     Ok(())
 }
 
-/// A page whose webview already exists (the same tab reopened) is brought up to date.
 pub(super) fn adopt_existing(
     app: &AppHandle,
     state: &BrowserSessionState,

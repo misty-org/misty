@@ -1,4 +1,3 @@
-//! The favicon probe a new browser page runs.
 use crate::browser::*;
 
 pub(in crate::browser) fn request_browser_favicon(webview: &Webview, app: &AppHandle, id: &str) {

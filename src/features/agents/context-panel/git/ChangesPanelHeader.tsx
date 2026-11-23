@@ -31,28 +31,22 @@ import {
   rowShapeWrap,
   cn,
 } from "@misty/ui";
-import type { BranchInfo } from "./gitApi";
+import type { BranchInfo } from "./git_api";
 import { useGitStore } from "./store";
 
-/** A row of the changes header; the first is the side panel's header row, filling it. */
 const headRowClass = "flex min-w-0 flex-1 items-center gap-1";
 
-/** A row of the branch picker: the check column, the name, then where the branch lives. */
 const branchRowClass = cn(rowShapeWrap, "w-full text-meta");
 
 interface ChangesPanelHeaderProps {
   workspacePath: string;
-  /** Set when the panel follows the file tree into a repository other than the folder's own,
-   * so it's clear which repository staging, committing, pulling and pushing act on. */
   followedRepoPath?: string;
   notRepo: boolean;
   branch: string | undefined;
-  /** Commits ahead of and behind the upstream; undefined hides them. */
   ahead: number | undefined;
   behind: number | undefined;
   branches: BranchInfo[] | undefined;
   pending: Record<string, true>;
-  /** The first error to show: a failed action, else the last refresh's failure. */
   error: string | null;
   run: (key: string, action: () => Promise<unknown>) => void;
   onDismissError: () => void;
@@ -60,7 +54,6 @@ interface ChangesPanelHeaderProps {
   onToggleViewMode?: () => void;
 }
 
-/** The branch, how far it is from its upstream, and Git's actions; then the branch picker. */
 export function ChangesPanelHeader({
   workspacePath,
   followedRepoPath,
@@ -83,10 +76,7 @@ export function ChangesPanelHeader({
   const git = useGitStore.getState;
   useNotice(Boolean(error), { message: error ?? "", tone: "error", onDismiss: onDismissError });
 
-  // Outside a repository nothing here applies: the panel shows only its way to make one.
   if (notRepo && !followedRepoPath) return null;
-  // The branch row is the panel's header row; what is left (another repository's name, a new
-  // branch's form) stays a quiet row of its own.
   const branchRow = notRepo ? null : (
     <SidePanelHeader bar>
       <div className={headRowClass}>
@@ -199,7 +189,6 @@ export function ChangesPanelHeader({
   );
 }
 
-/** The branch button, a popover to search and switch, and its "New branch" row. */
 function BranchPicker(props: {
   workspacePath: string;
   branch: string | undefined;
@@ -214,7 +203,6 @@ function BranchPicker(props: {
   const { open, onQueryChange } = props;
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // A filter from last time doesn't carry into the next opening.
   useEffect(() => {
     if (!open) onQueryChange("");
   }, [open, onQueryChange]);
@@ -231,7 +219,6 @@ function BranchPicker(props: {
       open={open}
       onOpenChange={(next) => {
         props.onOpenChange(next);
-        // Branches change outside the panel too (a checkout in a terminal); read them each time.
         if (next) void useGitStore.getState().loadBranches(props.workspacePath);
       }}
     >
@@ -276,7 +263,6 @@ function BranchPicker(props: {
                 aria-selected={current}
                 onClick={() => {
                   props.onOpenChange(false);
-                  // Which branch is current comes from the status, like the button's label.
                   if (!current) {
                     props.run("checkout", () =>
                       useGitStore.getState().checkout(props.workspacePath, branch.name),
@@ -302,7 +288,6 @@ function BranchPicker(props: {
             </Text>
           ) : null}
           {!props.branches ? (
-            // Branch rows as they will be: the check column, then the name.
             <div role="status" aria-label="Branches" aria-busy="true" className="grid">
               {["w-1/2", "w-2/3", "w-2/5", "w-3/5"].map((width) => (
                 <div key={width} className="flex h-7.5 items-center gap-2 px-2">
@@ -327,7 +312,6 @@ function BranchPicker(props: {
   );
 }
 
-/** The new branch's name, under the head. */
 function NewBranchForm(props: {
   name: string;
   busy: boolean;

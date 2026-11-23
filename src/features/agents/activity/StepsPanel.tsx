@@ -1,22 +1,16 @@
-import { ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
-import { Button, cn, ErrorState, Pressable, Text, rowShapeWrap } from "@misty/ui";
-import { useChatFolder } from "../shared-folders/chatFolder";
-import { activityApi, type RunRow } from "./activityApi";
+import { useCachedResource } from "@/api/cache/cached_resource";
+import { Button, cn, ErrorState, FoldChevron, Pressable, Text, rowShapeWrap } from "@misty/ui";
+import { useChatFolder } from "../shared-folders/chat_folder";
+import { activityApi, type RunRow } from "./activity_api";
 import { RunSteps, RunStepsEmpty } from "./RunSteps";
 import { RunStateBadge, runWhen } from "./RunLabels";
 import { StepRowsSkeleton, StepsSkeleton } from "./StepsSkeleton";
-import { runStepsKey, useRunEvents } from "./useRunSteps";
-import { useNow } from "@/shared/hooks/useNow";
-import { openBrowserLog } from "../browser-log/browserLogStore";
-import { chatKey } from "../conversations/state/draftChat";
+import { runStepsKey, useRunEvents } from "./use_run_steps";
+import { useNow } from "@/shared/hooks/use_now";
+import { openBrowserLog } from "../browser-log/browser_log_store";
+import { chatKey } from "../conversations/state/draft_chat";
 
-/**
- * This chat's runs on this computer, newest first, kept current while one goes on. The runs read
- * before show at once and are read again behind them; `runs` is null only on the very first read,
- * and `failed` says that read didn't come.
- */
 function useChatRuns(conversationId: string) {
   const runs = useCachedResource(`agents/run-timeline:${conversationId}`, () =>
     activityApi.timeline([conversationId], 50),
@@ -29,7 +23,6 @@ function useChatRuns(conversationId: string) {
   };
 }
 
-/** One run's steps, from the last read while they are read again. */
 function RunStepsBody(props: { run: RunRow; folder?: string; conversationId: string }) {
   const { runId } = props.run;
   const steps = useCachedResource(runStepsKey(runId), () => activityApi.steps(runId));
@@ -59,13 +52,8 @@ function RunStepsBody(props: { run: RunRow; folder?: string; conversationId: str
   );
 }
 
-/** A run's head: when it started and its state, on a 30px line in the steps' inset. */
 const headClass = rowShapeWrap;
 
-/**
- * The context panel's "Steps": what this chat's agent did in each run, step by step in plain
- * sentences, beside the chat's own tool rows. The latest run is open; earlier ones open on demand.
- */
 export function StepsPanel({ conversationId }: { conversationId: string }) {
   const { runs, failed, retry } = useChatRuns(conversationId);
   const { folder } = useChatFolder(conversationId);
@@ -112,13 +100,7 @@ export function StepsPanel({ conversationId }: { conversationId: string }) {
                 }
               >
                 <Text bare tone="muted" className="flex shrink-0">
-                  <ChevronRight
-                    aria-hidden="true"
-                    className={cn(
-                      "transition-transform duration-120 motion-reduce:transition-none",
-                      expanded && "rotate-90",
-                    )}
-                  />
+                  <FoldChevron open={expanded} />
                 </Text>
                 <span className="flex-1 text-left">{runWhen(run.startedAt, now)}</span>
                 <RunStateBadge state={run.state} />

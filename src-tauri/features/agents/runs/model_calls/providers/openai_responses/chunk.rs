@@ -1,6 +1,3 @@
-//! One event of a Responses stream, as the SDK's `openaiResponsesChunkSchema` reads it. Its last
-//! rule takes anything with a string `type` as an unknown chunk, so a known event that is malformed
-//! is ignored rather than reported. Only a chunk with no `type` at all is invalid.
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
@@ -8,15 +5,25 @@ use serde_json::{json, Map, Value};
 #[serde(tag = "type")]
 pub(super) enum Known {
     #[serde(rename = "response.output_text.delta")]
-    TextDelta { item_id: String, output_index: Option<u64>, delta: String },
+    TextDelta {
+        item_id: String,
+        output_index: Option<u64>,
+        delta: String,
+    },
     #[serde(rename = "response.completed", alias = "response.incomplete")]
     Finished { response: FinishedResponse },
     #[serde(rename = "response.failed")]
-    Failed { sequence_number: u64, response: FailedResponse },
+    Failed {
+        sequence_number: u64,
+        response: FailedResponse,
+    },
     #[serde(rename = "response.created")]
     Created { response: CreatedResponse },
     #[serde(rename = "response.in_progress")]
-    InProgress { #[allow(dead_code)] response: CreatedResponse },
+    InProgress {
+        #[allow(dead_code)]
+        response: CreatedResponse,
+    },
     #[serde(rename = "response.output_item.added")]
     ItemAdded { output_index: u64, item: AddedItem },
     #[serde(rename = "response.output_item.done")]
@@ -24,12 +31,24 @@ pub(super) enum Known {
     #[serde(rename = "response.function_call_arguments.delta")]
     ArgumentsDelta { output_index: u64, delta: String },
     #[serde(rename = "response.reasoning_summary_part.added")]
-    SummaryPartAdded { item_id: String, output_index: Option<u64>, summary_index: u64 },
+    SummaryPartAdded {
+        item_id: String,
+        output_index: Option<u64>,
+        summary_index: u64,
+    },
     #[serde(rename = "response.reasoning_summary_text.delta")]
-    SummaryTextDelta { item_id: String, output_index: Option<u64>, summary_index: u64, delta: String },
+    SummaryTextDelta {
+        item_id: String,
+        output_index: Option<u64>,
+        summary_index: u64,
+        delta: String,
+    },
     #[serde(rename = "response.reasoning_summary_part.done")]
-    SummaryPartDone { item_id: String, output_index: Option<u64>, summary_index: u64 },
-    /// Events that only happen with OpenAI's built-in tools, which Misty never offers.
+    SummaryPartDone {
+        item_id: String,
+        output_index: Option<u64>,
+        summary_index: u64,
+    },
     #[serde(
         rename = "response.custom_tool_call_input.delta",
         alias = "response.image_generation_call.partial_image",
@@ -85,8 +104,14 @@ pub(super) struct CreatedResponse {
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub(super) enum AddedItem {
-    Message { id: String, phase: Option<Phase> },
-    Reasoning { id: String, encrypted_content: Option<String> },
+    Message {
+        id: String,
+        phase: Option<Phase>,
+    },
+    Reasoning {
+        id: String,
+        encrypted_content: Option<String>,
+    },
     FunctionCall {
         #[allow(dead_code)]
         id: String,
@@ -102,8 +127,14 @@ pub(super) enum AddedItem {
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub(super) enum DoneItem {
-    Message { id: String, phase: Option<Phase> },
-    Reasoning { id: String, encrypted_content: Option<String> },
+    Message {
+        id: String,
+        phase: Option<Phase>,
+    },
+    Reasoning {
+        id: String,
+        encrypted_content: Option<String>,
+    },
     FunctionCall {
         id: String,
         call_id: String,
@@ -149,7 +180,6 @@ pub(super) enum Caller {
     Program { caller_id: String },
 }
 
-/// Usage as the SDK's schema keeps it: only these fields, and `raw` carries exactly them.
 #[derive(Deserialize)]
 pub(super) struct RawUsage {
     pub input_tokens: u64,
@@ -181,7 +211,6 @@ fn keep(object: &Value, names: &[&str]) -> Map<String, Value> {
     kept
 }
 
-/// The usage as the SDK reports it in `raw`, from the same event's `response.usage`.
 pub(super) fn raw_usage(usage: &Value) -> Value {
     let mut raw = keep(usage, &["input_tokens", "output_tokens"]);
     for (name, known) in [
@@ -194,7 +223,10 @@ pub(super) fn raw_usage(usage: &Value) -> Value {
                 "orchestration_input_cached_tokens",
             ][..],
         ),
-        ("output_tokens_details", &["reasoning_tokens", "orchestration_output_tokens"][..]),
+        (
+            "output_tokens_details",
+            &["reasoning_tokens", "orchestration_output_tokens"][..],
+        ),
     ] {
         match usage.get(name) {
             Some(details) if details.is_object() => {
@@ -211,7 +243,6 @@ pub(super) fn raw_usage(usage: &Value) -> Value {
 
 pub(super) enum Chunk {
     Known(Box<Known>),
-    /// An `error` event, as the schema that matched it keeps it.
     ErrorFrame(Value),
     Unknown,
 }
@@ -220,10 +251,10 @@ fn text_or_null(value: Option<&Value>) -> bool {
     value.map_or(true, |value| value.is_null() || value.is_string())
 }
 
-/// Two shapes exist. OpenAI's early `insufficient_quota` failure nests the error, and its documented
-/// event has the fields at the top.
 fn error_frame(value: &Value) -> Option<Value> {
-    let sequence = value.get("sequence_number").filter(|number| number.is_number())?;
+    let sequence = value
+        .get("sequence_number")
+        .filter(|number| number.is_number())?;
     if let Some(error) = value.get("error").filter(|error| {
         error.get("type").is_some_and(Value::is_string)
             && error.get("code").is_some_and(Value::is_string)
@@ -239,10 +270,14 @@ fn error_frame(value: &Value) -> Option<Value> {
     let fine = value.get("message").is_some_and(Value::is_string)
         && text_or_null(value.get("code"))
         && text_or_null(value.get("param"));
-    fine.then(|| Value::Object(keep(value, &["type", "sequence_number", "code", "message", "param"])))
+    fine.then(|| {
+        Value::Object(keep(
+            value,
+            &["type", "sequence_number", "code", "message", "param"],
+        ))
+    })
 }
 
-/// Reads a parsed event, or `None` when the schema would refuse it outright.
 pub(super) fn read_chunk(value: &Value) -> Option<Chunk> {
     let kind = value.get("type")?.as_str()?;
     if kind == "error" {
@@ -250,26 +285,38 @@ pub(super) fn read_chunk(value: &Value) -> Option<Chunk> {
     }
     Some(match serde_json::from_value::<Known>(value.clone()) {
         Ok(Known::Finished { mut response }) => {
-            response.usage.raw = value.pointer("/response/usage").map(raw_usage).unwrap_or_default();
+            response.usage.raw = value
+                .pointer("/response/usage")
+                .map(raw_usage)
+                .unwrap_or_default();
             Chunk::Known(Box::new(Known::Finished { response }))
         }
-        Ok(Known::Failed { sequence_number, mut response }) => {
+        Ok(Known::Failed {
+            sequence_number,
+            mut response,
+        }) => {
             if let Some(usage) = &mut response.usage {
-                usage.raw = value.pointer("/response/usage").map(raw_usage).unwrap_or_default();
+                usage.raw = value
+                    .pointer("/response/usage")
+                    .map(raw_usage)
+                    .unwrap_or_default();
             }
-            Chunk::Known(Box::new(Known::Failed { sequence_number, response }))
+            Chunk::Known(Box::new(Known::Failed {
+                sequence_number,
+                response,
+            }))
         }
         Ok(known) => Chunk::Known(Box::new(known)),
         Err(_) => Chunk::Unknown,
     })
 }
 
-/// Whether the model has started producing output, which ends the wait for an early failure.
 pub(super) fn is_output_chunk(chunk: &Chunk) -> bool {
     match chunk {
         Chunk::Unknown | Chunk::ErrorFrame(_) => false,
-        Chunk::Known(known) => {
-            !matches!(**known, Known::Created { .. } | Known::InProgress { .. } | Known::Failed { .. })
-        }
+        Chunk::Known(known) => !matches!(
+            **known,
+            Known::Created { .. } | Known::InProgress { .. } | Known::Failed { .. }
+        ),
     }
 }

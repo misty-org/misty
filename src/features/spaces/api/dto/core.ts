@@ -1,9 +1,9 @@
 import type { MessageSpan, SpaceRole } from "./common";
-import type { SpacePermission } from "./role-types";
+import type { SpacePermission } from "./role_types";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
-import type { SpaceMessageSender } from "./conversation-types";
-export type * from "./member-types";
-export type * from "./conversation-types";
+import type { SpaceMessageSender } from "./conversation_types";
+export type * from "./member_types";
+export type * from "./conversation_types";
 
 export interface Space {
   id: string;
@@ -15,9 +15,7 @@ export interface Space {
   member_count: number;
   pending_count: number;
   is_shared: boolean;
-  /** Names the Space's uploaded picture; 0 or missing when it has none and shows its initials. */
   avatar_version?: number;
-  /** What the person may do in this Space, from their roles; missing from servers before roles. */
   permissions?: SpacePermission[];
   created_at: string;
   updated_at: string;
@@ -32,10 +30,6 @@ export interface SpaceInvitation {
   invited_email: string;
   invited_by_user_id: string;
   inviter_name?: string;
-  /**
-   * The invitation's link (`misty://open/invite/…`), only in the answer that made it: the server
-   * sends no email, so the owner passes it on. A new link replaces the old one.
-   */
   link?: string;
   expires_at: string;
   created_at: string;
@@ -45,7 +39,6 @@ export interface CreateSpaceRequest {
   name: string;
 }
 
-/** Someone the person already shares a Space with. */
 export interface SpacePerson {
   user_id: string;
   name: string;
@@ -66,9 +59,7 @@ export interface SpaceInvitationPreview {
 export interface SpaceMessage {
   seq: number;
   id: string;
-  /** Echoed on create responses/events to reconcile a client-side optimistic row. */
   client_nonce?: string;
-  /** Client-only state; confirmed server messages omit it. */
   local_delivery_state?: "sending" | "failed";
   space_id: string;
   conversation_id?: string;
@@ -83,9 +74,7 @@ export interface SpaceMessage {
   attachments?: MessageAttachment[];
   reactions?: SpaceMessageReaction[];
   reply_to_message_id?: string;
-  /** Set on a reply made in a thread's panel; such a reply is not in the channel's own list. */
   thread_root_id?: string;
-  /** On a thread's root: how many replies it has and when the last came. */
   reply_count?: number;
   last_reply_at?: string;
   edited_at?: string;
@@ -158,7 +147,6 @@ export interface SpacesSnapshot {
   };
 }
 
-/** A thread the person follows: its root, its replies' count and how many they haven't read. */
 export interface SpaceThread {
   root: SpaceMessage;
   reply_count: number;

@@ -29,6 +29,10 @@ pub(super) fn initialization() -> Value {
     params
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "checks the folders the person added to a Kimi run, which need not be linked"
+)]
 async fn existing_additional_dirs(dirs: &[String]) -> Result<Vec<&str>, String> {
     let mut existing = Vec::new();
     for dir in dirs {
@@ -128,10 +132,6 @@ pub(super) async fn attach_session(
     Ok((session_id, actual_effort))
 }
 
-/// Kimi's own mode for the run: `default`, where each ask comes back through ACP and Misty's
-/// gate answers it, `plan`, or `auto`, where Kimi approves safe operations itself and asks the
-/// rest. Its `yolo` mode is never used, since Kimi has no sandbox that keeps it inside its
-/// folder (no Bypass).
 fn mode(permission: Option<&str>) -> &'static str {
     match super::kimi::KimiEngine.resolve_permission(permission) {
         "plan" => "plan",
@@ -296,10 +296,6 @@ pub(super) fn answer_frame(context: &Value, answers: Option<&Value>) -> Result<V
     ))
 }
 
-/// ACP's `usage_update`: how full the context is (`used`) out of the model's window (`size`).
-/// `used` is sent on by that name too, so a turn's later `totalTokens`, which adds up every call
-/// in the turn, doesn't replace it. An empty context's 0 stays out: a bare `used: 0` reads as a
-/// compaction the engine didn't size.
 pub(super) fn usage(params: &Value) -> Option<Value> {
     let update = &params["update"];
     if update["sessionUpdate"] != "usage_update" {

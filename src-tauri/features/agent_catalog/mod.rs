@@ -114,7 +114,6 @@ pub struct CatalogAgentView {
     division_id: String,
     name: String,
     description: String,
-    /// The persona's emoji; the renderer falls back to a generic icon when absent.
     icon: Option<String>,
     color: Option<String>,
     vibe: Option<String>,
@@ -193,18 +192,24 @@ fn catalog_root_candidates(resource_dir: Option<&Path>) -> Vec<PathBuf> {
             candidates.push(executable_dir.join(CATALOG_DIR).join(PROVIDER_ID));
         }
     }
-    // Only a development build reads the pack from the source tree.
     if cfg!(debug_assertions) {
         candidates.push(source_tree_root());
     }
     candidates
 }
 
-/// The pack's folder. It is opened read-only to the file gate once it is found, and only here.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "probes where the persona catalog is installed before granting that folder"
+)]
+fn has_catalog_manifest(candidate: &Path) -> bool {
+    candidate.join("manifest.json").is_file()
+}
+
 fn resolve_catalog_root(resource_dir: Option<&Path>) -> Result<PathBuf, String> {
     let found = catalog_root_candidates(resource_dir)
         .into_iter()
-        .find(|candidate| candidate.join("manifest.json").is_file())
+        .find(|candidate| has_catalog_manifest(candidate))
         .ok_or_else(|| {
             "The persona catalog isn't installed with this copy of Misty.".to_string()
         })?;
@@ -260,7 +265,6 @@ fn load_catalog_from_root(root: PathBuf) -> Result<LoadedCatalog, String> {
     })
 }
 
-/// The pack never changes while Misty runs, so it is read and checked once.
 fn catalog(app: &tauri::AppHandle) -> Result<&'static LoadedCatalog, String> {
     static LOADED: OnceLock<LoadedCatalog> = OnceLock::new();
     if let Some(loaded) = LOADED.get() {
@@ -312,8 +316,6 @@ fn build_catalog_view(catalog: &LoadedCatalog) -> CatalogView {
     }
 }
 
-/// Reads a persona's prompt and checks it against the hash pinned in agents.json. A tampered or
-/// half-copied resource never reaches a prompt.
 fn resolve_prompt<'a>(
     catalog: &'a LoadedCatalog,
     agent_id: &str,
@@ -338,7 +340,6 @@ fn resolve_prompt<'a>(
     Ok((agent, prompt))
 }
 
-/// The catalog: its source, its divisions and every persona in it.
 #[tauri::command]
 pub async fn agent_catalog_list(app: tauri::AppHandle) -> Result<CatalogView, String> {
     tauri::async_runtime::spawn_blocking(move || catalog(&app).map(build_catalog_view))
@@ -346,7 +347,6 @@ pub async fn agent_catalog_list(app: tauri::AppHandle) -> Result<CatalogView, St
         .map_err(|error| error.to_string())?
 }
 
-/// One persona with its checked prompt, for the `#` picker and for making an agent from it.
 #[tauri::command]
 pub async fn agent_catalog_prompt(
     app: tauri::AppHandle,

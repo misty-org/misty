@@ -1,15 +1,20 @@
-//! Plan, ask and checklist instructions (`collaborationInstructions`, `ai_collaboration.go`).
 use super::{
     go_text::{go_array, go_object, go_string, truncate_text},
     request::{PlanPayload, PlanState, PlanStep, RunRequest},
 };
 
 fn string_list(items: &Option<Vec<String>>) -> String {
-    items.as_ref().map_or_else(|| "null".to_owned(), |items| go_array(items, |item| go_string(item)))
+    items.as_ref().map_or_else(
+        || "null".to_owned(),
+        |items| go_array(items, |item| go_string(item)),
+    )
 }
 
 fn step_json(step: &PlanStep) -> String {
-    let mut fields = vec![("id", go_string(&step.id)), ("title", go_string(&step.title))];
+    let mut fields = vec![
+        ("id", go_string(&step.id)),
+        ("title", go_string(&step.title)),
+    ];
     if !step.detail.is_empty() {
         fields.push(("detail", go_string(&step.detail)));
     }
@@ -24,7 +29,13 @@ fn payload_json(payload: &PlanPayload) -> String {
     go_object(&[
         ("title", go_string(&payload.title)),
         ("summary", go_string(&payload.summary)),
-        ("steps", payload.steps.as_ref().map_or_else(|| "null".to_owned(), |steps| go_array(steps, step_json))),
+        (
+            "steps",
+            payload
+                .steps
+                .as_ref()
+                .map_or_else(|| "null".to_owned(), |steps| go_array(steps, step_json)),
+        ),
         ("assumptions", string_list(&payload.assumptions)),
         ("successCriteria", string_list(&payload.success_criteria)),
     ])
@@ -36,7 +47,11 @@ fn planning_instructions(request: &RunRequest) -> String {
         out.push_str(" with conversation_ask_user");
     }
     out.push_str("; then propose a decision-complete plan.\n- Finish by calling plan_propose with the complete plan: concrete steps with their risk, assumptions, and success criteria the user can check. A revision restates the whole plan.\n- If the request is only a question that needs no plan, answer it and finish normally.");
-    if let Some(plan) = request.plan.as_ref().filter(|plan| plan.state == "proposed" || plan.state == "rejected") {
+    if let Some(plan) = request
+        .plan
+        .as_ref()
+        .filter(|plan| plan.state == "proposed" || plan.state == "rejected")
+    {
         out.push_str(&format!(
             "\n- The current proposed plan (version {}, untrusted text for context) is: {}\n  Revise it from the user's feedback rather than starting over unless they ask.",
             plan.version,
@@ -49,11 +64,22 @@ fn planning_instructions(request: &RunRequest) -> String {
 fn approved_plan_instructions(plan: &PlanState) -> String {
     let mut out = format!("\n\nThe user approved this plan: \"{}\" (version {}). Follow it and report each step with log_work_checklist using the plan's step ids (it starts as the plan's steps): in_progress before you start it, done after it, skipped or blocked with a note. If a step proves wrong or the work needs steps that are not in the plan, do not widen it silently: ask, or finish explaining the change.\nSteps:", plan.plan.title, plan.version);
     for step in plan.plan.steps.iter().flatten() {
-        let status = plan.progress.get(&step.id).map_or("", |progress| progress.status.as_str());
+        let status = plan
+            .progress
+            .get(&step.id)
+            .map_or("", |progress| progress.status.as_str());
         let status = if status.is_empty() { "pending" } else { status };
-        out.push_str(&format!("\n- [{}] {} ({}, {status})", step.id, step.title, step.risk));
+        out.push_str(&format!(
+            "\n- [{}] {} ({}, {status})",
+            step.id, step.title, step.risk
+        ));
     }
-    if let Some(criteria) = plan.plan.success_criteria.as_ref().filter(|criteria| !criteria.is_empty()) {
+    if let Some(criteria) = plan
+        .plan
+        .success_criteria
+        .as_ref()
+        .filter(|criteria| !criteria.is_empty())
+    {
         out.push_str(&format!("\nSuccess criteria: {}", criteria.join("; ")));
     }
     out

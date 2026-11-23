@@ -16,15 +16,10 @@ import {
   accountDeletionError,
   requestAccountDeletion,
   type AccountExportProof,
-} from "./accountExport";
+} from "./account_export";
 
 const CONFIRMATION = "DELETE";
 
-/**
- * Deletes the signed-in account after the person types DELETE and confirms it is them: their
- * Misty password, or a fresh Google sign-in for a Google account. `onDeleted` runs once the
- * server has accepted it, so the caller can end the session.
- */
 export function AccountDeleteDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;

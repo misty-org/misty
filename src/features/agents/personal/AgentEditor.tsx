@@ -1,4 +1,4 @@
-import { personalAgentsApi } from "./personalAgentsApi";
+import { personalAgentsApi } from "./personal_agents_api";
 import { AgentPermissionsField } from "./AgentPermissionsField";
 import { AgentEngineField } from "../engines/AgentEngineField";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
@@ -144,8 +144,6 @@ export function AgentEditor({
           onChange={(e) => update("name", e.target.value)}
         />
       </Field>
-      {/* Its own voice: picked when it was made, changed here. An agent made before voices has
-          none and speaks in Misty's voice until one is picked. */}
       {profile?.system_managed ? null : (
         <Field label="Voice">
           <AgentVoicePicker
@@ -156,7 +154,6 @@ export function AgentEditor({
           />
         </Field>
       )}
-      {/* What it does, in a few words: the studio and the @ menu tell agents apart by it. */}
       <span data-tour="agent-role" className="contents">
         <Field label="Role">
           <Input
@@ -185,7 +182,6 @@ export function AgentEditor({
           onModel={(model) => update("engine_model", model)}
         />
       </span>
-      {/* The one Space it works and saves in. A new agent gets the window's. */}
       {profile ? <AgentSpaceField agent={profile} /> : null}
       <span data-tour="agent-permissions" className="contents">
         <AgentPermissionsField
@@ -213,10 +209,7 @@ export function AgentEditor({
       </details>
       <div className="flex flex-wrap gap-3 empty:hidden">
         {(!profile || dirty) && (
-          <Button
-            disabled={!draft.name.trim() || (!profile && !draft.voice) || busy}
-            type="submit"
-          >
+          <Button disabled={!draft.name.trim() || (!profile && !draft.voice) || busy} type="submit">
             {profile ? "Save changes" : "Create agent"}
           </Button>
         )}
@@ -234,7 +227,7 @@ export function AgentEditor({
         )}
       </div>
       {confirmDelete && (
-        <div role="alert" className="space-y-3 text-sm">
+        <div role="alert" className="space-y-3 text-control">
           <p>
             Delete {profile?.name}? Active work will stop. Existing conversation history is
             retained.

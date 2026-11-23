@@ -1,5 +1,3 @@
-// Report where the focused text field is, so the system's AutoFill suggestions open under it.
-// Only a rectangle in page pixels is sent; never the field's value.
 if (window === window.top) {
   let caretTimer = 0;
   let lastCaret = '';
@@ -18,7 +16,6 @@ if (window === window.top) {
       body = '{"x":' + n(box.left) + ',"y":' + n(box.top) + ',"w":' + n(box.width) + ',"h":' + n(box.height) + '}';
     }
     if (body === lastCaret) return;
-    // Built by concatenation: a page-defined toJSON must never see the token.
     if (sendToHost('{"token":"' + shortcutToken + '","caret":' + body + '}')) lastCaret = body;
   };
   const scheduleCaret = () => {

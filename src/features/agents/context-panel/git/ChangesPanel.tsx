@@ -1,8 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useFilesStore } from "../files/filesStore";
+import { useFilesStore } from "../files/files_store";
 import { ChangesSkeleton } from "../PanelSkeletons";
-import { resolveWorkspaceRepository } from "../files/repositorySelection";
+import { resolveWorkspaceRepository } from "../files/repository_selection";
 import { ChangesFileMenu } from "./ChangesFileContextMenu";
 import { ChangesSummary, GroupSection } from "./ChangesGroupSection";
 import { ChangesPanelHeader } from "./ChangesPanelHeader";
@@ -13,18 +13,13 @@ import {
   NotRepoState,
   StatusErrorState,
 } from "./ChangesStates";
-import { useChangesSelection, useGitViewMode, useRefreshWhileWorking } from "./changesHooks";
+import { useChangesSelection, useGitViewMode, useRefreshWhileWorking } from "./changes_hooks";
 import { DiffView } from "./DiffView";
-import type { GitFileEntry } from "./gitApi";
+import type { GitFileEntry } from "./git_api";
 import { useGitStore } from "./store";
-import { useChangesActions } from "./useChangesActions";
-import "../codeViews.css";
+import { useChangesActions } from "./use_changes_actions";
+import "../code_views.css";
 
-/**
- * What changed in the folder, as Git sees it: the branch and its upstream, staged, unstaged and
- * new files as a list or a tree, each file's diff, and a commit of the ticked files. When the
- * file tree has a nested repository selected, the panel follows it.
- */
 export function ChangesPanel({ folder }: { folder: string }) {
   const selectedPath = useFilesStore((state) => state.selectedPath);
   const repositories = useFilesStore((state) => state.repositories);
@@ -42,7 +37,6 @@ export function ChangesPanel({ folder }: { folder: string }) {
   const refreshError = useGitStore((state) => state.errorByWorkspace[repository]);
   const branches = useGitStore((state) => state.branchesByWorkspace[repository]);
   const diffView = useGitStore((state) => state.diffView);
-  // A failed read clears the status, so its reason is the whole body.
   const statusError = status ? null : (refreshError ?? null);
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const scrollOffset = useRef(0);
@@ -136,7 +130,6 @@ export function ChangesPanel({ folder }: { folder: string }) {
               scrollOffset.current = event.currentTarget.scrollTop;
             }}
           >
-            {/* The status read last stays up while it is read again; this is the first read. */}
             {!status ? (
               <ChangesSkeleton />
             ) : total === 0 ? (
@@ -210,7 +203,6 @@ export function ChangesPanel({ folder }: { folder: string }) {
               </>
             )}
           </div>
-          {/* Nothing to commit, nothing to write a message for. */}
           {total > 0 ? (
             <CommitFooter
               selectedCount={selection.selectedFiles.size}

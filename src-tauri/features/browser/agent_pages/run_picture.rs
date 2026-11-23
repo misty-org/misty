@@ -1,6 +1,3 @@
-//! A small picture of the page an agent's run is working on, for its steps in the person's activity
-//! view. It is taken without showing the page or touching the agent's grants, and stays on this
-//! computer.
 use base64::Engine;
 use tauri::{AppHandle, Manager};
 
@@ -8,7 +5,6 @@ use crate::browser::BrowserSessionState;
 
 const PAGE_PREFIX: &str = "misty-browser-";
 
-/// The page of one of these runs, as JPEG bytes at most 640 pixels on its long side.
 pub(crate) async fn picture_of_run(app: &AppHandle, run_ids: &[String]) -> Option<Vec<u8>> {
     let id = {
         let state = app.try_state::<BrowserSessionState>()?;

@@ -9,10 +9,6 @@ interface DirectRecipient {
   name: string;
 }
 
-/**
- * The opening of a one-to-one conversation's history: the other person's face, their name and
- * where the history with them begins, as Discord opens a direct message.
- */
 export function DirectMessageIntro({
   spaceId,
   recipient,
@@ -51,9 +47,7 @@ function useMemberAvatarUrl(spaceId: string, userId: string): string {
         objectUrl = URL.createObjectURL(blob);
         setUrl(objectUrl);
       })
-      .catch(() => {
-        /* No avatar set — the initials fallback covers it. */
-      });
+      .catch(() => {});
     return () => {
       canceled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);

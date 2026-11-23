@@ -1,5 +1,3 @@
-//! What a run needs from the app and the network, behind small interfaces so the loop can be tested
-//! without either.
 use std::sync::Arc;
 
 use futures_util::future::BoxFuture;
@@ -12,16 +10,18 @@ use crate::device_models::DeviceModelStore;
 use crate::instance_model::{WatchedModel, STREAM_STALL_MS};
 use crate::local_tools::LocalToolHost;
 use crate::logger::Logger;
-use crate::tool_gateway::ToolGateway;
 use crate::model_access::{Generated, ModelAccess};
+use crate::model_calls::{
+    generate_text, prepare_call, resolve_model, start_stream, CallOptions, GenerateSettings,
+    ModelError, ModelStream,
+};
+use crate::tool_gateway::ToolGateway;
+use crate::web_fetch::reader::PageReader;
 use crate::web_search::provider::SearchProviderId;
 use crate::web_search::search_step::{DeviceSearch, SearchEndpoints, WebSearchCache};
-use crate::web_fetch::reader::PageReader;
-use crate::model_calls::{generate_text, prepare_call, resolve_model, start_stream, CallOptions, GenerateSettings, ModelError, ModelStream};
 
 use super::store::RunStore;
 
-/// The device's choices and the calls a run makes on its fast model.
 pub(crate) trait RunDevice: Send + Sync {
     fn model_id(&self, role: DeviceRole) -> Option<String>;
     fn reasoning(&self) -> String;
@@ -29,30 +29,50 @@ pub(crate) trait RunDevice: Send + Sync {
     fn search_provider(&self) -> Option<SearchProviderId> {
         self.search().map(|saved| saved.provider)
     }
-    fn title_for<'a>(&'a self, message: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, String>>;
-    fn summary_for<'a>(&'a self, previous: &'a str, turns: &'a str) -> BoxFuture<'a, Result<String, String>>;
+    fn title_for<'a>(
+        &'a self,
+        message: &'a str,
+        reply: &'a str,
+    ) -> BoxFuture<'a, Result<String, String>>;
+    fn summary_for<'a>(
+        &'a self,
+        previous: &'a str,
+        turns: &'a str,
+    ) -> BoxFuture<'a, Result<String, String>>;
 }
 
-/// A run's main model call: on the device's key, with the SDK's retries around starting the stream.
 pub(crate) trait TurnModels: Send + Sync {
-    fn stream<'a>(&'a self, model_id: &'a str, options: CallOptions, max_retries: u32, watch: bool) -> BoxFuture<'a, Result<ModelStream, ModelError>>;
+    fn stream<'a>(
+        &'a self,
+        model_id: &'a str,
+        options: CallOptions,
+        max_retries: u32,
+        watch: bool,
+    ) -> BoxFuture<'a, Result<ModelStream, ModelError>>;
 }
 
-/// Runs model turns on the device's keys. The key is read for each try and dropped when it returns.
 pub(crate) struct DeviceTurnModels {
     pub(crate) models: Arc<DeviceModelStore>,
     pub(crate) http: reqwest::Client,
 }
 
 impl TurnModels for DeviceTurnModels {
-    fn stream<'a>(&'a self, model_id: &'a str, options: CallOptions, max_retries: u32, watch: bool) -> BoxFuture<'a, Result<ModelStream, ModelError>> {
+    fn stream<'a>(
+        &'a self,
+        model_id: &'a str,
+        options: CallOptions,
+        max_retries: u32,
+        watch: bool,
+    ) -> BoxFuture<'a, Result<ModelStream, ModelError>> {
         Box::pin(async move {
-            // The SDK tidies the prompt first, and only then does a provider's own adjustment.
             let options = prepare_call(options)?;
             let route = self.models.route(model_id)?;
             let (model, options) = resolve_model(model_id, options, &route, &self.http)?;
             if watch {
-                let watched = WatchedModel { inner: model, stall_ms: STREAM_STALL_MS };
+                let watched = WatchedModel {
+                    inner: model,
+                    stall_ms: STREAM_STALL_MS,
+                };
                 start_stream(&watched, options, Some(max_retries)).await
             } else {
                 start_stream(model.as_ref(), options, Some(max_retries)).await
@@ -61,14 +81,17 @@ impl TurnModels for DeviceTurnModels {
     }
 }
 
-/// The single calls made outside a run's turns, each `maxRetries: 1` and inside a step of its own.
 pub(crate) struct DeviceModelAccess {
     pub(crate) models: Arc<DeviceModelStore>,
     pub(crate) http: reqwest::Client,
 }
 
 impl ModelAccess for DeviceModelAccess {
-    fn generate(&self, model_id: &str, options: CallOptions) -> BoxFuture<'_, Result<Generated, ModelError>> {
+    fn generate(
+        &self,
+        model_id: &str,
+        options: CallOptions,
+    ) -> BoxFuture<'_, Result<Generated, ModelError>> {
         let model_id = model_id.to_owned();
         Box::pin(async move {
             let mut tries = 0;
@@ -85,10 +108,17 @@ impl ModelAccess for DeviceModelAccess {
 }
 
 impl DeviceModelAccess {
-    async fn generate_once(&self, model_id: &str, options: CallOptions) -> Result<Generated, ModelError> {
+    async fn generate_once(
+        &self,
+        model_id: &str,
+        options: CallOptions,
+    ) -> Result<Generated, ModelError> {
         let route = self.models.route(model_id)?;
         let (model, options) = resolve_model(model_id, options, &route, &self.http)?;
-        let settings = GenerateSettings { max_retries: Some(1), ..GenerateSettings::default() };
+        let settings = GenerateSettings {
+            max_retries: Some(1),
+            ..GenerateSettings::default()
+        };
         Ok(generate_text(model.as_ref(), options, settings).await?.turn)
     }
 }
@@ -111,14 +141,31 @@ impl RunDevice for DesktopDevice {
         self.models.search()
     }
 
-    fn title_for<'a>(&'a self, message: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, String>> {
-        Box::pin(async move { self.calls.title_for(message, reply).await.map_err(|_| String::new()) })
+    fn title_for<'a>(
+        &'a self,
+        message: &'a str,
+        reply: &'a str,
+    ) -> BoxFuture<'a, Result<String, String>> {
+        Box::pin(async move {
+            self.calls
+                .title_for(message, reply)
+                .await
+                .map_err(|_| String::new())
+        })
     }
 
-    fn summary_for<'a>(&'a self, previous: &'a str, turns: &'a str) -> BoxFuture<'a, Result<String, String>> {
-        Box::pin(async move { self.calls.summary_for(previous, turns).await.map_err(|_| String::new()) })
+    fn summary_for<'a>(
+        &'a self,
+        previous: &'a str,
+        turns: &'a str,
+    ) -> BoxFuture<'a, Result<String, String>> {
+        Box::pin(async move {
+            self.calls
+                .summary_for(previous, turns)
+                .await
+                .map_err(|_| String::new())
+        })
     }
-
 }
 
 pub(crate) type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;

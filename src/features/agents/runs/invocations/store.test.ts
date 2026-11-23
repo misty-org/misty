@@ -1,18 +1,15 @@
 const handoff = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@/features/agents/conversations/ask/handoff", () => ({ openMisty: handoff }));
-// The real module pulls in all of Misty; loading it cold on a busy machine took
-// longer than these tests wait for the handoff.
 vi.mock("@/features/agents/conversations/context/context", () => ({
   mistyContextRef: (value: unknown) => value,
 }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAiSurfaceStore } from "./store";
-import { consumeInvocationEvent } from "./storeRuntime";
-import type { AiSurfaceAdapter } from "./invocationTypes";
+import { consumeInvocationEvent } from "./store_runtime";
+import type { AiSurfaceAdapter } from "./invocation_types";
 
 describe("embodied Misty state", () => {
   beforeEach(() => {
-    // Calls carry over between tests otherwise, and the waits below rely on them.
     handoff.mockClear();
     useAiSurfaceStore.setState({
       sessions: {},
@@ -20,8 +17,6 @@ describe("embodied Misty state", () => {
       companion: {},
     });
   });
-  // Summoning loads Misty on demand. Finish those loads inside the test, so a
-  // stray call fails here instead of after the file's environment has closed.
   afterEach(() => vi.dynamicImportSettled());
 
   it("keeps drafts isolated by account and pane", () => {

@@ -5,25 +5,19 @@ import { useDms, useFriends } from "@/features/direct";
 import { useSpacesStore } from "@/features/spaces";
 import { ChoiceGroup, IndicatorDot, spaceIcons } from "@misty/ui";
 import { useSpaceInvitationWaiting } from "./SpaceInvitations";
-import { choosePlace, usePlace, useSpacesSideFollowsSpaces, type Place } from "./placeStore";
+import { choosePlace, usePlace, useSpacesSideFollowsSpaces, type Place } from "./place_store";
 
 const SpaceIcon = spaceIcons.space;
 const PersonalIcon = spaceIcons.personal;
 
-/** Something waits on the person in Personal: an unread DM, or a friend request. */
 function usePersonalWaiting(): boolean {
   const dms = useDms().data;
   const friends = useFriends().data;
   return Boolean(dms?.some((dm) => dm.unread_count > 0) || (friends?.incoming.length ?? 0) > 0);
 }
 
-/** Someone @mentioned the person in a shared Space while they were in Personal. */
 const useSpacesMention = create<{ waiting: boolean }>(() => ({ waiting: false }));
 
-/**
- * Watches new messages for an @mention of the person in one of their shared Spaces (never a DM or
- * Personal) while the sidebar is on Personal; going to Spaces clears it.
- */
 function useSpacesMentionWaiting(place: Place): boolean {
   const { user } = useAuth();
   const placeRef = useRef(place);
@@ -58,12 +52,6 @@ function useSpacesMentionWaiting(place: Place): boolean {
   return useSpacesMention((state) => state.waiting);
 }
 
-/**
- * The sidebar's switch between Personal (the profile icon) and Spaces (the galaxy), in its
- * top row after the sidebar toggle. A dot marks Personal while something waits there (an unread
- * DM or a friend request), and Spaces after an @mention in a shared Space or while an invitation
- * to one waits.
- */
 export function PlaceToggle() {
   const place = usePlace();
   useSpacesSideFollowsSpaces();
@@ -93,8 +81,6 @@ export function PlaceToggle() {
           value: "spaces",
           label: "Spaces",
           iconOnly: true,
-          // A dot while someone @mentioned the person in a shared Space they haven't gone to, or
-          // while an invitation to a shared Space waits.
           icon: (
             <span className="relative inline-flex">
               <SpaceIcon />

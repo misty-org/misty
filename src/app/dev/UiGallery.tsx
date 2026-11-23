@@ -14,11 +14,6 @@ import { StructureSection } from "./gallery/StructureSection";
 import { TypeSection } from "./gallery/TypeSection";
 import { WorkspaceSection } from "./gallery/WorkspaceSection";
 
-/**
- * Dev-only catalog of the shared UI (/dev/ui): every component from `@misty/ui` with its
- * variants and states. It is the reference for how Misty looks, so it uses only the current API,
- * never the deprecated forms features are moving off.
- */
 export default function UiGallery() {
   return (
     <div className="h-full overflow-y-auto">

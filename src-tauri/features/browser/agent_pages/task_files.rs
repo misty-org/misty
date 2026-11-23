@@ -1,5 +1,3 @@
-//! Reuse a verified download across websites within one live agent task.
-//! Model-visible IDs select receipts, never arbitrary filesystem paths.
 use crate::browser::{BrowserAgentExecuteRequest, BrowserDownload, BrowserSessionState};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use file_access::fs;
@@ -173,7 +171,6 @@ pub(in crate::browser) fn resume_downloads(
 }
 
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;

@@ -7,9 +7,6 @@
 
 use std::path::{Path, PathBuf};
 
-/// Mirrors `isHtmlFile` in the editor. The check also keeps this from becoming a "launch this
-/// file" command: the fallback hands the path to the system's default handler, which for
-/// `.command`, `.app` or `.exe` would run it.
 const HTML_EXTENSIONS: [&str; 3] = ["html", "htm", "xhtml"];
 
 pub(super) fn is_html_path(path: &Path) -> bool {
@@ -22,8 +19,6 @@ pub(super) fn is_html_path(path: &Path) -> bool {
         })
 }
 
-/// The real path of an existing HTML file. The ending is checked on the real path, so a
-/// `page.html` link to a script is refused.
 pub(super) fn resolve_html_file(path: &Path) -> Result<PathBuf, String> {
     if path.as_os_str().is_empty() {
         return Err("No file was named.".into());
@@ -39,7 +34,6 @@ pub(super) fn resolve_html_file(path: &Path) -> Result<PathBuf, String> {
     Ok(super::plain_path(&real))
 }
 
-/// The app that opens `https://` links: the default browser.
 #[cfg(target_os = "macos")]
 fn default_browser_app() -> Option<PathBuf> {
     use objc2_app_kit::NSWorkspace;
@@ -50,9 +44,6 @@ fn default_browser_app() -> Option<PathBuf> {
         .to_file_path()
 }
 
-/// Opens a local HTML file in the default browser. macOS names the browser (`open -a`) and only
-/// falls back to the file's default app when no browser is registered; Windows and Linux use
-/// the default app for `.html`, which is the browser unless the person changed it.
 pub(super) async fn open_in_browser(path: &Path) -> Result<(), String> {
     let file = resolve_html_file(path)?;
     #[cfg(target_os = "macos")]

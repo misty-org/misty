@@ -1,9 +1,3 @@
-//! Each run's browser log on this computer: every action the agent took in its browser tabs, in
-//! order, with the page it was on, what the action did to the page and a picture of the page after
-//! it. A browser_run program's page calls are logged one by one. The activity log says what the
-//! agent did (one row per tool call); this says what happened in the browser, and an activity row
-//! points into it by the tool call both share. Typed text is never kept, only where it went. Rows
-//! live in `misty.db`, pictures beside the activity's, and neither syncs or reaches the server.
 use base64::Engine;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -11,11 +5,8 @@ use tauri::{AppHandle, Webview};
 
 use super::windows::account_of_window;
 
-/// Past this a run's further actions aren't kept.
 const MAX_ENTRIES: i64 = 4000;
-/// The longest address, title, target or note kept.
 const MAX_TEXT: usize = 400;
-/// A picture larger than this isn't kept.
 const MAX_PICTURE_BYTES: usize = 400_000;
 const JPEG: &str = "data:image/jpeg;base64,";
 
@@ -23,29 +14,21 @@ fn clip(text: &str) -> String {
     text.trim().chars().take(MAX_TEXT).collect()
 }
 
-/// One browser action as the window reports it, after it ran.
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct LogEntryIn {
     pub run_id: String,
-    /// The tool call the action was part of (the engine's id for it).
     pub call_id: String,
     pub scope_id: String,
-    /// The browser operation, such as `browser.click`.
     pub operation: String,
-    /// What it acted on: an element's role and name, or the address it opened.
     pub target: String,
     pub url: String,
     pub title: String,
-    /// What the action did to the page: `navigated`, `changed` or `unchanged`, when it said.
     pub verdict: String,
-    /// `completed` or `failed`.
     pub state: String,
     pub error: String,
-    /// Anything else the page said about the action, such as a dialog it opened.
     pub note: String,
     pub duration_ms: i64,
-    /// The page after the action, as a JPEG data address.
     pub picture: Option<String>,
 }
 
@@ -54,7 +37,6 @@ pub struct LogEntryIn {
 pub struct LogRow {
     pub seq: i64,
     pub at: i64,
-    /// The tool call the action was part of, as the activity log keys it (`<run>:<call>`).
     pub call_id: String,
     pub scope_id: String,
     pub operation: String,
@@ -70,8 +52,6 @@ pub struct LogRow {
     pub picture: String,
 }
 
-/// Files one action under the run its steps go under. Returns the run it went under and the
-/// action's number there, or nothing when the run isn't this account's or is full.
 pub(super) fn record(
     connection: &Connection,
     account: &str,
@@ -174,7 +154,6 @@ pub(super) fn rows(
     rows.collect()
 }
 
-/// Forgets an account's whole browser log, as the activity's own clearing does.
 pub(super) fn clear(connection: &Connection, account: &str) -> rusqlite::Result<()> {
     connection.execute(
         "DELETE FROM agent_browser_log WHERE account = ?1",
@@ -183,7 +162,6 @@ pub(super) fn clear(connection: &Connection, account: &str) -> rusqlite::Result<
     Ok(())
 }
 
-/// Forgets logs older than the oldest steps kept.
 pub(super) fn prune(connection: &Connection, oldest: i64) -> rusqlite::Result<()> {
     connection.execute(
         "DELETE FROM agent_browser_log WHERE at < ?1",
@@ -199,7 +177,6 @@ fn person_account(webview: &Webview) -> Result<String, String> {
     Ok(account_of_window(webview.label()).unwrap_or_default())
 }
 
-/// Logs one browser action of a run, with its picture when there is one.
 #[tauri::command]
 pub async fn agent_browser_log_record(
     app: AppHandle,
@@ -242,7 +219,6 @@ pub async fn agent_browser_log_record(
     .map_err(|error| error.to_string())?
 }
 
-/// A run's browser log, oldest first. Another account's run never comes back.
 #[tauri::command]
 pub async fn agent_browser_log(
     app: AppHandle,
@@ -255,7 +231,6 @@ pub async fn agent_browser_log(
     };
     tokio::task::spawn_blocking(move || {
         let connection = store.connect().map_err(|error| error.to_string())?;
-        // A sub-agent's tab belongs to its own run; its actions are under the run that started it.
         let (root, _) =
             super::run_steps::root_of(&connection, &run_id).map_err(|error| error.to_string())?;
         rows(&connection, &account, &root).map_err(|error| error.to_string())
@@ -264,7 +239,6 @@ pub async fn agent_browser_log(
     .map_err(|error| error.to_string())?
 }
 
-/// One action's picture, as a data address the window can show. Only the run's own person gets it.
 #[tauri::command]
 pub async fn agent_browser_log_picture(
     app: AppHandle,

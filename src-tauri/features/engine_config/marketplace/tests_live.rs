@@ -1,14 +1,5 @@
-//! Opt-in tests that run the installed engine CLIs for real, against the person's own engine
-//! homes. They're ignored by default; each doc comment says how to run it.
-
 use super::parse::*;
 
-/// Runs every engine's real CLI through Misty's own listing path, against the person's real
-/// engine homes, and checks Misty read all of what each CLI answered. It needs the engines
-/// installed and signed in, so it runs only when asked, with the real home passed in (tests
-/// otherwise run in a throwaway one):
-/// `MISTY_LIVE_HOME=$HOME cargo test --lib marketplace::tests_live::live -- --ignored --nocapture`.
-/// An engine whose CLI isn't installed is reported and skipped; one that is installed must list.
 #[tokio::test]
 #[ignore = "runs the installed engine CLIs"]
 async fn live_every_engine_lists_its_marketplace() {
@@ -19,11 +10,9 @@ async fn live_every_engine_lists_its_marketplace() {
         std::env::set_var("HOME", &home);
         std::env::set_var("USERPROFILE", &home);
     }
-    // What the app grants the file gate when it starts.
     crate::engine_config::support::allow_engine_config_locations();
     let mut broken = Vec::new();
     for engine in super::ENGINES {
-        // Gemini and Qwen list the public gallery whether or not their CLI is installed.
         let gallery = super::GALLERY_ENGINES.contains(engine);
         if !gallery && !on_path(engine) {
             println!("absent  {engine}");
@@ -63,7 +52,6 @@ async fn live_every_engine_lists_its_marketplace() {
         if items.is_empty() && !sources.is_empty() {
             broken.push(format!("{engine}: has marketplaces but listed no plugins"));
         }
-        // What the CLI itself says is installed and where it reads from, to hold Misty's reading to.
         if let Some((want_installed, want_sources)) = cli_counts(engine).await {
             if installed.len() != want_installed {
                 broken.push(format!(
@@ -108,13 +96,12 @@ async fn live_every_engine_lists_its_marketplace() {
     assert!(broken.is_empty(), "broken engines:\n{}", broken.join("\n"));
 }
 
-/// Installs a throwaway plugin in each engine through Misty's own install path, checks the
-/// listing shows it, removes it the way the page does (by the id the listing gives) and checks
-/// it's gone. An engine with no marketplace of its own gets Claude's official one added for the
-/// test and removed after, which checks adding and removing marketplaces too. It changes the
-/// engines' real setup for a moment, so it runs only when asked, like the listing test:
-/// `MISTY_LIVE_HOME=$HOME cargo test --lib marketplace::tests_live::live_install -- --ignored --nocapture`.
-/// Each plugin must not be installed beforehand, so removing it leaves things as they were.
+type Throwaway = (
+    &'static str,
+    &'static str,
+    Option<(&'static str, &'static str)>,
+);
+
 #[tokio::test]
 #[ignore = "installs and removes plugins in the installed engine CLIs"]
 async fn live_install_and_remove_in_every_engine() {
@@ -127,12 +114,10 @@ async fn live_install_and_remove_in_every_engine() {
     crate::engine_config::support::allow_engine_config_locations();
     const CLAUDE_MD: &str = "claude-md-management@claude-plugins-official";
     const GALLERY_PICK: &str = "https://github.com/gemini-cli-extensions/web-accessibility";
-    // (engine, plugin to install, marketplace to add first as (source, name))
-    let throwaway: &[(&str, &str, Option<(&str, &str)>)] = &[
+    let throwaway: &[Throwaway] = &[
         ("claude", CLAUDE_MD, None),
         ("codex", "build-web-data-visualization@openai-curated", None),
         ("minimax", "image-generation@official", None),
-        // Qoder refuses Claude's official catalog (a source type it doesn't know).
         (
             "qoder",
             "claude-api@anthropic-agent-skills",
@@ -163,7 +148,6 @@ async fn live_install_and_remove_in_every_engine() {
             println!("absent  {engine}");
             continue;
         }
-        // The listed item for this plugin, found by id or, for a gallery extension, its address.
         let find = || async move {
             super::list_engine(engine).await.map(|(items, sources)| {
                 let item = items
@@ -286,7 +270,6 @@ async fn test_one_install<F, Fut>(
     }
 }
 
-/// Installed plugins and marketplaces, counted from the CLI's own JSON where it prints JSON.
 async fn cli_counts(engine: &str) -> Option<(usize, usize)> {
     let count = |value: &serde_json::Value, key: &str| {
         value[key]
@@ -314,7 +297,6 @@ async fn cli_counts(engine: &str) -> Option<(usize, usize)> {
     Some((installed, count(&sources, "marketplaces")))
 }
 
-/// Whether the engine's CLI is on Misty's PATH.
 fn on_path(engine: &str) -> bool {
     std::process::Command::new("which")
         .arg(super::super::cli_lifecycle::engine_bin(engine))

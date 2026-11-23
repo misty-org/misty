@@ -1,7 +1,5 @@
-//! One profile's records: what its windows and native data read and write.
 use super::*;
 
-/// One profile's records.
 #[derive(Clone)]
 pub struct ProfileRecords {
     pub profile: String,
@@ -9,7 +7,6 @@ pub struct ProfileRecords {
 }
 
 impl ProfileRecords {
-    /// Saves local edits: `None` deletes.
     pub async fn records_write(
         &self,
         collection: &str,

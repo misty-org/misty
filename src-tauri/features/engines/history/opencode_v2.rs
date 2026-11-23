@@ -1,11 +1,3 @@
-//! OpenCode 2.x's chats. They live in the same `opencode.db` as 1.x's, under new tables:
-//! `session_v2` (one row per chat, with its `directory`), `session_message` (each message's
-//! `type` and its JSON `data`, in `seq` order) and `session_part` (an assistant message's parts
-//! by `ordinal`, which 2.3.0 writes only behind an experimental flag; OpenCode reads them before
-//! the message's own `content`). Shapes read from OpenCode 2.3.0's schema and from sessions it
-//! wrote. Each message is put into 1.x's `(message, parts)` shape, so the one projection in
-//! `extract.rs` serves both, and the sidebar, search and reader all see 2.x chats.
-
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -14,20 +6,22 @@ use serde_json::{json, Value};
 
 use super::{same_or_child, SessionFile};
 
-/// The chats the sidebar shows: no sub-agent's (`parent_id`), none archived, and only ones
-/// that got a prompt or a reply. A fork is a chat of its own and stays.
 const VISIBLE: &str = "parent_id IS NULL AND time_archived IS NULL AND EXISTS \
     (SELECT 1 FROM session_message m WHERE m.session_id = session_v2.id \
      AND m.type IN ('user', 'assistant'))";
 
-/// The most chats, messages and parts read from one database or chat, as 1.x's reader caps them.
 const MAX_SESSIONS: i64 = 512;
 const MAX_MESSAGES: i64 = 4096;
 const MAX_PARTS: i64 = 512;
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads OpenCode's own database in place, wherever OpenCode keeps it"
+)]
 fn open(db: &Path) -> Option<Connection> {
-    // Read-only: OpenCode's background service holds the database (WAL), and a scan must never
-    // change it.
+    if !db.is_file() {
+        return None;
+    }
     Connection::open_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY).ok()
 }
 
@@ -40,8 +34,6 @@ fn has_table(conn: &Connection, table: &str) -> bool {
     .is_ok()
 }
 
-/// The 2.x chats in `<root>/opencode.db` that ran in `workspace` or a folder inside it, addressed
-/// like 1.x's (`opencode_db_session_path`). Ids already found (a 1.x row) are skipped.
 pub(super) fn discover(
     root: &Path,
     workspace: &Path,
@@ -49,9 +41,6 @@ pub(super) fn discover(
     out: &mut Vec<SessionFile>,
 ) {
     let db = root.join("opencode.db");
-    if !db.is_file() {
-        return;
-    }
     let Some(conn) = open(&db) else {
         return;
     };
@@ -86,8 +75,6 @@ pub(super) fn discover(
     }
 }
 
-/// Of `session_ids`, the ones the sidebar still shows, from either generation's table. `None`
-/// when the database can't be read or holds neither table, so the caller leaves its rows alone.
 pub(super) fn visible_sessions(db: &Path, session_ids: &[String]) -> Option<HashSet<String>> {
     let conn = open(db)?;
     let (v1, v2) = (has_table(&conn, "session"), has_table(&conn, "session_v2"));
@@ -100,7 +87,6 @@ pub(super) fn visible_sessions(db: &Path, session_ids: &[String]) -> Option<Hash
         HashSet::new()
     };
     if v2 {
-        // Chunked to stay well under SQLite's bound-variable limit.
         for chunk in session_ids.chunks(200) {
             let marks = vec!["?"; chunk.len()].join(",");
             let sql = format!("SELECT id FROM session_v2 WHERE id IN ({marks}) AND {VISIBLE}");
@@ -114,9 +100,6 @@ pub(super) fn visible_sessions(db: &Path, session_ids: &[String]) -> Option<Hash
     Some(visible)
 }
 
-/// One 2.x chat's messages in 1.x's `(message, parts)` shape, or `None` when the database has
-/// no such 2.x chat (a 1.x one is read from the old tables). `part_byte_cap` drops oversized
-/// parts and tool output in a scan, which keeps only the title, preview and count.
 pub(super) fn messages(
     conn: &Connection,
     session_id: &str,
@@ -176,9 +159,6 @@ pub(super) fn messages(
     Some(out)
 }
 
-/// One 2.x message as 1.x's `(message, parts)`. What a chat shows comes through: the person's
-/// prompts, the replies and a finished compaction's summary. Shell runs, the text OpenCode adds
-/// for them, idle marks and agent or model switches have no 1.x counterpart and stay out.
 pub(super) fn as_v1(
     kind: &str,
     data: &Value,
@@ -216,8 +196,6 @@ pub(super) fn as_v1(
                                   "agent": data["agent"] });
             Some((message, parts))
         }
-        // The summary stands in for the chat before it; its tokens are the summarizing call's,
-        // which the shared projection reports as an unknown context size.
         "compaction" if data["status"] == "completed" => {
             let mut parts = vec![json!({ "type": "text", "text": data["summary"] })];
             step_finish(&mut parts);
@@ -229,8 +207,6 @@ pub(super) fn as_v1(
     }
 }
 
-/// A prompt's attached image, as 1.x's `file` part with a data URL. Its bytes are inline
-/// (`data`, base64) or at a URI.
 fn file(attachment: &Value) -> Option<Value> {
     let mime = attachment["mime"].as_str()?;
     let url = match attachment["data"].as_str().filter(|data| !data.is_empty()) {
@@ -240,8 +216,6 @@ fn file(attachment: &Value) -> Option<Value> {
     Some(json!({ "type": "file", "mime": mime, "url": url }))
 }
 
-/// One part of a reply: text, reasoning or a tool call. A tool's result is the text of its
-/// `content`, or its error.
 fn assistant_part(part: &Value, part_byte_cap: Option<u64>) -> Option<Value> {
     let start = json!({ "start": part["time"]["created"] });
     match part["type"].as_str()? {

@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 
 use super::{FileOpResult, PasteClipboardResult};
 
-/// Finder-style copy names: `name copy`, `name copy 2`, …; a file keeps its extension
-/// (`name copy.txt`).
 pub(super) fn copy_destination_name(
     source: &Path,
     is_dir: bool,
@@ -28,7 +26,6 @@ pub(super) fn copy_destination_name(
     } else {
         format!(" copy {counter}")
     };
-    // A folder's name is all name: `src.v2` copies to `src.v2 copy`.
     Ok(match (is_dir, extension) {
         (false, Some(extension)) => format!("{stem}{suffix}.{extension}"),
         (false, None) => format!("{stem}{suffix}"),
@@ -71,9 +68,6 @@ fn copy_dir_recursive_with(
     Ok(())
 }
 
-/// Copies `source` into `target_dir` under a name nothing has yet (`prefer_original_name` keeps
-/// the plain name when it is free, as paste does; a duplicate always takes the " copy" suffix).
-/// Returns where it landed.
 pub(super) fn copy_item_into_dir_with(
     source: &Path,
     is_dir: bool,
@@ -99,9 +93,6 @@ pub(super) fn copy_item_into_dir_with(
             .find(|candidate| file_access::fs::symlink_metadata(candidate).is_err())
             .ok_or("There are too many copies already.")?;
     }
-    // A unique staged name keeps copies running at once apart; only this copy's own staged item
-    // is ever cleaned up. It doesn't hold the source's name: a long name plus the suffix could
-    // pass the 255-character limit and fail a copy whose real destination fits.
     let staged = target_dir.join(format!(".misty-copying-{}", uuid::Uuid::new_v4()));
     if is_dir {
         file_access::fs::create_dir(&staged)
@@ -123,16 +114,10 @@ pub(super) fn copy_item_into_dir_with(
     Ok(destination)
 }
 
-/// Publishes a finished staged copy without replacing anything that appeared at the destination
-/// meanwhile. The staged item sits beside the destination, so the rename stays on one disk.
 fn publish_copy(from: &Path, to: &Path) -> std::io::Result<()> {
     publish_copy_with(from, to, rename_exclusive)
 }
 
-/// Some file systems have no exclusive rename: exFAT on macOS answers `RENAME_EXCL` with ENOTSUP,
-/// and network or FUSE mounts on Linux may refuse `RENAME_NOREPLACE` with EINVAL. Duplicate and
-/// paste still work there: the fallback checks the destination, then renames. Something made at
-/// the destination in that short gap can still be replaced, the best such a disk allows.
 pub(super) fn publish_copy_with(
     from: &Path,
     to: &Path,
@@ -156,8 +141,6 @@ fn exclusive_rename_unsupported(error: &std::io::Error) -> bool {
     })
 }
 
-/// `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING` works on every Windows file system, so there
-/// is nothing to fall back from.
 #[cfg(windows)]
 fn exclusive_rename_unsupported(_error: &std::io::Error) -> bool {
     false
@@ -212,9 +195,6 @@ fn rename_exclusive(from: &Path, to: &Path) -> std::io::Result<()> {
     }
 }
 
-/// `MoveFileExW` gets the raw path, without the `\\?\` prefix and normalization `std::fs` adds,
-/// so a path near `MAX_PATH` fails although each `std::fs` step of the same copy worked. Paths
-/// past the legacy limit are made absolute by `GetFullPathNameW` and get the prefix.
 #[cfg(windows)]
 fn rename_exclusive(from: &Path, to: &Path) -> std::io::Result<()> {
     use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
@@ -236,8 +216,6 @@ fn rename_exclusive(from: &Path, to: &Path) -> std::io::Result<()> {
 mod windows_path {
     use std::path::Path;
 
-    /// `std`'s legacy limit for Windows paths: folders at 248 UTF-16 units (260 for files)
-    /// unless the `\\?\` prefix lifts it.
     const LEGACY_MAX_PATH: usize = 248;
 
     pub(super) fn wide(path: &Path) -> std::io::Result<Vec<u16>> {
@@ -298,8 +276,6 @@ mod windows_path {
         wide
     }
 
-    /// The absolute, normalized form of `wide`. `GetFullPathNameW` reports the size it needs when
-    /// the buffer is too small; success returns the length without the NUL.
     fn full_path(wide: &[u16]) -> std::io::Result<Vec<u16>> {
         use windows_sys::Win32::Storage::FileSystem::GetFullPathNameW;
 
@@ -335,7 +311,6 @@ fn remove_partial_copy(path: &Path, is_dir: bool, error: String) -> String {
     };
     match cleanup {
         Ok(()) => error,
-        // The copy failed before making its staged item: nothing partial to report.
         Err(cleanup) if cleanup.kind() == std::io::ErrorKind::NotFound => error,
         Err(cleanup) => format!(
             "{error}; a partial copy is left at {}: {cleanup}",
@@ -356,8 +331,6 @@ fn copy_item_into_dir(
         target_dir,
         prefer_original_name,
         &mut |_| {},
-        // fs::copy keeps mode bits, and on macOS clones on APFS (instant, no extra space) with
-        // timestamps and extended attributes.
         &mut |from, to| {
             file_access::fs::copy(from, to)
                 .map_err(|error| format!("Couldn't copy {}: {error}", from.display()))
@@ -404,9 +377,6 @@ pub(super) fn paste(source: &Path, dir: &Path) -> Result<FileOpResult, String> {
     Ok(result(destination, meta.is_dir()))
 }
 
-/// Copies the files the system clipboard named into `target_dir`. The paths came from the
-/// clipboard natively, after the person copied them in Finder or Explorer, so each is read under
-/// a picked-file grant the way a file chosen in a dialog is; nothing a window sends gets one.
 pub(super) fn copy_clipboard_items_into(
     sources: &[String],
     target_dir: &Path,

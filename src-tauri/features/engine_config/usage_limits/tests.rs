@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-#![allow(clippy::disallowed_methods)] // Fixtures are built with the standard library.
+#![allow(clippy::disallowed_methods)]
 
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -12,7 +12,6 @@ use super::codex::{BoxFuture, CodexFailure, CodexSource};
 use super::store::Store;
 use super::*;
 
-/// Answers queued in order; the last one repeats.
 struct FakeCodex {
     answers: Mutex<Vec<Result<Value, CodexFailure>>>,
     calls: AtomicUsize,

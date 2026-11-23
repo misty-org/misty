@@ -1,5 +1,3 @@
-//! Window control: the agent drives Misty's own window with in-process events.
-//! No global input is posted; the checks run in Rust before an action gets here.
 use std::{cell::RefCell, sync::mpsc};
 
 use base64::Engine;
@@ -28,12 +26,10 @@ use crate::agents::cursor::macos::{
     support::{error_json, jpeg, macos_at_least, on_main_queued},
 };
 
-/// Window control needs the window-only ScreenCaptureKit stream of macOS 14.4.
 pub(crate) fn supported() -> bool {
     macos_at_least(14, 4)
 }
 
-/// The error shown when Misty lost focus, naming what has it.
 pub(crate) fn focus_reason() -> Value {
     let name = NSWorkspace::sharedWorkspace()
         .frontmostApplication()
@@ -66,7 +62,6 @@ define_class!(
 
         #[unsafe(method(drawRect:))]
         fn draw_rect(&self, _rect: NSRect) {
-            // The same arrow as the in-page and desktop agent cursors.
             draw_arrow(2.0);
         }
     }
@@ -90,7 +85,6 @@ fn active_window(mtm: MainThreadMarker) -> Option<Retained<NSWindow>> {
         .filter(|window| app.isActive() && window.isVisible() && !window.isMiniaturized())
 }
 
-/// Spec for a workspace key: the key code and the character it types.
 fn key_spec(key: &str) -> Option<(u16, &'static str, bool)> {
     Some(match key {
         "Enter" => (0x24, "\r", false),
@@ -117,7 +111,6 @@ fn integer(action: &Value, key: &str) -> i64 {
         .unwrap_or(0)
 }
 
-/// Called on the main queue, after the Rust task/grant checks. No global input is posted.
 pub(crate) fn action(mtm: MainThreadMarker, input: &Value) -> Value {
     let app = NSApplication::sharedApplication(mtm);
     let frame: Vec<f64> = input["frame"]
@@ -183,7 +176,6 @@ pub(crate) fn action(mtm: MainThreadMarker, input: &Value) -> Value {
                 None,
             );
             let local = content_view.convertPoint_fromView(point, None);
-            // The tip (2,2) of the flipped view sits on the target.
             cursor.setFrame(NSRect::new(
                 NSPoint::new(local.x - 2.0, local.y - 28.0),
                 NSSize::new(26.0, 30.0),
@@ -259,7 +251,6 @@ pub(crate) fn action(mtm: MainThreadMarker, input: &Value) -> Value {
     json!({"attempted": true, "verified": false})
 }
 
-/// Worker entry point. Captures the active Misty window including every child webview.
 pub(crate) fn capture() -> Value {
     if !macos_at_least(14, 4) {
         return error_json("Misty window control requires macOS 14.4 or later");

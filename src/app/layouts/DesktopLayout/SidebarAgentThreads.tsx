@@ -1,21 +1,10 @@
 import { useMemo } from "react";
-import {
-  AgentAvatar,
-  isChatUnread,
-  shortAgo,
-  type ChatStatus,
-} from "@/features/agents";
-import { useNow } from "@/shared/hooks/useNow";
+import { AgentAvatar, isChatUnread, type ChatStatus } from "@/features/agents";
 import type { AgentProfile } from "@/shared/schemas";
 import { Badge, NavRow, NavRowLabel, Spinner, Text, Tooltip } from "@misty/ui";
-import { markSlotClass } from "./styles";
-import type { SidebarChat } from "./sidebarTypes";
+import { faceSlotClass } from "./styles";
+import type { SidebarChat } from "./sidebar_types";
 
-/**
- * Each of the person's agents as one direct message: a single long thread that carries on from one
- * day to the next. `/clear` clears the agent's context, not this thread. The thread is the agent's
- * most recently used chat; an agent with none yet opens a new one, which becomes its thread.
- */
 export function SidebarAgentThreads({
   agents,
   chats,
@@ -29,7 +18,6 @@ export function SidebarAgentThreads({
   openChat: string | null;
   onOpen(agent: AgentProfile, chatId?: string): void;
 }) {
-  const now = useNow();
   const rows = useMemo(() => {
     const threadOf = new Map<string, SidebarChat>();
     for (const chat of chats) {
@@ -62,11 +50,9 @@ export function SidebarAgentThreads({
             aria-busy={status === "working" || undefined}
             onClick={() => onOpen(agent, thread?.id)}
           >
-            <span className={markSlotClass}>
-              <AgentAvatar agent={agent} compact />
+            <span className={faceSlotClass}>
+              <AgentAvatar agent={agent} face />
             </span>
-            {/* The name, then the same Agent tag its messages carry, so an agent never reads as a
-                person among the direct messages; people get no tag. */}
             <NavRowLabel bright={here || status === "working" || unread} className="min-w-0">
               {agent.name}
             </NavRowLabel>
@@ -76,7 +62,9 @@ export function SidebarAgentThreads({
               <Tooltip content={stateLabel}>
                 <Text
                   bare
-                  tone={status === "working" ? "working" : status === "needs-you" ? "waiting" : "failed"}
+                  tone={
+                    status === "working" ? "working" : status === "needs-you" ? "waiting" : "failed"
+                  }
                   role="img"
                   aria-label={stateLabel}
                   className="inline-flex flex-none items-center px-1 text-micro"
@@ -88,18 +76,13 @@ export function SidebarAgentThreads({
                   )}
                 </Text>
               </Tooltip>
-            ) : thread ? (
-              <span className="inline-flex flex-none items-center gap-1 text-micro tabular-nums">
-                {unread ? (
-                  <Text
-                    bare
-                    tone="chrome"
-                    className="size-1.5 rounded-full bg-current"
-                    aria-label="Unread"
-                  />
-                ) : null}
-                {shortAgo(thread.updatedAt, now)}
-              </span>
+            ) : unread ? (
+              <Text
+                bare
+                tone="chrome"
+                className="size-1.5 flex-none rounded-full bg-current"
+                aria-label="Unread"
+              />
             ) : null}
           </NavRow>
         );

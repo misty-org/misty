@@ -14,14 +14,14 @@ import { Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
-import { SavedAccountSessionUnavailableError } from "../sessions/sessionErrors";
+import { SavedAccountSessionUnavailableError } from "../sessions/session_errors";
 import AuthCard from "../components/AuthCard";
 import AuthMessage from "../components/AuthMessage";
 import AuthShell from "../components/AuthShell";
 import SignInForm from "../components/SignInForm";
 import { ServerStep, useNeedsServer } from "../setup/ServerStep";
-import { useFinishSignIn } from "../sign-in-sheet/useFinishSignIn";
-import type { SavedAccountSession } from "../sessions/accountVault";
+import { useFinishSignIn } from "../sign-in-sheet/use_finish_sign_in";
+import type { SavedAccountSession } from "../sessions/account_vault";
 
 export default function SignIn() {
   const location = useLocation();
@@ -41,7 +41,6 @@ export default function SignIn() {
   const finishSignIn = useFinishSignIn(from, !user);
   const needsServer = useNeedsServer();
   const reauthenticateEmail = routeState?.reauthenticateEmail ?? "";
-  // Saved accounts come first, even when adding one; with none, straight to the login form.
   const [mode, setMode] = useState<"chooser" | "login">(
     accounts.length > 0 && !reauthenticateEmail ? "chooser" : "login",
   );
@@ -90,8 +89,6 @@ export default function SignIn() {
     }
   }
 
-  // A route guard may reach sign-in before the saved identity finishes loading.
-  // Only an explicit Add account action should keep a signed-in user here.
   if (user && !addingAccount && !transitioning) return <Navigate to={from} replace />;
 
   if (needsServer) {

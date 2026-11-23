@@ -1,10 +1,6 @@
 import type { SkillTargetId } from "@/features/engine-config/skills";
 import { invoke } from "@/native/invoke";
 
-/**
- * Engines whose own CLI lists and installs plugins or extensions. Gemini CLI and Qwen Code
- * install from Gemini's public extension gallery.
- */
 export type MarketEngine =
   "claude" | "codex" | "omp" | "qoder" | "codebuddy" | "minimax" | "gemini" | "qwen";
 
@@ -21,7 +17,6 @@ const pluginEngines: ReadonlySet<string> = new Set<MarketEngine>([
 
 export const hasPlugins = (engine: string): engine is MarketEngine => pluginEngines.has(engine);
 
-/** Engines that take marketplaces from Misty (`plugin marketplace add`). */
 const sourceEngines: ReadonlySet<MarketEngine> = new Set<MarketEngine>([
   "claude",
   "codex",
@@ -32,11 +27,9 @@ const sourceEngines: ReadonlySet<MarketEngine> = new Set<MarketEngine>([
 
 export const takesSources = (engine: MarketEngine) => sourceEngines.has(engine);
 
-/** What an engine calls its add-ons, for the page's words. */
 export const pluginNoun = (engine: string) =>
   engine === "gemini" || engine === "qwen" ? "extension" : "plugin";
 
-/** Each engine's folder in the skills hub, which keeps one copy of a skill and syncs it there. */
 const skillTargets: Partial<Record<string, SkillTargetId>> = {
   claude: "claude",
   codex: "codex",
@@ -57,17 +50,11 @@ const skillTargets: Partial<Record<string, SkillTargetId>> = {
 export const skillTargetOf = (engine: string) => skillTargets[engine];
 
 interface SuggestedMarketplace {
-  /** What the engine's `plugin marketplace add` takes. */
   source: string;
   name: string;
   line: string;
 }
 
-/**
- * Marketplaces from makers and well-known open-source repositories, offered with one click. Each
- * was checked to be a real marketplace for that engine (checked 2026-11-12); anything else a
- * person adds by hand.
- */
 const officialClaude: SuggestedMarketplace = {
   source: "anthropics/claude-plugins-official",
   name: "Claude plugins",
@@ -97,9 +84,7 @@ const hashicorp: SuggestedMarketplace = {
 const suggestedMarketplaces: Record<MarketEngine, SuggestedMarketplace[]> = {
   claude: [anthropicSkills, workflows, superpowers, hashicorp],
   codex: [workflows, hashicorp],
-  // Oh My Pi reads Claude Code's marketplace format, and starts with none of its own.
   omp: [officialClaude, anthropicSkills, workflows, superpowers, hashicorp],
-  // CodeBuddy reads Claude Code's plugin format too.
   codebuddy: [officialClaude, anthropicSkills, workflows, superpowers, hashicorp],
   qoder: [],
   minimax: [],
@@ -107,7 +92,6 @@ const suggestedMarketplaces: Record<MarketEngine, SuggestedMarketplace[]> = {
   qwen: [],
 };
 
-/** Suggestions the engine doesn't read from yet, matched by the repository in its sources. */
 export function unaddedSuggestions(engine: MarketEngine, sources: MarketSource[]) {
   const known = sources.map((entry) => entry.location.toLowerCase());
   return suggestedMarketplaces[engine].filter(
@@ -115,9 +99,7 @@ export function unaddedSuggestions(engine: MarketEngine, sources: MarketSource[]
   );
 }
 
-/** One plugin an engine's marketplaces offer or already have installed. */
 export interface MarketItem {
-  /** `plugin@marketplace`, what the engine's own install command takes. */
   id: string;
   name: string;
   description: string;
@@ -128,11 +110,8 @@ export interface MarketItem {
   enabled: boolean;
   installs: number | null;
   link: string | null;
-  /** When the plugin signs in to an app of its own (Codex). */
   signIn: "on_install" | "on_use" | null;
-  /** The GitHub stars Gemini's extension gallery reports. */
   stars: number | null;
-  /** Who made it, as its marketplace catalog names them. */
   author?: string | null;
 }
 
@@ -143,7 +122,6 @@ export interface MarketSource {
 
 export interface EngineMarket {
   engine: MarketEngine;
-  /** The engine's CLI answered; when it didn't, `error` has its words. */
   ready: boolean;
   items: MarketItem[];
   sources: MarketSource[];
@@ -154,7 +132,6 @@ type InstallOutcome =
   | { result: "installed" }
   | { result: "confirmCommand"; command: { command: string; sha256: string } };
 
-/** An app an engine reaches under the person's own sign-in. */
 export interface EngineConnector {
   engine: MarketEngine;
   name: string;
@@ -162,21 +139,16 @@ export interface EngineConnector {
   state: "connected" | "needs_sign_in" | "failed" | "pending" | "off";
 }
 
-/** What a plugin adds to its engine, read from its folder (Claude Code's plugins only). */
 export interface PluginContents {
-  /** Whether its folder was found: a plugin fetched from its own repository has none until installed. */
   known: boolean;
   version: string | null;
   skills: string[];
-  /** As typed: `/review`. */
   commands: string[];
   agents: string[];
-  /** The events its hooks run on. */
   hooks: string[];
   mcpServers: string[];
 }
 
-/** Engines whose CLI turns an installed plugin on and off. */
 export const canTurnOff = (engine: string) => engine === "claude";
 
 export const marketApi = {
@@ -203,7 +175,6 @@ export const failureText = (reason: unknown, fallback: string) =>
       ? reason
       : fallback;
 
-/** Plugins that match every word of the search, by name, description, marketplace or category. */
 export function matchItems(items: MarketItem[], query: string, installedOnly: boolean) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   return items.filter((item) => {
@@ -215,7 +186,6 @@ export function matchItems(items: MarketItem[], query: string, installedOnly: bo
   });
 }
 
-/** Installed first, then the most installed, then by name. */
 export function orderItems(items: MarketItem[]) {
   return [...items].sort(
     (a, b) =>
@@ -226,17 +196,14 @@ export function orderItems(items: MarketItem[]) {
   );
 }
 
-/** A category as a card's chip shows it: `productivity` → `Productivity`. */
 export const categoryLabel = (category: string | null) =>
   category ? category.charAt(0).toUpperCase() + category.slice(1).replace(/[-_]/g, " ") : "";
 
 export type MarketSort = "popular" | "name";
 
-/** The categories among the plugins, most used first, with how many each has. */
 export function categoriesOf(items: MarketItem[]) {
   const counts = new Map<string, number>();
   for (const item of items)
     if (item.category) counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
-

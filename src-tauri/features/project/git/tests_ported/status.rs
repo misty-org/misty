@@ -159,7 +159,6 @@ fn status_ignores_skip_worktree_paths() {
     let scratch = Scratch::new();
     let repo = Repository::init(&scratch.0).unwrap();
     commit_file(&repo, "sparse.txt", "index only\n");
-    // A sparse checkout: tracked in the index, marked skip-worktree, absent from the folder.
     std::fs::remove_file(scratch.0.join("sparse.txt")).unwrap();
     let mut index = repo.index().unwrap();
     let mut entry = index.get_path(Path::new("sparse.txt"), 0).unwrap();
@@ -171,7 +170,6 @@ fn status_ignores_skip_worktree_paths() {
     assert!(status.staged.is_empty(), "status={status:?}");
     assert!(status.unstaged.is_empty(), "status={status:?}");
     assert!(status.untracked.is_empty(), "status={status:?}");
-    // The tree's summary reads the same snapshot.
     assert_eq!(exact_repository_summary(&scratch.0).unwrap().changed, 0);
 }
 
@@ -251,7 +249,6 @@ fn init_inside_an_existing_repository_leaves_it_alone() {
     let nested = scratch.0.join("sub");
     std::fs::create_dir_all(&nested).unwrap();
     init_repository(&nested).unwrap();
-    // A stale answer must not nest a second repository that hides the outer one's changes.
     assert!(!nested.join(".git").exists());
 }
 
@@ -273,7 +270,6 @@ fn open_repo_error_mapping_keeps_real_causes() {
         )),
         "NOT_A_REPO"
     );
-    // libgit2's ownership check: GIT_EOWNER, judged by its code, not its wording.
     assert_eq!(
         map_open_repo_error(git2::Error::new(
             git2::ErrorCode::Owner,
@@ -282,7 +278,6 @@ fn open_repo_error_mapping_keeps_real_causes() {
         )),
         "GIT_UNSAFE_REPO:repository path 'C:/x' is owned by someone else"
     );
-    // Without the code, the wording still classifies it.
     assert!(map_open_repo_error(git2::Error::new(
         git2::ErrorCode::GenericError,
         git2::ErrorClass::Os,
@@ -306,7 +301,6 @@ fn open_repo_non_repo_is_not_a_repo() {
     }
 }
 
-/// A path with spaces and non-Latin names is still a repository.
 #[test]
 fn open_repo_supports_unicode_paths() {
     let scratch = Scratch::new();

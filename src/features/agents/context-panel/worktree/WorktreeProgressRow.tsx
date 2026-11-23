@@ -1,9 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { X } from "lucide-react";
 import { Button, IconButton, Spinner, Text, Tooltip, rowShape, cn } from "@misty/ui";
-import { useWorktreeStore, type PendingCreation } from "./worktreeStore";
+import { useWorktreeStore, type PendingCreation } from "./worktree_store";
 
-/** Each fixed failure code the native side sends, as words. */
 const ERROR_TEXT: Record<string, string> = {
   pr_not_found:
     "The pull request doesn't exist, was closed and its ref removed, or the remote isn't GitHub",
@@ -23,10 +22,8 @@ const ERROR_TEXT: Record<string, string> = {
   unknown: "The worktree couldn't be made. Try again",
 };
 
-/** A creation's one line in the worktree menu, as tall as a worktree's row. */
 const rowClass = cn(rowShape, "text-meta");
 
-/** Why a creation failed: the native wording where the code alone says too little. */
 function failureReason(pending: PendingCreation): string {
   if (pending.stage === "canceled") return "Cancelled";
   const ownWords = ["add_failed", "repo_open_failed", "fetch_failed"];
@@ -50,8 +47,6 @@ function stageText(pending: PendingCreation): string {
   }
 }
 
-/** A creation in the worktree menu: a spinner, its stage and a cancel button, then a retry
- * row once it failed or was cancelled. One line in every state, so rows below never move. */
 export function WorktreeProgressRow({ pending }: { pending: PendingCreation }) {
   const cancel = useWorktreeStore((s) => s.cancel);
   const retry = useWorktreeStore((s) => s.retry);

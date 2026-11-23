@@ -1,16 +1,22 @@
 import { useNavigate } from "react-router-dom";
-import { Avatar, AvatarFallback, MemberGroupHeading, MemberList, MemberRow, notify } from "@misty/ui";
-import { personInitials } from "@/shared/lib/personInitials";
-import { personTone } from "@/shared/lib/personTone";
+import {
+  Avatar,
+  AvatarFallback,
+  MemberGroupHeading,
+  MemberList,
+  MemberRow,
+  notify,
+} from "@misty/ui";
+import { personInitials } from "@/shared/lib/person_initials";
+import { personTone } from "@/shared/lib/person_tone";
 import { directApi, type Person } from "./api";
-import { dmPath, reloadDms } from "./directData";
-import { useCustomStatus, usePresence } from "./statusStore";
+import { dmPath, reloadDms } from "./direct_data";
+import { useCustomStatus, usePresence } from "./status_store";
 
 function DmMember({ person, self }: { person: Person; self: boolean }) {
   const navigate = useNavigate();
   const presence = usePresence(person.user_id);
   const custom = useCustomStatus(person.user_id);
-  // Someone else opens your own DM with them; only friends have one, so it can be refused.
   const open = async () => {
     try {
       const dm = await directApi.openDm(person.user_id);
@@ -38,7 +44,6 @@ function DmMember({ person, self }: { person: Person; self: boolean }) {
   );
 }
 
-/** The people in a DM, beside its messages, as Discord lists a group DM's members. */
 export function DmMembers({ members, me }: { members: Person[]; me: string }) {
   return (
     <MemberList label="Members">

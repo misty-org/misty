@@ -1,11 +1,8 @@
-//! The dictation pill: a small monochrome window under the cursor that shows
-//! live words. It never takes focus, so typing continues in the app below.
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 pub const LABEL: &str = "misty-dictation-pill";
 const WIDTH: f64 = 420.0;
 const HEIGHT: f64 = 56.0;
-/// Below and right of the pointer, clear of the I-beam.
 const OFFSET: (f64, f64) = (14.0, 22.0);
 
 fn window(app: &AppHandle) -> Option<WebviewWindow> {
@@ -84,11 +81,8 @@ fn show_without_focus(pill: &WebviewWindow) {
     crate::agents::cursor::show_overlay(pill);
 }
 
-/// Shows the pill at the pointer without activating Misty.
 pub fn show(app: &AppHandle) {
     let handle = app.clone();
-    // Built off the UI thread like the companion overlays (WebView2 deadlocks
-    // otherwise); shown on it.
     std::thread::spawn(move || {
         let Some(pill) = window(&handle) else { return };
         place(&pill);

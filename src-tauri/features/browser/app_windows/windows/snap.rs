@@ -1,8 +1,3 @@
-//! The Snap Layouts flyout for Misty's own maximize button. Windows shows it
-//! when the pointer rests on a window's maximize button, but Misty draws its
-//! own caption buttons in the page, where Windows can't see them. Win+Z, the
-//! system's shortcut for the same flyout, opens it for the window the person
-//! is using.
 use windows_sys::Win32::{
     System::SystemInformation::{GetVersionExW, OSVERSIONINFOW},
     UI::{
@@ -13,12 +8,10 @@ use windows_sys::Win32::{
     },
 };
 
-/// Windows 11, whose first build is 22000, introduced Snap Layouts.
 fn has_snap_layouts() -> bool {
     // SAFETY: a plain out-structure with its size set.
     let mut version: OSVERSIONINFOW = unsafe { std::mem::zeroed() };
     version.dwOSVersionInfoSize = std::mem::size_of::<OSVERSIONINFOW>() as u32;
-    // Misty's manifest declares Windows 10 and 11, so the real build comes back.
     (unsafe { GetVersionExW(&mut version) } != 0) && version.dwBuildNumber >= 22000
 }
 
@@ -37,11 +30,6 @@ fn key(code: u16, up: bool) -> INPUT {
     }
 }
 
-/// Opens Snap Layouts for Misty's main window while it is the window in use.
-///
-/// Takes the calling webview, not a `WebviewWindow`: a window holding browser
-/// pages has child webviews of its own, and Tauri then refuses to hand the
-/// command a `WebviewWindow`, so the flyout never opened once a tab had loaded.
 #[tauri::command]
 pub fn window_show_snap_layouts(webview: tauri::Webview) -> Result<(), String> {
     let window = webview.window();
@@ -54,7 +42,6 @@ pub fn window_show_snap_layouts(webview: tauri::Webview) -> Result<(), String> {
         return Ok(());
     }
     const Z: u16 = b'Z' as u16;
-    // One call, so nothing the person types lands between the keys.
     let keys = [
         key(VK_LWIN, false),
         key(Z, false),

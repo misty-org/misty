@@ -18,8 +18,6 @@ function (target) {
     const bounds = element.getBoundingClientRect();
     const mouse = { clientX: bounds.left + bounds.width / 2, clientY: bounds.top + bounds.height / 2,
       bubbles: true, cancelable: true, composed: true, button: 0 };
-    // Some controls (including Drive menus) activate on mouse-down instead of
-    // click. Dispatch one complete sequence, never a second fallback click.
     const compatibilityMouse = element.dispatchEvent(new PointerEvent("pointerdown", { ...mouse, buttons: 1, pointerId: 1, pointerType: "mouse", isPrimary: true }));
     if (compatibilityMouse) element.dispatchEvent(new MouseEvent("mousedown", { ...mouse, buttons: 1 }));
     if (element.isConnected) {

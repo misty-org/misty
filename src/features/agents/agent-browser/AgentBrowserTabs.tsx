@@ -11,14 +11,14 @@ import {
   Text,
   Tooltip,
 } from "@misty/ui";
-import { addPersonTab } from "../tabs/agentPersonTabs";
-import { closeAgentTab } from "../tabs/agentTabs";
+import { addPersonTab } from "../tabs/agent_person_tabs";
+import { closeAgentTab } from "../tabs/agent_tabs";
 import {
   showViewTab,
   useAgentBrowser,
   type AgentBrowserTab,
   type AgentBrowserView,
-} from "./agentBrowserStore";
+} from "./agent_browser_store";
 import { SiteIcon } from "@/features/browser";
 
 const agentTabLabel = (tab: AgentBrowserTab | undefined) => {
@@ -32,7 +32,6 @@ const agentTabLabel = (tab: AgentBrowserTab | undefined) => {
   }
 };
 
-/** A tab's site icon, a spinner while it loads, as in the window's tab sidebar. */
 function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; active: boolean }) {
   const icon = tab?.faviconUrl ?? (tab?.url ? browserFaviconUrl(tab.url) : null);
   const [failed, setFailed] = useState(false);
@@ -40,7 +39,10 @@ function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; activ
   if (tab?.loading)
     return (
       <Text bare tone={active ? "bright" : "muted"} className="flex shrink-0">
-        <Spinner label={false} style={{ width: "calc(var(--spacing) * 4)", height: "calc(var(--spacing) * 4)" }} />
+        <Spinner
+          label={false}
+          style={{ width: "calc(var(--spacing) * 4)", height: "calc(var(--spacing) * 4)" }}
+        />
       </Text>
     );
   if (icon && !failed)
@@ -54,11 +56,6 @@ function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; activ
   return <Globe className="shrink-0" aria-hidden="true" />;
 }
 
-/**
- * The agent browser's tab strip: the shown view's tabs side by side above its toolbar and page,
- * like the horizontal strip Misty's own browser used to have. Only this small browser has one;
- * the window's tabs stay in the sidebar.
- */
 export function AgentBrowserTabs({
   conversationId,
   view,
@@ -90,8 +87,6 @@ export function AgentBrowserTabs({
         const active = scope === view.shownScope;
         const label = agentTabLabel(tab);
         return (
-          // A tab and its close button: the wrapper takes the strip's sizing and the tab's fill;
-          // the button sits over the tab's right edge and shows on hover, focus and the shown tab.
           <Surface
             key={scope}
             tone={active ? "card" : "none"}
@@ -108,7 +103,6 @@ export function AgentBrowserTabs({
                 data-scope={scope}
                 className="flex h-8 min-w-0 flex-auto items-center overflow-hidden whitespace-nowrap pr-7 pl-2"
                 onClick={() => select(scope)}
-                // A middle click closes a tab, as in Misty's own browser.
                 onAuxClick={(event) => {
                   if (event.button !== 1) return;
                   event.preventDefault();

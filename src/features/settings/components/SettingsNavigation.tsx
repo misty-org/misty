@@ -6,29 +6,20 @@ export interface DesktopSettingsNavEntry<Id extends string = string> {
   label: string;
   icon?: LucideIcon;
 }
-/** A section of the open page, listed under its row so a long page can be jumped through. */
 export interface DesktopSettingsPageSection {
   id: string;
   label: string;
 }
 export interface DesktopSettingsNavGroup<Id extends string = string> {
-  /** A plain muted label naming the feature the pages belong to. */
   label: string;
   items: readonly DesktopSettingsNavEntry<Id>[];
 }
-/**
- * Pages under plain group labels, one row per page: an icon and the name. No disclosures,
- * chevrons or dividers. The rows are the sidebar's own (`NavRow`), in the page's text, so every
- * navigation list in Misty has one height, rounding and padding.
- */
 export function SettingsNavigation<Id extends string>(props: {
   groups: readonly DesktopSettingsNavGroup<Id>[];
   activeId: Id;
   label: string;
   onSelect: (id: Id) => void;
-  /** The open page's sections, as rows under its own; none for a short page. */
   sections?: readonly DesktopSettingsPageSection[];
-  /** The section in view. */
   activeSection?: string;
   onSection?: (id: string) => void;
 }) {

@@ -1,7 +1,3 @@
-//! Server-sent events, fed in whatever pieces the network delivers.
-
-/// Gathers bytes into complete events. Holds bytes rather than text, because a network read can
-/// end in the middle of a multi-byte character.
 #[derive(Default)]
 pub(crate) struct SseDecoder {
     pending: Vec<u8>,
@@ -9,7 +5,6 @@ pub(crate) struct SseDecoder {
 }
 
 impl SseDecoder {
-    /// Takes more bytes and returns the data of every event they completed.
     pub(crate) fn push(&mut self, bytes: &[u8]) -> Vec<String> {
         self.pending.extend_from_slice(bytes);
         let mut events = Vec::new();
@@ -28,9 +23,9 @@ impl SseDecoder {
                 self.data.clear();
             }
         } else if let Some(value) = line.strip_prefix("data:") {
-            self.data.push(value.strip_prefix(' ').unwrap_or(value).to_owned());
+            self.data
+                .push(value.strip_prefix(' ').unwrap_or(value).to_owned());
         }
-        // Comments (`:`), `event:`, `id:` and `retry:` lines carry nothing Misty reads.
     }
 }
 

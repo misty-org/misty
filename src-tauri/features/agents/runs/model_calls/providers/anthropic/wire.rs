@@ -1,5 +1,3 @@
-//! The Messages API's request shapes. Typed rather than built as a `Value`, because a `Value` would
-//! sort keys, and Anthropic's prompt cache needs them stable from turn to turn.
 use std::borrow::Cow;
 
 use serde::Serialize;
@@ -68,8 +66,14 @@ pub(super) struct SystemBlock<'a> {
 #[derive(Serialize)]
 #[serde(untagged)]
 pub(super) enum OutgoingMessage<'a> {
-    System { role: &'static str, content: Vec<SystemBlock<'a>> },
-    Turn { role: &'static str, content: Vec<Block<'a>> },
+    System {
+        role: &'static str,
+        content: Vec<SystemBlock<'a>>,
+    },
+    Turn {
+        role: &'static str,
+        content: Vec<Block<'a>>,
+    },
 }
 
 #[derive(Serialize)]
@@ -119,9 +123,17 @@ pub(super) enum Block<'a> {
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub(super) enum Source<'a> {
-    Base64 { media_type: Cow<'a, str>, data: &'a str },
-    Url { url: &'a str },
-    Text { media_type: &'static str, data: String },
+    Base64 {
+        media_type: Cow<'a, str>,
+        data: &'a str,
+    },
+    Url {
+        url: &'a str,
+    },
+    Text {
+        media_type: &'static str,
+        data: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -139,7 +151,6 @@ pub(super) enum ToolResultPiece<'a> {
     Document { source: Source<'a> },
 }
 
-/// Anthropic needs a tool call's input to be an object, so anything else travels wrapped.
 #[derive(Serialize)]
 #[serde(untagged)]
 pub(super) enum ToolInput<'a> {

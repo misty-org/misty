@@ -29,7 +29,7 @@ export class RenderErrorBoundary extends Component<
           "text-center",
         )}
       >
-        <Text bare as="h1" tone="default" className="m-0 text-xl font-semibold">
+        <Text bare as="h1" size="title" weight="semibold" tone="default" className="m-0">
           {this.props.scope === "tab" ? "This tab could not be loaded" : "Workspace render failed"}
         </Text>
         <Text wrap tone="muted" className="m-0 max-w-170">
@@ -39,7 +39,6 @@ export class RenderErrorBoundary extends Component<
           variant="secondary"
           size="lg"
           onClick={() => {
-            // A failed module request does not imply damaged workspace data.
             if (this.state.error && isHookOrderMismatch(this.state.error)) {
               clearVolatileWorkspaceSnapshots();
               clearHookOrderRecoveryAttempt();
@@ -74,9 +73,7 @@ function recoverFromHookOrderMismatch(error: Error): void {
     window.localStorage.setItem(explorerWorkspaceResetKey, "1");
     clearVolatileWorkspaceSnapshots();
     window.location.reload();
-  } catch {
-    // The visible boundary still offers a manual retry if storage is unavailable.
-  }
+  } catch {}
 }
 
 function isHookOrderMismatch(error: Error): boolean {
@@ -90,18 +87,14 @@ function clearVolatileWorkspaceSnapshots(): void {
     for (const key of volatileWorkspaceSnapshotKeys) {
       window.localStorage.removeItem(key);
     }
-  } catch {
-    // Ignore storage failures; retry still remounts the route subtree.
-  }
+  } catch {}
 }
 
 function clearHookOrderRecoveryAttempt(): void {
   if (typeof window === "undefined") return;
   try {
     window.sessionStorage.removeItem(hookOrderRecoveryKey);
-  } catch {
-    // Ignore storage failures; retry still reloads the app where possible.
-  }
+  } catch {}
 }
 
 interface RenderErrorBoundaryProps {

@@ -43,7 +43,7 @@ export function AgentSettingsModal(props: {
         }}
       >
         <header className="flex h-14 shrink-0 items-center gap-1.5 pr-3 pl-4">
-          <SheetTitle className="text-sm">{title}</SheetTitle>
+          <SheetTitle className="text-control">{title}</SheetTitle>
           <IconButton
             ref={closeRef}
             label="Close settings"
@@ -57,7 +57,6 @@ export function AgentSettingsModal(props: {
         <div className="misty-transient-scrollbar min-h-0 flex-1 overflow-auto px-5 pt-3 pb-16">
           {props.activeTab === "companion" ? <AgentCompanionPanel /> : props.children}
         </div>
-        {/* The companion tab has none of the fields the tour points at. */}
         {props.activeTab === "companion" ? null : <TourCorner tour="agent-settings" />}
       </SheetContent>
     </Sheet>

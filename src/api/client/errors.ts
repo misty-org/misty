@@ -1,4 +1,4 @@
-import { accountLimitMessage } from "./accountLimits";
+import { accountLimitMessage } from "./account_limits";
 
 export class ApiRequestError extends Error {
   constructor(

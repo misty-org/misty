@@ -1,5 +1,3 @@
-//! The simple model's rules, one scenario each, against the fake server: Ana and Ben on their own
-//! computers, and Ana's second computer for one person editing in two places.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 mod common;
@@ -9,7 +7,6 @@ use std::{sync::atomic::Ordering, time::Duration};
 use common::*;
 use space_drive::{Kind, NoticeKind, TrashBy};
 
-/// A text of three lines that two people can each edit without overlapping.
 fn lines(first: &str, last: &str) -> Vec<u8> {
     format!("{first}\n--\nmiddle\n--\n{last}\n").into_bytes()
 }
@@ -34,8 +31,10 @@ fn non_overlapping_text_edits_from_two_computers_both_survive() {
         let b = server.open_drive(&ben, dir_b.path().to_path_buf(), runtime.handle().clone());
         save(&a, "/Notes.md", &lines("one", "three"));
         settle(&server, &[a.clone(), b.clone()]).await;
-        // Ben opens it, so his computer has it and its base.
-        assert_eq!(b.read_bytes(&space(), "/Notes.md").await.unwrap(), lines("one", "three"));
+        assert_eq!(
+            b.read_bytes(&space(), "/Notes.md").await.unwrap(),
+            lines("one", "three")
+        );
 
         save(&a, "/Notes.md", &lines("ONE by Ana", "three"));
         save(&b, "/Notes.md", &lines("one", "THREE by Ben"));
@@ -43,14 +42,22 @@ fn non_overlapping_text_edits_from_two_computers_both_survive() {
         settle(&server, &[b.clone(), a.clone()]).await;
 
         let merged = String::from_utf8(lines("ONE by Ana", "THREE by Ben")).unwrap();
-        assert_eq!(content_at(&server, "/Notes.md").as_deref(), Some(merged.as_str()));
         assert_eq!(
-            local_tree(&b).get("/Notes.md").and_then(|(_, sha, _)| sha.clone()),
+            content_at(&server, "/Notes.md").as_deref(),
+            Some(merged.as_str())
+        );
+        assert_eq!(
+            local_tree(&b)
+                .get("/Notes.md")
+                .and_then(|(_, sha, _)| sha.clone()),
             Some(sha(merged.as_bytes())),
             "the merge is written back on the computer that made it"
         );
         assert!(
-            server.trashed_items().iter().all(|item| item.replaced_of.is_none()),
+            server
+                .trashed_items()
+                .iter()
+                .all(|item| item.replaced_of.is_none()),
             "a merge replaces nothing"
         );
     });
@@ -76,7 +83,10 @@ fn of_two_saves_of_a_binary_file_the_last_wins_and_the_first_waits_in_the_trash(
         settle(&server, &[a.clone(), b.clone()]).await;
 
         let tree = server.live_tree();
-        assert_eq!(tree.get("/Report.pdf").and_then(|(_, sha)| sha.clone()), Some(sha(b"ben's\0")));
+        assert_eq!(
+            tree.get("/Report.pdf").and_then(|(_, sha)| sha.clone()),
+            Some(sha(b"ben's\0"))
+        );
         let kept: Vec<_> = server
             .trashed_items()
             .into_iter()
@@ -93,7 +103,12 @@ fn of_two_saves_of_a_binary_file_the_last_wins_and_the_first_waits_in_the_trash(
         assert_eq!(notice.by.as_deref(), Some("Ben"));
         assert_eq!(notice.name, "Report.pdf");
         assert_eq!(notice.item_id.as_ref(), Some(&kept[0].id));
-        assert!(!ben.notices.lock().unwrap().iter().any(|notice| notice.kind == NoticeKind::SaveReplaced));
+        assert!(!ben
+            .notices
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|notice| notice.kind == NoticeKind::SaveReplaced));
     });
 }
 
@@ -126,13 +141,13 @@ fn an_edit_after_a_delete_brings_the_file_back() {
             "the later write wins"
         );
         assert!(server.revived_by_write() >= 1);
-        assert!(local_tree(&a).contains_key("/Report.pdf"), "Ana sees it come back");
-        assert!(ana
-            .notices
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|notice| notice.kind == NoticeKind::Revived && notice.by.as_deref() == Some("Ben")));
+        assert!(
+            local_tree(&a).contains_key("/Report.pdf"),
+            "Ana sees it come back"
+        );
+        assert!(ana.notices.lock().unwrap().iter().any(|notice| notice.kind
+            == NoticeKind::Revived
+            && notice.by.as_deref() == Some("Ben")));
     });
 }
 
@@ -151,9 +166,6 @@ fn a_delete_after_an_edit_trashes_the_edited_file() {
 
         save(&a, "/Report.pdf", b"v2");
         a.sync_now(&space()).await.unwrap();
-        // Ben hasn't heard of v2 and deletes his copy: the delete is the later change. Ana's
-        // computer is away by then; while she's there, having just saved it counts as using it
-        // (`USED_LATELY`), which would refuse the delete.
         ana.offline.store(true, Ordering::SeqCst);
         b.trash_now(&space(), &id, TrashBy::Person).await.unwrap();
         ana.offline.store(false, Ordering::SeqCst);
@@ -161,7 +173,10 @@ fn a_delete_after_an_edit_trashes_the_edited_file() {
 
         assert!(!server.live_tree().contains_key("/Report.pdf"));
         let trashed = server.trashed_items();
-        let report = trashed.iter().find(|item| item.id == id).expect("in the trash");
+        let report = trashed
+            .iter()
+            .find(|item| item.id == id)
+            .expect("in the trash");
         assert_eq!(report.sha256, Some(sha(b"v2")), "restorable as Ana left it");
         assert!(!local_tree(&a).contains_key("/Report.pdf"));
     });
@@ -191,9 +206,18 @@ fn a_new_file_in_a_deleted_folder_brings_the_folder_back() {
 
         let tree = server.live_tree();
         assert!(matches!(tree.get("/Docs"), Some((Kind::Folder, _))));
-        assert_eq!(tree.get("/Docs/new.txt").and_then(|(_, sha)| sha.clone()), Some(sha(b"new")));
-        assert!(tree.contains_key("/Docs/old.txt"), "the folder comes back whole");
-        assert!(local_tree(&a).contains_key("/Docs/new.txt"), "the deleter sees it");
+        assert_eq!(
+            tree.get("/Docs/new.txt").and_then(|(_, sha)| sha.clone()),
+            Some(sha(b"new"))
+        );
+        assert!(
+            tree.contains_key("/Docs/old.txt"),
+            "the folder comes back whole"
+        );
+        assert!(
+            local_tree(&a).contains_key("/Docs/new.txt"),
+            "the deleter sees it"
+        );
     });
 }
 
@@ -213,12 +237,18 @@ fn two_new_files_by_one_name_are_one_file_and_the_first_waits_in_the_trash() {
         settle(&server, &[b.clone(), a.clone()]).await;
         let tree = server.live_tree();
         assert_eq!(tree.len(), 1, "{tree:?}");
-        assert_eq!(tree.get("/Notes.md").and_then(|(_, sha)| sha.clone()), Some(sha(b"ben")));
+        assert_eq!(
+            tree.get("/Notes.md").and_then(|(_, sha)| sha.clone()),
+            Some(sha(b"ben"))
+        );
         assert!(server
             .trashed_items()
             .iter()
             .any(|item| item.replaced_of.is_some() && item.sha256 == Some(sha(b"ana"))));
-        let content = |tree: std::collections::HashMap<String, (Kind, Option<String>, space_drive::LocalState)>| {
+        let content = |tree: std::collections::HashMap<
+            String,
+            (Kind, Option<String>, space_drive::LocalState),
+        >| {
             tree.into_iter()
                 .map(|(path, (kind, sha, _))| (path, (kind, sha)))
                 .collect::<std::collections::HashMap<_, _>>()
@@ -284,19 +314,20 @@ fn a_rename_onto_a_taken_name_trashes_the_item_that_held_it_unless_it_is_open() 
         let draft = save(&b, "/Draft.md", b"draft");
         settle(&server, &[a.clone(), b.clone()]).await;
 
-        // Ana makes Final.md while Ben, offline, renames his draft to the same name.
         ben.offline.store(true, Ordering::SeqCst);
         let final_md = save(&a, "/Final.md", b"ana's final");
         a.sync_now(&space()).await.unwrap();
         b.rename(&space(), &draft, None, "Final.md").unwrap();
-        // Ana has her file open: the rename can't trash it, and is undone.
         a.open(&space(), &final_md, false).await.unwrap();
         tokio::time::sleep(space_drive::in_use::REPORT_AFTER + Duration::from_millis(500)).await;
         ben.offline.store(false, Ordering::SeqCst);
         b.sync_now(&space()).await.unwrap();
         settle(&server, &[a.clone(), b.clone()]).await;
         let tree = server.live_tree();
-        assert!(tree.contains_key("/Draft.md") && tree.contains_key("/Final.md"), "{tree:?}");
+        assert!(
+            tree.contains_key("/Draft.md") && tree.contains_key("/Final.md"),
+            "{tree:?}"
+        );
         assert!(ben
             .notices
             .lock()
@@ -330,9 +361,17 @@ fn a_rename_onto_a_taken_name_takes_it_and_the_holder_waits_in_the_trash() {
 
         let tree = server.live_tree();
         assert_eq!(tree.len(), 1, "{tree:?}");
-        assert_eq!(tree.get("/Final.md").and_then(|(_, sha)| sha.clone()), Some(sha(b"draft")));
-        assert!(server.trashed_ids().contains(final_md.as_str()), "Ana's file waits in the trash");
-        assert!(local_tree(&a).get("/Final.md").is_some_and(|(_, held, _)| held == &Some(sha(b"draft"))));
+        assert_eq!(
+            tree.get("/Final.md").and_then(|(_, sha)| sha.clone()),
+            Some(sha(b"draft"))
+        );
+        assert!(
+            server.trashed_ids().contains(final_md.as_str()),
+            "Ana's file waits in the trash"
+        );
+        assert!(local_tree(&a)
+            .get("/Final.md")
+            .is_some_and(|(_, held, _)| held == &Some(sha(b"draft"))));
     });
 }
 
@@ -348,15 +387,21 @@ fn a_file_moved_over_another_here_keeps_the_one_it_replaced_in_the_trash() {
         let old = save(&a, "/Old.md", b"old");
         settle(&server, &[a.clone()]).await;
 
-        // Not a save (no temp file): a file of its own, moved over the other.
         a.rename(&space(), &old, None, "Notes.md").unwrap();
         settle(&server, &[a.clone()]).await;
 
         let tree = server.live_tree();
-        assert_eq!(tree.get("/Notes.md").and_then(|(_, sha)| sha.clone()), Some(sha(b"old")), "{tree:?}");
+        assert_eq!(
+            tree.get("/Notes.md").and_then(|(_, sha)| sha.clone()),
+            Some(sha(b"old")),
+            "{tree:?}"
+        );
         assert!(!tree.contains_key("/Old.md"));
         assert!(
-            server.all_contents().iter().any(|content| content == "notes"),
+            server
+                .all_contents()
+                .iter()
+                .any(|content| content == "notes"),
             "what it replaced waits in the trash"
         );
     });
@@ -376,7 +421,10 @@ fn a_file_someone_has_open_is_not_deleted() {
         settle(&server, &[a.clone(), b.clone()]).await;
         b.open(&space(), &id, false).await.unwrap();
         let refused = a.trash_now(&space(), &id, TrashBy::Person).await;
-        assert!(matches!(refused, Err(space_drive::DriveError::InUse(_))), "{refused:?}");
+        assert!(
+            matches!(refused, Err(space_drive::DriveError::InUse(_))),
+            "{refused:?}"
+        );
         assert!(a.node(&space(), &id).unwrap().is_some(), "it comes back");
         assert!(server.live_tree().contains_key("/Report.pdf"));
         assert!(ana
@@ -387,7 +435,10 @@ fn a_file_someone_has_open_is_not_deleted() {
             .any(|notice| notice.kind == NoticeKind::DeleteRefusedInUse));
         b.close(&space(), &id, false).await;
         a.trash_now(&space(), &id, TrashBy::Person).await.unwrap();
-        assert!(!server.live_tree().contains_key("/Report.pdf"), "closed, it goes");
+        assert!(
+            !server.live_tree().contains_key("/Report.pdf"),
+            "closed, it goes"
+        );
     });
 }
 
@@ -404,14 +455,16 @@ fn one_person_edits_on_two_computers_like_anyone() {
         let id = save(&one, "/Notes.md", &lines("one", "three"));
         settle(&server, &[one.clone(), two.clone()]).await;
         two.read_bytes(&space(), "/Notes.md").await.unwrap();
-        // Editing on both at once is never refused.
         one.open(&space(), &id, true).await.unwrap();
         two.open(&space(), &id, true).await.unwrap();
         save(&one, "/Notes.md", &lines("ONE", "three"));
         save(&two, "/Notes.md", &lines("one", "THREE"));
         settle(&server, &[one.clone(), two.clone()]).await;
         let merged = String::from_utf8(lines("ONE", "THREE")).unwrap();
-        assert_eq!(content_at(&server, "/Notes.md").as_deref(), Some(merged.as_str()));
+        assert_eq!(
+            content_at(&server, "/Notes.md").as_deref(),
+            Some(merged.as_str())
+        );
         one.close(&space(), &id, true).await;
         two.close(&space(), &id, true).await;
     });
@@ -464,7 +517,13 @@ fn a_lost_reply_never_makes_a_copy_of_ones_own_change() {
         settle(&server, &[a.clone()]).await;
         let tree = server.live_tree();
         assert_eq!(tree.len(), 1, "{tree:?}");
-        assert_eq!(tree.get("/a.txt").and_then(|(_, sha)| sha.clone()), Some(sha(b"two")));
-        assert!(server.trashed_items().is_empty(), "nothing of one's own is replaced");
+        assert_eq!(
+            tree.get("/a.txt").and_then(|(_, sha)| sha.clone()),
+            Some(sha(b"two"))
+        );
+        assert!(
+            server.trashed_items().is_empty(),
+            "nothing of one's own is replaced"
+        );
     });
 }

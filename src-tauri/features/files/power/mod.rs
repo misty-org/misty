@@ -19,14 +19,17 @@ pub use compare::{CompareRow, CompareState};
 pub use duplicates::DuplicateGroup;
 pub use rename::{RenamePreview, RenameRule};
 
-/// A file's SHA-256 in lowercase hex, read in pieces so a large file never sits in memory.
-/// `read` hears each piece's size and says whether to go on; None when it said stop.
-pub(crate) fn sha256_of(path: &Path, mut read: impl FnMut(u64) -> bool) -> Result<Option<String>, String> {
+pub(crate) fn sha256_of(
+    path: &Path,
+    mut read: impl FnMut(u64) -> bool,
+) -> Result<Option<String>, String> {
     let mut file = fs_disk::open(path).map_err(|error| failed(path, error))?;
     let mut hasher = Sha256::new();
     let mut buffer = vec![0u8; 256 * 1024];
     loop {
-        let count = file.read(&mut buffer).map_err(|error| failed(path, error))?;
+        let count = file
+            .read(&mut buffer)
+            .map_err(|error| failed(path, error))?;
         if count == 0 {
             break;
         }
@@ -38,9 +41,10 @@ pub(crate) fn sha256_of(path: &Path, mut read: impl FnMut(u64) -> bool) -> Resul
     Ok(Some(hex::encode(hasher.finalize())))
 }
 
-/// The link Make Alias makes: "name alias", then "name alias 2" and on while one is taken.
 fn alias_path(path: &Path) -> Result<std::path::PathBuf, String> {
-    let dir = path.parent().ok_or_else(|| failed(path, "an alias can't be made here"))?;
+    let dir = path
+        .parent()
+        .ok_or_else(|| failed(path, "an alias can't be made here"))?;
     let name = display_name(path);
     let mut number = 1u32;
     loop {
@@ -57,7 +61,6 @@ fn alias_path(path: &Path) -> Result<std::path::PathBuf, String> {
     }
 }
 
-/// The file's SHA-256, for Get Info's checksum.
 #[tauri::command]
 pub async fn files_checksum(webview: tauri::Webview, path: String) -> Result<String, String> {
     person_window(&webview)?;
@@ -71,8 +74,6 @@ pub async fn files_checksum(webview: tauri::Webview, path: String) -> Result<Str
     .await
 }
 
-/// Makes an alias (a symbolic link) to the item beside it, as Finder's Make Alias; returns its
-/// path.
 #[tauri::command]
 pub async fn files_make_link(webview: tauri::Webview, path: String) -> Result<String, String> {
     person_window(&webview)?;
@@ -88,7 +89,6 @@ pub async fn files_make_link(webview: tauri::Webview, path: String) -> Result<St
     .await
 }
 
-/// What Rename Items would do to each of `paths`, in their order, without doing it.
 #[tauri::command]
 pub async fn files_rename_preview(
     webview: tauri::Webview,
@@ -96,11 +96,19 @@ pub async fn files_rename_preview(
     rule: RenameRule,
 ) -> Result<Vec<RenamePreview>, String> {
     person_window(&webview)?;
-    let paths = paths.iter().map(|path| asked_path(path)).collect::<Result<Vec<_>, _>>()?;
-    blocking(move || Ok(rename::plan(&paths, &rule).into_iter().map(|plan| plan.preview).collect())).await
+    let paths = paths
+        .iter()
+        .map(|path| asked_path(path))
+        .collect::<Result<Vec<_>, _>>()?;
+    blocking(move || {
+        Ok(rename::plan(&paths, &rule)
+            .into_iter()
+            .map(|plan| plan.preview)
+            .collect())
+    })
+    .await
 }
 
-/// Renames `paths` by `rule`, skipping any whose new name clashes, as one step of Undo.
 #[tauri::command]
 pub async fn files_rename_many(
     webview: tauri::Webview,
@@ -108,12 +116,13 @@ pub async fn files_rename_many(
     rule: RenameRule,
 ) -> Result<TransferResult, String> {
     person_window(&webview)?;
-    let paths = paths.iter().map(|path| asked_path(path)).collect::<Result<Vec<_>, _>>()?;
+    let paths = paths
+        .iter()
+        .map(|path| asked_path(path))
+        .collect::<Result<Vec<_>, _>>()?;
     blocking(move || Ok(rename::rename_many(&paths, &rule))).await
 }
 
-/// Files in `dir` (and the folders in it) with the same contents, two or more to a group,
-/// largest first. Reports on `files://progress` under `opId`; Cancel ends it with what it found.
 #[tauri::command]
 pub async fn files_duplicates(
     app: AppHandle,
@@ -126,7 +135,6 @@ pub async fn files_duplicates(
     blocking(move || duplicates::find(&app, &dir, &op_id)).await
 }
 
-/// Two folders side by side, everything in either by its path inside them, compared by content.
 #[tauri::command]
 pub async fn files_compare(
     webview: tauri::Webview,

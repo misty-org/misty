@@ -10,15 +10,9 @@ export type Turn = {
   segmentIds: string[];
 };
 
-/**
- * Keeps the latest revision of every segment from one or more streams.
- * Stale or out-of-order revisions are dropped, and a final segment is never
- * replaced, so a transcript only moves forward.
- */
 export class Transcript {
   private byId = new Map<string, Segment>();
 
-  /** Returns true when the segment changed the transcript. */
   accept(segment: Segment): boolean {
     const previous = this.byId.get(segment.id);
     if (previous && (previous.final || segment.revision <= previous.revision)) return false;
@@ -27,7 +21,6 @@ export class Transcript {
     return true;
   }
 
-  /** The newest segments as they arrived, with a translation that came after its speech. */
   latest(count: number): Segment[] {
     return [...this.byId.values()].slice(-count);
   }
@@ -38,7 +31,6 @@ export class Transcript {
       .sort((a, b) => a.startMs - b.startMs || a.sequence - b.sequence);
   }
 
-  /** Consecutive segments from the same speaker on the same channel. */
   turns(): Turn[] {
     const turns: Turn[] = [];
     for (const segment of this.segments()) {
@@ -64,7 +56,6 @@ export class Transcript {
     return turns;
   }
 
-  /** Plain text with speaker labels, for notes, export and search. */
   text(name: (speaker: string) => string = (speaker) => speaker): string {
     return this.turns()
       .map((turn) => `${name(turn.speaker)}: ${turn.text}`)

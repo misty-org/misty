@@ -1,15 +1,10 @@
 import { Check, SendHorizontal } from "lucide-react";
 import { Button, ColorChip, Separator, Surface, Text, Tooltip } from "@misty/ui";
-import { sizeLabel, styleNames } from "./pickedElement";
-import type { PagePick } from "./pickApi";
+import { sizeLabel, styleNames } from "./picked_element";
+import type { PagePick } from "./pick_api";
 
-/** The styles worth a glance in the card; the message to the agent carries all of them. */
 const shownStyles = styleNames.filter((name) => name !== "width" && name !== "height");
 
-/**
- * The element the person picked: where it is, how big, and the styles that matter, with the
- * choice to put it in the chat's composer or drop it.
- */
 export function PickedElementCard({
   pick,
   sent,
@@ -17,14 +12,12 @@ export function PickedElementCard({
   onClear,
 }: {
   pick: PagePick;
-  /** Its details are already in the composer. */
   sent: boolean;
   onSend(): void;
   onClear(): void;
 }) {
   const { element, image } = pick;
   return (
-    // Painted, like everything in the panel but the page, so the page shows only through its frame.
     <Surface
       as="section"
       tone="sidebar"
@@ -60,7 +53,6 @@ export function PickedElementCard({
             </Text>
           </div>
         </div>
-        {/* preview-card-styles: codeViews.css sets the values in the code font. */}
         <dl className="preview-card-styles m-0 grid gap-1 text-caption">
           {shownStyles.map((name) =>
             element.styles[name] ? (

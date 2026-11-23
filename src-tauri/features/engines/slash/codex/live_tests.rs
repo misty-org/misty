@@ -5,7 +5,6 @@ use serde_json::json;
 use super::super::{run, Context, Output};
 use crate::engines::codex_rpc::{self, Session};
 
-/// `/approve` on a real auto-review denial (two Codex turns).
 mod approve;
 
 struct Scratch {
@@ -14,8 +13,6 @@ struct Scratch {
     db: database::store::Store,
 }
 
-/// The test binary points HOME at a scratch folder (`isolate_for_tests`); Codex's sign-in,
-/// config and threads live in the person's real one, which their account record names.
 fn use_real_home() {
     // SAFETY: getpwuid returns the calling user's static record, read before anything else.
     let home = unsafe {
@@ -53,10 +50,6 @@ fn context(scratch: &Scratch, session: Option<&str>, args: &str) -> Context {
     }
 }
 
-/// A real thread at $0: `thread/start` makes one and runs no turn. Codex writes a thread's
-/// rollout file only once something is recorded in it, and an unwritten thread is gone for
-/// every other app-server, so it is named while it is loaded (a chat's thread always has
-/// its rollout: Misty keeps a thread id only after a turn).
 async fn new_thread(scratch: &Scratch) -> String {
     let command = codex_rpc::chat_command(Some(&scratch.folder))
         .await
@@ -95,7 +88,6 @@ async fn show(context: Context, name: &str) -> Result<Output, String> {
     outcome
 }
 
-/// Commands that only read, with the arguments that only read.
 const READ_ONLY: &[(&str, &str)] = &[
     ("status", ""),
     ("usage", ""),
@@ -107,8 +99,6 @@ const READ_ONLY: &[(&str, &str)] = &[
     ("hooks", ""),
     ("apps", ""),
     ("plugins", ""),
-    // A local plugin, an installed one from the online catalog, and one only a search of
-    // the catalog finds.
     ("plugins", "documents"),
     ("plugins", "github@openai-curated-remote"),
     ("plugins", "website-maker"),
@@ -152,7 +142,6 @@ async fn read_only_commands_on_a_thread() {
             failed.push(*name);
         }
     }
-    // Arguments Misty answers itself, before any call.
     for (name, args) in [
         ("usage", "monthly"),
         ("mcp", "login"),

@@ -10,16 +10,16 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/api/deployment/probe", () => ({ probeServer: mocks.probe }));
 vi.mock("@/features/account/api/api", () => ({ accountApi: { redeemSetupKeyOn: mocks.redeemOn } }));
-vi.mock("../sessions/useAccountStore", () => ({
+vi.mock("../sessions/use_account_store", () => ({
   accountRedeemSetupKey: mocks.redeem,
   accountFinishSetupKey: mocks.finish,
 }));
-vi.mock("./useServerSwitch", () => ({ useServerSwitch: () => ({ moveTo: mocks.moveTo }) }));
+vi.mock("./use_server_switch", () => ({ useServerSwitch: () => ({ moveTo: mocks.moveTo }) }));
 
-import { useServerChoice } from "@/api/deployment/serverChoice";
+import { useServerChoice } from "@/api/deployment/server_choice";
 import { NoticeViewport } from "@misty/ui";
 import { CloudScreen } from "./CloudScreen";
-import { useSetupLinkStore } from "./setupLinkStore";
+import { useSetupLinkStore } from "./setup_link_store";
 
 const key = "misty_setup_ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const answer = { user_id: "account-a", username: "ada", email: "ada@misty.example" };

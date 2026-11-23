@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { useAgentBrowser } from "../agent-browser/agentBrowserStore";
+import { useAgentBrowser } from "../agent-browser/agent_browser_store";
 import { LedgerTable } from "./LedgerTable";
 import type { LedgerRow } from "./ledger";
 

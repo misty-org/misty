@@ -1,9 +1,3 @@
-//! Link previews, fetched on the person's device the way Discord's unfurler does on its server:
-//! read the page's own preview metadata (YouTube through its oEmbed), then fetch and shrink the
-//! image. Every request goes through `web_fetch`, so only public addresses are contacted, without
-//! cookies or sign-ins, and the image comes back as a small data URL the page can show without
-//! contacting the site again. The renderer keeps results in the encrypted local cache.
-
 pub(crate) mod meta;
 
 use base64::Engine;
@@ -16,7 +10,6 @@ const PAGE_BYTES: usize = 256 * 1024;
 const OEMBED_BYTES: usize = 64 * 1024;
 const IMAGE_BYTES: usize = 3 * 1024 * 1024;
 const THUMBNAIL_EDGE: u32 = 360;
-/// A source image that can't be shrunk is sent as it is only when it is this small.
 const RAW_IMAGE_BYTES: usize = 200 * 1024;
 
 #[derive(Serialize)]
@@ -26,11 +19,9 @@ pub struct LinkPreview {
     pub site_name: String,
     pub title: String,
     pub description: String,
-    /// A small JPEG or the original image, as a data URL.
     pub image: Option<String>,
 }
 
-/// None when the page offers nothing worth a card.
 #[tauri::command]
 pub async fn link_preview_fetch(url: String) -> Result<Option<LinkPreview>, String> {
     let _ = rustls::crypto::ring::default_provider().install_default();
@@ -106,9 +97,6 @@ async fn page(address: &url::Url) -> Option<(PageMeta, url::Url)> {
     Some((meta::parse(&text, &response.final_url), response.final_url))
 }
 
-/// YouTube answers oEmbed with the title and channel, and its thumbnails follow one pattern, so
-/// a video needs no page fetch. The 16:9 thumbnail has no letterbox bars, unlike the one oEmbed
-/// names.
 async fn youtube(address: &url::Url) -> Option<PageMeta> {
     let host = address
         .host_str()?

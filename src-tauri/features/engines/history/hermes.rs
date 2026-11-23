@@ -1,8 +1,3 @@
-//! Hermes Agent keeps every session in one SQLite file, `<hermes home>/state.db`: `sessions`
-//! (with the `cwd` it ran in) and `messages` (`role`, `content`, `timestamp` in seconds, `active`).
-//! Each session gets the same virtual `<db>\u{1f}<id>` address as OpenCode's database rows, so the
-//! path-keyed history pipeline reads it. Read-only: a running Hermes holds the database.
-
 use std::path::{Path, PathBuf};
 
 use super::{Message, ParsedSession, ScanSummary, SessionFile};
@@ -22,8 +17,6 @@ pub(super) fn discover_hermes(workspace: &Path) -> Vec<SessionFile> {
     discover_hermes_in(&database(), workspace)
 }
 
-/// The workspace's own sessions: started in it or a folder inside it, not hidden, and not a
-/// subagent's or a branch's (those carry a `parent_session_id`).
 pub(super) fn discover_hermes_in(db: &Path, workspace: &Path) -> Vec<SessionFile> {
     if !file_access::fs::exists(db) {
         return Vec::new();
@@ -54,8 +47,6 @@ pub(super) fn discover_hermes_in(db: &Path, workspace: &Path) -> Vec<SessionFile
         .collect()
 }
 
-/// The session's visible turns: the person's and Hermes's own text, in order. Tool rows and
-/// messages Hermes rewound (`active = 0`) are left out.
 pub(super) fn parse_hermes_session(path: &Path) -> ParsedSession {
     let Some((db, id)) = super::split_opencode_db_path(path) else {
         return ParsedSession {

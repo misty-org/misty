@@ -1,8 +1,5 @@
-//! Hermes's commands that its gateway refuses over ACP, run here instead.
-
 use super::*;
 
-/// Hermes's `_FORK_PROMPT` (`agent/side_question.py`), then the question.
 pub(super) fn hermes_btw_prompt(question: &str) -> String {
     format!(
         "The user asked a quick SIDE question with /btw while the main work continues in the \
@@ -15,13 +12,8 @@ pub(super) fn hermes_btw_prompt(question: &str) -> String {
     )
 }
 
-/// How long a side question may take.
 const SIDE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
-/// `/btw <question>`: asked in an ACP fork of the session, so the chat's own session never sees
-/// it, and the fork is deleted after (Hermes answers from a detached copy of the agent). The fork
-/// is put in Hermes's `default` mode first, which asks before every edit; nobody is here to
-/// allow one, so a tool it tries anyway changes nothing.
 pub(super) async fn hermes_btw(
     context: &Context,
     folder: &Path,
@@ -55,7 +47,6 @@ pub(super) async fn hermes_btw(
     .await;
     live.close().await;
     if let Some(side) = side {
-        // Best effort: Hermes refuses while its gateway still holds the fork busy.
         let _ = hermes_cli(folder, &["sessions", "delete", &side, "--yes"]).await;
     }
     let answer = result?;
@@ -72,7 +63,6 @@ pub(super) async fn hermes_btw(
     ))
 }
 
-/// One of Hermes's own subcommands (no model), with its output; its words when it fails.
 async fn hermes_cli(folder: &Path, args: &[&str]) -> Result<String, String> {
     let (mut command, bin) = crate::engines::pi_family::cli_command("hermes", folder)?;
     command.args(args);
@@ -97,7 +87,6 @@ async fn hermes_cli(folder: &Path, args: &[&str]) -> Result<String, String> {
     Err(said.unwrap_or_else(|| "Hermes couldn't run it.".into()))
 }
 
-/// Hermes's `SAVE_USAGE`, for a bare `/save`.
 pub(super) fn hermes_save_usage() -> Output {
     Output::info(
         "Save",
@@ -117,7 +106,6 @@ pub(super) fn hermes_save_usage() -> Output {
     )
 }
 
-/// What `/save` was asked for: the format, the file named (if any) and whether to redact.
 pub(super) fn hermes_save_args(args: &str) -> Result<(&'static str, Option<String>, bool), String> {
     let mut parts: Vec<&str> = args.split_whitespace().collect();
     let redact = parts
@@ -140,8 +128,10 @@ pub(super) fn hermes_save_args(args: &str) -> Result<(&'static str, Option<Strin
     Ok((format, parts.get(1).map(|name| name.to_string()), redact))
 }
 
-/// `/save <json|md|html> [filename] [redact]`: Hermes's own export of the stored session
-/// (`hermes sessions export`, what its `/save` renders), written where its CLI writes it.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "saves the conversation where the person asked, which may be outside what the gate grants"
+)]
 pub(super) async fn hermes_save(
     context: &Context,
     folder: &Path,
@@ -171,8 +161,6 @@ pub(super) async fn hermes_save(
             .map_err(|error| format!("Couldn't create {}: {error}", parent.display()))?;
     }
     let mut args = vec!["sessions", "export"];
-    // md writes one file per session into a folder, named by Hermes: it goes to a scratch
-    // folder and is moved to the name asked for.
     let scratch = std::env::temp_dir().join(format!(
         "misty-hermes-save-{}",
         chrono::Local::now()
@@ -195,7 +183,6 @@ pub(super) async fn hermes_save(
         let said = said?;
         match format {
             "json" => {
-                // One session per line; /save writes it indented.
                 let snapshot = said
                     .lines()
                     .rev()
@@ -207,7 +194,7 @@ pub(super) async fn hermes_save(
                     .map_err(|e| e.to_string())
             }
             "md" => {
-                let file = std::fs::read_dir(&scratch)
+                let file = file_access::fs::read_dir(&scratch)
                     .map_err(|error| error.to_string())?
                     .flatten()
                     .map(|entry| entry.path())
@@ -222,7 +209,7 @@ pub(super) async fn hermes_save(
         }
     }
     .await;
-    let _ = tokio::fs::remove_dir_all(&scratch).await;
+    let _ = file_access::fs_async::remove_dir_all(&scratch).await;
     written?;
     let label = match format {
         "json" => "JSON",
@@ -235,10 +222,6 @@ pub(super) async fn hermes_save(
     )))
 }
 
-/// `/rollback`: Hermes's checkpoints for the chat's folder, read from its shadow git store
-/// (`tools/checkpoint_manager.py`: `checkpoints/store`, one `refs/hermes/<sha256(folder)[:16]>`
-/// branch per folder). A restore runs on its gateway, which also rewinds the session there, and
-/// ACP has no call for it, so a number points to Misty's own rewind.
 pub(super) async fn hermes_rollback(context: &Context, folder: &Path) -> Result<Output, String> {
     if !context.args.is_empty() {
         return Ok(Output::done(
@@ -250,8 +233,8 @@ pub(super) async fn hermes_rollback(context: &Context, folder: &Path) -> Result<
     let store = crate::engine_config::support::hermes_home()
         .join("checkpoints")
         .join("store");
-    let folder = std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
-    let checkpoints = if store.join("HEAD").exists() {
+    let folder = real_folder(folder);
+    let checkpoints = if file_access::fs::exists(store.join("HEAD")) {
         checkpoint_list(&store, &folder).await
     } else {
         Vec::new()
@@ -277,7 +260,14 @@ pub(super) async fn hermes_rollback(context: &Context, folder: &Path) -> Result<
     ))
 }
 
-/// Hermes's `list_checkpoints`, newest first, numbered as its `/rollback` numbers them.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves the person's project folder as Hermes records it; the folder may not be linked"
+)]
+fn real_folder(folder: &Path) -> std::path::PathBuf {
+    std::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf())
+}
+
 async fn checkpoint_list(store: &Path, folder: &Path) -> Vec<super::super::Row> {
     use sha2::{Digest, Sha256};
     let folder_text = folder.to_string_lossy().into_owned();
@@ -315,8 +305,6 @@ async fn checkpoint_list(store: &Path, folder: &Path) -> Vec<super::super::Row> 
     rows
 }
 
-/// A read-only git call on Hermes's store, isolated from the person's git config as Hermes
-/// isolates it.
 async fn shadow_git(store: &Path, folder: &Path, args: &[&str]) -> Option<String> {
     let mut command = tokio::process::Command::new("git");
     command
@@ -348,12 +336,9 @@ async fn shadow_git(store: &Path, folder: &Path, args: &[&str]) -> Option<String
         .then(|| String::from_utf8_lossy(&run.stdout).into_owned())
 }
 
-/// `/agents`: the background processes Hermes's tools started, from the list its process
-/// registry keeps on disk (`<hermes home>/processes.json`, rewritten as they start and exit).
-/// Its subagents and delegations live only in the gateway's memory.
 pub(super) fn hermes_agents() -> Result<Output, String> {
     let path = crate::engine_config::support::hermes_home().join("processes.json");
-    let entries: Vec<Value> = std::fs::read_to_string(&path)
+    let entries: Vec<Value> = file_access::fs::read_to_string(&path)
         .ok()
         .and_then(|text| serde_json::from_str(text.trim_start_matches('\u{feff}')).ok())
         .unwrap_or_default();
@@ -376,7 +361,6 @@ pub(super) fn hermes_agents() -> Result<Output, String> {
     ))
 }
 
-/// One row per process: its id, how long it has run and its command, as Hermes's `/agents`.
 pub(super) fn hermes_process_rows(entries: &[Value], now: f64) -> Vec<super::super::Row> {
     entries
         .iter()
@@ -402,7 +386,6 @@ pub(super) fn hermes_process_rows(entries: &[Value], now: f64) -> Vec<super::sup
         .collect()
 }
 
-/// Hermes's `format_uptime_short`: `45s`, `12m`, `3h 5m`.
 pub(super) fn uptime(seconds: u64) -> String {
     match seconds {
         0..=59 => format!("{seconds}s"),
@@ -411,8 +394,6 @@ pub(super) fn uptime(seconds: u64) -> String {
     }
 }
 
-/// `/reload-mcp` and `/reload-skills` run inside Hermes's gateway (`reload.mcp`,
-/// `skills.reload`), which its ACP server doesn't expose.
 pub(super) fn hermes_reload(name: &str) -> Output {
     Output::done(if name == "reload-mcp" {
         "Hermes reloads MCP servers inside its gateway, which its ACP server doesn't expose. The \

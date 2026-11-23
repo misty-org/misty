@@ -11,8 +11,6 @@ use serde::{Deserialize, Serialize};
 
 use super::repo::is_skip_worktree;
 
-/// A folder in the tree that is the top of a Git repository, with its branch and counts. Unlike
-/// the panel's status it names no files.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositorySummary {
@@ -37,9 +35,6 @@ pub struct GitTreeStatus {
     pub file_colors: HashMap<String, HashMap<String, String>>,
 }
 
-/// Opens `path` only when that folder is itself the top of a repository (a `.git` folder, or a
-/// linked worktree's `.git` file), so an ordinary folder inside a repository isn't mistaken for
-/// one. The real paths are compared too, so an odd `.git` can't pass the parent off as this one.
 pub(super) fn open_exact_repo(path: &Path) -> Option<Repository> {
     if !file_access::fs::exists(path.join(".git")) {
         return None;
@@ -51,7 +46,6 @@ pub(super) fn open_exact_repo(path: &Path) -> Option<Repository> {
     (actual == expected).then_some(repo)
 }
 
-/// One status scan per repository for a whole batch of tree levels.
 pub(super) struct TreeSnapshots {
     statuses: HashMap<PathBuf, Option<Vec<(String, git2::Status)>>>,
     recurse_untracked_dirs: bool,
@@ -85,7 +79,6 @@ impl TreeSnapshots {
                 options
                     .include_untracked(true)
                     .recurse_untracked_dirs(recurse);
-                // A sparse checkout's absent paths aren't changes, as in the panel's status.
                 let index = repo.index().ok();
                 repo.statuses(Some(&mut options)).ok().map(|statuses| {
                     statuses
@@ -120,7 +113,6 @@ fn repository_summary_cached(
         .and_then(|head| head.shorthand().map(str::to_string))
         .unwrap_or_else(|| "HEAD".to_string());
     let statuses = snapshots.get(&repo)?;
-    // A file can be staged and changed again; it counts once.
     let mut changed = HashSet::new();
     let mut untracked = HashSet::new();
     for (file, status) in statuses {
@@ -146,11 +138,6 @@ pub(super) fn repository_summaries_blocking(paths: Vec<String>) -> Vec<Repositor
         .collect()
 }
 
-/// Colors for one loaded tree level, from two places:
-/// 1. The repository that holds the listed folder, at any depth. Its status paths are relative
-///    to the repository, so they're re-based onto the listed folder first.
-/// 2. Each listed folder that is itself a repository, which is marked as one: the repository
-///    around it usually sees it as one entry, or nothing when the tree's root isn't a repository.
 #[cfg(test)]
 pub(super) fn file_tree_colors(path: &str, files: &[String]) -> HashMap<String, &'static str> {
     file_tree_colors_cached(path, files, &mut TreeSnapshots::new(false))
@@ -175,8 +162,6 @@ fn file_tree_colors_cached(
             let statuses = snapshots.get(&repo)?;
             let with_prefix = (!prefix.is_empty()).then(|| format!("{prefix}/"));
             for (raw, status) in statuses {
-                // A trailing slash marks an untracked folder git didn't open; without it the
-                // folder (and those above it) can light up too.
                 let file = raw.strip_suffix('/').unwrap_or(raw);
                 let relative_file = match &with_prefix {
                     Some(prefix) => match file.strip_prefix(prefix.as_str()) {
@@ -185,7 +170,6 @@ fn file_tree_colors_cached(
                     },
                     None => file,
                 };
-                // Staged but never committed reads as new, like an untracked file.
                 let color = if status.intersects(git2::Status::INDEX_NEW | git2::Status::WT_NEW) {
                     "untracked"
                 } else {
@@ -194,8 +178,6 @@ fn file_tree_colors_cached(
                 if file_set.contains(relative_file) {
                     out.insert(relative_file.to_string(), color);
                 }
-                // A folder takes the state of what's inside it, so it shows without opening.
-                // Changed wins over new when it holds both.
                 let mut folder = Path::new(relative_file);
                 while let Some(parent) = folder.parent() {
                     if parent.as_os_str().is_empty() {
@@ -216,8 +198,6 @@ fn file_tree_colors_cached(
         })();
     }
 
-    // Folders that are repositories are marked as such whatever their own state: the branch
-    // badge beside them carries that.
     for name in files {
         if open_exact_repo(&listed.join(name)).is_some() {
             out.insert(name.clone(), "repository");

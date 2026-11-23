@@ -4,16 +4,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, cn, Input, screenMarkClass, Surface, ViewportLayer } from "@misty/ui";
 import { DictationPill } from "@/features/voice";
-// These windows draw with the app's own classes; the mist's page stays transparent
-// (desktop.html), so nothing opaque ever covers the screen.
 import "@/styles/styles.css";
 
-/**
- * Misty's windows while it controls the desktop or its own window on Windows
- * (src-tauri/features/agents/desktop_control/windows/overlays.rs): the control island, and
- * the mist that rings what Misty controls and carries its own pointer. The window's label says
- * which this page is.
- */
 export function DesktopOverlayRoot() {
   const label = getCurrentWebview().label;
   if (label === "misty-desktop-island") return <DesktopIsland />;
@@ -21,8 +13,6 @@ export function DesktopOverlayRoot() {
   return <DesktopMist />;
 }
 
-/** Listens for `event` and also reads the current state once, so a page that
- * loads after an update still shows it. */
 function useOverlayState<T>(event: string, initial: T) {
   const [state, setState] = useState(initial);
   useEffect(() => {

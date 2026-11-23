@@ -2,10 +2,6 @@ import { Button, cn, Surface, Text } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { useDevicePreferences } from "../device-preferences/store";
 
-/**
- * Appears at the bottom right while settings have unsaved changes. Trying to leave with
- * changes pending makes it nudge and say so, rather than closing.
- */
 export function SettingsSaveBar() {
   const dirty = useDevicePreferences((s) => s.dirty);
   const attention = useDevicePreferences((s) => s.attention);
@@ -21,7 +17,6 @@ export function SettingsSaveBar() {
   const warned = nudge > 0;
   return (
     <Surface
-      // Remounting on each attempt replays the shake.
       key={warned ? `nudge-${nudge}` : "bar"}
       role="alertdialog"
       aria-label="Unsaved changes"
@@ -31,12 +26,12 @@ export function SettingsSaveBar() {
       radius="xl"
       className={cn(
         "absolute bottom-4 right-6 z-20 flex max-w-[calc(100%-var(--spacing)*12)] items-center gap-4",
-        "py-2.5 pl-4 pr-2.5 shadow-2xl",
+        "py-2.5 pl-4 pr-2.5",
         "animate-in fade-in-0 slide-in-from-bottom-2 duration-200",
         warned && "misty-shake",
       )}
     >
-      <Text bare as="p" tone="default" className="m-0 text-md leading-6">
+      <Text as="p" size="control" tone="default" className="m-0">
         {warned ? "Save or cancel your changes before leaving." : "You have unsaved changes."}
       </Text>
       <div className="flex shrink-0 items-center gap-2">

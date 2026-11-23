@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock("@/shared/platform/nativeInvoke", () => native);
-vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "me" }));
+vi.mock("@/shared/platform/native_invoke", () => native);
+vi.mock("../../personal/agent_account", () => ({ agentAccountId: () => "me" }));
 
-import { useFolderSettings } from "../folders/folderSettings";
-import { availableTargets, chosenTarget, useOpenApps } from "./openApp";
+import { useFolderSettings } from "../folders/folder_settings";
+import { availableTargets, chosenTarget, useOpenApps } from "./open_app";
 import { NoticeViewport } from "@misty/ui";
 import { OpenInMenu } from "./OpenInMenu";
 
@@ -15,7 +15,6 @@ afterEach(cleanup);
 
 type Request = { kind: string; id?: string; path?: string };
 
-/** A computer with VS Code and IntelliJ installed and one added program. */
 function nativeComputer(programs = [{ id: "p1", name: "Nova", path: "/Applications/Nova.app" }]) {
   native.invoke.mockImplementation(async (command: string, args?: Record<string, unknown>) => {
     if (command === "project_program_icon") {

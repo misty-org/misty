@@ -1,6 +1,3 @@
-//! A long operation's progress and its Cancel: one entry per `opId` the window chose, reported on
-//! `files://progress` (`Progress` in `disk.ts`) at most every 100 ms. There is no queue: each
-//! operation runs at once, and what it already did stays when it is cancelled.
 use std::{
     collections::HashMap,
     sync::{
@@ -30,7 +27,6 @@ struct Payload {
 
 static RUNNING: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> = LazyLock::new(Mutex::default);
 
-/// One running operation. Dropping it forgets the operation.
 pub struct Op {
     app: AppHandle,
     id: String,
@@ -42,7 +38,6 @@ pub struct Op {
 }
 
 impl Op {
-    /// Starts reporting under `id`, for work of about `total` bytes (0 when not known yet).
     pub fn start(app: &AppHandle, id: &str, label: &'static str, total: u64) -> Self {
         let stopped = Arc::new(AtomicBool::new(false));
         RUNNING
@@ -70,7 +65,6 @@ impl Op {
         self.total = total;
     }
 
-    /// Adds `bytes` done on `item`, reporting if 100 ms have passed since the last report.
     pub fn advance(&mut self, bytes: u64, item: &str) {
         self.done = self.done.saturating_add(bytes);
         if self.last.elapsed() >= Duration::from_millis(100) {
@@ -105,7 +99,6 @@ impl Drop for Op {
     }
 }
 
-/// Stops the operation running under `opId`. Unknown ids (one that just finished) are fine.
 #[tauri::command]
 pub fn files_cancel(webview: tauri::Webview, op_id: String) -> Result<(), String> {
     person_window(&webview)?;

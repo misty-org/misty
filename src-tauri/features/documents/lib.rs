@@ -1,8 +1,3 @@
-//! Documents prepared for agents. Untrusted files are parsed only by the
-//! bundled document worker, confined by the operating system: `sandbox-exec`
-//! on macOS, an AppContainer on Windows, and Landlock, seccomp and namespaces
-//! on Linux.
-
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub mod unix;
 #[cfg(windows)]
@@ -10,7 +5,6 @@ pub mod windows;
 
 use serde::{Deserialize, Serialize};
 
-/// Where the app keeps the bundled worker program: its name and protocol in, its bytes out.
 pub type WorkerBytes = fn(&str, u32) -> Result<&'static [u8], String>;
 
 pub const MAX_AGENT_DOCUMENT_BYTES: u64 = 50 * 1024 * 1024;
@@ -34,7 +28,6 @@ pub struct PreparedDocumentSection {
     pub text: String,
 }
 
-/// Parses the document at `path` in the confined worker.
 #[cfg(windows)]
 pub async fn prepare_document(
     path: std::path::PathBuf,
@@ -50,7 +43,6 @@ pub async fn prepare_document(
     .map_err(|_| "Document preparation stopped.".to_owned())?
 }
 
-/// Parses the document at `path` in the confined worker.
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub async fn prepare_document(
     path: std::path::PathBuf,
@@ -61,7 +53,6 @@ pub async fn prepare_document(
         Arc, OnceLock,
     };
 
-    /// Cancels the worker when the request is dropped before it finishes.
     struct CancelOnDrop(Arc<AtomicBool>);
     impl Drop for CancelOnDrop {
         fn drop(&mut self) {
@@ -87,8 +78,6 @@ pub async fn prepare_document(
     .map_err(|_| "Document preparation stopped.".to_owned())?
 }
 
-/// No system confines the document worker here, and untrusted files are never parsed in Misty's
-/// own process.
 #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
 pub async fn prepare_document(
     _path: std::path::PathBuf,

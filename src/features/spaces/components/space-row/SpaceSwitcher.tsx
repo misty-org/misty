@@ -2,15 +2,11 @@ import { useCallback, useState } from "react";
 import type { Space } from "../../api/dto/entities";
 import { DropdownMenu, DropdownMenuContent, MenuTrigger, Popover, PopoverAnchor } from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../../create/GlobalCreateSpaceDialog";
-import { spaceNavigationName } from "../../routes/defaultSpace";
+import { spaceNavigationName } from "../../routes/default_space";
 import { SpaceAvatar } from "../SpaceAvatar";
 import { isSpacePanel, SpaceDialogs, type SpaceDialog } from "./SpaceDialogs";
 import { SpaceMenuItems } from "./SpaceMenuItems";
 
-/**
- * The Space page's title: the Space's avatar and name, opening onto the Spaces to switch this
- * window to, a new Space, and inviting people to this one.
- */
 export function SpaceSwitcher({ space }: { space: Space }) {
   const [dialog, setDialog] = useState<SpaceDialog>(null);
   const close = useCallback(() => setDialog(null), []);
@@ -26,12 +22,12 @@ export function SpaceSwitcher({ space }: { space: Space }) {
                   label={`${name}, switch Space`}
                   value={name}
                   fit
-                  className="-ml-2.5 gap-2 text-sm font-semibold"
+                  className="-ml-2.5 gap-2"
                   icon={
                     <SpaceAvatar
                       space={space}
                       className="size-5 rounded-md"
-                      fallbackClassName="text-3xs font-semibold"
+                      fallbackClassName="text-micro font-semibold"
                     />
                   }
                 />

@@ -1,30 +1,15 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-import { GripVertical, KeyRound, Pencil, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import { useMemo, type DragEvent, type ReactNode } from "react";
-import {
-  Avatar,
-  AvatarFallback,
-  Badge,
-  cn,
-  IconButton,
-  OverflowFadeText,
-  Pressable,
-  Separator,
-  Switch,
-  Text,
-  Tooltip,
-} from "@misty/ui";
+import { Badge, ListRow, MenuItem, Switch, Text, Tooltip } from "@misty/ui";
 import type { ProviderEntry } from "./providers";
-
-export const ROW = "flex min-h-13 w-full items-center gap-3 border-b px-3 py-2.5 last:border-b-0";
 
 export function Pill({ children }: { children: ReactNode }) {
   return <Badge variant="outline">{children}</Badge>;
 }
 
-/** host("https://api.moonshot.cn/anthropic") is "api.moonshot.cn". */
 function hostOf(url: string): string {
   try {
     return new URL(url.includes("://") ? url : `https://${url}`).host;
@@ -33,16 +18,6 @@ function hostOf(url: string): string {
   }
 }
 
-/** A neutral monogram for a channel. */
-function ChannelAvatar({ name }: { name: string }) {
-  return (
-    <Avatar shape="tile">
-      <AvatarFallback>{name.charAt(0).toUpperCase() || "?"}</AvatarFallback>
-    </Avatar>
-  );
-}
-
-/** One saved channel. Clicking it makes it current; it can be dragged to reorder. */
 export function ChannelRow({
   entry,
   current,
@@ -55,7 +30,6 @@ export function ChannelRow({
   entry: ProviderEntry;
   current: boolean;
   busy: boolean;
-  /** true makes it current; false (only while current) goes back to the CLI's own config. */
   onToggle: (on: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -77,78 +51,56 @@ export function ChannelRow({
         .join(", "),
     [entry.remark, entry.baseUrl, entry.model],
   );
+  const badge =
+    fromCcSwitch || entry.hasKey ? (
+      <span className="flex items-center gap-1.5">
+        {fromCcSwitch ? <Pill>CC Switch</Pill> : null}
+        {entry.hasKey ? (
+          <Tooltip content="Key saved in the keychain">
+            <Text bare tone="muted" className="flex">
+              <KeyRound aria-label="Key saved" />
+            </Text>
+          </Tooltip>
+        ) : null}
+      </span>
+    ) : undefined;
   return (
-    <div
+    <ListRow
+      label={entry.name}
+      aria-label={`Use ${entry.name}`}
+      description={subtitle || undefined}
+      badge={badge}
       draggable={!busy}
       onDragStart={drag.onDragStart}
       onDragOver={drag.onDragOver}
       onDrop={drag.onDrop}
-      className={cn(ROW, "relative", drag.dragging && "opacity-50")}
-    >
-      {/* The whole row makes the channel current; the controls sit above it. */}
-      <Pressable
-        wash="control"
-        aria-label={`Use ${entry.name}`}
-        className="absolute inset-0"
-        onClick={() => {
-          if (!busy && !current) onToggle(true);
-        }}
-      />
-      <Text bare tone="muted" className="pointer-events-none relative flex shrink-0">
-        <GripVertical aria-hidden />
-      </Text>
-      <span className="pointer-events-none relative flex shrink-0">
-        <ChannelAvatar name={entry.name} />
-      </span>
-      <div className="pointer-events-none relative flex min-w-0 flex-1 flex-col">
-        <Text bare as="p" tone="bright" className="flex items-center gap-1.5 text-sm">
-          <OverflowFadeText full>{entry.name}</OverflowFadeText>
-          {fromCcSwitch ? <Pill>CC Switch</Pill> : null}
-          {entry.hasKey ? (
-            <Tooltip content="Key saved in the keychain">
-              <Text bare tone="muted" className="pointer-events-auto">
-                <KeyRound aria-label="Key saved" />
-              </Text>
-            </Tooltip>
-          ) : null}
-        </Text>
-        {subtitle ? (
-          <Text as="p" tone="muted" full className="text-xs">
-            {subtitle}
-          </Text>
-        ) : null}
-      </div>
-      <span className="relative" onClick={(event) => event.stopPropagation()}>
+      className={drag.dragging ? "opacity-50" : undefined}
+      onOpen={() => {
+        if (!busy && !current) onToggle(true);
+      }}
+      trailing={
         <Switch
           aria-label={entry.name}
           checked={current}
           disabled={busy}
           onCheckedChange={onToggle}
         />
-      </span>
-      <Separator orientation="vertical" className="relative h-4" />
-      <IconButton
-        label="Edit"
-        className="relative"
-        disabled={busy}
-        onClick={(event) => {
-          event.stopPropagation();
-          onEdit();
-        }}
-      >
-        <Pencil />
-      </IconButton>
-      <IconButton
-        label="Delete"
-        className="relative"
-        disabled={busy || current}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (!current) onDelete();
-        }}
-      >
-        <Trash2 />
-      </IconButton>
-    </div>
+      }
+      menuLabel={`Actions for ${entry.name}`}
+      menu={
+        <>
+          <MenuItem icon={Pencil} label="Edit" disabled={busy} onSelect={onEdit} />
+          <MenuItem
+            icon={Trash2}
+            label="Delete"
+            danger
+            disabled={busy || current}
+            onSelect={() => {
+              if (!current) onDelete();
+            }}
+          />
+        </>
+      }
+    />
   );
 }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const fixture = vi.hoisted(() => ({ state: {} as any, registrations: {} as any }));
-vi.mock("@/features/app-windows/tabs/useWorkspaceStore", () => ({
+vi.mock("@/features/app-windows/tabs/use_workspace_store", () => ({
   useWorkspaceStore: { getState: () => fixture.state },
 }));
 vi.mock("@/features/app-windows/profiles/windows", () => ({

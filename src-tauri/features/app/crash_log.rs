@@ -1,13 +1,3 @@
-//! Every panic, written to `<data folder>/logs/crash.log` with its thread and backtrace.
-//!
-//! Misty keeps unwinding on panic (see `[profile.release]` in Cargo.toml), so a panic on the main
-//! thread ends the app with exit code 101 and macOS writes no crash report. Without this file,
-//! all that is left of such a quit is what scrolled past in the terminal, if there was one.
-//! Panics a `catch_unwind` recovers from are written too; each entry says which thread it was on.
-//!
-//! The file is opened once, at startup: the panic hook takes no lock the panicking code might
-//! hold (the file gate's policy among them), and skips writing rather than wait.
-
 use std::backtrace::Backtrace;
 use std::io::Write;
 use std::panic::PanicHookInfo;
@@ -16,15 +6,11 @@ use std::sync::{Mutex, OnceLock};
 
 use file_access::fs;
 
-/// A log over this size is moved to `crash.1.log` at startup, replacing the one before.
 const KEEP_BYTES: u64 = 1024 * 1024;
 
 static LOG: OnceLock<Mutex<fs::File>> = OnceLock::new();
-/// Where the crash log is, for showing it in the file manager.
 static LOG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-/// Opens the crash log in `home` (this build's data folder) and adds the hook that writes to it,
-/// in front of the default one, which still prints the panic to stderr.
 pub fn install(home: &Path) {
     let folder = home.join("logs");
     let path = folder.join("crash.log");
@@ -77,7 +63,6 @@ fn write_entry(info: &PanicHookInfo<'_>) {
     let _ = file.flush();
 }
 
-/// Shows the crash log in the system's file manager, for Settings › Advanced › Diagnostics.
 #[tauri::command]
 pub fn app_reveal_crash_log(webview: tauri::Webview, app: tauri::AppHandle) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;

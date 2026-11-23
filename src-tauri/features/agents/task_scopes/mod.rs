@@ -1,4 +1,3 @@
-//! One process-wide coordinator for agent execution leases.
 use serde_json::Value;
 use std::{
     collections::{HashMap, VecDeque},
@@ -7,8 +6,6 @@ use std::{
 };
 use tauri::{AppHandle, State, Webview};
 
-// Development diagnostics contain only opaque authority IDs, never page or
-// account content. Record native revocation separately from server renewals.
 fn lease_diagnostic(reason: &str, task: &str, window: &str) {
     if cfg!(debug_assertions) {
         eprintln!("agent_native_lease reason={reason} task={task} window={window}");
@@ -28,8 +25,6 @@ struct Lease {
     account: String,
     window: String,
     expires: Instant,
-    /// A hidden session of the agent's own (never on screen, no native input), which
-    /// neither waits for nor blocks other tasks in the window.
     background: bool,
 }
 struct Scope {
@@ -99,7 +94,6 @@ fn acquire_lease(
     window: &str,
     request: LeaseRequest,
 ) -> Result<LeaseResult, String> {
-    // A task belongs to an account, agent and window, independent of content.
     if [&request.account_id, &request.agent_id, &request.task_id]
         .iter()
         .any(|s| s.is_empty() || s.len() > 256)
@@ -144,9 +138,6 @@ fn acquire_lease(
             agent: request.agent_id,
             account: request.account_id,
             window: window.clone(),
-            // A hidden session's renewals come from a timer in the app window, which WebKit
-            // throttles while the window is in the background; a longer lease keeps the
-            // agent's tabs alive. Stop and the session's end still release it at once.
             expires: Instant::now()
                 + Duration::from_secs(if request.background { 600 } else { 30 }),
             background: request.background,
@@ -207,8 +198,6 @@ pub fn agent_workspace_bind_scope(
         {
             return Err("agent_task_mismatch".into());
         }
-        // Resume rotates execution authority, but verified files from the
-        // paused task remain usable in its explicitly rebound browser scopes.
         crate::browser::resume_task_downloads(&app, &scope_id, &scope.agent, &previous, &task_id)?;
     }
     inner.scopes.insert(scope_id, scope);

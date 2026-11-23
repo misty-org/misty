@@ -1,6 +1,3 @@
-//! These tests change folder permissions, so they only ever touch folders
-//! they create, and a guard takes every rule away again even when a test
-//! fails.
 #![cfg(windows)]
 use std::{
     ffi::OsString,
@@ -19,9 +16,6 @@ use sandbox::{
 const CMD: &str = r"C:\Windows\System32\cmd.exe";
 const NODE: &str = r"C:\Program Files\nodejs\node.exe";
 
-/// A scratch folder whose rules are all removed on drop. Its `tools` folder
-/// stands in for an installed toolchain: open to holders of the test
-/// capability only.
 struct Scratch {
     container: Container,
     tools: Capability,
@@ -70,8 +64,6 @@ impl Scratch {
         }
     }
 
-    /// Runs `command` under cmd.exe in `cwd`, inside the container, with the
-    /// tools folder on PATH and, when `tools`, the capability to use it.
     fn start(&self, cwd: &Path, command: &str, job: &Job, tools: bool) -> (File, Process) {
         let path = format!(r"{};C:\Windows\System32", self.path("tools").display());
         let mut variables = system_variables();
@@ -203,7 +195,13 @@ fn add_edit_access_adds_and_edits_but_never_deletes() {
          & (move \"{at}\\keep.txt\" moved.txt || echo blocked-move)"
     );
     let output = scratch.run(&work, &command);
-    for expected in ["added", "edited", "made-folder", "blocked-rename", "blocked-move"] {
+    for expected in [
+        "added",
+        "edited",
+        "made-folder",
+        "blocked-rename",
+        "blocked-move",
+    ] {
         assert!(output.contains(expected), "{expected}: {output}");
     }
     assert!(shared.join("keep.txt").exists(), "{output}");
@@ -235,7 +233,6 @@ fn the_job_ends_every_process_it_started() {
     scratch.grant(&folder, Access::Full);
     let started = Instant::now();
     let job = job(8);
-    // A child that would outlive its parent by half a minute.
     let (_read, process) =
         scratch.start(&folder, "node -e \"setTimeout(()=>{},30000)\"", &job, true);
     assert_eq!(process.wait(Duration::from_millis(500)), None);
@@ -267,7 +264,6 @@ fn environment_blocks_are_sorted_and_terminated() {
     assert_eq!(environment_block(Vec::<(&str, &str)>::new()), vec![0, 0]);
 }
 
-/// A path's DACL, label and flags, as SDDL.
 fn sddl(path: &Path) -> String {
     let output = Command::new("powershell.exe")
         .args(["-NoProfile", "-Command"])
@@ -341,7 +337,6 @@ fn commands_on_their_own_drive_can_list_and_delete() {
 
 #[test]
 fn known_capability_names_give_their_well_known_sids() {
-    // A helper that may use the internet holds Windows' own internetClient.
     let internet = sandbox::Capability::named("internetClient").unwrap();
     assert_eq!(internet.sid_string().unwrap(), "S-1-15-3-1");
 }

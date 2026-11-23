@@ -1,5 +1,3 @@
-//! Placing a page's native view: its bounds, kept unchanged when nothing moved,
-//! and on Windows the hidden tabs that shared its place.
 use crate::browser::*;
 
 pub(in crate::browser) fn logical_bounds(
@@ -20,7 +18,6 @@ pub(in crate::browser) fn set_webview_bounds_if_changed(
     position: LogicalPosition<f64>,
     size: LogicalSize<f64>,
 ) -> Result<(), String> {
-    // A page in full screen fills its window, whatever its pane reports.
     let (position, size) =
         super::fullscreen::fullscreen_bounds(webview).unwrap_or((position, size));
     let scale = webview
@@ -29,8 +26,6 @@ pub(in crate::browser) fn set_webview_bounds_if_changed(
         .map_err(|error| error.to_string())?;
     #[cfg(not(windows))]
     let _ = app;
-    // A view still waiting for its first paint takes its size but stays parked,
-    // so no caller can pull the blank surface on screen early.
     let position = if is_held_view(webview) {
         PARKED_POSITION
     } else {
@@ -61,16 +56,11 @@ pub(in crate::browser) fn set_webview_bounds_if_changed(
     refresh_browser_cursor_ownership(webview)
 }
 
-/// Equal sizes after logical-to-physical rounding at fractional display scales.
 #[cfg(windows)]
 fn about_same_size(a: tauri::PhysicalSize<u32>, b: tauri::PhysicalSize<u32>) -> bool {
     a.width.abs_diff(b.width) <= 2 && a.height.abs_diff(b.height) <= 2
 }
 
-/// When a page on screen moves or changes size (the window, the sidebar or a
-/// split moved), the hidden tabs that shared its old place follow it: stacked
-/// ones to its new place and size, parked ones to its new size. Switching to
-/// one then only raises it, already laid out where it shows.
 #[cfg(windows)]
 fn follow_siblings(
     app: &AppHandle,

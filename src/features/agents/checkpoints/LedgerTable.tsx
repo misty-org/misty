@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Input } from "@misty/ui";
-import { setBrowserExpanded } from "../agent-browser/agentBrowserStore";
+import { setBrowserExpanded } from "../agent-browser/agent_browser_store";
 import { StatusRow, StatusTable, type StatusState } from "../progress/StatusTable";
 import { isOpen, type LedgerRow } from "./ledger";
 
@@ -19,11 +19,6 @@ function verb(row: LedgerRow) {
   return row.state === "blocked" ? "Blocked" : "Failed";
 }
 
-/**
- * How a run that did not finish ends when it kept a ledger:
- * the parts still open, each with the action it needs, over a count of what is done. Resuming
- * works only the open parts; the finished ones are never done again.
- */
 export function LedgerTable({
   rows,
   conversationId,
@@ -34,7 +29,6 @@ export function LedgerTable({
   rows: LedgerRow[];
   conversationId?: string;
   working: boolean;
-  /** Carries on from these rows; `only` limits the work to some of the open ones. */
   onResume: (rows: LedgerRow[], only?: string[]) => void;
   onChange: (rows: LedgerRow[]) => void;
 }) {

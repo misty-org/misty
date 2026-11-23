@@ -5,8 +5,8 @@ import {
   assertStableApiSession,
   resolveRequiredApiBase,
 } from "@/api/client";
-import { cachedRequest } from "@/api/cache/cached-request";
-import { accountLimitMessages } from "@/api/client/accountLimits";
+import { cachedRequest } from "@/api/cache/cached_request";
+import { accountLimitMessages } from "@/api/client/account_limits";
 import { isSpaceReferenceOnly, isSpaceWriteRequest, setSpaceReferenceOnly } from "./connectivity";
 import { createSpaceConversationsApi } from "./conversations";
 import { createSpacePinsApi } from "./pins";
@@ -23,8 +23,8 @@ import { createSpaceMembersApi } from "./members";
 import { createSpaceRolesApi } from "./roles";
 import { createSpaceChatApi } from "./chat";
 import { spaceAttachmentsApi } from "./attachments";
-import { fetchProtectedBlob } from "./protected-download";
-import type { SpaceRequestInit } from "./spaceRequestTypes";
+import { fetchProtectedBlob } from "./protected_download";
+import type { SpaceRequestInit } from "./space_request_types";
 
 export class SpaceRequestError extends ApiRequestError {
   constructor(message: string, status: number, code?: string, responseText = "") {
@@ -167,7 +167,6 @@ export const spacesApi = {
   snapshot: (onCached?: (value: SpacesSnapshot) => void) =>
     spaceRequest<SpacesSnapshot>("/spaces", { onCached }),
   create: createSpaceRequest,
-  /** People the person already shares a Space with. */
   people: () => spaceRequest<{ people: SpacePerson[] }>("/me/space-people"),
   invitationPreview: (token: string) =>
     spaceRequest<SpaceInvitationPreview>(`/space-invitations/${encodeURIComponent(token)}`),
@@ -186,17 +185,14 @@ export const spacesApi = {
       method: "DELETE",
       body: JSON.stringify({ confirmation }),
     }),
-  /** A Space's own picture, for its members (a PNG). */
   spacePicture: (spaceId: string) =>
     fetchProtectedBlob(`/spaces/${encodeURIComponent(spaceId)}/avatar`),
-  /** The owner sets the Space's picture: a square PNG body of at most 5 MB, not multipart. */
   setSpacePicture: (spaceId: string, png: Blob) =>
     spaceRequest<{ avatar_version: number }>(`/spaces/${encodeURIComponent(spaceId)}/avatar`, {
       method: "PUT",
       headers: { "Content-Type": "image/png" },
       body: png,
     }),
-  /** The owner takes the picture away; the Space shows its initials again. */
   removeSpacePicture: (spaceId: string) =>
     spaceRequest<{ avatar_version: number }>(`/spaces/${encodeURIComponent(spaceId)}/avatar`, {
       method: "DELETE",

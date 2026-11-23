@@ -12,17 +12,14 @@ import {
   AlertDialogTitle,
 } from "@misty/ui";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { flushWorkspaceRecovery } from "./recoveryStorage";
+import { flushWorkspaceRecovery } from "./recovery_storage";
 
 interface HeldQuit {
   unsaved: number;
-  /** Only the main window is closing; the app keeps running. */
   closing: boolean;
 }
 const finish = (closing: boolean) => invoke("app_quit_confirmed", { closing });
 
-/** Native holds quit (or closing the main window) while some workspace saves
- * exist only in this window. Save them first; ask only if that still fails. */
 export function UnsavedQuitGuard() {
   const [held, setHeld] = useState<HeldQuit | null>(null);
   const [busy, setBusy] = useState(false);

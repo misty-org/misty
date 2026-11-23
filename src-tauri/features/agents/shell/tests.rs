@@ -1,5 +1,3 @@
-//! The real OS wall, on real files in temporary folders. If one of these fails, the permission
-//! isn't holding, so they run against `sandbox-exec` itself rather than a mock.
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -161,7 +159,6 @@ async fn write_access_adds_and_edits_but_never_deletes() {
         let outcome = shell(&scene, "chat", command, folder).await;
         assert_ne!(outcome.exit_code, Some(0), "{command} should be refused");
     }
-    // Only the file surviving proves this one, whatever a tool's exit code says.
     shell(
         &scene,
         "chat",

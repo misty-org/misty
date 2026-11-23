@@ -1,5 +1,3 @@
-//! `/status` and `/usage`: the thread, the account, its rate limits and token use.
-
 use super::*;
 
 pub(super) async fn status(context: &Context) -> Result<Output, String> {
@@ -66,7 +64,6 @@ pub(super) async fn status(context: &Context) -> Result<Output, String> {
         ),
     });
 
-    // The email is shown to the person and never logged.
     let account_rows = match account {
         Ok(account) => account_rows(&account),
         Err(error) => vec![row("Account", error)],
@@ -131,7 +128,6 @@ pub(super) async fn usage(context: &Context) -> Result<Output, String> {
     Ok(Output::info("Codex usage", sections))
 }
 
-/// Uses one of the account's usage-limit resets. The key makes a retried request count once.
 async fn use_reset(context: &Context) -> Result<Output, String> {
     let result = call_once(
         context,
@@ -221,8 +217,6 @@ fn window_name(minutes: i64) -> String {
     }
 }
 
-/// The account's tokens: the summary, or the days (`daily`), weeks (`weekly`) or running total
-/// (`cumulative`) of the last ones Codex reports.
 fn token_section(tokens: &Value, view: &str) -> Section {
     let days: Vec<(String, i64)> = tokens["dailyUsageBuckets"]
         .as_array()
@@ -278,7 +272,6 @@ fn summary_rows(summary: &Value) -> Vec<Row> {
     rows
 }
 
-/// Days summed into the weeks (Monday first) they fall in.
 fn weeks(days: &[(String, i64)]) -> Vec<Row> {
     use chrono::Datelike;
     let mut weeks: Vec<(chrono::NaiveDate, i64)> = Vec::new();

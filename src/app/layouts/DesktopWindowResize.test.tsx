@@ -11,7 +11,7 @@ vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 vi.mock("@/shared/platform/os", () => ({ platform: () => "macos" }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => native }));
 
-import { useDesktopWindowChrome } from "./DesktopLayout/useDesktopWindowChrome";
+import { useDesktopWindowChrome } from "./DesktopLayout/use_desktop_window_chrome";
 
 beforeEach(() => {
   vi.useFakeTimers();

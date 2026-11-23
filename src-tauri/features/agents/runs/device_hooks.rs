@@ -1,6 +1,3 @@
-//! `defineHook` for device resumes: a run waits on a token, and `resume_device` answers it. Waits are
-//! in memory. A run re-registers its own after a restart (`tool_calls::SavedWait`), and an answer that
-//! arrives while a live run is between saying it will wait and waiting is kept for it.
 use std::{
     collections::HashMap,
     future::Future,
@@ -18,7 +15,6 @@ struct Hooks {
 #[derive(Default)]
 pub(crate) struct DeviceHooks(Mutex<Hooks>);
 
-/// The run a wake token belongs to: `misty-device:<run>:<call>:wait:<attempt>`.
 fn run_of(token: &str) -> Option<&str> {
     token.strip_prefix("misty-device:")?.split(':').next()
 }
@@ -28,8 +24,6 @@ impl DeviceHooks {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Waits for the token's answer. The hook exists from this call on, before the future is polled.
-    /// A hook that goes away unanswered (its run is ending) reads as unavailable.
     pub(crate) fn create(&self, token: &str) -> impl Future<Output = bool> + Send + 'static {
         let mut hooks = self.hooks();
         let early = hooks.early.remove(token);
@@ -45,9 +39,12 @@ impl DeviceHooks {
         }
     }
 
-    /// Answers a wait. `run_live` says whether the token's run is still going, in which case its
-    /// answer waits for it; otherwise the resume fails as `hook.resume` does for an unknown token.
-    pub(crate) fn resume(&self, token: &str, available: bool, run_live: impl Fn(&str) -> bool) -> bool {
+    pub(crate) fn resume(
+        &self,
+        token: &str,
+        available: bool,
+        run_live: impl Fn(&str) -> bool,
+    ) -> bool {
         let mut hooks = self.hooks();
         if let Some(waiter) = hooks.waiting.remove(token) {
             return waiter.send(available).is_ok();
@@ -59,10 +56,11 @@ impl DeviceHooks {
         false
     }
 
-    /// Forgets everything of a run that ended.
     pub(crate) fn forget_run(&self, run_id: &str) {
         let mut hooks = self.hooks();
-        hooks.waiting.retain(|token, _| run_of(token) != Some(run_id));
+        hooks
+            .waiting
+            .retain(|token, _| run_of(token) != Some(run_id));
         hooks.early.retain(|token, _| run_of(token) != Some(run_id));
     }
 }
@@ -79,7 +77,6 @@ mod tests {
         let wait = hooks.create(TOKEN);
         assert!(hooks.resume(TOKEN, true, |_| false));
         assert!(wait.await);
-        // The hook is used up.
         assert!(!hooks.resume(TOKEN, true, |_| false));
     }
 

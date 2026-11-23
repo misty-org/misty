@@ -1,6 +1,6 @@
 import { DockDropPreview } from "./DockDropPreview";
 import { panePlacement } from "@/features/app-windows";
-import { keepsLayoutWhileHidden } from "./keptTabs";
+import { keepsLayoutWhileHidden } from "./kept_tabs";
 import { selectPaneFocusPreferences } from "@/features/app-windows";
 import { useSettingsStore } from "@/features/settings";
 import { allLayoutViews, dockWidgetRegistry } from "@/features/app-windows";
@@ -23,23 +23,17 @@ import {
   dropZoneAt,
   dropZoneLabels,
   dropZoneRect,
-} from "./dockSplitFit";
-import { openWorkspaceRouteAt } from "./spaceNavigation";
-import { workspaceAiAdapter } from "./workspaceAi";
+} from "./dock_split_fit";
+import { openWorkspaceRouteAt } from "./space_navigation";
+import { workspaceAiAdapter } from "./workspace_ai";
 import type { WorkspaceDockTreeProps } from "./WorkspaceDockTree";
 
 const viewDragType = "application/x-misty-workspace-tab";
 
-/**
- * One open tab's page. Every open tab stays mounted, so this is the render
- * boundary: store updates keep an untouched tab's object identical, and a
- * change to another tab, the layout or the app route leaves this page alone.
- */
 const MountedWorkspaceView = memo(
   function MountedWorkspaceView(props: { paneId: string; tab: WorkspaceView; active: boolean }) {
     const tab = useRenderedView(props.tab);
     const defaultAdapter = useMemo(() => workspaceAiAdapter(tab), [tab]);
-    // Showing or hiding the tab only tells the AI host; the page itself does not render again.
     const surface = useMemo(
       () => (
         <WorkspaceViewTitleProvider tabId={tab.id}>
@@ -60,12 +54,6 @@ const MountedWorkspaceView = memo(
     sameRenderedView(previous.tab, next.tab),
 );
 
-/**
- * Selecting a tab stamps it with `lastFocusedAt`, which only the store's own ordering reads. A
- * page handed that new object rendered again in full on every switch (a Space with a long
- * collection took a third of a second), so the page keeps the object it has until something
- * it shows changes.
- */
 function sameRenderedView(previous: WorkspaceView, next: WorkspaceView): boolean {
   if (previous === next) return true;
   const keys = Object.keys(next) as (keyof WorkspaceView)[];
@@ -79,7 +67,6 @@ function useRenderedView(view: WorkspaceView): WorkspaceView {
   return rendered.current;
 }
 
-/** A drop on a pane's zone, drawn as the part of the pane the page will take, with its name. */
 function dockHit(rect: DOMRect, zone: DockDropZone) {
   return {
     id: zone,
@@ -96,16 +83,12 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
   const { pane } = props;
   const sectionRef = useRef<HTMLElement | null>(null);
   const [dropZone, setDropZone] = useState<DockDropZone | null>(null);
-  // Measured when a drag asks. Kept in state it re-rendered the pane on every step of a window resize.
   const paneSize = () => {
     const bounds = sectionRef.current?.getBoundingClientRect();
     return { width: bounds?.width ?? 0, height: bounds?.height ?? 0 };
   };
   const activeTab = pane.views.find((tab) => tab.id === pane.activeViewId) ?? pane.views[0];
   const focused = props.workspaceActive !== false && pane.id === props.focusedPaneId;
-  // Open tabs own live UI state and subscriptions. Hiding an inactive surface
-  // must not unmount it, otherwise collaborative tools reconnect and reload on
-  // every tab switch. Closing the tab remains the lifecycle boundary.
   const mountedTabs = [...pane.views].sort((a, b) => a.id.localeCompare(b.id));
   usePointerDropTarget(sectionRef, {
     scope: "workspace-tabs",
@@ -116,7 +99,6 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
       const moving = allLayoutViews(useWorkspaceStore.getState().layout).find(
         (tab) => tab.id === drag.id,
       );
-      // A pane already showing the dragged page has nowhere to put it.
       if (!moving || pane.views.some((view) => view.id === moving.id)) return null;
       if (zone !== "center" && !dockSplitFits(pane, paneSize(), zone, moving)) return null;
       return dockHit(rect, zone);
@@ -128,7 +110,6 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
     },
   });
 
-  // A page not open yet, by its route (a chat dragged from the sidebar), docks the same way.
   usePointerDropTarget(sectionRef, {
     scope: "workspace-place",
     hit(x, y, drag) {
@@ -234,8 +215,6 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
       className={cn(
         "group/pane relative grid h-full min-h-0 min-w-0 grid-rows-[minmax(0,1fr)]",
         "overflow-hidden focus:outline-none",
-        // A pane at the window's top with no toolbar of its own gets a title band under the
-        // window buttons (useMergedTitlebar marks it).
         "data-[window-titlebar-fallback-active=true]:pt-[var(--shell-titlebar,calc(var(--spacing)*9.5))]",
       )}
       data-workspace-pane={pane.id}
@@ -263,7 +242,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
         data-workspace-titlebar-fallback
         data-misty-window-titlebar-region="true"
         className={cn(
-          "hidden min-w-0 text-xs",
+          "hidden min-w-0 text-caption",
           "group-data-[window-titlebar-fallback-active=true]/pane:absolute",
           "group-data-[window-titlebar-fallback-active=true]/pane:inset-x-0",
           "group-data-[window-titlebar-fallback-active=true]/pane:top-0",
@@ -277,7 +256,6 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
         <Text tone="muted">{activeTab?.title || "New tab"}</Text>
       </Surface>
       <div
-        // A pane narrower than its view's content scrolls it sideways instead of crushing it.
         className="grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-x-auto overflow-y-hidden"
         data-pane-layer
       >

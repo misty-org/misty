@@ -25,7 +25,7 @@ vi.mock("@/features/account", () => ({
 
 vi.mock("./list/SpaceAgentsBroadcast", () => ({ SpaceAgentsBroadcast: () => null }));
 vi.mock("./list/SpaceStudioPeople", () => ({ SpaceStudioPeople: () => null }));
-vi.mock("./list/useSpacesStore", () => ({
+vi.mock("./list/use_spaces_store", () => ({
   useSpacesStore: Object.assign(
     (selector: (state: typeof mocks.spaces) => unknown) => selector(mocks.spaces),
     { getState: () => mocks.spaces },

@@ -1,6 +1,5 @@
-import { useConversationActions } from "./useConversationActions";
+import { useConversationActions } from "./UseConversationActions";
 
-/** Shared by collection rows, history, recents, and the open conversation. */
 export function AgentConversationActions(props: {
   conversation: { id: string; title?: string };
   disabled?: boolean;

@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalToolRejected } from "../host";
-import { spacesGateway } from "../../spaces-gateway/spacesGateway";
-import { spaceTools } from "../spaceTools";
-import { SPACES, call, serve } from "./testRoutes";
+import { spacesGateway } from "../../spaces-gateway/spaces_gateway";
+import { spaceTools } from "../space_tools";
+import { SPACES, call, serve } from "./test_routes";
 
 vi.mock("@/api/client", async (original) => ({
   ...(await original<object>()),
   apiRequest: vi.fn(),
 }));
-// The run works in its agent's home Space, Work.
-vi.mock("../runContexts", async (original) => ({
+vi.mock("../run_contexts", async (original) => ({
   ...(await original<object>()),
   runSpaceId: vi.fn(async () => "s1"),
 }));
@@ -58,10 +57,12 @@ describe("files", () => {
     serve(SPACES);
     drive.driveEntry.mockResolvedValue(entry("/notes.md"));
     drive.driveRead.mockResolvedValue(new TextEncoder().encode("hi").buffer);
-    await expect(call(tool("file.read"), { space: "s1", path: "notes.md" })).resolves.toMatchObject({
-      path: "/notes.md",
-      text: "hi",
-    });
+    await expect(call(tool("file.read"), { space: "s1", path: "notes.md" })).resolves.toMatchObject(
+      {
+        path: "/notes.md",
+        text: "hi",
+      },
+    );
     expect(drive.driveEntry).toHaveBeenCalledWith("s1", "/notes.md");
     await expect(
       call(tool("file.read"), { space: "s1", path: "../x" }).catch(refusal),

@@ -1,14 +1,3 @@
-//! Antigravity's sub-agents on the ACP turn. `invoke_subagent` (`/teamwork`, `/browser`, `/goal`
-//! and the model's own hand-offs) reaches ACP as one tool call with only `Prompt`, `Role` and
-//! `TypeName`, and finishes as soon as the sub-agent starts: the sub-agent works on in the
-//! background, and its steps go only to its own conversation's transcript. This reads them from
-//! there and shows them nested under the row that started it, the way Claude Code's Task shows.
-//!
-//! Checked against agy 1.5.9: each sub-agent the conversation starts is recorded in
-//! `brain/<conversation>/.system_generated/subagents/<child>.json` (`conversationId`,
-//! `spawnStepIndex`, `subagentDescriptor`), and the child writes its steps to
-//! `brain/<child>/.system_generated/logs/transcript.jsonl`, one JSON step per line.
-
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -17,49 +6,30 @@ use serde_json::{json, Map, Value};
 
 use crate::engines::{tool_call_message_with_id, tool_result_patch_with_id, EngineEvent};
 
-/// How often the sub-agents' files are read while the turn's own stream is busy.
 const POLL: Duration = Duration::from_millis(400);
-/// After the prompt has answered, how long the turn waits on a sub-agent that hasn't reported
-/// back, with nothing new from it or the main agent: a model's turn can think this long.
 const QUIET_WORKING: Duration = Duration::from_secs(90);
-/// And once every sub-agent has reported back. agy 1.5.9 doesn't stream the main agent's answer
-/// to the report over ACP (it runs in the conversation, unsent), so this is only slack.
 const QUIET_REPORTED: Duration = Duration::from_secs(5);
 
-/// The sub-agents one turn starts, and how far each one's transcript has been read.
 pub(crate) struct Subagents {
     brain: PathBuf,
-    /// `brain/<conversation>/.system_generated/subagents`.
     folder: PathBuf,
-    /// Sub-agents already shown, and those an earlier turn started, which this one leaves alone.
     seen: HashSet<String>,
-    /// `invoke_subagent` rows no sub-agent has been matched to yet, oldest first.
     rows: VecDeque<String>,
-    /// The parent's step that started sub-agents -> the row they nest under: one call can start
-    /// several, and each records the same `spawnStepIndex`.
     spawns: HashMap<i64, String>,
     logs: Vec<ChildLog>,
     polled: Option<Instant>,
 }
 
-/// One sub-agent's transcript, read as it grows.
 struct ChildLog {
-    /// The `invoke_subagent` row its own rows nest under.
     row: String,
     conversation: String,
     path: PathBuf,
-    /// Bytes of the transcript already read (whole lines only).
     offset: u64,
-    /// Calls whose result step hasn't been read yet, oldest first: the transcript runs a planner
-    /// step's calls in the steps after it, in order.
     pending: VecDeque<(String, String)>,
-    /// Its last step sent the main agent a message (`send_message`), which is how a sub-agent
-    /// hands back its work.
     reported: bool,
 }
 
 impl Subagents {
-    /// The sub-agents of the conversation `session_id`, in Antigravity's own home.
     pub(crate) fn of(session_id: &str) -> Self {
         Self::in_brain(super::agy_home().join("brain"), session_id)
     }
@@ -84,9 +54,6 @@ impl Subagents {
         }
     }
 
-    /// Follows one `session/update`. An `invoke_subagent` call is remembered as the row its
-    /// sub-agent nests under, and comes back with its input named the way the chat reads a
-    /// sub-agent's goal off its Task (`description`, `prompt`, `subagent_type`).
     pub(crate) fn update(&mut self, params: &Value) -> Option<Value> {
         let update = &params["update"];
         if update["sessionUpdate"] != "tool_call" || update["name"] != "invoke_subagent" {
@@ -95,7 +62,6 @@ impl Subagents {
         let id = update["toolCallId"].as_str().filter(|id| !id.is_empty())?;
         if !self.rows.iter().any(|row| row == id) && !self.spawns.values().any(|row| row == id) {
             self.rows.push_back(id.to_string());
-            // Look for its sub-agent on the next line.
             self.polled = None;
         }
         let input = update.get("rawInput").and_then(Value::as_object)?;
@@ -114,8 +80,6 @@ impl Subagents {
         Some(params)
     }
 
-    /// What the sub-agents have done since the last look, at most every `POLL` unless `now`:
-    /// each one's rows inside a `Scope` naming the row that started it.
     pub(crate) fn poll(&mut self, now: bool) -> Vec<EngineEvent> {
         if (self.rows.is_empty() && self.logs.is_empty())
             || (!now && self.polled.is_some_and(|at| at.elapsed() < POLL))
@@ -139,12 +103,10 @@ impl Subagents {
         out
     }
 
-    /// Whether this turn started a sub-agent.
     pub(crate) fn started_any(&self) -> bool {
         !self.rows.is_empty() || !self.logs.is_empty()
     }
 
-    /// How long the turn may go with nothing new before it ends, once its prompt has answered.
     pub(crate) fn quiet_after(&self) -> Duration {
         if self.rows.is_empty() && self.logs.iter().all(|log| log.reported) {
             QUIET_REPORTED
@@ -153,8 +115,6 @@ impl Subagents {
         }
     }
 
-    /// Starts reading each new sub-agent, under the row of the call that started it. One seen
-    /// before its call's row arrived waits for the next look.
     fn adopt(&mut self) {
         let mut found: Vec<(String, i64)> = records(&self.folder)
             .into_iter()
@@ -191,8 +151,10 @@ impl Subagents {
     }
 }
 
-/// Each sub-agent record in the folder: its conversation id and the parent's step that started
-/// it. A record still being written is left for the next look.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads agy's own subagent records in place, under its home, which ANTIGRAVITY_HOME may move outside the engine folders the gate grants"
+)]
 fn records(folder: &std::path::Path) -> Vec<(String, i64)> {
     let Ok(entries) = std::fs::read_dir(folder) else {
         return Vec::new();
@@ -212,6 +174,10 @@ fn records(folder: &std::path::Path) -> Vec<(String, i64)> {
 }
 
 impl ChildLog {
+    #[allow(
+        clippy::disallowed_types,
+        reason = "tails agy's own subagent transcript in place, under its home, which ANTIGRAVITY_HOME may move outside the engine folders the gate grants"
+    )]
     fn read(&mut self, out: &mut Vec<EngineEvent>) {
         use std::io::{Read, Seek, SeekFrom};
         let Ok(mut file) = std::fs::File::open(&self.path) else {
@@ -219,7 +185,6 @@ impl ChildLog {
         };
         let length = file.metadata().map(|m| m.len()).unwrap_or(0);
         if length < self.offset {
-            // Rewritten from the start: read it again (rows already shown keep their ids).
             self.offset = 0;
             self.pending.clear();
         }
@@ -230,7 +195,6 @@ impl ChildLog {
         if file.read_to_end(&mut bytes).is_err() {
             return;
         }
-        // A line still being written waits for the next look.
         let Some(end) = bytes.iter().rposition(|b| *b == b'\n') else {
             return;
         };
@@ -242,9 +206,6 @@ impl ChildLog {
         }
     }
 
-    /// One transcript step: a `PLANNER_RESPONSE` lists the calls it makes in `tool_calls` (each
-    /// argument JSON-encoded as a string), and each call's outcome is a later step, `DONE` with
-    /// its output in `content` or `ERROR` with `error`.
     fn step(&mut self, step: &Value, out: &mut Vec<EngineEvent>) {
         let index = step["step_index"].as_i64().unwrap_or(-1);
         match step["type"].as_str().unwrap_or("") {
@@ -288,13 +249,10 @@ impl ChildLog {
     }
 }
 
-/// A failed tool result, the shape every adapter settles a row as failed with.
 fn failure(message: &str) -> Value {
     json!({ "isError": true, "content": message })
 }
 
-/// Tool output opens with agy's own `Created At:` / `Completed At:` lines, which say nothing the
-/// row's timing doesn't.
 fn without_timestamps(text: &str) -> String {
     let mut rest = text;
     while rest.starts_with("Created At:") || rest.starts_with("Completed At:") {
@@ -303,8 +261,6 @@ fn without_timestamps(text: &str) -> String {
     rest.to_string()
 }
 
-/// A transcript's tool-call arguments are each JSON-encoded (`"\"ls -la\""`); decoded here so the
-/// row shows the values themselves.
 fn decoded_args(args: &Value) -> Value {
     match args {
         Value::Object(map) => Value::Object(

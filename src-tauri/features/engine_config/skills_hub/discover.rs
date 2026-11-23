@@ -13,9 +13,7 @@ use super::registry::*;
 use super::repos::*;
 use super::scan::*;
 use super::target_sync::SKILL_CONTENT_MAX_BYTES;
-// ===== discover / updates / search / popular (caches and network) =====
 
-/// upstream's `/(^|\/)SKILL\.md$/i` test (case-insensitive).
 pub(super) fn is_skill_md_path(path: &str) -> bool {
     let bytes = path.as_bytes();
     if bytes.len() == "skill.md".len() {
@@ -25,7 +23,6 @@ pub(super) fn is_skill_md_path(path: &str) -> bool {
         && bytes[bytes.len() - "/skill.md".len()..].eq_ignore_ascii_case(b"/skill.md")
 }
 
-/// upstream's `docPath.replace(/(^|\/)(?:SKILL|skill)\.md$/i, "")`.
 pub(super) fn strip_skill_md_suffix(doc_path: &str) -> &str {
     let bytes = doc_path.as_bytes();
     if bytes.len() == "skill.md".len() && bytes.eq_ignore_ascii_case(b"skill.md") {
@@ -39,8 +36,6 @@ pub(super) fn strip_skill_md_suffix(doc_path: &str) -> &str {
     doc_path
 }
 
-/// upstream discoverRepoSkills: the tree's SKILL.md blobs, at most 200, with front matter fetched 4 at a
-/// time; a failure other than a rate limit keeps the entry as `{name: installName, description: ""}`.
 pub(super) async fn discover_repo_skills(
     client: &reqwest::Client,
     repo_input: &Value,
@@ -81,7 +76,6 @@ pub(super) async fn discover_repo_skills(
             let branch = Arc::clone(&branch);
             async move {
                 let doc_path = doc_path.replace('\\', "/");
-                // A SKILL.md at the root → repo.name.
                 let stripped = strip_skill_md_suffix(&doc_path);
                 let directory = if stripped.is_empty() {
                     name.as_str().to_string()
@@ -104,7 +98,6 @@ pub(super) async fn discover_repo_skills(
                         if error.is_rate_limited() {
                             return Err(error);
                         }
-                        // A failure other than a rate limit: keep the entry (metadata fallback).
                     }
                 }
                 Ok(Some(json!({
@@ -133,7 +126,6 @@ pub(super) async fn discover_repo_skills(
     Ok(skills)
 }
 
-/// upstream dedupeSkills: dedupes by lowercased key (the later one wins, in the first one's place), sorted by name.
 pub(super) fn dedupe_skills(skills: Vec<Value>) -> Vec<Value> {
     let mut by_key: HashMap<String, usize> = HashMap::new();
     let mut values: Vec<Value> = Vec::new();
@@ -157,7 +149,6 @@ pub(super) fn dedupe_skills(skills: Vec<Value>) -> Vec<Value> {
     values
 }
 
-/// upstream discover fingerprint: enabled repos' `owner/name@branch`, sorted and joined with `|`.
 pub(super) fn discover_fingerprint(repos: &[Value]) -> String {
     let mut parts: Vec<String> = repos
         .iter()
@@ -174,7 +165,6 @@ pub(super) fn discover_fingerprint(repos: &[Value]) -> String {
     parts.join("|")
 }
 
-/// upstream readDiscoverCache: a hit only when the fingerprint matches and generatedAt is at most 1h old.
 pub(super) fn read_discover_cache(fingerprint: &str) -> Option<(Vec<Value>, i64)> {
     let data = read_json(&discover_cache_path())?;
     let skills = data.get("skills").and_then(Value::as_array)?.clone();
@@ -195,8 +185,6 @@ pub(super) fn write_discover_cache(fingerprint: &str, skills: &[Value]) -> Skill
     )
 }
 
-/// upstream discoverSkills: allSettled semantics (one repo failing doesn't sink the rest, but an empty
-/// result with a rate limit surfaces the rate limit).
 pub(super) async fn discover_skills(force: bool) -> SkillResult<Value> {
     let registry = read_registry();
     let enabled: Vec<Value> = registry
@@ -242,16 +230,10 @@ pub(super) async fn discover_skills(force: bool) -> SkillResult<Value> {
     Ok(json!({"skills": merged, "cached": false, "generatedAt": now_ms()}))
 }
 
-// ===== skills.sh details: find SKILL.md in the repo and read it back =====
-
-/// A skills.sh skill id normalized: lowercase, `:` to `-` (the site's `react:components` is
-/// `react-components` in the repo).
 pub(super) fn normalize_skill_id(value: &str) -> String {
     value.trim().to_lowercase().replace(':', "-")
 }
 
-/// How well a folder name matches a skill id: 3 = the same; 2 = one is the other without the repo
-/// prefix (`vercel-react-best-practices` ↔ `react-best-practices`); 0 = no match.
 fn skill_dir_score(folder: &str, wanted: &str) -> u8 {
     let folder = normalize_skill_id(folder);
     if folder.is_empty() {
@@ -266,13 +248,6 @@ fn skill_dir_score(folder: &str, wanted: &str) -> u8 {
     0
 }
 
-/// Finds the folder holding `SKILL.md` for a skills.sh skill id in the repo tree, by folder name
-/// (the folder path without `/SKILL.md`; a SKILL.md at the root gives an empty string, which skills.sh
-/// only points at when the id equals the repo name).
-///
-/// Only three matches count: the same name, without the repo prefix, or `:` changed to `-`; of
-/// several the shallowest wins, and none gives None: better to report not_found and send the person
-/// to GitHub than show another skill's text in its place.
 pub(super) fn resolve_skill_dir_in_tree(tree: &[Value], skill_id: &str) -> Option<String> {
     let wanted = normalize_skill_id(skill_id);
     if wanted.is_empty() {
@@ -312,7 +287,6 @@ pub(super) fn resolve_skill_dir_in_tree(tree: &[Value], skill_id: &str) -> Optio
     best.map(|(_, _, dir)| dir)
 }
 
-/// Every blob in one folder (an install downloads a folder's files by the same rule).
 pub(super) fn skill_dir_files<'a>(tree: &'a [Value], dir: &str) -> Vec<&'a Value> {
     let prefix = format!("{dir}/");
     tree.iter()
@@ -327,7 +301,6 @@ pub(super) fn skill_dir_files<'a>(tree: &'a [Value], dir: &str) -> Vec<&'a Value
         .collect()
 }
 
-/// Whether the folder has a `SKILL.md` (uppercase first, then `skill.md`).
 pub(super) fn dir_has_skill_md(tree: &[Value], dir: &str) -> bool {
     skill_dir_files(tree, dir).iter().any(|entry| {
         entry
@@ -338,8 +311,6 @@ pub(super) fn dir_has_skill_md(tree: &[Value], dir: &str) -> bool {
     })
 }
 
-/// When the given folder has no SKILL.md, resolves the skills.sh id in the tree once more
-/// （`vercel-react-best-practices` → `skills/react-best-practices`）。
 pub(super) fn resolve_existing_skill_dir(tree: &[Value], requested: &str) -> Option<String> {
     if dir_has_skill_md(tree, requested) {
         return Some(requested.to_string());
@@ -352,8 +323,6 @@ pub(super) fn resolve_existing_skill_dir(tree: &[Value], requested: &str) -> Opt
     Some(resolved)
 }
 
-/// skills.sh search and popular give only name / repo / installs; what a skill does has to come
-/// from the repo's `SKILL.md` (the details panel asks on demand, never for a whole list).
 pub(super) async fn remote_skill_content(
     owner: &str,
     name: &str,
@@ -373,7 +342,6 @@ pub(super) async fn remote_skill_content(
     let (branch, tree) = get_repo_tree(&client, owner, name, branch).await?;
     let doc_path = match resolve_skill_dir_in_tree(&tree, &wanted) {
         Some(dir) => format!("{dir}/SKILL.md"),
-        // The whole repo has one SKILL.md at the root: a skills.sh id is often the repo name.
         None => {
             let all: Vec<&str> = tree
                 .iter()

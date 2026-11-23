@@ -1,4 +1,4 @@
-import { needsDefaultEngine, openEngineSettings } from "../../engines/engineNeeded";
+import { needsDefaultEngine, openEngineSettings } from "../../engines/engine_needed";
 import { ErrorNotice } from "../ErrorNotice";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -79,21 +79,17 @@ export function BrowserContextMenuView({
       </Portal>
       <DropdownMenuContent
         aria-label="Browser actions"
-        // Opens at the pointer, so it fades in place rather than sliding.
         data-popup-at-pointer=""
         align="start"
         side="bottom"
         sideOffset={0}
         collisionPadding={8}
         width="lg"
-        // Stay within the space left in the window so the last items (Inspect
-        // Page, Extensions) scroll into view instead of running off-screen.
         className="max-h-[min(--spacing(140),var(--radix-dropdown-menu-content-available-height))]"
         onCloseAutoFocus={(event) => event.preventDefault()}
         onPointerDown={(event) => event.stopPropagation()}
       >
         {menu.actions
-          // A separator never comes first, last or doubled.
           .filter(
             (action, index, all) =>
               action !== "separator" ||
@@ -151,8 +147,6 @@ export function BrowserContextMenuBridge() {
         if (!disposed && current.current === payload) setMenu(payload);
       },
     );
-    // While Misty's menu for a page is on its way or open, the renderer's own engine menu would
-    // open beside it for a few frames, so it never shows then. Fields keep theirs.
     const suppressEngineMenu = (event: MouseEvent) => {
       if (current.current && !isEditableTarget(event.target)) event.preventDefault();
     };
@@ -175,7 +169,6 @@ export function BrowserContextMenuBridge() {
     const pending = current.current;
     if (!pending) return;
     current.current = null;
-    // Unmount the modal layer before Ask or another surface acquires focus.
     flushSync(() => setMenu(null));
     setBrowserWebviewsSuspended(false, suspensionReason);
     void invoke("browser_context_menu_select", { key: pending.key, action }).catch(

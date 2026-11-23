@@ -1,0 +1,140 @@
+import { apiRequest } from "@/api/client";
+import { spacePath } from "@/features/agents/local_run";
+import type { AiCitation, AiContextReference } from "../invocations/invocation_types";
+
+const maxReferences = 64;
+const maxChunk = 8_000;
+
+export interface ResolvedSource {
+  kind: string;
+  title: string;
+  content: string;
+  citation: AiCitation;
+}
+
+interface ChatMessage {
+  created_at: string;
+  sender_name: string;
+  content: { type: string; text?: string; label?: string }[];
+}
+
+const excerpt = (text: string) => {
+  const clean = text.split(/\s+/).filter(Boolean).join(" ");
+  return [...clean].length > 240 ? `${[...clean].slice(0, 239).join("")}…` : clean;
+};
+
+function relevantChunk(content: string, query: string): string {
+  const text = content.trim();
+  if ([...text].length <= maxChunk) return text;
+  const at = query.trim() ? text.toLowerCase().indexOf(query.trim().toLowerCase()) : -1;
+  const start = Math.max(0, at - 800);
+  return text.slice(start, start + maxChunk);
+}
+
+const firstText = (...values: (string | undefined)[]) =>
+  values.find((value) => value?.trim())?.trim() ?? "";
+
+const spansText = (spans: ChatMessage["content"]) =>
+  spans
+    .map((span) => (span.type === "text" ? (span.text ?? "") : span.label ? `@${span.label}` : ""))
+    .join("")
+    .trim();
+
+async function note(reference: AiContextReference, spaceId: string): Promise<ResolvedSource> {
+  const note = await apiRequest<{
+    id: string;
+    title: string;
+    markdown?: string;
+    revision?: unknown;
+  }>(spacePath(spaceId, `/notes/${encodeURIComponent(reference.id)}`));
+  const body = (note.markdown ?? "").trim();
+  const title = firstText(note.title, reference.title, "Note");
+  return {
+    kind: "note",
+    title,
+    content: body,
+    citation: {
+      id: note.id,
+      kind: "note",
+      title,
+      href: `/spaces/${encodeURIComponent(spaceId)}/lab?doc=${encodeURIComponent(note.id)}`,
+      revision: note.revision as AiCitation["revision"],
+      excerpt: excerpt(body),
+    },
+  };
+}
+
+async function chat(reference: AiContextReference, spaceId: string): Promise<ResolvedSource> {
+  const everyone = reference.id === "everyone" || reference.id === spaceId;
+  const path = everyone
+    ? spacePath(spaceId, "/messages?limit=100")
+    : spacePath(spaceId, `/conversations/${encodeURIComponent(reference.id)}/messages?limit=100`);
+  const { messages } = await apiRequest<{ messages: ChatMessage[] }>(path);
+  const lines = messages.flatMap((message) => {
+    const text = spansText(message.content);
+    return text ? [`${message.created_at} — ${message.sender_name}: ${text}`] : [];
+  });
+  const title = firstText(reference.title, "Space chat");
+  const href = `/spaces/${encodeURIComponent(spaceId)}/chat`;
+  return {
+    kind: "space.chat",
+    title,
+    content: relevantChunk(lines.join("\n"), reference.title),
+    citation: {
+      id: reference.id,
+      kind: "space.chat",
+      title,
+      href: everyone ? href : `${href}?conversation=${encodeURIComponent(reference.id)}`,
+      excerpt: "Recent messages in the visible conversation",
+    },
+  };
+}
+
+function workspaceScope(reference: AiContextReference): ResolvedSource | null {
+  const members = reference.metadata?.members;
+  if (typeof members !== "string" || members.length > 64 << 10) return null;
+  try {
+    JSON.parse(members);
+  } catch {
+    return null;
+  }
+  return {
+    kind: reference.kind,
+    title: reference.title,
+    content: `Search only these attached source references. Contents have not been loaded: ${members}`,
+    citation: { id: reference.id, kind: reference.kind, title: reference.title, href: "" },
+  };
+}
+
+async function resolveOne(reference: AiContextReference): Promise<ResolvedSource | null> {
+  const spaceId = reference.spaceId?.trim() ?? "";
+  switch (reference.kind.trim().toLowerCase()) {
+    case "note":
+    case "notes":
+      return spaceId ? note(reference, spaceId) : null;
+    case "space.chat":
+      return spaceId ? chat(reference, spaceId) : null;
+    case "workspace.scope":
+      return workspaceScope(reference);
+    default:
+      return null;
+  }
+}
+
+export async function resolveContext(
+  references: AiContextReference[],
+  signedIn: boolean,
+): Promise<ResolvedSource[]> {
+  if (!signedIn) return [];
+  const seen = new Set<string>();
+  const unique = references.slice(0, maxReferences).filter((reference) => {
+    const identity = `${reference.kind}:${reference.id}`;
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+  const settled = await Promise.allSettled(unique.map(resolveOne));
+  return settled.flatMap((result) =>
+    result.status === "fulfilled" && result.value ? [result.value] : [],
+  );
+}

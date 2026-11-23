@@ -86,86 +86,45 @@ use sandbox::{sandbox_for, writable_roots};
 pub(super) use questions::{answer_frame, async_answer_request, next_async_question_rpc_id};
 use questions::{async_question_cards, park_async_question, park_question, question_cards};
 
-/// Terminal marker for a kill-interrupted turn. The driver swallows it (the
-/// killed flag already said why) and lets the turn settle as an interruption,
-/// the same contract as the sibling drivers.
 const CANCELLED: &str = "codex turn cancelled";
 
-/// `thread/start` builds the thread's context before it can answer — on a large
-/// workspace that is the expensive call of the whole turn, so it gets far more
-/// headroom than a plain RPC.
 const THREAD_TIMEOUT: Duration = Duration::from_secs(90);
-/// `thread/resume` only re-attaches an existing thread.
 const RESUME_TIMEOUT: Duration = Duration::from_secs(30);
-/// Grace for the CLI to react to `turn/interrupt` with its own terminal
-/// notification before the process tree is killed anyway.
 const INTERRUPT_SETTLE_TIMEOUT: Duration = Duration::from_secs(2);
 pub(super) const ASYNC_QUESTION_REPLY_TIMEOUT: Duration = Duration::from_secs(10);
 static NEXT_ASYNC_QUESTION_RPC_ID: AtomicU64 = AtomicU64::new(1);
 
-/// What a pump call is waiting for.
 #[derive(Clone, Copy)]
 enum Expect<'a> {
-    /// The reply to the request whose id key is carried here.
     Reply(&'a str),
-    /// No reply — the turn's own terminal notification ends this pump.
     Turn,
 }
 
-/// How the pump should treat one decoded line.
 enum Handled {
-    /// Nothing for the turn; keep reading.
     Ignore,
-    /// Answer this server→client request now.
     Answer(Value),
-    /// The request was parked for the user: do not answer it here, the answer
-    /// command writes the response on the shared stdin later.
     Parked,
-    /// The turn is over.
     Ended,
 }
 
-/// Per-run projection state: what streamed, and what to report at settle time.
 #[derive(Default)]
 struct TurnView {
-    /// The reply that opened the turn's thread: set by the handshake, or carried in from a warm
-    /// app-server that already holds the thread, which then skips its handshake.
     thread_reply: Option<Value>,
-    /// Item id whose text already streamed as deltas. A completed
-    /// `agentMessage` repeats that text in full, and a `message` row appends as
-    /// a settled snapshot (the UI collapses the live row first), so replaying
-    /// it would print the answer twice. Same for reasoning.
     streamed_message: Option<String>,
     streamed_reasoning: Option<String>,
-    /// Turn id from the `turn/start` reply, or from `turn/started` for a turn
-    /// whose reply has none (`/compact`) — the handle `turn/interrupt` needs.
     turn_id: Option<String>,
-    /// Last `thread/tokenUsage/updated` payload, folded into this turn's Done:
-    /// the terminal notification itself carries no usage.
     last_usage: Option<Value>,
     exit_unconfirmed: bool,
     isolated_home: Option<std::path::PathBuf>,
-    /// This run is a human-approved planning turn (`permission == "plan"`):
-    /// only then do plan deltas/items feed the approval backbone — a plan
-    /// item in an ordinary turn must never become an approvable review.
     plan_mode: bool,
-    /// Workspace snapshot for the review record (the turn handlers have no
-    /// access to the request, so the driver seeds it here).
     workspace: String,
-    /// The thread this turn runs on. Sub-agent threads (Codex's collab tools) stream on the same
-    /// connection under their own thread id; only this one's session, text and end count.
     main_thread: Option<String>,
-    /// Sub-agent thread -> the `collabAgentToolCall` item that spawned it, so the sub-agent's
-    /// rows nest under that row (`EngineEvent::Scope`, as Claude's `parent_tool_use_id`).
     children: HashMap<String, String>,
-    /// The latest spawn item, for a sub-agent thread seen before its spawn completed.
     last_spawn: Option<String>,
-    /// The scope last announced to the bridge.
     scope: Option<String>,
 }
 
 impl TurnView {
-    /// A thread other than this turn's own: a sub-agent's.
     fn is_child(&self, thread: &str) -> bool {
         self.main_thread
             .as_deref()
@@ -181,8 +140,6 @@ impl TurnView {
     }
 }
 
-/// Whether a started thread is a sub-agent's: its `source` names one (`subAgent`, in whichever
-/// casing the server writes it).
 fn is_sub_agent(thread: &Value) -> bool {
     thread
         .get("source")
@@ -194,9 +151,6 @@ fn is_sub_agent(thread: &Value) -> bool {
         })
 }
 
-/// One notification on a sub-agent's thread. Its tool rows nest under the spawn row; its text,
-/// usage and turn end belong to the sub-agent, whose result reaches the main agent through the
-/// collab tool itself, so they don't stream into this turn's reply.
 fn handle_child_notification(
     core: &TurnCore,
     state: &mut TurnState,
@@ -234,11 +188,7 @@ fn handle_child_notification(
     Handled::Ignore
 }
 
-/// A turn's JSON-RPC channel to one `codex app-server` child.
 struct AppServer {
-    /// Shared with the registry: the answer command writes a parked question's
-    /// response on this same pipe, so the lock is the only serialization point
-    /// between the two writers.
     stdin: Arc<TokioMutex<Option<ChildStdin>>>,
     stdout: BufReader<ChildStdout>,
     line_buf: Vec<u8>,
@@ -271,7 +221,6 @@ impl AppServer {
             .map_err(|error| format!("codex stdin flush failed: {error}"))
     }
 
-    /// Send a request and return the id key its reply will carry.
     async fn request(&mut self, method: &str, params: Value) -> Result<String, String> {
         let id = self.next_id;
         self.next_id += 1;
@@ -279,19 +228,6 @@ impl AppServer {
         Ok(id.to_string())
     }
 
-    /// Read until this pump's expectation is met.
-    ///
-    /// `Ok(Some(result))` is the awaited reply; `Ok(None)` means the turn ended
-    /// first — a fast turn can finish before its `turn/start` reply is read, and
-    /// the turn pump ends on `turn/completed` rather than on any reply. Lines
-    /// are classified locally (method+id is a server→client request, method
-    /// alone a notification, id alone a reply) because codex speaks plain
-    /// JSON-RPC, unlike the ACP framing the sibling drivers parse. A `None`
-    /// deadline reads on until the expectation, the CLI's EOF, or a kill.
-    ///
-    /// `interrupt` is the thread a kill interrupts and its turn id. A turn
-    /// started by `thread/compact/start` has no id in its reply, so with
-    /// `None` for the id the pump takes it from the thread's `turn/started`.
     async fn pump(
         &mut self,
         label: &str,
@@ -299,13 +235,9 @@ impl AppServer {
         deadline: impl Into<Option<Instant>>,
         killed: &AtomicBool,
         interrupt: Option<(&str, Option<&str>)>,
-        // `Send` is required: the driver runs inside a spawned task, and a
-        // bare trait object would make the whole turn future non-Send.
         on_message: &mut (dyn FnMut(&Value) -> Handled + Send),
     ) -> Result<Option<Value>, String> {
         let mut interrupted = false;
-        // Killed before the turn's id was known: the pump reads on for the
-        // settle window, waiting for `turn/started`.
         let mut awaiting_id = false;
         let mut learned: Option<String> = None;
         let mut deadline: Option<Instant> = deadline.into();
@@ -314,14 +246,6 @@ impl AppServer {
                 let interrupt = interrupt
                     .map(|(thread_id, turn_id)| (thread_id, turn_id.or(learned.as_deref())));
                 match interrupt {
-                    // Ask the CLI to stop the turn itself: its `interrupted`
-                    // completion is what lets it persist the rollout before the
-                    // tree dies, so it gets a bounded window to do that instead
-                    // of a pipe yanked out from under it. This must carry an id
-                    // — measured against this CLI, a bare notification is
-                    // ignored and the turn runs on to completion — and its own
-                    // reply is dropped by the pump, which is waiting on the
-                    // completion, not on the acknowledgement.
                     Some((thread_id, Some(turn_id))) if !interrupted => {
                         interrupted = true;
                         let settle_by = Instant::now() + INTERRUPT_SETTLE_TIMEOUT;
@@ -332,10 +256,7 @@ impl AppServer {
                         )
                         .await?;
                     }
-                    // Already asked: read on until the window closes.
                     Some((_, Some(_))) => {}
-                    // The turn hasn't said its id yet: give it the settle
-                    // window to, then interrupt it.
                     Some((_, None)) => {
                         if !awaiting_id {
                             awaiting_id = true;
@@ -344,14 +265,9 @@ impl AppServer {
                                 Some(deadline.map_or(settle_by, |until| until.min(settle_by)));
                         }
                     }
-                    // Nothing to interrupt, so there is no turn left to settle.
-                    // The answer command still needs the registry entry, so
-                    // this returns rather than tearing the child down here.
                     None => return Err(CANCELLED.to_string()),
                 }
             }
-            // Poll in short slices instead of blocking on the socket, so a kill
-            // is honored within KILL_POLL rather than at the next line.
             let remaining = deadline.map(|until| until.saturating_duration_since(Instant::now()));
             if remaining == Some(Duration::ZERO) {
                 return Err(if interrupted || awaiting_id {
@@ -366,15 +282,12 @@ impl AppServer {
             )
             .await
             {
-                // Idle tick with no complete line yet.
                 Err(_) => continue,
                 Ok(Err(error)) => return Err(format!("{label}: reading codex stdout: {error}")),
                 Ok(Ok(LineRead::Eof)) => {
                     return Err(format!("{label}: the codex app-server closed stdout"))
                 }
                 Ok(Ok(LineRead::TooLong)) => {
-                    // Mirrors the host reader's own terminal message: a line
-                    // this large is a stuck CLI, not an event.
                     return Err(format!(
                         "codex emitted a line over {} MiB without a newline; run terminated",
                         MAX_LINE_BYTES / (1024 * 1024),
@@ -388,8 +301,6 @@ impl AppServer {
                 continue;
             }
             let Ok(value) = serde_json::from_str::<Value>(trimmed) else {
-                // Not JSON-RPC at all (a stray banner): nothing to answer, and
-                // no peer is blocked on it.
                 continue;
             };
             if let Some((thread_id, None)) = interrupt {
@@ -399,9 +310,6 @@ impl AppServer {
             }
             let id = value.get("id").filter(|id| !id.is_null());
             if value.get("method").is_none() {
-                // This pump may be waiting on another request or the turn's end, so unmatched
-                // replies are forwarded too: the turn/steer acknowledgement an answer command
-                // waits for is read from stdout by this loop.
                 let expected = matches!(expect, Expect::Reply(key)
                     if jsonrpc_id_key(id.unwrap_or(&Value::Null)).as_deref() == Some(key));
                 if !expected {
@@ -409,8 +317,6 @@ impl AppServer {
                     continue;
                 }
                 if let Some(error) = value.get("error") {
-                    // Label-free so `terminal_message` surfaces the CLI's own
-                    // words instead of this driver's.
                     return Err(format!(
                         "rpc:{}:{}",
                         error.get("code").and_then(Value::as_i64).unwrap_or(0),
@@ -424,17 +330,13 @@ impl AppServer {
             }
             match on_message(&value) {
                 Handled::Ended => return Ok(None),
-                // Only a request (method + id) expects a response; a
-                // notification that routed to an answer has no peer waiting.
                 Handled::Answer(frame) if id.is_some() => self.write(&frame).await?,
-                // Parked (the user answers later) or nothing to do.
                 _ => {}
             }
         }
     }
 }
 
-/// Classify and project one decoded frame.
 fn route(core: &TurnCore, state: &mut TurnState, view: &mut TurnView, value: &Value) -> Handled {
     let Some(method) = value.get("method").and_then(Value::as_str) else {
         if let Some(request_id) = value.get("id").and_then(Value::as_str) {
@@ -462,7 +364,6 @@ fn route(core: &TurnCore, state: &mut TurnState, view: &mut TurnView, value: &Va
     }
 }
 
-/// A server→client request: the CLI is blocked until this is answered.
 fn handle_server_request(
     core: &TurnCore,
     state: &mut TurnState,
@@ -471,21 +372,14 @@ fn handle_server_request(
     params: &Value,
 ) -> Handled {
     match method {
-        // The reason this transport exists: the model's own multiple-choice
-        // question becomes an app card and the turn stays parked until the user
-        // picks. `answer_frame` writes the response later, on this same pipe.
         "item/tool/requestUserInput" => {
             let (cards, ids) = question_cards(params);
             if cards.is_empty() {
-                // A question the card UI cannot render must not wedge the turn:
-                // an empty answer reads as "no answer" and lets the model go on.
                 return Handled::Answer(jsonrpc_result_response(id, json!({ "answers": {} })));
             }
             park_question(core, state, id, params, cards, ids);
             Handled::Parked
         }
-        // Asked only in Ask ("untrusted"): Misty's gate decides under the run's mode and the
-        // answer goes back on the same pipe.
         "item/commandExecution/requestApproval" | "item/fileChange/requestApproval" => {
             let tool = if method.starts_with("item/commandExecution") {
                 "command"
@@ -505,20 +399,16 @@ fn handle_server_request(
             let _ = state;
             Handled::Parked
         }
-        // An empty profile grants nothing, and still settles the request.
         "item/permissions/requestApproval" => {
             Handled::Answer(jsonrpc_result_response(id, json!({ "permissions": {} })))
         }
         "mcpServer/elicitation/request" => {
             Handled::Answer(jsonrpc_result_response(id, json!({ "action": "decline" })))
         }
-        // Unknown ask: only the peer knows the shape. An empty result still
-        // settles its request — silence is what would deadlock the turn.
         _ => Handled::Answer(jsonrpc_result_response(id, json!({}))),
     }
 }
 
-/// A notification: no reply is expected, so anything unknown is ignorable.
 fn handle_notification(
     core: &TurnCore,
     state: &mut TurnState,
@@ -529,7 +419,6 @@ fn handle_notification(
     if method == "account/rateLimits/updated" {
         crate::engine_config::usage_limits::record_codex_rate_limits(params);
     }
-    // A sub-agent's thread (Codex's collab tools) shares this connection.
     if method == "thread/started" {
         if let Some(thread) = params.get("thread") {
             let id = thread.get("id").and_then(Value::as_str).unwrap_or("");
@@ -564,9 +453,6 @@ fn handle_notification(
         "item/agentMessage/delta" => {
             if let Some(delta) = params.get("delta").and_then(Value::as_str) {
                 if !delta.is_empty() {
-                    // The text streams as deltas and the completed item is then
-                    // skipped by the de-dup below, because a `message` row is a
-                    // settled snapshot the UI appends on top of the live one.
                     if let Some(item_id) = params.get("itemId").and_then(Value::as_str) {
                         view.streamed_message = Some(item_id.to_string());
                     }
@@ -597,10 +483,6 @@ fn handle_notification(
                 );
             }
         }
-        // Plan body streaming (EXPERIMENTAL): draft preview only. The schema
-        // warns the concatenated deltas need not match the completed plan
-        // item, so the review text below comes from the item, never from
-        // accumulating these.
         "item/plan/delta" => {
             if view.plan_mode {
                 if let (Some(thread_id), Some(delta)) = (
@@ -620,13 +502,8 @@ fn handle_notification(
                 }
             }
         }
-        // `turn/plan/updated` is the update_plan tool's task checklist (step
-        // statuses), not the proposed plan body: it must never trigger a
-        // review, and it has no timeline row of its own.
         "thread/tokenUsage/updated" => {
             if let Some(usage) = params.get("tokenUsage") {
-                // The window sits inside `tokenUsage` (ThreadTokenUsage); older builds put it
-                // beside it.
                 let window = usage
                     .get("modelContextWindow")
                     .filter(|value| !value.is_null())
@@ -641,15 +518,12 @@ fn handle_notification(
                 if view
                     .main_thread
                     .as_deref()
-                    .map_or(true, |main| main == thread_id)
+                    .is_none_or(|main| main == thread_id)
                 {
                     core.dispatch_event(state, EngineEvent::SessionId(thread_id.to_string()));
                 }
             }
         }
-        // The server moved this turn to another model (safety reroute): the
-        // response's own account of what is answering, so the check flags it
-        // instead of leaving the launch selection looking confirmed.
         "model/rerouted" => {
             if let Some(to) = params
                 .get("toModel")
@@ -666,10 +540,6 @@ fn handle_notification(
                 );
             }
         }
-        // Terminal. A failed turn arrives here as a completion whose status is
-        // `failed` with an explanatory message, so both shapes are read the
-        // same; `turn/failed` is handled defensively in case a newer CLI emits
-        // a notification this schema does not know.
         "turn/completed" | "turn/failed" => {
             let turn = params.get("turn");
             let failed = turn
@@ -692,8 +562,6 @@ fn handle_notification(
             }
             return Handled::Ended;
         }
-        // Codex's auto-review turned an action down. Its terminal app lets the person approve
-        // one retry with `/approve`; keep the denial for Misty's `/approve` and say it's there.
         "item/autoApprovalReview/completed" => {
             let thread = params.get("threadId").and_then(Value::as_str);
             if let (Some(thread), Some(event)) = (thread, denials::core_event(params)) {
@@ -702,8 +570,6 @@ fn handle_notification(
                 core.dispatch_event(state, EngineEvent::Warn(notice));
             }
         }
-        // Non-terminal by contract (`willRetry`): the CLI is retrying an
-        // upstream call, so the turn keeps running and the UI shows a notice.
         "error" => {
             let message = params
                 .pointer("/error/message")
@@ -716,11 +582,6 @@ fn handle_notification(
     Handled::Ignore
 }
 
-/// Project one item lifecycle event. Tool work opens a row on start (the
-/// app-server reports the command up front, unlike exec) and the same row is
-/// patched with its result on completion; assistant and reasoning text comes
-/// from deltas, with the completed item as the fallback for a CLI that streams
-/// none.
 fn handle_item(
     core: &TurnCore,
     state: &mut TurnState,
@@ -764,10 +625,6 @@ fn handle_item(
                 }
             }
         }
-        // The completed plan item is the AUTHORITATIVE plan body (the schema
-        // says so verbatim) — it replaces, never extends, the streamed
-        // deltas. In a plan run it becomes the review the user approves; the
-        // turn then ends normally and the thread idles until the decision.
         "plan" => {
             if !completed || !view.plan_mode {
                 return;
@@ -781,7 +638,6 @@ fn handle_item(
             if text.trim().is_empty() {
                 return;
             }
-            // No stable thread id, no approvable identity: fail closed.
             let Some(thread_id) = thread_id
                 .map(str::to_string)
                 .or_else(|| state.native_session_id.clone())
@@ -794,7 +650,6 @@ fn handle_item(
                 session_id: thread_id.clone(),
                 workspace_path: view.workspace.clone(),
                 run_id: Some(core.run_id.clone()),
-                // Assigned by record_review on dispatch.
                 revision: 0,
                 title: plan_title(text),
                 content: text.to_string(),
@@ -802,8 +657,6 @@ fn handle_item(
                 complete: true,
                 review_kind: PlanReviewKind::NextTurn,
                 native_plan_id: Some(plan_item_id.to_string()),
-                // The execution turn inherits the thread's sandbox, which the
-                // plan run derived exactly like an "auto" run (workspace-write).
                 exec_permission: "auto".to_string(),
                 status: plan_review::PlanStatus::AwaitingReview,
                 execution: plan_review::PlanExecution::NotStarted,
@@ -814,9 +667,6 @@ fn handle_item(
                 updated_at: 0,
                 superseded_by: None,
             };
-            // next_turn does not park: the plan turn ended on its own, and
-            // approval means starting a fresh execution turn. The context is
-            // Null — the backbone only parks native_request reviews.
             core.dispatch_event(
                 state,
                 EngineEvent::PlanReviewReady {
@@ -829,8 +679,6 @@ fn handle_item(
             if !completed || view.streamed_reasoning.as_deref() == item_id {
                 return;
             }
-            // Both arrays are optional, and often only one is populated: the
-            // summary is the model's rendering, the content the raw trace.
             let mut parts: Vec<String> = Vec::new();
             for key in ["summary", "content"] {
                 if let Some(entries) = item.get(key).and_then(Value::as_array) {
@@ -865,15 +713,11 @@ fn handle_item(
         }
         "fileChange" => {
             if completed {
-                // The per-file rows were opened on start; the completion only
-                // carries the item's own status.
                 core.dispatch_event(
                     state,
                     tool_result_patch("apply_patch", Some(&pick(item, &["status"]))),
                 );
             } else if let Some(changes) = item.get("changes").and_then(Value::as_array) {
-                // One row per file: the UI resolves `path` out of the args for
-                // its file chip, and the diff gets an expandable panel.
                 for change in changes {
                     core.dispatch_event(
                         state,
@@ -950,9 +794,6 @@ fn handle_item(
                 );
             }
         }
-        // Codex's sub-agents (the collab tools: spawn, send input, wait, close). The call is a
-        // row of its own, keyed by the item id, and the threads it spawns are remembered so
-        // their rows nest under it.
         "collabAgentToolCall" => {
             let tool = item.get("tool").and_then(Value::as_str).unwrap_or("agent");
             let name = collab_row_name(tool);
@@ -995,13 +836,10 @@ fn handle_item(
                 );
             }
         }
-        // Plans, review mode and compaction have no row of their own in this client's
-        // timeline; what they contain is outside what the app renders, not lost by a missing arm.
         _ => {}
     }
 }
 
-/// A collab tool's row name, in the shape the chat recognises as a sub-agent task.
 fn collab_row_name(tool: &str) -> &'static str {
     match tool {
         "spawnAgent" | "spawn_agent" => "spawn_agent",
@@ -1013,9 +851,6 @@ fn collab_row_name(tool: &str) -> &'static str {
     }
 }
 
-/// Approval policy for the run's permission. Read only asks for each edit or command, and an
-/// older Ask ("manual") stops for untrusted ones; each request goes to Misty's gate. The other
-/// modes never ask, and the sandbox is the boundary.
 fn approval_for(permission: Option<&str>) -> &'static str {
     match permission {
         Some(super::codex::READ_ONLY) => "on-request",
@@ -1024,10 +859,6 @@ fn approval_for(permission: Option<&str>) -> &'static str {
     }
 }
 
-/// The turn's input blocks: the prompt, then one local-image block per
-/// attachment. `localImage` (not `image`, which wants a URL) makes the CLI read
-/// the file from disk; the path is absolutized against the workspace exactly as
-/// the exec transport's `-i` argument is.
 fn turn_input(req: &SendRequest) -> Vec<Value> {
     let mut input = vec![json!({ "type": "text", "text": req.prompt })];
     for raw in &req.images {
@@ -1038,10 +869,6 @@ fn turn_input(req: &SendRequest) -> Vec<Value> {
     input
 }
 
-/// Project token usage onto the shape the app's usage panel parses. `last` is
-/// the most recent response's occupancy — what the context meter shows — while
-/// `total` is the billed-session cumulative. Returns None when the report
-/// carries nothing usable, so a bare Done keeps its previous numbers.
 fn usage_payload(usage: &Value, context_window: Option<&Value>) -> Option<Value> {
     let last = usage.get("last")?;
     let mut out = Map::new();
@@ -1066,9 +893,6 @@ fn usage_payload(usage: &Value, context_window: Option<&Value>) -> Option<Value>
     Some(Value::Object(out))
 }
 
-/// Tool rows are keyed by name — a result patch updates the newest row with the
-/// same name — so both halves of one execution must derive it identically. The
-/// command string is the only stable handle the protocol gives a command.
 fn row_name(command: &str) -> String {
     let name = command.trim();
     if name.is_empty() {
@@ -1077,8 +901,6 @@ fn row_name(command: &str) -> String {
     name.chars().take(120).collect()
 }
 
-/// Copy the named keys of `value` into a fresh object, dropping absent and null
-/// ones so a tool row's args or result panel never shows empty slots.
 fn pick(value: &Value, keys: &[&str]) -> Value {
     let mut out = Map::new();
     for key in keys {
@@ -1093,17 +915,10 @@ struct SpawnedCodex {
     child: Child,
     server: AppServer,
     stderr_buf: Arc<Mutex<String>>,
-    /// Kill-on-close job guard (Windows): drops after teardown, sweeping any
-    /// grandchild the CLI orphaned before `taskkill /T` could see a tree.
     #[cfg(windows)]
     _tree_guard: Option<Arc<super::job::KillOnCloseJob>>,
 }
 
-/// Spawn the prepared app-server command as this driver's own child: piped
-/// stdio, own process group (so teardown sweeps the tree) and a drop backstop,
-/// because a dropped driver future must never orphan the CLI. Unlike the ACP
-/// spawn the reader is kept in the struct: this transport answers server
-/// requests on the same pipe while it reads, so both ends stay live.
 fn spawn_app_server(command: &mut Command, workspace: &Path) -> Result<SpawnedCodex, String> {
     command
         .current_dir(workspace)
@@ -1137,11 +952,6 @@ fn spawn_app_server(command: &mut Command, workspace: &Path) -> Result<SpawnedCo
     })
 }
 
-// ==================== turn driver ====================
-
-/// Run one app-server turn and settle it exactly like the sibling drivers: a
-/// question left parked by an interrupted run is resolved first, then the turn
-/// reports either the engine's error or its own Done.
 pub(super) async fn run_app_server_turn(
     core: TurnCore,
     req: SendRequest,
@@ -1150,13 +960,12 @@ pub(super) async fn run_app_server_turn(
     virtual_pid: u32,
 ) {
     let mut state = TurnState::new(req.session_id.clone());
-    let mut view = TurnView::default();
-    view.plan_mode = req.permission.as_deref() == Some("plan");
-    view.workspace = req.workspace.to_string_lossy().into_owned();
+    let mut view = TurnView {
+        plan_mode: req.permission.as_deref() == Some("plan"),
+        workspace: req.workspace.to_string_lossy().into_owned(),
+        ..Default::default()
+    };
     let preassigned_session_id = req.session_id.clone();
-    // Abort-safe backstop: the by-name removals below only run when the task
-    // finishes normally. An abort or a panic would otherwise leave this run's
-    // keys pinning a concurrency slot until app exit.
     let _registry_guard =
         VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
     let result = turn_inner(&core, &mut state, &mut view, &req, built, &killed, None).await;
@@ -1172,11 +981,6 @@ pub(super) async fn run_app_server_turn(
     .await;
 }
 
-/// Shared settle for every virtual app-server run (ordinary turns and plan
-/// decision turns): parked questions die with the turn, parked plan reviews
-/// expire with it (a no-op for codex — next_turn never parks — kept as the
-/// host-driver contract the sibling drivers follow), then the turn reports
-/// either the engine's error or its own Done.
 async fn settle(
     core: &TurnCore,
     state: &mut TurnState,
@@ -1186,10 +990,6 @@ async fn settle(
     virtual_pid: u32,
     preassigned_session_id: Option<String>,
 ) {
-    // Pending questions die with the turn: settle their cards BEFORE any
-    // terminal dispatch, or the monotonic saw_done/saw_error guard in
-    // dispatch_event would drop these and leave answerable cards pointing at a
-    // settled turn.
     for key in [
         state.native_session_id.clone(),
         Some(core.run_id.clone()),
@@ -1204,15 +1004,11 @@ async fn settle(
         super::reader::expire_parked_plans(core, state, &key);
     }
     core.registry.settle_pending_rpc_replies(&core.run_id);
-    // A killed turn is not an error: it was interrupted on purpose, and the
-    // marker below only exists to end this pump.
     if let Err(error) = result {
         if !killed.load(Ordering::SeqCst) {
             core.dispatch_event(state, EngineEvent::Error(error));
         }
     }
-    // An interrupted run commits its partial output as a normal turn end — the
-    // same contract as the SIGKILL'd process path.
     if !state.saw_done && !state.saw_error {
         let usage = if killed.load(Ordering::SeqCst) {
             None
@@ -1223,10 +1019,6 @@ async fn settle(
         core.dispatch_event(state, EngineEvent::Done { session_id, usage });
     }
     core.registry.remove_if_pid(&core.run_id, virtual_pid);
-    // Clean up both the native session id (if the CLI reported one) and the
-    // preassigned session id (if we resumed an existing conversation). A
-    // resumed session was keyed at spawn under req.session_id, so that alias
-    // must go even if the native id differs or never arrived.
     if let Some(session_id) = state.native_session_id.clone() {
         core.registry.remove_if_pid(&session_id, virtual_pid);
     }
@@ -1255,13 +1047,9 @@ async fn turn_inner(
     } = built;
     let _staging_guard = codex_read_only::StagedHomeGuard(cleanup_files);
     let outcome = drive(&mut command, core, state, view, req, killed, decision).await;
-    // Staged prompt files go on every exit path, including a spawn that never
-    // got off the ground.
     outcome
 }
 
-/// Spawn, handshake, prompt, then tear the tree down: the app-server is
-/// resident and would otherwise outlive the run.
 async fn drive(
     command: &mut Command,
     core: &TurnCore,
@@ -1273,13 +1061,10 @@ async fn drive(
 ) -> Result<(), String> {
     if codex_read_only::requested(req) {
         view.isolated_home = Some(
-            std::fs::canonicalize(codex_read_only::isolated_home(command)?)
+            file_access::fs::canonicalize(codex_read_only::isolated_home(command)?)
                 .map_err(|_| "Cannot verify isolated Codex home")?,
         );
     }
-    // Misty: an ordinary chat turn may run on the app-server its chat's last turn left warm,
-    // which already holds the thread (`warm.rs`). Planning, its decisions and read-only runs
-    // open their own, as before.
     let ordinary = decision.is_none()
         && !codex_read_only::requested(req)
         && req.permission.as_deref() != Some("plan");
@@ -1313,8 +1098,6 @@ async fn drive(
         },
     };
     view.exit_unconfirmed = true;
-    // The answer command writes a parked question's response on this same pipe,
-    // so the registry gets the writer from the first frame on.
     core.registry
         .set_stdin(&core.run_id, Arc::clone(&warm.item.spawned.server.stdin));
     let result = handshake_and_turn(
@@ -1327,7 +1110,6 @@ async fn drive(
         decision,
     )
     .await;
-    // A clean turn leaves the app-server warm, holding its thread, for the chat's next message.
     if let (Ok(()), Some(fingerprint), Some(thread_id), Some(reply)) = (
         &result,
         fingerprint,
@@ -1345,7 +1127,6 @@ async fn drive(
                 fingerprint,
                 warm,
             );
-            // The process stays on purpose: the turn's end needn't wait for it to exit.
             view.exit_unconfirmed = false;
             return Ok(());
         }
@@ -1359,10 +1140,8 @@ async fn drive(
     }
 }
 
-/// A Codex app-server idling after a clean turn, its thread still open.
 struct WarmCodex {
     spawned: SpawnedCodex,
-    /// The reply that opened the thread, which the next turn announces again.
     thread: Value,
 }
 
@@ -1386,17 +1165,14 @@ impl super::warm::Retire for WarmCodex {
 
 static WARM: super::warm::Pool<WarmCodex> = super::warm::Pool::new();
 
-/// Ends the warm app-servers, as the app quits.
 pub(super) fn kill_warm() {
     WARM.kill_all();
 }
 
-/// Ends the warm app-servers working in `folder`.
 pub(super) fn retire_warm_in(folder: &Path) {
     WARM.retire_in(folder);
 }
 
-/// `initialize` → thread → turn, projecting everything through `route`.
 async fn handshake_and_turn(
     server: &mut AppServer,
     core: &TurnCore,
@@ -1423,32 +1199,11 @@ async fn handshake_and_turn(
     pump_turn_to_end(server, core, state, view, &started, killed).await
 }
 
-/// A turn whose `turn/start` the server has acknowledged.
 struct TurnStarted {
     thread_id: String,
-    /// None when the ack carried no id and no `turn/started` came before it
-    /// (`/compact`): the turn pump then takes it from `turn/started`.
     turn_id: Option<String>,
 }
 
-/// `clientInfo` is required, but Codex treats `codex-backend` as a
-/// non-originating client: it leaves the CLI's process-wide originator and UA
-/// suffix untouched. Do not send the host's name or version here, or hard-code
-/// a User-Agent that will drift from the CLI.
-///
-/// Known consequences (codex 0.167 source, recheck
-/// `app-server/src/request_processors/initialize_processor.rs` on upgrades):
-/// - The exemption list (`NON_ORIGINATING_CLIENT_NAMES`) exists since 0.131;
-///   older CLIs adopt `codex-backend` as the originator.
-/// - The default originator `codex_cli_rs` counts as first-party, which
-///   unlocks skill MCP-dependency auto-install; `CodexEngine::host_command`
-///   disables that feature.
-/// - Since 0.157 a non-originating client never enables automatic browser
-///   sign-in for gateway-OAuth providers: a missing or rejected gateway token
-///   fails with "Gateway sign-in required" until the user signs in with Codex.
-/// - Codex hooks receive `client: "codex-backend"`.
-///
-/// Out-of-turn calls (`codex_rpc.rs`) shake hands the same way, so Codex sees one client.
 pub(super) fn initialize_params(experimental: bool) -> Value {
     json!({
         "clientInfo": { "name": "codex-backend", "version": "" },
@@ -1456,11 +1211,7 @@ pub(super) fn initialize_params(experimental: bool) -> Value {
     })
 }
 
-/// `initialize` → thread → [plan-item verification] → `turn/start`, up to the
-/// turn's acknowledgement. `decision` marks a plan-decision turn: the reviewed
-/// plan item is re-fetched and compared first, and the turn starts in the
-/// decision's collaboration mode instead of the request's plain model/effort.
-/// `Ok(None)` means the turn already ended inside the ack window.
+#[allow(clippy::too_many_arguments)]
 async fn handshake_and_start(
     server: &mut AppServer,
     core: &TurnCore,
@@ -1471,8 +1222,6 @@ async fn handshake_and_start(
     decision: Option<&DecisionCheck>,
     ack_timeout: Option<Duration>,
 ) -> Result<Option<TurnStarted>, String> {
-    // Misty: a warm app-server (`drive`) already holds the thread, opened on an earlier turn:
-    // its reply stands in for the handshake, and the turn starts straight away.
     let (result, method) = match view.thread_reply.clone() {
         Some(reply) => (reply, "thread/resume"),
         None => open_thread(server, core, state, view, req, killed, decision).await?,
@@ -1493,8 +1242,6 @@ async fn handshake_and_start(
     .await
 }
 
-/// `initialize`, then the thread resumed or started: the thread's reply and the method that
-/// opened it.
 async fn open_thread(
     server: &mut AppServer,
     core: &TurnCore,
@@ -1505,12 +1252,6 @@ async fn open_thread(
     decision: Option<&DecisionCheck>,
 ) -> Result<(Value, &'static str), String> {
     let deadline = Instant::now() + RPC_HANDSHAKE_TIMEOUT;
-    // collaborationMode and the plan items are EXPERIMENTAL in the 0.154.0
-    // schema: the client must opt into the experimental API to negotiate
-    // them. If the server then refuses the fields, the rpc error fails the
-    // turn — there is no degraded fallback.
-    // Codex 0.150 requires this opt-in for `thread/resume.excludeTurns`;
-    // the field is stable from 0.151, which also accepts the capability.
     let experimental = req.session_id.is_some()
         || codex_read_only::requested(req)
         || decision.is_some()
@@ -1566,9 +1307,6 @@ async fn open_thread(
             }
         }
     }
-    // Resuming re-attaches the conversation the app already holds; starting
-    // opens a new one. Both take the run's sandbox, and approvals stay pinned
-    // off: this client has no approval UI and the sandbox is the boundary.
     let deadline = Instant::now()
         + if req.session_id.is_some() {
             RESUME_TIMEOUT
@@ -1622,7 +1360,6 @@ async fn open_thread(
     Ok((result, method))
 }
 
-/// What the thread's reply says, announced to the chat, then the turn started on it.
 #[allow(clippy::too_many_arguments)]
 async fn start_on_thread(
     server: &mut AppServer,
@@ -1644,8 +1381,6 @@ async fn start_on_thread(
         .ok_or_else(|| format!("{method} returned no thread id"))?;
     view.main_thread = Some(thread_id.clone());
     core.dispatch_event(state, EngineEvent::SessionId(thread_id.clone()));
-    // The request side of the response check: what this client asked for,
-    // before the thread's own settings are known.
     if req.model.is_some() || req.effort.is_some() {
         core.dispatch_event(
             state,
@@ -1653,8 +1388,6 @@ async fn start_on_thread(
                 comparison_model: None,
                 model: req.model.clone(),
                 effort: req.effort.clone(),
-                // The thread's effective settings follow right below as the
-                // served side.
                 reports_served: true,
             },
         );
@@ -1674,9 +1407,6 @@ async fn start_on_thread(
     if let Some(effort) = req.effort.as_deref().or(reported_effort.as_deref()) {
         core.dispatch_event(state, EngineEvent::Effort(effort.to_string()));
     }
-    // The thread's effective settings are the closest thing codex has to a
-    // served selection: codex can clamp what it cannot honor, and a later
-    // `model/rerouted` notification supersedes them.
     if thread_model.is_some() || reported_effort.is_some() {
         core.dispatch_event(
             state,
@@ -1686,16 +1416,9 @@ async fn start_on_thread(
             },
         );
     }
-    // A decision turn may only start once the reviewed plan is proven live and
-    // unchanged: re-fetch the final plan item from the thread and compare id +
-    // body hash against the record. Changed or gone → the whole decision fails
-    // here, before any turn exists.
     if let Some(check) = decision {
         verify_plan_item(server, core, state, view, &thread_id, check, killed).await?;
     }
-    // `/compact`, `/review` and `/init` are Codex terminal commands. The app-server runs the
-    // first two through its own calls, each as an ordinary turn that streams like any other;
-    // `/init` is a turn whose text is Codex's own prompt for it.
     let mut prompt_text = None;
     if decision.is_none()
         && req.permission.as_deref() != Some("plan")
@@ -1718,8 +1441,6 @@ async fn start_on_thread(
                 else {
                     return Ok(None);
                 };
-                // `review/start` answers with its turn; `thread/compact/start` answers with
-                // nothing, so its id is the one `turn/started` gave, if that came first.
                 let turn_id = result
                     .pointer("/turn/id")
                     .and_then(Value::as_str)
@@ -1740,19 +1461,12 @@ async fn start_on_thread(
         turn_params["sandboxPolicy"] = json!({"type":"readOnly","networkAccess":false});
     }
     if let Some(check) = decision {
-        // Approve → one execution turn (mode "default"); RequestChanges → a
-        // fresh planning turn carrying the feedback. The thread metadata has
-        // no mode field, so the mode is restated explicitly and the settings
-        // inherit the thread's current model/effort.
         turn_params["collaborationMode"] = decision_collaboration(
             check.mode,
             thread_model.as_deref(),
             reported_effort.as_deref(),
         )?;
     } else if req.permission.as_deref() == Some("plan") {
-        // Planning turn (EXPERIMENTAL): collaborationMode takes precedence
-        // over the top-level model/effort fields, so only one of the two
-        // shapes is sent. A missing model is schema-invalid — fail closed.
         turn_params["collaborationMode"] = plan_collaboration(
             req.model.as_deref(),
             thread_model.as_deref(),
@@ -1767,8 +1481,6 @@ async fn start_on_thread(
         }
     }
     let key = server.request("turn/start", turn_params).await?;
-    // A fast turn can be over before its own acknowledgement is read, so an
-    // ended pump here is a settled turn and not a missing reply.
     let Some(result) = server
         .pump(
             "turn/start",
@@ -1789,10 +1501,6 @@ async fn start_on_thread(
     Ok(Some(TurnStarted { thread_id, turn_id }))
 }
 
-/// A resume reply is one NDJSON frame. Asking Codex to hydrate every prior
-/// turn can make that otherwise valid frame exceed the host's safety bound.
-/// `excludeTurns` only omits history from the reply; Codex still resumes its
-/// own persisted context for the next turn.
 fn thread_open_request(session_id: Option<&str>) -> (&'static str, Value) {
     match session_id {
         Some(thread_id) => (
@@ -1803,9 +1511,6 @@ fn thread_open_request(session_id: Option<&str>) -> (&'static str, Value) {
     }
 }
 
-/// Everything after the `turn/start` ack: stream the turn to its terminal
-/// notification. A kill first asks the CLI to interrupt (so it can persist
-/// the rollout), exactly like the ordinary turn path.
 async fn pump_turn_to_end(
     server: &mut AppServer,
     core: &TurnCore,
@@ -1814,8 +1519,6 @@ async fn pump_turn_to_end(
     started: &TurnStarted,
     killed: &Arc<AtomicBool>,
 ) -> Result<(), String> {
-    // The turn id is needed to interrupt a cancelled turn, so it must be known
-    // before the turn pump starts.
     if started.turn_id.is_some() {
         view.turn_id = started.turn_id.clone();
     }
@@ -1832,18 +1535,12 @@ async fn pump_turn_to_end(
     Ok(())
 }
 
-/// Verification handle for a plan-decision turn.
 struct DecisionCheck {
-    /// "default" (approve → execute) | "plan" (request changes → keep planning).
     mode: &'static str,
-    /// The completed plan item id recorded at review time.
     native_plan_id: String,
-    /// Hash of the reviewed body; the re-fetched item must match it.
     content_hash: String,
 }
 
-/// `thread/turns/list` (itemsView=full) → [`check_plan_item`]: the reviewed
-/// final plan item must still be in the thread with an identical body.
 async fn verify_plan_item(
     server: &mut AppServer,
     core: &TurnCore,
@@ -1859,8 +1556,6 @@ async fn verify_plan_item(
             json!({
                 "threadId": thread_id,
                 "itemsView": "full",
-                // The plan turn is the latest one; a small newest-first page
-                // covers it without walking history.
                 "limit": 16,
                 "sortDirection": "desc",
             }),
@@ -1882,19 +1577,6 @@ async fn verify_plan_item(
     check_plan_item(&page, &check.native_plan_id, &check.content_hash)
 }
 
-/// Codex next_turn plan approval executor — the backbone's respond_plan_review
-/// NextTurn branch calls this AFTER the CAS claimed the submission.
-///
-/// Semantics: re-attach to the review's thread, prove the reviewed final plan
-/// item is still there with an identical body (thread/resume +
-/// thread/turns/list itemsView=full), then atomically start ONE new turn —
-/// Approve: collaborationMode "default" with the fixed execution instruction;
-/// RequestChanges: collaborationMode "plan" with the feedback text. `Ok(())`
-/// means the server acknowledged the new turn (its streaming finishes in a
-/// detached task, registered as a new run under the same session id). Any
-/// `Err` means no turn was created: a stale plan expires the claimed revision
-/// here (it may not keep waiting with a stale body); every other failure is
-/// the backbone's revert_submission case, decision intent preserved.
 pub(crate) async fn run_plan_decision(
     state: &crate::engines::support::EngineState,
     review: &PlanReview,
@@ -1909,8 +1591,6 @@ pub(crate) async fn run_plan_decision(
         content_hash: review.content_hash.clone(),
     };
 
-    // Rebuild the launch like a send on this session would: same binary, the engine's current
-    // channel and the same service tier.
     crate::engines::support::config::ensure_engine_enabled("codex")?;
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = super::engine_bin(&settings, "codex");
@@ -1924,11 +1604,9 @@ pub(crate) async fn run_plan_decision(
         session_id: Some(thread_id.clone()),
         workspace: PathBuf::from(&review.workspace_path),
         prompt: spec.prompt,
-        // An internal verification spawn: no turn of its own, nothing to contribute to the prompt.
         prompt_contributions: Vec::new(),
         native_compact: false,
         images: Vec::new(),
-        // Settings inherit the thread's reported model/effort instead.
         model: None,
         effort: None,
         service_tier: settings.codex_service_tier.clone(),
@@ -1948,10 +1626,6 @@ pub(crate) async fn run_plan_decision(
     }
     super::codex_provider_env::apply(&mut built.command).await;
 
-    // Register like send_host_stream does: the entry routes interrupts and
-    // question answers for the new run; the session alias lets the frontend
-    // stop it by conversation id. Registration precedes the spawn so a Stop
-    // landing inside the start window still settles the turn.
     let run_id = uuid::Uuid::new_v4().to_string();
     let killed = Arc::new(AtomicBool::new(false));
     let reader_abort = Arc::new(std::sync::OnceLock::new());
@@ -1987,14 +1661,12 @@ pub(crate) async fn run_plan_decision(
         followup: None,
     };
     let mut turn_state = TurnState::new(Some(thread_id.clone()));
-    let mut view = TurnView::default();
-    // A RequestChanges turn plans again: its new plan item becomes the next
-    // revision of the same planId. An execution turn must never produce one.
-    view.plan_mode = decision == PlanDecision::RequestChanges;
-    view.workspace = review.workspace_path.clone();
+    let mut view = TurnView {
+        plan_mode: decision == PlanDecision::RequestChanges,
+        workspace: review.workspace_path.clone(),
+        ..Default::default()
+    };
 
-    // Phase A (synchronous): spawn → initialize → resume → verify → one
-    // atomic turn/start. Only a server-acknowledged turn returns Ok.
     let spawned = match start_decision_turn(
         &core,
         &mut turn_state,
@@ -2010,9 +1682,6 @@ pub(crate) async fn run_plan_decision(
         Ok(spawned) => spawned,
         Err(error) => {
             if error.starts_with(PLAN_STALE_PREFIX) {
-                // The reviewed body is gone or changed: the claimed revision
-                // may not survive this. Expire it here — the backbone's
-                // revert_submission then no-ops on the non-submitting status.
                 let _ = plan_review::expire_reviews(
                     &state.db,
                     &[(review.plan_id.clone(), review.revision)],
@@ -2022,8 +1691,6 @@ pub(crate) async fn run_plan_decision(
         }
     };
 
-    // Phase B (detached): the turn exists — stream it to its end and settle
-    // like any other app-server run.
     let task = tokio::spawn(finish_decision_turn(
         core,
         req.session_id.clone(),
@@ -2038,9 +1705,6 @@ pub(crate) async fn run_plan_decision(
     Ok(())
 }
 
-/// Decision turn, phase A: everything up to and including the `turn/start`
-/// acknowledgement. On error the process tree is torn down, the run is
-/// settled (so its events end honestly) and the registry keys are gone.
 #[allow(clippy::too_many_arguments)]
 async fn start_decision_turn(
     core: &TurnCore,
@@ -2061,8 +1725,6 @@ async fn start_decision_turn(
     let mut spawned = match spawn_app_server(&mut command, &req.workspace) {
         Ok(spawned) => spawned,
         Err(error) => {
-            // Nothing was ever emitted for this run, so there is nothing to
-            // settle — just drop the registrations made above.
             core.registry.remove_if_pid(&core.run_id, virtual_pid);
             if let Some(session_id) = req.session_id.as_deref() {
                 core.registry.remove_if_pid(session_id, virtual_pid);
@@ -2073,8 +1735,6 @@ async fn start_decision_turn(
     view.exit_unconfirmed = true;
     core.registry
         .set_stdin(&core.run_id, Arc::clone(&spawned.server.stdin));
-    // The ack is immediate by protocol; bound it like a resume, not like a
-    // turn — the caller (an IPC handler) is waiting on this phase.
     let started = handshake_and_start(
         &mut spawned.server,
         core,
@@ -2108,8 +1768,6 @@ async fn start_decision_turn(
     Ok((spawned, started))
 }
 
-/// Decision turn, phase B: the turn was created — stream it to its terminal
-/// notification, tear the tree down and settle exactly like an ordinary run.
 #[allow(clippy::too_many_arguments)]
 async fn finish_decision_turn(
     core: TurnCore,
@@ -2135,7 +1793,6 @@ async fn finish_decision_turn(
             )
             .await
         }
-        // The turn ended inside its own ack window.
         None => Ok(()),
     };
     teardown(&mut spawned.child).await;
@@ -2153,9 +1810,6 @@ async fn finish_decision_turn(
     .await;
 }
 
-/// Reduce a failure to what the user should read: the CLI's own rpc message,
-/// else its stderr tail (a crash or a rejected launch speaks there), else the
-/// driver's own words.
 fn terminal_message(raw: String, stderr_buf: &Mutex<String>) -> String {
     if let Some(rest) = raw.strip_prefix("rpc:") {
         if let Some((_, message)) = rest.split_once(':') {
@@ -2181,7 +1835,6 @@ mod tests {
     use crate::engines::ProcessRegistry;
     use std::collections::HashMap;
 
-    /// Test emitter collecting flushed event JSON for assertions.
     pub(super) struct CollectingEmitter(Mutex<Vec<String>>);
 
     impl Emit for CollectingEmitter {
@@ -2190,8 +1843,6 @@ mod tests {
         }
     }
 
-    /// A TurnCore with a registry entry under its run id (so question parking
-    /// has somewhere to land) plus the collected flushes for assertions.
     pub(super) fn test_core() -> (TurnCore, Arc<ProcessRegistry>, Arc<CollectingEmitter>) {
         let emitter = Arc::new(CollectingEmitter(Mutex::new(Vec::new())));
         let registry = Arc::new(ProcessRegistry::default());
@@ -2219,7 +1870,6 @@ mod tests {
         (core, registry, emitter)
     }
 
-    /// Flush the sink and return `(kind, data)` for every event emitted.
     fn flushed(core: &TurnCore, emitter: &Arc<CollectingEmitter>) -> Vec<(String, Value)> {
         core.sink.flush();
         let mut out = Vec::new();
@@ -2377,8 +2027,6 @@ mod tests {
             killed,
             virtual_pid,
         ));
-        // The shell makes the file before it writes its pid, and a busy test run can be slow to
-        // start it, so wait for a pid that reads whole, with room to spare.
         let child_pid: i32 = timeout(Duration::from_secs(15), async {
             loop {
                 let pid = std::fs::read_to_string(&pid_file)
@@ -2444,8 +2092,6 @@ mod tests {
             Some(&json!({ "Layers?": ["ui", "engine"] })),
         )
         .unwrap();
-        // The id is echoed verbatim: the CLI correlates on its own token, which
-        // may be a string or a number.
         assert_eq!(frame["id"], json!("rpc-9"));
         assert_eq!(
             frame["result"]["answers"]["q9"]["answers"],
@@ -2472,8 +2118,6 @@ mod tests {
 
     #[test]
     fn answer_frame_settles_a_dismissed_card_with_an_empty_answer() {
-        // A dismissal is not an error: the model must be able to move on, and
-        // an empty answer map is the protocol's way of saying "nothing chosen".
         let frame = answer_frame(&parked(json!(3), json!({ "Which one?": "q1" })), None).unwrap();
         assert_eq!(frame["id"], json!(3));
         assert_eq!(frame["result"], json!({ "answers": {} }));
@@ -2514,8 +2158,6 @@ mod tests {
             cards[0]["options"][1],
             json!({ "label": "Beta", "description": "the second one" })
         );
-        // Codex asks single-choice questions: an absent flag is what the card
-        // already reads as, so it must not be synthesised.
         assert!(cards[0].get("multiSelect").is_none());
         assert_eq!(cards[1]["question"], json!("And then?"));
         assert_eq!(cards[1]["header"], json!("Q2"));
@@ -2534,8 +2176,6 @@ mod tests {
         });
         let (cards, ids) = question_cards(&params);
         assert_eq!(cards.len(), 1);
-        // The header stays tied to the question's position in the request, so a
-        // skipped one still shifts the numbering the protocol implies.
         assert_eq!(cards[0]["header"], json!("Q3"));
         assert_eq!(ids, json!({ "Real?": "q3" }));
     }
@@ -2618,8 +2258,6 @@ mod tests {
 
     #[tokio::test]
     async fn metadata_only_resume_preserves_the_turn_and_plan_verification_handshake() {
-        // Exercise the real pipe, request builder and reply parser. The peer
-        // enforces the older experimental gate and sends no hydrated turns.
         let peer = r#"
 const assert = require('node:assert/strict');
 const mode = process.argv[1];
@@ -2747,10 +2385,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         assert_eq!(payload, json!({ "total_tokens": 3 }));
     }
 
-    // Every test below drives the router, so each needs a runtime: the sink
-    // schedules its batch flush with `tokio::spawn`, and an error dispatch
-    // kills the run through `spawn_blocking`.
-
     #[tokio::test]
     async fn model_reroute_reports_the_served_model() {
         let (core, _registry, emitter) = test_core();
@@ -2805,8 +2439,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
                 },
             }),
         );
-        // Parked, not answered: the card waits for the user and the rpc id is
-        // what the answer command writes back on.
         assert!(matches!(handled, Handled::Parked));
         let events = flushed(&core, &emitter);
         let question = events
@@ -2824,8 +2456,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
             .get("12")
             .cloned()
             .expect("the answer context must be parked under the rpc id");
-        // The two halves of the round trip must agree: what `route` parked is
-        // exactly what `answer_frame` (called by the answer command) consumes.
         let frame = answer_frame(
             parked.get("codexApp").expect("codexApp context"),
             Some(&json!({ "Which one?": "Alpha" })),
@@ -2967,7 +2597,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
                 "params": { "command": "rm -rf build" },
             }),
         );
-        // Misty's gate answers it later, on the app-server's stdin.
         assert!(matches!(handled, Handled::Parked));
     }
 
@@ -3051,8 +2680,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
             view.last_usage,
             Some(json!({ "total_tokens": 42, "model_context_window": 1000 }))
         );
-        // The run reports usage once, with its Done: a mid-turn frame would
-        // make the UI's context meter jump between turns.
         assert!(flushed(&core, &emitter).is_empty());
     }
 
@@ -3099,12 +2726,8 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
             }),
         );
         assert!(matches!(handled, Handled::Ended));
-        // The driver settles the turn itself; a mid-turn error here would make
-        // a perfectly good run look failed.
         assert!(flushed(&core, &emitter).is_empty());
     }
-
-    // ==================== plan approval (next_turn) ====================
 
     fn plan_view() -> TurnView {
         TurnView {
@@ -3146,12 +2769,10 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
             collaboration_mode("plan", "gpt-5", Some("high")),
             json!({"mode": "plan", "settings": {"model": "gpt-5", "reasoning_effort": "high"}})
         );
-        // No effort: settings carry only the model the schema requires.
         assert_eq!(
             collaboration_mode("default", "gpt-5", None),
             json!({"mode": "default", "settings": {"model": "gpt-5"}})
         );
-        // A blank effort is no effort.
         assert_eq!(
             collaboration_mode("plan", "gpt-5", Some("  ")),
             json!({"mode": "plan", "settings": {"model": "gpt-5"}})
@@ -3160,17 +2781,14 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
 
     #[test]
     fn plan_collaboration_prefers_the_request_and_fails_closed_without_a_model() {
-        // An explicit model wins over the thread's; effort is sent only when set.
         assert_eq!(
             plan_collaboration(Some("gpt-5"), Some("thread-model"), Some("low")).unwrap(),
             json!({"mode": "plan", "settings": {"model": "gpt-5", "reasoning_effort": "low"}})
         );
-        // No model in the request: keep the thread's current one.
         assert_eq!(
             plan_collaboration(None, Some("thread-model"), None).unwrap(),
             json!({"mode": "plan", "settings": {"model": "thread-model"}})
         );
-        // Neither: settings.model is required, so this is invalid at the schema level.
         let error = plan_collaboration(None, None, None).unwrap_err();
         assert!(error.contains("model"), "{error}");
         let error = plan_collaboration(Some("  "), Some(" "), None).unwrap_err();
@@ -3187,7 +2805,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
             decision_collaboration("plan", Some("thread-model"), None).unwrap(),
             json!({"mode": "plan", "settings": {"model": "thread-model"}})
         );
-        // With the thread's model unknown, settings can't be rebuilt; the mode must be restated after resume.
         assert!(decision_collaboration("default", None, None).is_err());
     }
 
@@ -3221,7 +2838,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
                 ),
             ]
         );
-        // Not a plan turn: the same deltas are ignored and never reach plan review.
         let (core, _registry, emitter) = test_core();
         let mut state = TurnState::new(Some("thread-1".into()));
         let mut view = TurnView::default();
@@ -3269,7 +2885,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         let kinds: Vec<&str> = events.iter().map(|(kind, _)| kind.as_str()).collect();
         assert_eq!(kinds, ["plan_draft", "plan_review"]);
         let review = &events[1].1;
-        // The final item replaces the draft: the body is the completed item's full text, not the joined deltas.
         assert_eq!(review["content"], json!("# Final plan\n- step one"));
         assert_eq!(
             review["contentHash"],
@@ -3292,8 +2907,10 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
     async fn a_plan_item_outside_a_plan_run_never_becomes_a_review() {
         let (core, _registry, emitter) = test_core();
         let mut state = TurnState::new(Some("thread-1".into()));
-        let mut view = TurnView::default();
-        view.workspace = "/tmp/ws".into();
+        let mut view = TurnView {
+            workspace: "/tmp/ws".into(),
+            ..Default::default()
+        };
         route(
             &core,
             &mut state,
@@ -3316,7 +2933,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         let (core, _registry, emitter) = test_core();
         let mut state = TurnState::new(Some("thread-1".into()));
         let mut view = plan_view();
-        // turn/plan/updated is the update_plan tool's checklist (step status), not the plan body.
         route(
             &core,
             &mut state,
@@ -3330,7 +2946,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
                 },
             }),
         );
-        // A plain completed agentMessage: projected as a message, nothing to do with review.
         route(
             &core,
             &mut state,
@@ -3383,16 +2998,12 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         ], "nextCursor": null});
         let hash = plan_review::content_hash("# Plan\n- a");
         assert!(check_plan_item(&page, "item-9", &hash).is_ok());
-        // The body changed: stale, the revision must expire.
         let error = check_plan_item(&page, "item-9", "0123456789abcdef").unwrap_err();
         assert!(error.starts_with(PLAN_STALE_PREFIX), "{error}");
-        // The item is gone: the same.
         let error = check_plan_item(&page, "item-404", &hash).unwrap_err();
         assert!(error.starts_with(PLAN_STALE_PREFIX), "{error}");
-        // An empty page without the item is stale too.
         let error = check_plan_item(&json!({"data": []}), "item-9", &hash).unwrap_err();
         assert!(error.starts_with(PLAN_STALE_PREFIX), "{error}");
-        // A malformed response isn't staleness: a plain error; the submission reverts and the revision stays.
         let error = check_plan_item(&json!({}), "item-9", &hash).unwrap_err();
         assert!(!error.starts_with(PLAN_STALE_PREFIX), "{error}");
     }
@@ -3401,7 +3012,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
     fn plan_title_takes_the_first_atx_heading() {
         assert_eq!(plan_title("# 实施方案\n- a"), "实施方案");
         assert_eq!(plan_title("intro\n## Steps\n- a"), "Steps");
-        // `#` without whitespace after it is not a heading.
         assert_eq!(plan_title("#tag\nbody"), DEFAULT_PLAN_TITLE);
         assert_eq!(plan_title("no heading here"), DEFAULT_PLAN_TITLE);
         assert_eq!(plan_title(""), DEFAULT_PLAN_TITLE);
@@ -3426,23 +3036,18 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
     #[test]
     fn decision_spec_rejects_before_touching_the_transport() {
         let review = next_turn_review();
-        // Changes need non-empty feedback (the claim already ensures it; this is the last check before transport).
         assert!(decision_spec(&review, PlanDecision::RequestChanges, None).is_err());
         assert!(decision_spec(&review, PlanDecision::RequestChanges, Some("  ")).is_err());
-        // Defer settles locally and never starts a turn.
         assert!(decision_spec(&review, PlanDecision::Defer, None).is_err());
-        // A record that isn't next_turn must never get here.
         let mut wrong_kind = next_turn_review();
         wrong_kind.review_kind = PlanReviewKind::NativeRequest;
         assert!(decision_spec(&wrong_kind, PlanDecision::Approve, None).is_err());
-        // Without the native item id or the execution permission snapshot there's nothing to verify or keep: refuse.
         let mut no_item = next_turn_review();
         no_item.native_plan_id = None;
         assert!(decision_spec(&no_item, PlanDecision::Approve, None).is_err());
         let mut no_permission = next_turn_review();
         no_permission.exec_permission = "  ".into();
         assert!(decision_spec(&no_permission, PlanDecision::Approve, None).is_err());
-        // The fixed instruction an approval sends carries no user text.
         let spec = decision_spec(&review, PlanDecision::Approve, Some("ignored")).unwrap();
         assert_eq!(spec.prompt, EXECUTE_PLAN_PROMPT);
     }
@@ -3471,10 +3076,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         assert!(!state.saw_error, "a retry must not settle the run");
     }
 
-    /// A turn has no wall-clock cap: one silent past 30 minutes (a long build,
-    /// a user away from a question card) still ends on its own completion
-    /// instead of being cut off as "turn timed out". The paused clock races
-    /// the pump's idle ticks forward, so 31 minutes pass in milliseconds.
     #[cfg(unix)]
     #[tokio::test(start_paused = true)]
     async fn a_turn_silent_past_thirty_minutes_runs_to_its_own_completion() {
@@ -3526,9 +3127,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         assert!(flushed(&core, &emitter).is_empty());
     }
 
-    /// Without a wall-clock cap, Stop is what ends a hung turn: the pump asks
-    /// the CLI to interrupt and, when it never answers, still gives up after
-    /// the settle window instead of waiting forever.
     #[cfg(unix)]
     #[tokio::test(start_paused = true)]
     async fn stopping_a_hung_turn_gives_up_after_the_settle_window() {
@@ -3540,8 +3138,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         std::fs::create_dir_all(&directory).unwrap();
         let received = directory.join("received");
         let mut command = Command::new("sh");
-        // The shell keeps stdout open (a hung CLI, not an exited one) while
-        // cat records what the driver sends.
         command.args([
             "-c",
             &format!("cat > '{}'; exec sleep 30", received.display()),
@@ -3552,8 +3148,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
             thread_id: "t1".into(),
             turn_id: Some("turn-1".into()),
         };
-        // A broken settle window would spin forever; the outer bound turns
-        // that into a failure (it costs nothing on the paused clock).
         let (result, stopped_at) = timeout(Duration::from_secs(40 * 60), async {
             tokio::join!(
                 pump_turn_to_end(
@@ -3585,8 +3179,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
         assert!(sent.contains("\"turn/interrupt\""), "{sent}");
     }
 
-    /// Paused time races past the child process, so wait on the wall clock
-    /// for `cat` to record what the driver sent before tearing it down.
     #[cfg(unix)]
     pub(super) fn recorded(path: &Path, needle: &str) -> String {
         for _ in 0..300 {

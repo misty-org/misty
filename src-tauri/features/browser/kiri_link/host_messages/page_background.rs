@@ -1,14 +1,10 @@
-//! Each page's reported background color, kept and replayed on its native view.
 use super::*;
 
-/// Each page's last reported color. Pages survive renderer reloads, but only
-/// report a color when it changes, so the shell replays it on reattachment.
 static PAGE_BACKGROUNDS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 pub(super) fn page_backgrounds() -> &'static Mutex<HashMap<String, String>> {
     PAGE_BACKGROUNDS.get_or_init(Mutex::default)
 }
 
-/// A new document reports its own color; never show the previous page's.
 pub(in crate::browser) fn forget_page_background(id: &str) {
     if let Ok(mut values) = page_backgrounds().lock() {
         values.remove(id);
@@ -30,9 +26,6 @@ pub(in crate::browser) fn replay_page_background(app: &AppHandle, id: &str) {
     }
 }
 
-/// WebKit fills area it has not painted yet, such as the strip a live window
-/// resize exposes before the page lays out again, with its under-page color.
-/// Match the page so that strip blends in instead of flashing gray.
 #[cfg(target_os = "macos")]
 #[allow(unexpected_cfgs)]
 pub(super) fn set_under_page_background(webview: &Webview, hex: String) {
@@ -56,7 +49,6 @@ pub(super) fn set_under_page_background(webview: &Webview, hex: String) {
     });
 }
 
-/// WebView2 fills unpainted area with its default background color.
 #[cfg(windows)]
 pub(super) fn set_under_page_background(webview: &Webview, hex: String) {
     let channel = |start: usize| u8::from_str_radix(&hex[start..start + 2], 16).unwrap_or(0);

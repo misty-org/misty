@@ -1,5 +1,5 @@
 import { Download, ExternalLink, FolderInput, RefreshCw, Trash2 } from "lucide-react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import {
   daysSince,
   EngineGlyph,
@@ -13,7 +13,7 @@ import {
   type SkillTargetInfo,
   type SkillUsageEntry,
 } from "@/features/engine-config/skills";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
   CatalogDone,
@@ -30,9 +30,8 @@ import {
   type StoreFact,
 } from "@misty/ui";
 import { MakerTile, pluginMaker } from "./PluginMaker";
-import type { SkillEntry } from "./skillCatalog";
+import type { SkillEntry } from "./skill_catalog";
 
-/** What SKILL.md reads as, from the hub's copy or the repository's. */
 interface SkillFile {
   path: string;
   markdown: string;
@@ -41,7 +40,6 @@ interface SkillFile {
 
 const compact = new Intl.NumberFormat(undefined, { notation: "compact" });
 
-/** "Last used": never, today, N days ago or N months ago. */
 function lastUsedLabel(usage?: SkillUsageEntry | null): string {
   const days = daysSince(usage?.lastUsedAt);
   if (days == null) return t("detail.neverUsed");
@@ -50,19 +48,11 @@ function lastUsedLabel(usage?: SkillUsageEntry | null): string {
   return t("usage.monthsAgo", { months: Math.max(1, Math.floor(days / 30)) });
 }
 
-/** The repository a skill comes from, as a link on GitHub. */
 export const repoLink = (entry: SkillEntry) =>
   entry.repo ? `https://github.com/${entry.repo}` : null;
 
 export const skillMaker = (entry: SkillEntry) => pluginMaker({ link: repoLink(entry) });
 
-/**
- * One skill up close, as a store page. An installed one (for any engine) shows its source, its
- * engines, how often Claude Code called it, which engines hold a copy (each one toggled here),
- * its folder and its SKILL.md, with Update, Adopt and the removals. A found one shows where it
- * comes from and the repository's SKILL.md, with Install. SKILL.md is read when it opens, never
- * with the list.
- */
 export function SkillStoreDetail({
   entry,
   target,
@@ -82,9 +72,7 @@ export function SkillStoreDetail({
   onDeleteLocal,
   onImport,
 }: {
-  /** The skill shown; null closes it. */
   entry: SkillEntry | null;
-  /** The engine the section installs into. */
   target: SkillTargetId;
   engineName: string;
   targets: SkillTargetInfo[];
@@ -174,7 +162,12 @@ export function SkillStoreDetail({
 
   const primary =
     row && hasUpdate ? (
-      <Button variant="get-filled" icon={RefreshCw} disabled={pending} onClick={() => onUpdate(row)}>
+      <Button
+        variant="get-filled"
+        icon={RefreshCw}
+        disabled={pending}
+        onClick={() => onUpdate(row)}
+      >
         {t("actions.update")}
       </Button>
     ) : here ? (
@@ -202,7 +195,11 @@ export function SkillStoreDetail({
         (row && !readonly) || link ? (
           <>
             {link ? (
-              <MenuItem icon={ExternalLink} label="Open its page" onSelect={() => openExternalLink(link)} />
+              <MenuItem
+                icon={ExternalLink}
+                label="Open its page"
+                onSelect={() => openExternalLink(link)}
+              />
             ) : null}
             {row && !row.managed && !readonly ? (
               <MenuItem
@@ -261,7 +258,6 @@ export function SkillStoreDetail({
           <ul className="m-0 grid list-none p-0">
             {engineTargets.map((info) => {
               const copy = row.targetStates?.[info.id] ?? "off";
-              // An unmanaged local skill's copy is the person's own folder and can't be turned off.
               const locked = !row.managed && copy === "synced";
               return (
                 <li key={info.id}>

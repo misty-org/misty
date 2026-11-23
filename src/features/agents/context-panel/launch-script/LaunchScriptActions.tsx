@@ -18,16 +18,18 @@ import {
   Tooltip,
   useNotice,
 } from "@misty/ui";
-import { errorText } from "../projectApi";
-import { createLaunchScriptEntry, useLaunchScripts, type LaunchScriptEntry } from "./launchScripts";
-import { runLaunchScript } from "./runLaunchScript";
+import { errorText } from "../project_api";
+import {
+  createLaunchScriptEntry,
+  useLaunchScripts,
+  type LaunchScriptEntry,
+} from "./launch_scripts";
+import { runLaunchScript } from "./run_launch_script";
 
 const noEntries: LaunchScriptEntry[] = [];
 
-// Other menus (a folder's menu, the command palette) can ask the mounted button to open its editor.
 const editorRequests = new Set<(folder: string) => void>();
 
-/** Opens the start command editor of the folder's mounted launch button. */
 export function requestLaunchScriptEditor(folder: string): void {
   editorRequests.forEach((listener) => listener(folder));
 }
@@ -43,9 +45,7 @@ function ScriptFields(props: {
   return (
     <div className="grid gap-3">
       <div className="space-y-1.5">
-        <Label htmlFor={`${props.idPrefix}-label`} className="text-2xs">
-          Name
-        </Label>
+        <Label htmlFor={`${props.idPrefix}-label`}>Name</Label>
         <Input
           id={`${props.idPrefix}-label`}
           className="text-ui"
@@ -54,9 +54,7 @@ function ScriptFields(props: {
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor={`${props.idPrefix}-script`} className="text-2xs">
-          Command
-        </Label>
+        <Label htmlFor={`${props.idPrefix}-script`}>Command</Label>
         <Textarea
           id={`${props.idPrefix}-script`}
           variant="code"
@@ -71,16 +69,9 @@ function ScriptFields(props: {
   );
 }
 
-/**
- * The folder's start commands in the panel's head, after ccgui's launch script button: the first
- * command gets a play button (click to run it, right-click to edit it), commands with names get
- * named buttons, and the editor changes the first command and adds more. A command runs in the
- * chat's launch tab of the terminal, the same tab every time. Saving an empty command removes it.
- */
 export function LaunchScriptButton({ chat, folder }: { chat: string; folder: string }) {
   const entries = useLaunchScripts((state) => state.byFolder[folder] ?? noEntries);
   const loaded = useLaunchScripts((state) => state.byFolder[folder] !== undefined);
-  // `false` while closed; `null` edits a first command that doesn't exist yet.
   const [editIndex, setEditIndex] = useState<number | null | false>(false);
   const [showNew, setShowNew] = useState(false);
   const [draftLabel, setDraftLabel] = useState("");
@@ -94,13 +85,11 @@ export function LaunchScriptButton({ chat, folder }: { chat: string; folder: str
     void useLaunchScripts
       .getState()
       .load(folder)
-      // A failed read settles to none, so the play button still shows beside this.
       .catch((reason) => setError(`The start commands couldn't be read: ${errorText(reason)}`));
   }, [folder]);
 
   const openEditor = useCallback(
     (index: number | null) => {
-      // Read from the store, not this render, so a request from another menu sees the latest.
       const stored = useLaunchScripts.getState().byFolder[folder] ?? [];
       const entry = index === null ? undefined : stored[index];
       setDraftLabel(entry?.label ?? "");
@@ -141,7 +130,6 @@ export function LaunchScriptButton({ chat, folder }: { chat: string; folder: str
   const run = (entry: LaunchScriptEntry, index: number) => {
     setError("");
     void runLaunchScript(chat, folder, entry).catch((reason: unknown) => {
-      // A run that fails is never silent: the editor opens with what went wrong.
       openEditor(index);
       setError(`The start command could not run: ${errorText(reason)}`);
     });
@@ -221,7 +209,7 @@ export function LaunchScriptButton({ chat, folder }: { chat: string; folder: str
       <Dialog open={editIndex !== false} onOpenChange={(open) => !open && closeEditor()}>
         <DialogContent aria-describedby={undefined} className="max-w-105">
           <DialogHeader>
-            <DialogTitle className="text-sm">Start command</DialogTitle>
+            <DialogTitle className="text-control">Start command</DialogTitle>
           </DialogHeader>
           <ScriptFields
             idPrefix="launch-script"

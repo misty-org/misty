@@ -1,5 +1,3 @@
-// Where Misty installs engines and Node.js, and the order engines are found in: the program path
-// from Settings, then a copy already on the computer, then Misty's own.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use std::path::{Path, PathBuf};
@@ -8,8 +6,6 @@ use super::maker_builds;
 use super::routes::{self, Route};
 use crate::engines::support::paths::InstallRoot;
 
-/// A scratch folder standing in for the home folder, with Misty's install root inside it. No
-/// test here moves the process-wide `HOME`: other tests in the crate do, under locks of their own.
 struct Scratch {
     dir: PathBuf,
     root: InstallRoot,
@@ -54,7 +50,6 @@ fn engines_and_node_install_into_mistys_folder() {
             misty.join("engines/gemini/node_modules/.bin")
         ]
     );
-    // Hermes Agent's launcher lives in its source checkout.
     assert_eq!(
         root.program_dirs("hermes")[2],
         misty.join("engines/hermes/hermes-agent/.hermes/bin")
@@ -71,7 +66,6 @@ fn engines_and_node_install_into_mistys_folder() {
     if !cfg!(windows) {
         assert_eq!(root.node_bin_dir(), misty.join("runtime/node/bin"));
     }
-    // npm installs go into the engine's own folder, never globally.
     let args = routes::npm_prefix_args(&root.engine_dir("gemini"), "@google/gemini-cli");
     assert_eq!(
         &args[..3],
@@ -83,7 +77,6 @@ fn engines_and_node_install_into_mistys_folder() {
     );
     assert!(!args.iter().any(|arg| arg == "-g" || arg == "--global"));
     assert_eq!(args.last().unwrap(), "@google/gemini-cli@latest");
-    // A downloaded build lands in the engine's `bin`.
     let claude = if cfg!(windows) {
         "claude.exe"
     } else {
@@ -93,7 +86,6 @@ fn engines_and_node_install_into_mistys_folder() {
         maker_builds::program_path_in(root, "claude"),
         misty.join("engines/claude/bin").join(claude)
     );
-    // The engine layer's own staging folders are never named after an engine.
     for engine in crate::engines::support::config::ENGINES {
         assert!(!engine.ends_with("-staging"), "{engine}");
     }
@@ -101,8 +93,6 @@ fn engines_and_node_install_into_mistys_folder() {
 
 #[test]
 fn makers_scripts_update_a_copy_they_put_on_the_computer_where_it_is() {
-    // Codex and Antigravity come into Misty's folder as their builds; their scripts only update a
-    // copy the person installed with them before, which stays where it is.
     let (program, args, env) = routes::script_argv("codex", None, false);
     assert!(program.ends_with("bash"), "{program}");
     assert_eq!(args[0], "-c");
@@ -161,10 +151,8 @@ fn mistys_own_copy_updates_and_removes_the_way_misty_installed_it() {
         routes::route_in(root, "claude", &claude, true, false),
         Some(Route::MistyDownload)
     );
-    // Another engine's folder isn't this engine's.
     assert!(!routes::installed_by_misty_in(root, "codex", &claude));
 
-    // A copy that was on the computer before is never removed.
     let elsewhere = home.dir.join(".local/bin/gemini");
     write_program(&elsewhere);
     let elsewhere = elsewhere.to_string_lossy().into_owned();
@@ -185,10 +173,8 @@ fn engines_are_found_in_settings_then_the_computer_then_mistys_folder() {
     let mistys = misty_dir.join(&name);
     write_program(&mistys);
     let search = crate::engines::resolve::search_path_with(None, std::slice::from_ref(&misty_dir));
-    // Only Misty's copy: it is found.
     let found = which::which_in(&name, Some(&search), &home.dir).expect("found");
     assert_eq!(std::fs::canonicalize(found).unwrap(), mistys);
-    // A copy already on the computer, in a folder searched before Misty's, wins.
     let computer = home.dir.join("computer");
     write_program(&computer.join(&name));
     let both = std::env::join_paths([computer.clone(), misty_dir.clone()]).unwrap();
@@ -196,13 +182,11 @@ fn engines_are_found_in_settings_then_the_computer_then_mistys_folder() {
         which::which_in(&name, Some(&both), &home.dir).unwrap(),
         computer.join(&name)
     );
-    // The program path from Settings wins over everything.
     let chosen = home.dir.join("chosen").join(&name);
     write_program(&chosen);
     let found =
         crate::engines::resolve::find_cli_binary(&name, Some(&chosen.to_string_lossy())).unwrap();
     assert_eq!(found, chosen);
-    // Misty's folders come after every folder the computer already searches.
     let search: Vec<PathBuf> = std::env::split_paths(&search).collect();
     let misty_at = search
         .iter()
@@ -237,13 +221,10 @@ fn hermes_installs_its_checkout_into_mistys_folder_without_questions() {
         get(&env, "MISTY_ENGINE_DIR").as_deref(),
         Some("/home/me/.misty/shared/engines/hermes/hermes-agent")
     );
-    // Its shell profile lines and wrappers land in a home inside Misty's folder; its data stays
-    // in the person's own Hermes folder.
     assert_eq!(
         get(&env, "HOME").as_deref(),
         Some("/home/me/.misty/shared/engines/hermes/home")
     );
-    // The person's own Hermes folder (other tests move the home it is read from).
     let data = get(&env, "HERMES_HOME").unwrap();
     assert!(!data.contains(".misty"), "{data}");
     let (_, args, env) = routes::script_argv("hermes", Some(into), true);
@@ -253,7 +234,6 @@ fn hermes_installs_its_checkout_into_mistys_folder_without_questions() {
         "& ([scriptblock]::Create((irm https://hermes-agent.nousresearch.com/install.ps1))) \
          -NonInteractive -InstallDir $env:MISTY_ENGINE_DIR"
     );
-    // Updating a copy that was on the computer before still answers nothing, and moves nothing.
     let (_, args, env) = routes::script_argv("hermes", None, false);
     assert!(get(&env, "HOME").is_none());
     assert!(
@@ -285,7 +265,6 @@ fn hermes_wrappers_for_mistys_checkout_are_mistys_and_go_with_remove() {
         ),
     )
     .unwrap();
-    // The person's own Hermes, from another checkout, beside it.
     let theirs = local_bin.join("hermes-agent");
     std::fs::write(
         &theirs,
@@ -303,7 +282,6 @@ fn hermes_wrappers_for_mistys_checkout_are_mistys_and_go_with_remove() {
         "hermes",
         &theirs.to_string_lossy()
     ));
-    // Another engine never reads a wrapper.
     assert!(!routes::installed_by_misty_in(root, "codex", &wrapper_bin));
 
     routes::remove_in(
@@ -318,7 +296,6 @@ fn hermes_wrappers_for_mistys_checkout_are_mistys_and_go_with_remove() {
     assert!(!root.engine_dir("hermes").exists());
 }
 
-/// The person's folders inside the scratch home, for finding where an engine came from.
 fn homes(home: &Scratch) -> super::uninstall::Homes {
     super::uninstall::Homes {
         home: home.dir.clone(),
@@ -334,16 +311,13 @@ fn uninstall_follows_how_each_copy_was_installed_and_leaves_settings() {
     use std::os::unix::fs::symlink;
     let home = Scratch::new();
     let (root, homes) = (&home.root, homes(&home));
-    let removal = |engine: &str, bin: &Path| {
-        removal_in(root, &homes, engine, &bin.to_string_lossy(), false)
-    };
+    let removal =
+        |engine: &str, bin: &Path| removal_in(root, &homes, engine, &bin.to_string_lossy(), false);
 
-    // Misty's own copy.
     let misty = root.program_dirs("gemini")[1].join("gemini");
     write_program(&misty);
     assert_eq!(removal("gemini", &misty), Some(Removal::Misty));
 
-    // npm's global copy (nvm here): a link from the prefix's bin into its node_modules.
     let prefix = home.dir.join(".nvm/versions/node/v22");
     let package = prefix.join("lib/node_modules/@google/gemini-cli");
     write_program(&package.join("bundle/gemini.js"));
@@ -358,7 +332,6 @@ fn uninstall_follows_how_each_copy_was_installed_and_leaves_settings() {
         })
     );
 
-    // Homebrew's copy, even a formula built on npm, goes through that Homebrew's brew.
     let brew_prefix = home.dir.join("homebrew");
     write_program(&brew_prefix.join("bin/brew"));
     let cellar = brew_prefix.join("Cellar/gemini-cli/1.0.0/libexec/lib/node_modules/x/gemini");
@@ -374,7 +347,6 @@ fn uninstall_follows_how_each_copy_was_installed_and_leaves_settings() {
         })
     );
 
-    // Claude Code's installer: the link and its versions go, `~/.claude` stays.
     let versions = home.dir.join(".local/share/claude");
     write_program(&versions.join("versions/2.1.0"));
     let claude = home.dir.join(".local/bin/claude");
@@ -385,20 +357,22 @@ fn uninstall_follows_how_each_copy_was_installed_and_leaves_settings() {
         Some(Removal::Files(vec![claude.clone(), versions.clone()]))
     );
 
-    // Codex's script: the link, its code-mode host and the standalone releases, not `~/.codex`.
     let standalone = home.dir.join(".codex/packages/standalone");
     write_program(&standalone.join("releases/1/bin/codex"));
     write_program(&standalone.join("releases/1/bin/codex-code-mode-host"));
     let codex = home.dir.join(".local/bin/codex");
     let host = home.dir.join(".local/bin/codex-code-mode-host");
     symlink(standalone.join("releases/1/bin/codex"), &codex).unwrap();
-    symlink(standalone.join("releases/1/bin/codex-code-mode-host"), &host).unwrap();
+    symlink(
+        standalone.join("releases/1/bin/codex-code-mode-host"),
+        &host,
+    )
+    .unwrap();
     assert_eq!(
         removal("codex", &codex),
         Some(Removal::Files(vec![codex.clone(), host, standalone]))
     );
 
-    // A copy found anywhere else is left alone.
     let stray = home.dir.join("tools/gemini");
     write_program(&stray);
     assert_eq!(removal("gemini", &stray), None);

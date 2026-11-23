@@ -1,4 +1,3 @@
-//! The agents database rows behind the service: the device id and shared folders.
 use crate::agents::*;
 
 pub(in crate::agents) fn device_snapshot_sync(
@@ -64,7 +63,6 @@ pub(in crate::agents) fn scoped_file_path_sync(
     }
     let root = canonical(root).map_err(io_error)?;
     let target = canonical(root.join(relative_path)).map_err(io_error)?;
-    // Asked again of where it really is, in case a link inside the folder pointed at a secret.
     let closed = target
         .strip_prefix(&root)
         .is_ok_and(file_access::secrets::closed_to_agents);

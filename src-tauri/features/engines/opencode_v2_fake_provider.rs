@@ -1,6 +1,3 @@
-//! A fake OpenAI-compatible provider on loopback for the keyed-provider live test: it checks
-//! the bearer key and streams canned replies, tool calls and usage included, at no cost.
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,16 +5,13 @@ use serde_json::{json, Value};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-/// Words in a prompt that pick the fake provider's reply.
 pub(super) const TOOL_MARK: &str = "TOOLTURN";
 pub(super) const SLOW_MARK: &str = "SLOWTURN";
 
-/// What the fake provider saw of one request.
 #[derive(Clone, Debug)]
 pub(super) struct Seen {
     pub(super) authorization: Option<String>,
     pub(super) model: String,
-    /// A turn's steps offer the agent's tools; the title call offers none.
     pub(super) tools: bool,
 }
 
@@ -26,10 +20,6 @@ pub(super) struct FakeProvider {
     pub(super) seen: Arc<std::sync::Mutex<Vec<Seen>>>,
 }
 
-/// An OpenAI-style `/v1/chat/completions` on loopback that turns away a request without
-/// `Authorization: Bearer <key>` and streams a canned reply: a `read` of `notes` when the prompt
-/// asks for a tool, the answer once the tool's result comes back, a slow count to stop mid-way,
-/// else "pong". Every reply ends with usage, cached tokens included.
 pub(super) async fn fake_provider(key: &'static str, notes: String) -> FakeProvider {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
@@ -43,7 +33,6 @@ pub(super) async fn fake_provider(key: &'static str, notes: String) -> FakeProvi
     FakeProvider { base_url, seen }
 }
 
-/// One request's head and body (the body by its `content-length`).
 async fn read_request(stream: &mut TcpStream) -> Option<(String, Vec<u8>)> {
     let mut bytes = Vec::new();
     let mut buffer = [0u8; 8192];
@@ -141,7 +130,6 @@ async fn answer(
         if pause > 0 {
             tokio::time::sleep(Duration::from_millis(pause)).await;
         }
-        // A stopped turn hangs up on the stream; the reply ends there.
         if stream
             .write_all(format!("data: {frame}\n\n").as_bytes())
             .await
@@ -154,7 +142,6 @@ async fn answer(
     let _ = stream.shutdown().await;
 }
 
-/// The reply's deltas, each with the pause before it, and how the choice finishes.
 fn reply(request: &Value, notes: &str) -> (Vec<(Value, u64)>, &'static str) {
     let messages = request["messages"].as_array().cloned().unwrap_or_default();
     let last = messages.last().cloned().unwrap_or(Value::Null);

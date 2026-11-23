@@ -40,7 +40,6 @@ impl Failure {
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferResult {
-    /// The new paths, in the order of the sources.
     pub created: Vec<String>,
     pub failed: Vec<Failure>,
     pub cancelled: bool,
@@ -68,8 +67,6 @@ pub enum TransferOp {
     Move,
 }
 
-/// Splits "photo 2" into ("photo", 3): the base and the next number to try. A name with no
-/// number of its own starts at 2, as Finder's Keep both does.
 fn counter_base(stem: &str) -> (&str, u32) {
     match stem.rsplit_once(' ') {
         Some((base, number)) if !base.is_empty() && !number.starts_with('0') => {
@@ -82,7 +79,6 @@ fn counter_base(stem: &str) -> (&str, u32) {
     }
 }
 
-/// The name Keep both gives the `n`th item called `name`: "photo 2.jpg", "photo 3.jpg".
 fn numbered(name: &str, n: u32) -> String {
     let (stem, ext) = match name.rsplit_once('.') {
         Some((stem, ext)) if !stem.is_empty() && !ext.is_empty() => (stem, Some(ext)),
@@ -95,11 +91,13 @@ fn numbered(name: &str, n: u32) -> String {
     }
 }
 
-/// Finder's Keep both: the first of "name 2.ext", "name 3.ext"… that `dir` doesn't have yet. A
-/// name that already ends in a number goes on from it ("photo 2.jpg" becomes "photo 3.jpg").
 pub fn keep_both_name(dir: &Path, name: &str) -> PathBuf {
     let stem = name.rsplit_once('.').map_or(name, |(stem, ext)| {
-        if stem.is_empty() || ext.is_empty() { name } else { stem }
+        if stem.is_empty() || ext.is_empty() {
+            name
+        } else {
+            stem
+        }
     });
     let (_, start) = counter_base(stem);
     (start..start.saturating_add(10_000))
@@ -116,7 +114,6 @@ fn is_cancel(error: &io::Error) -> bool {
     error.kind() == io::ErrorKind::Interrupted
 }
 
-/// Whether two items are on the same drive, so a move is a rename.
 #[cfg(unix)]
 fn same_volume(source: &Path, dir: &Path) -> bool {
     use std::os::unix::fs::MetadataExt;
@@ -143,7 +140,6 @@ fn cross_device(error: &io::Error) -> bool {
 
 #[cfg(windows)]
 fn cross_device(error: &io::Error) -> bool {
-    // ERROR_NOT_SAME_DEVICE
     error.raw_os_error() == Some(17)
 }
 
@@ -152,8 +148,6 @@ fn copy_link(source: &Path, target: &Path) -> io::Result<()> {
     fs_disk::symlink(points, target)
 }
 
-/// Copies one item with no progress: a link as a link, a folder whole (a clone on APFS), a file
-/// with the system's copy. Duplicate uses it.
 pub(crate) fn copy_plain(source: &Path, target: &Path) -> io::Result<()> {
     let meta = fs_disk::symlink_metadata(source)?;
     if meta.file_type().is_symlink() {
@@ -165,7 +159,6 @@ pub(crate) fn copy_plain(source: &Path, target: &Path) -> io::Result<()> {
     }
 }
 
-/// Removes an item for good, a folder with what it holds, a link as itself.
 pub(crate) fn remove_item(path: &Path) -> io::Result<()> {
     let meta = fs_disk::symlink_metadata(path)?;
     if meta.is_dir() && !meta.file_type().is_symlink() {
@@ -175,8 +168,6 @@ pub(crate) fn remove_item(path: &Path) -> io::Result<()> {
     }
 }
 
-/// Copies a folder file by file, so the progress moves and Cancel stops it between files. The
-/// folder's own permissions are set last, so a read-only folder still takes what it holds.
 fn copy_tree_tracked(source: &Path, target: &Path, op: &mut Op) -> io::Result<()> {
     fs_disk::create_dir(target)?;
     for item in fs_disk::read_dir(source)? {
@@ -194,7 +185,6 @@ fn copy_tree_tracked(source: &Path, target: &Path, op: &mut Op) -> io::Result<()
             let bytes = fs_disk::copy(&from, &to)?;
             op.advance(bytes, &display_name(&from));
         }
-        // Sockets and pipes belong to a running process and aren't copied.
     }
     if let Ok(meta) = fs_disk::metadata(source) {
         let _ = fs_disk::set_permissions(target, meta.permissions());
@@ -202,15 +192,13 @@ fn copy_tree_tracked(source: &Path, target: &Path, op: &mut Op) -> io::Result<()
     Ok(())
 }
 
-/// Copies one item for a transfer. What it left behind is removed when it fails or is cancelled.
 fn copy_tracked(source: &Path, target: &Path, op: &mut Op) -> io::Result<()> {
     let meta = fs_disk::symlink_metadata(source)?;
     let copied = if meta.file_type().is_symlink() {
         copy_link(source, target)
     } else if meta.is_dir() {
-        // On one APFS drive a folder copy is a clone, which is instant; elsewhere it goes file
-        // by file so Cancel can stop it.
-        if cfg!(target_os = "macos") && target.parent().is_some_and(|dir| same_volume(source, dir)) {
+        if cfg!(target_os = "macos") && target.parent().is_some_and(|dir| same_volume(source, dir))
+        {
             let copied = fs_disk::copy_tree(source, target);
             op.advance(tree_size(source), &display_name(source));
             copied
@@ -226,8 +214,6 @@ fn copy_tracked(source: &Path, target: &Path, op: &mut Op) -> io::Result<()> {
     copied
 }
 
-/// Moves `source` to `target`, which must be free: a rename on one drive, else a copy and then
-/// the original removed. Agent trash and Undo use it too.
 pub fn move_or_copy(source: &Path, target: &Path) -> io::Result<()> {
     match fs_disk::rename(source, target) {
         Ok(()) => Ok(()),
@@ -255,7 +241,6 @@ fn move_tracked(source: &Path, target: &Path, op: &mut Op) -> io::Result<()> {
     remove_item(source)
 }
 
-/// The bytes of everything in `path` that a copy would write. Links count as nothing.
 fn tree_size(path: &Path) -> u64 {
     if check_disk(path, Access::Read).is_err() {
         return 0;
@@ -270,14 +255,16 @@ fn tree_size(path: &Path) -> u64 {
         .sum()
 }
 
-/// The real folder an item is in, joined to its own name, so a link isn't followed.
 fn real_item(path: &Path) -> io::Result<PathBuf> {
-    let parent = path.parent().ok_or_else(|| io::Error::other("A drive can't be moved."))?;
-    let name = path.file_name().ok_or_else(|| io::Error::other("That item has no name."))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("A drive can't be moved."))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| io::Error::other("That item has no name."))?;
     Ok(fs_disk::canonicalize(parent)?.join(name))
 }
 
-/// Where `source` lands in `dir` (its own name), or None when it is already there.
 fn landing(source: &Path, real_dir: &Path) -> io::Result<Option<PathBuf>> {
     let real = real_item(source)?;
     if real.parent() == Some(real_dir) {
@@ -286,7 +273,9 @@ fn landing(source: &Path, real_dir: &Path) -> io::Result<Option<PathBuf>> {
     if fs_disk::is_dir(source) && real_dir.starts_with(fs_disk::canonicalize(source)?) {
         return Err(io::Error::other("A folder can't go inside itself."));
     }
-    let name = source.file_name().ok_or_else(|| io::Error::other("That item has no name."))?;
+    let name = source
+        .file_name()
+        .ok_or_else(|| io::Error::other("That item has no name."))?;
     Ok(Some(real_dir.join(name)))
 }
 
@@ -294,7 +283,9 @@ fn conflicts(sources: &[PathBuf], dir: &Path) -> Result<Vec<Conflict>, String> {
     let real_dir = fs_disk::canonicalize(dir).map_err(|error| failed(dir, io_text(&error)))?;
     let mut found = Vec::new();
     for source in sources {
-        let Ok(Some(target)) = landing(source, &real_dir) else { continue };
+        let Ok(Some(target)) = landing(source, &real_dir) else {
+            continue;
+        };
         if fs_disk::exists(&target) {
             if let Ok(existing) = entry_for(&target) {
                 found.push(Conflict {
@@ -307,7 +298,6 @@ fn conflicts(sources: &[PathBuf], dir: &Path) -> Result<Vec<Conflict>, String> {
     Ok(found)
 }
 
-/// The items already in `dir` that a copy or move of `sources` there would meet.
 #[tauri::command]
 pub async fn files_conflicts(
     webview: tauri::Webview,
@@ -329,11 +319,8 @@ struct Job {
     resolutions: HashMap<String, Resolution>,
 }
 
-/// One source's way into the folder: its target, or None to leave it (skipped, or a move into
-/// the folder it is already in).
 fn target_for(job: &Job, source: &Path) -> io::Result<Option<PathBuf>> {
     let Some(target) = landing(source, &job.real_dir)? else {
-        // Copying into its own folder makes a copy beside it, as Duplicate does.
         return match job.op {
             TransferOp::Copy => super::ops::copy_target(source, &job.real_dir).map(Some),
             TransferOp::Move => Ok(None),
@@ -344,10 +331,14 @@ fn target_for(job: &Job, source: &Path) -> io::Result<Option<PathBuf>> {
     }
     match job.resolutions.get(&source.display().to_string()) {
         None | Some(Resolution::Skip) => Ok(None),
-        Some(Resolution::KeepBoth) => Ok(Some(keep_both_name(&job.real_dir, &display_name(&target)))),
+        Some(Resolution::KeepBoth) => {
+            Ok(Some(keep_both_name(&job.real_dir, &display_name(&target))))
+        }
         Some(Resolution::Replace) => {
             if real_item(source)?.starts_with(&target) {
-                return Err(io::Error::other("An item can't replace the folder it is in."));
+                return Err(io::Error::other(
+                    "An item can't replace the folder it is in.",
+                ));
             }
             let (_, failures) = super::trash::trash_paths(std::slice::from_ref(&target));
             match failures.into_iter().next() {
@@ -409,9 +400,6 @@ fn transfer(job: Job, sources: &[PathBuf], op: &mut Op) -> TransferResult {
     result
 }
 
-/// Copies or moves `sources` into `dir`. A source that meets a name already there follows its
-/// answer in `resolutions` (by its path); with no answer it is skipped. Progress goes out on
-/// `files://progress` under `op_id`, and `files_cancel` stops it between files.
 #[tauri::command]
 pub async fn files_transfer(
     app: tauri::AppHandle,
@@ -446,7 +434,11 @@ pub async fn files_transfer(
             .map(|source| tree_size(source))
             .sum();
         progress.set_total(total);
-        let job = Job { op, real_dir, resolutions };
+        let job = Job {
+            op,
+            real_dir,
+            resolutions,
+        };
         Ok(transfer(job, &sources, &mut progress))
     })
     .await

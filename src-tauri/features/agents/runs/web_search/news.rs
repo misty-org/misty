@@ -1,7 +1,3 @@
-//! Recent news for a notebook that follows something (a company, a ticker, a topic), on this
-//! device's search provider and the person's own search key. The app asks for it directly, not
-//! through a run: it's the same request a `web.search` of kind "news" makes, and nothing of it
-//! reaches Misty's server.
 use std::time::Duration;
 
 use crate::js_json::JsValue;
@@ -13,33 +9,24 @@ use super::{
 };
 
 const TIMEOUT_MS: u64 = 15_000;
-/// The most news items one call returns.
 pub const MAX_NEWS: u32 = 20;
 
-/// One news story, as the provider listed it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewsHit {
     pub title: String,
     pub url: String,
     pub source: Option<String>,
-    /// The provider's own date text ("2 hours ago", "Nov 12, 2026"), unparsed.
     pub published: Option<String>,
     pub snippet: Option<String>,
 }
 
-/// Why a news search failed. It never carries the provider's body or the key.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NewsSearchError {
-    /// The provider named isn't one Misty searches with.
     UnknownProvider,
-    /// The provider refused the key (401 or 403).
     KeyRefused,
-    /// Anything else: the network, a timeout, another status.
     Failed,
 }
 
-/// Searches news on `provider` ("decodo" or "serper") with the person's key. `recency` is "day",
-/// "week", "month" or "year"; anything else searches without a date limit.
 pub async fn device_news(
     client: &reqwest::Client,
     provider: &str,
@@ -91,7 +78,6 @@ pub async fn device_news(
         .collect())
 }
 
-/// A search hit as a news story; a hit without a link isn't one.
 fn news_hit(hit: &JsValue) -> Option<NewsHit> {
     let url = field(hit, &["url"]);
     if url.is_empty() {

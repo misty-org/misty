@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
-import { useMistyDraftAttachments } from "@/features/agents/conversations/composer/draftAttachments";
+import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
+import { useMistyDraftAttachments } from "@/features/agents/conversations/composer/draft_attachments";
 import { AgentConversationActions } from "./AgentConversationActions";
 
 const conversation = {

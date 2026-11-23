@@ -3,8 +3,6 @@
 
 use super::*;
 
-/// An app on the fixed list: its id, the name `open -a` knows it by on macOS, its bundle ids
-/// (to find its icon and whether it's installed), and the command-line programs elsewhere.
 pub(super) struct Preset {
     pub(super) id: &'static str,
     pub(super) mac_app: &'static str,
@@ -68,11 +66,7 @@ pub(super) const PRESETS: &[Preset] = &[
 pub(super) fn preset(id: &str) -> Option<&'static Preset> {
     PRESETS.iter().find(|preset| preset.id == id)
 }
-// ---------------------------------------------------------------------------
-// Fixed-list apps
-// ---------------------------------------------------------------------------
 
-/// Where an app's bundle is installed, by its bundle ids.
 #[cfg(target_os = "macos")]
 pub(super) fn bundle_path(preset: &Preset) -> Option<PathBuf> {
     use objc2_app_kit::NSWorkspace;
@@ -85,8 +79,6 @@ pub(super) fn bundle_path(preset: &Preset) -> Option<PathBuf> {
     })
 }
 
-/// IntelliJ's own command-line launcher inside its bundle. JetBrains' CLI checks the projects
-/// already open, where a Launch Services "open document" can start a second copy of one.
 #[cfg(target_os = "macos")]
 pub(super) fn jetbrains_launcher(preset: &Preset) -> Option<PathBuf> {
     let name = match preset.id {
@@ -128,8 +120,6 @@ pub(super) fn macos_open_command(
     command
 }
 
-/// Starts a JetBrains launcher. With the IDE already open it hands the request on and exits;
-/// on a cold start it becomes the IDE and lives on, so only an early failure counts.
 #[cfg(target_os = "macos")]
 pub(super) async fn start_launcher(mut command: tokio::process::Command) -> Result<(), String> {
     let mut child = command
@@ -148,8 +138,6 @@ pub(super) async fn start_launcher(mut command: tokio::process::Command) -> Resu
     }
 }
 
-/// The command-line programs to try for an app off macOS, first match wins, including the
-/// usual Windows install folders for VS Code and Cursor.
 #[cfg(not(target_os = "macos"))]
 pub(super) fn program_candidates(preset: &Preset) -> Vec<PathBuf> {
     let mut found: Vec<PathBuf> = preset

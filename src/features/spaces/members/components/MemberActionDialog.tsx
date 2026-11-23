@@ -8,9 +8,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@misty/ui";
-import type { MemberDialogsState } from "./useMemberDialogs";
+import type { MemberDialogsState } from "./use_member_dialogs";
 
-/** Confirms the two destructive member actions: transfer ownership and remove. */
 export function MemberActionDialog({ dialogs }: { dialogs: MemberDialogsState }) {
   const { memberAction, actionBusy } = dialogs;
   const isTransfer = memberAction?.kind === "transfer";

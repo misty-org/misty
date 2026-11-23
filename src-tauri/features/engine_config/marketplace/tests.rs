@@ -284,11 +284,6 @@ fn a_claude_install_that_needs_its_command_seen_says_so() {
     assert!(shown_command(&failed).is_none());
 }
 
-/// Reads output recorded from the real CLIs, never the CLIs themselves (tests run in an empty
-/// home): save `claude plugin list --json --available` as claude-plugins.json, its
-/// `plugin marketplace list --json` as claude-sources.json, the same two from Codex as
-/// codex-plugins.json and codex-sources.json, and `claude mcp list` as claude-mcp.txt, then run
-/// `MARKET_SAMPLES=<folder> cargo test --lib -- --ignored market_samples --nocapture`.
 #[test]
 #[ignore]
 fn market_samples() {
@@ -307,7 +302,11 @@ fn market_samples() {
         ),
         (
             "codex",
-            codex_items(&json("codex", "codex-plugins.json"), &manifest, Path::new("/codex/plugins/cache")),
+            codex_items(
+                &json("codex", "codex-plugins.json"),
+                &manifest,
+                Path::new("/codex/plugins/cache"),
+            ),
             codex_sources(&json("codex", "codex-sources.json")),
         ),
     ] {
@@ -360,7 +359,9 @@ fn an_installed_remote_codex_plugin_reads_codexs_own_copy() {
     let items = codex_items(&listing, &manifest, Path::new("/codex/plugins/cache"));
     assert_eq!(
         *read.borrow(),
-        vec![Path::new("/codex/plugins/cache/openai-curated-remote/work-pets/0.1.6/.codex-plugin")],
+        vec![Path::new(
+            "/codex/plugins/cache/openai-curated-remote/work-pets/0.1.6/.codex-plugin"
+        )],
         "a version that isn't one folder is never read"
     );
     assert_eq!(items[0].description, "Animated companion pets.");

@@ -6,11 +6,6 @@ const points = [
   "Your space is where you build, on your own or with others.",
 ];
 
-/**
- * The first setup step, before the person picks an AI: what the AI, Misty and a space are each
- * for, and that Misty doesn't decide how an AI behaves. Its two parts sit in the step's own
- * column, which spaces them.
- */
 export function HowMistyWorksStep() {
   return (
     <>

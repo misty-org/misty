@@ -1,22 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * Agents › Channels: a third-party API an engine CLI starts against instead of its
- * own sign-in, per engine.
- *
- *   CC Switch banner (when its store changed)
- *   → the engine's switch (off hides it from pickers and refuses new chats)
- *   → its own config (the CLI's files, with an editor), then its channels, with drag to reorder
- *   → its program (path, Codex's home, custom models) and how it signs in (engine-setup/).
- *
- * A channel's key goes to this computer's keychain and only ever to the channel's provider; the
- * page only learns whether one is saved. Choosing a channel never writes the CLI's own files: it
- * applies to each new chat's start.
- */
 import { Download, FileUp, Plus } from "lucide-react";
 import { useState, type DragEvent } from "react";
-import { EngineMark } from "../EngineMark";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow,
@@ -32,24 +18,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
+  EmptyState,
+  ListRow,
+  ListRowSkeleton,
+  Mark,
   MenuItem,
+  RowGroupSection,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Skeleton,
-  SkeletonControl,
   Switch,
-  Surface,
-  Text,
 } from "@misty/ui";
 import { EngineSetupSections } from "../engine-setup/EngineSetupSections";
 import { channelsApi } from "./api";
-import { ChannelRow, Pill, ROW } from "./ChannelRow";
+import { ChannelRow, Pill } from "./ChannelRow";
 import {
   CC_SWITCH_ENGINES,
   ENGINE_IDS,
@@ -66,7 +50,7 @@ import {
   codexConfigToml,
   type ProviderEntry,
 } from "./providers";
-import { useCliConfig, type CliConfigState } from "./useCliConfig";
+import { useCliConfig, type CliConfigState } from "./use_cli_config";
 
 function formValueOf(entry: ProviderEntry): ProviderFormValue {
   return {
@@ -81,7 +65,6 @@ function formValueOf(entry: ProviderEntry): ProviderFormValue {
   };
 }
 
-/** The engine whose channels the page shows. */
 export function EnginePicker({
   engine,
   onChange,
@@ -99,36 +82,12 @@ export function EnginePicker({
           <SelectItem
             key={id}
             value={id}
-            icon={<EngineMark engine={id} name={ENGINE_NAMES[id]} size={14} />}
+            icon={<Mark of={`engine:${id}`} label={ENGINE_NAMES[id]} size={14} aria-hidden />}
             label={ENGINE_NAMES[id]}
           />
         ))}
       </SelectContent>
     </Select>
-  );
-}
-
-function CcSwitchImportMenu({ cli }: { cli: CliConfigState }) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button icon={Download} disabled={cli.busy}>
-          Import from CC Switch
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <MenuItem
-          icon={Download}
-          label="Import or update from CC Switch"
-          onSelect={() => void cli.syncCcSwitch(cli.engine)}
-        />
-        <MenuItem
-          icon={FileUp}
-          label="Choose a CC Switch file"
-          onSelect={() => void cli.importCcSwitchFile()}
-        />
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -178,92 +137,99 @@ function ChannelsBody({ cli }: { cli: CliConfigState }) {
       {enabled ? (
         <>
           <Section title="Own config">
-            <div
-              role="button"
-              tabIndex={0}
-              className={`${ROW} cursor-pointer`}
-              onClick={() => {
+            <ListRow
+              label={`${name}'s own config`}
+              leading={<Mark of={`engine:${engine}`} size={16} label={name} aria-hidden />}
+              badge={<Pill>Built in</Pill>}
+              description="Its own sign-in and config files"
+              onOpen={() => {
                 if (!busy && !cli.officialActive) cli.activate(PSEUDO_LOCAL);
               }}
-              onKeyDown={(event) => {
-                if (event.target !== event.currentTarget) return;
-                if ((event.key === "Enter" || event.key === " ") && !cli.officialActive) {
-                  event.preventDefault();
-                  cli.activate(PSEUDO_LOCAL);
-                }
-              }}
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center">
-                <EngineMark engine={engine} size={16} name={name} />
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <Text bare as="p" tone="bright" className="flex items-center gap-1.5 text-sm">
-                  <Text full>{name}'s own config</Text>
-                  <Pill>Built in</Pill>
-                </Text>
-                <Text as="p" tone="muted" full className="text-xs">
-                  Its own sign-in and config files
-                </Text>
-              </div>
-              {OFFICIAL_EDITABLE_ENGINES.includes(engine) ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={busy}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    cli.setOfficialEditing(true);
-                  }}
-                >
-                  Edit
-                </Button>
-              ) : null}
-              <span onClick={(event) => event.stopPropagation()}>
-                <Switch
-                  aria-label={`${name}'s own config`}
-                  checked={cli.officialActive}
-                  disabled={busy || cli.officialActive}
-                  onCheckedChange={(on) => {
-                    if (on) cli.activate(PSEUDO_LOCAL);
-                  }}
-                />
-              </span>
-            </div>
+              trailing={
+                <>
+                  {OFFICIAL_EDITABLE_ENGINES.includes(engine) ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => cli.setOfficialEditing(true)}
+                    >
+                      Edit
+                    </Button>
+                  ) : null}
+                  <Switch
+                    aria-label={`${name}'s own config`}
+                    checked={cli.officialActive}
+                    disabled={busy || cli.officialActive}
+                    onCheckedChange={(on) => {
+                      if (on) cli.activate(PSEUDO_LOCAL);
+                    }}
+                  />
+                </>
+              }
+            />
           </Section>
 
-          <section aria-label="Channels" className="mb-8">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <Text bare as="h2" size="body" weight="semibold" tone="bright">
-                Channels
-              </Text>
-              <div className="flex shrink-0 items-center gap-2">
-                {CC_SWITCH_ENGINES.includes(engine) ? <CcSwitchImportMenu cli={cli} /> : null}
-                <Button variant="primary" disabled={busy} onClick={() => cli.setDialog({})}>
-                  <Plus />
-                  Add channel
-                </Button>
-              </div>
-            </div>
-            <Surface tone="card" edge="hairline" radius="xl" className="overflow-hidden">
-              {entries.map((entry) => (
-                <ChannelRow
-                  key={entry.id}
-                  entry={entry}
-                  current={currentId === entry.id}
-                  busy={busy}
-                  drag={dragFor(entry.id)}
-                  onToggle={(on) => cli.activate(on ? entry.id : PSEUDO_LOCAL)}
-                  onEdit={() => cli.setDialog({ entry })}
-                  onDelete={() => cli.setPendingDelete(entry)}
-                />
-              ))}
-              {entries.length === 0 ? (
-                <Text bare as="div" tone="muted" className="px-4 py-6 text-center text-sm">
-                  No channels yet
-                </Text>
-              ) : null}
-            </Surface>
-          </section>
+          <RowGroupSection
+            title="Channels"
+            count={entries.length || undefined}
+            action={
+              CC_SWITCH_ENGINES.includes(engine)
+                ? {
+                    label: "Add channel",
+                    icon: Plus,
+                    showLabel: true,
+                    disabled: busy,
+                    menu: (
+                      <>
+                        <MenuItem
+                          icon={Plus}
+                          label="New channel"
+                          onSelect={() => cli.setDialog({})}
+                        />
+                        <MenuItem
+                          icon={Download}
+                          label="Import or update from CC Switch"
+                          onSelect={() => void cli.syncCcSwitch(cli.engine)}
+                        />
+                        <MenuItem
+                          icon={FileUp}
+                          label="Choose a CC Switch file"
+                          onSelect={() => void cli.importCcSwitchFile()}
+                        />
+                      </>
+                    ),
+                  }
+                : {
+                    label: "Add channel",
+                    icon: Plus,
+                    showLabel: true,
+                    disabled: busy,
+                    onSelect: () => cli.setDialog({}),
+                  }
+            }
+            className="mb-8"
+          >
+            {entries.map((entry) => (
+              <ChannelRow
+                key={entry.id}
+                entry={entry}
+                current={currentId === entry.id}
+                busy={busy}
+                drag={dragFor(entry.id)}
+                onToggle={(on) => cli.activate(on ? entry.id : PSEUDO_LOCAL)}
+                onEdit={() => cli.setDialog({ entry })}
+                onDelete={() => cli.setPendingDelete(entry)}
+              />
+            ))}
+            {entries.length === 0 ? (
+              <EmptyState
+                inline
+                title="No channels yet"
+                line={`Add a provider channel for ${name}.`}
+              />
+            ) : null}
+          </RowGroupSection>
 
           <EngineSetupSections engine={engine} />
         </>
@@ -272,10 +238,6 @@ function ChannelsBody({ cli }: { cli: CliConfigState }) {
   );
 }
 
-/**
- * The channels' first read, shaped like the page it turns into: the engine's switch row, then its
- * own config's card row with Edit (for engines whose files can be edited here) and its switch.
- */
 function ChannelsSkeleton({ engine }: { engine: EngineId }) {
   const name = ENGINE_NAMES[engine];
   return (
@@ -284,30 +246,20 @@ function ChannelsSkeleton({ engine }: { engine: EngineId }) {
         <DesktopSettingsRowSkeleton label="Reading channels" description control="switch" />
       </Section>
       <Section title="Own config">
-        <div aria-hidden="true" className={ROW}>
-          <span className="flex size-8 shrink-0 items-center justify-center">
-            <Skeleton className="size-4 rounded-sm" />
-          </span>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex h-5 items-center gap-1.5">
-              <Skeleton className="h-3.5 w-36" />
-              <SkeletonControl kind="badge" />
-            </div>
-            <div className="flex h-4 items-center">
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          </div>
-          {OFFICIAL_EDITABLE_ENGINES.includes(engine) ? (
-            <SkeletonControl kind="button-sm" className="w-10" />
-          ) : null}
-          <SkeletonControl kind="switch" />
-        </div>
+        <ListRowSkeleton
+          label="Reading channels"
+          rows={1}
+          leading
+          lines={2}
+          trailing={
+            OFFICIAL_EDITABLE_ENGINES.includes(engine) ? ["button-sm", "switch"] : ["switch"]
+          }
+        />
       </Section>
     </>
   );
 }
 
-/** Agents › Channels. */
 export function ChannelsSection() {
   const [engine, setEngine] = useState<EngineId>("claude");
   const cli = useCliConfig(engine);

@@ -1,9 +1,3 @@
-//! Moving content: uploads streamed from disk to the server's presigned addresses (one `PUT` up
-//! to 100 MiB, S3 multipart above, resumable after a restart) and downloads checked against
-//! their SHA-256 in a temporary file, then moved into place whole.
-//!
-//! The streamed file body and the header filter moved here from `spaces_folders/upload.rs`, and
-//! the verified download from `spaces_folders/download.rs`; shared folders use them from here.
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
@@ -16,21 +10,16 @@ use crate::model::{now_ms, ItemId, SpaceId};
 use crate::store::{Store, TransferRow};
 use crate::DriveError;
 
-/// One request carries a file up to this size; above it, multipart.
 pub const SINGLE_LIMIT: u64 = 100 * 1024 * 1024;
 const CHUNK: usize = 256 * 1024;
-/// The SHA-256 of nothing: an empty file has no blob to fetch.
 pub const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-/// Headers Misty sets itself, or that a request can't carry.
 pub fn skipped_header(name: &str) -> bool {
     ["host", "content-length", "connection", "transfer-encoding"]
         .iter()
         .any(|skip| name.eq_ignore_ascii_case(skip))
 }
 
-/// `length` bytes of the file at `path` from `offset`, read on a blocking thread and handed over a
-/// few chunks at a time; `read` hears each chunk's length as it is read.
 pub fn file_chunks(
     path: PathBuf,
     offset: u64,
@@ -86,8 +75,6 @@ pub fn file_chunks(
     }))
 }
 
-/// Writes `body` to `temp`, checking it is `size` bytes hashing to `sha256`, then moves it to
-/// `target`. Nothing half-written ever reaches `target`. `read` hears each chunk's length.
 pub async fn write_verified(
     mut body: ByteStream,
     temp: &Path,
@@ -131,7 +118,6 @@ pub async fn write_verified(
     file_access::fs::rename(temp, target).map_err(DriveError::io)
 }
 
-/// Downloads an item's content to `target` through `temp`. An empty file needs no fetch.
 pub async fn download(
     api: &Api,
     space: &SpaceId,
@@ -150,7 +136,6 @@ pub async fn download(
     }
     let link = api.content_url(space, id).await.map_err(DriveError::from)?;
     if link.url.is_empty() {
-        // The server's word for an empty file; anything else is out of step.
         return Err(DriveError::Corrupt);
     }
     let (status, body) = api
@@ -167,10 +152,6 @@ pub async fn download(
     write_verified(body, temp, target, size, sha256, |_| ()).await
 }
 
-/// Sends the content at `path` (`sha256`, `size`) for item `id`, and answers the upload id to
-/// name in the create or change. Asking the server again for the same content renews the same
-/// upload with fresh addresses, so a multipart upload carries on after a restart with only the
-/// parts `drive.db` hasn't recorded as sent. Whatever the server already has isn't sent again.
 pub async fn upload(
     api: &Api,
     store: &Store,
@@ -216,7 +197,6 @@ pub async fn upload(
                 message: "The upload was refused.".to_owned(),
             }));
         }
-        // A single upload is checked by the server's HEAD when it is completed.
         api.complete_upload(space, &start.upload_id, &[])
             .await
             .map_err(DriveError::from)?;
@@ -228,7 +208,6 @@ pub async fn upload(
             message: "The server didn't say where to upload.".to_owned(),
         }));
     };
-    // The parts already sent count only for the same upload at the same part size.
     let done = earlier
         .filter(|row| row.upload_id == start.upload_id && row.part_size == part_size)
         .map(|row| row.done)

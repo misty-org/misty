@@ -19,7 +19,7 @@ import {
   notify,
   useConfirmDelete,
 } from "@misty/ui";
-import { useDirectUserId } from "./directAccount";
+import { useDirectUserId } from "./direct_account";
 import { useWorkspaceViewTitle, type WorkspaceView } from "@/features/app-windows";
 import { ChatBarButtons, SpaceChat, useChatBarMenu, useSpacesStore } from "@/features/spaces";
 import { DmMembers } from "./DmMembers";
@@ -27,21 +27,14 @@ import { DmFace, DmProfile, DmWelcome, profileIcon } from "./DmPeople";
 import { directApi, type DirectConversation } from "./api";
 import { AddPeopleDialog } from "./AddPeopleDialog";
 import { CallButtons } from "./calls/CallButtons";
-import { dmOf, useCallStore, useCallsAvailable } from "./calls/callStore";
+import { dmOf, useCallStore, useCallsAvailable } from "./calls/call_store";
 import { CallStageView } from "./calls/CallView";
-import { useMissedCalls } from "./calls/missedCalls";
-import { dmName, dmOthers, friendsRoute, reloadDms, updateDms, useDms } from "./directData";
+import { useMissedCalls } from "./calls/missed_calls";
+import { dmName, dmOthers, friendsRoute, reloadDms, updateDms, useDms } from "./direct_data";
 
-/**
- * A DM: its people's chat, which is the DM's own Space chat on the server. Its bar shows whose it
- * is (the other person's face, or the group's name), then Calls, Pinned, the profile (or a
- * group's members), a ⋯ holding Threads, Notifications, Add people and deleting it (a one-to-one)
- * or leaving it (a group), and message search.
- */
 export function DmView({ tab, dmId }: { tab: WorkspaceView; dmId: string }) {
   const dms = useDms();
   const listed = dms.data?.find((dm) => dm.id === dmId);
-  // A DM not in the list yet (just made, or opened from a link) is read on its own.
   const [fetched, setFetched] = useState<{
     id: string;
     dm?: DirectConversation;
@@ -86,21 +79,18 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
   const [addingPeople, setAddingPeople] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const { confirm, dialog } = useConfirmDelete();
-  // The search Enter ran in the bar, and what is typed there now.
   const [searchText, setSearchText] = useState("");
   const [searchedText, setSearchedText] = useState("");
   useWorkspaceViewTitle(tab.id, name);
   const missed = useMissedCalls((state) => state.byDm[dm.id]);
   const inCall = useCallStore((state) => dmOf(state.active) === dm.id);
 
-  // Mentions and names in the chat resolve from the DM's members.
   useEffect(() => {
     void useSpacesStore
       .getState()
       .loadMembers(dm.id)
       .catch(() => undefined);
   }, [dm.id]);
-  // The chat marks itself read on the server; the list here shows it read at once.
   useEffect(() => {
     updateDms((current) =>
       current.map((item) => (item.id === dm.id ? { ...item, unread_count: 0 } : item)),
@@ -150,8 +140,6 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
     setSearchedText("");
   };
   const menu = useChatBarMenu({ spaceId: dm.id, muteId: dm.id, onPanel: closeSearch });
-  // Threads, Notifications and Add people fold into ⋯, so the bar keeps to calls, Pinned and the
-  // profile, as Discord's direct messages do.
   const more = (
     <DropdownMenu>
       <span className="relative inline-flex">
@@ -182,7 +170,6 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-  // Calls, then the chat's own buttons and ⋯, then the search, which never folds.
   const end = (
     <>
       <CallButtons dmId={dm.id} />
@@ -245,7 +232,6 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
       {missed ? (
-        // A call that came during Do not disturb, said once and quietly; it goes once seen.
         <div className="flex shrink-0 items-center gap-2 px-4 pt-2">
           <Text tone="muted" size="meta" className="min-w-0 flex-1">
             {`Missed ${missed.video ? "video" : "voice"} call from ${

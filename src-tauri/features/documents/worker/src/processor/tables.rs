@@ -1,4 +1,3 @@
-//! Spreadsheets and CSV files, one section per sheet.
 use super::*;
 
 pub(super) fn prepare_spreadsheet_sections(

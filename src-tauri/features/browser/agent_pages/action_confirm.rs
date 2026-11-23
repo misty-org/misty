@@ -1,10 +1,3 @@
-//! Stop before paying, sending, deleting or posting. The agent's
-//! page step waits here, natively, until the person allows or refuses it in
-//! the control island. In Auto, a send, delete or publish on a site the person
-//! remembered for this agent continues; payments always ask, since the device
-//! cannot check a payment's cap. What's asked and what's remembered are read
-//! here from `misty.db`, so neither the model nor a window can skip this, and
-//! nobody answering means no.
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -17,11 +10,8 @@ use tokio::sync::oneshot;
 use crate::agents::run_control::windows::emit_to_account;
 use crate::browser::BrowserAgentExecuteRequest;
 
-/// Kinds of page action the person can be asked about.
 pub(in crate::browser) const KINDS: [&str; 4] = ["payment", "send", "delete", "publish"];
 
-/// Whether this kind of step waits for the person. Settings can name fewer kinds, but an empty or
-/// missing list can't turn the stop off, and payments always stop.
 pub(in crate::browser) fn asks(request: &BrowserAgentExecuteRequest, kind: &str) -> bool {
     kinds_ask(request.policy.confirm_kinds.as_deref(), kind)
 }
@@ -38,7 +28,6 @@ fn kinds_ask(chosen: Option<&[String]>, kind: &str) -> bool {
     }
 }
 
-/// The run's mode and the person's remembered page grants for this agent.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GrantSet {
@@ -48,7 +37,6 @@ pub struct GrantSet {
     pub grants: Vec<SiteGrant>,
 }
 
-/// One remembered page grant: this kind of action on this exact origin.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SiteGrant {
     #[serde(default)]
@@ -57,8 +45,6 @@ pub struct SiteGrant {
     pub origin: String,
 }
 
-/// Whether a remembered grant lets this step continue without asking: only in
-/// Auto, never for payments, and only for the exact origin the person named.
 pub(in crate::browser) fn covered(
     request: &BrowserAgentExecuteRequest,
     origin: &str,
@@ -79,7 +65,6 @@ fn granted(set: Option<&GrantSet>, origin: &str, kind: &str) -> bool {
             .any(|grant| grant.kind == kind && grant.origin == origin)
 }
 
-/// The page's origin as remembered grants name it: scheme, host and port.
 pub(in crate::browser) fn page_origin(view: &Webview) -> String {
     view.url().map(|url| origin_of(&url)).unwrap_or_default()
 }
@@ -91,8 +76,6 @@ fn origin_of(url: &url::Url) -> String {
     }
 }
 
-/// How long a step waits for an answer. A run with nobody at the computer
-/// stops here and says so.
 const WAIT: Duration = Duration::from_secs(180);
 
 pub(crate) enum Answer {
@@ -109,15 +92,12 @@ struct Question<'a> {
     control: &'a str,
     reason: &'a str,
     site: &'a str,
-    /// The page's origin, which "Accept and remember" would name.
     origin: &'a str,
-    /// Sends, deletes and publishes on an https page can be remembered; payments can't.
     rememberable: bool,
     agent_id: &'a str,
     task_id: &'a str,
 }
 
-/// A question that closes however its wait ends: a run that stops waiting withdraws it.
 struct Open<'a> {
     id: &'a str,
     app: &'a AppHandle,
@@ -138,8 +118,6 @@ impl Drop for Open<'_> {
     }
 }
 
-/// Whether anyone is being asked right now. Agents acting on Misty's own window wait for that: its
-/// Allow button is the one control they must never reach.
 pub(crate) fn question_open() -> bool {
     pending().lock().map_or(true, |map| !map.is_empty())
 }
@@ -149,7 +127,6 @@ fn pending() -> &'static Mutex<HashMap<String, oneshot::Sender<bool>>> {
     PENDING.get_or_init(Default::default)
 }
 
-/// Asks the person and waits for their answer.
 pub(in crate::browser) async fn ask(
     app: &AppHandle,
     view: &Webview,
@@ -188,8 +165,6 @@ pub(in crate::browser) async fn ask(
     .await
 }
 
-/// Shows the question in the account's windows and holds until it's answered or the wait ends. An
-/// empty account is a run nobody can place, which every window hears rather than stop for nothing.
 async fn wait_for_answer(app: &AppHandle, account: &str, question: Question<'_>) -> Answer {
     let id = question.id.to_owned();
     let (send, receive) = oneshot::channel();
@@ -209,7 +184,6 @@ async fn wait_for_answer(app: &AppHandle, account: &str, question: Question<'_>)
     }
 }
 
-/// A question about a tool, before anything reaches a window. Nothing here can be remembered.
 pub(crate) struct ToolAsk<'a> {
     pub(crate) account: &'a str,
     pub(crate) kind: &'a str,
@@ -240,14 +214,11 @@ pub(crate) async fn ask_tool(app: &AppHandle, ask: ToolAsk<'_>) -> Answer {
     .await
 }
 
-/// Accounts that said no to taking over what was kept signed out, until Misty next opens.
 fn declined_adoption() -> &'static Mutex<std::collections::HashSet<String>> {
     static DECLINED: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
     DECLINED.get_or_init(Default::default)
 }
 
-/// Asks this window's person before an account takes over what was kept signed out, which on a shared
-/// computer may be someone else's. Saying no leaves it where it is and doesn't ask again this launch.
 pub(crate) async fn ask_to_adopt(app: &AppHandle, window: &str, account: &str) -> bool {
     if declined_adoption()
         .lock()
@@ -284,8 +255,6 @@ pub(crate) async fn ask_to_adopt(app: &AppHandle, window: &str, account: &str) -
     }
 }
 
-/// The person's answer from the control island. Only Misty's main window can
-/// answer, so a page or a dock window can't approve for them.
 #[tauri::command]
 pub fn agent_action_confirm(webview: Webview, id: String, allow: bool) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
@@ -304,7 +273,6 @@ pub fn agent_action_confirm(webview: Webview, id: String, allow: bool) -> Result
     }
 }
 
-/// Words for the model and the island, per kind.
 pub(in crate::browser) fn label(kind: &str) -> &'static str {
     match kind {
         "payment" => "pay or buy",
@@ -376,7 +344,6 @@ mod tests {
         let only_send = ["send".to_owned()];
         assert!(kinds_ask(Some(&only_send), "send"));
         assert!(!kinds_ask(Some(&only_send), "delete"));
-        // Payments stop whatever the list says.
         assert!(kinds_ask(Some(&only_send), "payment"));
         assert!(!kinds_ask(None, "anything"));
     }

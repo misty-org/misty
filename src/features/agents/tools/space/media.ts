@@ -1,19 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import { agentFolderOf } from "../../artifacts/agentArtifacts";
-import { spacesGateway } from "../../spaces-gateway/spacesGateway";
+import { agentFolderOf } from "../../artifacts/agent_artifacts";
+import { spacesGateway } from "../../spaces-gateway/spaces_gateway";
 import type { LocalToolHandler, LocalToolRequest } from "../host";
-import { loadRunEntry } from "../runContexts";
+import { loadRunEntry } from "../run_contexts";
 import { refuse } from "./api";
 import { text } from "./args";
 import { routedTool } from "./routing";
-
-/**
- * Media between a Space's drive and the chat's folder. An agent brings its own tools for the heavy
- * work (splitting a voice from music, upscaling, making an image): `media.fetch` puts one of the
- * Space's files in the chat's folder for them, and `file.upload` saves what they made back into the
- * agent's folder of the drive (`/Agents/<agent name>/`). Native code keeps both inside the chat's own
- * folder (`engines/chat_media.rs`).
- */
 
 const UNAVAILABLE = "Files can't be reached from here.";
 

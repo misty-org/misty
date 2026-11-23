@@ -1,5 +1,3 @@
-//! Trying a call again after a passing failure. Ported from the SDK's
-//! `retryWithExponentialBackoffRespectingRetryHeaders`.
 use std::future::Future;
 use std::time::Duration;
 
@@ -7,11 +5,8 @@ use crate::model_calls::error::{ModelError, RetryReason};
 
 const INITIAL_DELAY_MS: u64 = 2_000;
 const BACKOFF_FACTOR: u64 = 2;
-/// The SDK's default when a caller doesn't say.
 pub const DEFAULT_MAX_RETRIES: u32 = 2;
 
-/// How long to wait before the next try. A wait the provider asked for wins when it isn't negative
-/// and is either under a minute or shorter than the backoff.
 pub(crate) fn delay_in_ms(error: &ModelError, backoff_ms: u64) -> u64 {
     let asked = match error {
         ModelError::Api { retry_after_ms, .. } => *retry_after_ms,
@@ -23,7 +18,6 @@ pub(crate) fn delay_in_ms(error: &ModelError, backoff_ms: u64) -> u64 {
     }
 }
 
-/// Runs `attempt` until it works, retries run out or a failure can't be helped by trying again.
 pub async fn with_retries<T, F, Fut>(max_retries: u32, mut attempt: F) -> Result<T, ModelError>
 where
     F: FnMut() -> Fut,
@@ -85,12 +79,27 @@ mod tests {
     #[test]
     fn a_requested_wait_applies_within_limits() {
         assert_eq!(delay_in_ms(&api(429, None), 2_000), 2_000);
-        assert_eq!(delay_in_ms(&api(429, Some(5_000)), 2_000), 5_000, "under a minute");
+        assert_eq!(
+            delay_in_ms(&api(429, Some(5_000)), 2_000),
+            5_000,
+            "under a minute"
+        );
         assert_eq!(delay_in_ms(&api(429, Some(0)), 2_000), 0);
         assert_eq!(delay_in_ms(&api(429, Some(59_999)), 2_000), 59_999);
-        assert_eq!(delay_in_ms(&api(429, Some(60_000)), 2_000), 2_000, "a minute or more is too long");
-        assert_eq!(delay_in_ms(&api(429, Some(70_000)), 80_000), 70_000, "but not if the backoff is longer");
-        assert_eq!(delay_in_ms(&ModelError::Network("down".into()), 4_000), 4_000);
+        assert_eq!(
+            delay_in_ms(&api(429, Some(60_000)), 2_000),
+            2_000,
+            "a minute or more is too long"
+        );
+        assert_eq!(
+            delay_in_ms(&api(429, Some(70_000)), 80_000),
+            70_000,
+            "but not if the backoff is longer"
+        );
+        assert_eq!(
+            delay_in_ms(&ModelError::Network("down".into()), 4_000),
+            4_000
+        );
     }
 
     async fn measured<T>(future: impl Future<Output = T>) -> (T, Duration) {
@@ -115,7 +124,6 @@ mod tests {
         .await;
         assert_eq!(result.unwrap(), "done");
         assert_eq!(calls.load(Ordering::SeqCst), 5);
-        // 2, 4, 8 and 16 seconds, which the runtime counts on to ride out a short blip.
         assert_eq!(took, Duration::from_secs(30));
     }
 
@@ -129,11 +137,19 @@ mod tests {
         .await;
         assert_eq!(calls.load(Ordering::SeqCst), 3);
         assert_eq!(took, Duration::from_secs(6));
-        let Err(ModelError::Retry { reason, message, errors }) = result else {
+        let Err(ModelError::Retry {
+            reason,
+            message,
+            errors,
+        }) = result
+        else {
             panic!("expected a retry error");
         };
         assert_eq!(reason, RetryReason::MaxRetriesExceeded);
-        assert_eq!(message, "Failed after 3 attempts. Last error: failed with 500");
+        assert_eq!(
+            message,
+            "Failed after 3 attempts. Last error: failed with 500"
+        );
         assert_eq!(errors.len(), 3);
     }
 
@@ -147,7 +163,10 @@ mod tests {
         .await;
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         assert_eq!(took, Duration::ZERO);
-        assert!(matches!(result, Err(ModelError::Api { status: 400, .. })), "the original error");
+        assert!(
+            matches!(result, Err(ModelError::Api { status: 400, .. })),
+            "the original error"
+        );
     }
 
     #[tokio::test(start_paused = true)]
@@ -158,11 +177,19 @@ mod tests {
             async move { Err::<(), _>(api(if call == 0 { 503 } else { 401 }, None)) }
         })
         .await;
-        let Err(ModelError::Retry { reason, message, errors }) = result else {
+        let Err(ModelError::Retry {
+            reason,
+            message,
+            errors,
+        }) = result
+        else {
             panic!("expected a retry error");
         };
         assert_eq!(reason, RetryReason::ErrorNotRetryable);
-        assert_eq!(message, "Failed after 2 attempts with non-retryable error: 'failed with 401'");
+        assert_eq!(
+            message,
+            "Failed after 2 attempts with non-retryable error: 'failed with 401'"
+        );
         assert_eq!(errors.len(), 2);
     }
 
@@ -193,7 +220,6 @@ mod tests {
         }))
         .await;
         assert!(result.is_ok());
-        // The first wait is the provider's half second, and the backoff still doubled behind it.
         assert_eq!(took, Duration::from_millis(500 + 4_000));
     }
 }

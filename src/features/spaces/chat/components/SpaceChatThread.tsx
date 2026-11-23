@@ -1,11 +1,11 @@
 import type { MistyPickerSource } from "@/features/files";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { RefObject, UIEventHandler } from "react";
-import type { ChatSuggestionsState } from "../hooks/useChatSuggestions";
-import type { MessageEditingState } from "../hooks/useMessageEditing";
-import type { useSpaceChatScope, useSpaceChatStore } from "../hooks/useSpaceChatData";
-import type { useSpaceChatMessageActions } from "../hooks/useSpaceChatMessageActions";
-import type { SpaceChatAccess } from "../hooks/useSpaceChatAccess";
+import type { ChatSuggestionsState } from "../hooks/use_chat_suggestions";
+import type { MessageEditingState } from "../hooks/use_message_editing";
+import type { useSpaceChatScope, useSpaceChatStore } from "../hooks/use_space_chat_data";
+import type { useSpaceChatMessageActions } from "../hooks/use_space_chat_message_actions";
+import type { SpaceChatAccess } from "../hooks/use_space_chat_access";
 import type { SpaceChatMessagesProps } from "./ChatMessages";
 import { ChatMessageList } from "./ChatMessageList";
 
@@ -27,9 +27,7 @@ export interface SpaceChatThreadProps extends Pick<
   endRef: RefObject<HTMLDivElement | null>;
   scrollRef: RefObject<HTMLDivElement | null>;
   onScroll: UIEventHandler<HTMLDivElement>;
-  /** Older messages may still be on the server, before the first one shown. */
   hasOlderMessages: boolean;
-  /** Brings a message that isn't drawn yet into view, reading further back for it. */
   onJumpToMessage: (messageId: string) => void;
   onOpenPicker: (source: MistyPickerSource) => void;
   onBeginMention: () => void;
@@ -38,7 +36,6 @@ export interface SpaceChatThreadProps extends Pick<
   onReload: () => void;
 }
 
-/** The scrolling message list, wired to the Space's data and message actions. */
 export function SpaceChatThread(props: SpaceChatThreadProps) {
   const { spaceId, access, scope, store, editing, actions } = props;
 

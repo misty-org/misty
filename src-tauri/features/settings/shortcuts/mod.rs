@@ -6,15 +6,11 @@ use crate::error::{Error as ApiError, Result as ApiResult};
 use database::environment::AppEnvironmentService;
 use database::store::Store;
 
-/// Keyboard shortcut overrides, in `misty.db`. Only changes are stored: a command with no
-/// row uses the platform default.
 #[derive(Debug, Clone)]
 pub struct ShortcutService {
     store: Store,
 }
 
-/// A missing field inherits the platform default. A present `null` field is
-/// intentionally unbound. This distinction is why the nested Options matter.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShortcutOverride {
@@ -100,7 +96,6 @@ fn snapshot_from(
     })
 }
 
-/// A slot is stored as NULL (use the default), '' (deliberately unbound) or a binding.
 fn slot_to_column(slot: &Option<Option<String>>) -> Option<String> {
     slot.as_ref().map(|value| value.clone().unwrap_or_default())
 }

@@ -11,10 +11,7 @@ use super::super::{linked_path, person_window};
 use super::{blocking, MAX_READ_BYTES};
 
 const MAX_SEARCH_RESULTS: usize = 200;
-/// The search overlay's index: bounds the walk on a huge tree (the gitignore filter drops build
-/// output; the cap is the last line of defense).
 const MAX_INDEX_ENTRIES: usize = 20_000;
-/// Folders the composer's `@` walk never opens: they hold thousands of files nobody edits by hand.
 const HEAVY: [&str; 3] = [".git", "node_modules", "target"];
 
 #[derive(Serialize)]
@@ -28,13 +25,10 @@ pub struct SearchHit {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileIndexEntry {
-    /// Relative to the folder, `/` between names (the panel joins it back to the root, which
-    /// keeps the payload half the size of absolute paths).
     pub rel: String,
     pub is_dir: bool,
 }
 
-/// A case-insensitive substring check; ASCII takes a path that allocates nothing.
 fn contains_case_insensitive(line: &str, needle_lower: &str) -> bool {
     if line.is_ascii() && needle_lower.is_ascii() {
         line.as_bytes()
@@ -88,7 +82,6 @@ pub(crate) fn search_text_blocking(root: &Path, query: &str) -> Vec<SearchHit> {
                 continue;
             };
             for (index, line) in std::io::BufReader::new(file).lines().enumerate() {
-                // Not UTF-8 (a binary file): stop reading this one.
                 let Ok(line) = line else { break };
                 if contains_case_insensitive(&line, &needle) {
                     hits.push(SearchHit {
@@ -106,7 +99,6 @@ pub(crate) fn search_text_blocking(root: &Path, query: &str) -> Vec<SearchHit> {
     hits
 }
 
-/// Lines under a folder that contain `query`, ignoring case, at most 200.
 #[tauri::command]
 pub async fn project_search_text(
     app: tauri::AppHandle,
@@ -120,9 +112,6 @@ pub async fn project_search_text(
     blocking(move || Ok(search_text_blocking(&root, &query))).await
 }
 
-/// Every file and folder under `root` for the search overlay, .gitignore-aware through ripgrep's
-/// walker (`.gitignore`, info/exclude and global excludes count even outside a repository);
-/// hidden entries are skipped, and `node_modules` and `target` even where nothing ignores them.
 pub(crate) fn file_index_blocking(root: &Path) -> Vec<FileIndexEntry> {
     let mut out = Vec::new();
     let walker = ignore::WalkBuilder::new(root)
@@ -166,7 +155,6 @@ pub async fn project_file_index(
     blocking(move || Ok(file_index_blocking(&root))).await
 }
 
-/// A file or folder the composer's `@` menu can mention, by its path inside the folder.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Found {
@@ -175,8 +163,6 @@ pub struct Found {
     is_dir: bool,
 }
 
-/// Files and folders under a linked folder whose path contains every word of `query`, the
-/// closest matches first. Heavy and hidden folders are skipped, and the walk stops early.
 #[tauri::command]
 pub async fn project_find_files(
     app: tauri::AppHandle,
@@ -234,7 +220,6 @@ pub(crate) fn find_files(root: &std::path::Path, query: &str, limit: usize) -> V
             if !words.iter().all(|word| lower.contains(word.as_str())) {
                 continue;
             }
-            // A match in the name beats one in the folders above it; shorter paths come first.
             let name_lower = name.to_lowercase();
             let in_name = words
                 .iter()

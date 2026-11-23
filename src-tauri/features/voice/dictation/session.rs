@@ -1,5 +1,3 @@
-//! Native side of dictation: the shortcut, the microphone and insertion.
-//! The renderer owns the live transcription socket, cleanup and routing.
 use crate::voice::dictation::{Action, Dictation};
 use crate::voice::hold_to_talk::{self, Chord, HotkeyEvent, Subscription};
 use crate::voice::insert::{self, Inserted};
@@ -14,13 +12,11 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, State, Webview};
 use voice_capture::{AudioSource, Capture};
 
-/// Keep recording briefly after release so the last word isn't clipped.
 const TAIL: Duration = Duration::from_millis(180);
 
 #[derive(Default)]
 pub struct DictationState {
     inner: Mutex<Option<Running>>,
-    /// Each dictation's number, so late audio from an old one is ignored.
     turn: Arc<AtomicU64>,
 }
 
@@ -38,8 +34,8 @@ fn require_main(webview: &Webview) -> Result<(), String> {
 }
 
 fn emit(app: &AppHandle, turn: u64, phase: &str) {
-    let _ = crate::browser::app_windows::emit_to_primary(
-        &app,
+    crate::browser::app_windows::emit_to_primary(
+        app,
         "misty://dictation",
         json!({"turn": turn, "phase": phase}),
     );
@@ -55,14 +51,14 @@ fn start_capture(app: &AppHandle, turn: u64, current: Arc<AtomicU64>) -> Result<
             if current.load(Ordering::SeqCst) != turn {
                 return;
             }
-            let _ = crate::browser::app_windows::emit_to_primary(&audio_app,
+            crate::browser::app_windows::emit_to_primary(&audio_app,
                 "misty://dictation-audio",
                 json!({"turn": turn, "startFrame": chunk.start_frame, "power": chunk.power(), "pcm": STANDARD.encode(chunk.to_le_bytes())}),
             );
         },
         move |error| {
             if failed_turn.load(Ordering::SeqCst) == turn {
-                let _ = crate::browser::app_windows::emit_to_primary(&error_app, "misty://dictation", json!({"turn": turn, "phase": "error", "message": error.to_string()}));
+                crate::browser::app_windows::emit_to_primary(&error_app, "misty://dictation", json!({"turn": turn, "phase": "error", "message": error.to_string()}));
             }
         },
     )
@@ -81,8 +77,8 @@ fn act(app: &AppHandle, state: &Running, turn_counter: &Arc<AtomicU64>, action: 
                 }
                 Err(message) => {
                     let _ = state.machine.lock().map(|mut m| m.abort());
-                    let _ = crate::browser::app_windows::emit_to_primary(
-                        &app,
+                    crate::browser::app_windows::emit_to_primary(
+                        app,
                         "misty://dictation",
                         json!({"turn": turn, "phase": "error", "message": message}),
                     );
@@ -122,7 +118,7 @@ fn listen(app: AppHandle, subscription: Subscription, running: Running, turns: A
             Ok(HotkeyEvent::Down) => running.machine.lock().unwrap().key_down(now),
             Ok(HotkeyEvent::Up) => running.machine.lock().unwrap().key_up(now),
             Ok(HotkeyEvent::Error(message)) => {
-                let _ = crate::browser::app_windows::emit_to_primary(
+                crate::browser::app_windows::emit_to_primary(
                     &app,
                     "misty://dictation",
                     json!({"turn": turns.load(Ordering::SeqCst), "phase": "error", "message": message}),
@@ -141,8 +137,6 @@ fn listen(app: AppHandle, subscription: Subscription, running: Running, turns: A
     }
 }
 
-/// Turns dictation on with a chord ("Fn", "RightAlt", …) or off. The
-/// microphone opens only while the chord is held or locked.
 #[tauri::command]
 pub fn voice_dictation_configure(
     webview: Webview,
@@ -181,7 +175,6 @@ pub fn voice_dictation_configure(
     Ok(())
 }
 
-/// Mute or the pill's Stop: end the current dictation without inserting.
 #[tauri::command]
 pub fn voice_dictation_stop(
     webview: Webview,
@@ -199,9 +192,6 @@ pub fn voice_dictation_stop(
     Ok(())
 }
 
-/// Puts finished text where the person is typing. Returns "misty" when Misty
-/// itself is frontmost, so the renderer inserts it without the clipboard;
-/// `force` pastes anyway (a web page in a tab has focus).
 #[tauri::command]
 pub async fn voice_dictation_insert(
     webview: Webview,
@@ -216,8 +206,6 @@ pub async fn voice_dictation_insert(
     if !force && insert::misty_is_frontmost() {
         return Ok(json!({"inserted": "misty"}));
     }
-    // `force` is a page in one of Misty's own tabs. Anything else goes to another app, and this is
-    // the only way dictation reaches one.
     if !force && !permissions::ensure_async(&app, Permission::DictationTyping).await {
         return Ok(json!({"inserted": "not-allowed"}));
     }
@@ -231,7 +219,6 @@ pub async fn voice_dictation_insert(
     }}))
 }
 
-/// Hides the pill once the renderer has shown how dictation ended.
 #[tauri::command]
 pub fn voice_dictation_pill_hide(webview: Webview, app: AppHandle) -> Result<(), String> {
     require_main(&webview)?;

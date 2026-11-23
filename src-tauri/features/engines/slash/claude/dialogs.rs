@@ -1,6 +1,3 @@
-//! Claude Code's terminal dialogs (`/status`, `/context`, `/memory`, `/hooks`, `/permissions`,
-//! `/sandbox`, `/skills`, `/plan`), from its control answers.
-
 use super::*;
 
 pub(super) async fn status(context: &Context) -> Result<Output, String> {
@@ -258,8 +255,6 @@ pub(super) async fn skills(context: &Context) -> Result<Output, String> {
     let (on, off): (Vec<&Value>, Vec<&Value>) = list(&answer, "skills")
         .iter()
         .partition(|skill| field(skill, "state") == "on");
-    // Where each comes from and what it costs, as Claude Code's own dialog lists them: a
-    // skill's description is written for the model and runs to a paragraph.
     let rows = |skills: Vec<&Value>| -> Vec<Row> {
         skills
             .into_iter()
@@ -300,8 +295,6 @@ pub(super) async fn skills(context: &Context) -> Result<Output, String> {
     Ok(Output::info("Skills", sections))
 }
 
-/// The session's plan. `/plan <description>` (turning plan mode on with a request) is the
-/// composer's: Misty's modes are chosen in its mode menu.
 pub(super) async fn plan(context: &Context) -> Result<Output, String> {
     let args = context.args.as_str();
     if !args.is_empty() && args != "open" {

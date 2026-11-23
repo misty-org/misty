@@ -1,5 +1,3 @@
-//! Acting on a control the way an assistive tool does: press, focus, fill
-//! and scroll, without the person's pointer or keyboard.
 use windows::{
     core::{Interface, BSTR},
     Win32::UI::Accessibility::*,
@@ -8,7 +6,6 @@ use windows::{
 use super::Element;
 
 impl Element {
-    /// Whether the control does something when pressed.
     pub fn pressable(&self) -> bool {
         [
             UIA_InvokePatternId,
@@ -24,8 +21,6 @@ impl Element {
         })
     }
 
-    /// Presses the control: invoke, toggle, select or expand, whichever it
-    /// supports, without moving the person's pointer.
     pub fn press(&self) -> Result<(), String> {
         let failed = |_| "That control didn't respond.".to_owned();
         // SAFETY: each pattern is queried by its own interface type and used
@@ -73,7 +68,6 @@ impl Element {
         unsafe { self.0.SetFocus() }.map_err(|_| "That control can't take focus.".into())
     }
 
-    /// Replaces the text in a field. Password fields are refused.
     pub fn set_value(&self, value: &str) -> Result<(), String> {
         if self.is_password() {
             return Err("Agents don't type into password fields.".into());
@@ -87,7 +81,6 @@ impl Element {
             .map_err(|_| "That field refused the text.".into())
     }
 
-    /// Scrolls the control by whole steps (positive is down or right).
     pub fn scroll(&self, horizontal: i32, vertical: i32) -> Result<(), String> {
         // SAFETY: the pattern is queried by its own interface type.
         let pattern: IUIAutomationScrollPattern =

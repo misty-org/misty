@@ -1,12 +1,11 @@
-import "@/app/featureSeams";
-import type * as AgentsRuntimeModule from "../AgentsRuntime";
+import "@/app/feature_seams";
+import type * as AgentsRuntimeModule from "../agents_runtime";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Agents opens straight into an agent's workspace, so the store needs one.
-vi.mock("../personal/personalAgentsStore", () => ({
+vi.mock("../personal/personal_agents_store", () => ({
   defaultAgentOf: (agents: { system_managed?: boolean; engine?: string }[]) =>
     agents.find((agent) => agent.engine) ?? agents.find((agent) => agent.system_managed),
   usePersonalAgentsStore: () => ({
@@ -29,7 +28,7 @@ vi.mock("../personal/personalAgentsStore", () => ({
   }),
 }));
 
-vi.mock("../AgentsRuntime", async (original) => ({
+vi.mock("../agents_runtime", async (original) => ({
   ...(await original<typeof AgentsRuntimeModule>()),
   useAgentsAuth: () => ({ user: { id: "owner" } }),
   runtimeAiApi: { activity: async () => ({ entries: [] }) },

@@ -5,7 +5,6 @@ use agent_runs::{
 };
 use futures_util::future::BoxFuture;
 
-/// No run starts in these tests, so nothing publishes.
 struct NoRuns;
 
 impl LocalRunHost for NoRuns {

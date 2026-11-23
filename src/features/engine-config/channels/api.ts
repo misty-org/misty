@@ -3,11 +3,9 @@
 
 import { invoke } from "@/native/invoke";
 
-/** One saved channel as native code shows it: everything but its key. */
 export interface ChannelView {
   id: string;
   config: unknown;
-  /** Whether a key is saved for it in the keychain. The key itself never comes back. */
   hasKey: boolean;
 }
 
@@ -52,7 +50,6 @@ export interface CcSwitchImportResult {
 
 export const channelsApi = {
   list: () => invoke<EngineChannels[]>("engine_channels_list"),
-  /** Adds or replaces a channel. A key in it goes to the keychain; `clearKey: true` removes it. */
   upsert: (engine: string, id: string, json: Record<string, unknown>) =>
     invoke<void>("engine_channels_upsert", { engine, id, json }),
   remove: (engine: string, id: string) => invoke<void>("engine_channels_delete", { engine, id }),
@@ -62,7 +59,6 @@ export const channelsApi = {
     invoke<void>("engine_channels_set_current", { engine, id }),
   reorder: (engine: string, ids: string[]) =>
     invoke<void>("engine_channels_reorder", { engine, ids }),
-  /** A channel's model list. With `id`, its saved base URL and key are used in native code. */
   models: (engine: string, args: { id?: string; baseUrl?: string; apiKey?: string }) =>
     invoke<ProviderModelList>("engine_channels_models", {
       engine,
@@ -79,7 +75,6 @@ export const channelsApi = {
   ccSwitchDismiss: (hash: string) => invoke<void>("engine_cc_switch_dismiss", { hash }),
   ccSwitchImport: (engine: string) =>
     invoke<CcSwitchImportResult>("engine_cc_switch_import", { engine }),
-  /** Opens the system's file dialog in native code; null when cancelled. */
   ccSwitchImportFile: (engine: string) =>
     invoke<CcSwitchImportResult | null>("engine_cc_switch_import_file", { engine }),
 };

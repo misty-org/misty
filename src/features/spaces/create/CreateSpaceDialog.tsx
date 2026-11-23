@@ -3,42 +3,43 @@ import {
   AvatarFallback,
   Button,
   Dialog,
+  DialogBody,
   DialogContent,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
+  Field,
   FieldError,
   Input,
-  Text,
   cn,
 } from "@misty/ui";
-import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
+import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatar_palette";
 import { spaceInitials } from "../components/SpaceAvatar";
 import { CreateSpaceInvitePeople } from "./CreateSpaceInvitePeople";
-import type { useCreateSpaceDialog } from "./useCreateSpaceDialog";
+import type { useCreateSpaceDialog } from "./use_create_space_dialog";
 
-/** One short form: the Space's name and who to invite. */
 export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCreateSpaceDialog> }) {
   return (
     <Dialog
       open={dialog.open}
       onOpenChange={(open) => (open ? dialog.setOpen(true) : dialog.close())}
     >
-      <DialogContent aria-describedby={undefined} className="max-w-110 gap-0 p-0">
+      <DialogContent aria-describedby={undefined} size="md">
         <form className="contents" onSubmit={(event) => void dialog.submit(event)}>
-          <header className="px-6 pb-4 pt-5">
-            <DialogTitle className="text-lg">Create a Space</DialogTitle>
-          </header>
+          <DialogHeader>
+            <DialogTitle>Create a Space</DialogTitle>
+          </DialogHeader>
 
-          <div className="grid gap-5 border-t px-6 py-4">
-            <Text bare as="label" tone="muted" className="grid gap-2 text-xs font-medium">
-              Name
-              <span className="flex items-center gap-3">
-                <Avatar shape="tile" className="size-10 shrink-0" aria-hidden="true">
-                  <AvatarFallback
-                    className={cn(avatarColorClass(dialog.name || "new-space"), avatarInkClass)}
-                  >
-                    {spaceInitials(dialog.name)}
-                  </AvatarFallback>
-                </Avatar>
+          <DialogBody className="grid gap-5">
+            <div className="flex items-end gap-3">
+              <Avatar shape="tile" className="size-10 shrink-0" aria-hidden="true">
+                <AvatarFallback
+                  className={cn(avatarColorClass(dialog.name || "new-space"), avatarInkClass)}
+                >
+                  {spaceInitials(dialog.name)}
+                </AvatarFallback>
+              </Avatar>
+              <Field label="Name" className="min-w-0 flex-1">
                 <Input
                   autoFocus
                   value={dialog.name}
@@ -47,8 +48,8 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
                   disabled={dialog.creating}
                   onChange={(event) => dialog.setName(event.target.value)}
                 />
-              </span>
-            </Text>
+              </Field>
+            </div>
 
             <CreateSpaceInvitePeople
               people={dialog.people}
@@ -56,23 +57,28 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
               disabled={dialog.creating}
               onChange={dialog.setInvites}
             />
-          </div>
+          </DialogBody>
 
-          <footer className="flex items-center justify-end gap-2 border-t px-6 py-3">
+          <DialogFooter>
             <FieldError className="mr-auto min-w-0" message={dialog.createError} />
             <Button
               type="button"
-              variant="secondary"
+              variant="quiet"
               size="lg"
               disabled={dialog.creating}
               onClick={dialog.close}
             >
               Cancel
             </Button>
-            <Button type="submit" size="lg" disabled={!dialog.name.trim() || dialog.creating}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={!dialog.name.trim() || dialog.creating}
+            >
               Create Space
             </Button>
-          </footer>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

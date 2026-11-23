@@ -1,16 +1,9 @@
-//! The cursor companion's turns on an outside engine. Misty's own runtime gets the screens and the
-//! pointing rules in its own prompt; an engine gets the same: the display captures as images (saved
-//! where engines read pasted images) and a note with the rules and the screenshots' names and sizes.
-//! The engine's reply carries the same [POINT] and [GUIDE] tags, which the companion reads.
 use std::path::PathBuf;
 
 use serde_json::Value;
 
-/// Engines take at most this many images in a turn; screens come before anything else attached.
 const MOST_SCREENS: usize = 4;
 
-/// What a companion turn adds for an engine: the screenshots to attach and the note for its prompt.
-/// Nothing for a turn that isn't the companion's.
 pub(super) struct CompanionTurn {
     pub images: Vec<PathBuf>,
     pub note: Option<String>,
@@ -47,7 +40,6 @@ pub(super) fn companion_turn(body: &Value, takes_images: bool) -> CompanionTurn 
     }
 }
 
-/// One capture's image, saved as a file the engine reads.
 fn save_capture(capture: &Value) -> Option<PathBuf> {
     let mime = capture["mime_type"].as_str()?;
     let (head, data) = capture["data_url"].as_str()?.split_once(";base64,")?;

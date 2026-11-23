@@ -13,7 +13,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  hasMark,
   IconButton,
+  Mark,
   MenuItem,
   MenuLabel,
   MenuRadioGroup,
@@ -28,25 +30,23 @@ import {
   type ButtonIcon,
 } from "@misty/ui";
 import { invoke } from "@/native/invoke";
-import { captureAttachmentFromDataUrl } from "../../../runs/invocations/captureAttachment";
+import { captureAttachmentFromDataUrl } from "../../../runs/invocations/capture_attachment";
 import { EngineFastItem } from "../../view/engine/EngineFastItem";
-import { chooseEngineMode } from "../../../plans/permissionMode";
-import type { EngineModeKind, EngineModeOption } from "../../../engines/engineModes";
-import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
+import { chooseEngineMode } from "../../../plans/permission_mode";
+import type { EngineModeKind, EngineModeOption } from "../../../engines/engine_modes";
 import {
   engineModels,
   mistyEngine,
   modelNamed,
   usablePick,
   type EngineModel,
-} from "../../../engines/enginesApi";
-import { modelName } from "../../../engines/modelNames";
-import { useComposerChoices, useModelEfforts, type ComposerChoices } from "./composerChoices";
-import { effectiveEffort, effortLabel, effortNote, modelEfforts } from "./engineOptions";
-import { useComposerVim } from "./composerVim";
-import type { VimMode } from "./vimKeys";
+} from "../../../engines/engines_api";
+import { modelName } from "../../../engines/model_names";
+import { useComposerChoices, useModelEfforts, type ComposerChoices } from "./composer_choices";
+import { effectiveEffort, effortLabel, effortNote, modelEfforts } from "./engine_options";
+import { useComposerVim } from "./composer_vim";
+import type { VimMode } from "./vim_keys";
 
-/** Captures part of the screen with the system's own picker and attaches it. */
 export async function captureRegionFile(): Promise<File | null> {
   const shot = await invoke<{ dataUrl: string; width: number; height: number } | null>(
     "misty_capture_region",
@@ -59,14 +59,9 @@ export async function captureRegionFile(): Promise<File | null> {
   return new File([bytes], "Screen capture.jpg", { type });
 }
 
-/**
- * A picker in the composer's bar. With room it shows its value; in icon form, or when the bar has
- * folded it into ⋯, its rows still choose (as a submenu of ⋯).
- */
 function picker(input: {
   id: string;
   icon: LucideIcon | ReactNode;
-  /** What it picks, the tooltip in icon form and the ⋯ row's name. */
   name: string;
   value: string;
   priority: number;
@@ -119,15 +114,10 @@ const modeIcons: Record<EngineModeKind, LucideIcon> = {
   no_asking: ShieldOff,
 };
 
-/**
- * The engine's own modes, by its own names: from checking first to working without asking
- * inside its folder, and its planning mode. None when the engine has only one.
- */
 export function engineModeItem(props: {
   conversationId?: string;
   modes: EngineModeOption[];
   current?: EngineModeOption;
-  /** A Teach lesson keeps its mode whatever is chosen here. */
   teaching?: boolean;
   disabled?: boolean;
 }): ActionBarItem | null {
@@ -165,7 +155,6 @@ export function engineModeItem(props: {
   });
 }
 
-/** Vim keys' mode while they're on (`/vim`), and the way to turn them off. */
 export function vimItem(props: { on: boolean; mode: VimMode }): ActionBarItem | null {
   if (!props.on) return null;
   return picker({
@@ -183,7 +172,6 @@ export function vimItem(props: { on: boolean; mode: VimMode }): ActionBarItem | 
   });
 }
 
-/** The models an engine offers, read once per engine. */
 export function useEngineModels(engine: string | undefined) {
   const [models, setModels] = useState<{ engine: string; list: EngineModel[] }>();
   useEffect(() => {
@@ -197,12 +185,6 @@ export function useEngineModels(engine: string | undefined) {
   return models && models.engine === engine ? models.list : undefined;
 }
 
-/**
- * The model and how hard it thinks, as two buttons after OpenChamber's: "Sonnet 5.5" and "Medium". Each
- * model is named for what it runs, offers only the levels it takes, and brings back the level last
- * used with it. What it shows is what the next turn sends (`runBody.ts`); there is no "engine's
- * default" row. None for Misty's own engine.
- */
 export function modelEffortItem(props: {
   accountId: string;
   conversationId?: string;
@@ -216,10 +198,8 @@ export function modelEffortItem(props: {
 }): ActionBarItem | null {
   const engine = props.engine;
   if (!engine || engine === mistyEngine) return null;
-  // A pick the account can no longer run gives way to the engine's own (`usablePick`).
   const currentId = usablePick(engine, props.models, props.choices.model || props.agentModel || "");
   const current = modelNamed(props.models, currentId);
-  // Elsewhere, a model saved earlier that the engine no longer lists still shows, by its id.
   const list = [...(props.models ?? [])];
   if (currentId && !current)
     list.unshift({ id: currentId, label: modelName(currentId, currentId), default: false });
@@ -230,7 +210,6 @@ export function modelEffortItem(props: {
       ? modelName(currentId, currentId)
       : "Default model";
   const byId = new Map(list.map((model) => [model.id, model]));
-  // The level a model would run at: the chat's pick for the current one, else its remembered one.
   const effortFor = (id: string) =>
     effectiveEffort({
       engine,
@@ -254,7 +233,11 @@ export function modelEffortItem(props: {
     choose({ effort: level });
     remember(value, level);
   };
-  const icon: ButtonIcon = hasEngineMark(engine) ? <EngineMark engine={engine} size={16} /> : Cpu;
+  const icon: ButtonIcon = hasMark(`engine:${engine}`) ? (
+    <Mark of={`engine:${engine}`} size={16} />
+  ) : (
+    Cpu
+  );
   const models =
     props.models === undefined
       ? undefined
@@ -266,7 +249,6 @@ export function modelEffortItem(props: {
           keywords: [model.id],
           section: model.section === "more" ? ("more" as const) : ("main" as const),
         }));
-  // Where the bar has folded it into ⋯: the models, then the levels.
   const rows = (
     <>
       <MenuLabel>{props.engineName ?? "Model"}</MenuLabel>
@@ -320,13 +302,11 @@ export function modelEffortItem(props: {
   };
 }
 
-/** Misty's browser, attached to the message: the engine is told to work there, and gets its tools. */
 export function BrowserChip(props: { onRemove(): void }) {
   return (
     <Surface
       as="span"
       tone="well"
-      edge="hairline"
       radius="md"
       className="inline-flex h-7 shrink-0 items-center gap-1.5 pr-1 pl-2.5"
     >

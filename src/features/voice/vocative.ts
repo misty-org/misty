@@ -1,9 +1,3 @@
-/**
- * "Hey Juniper, find a time with Sam" sends the rest to the agent named
- * Juniper instead of typing it. Matching is forgiving about speech-to-text
- * spellings and works with common greetings in several languages, but only
- * at the very start of what was said.
- */
 export type VocativeAgent = { id: string; name: string };
 export type Vocative = { agent: VocativeAgent; message: string };
 
@@ -57,16 +51,10 @@ function distance(a: string, b: string): number {
   return row[b.length]!;
 }
 
-/** How far a heard name may be from the real one: none for short names. */
 const tolerance = (name: string) => (name.length >= 8 ? 2 : name.length >= 4 ? 1 : 0);
 
 const words = (text: string) => text.split(/[\s,，、。.!?！？:;]+/u).filter(Boolean);
 
-/**
- * Finds "<greeting> <agent name>[,] <message>" at the start of a transcript.
- * Returns null when there is no greeting, no close-enough name, no message,
- * or two agents match equally well.
- */
 export function matchVocative(transcript: string, agents: VocativeAgent[]): Vocative | null {
   const text = transcript.trim();
   const spoken = words(text);
@@ -87,7 +75,6 @@ export function matchVocative(transcript: string, agents: VocativeAgent[]): Voca
     } else if (score === best.score) tie = true;
   }
   if (!best || tie) return null;
-  // Drop the greeting and the name as written, keeping the rest verbatim.
   let rest = text;
   for (let i = 0; i < 1 + best.nameWords; i++)
     rest = rest.replace(/^[\s,，、。.!?！？:;]*[^\s,，、。.!?！？:;]+/u, "");

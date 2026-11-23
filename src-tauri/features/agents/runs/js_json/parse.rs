@@ -1,10 +1,5 @@
-//! `JSON.parse`. A parser of its own because `serde_json` without `float_roundtrip` can land a long
-//! number one step off from the nearest double, turning it on would change the whole app, and text
-//! rebuilt from a parsed value has to read as Node wrote it.
 use super::{into_object, JsValue};
 
-/// The deepest nesting read. Past this `JSON.parse` would still work, but a tool result doesn't get
-/// here, and a stack overflow can't be caught.
 const MAX_DEPTH: usize = 512;
 
 struct Parser<'a> {
@@ -14,7 +9,11 @@ struct Parser<'a> {
 }
 
 pub(super) fn parse(text: &str) -> Option<JsValue> {
-    let mut parser = Parser { text, bytes: text.as_bytes(), at: 0 };
+    let mut parser = Parser {
+        text,
+        bytes: text.as_bytes(),
+        at: 0,
+    };
     parser.skip_space();
     let value = parser.value(0)?;
     parser.skip_space();
@@ -33,7 +32,9 @@ impl Parser<'_> {
     }
 
     fn eat(&mut self, word: &str) -> Option<()> {
-        self.bytes[self.at..].starts_with(word.as_bytes()).then(|| self.at += word.len())
+        self.bytes[self.at..]
+            .starts_with(word.as_bytes())
+            .then(|| self.at += word.len())
     }
 
     fn value(&mut self, depth: usize) -> Option<JsValue> {
@@ -152,7 +153,6 @@ impl Parser<'_> {
     fn string(&mut self) -> Option<String> {
         self.at += 1;
         let mut out = String::new();
-        // A run of \u escapes, which may pair into one character.
         let mut units: Vec<u16> = Vec::new();
         loop {
             let start = self.at;
@@ -168,7 +168,6 @@ impl Parser<'_> {
             self.at += 1;
             match byte {
                 b'"' => {
-                    // A lone surrogate can't be held in a Rust string, so it reads as U+FFFD.
                     out.push_str(&String::from_utf16_lossy(&units));
                     return Some(out);
                 }
@@ -209,22 +208,55 @@ mod tests {
 
     #[test]
     fn reads_what_json_parse_reads() {
-        assert_eq!(read(" { \"a\" : [ 1 , { } , [ ] , \"x\" ] } "), Some(r#"{"a":[1,{},[],"x"]}"#.to_owned()));
+        assert_eq!(
+            read(" { \"a\" : [ 1 , { } , [ ] , \"x\" ] } "),
+            Some(r#"{"a":[1,{},[],"x"]}"#.to_owned())
+        );
         assert_eq!(read("-0.5e1"), Some("-5".to_owned()));
-        assert_eq!(read(r#""é😀\u00e9\ud83d\ude00\n""#), Some("\"é😀é😀\\n\"".to_owned()));
+        assert_eq!(
+            read(r#""é😀\u00e9\ud83d\ude00\n""#),
+            Some("\"é😀é😀\\n\"".to_owned())
+        );
         assert_eq!(read(r#""\ud83dA""#), Some("\"\u{FFFD}A\"".to_owned()));
     }
 
     #[test]
     fn numbers_land_on_the_nearest_double() {
-        assert_eq!(read("0.30000000000000004"), Some("0.30000000000000004".to_owned()));
-        assert_eq!(read("37.77492950000001"), Some("37.77492950000001".to_owned()));
-        assert_eq!(read("123456789012345680000"), Some("123456789012345680000".to_owned()));
+        assert_eq!(
+            read("0.30000000000000004"),
+            Some("0.30000000000000004".to_owned())
+        );
+        assert_eq!(
+            read("37.77492950000001"),
+            Some("37.77492950000001".to_owned())
+        );
+        assert_eq!(
+            read("123456789012345680000"),
+            Some("123456789012345680000".to_owned())
+        );
     }
 
     #[test]
     fn refuses_what_json_parse_refuses() {
-        for text in ["", "{", "[1,]", "{\"a\":1,}", "01", "1.", ".5", "+1", "1e", "tru", "\"a", "\"\\x\"", "\"\n\"", "1 2", "{a:1}", "[1 2]", "\"\\u12\""] {
+        for text in [
+            "",
+            "{",
+            "[1,]",
+            "{\"a\":1,}",
+            "01",
+            "1.",
+            ".5",
+            "+1",
+            "1e",
+            "tru",
+            "\"a",
+            "\"\\x\"",
+            "\"\n\"",
+            "1 2",
+            "{a:1}",
+            "[1 2]",
+            "\"\\u12\"",
+        ] {
             assert_eq!(read(text), None, "{text}");
         }
     }

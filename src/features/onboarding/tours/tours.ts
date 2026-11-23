@@ -1,11 +1,6 @@
 import type { TourStep } from "@misty/ui";
-import { utilityTours } from "./utilityTours";
+import { utilityTours } from "./utility_tours";
 
-/**
- * Misty's guided tours, written for someone who has never used AI: what each thing is for, in
- * plain words, never how it works inside. A step points at the element tagged with its
- * `data-tour` name and is skipped when that element isn't on screen.
- */
 export type TourId =
   | "welcome"
   | "agents"

@@ -1,4 +1,3 @@
-//! Telling the pages when the renderer draws over them, and what the companion shows.
 use crate::browser::*;
 
 #[tauri::command]
@@ -17,7 +16,7 @@ pub fn browser_webviews_set_overlay_active(
         }
         let mut errors = Vec::new();
         for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-")
+            if (label.starts_with("misty-browser-") || crate::apps::frames::is_app_page(&label))
                 && webview.window().label() == caller.window().label()
             {
                 if let Err(error) = position_macos_webview(&webview, false) {
@@ -25,16 +24,14 @@ pub fn browser_webviews_set_overlay_active(
                 }
             }
         }
-        return if errors.is_empty() {
+        if errors.is_empty() {
             Ok(())
         } else {
             Err(errors.join("; "))
-        };
+        }
     }
     #[cfg(windows)]
     {
-        // Only the stacking changes: the renderer is already transparent, so
-        // the page reads the same above or below it.
         remember_main_macos_webview(&app, caller.window().label())?;
         if let Ok(mut map) = renderers().lock() {
             map.entry(caller.window().label().to_owned())
@@ -43,10 +40,9 @@ pub fn browser_webviews_set_overlay_active(
         }
         let mut errors = Vec::new();
         for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-")
+            if (label.starts_with("misty-browser-") || crate::apps::frames::is_app_page(&label))
                 && webview.window().label() == caller.window().label()
             {
-                // Stacked tabs stay beneath everything, overlay or not.
                 if is_stacked(&webview) {
                     continue;
                 }
@@ -63,9 +59,6 @@ pub fn browser_webviews_set_overlay_active(
     }
     #[cfg(not(any(target_os = "macos", windows)))]
     {
-        // WebKitGTK does not expose sibling z-order through Tauri. Park
-        // external pages while renderer-owned popovers are open; the frontend
-        // reconciles the active page when the overlay closes.
         if active {
             browser_webviews_hide_all(caller, app)
         } else {
@@ -74,9 +67,6 @@ pub fn browser_webviews_set_overlay_active(
     }
 }
 
-/// Where the renderer's notices are: left, top, right and bottom in its points, so a notice
-/// doesn't hold the page. On macOS the page sits beneath and clicks past a notice reach it; on
-/// Windows the page stays on top with the notice's box cut out of it. Linux still holds the page.
 #[tauri::command]
 pub fn browser_webviews_set_notice_rects(
     caller: Webview,
@@ -89,8 +79,6 @@ pub fn browser_webviews_set_notice_rects(
         remember_main_macos_webview(&app, caller.window().label())?;
         let window = caller.window();
         let scale = window.scale_factor().map_err(|error| error.to_string())?;
-        // Rounded inward: a pixel the notice only partly covers stays the page's, or what's
-        // behind the page would show along the edge.
         let holes = rects
             .iter()
             .map(|[left, top, right, bottom]| {
@@ -109,7 +97,9 @@ pub fn browser_webviews_set_notice_rects(
         );
         let mut errors = Vec::new();
         for (label, webview) in app.webviews() {
-            if label.starts_with("misty-browser-") && webview.window().label() == window.label() {
+            if (label.starts_with("misty-browser-") || crate::apps::frames::is_app_page(&label))
+                && webview.window().label() == window.label()
+            {
                 if let Err(error) = crate::browser::pages::windows::page_frame::reapply(&webview) {
                     errors.push(error);
                 }

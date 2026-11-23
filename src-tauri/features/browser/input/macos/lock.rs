@@ -1,9 +1,3 @@
-//! Keeps the person's own mouse and keyboard out of a browser view an agent has been granted.
-//!
-//! Physical events pass through the local app monitor; our explicit scoped view dispatch
-//! does not. Thus trusted WebKit events can work without briefly opening the agent-owned
-//! view to unrelated human input.
-
 use block2::RcBlock;
 use objc2::rc::{Retained, Weak};
 use objc2::runtime::AnyObject;
@@ -12,12 +6,10 @@ use objc2_foundation::MainThreadMarker;
 use std::{cell::RefCell, ptr::NonNull};
 
 thread_local! {
-    // The monitor and the views it guards live on the main thread, where AppKit runs them.
     static LOCKED: RefCell<Vec<Weak<NSView>>> = const { RefCell::new(Vec::new()) };
     static MONITOR: RefCell<Option<Retained<AnyObject>>> = const { RefCell::new(None) };
 }
 
-/// Locks or unlocks `view`. Called on the main thread.
 pub(crate) fn set_locked(view: &NSView, locked: bool) {
     LOCKED.with_borrow_mut(|views| {
         views.retain(|held| held.load().is_some_and(|held| !std::ptr::eq(&*held, view)));
@@ -57,7 +49,6 @@ pub(crate) fn set_locked(view: &NSView, locked: bool) {
     MONITOR.with_borrow_mut(|slot| *slot = monitor);
 }
 
-/// Whether `event` is aimed into a locked view and so is dropped.
 fn swallows(mtm: MainThreadMarker, event: &NSEvent) -> bool {
     let Some(window) = event.window(mtm) else {
         return false;

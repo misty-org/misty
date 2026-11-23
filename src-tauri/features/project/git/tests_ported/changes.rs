@@ -108,14 +108,11 @@ fn diff_is_capped_with_explicit_truncation_marker() {
     assert!(text.len() <= MAX_DIFF_PATCH_BYTES + DIFF_TRUNCATED_MARKER.len() + 1);
 }
 
-/// Two clicks in the panel (stage while an unstage is still running) overlap; libgit2 would
-/// fail the second with "the index is locked". Both must land.
 #[test]
 fn overlapping_index_writes_on_one_repo_both_land() {
     let scratch = Scratch::new();
     let repo = Repository::init(&scratch.0).unwrap();
     {
-        // A larger index widens the read-modify-write window.
         let mut index = repo.index().unwrap();
         for i in 0..2000 {
             let relative = format!("f{i}.txt");

@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   resetLayout: vi.fn(),
 }));
 
-vi.mock("./recoveryActions", () => ({
+vi.mock("./recovery_actions", () => ({
   recoverLastClosedWorkspaceTab: mocks.recoverTab,
   reloadMisty: mocks.reload,
   resetWorkspaceLayout: mocks.resetLayout,
@@ -48,7 +48,6 @@ describe("SupportRecoverySection", () => {
       Array.from(container.querySelectorAll("button")).find(
         (candidate) => candidate.textContent?.trim() === text,
       );
-    // A row's button reads its label, then its description.
     const row = (label: string) =>
       Array.from(container.querySelectorAll("button")).find((candidate) =>
         candidate.textContent?.trim().startsWith(label),

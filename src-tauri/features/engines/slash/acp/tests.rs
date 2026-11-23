@@ -27,8 +27,6 @@ fn save_arguments_follow_hermes() {
     assert!(hermes_save_args("redact").is_err());
 }
 
-/// The `initialize` answers of the installed engines (Kimi Code 2.6.2, Grok 1.0.77, Hermes
-/// 0.23.1, MiniMax Code 0.7.7), trimmed to their session capabilities.
 #[test]
 fn session_calls_follow_each_engines_handshake() {
     let kimi = json!({"protocolVersion": 1, "agentCapabilities": {"loadSession": true,
@@ -44,14 +42,11 @@ fn session_calls_follow_each_engines_handshake() {
         assert!(has_session_call(agent, "fork"));
         assert!(has_session_call(agent, "resume"));
     }
-    // Grok has no ACP fork: its own `_x.ai/session/fork` makes one.
     assert!(!has_session_call(&grok, "fork"));
     assert!(has_session_call(&grok, "resume"));
     assert!(!has_session_call(&json!({}), "resume"));
 }
 
-/// Grok 1.0.77's own session calls, as it answers them: fork and rename unwrapped, info
-/// wrapped in `{result}` (and `{result: {}}` for a session this process hasn't opened).
 #[test]
 fn grok_session_calls_read_its_answers() {
     let forked = json!({"newSessionId": "01a1d856-29df-7f81-a279-92fac4df77db",

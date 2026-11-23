@@ -1,12 +1,3 @@
-//! Keeps the engines Misty installed in `~/.misty/shared/engines` at the version this build needs.
-//!
-//! Every build shares those installs, so a newer build may need a newer engine than the one an
-//! older build installed. Before a run starts an engine Misty installed, its version is compared
-//! with this build's minimum (`MINIMUMS`) without going to the network: the version found is kept
-//! in `shared/engines/versions.json` until the program itself changes. Only an engine below its
-//! minimum is updated, by the same route Settings › Engines uses, under a lock so two builds never
-//! update it at once. Nothing is ever downgraded, and an engine that was on the computer before
-//! Misty is the person's and is never touched.
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -18,15 +9,10 @@ use super::{
 };
 use crate::engines::support::paths::{app_home, InstallRoot};
 
-/// The oldest version of each engine this build works with. An adapter adds its engine here when
-/// it relies on something an older release of that engine doesn't have.
 const MINIMUMS: &[(&str, &str)] = &[];
 
-/// How long another build's update may hold the lock before it counts as abandoned.
 const LOCK_STALE: Duration = Duration::from_secs(15 * 60);
 
-/// Brings `engine` up to this build's minimum when Misty installed it and it is older. A failed
-/// update is returned; the caller decides whether the run goes ahead with the older engine.
 pub(crate) async fn ensure_minimum(engine: &str) -> Result<(), String> {
     if engine == "hermes" {
         repair_moved_hermes().await?;
@@ -46,10 +32,8 @@ pub(crate) async fn ensure_minimum(engine: &str) -> Result<(), String> {
         return Ok(());
     }
     let Some(_lock) = UpdateLock::take(engine) else {
-        // Another build is updating it right now; this run uses what is there.
         return Ok(());
     };
-    // That build may have finished between the check and the lock.
     if recent_enough(engine, &bin, needed).await {
         return Ok(());
     }
@@ -61,14 +45,6 @@ pub(crate) async fn ensure_minimum(engine: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Layout v1 moved `~/.misty/engines` into `shared/` (`database/misty_profiles.rs`), but Hermes
-/// Agent's installer writes its checkout's path into the launchers it keeps in the checkout, and
-/// keys the checkout's dependency environment (`~/.hermes/installs/<hash of the path>`) by it.
-/// A checkout Misty installed before the move can't start where it is now: its launchers still
-/// point at the old place, and the new place has no environment ("no dependency environment is
-/// committed"). Hermes's own script, run again on the checkout (the update route of Settings ›
-/// Engines), writes both for where it is now. The wrappers an older install left in
-/// `~/.local/bin` for the old place go too: nothing is there any more.
 async fn repair_moved_hermes() -> Result<(), String> {
     let Some(before) = file_access::paths::misty_root_dir()
         .map(|misty| misty.join("engines").join("hermes").join("hermes-agent"))
@@ -84,7 +60,6 @@ async fn repair_moved_hermes() -> Result<(), String> {
         return Ok(());
     }
     let Some(_lock) = UpdateLock::take("hermes") else {
-        // Another build is repairing it right now; this run uses what is there.
         return Ok(());
     };
     if !moved(&launcher) {
@@ -111,8 +86,6 @@ async fn recent_enough(engine: &str, bin: &str, needed: (u64, u64, u64)) -> bool
         .is_some_and(|found| found >= needed)
 }
 
-/// The version of the program at `bin`: the one noted in `versions.json` while the program is
-/// unchanged, else `<bin> --version`, noted for next time.
 async fn installed_version(engine: &str, bin: &str) -> Option<String> {
     let stamp = modified_ms(Path::new(bin));
     let mut noted = read_noted();
@@ -163,7 +136,6 @@ fn write_noted(noted: &Map<String, Value>) {
     }
 }
 
-/// `shared/engines/<engine>.updating`, held while one build updates that engine.
 struct UpdateLock(PathBuf);
 
 impl UpdateLock {

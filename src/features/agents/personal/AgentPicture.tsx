@@ -1,35 +1,25 @@
-// Kept apart from AgentAvatar.tsx so windows without the agents' store (the cursor overlay) can
-// draw an agent from its profile alone.
 import { Cloud } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, PersonaLogo, personaTone, Surface, Text } from "@misty/ui";
-import { EngineMark, hasEngineMark } from "@/features/engine-config/EngineMark";
-import { mistyEngine } from "../engines/mistyEngine";
-import { agentCloudAvatar, type agentCloudVariants } from "./agentCloudAvatars";
-import { personaGlyph } from "../personas/personaGlyph";
+import { cn, hasMark, Mark, PersonaLogo, personaTone, Surface, Text } from "@misty/ui";
+import { mistyEngine } from "../engines/misty_engine";
+import { agentCloudAvatar, type agentCloudVariants } from "./agent_cloud_avatars";
+import { personaGlyph } from "../personas/persona_glyph";
 
-/**
- * An agent's picture. An agent made from a persona wears the persona's logo, as Explore shows it.
- * Otherwise an agent on an outside engine wears that engine's own mark, or its initial
- * when the engine has none, drawn bare with nothing behind it. The cloud is Misty's own: it shows
- * for agents on Misty's runtime, and in the small size used in lists of chats it is a plain cloud
- * glyph, since the animated cloud belongs to the companion.
- */
 export function AgentAvatar({
   agent,
   large = false,
   compact = false,
+  face = false,
   className,
 }: {
   agent?: AgentProfile;
   large?: boolean;
   compact?: boolean;
-  /** Layout only: a box of another size, such as a profile's 64px picker. */
+  face?: boolean;
   className?: string;
 }) {
-  const glyph = large ? 34 : compact ? 16 : 22;
-  // `agent-avatar` stays as a hook: the sidebar and search draw the mark at icon size by it.
+  const glyph = large ? 34 : compact && !face ? 16 : 22;
   const frame = (bare: boolean, disc: boolean, children: ReactNode) => (
     <Surface
       as="span"
@@ -42,11 +32,15 @@ export function AgentAvatar({
         bare ? "overflow-visible" : "overflow-hidden",
         large
           ? "size-16 text-display"
-          : compact
+          : face
             ? bare
-              ? "size-4.5 text-meta"
-              : "size-7 text-caption"
-            : "size-10 text-title",
+              ? "size-6 text-control"
+              : "size-6 text-caption"
+            : compact
+              ? bare
+                ? "size-4.5 text-meta"
+                : "size-7 text-caption"
+              : "size-10 text-title",
         className,
       )}
     >
@@ -69,7 +63,7 @@ export function AgentAvatar({
         <PersonaLogo
           icon={personaGlyph(persona)}
           color={personaTone(persona.id)}
-          size={large ? "tile" : compact ? "row" : "avatar"}
+          size={large ? "tile" : compact || face ? "row" : "avatar"}
         />
       </span>
     );
@@ -78,8 +72,8 @@ export function AgentAvatar({
     return frame(
       true,
       false,
-      hasEngineMark(agent.engine) ? (
-        <EngineMark engine={agent.engine} size={glyph} />
+      hasMark(`engine:${agent.engine}`) ? (
+        <Mark of={`engine:${agent.engine}`} size={glyph} />
       ) : (
         (agent.name.trim()[0] ?? "?").toUpperCase()
       ),
@@ -88,14 +82,10 @@ export function AgentAvatar({
   if (typeof agent?.avatar?.emoji === "string" && agent.avatar.emoji) {
     return frame(false, true, agent.avatar.emoji);
   }
-  if (compact) return frame(true, false, <Cloud />);
+  if (compact || face) return frame(true, false, <Cloud />);
   return frame(false, false, <AgentCloudImage variant={agentCloudAvatar(agent)} fill />);
 }
 
-/**
- * One of the cloud's pictures, still when motion is reduced. `fill` makes it fill its box, the
- * picture contained in it; without it the picture keeps its own size up to its box's width.
- */
 export function AgentCloudImage({
   variant,
   fill = false,

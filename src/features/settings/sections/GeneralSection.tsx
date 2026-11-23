@@ -4,7 +4,7 @@ import {
   DesktopSettingsSection as SettingsSectionBlock,
 } from "../components/DesktopSettingsUI";
 import { booleanSetting, numberSetting, SelectControl, SwitchControl } from "../SettingsControls";
-import type { SettingsContentProps } from "../settingsTypes";
+import type { SettingsContentProps } from "../settings_types";
 export function GeneralSection(props: SettingsContentProps) {
   const launchOnLoginUnsupported = props.launchOnLogin?.supported === false;
   const launchOnLoginEnabled = booleanSetting(props.document, "general", "launch_on_login", false);

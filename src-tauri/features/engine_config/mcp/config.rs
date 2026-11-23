@@ -1,21 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Reading, redacting and safely writing the MCP config sources.
-//!
-//! Sources and scopes follow the two CLIs' own files:
-//! - Claude `~/.claude.json` top-level `mcpServers` (user) and
-//!   `projects.<workspace>.mcpServers` (local), toggled through that project's
-//!   `disabledMcpServers`;
-//! - Claude's workspace `.mcp.json` (project), toggled through the
-//!   `enabledMcpjsonServers` / `disabledMcpjsonServers` lists in `.claude/settings.local.json`;
-//! - Codex `$CODEX_HOME/config.toml` and the workspace `.codex/config.toml`
-//!   `[mcp_servers.<name>] enabled`, changed in place.
-//!
-//! Writes never rebuild a whole file: TOML goes through toml_edit (comments and unrelated fields
-//! stay), JSON through serde_json, then `support::atomic_write` replaces the file. Every write
-//! compares the content hash first and refuses to overwrite a change made elsewhere.
-
 use super::probe::ProbeTarget;
 use super::sources::{
     probe_target_from_json, probe_target_from_toml, source_spec, SourceSpec, CLAUDE_FIELDS,
@@ -44,9 +29,6 @@ pub(super) fn read_text(path: &Path) -> Result<String, McpError> {
         .map_err(|error| McpError::format(format!("{}: invalid UTF-8: {error}", path.display())))
 }
 
-/// The user's Claude config: `~/.claude.json` by default; when `CLAUDE_CONFIG_DIR` is set and
-/// holds a `.claude.json`, that one wins (both are places the CLI really reads, so it falls back
-/// by which exists).
 pub(super) fn claude_user_config_path() -> PathBuf {
     if let Some(dir) = std::env::var_os("CLAUDE_CONFIG_DIR").filter(|value| !value.is_empty()) {
         let candidate = PathBuf::from(dir).join(".claude.json");
@@ -71,9 +53,6 @@ fn codex_project_config_path(workspace: &Path) -> PathBuf {
     workspace.join(".codex").join("config.toml")
 }
 
-// ===== Reading and parsing =====
-
-/// Claude's and Codex's source files (including preferred paths not created yet).
 pub(super) fn engine_source_infos(
     engine: &str,
     workspace: Option<&str>,
@@ -112,7 +91,6 @@ pub(super) fn engine_source_infos(
     }
 }
 
-/// For a probe: reads the config again for the raw entry (not redacted, used only here).
 pub(super) fn probe_target(
     source: &str,
     name: &str,
@@ -238,10 +216,6 @@ pub(super) fn read_config_entries(workspace: Option<&str>) -> McpConfigSection {
     section
 }
 
-/// `~/.claude.json`: top-level user servers plus the current workspace's local servers. Whether
-/// one is off comes from `projects[<workspace>].disabledMcpServers` (Claude Code's TUI writes
-/// that key for "disable for this project"; checked against `claude mcp list`, which shows it as
-/// Disabled).
 fn read_claude_json(
     path: &Path,
     source: &str,
@@ -266,7 +240,6 @@ fn read_claude_json(
         &project_disabled,
         workspace.is_some(),
     )?;
-    // Local scope: projects[<workspace>].mcpServers, which belong to this workspace only.
     if let Some(entry) = project {
         let mut local = parse_claude_servers(
             entry.get("mcpServers"),
@@ -282,8 +255,6 @@ fn read_claude_json(
     Ok(entries)
 }
 
-/// The project key may be a resolved path (Claude Code keys by realpath): look it up as given,
-/// then canonicalized, so a path through a link still finds its local config.
 fn project_entry<'a>(projects: &'a Map<String, Value>, workspace: &str) -> Option<&'a Value> {
     workspace_key(projects, workspace).and_then(|key| projects.get(&key))
 }
@@ -301,8 +272,6 @@ fn disabled_names(value: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// The workspace `.mcp.json`: project servers, on or off by the approval lists in
-/// `.claude/settings.local.json` and the project's disabled list in `.claude.json`.
 fn read_claude_project(workspace: &Path) -> Result<Vec<McpConfigEntry>, McpError> {
     let path = claude_project_config_path(workspace);
     let raw = read_text(&path)?;
@@ -322,7 +291,6 @@ fn read_claude_project(workspace: &Path) -> Result<Vec<McpConfigEntry>, McpError
     )
 }
 
-/// That workspace's `disabledMcpServers` in `.claude.json` (empty when it can't be read).
 fn read_project_disabled(claude_json_path: &Path, workspace: &Path) -> Vec<String> {
     let Some(workspace) = workspace.to_str() else {
         return Vec::new();
@@ -353,7 +321,6 @@ fn parse_claude_servers(
     let spec = source_spec(source).ok_or_else(|| McpError::internal("unknown MCP source"))?;
     let mut entries = Vec::new();
     let Some(Value::Object(servers)) = servers else {
-        // Missing or not an object: nothing to show, and not a broken file (other keys still work).
         return Ok(entries);
     };
     let disabled_list = approval.get(1);
@@ -370,10 +337,6 @@ fn parse_claude_servers(
         let Some(spec_object) = raw_spec.as_object() else {
             continue;
         };
-        // The disabled list wins; a server on neither list keeps Claude Code's default for project
-        // servers (on), which neither `enableAllProjectMcpServers` nor the enabled list changes.
-        // The project key's `disabledMcpServers` applies to every scope (the TUI's "disable for
-        // this project").
         let enabled = if project_disabled.iter().any(|item| item == name) {
             false
         } else if source == SOURCE_CLAUDE_PROJECT {
@@ -382,7 +345,6 @@ fn parse_claude_servers(
             true
         };
         let mut entry = build_entry(&spec, name, path, version, enabled, spec_object);
-        // User and local toggles are kept per project: without a workspace there's nowhere to write.
         if matches!(source, SOURCE_CLAUDE_USER | SOURCE_CLAUDE_LOCAL) && !has_workspace {
             entry.writable = false;
             entry.readonly_reason_code = Some(REASON_NEEDS_WORKSPACE.to_string());
@@ -538,10 +500,6 @@ fn read_codex_toml(path: &Path, source: &str) -> Result<Vec<McpConfigEntry>, Mcp
     Ok(entries)
 }
 
-// ===== Redaction =====
-
-/// Whether a key name is a credential (case-insensitive: words such as `key`, `token`, `secret`,
-/// alone or with a `_`/`-` prefix or suffix).
 pub(super) fn is_sensitive_key(key: &str) -> bool {
     const SENSITIVE: [&str; 16] = [
         "key",
@@ -573,8 +531,6 @@ pub(super) fn is_sensitive_key(key: &str) -> bool {
     })
 }
 
-/// URLs are redacted by default: userinfo removed, sensitive query values replaced with `***`.
-/// When it can't be parsed, the whole query is dropped and only origin and path are kept.
 pub(super) fn redact_url(raw: &str) -> String {
     match reqwest::Url::parse(raw) {
         Ok(url) => {
@@ -616,8 +572,6 @@ pub(super) fn redact_url(raw: &str) -> String {
     }
 }
 
-// ===== Writing =====
-
 pub(super) fn write_enabled(
     entry_id: &str,
     enabled: bool,
@@ -641,8 +595,6 @@ pub(super) fn write_enabled(
         return Err(McpError::invalid("MCP server name must not be empty"));
     }
 
-    // The other engines' sources take WRITE_LOCK themselves in sources::write_enabled; the lock
-    // isn't reentrant, so taking it here first would hang the grok, opencode and omp toggles.
     if !matches!(
         source,
         SOURCE_CODEX_USER
@@ -709,7 +661,6 @@ fn reread_entry(
     {
         read_codex_toml(config_path, source)?
     } else if matches!(source, SOURCE_CLAUDE_USER | SOURCE_CLAUDE_LOCAL) {
-        // `.claude.json`: the project's disabled list is written; read back user and local scopes.
         read_claude_json(
             config_path,
             source,
@@ -752,7 +703,6 @@ fn reread_entry(
         .ok_or_else(|| McpError::not_found(format!("MCP server \"{name}\" not found after write")))
 }
 
-/// Reads the three approval fields in Claude's project settings: `[enabled, disabled, enableAll]`.
 fn read_approval_lists(path: &Path) -> Result<Vec<Value>, McpError> {
     if !file_access::fs::is_file(path) {
         return Ok(vec![Value::Null, Value::Null, Value::Bool(false)]);
@@ -772,8 +722,6 @@ fn read_approval_lists(path: &Path) -> Result<Vec<Value>, McpError> {
     ])
 }
 
-/// Codex: `[mcp_servers.<name>] enabled = <bool>`. A missing table or server is not_found; a
-/// server or table is never created.
 fn set_codex_enabled_in(
     path: &Path,
     name: &str,
@@ -811,10 +759,6 @@ fn set_codex_enabled_in(
         .map_err(McpError::internal)
 }
 
-/// Claude's user and local toggles: the project's `disabledMcpServers` list in `~/.claude.json`
-/// (the same switch as Claude Code's TUI "disable for this project"; checked against
-/// `claude mcp list`). The server definition itself is left alone, and a project record that
-/// doesn't exist isn't created (the CLI may never have been started in that folder).
 fn set_claude_disabled_in(
     path: &Path,
     workspace: &str,
@@ -894,11 +838,6 @@ fn set_claude_disabled_in(
     crate::engine_config::support::atomic_write(path, &text).map_err(McpError::internal)
 }
 
-/// Finds the key in `projects` for `workspace` (the key as written in the file, so a write back
-/// keeps its name). The two sides spell paths differently: Claude Code stores `S:/a/b` on
-/// Windows, while a workspace that went through `ensure_allowed` is `\\?\S:\a\b`. Both drop a
-/// `\\?\` prefix, use `/`, lose a trailing separator and ignore case on Windows before comparing;
-/// if that still fails, canonicalize is the fallback (links).
 fn workspace_key(projects: &Map<String, Value>, workspace: &str) -> Option<String> {
     if projects.contains_key(workspace) {
         return Some(workspace.to_string());
@@ -916,7 +855,6 @@ fn workspace_key(projects: &Map<String, Value>, workspace: &str) -> Option<Strin
     })
 }
 
-/// A path's form for comparing only: never stored or written back.
 fn comparable_path(path: &str) -> String {
     let path = path
         .strip_prefix(r"\\?\UNC\")
@@ -936,9 +874,6 @@ fn comparable_path(path: &str) -> String {
     }
 }
 
-/// Claude project scope: the server definition stays in `.mcp.json`, and the toggle is written to
-/// the enabled/disabled lists in `.claude/settings.local.json` (the person's own file, not the
-/// team's shared `settings.json`).
 fn set_claude_project_enabled(
     config_path: &Path,
     settings_path: &Path,
@@ -1054,12 +989,10 @@ mod tests {
             redact_url("https://example.com/mcp?token=abc"),
             "https://example.com/mcp?token=***"
         );
-        // No query: unchanged.
         assert_eq!(
             redact_url("https://example.com/mcp"),
             "https://example.com/mcp"
         );
-        // Not a URL: drop the query to be safe.
         assert_eq!(redact_url("not a url?token=abc"), "not a url?***");
     }
 
@@ -1119,7 +1052,6 @@ mod tests {
         std::fs::write(&path, "[mcp_servers.alpha]\ncommand = \"npx\"\n").unwrap();
         let error = set_codex_enabled_in(&path, "alpha", false, "stale-hash").unwrap_err();
         assert_eq!(error.code, "conflict");
-        // The file wasn't rewritten.
         assert!(std::fs::read_to_string(&path).unwrap().contains("command"));
     }
 
@@ -1152,16 +1084,12 @@ mod tests {
         assert_eq!(error.code, "format");
     }
 
-    /// Escapes a path as a JSON string before putting it in JSON text: Windows paths hold `\`,
-    /// which would make invalid JSON (an invalid escape).
     fn json_key(value: &str) -> String {
         serde_json::to_string(value).expect("json string")
     }
 
     #[test]
     fn claude_project_toggle_writes_personal_settings_only() {
-        // read_claude_project reads the process env through claude_user_config_path(); share
-        // the lock with the other home-folder tests so it never sees a value mid-change.
         let _guard = crate::engine_config::support::HOME_ENV_LOCK.lock();
         let dir = TempDir::new("claude-project-toggle");
         let mcp = dir.path().join(".mcp.json");
@@ -1190,7 +1118,6 @@ mod tests {
         assert!(beta.enabled);
         assert_eq!(beta.url.as_deref(), Some("https://x/mcp?key=***"));
 
-        // On again: the disabled list is emptied and the enabled list gets the name.
         let version = file_hash(&std::fs::read(&mcp).unwrap());
         set_claude_project_enabled(&mcp, &settings, "alpha", true, &version).unwrap();
         let written: Value =
@@ -1239,7 +1166,6 @@ mod tests {
             .iter()
             .find(|entry| entry.source == SOURCE_CLAUDE_USER)
             .unwrap();
-        // A user server turned off by the project's disabled list, and now toggled in place.
         assert!(!user.enabled);
         assert!(user.writable);
         let local = entries
@@ -1250,7 +1176,6 @@ mod tests {
         assert!(local.writable);
         assert!(local.enabled);
 
-        // No workspace: readable but not writable (the disabled list is kept per project).
         let without = read_claude_json(&path, SOURCE_CLAUDE_USER, None).unwrap();
         assert!(!without[0].writable);
         assert_eq!(
@@ -1261,9 +1186,6 @@ mod tests {
 
     #[test]
     fn claude_user_toggle_writes_the_project_disable_list() {
-        // `write_enabled` goes through claude_user_config_path(): pointing CLAUDE_CONFIG_DIR at a
-        // scratch folder keeps the real ~/.claude.json untouched and covers dispatch, write and
-        // read-back.
         let _guard = crate::engine_config::support::HOME_ENV_LOCK.lock();
         let dir = TempDir::new("claude-toggle");
         let path = dir.path().join(".claude.json");
@@ -1277,7 +1199,6 @@ mod tests {
         std::fs::write(&path, &original).unwrap();
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.path());
 
-        // Like Claude Code's TUI "disable for this project": the project key's disabledMcpServers.
         let entry = write_enabled(
             "claude_user:alpha",
             false,
@@ -1292,11 +1213,9 @@ mod tests {
             written["projects"][&workspace_key]["disabledMcpServers"],
             serde_json::json!(["alpha"])
         );
-        // The server definition itself is left alone: no enabled field is added to the entry.
         assert!(written["mcpServers"]["alpha"]["command"] == "npx");
         assert!(written["mcpServers"]["alpha"].get("enabled").is_none());
 
-        // On again: the name leaves the list (an empty list removes the key).
         let entry = write_enabled(
             "claude_user:alpha",
             true,
@@ -1319,9 +1238,6 @@ mod tests {
 
     #[test]
     fn claude_project_keys_match_across_windows_path_spellings() {
-        // Claude Code stores `S:/a/b` on Windows; Misty's workspace after ensure_allowed is
-        // `\\?\S:\a\b`. Both must reach the same project key, or a toggle always reports "no
-        // record of this project". The key comes back as written, so a write keeps its name.
         let projects: Map<String, Value> =
             serde_json::from_str(r#"{ "S:/AIWorker/Proj": {}, "/home/u/ws": {} }"#).unwrap();
         assert_eq!(
@@ -1339,7 +1255,6 @@ mod tests {
         assert!(workspace_key(&projects, r"S:\AIWorker\Other").is_none());
         assert!(project_entry(&projects, r"\\?\S:\AIWorker\Proj").is_some());
         if cfg!(windows) {
-            // Windows paths ignore case.
             assert_eq!(
                 workspace_key(&projects, r"\\?\s:\aiworker\proj").as_deref(),
                 Some("S:/AIWorker/Proj")
@@ -1363,10 +1278,8 @@ mod tests {
         .unwrap();
         std::env::set_var("CLAUDE_CONFIG_DIR", dir.path());
 
-        // No workspace: the disabled list is kept per project, so there's nowhere to write.
         let error = write_enabled("claude_user:alpha", false, "", None).unwrap_err();
         assert_eq!(error.code, "invalid_input");
-        // No project record: none is created, nothing is written.
         let error =
             write_enabled("claude_user:alpha", false, "", Some(&workspace_key)).unwrap_err();
         assert_eq!(error.code, "not_found");
@@ -1378,7 +1291,6 @@ mod tests {
             ),
         )
         .unwrap();
-        // No such server: refused.
         let error = write_enabled(
             "claude_user:ghost",
             false,
@@ -1387,7 +1299,6 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error.code, "not_found");
-        // Version conflict: a change made elsewhere isn't overwritten; the file stays as it was.
         let error =
             write_enabled("claude_user:alpha", false, "stale", Some(&workspace_key)).unwrap_err();
         assert_eq!(error.code, "conflict");
@@ -1408,9 +1319,6 @@ mod tests {
 
     #[test]
     fn new_engine_toggle_through_the_command_path_does_not_deadlock() {
-        // engine_mcp_set_enabled → config::write_enabled → sources::write_enabled: if the outer
-        // call took WRITE_LOCK first, the inner one would deadlock. Run it on a thread with a time
-        // limit so a hang fails the test instead of stalling it.
         let _guard = crate::engine_config::support::HOME_ENV_LOCK.lock();
         let dir = TempDir::new("omp-toggle-command-path");
         let path = dir.path().join("mcp.json");

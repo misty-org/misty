@@ -1,17 +1,11 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! `usage-stats.db` in `~/.misty/engine-config`: per-file read cursors, deduplicated usage
-//! events and the Codex fork lineage. Its own file (not `misty.db`) so a schema change is a cheap
-//! table wipe that never touches the rest of Misty's data, and nothing in it syncs.
-
 use super::types::UsageEvent;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Bump when the schema or any parser's semantics change: an older DB is
-/// wiped and rebuilt from the logs on next open.
 const SCHEMA_VERSION: &str = "1";
 
 const SCHEMA: &str = "
@@ -56,24 +50,18 @@ DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS codex_lineage;
 ";
 
-/// Read position and identity of one log file.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Cursor {
     pub path: String,
     pub engine: String,
-    /// File length when last read (the read stops there).
     pub size: i64,
     pub mtime_ms: i64,
-    /// Byte offset after the last complete line consumed.
     pub offset: i64,
-    /// Length and hash of the file head, to detect a replaced file.
     pub head_len: i64,
     pub head_hash: String,
-    /// Parser carry-over state (JSON).
     pub state: Option<String>,
 }
 
-/// One aggregated group before pricing.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct AggRow {
     pub bucket: String,
@@ -94,7 +82,6 @@ pub(crate) fn open(path: &Path) -> Result<Connection, String> {
         file_access::fs::create_dir_all(parent)
             .map_err(|e| format!("create {}: {e}", parent.display()))?;
     }
-    // Holds project paths: keep it owner-only, like misty.db.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -122,8 +109,6 @@ fn configure(conn: &Connection) -> rusqlite::Result<()> {
 }
 
 fn migrate(conn: &Connection) -> rusqlite::Result<()> {
-    // Pure read first: a query must not need the write lock a full rebuild
-    // holds for its whole duration.
     let version: Option<String> = conn
         .query_row(
             "SELECT value FROM meta WHERE key = 'schema_version'",
@@ -135,19 +120,11 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if version.as_deref() == Some(SCHEMA_VERSION) {
         return Ok(());
     }
-    // Only a fresh or pre-release database lands here today. A future
-    // SCHEMA_VERSION bump must migrate `events` (ALTER / copy) instead of
-    // dropping it, for the same reason `reset_cursors` keeps events.
     conn.execute_batch(DROP_ALL)?;
     conn.execute_batch(SCHEMA)?;
     set_meta(conn, "schema_version", SCHEMA_VERSION)
 }
 
-/// Full rescan: forget every cursor and lineage pair so every log on disk is
-/// read again from byte 0. Events are kept on purpose — the CLIs delete their
-/// own logs (Claude Code after 30 days by default), so wiping events would
-/// permanently lose usage that can no longer be rebuilt. Re-read events
-/// upsert onto their stable keys, which corrects them in place.
 pub(crate) fn reset_cursors(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
         "DELETE FROM files; DELETE FROM codex_lineage;
@@ -217,8 +194,6 @@ pub(crate) fn save_cursor(conn: &Connection, cursor: &Cursor) -> rusqlite::Resul
     .map(|_| ())
 }
 
-/// Drop cursors of files no longer on disk. Their events stay: usage
-/// outlives the CLI's own log cleanup.
 pub(crate) fn prune_cursors(
     conn: &Connection,
     engine: &str,
@@ -233,10 +208,6 @@ pub(crate) fn prune_cursors(
     Ok(removed)
 }
 
-/// Upsert one event. Usage numbers and model follow the latest line (last
-/// write wins); the earliest timestamp and the first known session/project
-/// are kept so a resumed or forked copy does not move history. Returns true
-/// when a row was inserted or actually changed.
 pub(crate) fn upsert_event(conn: &Connection, event: &UsageEvent) -> rusqlite::Result<bool> {
     let mut stmt = conn.prepare_cached(
         "INSERT INTO events(key, ts_ms, engine, model, project, session_id,
@@ -293,8 +264,6 @@ pub(crate) fn save_lineage(conn: &Connection, pairs: &[(String, String)]) -> rus
     Ok(())
 }
 
-/// Group events in `[from_ms, to_ms)` by local bucket × engine × model ×
-/// project. Buckets are computed in SQL from the fixed UTC offset.
 pub(crate) fn aggregate(
     conn: &Connection,
     from_ms: i64,

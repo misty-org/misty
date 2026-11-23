@@ -18,17 +18,11 @@ import {
   planFiles,
   type ChosenFile,
   type RewindFiles,
-} from "../../checkpoints/turnFiles";
+} from "../../checkpoints/turn_files";
 
-/** What the person decided about the files a rewind would put back. */
 export type RewindChoice =
   { kind: "cancel" } | { kind: "keep" } | { kind: "restore"; files: ChosenFile[] };
 
-/**
- * Asks before a rewind puts files back, since it changes the person's own files. The agent's
- * files are ticked; one the person changed since is listed unticked, so it is only overwritten
- * when they tick it.
- */
 export function RewindFilesDialog({
   plan,
   onChoose,
@@ -58,7 +52,7 @@ export function RewindFilesDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Put back the files these turns changed?</AlertDialogTitle>
         </AlertDialogHeader>
-        <ul className="grid max-h-64 gap-1.5 overflow-y-auto text-sm" aria-label="Files">
+        <ul className="grid max-h-64 gap-1.5 overflow-y-auto text-control" aria-label="Files">
           {files.map((file) => {
             const key = fileKey(file);
             const name = several ? `${file.folder}/${file.path}` : file.path;
@@ -69,10 +63,10 @@ export function RewindFilesDialog({
                     checked={chosen.has(key)}
                     onCheckedChange={(state) => toggle(key, state === true)}
                   />
-                  <OverflowFadeText className="min-w-0 flex-1 text-xs" full>
+                  <OverflowFadeText className="min-w-0 flex-1 text-meta" full>
                     {name}
                   </OverflowFadeText>
-                  <Text bare tone="muted" className="shrink-0 text-xs">
+                  <Text size="meta" bare tone="muted" className="shrink-0">
                     {file.changedByYou
                       ? "Changed since"
                       : file.change === "remove"
@@ -85,7 +79,7 @@ export function RewindFilesDialog({
           })}
         </ul>
         {plan?.incomplete ? (
-          <Text bare as="p" tone="muted" className="text-sm">
+          <Text size="control" bare as="p" tone="muted">
             Some of these turns weren&apos;t saved, so their changes stay.
           </Text>
         ) : null}

@@ -21,27 +21,17 @@ import {
 } from "@misty/ui";
 import { FileSearchOverlay } from "./FileSearchOverlay";
 import { FileTree } from "./FileTree";
-import { getFileTreeIconSvg } from "./fileIcons";
-import { fileName, useFilesStore } from "./filesStore";
-import { useTreePreferences } from "./treePreferences";
+import { getFileTreeIconSvg } from "./file_icons";
+import { fileName, useFilesStore } from "./files_store";
+import { useTreePreferences } from "./tree_preferences";
 
 const EditorPane = lazyTool(() => import("../editor/EditorPane"));
 
-/** A tab in the strip over the panel: 28px, its icon and name in the caption role. */
 const tabClass = "flex h-7 min-w-0 max-w-45 flex-none items-center gap-1 text-caption";
-/**
- * A tab as the Code page draws it: a square block the strip's full 40px tall, ruled off from the
- * next by a hairline, so the editor's tabs never pass for the window's rounded ones. The open one
- * takes the page's fill and drops its bottom rule, running on into the editor under it.
- */
 const blockClass =
   "flex h-full min-w-0 max-w-48 flex-none items-center gap-1 border-r text-caption";
-/** What a tab shows: its icon and name, bright while it is the one open. */
 const tabContentClass = "flex h-full min-w-0 flex-1 items-center";
 
-/** The strip over the panel: the tree, then each open file. Tabs close, reorder by dragging,
- * and are kept per folder. The Code page, whose tree has a column of its own, leaves out the
- * tree's tab (`withTree`) and draws them as square blocks (`blocks`). */
 export function FileTabs({
   onClose,
   withTree = true,
@@ -49,7 +39,6 @@ export function FileTabs({
 }: {
   onClose(path: string): void;
   withTree?: boolean;
-  /** Square, ruled-off tabs on the sidebar's color, for the Code page's editor. */
   blocks?: boolean;
 }) {
   const openFiles = useFilesStore((state) => state.openFiles);
@@ -59,7 +48,6 @@ export function FileTabs({
   const [dragging, setDragging] = useState<string | null>(null);
   if (openFiles.length === 0) return null;
   const strip = (
-    // Tabs read muted and brighten under the pointer (the wash); the open one is bright.
     <Text
       bare
       as="div"
@@ -162,12 +150,9 @@ export function FileTabs({
           </IconButton>
         </Surface>
       ))}
-      {/* The rest of the strip keeps the rule under the tabs, out to the editor's edge. */}
       {blocks ? <div aria-hidden className="min-w-0 flex-1 border-b" /> : null}
     </Text>
   );
-  // On the Code page the strip is a toolbar row on the sidebar's color, so the open block in the
-  // page's fill runs on into the editor and stands out from the rest.
   return blocks ? (
     <Surface tone="sidebar" className="flex-none">
       {strip}
@@ -177,13 +162,8 @@ export function FileTabs({
   );
 }
 
-/** The tree, or one open file; the others stay mounted but hidden. */
 const viewClass = "relative flex min-h-0 min-w-0 flex-1 flex-col";
 
-/**
- * The folder's files: a tree, and the files opened from it as tabs, each in a code editor with
- * Markdown and HTML previews and find and replace. The search overlay covers the tree while open.
- */
 export function FilesPanel({ folder }: { folder: string }) {
   const root = useFilesStore((state) => state.root);
   const setRoot = useFilesStore((state) => state.setRoot);
@@ -202,7 +182,6 @@ export function FilesPanel({ folder }: { folder: string }) {
     else useFilesStore.getState().closeFile(path);
   };
 
-  // The store still names the folder shown before, for the one frame until it follows this one.
   if (root !== folder) return null;
 
   return (
@@ -213,7 +192,6 @@ export function FilesPanel({ folder }: { folder: string }) {
           <FileTree />
           {searchRoot ? <FileSearchOverlay searchRoot={searchRoot} /> : null}
         </div>
-        {/* Open tabs stay mounted, so each keeps its draft, cursor and scroll. */}
         {openFiles.map((path) => (
           <div key={path} className={viewClass} hidden={active !== path}>
             <ToolSuspense tool="code editor">
@@ -227,7 +205,6 @@ export function FilesPanel({ folder }: { folder: string }) {
   );
 }
 
-/** Asks before closing a tab with unsaved edits; `path` null keeps it shut. */
 export function CloseFileDialog({ path, onDone }: { path: string | null; onDone(): void }) {
   return (
     <AlertDialog open={path !== null} onOpenChange={(open) => !open && onDone()}>

@@ -1,10 +1,3 @@
-//! Text-first page layer for agents:
-//! accessibility snapshots with refs that survive actions, batches of actions
-//! by ref, waiting without model calls, and page text for extraction.
-//!
-//! The runtime lives in its own script world (a WKContentWorld on macOS, an
-//! isolated world on Windows and WebKitGTK), so page scripts can neither read
-//! nor forge its refs, and clicks and keys arrive as native, trusted input.
 use crate::browser::input::native_input;
 use crate::browser::{
     browser_target_observation, resolve_agent_webview, BrowserAgentExecuteRequest,
@@ -39,14 +32,12 @@ pub(in crate::browser) use site_blocks::blocked as site_blocked;
 pub(crate) use site_blocks::SiteBlocks;
 use steps::Step;
 
-/// The script itself lives in the misty-browser-harness repository (`crates/page-runtime/js`).
 const RUNTIME: &str = misty_page_runtime::RUNTIME;
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 const WORLD: &str = "misty-agent-page";
 const SNAPSHOT_CHARS: u64 = 24_000;
 const AFTER_STEPS_SNAPSHOT_CHARS: u64 = 12_000;
 
-/// Operations this layer answers. Reads observe; `steps` and `fill_form` act.
 pub(in crate::browser) fn handles(operation: &str) -> bool {
     matches!(
         operation,
@@ -76,8 +67,6 @@ async fn call(
     call_at(webview, None, operation, args, semantic).await
 }
 
-/// The cross-origin frame a ref belongs to and its document id (frames.rs); None for the
-/// top document's refs.
 fn frame_of(view: &Webview, reference: Option<&str>) -> Option<(u64, String)> {
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     {
@@ -90,7 +79,6 @@ fn frame_of(view: &Webview, reference: Option<&str>) -> Option<(u64, String)> {
     }
 }
 
-/// `call` in the top document, or in one cross-origin frame of it.
 async fn call_at(
     webview: &Webview,
     frame: Option<u64>,
@@ -141,7 +129,6 @@ async fn call_at(
     #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
     {
         let _ = frame;
-        // The page world has no awaiting evaluation; settle is a host sleep there.
         if operation == "\"settle\"" {
             tokio::time::sleep(Duration::from_millis(300)).await;
             return Ok(json!({"ok": true}));
@@ -156,7 +143,6 @@ async fn call_at(
     }
 }
 
-/// Adds what the page's cross-origin frames show under their iframes (frames.rs).
 async fn with_frame_trees(view: &Webview, snapshot: &mut Value) {
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     {
@@ -178,8 +164,6 @@ fn page_error(result: &Value, fallback: &str) -> String {
     }
 }
 
-/// A call rejected before it touched the page, with a reason the model can act
-/// on. It completes the device job, so the message survives intact.
 fn rejected(code: &str, message: impl Into<String>) -> Value {
     json!({"status": "failure", "attempted": false, "tool_error": {"code": code, "message": message.into()}})
 }

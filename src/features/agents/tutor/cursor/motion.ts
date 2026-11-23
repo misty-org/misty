@@ -1,4 +1,3 @@
-// Ported from Clicky (https://github.com/farzaa/clicky), leanring-buddy/OverlayWindow.swift.
 export interface Point {
   x: number;
   y: number;
@@ -23,7 +22,6 @@ export function flight(from: Point, to: Point, elapsedMs: number) {
     done: progress === 1,
   };
 }
-/** SwiftUI spring(response: .2, dampingFraction: .6), integrated in bounded substeps. */
 export function spring(
   position: Point,
   velocity: Point,
@@ -44,7 +42,6 @@ export function spring(
   }
 }
 
-/** Clicky's RMS gain/decay and five-bar profile; independent of microphone sample rate. */
 export function recordingPower(rms: number, previous: number) {
   return Math.max(Math.min(Math.max(rms * 10.2, 0), 1), previous * 0.72);
 }

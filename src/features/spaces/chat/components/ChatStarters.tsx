@@ -1,14 +1,14 @@
 import { Text } from "@misty/ui";
 import type { SpaceChatStarter } from "./ChatMessages";
 
-/** The opening screen of an empty conversation. */
 export function ChatStarters({ onStarter }: { onStarter?: (starter: SpaceChatStarter) => void }) {
   return (
     <Text
       bare
       as="div"
+      size="control"
       tone="muted"
-      className="flex min-h-48 flex-col items-center justify-center gap-2 text-center text-sm"
+      className="flex min-h-48 flex-col items-center justify-center gap-2 text-center"
     >
       {onStarter ? (
         <>

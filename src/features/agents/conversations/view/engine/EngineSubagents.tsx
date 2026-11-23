@@ -1,52 +1,62 @@
-import type { EngineSubagent } from "./engineTurnStore";
-import { StatusRow, StatusTable, type StatusState } from "../../../progress/StatusTable";
-import { WorkGroup } from "../../../progress/WorkGroup";
+import { useId, useState } from "react";
+import { Text, ToolBody, ToolList, ToolRow } from "@misty/ui";
+import type { EngineSubagent } from "./engine_turn_store";
+import { Fold } from "../../../progress/WorkGroup";
 
-const rowState = (state: EngineSubagent["state"]): { verb: string; row: StatusState } =>
-  state === "completed"
-    ? { verb: "Done", row: "done" }
-    : state === "failed"
-      ? { verb: "Didn’t finish", row: "failed" }
-      : { verb: "Working", row: "running" };
+const verbs: Record<EngineSubagent["state"], string> = {
+  running: "Working",
+  completed: "Done",
+  failed: "Didn’t finish",
+};
 
-/**
- * The sub-agents an outside engine started (Claude Code's Task, Codex's sub-agent threads), each
- * with the steps it took nested under it, like Misty's own sub-agents.
- */
+const rowState = (state: EngineSubagent["state"]) =>
+  state === "completed" ? "done" : state === "failed" ? "failed" : "running";
+
+function Subagent({ subagent }: { subagent: EngineSubagent }) {
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  const steps = subagent.rows.length;
+  const opens = steps > 0;
+  return (
+    <li>
+      <ToolRow
+        name={verbs[subagent.state]}
+        target={subagent.goal || subagent.name}
+        meta={steps ? (steps === 1 ? "1 step" : `${steps} steps`) : undefined}
+        state={rowState(subagent.state)}
+        open={opens ? open : undefined}
+        onToggle={opens ? () => setOpen(!open) : undefined}
+        controls={opens ? bodyId : undefined}
+      />
+      {opens ? (
+        <Fold id={bodyId} open={open} onReveal={() => setOpen(true)}>
+          <ToolBody>
+            {subagent.rows.map((step) => (
+              <Text key={step.id} size="meta" tone={step.state === "failed" ? "failed" : "muted"}>
+                {step.name}
+                {step.detail ? (
+                  <Text as="span" bare size="meta" tone="default">
+                    {` ${step.detail}`}
+                  </Text>
+                ) : null}
+              </Text>
+            ))}
+          </ToolBody>
+        </Fold>
+      ) : null}
+    </li>
+  );
+}
+
 export function EngineSubagents({ subagents }: { subagents: EngineSubagent[] }) {
   if (!subagents.length) return null;
-  const live = subagents.filter((subagent) => subagent.state === "running").length;
-  const total = subagents.length;
-  const noun = total === 1 ? "sub-agent" : "sub-agents";
   return (
-    <WorkGroup
-      summary={live ? `Running ${live} of ${total} ${noun}` : `Ran ${total} ${noun}`}
-      running={live > 0}
-    >
-      <StatusTable label="Sub-agents">
-        {subagents.map((subagent) => {
-          const { verb, row } = rowState(subagent.state);
-          return [
-            <StatusRow key={subagent.id} state={row} verb={verb}>
-              {subagent.goal || subagent.name}
-            </StatusRow>,
-            ...subagent.rows.map((step) => {
-              const child = rowState(step.state);
-              return (
-                <StatusRow
-                  key={`${subagent.id}:${step.id}`}
-                  state={child.row}
-                  verb={child.verb}
-                  sub={step.detail}
-                  depth={1}
-                >
-                  {step.name}
-                </StatusRow>
-              );
-            }),
-          ];
-        })}
-      </StatusTable>
-    </WorkGroup>
+    <div className="my-3">
+      <ToolList label="Sub-agents">
+        {subagents.map((subagent) => (
+          <Subagent key={subagent.id} subagent={subagent} />
+        ))}
+      </ToolList>
+    </div>
   );
 }

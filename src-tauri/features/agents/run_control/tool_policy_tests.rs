@@ -60,13 +60,10 @@ fn the_engines_own_mode_decides_by_its_kind_and_a_page_cant_name_another() {
     assert!(on("claude", "plan").planning);
     assert!(on("codex", "plan").planning);
     let yolo = on("gemini", "yolo");
-    // A no-asking mode counts only where the engine's folder sandbox runs; elsewhere it asks.
     assert_eq!(yolo.bypass, cfg!(target_os = "macos"));
     assert_eq!(yolo.auto, cfg!(target_os = "macos"));
-    // An id the engine doesn't list reads as asking, whatever the older field says.
     let unknown = on("kimi", "yolo");
     assert!(!unknown.auto && !unknown.bypass && unknown.mode_id.is_empty());
-    // An engine mode that works without asking doesn't stop Misty's Space writes.
     let taint = Taint::default();
     assert_eq!(
         decide(&edits, &taint, "file.update", &json!({})),
@@ -230,7 +227,6 @@ fn after_a_private_read_a_new_host_with_a_query_asks_in_both_modes() {
             assert!(asks(&decide(&run(auto), &tainted, name, &call)), "{name}");
         }
     }
-    // Plain pages still don't stop Auto.
     assert_eq!(
         decide(
             &run(true),
@@ -368,7 +364,6 @@ fn an_engine_opens_pages_freely_in_ask_mode_and_asks_before_acting() {
     for name in ["browser.navigate", "screen.open"] {
         let input = json!({ "url": "https://example.com", "reason": "Read it" });
         assert!(!asks(&decide(&engine, &taint, name, &input)), "{name}");
-        // Misty's own agent still asks.
         assert!(asks(&decide(&run(false), &taint, name, &input)), "{name}");
     }
     for name in ["browser.steps", "browser.fill_form", "browser.run"] {

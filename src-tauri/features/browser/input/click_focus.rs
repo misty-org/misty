@@ -1,11 +1,3 @@
-//! Activates a Browser page's pane on the click itself. The page is a separate
-//! native view outside the renderer's DOM, and its own focus script runs in the
-//! web content process, where a busy or hostile page can delay or swallow it.
-//! AppKit hands every mouse-down to this monitor before routing it to a view,
-//! so the renderer learns which page was clicked before the page does.
-//! A mouse's back and forward side buttons on a page are reported the same way;
-//! WebKit hands them to neither the page nor its history.
-
 use objc2::runtime::{AnyObject, Bool};
 use objc2::{class, msg_send};
 use objc2_app_kit::{NSEvent, NSView};
@@ -13,12 +5,10 @@ use objc2_foundation::NSPoint;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-/// The click in the renderer view's points (CSS pixels times app zoom), from the top left.
 #[derive(Clone, Serialize)]
 struct BrowserPagePointerDown {
     x: f64,
     y: f64,
-    /// `back` or `forward` for a mouse's side buttons.
     #[serde(skip_serializing_if = "Option::is_none")]
     navigate: Option<&'static str>,
 }
@@ -35,8 +25,6 @@ unsafe fn add_monitor(app: AppHandle) {
         }
         event
     });
-    // Left, right and other mouse-down. AppKit copies the handler and keeps the
-    // monitor for the app's lifetime; the event is always passed through.
     let mask: u64 = (1 << 1) | (1 << 3) | (1 << 25);
     let _: *mut AnyObject = msg_send![
         class!(NSEvent),
@@ -71,8 +59,6 @@ unsafe fn report_page_click(app: &AppHandle, event: &NSEvent) {
         msg_send![superview, convertPoint: location, fromView: std::ptr::null::<NSView>()]
     };
     let mut view: *mut NSView = msg_send![content, hitTest: point];
-    // Only a click that lands in a page's own view counts; while a popup raises
-    // the renderer above the page, the renderer receives it as app UI.
     let web_view = class!(WKWebView);
     loop {
         if view.is_null() || view == renderer {
@@ -84,14 +70,12 @@ unsafe fn report_page_click(app: &AppHandle, event: &NSEvent) {
         }
         view = msg_send![view, superview];
     }
-    // Buttons 3 and 4 are the side buttons most mice label back and forward.
     let button: isize = msg_send![event, buttonNumber];
     let navigate = match button {
         3 => Some("back"),
         4 => Some("forward"),
         _ => None,
     };
-    // WKWebView is flipped, so this is already measured from the top.
     let point: NSPoint =
         msg_send![renderer, convertPoint: location, fromView: std::ptr::null::<NSView>()];
     let _ = app.emit_to(

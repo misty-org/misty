@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { cn, itemToneClass, itemTones, type ItemTone } from "@misty/ui";
 
-// Group by content rather than assigning a different brand/color to every format.
 const fileTypes: ReadonlyArray<readonly [LucideIcon, ItemTone, ReadonlySet<string>]> = [
   [FileArchive, itemTones.archive, new Set("zip rar 7z tar gz bz2 xz tgz zst".split(" "))],
   [
@@ -95,12 +94,7 @@ function EntryIcon(props: FileGlyph & { size?: number; className?: string }) {
     <Icon
       aria-hidden="true"
       focusable="false"
-      className={cn(
-        "block shrink-0",
-        // An untoned glyph takes the color of the slot it sits in, muted in collection rows.
-        props.tone && itemToneClass(props.tone),
-        props.className,
-      )}
+      className={cn("block shrink-0", props.tone && itemToneClass(props.tone), props.className)}
     />
   );
 }

@@ -21,18 +21,14 @@ fn reads_the_engine_layers_usage_shapes() {
 
 #[test]
 fn acp_turn_totals_size_the_context() {
-    // Grok 0.1's prompt `_meta` (PromptResponseMeta), as grok_acp projects it.
     let grok = json!({ "totalTokens": 12345, "inputTokens": 12000, "outputTokens": 345 });
     assert_eq!(context_usage(&grok), (Some(12345), None));
-    // omp 18's prompt answer usage, with the window its usage_update gave.
     let omp = json!({ "totalTokens": 40300, "inputTokens": 300, "outputTokens": 200,
                       "cacheRead": 39800, "model_context_window": 128000 });
     assert_eq!(context_usage(&omp), (Some(40300), Some(128000)));
-    // Gemini-style buckets with no total add up, each bucket once however it's spelt.
     let buckets = json!({ "inputTokens": 100, "cacheRead": 900, "cachedReadTokens": 900,
                           "outputTokens": 5 });
     assert_eq!(context_usage(&buckets), (Some(1005), None));
-    // An explicit size wins over the turn total that came with it.
     assert_eq!(
         context_usage(&json!({ "used": 40300, "totalTokens": 80600 })),
         (Some(40300), None)
@@ -41,7 +37,6 @@ fn acp_turn_totals_size_the_context() {
 
 #[test]
 fn a_zero_token_attempt_is_not_an_unknown_size() {
-    // A failed attempt before a retry reports zeros in every spelling.
     for failed in [
         json!({ "totalTokens": 0, "inputTokens": 0, "outputTokens": 0 }),
         json!({ "total_tokens": 0, "input_tokens": 0, "output_tokens": 0 }),
@@ -49,7 +44,6 @@ fn a_zero_token_attempt_is_not_an_unknown_size() {
     ] {
         assert_eq!(context_usage(&failed), (None, None), "{failed}");
     }
-    // Only an explicit `used: 0` (a compaction the engine didn't size) clears the bar.
     assert_eq!(context_usage(&json!({ "used": 0 })), (Some(0), None));
 }
 
@@ -100,9 +94,7 @@ fn a_result_for_a_call_never_seen_settles_no_other_row() {
         ..RunView::default()
     };
     assert_eq!(find_tool(&view, Some("toolu_lamer"), ""), Some(0));
-    // A helper's call this run never saw start, with no name to go by.
     assert_eq!(find_tool(&view, Some("toolu_dior"), ""), None);
-    // One with a name may only be a row that came without an id.
     assert_eq!(
         find_tool(&view, Some("toolu_dior"), "mcp__misty__browser_navigate"),
         None
@@ -111,6 +103,5 @@ fn a_result_for_a_call_never_seen_settles_no_other_row() {
         find_tool(&view, Some("toolu_dior"), "mcp__misty__browser_run"),
         Some(1)
     );
-    // Engines that give no ids still pair by name.
     assert_eq!(find_tool(&view, None, "mcp__misty__browser_run"), Some(1));
 }

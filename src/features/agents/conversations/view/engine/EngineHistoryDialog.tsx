@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import {
   Dialog,
   DialogBody,
@@ -16,10 +16,10 @@ import {
   Skeleton,
   Text,
 } from "@misty/ui";
-import { defaultEngineAgent } from "../../../engines/defaultEngine";
-import { folderName } from "../../../engines/enginesApi";
-import { useChatFolders } from "../../../shared-folders/chatFolder";
-import { resumeInNewChat } from "../../startChat";
+import { defaultEngineAgent } from "../../../engines/default_engine";
+import { folderName } from "../../../engines/engines_api";
+import { useChatFolders } from "../../../shared-folders/chat_folder";
+import { resumeInNewChat } from "../../start_chat";
 import {
   listEngineSessions,
   renameEngineSession,
@@ -27,10 +27,9 @@ import {
   searchEngineSessions,
   sessionsByFolder,
   type EngineSession,
-} from "./engineHistory";
-import { syncEngineSession } from "./engineSessionImport";
+} from "./engine_history";
+import { syncEngineSession } from "./engine_session_import";
 
-/** Before the first read: two folders' heads (name and path), each over its chats. */
 const historySkeleton = (
   <div role="status" aria-label="Past chats" aria-busy="true" className="grid gap-4">
     {["w-24", "w-20"].map((width) => (
@@ -48,16 +47,9 @@ const historySkeleton = (
 const titleOf = (session: { title: string; customTitle?: string | null }) =>
   session.customTitle?.trim() || session.title.trim() || "Untitled session";
 
-/** The route of an agent's chat. */
 const chatRoute = (agentId: string, conversationId: string) =>
   `/agents?${new URLSearchParams({ agent: agentId, conversation: conversationId })}`;
 
-/**
- * Past chats from this engine's own history, from every folder they ran in, grouped by folder:
- * search them, rename one (written back to the CLI's own files), or continue one. It continues in
- * the open chat, or in a new chat with this agent when none is open. A session from one of the
- * person's projects works there; one from any other folder works in the chat's scratch folder.
- */
 export function EngineHistoryDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -67,8 +59,6 @@ export function EngineHistoryDialog(props: {
   onResumed?(): void;
 }) {
   const navigate = useNavigate();
-  // The engines' own history, read each time the dialog opens; the last read shows meanwhile. It
-  // holds what was said in each chat, so it stays in this session's memory, never on disk.
   const history = useCachedResource<EngineSession[]>(
     props.open ? "agents/engine-history" : null,
     listEngineSessions,
@@ -79,7 +69,6 @@ export function EngineHistoryDialog(props: {
   const [renaming, setRenaming] = useState<EngineSession>();
   const [resumeError, setResumeError] = useState("");
   const error = resumeError || (history.error && !sessions ? String(history.error) : "");
-  // A chat that couldn't continue reopens the dialog to say so; closing it again clears that.
   useEffect(() => {
     if (!props.open) setResumeError("");
   }, [props.open]);
@@ -114,7 +103,6 @@ export function EngineHistoryDialog(props: {
     try {
       if (props.conversationId) {
         await resumeEngineSession(props.conversationId, chat);
-        // Native code may have made the session's project the chat's folder.
         void useChatFolders
           .getState()
           .load(props.conversationId)

@@ -1,8 +1,6 @@
 use super::*;
 use crate::engines::slash::run as run_command;
 
-/// The test binary points HOME at a scratch folder; Misty's settings, which name where
-/// Hermes is installed, live in the person's real one.
 fn use_real_home() {
     // SAFETY: getpwuid returns the calling user's static record, read before anything else.
     let home = unsafe {
@@ -43,11 +41,7 @@ async fn show(context: Context, name: &str) -> Result<Output, String> {
     outcome
 }
 
-/// Two checkpoints of `folder`, taken by Hermes's own checkpoint manager in its own Python
-/// (the virtualenv Hermes made under the home); why not, when it can't.
 fn take_checkpoints(home: &Path, folder: &Path) -> Result<(), String> {
-    // `hermes --version` names its checkout ("Install directory: …"); the launcher Misty
-    // finds may be a shim elsewhere.
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = crate::engines::engine_bin(&settings, "hermes");
     let version = std::process::Command::new(&bin)
@@ -107,7 +101,6 @@ fn engine_context(
     }
 }
 
-/// A scratch project folder and Misty store.
 fn project() -> (tempfile::TempDir, PathBuf, database::store::Store) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("project")).unwrap();
@@ -116,7 +109,6 @@ fn project() -> (tempfile::TempDir, PathBuf, database::store::Store) {
     (dir, folder, db)
 }
 
-/// `session/new` on the engine's ACP server, launched as Misty launches it out of turn.
 async fn new_session(context: &Context, folder: &Path) -> (Value, String) {
     let mut live = OutOfTurn::open(context, folder).await.unwrap();
     let agent = live.agent.clone();
@@ -215,7 +207,6 @@ async fn minimax_fork_on_a_scratch_home() {
         |session: Option<&str>, args: &str| engine_context("minimax", &folder, session, args, &db);
     let (agent, session) = new_session(&at(None, ""), &folder).await;
     assert_eq!(agent["agentInfo"]["name"], "minimax-code", "{agent}");
-    // mcode forks only at a finished reply, and this session has none.
     assert_eq!(
         show(at(Some(&session), ""), "fork").await.unwrap_err(),
         "MiniMax Code forks a session only after a reply has finished."
@@ -237,7 +228,6 @@ async fn hermes_commands_on_a_scratch_home() {
     let db = database::store::Store::at(dir.path().join("misty.db"));
     let at = |session: Option<&str>, args: &str| context(&folder, session, args, &db);
 
-    // A session, opened the way Misty opens one out of turn.
     let mut live = OutOfTurn::open(&at(None, ""), &folder).await.unwrap();
     assert!(live.can("fork") && live.can("resume"), "{}", live.agent);
     let created = live

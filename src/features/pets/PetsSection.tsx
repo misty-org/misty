@@ -1,27 +1,22 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useEffect, useState, type ReactNode } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsSection as Section,
   type SettingsContentProps,
 } from "@/features/settings";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmAction } from "@/shared/lib/confirm_action";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, cn, ErrorState, Skeleton, SkeletonControl, useNotice } from "@misty/ui";
 import { DropdownControl, SwitchControl } from "../settings/SettingsControls";
-import type { PetSummary } from "./petAtlas";
-import { normalizePetScale, PET_SCALE_OPTIONS } from "./petScale";
-import { petErrorMessage, petsApi, petSettingsEvent } from "./petsApi";
+import type { PetSummary } from "./pet_atlas";
+import { normalizePetScale, PET_SCALE_OPTIONS } from "./pet_scale";
+import { petErrorMessage, petsApi, petSettingsEvent } from "./pets_api";
 import { listen } from "@tauri-apps/api/event";
 
-/** The cache entry for this device's pets and choices. */
 const PETS_KEY = "pets/list";
 
-/**
- * This device's pets and choices, read again whenever native code says they changed. The last
- * list is kept on this computer, so the section paints at once and refreshes behind it.
- */
 function usePets() {
   const listing = useCachedResource(PETS_KEY, () => petsApi.list(), { persist: "device" });
   const [error, setError] = useState("");
@@ -29,8 +24,6 @@ function usePets() {
   const [busy, setBusy] = useState(false);
 
   const { reload } = listing;
-  // A failed read keeps what is shown, and the failure is the notice beside it; with nothing to
-  // show, the section says so in place of its rows.
   const shown = listing.data !== undefined;
   const refreshError = shown ? listing.error : undefined;
   useEffect(() => {
@@ -40,13 +33,11 @@ function usePets() {
     !shown && !listing.loading && listing.error ? petErrorMessage(listing.error) : null;
 
   useEffect(() => {
-    // Outside the desktop app (a browser preview, tests) there are no native events to hear.
     if (!hasTauriInternals()) return;
     const unlisten = listen(petSettingsEvent, () => void reload());
     return () => void unlisten.then((dispose) => dispose()).catch(() => undefined);
   }, [reload]);
 
-  /** Runs one change, showing what went wrong and reading the truth back afterwards. */
   const act = async (work: () => Promise<unknown>) => {
     setBusy(true);
     try {
@@ -70,13 +61,8 @@ function usePets() {
   };
 }
 
-/**
- * One placeholder settings row, in DesktopSettingsRow's grid, ending in `children`. The first row
- * names what is loading for screen readers, as the panel insets only its direct rows.
- */
 function SkeletonRow(props: { width: string; status?: boolean; children: ReactNode }) {
   return (
-    // An empty label keeps the panel's padding and hairlines without naming a setting.
     <div
       data-setting-label=""
       role={props.status ? "status" : undefined}
@@ -92,7 +78,6 @@ function SkeletonRow(props: { width: string; status?: boolean; children: ReactNo
   );
 }
 
-/** The section's three rows on a first load: the switch, the pet menu with Import, and size. */
 function PetsSkeleton() {
   return (
     <>
@@ -110,10 +95,6 @@ function PetsSkeleton() {
   );
 }
 
-/**
- * Settings for the desktop pet: show it, pick or import one, and its size. A pet is a Codex v2
- * package (a folder with `pet.json` and its spritesheet) and follows what the person's agents do.
- */
 export function PetsSection(_props: SettingsContentProps) {
   const { pets, settings, busy, act, loadError, retry } = usePets();
   if (!hasTauriInternals()) return null;

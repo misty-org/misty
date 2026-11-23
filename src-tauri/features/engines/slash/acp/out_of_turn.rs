@@ -1,18 +1,10 @@
-//! The short-lived ACP process the out-of-turn commands run on.
-
 use super::*;
 
-/// A short-lived ACP process for calls out of turn: the engine's own ACP command, as a turn
-/// launches it (`prepare_launch` in `engines/mod.rs`), opened in the chat's folder and
-/// initialized, and torn down when the calls are done. A turn's process exits with its turn, so
-/// there is none to borrow.
 pub(super) struct OutOfTurn {
     spawned: SpawnedAcp,
-    /// The `initialize` result: what the engine says it can do.
     pub(super) agent: Value,
     folder: PathBuf,
     killed: AtomicBool,
-    /// A Grok channel's private home, staged for this process alone.
     cleanup: Vec<PathBuf>,
 }
 
@@ -30,7 +22,6 @@ impl OutOfTurn {
                 return Err(error);
             }
         };
-        // The commands it announces on the way keep the menu current, as a turn's do.
         spawned.acp.reports_as = Some(context.engine.clone());
         let mut live = Self {
             spawned,
@@ -58,13 +49,10 @@ impl OutOfTurn {
         self.folder.to_string_lossy().into_owned()
     }
 
-    /// Whether the engine said it has a session call (`agentCapabilities.sessionCapabilities`).
     pub(super) fn can(&self, call: &str) -> bool {
         has_session_call(&self.agent, call)
     }
 
-    /// Opens the chat's session here: `session/resume` where the engine has it, which replays
-    /// no history, else `session/load`. Misty's servers aren't mounted; nothing runs here.
     pub(super) async fn attach(&mut self, session: &str) -> Result<(), String> {
         let method = if self.can("resume") {
             "session/resume"
@@ -93,8 +81,6 @@ impl OutOfTurn {
         result.map_err(|error| self.message(error))
     }
 
-    /// `session/prompt` on an open session, with the reply's text: what the agent said after its
-    /// last tool call (earlier text is commentary). Asks are answered as `answer` does.
     pub(super) async fn prompt(
         &mut self,
         session: &str,
@@ -142,8 +128,6 @@ impl OutOfTurn {
         }
     }
 
-    /// The engine's own words for a failed call: the rpc error's message, else what it last
-    /// wrote to stderr (a missing sign-in, say), else the raw error.
     fn message(&self, raw: String) -> String {
         if let Some(message) = raw
             .strip_prefix("rpc:")
@@ -172,16 +156,12 @@ impl OutOfTurn {
     }
 }
 
-/// Whether an `initialize` result lists a session call (`fork`, `resume`, …).
 pub(super) fn has_session_call(agent: &Value, call: &str) -> bool {
     agent
         .pointer(&format!("/agentCapabilities/sessionCapabilities/{call}"))
         .is_some_and(|capability| !capability.is_null())
 }
 
-/// What the engine asks of Misty out of turn. Nobody is there to answer an ask, so a permission
-/// ask is cancelled and a form declined; a file read inside the folder is served, and anything
-/// else is refused.
 fn answer(folder: &Path, line: &AcpLine) -> Option<Value> {
     let AcpLine::AgentRequest { id, method, params } = line else {
         return None;
@@ -200,9 +180,6 @@ fn answer(folder: &Path, line: &AcpLine) -> Option<Value> {
     })
 }
 
-/// The engine's ACP command with the environment a turn gives it: the person's variables, the
-/// engine's chosen channel and the proxy, and Kimi's or Grok's channel overlay. The chat's own
-/// channel isn't known here, so the engine's current one is used.
 fn launch(context: &Context, folder: &Path) -> Result<BuiltCommand, String> {
     let engine_id = context.engine.as_str();
     let engine = crate::engines::engine_by_id(engine_id).ok_or("That engine has no adapter.")?;

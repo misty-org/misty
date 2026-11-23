@@ -1,0 +1,93 @@
+import { publishLocalRunEvent } from "../runs/local-run/local_run_events";
+import type { AiInvocationEvent } from "../runs/invocations/invocation_types";
+import {
+  changeConversationState,
+  collaborationOf,
+  conversationStateExists,
+  publicQuestionSet,
+  readConversationState,
+} from "../tools/run-state/conversation_state";
+import { RunStateError, runStateAccount } from "../tools/run-state/documents";
+import { approvePlan, rejectPlan, revisePlan } from "../tools/run-state/plans";
+import { answerQuestionSet, questionContinuationPrompt } from "../tools/run-state/questions";
+import type {
+  AgentPlan,
+  AgentPlanPayload,
+  AgentQuestionAnswer,
+  ConversationMode,
+  PermissionMode,
+} from "./plan_types";
+
+function account(): string {
+  const current = runStateAccount();
+  if (!current) throw new RunStateError("not_found");
+  return current;
+}
+
+export const localCollaborationApi = {
+  async get(conversationId: string) {
+    const owner = account();
+    if (!(await conversationStateExists(owner, conversationId)))
+      throw new RunStateError("not_found");
+    return collaborationOf(await readConversationState(owner, conversationId), Date.now());
+  },
+  async setMode(conversationId: string, mode: ConversationMode) {
+    if (!["act", "plan", "teach"].includes(mode)) throw new RunStateError("invalid");
+    await changeConversationState(account(), conversationId, (state) => ({
+      next: { ...state, mode },
+      result: undefined,
+    }));
+    return { mode };
+  },
+  async setPermissionMode(conversationId: string, permissionMode: PermissionMode | "") {
+    if (typeof permissionMode !== "string" || !/^[A-Za-z0-9_-]{0,64}$/.test(permissionMode))
+      throw new RunStateError("invalid");
+    await changeConversationState(account(), conversationId, (state) => ({
+      next: { ...state, permissionMode },
+      result: undefined,
+    }));
+    return { permissionMode };
+  },
+  async answer(questionSetId: string, answers: AgentQuestionAnswer[], conversationId: string) {
+    const set = await changeConversationState(account(), conversationId, (state) =>
+      answerQuestionSet(state, questionSetId, answers, Date.now(), performance.timeOrigin),
+    );
+    const questionSet = publicQuestionSet(set);
+    publishLocalRunEvent(set.runId, {
+      id: crypto.randomUUID(),
+      type: "question.answered",
+      questionSet,
+    } as AiInvocationEvent);
+    return {
+      questionSet,
+      ...(set.continued ? { continuation: { prompt: questionContinuationPrompt(set) } } : {}),
+    };
+  },
+  async approvePlan(plan: AgentPlan) {
+    const approved = await changeConversationState(account(), plan.conversationId, (state) =>
+      approvePlan(state, plan.id, plan.version, Date.now()),
+    );
+    return {
+      plan: approved,
+      mode: "act" as ConversationMode,
+      prompt: `Run the approved plan “${approved.plan.title}”.`,
+    };
+  },
+  async revisePlan(plan: AgentPlan, payload: AgentPlanPayload) {
+    const revised = await changeConversationState(account(), plan.conversationId, (state) =>
+      revisePlan(state, {
+        id: `plan_${crypto.randomUUID()}`,
+        currentId: plan.id,
+        payload,
+        now: Date.now(),
+      }),
+    );
+    return { plan: revised };
+  },
+  async rejectPlan(plan: AgentPlan) {
+    const rejected = await changeConversationState(account(), plan.conversationId, (state) =>
+      rejectPlan(state, plan.id, Date.now()),
+    );
+    return { plan: rejected };
+  },
+};

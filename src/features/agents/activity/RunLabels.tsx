@@ -1,5 +1,5 @@
 import { cn, Text, type TextTone } from "@misty/ui";
-import type { RunRow } from "./activityApi";
+import type { RunRow } from "./activity_api";
 
 const stateLabel: Record<RunRow["state"], string> = {
   running: "Working",
@@ -9,17 +9,12 @@ const stateLabel: Record<RunRow["state"], string> = {
   canceled: "Stopped",
 };
 
-/** The dot's tone, where the state means something; the rest take a dimmed muted dot. */
 const dotTone: Partial<Record<RunRow["state"] | "idle", TextTone>> = {
   running: "working",
   "needs-you": "waiting",
   failed: "failed",
 };
 
-/**
- * A run's state as a word with a dot, colored only where the state means something. The word is
- * muted, or full color with `tone="default"` on a picture's badge.
- */
 export function RunStateBadge({
   state,
   tone = "muted",
@@ -48,7 +43,6 @@ export function RunStateBadge({
   );
 }
 
-/** When a run started: the time today, else the day and time. */
 export function runWhen(at: number, now: number): string {
   const date = new Date(at);
   if (Number.isNaN(date.getTime())) return "";

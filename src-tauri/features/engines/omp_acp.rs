@@ -47,25 +47,14 @@ use crate::engines::{
     VirtualRunGuard,
 };
 
-/// The elicitation select's approve label; OMP compares it exactly
-/// (`const APPROVE_OPTION = "Approve and execute";`, `return value === APPROVE_OPTION;`).
-/// Any drift in the text means refine.
 const APPROVE_OPTION: &str = "Approve and execute";
-/// The refine label. ACP feedback is only this yes/no signal with no text; the person's
-/// feedback text stays in the review record and can't go into the reply frame.
 const REFINE_OPTION: &str = "Refine plan";
-/// The wire method an OMP plan proposal arrives on.
 const ELICITATION_METHOD: &str = "elicitation/create";
-/// The ACP plan mode id (`const ACP_PLAN_MODE_ID = "plan";`).
 const PLAN_MODE_ID: &str = "plan";
-/// The plan file's read limit (the adapter's own safety bound; OMP itself has no limit).
 const MAX_PLAN_BYTES: usize = 1024 * 1024;
 
-/// Why a resume request is refused (shared by build_command and the driver, which both check).
 pub(crate) const RESUME_REFUSAL: &str = "An OMP plan session must start from a new session: the review point (planModeState and the proposal handler) lives only in memory and session/load doesn't re-register it, so a resumed session has no verifiable wait point for your review. Start a new chat to ask for a plan.";
 
-/// Per-turn projection state: the usage from the prompt result, the tool_call name table for
-/// patches, and the context window usage_update pushes.
 #[derive(Default)]
 struct TurnView {
     last_usage: Option<Value>,
@@ -73,10 +62,6 @@ struct TurnView {
     context_window: Option<i64>,
 }
 
-/// Drive one send as an OMP ACP plan-mode turn. Settle contract mirrors
-/// grok_acp::run_acp_turn: parked question cards and plan reviews settle or expire first, then
-/// the terminal event goes out, and last the registry is cleaned by run and session key.
-/// Interrupt works as for grok: when killed, partial output commits as a normal turn end.
 pub(crate) async fn run_acp_turn(
     core: TurnCore,
     req: SendRequest,
@@ -91,20 +76,13 @@ pub(crate) async fn run_acp_turn(
     } = built;
     let mut state = TurnState::new(None);
     let mut view = TurnView::default();
-    // Abort-safe backstop (as for grok): an aborted or panicking task must not leak registry keys.
     let _registry_guard =
         VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
     let result = if req.session_id.is_some() {
-        // Belt and braces: build_command already refused before spawning; even if that layer
-        // were bypassed, no plan may run in a resumed session without a human wait point.
         Err(RESUME_REFUSAL.to_string())
     } else {
         turn_inner(&core, &mut state, &mut view, &req, &mut command, &killed).await
     };
-    // Parked interactions die with the run: settle the question cards and expire parked plan
-    // reviews (once per registry key) before the terminal event, after which the monotonic
-    // guard drops every dispatch. Resume is refused, so the only keys are the run_id and the
-    // native session id from the handshake.
     for key in [state.native_session_id.clone(), Some(core.run_id.clone())]
         .into_iter()
         .flatten()
@@ -146,13 +124,9 @@ async fn turn_inner(
 ) -> Result<(), String> {
     let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
     spawned.acp.reports_as = Some(core.engine_id.clone());
-    // Review frames are written back on this stdin through the registry (respond_plan_review's
-    // route:"stdin" path), so it must be attached before the handshake.
     core.registry
         .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
     let result = handshake_and_prompt(&mut spawned.acp, core, state, view, req, killed).await;
-    // ACP is a resident session protocol: the CLI stays after the prompt answer, so every exit
-    // path tears the tree down.
     teardown(&mut spawned.child).await;
     match result {
         Ok(()) => Ok(()),
@@ -168,9 +142,6 @@ async fn handshake_and_prompt(
     req: &SendRequest,
     killed: &AtomicBool,
 ) -> Result<(), String> {
-    // The key safety fact: OMP hands plan review to the client only when the client declares
-    // elicitation.form, and silently auto-approves otherwise. Check it after building and fail
-    // closed before any session action if it is missing.
     let init = omp_initialize_params();
     if !elicitation_form_declared(&init) {
         return Err(
@@ -210,9 +181,6 @@ async fn handshake_and_prompt(
         );
     }
     core.dispatch_event(state, EngineEvent::SessionId(session_id.clone()));
-    // Model and effort go over the ACP config protocol (setSessionConfigOption's
-    // MODEL/THINKING_CONFIG_ID), passed as the person chose them; an unknown value is the CLI's
-    // error and fails before the prompt.
     if let Some(model) = req
         .model
         .as_deref()
@@ -247,8 +215,6 @@ async fn handshake_and_prompt(
         .await
         .map_err(|error| format!("OMP couldn't apply the reasoning effort `{effort}`: {error}"))?;
     }
-    // Prompt only after set_mode succeeds (plan.enabled defaults to true; when it is off this
-    // returns an "Unsupported ACP mode" error and fails instead of falling back to a normal session).
     acp.routed(
         "session/set_mode",
         json!({ "sessionId": session_id, "modeId": PLAN_MODE_ID }),
@@ -268,17 +234,11 @@ async fn handshake_and_prompt(
                 handle_session_update(core, state, view, params);
                 None
             }
-            // A plan proposal's elicitation belongs to the review path: park it until
-            // respond_plan_review writes the frame back on the registry's stdin. Never answer it
-            // here; cancel, timeout and dismiss are never approval.
             AcpLine::AgentRequest { id, method, params }
                 if method == ELICITATION_METHOD && is_plan_approval_elicitation(params) =>
             {
                 park_plan_review(core, state, &workspace, &session_id, id, params)
             }
-            // Other elicitations in a plan session (the ask tool's select/confirm/input) mean no
-            // approval. The ACP plan transport has no ordinary question channel yet, so they are
-            // closed as cancelled and the CLI carries on as if dismissed (never an approval).
             AcpLine::AgentRequest { id, method, .. } if method == ELICITATION_METHOD => {
                 Some(jsonrpc_result_response(id, json!({ "action": "cancel" })))
             }
@@ -304,18 +264,12 @@ async fn handshake_and_prompt(
     Ok(())
 }
 
-// ==================== handshake and capability check ====================
-
-/// OMP's initialize params: the shared ones + the elicitation.form declaration
-/// (ClientCapabilities.elicitation.form).
 fn omp_initialize_params() -> Value {
     let mut params = initialize_params();
     params["clientCapabilities"]["elicitation"] = json!({ "form": {} });
     params
 }
 
-/// The preflight check: without the form declaration OMP silently auto-approves, so a missing
-/// declaration must fail.
 fn elicitation_form_declared(params: &Value) -> bool {
     params
         .get("clientCapabilities")
@@ -324,8 +278,6 @@ fn elicitation_form_declared(params: &Value) -> bool {
         .is_some_and(|form| !form.is_null())
 }
 
-/// Whether session/new's modes.availableModes includes plan (offered only when plan.enabled).
-/// Without modes, set_mode's real result decides (no field is made up).
 fn plan_mode_advertised(session_result: &Value) -> bool {
     session_result
         .get("modes")
@@ -349,8 +301,6 @@ fn extract_session_id(value: &Value) -> Option<String> {
         .map(str::to_string)
 }
 
-/// ACP prompt content blocks: text plus base64 image blocks (OMP declares
-/// promptCapabilities.image=true).
 fn prompt_blocks(text: &str, images: &[String], workspace: &Path) -> Result<Vec<Value>, String> {
     let mut blocks = vec![json!({ "type": "text", "text": text })];
     for raw in images {
@@ -364,11 +314,6 @@ fn prompt_blocks(text: &str, images: &[String], workspace: &Path) -> Result<Vec<
     Ok(blocks)
 }
 
-// ==================== elicitation recognition and review frames ====================
-
-/// Strictly recognizes a plan review elicitation: mode=form and the value property's enum is
-/// exactly the two plan options (enum:[APPROVE_OPTION, REFINE_OPTION]). The ask tool's
-/// elicitations (another schema) don't match.
 fn is_plan_approval_elicitation(params: &Value) -> bool {
     if params.get("mode").and_then(Value::as_str) != Some("form") {
         return false;
@@ -391,10 +336,6 @@ fn is_plan_approval_elicitation(params: &Value) -> bool {
             .any(|value| value.as_str() == Some(REFINE_OPTION))
 }
 
-/// The approve and refine reply frames, reproduced exactly from OMP's elicitation handling:
-/// elicitFormFromAcpClient reads the form result as `content.value`, and approval is the exact
-/// comparison `value === "Approve and execute"`. The result shape is CreateElicitationResponse
-/// (`{action:"accept", content:{...}}`).
 fn approval_frames(rpc_id: &Value) -> Value {
     json!({
         "approve": jsonrpc_result_response(rpc_id, json!({
@@ -408,9 +349,6 @@ fn approval_frames(rpc_id: &Value) -> Value {
     })
 }
 
-/// Parses the elicitation message:
-/// `Approve plan "<title>" and start implementation?\n\n<12-line preview><\n…?>`.
-/// Returns (title, preview text).
 fn parse_approval_message(message: &str) -> Option<(String, String)> {
     let rest = message.strip_prefix("Approve plan \"")?;
     let (title, after) = rest.split_once("\" and start implementation?")?;
@@ -422,9 +360,6 @@ fn parse_approval_message(message: &str) -> Option<(String, String)> {
     Some((title.to_string(), preview.to_string()))
 }
 
-/// Binds the file body to the elicitation preview exactly: the preview is the first 12 lines
-/// joined with "\n", plus a trailing "\n…" past 12 lines. The ellipsis is checked both ways;
-/// a mismatch means it isn't this proposal's body.
 fn preview_matches(content: &str, preview: &str) -> bool {
     let (preview_body, had_ellipsis) = match preview.strip_suffix("\n…") {
         Some(body) => (body, true),
@@ -440,12 +375,10 @@ fn preview_matches(content: &str, preview: &str) -> bool {
     head == preview_body && (lines.len() > 12) == had_ellipsis
 }
 
-// ==================== locating and reading the plan file from the allowlist ====================
-
-/// Candidate OMP session roots (getAgentDir, getSessionsDir): PI_CODING_AGENT_DIR overrides
-/// the agent directory; in the default layout an existing XDG_DATA_HOME/omp flattens the agent/
-/// prefix; otherwise ~/.<PI_CONFIG_DIR=.omp>/agent/sessions. The profile layout
-/// (profiles/<name>/agent) isn't covered: not found fails closed.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads OMP's own session artifacts in place, wherever PI_CODING_AGENT_DIR, XDG_DATA_HOME or PI_CONFIG_DIR keep them"
+)]
 fn omp_sessions_roots() -> Vec<PathBuf> {
     if let Some(agent_dir) = std::env::var("PI_CODING_AGENT_DIR")
         .ok()
@@ -475,7 +408,6 @@ fn omp_sessions_roots() -> Vec<PathBuf> {
     roots
 }
 
-/// path.resolve without the filesystem: make absolute and normalize `.`/`..`.
 fn normalize_absolute(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
@@ -497,12 +429,14 @@ fn normalize_absolute(path: &Path) -> PathBuf {
     normalized
 }
 
-/// resolveEquivalentPath: the realpath, or the resolved path as it is when that fails.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves the person's workspace and home the way OMP names its session folders; neither need be linked"
+)]
 fn realpath_or(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
-/// encodeRelativeSessionDirName.
 fn encode_relative(prefix: &str, rel: &Path) -> String {
     let encoded = rel.to_string_lossy().replace(['/', '\\', ':'], "-");
     if encoded.is_empty() {
@@ -514,16 +448,12 @@ fn encode_relative(prefix: &str, rel: &Path) -> String {
     }
 }
 
-/// encodeLegacyAbsoluteSessionDirName.
 fn encode_legacy(resolved: &Path) -> String {
     let text = resolved.to_string_lossy();
     let without_root = text.trim_start_matches(['/', '\\']);
     format!("--{}--", without_root.replace(['/', '\\', ':'], "-"))
 }
 
-/// getDefaultSessionDirName: relative to home → `-…`, relative to tmp → `-tmp-…`, otherwise the
-/// legacy absolute-path encoding. Prefixes compare canonical paths (realpath); the legacy name
-/// uses the resolved path (not the realpath, as upstream does).
 fn encode_session_dir_name(
     canonical: &Path,
     home: Option<&Path>,
@@ -551,9 +481,10 @@ fn session_dir_name(workspace: &Path) -> String {
     encode_session_dir_name(&canonical, home.as_deref(), &tmp, &resolved)
 }
 
-/// Candidate local:// roots for the session: `<root>/<encoded cwd>/<timestamp>_<sessionId>/local`.
-/// The artifacts directory is the session file without .jsonl (artifactsDirectoryFor), and the
-/// local root is artifactsDir/local.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads OMP's own session artifacts in place, wherever PI_CODING_AGENT_DIR, XDG_DATA_HOME or PI_CONFIG_DIR keep them"
+)]
 fn session_local_roots(roots: &[PathBuf], workspace: &Path, session_id: &str) -> Vec<PathBuf> {
     let mut locals = Vec::new();
     let dir_name = session_dir_name(workspace);
@@ -580,8 +511,6 @@ fn session_local_roots(roots: &[PathBuf], workspace: &Path, session_id: &str) ->
     locals
 }
 
-/// normalizePlanTitle's sanitizing rule. The elicitation title is already sanitized; this
-/// recomputes it defensively so the file name built from it stays inside the allowlist.
 fn sanitize_title(title: &str) -> String {
     let trimmed = title.trim();
     let without_ext = if trimmed.len() >= 3 && trimmed.to_ascii_lowercase().ends_with(".md") {
@@ -605,8 +534,6 @@ fn sanitize_title(title: &str) -> String {
     out.trim_matches('-').to_string()
 }
 
-/// planSlugFromSupplied: the sanitized title without a trailing `-plan` (case-insensitive),
-/// falling back to the sanitized title when that leaves nothing.
 fn slug_from_title(title: &str) -> Option<String> {
     let sanitized = sanitize_title(title);
     if sanitized.is_empty() {
@@ -620,9 +547,10 @@ fn slug_from_title(title: &str) -> Option<String> {
     Some(slug.unwrap_or(sanitized))
 }
 
-/// Candidate plan file names, in resolveApprovedPlan's order: the one derived from the slug →
-/// the state path PLAN.md → scanned *plan.md files newest first (/plan\.md$/i) → PLAN.md as a
-/// fallback. Deduplicated, order kept.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads OMP's own session artifacts in place, wherever PI_CODING_AGENT_DIR, XDG_DATA_HOME or PI_CONFIG_DIR keep them"
+)]
 fn plan_candidate_names(local_root: &Path, slug: Option<&str>) -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
     if let Some(slug) = slug {
@@ -664,9 +592,10 @@ fn plan_candidate_names(local_root: &Path, slug: Option<&str>) -> Vec<String> {
     names
 }
 
-/// Reads one plan file candidate from the allowlist: the name must be a single-level *plan.md; a
-/// symlink escaping the local root is refused; at most 1 MiB; a missing file returns Ok(None)
-/// so the next candidate is tried. The caller computes the body's content_hash.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads OMP's own session artifacts in place, wherever PI_CODING_AGENT_DIR, XDG_DATA_HOME or PI_CONFIG_DIR keep them"
+)]
 fn read_plan_candidate(local_root: &Path, name: &str) -> Result<Option<String>, String> {
     if name.is_empty()
         || name.contains(['/', '\\'])
@@ -686,7 +615,6 @@ fn read_plan_candidate(local_root: &Path, name: &str) -> Result<Option<String>, 
     })?;
     let file_canonical = match std::fs::canonicalize(&candidate) {
         Ok(path) => path,
-        // Missing (a dangling symlink included) = this candidate misses; try the next.
         Err(_) => return Ok(None),
     };
     if !file_canonical.starts_with(&root_canonical) {
@@ -714,10 +642,6 @@ fn read_plan_candidate(local_root: &Path, name: &str) -> Result<Option<String>, 
     })
 }
 
-/// Locates and verifies this proposal's plan file: the elicitation carries only a 12-line
-/// preview, so the full text must come from the plan file; "first 12 lines == preview" binds
-/// the proposal to that version of the body, and a mismatch is never approved. Returns (full
-/// text, elicitation title).
 fn load_verified_plan(local_roots: &[PathBuf], params: &Value) -> Result<(String, String), String> {
     let message = params
         .get("message")
@@ -754,8 +678,6 @@ fn load_verified_plan(local_roots: &[PathBuf], params: &Value) -> Result<(String
     })
 }
 
-/// The body's first level-one markdown heading (firstLevelOneHeading:
-/// `/^[ \t]*#[ \t]+(.+?)[ \t]*$/m`).
 fn first_heading(content: &str) -> Option<String> {
     for line in content.lines() {
         let line = line.trim_start_matches([' ', '\t']);
@@ -773,14 +695,6 @@ fn first_heading(content: &str) -> Option<String> {
     None
 }
 
-// ==================== parking and event projection ====================
-
-/// Parks one plan proposal: once the full body is verified, dispatch PlanReviewReady (the
-/// context follows the stdin parking shape: {route, contentHash, frames} at the top level, with
-/// the revision added by the backend). A failed check fails closed: dispatch an Error so the
-/// wait point can never be approved with an unverifiable body; the Error kills the process
-/// tree, and the CLI's elicitation falls to refine as the connection drops. Neither outcome
-/// writes a reply frame: it returns None, and the read loop waits or exits accordingly.
 fn park_plan_review(
     core: &TurnCore,
     state: &mut TurnState,
@@ -820,8 +734,6 @@ fn build_review(
     let hash = plan_review::content_hash(&content);
     let now = plan_review::now_ms();
     let record = PlanReview {
-        // Each new proposal in the same session bumps the same plan_id's revision (record_review
-        // supersedes the old one); the elicitation's rpc id goes in native_plan_id.
         plan_id: format!("omp-acp-plan/{session_id}"),
         engine: core.engine_id.clone(),
         session_id: session_id.to_string(),
@@ -834,8 +746,6 @@ fn build_review(
         complete: true,
         review_kind: PlanReviewKind::NativeRequest,
         native_plan_id: Some(jsonrpc_id_key(rpc_id).unwrap_or_else(|| rpc_id.to_string())),
-        // After approval the same turn carries on with this launch's non-bypass tool policy
-        // (no --auto-approve on the command line; approving never changes permissions).
         exec_permission: "auto".to_string(),
         status: PlanStatus::AwaitingReview,
         execution: PlanExecution::NotStarted,
@@ -854,9 +764,6 @@ fn build_review(
     Ok((record, context))
 }
 
-/// One `session/update` notification projected to engine events. OMP's update vocabulary is
-/// the same as qoder's and grok's, so the shared mapping is reused; usage_update gives the
-/// context's size and window, and the turn's token totals come from the prompt answer.
 fn handle_session_update(
     core: &TurnCore,
     state: &mut TurnState,
@@ -876,7 +783,6 @@ fn handle_session_update(
         {
             view.context_window = Some(size);
         }
-        // How full the context is: the prompt answer's total adds up every call in the turn.
         if let Some(usage) = crate::engines::kimi_acp::usage(params) {
             core.dispatch_event(state, EngineEvent::Usage(usage));
         }
@@ -923,8 +829,6 @@ fn handle_session_update(
     }
 }
 
-/// The prompt answer's usage (buildTurnUsage: top-level
-/// `usage.{input,output,total}Tokens(+cached*)`).
 fn prompt_usage(result: &Value, context_window: Option<i64>) -> Option<Value> {
     let usage = result.get("usage").filter(|usage| usage.is_object())?;
     let total = usage.get("totalTokens").and_then(Value::as_u64)?;
@@ -951,8 +855,6 @@ fn prompt_usage(result: &Value, context_window: Option<i64>) -> Option<Value> {
     Some(Value::Object(out))
 }
 
-/// Terminal message precedence (as for grok): the rpc error's message → the tail of the CLI's
-/// stderr → the raw error.
 fn terminal_message(raw: String, stderr_buf: &Arc<Mutex<String>>) -> String {
     let bare = raw
         .strip_prefix("rpc:")

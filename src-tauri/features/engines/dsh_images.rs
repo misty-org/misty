@@ -20,17 +20,12 @@ use crate::engines::support::dsh_host::HostRpcError;
 const PI_AI_NS: &str = "llm-pi-ai";
 const TEXT_AND_IMAGE: [&str; 2] = ["text", "image"];
 
-/// One loaded composer attachment, ready for a `session/prompt` image part.
 pub(crate) struct DshPromptImage {
     media_type: String,
     data: String,
     name: Option<String>,
 }
 
-/// Load composer attachments through the shared image pipeline (data URLs,
-/// sandboxed picks, workspace-relative paths; 8MB cap). Any attached-but-
-/// unreadable image fails the send instead of being silently dropped —
-/// same contract as the other engines.
 pub(crate) fn load_prompt_images(
     images: &[String],
     workspace: &Path,
@@ -61,7 +56,6 @@ pub(crate) fn load_prompt_images(
     Ok(loaded)
 }
 
-/// Display name for a `name` part field; data URLs carry no filename.
 fn image_name(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.starts_with("data:") {
@@ -73,10 +67,6 @@ fn image_name(raw: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// `session/prompt` content parts: text first, then one image part per
-/// attachment. The host schema is `$strip` + `name?: string` — `name: null`
-/// is rejected as an invalid payload, so the key is omitted when no name
-/// exists.
 pub(crate) fn build_prompt_content(text: &str, images: &[DshPromptImage]) -> Vec<Value> {
     let mut content = vec![json!({ "type": "text", "text": text })];
     for image in images {
@@ -98,9 +88,6 @@ pub(crate) fn build_prompt_content(text: &str, images: &[DshPromptImage]) -> Vec
     content
 }
 
-/// The session's effective route for admission: the picker's `provider/model`
-/// selector when one was dispatched this turn, else the host's current model
-/// (`session/modelCatalog` `default`). `None` means no route is knowable.
 pub(crate) async fn current_selection(
     origin: &str,
     requested_model: Option<&str>,
@@ -128,9 +115,6 @@ pub(crate) async fn current_selection(
 
 #[derive(Debug, PartialEq)]
 enum AdmissionPlan {
-    /// Nothing to write: an official adapter owns the route, the route is
-    /// outside the configurable directory (ccgui cannot know its settings
-    /// namespace), or the declaration already covers image input.
     Noop,
     Mutate {
         ops: Vec<Value>,
@@ -139,10 +123,6 @@ enum AdmissionPlan {
     Reject(String),
 }
 
-/// Declare image input for `provider/model` when the route is a writable
-/// hand-declared `llm-pi-ai` profile that does not admit images yet. One
-/// conflict retry: a concurrent settings write bumps the revision, so the
-/// plan is recomputed against a fresh describe.
 pub(crate) async fn ensure_image_admission(
     origin: &str,
     provider: &str,
@@ -197,10 +177,6 @@ pub(crate) async fn ensure_image_admission(
     }
 }
 
-/// The one prompt refusal admission cannot pre-empt (read-only host, a
-/// non-pi-ai adapter, or the upstream itself rejecting the image after the
-/// declaration): say so plainly instead of sending every user to hand-edit
-/// DSH settings.
 pub(crate) fn format_prompt_refusal(error: &HostRpcError) -> String {
     if error.code == "session/attachment-invalid"
         && error.details.get("reason").and_then(Value::as_str)
@@ -229,10 +205,7 @@ fn plan_image_admission(
     }
 
     match provider_settings_ns(configurable, provider) {
-        // Official adapters (llm-deepseek, …) declare their own modalities.
         Some(ns) if ns != PI_AI_NS => return AdmissionPlan::Noop,
-        // Not in the configurable directory: ccgui cannot know which
-        // namespace owns the route, so it must not invent a settings write.
         None => return AdmissionPlan::Noop,
         Some(_) => {}
     }
@@ -275,8 +248,6 @@ fn plan_image_admission(
         );
     };
 
-    // The user layer is the one ccgui writes: pin `input` on the exact model
-    // entry when it exists there, otherwise widen the route's `defaultInput`.
     let ops = if let Some(models) = user_models_array(user_profile) {
         if let Some(index) = model_index(models, model) {
             let mut next_models = models.clone();
@@ -299,8 +270,6 @@ fn plan_image_admission(
     }
 }
 
-/// `llm/listConfigurableProviders` value (a bare array) → the settings
-/// namespace owning `provider`'s route.
 fn provider_settings_ns(configurable: &Value, provider: &str) -> Option<String> {
     configurable
         .as_array()
@@ -335,9 +304,6 @@ fn model_index(models: &[Value], model: &str) -> Option<usize> {
         .position(|entry| entry.get("id").and_then(Value::as_str).map(str::trim) == Some(model))
 }
 
-/// Image admitted when the model entry's `input` says so, or — the entry
-/// omitting it — the route's `defaultInput` does. An empty `input` array is
-/// schemastery's materialized "no answer here", not a refusal.
 fn modalities_include_image(value_profile: Option<&Value>, model: &str) -> bool {
     if let Some(entry) = first_model_entry(value_profile, model) {
         if let Some(input) = entry.get("input").and_then(Value::as_array) {
@@ -499,8 +465,6 @@ mod tests {
 
     #[test]
     fn mutate_widens_default_input_when_model_not_in_user_layer() {
-        // The model exists only in the effective (base) layer: the user
-        // layer has the profile but no models array to pin.
         let user = json!({ "providers": { "acme": { "apiKeyEnv": "ACME_KEY" } } });
         let plan = plan_image_admission(
             &describe(true, 4, profile_with_model(None), Some(user)),
@@ -574,7 +538,6 @@ mod tests {
             vec![
                 json!({ "type": "text", "text": "Look at this picture" }),
                 json!({ "type": "image", "mediaType": "image/png", "data": "AQ==", "name": "shot.png" }),
-                // `name: null` is an invalid payload on the host: omit the key.
                 json!({ "type": "image", "mediaType": "image/jpeg", "data": "Ag==" }),
             ]
         );

@@ -1,5 +1,3 @@
-//! Recall: one agent searching its own chat history and the notes its engine wrote. Chat history
-//! lives in `misty.db`; engine notes are read in place and are never copied there.
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -14,18 +12,12 @@ use database::store::Store;
 mod notes;
 use notes::*;
 
-/// The tool's name on the wire.
 pub(super) const RECALL: &str = "recall";
 
-/// How many hits come back at most.
 const MAX_HITS: usize = 8;
-/// A chunk of text is cut here, so a hit stays a snippet.
 const CHUNK_CHARS: usize = 400;
-/// How many chat messages the table hands the fuzzy matcher.
 const MAX_CANDIDATES: usize = 300;
-/// A note larger than this is skipped.
 const MAX_NOTE_BYTES: u64 = 256 * 1024;
-/// Don't walk an engine-managed tree without a bound.
 const MAX_NOTE_FILES: usize = 500;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -72,7 +64,6 @@ impl AsRef<str> for Chunk {
     }
 }
 
-/// Text cut into paragraphs of at most [`CHUNK_CHARS`] characters.
 fn chunks(source: &str, text: &str, into: &mut Vec<Chunk>) {
     for paragraph in text.split("\n\n") {
         let paragraph = paragraph.trim();
@@ -81,7 +72,8 @@ fn chunks(source: &str, text: &str, into: &mut Vec<Chunk>) {
         }
         let mut current = String::new();
         for word in paragraph.split_whitespace() {
-            if !current.is_empty() && current.chars().count() + word.chars().count() >= CHUNK_CHARS {
+            if !current.is_empty() && current.chars().count() + word.chars().count() >= CHUNK_CHARS
+            {
                 into.push(Chunk {
                     source: source.to_string(),
                     text: std::mem::take(&mut current),
@@ -101,8 +93,6 @@ fn chunks(source: &str, text: &str, into: &mut Vec<Chunk>) {
     }
 }
 
-/// The query's own 3-letter pieces, each quoted for FTS5: a typo spoils only some of them, so the
-/// words it was meant for still share most (the table is trigram-tokenized).
 fn pieces(query: &str) -> String {
     let mut found: Vec<String> = Vec::new();
     for word in query.split(|c: char| !c.is_alphanumeric()) {
@@ -122,8 +112,6 @@ fn pieces(query: &str) -> String {
         .join(" OR ")
 }
 
-/// This agent's chat messages that share pieces with the query, best first (`chat_recall`, kept up to
-/// date as chats are saved). The fuzzy matcher then orders them.
 fn chat_chunks(
     store: &Store,
     account: &str,
@@ -162,12 +150,15 @@ fn chat_chunks(
         .map_err(|error| error.to_string())?;
     for (text, role, at) in rows.flatten() {
         let who = if role == "user" { "you" } else { "me" };
-        chunks(&format!("chat, {who}, {}", at.get(..10).unwrap_or("")), &text, into);
+        chunks(
+            &format!("chat, {who}, {}", at.get(..10).unwrap_or("")),
+            &text,
+            into,
+        );
     }
     Ok(())
 }
 
-/// The best matches for `query` among this agent's notes and chat, as the tool's result text.
 pub(super) fn search(
     store: &Store,
     account: &str,
@@ -183,16 +174,24 @@ pub(super) fn search(
     let notes = memory_notes(engine, folder);
     let mut all = Vec::new();
     for note in notes.notes {
-        chunks(&format!("note: {} · {}", note.source, note.title), &note.content, &mut all);
+        chunks(
+            &format!("note: {} · {}", note.source, note.title),
+            &note.content,
+            &mut all,
+        );
     }
     chat_chunks(store, account, agent_id, query, &mut all)?;
     let pattern = Pattern::parse(query.trim(), CaseMatching::Ignore, Normalization::Smart);
     let mut matcher = Matcher::new(Config::DEFAULT);
     let mut hits = pattern.match_list(all, &mut matcher);
-    // Notes are what the agent chose to keep, so they win a tie.
     hits.sort_by(|(a, x), (b, y)| {
         let boost = |chunk: &Chunk, score: u32| {
-            score + if chunk.source.starts_with("note") { score / 5 } else { 0 }
+            score
+                + if chunk.source.starts_with("note") {
+                    score / 5
+                } else {
+                    0
+                }
         };
         boost(b, *y).cmp(&boost(a, *x))
     });
@@ -257,9 +256,11 @@ pub(crate) async fn agent_memory_delete(
         &agent_id,
         conversation_id.as_deref(),
     )?;
-    tauri::async_runtime::spawn_blocking(move || delete_memory_note(&engine, folder.as_deref(), &note_id))
-        .await
-        .map_err(|error| error.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        delete_memory_note(&engine, folder.as_deref(), &note_id)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 fn resolve_agent_folder(

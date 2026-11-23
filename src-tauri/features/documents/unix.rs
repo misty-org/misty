@@ -1,7 +1,3 @@
-//! Untrusted documents are parsed on macOS and Linux by the bundled document worker, confined to a
-//! private working folder: by `sandbox-exec` on macOS, and by Landlock, seccomp and namespaces on
-//! Linux (`sandbox::linux`). Misty's own process never parses them. Windows uses the same worker in
-//! an AppContainer (see `windows.rs`).
 use file_access::fs;
 use file_access::fs::File;
 use std::{
@@ -16,7 +12,6 @@ use std::{
 use serde_json::{json, Value};
 
 const PROTOCOL: u32 = 6;
-/// The largest response the worker may return.
 const MAX_RESPONSE: u64 = 4 * 1024 * 1024;
 const STAGING_TIMEOUT: Duration = Duration::from_secs(60);
 const PROCESSING_TIMEOUT: Duration = Duration::from_secs(120);
@@ -24,13 +19,11 @@ const PROCESSING_TIMEOUT: Duration = Duration::from_secs(120);
 #[cfg(target_os = "macos")]
 const PROFILE: &str = include_str!("../../tauri-permissions/permissions/document-worker.sb");
 
-/// What has to stay alive until the worker has started.
 #[cfg(target_os = "macos")]
 type Keep = ();
 #[cfg(target_os = "linux")]
 type Keep = sandbox::linux::Confinement;
 
-/// The environment the worker gets: nothing of Misty's own.
 fn plain_environment(command: &mut Command, work: &Path) {
     command
         .current_dir(work)
@@ -45,8 +38,6 @@ fn plain_environment(command: &mut Command, work: &Path) {
         .stderr(Stdio::null());
 }
 
-/// Builds the sandboxed command that runs `executable` with `work` as its only
-/// writable folder and tight resource limits. There is no permissive fallback.
 #[cfg(target_os = "macos")]
 fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), String> {
     use std::os::unix::process::CommandExt;
@@ -62,7 +53,6 @@ fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), 
         .arg(&executable);
     plain_environment(&mut command, &work);
     command.process_group(0);
-    // Only async-signal-safe resource-limit calls run between fork and exec.
     unsafe {
         command.pre_exec(|| {
             sandbox::macos::set_limits(&[
@@ -76,8 +66,6 @@ fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), 
     Ok((command, ()))
 }
 
-/// The same on Linux: the worker reads and writes only `work`, runs only itself, has no network
-/// and dies with Misty. Without Landlock it doesn't start.
 #[cfg(target_os = "linux")]
 fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), String> {
     use sandbox::linux::{Access, Confinement, Policy};
@@ -99,14 +87,12 @@ fn sandboxed_command(executable: &Path, work: &Path) -> Result<(Command, Keep), 
     })?;
     let mut command = Command::new(&executable);
     plain_environment(&mut command, &work);
-    // The hook starts the worker's own session, which is its process group too.
     unsafe {
         command.pre_exec(confinement.hook());
     }
     Ok((command, confinement))
 }
 
-/// Kills the worker's whole process group if it is dropped while still running.
 struct Child(std::process::Child, bool);
 impl Drop for Child {
     fn drop(&mut self) {
@@ -119,8 +105,11 @@ impl Drop for Child {
     }
 }
 
-/// Parses the document at `path` in the confined worker. `stop` cancels it.
-pub fn process(path: &Path, stop: &AtomicBool, worker: super::WorkerBytes) -> Result<Value, String> {
+pub fn process(
+    path: &Path,
+    stop: &AtomicBool,
+    worker: super::WorkerBytes,
+) -> Result<Value, String> {
     let display_name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -147,7 +136,8 @@ pub fn process(path: &Path, stop: &AtomicBool, worker: super::WorkerBytes) -> Re
         .tempdir()
         .map_err(|_| "Could not create document workspace.")?;
     let executable = work.path().join("worker");
-    fs::write(&executable, worker("document-processing", PROTOCOL)?).map_err(|_| "Could not stage document processor.")?;
+    fs::write(&executable, worker("document-processing", PROTOCOL)?)
+        .map_err(|_| "Could not stage document processor.")?;
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o500))
         .map_err(|_| "Could not prepare processor permissions.")?;
     let started = Instant::now();
@@ -209,7 +199,6 @@ pub fn process(path: &Path, stop: &AtomicBool, worker: super::WorkerBytes) -> Re
     Ok(value)
 }
 
-/// Copies the selected document into the worker's private folder.
 fn stage_input(
     input: &File,
     destination: &Path,
@@ -243,7 +232,6 @@ fn stage_input(
     }
 }
 
-/// Waits for the worker to finish, enforcing cancellation, time and output limits.
 fn wait_for_exit(
     child: &mut Child,
     output: &File,

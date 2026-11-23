@@ -1,4 +1,3 @@
-//! Recordings recognized whole: a file, a recording the window holds, and captions word by word.
 use std::path::{Path, PathBuf};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -7,7 +6,6 @@ use tauri::{AppHandle, Manager, Webview};
 use super::super::speech_models;
 use super::*;
 
-/// Recognizes a recording on this computer, phrase by phrase. Blocking.
 fn recognize_path(state: &SpeechState, path: &Path) -> Result<Vec<voice_speech::Phrase>, String> {
     let vad = speech_models::vad_spec().ok_or_else(|| voice_speech::reason("no_model"))?;
     let recognizer = recognizer(state)?;
@@ -23,7 +21,6 @@ fn joined(phrases: &[voice_speech::Phrase]) -> String {
         .join(" ")
 }
 
-/// Recognizes a recorded file for an agent's run (`agents/run_control/calls.rs`).
 pub async fn transcribe_path(app: &AppHandle, path: PathBuf) -> Result<String, String> {
     let app = app.clone();
     tokio::task::spawn_blocking(move || {
@@ -34,7 +31,6 @@ pub async fn transcribe_path(app: &AppHandle, path: PathBuf) -> Result<String, S
     .map_err(|_| voice_speech::reason("failed"))?
 }
 
-/// Recognizes a recorded audio file.
 #[tauri::command]
 pub async fn speech_recognize_file(
     app: AppHandle,
@@ -45,8 +41,6 @@ pub async fn speech_recognize_file(
     transcribe_path(&app, PathBuf::from(path)).await
 }
 
-/// A recording held by the window, sent as base64 with its type, written to a temporary file for
-/// the recognizer and removed after.
 pub(crate) async fn with_recording<T: Send + 'static>(
     audio: String,
     mime: String,
@@ -80,7 +74,6 @@ pub(crate) async fn with_recording<T: Send + 'static>(
     result?
 }
 
-/// Recognizes a short recording held by the window (the chat microphone's).
 #[tauri::command]
 pub async fn speech_recognize_audio(
     app: AppHandle,
@@ -89,7 +82,6 @@ pub async fn speech_recognize_audio(
     mime: String,
 ) -> Result<String, String> {
     require_person(&webview)?;
-    // A minute of compressed speech is well under this.
     with_recording(audio, mime, 40 * 1024 * 1024, move |path| {
         let state = app.state::<SpeechState>();
         recognize_path(&state, path).map(|phrases| joined(&phrases))
@@ -97,7 +89,6 @@ pub async fn speech_recognize_audio(
     .await
 }
 
-/// Recognizes a recording held by the window word by word, for captions (`speech_words.rs`).
 pub(crate) fn recognize_words(
     app: &AppHandle,
     path: &Path,
@@ -107,8 +98,6 @@ pub(crate) fn recognize_words(
     Ok(phrases.into_iter().flat_map(words_of).collect())
 }
 
-/// A phrase's words with their times: the model's own when it times its tokens, else the
-/// phrase's time shared out by each word's length.
 fn words_of(phrase: voice_speech::Phrase) -> Vec<voice_speech::Word> {
     if !phrase.words.is_empty() {
         return phrase.words;

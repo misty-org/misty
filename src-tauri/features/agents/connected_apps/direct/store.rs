@@ -1,5 +1,3 @@
-//! The person's direct app connections, tokens and all, in the OS keychain: one item per Misty
-//! account on this computer, never synced and never sent anywhere but the app that issued them.
 use std::sync::{Mutex, PoisonError};
 
 use serde::{Deserialize, Serialize};
@@ -8,28 +6,23 @@ use super::super::SIGNED_OUT;
 
 const SERVICE: &str = "com.misty.app-connections";
 
-/// One sign-in to one app's own MCP server.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default)]
 pub struct Connection {
     pub id: String,
-    /// The short name tools are filed under, unique among this account's connections: `notion`.
     pub app: String,
     pub name: String,
     pub url: String,
-    /// The OAuth client the app registered for this sign-in, and its secret when it issued one.
     pub client_id: String,
     pub client_secret: Option<String>,
     pub token_endpoint: String,
     pub resource: String,
     pub access_token: String,
     pub refresh_token: Option<String>,
-    /// Unix seconds; None when the app didn't say.
     pub expires_at: Option<i64>,
     pub created_at: String,
 }
 
-/// What a page may see of a connection: never a token.
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct ConnectionView {
     pub id: String,
@@ -59,7 +52,6 @@ fn entry(account: &str) -> String {
     }
 }
 
-/// Reads and writes of one account's list never interleave.
 static LOCK: Mutex<()> = Mutex::new(());
 
 fn read(account: &str) -> Result<Vec<Connection>, String> {
@@ -80,13 +72,11 @@ fn write(account: &str, connections: &[Connection]) -> Result<(), String> {
     crate::account::credential_store::store(SERVICE, &entry(account), &text).map_err(|_| failed())
 }
 
-/// Blocking: the keychain may prompt. Call from `spawn_blocking`.
 pub fn list(account: &str) -> Result<Vec<Connection>, String> {
     let _held = LOCK.lock().unwrap_or_else(PoisonError::into_inner);
     read(account)
 }
 
-/// Changes the list under the lock and returns what it became. Blocking, like `list`.
 pub fn update<T>(
     account: &str,
     change: impl FnOnce(&mut Vec<Connection>) -> T,
@@ -98,7 +88,6 @@ pub fn update<T>(
     Ok((answer, connections))
 }
 
-/// `notion`, or `notion2` when the account already has a `notion` from another server.
 pub fn unique_app(connections: &[Connection], wanted: &str, url: &str) -> String {
     let taken = |name: &str| {
         connections

@@ -60,12 +60,12 @@ import {
   ThemeButton,
   ZoomLevel,
 } from "./BottomBarButtons";
-import { useBottomBarOpen as useOpen } from "./bottomBarOpenContext";
+import { useBottomBarOpen as useOpen } from "./bottom_bar_open_context";
 import { ConnectionProblem, ServerStatus } from "./ServerStatusItems";
-import { openChatRoute, openWorkspaceRoute } from "./spaceNavigation";
-import type { BottomBarItemId } from "./bottomBarStore";
+import { openChatRoute, openWorkspaceRoute } from "./space_navigation";
+import type { BottomBarItemId } from "./bottom_bar_store";
 
-export { BottomBarOpenContext } from "./bottomBarOpenContext";
+export { BottomBarOpenContext } from "./bottom_bar_open_context";
 
 type BarItem = {
   label: string;

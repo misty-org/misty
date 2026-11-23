@@ -1,7 +1,3 @@
-//! macOS: AuthenticationServices' web-browser passkey APIs, which accept the
-//! caller's origin from the browser. They need the restricted
-//! `com.apple.developer.web-browser.public-key-credential` entitlement; without
-//! it Kiri leaves WebKit's own WebAuthn in place.
 #![allow(unexpected_cfgs)]
 
 use super::{Assertion, Authenticator, Ceremony, CreateRequest, GetRequest, Registration};
@@ -43,7 +39,6 @@ extern "C" {
 
 const ENTITLEMENT: &str = "com.apple.developer.web-browser.public-key-credential";
 
-/// Whether this build may run passkey ceremonies for any site.
 pub fn available() -> bool {
     static AVAILABLE: OnceLock<bool> = OnceLock::new();
     *AVAILABLE.get_or_init(|| unsafe { supported_system() && entitled() })
@@ -96,7 +91,6 @@ pub(super) unsafe fn responds(object: Id, selector: objc::runtime::Sel) -> bool 
     answer == objc::runtime::YES
 }
 
-/// `[[Class alloc] init…]`, handed to the autorelease pool.
 pub(super) unsafe fn made(object: Id) -> Id {
     msg_send![object, autorelease]
 }
@@ -108,7 +102,6 @@ enum Ask {
 
 type Reply = oneshot::Sender<Result<Outcome, KiriError>>;
 
-/// Runs on the main thread once Misty's access to passkeys is settled.
 unsafe fn perform(ask: Ask, platform: bool, reply: Reply) {
     let requests = match &ask {
         Ask::Create(request) => registration_requests(request, platform),
@@ -152,9 +145,6 @@ unsafe fn perform(ask: Ask, platform: bool, reply: Reply) {
     }
 }
 
-/// Settles whether Misty may use the person's passkeys, asking the first time.
-/// A request waiting on the person's answer to "use passkeys in Misty?".
-/// Cancel can end it before the system answers.
 type Authorizing = (Ask, Reply, Arc<dyn Host>);
 
 fn authorizing() -> &'static Mutex<Option<Authorizing>> {
@@ -177,7 +167,6 @@ unsafe fn begin(host: Arc<dyn Host>, ask: Ask, reply: Reply) {
         return;
     };
     let manager: Id = msg_send![manager_class, new];
-    // Authorized = 0, Denied = 1, NotDetermined = 2.
     let state: isize = msg_send![manager, authorizationStateForPlatformCredentials];
     if state != 2 {
         let _: () = msg_send![manager, release];
@@ -191,7 +180,6 @@ unsafe fn begin(host: Arc<dyn Host>, ask: Ask, reply: Reply) {
     let answered: block2::RcBlock<dyn Fn(isize)> = block2::RcBlock::new(move |state: isize| {
         host.run_on_main(Box::new(move || unsafe {
             let _: () = msg_send![manager_address as Id, release];
-            // Gone if the page canceled while the system was asking.
             if let Some((ask, reply, _)) =
                 authorizing().lock().ok().and_then(|mut slot| slot.take())
             {
@@ -217,8 +205,6 @@ fn start(
     }
 }
 
-/// Runs ceremonies through AuthenticationServices. Kiri registers it only when
-/// `available()`; embedders may construct it directly to exercise the path.
 pub struct MacAuthenticator;
 
 impl Authenticator for MacAuthenticator {
@@ -248,8 +234,6 @@ impl Authenticator for MacAuthenticator {
 
     fn cancel(&self, host: Arc<dyn Host>) {
         host.run_on_main(Box::new(|| unsafe {
-            // Still waiting on the system's passkey access question: settle the
-            // page's request now; the late answer finds nothing to run.
             if let Some((_, reply, _)) = authorizing().lock().ok().and_then(|mut slot| slot.take())
             {
                 let _ = reply.send(Err(KiriError::not_allowed("The request was canceled.")));

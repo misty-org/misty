@@ -16,7 +16,6 @@ interface ForwardedShortcutEvent {
   editable: boolean;
 }
 
-/** Keyboard shortcuts for the window: key presses, and the commands native menus forward. */
 export function ShortcutRuntime(): null {
   useEffect(() => {
     const dispatch = (event: KeyboardEvent) => dispatchShortcutEvent(event);

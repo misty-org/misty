@@ -22,34 +22,25 @@ use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// What an engine offers for plan review: whether, the evidence, the review kind, the limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum PlanApproval {
-    /// The typed human-review path is wired (declared per engine adapter).
     Typed {
         #[serde(rename = "reviewKind")]
         review_kind: PlanReviewKind,
-        /// Where the transport/version was verified (source and version).
         evidence: &'static str,
-        /// The limits the person is told about.
         limitations: &'static str,
     },
-    /// The engine's own plan entry point, with its existing behavior (claude/kimi/agy/opencode);
-    /// it doesn't go through this review path.
     Legacy,
-    /// No verifiable human plan review: an explicit plan request is refused before launch, never
-    /// silently downgraded through resolve_permission or an auto-approve flag.
-    Unavailable { reason: &'static str },
+    Unavailable {
+        reason: &'static str,
+    },
 }
 
-/// The two native lifecycles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanReviewKind {
-    /// The native request really pauses execution until the client answers in its format (OMP/DSH/Grok/Qoder).
     NativeRequest,
-    /// The plan turn ends normally and the client arbitrates; approval = one new execution turn (Codex).
     NextTurn,
 }
 
@@ -111,8 +102,6 @@ impl PlanStatus {
             _ => return None,
         })
     }
-    /// A decision may only be claimed atomically from these two states; every other state
-    /// (submitting and all terminal ones) is a conflict.
     fn accepts_submission(self) -> bool {
         matches!(self, Self::AwaitingReview | Self::Deferred)
     }
@@ -153,7 +142,6 @@ impl PlanExecution {
     }
 }
 
-/// The person's decision. The renderer submits only this and optional feedback; an approval carries no native parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PlanDecision {
@@ -163,7 +151,6 @@ pub enum PlanDecision {
 }
 
 impl PlanDecision {
-    /// The review state once the decision takes effect.
     pub fn settled_status(self) -> PlanStatus {
         match self {
             Self::Approve => PlanStatus::Approved,
@@ -180,8 +167,6 @@ impl PlanDecision {
     }
 }
 
-/// A plan review record (the source of truth). Identity = workspace + engine + session +
-/// run/turn + planId + revision.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanReview {
@@ -192,24 +177,16 @@ pub struct PlanReview {
     pub run_id: Option<String>,
     pub revision: i64,
     pub title: String,
-    /// The final Markdown the person sees and copies; it must match the native final text exactly.
     pub content: String,
-    /// Content change detection (not a secure hash; checked again before submit; the TOCTOU
-    /// limit of file-based sources is stated in the capability declaration).
     pub content_hash: String,
-    /// false = a draft or an uncertain source: every approval path must refuse it.
     pub complete: bool,
     pub review_kind: PlanReviewKind,
-    /// The native plan/item id (the engine's own, kept as is).
     pub native_plan_id: Option<String>,
-    /// The execution permission an approval keeps; approving must not change it.
     pub exec_permission: String,
     pub status: PlanStatus,
     pub execution: PlanExecution,
-    /// The stored decision intent {decision, feedback?}; kept when a pipe write fails or the connection is lost.
     pub decision: Option<Value>,
     pub decision_intent_at: Option<i64>,
-    /// When the native acknowledgement or state change was recorded; None = not yet acknowledged (unknown included).
     pub applied_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
@@ -223,9 +200,6 @@ pub fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// A non-cryptographic content fingerprint: detects content changes between revisions and around
-/// a submit. Not a security binding (a race on a native file can only be settled by an
-/// immutable upstream proposal), so the standard library's SipHash is enough.
 pub fn content_hash(content: &str) -> String {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -234,9 +208,6 @@ pub fn content_hash(content: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-/// Records a new plan revision: revision = the planId's highest revision + 1, and every older
-/// one is marked superseded (approved or replaced revisions can only be viewed and copied, no
-/// longer approved). Returns the new record's revision.
 pub(crate) fn record_review(db: &Db, review: &PlanReview) -> Result<i64, String> {
     let conn = db.0.lock();
     let next: i64 = conn
@@ -342,19 +313,12 @@ pub(crate) fn get_review(
     .map_err(|e| e.to_string())
 }
 
-/// Compare-and-set result: either this call claimed the submission, or the current state comes
-/// back for the caller to show the conflict (a repeated click gets the same result or a conflict).
 #[derive(Debug)]
 pub(crate) enum SubmitOutcome {
-    /// Claimed: the record is now submitting and the decision intent is stored.
     Claimed { previous: PlanStatus },
-    /// Conflict: the current state or revision isn't what the caller expected.
     Conflict(Box<PlanReview>),
 }
 
-/// Claims a submission atomically: an update conditioned on expectedRevision and state, read
-/// then written under the db lock, so at most one submitter per planId/revision (double clicks,
-/// two windows, retries).
 pub(crate) fn submit_decision(
     db: &Db,
     plan_id: &str,
@@ -410,7 +374,6 @@ pub(crate) fn submit_decision(
     })
 }
 
-/// Records the native acknowledgement: submitting → the decision's terminal state, applied_at = when.
 pub(crate) fn mark_applied(
     db: &Db,
     plan_id: &str,
@@ -433,8 +396,6 @@ pub(crate) fn mark_applied(
     Ok(())
 }
 
-/// The pipe write failed: the decision intent is kept (decision/decision_intent_at untouched),
-/// the state goes back to what it was before the claim, and an approval never shows as done.
 pub(crate) fn revert_submission(
     db: &Db,
     plan_id: &str,
@@ -457,7 +418,6 @@ pub(crate) fn revert_submission(
     Ok(())
 }
 
-/// Advances the execution state (approved is not executed; a lost connection is unknown, checked upstream first).
 pub(crate) fn mark_execution(
     db: &Db,
     plan_id: &str,
@@ -474,9 +434,6 @@ pub(crate) fn mark_execution(
     Ok(())
 }
 
-/// When a run ends, its parked plans all expire: the native request died with the process, and
-/// history must not pretend they can still be approved. next_turn plans have no parked context
-/// and never appear here. Returns (plan_id, revision, previous state).
 pub(crate) fn expire_reviews(
     db: &Db,
     parked: &[(String, i64)],
@@ -498,7 +455,6 @@ pub(crate) fn expire_reviews(
             .map_err(|e| e.to_string())?
             .and_then(|s| PlanStatus::parse(&s));
         let Some(previous) = previous else { continue };
-        // Only revisions still open for review expire; decided and terminal ones stay.
         if !matches!(
             previous,
             PlanStatus::Draft
@@ -519,9 +475,6 @@ pub(crate) fn expire_reviews(
     Ok(expired)
 }
 
-/// Cleaned up with the session that goes away (no ghost plans after a delete; a sessions row
-/// can be created after the plan record, so there is no foreign key and each delete path cleans
-/// up explicitly). The caller passes its connection inside its own transaction.
 pub(crate) fn delete_reviews_for_session(
     conn: &rusqlite::Connection,
     engine: &str,
@@ -581,7 +534,6 @@ mod tests {
         let (db, dir) = temp_db("supersede");
         let r = review("p1", "s1");
         assert_eq!(record_review(&db, &r).unwrap(), 1);
-        // Second revision: the old one is superseded, the new one is revision 2.
         let mut r2 = review("p1", "s1");
         r2.content = "# Plan\nStep one\nStep two".into();
         r2.content_hash = content_hash(&r2.content);
@@ -591,7 +543,6 @@ mod tests {
         assert_eq!(old.superseded_by, Some(2));
         let new = get_review(&db, "p1", 2).unwrap().unwrap();
         assert_eq!(new.status, PlanStatus::AwaitingReview);
-        // Third revision: r1, already superseded, stays; r2 is replaced.
         assert_eq!(record_review(&db, &review("p1", "s1")).unwrap(), 3);
         let r1 = get_review(&db, "p1", 1).unwrap().unwrap();
         assert_eq!(r1.superseded_by, Some(2));
@@ -605,7 +556,6 @@ mod tests {
     fn cas_claims_exactly_once_and_conflicts_afterwards() {
         let (db, dir) = temp_db("cas");
         record_review(&db, &review("p1", "s1")).unwrap();
-        // The first submitter claims it.
         let first = submit_decision(&db, "p1", 1, PlanDecision::Approve, None).unwrap();
         assert!(matches!(
             first,
@@ -613,7 +563,6 @@ mod tests {
                 previous: PlanStatus::AwaitingReview
             }
         ));
-        // A double click or a second window: the same revision can't be submitted again.
         let second = submit_decision(&db, "p1", 1, PlanDecision::Approve, None).unwrap();
         match second {
             SubmitOutcome::Conflict(current) => {
@@ -621,7 +570,6 @@ mod tests {
             }
             SubmitOutcome::Claimed { .. } => panic!("double submit must conflict"),
         }
-        // A stale revision can't be submitted.
         let stale = submit_decision(&db, "p1", 99, PlanDecision::Approve, None);
         assert!(stale.is_err());
         std::fs::remove_dir_all(&dir).ok();
@@ -641,7 +589,6 @@ mod tests {
         submit_decision(&db, "p2", 1, PlanDecision::Defer, None).unwrap();
         revert_submission(&db, "p2", 1, PlanStatus::AwaitingReview).unwrap();
         let reverted = get_review(&db, "p2", 1).unwrap().unwrap();
-        // The pipe write failed: back to awaiting review, the intent kept, no approval shown.
         assert_eq!(reverted.status, PlanStatus::AwaitingReview);
         assert!(reverted.decision_intent_at.is_some());
         assert!(reverted.applied_at.is_none());
@@ -654,7 +601,6 @@ mod tests {
         record_review(&db, &review("p1", "s1")).unwrap();
         assert!(submit_decision(&db, "p1", 1, PlanDecision::RequestChanges, None).is_err());
         assert!(submit_decision(&db, "p1", 1, PlanDecision::RequestChanges, Some("  ")).is_err());
-        // After "not now" the same revision can still be decided.
         submit_decision(&db, "p1", 1, PlanDecision::Defer, None).unwrap();
         mark_applied(&db, "p1", 1, PlanDecision::Defer).unwrap();
         let deferred = get_review(&db, "p1", 1).unwrap().unwrap();
@@ -691,7 +637,6 @@ mod tests {
             get_review(&db, "p1", 1).unwrap().unwrap().status,
             PlanStatus::Expired
         );
-        // An approved revision doesn't expire.
         assert_eq!(
             get_review(&db, "p2", 1).unwrap().unwrap().status,
             PlanStatus::Approved

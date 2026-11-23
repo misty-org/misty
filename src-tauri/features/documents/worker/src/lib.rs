@@ -16,7 +16,6 @@ pub type ApiResult<T> = Result<T, ApiError>;
 
 pub const PROTOCOL_VERSION: u32 = 6;
 
-/// The only operation: parse a document into sections an agent can cite.
 #[derive(Default, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
@@ -24,8 +23,6 @@ pub enum Operation {
     Document,
 }
 
-/// Fixed, versioned operation. Input and output are staged by the host, never
-/// arbitrary paths or commands supplied by an app.
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Request {

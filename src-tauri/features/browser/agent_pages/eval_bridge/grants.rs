@@ -1,5 +1,3 @@
-//! Following and cancelling a run through the bridge (debug builds only), as a window
-//! following it does.
 use super::*;
 
 #[derive(Deserialize)]
@@ -8,7 +6,6 @@ struct RunRequest {
     run_id: String,
 }
 
-/// What a run has said and how it stands, as a window following it reads it.
 pub(super) async fn run_follow(
     AxumState(bridge): AxumState<Bridge>,
     headers: HeaderMap,

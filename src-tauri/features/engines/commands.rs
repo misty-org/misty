@@ -1,6 +1,3 @@
-//! What a window may ask about engines and a Space's linked folders. Linking happens only
-//! through the system's folder picker, so nothing in a page can name a folder for an engine.
-
 use tauri::State;
 
 use crate::app::runtime::MistyRuntime;
@@ -16,7 +13,6 @@ pub(super) fn person_window(webview: &tauri::Webview) -> Result<(), String> {
     }
 }
 
-/// A Space's key in the folder table: its id, or `personal` for the person's own Space.
 pub(super) fn space_key(space: &str) -> Result<String, String> {
     let key = space.trim();
     if key.len() > 200 || key.chars().any(char::is_control) {
@@ -37,14 +33,12 @@ pub(super) async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-/// The engines Misty has adapters for, and which are installed on this computer.
 #[tauri::command]
 pub async fn engines_list(webview: tauri::Webview) -> Result<Vec<EngineInfo>, String> {
     person_window(&webview)?;
     Ok(super::list().await)
 }
 
-/// The models an engine offers, for the agent editor's model choice.
 #[tauri::command]
 pub async fn engine_models(
     webview: tauri::Webview,
@@ -57,20 +51,15 @@ pub async fn engine_models(
     Ok(super::models(&engine).await)
 }
 
-/// Lets the file gate reach every project folder on this computer. Runs once as the app starts.
 pub fn allow_linked_folders(db: &database::store::Store) {
     for folder in store::all_folders(db).unwrap_or_default() {
         file_access::allow_linked_folder(&folder);
     }
-    // Multi-run: the worktrees it made are reached the same way (multirun.rs).
     for folder in super::multirun::worktree_folders(db) {
         file_access::allow_linked_folder(&folder);
     }
 }
 
-/// An engine's slash commands and skills, for the composer's `/` and `$` menus. `folder` is the
-/// chat's linked folder; a folder that isn't linked is ignored, so a page can't make Misty read
-/// another folder's command files.
 #[tauri::command]
 pub async fn engine_catalog(
     webview: tauri::Webview,
@@ -84,8 +73,6 @@ pub async fn engine_catalog(
         return Err("That engine has no adapter.".into());
     }
     let db = state.environment.store();
-    // OpenCode reports its commands from its server; asking it now fills the menu before the
-    // chat's first turn. The next menu read shows them.
     if engine == "opencode" && !folder.is_empty() {
         let (db, account, folder) = (db.clone(), account.clone(), folder.clone());
         tokio::spawn(async move {
@@ -119,11 +106,6 @@ pub async fn engine_catalog(
     .await
 }
 
-// ---- Engine turns: questions, plan reviews, settings, history, fork ----
-
-/// Answers a question card an engine raised (Claude's AskUserQuestion, Codex's
-/// `requestUserInput`, an ACP form). `answers` maps each question's text to the chosen label, or
-/// an array of labels for a multi-select question, or the person's own words; None dismisses it.
 #[tauri::command]
 pub async fn engine_answer_question(
     webview: tauri::Webview,
@@ -139,20 +121,14 @@ pub async fn engine_answer_question(
     super::answer_question(state, run_id, request_id, answers).await
 }
 
-/// What the chat does after a plan decision.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanDecided {
     pub review: super::PlanReview,
-    /// The engine carries the plan out in the same turn (its native request was answered).
     pub native: bool,
-    /// The chat switches to Auto and asks the engine to carry the plan out.
     pub continue_in_auto: bool,
 }
 
-/// Approves a plan, asks for changes, or defers it. A plan the engine is still waiting on is
-/// answered natively; any other (Claude Code's, Codex's) is recorded, and on approval the chat
-/// switches to Auto and continues the same engine session.
 #[tauri::command]
 pub async fn engine_plan_respond(
     webview: tauri::Webview,
@@ -202,7 +178,6 @@ pub async fn engine_plan_respond(
     })
 }
 
-/// This device's engine settings (default models and efforts, Codex Fast, program overrides).
 #[tauri::command]
 pub async fn engine_settings_get(
     webview: tauri::Webview,
@@ -220,10 +195,8 @@ pub async fn engine_settings_set(
     blocking(move || super::support::settings::write_settings(&settings)).await
 }
 
-/// Runs one of an engine's commands Misty runs for it out of turn (`slash/mod.rs`): `/status`,
-/// `/rename`, `/fork` and the like, which the engine only runs in its own terminal app. `folder`
-/// is the chat's linked folder; one that isn't linked is ignored.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn engine_command_run(
     webview: tauri::Webview,
     state: State<'_, MistyRuntime>,
@@ -275,7 +248,6 @@ pub async fn engine_command_run(
     super::slash::run(context, name.trim().trim_start_matches('/')).await
 }
 
-/// Forgets a chat's engine session (`/clear`): the chat stays, its next turn starts fresh.
 #[tauri::command]
 pub async fn engine_chat_clear(
     webview: tauri::Webview,
@@ -288,8 +260,6 @@ pub async fn engine_chat_clear(
     blocking(move || store::forget_session(&db, &account, &conversation)).await
 }
 
-/// Points a chat at a session from an engine's own history, or a fork, so its next turn
-/// resumes it. The folder must be linked.
 #[tauri::command]
 pub async fn engine_chat_resume(
     webview: tauri::Webview,
@@ -307,10 +277,6 @@ pub async fn engine_chat_resume(
     let db = state.environment.store();
     blocking(move || {
         let path = std::path::Path::new(&folder);
-        // A session that ran in one of the person's projects (or a scratch folder) continues
-        // there, and the chat works there too. One from a folder that isn't a project on this
-        // computer can't be resumed by its engine anywhere else: the chat keeps its turns as
-        // history and works in its own scratch folder, where the next turn starts afresh.
         if !store::is_linked(&db, &account, path)? || !file_access::fs::is_dir(path) {
             return Ok(());
         }

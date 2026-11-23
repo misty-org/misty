@@ -16,35 +16,13 @@ use denials::{
 };
 
 pub struct ClaudeEngine {
-    /// Per-block partial JSON for tool_use inputs. Streamed as
-    /// `input_json_delta` after a name-only `content_block_start`. Keyed by the agent streaming it
-    /// (its `parent_tool_use_id`, empty for the main agent) and the block's index: helper agents
-    /// stream at the same time as the main one, and their block indexes start at 0 too.
     pending_tool_json: Mutex<HashMap<(String, u64), PendingTool>>,
-    /// tool_use id -> tool name, recorded at `content_block_start` so a
-    /// later `tool_result` (user message) can be attributed to its call.
     tool_names: Mutex<HashMap<String, String>>,
-    /// tool_use id -> structured path argument, recorded at
-    /// `content_block_stop` once the input JSON is complete. Permission
-    /// denials resolve the real denied path from here instead of scraping
-    /// the free-text error.
     tool_paths: Mutex<HashMap<String, String>>,
-    /// Post-compaction remaining context tokens from `compact_boundary` event,
-    /// used to report accurate post-compaction usage instead of the turn's billing usage.
     compact_post_tokens: Mutex<Option<i64>>,
-    /// A `task_notification` with status `stopped` was just seen: a resumed
-    /// process stops its predecessor's background task and reports that as an
-    /// empty zero-turn `result` before it answers the new message. That result
-    /// ends nothing the user asked for.
     stopped_task_result_pending: Mutex<bool>,
-    /// The turn has streamed text of its own. A local command (`/context`, `/config`, …) streams
-    /// none: its output arrives only as a `<synthetic>` snapshot and the zero-turn `result`.
     streamed_text: Mutex<bool>,
-    /// The text of this turn's `<synthetic>` snapshots, shown at its `result` when the turn
-    /// streamed none and ran no model turn (a local command's output).
     local_text: Mutex<String>,
-    /// The engine id its `system/init` report is kept under (`reported.rs`): Claude Code, or
-    /// CodeBuddy, which shares this format.
     reports_as: &'static str,
 }
 
@@ -77,33 +55,25 @@ impl ClaudeEngine {
 #[path = "claude_sandbox.rs"]
 mod sandbox;
 
-/// A short-lived process that answers control requests, for the commands Misty runs out of turn.
 #[path = "claude_control.rs"]
 pub(crate) mod control;
 
-/// The background tasks Claude Code reports per session, for `/tasks`.
 #[path = "claude_tasks.rs"]
 mod tasks;
 pub(crate) use tasks::{background_tasks, forget_background_tasks, BackgroundTask};
 use tasks::{record_background_tasks, record_task_update};
 
-/// A local command's output, shown as the turn's reply.
 #[path = "claude_local.rs"]
 mod local;
 use local::local_command_reply;
 
-/// A turn's reported context window and post-compaction usage.
 #[path = "claude_usage.rs"]
 mod usage;
 use sandbox::{extra_dirs, folder_sandbox_runs, folder_sandbox_settings};
 
-/// Claude Code's limit for one call to Misty's MCP server: longer than a browser_run program's
-/// own deadline (`programs/runProgram.ts`) and its device wait (`tools/deviceJob.ts`, 170 s).
 const MISTY_TOOL_TIMEOUT_MS: u64 = 300_000;
 use usage::{attach_reported_context_window, compact_usage};
 
-/// Claude Code's own permission modes, in its mode switcher's order. `auto` (its classifier)
-/// and `dontAsk` aren't offered: neither is held to the folder.
 const CLAUDE_MODES: &[super::modes::EngineMode] = {
     use super::modes::{mode, ModeKind::*};
     &[
@@ -119,12 +89,16 @@ const CLAUDE_MODES: &[super::modes::EngineMode] = {
     ]
 };
 
-/// What this Claude Code calls its asking mode: `manual` when its help lists that, else the
-/// older `default`.
 fn manual_mode_value() -> &'static str {
     match super::modes::reported("claude") {
         Some(listed) if listed.iter().any(|id| id == "manual") => "manual",
         _ => "default",
+    }
+}
+
+impl Default for ClaudeEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -133,7 +107,6 @@ impl Engine for ClaudeEngine {
         "claude"
     }
 
-    /// Every assistant snapshot names the model that produced it.
     fn reports_served(&self) -> bool {
         true
     }
@@ -145,18 +118,15 @@ impl Engine for ClaudeEngine {
         true
     }
 
-    /// The CLI ships its own web search tool.
     fn supports_web_search(&self) -> bool {
         true
     }
     fn supports_effort(&self) -> bool {
         true
     }
-    /// Its help lists the modes this install has (`modes::learn_reported`).
     fn modes_help_flag(&self) -> Option<&'static str> {
         Some("--permission-mode")
     }
-    /// Newer Claude Code calls its asking mode `manual`; older builds called it `default`.
     fn mode_values(&self, id: &'static str) -> Vec<&'static str> {
         if id == "default" {
             vec!["manual", "default"]
@@ -164,9 +134,6 @@ impl Engine for ClaudeEngine {
             vec![id]
         }
     }
-    /// Claude Code's permission modes, by the names its own mode switcher shows (2.1.322:
-    /// `default` "Manual", `acceptEdits`, `plan`, `bypassPermissions`). Bypass permissions runs
-    /// only inside Claude Code's own sandbox, held to the folder (`claude_sandbox.rs`).
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         CLAUDE_MODES
     }
@@ -174,8 +141,6 @@ impl Engine for ClaudeEngine {
         folder_sandbox_runs()
     }
 
-    /// Read-only tool constraints: claude's plan mode refuses every edit and command, with a
-    /// per-call --allowedTools whitelist and an explicit --disallowedTools on top.
     fn supports_tool_constraints(&self) -> bool {
         true
     }
@@ -189,24 +154,11 @@ impl Engine for ClaudeEngine {
         cmd.arg("stream-json");
         cmd.arg("--verbose");
         cmd.arg("--include-partial-messages");
-        // SDK control protocol over stdin/stdout: permission asks — including
-        // AskUserQuestion, whose dialog is this client's job — arrive as
-        // can_use_tool control_requests. Without the flag the CLI treats
-        // every ask as terminal and never mounts AskUserQuestion at all.
         cmd.arg("--permission-prompt-tool");
         cmd.arg("stdio");
-        // Headless -p cannot prompt mid-turn: "manual" maps onto claude's
-        // default mode, where approval-needing tools are denied and the
-        // agent is told to work around them (honest degrade, no fake ask).
-        // Tools pre-approved for this run, emitted as a single --allowedTools
-        // (headless -p cannot prompt mid-turn, so anything not listed here
-        // gets denied outright).
         let mut preapproved: Vec<&str> = Vec::new();
         let extra_dirs = extra_dirs(req);
         if let Some(tools) = req.allowed_tools.as_deref() {
-            // Read-only constraint: plan mode refuses every edit and command, plus the
-            // whitelist; headless -p refuses any tool not in --allowedTools. Known write
-            // tools are also denied explicitly, in case the mode is parsed differently.
             cmd.arg("--permission-mode");
             cmd.arg("plan");
             cmd.arg("--allowedTools");
@@ -222,8 +174,6 @@ impl Engine for ClaudeEngine {
         } else {
             match self.resolve_permission(req.permission.as_deref()) {
                 "bypass" => {
-                    // No asks, but only inside the folder: the sandbox holds every command to
-                    // it, and the file tools are held to it as well.
                     cmd.arg("--dangerously-skip-permissions");
                     cmd.arg("--settings");
                     cmd.arg(folder_sandbox_settings(&extra_dirs).to_string());
@@ -231,33 +181,22 @@ impl Engine for ClaudeEngine {
                 mode => {
                     cmd.arg("--permission-mode");
                     cmd.arg(match mode {
-                        // The asking mode by the name this install lists (`manual` on newer
-                        // builds, `default` before).
                         "manual" => manual_mode_value(),
                         "plan" => "plan",
                         _ => "acceptEdits",
                     });
                     if mode == "auto" {
-                        // acceptEdits pre-approves file edits only; WebSearch and
-                        // WebFetch still ask, and headless -p cannot prompt, so
-                        // the CLI would deny every web call outright. Pre-approve
-                        // the two read-only network tools in auto mode.
                         preapproved.extend(["WebSearch", "WebFetch"]);
                     }
                 }
             }
         }
-        // Misty's Space MCP server, one --mcp-config carrying it. Its calls come back through the
-        // permission ask like any tool, and Misty's own gate decides them under the run's mode.
         let mut mcp_servers = req
             .mcp_servers
             .as_ref()
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_default();
-        // A browser_run program may take its full 2 minutes plus a wait for the page, past Claude
-        // Code's default limit for one MCP call (about 2 minutes), which cut it off with "The
-        // operation timed out." while Misty was still running it.
         if let Some(misty) = mcp_servers.get_mut("misty").and_then(Value::as_object_mut) {
             misty
                 .entry("timeout")
@@ -268,8 +207,6 @@ impl Engine for ClaudeEngine {
             let config = serde_json::json!({ "mcpServers": mcp_servers });
             cmd.arg("--mcp-config");
             if mcp_servers.keys().any(|name| name != "misty") {
-                // An agent's own servers can carry the person's keys in their env or headers:
-                // a private file, as CodeBuddy's adapter stages them, keeps them off argv.
                 let path = super::codebuddy::stage_private_json(
                     &crate::engines::support::paths::app_home().join("claude-staging"),
                     "mcp",
@@ -289,33 +226,23 @@ impl Engine for ClaudeEngine {
         }
         if let Some(model) = req.model.as_deref() {
             cmd.arg("--model");
-            // prepare_launch resolves aliases against the selected channel;
-            // reading native settings here would remap independent channels.
             cmd.arg(model);
         }
         if let Some(effort) = req.effort.as_deref() {
             cmd.arg("--effort");
             cmd.arg(effort);
             cmd.env("CLAUDE_CODE_EFFORT_LEVEL", effort);
-            // The CLI decides what a level means (its thinking budget among it): Misty passes
-            // the level the person picked from the CLI's own list and sets no budget of its own.
         }
-        // Fast mode, where Claude Code's own catalog offers it for this model.
         if req.service_tier.as_deref() == Some("fast")
             && super::models::claude_fast_offered(req.model.as_deref())
         {
             cmd.arg("--fast-mode");
             cmd.arg("on");
         }
-        // Granted directories ride every launch: the CLI cannot expand its
-        // allowed-dirs mid-process, and each send is a fresh process anyway,
-        // so a grant approved mid-conversation takes effect on the next send.
         for dir in &extra_dirs {
             cmd.arg("--add-dir");
             cmd.arg(dir);
         }
-        // A session of Misty's that has had no turn yet is started under its id, not resumed;
-        // its warm-up launch writes no prompt and waits for the turn (`warm_up.rs`).
         let mut warming = false;
         let mut preassigned = None;
         if let Some(session_id) = req.session_id.as_deref() {
@@ -334,7 +261,11 @@ impl Engine for ClaudeEngine {
         let stdin_payload = if warming {
             None
         } else {
-            Some(images::claude_stdin_message(&req.prompt, &req.images, &req.workspace)?)
+            Some(images::claude_stdin_message(
+                &req.prompt,
+                &req.images,
+                &req.workspace,
+            )?)
         };
         Ok(BuiltCommand {
             command: cmd,
@@ -349,7 +280,6 @@ impl Engine for ClaudeEngine {
         let Ok(value) = serde_json::from_str::<Value>(line) else {
             return;
         };
-        // A sub-agent's own lines carry the Task call that started it: its rows nest under it.
         let parent = value
             .get("parent_tool_use_id")
             .and_then(Value::as_str)
@@ -376,8 +306,6 @@ impl ClaudeEngine {
         let value = value.clone();
         let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
         if event_type == "rate_limit_event" {
-            // The plan's limits, as Claude Code reports them on its own stream: the only way
-            // Misty learns them, since it never reads the person's sign-in.
             crate::engine_config::usage_limits::record_claude_rate_limit(&value);
         }
         match event_type {
@@ -385,10 +313,6 @@ impl ClaudeEngine {
                 push_session_id(&value, "session_id", out);
                 let subtype = value.get("subtype").and_then(Value::as_str);
                 if subtype == Some("api_retry") {
-                    // Live progress, not an error: the CLI backs off for
-                    // minutes (10 attempts, 30s+ delays) and then continues.
-                    // The run status line shows "Retrying x of y"; the detail
-                    // rides along for its tooltip.
                     out.push(EngineEvent::Retry {
                         attempt: value.get("attempt").and_then(Value::as_u64).unwrap_or(0),
                         max: value
@@ -398,14 +322,7 @@ impl ClaudeEngine {
                         message: format_api_retry(&value),
                     });
                 } else if subtype == Some("init") {
-                    // Its slash commands and skills, as this mode offers them: the `/` menu's
-                    // list for this engine.
                     super::reported::claude_init(self.reports_as, &value);
-                    // `system/init` is the only place the CLI reports which MCP
-                    // servers it actually loaded. Capture it as an engine event
-                    // (session-scoped snapshot for the MCP settings page); its
-                    // `tools` list lets us attribute `mcp__<server>__<tool>`
-                    // names back to each server.
                     let servers = value
                         .get("mcp_servers")
                         .or_else(|| value.get("mcpServers"))
@@ -488,7 +405,6 @@ impl ClaudeEngine {
                 self.note_streamed_text(&out[before..]);
             }
             "assistant" => {
-                // Full message snapshot; used as session-id and actual model source.
                 push_session_id(&value, "session_id", out);
                 let reported_model = value
                     .get("message")
@@ -502,8 +418,6 @@ impl ClaudeEngine {
                     .get("message")
                     .and_then(|m| m.get("thinking_effort").or_else(|| m.get("effort")))
                     .or_else(|| value.get("thinking_effort"))
-                    // Only use effort explicitly present in this streamed assistant
-                    // payload. Local transcript metadata is not response evidence.
                     .or_else(|| value.get("effort"))
                     .and_then(Value::as_str)
                     .map(str::trim)
@@ -515,9 +429,6 @@ impl ClaudeEngine {
                 if let Some(effort) = reported_effort.clone() {
                     out.push(EngineEvent::Effort(effort));
                 }
-                // The response's own account of what ran. `<synthetic>` marks
-                // messages the CLI fabricated locally (errors, interrupts):
-                // that is not a served model and must not read as one.
                 let synthetic = reported_model
                     .as_deref()
                     .is_some_and(|model| model.starts_with('<'));
@@ -533,19 +444,10 @@ impl ClaudeEngine {
                 }
             }
             "user" => {
-                // tool_result blocks carry permission denials as is_error
-                // text (headless cannot prompt). Surface them so the UI can
-                // offer a directory grant instead of letting the model
-                // narrate a terminal prompt that does not exist.
                 for (id, text) in tool_result_error_blocks(&value) {
                     if !looks_like_permission_denial(&text) {
                         continue;
                     }
-                    // The denied call's structured input is authoritative:
-                    // resolve the real path argument by tool_use id and only
-                    // fall back to scraping the free-text error when the call
-                    // was never seen (e.g. resumed transcript) or carries no
-                    // path argument (e.g. Bash).
                     let tool = id
                         .as_ref()
                         .and_then(|id| self.tool_names.lock().ok()?.get(id).cloned());
@@ -563,10 +465,6 @@ impl ClaudeEngine {
                         tool_use_id: id,
                     });
                 }
-                // Tool result output emitted in response to tool_use. The
-                // tool name is resolved from the tool_use_id recorded at
-                // content_block_start, so the result patch lands on the
-                // matching row even when tool calls run in parallel.
                 if let Some(content) = value
                     .get("message")
                     .and_then(|m| m.get("content"))
@@ -574,17 +472,11 @@ impl ClaudeEngine {
                 {
                     for block in content {
                         if block.get("type").and_then(Value::as_str) == Some("tool_result") {
-                            // Error blocks are surfaced as permission denials
-                            // above (or narrated by the model); denial-shaped
-                            // text without is_error stays silent for the same
-                            // reason. Keep both out of the timeline panel to
-                            // avoid double-reporting.
                             let block_text = tool_result_block_text(block);
                             if looks_like_permission_denial(&block_text) {
                                 continue;
                             }
                             let tool_call_id = block.get("tool_use_id").and_then(Value::as_str);
-                            // Any other error still settles its row, as a failure.
                             let errored = block
                                 .get("is_error")
                                 .and_then(Value::as_bool)
@@ -616,20 +508,14 @@ impl ClaudeEngine {
                 if stopped_task_result
                     && value.get("num_turns").and_then(Value::as_u64) == Some(0)
                     && value.get("is_error").and_then(Value::as_bool) != Some(true)
-                    // Absent or blank: a CLI variant that omits `result` on
-                    // this bookkeeping line must not resurrect the old bug.
                     && value
                         .get("result")
                         .and_then(Value::as_str)
-                        .map_or(true, |text| text.trim().is_empty())
+                        .is_none_or(|text| text.trim().is_empty())
                 {
                     return;
                 }
-                // What this turn showed so far, cleared for the next turn on a live process.
                 let (streamed, local_text) = self.take_local_output();
-                // Structured fallback: the final result lists every denial
-                // of the turn. The frontend dedupes against the tool_result
-                // signal above (same path), so double-reporting is harmless.
                 if let Some(denials) = value.get("permission_denials").and_then(Value::as_array) {
                     for denial in denials {
                         let tool = denial
@@ -675,8 +561,6 @@ impl ClaudeEngine {
                 }
                 .map(|usage| attach_reported_context_window(usage, &value))
                 .map(|mut usage| {
-                    // What the turn cost, as Claude Code reckons it: each turn is its own
-                    // process here, so the total is this turn's.
                     if let (Some(cost), Some(object)) = (
                         value.get("total_cost_usd").and_then(Value::as_f64),
                         usage.as_object_mut(),
@@ -698,7 +582,6 @@ impl ClaudeEngine {
                         .to_string();
                     out.push(EngineEvent::Error(message));
                 } else {
-                    // A local command's output, shown as the reply.
                     if let Some(text) = local_command_reply(streamed, local_text, &value) {
                         out.push(EngineEvent::Delta(text));
                     }
@@ -706,11 +589,6 @@ impl ClaudeEngine {
                 }
             }
             "control_request" => {
-                // SDK control protocol asks. AskUserQuestion surfaces to the
-                // UI; every other ask is answered in place (deny for tool
-                // permissions, decline for MCP elicitation, error for
-                // anything unrecognized) — every request must get exactly
-                // one response or the CLI parks on it forever.
                 let request = value.get("request");
                 let subtype = request
                     .and_then(|r| r.get("subtype"))
@@ -752,9 +630,6 @@ impl ClaudeEngine {
                         });
                     }
                 } else if subtype == "elicitation" {
-                    // MCP elicitation (form input / confirmation from an MCP
-                    // server). No form UI here: decline so the MCP tool call
-                    // settles instead of hanging the turn (issue #1432).
                     out.push(EngineEvent::ElicitationDecline {
                         request_id: request_id.to_string(),
                     });
@@ -777,7 +652,6 @@ impl ClaudeEngine {
     }
 }
 
-/// Human-readable line for a `system/api_retry` event.
 fn format_api_retry(value: &Value) -> String {
     let attempt = value.get("attempt").and_then(Value::as_u64).unwrap_or(0);
     let max = value
@@ -807,7 +681,6 @@ fn format_api_retry(value: &Value) -> String {
     msg
 }
 
-/// Anthropic SSE wrapped events (requires --include-partial-messages).
 fn parse_stream_event(
     pending: &Mutex<HashMap<(String, u64), PendingTool>>,
     tool_names: &Mutex<HashMap<String, String>>,
@@ -824,11 +697,8 @@ fn parse_stream_event(
         .unwrap_or("");
     match event.get("type").and_then(Value::as_str) {
         Some("message_start") => out.push(EngineEvent::Generation { active: true }),
-        // Decode window closes after the last block (tool arguments included).
         Some("message_stop") => out.push(EngineEvent::Generation { active: false }),
         Some("content_block_delta") => parse_content_block_delta(pending, agent, event, out),
-        // Tool calls surface at block start with `input: {}`; the real
-        // arguments stream in as `input_json_delta` and flush on stop.
         Some("content_block_start") => {
             parse_content_block_start(pending, agent, tool_names, tool_paths, event, out)
         }
@@ -908,8 +778,6 @@ fn parse_content_block_start(
         if let Ok(mut map) = tool_names.lock() {
             map.insert(id.to_string(), name.clone());
         }
-        // Non-streaming lines carry the full input at block start; record
-        // its path argument immediately (partial streams patch it at stop).
         if let Some(path) = input.and_then(super::tool_path_arg) {
             if let Ok(mut map) = tool_paths.lock() {
                 map.insert(id.to_string(), path);
@@ -930,8 +798,6 @@ fn parse_content_block_start(
             );
         }
     }
-    // Name-only start so the timeline can show the tool immediately; args
-    // patch in when the JSON stream completes (or if input is already full).
     out.push(tool_call_message_with_id(
         name,
         input,
@@ -1014,7 +880,6 @@ mod tests {
             &vec!["Bash".to_string(), "mcp__alpha__search".to_string()]
         );
 
-        // An init without mcp_servers produces no event (no snapshot out of nothing).
         let mut out = Vec::new();
         ClaudeEngine::new().parse_line(
             &serde_json::json!({
@@ -1052,8 +917,6 @@ mod tests {
             "got {out:?}"
         );
 
-        // `<synthetic>` marks a message the CLI fabricated locally (an error
-        // or an interrupt): not a served model, so no evidence is emitted.
         let mut out = Vec::new();
         ClaudeEngine::new().parse_line(
             &serde_json::json!({
@@ -1068,8 +931,6 @@ mod tests {
             "got {out:?}"
         );
 
-        // A top-level level is accepted only when the streamed assistant
-        // event explicitly carries it.
         let mut out = Vec::new();
         ClaudeEngine::new().parse_line(
             &serde_json::json!({
@@ -1111,7 +972,6 @@ mod tests {
             "got {out:?}"
         );
 
-        // Top-level fallback; blank values are ignored.
         let mut out = Vec::new();
         ClaudeEngine::new().parse_line(
             &serde_json::json!({ "type": "assistant", "thinking_effort": " low " }).to_string(),
@@ -1417,7 +1277,6 @@ mod tests {
         };
         let stop = serde_json::json!({ "type": "content_block_stop", "index": 1 });
         let mut out = Vec::new();
-        // Both agents' first tool call is block 1, streamed interleaved.
         engine.parse_line(&line("", start("toolu_main")), &mut out);
         engine.parse_line(&line("toolu_task", start("toolu_helper")), &mut out);
         engine.parse_line(&line("", delta("main.ts")), &mut out);
@@ -1506,9 +1365,6 @@ mod tests {
         }
     }
 
-    /// Live wire: TaskCreate and TaskGet both answer with a `toolUseResult`
-    /// of `{task:{id,subject,...}}`. Only the creation names a new todo id;
-    /// reading a task must not patch the list (it used to reset it to pending).
     #[test]
     fn task_create_result_carries_the_id_and_task_get_patches_nothing() {
         let engine = ClaudeEngine::new();
@@ -1710,7 +1566,6 @@ mod tests {
             "event": { "type": "content_block_stop", "index": 0 }
         })
         .to_string();
-        // Pathless denial text: nothing for extract_absolute_path to find.
         let denial = serde_json::json!({
             "type": "user",
             "message": {
@@ -1749,27 +1604,26 @@ mod tests {
 
     #[test]
     fn tool_result_non_error_and_non_denial_stay_silent() {
-        for (is_error, text) in [(
+        let (is_error, text) = (
             false,
             "Claude requested permissions to read from /etc, but you haven't granted it yet.",
-        )] {
-            let line = serde_json::json!({
-                "type": "user",
-                "message": {
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": "toolu_1",
-                        "is_error": is_error,
-                        "content": text
-                    }]
-                }
-            })
-            .to_string();
-            let mut out = Vec::new();
-            ClaudeEngine::new().parse_line(&line, &mut out);
-            assert!(out.is_empty(), "is_error={is_error} text={text}");
-        }
+        );
+        let line = serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_1",
+                    "is_error": is_error,
+                    "content": text
+                }]
+            }
+        })
+        .to_string();
+        let mut out = Vec::new();
+        ClaudeEngine::new().parse_line(&line, &mut out);
+        assert!(out.is_empty(), "is_error={is_error} text={text}");
     }
 
     #[test]
@@ -1816,8 +1670,6 @@ mod tests {
         ClaudeEngine::new().parse_line(&line, &mut out);
         assert_eq!(out.len(), 2);
         match &out[0] {
-            // The same call's mid-turn copy carries this id too: the
-            // frontend matches the two by it.
             EngineEvent::PermissionDenied {
                 tool,
                 path,
@@ -1833,10 +1685,6 @@ mod tests {
         assert!(matches!(out[1], EngineEvent::Done { .. }));
     }
 
-    /// A declined AskUserQuestion is the user's answer, not a grantable
-    /// permission. CodeBuddy 2.179 lists it in `permission_denials` (shape
-    /// copied from a real run) and its mid-turn result reads "Permission
-    /// denied by SDK"; neither may raise a "permission required" card.
     #[test]
     fn declined_question_never_surfaces_as_permission_denial() {
         let engine = ClaudeEngine::new();
@@ -1954,8 +1802,6 @@ mod tests {
         );
     }
 
-    /// A read-only run must land in the launch arguments (plan mode + whitelist + write tools
-    /// denied explicitly), not merely be named read-only.
     #[test]
     fn read_only_tool_constraints_force_plan_mode_and_whitelist() {
         let engine = ClaudeEngine::new();
@@ -1995,7 +1841,6 @@ mod tests {
                 "{tool} must be explicitly denied"
             );
         }
-        // The ordinary permission flags must not appear as well (no conflicting modes).
         assert!(!args
             .windows(2)
             .any(|w| w == ["--permission-mode", "acceptEdits"]));

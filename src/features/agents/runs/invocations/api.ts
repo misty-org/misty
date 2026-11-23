@@ -1,4 +1,4 @@
-import { localRunActivity } from "@/features/agents/localRun";
+import { localRunActivity } from "@/features/agents/local_run";
 import { invoke } from "@/native/invoke";
 import type {
   AgentNotebook,
@@ -8,16 +8,16 @@ import type {
   AiInvocationCreated,
   AiInvocationRequest,
   AiProgressItem,
-} from "./invocationTypes";
+} from "./invocation_types";
 import type { MistyActivityEntry } from "../../conversations/state/activity";
 
-export * from "./aiSettingsTypes";
-export { subscribeToAiInvocation } from "./invocationSubscription";
-import type { ScreenLocation } from "./aiSettingsTypes";
-import { changeAgentSettings, readAgentSettings } from "./localAiSettings";
+export * from "./ai_settings_types";
+export { subscribeToAiInvocation } from "./invocation_subscription";
+import type { ScreenLocation } from "./ai_settings_types";
+import { changeAgentSettings, readAgentSettings } from "./local_ai_settings";
 import { completeLocalArtifact, decideLocalArtifact } from "../local-run/artifacts";
-import { localRunProgress, localRunState } from "../local-run/runState";
-import { startLocalRun } from "../local-run/startRun";
+import { localRunProgress, localRunState } from "../local-run/run_state";
+import { startLocalRun } from "../local-run/start_run";
 
 export const aiSurfaceApi = {
   settings: async () => ({ settings: await readAgentSettings() }),
@@ -30,7 +30,6 @@ export const aiSurfaceApi = {
         : { agent_block_sensitive: change.block_sensitive }),
       ...(change.blocked_sites === undefined ? {} : { agent_blocked_sites: change.blocked_sites }),
     }),
-  /** Whether agents stop to ask before paying or buying (`payments_ask`). */
   updatePaymentsAsk: (paymentsAsk: boolean) => changeAgentSettings({ payments_ask: paymentsAsk }),
   updateKeepAwake: (keepAwake: boolean) =>
     changeAgentSettings({ keep_awake_for_agents: keepAwake }),
@@ -42,7 +41,6 @@ export const aiSurfaceApi = {
   }),
   createInvocation: (input: AiInvocationRequest): Promise<AiInvocationCreated> =>
     startLocalRun(input),
-  /** How a reply got its answer: notes and tool runs, rebuilt from what its run kept. */
   invocationProgress: (
     invocationId: string,
   ): Promise<{
@@ -51,18 +49,13 @@ export const aiSurfaceApi = {
     notebook?: AgentNotebook;
     subagents?: AgentSubagent[];
   }> => localRunProgress(invocationId),
-  /** The run's state: running, completed, failed, canceled, or missing when nothing knows of it. */
   invocationState: (invocationId: string) => localRunState(invocationId),
   cancelInvocation: async (invocationId: string) => {
     await invoke("agent_run_cancel", { runId: invocationId });
-    const { cancelSubAgentsOf } = await import("@/features/agents/tools/delegationTools");
+    const { cancelSubAgentsOf } = await import("@/features/agents/tools/delegation_tools");
     await cancelSubAgentsOf(invocationId).catch(() => undefined);
     return { state: "canceled" };
   },
-  /**
-   * Take over: Misty's own run waits at its next step; an outside engine is kept off the browser
-   * until resumed. False when nothing is running under that id to hold.
-   */
   pauseInvocation: (invocationId: string) =>
     invoke<boolean>("agent_run_pause", { runId: invocationId, paused: true }),
   resumeInvocation: (invocationId: string) =>

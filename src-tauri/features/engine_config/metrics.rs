@@ -584,10 +584,6 @@ impl CpuTracker {
     }
 }
 
-/// Pids refreshed for memory/CPU: this round's selection plus last round's,
-/// sorted and deduplicated. A pid that left the selection (exited, or pushed
-/// out by the limit) rides along once so sysinfo's `remove_dead_processes`
-/// drops it — `ProcessesToUpdate::Some` only ever prunes listed pids.
 fn refresh_targets(selected: &[u32], previous: &HashSet<u32>) -> Vec<u32> {
     let mut targets: Vec<u32> = selected.iter().chain(previous).copied().collect();
     targets.sort_unstable();
@@ -595,15 +591,6 @@ fn refresh_targets(selected: &[u32], previous: &HashSet<u32>) -> Vec<u32> {
     targets
 }
 
-/// Process table rows (pid, parent, name) used only to work out which
-/// processes are ours.
-///
-/// Windows: a Toolhelp snapshot lists pid / parent / exe name without
-/// opening any process. sysinfo's `ProcessesToUpdate::All` instead calls
-/// `OpenProcess(QUERY_INFORMATION | VM_READ)` on every new process on the
-/// machine — lsass included — every sample, which endpoint security reads
-/// as credential-theft / injection staging. Handles are opened only for the
-/// selected (own) pids in the second, `ProcessesToUpdate::Some` refresh.
 #[cfg(windows)]
 fn process_table(_system: &mut System) -> Option<Vec<ProcessIdentity>> {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
@@ -639,10 +626,6 @@ fn process_table(_system: &mut System) -> Option<Vec<ProcessIdentity>> {
     (!rows.is_empty()).then_some(rows)
 }
 
-/// macOS / Linux: sysinfo with `ProcessRefreshKind::nothing()` reads only
-/// list-level metadata (libproc process info / `/proc/<pid>/stat`) — no task
-/// port, memory contents or environment of other processes. Memory and CPU
-/// are read afterwards for the selected pids only.
 #[cfg(not(windows))]
 fn process_table(system: &mut System) -> Option<Vec<ProcessIdentity>> {
     let updated = system.refresh_processes_specifics(
@@ -668,7 +651,6 @@ struct Collector {
     cpu: CpuTracker,
     previous_system_sample: Option<Instant>,
     main_pid: u32,
-    /// Pids measured last round (see [`refresh_targets`]).
     sampled: HashSet<u32>,
 }
 
@@ -784,7 +766,6 @@ impl Collector {
 
 static STATE: OnceLock<MetricsState> = OnceLock::new();
 
-/// Starts the sampler with the saved preference. Runs once as the app starts.
 pub fn init() {
     let _ = STATE.get_or_init(|| {
         MetricsState::load().unwrap_or_else(|error| {
@@ -799,7 +780,6 @@ pub fn init() {
     });
 }
 
-/// Stops the sampler; the app calls it as it quits.
 pub fn shutdown() {
     if let Some(state) = STATE.get() {
         state.stop();
@@ -820,7 +800,6 @@ async fn blocking<T: Send + 'static>(
         .map_err(|e| e.to_string())?
 }
 
-/// The whole report: every sample in the last five minutes and what they can't tell.
 #[tauri::command]
 pub async fn engine_performance_report() -> Result<PerformanceDiagnostics, String> {
     state()?.report()
@@ -831,7 +810,6 @@ pub async fn engine_performance_enabled() -> Result<bool, String> {
     state()?.enabled()
 }
 
-/// Turns sampling on or off, saves the choice, and tells every window.
 #[tauri::command]
 pub async fn engine_performance_set_enabled(enabled: bool) -> Result<bool, String> {
     blocking(move || {
@@ -845,8 +823,6 @@ pub async fn engine_performance_set_enabled(enabled: bool) -> Result<bool, Strin
     .await
 }
 
-/// Writes an exported report to the file the person just chose in the save dialog
-/// (`sandbox_pick_save_file`), and nowhere else.
 #[tauri::command]
 pub async fn engine_performance_export(path: String, content: String) -> Result<(), String> {
     blocking(move || {
@@ -1187,14 +1163,9 @@ mod tests {
         assert!(refresh_targets(&[], &HashSet::new()).is_empty());
     }
 
-    /// Endpoint security reads "OpenProcess(VM_READ) on every new process,
-    /// lsass included, every 5 s" as credential-theft / injection staging,
-    /// and sysinfo does exactly that on Windows for `ProcessesToUpdate::All`.
-    /// The full-table refresh may only live in the non-Windows table reader.
     #[test]
     fn whole_system_refresh_never_reaches_the_windows_build() {
         let source = include_str!("metrics.rs");
-        // Code only: doc comments may name the API they warn about.
         let production: String = source
             .split("#[cfg(test)]")
             .next()

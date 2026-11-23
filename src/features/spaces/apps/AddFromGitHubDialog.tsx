@@ -13,22 +13,20 @@ import {
   PropertyList,
   Text,
 } from "@misty/ui";
-import { permissionLines } from "./appPermissions";
-import { appHosts, type AppSource, type ResolvedLink } from "./thirdPartyApps";
+import { permissionLines } from "./app_permissions";
+import { appHosts, type AppSource, type ResolvedLink } from "./third_party_apps";
 
 const messageOf = (reason: unknown, fallback: string) =>
-  reason instanceof Error ? reason.message : typeof reason === "string" && reason ? reason : fallback;
+  reason instanceof Error
+    ? reason.message
+    : typeof reason === "string" && reason
+      ? reason
+      : fallback;
 
-/**
- * Adds an app to a Space by its GitHub link, for a mod. Misty resolves the link (`space_app_resolve`): its reviewed
- * catalog, else the maker's own `misty-app.json`, else the basic check. What the app may do and reach shows before
- * it is added; an app Misty hasn't reviewed says so.
- */
 export function AddFromGitHubDialog({
   onAdd,
   onClose,
 }: {
-  /** Adds the resolved app to the Space. If it throws, its message shows and the dialog stays. */
   onAdd(source: AppSource): Promise<unknown>;
   onClose(): void;
 }) {
@@ -100,7 +98,12 @@ export function AddFromGitHubDialog({
           {found ? (
             <div className="flex flex-col gap-3">
               <div className="flex min-w-0 items-center gap-3">
-                <AppLogoImage src={found.entry.logo} name={found.entry.name} size="card" />
+                <AppLogoImage
+                  src={found.entry.logo}
+                  name={found.entry.name}
+                  size="card"
+                  render={found.entry.icon_render}
+                />
                 <div className="flex min-w-0 flex-col">
                   <Text weight="medium">{found.entry.name}</Text>
                   <Text size="meta" tone="muted">
@@ -110,8 +113,8 @@ export function AddFromGitHubDialog({
               </div>
               {found.listed ? null : (
                 <Text as="p" size="meta" tone="muted" wrap className="m-0">
-                  Misty hasn't reviewed this app. It runs sandboxed on its own, but check that you trust its
-                  maker before adding it.
+                  Misty hasn't reviewed this app. It runs sandboxed on its own, but check that you
+                  trust its maker before adding it.
                 </Text>
               )}
               <PropertyList
@@ -122,13 +125,17 @@ export function AddFromGitHubDialog({
                   {
                     label: "Can",
                     value: found.entry.permissions.length
-                      ? found.entry.permissions.map((name) => permissionLines[name] ?? name).join(". ")
+                      ? found.entry.permissions
+                          .map((name) => permissionLines[name] ?? name)
+                          .join(". ")
                       : "Run on its own",
                   },
                   {
                     label: "Reaches",
                     value: hosts.length
-                      ? hosts.map((entry) => (entry.paid ? `${entry.host} (paid)` : entry.host)).join(", ")
+                      ? hosts
+                          .map((entry) => (entry.paid ? `${entry.host} (paid)` : entry.host))
+                          .join(", ")
                       : "Nothing on the internet",
                   },
                 ]}

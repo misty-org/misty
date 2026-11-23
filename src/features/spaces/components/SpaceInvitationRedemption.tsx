@@ -7,7 +7,6 @@ import { spacesApi } from "../api/api";
 import type { SpaceInvitationPreview } from "../api/dto/entities";
 import {
   Button,
-  Card,
   ErrorState,
   PlaceholderIcon,
   Skeleton,
@@ -16,7 +15,7 @@ import {
   Text,
   useNotice,
 } from "@misty/ui";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { useSpacesStore } from "../list/use_spaces_store";
 
 export function SpaceInvitationRedemption() {
   const { token = "" } = useParams();
@@ -27,7 +26,6 @@ export function SpaceInvitationRedemption() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState("");
-  // The preview's read failed: the card says so in place of the invitation, with a retry.
   const [readFailed, setReadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
@@ -53,7 +51,6 @@ export function SpaceInvitationRedemption() {
     };
   }, [token, attempt]);
 
-  // Signed out, an invite link goes to sign in first and comes back here after.
   const join = async () => {
     if (!user || joining) return;
     setJoining(true);
@@ -73,22 +70,30 @@ export function SpaceInvitationRedemption() {
 
   return (
     <Surface tone="page" className="grid h-full place-items-center p-6">
-      <Card className="w-full max-w-md p-6 text-center">
+      <div className="w-full max-w-md text-center">
         {loading ? (
           <InvitationSkeleton signedIn={Boolean(user)} />
         ) : preview ? (
           <>
             <PlaceholderIcon icon={Users} className="mx-auto" />
-            <h1 className="mb-0 mt-4 text-xl font-semibold">Join {preview.space_name}</h1>
-            <Text tone="muted" wrap className="mb-0 mt-2 text-sm">
+            <Text as="h1" size="display" tone="bright" weight="semibold" wrap className="mb-0 mt-4">
+              Join {preview.space_name}
+            </Text>
+            <Text as="p" size="page" tone="muted" wrap className="mb-0 mt-2">
               {preview.inviter_name} invited {preview.invited_email} to collaborate in this Space.
             </Text>
             <div className="mt-5 grid gap-2">
-              <Button type="button" disabled={joining} onClick={() => void join()}>
+              <Button
+                type="button"
+                variant="primary"
+                size="lg"
+                disabled={joining}
+                onClick={() => void join()}
+              >
                 Join Space
               </Button>
               {user ? (
-                <Text tone="muted" wrap className="m-0 text-xs">
+                <Text as="p" size="meta" tone="muted" wrap className="m-0">
                   Signed in as {user.email}
                 </Text>
               ) : null}
@@ -106,15 +111,11 @@ export function SpaceInvitationRedemption() {
             }}
           />
         ) : null}
-      </Card>
+      </div>
     </Surface>
   );
 }
 
-/**
- * The invitation while it is read, shaped like it: the icon, the "Join" heading, the two lines on
- * who invited whom, the Join button and, signed in, the line under it.
- */
 function InvitationSkeleton({ signedIn }: { signedIn: boolean }) {
   return (
     <div role="status" aria-label="Loading invitation" aria-busy="true">

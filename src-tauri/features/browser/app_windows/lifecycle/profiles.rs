@@ -1,16 +1,11 @@
-//! Telling every window the profiles changed, and moving every window to the account that just
-//! signed in.
 use super::*;
 
-/// Everything that shows the list of profiles needs it again.
 pub(crate) fn profiles_changed<R: Runtime>(app: &AppHandle<R>) {
     let _ = app.emit_filter(PROFILES_CHANGED_EVENT, (), |target| {
         targets(target, is_app_window)
     });
 }
 
-/// The windows now belong to another account. A window of a profile that account doesn't have
-/// moves to its first profile; every window's app reloads its tabs for the new account.
 pub fn set_scope(scope: &str) {
     let Ok(mut state) = lock_registry() else {
         return;
@@ -30,7 +25,6 @@ pub fn set_scope(scope: &str) {
     save(&state);
 }
 
-/// Windows that closed and left tabs behind, for a window of the same profile to take.
 pub fn take_orphans(label: &str) -> Vec<String> {
     let Some(window) = parse(label) else {
         return Vec::new();
@@ -43,7 +37,6 @@ pub fn take_orphans(label: &str) -> Vec<String> {
     taken
 }
 
-/// Remembers which Space a window shows, for the next launch.
 pub fn set_window_space(label: &str, space: Option<String>) {
     if let Ok(mut current) = CURRENT.lock() {
         if let Some(window) = current.get_mut(label) {

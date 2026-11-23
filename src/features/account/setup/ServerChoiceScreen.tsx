@@ -3,7 +3,6 @@ import { Cloud, Server } from "lucide-react";
 
 export type ServerChoiceTarget = "cloud" | "own";
 
-/** Where the account lives: Misty Cloud first, a server the person runs second. */
 export function ServerChoiceScreen(props: {
   busy?: boolean;
   onChoose: (target: ServerChoiceTarget) => void;

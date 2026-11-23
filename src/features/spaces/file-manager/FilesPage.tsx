@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState, SetupState } from "@misty/ui";
 import { disk } from "@/features/files";
-import { useSpacesStore } from "../list/useSpacesStore";
-import { preferredDefaultSpace } from "../routes/defaultSpace";
-import { FilesWindow } from "./FilesWindow";
+import { useSpacesStore } from "../list/use_spaces_store";
+import { preferredDefaultSpace } from "../routes/default_space";
+import { FilesBrowser } from "./FilesBrowser";
 import { messageOf } from "./format";
 import type { FilesPlace } from "./model";
 
-type Grant = { status: "checking" } | { status: "failed"; message: string } | { status: "off" | "on" | "declined" };
+type Grant =
+  | { status: "checking" }
+  | { status: "failed"; message: string }
+  | { status: "off" | "on" | "declined" };
 
-/**
- * The Files page (`/agents?view=files`), the same in every Space. Before anything shows it asks native
- * whether the disk grant is on; while it's off, a centered empty state asks to allow access, which only
- * the native prompt can give. Declined, Files stays on the Space drives and the person's projects.
- */
 export function FilesPage() {
   const [grant, setGrant] = useState<Grant>({ status: "checking" });
   const [asking, setAsking] = useState(false);
@@ -24,7 +22,11 @@ export function FilesPage() {
     setGrant({ status: "checking" });
     void disk.granted().then(
       (on) => setGrant({ status: on ? "on" : "off" }),
-      (cause) => setGrant({ status: "failed", message: messageOf(cause, "Misty couldn't check its access to your files.") }),
+      (cause) =>
+        setGrant({
+          status: "failed",
+          message: messageOf(cause, "Misty couldn't check its access to your files."),
+        }),
     );
   }, []);
   useEffect(check, [check]);
@@ -63,6 +65,12 @@ export function FilesPage() {
     : personal
       ? { kind: "space-drive", spaceId: personal.id, path: "/" }
       : undefined;
-  if (!start) return <EmptyState title="No places to open" line="Join or make a Space, or add a project, to see its files here." />;
-  return <FilesWindow granted={granted} start={start} />;
+  if (!start)
+    return (
+      <EmptyState
+        title="No places to open"
+        line="Join or make a Space, or add a project, to see its files here."
+      />
+    );
+  return <FilesBrowser granted={granted} start={start} />;
 }

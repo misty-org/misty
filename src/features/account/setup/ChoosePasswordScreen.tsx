@@ -1,14 +1,10 @@
-import { useAuth } from "../sessions/authState";
+import { useAuth } from "../sessions/auth_state";
 import AuthField from "../components/AuthField";
 import AuthMessage from "../components/AuthMessage";
-import { accountSetFirstPassword } from "../sessions/accountPassword";
+import { accountSetFirstPassword } from "../sessions/account_password";
 import { Button } from "@misty/ui";
 import { useState, type FormEvent } from "react";
 
-/**
- * Right after a setup key signs in: the account's first password, or a new one in place of a
- * forgotten one (a sign-in link is the reset). Leaving it for later is allowed.
- */
 export function ChoosePasswordScreen(props: {
   onDone: () => void;
   onBusy: (busy: boolean) => void;

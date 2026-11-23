@@ -1,4 +1,3 @@
-//! The messages Misty's page scripts send, each parsed strictly from its JSON.
 use super::*;
 
 #[derive(serde::Deserialize)]
@@ -32,9 +31,6 @@ pub(super) fn pointer_message(raw: &str) -> Option<PointerMessage> {
     Some(message)
 }
 
-/// A host navigation (shortcut or context menu) posted instead of loaded, so
-/// the page cannot observe the URL that carries the token. The forwarders it
-/// is handed to check that token exactly as they do for a navigation.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct NavigateMessage {
@@ -57,7 +53,6 @@ pub(super) struct BackgroundMessage {
     pub(super) background: String,
 }
 
-/// The page asks to move the window: a press-and-drag on empty space at its top edge.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DragMessage {
@@ -72,7 +67,6 @@ pub(super) fn drag_message(raw: &str) -> Option<DragMessage> {
     serde_json::from_str(raw).ok()
 }
 
-/// The page reports a double press on its top edge, which acts as the titlebar's double-click.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ZoomMessage {
@@ -87,8 +81,6 @@ pub(super) fn zoom_message(raw: &str) -> Option<ZoomMessage> {
     serde_json::from_str(raw).ok()
 }
 
-/// Where the focused text field is, in page pixels from the page's top left; none once focus
-/// leaves a field.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct CaretMessage {
@@ -122,7 +114,6 @@ pub(super) fn caret_message(raw: &str) -> Option<CaretMessage> {
     Some(message)
 }
 
-/// Whether the page has an element in full screen.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct FullscreenMessage {
@@ -149,8 +140,6 @@ pub(super) fn background_message(raw: &str) -> Option<BackgroundMessage> {
     Some(message)
 }
 
-/// Escape stopped a loading page, its document finished loading, or the page changed its URL
-/// without loading (History API or hash), naming its new address.
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct StatusMessage {

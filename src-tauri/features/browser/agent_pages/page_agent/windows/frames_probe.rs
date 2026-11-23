@@ -1,9 +1,3 @@
-//! Live WebView2 probe for the page layer in cross-origin frames on Windows. A local page on
-//! one site embeds a frame from another site (its own process), one from its own site on
-//! another origin (the page's process) and, inside the first, one nested from the page's
-//! site again (attached through the first frame's session). The probe reads all three,
-//! types into the out-of-process one by its frame ref and checks the field took the text.
-//! Run with `cargo test --lib webview2_frames -- --ignored`.
 use crate::browser::agent_pages::frames;
 use crate::browser::agent_pages::page_agent::frames::{
     frame_of, markdown, shows, trees, REF_RANGE,
@@ -216,7 +210,6 @@ fn webview2_frames_read_and_type_across_origins() {
         .expect("build the frames probe")
         .run_return(|_, _| {});
     let code = output.load(Ordering::SeqCst);
-    // WebView2 keeps profile files open briefly after the views close.
     for _ in 0..50 {
         if fs::remove_dir_all(root.path()).is_ok() {
             break;

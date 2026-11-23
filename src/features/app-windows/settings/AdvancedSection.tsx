@@ -1,4 +1,4 @@
-import { MAX_PANE_DIM } from "../panes/paneFocus";
+import { MAX_PANE_DIM } from "../panes/pane_focus";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsSection as SettingsSectionBlock,
@@ -9,9 +9,8 @@ import {
   SliderControl,
   SwitchControl,
 } from "../../settings/SettingsControls";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import type { SettingsContentProps } from "../../settings/settings_types";
 
-/** Options few people change: link previews, window density and diagnostics. */
 export function AdvancedSection(props: SettingsContentProps) {
   const toggle = (section: string, key: string, fallback: boolean) => ({
     checked: booleanSetting(props.document, section, key, fallback),

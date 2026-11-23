@@ -1,6 +1,3 @@
-//! What a desktop task asks of control: the first-use confirmation, one capture
-//! of the controlled display, and one checked action. Rust validates the task,
-//! operation grant and one-use snapshot first.
 use objc2::rc::Retained;
 use objc2_app_kit::{NSRunningApplication, NSWorkspace};
 use objc2_core_graphics::{
@@ -20,8 +17,6 @@ use crate::agents::cursor::macos::{
     support::{error_json, on_main, MainOnly},
 };
 
-/// This confirmation is outside the model's action surface. Until the human
-/// accepts, there is no input tap, stream, or actionable desktop snapshot.
 pub(super) fn confirm_control(expected: &str) -> Option<String> {
     let want = expected.to_owned();
     let (failure, pending) = on_main(move |mtm| {
@@ -91,7 +86,6 @@ pub(super) fn confirm_control(expected: &str) -> Option<String> {
     })
 }
 
-/// Called on a worker. All state, HUD, and input ownership live on the main queue.
 pub(crate) fn capture(task_id: &str) -> Value {
     let expected = task_id.to_owned();
     if let Some(failure) = confirm_control(&expected) {
@@ -110,7 +104,6 @@ pub(crate) fn capture(task_id: &str) -> Value {
         if count == 0 {
             display = CGMainDisplayID();
         }
-        // Moving the human pointer must not silently retarget the agent's frame.
         if state(|state| state.controlling) {
             display = state(|state| state.controlled_display);
         }
@@ -171,8 +164,6 @@ pub(crate) fn capture(task_id: &str) -> Value {
     })
 }
 
-/// Rust validates the task, operation grant, one-use snapshot and action first.
-/// Main-queue dispatch rechecks native Stop and display geometry before acting.
 pub(crate) fn action(input: &Value) -> Value {
     let (stopped, controlling, lease_until) =
         state(|state| (state.stopped, state.controlling, state.lease_until));
@@ -201,8 +192,6 @@ pub(crate) fn action(input: &Value) -> Value {
     {
         return error_json("browser_snapshot_stale: display geometry changed; inspect again");
     }
-    // The person may keep working in other apps, so the foreground app can
-    // change; Accessibility targets the control under Misty's own cursor.
     let action = &input["action"];
     let (x, y) = (
         action["x"].as_f64().unwrap_or(0.0),

@@ -1,15 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Where each CLI keeps its logs, and a read-only walk that lists them.
-//! Roots come from the same helpers the history sidebar uses, so
-//! CLAUDE_CONFIG_DIR / CODEX_HOME apply.
-
 use super::types::{Engine, SourceStatus};
 use std::path::{Path, PathBuf};
 
-/// Session logs never sit deeper than this below a root (Claude subagents
-/// are `<project>/<session>/subagents/agent-*.jsonl`; omp nests advisors).
 const MAX_DEPTH: usize = 8;
 
 #[derive(Debug, Clone)]
@@ -18,7 +12,6 @@ pub(crate) struct SourceSpec {
     pub roots: Vec<PathBuf>,
 }
 
-/// One session log found under a root.
 #[derive(Debug, Clone)]
 pub(crate) struct FoundFile {
     pub path: PathBuf,
@@ -40,7 +33,6 @@ pub(crate) struct Discovery {
 }
 
 impl Discovery {
-    /// Every root was walked without error (pruning cursors is then safe).
     pub fn complete(&self) -> bool {
         self.roots
             .iter()
@@ -84,9 +76,6 @@ fn pi_family_root(home_dir_name: &str) -> PathBuf {
         .join("sessions")
 }
 
-/// Walk every root of `spec`. Symlinks are never followed (a link inside a
-/// root could point anywhere), only regular files the engine accepts are
-/// returned, and nothing is opened — this is readdir only.
 pub(crate) fn discover(spec: &SourceSpec) -> Discovery {
     let mut files = Vec::new();
     let mut roots = Vec::new();
@@ -95,8 +84,6 @@ pub(crate) fn discover(spec: &SourceSpec) -> Discovery {
         roots.push((root.clone(), state));
     }
     if spec.engine == Engine::Codex {
-        // Rollout names start with their creation time: parents are read
-        // before the forks that replay them.
         files.sort_by(|a, b| {
             a.path
                 .file_name()
@@ -114,8 +101,6 @@ fn walk_root(engine: Engine, root: &Path, out: &mut Vec<FoundFile>) -> RootState
         Ok(entries) => entries,
         Err(e) => return root_error(e),
     };
-    // Paths (not open ReadDir handles) on the stack: a wide tree must not
-    // hold one file descriptor per pending directory.
     let mut stack: Vec<(PathBuf, usize)> = Vec::new();
     let mut current = Some((entries, 0usize));
     while let Some((entries, depth)) = current.take() {
@@ -138,7 +123,6 @@ fn walk_root(engine: Engine, root: &Path, out: &mut Vec<FoundFile>) -> RootState
                 });
             }
         }
-        // An unreadable subdirectory is skipped; only the root decides status.
         while current.is_none() {
             let Some((dir, depth)) = stack.pop() else {
                 break;
@@ -155,13 +139,10 @@ fn root_error(error: std::io::Error) -> RootState {
     match error.kind() {
         std::io::ErrorKind::NotFound => RootState::Missing,
         std::io::ErrorKind::PermissionDenied => RootState::Denied(error.to_string()),
-        // A root that exists but is a file, or an I/O failure.
         _ => RootState::Error(error.to_string()),
     }
 }
 
-/// Status line for one source: `ok` if any root is readable, else the
-/// most telling failure (denied > error > missing).
 pub(crate) fn status_of(
     spec: &SourceSpec,
     discovery: &Discovery,

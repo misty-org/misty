@@ -1,13 +1,16 @@
 import "@/tests/ports/spaces";
 import { createRef } from "react";
-import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
+import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
 import type { AgentProfile } from "@/shared/schemas";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import type * as ActionQuestions from "@/features/agents/island/actionQuestions";
+import type * as ActionQuestions from "@/features/agents/island/action_questions";
 import { NoticeViewport } from "@misty/ui";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { initialCompanionPresentation, useCompanionState } from "../../tutor/cursor/companionState";
+import {
+  initialCompanionPresentation,
+  useCompanionState,
+} from "../../tutor/cursor/companion_state";
 import { AgentCompanionPanel } from "../../tutor/cursor/AgentCompanionPanel";
 import { AgentWorkspaceConversation, type AgentVoiceControl } from "./AgentWorkspaceConversation";
 const voiceMock = vi.hoisted(() => ({
@@ -18,7 +21,7 @@ const voiceMock = vi.hoisted(() => ({
   stop: vi.fn(),
   onTranscript: undefined as ((text: string) => void) | undefined,
 }));
-vi.mock("@/features/agents/runs/markdown/useAiVoiceRecorder", () => ({
+vi.mock("@/features/agents/runs/markdown/use_ai_voice_recorder", () => ({
   useAiVoiceRecorder: (options: { onTranscript(text: string): void }) => {
     voiceMock.onTranscript = options.onTranscript;
     return voiceMock;
@@ -28,14 +31,13 @@ vi.mock("./AgentConversationView", () => ({
   AgentConversationView: () => <div>Conversation messages</div>,
 }));
 const finishExecutionMock = vi.fn(async () => {});
-vi.mock("@/features/agents/runs/local-execution/localExecution", () => ({
+vi.mock("@/features/agents/runs/local-execution/local_execution", () => ({
   finishLocalExecution: () => finishExecutionMock(),
 }));
 vi.mock("@/shared/platform/tauri", () => ({
   hasTauriInternals: () => true,
 }));
-// No native window here to hear the device's action questions from.
-vi.mock("@/features/agents/island/actionQuestions", async (importOriginal) => ({
+vi.mock("@/features/agents/island/action_questions", async (importOriginal) => ({
   ...(await importOriginal<typeof ActionQuestions>()),
   listenForActionQuestions: () => undefined,
 }));
@@ -139,7 +141,6 @@ describe("Agents workspace conversations", () => {
         interactionMode: "auto",
       },
     );
-    // Typing here never goes through the cursor companion.
     expect(companionSubmit).not.toHaveBeenCalled();
     expect((screen.getByLabelText("Message") as HTMLTextAreaElement).value).toBe("");
   });

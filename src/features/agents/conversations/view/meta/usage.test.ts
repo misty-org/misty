@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { describe, expect, it } from "vitest";
 import { parseUsage, reportedContextWindow } from "./usage";
-import { usageBreakdown } from "./usageBreakdown";
+import { usageBreakdown } from "./usage_breakdown";
 
 describe("parseUsage", () => {
   it("recognizes 1M metadata before tokens arrive and rejects invalid capacities", () => {
@@ -27,11 +27,6 @@ describe("parseUsage", () => {
   );
 
   it("folds a codex record's cache counters out of its input", () => {
-    // The session-log tail emits token_usage_record payloads: a flat usage
-    // with codex's own cache field names and the stamped context window.
-    // Codex bills `input_tokens` as the whole prompt and reports
-    // `total_tokens` = input + output, so the cache counters are already
-    // inside input and must not be added again.
     const parsed = parseUsage({
       input_tokens: 8000,
       cached_input_tokens: 6000,
@@ -54,8 +49,6 @@ describe("parseUsage", () => {
   });
 
   it("keeps claude's cache tokens outside its input", () => {
-    // Claude reports fresh input separately from the cache it read and wrote,
-    // so there the cache volume is missing input rather than a subset of it.
     const parsed = parseUsage({
       input_tokens: 400,
       cache_read_input_tokens: 6000,
@@ -72,12 +65,6 @@ describe("parseUsage", () => {
   });
 
   it("reads DSH's camelCase counters as disjoint buckets", () => {
-    // DSH reports TokenUsage in camelCase, and its counts are disjoint:
-    // inputTokens is uncached input only, cache read/write are separate (billed
-    // input = the three summed). Without these aliases all four buckets read 0
-    // — only totalTokens survived — so the breakdown collapsed to a single
-    // total row, per-message readouts vanished, and the ledger dropped the row
-    // outright (usage_record skips a report whose four buckets sum to zero).
     const parsed = parseUsage({
       inputTokens: 1000,
       outputTokens: 50,
@@ -92,13 +79,9 @@ describe("parseUsage", () => {
       cacheWrite: 10,
       total: 1260,
     });
-    // Disjoint like claude: the cache volume must stay outside input (the
-    // codex-only `cached_input_tokens` heuristic must not fire here).
     expect(parsed!.input + parsed!.output + parsed!.cacheRead + parsed!.cacheWrite).toBe(
       parsed!.total,
     );
-    // Every bucket survives the breakdown, so the stacked bar keeps its four
-    // segments instead of falling back to the single total row.
     expect(
       usageBreakdown(
         {
@@ -138,7 +121,6 @@ describe("mergeUsage", () => {
       );
       expect(breakdown).not.toBeNull();
       expect(breakdown?.pct).toBe(6);
-      // The parts add up to the total (10000 + 2000 = 12000).
       const sumSegments = breakdown?.parts.reduce((sum, p) => sum + p.tokens, 0);
       expect(sumSegments).toBe(12000);
     });

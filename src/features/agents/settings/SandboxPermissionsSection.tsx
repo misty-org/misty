@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import { downloadsGrantId, sandboxPermissionSet, sandboxPermissionsList } from "@/native/sandbox";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmAction } from "@/shared/lib/confirm_action";
 import { Button, ErrorState, useNotice } from "@misty/ui";
 import {
   DesktopSettingsRow as Row,
@@ -10,17 +10,11 @@ import {
 } from "@/features/settings";
 import { SwitchControl } from "../../settings/SettingsControls";
 
-/**
- * What Misty may reach on this computer. Each stays off until the person says yes the first time
- * it's needed, and can be changed here. These live on the device and never sync.
- */
 export function SandboxPermissionsSection() {
-  // Kept on this computer: the last answers paint at once and are read again behind them.
   const listing = useCachedResource("agents/sandbox-permissions", sandboxPermissionsList, {
     persist: "device",
   });
   const rows = listing.data ?? null;
-  // Permissions never read say so in place of their rows; a failed refresh keeps them shown.
   const loadFailed = !listing.data && !listing.loading && Boolean(listing.error);
   const [working, setWorking] = useState("");
   const [error, setError] = useState("");

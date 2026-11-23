@@ -4,8 +4,6 @@ use serde_json::Value;
 
 pub struct GrokEngine;
 
-/// Grok rewrites config.toml during startup; GROK_CONFIG_PATH is only an
-/// overlay. Isolate its writable home, but keep transcripts in the native home.
 pub(super) fn isolate_channel(
     built: &mut BuiltCommand,
     provider: &Value,
@@ -28,7 +26,7 @@ fn stage_channel(
     directory: &std::path::Path,
 ) -> Result<(), String> {
     let config = native_home.join("config.toml");
-    let base = match std::fs::read_to_string(&config) {
+    let base = match read_native_config(&config) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(format!("read {}: {e}", config.display())),
@@ -57,7 +55,6 @@ fn stage_channel(
             .as_table_mut()
             .ok_or("Grok model entry must be a table")?;
         table.insert("model".into(), toml::Value::String(model));
-        // Per-model routing/credentials outrank global env and native auth.
         if let Some(base) = env.get("GROK_MODELS_BASE_URL") {
             table.insert("base_url".into(), toml::Value::String(base.clone()));
         }
@@ -70,64 +67,84 @@ fn stage_channel(
         }
     }
     let content = toml::to_string(&doc).map_err(|_| "Cannot serialize Grok channel config")?;
-    std::fs::create_dir_all(directory).map_err(|e| format!("create grok staging dir: {e}"))?;
+    file_access::fs::create_dir_all(directory)
+        .map_err(|e| format!("create grok staging dir: {e}"))?;
     let directory = directory.join(format!("grok-channel-{}", uuid::Uuid::new_v4()));
     #[allow(unused_mut)]
-    let mut builder = std::fs::DirBuilder::new();
+    let mut builder = file_access::fs::DirBuilder::new();
     #[cfg(unix)]
     {
-        use std::os::unix::fs::DirBuilderExt;
         builder.mode(0o700);
     }
     builder
         .create(&directory)
         .map_err(|e| format!("create private grok home: {e}"))?;
     built.cleanup_files.push(directory.clone());
-    // Copy configuration inputs, including managed policy and user extensions.
-    // Never link these: CLI writes must stay private. Exclude runtime caches.
-    // Symlinks are skipped, not followed: a link could point at sensitive
-    // paths outside the native config tree, and copied contents would strand
-    // in the private staging dir.
-    if native_home.exists() {
-        for entry in std::fs::read_dir(native_home).map_err(|e| format!("read grok home: {e}"))? {
-            let entry = entry.map_err(|e| format!("read grok home entry: {e}"))?;
-            let file_type = entry
-                .file_type()
-                .map_err(|e| format!("read grok home entry type: {e}"))?;
-            if file_type.is_symlink() {
-                continue;
-            }
-            let name = entry.file_name();
-            let name_text = name.to_string_lossy();
-            if (file_type.is_file() && !name_text.ends_with(".lock"))
-                || ["skills", "agents", "rules", "hooks", "plugins", "memory"]
-                    .contains(&name_text.as_ref())
-            {
-                copy_config_input(&entry.path(), &directory.join(name), &mut Vec::new())
-                    .map_err(|e| format!("copy grok configuration input: {e}"))?;
-            }
-        }
-    }
-    std::fs::write(directory.join("config.toml"), content)
+    copy_native_home(native_home, &directory)?;
+    file_access::fs::write(directory.join("config.toml"), content)
         .map_err(|e| format!("write grok channel config: {e}"))?;
     let sessions = native_home.join("sessions");
-    std::fs::create_dir_all(&sessions).map_err(|e| format!("create grok sessions dir: {e}"))?;
+    create_native_sessions(&sessions).map_err(|e| format!("create grok sessions dir: {e}"))?;
     link_sessions(&sessions, &directory.join("sessions"))
         .map_err(|e| format!("link grok session history: {e}"))?;
     built.command.env("GROK_HOME", directory);
-    // An inherited GROK_CONFIG/GROK_CONFIG_PATH would override GROK_HOME
-    // inside the CLI and silently un-isolate the channel — the probe tests
-    // had to remove them explicitly because a shell can legitimately export
-    // them. Strip them on the production path too.
     built.command.env_remove("GROK_CONFIG");
     built.command.env_remove("GROK_CONFIG_PATH");
     Ok(())
 }
 
-// Copy configuration inputs as private files. Symlinks are skipped (the
-// caller's top-level loop filters them, and nested ones stop here): a link
-// could point at sensitive paths outside the native tree. Directory cycles
-// are rejected rather than linked back into the native configuration tree.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Grok's own config in place, which may sit outside the engine folders the gate grants"
+)]
+fn read_native_config(config: &std::path::Path) -> std::io::Result<String> {
+    std::fs::read_to_string(config)
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "makes Grok's own session folder in its home, which may sit outside the engine folders the gate grants"
+)]
+fn create_native_sessions(sessions: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(sessions)
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "lists Grok's own home in place, which may sit outside the engine folders the gate grants"
+)]
+fn copy_native_home(
+    native_home: &std::path::Path,
+    directory: &std::path::Path,
+) -> Result<(), String> {
+    if !native_home.exists() {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(native_home).map_err(|e| format!("read grok home: {e}"))? {
+        let entry = entry.map_err(|e| format!("read grok home entry: {e}"))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("read grok home entry type: {e}"))?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name_text = name.to_string_lossy();
+        if (file_type.is_file() && !name_text.ends_with(".lock"))
+            || ["skills", "agents", "rules", "hooks", "plugins", "memory"]
+                .contains(&name_text.as_ref())
+        {
+            copy_config_input(&entry.path(), &directory.join(name), &mut Vec::new())
+                .map_err(|e| format!("copy grok configuration input: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "copies Grok's own config inputs out of its home, which may sit outside the engine folders the gate grants, into a private staging home"
+)]
 fn copy_config_input(
     source: &std::path::Path,
     target: &std::path::Path,
@@ -160,13 +177,11 @@ fn copy_config_input(
 fn link_sessions(source: &std::path::Path, target: &std::path::Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
-        std::os::unix::fs::symlink(source, target)
+        file_access::fs::symlink(source, target)
     }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        // Junctions work without the symlink privilege. Pass paths as env values,
-        // never interpolate user paths into PowerShell source.
         let output = std::process::Command::new("powershell.exe")
             .args(["-NoProfile", "-NonInteractive", "-Command",
                 "$ErrorActionPreference='Stop'; New-Item -ItemType Junction -Path $env:CCGUI_GROK_LINK -Target $env:CCGUI_GROK_SESSIONS | Out-Null"])
@@ -272,7 +287,6 @@ mod channel_tests {
                 "history"
             );
             std::fs::write(home.join("sessions/new.jsonl"), "new history").unwrap();
-            // Simulate the CLI persisting credentials and leaving a sidecar.
             std::fs::write(&staged_path, "rewritten by CLI").unwrap();
             std::fs::write(
                 env_path(built, "GROK_HOME").join("auth.json"),
@@ -412,9 +426,6 @@ mod channel_tests {
     }
 }
 
-/// Grok's mode for one prompt, as its `session/prompt` `_meta.mode` (`acp_agent.rs`), which
-/// outranks the session's mode: `ask` for its Ask mode, None for its agent. A build that ignores
-/// it still runs Ask read-only: Ask is a planning kind, so Misty's gate refuses every change.
 pub(super) fn prompt_mode(permission: Option<&str>) -> Option<&'static str> {
     (GrokEngine.resolve_permission(permission) == "ask").then_some("ask")
 }
@@ -424,22 +435,13 @@ impl Engine for GrokEngine {
         "grok"
     }
 
-    /// grok's native harness is ACP: `grok agent … stdio` speaks ndjson
-    /// JSON-RPC over the same pipes the app owns, so the model's question tool
-    /// has a channel (`_x.ai/ask_user_question`) that the one-shot headless
-    /// launch never had — there it answered the user's questions itself.
     fn drives_own_transport(&self) -> bool {
         true
     }
 
-    /// The command the ACP driver spawns, carrying the same model/effort and
-    /// auto-approval intent as the headless launch. The ACP session id comes
-    /// from the CLI (`session/new`), so there is nothing to preassign.
     fn host_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
         let mut cmd = command_for_binary(bin);
         cmd.arg("agent");
-        // Every ask comes back through ACP and Misty's gate answers it. Grok has no sandbox that
-        // keeps it inside its folder, so it never skips its asks (no Bypass).
         if let Some(model) = req.model.as_deref() {
             cmd.arg("-m");
             cmd.arg(model);
@@ -454,13 +456,10 @@ impl Engine for GrokEngine {
             cmd.arg(effort);
         }
         cmd.arg("stdio");
-        // Grok 0.2.x has no --no-auto-update flag; disable via env.
         cmd.env("GROK_DISABLE_AUTOUPDATER", "1");
         Ok(BuiltCommand {
             command: cmd,
             stdin_payload: None,
-            // The driver writes answers for parked questions to this pipe for
-            // the life of the session, so it stays open.
             keep_stdin_open: true,
             cleanup_files: Vec::new(),
             preassigned_session_id: None,
@@ -473,17 +472,10 @@ impl Engine for GrokEngine {
     fn supports_effort(&self) -> bool {
         true
     }
-    /// Grok's session modes (`xai-grok-tools` `SessionMode`): `default`, its agent, where each
-    /// ask comes back through ACP, and `ask`, which answers questions without using tools
-    /// (`prompt_mode`). Its `plan` isn't offered: its plan review isn't wired (`plan_approval`).
-    /// Its auto and always-approve are permission settings, not modes, and always-approve has no
-    /// sandbox that keeps it inside its folder.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[
             mode("default", "Default", Asks, "manual"),
-            // Ask only answers, with no tools; it isn't a plan mode, since Grok's plan review
-            // isn't wired, so the gate reads it as one that asks.
             mode("ask", "Ask", Asks, "ask"),
         ];
         MODES
@@ -492,13 +484,6 @@ impl Engine for GrokEngine {
         true
     }
 
-    /// Grok's ACP plan review would enter through x.ai/toggle_plan_mode and wait on the
-    /// x.ai/exit_plan_mode extension (the 1.0.40 binary's strings confirm the method names, the
-    /// planFileContent/planFileUri/executePlan fields, the awaiting_plan_approval state and the
-    /// resume re-park). The binary does not reveal ExitPlanModeExtResponse's two field names or
-    /// how approve/revise/abandon are encoded, nor toggle_plan_mode's params; wiring it without
-    /// a captured frame would fabricate the reply, so it stays Unavailable (fail-closed). Misty
-    /// runs a Plan request on Grok as Ask, with every change refused by its gate.
     fn plan_approval(&self) -> super::plan_review::PlanApproval {
         super::plan_review::PlanApproval::Unavailable {
             reason: "Grok plan review rides ACP x.ai/toggle_plan_mode + x.ai/exit_plan_mode (1.0.40 binary strings), but the ExitPlanModeExtResponse schema is not recoverable from the binary: its 2 field names (decision discriminant and feedback text) and the approve/revise/abandon encoding are unknown, and toggle_plan_mode's enter-plan-mode params encoding is unverified; wiring it without a live frame capture would fabricate the approval reply, and today a plan request would silently degrade to bypassPermissions",

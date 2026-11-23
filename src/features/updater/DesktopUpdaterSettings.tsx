@@ -5,18 +5,18 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DesktopSettingsRow } from "@/features/settings/desktop";
-import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, Progress } from "@misty/ui";
-import { rememberReleaseNotes } from "./releaseNotes";
-import { onUpdateCheckRequest } from "./updateCheckRequest";
+import { rememberReleaseNotes } from "./release_notes";
+import { onUpdateCheckRequest } from "./update_check_request";
 import {
   applyUpdateProgress,
   EMPTY_UPDATE_PROGRESS,
   isNoReleaseError,
   readableUpdateError,
   type UpdateProgress,
-} from "./updateProgress";
+} from "./update_progress";
 
 type UpdateState =
   "idle" | "checking" | "available" | "current" | "noRelease" | "installing" | "error";
@@ -65,7 +65,6 @@ export function DesktopUpdaterSettings() {
     }
   }, [releaseUpdate, supported]);
 
-  // "Check for Updates" in the menu bar opens this row and checks here.
   useEffect(() => onUpdateCheckRequest(() => void checkForUpdates()), [checkForUpdates]);
 
   useEffect(() => {
@@ -73,8 +72,6 @@ export function DesktopUpdaterSettings() {
     void getVersion()
       .then(setVersion)
       .catch(() => undefined);
-    // The launch check belongs to UpdateNotices; this row only checks when asked, so opening
-    // Settings never waits on the network.
     return () => {
       void releaseUpdate();
     };
@@ -90,7 +87,6 @@ export function DesktopUpdaterSettings() {
     let releaseUpdate = () => {};
     try {
       releaseUpdate = reserveMistyUpdate();
-      // Its notes wait for the restart, to be shown once the new version runs.
       rememberReleaseNotes(update);
       await update.downloadAndInstall((event) => {
         setProgress((current) => applyUpdateProgress(current, event));
@@ -105,7 +101,6 @@ export function DesktopUpdaterSettings() {
     }
   }
 
-  // While it checks or installs, the button spins and the progress bar fills; no status text.
   const status =
     state === "checking"
       ? ""
@@ -124,7 +119,11 @@ export function DesktopUpdaterSettings() {
     <>
       <DesktopSettingsRow
         label="Version"
-        description={updateNote ? `${version}, ${updateNote.charAt(0).toLowerCase()}${updateNote.slice(1)}` : version}
+        description={
+          updateNote
+            ? `${version}, ${updateNote.charAt(0).toLowerCase()}${updateNote.slice(1)}`
+            : version
+        }
       >
         <div className="grid w-full max-w-sm justify-items-end gap-2 max-[836px]:justify-items-start">
           <div className="flex min-w-0 items-center justify-end gap-2">

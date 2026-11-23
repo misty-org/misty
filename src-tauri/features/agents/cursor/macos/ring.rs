@@ -1,8 +1,3 @@
-//! Misty's control mist: a soft white fog inside the edges of whatever an agent
-//! controls, and a pulse where it acts. Drawings only; they never take input,
-//! nothing is drawn outside the frame, and captures leave them out so the agent
-//! sees the content underneath. Rects and points are global display
-//! coordinates with a top-left origin.
 use std::cell::RefCell;
 
 use block2::RcBlock;
@@ -22,7 +17,6 @@ use super::{
     support::{cocoa_rect, on_main_later, reduce_motion},
 };
 
-/// The title desktop capture looks for to leave the mist out of what an agent sees.
 pub(crate) const RING_TITLE: &str = "Misty control ring";
 const PULSE_SIZE: f64 = 44.0;
 
@@ -31,7 +25,6 @@ thread_local! {
     static PULSE_PANEL: RefCell<Option<Retained<NSPanel>>> = const { RefCell::new(None) };
 }
 
-/// Fades a container in; the mist view itself keeps its waiting alpha.
 pub(super) fn fade_in<T: NSAnimatablePropertyContainer + AlphaTarget + objc2::Message>(
     target: &T,
     alpha: f64,
@@ -46,7 +39,6 @@ pub(super) fn fade_in<T: NSAnimatablePropertyContainer + AlphaTarget + objc2::Me
     NSAnimationContext::runAnimationGroup(&changes);
 }
 
-/// Views and windows both fade by alpha.
 pub(super) trait AlphaTarget {
     fn set_alpha(&self, alpha: f64);
 }
@@ -61,7 +53,6 @@ impl AlphaTarget for NSPanel {
     }
 }
 
-/// A click-through borderless panel that holds a mist.
 pub(super) fn ring_panel(mtm: MainThreadMarker, frame: NSRect) -> Retained<NSPanel> {
     let panel = NSPanel::initWithContentRect_styleMask_backing_defer(
         NSPanel::alloc(mtm),
@@ -104,7 +95,6 @@ fn pulse_frame(x: f64, y: f64) -> NSRect {
     )
 }
 
-/// Made with the frame, before capture starts, so the stream can leave it out.
 fn make_pulse_panel(mtm: MainThreadMarker, x: f64, y: f64) -> Retained<NSPanel> {
     let panel = ring_panel(mtm, pulse_frame(x, y));
     let ring = CALayer::layer();
@@ -129,7 +119,6 @@ fn make_pulse_panel(mtm: MainThreadMarker, x: f64, y: f64) -> Retained<NSPanel> 
     panel
 }
 
-/// The mist along the edges of the display Misty controls on the desktop.
 pub(crate) fn show(x: f64, y: f64, width: f64, height: f64) {
     on_main_later(move |mtm| {
         let frame = cocoa_rect(x, y, width, height);
@@ -156,7 +145,6 @@ pub(crate) fn show(x: f64, y: f64, width: f64, height: f64) {
     });
 }
 
-/// A pulse where the agent acts.
 pub(crate) fn pulse(x: f64, y: f64) {
     on_main_later(move |mtm| {
         if PULSE_PANEL.with(|slot| slot.borrow().is_none()) {
@@ -211,7 +199,6 @@ pub(crate) fn pulse(x: f64, y: f64) {
     });
 }
 
-/// Removes the display mist and the pulse.
 pub(crate) fn hide() {
     on_main_later(|_| {
         if let Some(panel) = FRAME_PANEL.with(|slot| slot.borrow_mut().take()) {

@@ -1,5 +1,3 @@
-//! The confirmation before Misty first takes the desktop. It sits outside the
-//! model's action surface: until the person accepts, nothing is captured.
 use std::{cell::Cell, sync::mpsc};
 
 use objc2::{
@@ -52,7 +50,6 @@ define_class!(
 );
 
 impl AskPanel {
-    /// Answers no, once.
     pub(super) fn decline(&self) {
         let ivars = self.ivars();
         if ivars.answered.replace(true) {
@@ -71,7 +68,6 @@ fn frame(x: f64, y: f64, width: f64, height: f64) -> NSRect {
     NSRect::new(NSPoint::new(x, y), NSSize::new(width, height))
 }
 
-/// Shows the confirmation; the receiver gets a message once it is answered.
 pub(super) fn show(mtm: MainThreadMarker) -> (Retained<AskPanel>, mpsc::Receiver<()>) {
     let (send, receive) = mpsc::channel();
     let this = AskPanel::alloc(mtm).set_ivars(AskIvars {

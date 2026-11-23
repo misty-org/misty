@@ -1,14 +1,10 @@
 import { Reply, X } from "lucide-react";
-import type { GlobalAiConversation } from "../state/conversationTypes";
-import { useMistyStore } from "../state/useMistyStore";
-import { needsDefaultEngine, openEngineSettings } from "../../engines/engineNeeded";
+import type { GlobalAiConversation } from "../state/conversation_types";
+import { useMistyStore } from "../state/use_misty_store";
+import { needsDefaultEngine, openEngineSettings } from "../../engines/engine_needed";
 import { IconButton, Surface, Text } from "@misty/ui";
 import { ErrorNotice } from "../ErrorNotice";
 
-/**
- * The conversation's last error as a notice that stays while it holds, with the one way out it
- * has: picking a default engine, or reconnecting to a running task the window lost.
- */
 export function AgentComposeError({
   error,
   reconnect,
@@ -36,7 +32,6 @@ export function AgentComposeError({
   );
 }
 
-/** The answer, or part of one, the next message replies to. */
 export function AgentReplyTarget({
   agentName,
   reply,
@@ -48,12 +43,7 @@ export function AgentReplyTarget({
 }) {
   if (!reply) return null;
   return (
-    <Surface
-      tone="none"
-      edge="hairline"
-      radius="lg"
-      className="mb-2 flex items-center gap-2 py-1.5 pr-1.5 pl-3"
-    >
+    <Surface tone="faint" radius="xl" className="mb-2 flex items-center gap-2 py-1.5 pr-1.5 pl-3">
       <Text bare tone="muted" className="flex shrink-0">
         <Reply aria-hidden="true" />
       </Text>
@@ -70,7 +60,6 @@ export function AgentReplyTarget({
   );
 }
 
-/** Every run in the conversation, and the one starting in it now. */
 export const conversationInvocationIds = (
   conversation: GlobalAiConversation | undefined,
   starting: string | undefined,

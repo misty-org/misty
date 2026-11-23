@@ -1,4 +1,3 @@
-//! The Downloads folder's grant: `grant:downloads` in `settings_state`, asked on the first download.
 use std::path::PathBuf;
 
 use tauri::AppHandle;
@@ -22,8 +21,6 @@ pub fn downloads_granted(app: &AppHandle) -> bool {
     store::read(app, SCOPE)
 }
 
-/// True if the Downloads folder is granted; otherwise asks. A no isn't saved as anything lasting,
-/// so the next download asks again. See `permissions::ensure` for what waiting here means.
 pub fn ensure_downloads_folder(app: &AppHandle) -> bool {
     if downloads_granted(app) {
         restore_downloads_grant(app);
@@ -47,7 +44,6 @@ pub async fn ensure_downloads_folder_async(app: &AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-/// Gives the file gate the folder if it's granted, at startup and after a yes.
 pub fn restore_downloads_grant(app: &AppHandle) {
     if downloads_granted(app) {
         if let Some(folder) = downloads_folder() {

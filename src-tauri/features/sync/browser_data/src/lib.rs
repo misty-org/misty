@@ -1,6 +1,3 @@
-//! What the browser keeps on this computer: profile records, workspace recovery and the keys that
-//! seal them. Secret types deliberately cannot be serialized or formatted; the web renderer only
-//! receives projected UI state.
 pub mod crypto;
 pub mod document;
 pub mod local;

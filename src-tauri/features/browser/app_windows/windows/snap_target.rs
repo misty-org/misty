@@ -1,18 +1,3 @@
-//! Misty's maximize button as Windows sees it, so Snap Layouts opens under it.
-//!
-//! Windows anchors the Snap Layouts flyout to the spot where a window's hit
-//! test answers `HTMAXBUTTON`. Misty draws its caption buttons in the page,
-//! and the page's pointer input belongs to the engine's own windows, in
-//! another process, so no window of Misty's ever answers for that spot. An
-//! invisible window of Misty's own sits over the button and answers
-//! `HTMAXBUTTON` there itself, and the main window answers the same for that
-//! spot, for whichever one Windows asks. (Passing the hit test down with
-//! `HTTRANSPARENT` does not work: it only reaches windows on the same thread,
-//! and the engine's window beneath is not one, so the button went dead.)
-//! The pointer over the button is then that window's non-client input:
-//! hovering reaches the page as an event (for its hover look) and a click
-//! reaches it as another, which maximizes or restores through the page's
-//! usual path. Nothing else about the page changes.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock},
@@ -40,13 +25,12 @@ use windows_sys::Win32::{
 mod messages;
 use messages::{on_main, on_target};
 
-const MAIN_SUBCLASS: usize = 0x4D53_4E4D; // "MSNM"
+const MAIN_SUBCLASS: usize = 0x4D53_4E4D;
 const TARGET_CLASS: &str = "MistySnapTarget";
 
 #[derive(Default)]
 struct Target {
     label: String,
-    /// The button, in the main window's client pixels; none while hidden.
     rect: Option<RECT>,
     target: isize,
     subclassed: bool,
@@ -54,7 +38,6 @@ struct Target {
     pressed: bool,
 }
 
-/// Keyed by the main window's handle.
 fn targets() -> &'static Mutex<HashMap<isize, Target>> {
     static TARGETS: OnceLock<Mutex<HashMap<isize, Target>>> = OnceLock::new();
     TARGETS.get_or_init(Default::default)
@@ -67,15 +50,12 @@ fn app_handle() -> &'static OnceLock<AppHandle> {
 
 #[derive(Debug, Deserialize)]
 pub struct MaximizeButtonRect {
-    /// Physical pixels from the top-left of the window's client area.
     x: i32,
     y: i32,
     width: i32,
     height: i32,
 }
 
-/// Places (or, with `rect` absent, removes) the native maximize target for
-/// the calling window's maximize button.
 #[tauri::command]
 pub fn window_set_maximize_button(
     app: AppHandle,
@@ -102,8 +82,6 @@ pub fn window_set_maximize_button(
         .map_err(|error| error.to_string())
 }
 
-/// On the window's thread: subclasses the main window once, creates the
-/// target once, and fits the target over the button, above the renderer.
 fn place(main: isize, label: String, rect: Option<RECT>) {
     let Ok(mut targets) = targets().lock() else {
         return;
@@ -145,8 +123,6 @@ fn place(main: isize, label: String, rect: Option<RECT>) {
     }
 }
 
-/// An almost invisible child window over the button. It must be hit-testable
-/// (a fully transparent layered window is not), so it keeps an alpha of 1.
 fn create_target(main: HWND) -> Option<HWND> {
     static REGISTERED: OnceLock<bool> = OnceLock::new();
     let class: Vec<u16> = TARGET_CLASS.encode_utf16().chain([0]).collect();
@@ -187,7 +163,6 @@ fn create_target(main: HWND) -> Option<HWND> {
     }
 }
 
-/// Whether the screen point in `lparam` lies on `main`'s maximize button.
 fn over_button(main: HWND, lparam: LPARAM) -> bool {
     let mut point = POINT {
         x: (lparam & 0xFFFF) as i16 as i32,

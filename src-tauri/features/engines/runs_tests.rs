@@ -3,8 +3,6 @@ use serde_json::json;
 
 #[test]
 fn an_agy_write_names_its_file() {
-    // The `rawInput` of agy 1.5.9's `session/request_permission` for a `write_file` call, whose
-    // title is "File hello.txt".
     let input = json!({
         "Content": "Hello, world!\n",
         "Path": "/private/tmp/agyprobe/ws/hello.txt",
@@ -23,7 +21,6 @@ fn other_engines_spellings_still_read() {
         summarize(&json!({ "command": ["bash", "-lc", "make"] })),
         "make"
     );
-    // A command outranks a path when an ask names both.
     assert_eq!(summarize(&json!({ "path": "/ws", "command": "ls" })), "ls");
     assert_eq!(summarize(&json!("plain")), "");
     let long = "x".repeat(700);

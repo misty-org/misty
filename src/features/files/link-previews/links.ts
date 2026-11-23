@@ -1,6 +1,5 @@
 const linkPattern = /https?:\/\/[^\s<>"'`\]]+/gi;
 
-/** Trailing punctuation belongs to the sentence, and a closing bracket only to its own pair. */
 function trimLink(link: string): string {
   let text = link;
   for (;;) {
@@ -15,14 +14,12 @@ function trimLink(link: string): string {
 function previewable(link: string): boolean {
   try {
     const { hostname } = new URL(link);
-    // Private names and bare addresses are never fetched, so they would only show an empty card.
     return hostname.includes(".") && !/^[\d.]+$/.test(hostname) && !hostname.includes(":");
   } catch {
     return false;
   }
 }
 
-/** The distinct web links in a message, in order, up to `max`. */
 export function extractLinks(text: string, max = 3): string[] {
   const found: string[] = [];
   for (const match of text.matchAll(linkPattern)) {

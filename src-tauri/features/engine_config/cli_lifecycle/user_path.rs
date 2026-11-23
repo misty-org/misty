@@ -1,19 +1,3 @@
-// Windows' user PATH around Hermes Agent's installer. `install.ps1` always puts its commands'
-// folder (`%LOCALAPPDATA%\hermes\bin`, its data folder's `bin`) first on the user PATH
-// (`HKCU\Environment\Path`), and nothing in the script skips that. Misty finds Hermes in its own
-// folder and never needs that entry, so it reads the user PATH before the script runs and, when
-// the script added the entry, takes out that entry and nothing else, keeping the value's kind
-// (`REG_EXPAND_SZ` or `REG_SZ`) and every other entry as it was. Then it tells Windows the
-// environment changed (`WM_SETTINGCHANGE` with "Environment"), as the script does after writing.
-//
-// The editing is [`without_added_entry`], a pure function on strings; the registry and the
-// broadcast are Windows-only.
-
-/// The user PATH `after` the installer ran, with `entry` taken out again, or `None` to leave it
-/// alone: when `before` already named `entry`, or `after` doesn't. Entries compare the way
-/// Windows resolves them: `%VAR%` expanded by `expand`, without regard to case, slash direction,
-/// surrounding quotes or a trailing slash. Every other entry, empty ones and a trailing `;`
-/// included, stays exactly as `after` has it.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(super) fn without_added_entry(
     before: Option<&str>,
@@ -48,18 +32,14 @@ fn normalize(path: &str) -> String {
         .to_lowercase()
 }
 
-/// The user PATH as it was before an install, to put right afterwards.
 #[cfg(windows)]
 pub(super) struct Guard {
     entry: String,
-    /// `None` when the user PATH couldn't be read: then nothing is put right afterwards, since
-    /// Misty can't tell whether the entry was there before.
     before: Option<Option<String>>,
 }
 
 #[cfg(windows)]
 impl Guard {
-    /// Reads the user PATH before the installer runs. `entry` is the folder the installer may add.
     pub(super) fn take(entry: &std::path::Path) -> Self {
         Self {
             entry: entry.to_string_lossy().into_owned(),
@@ -69,9 +49,6 @@ impl Guard {
         }
     }
 
-    /// Takes out the entry the installer added, if it did, and tells Windows. A failure here only
-    /// leaves the entry where the installer put it, so it is reported in the output, not as an
-    /// install failure.
     pub(super) fn restore(self, reporter: &super::ProgressReporter) {
         let Some(before) = self.before else {
             return;
@@ -83,7 +60,6 @@ impl Guard {
         else {
             return;
         };
-        // No user PATH before and nothing left but separators: there was none, so there is none.
         let value = if before.is_none() && fixed.trim_matches(';').trim().is_empty() {
             None
         } else {
@@ -110,7 +86,6 @@ impl Guard {
     }
 }
 
-/// `%VAR%` expanded from Misty's own environment; an unknown one stays as written.
 #[cfg(windows)]
 fn expand_env(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
@@ -146,8 +121,6 @@ mod registry {
         RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags("Environment", flags)
     }
 
-    /// The user PATH as written, unexpanded, with its kind; `None` when there is none. A value
-    /// that isn't a string is an error: Misty doesn't edit what it can't read.
     pub(super) fn read() -> std::io::Result<Option<(String, RegType)>> {
         let missing = |error: &std::io::Error| error.kind() == std::io::ErrorKind::NotFound;
         let value = match key(KEY_QUERY_VALUE).and_then(|key| key.get_raw_value("Path")) {
@@ -171,7 +144,6 @@ mod registry {
         Ok(Some((text, value.vtype)))
     }
 
-    /// Writes the user PATH back with the kind it had, or deletes it with `None`.
     pub(super) fn write(value: Option<(&String, RegType)>) -> std::io::Result<()> {
         let key = key(KEY_SET_VALUE)?;
         let Some((text, vtype)) = value else {
@@ -185,9 +157,6 @@ mod registry {
         key.set_raw_value("Path", &RegValue { bytes, vtype })
     }
 
-    /// Tells running programs the environment changed, as Windows expects after an edit to
-    /// `HKCU\Environment`: `WM_SETTINGCHANGE` to every top-level window, naming "Environment",
-    /// without waiting on one that hangs.
     pub(super) fn broadcast() {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             SendMessageTimeoutW, HWND_BROADCAST, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,

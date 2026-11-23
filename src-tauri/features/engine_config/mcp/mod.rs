@@ -31,16 +31,8 @@ mod sources;
 use config::*;
 use sources::{engine_of_source, engine_support};
 
-/// The name Misty's own MCP server goes by in every engine's config (`engines/mcp.rs`).
 pub const MISTY_SERVER_NAME: &str = "misty";
 
-/// Sources whose config file sits inside the workspace folder (`.mcp.json`, `.codex/config.toml`,
-/// `.omp/mcp.json` and each engine's project/local files), so its content can arrive with a
-/// repository. Their commands and addresses aren't trusted: opening the page never probes them, a
-/// manual probe first asks the person to confirm the full command, and the probe doesn't expand
-/// `${ENV}` into URLs or headers (or a repository could use one probe to send a key from the
-/// environment anywhere). `claude_local` is project-scoped but lives in the person's own
-/// `~/.claude.json`, not in the repository. Unknown sources are treated as workspace sources.
 pub(crate) fn source_in_workspace(source: &str) -> bool {
     if source == sources::SOURCE_CLAUDE_LOCAL {
         return false;
@@ -48,7 +40,6 @@ pub(crate) fn source_in_workspace(source: &str) -> bool {
     sources::source_spec(source).is_none_or(|spec| spec.scope == "project")
 }
 
-/// Resolves an entry id to the real command or address (not redacted; only the probe uses it).
 pub(crate) fn probe_target(
     entry_id: &str,
     workspace: Option<&str>,
@@ -65,9 +56,6 @@ pub(crate) fn probe_target(
     Ok(target)
 }
 
-/// Serializes writes to the same path: read back before writing plus an atomic replace, with this
-/// lock, keeps Misty's own concurrent writes from overwriting each other. Claude/Codex (config)
-/// and the other engines (sources) share it.
 pub(super) static WRITE_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
 #[derive(Debug, Serialize)]
@@ -109,23 +97,15 @@ impl McpError {
     }
 }
 
-/// One server entry in a config source (URL, env and headers redacted).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpConfigEntry {
-    /// Generated here as `"{source}:{name}"`; the window only sends it back, never parses it.
     pub(crate) id: String,
     pub(crate) engine: String,
     pub(crate) name: String,
-    /// claude_user | claude_project | codex_user | codex_project | …
     pub(crate) source: String,
-    /// user | project
     pub(crate) scope: String,
-    /// The config file is in the workspace folder (`source_in_workspace`): its content came with
-    /// the repository, so it isn't probed automatically and is confirmed before a probe. The
-    /// window goes by this, not by `scope`.
     pub(crate) workspace_file: bool,
-    /// The file's path, for display.
     pub(crate) path: String,
     pub(crate) format: String,
     pub(crate) enabled: bool,
@@ -137,10 +117,8 @@ pub struct McpConfigEntry {
     pub(crate) header_keys: Vec<String>,
     pub(crate) writable: bool,
     pub(crate) readonly_reason: Option<String>,
-    /// Why it's read-only, as a code the window turns into words; None for older sources.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) readonly_reason_code: Option<String>,
-    /// The file's content hash when read; a write reads it again and refuses on a mismatch.
     pub(crate) version: String,
 }
 
@@ -152,8 +130,6 @@ pub struct McpSourceError {
     pub(crate) message: String,
 }
 
-/// A source file that was read. Listed even when it doesn't exist yet, so an empty state can say
-/// where the page looked.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpSourceInfo {
@@ -169,7 +145,6 @@ pub struct McpConfigSection {
     pub(crate) errors: Vec<McpSourceError>,
 }
 
-/// A runtime entry: from a real session (Claude's init event), with when and from which session.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpRuntimeEntry {
@@ -184,7 +159,6 @@ pub struct McpRuntimeEntry {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpRuntimeSection {
-    /// ready | no_session | session_ended | unsupported | unavailable
     pub(crate) status: String,
     pub(crate) reason: Option<String>,
     pub(crate) workspace: Option<String>,
@@ -198,9 +172,7 @@ pub struct McpRuntimeSection {
 pub struct McpEngineInventory {
     pub(crate) id: String,
     pub(crate) available: bool,
-    /// native (built in) / plugin (provided by a plugin) / none (no MCP).
     pub(crate) support: String,
-    /// The source files this engine reads (listed even when not created yet).
     pub(crate) sources: Vec<McpSourceInfo>,
     pub(crate) config: McpConfigSection,
     pub(crate) runtime: McpRuntimeSection,
@@ -242,8 +214,6 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| McpError::internal(format!("MCP worker failed: {error}")))?
 }
 
-/// Every engine gets its own section. Engines whose runtime can be queried get a snapshot; the
-/// rest say plainly that this build can't query them, rather than pretending they have no servers.
 #[tauri::command]
 pub async fn engine_mcp_inventory(
     webview: tauri::Webview,
@@ -259,8 +229,6 @@ pub async fn engine_mcp_inventory(
 
 fn inventory(workspace: Option<&str>) -> McpInventory {
     let mut config = read_config_entries(workspace);
-    // The other engines' declared sources (Kimi, Grok, OMP, OpenCode, Antigravity, Qoder, dsh)
-    // join the same list, then each engine's tab takes its own.
     sources::append_entries(&mut config, workspace);
     let collected_at = now_ms();
 
@@ -279,7 +247,6 @@ fn inventory(workspace: Option<&str>) -> McpInventory {
                 .cloned()
                 .collect(),
         };
-        // A stable order (source, then name), so the list doesn't follow the key order in files.
         section.entries.sort_by(|a, b| {
             a.source
                 .cmp(&b.source)
@@ -301,14 +268,10 @@ fn inventory(workspace: Option<&str>) -> McpInventory {
         .iter()
         .map(|engine| {
             let id = *engine;
-            // Only Claude sessions report an MCP snapshot today; the other engines keep an
-            // explicit "can't query" state.
             let runtime = if id == "claude" {
                 runtime::claude_section(workspace)
             } else {
                 McpRuntimeSection {
-                    // `unsupported` means "this build can't query it": no CLI or MCP process is
-                    // ever started just to list servers.
                     status: "unsupported".to_string(),
                     reason: None,
                     workspace: None,
@@ -327,7 +290,6 @@ fn inventory(workspace: Option<&str>) -> McpInventory {
     }
 }
 
-/// Turns one entry on or off: compare versions, replace atomically, read back what it is now.
 #[tauri::command]
 pub async fn engine_mcp_set_enabled(
     webview: tauri::Webview,
@@ -357,9 +319,6 @@ pub struct McpRevealRequest {
     pub(crate) workspace: Option<String>,
 }
 
-/// Shows one config file this page lists in the file manager (the folder that would hold it, when
-/// it doesn't exist yet). The path must be one the inventory reads, so a window can't point the
-/// file manager anywhere else.
 #[tauri::command]
 pub async fn engine_mcp_reveal(
     app: tauri::AppHandle,
@@ -414,8 +373,6 @@ pub(crate) fn now_ms() -> i64 {
     crate::engine_config::support::now_ms()
 }
 
-/// Project sources must sit in a folder linked to a Space; any other path is refused before a
-/// file on it is read.
 fn validate_workspace(workspace: Option<&str>) -> Result<Option<String>, McpError> {
     let Some(raw) = workspace.map(str::trim).filter(|value| !value.is_empty()) else {
         return Ok(None);
@@ -424,8 +381,6 @@ fn validate_workspace(workspace: Option<&str>) -> Result<Option<String>, McpErro
     Ok(Some(resolved.to_string_lossy().into_owned()))
 }
 
-/// Parses JSON text. Key order isn't kept: serde_json's `preserve_order` stays off in Misty, so a
-/// rewritten config file comes back with its keys sorted (the same settings, in another order).
 pub(crate) fn parse_json(text: &str, path: &str) -> Result<Value, McpError> {
     serde_json::from_str::<Value>(text)
         .map_err(|error| McpError::format(format!("{path}: invalid JSON: {error}")))

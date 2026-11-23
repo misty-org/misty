@@ -1,8 +1,7 @@
-import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import { useEffect, useState } from "react";
-import { installMistyContextBridge } from "./contextBridge";
+import { installMistyContextBridge } from "./context_bridge";
 
-/** Installs the context bridge agents read the current page and selection through. */
 export function MistyContextBridgeHost() {
   const [error, setError] = useState("");
   useEffect(() => {

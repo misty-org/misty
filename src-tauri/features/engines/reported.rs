@@ -1,17 +1,8 @@
-//! What an engine says about itself while it runs: the slash commands and skills it offers in the
-//! mode Misty runs it in. Claude Code names them in its `system/init` line; an ACP engine sends
-//! `available_commands_update` (Qwen adds its skills in `_meta.availableSkills`). The composer's
-//! `/` menu lists these in place of a guessed list, so it offers what the engine will run.
-//!
-//! Kept in memory for the app's life: the next run reports again, and until an engine has run
-//! once its menu falls back to the commands known to work (`catalog.rs`).
-
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use serde_json::Value;
 
-/// One command or skill as the engine named it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Named {
     pub name: String,
@@ -27,7 +18,6 @@ pub struct Report {
 
 static REPORTS: LazyLock<Mutex<HashMap<String, Report>>> = LazyLock::new(Default::default);
 
-/// The last report from `engine`, if it has run since the app started.
 pub fn report_of(engine: &str) -> Report {
     REPORTS
         .lock()
@@ -49,8 +39,6 @@ fn store(engine: &str, commands: Option<Vec<Named>>, skills: Option<Vec<Named>>)
     }
 }
 
-/// A name the menu can show: a short word, no spaces or control characters, so a misbehaving
-/// engine can't put arbitrary text in the menu.
 fn clean_name(raw: &str) -> Option<String> {
     let name = raw.trim().trim_start_matches(['/', '$']);
     (!name.is_empty()
@@ -93,8 +81,6 @@ fn names_in(list: Option<&Value>) -> Option<Vec<Named>> {
     )
 }
 
-/// Claude Code's `system/init` line: `slash_commands` (names; skills are among them) and
-/// `skills`. `engine` is the id it runs as (Claude Code or CodeBuddy, which shares the format).
 pub fn claude_init(engine: &str, init: &Value) {
     let skills = names_in(init.get("skills"));
     let commands = names_in(init.get("slash_commands")).map(|commands| {
@@ -111,8 +97,6 @@ pub fn claude_init(engine: &str, init: &Value) {
     store(engine, commands, skills);
 }
 
-/// An ACP `session/update` params object. Only `available_commands_update` is kept: its
-/// commands, with their input hint, and the skills Qwen lists in `_meta.availableSkills`.
 pub fn acp_update(engine: &str, params: &Value) {
     let update = params.get("update").unwrap_or(params);
     if update.get("sessionUpdate").and_then(Value::as_str) != Some("available_commands_update") {
@@ -133,12 +117,9 @@ pub fn acp_update(engine: &str, params: &Value) {
                     .and_then(Value::as_str)
                     .map(|hint| clean_text(Some(hint), 80))
                     .filter(|hint| !hint.is_empty());
-                // Qwen names a command's subcommands in `_meta.subcommands`.
                 if hint.is_none() {
                     hint = subcommand_hint(item.pointer("/_meta/subcommands"));
                 }
-                // Gemini reports a subcommand as its own two-word entry ("memory show"): it
-                // becomes one of its command's choices instead.
                 let mut words = raw.trim().trim_start_matches(['/', '$']).split_whitespace();
                 let (Some(first), second) = (words.next(), words.next()) else {
                     continue;
@@ -168,8 +149,6 @@ pub fn acp_update(engine: &str, params: &Value) {
             }
             commands
         });
-    // Qwen names its skills alone in `availableSkills`; their descriptions are in
-    // `availableSkillDetails`, and on the command each one also is.
     let details = names_in(update.pointer("/_meta/availableSkillDetails")).unwrap_or_default();
     let skills = names_in(update.pointer("/_meta/availableSkills")).map(|skills| {
         skills
@@ -191,11 +170,8 @@ pub fn acp_update(engine: &str, params: &Value) {
     store(engine, commands, skills);
 }
 
-/// The longest hint a command's subcommands make. Only whole choices go in, so a list that
-/// runs over loses its last choices rather than ending in half a word.
 const MOST_CHOICES: usize = 160;
 
-/// `choices` joined as a hint, with as many whole choices as fit.
 fn choices_hint<'a>(choices: impl IntoIterator<Item = &'a str>) -> Option<String> {
     let mut hint = String::new();
     for choice in choices {
@@ -211,7 +187,6 @@ fn choices_hint<'a>(choices: impl IntoIterator<Item = &'a str>) -> Option<String
     (!hint.is_empty()).then_some(hint)
 }
 
-/// The choices a command's `_meta.subcommands` lists (names, or objects with a name), as a hint.
 fn subcommand_hint(list: Option<&Value>) -> Option<String> {
     let names: Vec<String> = list?
         .as_array()?
@@ -226,7 +201,6 @@ fn subcommand_hint(list: Option<&Value>) -> Option<String> {
     choices_hint(names.iter().map(String::as_str))
 }
 
-/// Adds `sub` to the choices of the command `name`, adding the command when it isn't listed yet.
 fn add_subcommand(commands: &mut Vec<Named>, name: String, sub: String) {
     let command = match commands.iter().position(|command| command.name == name) {
         Some(at) => &mut commands[at],

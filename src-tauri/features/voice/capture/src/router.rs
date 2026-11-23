@@ -1,10 +1,6 @@
 use crate::{Channel, EchoReducer, PcmChunk};
 use std::collections::VecDeque;
 
-/// Joins a microphone capture and a system capture without ever mixing
-/// them. Each channel keeps its own frame numbering and is delivered on its
-/// own. With echo reduction on, the microphone waits for the matching system
-/// audio (up to `max_lag` samples) and has it subtracted.
 pub struct DuplexRouter {
     echo: Option<EchoReducer>,
     reference: VecDeque<i16>,
@@ -24,8 +20,6 @@ impl DuplexRouter {
         }
     }
 
-    /// Accepts a chunk from either capture and returns the chunks that are
-    /// ready, in order per channel.
     pub fn push(&mut self, chunk: PcmChunk) -> Vec<PcmChunk> {
         match chunk.channel {
             Channel::System => {
@@ -48,7 +42,6 @@ impl DuplexRouter {
         }
     }
 
-    /// Releases every held microphone chunk, used when capture stops.
     pub fn flush(&mut self) -> Vec<PcmChunk> {
         self.release(true)
     }

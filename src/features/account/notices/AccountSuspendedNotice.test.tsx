@@ -1,18 +1,17 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { useAccountNotSetUp } from "@/api/client/accountLimits";
-import { settleDeviceSettings } from "@/tests/fakeDeviceSettings";
+import { useAccountNotSetUp } from "@/api/client/account_limits";
+import { settleDeviceSettings } from "@/tests/fake_device_settings";
 
 type Held = { message: string; onDismiss?: () => void };
 const notices = vi.hoisted(() => ({ shown: [] as Held[] }));
 const db = await vi.hoisted(async () =>
-  (await import("@/tests/fakeDeviceSettings")).fakeDeviceSettings(),
+  (await import("@/tests/fake_device_settings")).fakeDeviceSettings(),
 );
 
-vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: db.invoke }));
-vi.mock("../sessions/authState", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
+vi.mock("@/shared/platform/native_invoke", () => ({ invoke: db.invoke }));
+vi.mock("../sessions/auth_state", () => ({ useAuth: () => ({ user: { id: "account" } }) }));
 vi.mock("@misty/ui", () => ({
-  // Records what is held up on each render, as the notice stack would show it.
   useNotice: (show: boolean, options: Held) => {
     if (show) notices.shown.push(options);
   },
@@ -23,7 +22,6 @@ import { AccountSuspendedNotice } from "./AccountSuspendedNotice";
 const limitShown = () => notices.shown.some((notice) => /reached a limit/.test(notice.message));
 
 beforeEach(async () => {
-  // misty.db has answered before each test, as it has a moment after launch.
   await settleDeviceSettings();
   localStorage.clear();
   notices.shown = [];

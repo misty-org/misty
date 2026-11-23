@@ -1,9 +1,7 @@
-//! Agent chats, kept on this computer.
 use tauri::State;
 
 use crate::app::runtime::MistyRuntime;
 
-/// Hands what was kept signed out to the account that just signed in.
 #[tauri::command]
 pub async fn agent_chats_adopt(
     app: tauri::AppHandle,
@@ -120,8 +118,6 @@ pub async fn agent_chats_delete(
     id: String,
 ) -> Result<(), String> {
     require_person_window(&webview)?;
-    // A deleted chat takes its folder record, engine sessions and scratch folder with it
-    // (`engines/chat_folder.rs`); a project it worked in is the person's and stays.
     if kind == "conversation" {
         let (db, owner, chat) = (state.environment.store(), account.clone(), id.clone());
         tokio::task::spawn_blocking(move || {
@@ -129,12 +125,13 @@ pub async fn agent_chats_delete(
         })
         .await
         .map_err(|error| error.to_string())?
-        .unwrap_or_else(|error| eprintln!("[chats] couldn't clear a deleted chat's folder: {error}"));
+        .unwrap_or_else(|error| {
+            eprintln!("[chats] couldn't clear a deleted chat's folder: {error}")
+        });
     }
     state.agent_chats.delete(account, kind, id).await
 }
 
-/// Chats are only for a profile's own window: never a page, and never an incognito window.
 fn require_person_window(webview: &tauri::Webview) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only a profile's window can read agent chats.".into());

@@ -22,21 +22,15 @@ pub struct Listing {
     pub entries: Vec<FileEntry>,
 }
 
-/// Below this many items the stat calls are cheaper than threads.
 const PARALLEL_FROM: usize = 512;
-/// A stat stops scaling past a handful of threads (the kernel's vnode locks).
 const MAX_THREADS: usize = 8;
 
-/// Files the system leaves in folders for itself: Finder's view settings, Explorer's thumbnail
-/// cache and folder settings. Nobody made them, so Files never shows them.
 pub(crate) fn is_os_junk(name: &str) -> bool {
     [".DS_Store", "Thumbs.db", "desktop.ini"]
         .iter()
         .any(|junk| name.eq_ignore_ascii_case(junk))
 }
 
-/// What a failed read says in the interface. The gate's own refusals already say why; the
-/// system's (macOS privacy, a folder only an administrator may open) say Misty can't open it.
 pub(crate) fn io_text(error: &io::Error) -> String {
     match error.kind() {
         io::ErrorKind::NotFound => "It isn't there anymore.".to_owned(),
@@ -68,8 +62,6 @@ fn hidden_by_system(_meta: &std::fs::Metadata) -> bool {
     false
 }
 
-/// One item from its directory entry, whose metadata is the item's own (a link isn't followed).
-/// A link to a folder lists as a folder, as `entry_for` does, so it opens like one.
 fn entry_from(
     gate: &DiskFolder,
     item: &std::fs::DirEntry,
@@ -78,14 +70,20 @@ fn entry_from(
 ) -> Option<FileEntry> {
     let own = item.metadata().ok()?;
     let (meta, kind, link_target) = if own.file_type().is_symlink() {
-        let target = fs_disk::read_link(&path).ok().map(|target| target.display().to_string());
+        let target = fs_disk::read_link(&path)
+            .ok()
+            .map(|target| target.display().to_string());
         match fs_disk::metadata(&path) {
             Ok(followed) if followed.is_dir() => (followed, FileKind::Folder, target),
             Ok(followed) => (followed, FileKind::Link, target),
             Err(_) => (own, FileKind::Link, target),
         }
     } else if own.is_dir() {
-        let kind = if is_package_name(&name) { FileKind::Package } else { FileKind::Folder };
+        let kind = if is_package_name(&name) {
+            FileKind::Package
+        } else {
+            FileKind::Folder
+        };
         (own, kind, None)
     } else {
         (own, FileKind::File, None)
@@ -105,8 +103,6 @@ fn entry_from(
     })
 }
 
-/// Folders first, then by name without regard to case, then by the exact name, so the order
-/// never depends on the order the system read them in.
 pub(crate) fn sort_entries(entries: &mut [FileEntry]) {
     entries.sort_by_cached_key(|entry| {
         let rank = u8::from(!matches!(entry.kind, FileKind::Folder));
@@ -114,7 +110,6 @@ pub(crate) fn sort_entries(entries: &mut [FileEntry]) {
     });
 }
 
-/// Reads `dir` and every item in it, through the gate.
 pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>> {
     let items: Vec<(std::fs::DirEntry, String)> = fs_disk::read_dir(dir)?
         .flatten()
@@ -125,7 +120,6 @@ pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>
         .filter(|(_, name)| !is_os_junk(name))
         .filter(|(_, name)| hidden || !name.starts_with('.'))
         .collect();
-    // Each item's tags pass the gate too; the folder is resolved for it once, not per item.
     let folder = DiskFolder::open(dir)?;
     let read = |(item, name): (std::fs::DirEntry, String)| {
         let path = dir.join(&name);
@@ -137,7 +131,6 @@ pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>
     let mut entries: Vec<FileEntry> = if items.len() < PARALLEL_FROM || threads < 2 {
         items.into_iter().filter_map(read).collect()
     } else {
-        // Each thread owns its share of the entries, so nothing is shared between them.
         let chunk = items.len().div_ceil(threads).max(1);
         let mut shares = Vec::new();
         let mut rest = items;
@@ -166,7 +159,6 @@ pub(crate) fn list_folder(dir: &Path, hidden: bool) -> io::Result<Vec<FileEntry>
     Ok(entries)
 }
 
-/// What a folder holds. Hidden items (a leading dot, or hidden by the system) only with `hidden`.
 #[tauri::command]
 pub async fn files_list(
     app: tauri::AppHandle,
@@ -214,7 +206,10 @@ mod tests {
         ];
         sort_entries(&mut entries);
         let names: Vec<&str> = entries.iter().map(|entry| entry.name.as_str()).collect();
-        assert_eq!(names, ["alpha", "Zeta", "Alpha.txt", "beta.txt", "Safari.app"]);
+        assert_eq!(
+            names,
+            ["alpha", "Zeta", "Alpha.txt", "beta.txt", "Safari.app"]
+        );
     }
 
     #[test]

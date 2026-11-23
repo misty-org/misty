@@ -17,7 +17,7 @@ vi.mock("@/native", async (importOriginal) => ({
 import { spaceErrorMessage, spaceRequest, spacesApi } from "@/features/spaces/api/api";
 import { configureApiSession } from "@/api/client/session";
 import { isSpaceReferenceOnly, setSpaceReferenceOnly } from "@/features/spaces/api/connectivity";
-import { fileNameFromPath, maxWebviewUploadBytes } from "@/features/spaces/api/library-upload";
+import { fileNameFromPath, maxWebviewUploadBytes } from "@/features/spaces/api/library_upload";
 
 beforeEach(() => {
   accountSession.transitioning = false;

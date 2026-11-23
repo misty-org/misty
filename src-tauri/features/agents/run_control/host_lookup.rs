@@ -1,16 +1,8 @@
-//! Whether an address an agent is about to open has no DNS record at all. An agent that guessed a
-//! wrong spelling opened it twice, got pages that never loaded and called the site a blocker, so it
-//! hears before any tab opens. Only a definite "no such host" counts: a slow or failing lookup leaves
-//! the page to load.
 use std::{io, time::Duration};
 
 const LOOKUP_LIMIT: Duration = Duration::from_secs(3);
-/// A name that always exists. macOS answers "no such host" for every name while it's offline, so a
-/// missing name only means something once this one resolves.
 const ALWAYS_THERE: &str = "example.com";
 
-/// What the system resolver says when a name has no record, in each system's words. Windows' are
-/// translated, so it goes by the code (`WSAHOST_NOT_FOUND`).
 fn says_no_such_host(error: &io::Error) -> bool {
     if error.raw_os_error() == Some(11001) {
         return true;
@@ -46,8 +38,6 @@ pub async fn agent_host_missing(webview: tauri::Webview, host: String) -> Result
     if !crate::browser::app_windows::is_person_window(webview.label()) {
         return Err("Only a profile's window can check an address.".into());
     }
-    // Whether an internal name resolves says something about the network this computer is on, which
-    // an agent has no business learning from what a page told it to try.
     if host.is_empty() || host.len() > 253 || not_a_public_name(&host) {
         return Ok(false);
     }

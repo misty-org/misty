@@ -1,10 +1,3 @@
-//! Pages out of sight sit out a live window resize.
-//!
-//! Every page is a native web view in the window, and AppKit resizes each one that has an
-//! autoresizing mask on every step of a drag, hidden or not. Each of those resizes asks that
-//! page's process to lay the page out again, so the cost of a step grew with every open tab. For
-//! the length of a drag only the views on screen follow the window. The rest catch up once when it
-//! ends, so a tab switch still finds its page laid out.
 #![allow(unexpected_cfgs)]
 #![allow(deprecated)]
 
@@ -17,10 +10,8 @@ use objc2::rc::Retained;
 use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSWindow};
 use objc2_foundation::NSSize;
 
-/// A page kept alive out of sight waits far past the window's left edge.
 const PARKED_X: f64 = -10_000.0;
 
-/// The views sitting out the current drag, each with its own mask, and the size they last followed.
 struct SatOut {
     old_size: NSSize,
     views: Vec<(Retained<NSView>, NSAutoresizingMaskOptions)>,
@@ -47,14 +38,12 @@ unsafe fn sit_out(window: id) -> Option<SatOut> {
 unsafe fn catch_up(out: SatOut) {
     for (view, mask) in out.views {
         view.setAutoresizingMask(mask);
-        // A page closed during the drag has no window left to follow.
         if view.superview().is_some() {
             view.resizeWithOldSuperviewSize(out.old_size);
         }
     }
 }
 
-/// Watches every window's live resizes. Only one can run at a time, since it follows the pointer.
 pub fn install() {
     let current: Rc<RefCell<Option<SatOut>>> = Rc::default();
     let started = current.clone();
@@ -85,7 +74,6 @@ pub fn install() {
             queue: cocoa::base::nil
             usingBlock: &*end as *const _ as id];
     }
-    // The observers live as long as the app does.
     std::mem::forget(start);
     std::mem::forget(end);
 }

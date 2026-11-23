@@ -5,7 +5,6 @@ import { BrowserRuntimeBridge } from "@/features/browser";
 import { DeferUntilIdle } from "./DeferUntilIdle";
 import { SettingsOverlay } from "./SettingsOverlays";
 
-/** Overlays and background bridges mounted beside the route shell. */
 export function DesktopShellOverlays(props: {
   settingsOpen: boolean;
   onCloseSettings: () => void;

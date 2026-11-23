@@ -63,7 +63,6 @@ fn paste_keeps_the_name_when_free_and_copies_folders_whole() {
     );
     let again = paste(&source, &target).unwrap();
     assert!(again.path.ends_with("src copy"));
-    // Nothing staged is left behind.
     assert!(std::fs::read_dir(&target)
         .unwrap()
         .flatten()

@@ -1,4 +1,3 @@
-//! Running one page-layer operation for an agent, and waiting on the page.
 use super::*;
 
 pub(in crate::browser) async fn execute(
@@ -111,7 +110,6 @@ pub(in crate::browser) async fn execute(
         }
         _ => return Err("Unsupported browser agent operation.".into()),
     };
-    // A navigation while reading means the result describes a page that is gone.
     if !acts(&request.operation) && view.url().map_err(|error| error.to_string())? != observed_url {
         return Err(
             "browser_document_changed: the page navigated while it was read; read it again".into(),
@@ -151,7 +149,6 @@ pub(super) async fn poll(
     let started = Instant::now();
     loop {
         let check = call(view, "waitCheck", condition.clone(), false).await?;
-        // Text can appear inside an embedded widget's frame rather than the page itself.
         #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
         let met = check["met"] == true
             || (condition["text"].is_string() && frames::shows(view, condition).await);

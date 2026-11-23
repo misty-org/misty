@@ -1,10 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Per-provider state: the TTL cache for Codex lookups, and each provider's last good result,
-//! kept in `misty.db` on this computer (`engine_config_values`, key `usage_limits.snapshot`; no
-//! secrets, only plan, windows, credits and when they were seen).
-
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -12,18 +8,13 @@ use serde::{Deserialize, Serialize};
 
 use super::{clamp_f64, Credits, LimitWindow, ProviderId};
 
-/// Serve the previous result for this long unless the caller asks for a refresh.
 pub(crate) const CACHE_TTL_MS: i64 = 60_000;
-/// Floor for explicit refreshes (`refresh: true`): repeated calls inside this window reuse the
-/// last answer instead of starting the CLI again.
 pub(crate) const REFRESH_MIN_INTERVAL_MS: i64 = 20_000;
 const SNAPSHOT_KEY: &str = "usage_limits.snapshot";
 const SNAPSHOT_VERSION: u32 = 1;
-/// Bounds applied to the stored copy so a corrupted row cannot inflate what the UI receives.
 const MAX_PERSISTED_WINDOWS: usize = 16;
 const MAX_PERSISTED_TEXT: usize = 64;
 
-/// The last good read. Exactly what is stored.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GoodData {
@@ -38,14 +29,11 @@ pub(crate) struct GoodData {
 
 #[derive(Debug, Default)]
 pub(crate) struct LookupState {
-    /// The last result handed out and when it was computed (TTL cache).
     pub last_result: Option<(super::ProviderLimits, i64)>,
 }
 
 pub(crate) struct Slot {
     pub state: tokio::sync::Mutex<LookupState>,
-    /// Bumped whenever a lookup finishes, so a caller that queued behind an in-flight lookup can
-    /// reuse its result instead of starting the CLI again.
     pub generation: AtomicU64,
 }
 
@@ -72,7 +60,6 @@ pub(crate) struct Store {
 }
 
 impl Store {
-    /// `persist: false` keeps everything in memory (tests).
     pub(crate) fn new(persist: bool) -> Self {
         Self {
             codex: Slot::new(),
@@ -84,7 +71,6 @@ impl Store {
         }
     }
 
-    /// The lookup slot; only Codex is looked up, Claude's limits arrive with its runs.
     pub(crate) fn slot(&self) -> &Slot {
         &self.codex
     }
@@ -93,13 +79,10 @@ impl Store {
         self.snapshot.lock().get(provider.as_str())
     }
 
-    /// A complete read replaces what was known.
     pub(crate) fn replace(&self, provider: ProviderId, good: &GoodData) {
         self.snapshot.lock().put(provider.as_str(), good.clone());
     }
 
-    /// A partial update: windows with the same id are replaced, the others kept, and fields the
-    /// update lacks keep their last value.
     pub(crate) fn merge(
         &self,
         provider: ProviderId,

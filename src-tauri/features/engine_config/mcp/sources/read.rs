@@ -1,11 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Reading server tables: JSON, JSONC, TOML and dsh's profile YAML.
-//!
-//! Parsing only ever reads files; entry fields map by `Source.fields` and the toggle reads by
-//! `Source.toggle` (the strings "false"/"0" count as off too).
-
 use super::{
     candidate_paths, first_existing, grok_home, source_spec, Fields, Source, Toggle,
     DSH_MCP_PLUGIN, REASON_JSONC_READONLY,
@@ -17,9 +12,6 @@ use serde_json::{Map, Value};
 use std::path::Path;
 use toml_edit::DocumentMut;
 
-/// JSONC (opencode's `opencode.jsonc`) allows comments and trailing commas; a write would lose the
-/// comments, so such files are read-only. Parsing first strips comments and trailing commas,
-/// aware of strings, then goes through serde_json.
 pub(super) fn parse_jsonc(text: &str, path: &str) -> Result<Value, McpError> {
     let stripped = strip_jsonc(text)
         .ok_or_else(|| McpError::format(format!("{path}: unterminated string in JSONC")))?;
@@ -72,7 +64,6 @@ pub(super) fn strip_jsonc(text: &str) -> Option<String> {
     if in_string {
         return None;
     }
-    // Trailing commas: drop a comma before an object or list closes (safe outside strings now).
     let mut trimmed = String::with_capacity(out.len());
     let mut pending_comma: Option<usize> = None;
     for ch in out.chars() {
@@ -148,7 +139,6 @@ pub(super) fn build_entry(
     is_jsonc: bool,
 ) -> McpConfigEntry {
     let spec = source_spec(source.id).expect("registered source");
-    // Writing JSONC would lose comments: the file becomes read-only, not the whole source.
     let writable = spec.writable && !is_jsonc;
     let readonly_reason_code = if is_jsonc {
         Some(REASON_JSONC_READONLY.to_string())
@@ -186,7 +176,6 @@ pub(super) fn build_entry(
     }
 }
 
-/// A non-empty string field (an empty string counts as not declared).
 pub(super) fn string_field(object: &Map<String, Value>, key: &str) -> Option<String> {
     if key.is_empty() {
         return None;
@@ -209,7 +198,6 @@ pub(super) fn command_and_args(
         .map(Vec::len)
         .unwrap_or(0);
     match spec_object.get(source.fields.command) {
-        // opencode's local server: `command: ["npx","-y","pkg"]`.
         Some(Value::Array(items)) if source.command_is_array => {
             let command = items
                 .first()
@@ -228,8 +216,6 @@ pub(super) fn command_and_args(
     }
 }
 
-/// The toggle field: `enabled` (default true) / `disabled` (default false); the strings `"false"`
-/// and `"0"` count as off too (OMP's lenient parsing).
 fn bool_field(object: &Map<String, Value>, key: &str) -> Option<bool> {
     match object.get(key) {
         Some(Value::Bool(value)) => Some(*value),
@@ -250,8 +236,6 @@ fn entry_enabled(source: &Source, spec_object: &Map<String, Value>) -> bool {
     }
 }
 
-/// Grok: `[mcp_servers.<name>]`; the user-level `disabled_mcp_servers` list turns servers off by
-/// name (project entries too, so a project source reads the user list as well).
 pub(super) fn read_toml_source(
     source: &Source,
     path: &Path,
@@ -371,17 +355,12 @@ pub(super) fn string_array(document: &DocumentMut, key: &str) -> Result<Vec<Stri
     }
 }
 
-/// dsh: each `dsh-mcp-client` plugin instance in a profile's cordis config is one MCP server, and
-/// the loader entry's `disabled` is its switch.
-/// One dsh MCP plugin instance (raw config, not redacted).
 pub(super) struct DshPluginEntry {
     pub name: String,
     pub disabled: bool,
     pub config: Option<serde_yaml::Value>,
 }
 
-/// Walks a profile's cordis config for `dsh-mcp-client` plugin instances (including nested insert
-/// lists such as `insert`).
 pub(super) fn dsh_plugin_entries(path: &Path) -> Result<Vec<DshPluginEntry>, McpError> {
     let raw = read_text(path)?;
     let root: serde_yaml::Value = serde_yaml::from_str(&raw)
@@ -480,7 +459,6 @@ fn dsh_probe_target(entry: &DshPluginEntry) -> ProbeTarget {
         url: dsh_text(config, "url"),
         headers: dsh_string_map(config, "headers"),
         transport: dsh_text(config, "transport"),
-        // Set by `mcp::probe_target` from the source id.
         from_workspace: false,
     }
 }
@@ -536,9 +514,6 @@ fn yaml_keys(config: Option<&serde_yaml::Value>, key: &str) -> Vec<String> {
     keys
 }
 
-// ===== Probe targets =====
-
-/// A probe target from a JSON server table entry (not redacted; used only here).
 pub(crate) fn probe_target_from_json(
     object: &Map<String, Value>,
     command_is_array: bool,
@@ -554,12 +529,10 @@ pub(crate) fn probe_target_from_json(
         headers: string_map(object.get(fields.headers)),
         transport: string_field(object, fields.transport)
             .or_else(|| string_field(object, fields.transport_alt)),
-        // Set by `mcp::probe_target` from the source id.
         from_workspace: false,
     }
 }
 
-/// A probe target from a TOML server table (Codex / Grok).
 pub(crate) fn probe_target_from_toml(
     table: &dyn toml_edit::TableLike,
     fields: Fields,
@@ -610,7 +583,6 @@ pub(crate) fn probe_target_from_toml(
         url: toml_string(fields.url).or_else(|| toml_string(fields.url_alt)),
         headers: toml_map(fields.headers),
         transport: toml_string(fields.transport).or_else(|| toml_string(fields.transport_alt)),
-        // Set by `mcp::probe_target` from the source id.
         from_workspace: false,
     }
 }
@@ -629,7 +601,6 @@ fn string_map(value: Option<&Value>) -> Vec<(String, String)> {
         .unwrap_or_default()
 }
 
-/// The command and its arguments (opencode's `command` is a list).
 fn command_and_args_raw(
     object: &Map<String, Value>,
     command_is_array: bool,
@@ -667,7 +638,6 @@ fn command_and_args_raw(
     }
 }
 
-/// A declarative source's probe target: reads the file again for the raw entry (not redacted).
 pub(crate) fn probe_target_for_source(
     source: &Source,
     name: &str,

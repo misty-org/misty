@@ -1,20 +1,14 @@
 use crate::KiriError;
 use url::Url;
 
-/// Who is calling, as established by Kiri rather than claimed by the page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Caller {
-    /// The embedder's label for the webview that sent the call.
     pub webview: String,
-    /// The top-level document's origin, e.g. `https://accounts.google.com`.
     pub origin: String,
-    /// Whether the origin is a secure context (HTTPS or loopback).
     pub secure: bool,
 }
 
 impl Caller {
-    /// Builds the caller from the webview's committed URL. Nothing in the
-    /// request payload contributes to the identity.
     pub fn from_page(webview: &str, page_url: &Url) -> Result<Self, KiriError> {
         let secure = match page_url.scheme() {
             "https" => true,

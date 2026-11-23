@@ -1,12 +1,7 @@
 import { cn, Surface, windowToolbarClass } from "@misty/ui";
-import { barHeight, closedHeight, openHeight } from "./spaceBarTiming";
-import { useWindowButtonsOnBar } from "./useWindowButtonsOnBar";
+import { barHeight, closedHeight, openHeight } from "./space_bar_timing";
+import { useWindowButtonsOnBar } from "./use_window_buttons_on_bar";
 
-/**
- * The strip above the pages. With tabs on the left it is only the window edge, which keeps the
- * page's top margin. With tabs on the right no sidebar sits under the window buttons, so they sit
- * in an empty bar here and keep it from being laid over the page.
- */
 export function TopEdge(props: { gridColumn: number; side?: "left" | "right" }) {
   const holdsWindowButtons = props.side === "right";
   useWindowButtonsOnBar(holdsWindowButtons, true);
@@ -26,7 +21,6 @@ export function TopEdge(props: { gridColumn: number; side?: "left" | "right" }) 
             tone="tab-well"
             edge="hairline"
             radius="lg"
-            // The window edge above and on its outer side, the gap toward the sidebar.
             className={cn(
               "mb-0 mt-[var(--shell-edge,calc(var(--spacing)*1.5))] shrink-0 overflow-hidden",
               props.side === "right"
@@ -40,8 +34,6 @@ export function TopEdge(props: { gridColumn: number; side?: "left" | "right" }) 
               className={cn(
                 "h-full min-w-0",
                 windowToolbarClass,
-                // The bar's own padding and the card's margin already count toward the room the
-                // window buttons need.
                 "data-[window-chrome=true]:!pl-[max(0px,calc(var(--window-chrome-left,0px)_-_var(--spacing)_*_4))]",
               )}
               data-window-toolbar=""

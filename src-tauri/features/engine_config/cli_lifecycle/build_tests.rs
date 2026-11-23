@@ -1,5 +1,3 @@
-// Codex's and Antigravity's builds, Hermes Agent's launchers outside Misty's folder, and what
-// Misty's own copy of Claude Code gets when it runs.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use std::path::PathBuf;
@@ -26,7 +24,6 @@ fn target(os: &'static str, arch: &'static str, musl: bool) -> Target<'static> {
     }
 }
 
-/// A scratch home with Misty's install root inside it, gone when dropped.
 struct Scratch {
     dir: PathBuf,
     root: InstallRoot,
@@ -55,7 +52,6 @@ fn codex_comes_from_its_release_as_its_scripts_fetch_it() {
         codex_target("macos", "aarch64", false).as_deref(),
         Some("aarch64-apple-darwin")
     );
-    // Linux builds are static, whatever the C library.
     assert_eq!(
         codex_target("linux", "x86_64", false).as_deref(),
         Some("x86_64-unknown-linux-musl")
@@ -85,7 +81,6 @@ fn codex_comes_from_its_release_as_its_scripts_fetch_it() {
         codex::asset_checksum(&release, "codex-package-x86_64-apple-darwin.tar.gz"),
         None
     );
-    // A tag that isn't a plain version is never spliced into a download URL.
     let odd = serde_json::json!({ "tag_name": "rust-v0.1.0/../x" });
     assert_eq!(codex::release_version(&odd), None);
     assert_eq!(
@@ -162,14 +157,12 @@ fn codex_and_antigravity_install_as_builds_on_every_system() {
     assert!(steps[0].contains("releases.openai.com"), "{steps:?}");
 }
 
-/// A launcher as Hermes writes it on Windows: distlib's stub, then the script stored as is.
 fn exe_launcher(checkout: &str) -> Vec<u8> {
     let mut bytes = b"MZ\x90\x00stub\x00\x00#!\"C:\\py\\python.exe\" -I\r\nPK\x03\x04".to_vec();
     bytes.extend(format!("import os, re, sys\nsys.path.insert(0, {checkout})\n").as_bytes());
     bytes
 }
 
-/// The `.cmd` fallback, with the script in base64.
 fn cmd_launcher(checkout: &str) -> String {
     let script = format!("import os, re, sys\nsys.path.insert(0, {checkout})\nimport x\n");
     let encoded = base64::engine::general_purpose::STANDARD.encode(script);
@@ -191,7 +184,6 @@ fn a_hermes_launcher_says_which_checkout_it_starts() {
         hermes_launchers::launcher_checkout(cmd_launcher(windows_path).as_bytes()).as_deref(),
         Some(expected)
     );
-    // repr() switches to double quotes for a path with an apostrophe.
     assert_eq!(
         hermes_launchers::launcher_checkout(&exe_launcher(r#""C:\\O'Neil\\hermes-agent""#))
             .as_deref(),
@@ -213,12 +205,10 @@ fn remove_takes_the_windows_launchers_of_mistys_checkout_and_no_others() {
     std::fs::create_dir_all(&bin).unwrap();
     let dirs = vec![bin.clone()];
     let ours = format!("{:?}", checkout.to_string_lossy());
-    // Before the install: nothing there. The install then writes these.
     let absent = hermes_launchers::absent(&dirs);
     std::fs::write(bin.join("hermes.exe"), exe_launcher(&ours)).unwrap();
     std::fs::write(bin.join("hermes-acp.exe"), b"MZ unreadable").unwrap();
     hermes_launchers::record_created(&root.engine_dir("hermes"), &absent).unwrap();
-    // Later, the person's own Hermes, and a launcher Misty didn't write.
     std::fs::write(
         bin.join("hermes-acp.cmd"),
         cmd_launcher(r"'C:\\Users\\me\\hermes-agent'"),

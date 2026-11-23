@@ -19,9 +19,8 @@ import {
   ListRowSkeleton,
   Text,
 } from "@misty/ui";
-import { agentMemoryApi, type AgentMemoryNote, type AgentMemoryNotes } from "./agentMemoryApi";
+import { agentMemoryApi, type AgentMemoryNote, type AgentMemoryNotes } from "./agent_memory_api";
 
-/** A read-only view over the notes this agent's engine has saved on this computer. */
 export function AgentMemoryPage(props: {
   accountId: string;
   agentId: string;
@@ -77,12 +76,17 @@ export function AgentMemoryPage(props: {
       }));
       if (opened?.id === note.id) setOpened(undefined);
     } catch (reason) {
-      setDeleteError(reason instanceof Error ? reason.message : "The memory note couldn't be deleted.");
+      setDeleteError(
+        reason instanceof Error ? reason.message : "The memory note couldn't be deleted.",
+      );
     }
   };
 
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-col" aria-label={`${props.agentName} memory`}>
+    <section
+      className="flex h-full min-h-0 min-w-0 flex-col"
+      aria-label={`${props.agentName} memory`}
+    >
       {loading ? <ListRowSkeleton label="Agent memory" rows={7} lines={2} /> : null}
       {!loading && error ? (
         <ErrorState
@@ -150,7 +154,10 @@ export function AgentMemoryPage(props: {
           </Text>
         </DialogContent>
       </Dialog>
-      <AlertDialog open={Boolean(deleting)} onOpenChange={(open) => !open && setDeleting(undefined)}>
+      <AlertDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => !open && setDeleting(undefined)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this memory note?</AlertDialogTitle>

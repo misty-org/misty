@@ -1,16 +1,11 @@
-//! Turning each engine's own plugin listings into one shape. Pure: the CLI's JSON and a way to
-//! read a plugin's manifest come in, items come out, so tests run on recorded output.
-
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::Path;
 
-/// One plugin an engine's marketplaces offer or already have installed.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MarketItem {
-    /// `plugin@marketplace`, what the engine's own install command takes.
     pub id: String,
     pub name: String,
     pub description: String,
@@ -19,40 +14,29 @@ pub struct MarketItem {
     pub category: Option<String>,
     pub installed: bool,
     pub enabled: bool,
-    /// Installs the engine's marketplace reports, when it reports them.
     pub installs: Option<u64>,
-    /// The plugin's repository or home page.
     pub link: Option<String>,
-    /// When the plugin signs in to an app of its own: `on_install` or `on_use` (Codex).
     pub sign_in: Option<String>,
-    /// The GitHub stars a gallery reports (Gemini's extension gallery).
     pub stars: Option<u64>,
-    /// Who made it, as its marketplace catalog names them (`Anthropic`, `Upstash`).
     pub author: Option<String>,
 }
 
-/// One marketplace an engine reads plugins from.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MarketSource {
     pub name: String,
-    /// Where it comes from: a GitHub repository, a git URL or a folder.
     pub location: String,
 }
 
-/// An app connection an engine has under the person's own sign-in.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Connector {
     pub engine: String,
     pub name: String,
-    /// `account` (connected on the engine maker's own site, like claude.ai), `plugin` or `config`.
     pub origin: String,
-    /// `connected`, `needs_sign_in`, `failed`, `pending` or `off`.
     pub state: String,
 }
 
-/// A manifest reader: the plugin folder in, the parsed manifest out.
 pub type ReadManifest<'a> = &'a dyn Fn(&Path) -> Option<Value>;
 
 pub(super) fn text(value: &Value, key: &str) -> Option<String> {
@@ -64,7 +48,6 @@ pub(super) fn text(value: &Value, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// `name@marketplace` split in two; an id without `@` has no marketplace.
 pub(super) fn split_id(id: &str) -> (String, String) {
     match id.rsplit_once('@') {
         Some((name, marketplace)) => (name.to_string(), marketplace.to_string()),
@@ -72,7 +55,6 @@ pub(super) fn split_id(id: &str) -> (String, String) {
     }
 }
 
-/// A web address for a plugin's source: a git URL without `.git`, or a GitHub repository.
 pub(super) fn source_link(source: &Value) -> Option<String> {
     let url = text(source, "url")
         .or_else(|| text(source, "repository").map(|repo| format!("https://github.com/{repo}")))?;
@@ -80,7 +62,6 @@ pub(super) fn source_link(source: &Value) -> Option<String> {
     url.starts_with("https://").then_some(url)
 }
 
-/// A catalog entry's maker: `author` as `{ "name": … }` or as plain text.
 pub(super) fn author(entry: &Value) -> Option<String> {
     text(&entry["author"], "name").or_else(|| {
         entry["author"]
@@ -91,7 +72,6 @@ pub(super) fn author(entry: &Value) -> Option<String> {
     })
 }
 
-/// A readable name from a plugin's id: `google-drive` → `Google drive`.
 pub(super) fn readable(name: &str) -> String {
     let spaced = name.replace(['-', '_'], " ");
     let mut chars = spaced.chars();
@@ -101,10 +81,6 @@ pub(super) fn readable(name: &str) -> String {
     }
 }
 
-// ===== Claude Code =====
-
-/// `claude plugin list --json --available`: `{ installed: [...], available: [...] }`. Installed
-/// entries carry no description, so it comes from the plugin's own manifest in its install folder.
 pub fn claude_items(listing: &Value, read_manifest: ReadManifest) -> Vec<MarketItem> {
     let mut items: Vec<MarketItem> = Vec::new();
     let mut index: HashMap<String, usize> = HashMap::new();
@@ -165,7 +141,6 @@ pub fn claude_items(listing: &Value, read_manifest: ReadManifest) -> Vec<MarketI
     items
 }
 
-/// `claude plugin marketplace list --json`: a list of `{ name, source, repo | url | path }`.
 pub fn claude_sources(listing: &Value) -> Vec<MarketSource> {
     listing
         .as_array()
@@ -182,9 +157,6 @@ pub fn claude_sources(listing: &Value) -> Vec<MarketSource> {
         .collect()
 }
 
-/// `claude mcp list` prints one line per server: `<name>: <address> - <state>`. Names never hold
-/// `": "` (a plugin's servers are `plugin:<plugin>:<server>`), so the first one ends the name.
-/// Addresses are left out: a URL can carry a token in its query.
 pub fn claude_connectors(output: &str) -> Vec<Connector> {
     output
         .lines()
@@ -221,13 +193,11 @@ pub fn claude_connectors(output: &str) -> Vec<Connector> {
         .collect()
 }
 
-// ===== Codex =====
-
-/// `codex plugin list --json --available`: `{ installed: [...], available: [...] }`, with no
-/// descriptions; those come from each plugin's `.codex-plugin/plugin.json`. A local plugin's is in
-/// its folder; an installed remote one's is in Codex's own copy of it,
-/// `<plugin_cache>/<marketplace>/<name>/<version>` (`plugin_cache` is `$CODEX_HOME/plugins/cache`).
-pub fn codex_items(listing: &Value, read_manifest: ReadManifest, plugin_cache: &Path) -> Vec<MarketItem> {
+pub fn codex_items(
+    listing: &Value,
+    read_manifest: ReadManifest,
+    plugin_cache: &Path,
+) -> Vec<MarketItem> {
     let mut items = Vec::new();
     let mut seen = std::collections::HashSet::new();
     let entries = listing["installed"]
@@ -243,7 +213,6 @@ pub fn codex_items(listing: &Value, read_manifest: ReadManifest, plugin_cache: &
             continue;
         }
         let (name, marketplace) = split_id(&id);
-        // Only a local source's path is a folder here; a `git-subdir` one is inside its repo.
         let local = text(&entry["source"], "path")
             .filter(|_| entry["source"]["source"].as_str() == Some("local"))
             .filter(|path| Path::new(path).is_absolute())
@@ -251,8 +220,11 @@ pub fn codex_items(listing: &Value, read_manifest: ReadManifest, plugin_cache: &
         let remote = || {
             let installed = entry["installed"].as_bool() == Some(true);
             let version = text(entry, "version").filter(|version| plain_segment(version))?;
-            (installed && entry["source"]["source"].as_str() == Some("remote") && plain_segment(&name) && plain_segment(&marketplace))
-                .then(|| plugin_cache.join(&marketplace).join(&name).join(version))
+            (installed
+                && entry["source"]["source"].as_str() == Some("remote")
+                && plain_segment(&name)
+                && plain_segment(&marketplace))
+            .then(|| plugin_cache.join(&marketplace).join(&name).join(version))
         };
         let manifest = local
             .or_else(remote)
@@ -287,12 +259,10 @@ pub fn codex_items(listing: &Value, read_manifest: ReadManifest, plugin_cache: &
     items
 }
 
-/// One path segment taken from the CLI's output, so a name can't reach outside Codex's cache.
 fn plain_segment(segment: &str) -> bool {
     !segment.is_empty() && segment != "." && segment != ".." && !segment.contains(['/', '\\'])
 }
 
-/// `codex plugin marketplace list --json`: `{ marketplaces: [{ name, root, marketplaceSource }] }`.
 pub fn codex_sources(listing: &Value) -> Vec<MarketSource> {
     listing["marketplaces"]
         .as_array()
@@ -308,10 +278,6 @@ pub fn codex_sources(listing: &Value) -> Vec<MarketSource> {
         .collect()
 }
 
-// ===== Checks on what reaches a command line =====
-
-/// A plugin id an install or remove may pass on: `name@marketplace`, plain characters only, so it
-/// can never read as an option.
 pub fn valid_id(id: &str) -> bool {
     let plain = |part: &str| {
         !part.is_empty()
@@ -326,7 +292,6 @@ pub fn valid_id(id: &str) -> bool {
     }
 }
 
-/// A marketplace name to remove: plain characters only.
 pub fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with(['-', '.'])
@@ -335,8 +300,6 @@ pub fn valid_name(name: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
 }
 
-/// A marketplace source to add: an `https://` URL, a GitHub `owner/repo`, or an absolute folder.
-/// Nothing that could read as an option or carry spaces.
 pub fn valid_source(source: &str) -> bool {
     let source = source.trim();
     if source.is_empty() || source.starts_with('-') || source.chars().any(char::is_whitespace) {
@@ -355,8 +318,6 @@ pub fn valid_source(source: &str) -> bool {
     valid_name(owner) && valid_name(repo)
 }
 
-/// What `claude plugin install --json` asks to be shown before a plugin whose marketplace runs a
-/// command of its own is installed: the command and its sha256, which a second run accepts.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ShownCommand {
@@ -364,7 +325,6 @@ pub struct ShownCommand {
     pub sha256: String,
 }
 
-/// The last JSON line of a `--json` run.
 pub fn last_json_line(output: &str) -> Option<Value> {
     output
         .lines()
@@ -374,7 +334,6 @@ pub fn last_json_line(output: &str) -> Option<Value> {
         .find_map(|line| serde_json::from_str(line).ok())
 }
 
-/// The command a Claude install wants shown first, wherever the result line nests it.
 pub fn shown_command(result: &Value) -> Option<ShownCommand> {
     fn find(value: &Value) -> Option<&Value> {
         match value {

@@ -2,12 +2,6 @@
 use super::{EngineCatalog, EngineModel};
 use std::sync::Mutex;
 
-/// The CLI's /model menu is only exposed on the ACP session handshake, so
-/// the catalog comes from a throwaway `mcode acp` probe (same convention
-/// as the qoder catalog): cache the last success so reopening the picker
-/// does not re-handshake every time — a provider added to mcode later
-/// shows up after an app restart. A failed probe lists nothing: no list of
-/// ours stands in for the engine's (anything the user pins still runs).
 static CACHE: Mutex<Option<Vec<EngineModel>>> = Mutex::new(None);
 
 pub(super) async fn minimax_catalog(bin: &str) -> EngineCatalog {

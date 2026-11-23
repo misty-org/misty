@@ -4,9 +4,8 @@ import { StatusRow, StatusTable } from "../progress/StatusTable";
 import { checklistForInvocation, checklistSummary, nestChildren } from "./checklists";
 import { statusText } from "./ChecklistStatus";
 import { useCollaborationStore } from "./store";
-import type { AgentChecklist as Checklist, ChecklistItem } from "./planTypes";
+import type { AgentChecklist as Checklist, ChecklistItem } from "./plan_types";
 
-/** Why a run's step in progress is not moving: it stopped, or waits on someone. */
 type ChecklistHold = "stopped" | "waiting_for_you" | { device: string } | undefined;
 
 function holdText(hold: ChecklistHold) {
@@ -64,11 +63,6 @@ function ItemRows({
   );
 }
 
-/**
- * A run's live checklist, above its progress lines: a one-line summary
- * ("3 of 6 · Editing tests") over a table of the steps, which stays open unless
- * folded. Delegated runs' steps nest under the step that handed them off.
- */
 function AgentChecklist({
   checklist,
   children = [],
@@ -81,7 +75,6 @@ function AgentChecklist({
   const label = holdText(hold);
   const running = !label && checklist.items.some((item) => item.status === "in_progress");
   return (
-    // Open from the start, as Claude shows its to-do list: what the agent means to do is always in view.
     <WorkGroup summary={checklistSummary(checklist.items)} running={running} openAtStart>
       <StatusTable label="Checklist">
         <ItemRows
@@ -94,12 +87,6 @@ function AgentChecklist({
   );
 }
 
-/**
- * The checklist for one assistant message's run, from the conversation's
- * collaboration state. Most runs have none, so nothing shows until that state is
- * known (a placeholder would push the reply down, then vanish); a refresh keeps
- * the current checklist on screen.
- */
 export function AgentMessageChecklist(props: {
   conversationId?: string;
   invocationId?: string;

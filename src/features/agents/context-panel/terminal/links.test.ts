@@ -15,11 +15,10 @@ function setPlatform(platform: string) {
 }
 
 const mocks = vi.hoisted(() => ({
-  // Folder path → its entries; the probe lists the candidate's parent.
   dirs: new Map<string, { name: string; isDir: boolean }[]>(),
   listDir: vi.fn(),
 }));
-vi.mock("../files/filesApi", () => ({
+vi.mock("../files/files_api", () => ({
   filesApi: {
     listDir: (path: string) => {
       mocks.listDir(path);
@@ -41,7 +40,6 @@ import {
 
 const file = (name: string) => ({ name, isDir: false });
 
-/** A minimal buffer: rows padded to `cols`, like xterm's translateToString(false). */
 function fakeTerm(rows: string[], wrapped: boolean[], cols: number): Terminal {
   const lines = rows.map((text, i) => ({
     isWrapped: wrapped[i],
@@ -86,7 +84,6 @@ describe("terminal path links", () => {
     const term = fakeTerm([line], [false], 80);
     const links = await getLinks(term, 1, CWD);
     expect(links?.[0].text).toBe(line);
-    // 24 narrow cells, two wide characters at two cells each, then "/app.app".
     expect(links?.[0].range).toEqual({ start: { x: 1, y: 1 }, end: { x: 36, y: 1 } });
   });
 

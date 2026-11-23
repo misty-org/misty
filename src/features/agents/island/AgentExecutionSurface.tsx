@@ -1,14 +1,14 @@
-import { needsDefaultEngine, openEngineSettings } from "../engines/engineNeeded";
+import { needsDefaultEngine, openEngineSettings } from "../engines/engine_needed";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
+import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import {
   continueQueuedLocalWork,
   pauseLocalExecution,
   useLocalExecution,
-} from "../runs/local-execution/localExecution";
+} from "../runs/local-execution/local_execution";
 import { Button, Surface, Text, ViewportLayer } from "@misty/ui";
 import { AgentControlIsland } from "./AgentControlIsland";
 
@@ -22,7 +22,6 @@ export function AgentExecutionSurface() {
   useEffect(() => {
     if (execution?.state === "finished")
       void continueQueuedLocalWork(execution.taskId).catch((e) => setError(String(e)));
-    // Continue queued work once per finish, not whenever the execution object is replaced.
   }, [execution?.taskId, execution?.state]);
   const viewport = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -79,7 +78,6 @@ export function AgentExecutionSurface() {
     window.addEventListener("pagehide", close);
     return () => window.removeEventListener("pagehide", close);
   }, [executionTaskId]);
-  // The island is the task's controls in every window, with or without this surface.
   if (!execution || execution.autopilot) return <AgentControlIsland />;
   return (
     <>
@@ -94,7 +92,7 @@ export function AgentExecutionSurface() {
             <div className="flex min-h-0 flex-1 pb-36">
               <div className="flex min-w-0 flex-1 flex-col">
                 <div ref={viewport} className="min-h-0 flex-1">
-                  <Text bare as="p" tone="muted" className="p-5 text-sm">
+                  <Text size="control" bare as="p" tone="muted" className="p-5">
                     {execution.views.length
                       ? "Browser workspace"
                       : "Working with native apps. Progress and results appear in chat."}

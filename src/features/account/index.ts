@@ -2,31 +2,32 @@ export * from "./AuthContext";
 export { AccountClosingNotice } from "./notices/AccountClosingNotice";
 export { AccountSuspendedNotice } from "./notices/AccountSuspendedNotice";
 export { ServerAlertsNotice } from "./notices/ServerAlertsNotice";
-export * from "./hooks/useAccountAvatarUrl";
+export * from "./hooks/use_account_avatar_url";
+export * from "./hooks/use_account_banner_url";
+export { BannerDialog } from "./profile/BannerDialog";
 export { default as RegisterPage } from "./pages/RegisterPage";
-export { SavedAccountSessionUnavailableError } from "./sessions/sessionErrors";
+export { SavedAccountSessionUnavailableError } from "./sessions/session_errors";
 export { default as SignInPage } from "./pages/SignInPage";
-export * from "./sessions/accountEvents";
-export * from "./sessions/useAccountStore";
-export * from "./sessions/useAuthTokenStore";
-export * from "./sessions/useUserStore";
+export * from "./sessions/account_events";
+export * from "./sessions/use_account_store";
+export * from "./sessions/use_auth_token_store";
+export * from "./sessions/use_user_store";
 export { SignInSheet } from "./sign-in-sheet/SignInSheet";
 export { openSignOutSheet, SignOutSheet } from "./sign-in-sheet/SignOutSheet";
-export { openSignInSheet, useSignInSheetStore } from "./sign-in-sheet/signInSheetStore";
+export { openSignInSheet, useSignInSheetStore } from "./sign-in-sheet/sign_in_sheet_store";
 
-// Public surface used by other features.
 export { useNativeSessionStore } from "./native-session";
 
 export { AccountSection } from "./settings/AccountSection";
 export { ServerSection } from "./settings/ServerSection";
 export { DevicePreferencesBridge } from "./DevicePreferencesBridge";
-export { accountResets, deviceDataErasers } from "./accountSeams";
+export { accountResets, deviceDataErasers } from "./account_seams";
 
 export { WelcomeNav } from "./components/WelcomeNav";
-export { useSetupStore } from "./setup/useSetupStore";
-export { setupFlow, type SetupStep } from "./setup/setupFlow";
+export { useSetupStore } from "./setup/use_setup_store";
+export { setupFlow, type SetupStep } from "./setup/setup_flow";
 
-export { deliverGoogleSignInCode } from "./google/googleSignInCode";
-export { notifyAccountScopeReset } from "./sessions/accountStore";
-export { openSetupDeepLink } from "./setup/setupLinks";
-export { openOnWebsite } from "./openOnWebsite";
+export { deliverGoogleSignInCode } from "./google/google_sign_in_code";
+export { notifyAccountScopeReset } from "./sessions/account_store";
+export { openSetupDeepLink } from "./setup/setup_links";
+export { openOnWebsite } from "./open_on_website";

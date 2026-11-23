@@ -2,8 +2,6 @@
 use super::SessionMeta;
 use std::sync::Arc;
 
-/// Run a parameterless query on the WAL read connection, so a background
-/// index write cannot stall session/workspace enumeration.
 fn query_rows<T>(
     db: &crate::engines::support::db::Db,
     sql: &str,
@@ -22,7 +20,9 @@ fn query_rows<T>(
     Ok(out)
 }
 
-pub(crate) fn list_sessions_from(db: &crate::engines::support::db::Db) -> Result<Vec<SessionMeta>, String> {
+pub(crate) fn list_sessions_from(
+    db: &crate::engines::support::db::Db,
+) -> Result<Vec<SessionMeta>, String> {
     query_rows(
         db,
         "SELECT s.engine, s.session_id, s.workspace_path, s.file_path, s.file_size, s.file_mtime_ms,
@@ -115,9 +115,6 @@ fn session_file(
         .ok()
 }
 
-/// One session's messages as its engine's own file holds them, read from the file each time, so a
-/// chat can show turns that happened outside Misty. A session the index doesn't know yet is
-/// looked for with one scan first.
 pub async fn read_session(
     state: tauri::State<'_, crate::engines::support::EngineState>,
     engine: String,
@@ -152,9 +149,10 @@ pub async fn read_session(
     .map_err(|e| e.to_string())?
 }
 
-/// An image a session names as a data URL the chat can draw: data URLs as they are, a file the
-/// engine saved (Kimi, Codex) read in. Missing files, other kinds and anything over 8 MB are left
-/// out.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an image a past session pointed at, wherever the engine or the person kept it"
+)]
 fn image_data_url(image: &str) -> Option<String> {
     use base64::Engine as _;
     if image.starts_with("data:image/") {
@@ -178,7 +176,6 @@ fn image_data_url(image: &str) -> Option<String> {
     ))
 }
 
-/// Registers a linked folder as a workspace, so the scan matches its engine sessions to it.
 pub(crate) fn add_workspace_inner(
     db: &Arc<crate::engines::support::db::Db>,
     sink: &Arc<crate::engines::support::event_sink::EventSink>,
@@ -188,15 +185,13 @@ pub(crate) fn add_workspace_inner(
     if trimmed.is_empty() {
         return Err("empty path".to_string());
     }
-    if !std::path::Path::new(trimmed).is_dir() {
+    if !is_folder(trimmed) {
         return Err(format!("not a directory: {trimmed}"));
     }
     let name = std::path::Path::new(trimmed)
         .file_name()
         .and_then(|n| n.to_str())
         .map(str::to_string)
-        // A separator-only path like "/": file_name is None and the trimmed text is empty, so
-        // fall back to the original; an empty name in the db would be an unrecognizable row.
         .unwrap_or_else(|| match trimmed.trim_end_matches(['/', '\\']) {
             "" => trimmed.to_string(),
             rest => rest.to_string(),
@@ -217,6 +212,14 @@ pub(crate) fn add_workspace_inner(
     }
     super::scanner::spawn_scan(Arc::clone(db), Arc::clone(sink));
     Ok(())
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "checks the folder the person is adding to history, which need not be linked yet"
+)]
+fn is_folder(path: &str) -> bool {
+    std::path::Path::new(path).is_dir()
 }
 
 #[cfg(test)]
@@ -262,8 +265,6 @@ mod tests {
         dir
     }
 
-    /// The sidebar list must not queue behind an in-flight index transaction:
-    /// the WAL reader has its own snapshot and mutex.
     #[test]
     fn session_list_reads_through_writer_lock() {
         let home = scratch_dir("list-reader");
@@ -282,8 +283,6 @@ mod tests {
         let worker = std::thread::spawn(move || {
             tx.send(list_sessions_from(&worker_db)).unwrap();
         });
-        // A read that took the writer mutex would time out here. Drop the
-        // writer before asserting so the old implementation still terminates.
         let result = rx.recv_timeout(std::time::Duration::from_secs(2));
         drop(writer);
         worker.join().unwrap();

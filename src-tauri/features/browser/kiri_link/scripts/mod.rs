@@ -1,7 +1,6 @@
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, LogicalPosition, Manager};
 
-/// The top document's page script; `browser_viewport_script` fills its placeholders.
 pub(in crate::browser) const BROWSER_VIEWPORT_SCRIPT: &str =
     concat!("\n", include_str!("viewport.js"));
 
@@ -59,7 +58,6 @@ pub(in crate::browser) fn browser_viewport_script(
         .replace("__MISTY_INITIAL_SHORTCUTS_PLACEHOLDER__", &bindings_json)
 }
 
-/// The tab's token authenticates the Escape-to-stop report on Kiri's host channel.
 pub(in crate::browser) fn browser_status_script(shortcut_token: &str) -> String {
     include_str!("status.js")
         .replace(
@@ -118,8 +116,6 @@ struct BrowserPointerEvent {
     inside: bool,
 }
 
-/// Reports where the pointer is over a page, in the window's logical points: the page sends its
-/// own coordinates, and the page's place in the window is added here, where it is known.
 pub(in crate::browser) fn emit_browser_pointer(
     app: &AppHandle,
     id: &str,
@@ -147,7 +143,6 @@ pub(in crate::browser) fn emit_browser_pointer(
     );
 }
 
-/// A point in a page, moved to where the page sits in its window.
 fn in_window(origin: LogicalPosition<f64>, pointer: &BrowserPointerNavigation) -> (f64, f64) {
     (origin.x + pointer.x, origin.y + pointer.y)
 }

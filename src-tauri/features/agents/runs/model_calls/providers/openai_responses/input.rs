@@ -1,14 +1,12 @@
-//! Turns a prompt into Responses input items. Ported from `convert-to-openai-responses-input.ts`, for
-//! function tools with no conversation or previous response chaining. When OpenAI stores responses,
-//! which is its default, items it already holds go back as `item_reference`s. When it doesn't,
-//! they go back whole, reasoning as its encrypted content.
 use serde::Serialize;
 use serde_json::{json, Value};
 
 use super::assistant_input::assistant_items;
 use crate::model_calls::error::ModelError;
-use crate::model_calls::prompt::{FileData, Message, OutputItem, ProviderOptions, ToolOutput, UserPart};
 use crate::model_calls::media_type::top_level;
+use crate::model_calls::prompt::{
+    FileData, Message, OutputItem, ProviderOptions, ToolOutput, UserPart,
+};
 use crate::model_calls::providers::media::{resolve_full_media_type, unsupported};
 
 #[derive(Serialize)]
@@ -114,31 +112,47 @@ pub(super) enum CallOutput<'a> {
 }
 
 pub(super) fn openai<'o>(options: Option<&'o ProviderOptions>, name: &str) -> Option<&'o Value> {
-    options?.get("openai")?.get(name).filter(|value| !value.is_null())
+    options?
+        .get("openai")?
+        .get(name)
+        .filter(|value| !value.is_null())
 }
 
 pub(super) fn openai_text(options: Option<&ProviderOptions>, name: &str) -> Option<String> {
     openai(options, name)?.as_str().map(str::to_owned)
 }
 
-/// A string that starts like this names a file already uploaded to OpenAI.
 fn file_id(data: &str) -> Option<&str> {
     data.starts_with("file-").then_some(data)
 }
 
 fn user_part(part: &UserPart, index: usize) -> Result<UserContent<'_>, ModelError> {
     let (data, media_type) = match part {
-        UserPart::Text { text } => return Ok(UserContent::Text { kind: "input_text", text }),
+        UserPart::Text { text } => {
+            return Ok(UserContent::Text {
+                kind: "input_text",
+                text,
+            })
+        }
         UserPart::File { data, media_type } => (data, media_type.as_str()),
     };
     if top_level(media_type) == "image" {
         return Ok(match data {
-            FileData::Url { url } => UserContent::ImageUrl { kind: "input_image", image_url: url.clone() },
+            FileData::Url { url } => UserContent::ImageUrl {
+                kind: "input_image",
+                image_url: url.clone(),
+            },
             FileData::Data { data: bytes } => match file_id(bytes) {
-                Some(file_id) => UserContent::ImageFile { kind: "input_image", file_id },
+                Some(file_id) => UserContent::ImageFile {
+                    kind: "input_image",
+                    file_id,
+                },
                 None => UserContent::ImageUrl {
                     kind: "input_image",
-                    image_url: format!("data:{};base64,{bytes}", resolve_full_media_type(media_type, data)?),
+                    image_url: format!(
+                        "data:{};base64,{bytes}",
+                        resolve_full_media_type(media_type, data)?
+                    ),
                 },
             },
         });
@@ -147,14 +161,20 @@ fn user_part(part: &UserPart, index: usize) -> Result<UserContent<'_>, ModelErro
         let FileData::Url { url } = data else {
             return Err(unsupported("file part"));
         };
-        return Ok(UserContent::FileUrl { kind: "input_file", file_url: url });
+        return Ok(UserContent::FileUrl {
+            kind: "input_file",
+            file_url: url,
+        });
     };
     let full = resolve_full_media_type(media_type, data)?;
     if full != "application/pdf" {
         return Err(unsupported(&format!("file part media type {full}")));
     }
     Ok(match file_id(bytes) {
-        Some(file_id) => UserContent::ImageFile { kind: "input_file", file_id },
+        Some(file_id) => UserContent::ImageFile {
+            kind: "input_file",
+            file_id,
+        },
         None => UserContent::FileData {
             kind: "input_file",
             filename: format!("part-{index}.pdf"),
@@ -165,20 +185,38 @@ fn user_part(part: &UserPart, index: usize) -> Result<UserContent<'_>, ModelErro
 
 fn output_item(item: &OutputItem) -> Result<UserContent<'_>, ModelError> {
     let (data, media_type) = match item {
-        OutputItem::Text { text } => return Ok(UserContent::Text { kind: "input_text", text }),
+        OutputItem::Text { text } => {
+            return Ok(UserContent::Text {
+                kind: "input_text",
+                text,
+            })
+        }
         OutputItem::File { data, media_type } => (data, media_type.as_str()),
     };
     let is_image = top_level(media_type) == "image";
     Ok(match data {
-        FileData::Url { url } if is_image => UserContent::ImageUrl { kind: "input_image", image_url: url.clone() },
-        FileData::Url { url } => UserContent::FileUrl { kind: "input_file", file_url: url },
+        FileData::Url { url } if is_image => UserContent::ImageUrl {
+            kind: "input_image",
+            image_url: url.clone(),
+        },
+        FileData::Url { url } => UserContent::FileUrl {
+            kind: "input_file",
+            file_url: url,
+        },
         FileData::Data { data: bytes } => {
             let full = resolve_full_media_type(media_type, data)?;
             let url = format!("data:{full};base64,{bytes}");
             if is_image {
-                UserContent::ImageUrl { kind: "input_image", image_url: url }
+                UserContent::ImageUrl {
+                    kind: "input_image",
+                    image_url: url,
+                }
             } else {
-                UserContent::FileData { kind: "input_file", filename: "data".into(), file_data: url }
+                UserContent::FileData {
+                    kind: "input_file",
+                    filename: "data".into(),
+                    file_data: url,
+                }
             }
         }
     })
@@ -187,18 +225,18 @@ fn output_item(item: &OutputItem) -> Result<UserContent<'_>, ModelError> {
 fn call_output(output: &ToolOutput) -> Result<CallOutput<'_>, ModelError> {
     Ok(match output {
         ToolOutput::Text { value } | ToolOutput::ErrorText { value } => CallOutput::Text(value),
-        ToolOutput::ExecutionDenied { reason } => CallOutput::Text(
-            reason.as_deref().unwrap_or("Tool call execution denied."),
-        ),
-        ToolOutput::Json { value } | ToolOutput::ErrorJson { value } => CallOutput::Text(value.get()),
-        // Unlike chat completions, a tool's output here can hold the screenshot itself.
+        ToolOutput::ExecutionDenied { reason } => {
+            CallOutput::Text(reason.as_deref().unwrap_or("Tool call execution denied."))
+        }
+        ToolOutput::Json { value } | ToolOutput::ErrorJson { value } => {
+            CallOutput::Text(value.get())
+        }
         ToolOutput::Content { value } => {
             CallOutput::Content(value.iter().map(output_item).collect::<Result<_, _>>()?)
         }
     })
 }
 
-/// The input items, with reasoning models taking their instructions as the developer.
 pub(super) fn convert_input<'a>(
     prompt: &'a [Message],
     instructions_role: &'static str,
@@ -209,7 +247,10 @@ pub(super) fn convert_input<'a>(
     for message in prompt {
         match message {
             Message::System { content, .. } => {
-                input.push(InputItem::Instructions { role: instructions_role, content });
+                input.push(InputItem::Instructions {
+                    role: instructions_role,
+                    content,
+                });
             }
             Message::User { content, .. } => {
                 let parts = content
@@ -217,9 +258,14 @@ pub(super) fn convert_input<'a>(
                     .enumerate()
                     .map(|(index, part)| user_part(part, index))
                     .collect::<Result<_, _>>()?;
-                input.push(InputItem::User { role: "user", content: parts });
+                input.push(InputItem::User {
+                    role: "user",
+                    content: parts,
+                });
             }
-            Message::Assistant { content, .. } => assistant_items(content, store, &mut input, warnings),
+            Message::Assistant { content, .. } => {
+                assistant_items(content, store, &mut input, warnings)
+            }
             Message::Tool { content, .. } => {
                 for part in content {
                     input.push(InputItem::Tagged(TaggedItem::FunctionCallOutput {
@@ -231,9 +277,14 @@ pub(super) fn convert_input<'a>(
         }
     }
     let unusable = |item: &InputItem<'a>| {
-        matches!(item, InputItem::Tagged(TaggedItem::Reasoning { encrypted_content: None, .. }))
+        matches!(
+            item,
+            InputItem::Tagged(TaggedItem::Reasoning {
+                encrypted_content: None,
+                ..
+            })
+        )
     };
-    // Without storage, OpenAI can only read reasoning that carries its encrypted content.
     if !store && input.iter().any(unusable) {
         warnings.push(json!({
             "type": "other",

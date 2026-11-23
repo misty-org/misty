@@ -1,17 +1,11 @@
-//! Display captures, sized for the vision models that read them.
 use super::ForegroundWindow;
 
-/// The size a display is sent at. Vision providers resize larger images before
-/// the model sees them (OpenAI to a 768px short side, Anthropic to a 1568px
-/// long side), which would shift every point, so stay inside both bounds.
-/// Matches `CompanionCaptureScale` in MistyCompanionCapture.m.
 pub fn companion_capture_size(width: u32, height: u32) -> (u32, u32) {
     let (w, h) = (width.max(1) as f64, height.max(1) as f64);
     let scale = (768.0 / w.min(h)).min(1568.0 / w.max(h)).min(1.0);
     (((w * scale) as u32).max(1), ((h * scale) as u32).max(1))
 }
 
-// Windows and macOS 12–13 retain xcap: SCScreenshotManager requires macOS 14.
 pub(super) fn capture_legacy_display(
     monitor: &xcap::Monitor,
 ) -> Result<(Vec<u8>, u32, u32), String> {
@@ -61,7 +55,6 @@ pub fn capture_display(monitor: &xcap::Monitor) -> Result<(Vec<u8>, u32, u32), S
     capture_legacy_display(monitor)
 }
 
-/// The window's area of `display`, in pixels of the display's own image.
 fn window_crop(
     display: &super::super::Display,
     window: &ForegroundWindow,
@@ -82,9 +75,6 @@ fn window_crop(
     ))
 }
 
-/// The focused window at the display's full resolution, cropped to the part
-/// on `display`, then fitted to `companion_capture_size`. Returns the image and
-/// the captured area in global units.
 #[cfg(any(windows, target_os = "linux"))]
 pub fn capture_window(
     monitor: &xcap::Monitor,
@@ -146,7 +136,6 @@ fn capture_window_legacy(
     window: &ForegroundWindow,
 ) -> Result<(Vec<u8>, u32, u32, super::super::Display), String> {
     let full = monitor.capture_image().map_err(|e| e.to_string())?;
-    // Display units are points on macOS and pixels on Windows; the image is pixels.
     let scale = full.width() as f64 / display.width.max(1.);
     let (x, y, width, height) =
         window_crop(display, window, scale).ok_or("The focused window is off this display")?;

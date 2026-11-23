@@ -62,12 +62,10 @@ fn hidden_sessions_run_beside_other_tasks() {
     };
     assert!(acquire_lease(&mut state, "space-personal", background("hidden-one")).is_ok());
     assert!(acquire_lease(&mut state, "space-personal", background("hidden-two")).is_ok());
-    // A task on screen still gets the window, and two on screen still exclude each other.
     let visible = personal_request("visible", false);
     assert!(acquire_lease(&mut state, "space-personal", visible).is_ok());
     let other = personal_request("other", false);
     assert!(acquire_lease(&mut state, "space-personal", other).is_err());
-    // A hidden session outlives a throttled renewal timer; a task on screen does not.
     let hidden = state.leases["hidden-one"].expires;
     let shown = state.leases["visible"].expires;
     assert!(hidden > shown + Duration::from_secs(300));

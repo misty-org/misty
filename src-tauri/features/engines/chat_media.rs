@@ -1,10 +1,3 @@
-//! Media moving between a Space and a chat's folder, for the video and photo editors' agents.
-//! `chat_media_save` puts a Media file the window read from the Space into the chat's folder,
-//! for the chat's agent to work on with its own tools (`media.fetch`); `chat_media_load` hands
-//! the window a file the agent made in that folder, to add to Media (`file.upload`). Both stay
-//! inside the chat's own folder: a name can't climb out of it, and a path that leads outside it
-//! (through `..` or a link) is refused.
-
 use std::path::{Path, PathBuf};
 
 use tauri::State;
@@ -13,7 +6,6 @@ use super::chat_folder;
 use super::commands::{blocking, person_window};
 use crate::app::runtime::MistyRuntime;
 
-/// The largest file either way: a long video, read whole into memory.
 const MAX_MEDIA_BYTES: usize = 2 * 1024 * 1024 * 1024;
 
 fn header(request: &tauri::ipc::Request<'_>, name: &str) -> Result<String, String> {
@@ -44,11 +36,16 @@ fn percent_decode(value: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// A file name that stays one name: no folders, no leading dots, nothing a system refuses.
 pub(crate) fn safe_name(name: &str) -> String {
     let cleaned: String = name
         .chars()
-        .map(|c| if matches!(c, '/' | '\\' | ':' | '\0') || c.is_control() { '_' } else { c })
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '\0') || c.is_control() {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
     let trimmed = cleaned.trim().trim_start_matches('.').trim();
     if trimmed.is_empty() {
@@ -58,10 +55,9 @@ pub(crate) fn safe_name(name: &str) -> String {
     }
 }
 
-/// `folder/name`, or `folder/stem (2).ext` and so on when that is taken.
 fn free_path(folder: &Path, name: &str) -> PathBuf {
     let first = folder.join(name);
-    if !first.exists() {
+    if !file_access::fs::exists(&first) {
         return first;
     }
     let path = Path::new(name);
@@ -72,11 +68,10 @@ fn free_path(folder: &Path, name: &str) -> PathBuf {
             Some(ext) => folder.join(format!("{stem} ({n}).{ext}")),
             None => folder.join(format!("{stem} ({n})")),
         })
-        .find(|candidate| !candidate.exists())
+        .find(|candidate| !file_access::fs::exists(candidate))
         .unwrap_or(first)
 }
 
-/// Whether `path`, followed through any links, is inside `folder`.
 pub(crate) fn inside(folder: &Path, path: &Path) -> bool {
     match (
         file_access::fs::canonicalize(folder),
@@ -87,8 +82,6 @@ pub(crate) fn inside(folder: &Path, path: &Path) -> bool {
     }
 }
 
-/// Saves a Media file into the chat's folder (`media/` in it) and answers its path. The bytes come
-/// as the body; the account, chat and file name in headers.
 #[tauri::command]
 pub async fn chat_media_save(
     webview: tauri::Webview,
@@ -122,8 +115,6 @@ pub async fn chat_media_save(
     .await
 }
 
-/// A file in the chat's folder, as bytes, for the window to add to Media. Refused for anything
-/// outside the folder.
 #[tauri::command]
 pub async fn chat_media_load(
     webview: tauri::Webview,
@@ -138,7 +129,11 @@ pub async fn chat_media_load(
         let folder = chat_folder::current(&db, &account, &conversation)
             .ok_or("This chat has no folder on this computer yet.")?;
         let path = PathBuf::from(&path);
-        let path = if path.is_absolute() { path } else { folder.join(path) };
+        let path = if path.is_absolute() {
+            path
+        } else {
+            folder.join(path)
+        };
         if !inside(&folder, &path) {
             return Err("Only files in this chat's own folder can be added to Media.".into());
         }
@@ -183,7 +178,10 @@ mod tests {
     fn a_taken_name_gets_a_number() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("a.mp4"), b"x").unwrap();
-        assert_eq!(free_path(root.path(), "a.mp4"), root.path().join("a (2).mp4"));
+        assert_eq!(
+            free_path(root.path(), "a.mp4"),
+            root.path().join("a (2).mp4")
+        );
         assert_eq!(free_path(root.path(), "b.mp4"), root.path().join("b.mp4"));
     }
 }

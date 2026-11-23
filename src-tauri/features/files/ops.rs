@@ -15,7 +15,6 @@ use super::listing::io_text;
 use super::undo::{self, Change};
 use super::{asked_path, blocking, failed, person_window};
 
-/// A name a person typed, as one item's name: not empty, not `.` or `..`, no folder separators.
 pub(crate) fn valid_name(name: &str) -> Result<&str, String> {
     if name.trim().is_empty() {
         return Err("Enter a name.".into());
@@ -30,18 +29,19 @@ pub(crate) fn valid_name(name: &str) -> Result<&str, String> {
     }
 }
 
-/// The name is taken: the error a create or rename gives, naming it.
 fn taken(name: &str) -> String {
     format!("The name {name} is already taken.")
 }
 
-/// Renames `from` to `to`. A change of case alone (`notes.txt` to `Notes.txt`) goes through a
-/// temporary name, since a disk that ignores case sees the two as one name already taken.
 pub(crate) fn rename_path(from: &Path, to: &Path) -> io::Result<()> {
     let case_only = from.parent() == to.parent()
         && from.file_name() != to.file_name()
-        && from.file_name().map(|name| name.to_string_lossy().to_lowercase())
-            == to.file_name().map(|name| name.to_string_lossy().to_lowercase());
+        && from
+            .file_name()
+            .map(|name| name.to_string_lossy().to_lowercase())
+            == to
+                .file_name()
+                .map(|name| name.to_string_lossy().to_lowercase());
     if case_only {
         let parent = from.parent().unwrap_or(from);
         let step = parent.join(format!(".misty-rename-{}", uuid::Uuid::new_v4()));
@@ -56,7 +56,6 @@ pub(crate) fn rename_path(from: &Path, to: &Path) -> io::Result<()> {
     fs_disk::rename(from, to)
 }
 
-/// A folder that exists, or the error naming it.
 fn folder(dir: &Path) -> Result<(), String> {
     if fs_disk::is_dir(dir) {
         Ok(())
@@ -85,12 +84,18 @@ fn create(dir: &Path, name: &str, make_folder: bool) -> Result<FileEntry, String
         io::ErrorKind::AlreadyExists => taken(name),
         _ => failed(&path, io_text(&error)),
     })?;
-    undo::record(if make_folder { "New Folder" } else { "New File" }, Change::Created(path.clone()));
+    undo::record(
+        if make_folder {
+            "New Folder"
+        } else {
+            "New File"
+        },
+        Change::Created(path.clone()),
+    );
     super::search::note_added(&path);
     entry(&path)
 }
 
-/// A new, empty folder in `dir`. Fails, rather than replace anything, when the name is taken.
 #[tauri::command]
 pub async fn files_create_folder(
     webview: tauri::Webview,
@@ -102,7 +107,6 @@ pub async fn files_create_folder(
     blocking(move || create(&dir, &name, true)).await
 }
 
-/// A new, empty file in `dir`. Fails, rather than replace anything, when the name is taken.
 #[tauri::command]
 pub async fn files_create_file(
     webview: tauri::Webview,
@@ -116,7 +120,9 @@ pub async fn files_create_file(
 
 fn rename(path: &Path, name: &str) -> Result<FileEntry, String> {
     let name = valid_name(name)?;
-    let parent = path.parent().ok_or_else(|| failed(path, "A drive can't be renamed here."))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| failed(path, "A drive can't be renamed here."))?;
     fs_disk::symlink_metadata(path).map_err(|error| failed(path, io_text(&error)))?;
     let target = parent.join(name);
     if target == path {
@@ -137,7 +143,6 @@ fn rename(path: &Path, name: &str) -> Result<FileEntry, String> {
     entry(&target)
 }
 
-/// Renames an item in its own folder. Fails when the new name is taken by another item.
 #[tauri::command]
 pub async fn files_rename(
     webview: tauri::Webview,
@@ -149,10 +154,12 @@ pub async fn files_rename(
     blocking(move || rename(&path, &name)).await
 }
 
-/// Finder's name for the `counter`th copy: "name copy", then "name copy 2"; a file keeps its
-/// extension after it ("report copy.pdf"), while a folder's name is all name.
 pub(crate) fn copy_name(name: &str, folder: bool, counter: u32) -> String {
-    let suffix = if counter <= 1 { " copy".to_owned() } else { format!(" copy {counter}") };
+    let suffix = if counter <= 1 {
+        " copy".to_owned()
+    } else {
+        format!(" copy {counter}")
+    };
     match name.rsplit_once('.') {
         Some((stem, ext)) if !folder && !stem.is_empty() && !ext.is_empty() => {
             format!("{stem}{suffix}.{ext}")
@@ -161,7 +168,6 @@ pub(crate) fn copy_name(name: &str, folder: bool, counter: u32) -> String {
     }
 }
 
-/// Where a copy of `source` goes in `dir` under a name nothing has yet.
 pub(crate) fn copy_target(source: &Path, dir: &Path) -> io::Result<PathBuf> {
     let name = super::display_name(source);
     let folder = fs_disk::symlink_metadata(source)?.is_dir();
@@ -179,9 +185,8 @@ fn duplicate(paths: &[PathBuf]) -> Result<Vec<String>, String> {
             problem.get_or_insert_with(|| failed(source, "A drive can't be duplicated."));
             continue;
         };
-        let copied = copy_target(source, dir).and_then(|target| {
-            super::transfer::copy_plain(source, &target).map(|()| target)
-        });
+        let copied = copy_target(source, dir)
+            .and_then(|target| super::transfer::copy_plain(source, &target).map(|()| target));
         match copied {
             Ok(target) => {
                 super::search::note_added(&target);
@@ -201,9 +206,11 @@ fn duplicate(paths: &[PathBuf]) -> Result<Vec<String>, String> {
     }
 }
 
-/// Copies each item beside itself, as "name copy.ext". Returns the copies' paths.
 #[tauri::command]
-pub async fn files_duplicate(webview: tauri::Webview, paths: Vec<String>) -> Result<Vec<String>, String> {
+pub async fn files_duplicate(
+    webview: tauri::Webview,
+    paths: Vec<String>,
+) -> Result<Vec<String>, String> {
     person_window(&webview)?;
     let paths = paths
         .iter()

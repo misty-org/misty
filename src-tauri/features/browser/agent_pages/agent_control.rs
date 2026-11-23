@@ -1,5 +1,3 @@
-//! Per-device-job execution controls. Dropping a dispatched webview operation
-//! cannot undo a website effect; interruption therefore reports uncertainty.
 use crate::browser::{
     execute_agent_request, revoke_execution_grant, BrowserAgentExecuteRequest, BrowserSessionState,
 };
@@ -104,8 +102,6 @@ pub fn browser_agent_execution_cancel(
     browser: State<'_, BrowserSessionState>,
     request: ExecutionControlRequest,
 ) -> Result<(), String> {
-    // Record a tombstone even if cancellation overtakes the execute invocation.
-    // A past lease must not prevent stopping work within its immutable deadline.
     let mut request = request;
     request.lease_expires_at = request.deadline_at.clone();
     let entry = control(&state, &request, true)?;

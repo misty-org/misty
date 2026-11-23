@@ -10,17 +10,11 @@ import {
   Text,
   Tooltip,
 } from "@misty/ui";
-import { preferredDefaultSpace, spaceNavigationName } from "../../routes/defaultSpace";
-import { useSpacesStore } from "../../list/useSpacesStore";
+import { preferredDefaultSpace, spaceNavigationName } from "../../routes/default_space";
+import { useSpacesStore } from "../../list/use_spaces_store";
 import { SpaceAvatar } from "../SpaceAvatar";
-import { useWindowSpace } from "./useWindowSpace";
+import { useWindowSpace } from "./use_window_space";
 
-/*
- * The Spaces' items for the window's bottom bar (Settings › Interface › Bottom bar): the window's
- * Space, to switch it from anywhere, and who else is in it right now.
- */
-
-/** The window's Space, opening onto the person's Spaces to show another in this window. */
 export function SpaceBarMenu() {
   const space = useWindowSpace();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -28,7 +22,7 @@ export function SpaceBarMenu() {
   const personal = preferredDefaultSpace(spaces);
   const ordered = personal ? [personal, ...spaces.filter((item) => item !== personal)] : spaces;
   const avatar = (item: typeof space) => (
-    <SpaceAvatar space={item} className="size-4 rounded-sm" fallbackClassName="text-3xs" />
+    <SpaceAvatar space={item} className="size-4 rounded-sm" fallbackClassName="text-micro" />
   );
   return (
     <DropdownMenu>
@@ -51,7 +45,6 @@ export function SpaceBarMenu() {
   );
 }
 
-/** How many other people are in the window's Space right now, named in the tooltip. */
 export function SpacePresence() {
   const space = useWindowSpace();
   const { user } = useAuth();

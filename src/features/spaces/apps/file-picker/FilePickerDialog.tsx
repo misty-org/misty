@@ -12,13 +12,12 @@ import {
 import { disk } from "@/features/files";
 import { FilesBrowser } from "../../file-manager";
 import type { FileItem } from "../../file-manager/model";
-import type { AppFileRef } from "../spaceAppFiles";
-import { appFilesFor } from "./chosenFiles";
+import type { AppFileRef } from "../space_app_files";
+import { appFilesFor } from "./chosen_files";
 
 const messageOf = (reason: unknown) =>
   reason instanceof Error ? reason.message : typeof reason === "string" ? reason : "";
 
-/** The picker's buttons: why the last pick failed, Cancel, and Open (into a folder, or the picked files). */
 function PickerFooter({
   picked,
   open,
@@ -61,13 +60,6 @@ function PickerFooter({
   );
 }
 
-/**
- * An app asking for files, answered in Files: the same browser in its picking mode, opening on the Space's
- * drive, showing folders and the files the app opens, with nothing that changes a file. A file already in
- * the Space's drive is handed over as it is; one from elsewhere on this computer (or another Space) is
- * copied into the app's folder in this Space's drive first. Without the disk grant, Files reaches the
- * Space drives and the person's projects; the picker never asks for the grant itself.
- */
 export function FilePickerDialog({
   spaceId,
   appName,

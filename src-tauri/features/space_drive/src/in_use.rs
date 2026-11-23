@@ -1,26 +1,3 @@
-//! In use, never locked: what this computer has open, the server's leases on it, and the answer
-//! to "is this in use here?" before someone else's delete.
-//!
-//! - A mark is a lease of 120 s (`LEASE`), renewed every 30 s (`RENEW_EVERY`) while the item is
-//!   open here or has a change not uploaded yet, so a crashed or offline computer can't hold a
-//!   file for long. A mark says whether this computer is editing (a write open or unsaved
-//!   changes) or only reading.
-//! - An open is told to the server only once it has lasted `REPORT_AFTER` (3 s), or as soon as
-//!   the file is written to, so an indexer, a thumbnailer or an antivirus scanner that opens a
-//!   file for a moment never marks it in use on everyone's computers. Only such an open counts
-//!   as the file being used lately. An open never waits for the server and is never refused:
-//!   being in use stops only a delete.
-//! - "Still open" is any of: a face or Misty itself reported it open and not yet closed; one of
-//!   the person's own processes holds it open, checked the way `lsof` does with no admin
-//!   (`held_open`: libproc on macOS, `/proc/<pid>/fd` on Linux, the Restart Manager on Windows);
-//!   or it was used in the last five minutes (`USED_LATELY`).
-//! - The server's `drive.in_use_check {item_id}` is answered by marking every item at or under
-//!   it that is open, dirty or used lately, before the asker's `wait_ms` runs out.
-//! - Who else has a file open is the Space's marks as the server lists them
-//!   (`GET /drive/in-use`), kept in memory (`Marks`): read on mount, again a moment after each
-//!   realtime `drive.in_use {item_id}`, and again before a held mark's lease would run out, since a
-//!   renewal that changes nothing sends no event. Offline, a mark is dropped once its `expires_at`
-//!   passes.
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -33,10 +10,7 @@ use crate::model::{ItemId, SpaceId};
 pub const LEASE: Duration = Duration::from_secs(120);
 pub const RENEW_EVERY: Duration = Duration::from_secs(30);
 pub const USED_LATELY: Duration = Duration::from_secs(5 * 60);
-/// A realtime check older than this was replayed from the cursor, not asked now.
 pub const STALE_CHECK: Duration = Duration::from_secs(10);
-/// How long an open has to last before the server hears of it, unless the file is written to
-/// first.
 pub const REPORT_AFTER: Duration = Duration::from_secs(3);
 
 type Key = (SpaceId, ItemId);
@@ -45,40 +19,37 @@ type Key = (SpaceId, ItemId);
 struct OpenState {
     readers: u32,
     writers: u32,
-    /// When the server last took this computer's mark.
     renewed: Option<Instant>,
-    /// When the item went from closed to open.
     since: Option<Instant>,
-    /// It was written to while open.
     written: bool,
 }
 
 impl OpenState {
-    /// Lasted long enough, or was written to: an open the server hears of.
     fn reportable(&self) -> bool {
-        self.written || self.since.is_some_and(|since| since.elapsed() >= REPORT_AFTER)
+        self.written
+            || self
+                .since
+                .is_some_and(|since| since.elapsed() >= REPORT_AFTER)
     }
 
-    /// This computer edits it: a write open. Marks say so, to show who is editing.
     fn editing(&self) -> bool {
         self.writers > 0
     }
 }
 
-/// What this computer has open.
 #[derive(Default)]
 pub struct Opens {
     open: Mutex<HashMap<Key, OpenState>>,
-    /// Items marked in use with the server only to answer a check, and when.
     answered: Mutex<HashMap<Key, Instant>>,
 }
 
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 impl Opens {
-    /// Counts an open. True when it is the item's first.
     pub fn open(&self, key: Key, editing: bool) -> bool {
         let mut open = lock(&self.open);
         let state = open.entry(key).or_default();
@@ -95,7 +66,6 @@ impl Opens {
         first
     }
 
-    /// Counts a close. True when nothing has it open any more.
     pub fn close(&self, key: &Key, editing: bool) -> bool {
         let mut open = lock(&self.open);
         let Some(state) = open.get_mut(key) else {
@@ -126,13 +96,10 @@ impl Opens {
         lock(&self.open).keys().cloned().collect()
     }
 
-    /// Whether the item is open and the open has lasted `REPORT_AFTER` or was written to: one
-    /// the server may hear of.
     pub fn reportable(&self, key: &Key) -> bool {
         lock(&self.open).get(key).is_some_and(OpenState::reportable)
     }
 
-    /// The open items the server may hear of, with whether this computer is editing each.
     pub fn reportable_keys(&self) -> Vec<(Key, bool)> {
         lock(&self.open)
             .iter()
@@ -141,8 +108,6 @@ impl Opens {
             .collect()
     }
 
-    /// The item was written to. True when it is open and that made its open one the server
-    /// hears of now, rather than once it has lasted.
     pub fn wrote(&self, key: &Key) -> bool {
         let mut open = lock(&self.open);
         let Some(state) = open.get_mut(key) else {
@@ -159,7 +124,6 @@ impl Opens {
         }
     }
 
-    /// Open items whose mark is due, with whether this computer is editing each.
     pub fn due(&self) -> Vec<(Key, bool)> {
         lock(&self.open)
             .iter()
@@ -170,18 +134,14 @@ impl Opens {
             .collect()
     }
 
-    /// Remembers that a check was answered with a mark, so it is renewed for one lease and then
-    /// let go.
     pub fn answered(&self, key: Key) {
         lock(&self.answered).insert(key, Instant::now());
     }
 
-    /// Lets go of an answered mark: the item was closed here, so the next check asks afresh.
     pub fn forget_answer(&self, key: &Key) {
         lock(&self.answered).remove(key);
     }
 
-    /// Answered marks still within their lease.
     pub fn answered_live(&self) -> Vec<Key> {
         let mut answered = lock(&self.answered);
         answered.retain(|_, at| at.elapsed() < LEASE);
@@ -189,7 +149,6 @@ impl Opens {
     }
 }
 
-/// One computer's mark on an item, as the server last listed it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Held {
     pub user_id: String,
@@ -197,14 +156,18 @@ pub struct Held {
     pub device_id: String,
     pub device_name: String,
     pub editing: bool,
-    /// When its lease runs out, in milliseconds since the epoch.
     pub expires_ms: i64,
 }
 
 impl Held {
-    /// What a row shows of it: everything but when the lease runs out, so a renewal is no change.
     fn shown(&self) -> (&str, &str, &str, &str, bool) {
-        (&self.name, &self.device_name, &self.user_id, &self.device_id, self.editing)
+        (
+            &self.name,
+            &self.device_name,
+            &self.user_id,
+            &self.device_id,
+            self.editing,
+        )
     }
 }
 
@@ -212,15 +175,18 @@ fn same(a: &[Held], b: &[Held]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.shown() == b.shown())
 }
 
-/// Every computer's marks in each mounted Space, by item: who else has a file open.
 #[derive(Default)]
 pub struct Marks {
     by_space: Mutex<HashMap<SpaceId, HashMap<ItemId, Vec<Held>>>>,
 }
 
 impl Marks {
-    /// Takes the server's whole list for a Space. Answers the items whose marks changed.
-    pub fn replace(&self, space: &SpaceId, marks: Vec<(ItemId, Held)>, now_ms: i64) -> HashSet<ItemId> {
+    pub fn replace(
+        &self,
+        space: &SpaceId,
+        marks: Vec<(ItemId, Held)>,
+        now_ms: i64,
+    ) -> HashSet<ItemId> {
         let mut next: HashMap<ItemId, Vec<Held>> = HashMap::new();
         for (item, held) in marks {
             if held.expires_ms > now_ms {
@@ -242,7 +208,6 @@ impl Marks {
         changed
     }
 
-    /// Drops the marks whose lease ran out. Answers the items that lost one.
     pub fn expire(&self, space: &SpaceId, now_ms: i64) -> HashSet<ItemId> {
         let mut changed = HashSet::new();
         if let Some(items) = lock(&self.by_space).get_mut(space) {
@@ -258,30 +223,33 @@ impl Marks {
         changed
     }
 
-    /// Whether any mark's lease runs out by `by_ms`, so the list is worth reading again.
     pub fn expiring(&self, space: &SpaceId, by_ms: i64) -> bool {
         lock(&self.by_space).get(space).is_some_and(|items| {
-            items.values().flatten().any(|held| held.expires_ms <= by_ms)
+            items
+                .values()
+                .flatten()
+                .any(|held| held.expires_ms <= by_ms)
         })
     }
 
-    /// The live marks on one item.
     pub fn on(&self, space: &SpaceId, item: &ItemId, now_ms: i64) -> Vec<Held> {
         lock(&self.by_space)
             .get(space)
             .and_then(|items| items.get(item))
-            .map(|list| list.iter().filter(|held| held.expires_ms > now_ms).cloned().collect())
+            .map(|list| {
+                list.iter()
+                    .filter(|held| held.expires_ms > now_ms)
+                    .cloned()
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
-    /// Forgets a Space's marks, as it is unmounted.
     pub fn forget(&self, space: &SpaceId) {
         lock(&self.by_space).remove(space);
     }
 }
 
-/// Which of `paths` one of the person's own processes holds open right now. Needs no admin: only
-/// the person's own processes are looked at, as `lsof` does for them.
 pub fn held_open(paths: &[PathBuf]) -> HashSet<PathBuf> {
     if paths.is_empty() {
         return HashSet::new();
@@ -291,8 +259,6 @@ pub fn held_open(paths: &[PathBuf]) -> HashSet<PathBuf> {
 
 #[cfg(target_os = "macos")]
 mod platform {
-    //! libproc: `proc_listpids(PROC_UID_ONLY)`, then each process's descriptors
-    //! (`PROC_PIDLISTFDS`) and each vnode's path (`PROC_PIDFDVNODEPATHINFO`).
     use std::{
         collections::HashSet,
         ffi::{c_void, CStr},
@@ -300,7 +266,6 @@ mod platform {
         path::PathBuf,
     };
 
-    /// From `<sys/proc_info.h>`; the libc crate doesn't name these.
     const PROC_UID_ONLY: u32 = 4;
     const PROC_PIDFDVNODEPATHINFO: c_int = 2;
 
@@ -324,7 +289,8 @@ mod platform {
         let mut held = HashSet::new();
         let pid_size = std::mem::size_of::<libc::pid_t>();
         // SAFETY: a null buffer only asks for the size the list would take.
-        let bytes = unsafe { libc::proc_listpids(PROC_UID_ONLY, libc::getuid(), std::ptr::null_mut(), 0) };
+        let bytes =
+            unsafe { libc::proc_listpids(PROC_UID_ONLY, libc::getuid(), std::ptr::null_mut(), 0) };
         if bytes <= 0 {
             return held;
         }
@@ -386,9 +352,7 @@ mod platform {
                     continue;
                 }
                 // SAFETY: the kernel writes a NUL-terminated path into the 1024-byte array.
-                let path = unsafe {
-                    CStr::from_ptr(info.pvip.vip_path.as_ptr().cast::<c_char>())
-                };
+                let path = unsafe { CStr::from_ptr(info.pvip.vip_path.as_ptr().cast::<c_char>()) };
                 let path = PathBuf::from(path.to_string_lossy().into_owned());
                 if wanted.contains(&path) {
                     held.insert(path);
@@ -404,10 +368,6 @@ mod platform {
 
 #[cfg(target_os = "linux")]
 mod platform {
-    //! `/proc/<pid>/fd`, for the person's own processes. These are the process table, not
-    //! anyone's files, so they are read directly rather than through the file gate, which covers
-    //! files: the gate has no place for `/proc`, and giving it one would let any of Misty's code
-    //! read every process's details.
     #![allow(clippy::disallowed_methods)]
     use std::{collections::HashSet, os::unix::fs::MetadataExt, path::PathBuf};
 
@@ -447,8 +407,6 @@ mod platform {
 
 #[cfg(windows)]
 mod platform {
-    //! The Restart Manager: one session per file, asked which processes hold it. It needs no admin
-    //! and sees the person's own processes.
     use std::{collections::HashSet, os::windows::ffi::OsStrExt, path::PathBuf};
 
     use windows_sys::Win32::Foundation::{ERROR_MORE_DATA, ERROR_SUCCESS};
@@ -456,7 +414,6 @@ mod platform {
         RmEndSession, RmGetList, RmRegisterResources, RmStartSession, CCH_RM_SESSION_KEY,
     };
 
-    /// Checking is a session per file; past this many, the rest go unchecked.
     const MOST: usize = 64;
 
     pub fn held_open(paths: &[PathBuf]) -> HashSet<PathBuf> {
@@ -567,9 +524,17 @@ mod tests {
             editing,
             expires_ms,
         };
-        assert_eq!(marks.replace(&space, vec![(item.clone(), ana(false, 100))], 0), HashSet::from([item.clone()]));
-        assert!(marks.replace(&space, vec![(item.clone(), ana(false, 200))], 0).is_empty());
-        assert_eq!(marks.replace(&space, vec![(item.clone(), ana(true, 200))], 0), HashSet::from([item.clone()]));
+        assert_eq!(
+            marks.replace(&space, vec![(item.clone(), ana(false, 100))], 0),
+            HashSet::from([item.clone()])
+        );
+        assert!(marks
+            .replace(&space, vec![(item.clone(), ana(false, 200))], 0)
+            .is_empty());
+        assert_eq!(
+            marks.replace(&space, vec![(item.clone(), ana(true, 200))], 0),
+            HashSet::from([item.clone()])
+        );
         assert!(marks.expiring(&space, 200));
         assert!(marks.expire(&space, 199).is_empty());
         assert_eq!(marks.expire(&space, 200), HashSet::from([item.clone()]));

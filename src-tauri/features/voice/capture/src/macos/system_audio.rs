@@ -1,5 +1,3 @@
-//! System or per-process audio through a Core Audio process tap.
-
 use super::sources::{number, process_objects};
 use super::{convert_and_send, global, output_format, Delivery, StartFailure, SYSTEM};
 use crate::Format;
@@ -32,14 +30,9 @@ use std::ptr::{self, NonNull};
 use std::sync::{Arc, Mutex, OnceLock};
 
 extern "C" {
-    /// The process macOS holds responsible for `pid`: the app itself for the
-    /// WebKit processes (pages, media) it starts. libSystem exports it.
     fn responsibility_get_pid_responsible_for_pid(pid: libc::pid_t) -> libc::pid_t;
 }
 
-/// Core Audio's objects for Misty and every process it is responsible for.
-/// A page's sound (a call's voices, a video) plays from WebKit's own
-/// processes, not Misty's, so leaving out Misty's pid alone would let it in.
 fn own_processes() -> Vec<AudioObjectID> {
     // SAFETY: getpid has no preconditions.
     let own = unsafe { libc::getpid() };
@@ -63,9 +56,6 @@ type CreateProcessTap =
 type DestroyProcessTap = unsafe extern "C-unwind" fn(AudioObjectID) -> i32;
 type ListenerBlock = RcBlock<dyn Fn(u32, NonNull<AudioObjectPropertyAddress>)>;
 
-/// The two process-tap calls, which only exist from macOS 14.2. Rust can't
-/// weak-link a symbol, and the app still launches on 14.0, where a direct
-/// reference would stop it loading, so they are looked up at run time.
 #[derive(Clone, Copy)]
 struct TapApi {
     create: CreateProcessTap,
@@ -105,9 +95,7 @@ pub(super) fn supported() -> bool {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Failure {
-    /// A Core Audio call returned this status.
     CoreAudio(i32),
-    /// The tap's format could not be read as PCM or converted.
     Device,
 }
 
@@ -137,15 +125,11 @@ fn dictionary(entries: &[(&CStr, &AnyObject)]) -> Retained<NSDictionary<NSString
     NSDictionary::from_slices(&keys, &values)
 }
 
-/// System or per-process audio through a Core Audio process tap on a private
-/// aggregate device (macOS 14.2+).
-/// The tap copies audio; what the user hears is unchanged.
 pub(super) struct SystemAudioCapture {
     api: TapApi,
     tap: AudioObjectID,
     device: AudioObjectID,
     io: AudioDeviceIOProcID,
-    /// Each listener with the system property it listens to.
     listeners: Vec<(AudioObjectPropertySelector, ListenerBlock)>,
     delivery: Arc<Delivery>,
     queue: DispatchRetained<DispatchQueue>,
@@ -347,16 +331,12 @@ impl SystemAudioCapture {
             )
         })?;
 
-        // A new default output device invalidates the tap; report it.
         let delivery = Arc::clone(&self.delivery);
         let listener: ListenerBlock = RcBlock::new(
             move |_count: u32, _addresses: NonNull<AudioObjectPropertyAddress>| delivery.fail(),
         );
         self.listen(kAudioHardwarePropertyDefaultOutputDevice, listener)?;
 
-        // WebKit starts its processes as pages need them, after the tap may
-        // have begun; each one Misty is responsible for is left out as it
-        // first appears, so its sound never reaches the tap.
         if global_tap && exclude_self {
             let tap = self.tap;
             let excluded = Mutex::new(own);
@@ -395,7 +375,6 @@ impl SystemAudioCapture {
         check(unsafe { AudioDeviceStart(self.device, self.io) })
     }
 
-    /// Listens to a system property on the capture's queue until `stop`.
     fn listen(
         &mut self,
         selector: AudioObjectPropertySelector,
@@ -447,8 +426,6 @@ impl SystemAudioCapture {
     }
 }
 
-/// The Core Audio process object for a PID, or None when that process has
-/// never opened audio.
 fn process_object(pid: libc::pid_t) -> Option<AudioObjectID> {
     let mut object: AudioObjectID = 0;
     let mut size = size_of::<AudioObjectID>() as u32;
@@ -486,7 +463,6 @@ pub(super) fn start(
     let mut capture = SystemAudioCapture::new(api, delivery);
     match capture.start(&processes, exclude_self, format) {
         Ok(()) => Ok(capture),
-        // A refused tap means the user has not allowed audio capture.
         Err(Failure::CoreAudio(code)) if code == kAudioHardwareIllegalOperationError => {
             Err(StartFailure::Denied)
         }

@@ -1,5 +1,3 @@
-//! Approvals the person remembered, kept like `requests`: rows the renderer's chat commands can't
-//! write. Unlike the server's they aren't per agent, because a tool call doesn't say which agent made it.
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -13,8 +11,6 @@ use super::{
 const GRANT_KIND: &str = "app_grant";
 const LOCAL_GRANT_PREFIX: &str = "localgrant_";
 
-/// An approval the person remembered: agents on this computer may take this action on this one
-/// resource while a chat is in Auto.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Grant {
     pub id: String,
@@ -81,7 +77,6 @@ pub(super) fn write_grant(
     )
 }
 
-/// Read fresh on every call, so a revoke applies to the next action.
 pub fn covering_grant(store: &Store, need: &GrantNeed) -> Result<bool, String> {
     let account = store.account();
     if !need.rememberable() {
@@ -120,7 +115,6 @@ pub fn grants(store: &Store) -> Result<Vec<Grant>, String> {
         .collect())
 }
 
-/// Forgets one grant, or every one when `id` is `None`.
 pub fn revoke_grants(store: &Store, id: Option<&str>) -> Result<(), String> {
     let account = store.account();
     let connection = store.connect().map_err(storage)?;

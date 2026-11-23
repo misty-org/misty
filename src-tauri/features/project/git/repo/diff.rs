@@ -10,8 +10,6 @@ use serde::Serialize;
 
 use super::status::open_repo;
 
-/// Both sides of an image change as data URLs. A side is absent when the file doesn't exist in
-/// that revision (added or deleted). A patch says nothing useful about an image.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitImageDiff {
@@ -19,17 +17,11 @@ pub struct GitImageDiff {
     pub new: Option<String>,
 }
 
-// The file panel's own image rules, so a diff and an opened file agree on what an image is.
 pub(crate) use crate::project::files::{image_mime, is_image};
 
-/// The largest image version a diff shows. Diff images come from Git's objects, not from a file on
-/// disk the webview could load by URL, so they still cross as data URLs and need a cap.
 pub(crate) const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 
-/// The most patch text sent to the panel. An untracked file is shown as all added, so a large
-/// new file (a build output, a log) would otherwise cross over whole.
 pub(crate) const MAX_DIFF_PATCH_BYTES: usize = 2 * 1024 * 1024;
-/// Ends a patch that was cut short, so the view shows where it stops.
 pub(crate) const DIFF_TRUNCATED_MARKER: &str = "[… the rest of this diff is too long to show …]\n";
 
 pub(crate) fn git_diff_blocking(path: &Path, file: &str, staged: bool) -> Result<String, String> {
@@ -37,7 +29,6 @@ pub(crate) fn git_diff_blocking(path: &Path, file: &str, staged: bool) -> Result
     let mut options = git2::DiffOptions::new();
     options.pathspec(file);
     if !staged {
-        // A new file's content is included, so it shows as a real patch.
         options
             .include_untracked(true)
             .recurse_untracked_dirs(true)
@@ -67,7 +58,6 @@ pub(crate) fn git_diff_blocking(path: &Path, file: &str, staged: bool) -> Result
     });
     match printed {
         Ok(()) => {}
-        // Our own stop: git2 turns a `false` from the callback into GIT_EUSER.
         Err(error) if truncated && error.code() == git2::ErrorCode::User => {}
         Err(error) => return Err(error.to_string()),
     }
@@ -88,7 +78,6 @@ fn image_data_url(file: &str, bytes: &[u8]) -> String {
     )
 }
 
-/// The 5 MiB preview limit, checked before any bytes are copied.
 fn ensure_image_size(size: usize) -> Result<(), String> {
     if size > MAX_IMAGE_BYTES {
         return Err("This image is over the 5MB preview limit.".to_string());
@@ -96,7 +85,6 @@ fn ensure_image_size(size: usize) -> Result<(), String> {
     Ok(())
 }
 
-/// `file` at HEAD; nothing for a repository with no commit or a path HEAD doesn't have.
 fn head_blob_bytes(repo: &Repository, file: &str) -> Result<Option<Vec<u8>>, String> {
     let Ok(head) = repo.head() else {
         return Ok(None);
@@ -113,7 +101,6 @@ fn head_blob_bytes(repo: &Repository, file: &str) -> Result<Option<Vec<u8>>, Str
     Ok(Some(blob.content().to_vec()))
 }
 
-/// `file` in the index; nothing when it isn't staged.
 fn index_blob_bytes(repo: &Repository, file: &str) -> Result<Option<Vec<u8>>, String> {
     let index = repo.index().map_err(|error| error.to_string())?;
     let Some(entry) = index.get_path(Path::new(file), 0) else {
@@ -126,8 +113,6 @@ fn index_blob_bytes(repo: &Repository, file: &str) -> Result<Option<Vec<u8>>, St
     Ok(Some(blob.content().to_vec()))
 }
 
-/// The file as it is in the folder, kept inside the repository so a crafted path or a link
-/// pointing out can't read anything else.
 fn worktree_image_bytes(repo: &Repository, file: &str) -> Result<Option<Vec<u8>>, String> {
     let Some(workdir) = repo.workdir() else {
         return Ok(None);

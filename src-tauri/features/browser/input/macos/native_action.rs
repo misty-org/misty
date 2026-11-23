@@ -1,9 +1,3 @@
-//! Trusted WKWebView input: builds real AppKit events and hands them to the granted view.
-//!
-//! Called only on the main thread following task, grant and snapshot checks. Never use
-//! `NSApp.sendEvent` or `CGEventPost`: those could reach browser chrome, a different
-//! app, or a window that became active while the model was thinking.
-
 use super::keys::key_spec;
 use objc2::rc::{autoreleasepool, Retained};
 use objc2::{msg_send, MainThreadMarker};
@@ -20,7 +14,6 @@ const NOT_FOUND: usize = usize::MAX;
 
 type Outcome = Result<(), &'static str>;
 
-/// Performs `input` (`{"action", "viewport", "editable"}`) on `view` and says what happened.
 pub(crate) fn perform(mtm: MainThreadMarker, view: &WKWebView, input: &Value) -> Value {
     autoreleasepool(|_| match act(mtm, view, input) {
         Ok(()) => json!({"attempted": true, "verified": false, "driver": "native-wkwebview"}),
@@ -32,7 +25,6 @@ fn number(value: &Value) -> f64 {
     value.as_f64().unwrap_or(0.0)
 }
 
-/// A point inside the view, from fractions of its width and height measured from the top left.
 fn point_in(view: &NSView, x: f64, y: f64) -> NSPoint {
     let bounds = view.bounds();
     let (width, height) = (bounds.size.width, bounds.size.height);
@@ -104,7 +96,6 @@ fn act(mtm: MainThreadMarker, view: &WKWebView, input: &Value) -> Outcome {
         };
         match kind {
             "move" => {
-                // The pointer comes to rest over the control, so the page's own :hover menus open.
                 if let Some(event) = mouse_event(view, NSEventType::MouseMoved, point, 0, time) {
                     target.mouseMoved(&event);
                 }
@@ -303,9 +294,6 @@ fn key(
         if kind == NSEventType::KeyUp {
             responder.keyUp(&event);
         } else if flags.contains(NSEventModifierFlags::Command) && editable {
-            // WebKit editor defaults require an explicit editing command when this
-            // agent-owned window is not key. Canvas applications instead receive their
-            // ordinary shortcut events. Never send through NSApp.
             let command = match name.to_lowercase().as_str() {
                 "a" => objc2::sel!(selectAll:),
                 _ if flags.contains(NSEventModifierFlags::Shift) => objc2::sel!(redo:),

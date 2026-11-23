@@ -1,11 +1,7 @@
-//! Which windows stand for the app, a profile or the person, and the events sent to them.
 use super::*;
 
-/// Emitted to the window that becomes the host after the host closes.
 pub const HOST_EVENT: &str = "misty://profile-window-host";
 
-/// The window that runs this device's own background work (agent jobs): the oldest
-/// open app window.
 pub fn host_window() -> Option<String> {
     current_windows()
         .into_iter()
@@ -13,7 +9,6 @@ pub fn host_window() -> Option<String> {
         .find(|label| is_person_window(label))
 }
 
-/// The window ids of a profile's open windows.
 pub(crate) fn open_window_ids(profile: &str) -> std::collections::BTreeSet<String> {
     current_windows()
         .into_iter()
@@ -22,7 +17,6 @@ pub(crate) fn open_window_ids(profile: &str) -> std::collections::BTreeSet<Strin
         .collect()
 }
 
-/// The profile's oldest open window.
 pub(crate) fn first_window_of(profile: &str) -> Option<String> {
     current_windows()
         .into_iter()
@@ -30,14 +24,11 @@ pub(crate) fn first_window_of(profile: &str) -> Option<String> {
         .map(|(label, _)| label)
 }
 
-/// The window the person used last, while it is open.
 pub(crate) fn last_person_window() -> Option<String> {
     registry::last_focused_person()
 }
 
-/// Every open app window.
 pub fn app_windows<R: Runtime>(app: &AppHandle<R>) -> Vec<Window<R>> {
-    // `get_webview_window` cannot see a window that holds page views beside its own.
     app.windows()
         .into_iter()
         .filter(|(label, _)| is_app_window(label))
@@ -45,7 +36,6 @@ pub fn app_windows<R: Runtime>(app: &AppHandle<R>) -> Vec<Window<R>> {
         .collect()
 }
 
-/// Every open person window.
 pub fn person_windows<R: Runtime>(app: &AppHandle<R>) -> Vec<Window<R>> {
     app_windows(app)
         .into_iter()
@@ -53,7 +43,6 @@ pub fn person_windows<R: Runtime>(app: &AppHandle<R>) -> Vec<Window<R>> {
         .collect()
 }
 
-/// A profile's open windows.
 pub fn windows_for_profile<R: Runtime>(app: &AppHandle<R>, key: &str) -> Vec<Window<R>> {
     app_windows(app)
         .into_iter()
@@ -61,8 +50,6 @@ pub fn windows_for_profile<R: Runtime>(app: &AppHandle<R>, key: &str) -> Vec<Win
         .collect()
 }
 
-/// The app window that answers for the app as a whole: the last focused person window,
-/// else the first profile's, else any.
 pub fn primary<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
     let last = registry::last_focused_person();
     last.and_then(|label| app.get_window(&label))
@@ -79,7 +66,6 @@ pub fn primary<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
         })
 }
 
-/// The app window the person used last: menu choices act there.
 #[cfg(target_os = "macos")]
 pub fn focused<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
     let last = registry::last_focused_any();
@@ -87,7 +73,6 @@ pub fn focused<R: Runtime>(app: &AppHandle<R>) -> Option<Window<R>> {
         .or_else(|| primary(app))
 }
 
-/// Sends a menu choice to the window the person used last.
 #[cfg(target_os = "macos")]
 pub fn emit_to_focused<R: Runtime, S: Serialize + Clone>(
     app: &AppHandle<R>,
@@ -103,7 +88,6 @@ pub fn primary_label<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
     primary(app).map(|window| window.label().to_owned())
 }
 
-/// The primary window's app webview.
 pub fn primary_webview<R: Runtime>(app: &AppHandle<R>) -> Option<tauri::Webview<R>> {
     primary_label(app).and_then(|label| app.get_webview(&label))
 }
@@ -118,12 +102,10 @@ pub(crate) fn targets(target: &EventTarget, accept: impl Fn(&str) -> bool) -> bo
     }
 }
 
-/// Sends an account-wide event (sync, devices) to every person window.
 pub fn emit<R: Runtime, S: Serialize + Clone>(app: &AppHandle<R>, event: &str, payload: S) {
     let _ = app.emit_filter(event, payload, |target| targets(target, is_person_window));
 }
 
-/// Sends an event to one profile's windows.
 pub fn emit_to_profile<R: Runtime, S: Serialize + Clone>(
     app: &AppHandle<R>,
     key: &str,
@@ -137,8 +119,6 @@ pub fn emit_to_profile<R: Runtime, S: Serialize + Clone>(
     });
 }
 
-/// Sends an event the person acts on (a menu choice, dictation, the cursor agent) to
-/// the window they use: the last focused person window.
 pub fn emit_to_primary<R: Runtime, S: Serialize + Clone>(
     app: &AppHandle<R>,
     event: &str,

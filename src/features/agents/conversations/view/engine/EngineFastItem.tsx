@@ -2,21 +2,14 @@ import { Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { invoke } from "@/native/invoke";
 import { MenuCheckItem, MenuSeparator } from "@misty/ui";
-import type { EngineModel } from "../../../engines/enginesApi";
+import type { EngineModel } from "../../../engines/engines_api";
 
-/** This device's engine settings, as native code keeps them in misty.db. */
 interface EngineSettings {
   codexServiceTier?: string | null;
   claudeFastMode?: boolean | null;
   [key: string]: unknown;
 }
 
-/**
- * The engine's own fast mode for the chat's model, by the engine's own name ("Fast mode", a Codex
- * tier's name), kept for this device. Shown only where the engine's catalog offers one for the
- * model (`EngineModel.fast`): Claude Code's catalog, Codex's service tiers. Off leaves the CLI's
- * own setting alone.
- */
 export function EngineFastItem({ engine, model }: { engine?: string; model?: EngineModel }) {
   const fast = model?.fast;
   const [settings, setSettings] = useState<EngineSettings>();

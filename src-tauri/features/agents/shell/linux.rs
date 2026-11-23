@@ -1,8 +1,3 @@
-//! Commands on Linux under `sandbox::linux`: Landlock lets them read the shell tools Misty ships, the
-//! system's libraries and, when granted, the shared folder, and change only the chat's workspace
-//! (and, when allowed, the shared folder); seccomp leaves them no socket; namespaces, where the system
-//! allows them, end every process with the command. The shell and its tools are the program in
-//! `tools`, and that's the only program the rules let them start.
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
@@ -22,14 +17,10 @@ use super::{
     ShellRequest,
 };
 
-/// A command may start this many processes beyond the person's own, so a fork bomb stops there
-/// rather than at the system's limit, where the person couldn't start anything either.
 const EXTRA_PROCESSES: u64 = 512;
 
-/// How many entries of a shared folder are looked through for secrets and Git folders.
 const MAX_SCANNED_ENTRIES: usize = 200_000;
 
-/// System files the shell's tools read: time zones for `date`, and user and group names for `ls -l`.
 const SHELL_FILES: &[&str] = &[
     "/usr/share/zoneinfo",
     "/etc/localtime",
@@ -38,8 +29,6 @@ const SHELL_FILES: &[&str] = &[
     "/etc/nsswitch.conf",
 ];
 
-/// How many processes this person is running now, since the system's limit counts all of them.
-// `/proc` is the kernel's view of processes, not anyone's files, so the file gate has no say here.
 #[allow(clippy::disallowed_methods)]
 fn running_processes() -> u64 {
     use std::os::unix::fs::MetadataExt;
@@ -60,7 +49,6 @@ fn running_processes() -> u64 {
         .count() as u64
 }
 
-/// Folders that run code by themselves later, outside the sandbox, so commands only read them.
 fn runs_later(name: &str, is_dir: bool) -> bool {
     let name = name.to_ascii_lowercase();
     if is_dir {
@@ -70,7 +58,6 @@ fn runs_later(name: &str, is_dir: bool) -> bool {
     }
 }
 
-/// What a scan found in a shared folder: entries closed to commands, and entries they only read.
 #[derive(Default)]
 struct Scanned {
     closed: Vec<PathBuf>,
@@ -117,11 +104,6 @@ fn scan(root: &Path, writable: bool) -> Scanned {
     found
 }
 
-/// The rules for a shared folder. Landlock only adds, so a folder holding a secret can't be granted
-/// whole: it gets its listing, and everything in it except the secret gets its own rule. Down the
-/// rest of the tree, folders without anything special are granted whole. Files a command makes right
-/// inside such a folder are refused; anywhere else they work as usual. A secret's name shows in a
-/// listing; what's in it never does. The folder's own rule comes first.
 fn folder_rules(root: &Path, writable: bool) -> Vec<(PathBuf, Access)> {
     let full = if writable {
         Access::AddEdit
@@ -132,7 +114,6 @@ fn folder_rules(root: &Path, writable: bool) -> Vec<(PathBuf, Access)> {
     if scanned.closed.is_empty() && scanned.read_only.is_empty() {
         return vec![(root.to_path_buf(), full)];
     }
-    // Every folder on the way to something special is split into its entries.
     let mut split = std::collections::HashSet::new();
     for path in scanned.closed.iter().chain(&scanned.read_only) {
         let mut parent = path.parent();
@@ -181,7 +162,6 @@ fn policy(tools: &tools::Tools, workspace: &Path, folder: Option<(&Path, bool)>)
         .map(|path| (PathBuf::from(path), Access::Read))
         .collect();
     if let Some((root, writable)) = folder {
-        // The folder itself must take its rule; an entry that went away since the scan needn't.
         let mut rules = folder_rules(root, writable).into_iter();
         required.extend(rules.next());
         optional.extend(rules);
@@ -247,7 +227,6 @@ pub(super) async fn run(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    // The hook starts the command's own session, which is its process group too.
     unsafe {
         command.pre_exec(confinement.hook());
     }
@@ -256,7 +235,6 @@ pub(super) async fn run(
         .map_err(|_| "shell_start_failed".to_owned())?;
     drop(confinement);
     let pid = child.id().ok_or("shell_start_failed")? as i32;
-    // A command that couldn't be stopped after a crash doesn't run at all.
     let Ok(exit_watcher) = ExitWatcher::start(pid) else {
         unsafe {
             libc::kill(-pid, libc::SIGKILL);
@@ -282,7 +260,6 @@ pub(super) async fn run(
             _ = tokio::time::sleep(Duration::from_millis(50)) => {}
         }
     };
-    // Whatever way it ended, nothing it started outlives it.
     tree.kill_all();
     unsafe {
         libc::kill(-pid, libc::SIGKILL);
@@ -321,7 +298,6 @@ where
     })
 }
 
-/// A process that escaped the group could hold a pipe open forever, so reading has a deadline.
 async fn finished(reader: tokio::task::JoinHandle<CappedOutput>) -> (String, bool) {
     let abort = reader.abort_handle();
     match tokio::time::timeout(Duration::from_secs(2), reader).await {

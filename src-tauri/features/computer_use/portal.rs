@@ -1,9 +1,3 @@
-//! Computer use on a Wayland session. Wayland gives no app the global pointer or keyboard, so
-//! input goes through the XDG desktop RemoteDesktop portal, in one session per Misty run that
-//! the person approves in the compositor's own prompt. The session also selects the displays
-//! as ScreenCast streams, which is what lets the portal place the pointer at a point; the
-//! frames themselves come from xcap's capture, which uses the Screenshot portal there.
-//! The person ends the session at any time from the compositor's sharing indicator.
 use std::sync::{Mutex, MutexGuard};
 
 use ashpd::desktop::{
@@ -28,7 +22,6 @@ struct Remote {
 }
 
 static REMOTE: Mutex<Option<Remote>> = Mutex::new(None);
-/// Lets the compositor skip its prompt while Misty runs, once the person allowed it.
 static RESTORE: Mutex<Option<String>> = Mutex::new(None);
 
 fn block<T>(work: impl std::future::Future<Output = T>) -> T {
@@ -111,7 +104,6 @@ fn remote() -> Result<MutexGuard<'static, Option<Remote>>, String> {
     Ok(remote)
 }
 
-/// Runs one portal call; a session the person ended is started again once, with a new prompt.
 fn with<T>(call: impl Fn(&Remote) -> Result<T, ashpd::Error>) -> Result<T, String> {
     for attempt in 0..2 {
         let mut guard = remote()?;
@@ -131,14 +123,12 @@ fn with<T>(call: impl Fn(&Remote) -> Result<T, ashpd::Error>) -> Result<T, Strin
     Err("Remote control stopped.".into())
 }
 
-/// Ends the portal session, as when computer use ends for every run.
 pub(crate) fn end() {
     if let Some(remote) = REMOTE.lock().ok().and_then(|mut remote| remote.take()) {
         let _ = block(remote.session.close());
     }
 }
 
-/// Moves the pointer to a point in the compositor's logical coordinates.
 pub(crate) fn move_to(x: f64, y: f64) -> Result<(), String> {
     with(|remote| {
         let area = remote
@@ -166,7 +156,6 @@ pub(crate) fn move_to(x: f64, y: f64) -> Result<(), String> {
     })
 }
 
-/// Linux input event codes for the buttons.
 const BUTTON_LEFT: i32 = 0x110;
 const BUTTON_RIGHT: i32 = 0x111;
 const BUTTON_MIDDLE: i32 = 0x112;
@@ -191,7 +180,6 @@ pub(crate) fn button(button: enigo::Button, pressed: bool) -> Result<(), String>
     })
 }
 
-/// Scrolls by wheel steps; positive y scrolls the content down, positive x to the right.
 pub(crate) fn scroll(steps_x: i32, steps_y: i32) -> Result<(), String> {
     with(|remote| {
         if steps_y != 0 {
@@ -214,7 +202,6 @@ pub(crate) fn scroll(steps_x: i32, steps_y: i32) -> Result<(), String> {
     })
 }
 
-/// The X keysym for a key, which the compositor maps through the person's keyboard layout.
 pub(crate) fn keysym(key: Key) -> Option<i32> {
     let symbol = match key {
         Key::Return => 0xff0d,
@@ -254,7 +241,6 @@ pub(crate) fn keysym(key: Key) -> Option<i32> {
     Some(symbol)
 }
 
-/// Latin-1 keysyms are their code points; the rest use the Unicode keysym range.
 fn char_keysym(character: char) -> i32 {
     match character {
         '\n' | '\r' => 0xff0d,

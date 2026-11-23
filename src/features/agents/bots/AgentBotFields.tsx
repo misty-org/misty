@@ -1,14 +1,14 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-/**
- * The bot fields in an agent's editor: its soul, the tools and MCP servers it may use,
- * and how an outside engine starts it. Under them, the prompt the run gets, built by the same
- * function the run uses, and the bot folder export.
- */
 import { useState } from "react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
 import { Button, useNotice, Field, Input, Surface, Text, Textarea } from "@misty/ui";
-import { exportBotBundle } from "./botBundle";
-import { assembleAgentPrompt, duplicateProseLines, proseOverLimit, PROSE_LIMIT } from "./botPrompt";
+import { exportBotBundle } from "./bot_bundle";
+import {
+  assembleAgentPrompt,
+  duplicateProseLines,
+  proseOverLimit,
+  PROSE_LIMIT,
+} from "./bot_prompt";
 
 const listText = (values?: string[]) => (values ?? []).join(", ");
 const listOf = (text: string) => [
@@ -91,7 +91,7 @@ export function AgentBotFields({
           as="pre"
           tone="card"
           radius="lg"
-          className="m-0 max-h-72 overflow-auto whitespace-pre-wrap p-3 text-xs"
+          className="m-0 max-h-72 overflow-auto whitespace-pre-wrap p-3 text-meta"
         >
           <Text bare tone="default">
             {preview.text || "Nothing yet"}
@@ -102,7 +102,6 @@ export function AgentBotFields({
   );
 }
 
-/** Export an agent as a bot folder. */
 export function ExportBotButton({ agent }: { agent: AgentProfile }) {
   const [state, setState] = useState<"idle" | "working" | "done">("idle");
   const [error, setError] = useState("");

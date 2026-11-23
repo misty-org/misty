@@ -19,10 +19,10 @@ import {
   isBrowserOpen,
   setBrowserExpanded,
   useAgentBrowser,
-} from "../agent-browser/agentBrowserStore";
-import { useContextPanel, type ContextPanelSurface } from "./contextPanelStore";
-import { chatKey } from "../conversations/state/draftChat";
-import { closeBrowserLog, useBrowserLog } from "../browser-log/browserLogStore";
+} from "../agent-browser/agent_browser_store";
+import { useContextPanel, type ContextPanelSurface } from "./context_panel_store";
+import { chatKey } from "../conversations/state/draft_chat";
+import { closeBrowserLog, useBrowserLog } from "../browser-log/browser_log_store";
 import { AgentProfileCard } from "./AgentProfileCard";
 
 const AgentContextPanel = lazyTool(async () => ({
@@ -32,7 +32,6 @@ const SessionPanel = lazyTool(async () => ({
   default: (await import("./SessionPanel")).SessionPanel,
 }));
 
-/** What the panel's header names when the open view puts nothing in it. */
 const surfaces: Record<ContextPanelSurface | "browser", [name: string, icon: LucideIcon]> = {
   browser: ["Browser", Globe],
   steps: ["Steps", ListOrdered],
@@ -42,12 +41,6 @@ const surfaces: Record<ContextPanelSurface | "browser", [name: string, icon: Luc
   profile: ["Profile", UserRound],
 };
 
-/**
- * One panel beside a chat, never two stacked: the agent browser and the context views share the
- * slot, and whichever the person (or the agent) opened last takes it. Opening a view while the
- * browser is open shrinks the browser to its picture in the chat; the browser opening closes the
- * view.
- */
 function useOnePanel(conversationId: string, tab: ContextPanelSurface | null, browser: boolean) {
   const previous = useRef({ tab, browser });
   useEffect(() => {
@@ -61,10 +54,6 @@ function useOnePanel(conversationId: string, tab: ContextPanelSurface | null, br
   }, [conversationId, tab, browser]);
 }
 
-/**
- * Whether a side panel (a context view, or the agent browser holding the slot) shows beside this
- * chat. The session card goes behind any of them while one does, and comes back as it closes.
- */
 export function useSidePanelShown(conversationId: string) {
   const tab = useContextPanel((state) => state.tab);
   const browserOpen = useAgentBrowser((state) =>
@@ -74,28 +63,18 @@ export function useSidePanelShown(conversationId: string) {
   return tab !== null || browserOpen || logOpen;
 }
 
-// How the panel gives way on a narrow Agents page (its `agent-studio` container). Important,
-// since the shared panel's own geometry is in its stylesheet.
-/** On a narrow page the open panel covers the chat instead of squeezing it. */
 const narrowPanelClass = cn(
   "@max-[47.5625rem]/agent-studio:absolute!",
   "@max-[47.5625rem]/agent-studio:inset-[--spacing(2)_--spacing(1)_--spacing(2)_--spacing(2)]!",
   "@max-[47.5625rem]/agent-studio:w-auto! @max-[47.5625rem]/agent-studio:max-w-none!",
   "@max-[47.5625rem]/agent-studio:m-0!",
 );
-/**
- * The right side of a chat, after the chat column and before the rail: the floating side panel
- * (the agent browser, steps, or the project folder's changes, files and terminal).
- * The session card floats over the chat itself (`ChatSessionCard`), so it takes no width here.
- */
 export function ChatSidePanels(props: { conversationId: string; agent: AgentProfile }) {
   const tab = useContextPanel((state) => state.tab);
   const width = useContextPanel((state) => state.width);
   const expanded = useContextPanel((state) => state.expanded);
-  // A chat that hasn't started keeps its browser under the draft key until it does.
   const browserChat = chatKey(props.conversationId);
   const browserShown = useAgentBrowser((state) => isBrowserOpen(state.chats[browserChat]));
-  // A run's browser log shows in the browser's slot, with or without a page beside it.
   const logOpen = useBrowserLog((state) => Boolean(state.chats[browserChat]));
   const browserOpen = browserShown || logOpen;
   useOnePanel(browserChat, tab, browserOpen);
@@ -109,7 +88,6 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
   return (
     <>
       {surface === "profile" ? (
-        // The profile is a narrow card only as tall as it needs, as Discord's beside a DM.
         <AgentProfileCard agent={props.agent} onClose={() => panel.close()} />
       ) : surface ? (
         <SidePanel
@@ -131,7 +109,6 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
           {surface === "browser" ? (
             <AgentBrowser key={browserChat} conversationId={browserChat} />
           ) : (
-            // While the panel's code loads, the view says it is getting ready, never a blank box.
             <ToolSuspense tool={surface === "terminal" ? "terminal" : `${surface} view`}>
               <AgentContextPanel
                 tab={surface}
@@ -146,21 +123,12 @@ export function ChatSidePanels(props: { conversationId: string; agent: AgentProf
   );
 }
 
-/**
- * The session card, a narrow glance at the chat's usage and where it works, floating over the
- * chat's top right corner: it takes none of the chat's width, and goes behind any side panel
- * while one is open (`useSidePanelShown`). Its parent is the chat's positioned column. Its pin, shown
- * only while the pointer is on the card's first header, keeps it open (filled) or lets it tuck off
- * the chat's edge (outlined), where resting the pointer brings it back.
- */
 export function ChatSessionCard(props: { conversationId: string; agent: AgentProfile }) {
   const session = useContextPanel((state) => state.session);
   const tucked = useContextPanel((state) => state.sessionTucked);
   const setTucked = useContextPanel((state) => state.setSessionTucked);
-  // Never beside a side panel: it stays open underneath and shows again once the panel closes.
   const covered = useSidePanelShown(props.conversationId);
   if (!session || covered) return null;
-  // One pin for both states, as any toggle: filled while the card is pinned open.
   const pinned = !tucked;
   const corner = (
     <IconButton

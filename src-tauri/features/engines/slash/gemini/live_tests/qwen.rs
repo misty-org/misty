@@ -1,8 +1,5 @@
 use super::*;
 
-/// Qwen Code on a scratch home whose sign-in is a stand-in key for a closed local port: the
-/// file commands, its ACP session (Ask mode really asks), its menu, and `/branch` on a
-/// session that a local command (`/status`, no model call) put records in.
 #[tokio::test]
 #[ignore = "runs the installed Qwen Code CLI"]
 async fn qwen_commands_on_a_scratch_home() {
@@ -47,12 +44,10 @@ async fn qwen_commands_on_a_scratch_home() {
         "session {session}, mode {}",
         result["modes"]["currentModeId"]
     );
-    // Ask mode starts in Qwen's `default`, not its classifier `auto`.
     assert_eq!(
         result.pointer("/modes/currentModeId"),
         Some(&json!("default"))
     );
-    // A local command records the session without a model call.
     let killed = AtomicBool::new(false);
     let mut refuse = refuse_requests;
     let prompt = tokio::time::timeout(
@@ -140,7 +135,6 @@ async fn qwen_commands_on_a_scratch_home() {
         "{rules}"
     );
 
-    // `/branch` through Qwen's own extension method, in a fresh process as Misty runs it.
     match show(
         context("qwen", &scratch, Some(&session), "live branch"),
         "branch",

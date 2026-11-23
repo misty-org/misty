@@ -1,20 +1,10 @@
-//! The engines that keep their chats' folders in a database or an index rather than in each chat
-//! file: OpenCode (`session.directory`, in `opencode.db` or its older JSON tree), Hermes
-//! (`sessions.cwd` in `state.db`), Kimi (`session_index.jsonl`), Grok (one folder per working
-//! folder, its path percent-encoded in the name) and Antigravity (`conversation_summaries.db` and
-//! `last_conversations.json`). Every database opens read-only, and every
-//! query and listing has a limit.
-
 use std::path::{Path, PathBuf};
 
 use super::past_folders::{modified_ms, newest_entries, Found};
 
-/// Rows read from an engine's own database.
 const MAX_ROWS: i64 = 500;
-/// OpenCode's older JSON tree: projects, and sessions per project, looked at.
 const MAX_TREE_PROJECTS: usize = 64;
 const MAX_TREE_SESSIONS: usize = 16;
-/// The biggest JSON or index file read whole.
 const MAX_FILE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_META_BYTES: u64 = 64 * 1024;
 
@@ -36,8 +26,6 @@ pub(super) fn find_stores(found: &mut Found) {
     find_agy(&crate::engines::agy::agy_home(), found);
 }
 
-/// OpenCode's data folders, as the scanner looks for them. One outside the engines' homes is
-/// refused by the file gate and skipped.
 fn opencode_roots() -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Some(home) = std::env::var_os("OPENCODE_HOME").filter(|home| !home.is_empty()) {
@@ -76,7 +64,6 @@ fn has_column(conn: &rusqlite::Connection, table: &str, column: &str) -> bool {
     .is_ok()
 }
 
-/// Runs a `(folder, last activity)` query and adds each row; the time is scaled to ms by `to_ms`.
 fn add_rows(conn: &rusqlite::Connection, sql: &str, to_ms: impl Fn(f64) -> i64, found: &mut Found) {
     let Ok(mut statement) = conn.prepare(sql) else {
         return;
@@ -91,9 +78,6 @@ fn add_rows(conn: &rusqlite::Connection, sql: &str, to_ms: impl Fn(f64) -> i64, 
     }
 }
 
-/// OpenCode 1.18 and later: one `session` row per chat, with its `directory`; 2.x keeps its
-/// chats in `session_v2`, same columns, in the same database. Subagents' and archived chats are
-/// left out where the schema has those columns.
 pub(super) fn find_opencode_db(db: &Path, found: &mut Found) {
     let Some(conn) = open_read_only(db) else {
         return;
@@ -118,8 +102,6 @@ pub(super) fn find_opencode_db(db: &Path, found: &mut Found) {
     }
 }
 
-/// OpenCode 1.1 and earlier: `storage/session/<project>/<session>.json`, each with its
-/// `directory` and `time.updated`.
 pub(super) fn find_opencode_tree(sessions: &Path, found: &mut Found) {
     for (project, _) in newest_entries(sessions, true)
         .into_iter()
@@ -154,8 +136,6 @@ fn small_json(path: &Path) -> Option<serde_json::Value> {
     serde_json::from_str(&text).ok()
 }
 
-/// Hermes: `sessions.cwd`, leaving out hidden chats and subagents' or branches' (those carry a
-/// `parent_session_id`). Its times are in seconds.
 pub(super) fn find_hermes(db: &Path, found: &mut Found) {
     let Some(conn) = open_read_only(db) else {
         return;
@@ -177,7 +157,6 @@ pub(super) fn find_hermes(db: &Path, found: &mut Found) {
     );
 }
 
-/// Kimi: one line per chat in `session_index.jsonl`, with its `workDir`.
 pub(super) fn find_kimi(index: &Path, found: &mut Found) {
     let Ok(metadata) = file_access::fs::metadata(index) else {
         return;
@@ -203,7 +182,6 @@ pub(super) fn find_kimi(index: &Path, found: &mut Found) {
     }
 }
 
-/// Grok: `<sessions>/<percent-encoded folder>/<session>/`, so the listing alone names them.
 pub(super) fn find_grok(sessions: &Path, found: &mut Found) {
     for (dir, changed) in newest_entries(sessions, true)
         .into_iter()
@@ -220,9 +198,6 @@ pub(super) fn find_grok(sessions: &Path, found: &mut Found) {
     }
 }
 
-/// Antigravity: each conversation's `workspace_uris` (`file://` URIs) in
-/// `conversation_summaries.db`, and the folder each last conversation ran in, the keys of
-/// `cache/last_conversations.json`. Neither records when, so the files' own times stand in.
 pub(super) fn find_agy(home: &Path, found: &mut Found) {
     let summaries = home.join("conversation_summaries.db");
     if let Some(conn) = open_read_only(&summaries) {

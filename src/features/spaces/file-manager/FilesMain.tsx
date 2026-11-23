@@ -1,4 +1,12 @@
-import { ClipboardPaste, Eye, FilePlus, Files, FolderInput, FolderPlus, Trash2 } from "lucide-react";
+import {
+  ClipboardPaste,
+  Eye,
+  FilePlus,
+  Files,
+  FolderInput,
+  FolderPlus,
+  Trash2,
+} from "lucide-react";
 import type { KeyboardEvent, MouseEvent, ReactNode, RefObject } from "react";
 import {
   Button,
@@ -18,11 +26,10 @@ import {
 } from "@misty/ui";
 import type { FilesView } from "./FilesToolbar";
 import { fileColumns } from "./FileItems";
-import { keys } from "./keyLabels";
+import { keys } from "./key_labels";
 import type { FilesPlace } from "./model";
-import type { ListingState } from "./useListing";
+import type { ListingState } from "./use_listing";
 
-/** What an empty place says, by what it is: one quiet line in the list's middle, as Kura's. */
 function emptyCopy(place: FilesPlace, searching: boolean): { line: string } {
   if (searching) return { line: "No items match this filter." };
   switch (place.kind) {
@@ -42,7 +49,6 @@ function emptyCopy(place: FilesPlace, searching: boolean): { line: string } {
   }
 }
 
-/** The background's own menu: what a right-click on the open folder's empty part offers. */
 export interface BackgroundMenu {
   create?: (kind: "folder" | "file") => void;
   paste?: () => void;
@@ -58,39 +64,53 @@ function BackgroundRows({ menu }: { menu: BackgroundMenu }) {
     <>
       {goToFolder ? (
         <>
-          <MenuItem icon={FolderInput} label="Go to folder" shortcut={keys.goToFolder} onSelect={goToFolder} />
+          <MenuItem
+            icon={FolderInput}
+            label="Go to folder"
+            shortcut={keys.goToFolder}
+            onSelect={goToFolder}
+          />
           <MenuSeparator />
         </>
       ) : null}
       {create ? (
         <>
-          <MenuItem icon={FolderPlus} label="New folder" shortcut={keys.newFolder} onSelect={() => create("folder")} />
+          <MenuItem
+            icon={FolderPlus}
+            label="New folder"
+            shortcut={keys.newFolder}
+            onSelect={() => create("folder")}
+          />
           <MenuItem icon={FilePlus} label="New file" onSelect={() => create("file")} />
         </>
       ) : null}
-      {paste ? <MenuItem icon={ClipboardPaste} label="Paste" shortcut={keys.paste} onSelect={paste} /> : null}
+      {paste ? (
+        <MenuItem icon={ClipboardPaste} label="Paste" shortcut={keys.paste} onSelect={paste} />
+      ) : null}
       {duplicates ? (
         <>
           <MenuSeparator />
           <MenuItem icon={Files} label="Find duplicates" onSelect={duplicates} />
         </>
       ) : null}
-      {emptyAgentTrash ? <MenuItem icon={Trash2} label="Empty agent trash" danger onSelect={emptyAgentTrash} /> : null}
+      {emptyAgentTrash ? (
+        <MenuItem icon={Trash2} label="Empty agent trash" danger onSelect={emptyAgentTrash} />
+      ) : null}
       {hidden ? (
         <>
           <MenuSeparator />
-          <MenuCheckItem icon={Eye} label="Show hidden files" checked={hidden.shown} onCheckedChange={hidden.toggle} />
+          <MenuCheckItem
+            icon={Eye}
+            label="Show hidden files"
+            checked={hidden.shown}
+            onCheckedChange={hidden.toggle}
+          />
         </>
       ) : null}
     </>
   );
 }
 
-/**
- * The open place's items: a skeleton on the first load, an error with Try again, an empty state, or the
- * list or grid (the columns are drawn by the caller). A right-click on the empty part opens the folder's
- * own menu; dragging items moves them (⌥ copies).
- */
 export function FilesMain({
   place,
   view,
@@ -110,9 +130,7 @@ export function FilesMain({
 }: {
   place: FilesPlace;
   view: FilesView;
-  /** How big the icon view draws its items. */
   zoom: CollectionZoom;
-  /** Kura's sort, shared by the ⋯ menu and the list's headers; none keeps folders first. */
   sort: { key: string; descending: boolean } | null;
   onSort(sort: { key: string; descending: boolean } | null): void;
   listing: ListingState & { retry(): void };
@@ -122,13 +140,15 @@ export function FilesMain({
   onSelect(event: MouseEvent, id: string, onOpen: () => void): void;
   drag?: CollectionDrag;
   background: BackgroundMenu;
-  /** The column view, when it is the view. */
   columns?: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
   onKeyDown(event: KeyboardEvent<HTMLElement>): void;
 }) {
   let body: ReactNode;
-  if (listing.status === "loading") body = <CollectionSkeleton label="Reading the folder" view={view === "grid" ? "grid" : "list"} />;
+  if (listing.status === "loading")
+    body = (
+      <CollectionSkeleton label="Reading the folder" view={view === "grid" ? "grid" : "list"} />
+    );
   else if (listing.status === "failed")
     body = (
       <ErrorState
@@ -160,7 +180,12 @@ export function FilesMain({
         />
         {listing.status === "ready" && listing.more ? (
           <div className="flex justify-center py-4">
-            <Button variant="secondary" size="md" disabled={listing.loadingMore} onClick={listing.more}>
+            <Button
+              variant="secondary"
+              size="md"
+              disabled={listing.loadingMore}
+              onClick={listing.more}
+            >
               Show more
             </Button>
           </div>
@@ -168,7 +193,9 @@ export function FilesMain({
       </>
     );
 
-  const hasMenu = Boolean(background.create || background.paste || background.duplicates || background.emptyAgentTrash);
+  const hasMenu = Boolean(
+    background.create || background.paste || background.duplicates || background.emptyAgentTrash,
+  );
   const region = (
     <div
       ref={scrollRef}
@@ -181,8 +208,7 @@ export function FilesMain({
           ? "flex min-h-0 flex-1"
           : view === "grid"
             ? "min-h-0 flex-1 overflow-y-auto px-2 pt-1"
-            : // The list sits flush, so its header's hairline and seams meet the pane's edges.
-              "min-h-0 flex-1 overflow-y-auto"
+            : "min-h-0 flex-1 overflow-y-auto"
       }
     >
       {body}

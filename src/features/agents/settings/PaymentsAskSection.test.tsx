@@ -36,7 +36,6 @@ describe("PaymentsAskSection", () => {
 
   it("shows a plain notice when saving fails", async () => {
     api.updatePaymentsAsk.mockRejectedValue(new Error("pq: raw server failure"));
-    // The failure is a notice, drawn where the app draws them.
     render(
       <>
         <NoticeViewport />

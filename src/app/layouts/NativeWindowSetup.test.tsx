@@ -1,9 +1,9 @@
-import type * as AppZoom from "@/shared/hooks/useAppZoom";
+import type * as AppZoom from "@/shared/hooks/use_app_zoom";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import macosConfig from "../../../src-tauri/tauri.macos.conf.json";
 import { App } from "../App";
-import { appZoomRenderScale } from "@/shared/hooks/useAppZoom";
+import { appZoomRenderScale } from "@/shared/hooks/use_app_zoom";
 import { NativeWindowSetup } from "./NativeWindowSetup";
 const mocks = vi.hoisted(() => ({
   reveal: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock("@/native", () => ({
   revealMainWindow: mocks.reveal,
   setWindowSurface: mocks.background,
 }));
-vi.mock("@/shared/hooks/useAppZoom", async (importOriginal) => {
+vi.mock("@/shared/hooks/use_app_zoom", async (importOriginal) => {
   const actual = await importOriginal<typeof AppZoom>();
   return {
     ...actual,
@@ -45,8 +45,7 @@ vi.mock("@tauri-apps/api/webview", () => ({
 vi.mock("@/shared/platform/os", () => ({
   platform: mocks.platform,
 }));
-// No onboarding or route content has mounted yet.
-vi.mock("../router", () => ({
+vi.mock("../Router", () => ({
   AppRouter: () => null,
 }));
 beforeEach(() => {
@@ -158,7 +157,6 @@ describe("main window readiness", () => {
     expect(mocks.reveal).toHaveBeenCalledTimes(1);
   });
   it("leaves other platforms' window visibility alone", async () => {
-    // macOS, Windows and Linux start hidden; a mobile build shows its window itself.
     mocks.platform.mockReturnValue("ios");
     render(<NativeWindowSetup />);
     await act(async () => {

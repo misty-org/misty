@@ -4,6 +4,7 @@ import {
   Button,
   CollectionItems,
   CollectionSkeleton,
+  DialogBody,
   DialogFooter,
   EmptyState,
   ErrorState,
@@ -13,16 +14,15 @@ import {
 } from "@misty/ui";
 import type { DrivePickerProps } from "@/features/files";
 import { pickerColumns, pickerItem } from "../apps/file-picker/PickerItems";
-import { enclosingFolders, placeName, type SpaceDrivePlace } from "../apps/file-picker/pickerPlaces";
-import { usePickerListing, type PickerEntry } from "../apps/file-picker/usePickerListing";
+import {
+  enclosingFolders,
+  placeName,
+  type SpaceDrivePlace,
+} from "../apps/file-picker/picker_places";
+import { usePickerListing, type PickerEntry } from "../apps/file-picker/use_picker_listing";
 
 const NO_FILTER: string[] = [];
 
-/**
- * The Space's Files in the shared picker: a folder of its drive at a time, its folders opening on a
- * press and its files chosen with a click (⌘ or ⇧ for more, up to `maximumSelected`). What it hands
- * back are drive entries: each file's id and its path in the drive.
- */
 export function DrivePickerPanel({
   spaceId,
   maximumSelected = 5,
@@ -111,7 +111,7 @@ export function DrivePickerPanel({
             <ArrowUp />
           </IconButton>
         ) : null}
-        <Text weight="semibold" tone="bright" className="min-w-0 flex-1" full>
+        <Text size="control" weight="semibold" tone="bright" className="min-w-0 flex-1" full>
           {placeName(place)}
         </Text>
         <SearchField
@@ -122,8 +122,8 @@ export function DrivePickerPanel({
           onChange={(event) => setQuery(event.target.value)}
         />
       </div>
-      <div className="min-h-0 overflow-y-auto p-4">{body}</div>
-      <DialogFooter className="flex-row items-center justify-end gap-2 border-t px-5 py-3">
+      <DialogBody className="min-h-0 overflow-y-auto p-4">{body}</DialogBody>
+      <DialogFooter className="px-5 py-3">
         <Button variant="quiet" size="lg" onClick={onCancel}>
           Cancel
         </Button>

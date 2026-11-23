@@ -52,7 +52,6 @@ fn frames_add_a_bounded_amount() {
         read("https://c.example", &big),
     ];
     let spliced = splice_trees("- heading \"Page\"", &frames);
-    // The budget counts frame text; indenting it under the iframe adds two characters a line.
     assert!(
         spliced.len() < FRAME_TREES_CHARS * 13 / 10,
         "{}",

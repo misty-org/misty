@@ -10,12 +10,12 @@ export function PreviewMessage(props: {
     <div className="grid min-h-130 place-items-center p-8 text-center">
       <Text bare as="div" tone="muted" className="grid max-w-md justify-items-center gap-3">
         {props.icon}
-        <strong className="text-base">
+        <strong className="text-control">
           <Text bare tone="default">
             {props.title}
           </Text>
         </strong>
-        <p className="m-0 text-sm leading-6">{props.detail}</p>
+        <p className="m-0 text-meta leading-6">{props.detail}</p>
         {props.action}
       </Text>
     </div>

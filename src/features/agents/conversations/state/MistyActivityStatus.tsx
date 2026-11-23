@@ -1,6 +1,5 @@
 import { Text } from "@misty/ui";
 
-/** What the run is doing, in one shimmering word or phrase; "Thinking" until it says more. */
 function taskAwarePhrase(value?: string) {
   const status = value?.trim();
   if (!status || status === "On it." || status === "thinking") return "Thinking";
@@ -30,7 +29,7 @@ export function MistyActivityStatus({
       bare
       as="div"
       tone="muted"
-      className={`flex items-center ${compact ? "py-1 text-xs" : "text-sm"}`}
+      className={`flex items-center ${compact ? "py-1 text-meta" : "text-control"}`}
       role="status"
       aria-live="polite"
     >

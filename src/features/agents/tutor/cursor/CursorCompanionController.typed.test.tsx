@@ -2,7 +2,7 @@ import "./CompanionController.testFixtures";
 import { act, render, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { mocks, mounted, saveCompanion } from "./CompanionController.testFixtures";
-import { useCompanionState } from "./companionState";
+import { useCompanionState } from "./companion_state";
 import { CursorCompanionController } from "./CursorCompanionController";
 it("ignores a stale native Stop and stops only the matching task", async () => {
   const view = await mounted();
@@ -94,7 +94,6 @@ it.each(["user", "agent"] as const)(
         conversationId: "conversation",
       }),
     );
-    // The screens go with the request; the task opens a browser only if it must act.
     expect(mocks.submit).toHaveBeenCalledWith(
       expect.stringContaining("open instagram"),
       [],

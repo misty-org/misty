@@ -1,26 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import type { IBufferRange, ILink, ILinkProvider, Terminal } from "@xterm/xterm";
-import { filesApi } from "../files/filesApi";
+import { filesApi } from "../files/files_api";
 
-/**
- * Links in terminal output: absolute paths inside the terminal's folder, and web addresses.
- * Build tools print artifact paths one per line ("Finished 2 bundles at: …"), and turning those
- * into modifier-clicks that open the file is the point. A shell prints arbitrary prose, so only
- * absolute POSIX or Windows-drive paths are considered.
- *
- * Spaces are allowed inside a path candidate ("My Project/…"), so the pattern over-captures
- * trailing prose on purpose; the existence probe then trims word by word from the right until
- * what remains is real. Only paths under the terminal's folder are probed and linked: the
- * native side refuses anything outside the folders linked to the Space anyway.
- */
-
-// One absolute-path candidate: drive or root prefix, a run without spaces, then any number of
-// space-separated continuations (over-captured on purpose, see above). Characters that never
-// appear unquoted in printed paths end it.
 const PATH_CANDIDATE = /(?:[A-Za-z]:[\\/](?![\\/])|\/)[^\s`"'<>|]+(?: [^\s`"'<>|]+)*/g;
 
-// Sentence punctuation a printed path picks up at the end of a line. `.` stays: real extensions
-// end in one, and a trailing dot fails the probe anyway.
 const TRAILING_NOISE = /[,;:!?)\]}"']+$/;
 
 const URL_CANDIDATE = /\bhttps?:\/\/[^\s`"'<>|]+/g;
@@ -32,11 +15,8 @@ const MAX_LOGICAL_ROWS = 10;
 const MAX_CACHE_ENTRIES = 500;
 
 interface LogicalRow {
-  /** 1-based buffer row. */
   y: number;
-  /** Offset of this row's first character in the joined logical line. */
   start: number;
-  /** Row length in string units, blank padding included. */
   length: number;
 }
 
@@ -49,7 +29,6 @@ function normalize(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
-/** Whether `path` is `folder` itself or lies inside it. */
 export function isPathUnder(path: string, folder: string): boolean {
   const target = normalize(path);
   const base = normalize(folder);
@@ -66,7 +45,6 @@ function parentAndName(path: string): [string, string] | null {
   return [clean.slice(0, cut), clean.slice(cut + 1)];
 }
 
-/** What a printed path is on disk, from a listing of its parent; null when it isn't there. */
 export async function probePath(path: string): Promise<{ isDir: boolean } | null> {
   const split = parentAndName(path);
   if (!split) return null;
@@ -85,9 +63,6 @@ export interface ResolvedPath {
   isDir: boolean;
 }
 
-// The probe lists a parent folder per candidate, so results are kept: xterm asks for links on
-// every hover, and after the first one that costs nothing. Keyed by folder and candidate, so tabs
-// in different folders never share a verdict.
 const probeCache = new Map<string, Promise<ResolvedPath | null>>();
 
 async function probe(raw: string, cwd: string): Promise<ResolvedPath | null> {
@@ -114,16 +89,10 @@ function resolveCandidate(raw: string, cwd: string): Promise<ResolvedPath | null
   return cached;
 }
 
-/** Forgets every probe verdict, as files change under a terminal. */
 export function clearLinkCache(): void {
   probeCache.clear();
 }
 
-/**
- * Soft-wrapped buffer rows joined into one logical line. Long paths wrap at narrow panel widths,
- * and matching row by row would see a cut-off path that fails the probe and never links. Blank
- * padding is kept (`translateToString(false)`) so string offsets stay aligned with cell columns.
- */
 function logicalLineAt(term: Terminal, y: number): LogicalLine | null {
   const buffer = term.buffer.active;
   let first = y - 1;
@@ -151,9 +120,6 @@ function logicalLineAt(term: Terminal, y: number): LogicalLine | null {
   return { text: text.trimEnd(), rows };
 }
 
-// xterm places links in cells; translateToString gives string indices. Wide characters (CJK)
-// take two cells, so a plain index would shift the span left of the real text. These are the
-// wide ranges xterm itself uses, without zero-width marks, which are rare in printed paths.
 function cellWidth(text: string): number {
   let cells = 0;
   for (const ch of text) {
@@ -190,8 +156,6 @@ function locate(log: LogicalLine, index: number): { x: number; y: number } {
 }
 
 function rangeOf(log: LogicalLine, start: number, length: number): IBufferRange {
-  // The range's end is the last cell, inclusive: locating the last character itself keeps a
-  // link that ends at a wrapped row's edge on its own row.
   return { start: locate(log, start), end: locate(log, start + length - 1) };
 }
 
@@ -199,12 +163,6 @@ export function isMacPlatform(): boolean {
   return typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 }
 
-/**
- * Opening a link is a modifier gesture: a plain click lands on printed output far too easily
- * (selecting text, clicking back into the window) to let it open a file. macOS uses ⌘ or ⌥ (the
- * terminal already treats ⌥ as meta), Windows and Linux use Ctrl, like Windows Terminal and
- * GNOME Terminal. Without the modifier a link still underlines on hover.
- */
 export function holdsLinkModifier(
   event: Pick<MouseEvent, "altKey" | "ctrlKey" | "metaKey">,
   mac: boolean = isMacPlatform(),
@@ -212,10 +170,6 @@ export function holdsLinkModifier(
   return mac ? event.altKey || event.metaKey : event.ctrlKey;
 }
 
-/**
- * Every visible row is scanned for absolute-path candidates; each resolves (async, cached) to its
- * longest real prefix and becomes a link covering just that prefix.
- */
 export function createPathLinkProvider(options: {
   term: Terminal;
   cwd: string;
@@ -234,8 +188,6 @@ export function createPathLinkProvider(options: {
       let match: RegExpExecArray | null;
       while ((match = PATH_CANDIDATE.exec(log.text)) !== null) {
         if (matches.length >= MAX_LINKS_PER_LINE) break;
-        // Skip URL tails ("https://host/a", after ':' or '/') and relative tokens glued to a
-        // word ("github.com/foo/bar").
         const before = match.index > 0 ? log.text[match.index - 1] : "";
         if (before === "/" || before === ":" || /[\w.]/.test(before)) continue;
         if (match[0].startsWith("//")) continue;
@@ -264,7 +216,6 @@ export function createPathLinkProvider(options: {
   };
 }
 
-/** Web addresses in output, opened with the same modifier gesture as paths. */
 export function createUrlLinkProvider(options: {
   term: Terminal;
   onActivate: (url: string) => void;

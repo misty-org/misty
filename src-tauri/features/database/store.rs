@@ -1,14 +1,8 @@
-//! Misty's database: `~/.misty/data/misty.db`, the one place structured data lives.
-//! Every store (settings, navigation names, shortcuts, approvals, device trust, ...) is a
-//! set of tables here, created by numbered migrations. The version is SQLite's own
-//! `user_version`; a database newer than this build is refused, never downgraded.
 use file_access::fs;
 use rusqlite::{Connection, TransactionBehavior};
 use std::path::{Path, PathBuf};
 
-/// One entry per schema version, oldest first. Never edit a shipped entry: add a new one.
 const MIGRATIONS: &[&str] = &[
-    // 1: credentials (encrypted by the credential crate, which also creates this idempotently)
     "CREATE TABLE IF NOT EXISTS secrets (
          profile TEXT NOT NULL,
          service TEXT NOT NULL,
@@ -18,8 +12,6 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (profile, service, account)
      ) WITHOUT ROWID;",
-    // 2: settings. One document of sections and keys for this device, and the id-keyed
-    // preference state the Settings screens edit (with a revision for safe concurrent edits).
     "CREATE TABLE settings_document (
          id INTEGER PRIMARY KEY CHECK (id = 1),
          document TEXT NOT NULL
@@ -29,8 +21,6 @@ const MIGRATIONS: &[&str] = &[
          revision INTEGER NOT NULL,
          document TEXT NOT NULL
      ) WITHOUT ROWID;",
-    // 3: which earlier-layout files have already been imported (so a deleted row never
-    // brings its old file back), and the names the person gave to windows, tabs and groups
     "CREATE TABLE legacy_imports (name TEXT PRIMARY KEY) WITHOUT ROWID;
      CREATE TABLE navigation_names (
          account TEXT NOT NULL,
@@ -38,33 +28,26 @@ const MIGRATIONS: &[&str] = &[
          name TEXT NOT NULL,
          PRIMARY KEY (account, key)
      ) WITHOUT ROWID;",
-    // 4: keyboard shortcut overrides (NULL = platform default, '' = unbound)
     "CREATE TABLE shortcut_overrides (
          command_id TEXT PRIMARY KEY,
          primary_binding TEXT,
          alternate_binding TEXT
      ) WITHOUT ROWID;",
-    // 5: the account this device last signed in with
     "CREATE TABLE session (
          id INTEGER PRIMARY KEY CHECK (id = 1),
          document TEXT NOT NULL
      );",
-    // 6: what this device trusts for each signed-in account (device list, policy)
     "CREATE TABLE device_trust (
          key TEXT PRIMARY KEY,
          document TEXT NOT NULL
      ) WITHOUT ROWID;",
-    // 7: Kura installs this device approved, by the hash of their token
     "CREATE TABLE kura_approvals (hash TEXT PRIMARY KEY) WITHOUT ROWID;",
-    // 8: website camera and microphone choices (permissions is the engine's JSON)
     "CREATE TABLE site_permissions (
          profile TEXT NOT NULL,
          origin TEXT NOT NULL,
          permissions TEXT NOT NULL,
          PRIMARY KEY (profile, origin)
      ) WITHOUT ROWID;",
-    // 9: folders this device shared with agents (a write folder is a project), and this
-    // device's own agent settings (its device id)
     "CREATE TABLE local_agent_settings (
          key TEXT PRIMARY KEY,
          value TEXT NOT NULL
@@ -80,10 +63,6 @@ const MIGRATIONS: &[&str] = &[
          allow_push INTEGER NOT NULL DEFAULT 0,
          allow_push_default INTEGER NOT NULL DEFAULT 0
      );",
-    // 10: the browser's durable library: the downloads list and browsing history (visits
-    // carry their profile; `origin` is the device that browsed, '' = this one; `changed`
-    // marks a visit not yet in its synced batch; `history_dirty` holds hours whose batch
-    // must be rewritten after a deletion)
     "CREATE TABLE downloads (
          id TEXT PRIMARY KEY,
          url TEXT NOT NULL,
@@ -114,9 +93,6 @@ const MIGRATIONS: &[&str] = &[
          hour INTEGER NOT NULL,
          PRIMARY KEY (origin, hour)
      );",
-    // 11: extension storage values waiting to sync (sealed with a device key, one per
-    // installation generation) and installations removed here whose remote values still
-    // need clearing
     "CREATE TABLE extension_journal (
          account TEXT NOT NULL,
          installation TEXT NOT NULL,
@@ -129,18 +105,14 @@ const MIGRATIONS: &[&str] = &[
          installation TEXT NOT NULL,
          PRIMARY KEY (account, generation)
      ) WITHOUT ROWID;",
-    // 12: the file list's recent and starred files, tags and last opened path (one document)
     "CREATE TABLE explorer_library (
          id INTEGER PRIMARY KEY CHECK (id = 1),
          document TEXT NOT NULL
      );",
-    // 13: the Misty home's layout version (what the launch-time upgrade has applied)
     "CREATE TABLE IF NOT EXISTS layout (
          id INTEGER PRIMARY KEY CHECK (id = 1),
          version INTEGER NOT NULL
      );",
-    // 14: the file organizer's write-ahead journal: folder grants, and plans with a receipt
-    // per move (written before each effect, so a crash can finish or undo a plan)
     "CREATE TABLE IF NOT EXISTS agent_file_grants (
          id TEXT PRIMARY KEY,
          document TEXT NOT NULL
@@ -150,10 +122,7 @@ const MIGRATIONS: &[&str] = &[
          document TEXT NOT NULL,
          saved_at INTEGER NOT NULL
      );",
-    // 15: projects' old access switches become remembered approvals on the server; this
-    // marks a project whose switches were carried over (the switches stay for reference)
     "ALTER TABLE local_agent_scopes ADD COLUMN grants_migrated INTEGER NOT NULL DEFAULT 0;",
-    // 16: agent chats from when they lived on this device, one JSON document per row
     "CREATE TABLE agent_chats (
          account TEXT NOT NULL,
          kind TEXT NOT NULL,
@@ -162,8 +131,6 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (account, kind, id)
      ) WITHOUT ROWID;",
-    // 17: hours to rewrite belong to one profile, and remember when they were marked so a
-    // deletion made during an upload stays marked
     "DROP TABLE history_dirty;
      CREATE TABLE history_dirty (
          profile_id TEXT NOT NULL,
@@ -172,10 +139,6 @@ const MIGRATIONS: &[&str] = &[
          marked_at INTEGER NOT NULL,
          PRIMARY KEY (profile_id, origin, hour)
      );",
-    // 18: what this database no longer keeps. Agent chats are on the server, the file
-    // organizer and the Kura bridge are gone, and the file list's table was never used. The
-    // device id and the marks that an account's first profile was seeded move into
-    // `settings_state`, and projects' old switches are approvals now.
     "INSERT OR IGNORE INTO settings_state (scope, revision, document)
          SELECT 'device:id', 1, json_quote(value) FROM local_agent_settings WHERE key = 'device_id';
      INSERT OR IGNORE INTO settings_state (scope, revision, document)
@@ -191,12 +154,8 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE local_agent_scopes DROP COLUMN allow_push;
      ALTER TABLE local_agent_scopes DROP COLUMN allow_push_default;
      ALTER TABLE local_agent_scopes DROP COLUMN grants_migrated;",
-    // 19: folders are shared read-only. Ones shared with write access stop being shared; their files stay.
     "DELETE FROM local_agent_scopes WHERE access = 'write';
      ALTER TABLE local_agent_scopes DROP COLUMN access;",
-    // 20: coding is gone, so its three device preferences go too: from the settings document,
-    // from the saved values, and from the frozen first-run copy of the document kept in
-    // `settings_state`. A document that isn't valid JSON is left as it is, so this can't fail.
     "UPDATE settings_document
      SET document = json_remove(document, '$.agent.coding_default_tool',
          '$.agent.coding_fallback_tool', '$.agent.coding_usage_cap')
@@ -216,8 +175,6 @@ const MIGRATIONS: &[&str] = &[
          json_type(document, '$.agent.coding_default_tool'),
          json_type(document, '$.agent.coding_fallback_tool'),
          json_type(document, '$.agent.coding_usage_cap')) IS NOT NULL ELSE 0 END;",
-    // 21: what the person approved for each extension on this computer. It never syncs: nothing
-    // from the server can stand in for the person's answer.
     "CREATE TABLE extension_approvals (
          scope TEXT NOT NULL,
          extension TEXT NOT NULL,
@@ -225,8 +182,6 @@ const MIGRATIONS: &[&str] = &[
          hosts TEXT NOT NULL,
          PRIMARY KEY (scope, extension)
      ) WITHOUT ROWID;",
-    // 22: agent chats live on this computer again: one JSON
-    // document per conversation, folder, lesson and course. The server keeps no transcript.
     "CREATE TABLE agent_chats (
          account TEXT NOT NULL,
          kind TEXT NOT NULL,
@@ -235,8 +190,6 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (account, kind, id)
      ) WITHOUT ROWID;",
-    // 23: what each of an agent's tool calls did, so a run that restarts never repeats a write it
-    // can't account for. A row with no outcome began and nobody saw it end.
     "CREATE TABLE agent_tool_journal (
          run_id TEXT NOT NULL,
          call_id TEXT NOT NULL,
@@ -245,9 +198,6 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (run_id, call_id)
      ) WITHOUT ROWID;",
-    // 24: Memory on this computer (memory): moments, facts and summaries per account and Space,
-    // what waits for a vector, and the vectors themselves, apart so a search reads nothing else.
-    // `sent`, `changed`, `backfill` and `memory_deleted` were for syncing it; migration 30 drops them.
     "CREATE TABLE memory_events (
          account TEXT NOT NULL,
          id TEXT NOT NULL,
@@ -342,8 +292,6 @@ const MIGRATIONS: &[&str] = &[
          deleted_at INTEGER NOT NULL,
          PRIMARY KEY (account, record_id)
      ) WITHOUT ROWID;",
-    // 25: whose run each journal row belongs to, so one account never reads another's receipts, and what
-    // each run has read, which decides what it may send out (agents/run_control/run_taint.rs).
     "ALTER TABLE agent_tool_journal ADD COLUMN account TEXT NOT NULL DEFAULT '';
      CREATE TABLE agent_run_taint (
          run_id TEXT NOT NULL,
@@ -351,8 +299,6 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (run_id, kind)
      ) WITHOUT ROWID;",
-    // 26: the project folders the person linked to each Space on this computer, where outside agent
-    // engines work, and each chat's session in its engine, to continue it (engines/store.rs).
     "CREATE TABLE space_folders (
          account TEXT NOT NULL,
          space TEXT NOT NULL,
@@ -369,8 +315,6 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (account, conversation_id, engine)
      ) WITHOUT ROWID;",
-    // 27: the connections a person made so an agent Misty doesn't start (Cursor, the Claude app) could
-    // use one of their Spaces. The feature is gone; migration 29 drops the table.
     "CREATE TABLE space_connections (
          id TEXT PRIMARY KEY,
          account TEXT NOT NULL,
@@ -379,8 +323,6 @@ const MIGRATIONS: &[&str] = &[
          token_hash TEXT NOT NULL UNIQUE,
          created_at INTEGER NOT NULL
      ) WITHOUT ROWID;",
-    // 28: the Git worktrees multi-run made, one per agent given the same task, each with the chat
-    // its turn runs in. A row is what lets an engine work in that worktree (engines/multirun.rs).
     "CREATE TABLE multirun_worktrees (
          account TEXT NOT NULL,
          multirun TEXT NOT NULL,
@@ -397,12 +339,7 @@ const MIGRATIONS: &[&str] = &[
          created_at INTEGER NOT NULL,
          PRIMARY KEY (account, multirun, lane)
      ) WITHOUT ROWID;",
-    // 29: outside agents can no longer connect to a Space, so the connections and their token
-    // hashes go, and no token handed out before can ever be honored again.
     "DROP TABLE IF EXISTS space_connections;",
-    // 30: memory and browsing history stay on this computer, so what tracked their syncing goes:
-    // memory's sent and changed marks, its deletions waiting to go out, the mark on copies that
-    // came from elsewhere, and the history hours waiting to be sent again.
     "DROP INDEX IF EXISTS memory_events_changed;
      DROP INDEX IF EXISTS memory_facts_changed;
      ALTER TABLE memory_events DROP COLUMN sent;
@@ -414,9 +351,6 @@ const MIGRATIONS: &[&str] = &[
      ALTER TABLE memory_chunks DROP COLUMN backfill;
      DROP TABLE IF EXISTS memory_deleted;
      DROP TABLE IF EXISTS history_dirty;",
-    // 31: one row per run, whatever engine ran it, for a Space's timeline on this computer: the mode
-    // it started in, how it ended, how many tools it used and which files it wrote
-    // (agents/run_control/run_ledger.rs). Never synced.
     "CREATE TABLE agent_run_ledger (
          run_id TEXT PRIMARY KEY,
          account TEXT NOT NULL,
@@ -430,10 +364,6 @@ const MIGRATIONS: &[&str] = &[
          files TEXT NOT NULL DEFAULT '[]'
      ) WITHOUT ROWID;
      CREATE INDEX agent_run_ledger_chat ON agent_run_ledger(account, conversation_id, started_at);",
-    // 32: each run's steps on this computer, for the person's own activity view
-    // (agents/run_control/run_steps.rs): the tool, the file or page it worked on and how it ended,
-    // never its arguments or result. A sub-agent's run files its steps under the run that started
-    // it. Never synced.
     "CREATE TABLE agent_run_steps (
          run_id TEXT NOT NULL,
          seq INTEGER NOT NULL,
@@ -456,10 +386,6 @@ const MIGRATIONS: &[&str] = &[
          parent_run_id TEXT NOT NULL,
          at INTEGER NOT NULL
      ) WITHOUT ROWID;",
-    // 33: memory becomes Engram's sessions, observations, relations and prompts beside MemPalace's
-    // drawers, closets and hallways, on this computer only. Facts become
-    // observations, moments become drawers in rooms by kind, recaps and summaries become sessions.
-    // Old vectors go: records are embedded again as the Embedding role is used, tagged by model.
     "DROP TABLE memory_vectors;
      DROP TABLE memory_chunks;
      CREATE TABLE memory_sessions (
@@ -738,10 +664,7 @@ const MIGRATIONS: &[&str] = &[
      DROP TABLE memory_events;
      DROP TABLE memory_facts;
      DROP TABLE memory_summaries;",
-    // 34: the virtual office is called the studio: its rooms and looks move to the new kind.
     "UPDATE agent_chats SET kind = 'studio' WHERE kind = 'office';",
-    // 35: Misty keeps no memory of its own, and no workflows, schedules or skills: engines have
-    // them. Their tables and saved documents go.
     "DROP TABLE IF EXISTS memory_observations_fts;
      DROP TABLE IF EXISTS memory_prompts_fts;
      DROP TABLE IF EXISTS memory_drawers_fts;
@@ -758,9 +681,6 @@ const MIGRATIONS: &[&str] = &[
      DROP TABLE IF EXISTS memory_embed_leases;
      DELETE FROM agent_chats
          WHERE kind IN ('workflow_method', 'workflow_schedule', 'workflow_replay', 'workflow_vector');",
-    // 36: what nothing reads any more: extensions' install journal, removals and approvals, memory's
-    // vectors, websites' camera, microphone and location choices (websites never get them now),
-    // and the downloads list and browsing history a person's own tabs kept.
     "DROP TABLE IF EXISTS extension_journal;
      DROP TABLE IF EXISTS extension_removals;
      DROP TABLE IF EXISTS extension_approvals;
@@ -768,8 +688,6 @@ const MIGRATIONS: &[&str] = &[
      DROP TABLE IF EXISTS site_permissions;
      DROP TABLE IF EXISTS downloads;
      DROP TABLE IF EXISTS visits;",
-    // 37: each agent's one folder on this computer, where every chat with it works on an outside
-    // engine (engines/store.rs). Never synced.
     "CREATE TABLE agent_folders (
          account TEXT NOT NULL,
          agent_id TEXT NOT NULL,
@@ -777,10 +695,6 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL,
          PRIMARY KEY (account, agent_id)
      ) WITHOUT ROWID;",
-    // 38: a chat owns its working folder, not its agent (engines/chat_folder.rs): a project the
-    // person picked, or the chat's own scratch folder in Misty's data folder. Project folders are
-    // the ones the person picked on this computer. Space folders are shared through the Space
-    // now, so the old device-only links go. Agent folders stay until the one-time move at start.
     "CREATE TABLE chat_folders (
          account TEXT NOT NULL,
          conversation_id TEXT NOT NULL,
@@ -797,18 +711,11 @@ const MIGRATIONS: &[&str] = &[
          PRIMARY KEY (account, path)
      ) WITHOUT ROWID;
      DROP TABLE IF EXISTS space_folders;",
-    // 39: the folder new projects go in (engines/open_in_code.rs), chosen in the system's dialog
-    // during setup. Only a project made inside it is reached; the folder itself never is.
     "CREATE TABLE projects_home (
          account TEXT NOT NULL PRIMARY KEY,
          path TEXT NOT NULL,
          updated_at INTEGER NOT NULL
      ) WITHOUT ROWID;",
-    // 40: chats and Code are two places now: a chat in its scratch folder is the sidebar's, a chat
-    // in a project is Code's. The chats that already worked in a project go, once, as the person
-    // asked: the chat, its plans and notebook, its link to an engine session and its folder record.
-    // The project folders and the engines' own session files stay, so those sessions still show in
-    // Code's history.
     "DELETE FROM agent_chats
          WHERE kind IN ('conversation', 'collaboration')
            AND EXISTS (SELECT 1 FROM chat_folders f
@@ -824,10 +731,6 @@ const MIGRATIONS: &[&str] = &[
                        WHERE f.kind = 'project' AND f.account = engine_sessions.account
                          AND f.conversation_id = engine_sessions.conversation_id);
      DELETE FROM chat_folders WHERE kind = 'project';",
-    // 41: each run's browser log on this computer (agents/run_control/browser_log.rs): every action
-    // the agent took in its tabs, the page it was on, what the action did and a picture after it,
-    // filed under the run its steps go under and keyed to their tool call. Never typed text, never
-    // synced.
     "CREATE TABLE agent_browser_log (
          run_id TEXT NOT NULL,
          seq INTEGER NOT NULL,
@@ -850,9 +753,6 @@ const MIGRATIONS: &[&str] = &[
      ) WITHOUT ROWID;
      CREATE INDEX agent_browser_log_call ON agent_browser_log(run_id, call_id);
      CREATE INDEX agent_browser_log_account ON agent_browser_log(account, at);",
-    // 42: an agent is one long thread now, so the scratch chats made before it go, once, as the
-    // person asked: each chat, its notebook, composer choices and collaboration, its engine session
-    // and its folder record. Kept: chats in a project (Code's), the studio's, lessons' and Tutor's.
     "CREATE TEMP TABLE scratch_chats AS
          SELECT c.account AS account, c.id AS id FROM agent_chats c
          WHERE c.kind = 'conversation'
@@ -888,10 +788,6 @@ const MIGRATIONS: &[&str] = &[
            AND EXISTS (SELECT 1 FROM scratch_chats s
                        WHERE s.account = agent_chats.account AND s.id = agent_chats.id);
      DROP TABLE scratch_chats;",
-    // 43: what an agent recalls from its chats (engines/recall.rs): every finished message of a chat
-    // as text in an FTS5 table (trigram, so a typo still shares most of its pieces with the word),
-    // kept up to date as chats are saved. `chat_recall_seen` says which messages are in it, so a
-    // save adds only the new ones. Rebuilt from the chats, so never synced.
     "CREATE VIRTUAL TABLE chat_recall USING fts5(
          text, account UNINDEXED, agent_id UNINDEXED, conversation UNINDEXED,
          role UNINDEXED, at UNINDEXED, tokenize = 'trigram'
@@ -918,9 +814,6 @@ const MIGRATIONS: &[&str] = &[
            AND COALESCE(json_extract(m.value, '$.state'), 'completed') = 'completed'
            AND trim(COALESCE(json_extract(m.value, '$.content'), '')) <> ''
            AND json_extract(m.value, '$.id') IS NOT NULL;",
-    // 44: agent chat documents keep metadata only. Each message is its own row, so a long-running
-    // direct thread can be read and saved in bounded windows. Recall tracks the message row it
-    // indexes so an edited or removed message can be replaced in the same transaction.
     "CREATE TABLE agent_chat_messages (
          account TEXT NOT NULL,
          conversation TEXT NOT NULL,
@@ -969,9 +862,6 @@ const MIGRATIONS: &[&str] = &[
          SELECT account, conversation, json_extract(document, '$.id'), recall_rowid
          FROM chat_recall_seed;
      DROP TABLE chat_recall_seed;",
-    // 45: what agents trashed, one table for Files and the Space drive. A local file waits in its
-    // holding folder; a drive item waits in its Space's trash on the server (held, so it never
-    // empties itself), and only which agent and chat did it is kept here. It never syncs.
     "CREATE TABLE files_agent_trash (
          id INTEGER PRIMARY KEY,
          original_path TEXT NOT NULL,
@@ -983,8 +873,6 @@ const MIGRATIONS: &[&str] = &[
          drive_item_id TEXT
      );
      CREATE INDEX files_agent_trash_drive ON files_agent_trash (space_id, drive_item_id);",
-    // 46: Files' Starred and Recent, and what Files moved to the system Trash, so Put Back knows
-    // where each item came from. They stay on this device and never sync.
     "CREATE TABLE files_starred (
          path TEXT PRIMARY KEY,
          starred_at INTEGER NOT NULL
@@ -1014,7 +902,6 @@ impl Store {
         Self { path: path.into() }
     }
 
-    /// The database of the Misty home at `home`.
     pub fn in_home(home: &Path) -> Self {
         Self::at(misty_credential_store::home_data_dir(home).join("misty.db"))
     }
@@ -1023,7 +910,6 @@ impl Store {
         &self.path
     }
 
-    /// Opens the database, creating it and applying any missing migrations.
     pub fn connect(&self) -> rusqlite::Result<Connection> {
         if let Some(parent) = self.path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
@@ -1033,8 +919,6 @@ impl Store {
                 )
             })?;
         }
-        // Switching a new file to WAL is not covered by the busy timeout, so two first
-        // opens at once can see "locked": try again briefly.
         let mut attempt = 0;
         let connection = loop {
             match self.open_once() {
@@ -1078,13 +962,10 @@ fn version(connection: &Connection) -> rusqlite::Result<i64> {
     connection.query_row("PRAGMA user_version", [], |row| row.get(0))
 }
 
-/// Applies every migration to `connection` (the same path `Store::connect` takes).
 pub fn migrate(connection: &mut Connection) -> rusqlite::Result<()> {
     if version(connection)? as usize >= MIGRATIONS.len() {
         return refuse_newer(connection);
     }
-    // Two launches (or a launch and the CLI) can race here: take the write lock first and
-    // read the version inside it.
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let current = version(&transaction)? as usize;
     for (index, sql) in MIGRATIONS.iter().enumerate().skip(current) {

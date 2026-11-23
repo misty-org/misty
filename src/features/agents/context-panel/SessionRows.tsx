@@ -1,21 +1,12 @@
-import { ChevronDown, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { OverflowFadeText, Pressable, RowTools, Text } from "@misty/ui";
+import { FoldChevron, OverflowFadeText, Pressable, RowTools, Text } from "@misty/ui";
 
-/**
- * A titled group of rows, after OpenChamber's session card: the header is one row tall, its glyph
- * in the same column as the rows' glyphs, its title a step brighter and larger than theirs, and at
- * the far end what it is about (the model, a count) in the rows' value type. A group that folds
- * says so with a chevron before its title. `tools` show only while the pointer is on the header,
- * at its far end; the subject gives way to them while they show.
- */
 export function Section(props: {
   title: string;
   icon?: LucideIcon;
   subject?: ReactNode;
-  /** A control after the subject, at the header's far end. */
   end?: ReactNode;
-  /** Buttons at the header's far end, shown only while the pointer is on it (RowTools `hover`). */
   tools?: ReactNode;
   open?: boolean;
   onToggle?(): void;
@@ -26,11 +17,7 @@ export function Section(props: {
     <>
       {props.onToggle ? (
         <Text bare tone="muted" className="flex flex-none">
-          <ChevronDown
-            aria-hidden="true"
-            className="-rotate-90 transition-transform duration-120 ease-[ease] data-[open]:rotate-0"
-            data-open={props.open || undefined}
-          />
+          <FoldChevron open={Boolean(props.open)} />
         </Text>
       ) : Icon ? (
         <Text bare tone="default" className="flex flex-none">
@@ -83,7 +70,6 @@ export function Row(props: {
   label: ReactNode;
   value?: ReactNode;
   onOpen?(): void;
-  /** For a row that shows and hides more rows. */
   expanded?: boolean;
 }) {
   const Icon = props.icon;
@@ -104,7 +90,6 @@ export function Row(props: {
       )}
     </>
   );
-  // Muted at rest; a row that opens something brightens under the pointer and on focus.
   return props.onOpen ? (
     <Text as="div" bare size="meta" tone="muted">
       <Pressable

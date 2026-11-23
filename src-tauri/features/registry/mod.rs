@@ -142,8 +142,8 @@ struct Header {
 }
 
 fn verified(text: &str, keys: &[(&str, &str)]) -> Result<Value, String> {
-    let envelope: Envelope =
-        serde_json::from_str(text).map_err(|_| "The registry file isn't signed JSON.".to_string())?;
+    let envelope: Envelope = serde_json::from_str(text)
+        .map_err(|_| "The registry file isn't signed JSON.".to_string())?;
     for entry in &envelope.signatures {
         let Ok(header) = URL_SAFE_NO_PAD
             .decode(&entry.protected)
@@ -297,7 +297,8 @@ mod tests {
         let signing = SigningKey::from_bytes(&[7; 32]);
         let public = STANDARD.encode(signing.verifying_key().to_bytes());
         let keys = [("registry-1", public.as_str())];
-        let document = serde_json::json!({ "schema": 1, "published_at": "2026-11-22T00:00:00Z", "apps": {} });
+        let document =
+            serde_json::json!({ "schema": 1, "published_at": "2026-11-22T00:00:00Z", "apps": {} });
         let text = envelope(&signing, "registry-1", &document);
         assert_eq!(verified(&text, &keys).unwrap(), document);
         assert!(verified(&envelope(&signing, "other", &document), &keys).is_err());

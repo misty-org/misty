@@ -52,7 +52,6 @@ function audienceFor(requested: string, hasRecipient: boolean): "private" | "spa
   );
 }
 
-/** Text with each "@Name" of the recipient as a real mention of them. */
 export function messageSpans(message: string, recipient?: Member): MessageSpan[] {
   const plain = [{ type: "text", text: message }];
   if (!recipient?.name.trim()) return plain;
@@ -93,8 +92,6 @@ const send = routedTool("change", async (request, space) => {
   let conversationId = "";
   if (audience === "private") {
     if (!recipient) throw refuse("a private message requires one resolved recipient");
-    // DMs are the account's, each a hidden Space of its own, and only friends have one. Opening it
-    // returns the same one every time, so a failure here changes nothing worth doubting.
     const direct = await readRoute<{ id: string }>(request, "/dms", "POST", {
       user_id: recipient.user_id,
     });

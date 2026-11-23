@@ -3,18 +3,10 @@ import { ENGINE_IDS, type EngineId } from "@/features/engine-config/channels";
 import { DisclosureButton, ListCard } from "@misty/ui";
 import { EngineSetupRow, type EngineSetupState } from "./EngineSetupRow";
 
-/**
- * Shown first, the rest wait behind More: the two most people already pay for, which can run
- * Misty's own work, then the two that cost nothing (Antigravity on any Google account, OpenCode's
- * free models with no account). Gemini CLI stopped taking personal Google accounts in June 2026,
- * so it waits under More.
- */
 const FEATURED_ENGINES: readonly EngineId[] = ["claude", "codex", "agy", "opencode"];
-// Read when shown: the engine list belongs to a feature that imports this one.
 const otherEngines = (first: readonly EngineId[]) =>
   ENGINE_IDS.filter((engine) => !first.includes(engine));
 
-/** The first step: the AI the person already uses, installed and signed in from here. */
 export function EnginesStep({
   onState,
   first = FEATURED_ENGINES,
@@ -23,12 +15,9 @@ export function EnginesStep({
   unfit,
 }: {
   onState(engine: EngineId, state: EngineSetupState): void;
-  /** The engines listed before More; the featured ones unless the caller knows better. */
   first?: readonly EngineId[];
-  /** With `onChoose`, one ready engine can be picked. */
   chosen?: EngineId;
   onChoose?(engine: EngineId): void;
-  /** Engines that can't be picked (they can't be the default engine). */
   unfit?(engine: EngineId): boolean;
 }) {
   const [more, setMore] = useState(false);
@@ -51,7 +40,6 @@ export function EnginesStep({
       <DisclosureButton open={more} onClick={() => setMore((open) => !open)}>
         {more ? "Fewer engines" : "More engines"}
       </DisclosureButton>
-      {/* Mounted only when opened, so first run doesn't probe fifteen CLIs at once. */}
       {more ? (
         <ListCard aria-label="More engines" role={role}>
           {otherEngines(first).map(row)}

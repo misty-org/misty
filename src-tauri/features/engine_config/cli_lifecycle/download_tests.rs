@@ -1,12 +1,9 @@
-// How a download is checked against its published checksum, and which build of each engine and of
-// Node.js is picked for this system.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use super::downloads::{self, Checksum, Hasher};
 use super::maker_builds::{self, Target};
 use super::node_runtime::{self, NODE_VERSION};
 
-/// The fixture every checksum test hashes, and its published hashes.
 const FIXTURE: &[u8] = b"Misty checks every download.\n";
 const FIXTURE_SHA256: &str = "aa131f23e45aaf3ea47b871577874cce99fc1e1e30d9c86f2e6f364491fd75c9";
 const FIXTURE_SHA512: &str =
@@ -26,16 +23,13 @@ fn downloads_are_kept_only_when_they_match_the_published_checksum() {
     let sha512 = Checksum::from_npm_integrity(&format!("sha512-{FIXTURE_SHA512}")).unwrap();
     assert!(downloads::file_matches(&file, &sha512).unwrap());
 
-    // One changed byte fails both.
     std::fs::write(&file, b"Misty checks every download!\n").unwrap();
     assert!(!downloads::file_matches(&file, &sha256).unwrap());
     assert!(!downloads::file_matches(&file, &sha512).unwrap());
-    // A hash of the other kind never passes.
     let mut hasher = Hasher::for_checksum(&sha256);
     hasher.update(FIXTURE);
     assert!(!hasher.matches(&sha512));
 
-    // Malformed checksums aren't accepted at all.
     assert_eq!(Checksum::sha256_hex("abc"), None);
     assert_eq!(Checksum::sha256_hex(&"z".repeat(64)), None);
     assert_eq!(Checksum::from_npm_integrity("sha1-abc"), None);
@@ -59,7 +53,6 @@ fn node_comes_from_its_shasums_line() {
         downloads::sha256_from_shasums(&shasums, "node-v0-linux-x64.tar.gz"),
         None
     );
-    // A line that only starts with the name doesn't count.
     assert_eq!(downloads::sha256_from_shasums(&shasums, "node"), None);
 
     let archive = node_runtime::node_archive("macos", "aarch64").unwrap();

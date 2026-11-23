@@ -1,14 +1,8 @@
-//! Which chats may change which shared folders: "Allow changes", kept here rather than in a window.
-//! An answer is only written after the person says yes in a native dialog
-//! (`agents_allow_folder_changes`), and every command asks again, so turning it off takes effect on
-//! the next command and a compromised page can't give itself write access.
 use std::collections::BTreeSet;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-/// `profile_state` refuses `grant:` scopes, so a window can't write this.
 const SCOPE: &str = "grant:agent-folder-changes";
-/// A new chat's choice, before the chat has an id.
 pub const DRAFT_KEY: &str = "draft";
 
 type Answers = BTreeSet<(String, String)>;
@@ -21,7 +15,6 @@ fn read(connection: &Connection) -> rusqlite::Result<Answers> {
             |row| row.get(0),
         )
         .optional()?;
-    // A file that can't be read means no one has said yes.
     Ok(document
         .and_then(|document| serde_json::from_str(&document).ok())
         .unwrap_or_default())
@@ -38,7 +31,6 @@ fn write(connection: &Connection, answers: &Answers) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// One change, whole: two at once mustn't lose either, least of all someone taking an answer back.
 fn change(connection: &Connection, work: impl FnOnce(&mut Answers)) -> rusqlite::Result<()> {
     connection.execute_batch("BEGIN IMMEDIATE")?;
     let done = read(connection).and_then(|mut answers| {
@@ -64,7 +56,6 @@ pub(in crate::agents) fn allow(
     })
 }
 
-/// Takes it back from a chat, for one folder or for all of them.
 pub(in crate::agents) fn stop(
     connection: &Connection,
     key: &str,
@@ -75,7 +66,6 @@ pub(in crate::agents) fn stop(
     })
 }
 
-/// A folder that stopped being shared loses every chat's answer.
 pub(in crate::agents) fn forget_folder(
     connection: &Connection,
     folder: &str,
@@ -93,8 +83,6 @@ pub(in crate::agents) fn allowed(
     Ok(read(connection)?.contains(&(key.to_owned(), folder.to_owned())))
 }
 
-/// A new chat takes its draft's answer, which is then spent. Nothing else can be passed on, so one
-/// chat's answer can't reach another chat.
 pub(in crate::agents) fn adopt(
     connection: &Connection,
     from: &str,

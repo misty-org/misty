@@ -30,8 +30,6 @@ pub struct DirEntry {
     pub is_dir: bool,
     pub size: u64,
     pub mtime_ms: i64,
-    /// Git ignores this entry (`.gitignore`, info/exclude, global excludes, and `.git` itself);
-    /// see `git_ignore.rs`. Omitted when false.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub ignored: bool,
 }
@@ -39,14 +37,10 @@ pub struct DirEntry {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileContent {
-    /// `text`, `image` or `binary`.
     pub kind: &'static str,
     pub text: Option<String>,
-    /// The file's size on disk, in bytes.
     pub size: u64,
-    /// When it last changed; an image's URL carries it, so a change on disk loads anew.
     pub mtime_ms: i64,
-    /// The file is longer than what was read; saving it would cut it short, so it opens read-only.
     pub truncated: bool,
 }
 
@@ -57,8 +51,6 @@ pub struct FileOpResult {
     pub is_dir: bool,
 }
 
-/// What pasting the system clipboard did: the items that landed, and why each one that didn't
-/// stayed behind (one bad entry must not lose the rest).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PasteClipboardResult {
@@ -82,17 +74,12 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-/// Files the operating system leaves in folders for itself: Finder's view settings, Explorer's
-/// thumbnail cache and folder settings. Nobody made them, so no listing shows them.
 fn is_os_junk(name: &str) -> bool {
     [".DS_Store", "Thumbs.db", "desktop.ini"]
         .iter()
         .any(|junk| name.eq_ignore_ascii_case(junk))
 }
 
-/// One folder's entries, folders first, without the system's own junk files. With `ignore_root`
-/// each entry carries its Git-ignore state, bounded by the tree's root (see `git_ignore.rs`);
-/// other callers skip the Git work.
 pub(crate) fn list_dir_blocking(
     dir: &Path,
     ignore_root: Option<&Path>,
@@ -133,8 +120,6 @@ pub(crate) fn list_dir_blocking(
     Ok(out)
 }
 
-/// What a folder holds, folders first. `git_ignore_root` is the tree's root, which bounds how far
-/// a folder's ignored state is inherited.
 #[tauri::command]
 pub async fn project_list_dir(
     app: tauri::AppHandle,
@@ -187,7 +172,6 @@ fn read_file_blocking(file: &Path) -> Result<FileContent, String> {
     let meta = file_access::fs::metadata(file)
         .map_err(|error| format!("Couldn't read {}: {error}", file.display()))?;
     let (size, mtime_ms) = (meta.len(), mtime_ms(&meta));
-    // The webview loads an image itself, over `misty-file:`; only what it is goes back here.
     if is_image(file) {
         return Ok(FileContent {
             kind: "image",
@@ -209,7 +193,6 @@ fn read_file_blocking(file: &Path) -> Result<FileContent, String> {
     }
     let truncated = bytes.len() > MAX_READ_BYTES;
     bytes.truncate(MAX_READ_BYTES);
-    // A zero byte in the first 8 KB means it isn't text.
     if bytes[..bytes.len().min(8192)].contains(&0) {
         return Ok(FileContent {
             kind: "binary",
@@ -228,8 +211,6 @@ fn read_file_blocking(file: &Path) -> Result<FileContent, String> {
     })
 }
 
-/// A file's text up to a megabyte; for an image only its kind, size and time, since the editor
-/// loads its bytes by URL.
 #[tauri::command]
 pub async fn project_read_file(
     app: tauri::AppHandle,
@@ -242,7 +223,6 @@ pub async fn project_read_file(
     blocking(move || read_file_blocking(&file)).await
 }
 
-/// The most `project_read_bytes` hands back: a Media file's upload limit (`upload-limits.ts`).
 const MAX_BYTES: u64 = 100 * 1024 * 1024;
 
 fn read_bytes_blocking(file: &Path) -> Result<Vec<u8>, String> {
@@ -261,8 +241,6 @@ fn read_bytes_blocking(file: &Path) -> Result<Vec<u8>, String> {
     file_access::fs::read(file).map_err(|_| format!("Misty couldn't read {name}."))
 }
 
-/// A file's bytes, whole, for the file picker to add it to a Space's Media. Only files in the
-/// account's linked folders, and none past the Media upload limit.
 #[tauri::command]
 pub async fn project_read_bytes(
     app: tauri::AppHandle,
@@ -277,7 +255,6 @@ pub async fn project_read_bytes(
         .map(tauri::ipc::Response::new)
 }
 
-/// Saves a file's text.
 #[tauri::command]
 pub async fn project_write_file(
     app: tauri::AppHandle,
@@ -311,7 +288,6 @@ pub async fn project_create_dir(
     .await
 }
 
-/// "New file" from the tree's menu: fails instead of overwriting when the name is taken.
 #[tauri::command]
 pub async fn project_create_file(
     app: tauri::AppHandle,
@@ -358,10 +334,6 @@ pub async fn project_rename(
     .await
 }
 
-/// Moves `path` to the system's trash in this process. On macOS the trash crate would ask Finder
-/// through `osascript` by default (an Automation prompt, and a process chain security tools
-/// distrust); NSFileManager's `trashItemAtURL` needs neither. The cost is that Finder's "Put
-/// Back" may be missing for these items; dragging them out of the Trash still restores them.
 pub(crate) fn move_to_trash(path: &Path) -> Result<(), trash::Error> {
     #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
     let mut context = trash::TrashContext::default();
@@ -382,7 +354,6 @@ pub async fn project_trash(
 ) -> Result<(), String> {
     person_window(&webview)?;
     let target = linked_path(&app, &account, &path).await?;
-    // The folder itself stays: a whole linked folder is unlinked, never trashed from here.
     let store = app
         .state::<crate::app::runtime::MistyRuntime>()
         .environment
@@ -424,13 +395,6 @@ pub async fn project_paste(
     blocking(move || copy::paste(&source, &dir)).await
 }
 
-/// Pastes the files the system clipboard holds (a Finder or Explorer copy). Nothing created and
-/// nothing failed means the clipboard held no file; the tree then falls back to its own copy.
-///
-/// The source paths are read from the clipboard here and never travel through a window: a
-/// window-named "paste from anywhere" would be a read of any file once the copy lands in the
-/// folder. Only the reading runs on the main thread, as AppKit wants; the copy, which can be a
-/// whole folder from another disk, runs on a worker.
 #[tauri::command]
 pub async fn project_paste_clipboard(
     app: tauri::AppHandle,
@@ -447,8 +411,6 @@ pub async fn project_paste_clipboard(
     blocking(move || Ok(copy::copy_clipboard_items_into(&snapshot.paths, &dir))).await
 }
 
-/// The file paths on the system clipboard and its change count, so the tree's Paste can tell
-/// whether its own Copy is still the newest one.
 #[tauri::command]
 pub async fn project_clipboard_snapshot(
     app: tauri::AppHandle,
@@ -458,8 +420,6 @@ pub async fn project_clipboard_snapshot(
     clipboard::snapshot_on_main_thread(&app).await
 }
 
-/// The clipboard's change count alone, read without opening the clipboard, for when a snapshot
-/// fails because another program holds it (Windows).
 #[tauri::command]
 pub async fn project_clipboard_change_count(
     app: tauri::AppHandle,
@@ -469,9 +429,6 @@ pub async fn project_clipboard_change_count(
     clipboard::change_count_on_main_thread(&app).await
 }
 
-/// Puts files from a linked folder on the system clipboard, so Finder or Explorer pastes the real
-/// item. Returns the clipboard's change count afterwards, written or not. Paths outside the
-/// linked folders were refused before this.
 #[tauri::command]
 pub async fn project_clipboard_set_files(
     app: tauri::AppHandle,

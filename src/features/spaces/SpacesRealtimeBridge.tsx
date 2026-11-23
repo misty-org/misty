@@ -1,7 +1,7 @@
-import { reportSystemError } from "@/shared/platform/systemErrors";
+import { reportSystemError } from "@/shared/platform/system_errors";
 import { useAuth } from "@/features/account";
 import { useEffect, useRef } from "react";
-import { useSpacesStore } from "./list/useSpacesStore";
+import { useSpacesStore } from "./list/use_spaces_store";
 import { SpaceAgentsBroadcast } from "./list/SpaceAgentsBroadcast";
 import { SpaceStudioPeople } from "./list/SpaceStudioPeople";
 
@@ -48,8 +48,6 @@ export function SpacesRealtimeBridge() {
       return;
     }
     if (isReconnectError(error)) {
-      // Until the first snapshot arrives, the surface needs this error to
-      // expose Retry instead of returning to an indefinite loading state.
       if (snapshotReady) clearError();
       return;
     }

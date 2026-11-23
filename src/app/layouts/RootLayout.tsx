@@ -9,13 +9,13 @@ import { ShortcutRuntime } from "../ShortcutRuntime";
 import { PetRuntime } from "@/features/pets";
 import { RunNotifier } from "@/features/agents";
 import { TrayVisibility } from "@/features/app-windows";
-import { useAppZoom } from "@/shared/hooks/useAppZoom";
+import { useAppZoom } from "@/shared/hooks/use_app_zoom";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { platform as osPlatform } from "@/shared/platform/os";
 import { useEffect, useRef } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
-import { installMistyDeepLinkHandler } from "../routing/deepLinks";
+import { installMistyDeepLinkHandler } from "../routing/deep_links";
 export function RootLayout(props: {
   isDeepLinkRouteAllowed: (route: string) => boolean;
   resolveAuthDeepLinkRoute: () => string;
@@ -45,9 +45,7 @@ export function RootLayout(props: {
     if (!hasTauriInternals()) return;
     try {
       document.documentElement.dataset.osPlatform = osPlatform();
-    } catch {
-      // Platform detection is best-effort; leave the attribute unset.
-    }
+    } catch {}
   }, []);
   useEffect(() => {
     if (!hasTauriInternals()) return;
@@ -83,15 +81,14 @@ function AppZoomIndicator(props: { visible: boolean; percent: number }) {
       radius="lg"
       className={cn(
         "pointer-events-none fixed inset-x-0 top-10 layer-dialog-backdrop mx-auto w-fit",
-        "px-3 py-1.5 text-sm font-semibold",
-        "shadow-xl transition duration-150",
+        "px-3 py-1.5 transition duration-150",
         props.visible ? "translate-y-0 opacity-100" : "-translate-y-2 opacity-0",
       )}
       role="status"
       aria-live="polite"
       aria-hidden={!props.visible}
     >
-      <Text bare tone="default">
+      <Text bare size="control" weight="semibold" tone="default">
         {props.percent}%
       </Text>
     </Surface>

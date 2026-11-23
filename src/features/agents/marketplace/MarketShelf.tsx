@@ -1,16 +1,9 @@
 import { useState, type ReactNode } from "react";
-import { Button, OptionSelect, Shelf, ShelfSkeleton, SkeletonControl } from "@misty/ui";
-import { EngineMark } from "@/features/engine-config/EngineMark";
+import { Button, Mark, OptionSelect, Shelf, ShelfSkeleton, SkeletonControl } from "@misty/ui";
 
-/** Items a folded shelf shows: three rows of two. */
 const FOLDED = 6;
-/** Items an opened shelf adds each time Show more is pressed. */
 const PAGE = 60;
 
-/**
- * A shelf of a catalog's items: folded to a few, with See all at its heading that opens it to the
- * rest a page at a time. Give it a `key` that changes with the filter, so it folds again.
- */
 export function MarketShelf<T>({
   title,
   items,
@@ -49,7 +42,6 @@ export function MarketShelf<T>({
   );
 }
 
-/** The agent a section adds to, picked from the installed ones, each with its own mark. */
 export function EnginePicker({
   engines,
   engine,
@@ -68,13 +60,12 @@ export function EnginePicker({
       options={engines.map((entry) => ({
         value: entry.id,
         label: entry.name,
-        icon: <EngineMark engine={entry.id} name={entry.name} />,
+        icon: <Mark of={`engine:${entry.id}`} size="1em" label={entry.name} aria-hidden />,
       }))}
     />
   );
 }
 
-/** A section's first load: its control row, then shelves in their own shape. */
 export function MarketSkeleton({ label, logos = true }: { label: string; logos?: boolean }) {
   return (
     <>
@@ -89,7 +80,6 @@ export function MarketSkeleton({ label, logos = true }: { label: string; logos?:
   );
 }
 
-/** Shelves before their items are listed; `logos={false}` for items that have none (skills). */
 export function MarketShelvesSkeleton({ label, logos = true }: { label: string; logos?: boolean }) {
   return (
     <>

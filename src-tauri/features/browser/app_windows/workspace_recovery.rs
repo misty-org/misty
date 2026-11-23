@@ -1,4 +1,3 @@
-//! Account-scoped local recovery of the workspace, kept on this computer.
 use browser_data::{
     crypto::RecoveryScope,
     recovery::{RecoveryRecord, RecoveryStore},
@@ -17,8 +16,6 @@ struct Client {
     _lock: fs::File,
 }
 static CLIENT: OnceLock<Mutex<Option<Client>>> = OnceLock::new();
-/// Keys whose newest save reached neither the database nor its pending slot.
-/// They exist only in the renderer, so quitting now would lose them.
 static UNSAVED: Mutex<std::collections::BTreeSet<String>> =
     Mutex::new(std::collections::BTreeSet::new());
 pub(crate) fn unsaved_count() -> usize {
@@ -28,7 +25,6 @@ fn client() -> &'static Mutex<Option<Client>> {
     CLIENT.get_or_init(|| Mutex::new(None))
 }
 pub(crate) fn close_account() -> Result<(), String> {
-    // Keys are per account; the next account starts with its own record.
     if let Ok(mut unsaved) = UNSAVED.lock() {
         unsaved.clear();
     }
@@ -43,14 +39,8 @@ fn main_only(view: &tauri::Webview) -> Result<(), String> {
     }
     Ok(())
 }
-/// The account scope the app uses while nobody is signed in. Its recovery belongs to this
-/// computer, so it opens without an account session.
 const LOCAL_ACCOUNT_SCOPE: &str = "local";
 
-/// The deployment an account scope's recovery is filed under. Recovery is this device's own data,
-/// sealed with a key in the OS keychain, so it does not ask the server: an account whose
-/// session expired keeps its windows and tabs while it waits to sign in again
-/// The local scope has no deployment.
 fn recovery_deployment(api_base: &str, account: &str) -> Result<String, String> {
     if account == LOCAL_ACCOUNT_SCOPE {
         return Ok(LOCAL_ACCOUNT_SCOPE.to_owned());
@@ -69,8 +59,6 @@ fn recovery_directory(
     let identity = hex::encode(Sha256::digest(
         serde_json::to_vec(&(deployment, account)).map_err(|_| "Invalid workspace identity")?,
     ));
-    // Under Misty's data folder with everything else. (A recovery database from an
-    // earlier layout was sealed with a key that no longer exists, so it is not reused.)
     let _ = app;
     Ok(file_access::paths::misty_home_dir()
         .ok_or("Workspace storage is unavailable")?
@@ -102,8 +90,6 @@ fn remove_recovery_files(directory: &std::path::Path) -> Result<(), String> {
             return Err("Could not remove workspace recovery. Retry removing this account.".into())
         }
     }
-    // Retain the lock inode: deleting it after releasing our process lock could
-    // let another process lock the old inode while a third locks a new one.
     Ok(())
 }
 
@@ -118,8 +104,6 @@ pub async fn browser_recovery_forget(
     let lifetime = crate::browser::profiles::browser_lifecycle().write().await;
     tauri::async_runtime::spawn_blocking(move || {
         let _lifetime = lifetime;
-        // This command serves the saved-account chooser after its cookie entry
-        // was removed. It can forget only an inactive local recovery identity.
         let deployment = recovery_deployment(&api_base, &account_id)?;
         let scope = RecoveryScope {
             deployment: deployment.clone(),
@@ -155,7 +139,6 @@ pub async fn browser_recovery_forget(
 #[derive(Serialize)]
 pub struct RecoverySession {
     session_id: String,
-    /// Keys whose newest value still waits in a pending slot (see `recovery_pending`).
     pending: Vec<String>,
 }
 
@@ -168,8 +151,6 @@ pub async fn browser_recovery_open(
 ) -> Result<RecoverySession, String> {
     main_only(&webview)?;
     let lifetime = crate::browser::profiles::browser_lifecycle().read().await;
-    // Move the lifetime lease into the blocking task. Cancellation of IPC cannot
-    // let an account switch race an outstanding SQLite operation.
     tauri::async_runtime::spawn_blocking(move || {
         let _lifetime = lifetime;
         let deployment = recovery_deployment(&api_base, &account_id)?;

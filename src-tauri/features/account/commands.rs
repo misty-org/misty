@@ -1,5 +1,3 @@
-//! What the app windows ask of the account: the signed-in user, the session, the API cache, sign-in
-//! windows and the server's address.
 use crate::app::error::{ApiError, ApiResult};
 
 #[tauri::command]
@@ -12,8 +10,6 @@ pub async fn server_host_resolves_public(webview: tauri::Webview, host: String) 
     Ok(crate::agents::web_fetch::host_resolves_public(&host).await)
 }
 
-// Commands that live in the feature's other modules, named here so the command table can list them all
-// from one place. `generate_handler!` needs each command's hidden macros beside it, so those are named too.
 pub(crate) use crate::account::api_cache::{
     __cmd__api_cache_clear, __cmd__api_cache_delete_prefix, __cmd__api_cache_get,
     __cmd__api_cache_put, __tauri_command_name_api_cache_clear,

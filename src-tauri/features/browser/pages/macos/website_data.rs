@@ -1,7 +1,3 @@
-//! Removing website data from a profile's WebKit store.
-
-/// Removes the chosen kinds of website data changed since `since_ms` from one
-/// profile's store, leaving the store itself in place.
 #[cfg(target_os = "macos")]
 pub(crate) async fn clear_browser_website_data(
     app: &tauri::AppHandle,

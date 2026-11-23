@@ -1,25 +1,14 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * Signing in to an engine CLI: its own login runs in a terminal in this dialog, the way
- * desktop-cc-gui hands Pi, Oh My Pi and CodeBuddy logins to its built-in terminal, but the
- * terminal waits under Show details and the dialog says in a sentence what to do in the browser.
- * Where the CLI shows a page and waits for its code (Claude Code, Antigravity), the dialog has one
- * field for that code, which native code types into the terminal; where only the CLI's own screen
- * asks (CodeBuddy's `/login`, Qwen Code's `/auth`), the sentence says to answer it under Show
- * details, and Done counts it as finished. Closing the dialog ends the CLI. When it ends, the
- * caller checks the sign-in again.
- */
 import type { Terminal } from "@xterm/xterm";
-import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
   TERMINAL_FONT_SIZE,
   terminalFontFamily,
   terminalTheme,
 } from "@/shared/lib/terminal/appearance";
-import { loadXterm } from "@/shared/lib/terminal/xtermLoader";
+import { loadXterm } from "@/shared/lib/terminal/xterm_loader";
 import {
   Button,
   cn,
@@ -28,7 +17,9 @@ import {
   CollapsibleTrigger,
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
+  DisclosureButton,
   FieldError,
   Input,
   Label,
@@ -36,10 +27,11 @@ import {
   Spinner,
   Surface,
   Text,
+  DialogFooter,
 } from "@misty/ui";
 import { engineName } from "../channels/engines";
 import { signInChoiceLabel } from "./SignInButton";
-import { listenSignIn, signInApi, type SignInRequest, type SignInStarted } from "./signInApi";
+import { listenSignIn, signInApi, type SignInRequest, type SignInStarted } from "./sign_in_api";
 import { uiPx } from "@misty/ui";
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -48,9 +40,7 @@ export function SignInDialog({
   request,
   onClose,
 }: {
-  /** null keeps the dialog closed. */
   request: SignInRequest | null;
-  /** After the CLI ended or the person closed the dialog. */
   onClose: () => void;
 }) {
   if (!request) return null;
@@ -63,14 +53,12 @@ export function SignInDialog({
   );
 }
 
-/** The page a provider's device sign-in opens, for the sentence that asks for its code. */
 const DEVICE_PAGES: Record<string, string> = {
   "github-copilot": "A GitHub page",
   xai: "An xAI page",
   "xai-oauth": "An xAI page",
 };
 
-/** The page each engine's direct sign-in opens, where it's always the same one. */
 const ENGINE_PAGES: Record<string, string> = {
   gemini: "A Google page opens in your browser. Sign in there with your Google account",
   kimi: "A Kimi page opens in your browser. Sign in there and allow access",
@@ -79,7 +67,6 @@ const ENGINE_PAGES: Record<string, string> = {
   grok: "An xAI page opens in your browser. Sign in there with your X or xAI account",
 };
 
-/** What the person does while the sign-in runs, in plain words. */
 export function signInSteps(
   started: SignInStarted,
   engine: string,
@@ -128,7 +115,6 @@ export function signInSteps(
   return "A sign-in page opens in your browser. Finish there, then come back here.";
 }
 
-/** How the sign-in ended, in plain words. */
 function endingLine(ok: boolean, name: string, signOut: boolean): string {
   if (signOut) {
     return ok ? `You're signed out of ${name}.` : `${name} stopped before it signed you out.`;
@@ -139,7 +125,6 @@ function endingLine(ok: boolean, name: string, signOut: boolean): string {
 }
 
 function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose: () => void }) {
-  // Started once per dialog: the key above remounts it for another engine or provider.
   const requestRef = useRef(request);
   const idRef = useRef<string | null>(null);
   const [started, setStarted] = useState<SignInStarted | null>(null);
@@ -147,7 +132,6 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
   const [ended, setEnded] = useState<boolean | null>(null);
   const [details, setDetails] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
-  // Trying again makes the terminal again, which starts the CLI once more.
   const [attempt, setAttempt] = useState(0);
   const name = engineName(request.engine);
   const signOut = Boolean(request.signOut);
@@ -183,7 +167,6 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
     setAttempt((value) => value + 1);
   };
 
-  // Done on a sign-in answered in the CLI's own screen says the person finished it there.
   const finish = async () => {
     const id = idRef.current;
     if (id) await signInApi.close(id, true).catch(() => undefined);
@@ -199,12 +182,13 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
           details ? "w-180" : "w-120",
         )}
       >
-        <DialogTitle className="pr-10 text-base">{title}</DialogTitle>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
         <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
           <div className="flex items-start gap-3" role="status">
             {codeSent && running ? <Spinner label={false} className="mt-0.5" /> : null}
             {line === null ? (
-              // The CLI is starting in its terminal; what to do follows once it has.
               <SetupState size="row" tool="sign-in" onRetry={retry} />
             ) : (
               <Text size="body" tone={startError === null ? undefined : "danger"} wrap>
@@ -224,12 +208,10 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
           ) : null}
           <Collapsible open={details} onOpenChange={setDetails}>
             <CollapsibleTrigger asChild>
-              <Button variant="quiet" size="sm" className="justify-self-start">
-                <ChevronDown className={cn("transition-transform", details && "rotate-180")} />
+              <DisclosureButton open={details} size="sm">
                 {details ? "Hide details" : "Show details"}
-              </Button>
+              </DisclosureButton>
             </CollapsibleTrigger>
-            {/* Mounted while folded, so the CLI keeps running behind it. */}
             <CollapsibleContent forceMount className="grid gap-3 pt-3">
               <CliTerminal
                 key={attempt}
@@ -241,15 +223,14 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
             </CollapsibleContent>
           </Collapsible>
         </div>
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           {running ? (
-            // A CLI whose own screen asks never ends by itself: the person closes it when done.
             started?.asks === "menu" ? (
               <Button variant="primary" onClick={() => void finish()}>
                 Done
               </Button>
             ) : (
-              <Button variant="secondary" onClick={onClose}>
+              <Button variant="quiet" onClick={onClose}>
                 Cancel
               </Button>
             )
@@ -258,16 +239,12 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
               Done
             </Button>
           )}
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-/**
- * The one field for a code the sign-in page shows. What is typed lives only in this field until
- * it is sent to the CLI, and is cleared once sent; nothing of it is kept or logged.
- */
 function CodeField({ onSubmit }: { onSubmit: (code: string) => Promise<void> }) {
   const id = useId();
   const errorId = `${id}-error`;
@@ -323,11 +300,6 @@ function CodeField({ onSubmit }: { onSubmit: (code: string) => Promise<void> }) 
   );
 }
 
-/**
- * The terminal native code runs for a sign-in: the line that runs, then the program's screen,
- * which the person types into. `start` is called once, as the terminal mounts; unmounting ends
- * the program. `onEnded` gets whether it exited cleanly; `onError` gets why it couldn't start.
- */
 export function CliTerminal({
   start,
   onEnded,
@@ -378,9 +350,7 @@ export function CliTerminal({
         term.open(host);
         try {
           fit.fit();
-        } catch {
-          // A host still being laid out; the observer fits it.
-        }
+        } catch {}
         const live = term;
         stopListening = await listenSignIn(
           id,
@@ -417,7 +387,6 @@ export function CliTerminal({
         live.focus();
       } catch (reason) {
         if (disposed) return;
-        // xterm, the listener or the CLI failing ends the setup where the dialog says so too.
         const message = errorText(reason);
         setError(message);
         errorRef.current?.(message);
@@ -456,7 +425,7 @@ export function CliTerminal({
         ) : null}
       </Surface>
       {error ? (
-        <Text role="alert" tone="muted" wrap className="text-sm">
+        <Text size="meta" role="alert" tone="muted" wrap>
           {error}
         </Text>
       ) : null}

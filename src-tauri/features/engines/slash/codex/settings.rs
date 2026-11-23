@@ -1,5 +1,3 @@
-//! Codex's settings: `/personality`, `/experimental`, `/memories` and `/debug-config`.
-
 use super::*;
 
 pub(super) async fn personality(context: &Context) -> Result<Output, String> {
@@ -20,7 +18,6 @@ pub(super) async fn personality(context: &Context) -> Result<Output, String> {
     if !PERSONALITIES.contains(&wanted.as_str()) {
         return Err(format!("Codex's styles are {}.", PERSONALITIES.join(", ")));
     }
-    // The terminal app saves the choice as the default in config.toml; so does this.
     call_once(
         context,
         "config/value/write",
@@ -32,9 +29,6 @@ pub(super) async fn personality(context: &Context) -> Result<Output, String> {
     )))
 }
 
-/// Experimental features, saved in config.toml's `[features]` as the terminal app saves them:
-/// `experimentalFeature/enablement/set` only lasts as long as the app-server, and this one stops
-/// right after.
 pub(super) async fn experimental(context: &Context) -> Result<Output, String> {
     let args = context.args.trim();
     let mut rpc = open(context).await?;
@@ -84,7 +78,6 @@ async fn experimental_in(rpc: &mut Session, args: &str) -> Result<Output, String
         "off" => false,
         _ => return Err("Use /experimental <feature> on or /experimental <feature> off.".into()),
     };
-    // Only a feature Codex lists becomes a key in config.toml.
     let known = features.iter().any(|feature| {
         feature["name"].as_str() == Some(name) && feature["stage"].as_str() != Some("removed")
     });
@@ -103,8 +96,6 @@ async fn experimental_in(rpc: &mut Session, args: &str) -> Result<Output, String
     )))
 }
 
-/// Memories: the `memories` feature and `[memories]` use and generation in config.toml, plus
-/// the chat's own thread when it has one.
 pub(super) async fn memories(context: &Context) -> Result<Output, String> {
     let args = context.args.trim();
     let mut rpc = open(context).await?;
@@ -156,7 +147,6 @@ async fn memories_in(rpc: &mut Session, context: &Context, args: &str) -> Result
                 json!({ "keyPath": "memories.use_memories", "value": on, "mergeStrategy": "replace" }),
                 json!({ "keyPath": "memories.generate_memories", "value": on, "mergeStrategy": "replace" }),
             ];
-            // Turning memories on needs the feature too; turning them off leaves the feature be.
             if on {
                 edits.push(json!({ "keyPath": "features.memories", "value": true, "mergeStrategy": "replace" }));
             }
@@ -203,7 +193,6 @@ pub(super) async fn debug_config(context: &Context) -> Result<Output, String> {
     rpc.stop().await;
     let config = config?;
     let mut sections = Vec::new();
-    // Only where each layer comes from: a layer's own values can hold credentials.
     let layers: Vec<Row> = config["layers"]
         .as_array()
         .into_iter()
@@ -256,7 +245,6 @@ pub(super) async fn debug_config(context: &Context) -> Result<Output, String> {
     Ok(Output::info("Codex config", sections))
 }
 
-/// A config layer's source as one line (`ConfigLayerSource`).
 fn layer_source(name: &Value) -> String {
     let parts: Vec<String> = [
         "file",
@@ -279,7 +267,6 @@ fn layer_source(name: &Value) -> String {
     }
 }
 
-/// A config layer's kind (`ConfigLayerSource.type`) in words.
 fn layer_kind(kind: &str) -> String {
     match kind {
         "user" => "User".into(),

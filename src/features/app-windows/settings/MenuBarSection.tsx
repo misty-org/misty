@@ -3,10 +3,9 @@ import {
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/features/settings";
 import { SwitchControl } from "@/features/settings/SettingsControls";
-import type { SettingsContentProps } from "@/features/settings/settingsTypes";
-import { useTrayHidden } from "@/shared/lib/trayHidden";
+import type { SettingsContentProps } from "@/features/settings/settings_types";
+import { useTrayHidden } from "@/shared/lib/tray_hidden";
 
-/** Settings › Server › Menu bar: whether Misty's icon shows there. Device-only. */
 export function MenuBarSection(props: SettingsContentProps) {
   const hidden = useTrayHidden((state) => state.value);
   return (

@@ -5,14 +5,12 @@ import {
 import { definitionById, fromLegacy } from "../device-preferences/registry";
 import { useDevicePreferences } from "../device-preferences/store";
 import { ChoiceControl, SwitchControl, TextControl } from "../SettingsControls";
-import { useSettingsStore } from "../preferences/useSettingsStore";
+import { useSettingsStore } from "../preferences/use_settings_store";
 
-/** One preference from the settings registry, with its matching control. */
 export function PreferenceRow({ id, description }: { id: string; description?: string }) {
   const d = definitionById.get(id)!;
   const store = useSettingsStore();
   const ready = useDevicePreferences((s) => s.ready);
-  // Until the settings are read, the row's shape, never its default posing as the value.
   if (!store.settings)
     return (
       <DesktopSettingsRowSkeleton

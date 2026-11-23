@@ -1,15 +1,13 @@
-//! Runtime failures: which retry, which stop a run, and what the person is told.
 use std::{fmt, sync::LazyLock};
 
 use regex::Regex;
 
 use super::{
     js_regex::js_regex,
-    tool_errors::classify_tool_transport_error,
     text::{js_prefix, js_trim},
+    tool_errors::classify_tool_transport_error,
 };
 
-/// `ControlPlaneError` from `control-plane-error.ts`.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ControlPlaneError {
     pub(crate) status: u16,
@@ -22,17 +20,24 @@ impl ControlPlaneError {
     #[cfg(test)]
     pub(crate) fn new(status: u16, message: impl Into<String>, code: Option<&str>) -> Self {
         let code = code.unwrap_or("control_plane_error").to_owned();
-        let transient = code != "usage_limit_reached" && (status == 408 || status == 429 || status >= 500);
-        Self { status, message: message.into(), code, transient }
+        let transient =
+            code != "usage_limit_reached" && (status == 408 || status == 429 || status >= 500);
+        Self {
+            status,
+            message: message.into(),
+            code,
+            transient,
+        }
     }
 }
 
-/// What a TypeScript `catch` saw: a known error class, or anything else by its diagnostic fields.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum RuntimeError {
     ControlPlane(ControlPlaneError),
-    /// `ToolRejectedError` from `tool-execution.ts`: Misty reported the call failed without effect.
-    ToolRejected { code: String, message: String },
+    ToolRejected {
+        code: String,
+        message: String,
+    },
     Other {
         name: String,
         message: String,
@@ -42,23 +47,36 @@ pub(crate) enum RuntimeError {
 }
 
 impl RuntimeError {
-    /// `new Error(message)`.
     pub(crate) fn error(message: impl Into<String>) -> Self {
         Self::named("Error", message)
     }
 
-    /// An error thrown as a bare string.
     pub(crate) fn text(message: impl Into<String>) -> Self {
         Self::named("", message)
     }
 
     pub(crate) fn named(name: impl Into<String>, message: impl Into<String>) -> Self {
-        Self::Other { name: name.into(), message: message.into(), status: None, cause: None }
+        Self::Other {
+            name: name.into(),
+            message: message.into(),
+            status: None,
+            cause: None,
+        }
     }
 
     pub(crate) fn with_status(self, next: u16) -> Self {
         match self {
-            Self::Other { name, message, cause, .. } => Self::Other { name, message, status: Some(next), cause },
+            Self::Other {
+                name,
+                message,
+                cause,
+                ..
+            } => Self::Other {
+                name,
+                message,
+                status: Some(next),
+                cause,
+            },
             other => other,
         }
     }
@@ -66,7 +84,17 @@ impl RuntimeError {
     #[cfg(test)]
     pub(crate) fn with_cause(self, next: RuntimeError) -> Self {
         match self {
-            Self::Other { name, message, status, .. } => Self::Other { name, message, status, cause: Some(Box::new(next)) },
+            Self::Other {
+                name,
+                message,
+                status,
+                ..
+            } => Self::Other {
+                name,
+                message,
+                status,
+                cause: Some(Box::new(next)),
+            },
             other => other,
         }
     }
@@ -113,26 +141,29 @@ impl fmt::Display for RuntimeError {
 
 impl std::error::Error for RuntimeError {}
 
-/// What the run's step does with a failure. Workflow's `FatalError` and `RetryableError` become two
-/// answers, and an error nobody recognizes goes back up unchanged.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum StepFailure {
     Fatal(String),
-    Retryable { message: String, retry_after_ms: u64 },
+    Retryable {
+        message: String,
+        retry_after_ms: u64,
+    },
     Unrecognized(RuntimeError),
 }
 
-/// Refusals the run stops on with the reason the person can act on.
-const REFUSALS: [&str; 4] = ["usage_limit_reached", "model_key_needed", "model_unsupported", "model_base_url_invalid"];
+const REFUSALS: [&str; 4] = [
+    "usage_limit_reached",
+    "model_key_needed",
+    "model_unsupported",
+    "model_base_url_invalid",
+];
 
-/// Step failures retry only for transient control-plane or transport errors.
 pub(crate) fn rethrow_step_error(error: RuntimeError) -> StepFailure {
     if let RuntimeError::ControlPlane(failure) = &error {
-        if failure.code == "agent_model_turn_limit" || failure.code == "agent_execution_time_limit" {
+        if failure.code == "agent_model_turn_limit" || failure.code == "agent_execution_time_limit"
+        {
             return StepFailure::Fatal(failure.code.clone());
         }
-        // Refusals keep their code, so the run fails with the reason the person
-        // can act on rather than a generic authorization error.
         if REFUSALS.contains(&failure.code.as_str()) {
             return StepFailure::Fatal(failure.code.clone());
         }
@@ -142,11 +173,17 @@ pub(crate) fn rethrow_step_error(error: RuntimeError) -> StepFailure {
                 retry_after_ms: if failure.status == 429 { 5_000 } else { 1_000 },
             };
         }
-        return StepFailure::Fatal("authorization_or_state_changed: Misty's authorization or run state changed.".to_owned());
+        return StepFailure::Fatal(
+            "authorization_or_state_changed: Misty's authorization or run state changed."
+                .to_owned(),
+        );
     }
     let failure = classify_tool_transport_error(&error);
     if failure.transient {
-        return StepFailure::Retryable { message: failure.message.to_owned(), retry_after_ms: failure.retry_after_ms };
+        return StepFailure::Retryable {
+            message: failure.message.to_owned(),
+            retry_after_ms: failure.retry_after_ms,
+        };
     }
     if failure.recognized {
         return StepFailure::Fatal(failure.message.to_owned());
@@ -156,9 +193,9 @@ pub(crate) fn rethrow_step_error(error: RuntimeError) -> StepFailure {
 
 static SPACES: LazyLock<Regex> = LazyLock::new(|| js_regex(r"\s+", false));
 static CODE_PREFIX: LazyLock<Regex> = LazyLock::new(|| js_regex(r"^[a-z0-9_]+:\s*", true));
-static APP_ACTION_LIMIT: LazyLock<Regex> = LazyLock::new(|| js_regex(r"\bapp_action_limit_reached:[^\n]*", true));
+static APP_ACTION_LIMIT: LazyLock<Regex> =
+    LazyLock::new(|| js_regex(r"\bapp_action_limit_reached:[^\n]*", true));
 
-/// A validation response the model can correct, without workflow internals.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RecoverableToolError {
     pub(crate) code: String,
@@ -177,26 +214,32 @@ pub(crate) fn recoverable_tool_error(error: &RuntimeError) -> Option<Recoverable
     }
     let stripped = CODE_PREFIX.replace(&failure.message, "");
     Some(RecoverableToolError {
-        code: if failure.code.is_empty() { "invalid_tool_input".to_owned() } else { failure.code.clone() },
+        code: if failure.code.is_empty() {
+            "invalid_tool_input".to_owned()
+        } else {
+            failure.code.clone()
+        },
         message: js_prefix(js_trim(&stripped), 500).to_owned(),
     })
 }
 
-/// A model provider failing on its side (a 5xx, or a rate limit) after the call's own retries.
-/// The run waits it out between turns instead of failing: on October 21 a free endpoint's one
-/// "Internal Server Error" ended a run 33 seconds in.
 pub(crate) fn provider_outage(error: &RuntimeError) -> bool {
     let normalized = runtime_error_description(error, 0).to_lowercase();
-    const WAITED_OUT: [&str; 6] = ["internal server error", "bad gateway", "service unavailable", "gateway timeout", "too many requests", "rate limit"];
+    const WAITED_OUT: [&str; 6] = [
+        "internal server error",
+        "bad gateway",
+        "service unavailable",
+        "gateway timeout",
+        "too many requests",
+        "rate limit",
+    ];
     normalized.contains("gatewayinternalservererror")
         || normalized.contains("service temporarily unavailable")
-        // A stream that went quiet through every retry: the endpoint hung.
         || normalized.contains("model_stream_stalled")
         || ((normalized.contains("dostreamstep") || normalized.contains("ai_apicallerror"))
             && WAITED_OUT.iter().any(|phrase| normalized.contains(phrase)))
 }
 
-/// A failure's stable code and the words the person sees.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ClassifiedError {
     pub(crate) code: &'static str,
@@ -208,8 +251,6 @@ const fn classified(code: &'static str, message: &'static str) -> ClassifiedErro
 }
 
 pub(crate) fn classify_runtime_error(error: &RuntimeError) -> ClassifiedError {
-    // Step failures may wrap the provider error in a cause. Inspect diagnostic fields, never raw
-    // responses.
     let normalized = runtime_error_description(error, 0).to_lowercase();
     let has = |phrase: &str| normalized.contains(phrase);
     if has("agent_model_turn_limit") {
@@ -222,26 +263,47 @@ pub(crate) fn classify_runtime_error(error: &RuntimeError) -> ClassifiedError {
         return classified("model_key_needed", "Add a model key in Settings → Models.");
     }
     if has("model_unsupported") {
-        return classified("model_unsupported", "The chosen model can't do this. Pick another in Settings → Models.");
+        return classified(
+            "model_unsupported",
+            "The chosen model can't do this. Pick another in Settings → Models.",
+        );
     }
     if has("model_base_url_invalid") {
-        return classified("model_base_url_invalid", "The model's base URL can't be used. Check it in Settings → Models.");
+        return classified(
+            "model_base_url_invalid",
+            "The model's base URL can't be used. Check it in Settings → Models.",
+        );
     }
     if has("timeout") || has("timed out") || has("aborted") {
-        return classified("agent_runtime_timeout", "Misty timed out before completing this request.");
+        return classified(
+            "agent_runtime_timeout",
+            "Misty timed out before completing this request.",
+        );
     }
     if has("usage_limit_reached") && has("too many agent tasks") {
-        return classified("usage_limit_reached", "Too many agent tasks are running at once. Wait for one to finish, then try again.");
+        return classified(
+            "usage_limit_reached",
+            "Too many agent tasks are running at once. Wait for one to finish, then try again.",
+        );
     }
     if has("usage_limit_reached") && has("starting agent tasks faster") {
-        return classified("usage_limit_reached", "You're starting agent tasks faster than they can run. Wait a minute, then try again.");
+        return classified(
+            "usage_limit_reached",
+            "You're starting agent tasks faster than they can run. Wait a minute, then try again.",
+        );
     }
     if has("usage_limit_reached") {
-        return classified("usage_limit_reached", "Misty paused here because a rate limit was reached. Try again in a moment.");
+        return classified(
+            "usage_limit_reached",
+            "Misty paused here because a rate limit was reached. Try again in a moment.",
+        );
     }
     let revoked = matches!(error, RuntimeError::ControlPlane(failure) if !failure.transient);
     if revoked || has("authorization_or_state_changed") {
-        return classified("authorization_or_state_changed", "Misty's authorization or run state changed.");
+        return classified(
+            "authorization_or_state_changed",
+            "Misty's authorization or run state changed.",
+        );
     }
     if has("positive credit balance is required") || has("insufficient_quota") {
         return classified(
@@ -249,39 +311,47 @@ pub(crate) fn classify_runtime_error(error: &RuntimeError) -> ClassifiedError {
             "The model provider says this key has no credit left. Add credit with the provider or use another key in Settings → Models.",
         );
     }
-    if has("api key has been invalidated") || has("invalid api key") || has("incorrect api key") || has("invalid_api_key") {
-        return classified("model_provider_key_invalid", "The model provider rejected the API key. Check the key in Settings → Models.");
+    if has("api key has been invalidated")
+        || has("invalid api key")
+        || has("incorrect api key")
+        || has("invalid_api_key")
+    {
+        return classified(
+            "model_provider_key_invalid",
+            "The model provider rejected the API key. Check the key in Settings → Models.",
+        );
     }
-    // A provider's own 5xx after the step's retries (a free endpoint's "Internal Server Error").
     if provider_outage(error) {
-        return classified("model_gateway_unavailable", "The model provider is temporarily unavailable. Please try again shortly.");
+        return classified(
+            "model_gateway_unavailable",
+            "The model provider is temporarily unavailable. Please try again shortly.",
+        );
     }
-    // The person sees a generic failure; the reason belongs in the runtime's log, or the failure
-    // can never be found (a whole Odysseys run ended this way with nothing logged).
     let description = runtime_error_description(error, 0);
     let flat = SPACES.replace_all(&description, " ");
     super::logger::process_log(&format!("unclassified_failure {}", js_prefix(&flat, 1_500)));
-    classified("agent_runtime_failed", "Misty could not complete this request.")
+    classified(
+        "agent_runtime_failed",
+        "Misty could not complete this request.",
+    )
 }
 
 fn runtime_error_description(error: &RuntimeError, depth: usize) -> String {
     if depth >= 6 {
         return String::new();
     }
-    let cause = error.cause().map_or_else(String::new, |cause| runtime_error_description(cause, depth + 1));
+    let cause = error.cause().map_or_else(String::new, |cause| {
+        runtime_error_description(cause, depth + 1)
+    });
     format!("{} {} {cause}", error.name(), error)
 }
 
-/// `errorText`: an error's message. Every error here is an `Error` or a string in the TypeScript's
-/// terms, so the `JSON.stringify` of a plain object has no counterpart.
 pub(crate) fn error_text(error: &RuntimeError) -> String {
     error.to_string()
 }
 
-/// Public timeline text for a failed call; raw diagnostics stay private.
 pub(crate) fn visible_error_message(error: &RuntimeError) -> String {
     let text = error_text(error);
-    // A plan's monthly app-action limit keeps its code, so the app can tell the person.
     if let Some(limit) = APP_ACTION_LIMIT.find(&text) {
         return js_prefix(limit.as_str(), 500).to_owned();
     }

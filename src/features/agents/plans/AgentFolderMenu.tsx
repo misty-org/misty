@@ -1,6 +1,6 @@
 import { FolderPlus, PencilLine } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmAction } from "@/shared/lib/confirm_action";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import {
   DropdownMenu,
@@ -13,27 +13,21 @@ import {
   MenuTrigger,
   notify,
 } from "@misty/ui";
-import type { AgentScope } from "../personal/agentScope";
+import type { AgentScope } from "../personal/agent_scope";
 import {
   agentsDeviceSnapshot,
   allowFolderChanges,
   shareFolder,
   stopFolderChanges,
-} from "../personal/useAgentsStore";
-import { useConversationFolder } from "../shared-folders/useConversationFolder";
+} from "../personal/use_agents_store";
+import { useConversationFolder } from "../shared-folders/use_conversation_folder";
 
 const none = "none";
 
-/** What sharing allows, said before the picker opens, since Auto doesn't pause for it. */
 export const shareFolderWarning =
   "Agents in chats you give this folder to can read its files. " +
   "In Auto, a page could trick an agent into sending them out over the web, and Misty won't stop to ask.";
 
-/**
- * The folder on this computer a chat on Misty's own runtime can read, or none, as a menu for the
- * context panel: pick one, share another, or let the chat change it. Only the chosen folder
- * travels with the chat. Desktop only.
- */
 export function ChatFolderMenu({ conversationId }: { conversationId: string | undefined }) {
   const [folders, setFolders] = useState<AgentScope[]>([]);
   const chosen = useConversationFolder((s) =>

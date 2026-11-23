@@ -7,9 +7,7 @@ use std::sync::Arc;
 
 use super::core::*;
 use super::fsutil::*;
-// ===== Network: User-Agent, Accept and a 20s timeout; 429/403 → RateLimit =====
 
-/// The hub's client: Misty's own, through the proxy from Settings.
 pub(super) fn http_client() -> SkillResult<reqwest::Client> {
     crate::engine_config::support::http_client()
         .map_err(|e| SkillError::other(format!("Failed to build HTTP client: {e}")))
@@ -38,7 +36,6 @@ pub(super) async fn fetch_checked(response: reqwest::Response) -> SkillResult<re
     Ok(response)
 }
 
-/// upstream fetchJson（Accept: application/vnd.github+json）。
 pub(super) async fn fetch_json(client: &reqwest::Client, url: &str) -> SkillResult<Value> {
     let response = client
         .get(url)
@@ -54,7 +51,6 @@ pub(super) async fn fetch_json(client: &reqwest::Client, url: &str) -> SkillResu
         .map_err(|e| SkillError::coded("http", format!("invalid JSON response: {e}")))
 }
 
-/// upstream fetchText（Accept: text/plain）。
 pub(super) async fn fetch_text(client: &reqwest::Client, url: &str) -> SkillResult<String> {
     let response = client
         .get(url)
@@ -70,8 +66,6 @@ pub(super) async fn fetch_text(client: &reqwest::Client, url: &str) -> SkillResu
         .map_err(|e| SkillError::coded("network", format!("failed to read response body: {e}")))
 }
 
-/// upstream getRepoTree: tries the branches [the configured branch (unless it matches /^head$/i), main,
-/// master] once each; when all fail, the last error is returned.
 pub(super) async fn get_repo_tree(
     client: &reqwest::Client,
     owner: &str,
@@ -108,9 +102,6 @@ pub(super) async fn get_repo_tree(
     Err(last_error.unwrap_or_else(|| SkillError::other(format!("Unable to read {owner}/{name}"))))
 }
 
-/// upstream mapWithConcurrency: a worker pool of fixed size, results in input order.
-/// (Upstream uses Promise.all, which rejects on the first rejection; this collects every result and lets
-/// the caller decide, which is allSettled plus the caller surfacing the first error.)
 pub(super) async fn map_with_concurrency<T, R, F, Fut>(
     items: Vec<T>,
     limit: usize,
@@ -127,7 +118,6 @@ where
     let semaphore = Arc::new(tokio::sync::Semaphore::new(limit.max(1)));
     let mut set: tokio::task::JoinSet<(usize, Result<R, SkillError>)> = tokio::task::JoinSet::new();
     for (index, item) in items.into_iter().enumerate() {
-        // Take a permit before spawning, like upstream's pool of N runners.
         let Ok(permit) = semaphore.clone().acquire_owned().await else {
             break;
         };

@@ -1,9 +1,3 @@
-//! A profile's open tabs, one record per tab strip entry. Sync tracks what's in the profile, never
-//! windows: which window holds a tab is this computer's own business, kept here.
-//!
-//! Each window says which tabs it holds and which it changed. A tab that left a window is only
-//! gone if no other window claims it a moment later, so dragging one between windows isn't closing
-//! it. Closing a window says nothing at all: its tabs stay in the profile.
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -14,12 +8,9 @@ use serde::{Deserialize, Serialize};
 use super::*;
 
 pub const TABS: &str = "tabs";
-/// How long a tab may be in nobody's window before it counts as closed.
 const CLAIM_WAIT: Duration = Duration::from_secs(2);
 const MAX_TABS_PER_CALL: usize = 5_000;
 
-/// Tabs that left a window and aren't closed yet, with the window they left. Until then nothing
-/// may hand them back as if new, or a tab being closed reappears and is saved again.
 static LEAVING: Mutex<BTreeMap<(String, String), String>> = Mutex::new(BTreeMap::new());
 
 fn leaving_from(profile: &str) -> BTreeSet<String> {
@@ -35,7 +26,6 @@ fn leaving_from(profile: &str) -> BTreeSet<String> {
     )
 }
 
-/// Which open window holds each tab, per profile. Kept in the store's meta, never synced.
 fn owners_key(profile: &str) -> String {
     format!("tabs.owners.{profile}")
 }
@@ -61,18 +51,13 @@ pub struct TabRecord {
     pub fields: Fields,
 }
 
-/// What a window should reconcile against.
 #[derive(Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TabsForWindow {
-    /// The tabs this window holds, including ones that just arrived from elsewhere.
     pub tabs: Vec<TabRecord>,
-    /// Of the tabs it listed, those closed elsewhere.
     pub removed: Vec<String>,
 }
 
-/// Works out which tabs belong to `window`: those it holds, plus any no open window holds. A tab
-/// owned by a window that's gone is up for grabs. `open_windows` lists the profile's open windows.
 pub(super) fn assign(
     owners: &mut BTreeMap<String, String>,
     tab_ids: &[String],
@@ -109,7 +94,6 @@ fn calling_window(webview: &tauri::Webview) -> Result<(String, String, String), 
     Ok((label, state.profile, state.window_id))
 }
 
-/// Whether new tabs from elsewhere should land in this window: the one last used in the profile.
 fn takes_new_tabs(label: &str, profile: &str) -> bool {
     let mine = |other: &str| {
         crate::browser::app_windows::profile_for_window(other).as_deref() == Some(profile)
@@ -120,8 +104,6 @@ fn takes_new_tabs(label: &str, profile: &str) -> bool {
     }
 }
 
-/// The tabs this window should show now. `local` is what it holds at the moment, so it can be told
-/// which of those were closed elsewhere.
 #[tauri::command]
 pub async fn profile_tabs_sync(
     webview: tauri::Webview,
@@ -141,7 +123,6 @@ pub async fn profile_tabs_sync(
             .map_err(|_| "Local storage is unavailable.")?;
         let mut owners = read_owners(&store, &profile);
         let ids: Vec<String> = records.iter().map(|record| record.id.clone()).collect();
-        // A tab the window already shows is its own, whoever held it last.
         for id in &local {
             if ids.contains(id) && !owners.get(id).is_some_and(|owner| open.contains(owner)) {
                 owners.insert(id.clone(), window.clone());
@@ -177,9 +158,6 @@ pub async fn profile_tabs_sync(
     .map_err(|_| "Local storage is unavailable.".to_owned())?
 }
 
-/// Saves what a window holds. `present` is every tab in it; `changed` only those that differ from
-/// what it last sent or received. A saved copy that hasn't changed can't bring back a tab someone
-/// closed elsewhere. A tab that left is closed unless another window claims it soon.
 #[tauri::command]
 pub async fn profile_tabs_publish(
     webview: tauri::Webview,
@@ -239,8 +217,6 @@ pub async fn profile_tabs_publish(
     Ok(())
 }
 
-/// Tabs that left `window`: closed for everyone, unless another window has claimed them by now or
-/// this one has taken them back.
 async fn close_unclaimed(records: ProfileRecords, window: String, left: Vec<String>) {
     tokio::time::sleep(CLAIM_WAIT).await;
     let closed: Vec<String> = {
@@ -248,7 +224,6 @@ async fn close_unclaimed(records: ProfileRecords, window: String, left: Vec<Stri
             return;
         };
         let mut owners = read_owners(&store, &records.profile);
-        // A window that holds it again took it off this list.
         let still_leaving = |id: &String| {
             LEAVING.lock().is_ok_and(|mut leaving| {
                 let key = (records.profile.clone(), id.clone());

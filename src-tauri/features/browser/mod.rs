@@ -109,9 +109,6 @@ fn renderer(label: &str) -> RendererState {
         .and_then(|map| map.get(label).cloned())
         .unwrap_or_default()
 }
-/// Activates a page's pane when the page takes focus. WebView2 reports it
-/// from the browser process, so a busy or hostile page can't delay or
-/// swallow it the way it could a script of its own.
 #[cfg(windows)]
 fn watch_page_focus(webview: &Webview, id: &str) {
     use webview2_com::FocusChangedEventHandler;
@@ -119,7 +116,6 @@ fn watch_page_focus(webview: &Webview, id: &str) {
     let id = id.to_owned();
     let _ = webview.with_webview(move |platform| {
         let handler = FocusChangedEventHandler::create(Box::new(move |_, _| {
-            // Focus we gave back ourselves changes nothing the app should answer.
             if crate::browser::app_windows::windows::focus::take_programmatic(&format!(
                 "misty-browser-{id}"
             )) {
@@ -176,7 +172,7 @@ use pages::bounds::{logical_bounds, set_webview_bounds_if_changed};
 
 fn apply_browser_pointer_tracking(webview: &Webview, enabled: bool) -> Result<(), String> {
     webview
-        .eval(&format!(
+        .eval(format!(
             "window.__MISTY_SET_POINTER_TRACKING__?.({});",
             if enabled { "true" } else { "false" }
         ))
@@ -199,6 +195,5 @@ pub mod profiles;
 pub mod site_data;
 pub mod site_icons;
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

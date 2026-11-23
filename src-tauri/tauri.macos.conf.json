@@ -27,7 +27,7 @@
     ]
   },
   "build": {
-    "beforeBundleCommand": "node tasks/drive-extension.ts"
+    "beforeBundleCommand": "node tasks/drive_extension.ts"
   },
   "bundle": {
     "macOS": {

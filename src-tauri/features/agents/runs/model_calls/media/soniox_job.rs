@@ -1,4 +1,3 @@
-//! What a Soniox job is asked to do and what its tokens say.
 use std::collections::BTreeMap;
 
 use serde_json::{json, Map, Value};
@@ -6,11 +5,18 @@ use serde_json::{json, Map, Value};
 use super::transcription::TranscriptSegment;
 use crate::model_calls::prompt::ProviderOptions;
 
-/// A token with only the fields the provider's schema names, if it has its text.
 pub(super) fn picked_token(token: &Value) -> Option<Value> {
     token.get("text")?.as_str()?;
     let mut kept = Map::new();
-    for key in ["text", "start_ms", "end_ms", "confidence", "speaker", "language", "translation_status"] {
+    for key in [
+        "text",
+        "start_ms",
+        "end_ms",
+        "confidence",
+        "speaker",
+        "language",
+        "translation_status",
+    ] {
         if let Some(field) = token.get(key) {
             kept.insert(key.to_owned(), field.clone());
         }
@@ -26,7 +32,6 @@ pub(super) fn segment(token: &Value) -> Option<TranscriptSegment> {
     })
 }
 
-/// Soniox names its context fields in snake case.
 fn mapped_context(context: &Value) -> Option<Value> {
     if context.is_null() || context.as_str() == Some("") {
         return None;
@@ -35,7 +40,12 @@ fn mapped_context(context: &Value) -> Option<Value> {
         return Some(context.clone());
     };
     let mut mapped = Map::new();
-    for (from, to) in [("general", "general"), ("text", "text"), ("terms", "terms"), ("translationTerms", "translation_terms")] {
+    for (from, to) in [
+        ("general", "general"),
+        ("text", "text"),
+        ("terms", "terms"),
+        ("translationTerms", "translation_terms"),
+    ] {
         if let Some(value) = fields.get(from).filter(|value| !value.is_null()) {
             mapped.insert(to.to_owned(), value.clone());
         }
@@ -45,21 +55,36 @@ fn mapped_context(context: &Value) -> Option<Value> {
 
 fn mapped_translation(translation: &Value) -> Option<Value> {
     match translation.get("type")?.as_str()? {
-        "one_way" => Some(json!({ "type": "one_way", "target_language": translation.get("targetLanguage") })),
-        _ => Some(json!({ "type": "two_way", "language_a": translation.get("languageA"), "language_b": translation.get("languageB") })),
+        "one_way" => {
+            Some(json!({ "type": "one_way", "target_language": translation.get("targetLanguage") }))
+        }
+        _ => Some(
+            json!({ "type": "two_way", "language_a": translation.get("languageA"), "language_b": translation.get("languageB") }),
+        ),
     }
 }
 
-pub(super) fn job_body(model: &str, file_id: &str, options: Option<&ProviderOptions>) -> Map<String, Value> {
+pub(super) fn job_body(
+    model: &str,
+    file_id: &str,
+    options: Option<&ProviderOptions>,
+) -> Map<String, Value> {
     let mut body = Map::new();
     body.insert("model".into(), json!(model));
     body.insert("file_id".into(), json!(file_id));
     let soniox = options.and_then(|all| all.get("soniox"));
-    let read = |key: &str| soniox.and_then(|fields| fields.get(key)).filter(|value| !value.is_null());
+    let read = |key: &str| {
+        soniox
+            .and_then(|fields| fields.get(key))
+            .filter(|value| !value.is_null())
+    };
     for (from, to) in [
         ("languageHints", "language_hints"),
         ("languageHintsStrict", "language_hints_strict"),
-        ("enableLanguageIdentification", "enable_language_identification"),
+        (
+            "enableLanguageIdentification",
+            "enable_language_identification",
+        ),
         ("enableSpeakerDiarization", "enable_speaker_diarization"),
         ("clientReferenceId", "client_reference_id"),
         ("webhookUrl", "webhook_url"),
@@ -79,11 +104,14 @@ pub(super) fn job_body(model: &str, file_id: &str, options: Option<&ProviderOpti
     body
 }
 
-/// The language most tokens are in. The first to reach the highest count wins a tie.
 pub(super) fn language_from_tokens(tokens: &[Value]) -> Option<String> {
     let mut order: Vec<&str> = Vec::new();
     let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
-    for language in tokens.iter().filter_map(|token| token.get("language")?.as_str()).filter(|text| !text.is_empty()) {
+    for language in tokens
+        .iter()
+        .filter_map(|token| token.get("language")?.as_str())
+        .filter(|text| !text.is_empty())
+    {
         if !counts.contains_key(language) {
             order.push(language);
         }
@@ -114,13 +142,23 @@ mod tests {
             json!({ "text": "a", "speaker": 1, "start_ms": 5, "language": null }),
         );
         assert!(picked_token(&json!({ "speaker": 1 })).is_none());
-        assert_eq!(segment(&json!({ "text": "a", "start_ms": 500, "end_ms": 1500 })).unwrap().end_second, 1.5);
+        assert_eq!(
+            segment(&json!({ "text": "a", "start_ms": 500, "end_ms": 1500 }))
+                .unwrap()
+                .end_second,
+            1.5
+        );
         assert!(segment(&json!({ "text": "a", "start_ms": 500 })).is_none());
     }
 
     #[test]
     fn the_most_common_language_wins_and_the_first_breaks_a_tie() {
-        let tokens = [token(Some("en")), token(Some("de")), token(Some("de")), token(None)];
+        let tokens = [
+            token(Some("en")),
+            token(Some("de")),
+            token(Some("de")),
+            token(None),
+        ];
         assert_eq!(language_from_tokens(&tokens).as_deref(), Some("de"));
         let tie = [token(Some("fr")), token(Some("en"))];
         assert_eq!(language_from_tokens(&tie).as_deref(), Some("fr"));

@@ -4,8 +4,6 @@ import { aiSurfaceApi } from "../runs/invocations/api";
 import { DesktopSettingsRow } from "@/features/settings";
 import { SwitchControl } from "../../settings/SettingsControls";
 
-/** Whether agents stop for your OK before they pay, even while a chat is in Auto. A row in
- * Access › Limits. */
 export function PaymentsAskSection() {
   const [paymentsAsk, setPaymentsAsk] = useState<boolean | null>(null);
   const [working, setWorking] = useState(false);

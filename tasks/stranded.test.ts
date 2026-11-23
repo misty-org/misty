@@ -82,7 +82,6 @@ test(
     const root = resolve(import.meta.dirname, "..");
     const port = 5290 + Math.floor(Math.random() * 100);
     const vite = resolve(root, "node_modules/vite/bin/vite.js");
-    // The trailing `:` keeps sh from exec-ing into node, so sh stays Vite's parent.
     const shell = spawn(
       "sh",
       ["-c", `"${process.execPath}" "${vite}" --mode desktop --config .config/vite.config.ts; :`],

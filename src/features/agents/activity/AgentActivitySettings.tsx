@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { invoke } from "@/native/invoke";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmAction } from "@/shared/lib/confirm_action";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, useNotice } from "@misty/ui";
-import { useProjectsHome, useProjectsHomePath } from "../shared-folders/projectsHome";
-import { activityApi } from "./activityApi";
-import { forgetStepPictures } from "./useRunSteps";
+import { useProjectsHome, useProjectsHomePath } from "../shared-folders/projects_home";
+import { activityApi } from "./activity_api";
+import { forgetStepPictures } from "./use_run_steps";
 
-/**
- * The steps each run took and the pictures of the pages it worked on, kept on this computer for
- * 90 days for the Activity page. Clearing them leaves the runs themselves and their chats.
- */
 export function AgentActivitySettings() {
   const [state, setState] = useState<"" | "clearing" | "cleared" | "failed">("");
   const native = hasTauriInternals();
@@ -54,7 +50,6 @@ export function AgentActivitySettings() {
   );
 }
 
-/** Where "Open in Code" makes a chat's project, chosen in the system's dialog. */
 function ProjectsHomeRow({ native }: { native: boolean }) {
   const path = useProjectsHomePath();
   const [busy, setBusy] = useState(false);
@@ -86,11 +81,9 @@ function ProjectsHomeRow({ native }: { native: boolean }) {
   );
 }
 
-/** How much room chats' scratch folders take, as native code counts it. */
 interface ScratchUsage {
   bytes: number;
   folders: number;
-  /** Scratch folders whose chat is gone. */
   leftBehind: number;
 }
 
@@ -111,10 +104,6 @@ function usageLine(usage: ScratchUsage): string {
   return `${size}, ${usage.leftBehind} of them left by deleted chats.`;
 }
 
-/**
- * The folders chats without a project work in, each deleted with its chat. Clearing removes the
- * ones whose chat is already gone, which a chat deleted elsewhere can leave behind.
- */
 function ScratchFoldersRow({ native }: { native: boolean }) {
   const [usage, setUsage] = useState<ScratchUsage | null>(null);
   const [failed, setFailed] = useState(false);

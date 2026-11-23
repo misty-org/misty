@@ -1,6 +1,3 @@
-//! `std::fs`, through the gate. Each function has the standard signature and checks the path first,
-//! so swapping `use std::fs` for this is the whole change at a call site.
-// Some of these only have callers on one platform.
 #![cfg_attr(windows, allow(dead_code))]
 use std::{
     fs, io,
@@ -49,7 +46,6 @@ pub fn remove_dir(path: impl AsRef<Path>) -> io::Result<()> {
     fs::remove_dir(path)
 }
 
-/// Removes a link rather than following it, and doesn't follow links inside the folder either.
 pub fn remove_dir_all(path: impl AsRef<Path>) -> io::Result<()> {
     check_link(path.as_ref(), Access::Write)?;
     fs::remove_dir_all(path)
@@ -67,9 +63,6 @@ pub fn copy(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<u64> {
     fs::copy(from, to)
 }
 
-/// Copies a whole folder to `to`, which must not exist yet. Links are copied as links, never
-/// followed. On APFS the copy is a clone: instant, and sharing the disk space until either side
-/// changes a file. Elsewhere it is a plain copy, file by file.
 pub fn copy_tree(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()> {
     let (from, to) = (from.as_ref(), to.as_ref());
     check(from, Access::Read)?;
@@ -77,7 +70,6 @@ pub fn copy_tree(from: impl AsRef<Path>, to: impl AsRef<Path>) -> io::Result<()>
     copy_tree_unchecked(from, to)
 }
 
-/// The copy itself, once the caller has checked both ends (here, or `disk::fs_disk::copy_tree`).
 pub(crate) fn copy_tree_unchecked(from: &Path, to: &Path) -> io::Result<()> {
     #[cfg(target_os = "macos")]
     if clone_tree(from, to).is_ok() {
@@ -89,7 +81,6 @@ pub(crate) fn copy_tree_unchecked(from: &Path, to: &Path) -> io::Result<()> {
 #[cfg(target_os = "macos")]
 fn clone_tree(from: &Path, to: &Path) -> io::Result<()> {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
-    // From <sys/clonefile.h>; the libc crate binds `clonefile` but not its flags.
     const CLONE_NOFOLLOW: u32 = 0x0001;
     let source = CString::new(from.as_os_str().as_bytes())?;
     let target = CString::new(to.as_os_str().as_bytes())?;
@@ -125,7 +116,6 @@ fn copy_tree_by_file(from: &Path, to: &Path) -> io::Result<()> {
         } else if kind.is_file() {
             fs::copy(&source, &target)?;
         }
-        // Sockets and pipes belong to a running process and aren't copied.
     }
     Ok(())
 }
@@ -160,15 +150,12 @@ pub fn set_permissions(path: impl AsRef<Path>, permissions: Permissions) -> io::
     fs::set_permissions(path, permissions)
 }
 
-/// Makes a link. Only where the link goes is checked: its target stays refused unless something
-/// else allows it, because reading through a link is checked at the target.
 #[cfg(unix)]
 pub fn symlink(target: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<()> {
     check_link(link.as_ref(), Access::Write)?;
     std::os::unix::fs::symlink(target, link)
 }
 
-/// Makes a hard link, which reaches the file's contents, so both ends have to be allowed.
 #[cfg(windows)]
 pub fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<()> {
     check(original.as_ref(), Access::Read)?;
@@ -176,35 +163,29 @@ pub fn hard_link(original: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Resu
     std::fs::hard_link(original, link)
 }
 
-/// Makes a folder link, on the same terms as `symlink`.
 #[cfg(windows)]
 pub fn symlink_dir(target: impl AsRef<Path>, link: impl AsRef<Path>) -> io::Result<()> {
     check_link(link.as_ref(), Access::Write)?;
     std::os::windows::fs::symlink_dir(target, link)
 }
 
-/// `Path::exists`: false for anything refused, as for anything missing.
 pub fn exists(path: impl AsRef<Path>) -> bool {
     metadata(path).is_ok()
 }
 
-/// `Path::is_file`: false for anything refused.
 pub fn is_file(path: impl AsRef<Path>) -> bool {
     metadata(path).is_ok_and(|metadata| metadata.is_file())
 }
 
-/// `Path::is_dir`: false for anything refused.
 pub fn is_dir(path: impl AsRef<Path>) -> bool {
     metadata(path).is_ok_and(|metadata| metadata.is_dir())
 }
 
-/// `rusqlite::Connection::open`: a database is a file like any other.
 pub fn open_sqlite(path: impl AsRef<Path>) -> rusqlite::Result<rusqlite::Connection> {
     check(path.as_ref(), Access::Write).map_err(sqlite_refused)?;
     rusqlite::Connection::open(path)
 }
 
-/// `rusqlite::Connection::open_with_flags`, on the same terms.
 pub fn open_sqlite_with_flags(
     path: impl AsRef<Path>,
     flags: rusqlite::OpenFlags,

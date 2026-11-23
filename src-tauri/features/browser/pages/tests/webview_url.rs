@@ -4,7 +4,6 @@ use objc2_web_kit::WKWebView;
 #[cfg(target_os = "macos")]
 use wry::{Error, Result};
 
-// Exercise the production URL reader, including its Objective-C calls.
 #[cfg(target_os = "macos")]
 #[path = "../../../../vendor/wry/src/wkwebview/current_url.rs"]
 mod current_url;

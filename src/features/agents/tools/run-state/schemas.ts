@@ -1,8 +1,3 @@
-/**
- * What each run state tool accepts, as the server's tool registry checked it before a call reached its
- * handler (`ai_collaboration_tools.go`, `ai_checklist_tools.go`, `agent_notebook_tools.go`). A call that
- * fails here had no effect.
- */
 export interface Schema {
   type: "object" | "array" | "string" | "boolean" | "integer";
   properties?: Record<string, Schema>;

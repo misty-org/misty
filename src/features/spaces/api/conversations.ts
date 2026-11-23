@@ -1,32 +1,26 @@
 import type { SpaceConversation, SpaceMessage } from "./dto/entities";
 import type { MessageSpan } from "./dto/common";
-import type { SpaceRequest } from "./spaceRequestTypes";
+import type { SpaceRequest } from "./space_request_types";
 import { spaceMessagePageSize } from "./chat";
 
 export function createSpaceConversationsApi(request: SpaceRequest) {
   return {
-    /** The person's conversations, each with its unread count, and Everyone's unread count. */
     conversations: (spaceId: string) =>
       request<{ conversations: SpaceConversation[]; everyone_unread_count?: number }>(
         `/spaces/${encodeURIComponent(spaceId)}/conversations`,
       ),
-    /** A group chat, public to the Space with everyone in it; or, with `voice`, a voice channel. */
     createConversation: (spaceId: string, title: string, options: { voice?: boolean } = {}) =>
       request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, {
         method: "POST",
         body: JSON.stringify(options.voice ? { title, voice: true } : { title }),
       }),
-    /**
-     * The person's DM with a friend, found or made. DMs belong to the account, not a Space: each is a
-     * hidden Space of its own, whose messages are that Space's (`messages`, `sendMessage` by its id).
-     * Only friends can DM, so it is refused for anyone else.
-     */
     openDirectMessage: (userId: string) =>
-      request<{ id: string }>("/dms", { method: "POST", body: JSON.stringify({ user_id: userId }) }),
-    /** The person's DMs: each one's id and who is in it. */
+      request<{ id: string }>("/dms", {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }),
     directMessages: () =>
       request<{ dms: { id: string; kind: string; members: { user_id: string }[] }[] }>("/dms"),
-    /** Adds people to a group DM of three or more. */
     addConversationMembers: (spaceId: string, conversationId: string, userIds: string[]) =>
       request<SpaceConversation>(
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/members`,
@@ -37,8 +31,12 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/members/me`,
         { method: "DELETE" },
       ),
-    /** Lists one of the person's agents in a DM; it answers only when they mention it. */
-    addConversationAgent: (spaceId: string, conversationId: string, agentId: string, name: string) =>
+    addConversationAgent: (
+      spaceId: string,
+      conversationId: string,
+      agentId: string,
+      name: string,
+    ) =>
       request(
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/agents/${encodeURIComponent(agentId)}`,
         { method: "PUT", body: JSON.stringify({ name }) },
@@ -60,7 +58,6 @@ export function createSpaceConversationsApi(request: SpaceRequest) {
         `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/read`,
         { method: "POST", body: JSON.stringify({ seq }) },
       ),
-    /** A page of a conversation; `onCached` paints the saved copy of it first, when there is one. */
     conversationMessages: (
       spaceId: string,
       conversationId: string,

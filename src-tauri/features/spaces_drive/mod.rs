@@ -1,19 +1,6 @@
-//! Misty's glue for the Space drive (`space_drive`): the account's session as its network, this
-//! computer's id and name, mounting each Space the renderer lists, the Tauri commands and events
-//! of the build contract (Appendix B), and the realtime events the renderer forwards.
-//!
-//! - The renderer hands over the server, the account and its Spaces with `drive_sync_spaces`;
-//!   native code mounts and unmounts drives to match, at `~/.misty/mnt/<Space>` (`mnt-dev` in
-//!   debug builds): FUSE on Linux, a link there to the Space's folder in the account's one File
-//!   Provider domain on macOS, a Cloud Files sync root there on Windows.
-//! - Realtime lives in the renderer; it forwards `drive.*` events with `drive_realtime_event`.
-//! - Events: `misty://drive-status`, `misty://drive-changed`, `misty://drive-notice`.
-//! - Every command refuses anything but a person's own window.
-//! - What agents trash is recorded in `files_agent_trash` in `misty.db`, never on the server.
-
 pub mod commands;
-pub mod file_commands;
 mod device;
+pub mod file_commands;
 mod http;
 
 use std::{
@@ -24,8 +11,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use space_drive::{
-    AgentTrash, ChangedEntry, Drive, DriveConfig, DriveError, DriveStatus, Events, Notice,
-    OsFace, SpaceId, SpaceMount, StatusKind,
+    AgentTrash, ChangedEntry, Drive, DriveConfig, DriveError, DriveStatus, Events, Notice, OsFace,
+    SpaceId, SpaceMount, StatusKind,
 };
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -35,7 +22,6 @@ pub(crate) const STATUS_EVENT: &str = "misty://drive-status";
 pub(crate) const CHANGED_EVENT: &str = "misty://drive-changed";
 pub(crate) const NOTICE_EVENT: &str = "misty://drive-notice";
 
-/// One Space the renderer lists.
 #[derive(Clone, Debug, Deserialize)]
 pub struct SpaceRef {
     pub id: String,
@@ -46,9 +32,7 @@ struct Host {
     server: String,
     account_id: String,
     drive: Drive,
-    /// Spaces that couldn't mount, with why.
     failed: HashMap<SpaceId, String>,
-    /// Why no Space can mount on this computer at all (an unsigned macOS build).
     unavailable: Option<String>,
     #[cfg(target_os = "linux")]
     fuse: Arc<space_drive::face::fuse::FuseFace>,
@@ -61,7 +45,6 @@ struct Host {
 }
 
 static HOST: LazyLock<Mutex<Option<Host>>> = LazyLock::new(|| Mutex::new(None));
-/// Each mounted Space's folder, for agents' runs and for recording agents' trash.
 static MOUNTS: LazyLock<Mutex<HashMap<String, PathBuf>>> = LazyLock::new(Default::default);
 
 fn host() -> std::sync::MutexGuard<'static, Option<Host>> {
@@ -69,10 +52,11 @@ fn host() -> std::sync::MutexGuard<'static, Option<Host>> {
 }
 
 fn mounts() -> std::sync::MutexGuard<'static, HashMap<String, PathBuf>> {
-    MOUNTS.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    MOUNTS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The account's drive, while one is open.
 pub(crate) fn drive() -> Result<Drive, String> {
     host()
         .as_ref()
@@ -80,17 +64,16 @@ pub(crate) fn drive() -> Result<Drive, String> {
         .ok_or_else(|| "Space drives aren't set up yet.".to_string())
 }
 
-/// The folder of a Space's drive on this computer, when the OS shows it there: what an agent's run
-/// in that Space reads (`engines/runs.rs`).
 pub(crate) fn run_folder(space: &str) -> Option<PathBuf> {
     mounts().get(space).cloned()
 }
 
-/// A folder name from an id: letters, digits, `-` and `_`.
 fn folder_name(id: &str) -> Option<&str> {
     let fine = !id.is_empty()
         && id.len() <= 128
-        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     fine.then_some(id)
 }
 
@@ -157,7 +140,6 @@ impl Events for AppEvents {
     }
 }
 
-/// Forgets an agent's trash record of a drive item: it was put back, or deleted for good.
 pub(crate) fn forget_agent_trash(app: &AppHandle, space: &str, item: &str) {
     let store = app.state::<MistyRuntime>().environment.store();
     if let Ok(connection) = store.connect() {
@@ -168,9 +150,6 @@ pub(crate) fn forget_agent_trash(app: &AppHandle, space: &str, item: &str) {
     }
 }
 
-/// Shared folders became folders in each Space's drive, so the copies this computer downloaded
-/// into its data folder (`spaces/<space>/folders/`, with `.<id>.partial` beside them) are stale
-/// duplicates of what the drive now holds. They were Misty's own cache, never the person's files.
 fn retire_shared_folder_copies(misty_dir: &std::path::Path) {
     let Ok(spaces) = file_access::fs::read_dir(misty_dir.join("spaces")) else {
         return;
@@ -206,15 +185,11 @@ fn open_host(
     config.cache_limit_bytes = device::cache_limit(&store);
     let network = Arc::new(http::AccountHttp::new(base, account_id.to_owned())?);
     let events = Arc::new(AppEvents { app: app.clone() });
-    // Tauri's own runtime, which outlives any one command and is there from any thread.
     let handle = tauri::async_runtime::handle().inner().clone();
     let drive = Drive::start(config, network, events, handle).map_err(|error| error.to_string())?;
     #[cfg(target_os = "macos")]
     let (provider, socket, unavailable) = {
         use space_drive::face::file_provider::{group_container, FileProviderFace};
-        // The socket's path follows `socket::socket_path` (`drive.sock`, else `d.sock`, else
-        // none fits), which the extension follows too. Without a socket no Space can mount, and
-        // the drive's status says why.
         let started = group_container().and_then(|container| {
             file_access::allow_space_drive(&container.path);
             let path = space_drive::socket::socket_path(&container.path)?;
@@ -222,13 +197,16 @@ fn open_host(
         });
         match started {
             Ok(socket) => {
-                // Finder shows the drive as "Misty - <name>", one place for every Space.
                 let name = person_name
                     .as_deref()
                     .map(str::trim)
                     .filter(|name| !name.is_empty())
                     .unwrap_or("Spaces");
-                (Some(FileProviderFace::new(drive.clone(), name)), Some(socket), None)
+                (
+                    Some(FileProviderFace::new(drive.clone(), name)),
+                    Some(socket),
+                    None,
+                )
             }
             Err(error) => (None, None, Some(error.to_string())),
         }
@@ -274,7 +252,6 @@ impl Host {
 
     fn unmount(&mut self, space: &SpaceId, leaving: bool) {
         let mount = self.drive.mount_of(space);
-        // Leaving the Space forgets what this computer kept of it; otherwise it stays for next time.
         let _ = self.drive.unmount(space, leaving);
         if let Some(mount) = &mount {
             if !cfg!(target_os = "macos") {
@@ -304,9 +281,6 @@ impl Host {
     }
 }
 
-/// Mounts and unmounts so the account's drives match `spaces`. A Space that left the list is
-/// unmounted; its records and (on macOS) its folder go only once nothing waits to upload there,
-/// so a list given while the renderer is still loading never costs unsynced work.
 pub(crate) fn sync_spaces(
     app: &AppHandle,
     server: &str,
@@ -324,7 +298,6 @@ pub(crate) fn sync_spaces(
         }
     }
     if spaces.is_empty() {
-        // Signed out, or nothing to show: unmount, keeping what's on this computer.
         if let Some(mut old) = slot.take() {
             old.shutdown();
         }
@@ -349,7 +322,6 @@ pub(crate) fn sync_spaces(
             host.unmount(&mount.space, clean);
         }
     }
-    // Folder names: safe here and unique among the Spaces, in a stable order.
     let mut ordered: Vec<(&SpaceId, &String)> = wanted.iter().collect();
     ordered.sort();
     let names: Vec<String> = ordered
@@ -358,7 +330,8 @@ pub(crate) fn sync_spaces(
         .collect();
     let keys: Vec<String> = ordered.iter().map(|(id, _)| id.0.clone()).collect();
     let unique = space_drive::names::unique_names(&names, &keys);
-    let root = file_access::paths::misty_mount_dir().ok_or("Misty couldn't find its data folder.")?;
+    let root =
+        file_access::paths::misty_mount_dir().ok_or("Misty couldn't find its data folder.")?;
     for ((space, name), mount_name) in ordered.into_iter().zip(unique) {
         if host.drive.mount_of(space).is_some() {
             continue;
@@ -407,7 +380,6 @@ fn statuses(host: &Host) -> Vec<DriveStatus> {
     out
 }
 
-/// Unmounts every drive as Misty quits.
 pub(crate) fn shutdown() {
     if let Some(mut old) = host().take() {
         old.shutdown();

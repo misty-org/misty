@@ -15,7 +15,6 @@ export function GallerySection(props: { title: string; children: ReactNode }) {
   );
 }
 
-/** One sample row: what it shows on the left, the components on the right. */
 export function GalleryRow(props: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[10rem_minmax(0,1fr)] items-center gap-4">
@@ -27,11 +26,6 @@ export function GalleryRow(props: { label: string; children: ReactNode }) {
   );
 }
 
-/**
- * The same component at several widths, so how it gives way can be seen side by side. The
- * hairline under each sample shows where its width ends. The widths are the sample's, not a
- * layout the app uses.
- */
 export function GalleryWidths(props: {
   label: string;
   widths: ReadonlyArray<number>;
@@ -57,7 +51,6 @@ export function GalleryWidths(props: {
   );
 }
 
-/** A labelled grid of samples: column headings across the top, one row per case. */
 export function GalleryMatrix(props: {
   columns: ReadonlyArray<string>;
   rows: ReadonlyArray<{ label: string; cells: ReadonlyArray<ReactNode> }>;
@@ -65,7 +58,9 @@ export function GalleryMatrix(props: {
   return (
     <div
       className="grid items-center gap-x-4 gap-y-3"
-      style={{ gridTemplateColumns: `calc(var(--spacing) * 40) repeat(${props.columns.length}, max-content)` }}
+      style={{
+        gridTemplateColumns: `calc(var(--spacing) * 40) repeat(${props.columns.length}, max-content)`,
+      }}
     >
       <span />
       {props.columns.map((column) => (
@@ -89,8 +84,6 @@ export function GalleryMatrix(props: {
   );
 }
 
-// A stand-in for media or the Studio's office, in full color, so overlay buttons and the
-// floating panels' translucency show.
 export function GalleryStage(props: { className?: string; children: ReactNode }) {
   return (
     <Surface tone="media" radius="md" className={cn("relative overflow-hidden", props.className)}>
@@ -99,7 +92,6 @@ export function GalleryStage(props: { className?: string; children: ReactNode })
   );
 }
 
-/** A fixed-size pane for samples that center themselves in their pane, such as EmptyState. */
 export function GalleryPane(props: { children: ReactNode }) {
   return (
     <div className="grid w-full max-w-md gap-1">

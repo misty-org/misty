@@ -1,7 +1,3 @@
-//! The disk grant opens the whole disk, so only Files may reach it: no `.rs` under
-//! `src-tauri/features` outside `file_access/` and `files/` names `file_access::disk`, except
-//! `permissions/disk.rs`, which turns the grant on and off. Clippy's `disallowed-methods` holds the
-//! rest of the gate the same way.
 #![allow(clippy::disallowed_methods)]
 
 use std::path::{Component, Path};
@@ -28,11 +24,15 @@ fn only_files_reaches_the_disk_grant() {
         if !item.file_type().is_file() || path.extension().is_none_or(|ext| ext != "rs") {
             continue;
         }
-        let Ok(relative) = path.strip_prefix(&features) else { continue };
+        let Ok(relative) = path.strip_prefix(&features) else {
+            continue;
+        };
         if allowed(relative) {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(path) else { continue };
+        let Ok(text) = std::fs::read_to_string(path) else {
+            continue;
+        };
         if text.contains(NEEDLE) {
             offenders.push(relative.display().to_string());
         }

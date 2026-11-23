@@ -38,11 +38,8 @@ fn tool_call_message_extracts_path_and_marks_patch() {
     }
 }
 
-/// Claude's TaskCreate answers with the id the CLI assigned; the call's
-/// args carry no id, so this result is the only place the id exists.
 #[test]
 fn created_task_result_carries_the_id_task_update_addresses() {
-    // Live wire shape: the structured object the CLI streams back.
     let payload = parse_todo_result(
         "TaskCreate",
         &json!({
@@ -56,7 +53,6 @@ fn created_task_result_carries_the_id_task_update_addresses() {
     assert_eq!(payload.items[0].content, "编写 bili_app.py 网页版");
     assert_eq!(payload.items[0].status, "pending");
 
-    // Transcript shape: the same fact as the CLI's own result line.
     let payload = parse_todo_result(
         "TaskCreate",
         &json!("Task #12 created successfully: 樱花\"整季选集\"批量下载设计"),
@@ -66,8 +62,6 @@ fn created_task_result_carries_the_id_task_update_addresses() {
     assert_eq!(payload.items[0].content, "樱花\"整季选集\"批量下载设计");
 }
 
-/// Updates and unrelated tool output must not be mistaken for creations:
-/// a phantom "pending" row per update would inflate the task count.
 #[test]
 fn non_create_results_are_not_todos() {
     assert!(parse_todo_result(
@@ -92,10 +86,6 @@ fn non_create_results_are_not_todos() {
     .is_none());
 }
 
-/// TaskGet answers with the same `{task:{id,subject}}` envelope as
-/// TaskCreate (plus the task's status), and its args are a bare `taskId`.
-/// Reading a task changes nothing, so neither half may become a todo
-/// patch: as a "creation" it forced the task back to pending.
 #[test]
 fn task_get_is_not_a_todo_fact() {
     let envelope = json!({
@@ -104,15 +94,10 @@ fn task_get_is_not_a_todo_fact() {
     });
     assert!(parse_todo_result("TaskGet", &envelope).is_none());
     assert!(parse_todo_args(&json!({"taskId": "1"})).is_none());
-    // Only TaskCreate's answer is a creation, whatever text another tool
-    // happens to print.
     assert!(parse_todo_result("Bash", &json!("Task #1 created successfully: x")).is_none());
     assert!(parse_todo_result("", &json!({"task": {"id": "1", "subject": "A"}})).is_none());
 }
 
-/// A TaskUpdate that does not name a status leaves the status alone:
-/// renames and description edits patch only what they carry, and
-/// owner/dependency-only updates have nothing the list shows.
 #[test]
 fn status_less_task_update_keeps_the_status() {
     assert!(parse_todo_args(&json!({"taskId": "3", "addBlockedBy": ["1"]})).is_none());
@@ -135,8 +120,6 @@ fn status_less_task_update_keeps_the_status() {
     assert_eq!(wire["items"][0]["status"], "complete");
 }
 
-/// omp still owns the `details.phases` shape; the created-task branch must
-/// not swallow it.
 #[test]
 fn phases_snapshot_still_wins_over_the_create_envelope() {
     let payload = parse_todo_result("todo", &json!({

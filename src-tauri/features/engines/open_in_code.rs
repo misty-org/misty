@@ -1,12 +1,3 @@
-//! Chats and Code. A chat works in its own scratch folder; once its work is something the person
-//! keeps, "Open in Code" makes it a project: a new folder in the person's projects folder (chosen
-//! in the system's dialog during setup), or in another folder they pick in the dialog for this one
-//! project. The chat's scratch files move into it and the chat works there from then on, listed on
-//! the Code page instead of the sidebar.
-//!
-//! Only native code decides where a project goes: a page names the folder's name, never its place.
-//! The projects folder itself is never reached; only the project made inside it is.
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
@@ -19,12 +10,9 @@ use super::store;
 use crate::agents::shared_folders::check_root;
 use crate::app::runtime::MistyRuntime;
 
-/// A folder picked in the dialog for one project, by account: the next "Open in Code" may put the
-/// project there instead of the projects folder.
 static PICKED: LazyLock<Mutex<HashMap<String, PathBuf>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Whether projects may go in `folder`: a project inside it would be one Misty may work in.
 fn check_parent(app: &tauri::AppHandle, folder: &Path) -> Result<(), String> {
     let protected = [app.state::<MistyRuntime>().environment.misty_dir()];
     let home = dirs::home_dir();
@@ -32,7 +20,6 @@ fn check_parent(app: &tauri::AppHandle, folder: &Path) -> Result<(), String> {
         .map_err(|_| "Projects can't go in that folder. Choose another one.".to_string())
 }
 
-/// A project's folder name as the person typed it: one plain name, nothing hidden.
 fn project_name(name: &str) -> Result<String, String> {
     let name = name.trim();
     let fine = !name.is_empty()
@@ -40,11 +27,11 @@ fn project_name(name: &str) -> Result<String, String> {
         && !name.starts_with('.')
         && !name.contains(['/', '\\', ':', '\0'])
         && !name.chars().any(char::is_control);
-    fine.then(|| name.to_string())
-        .ok_or_else(|| "Give the project a folder name without slashes or a leading dot.".to_string())
+    fine.then(|| name.to_string()).ok_or_else(|| {
+        "Give the project a folder name without slashes or a leading dot.".to_string()
+    })
 }
 
-/// The folder new projects go in, or `None` before the person has chosen one.
 #[tauri::command]
 pub async fn projects_home(
     webview: tauri::Webview,
@@ -56,8 +43,6 @@ pub async fn projects_home(
     blocking(move || Ok(store::projects_home(&db, &account))).await
 }
 
-/// Lets the person choose the folder new projects go in, in the system's dialog opening on their
-/// home folder. `None` when they cancel.
 #[tauri::command]
 pub async fn projects_home_choose(
     app: tauri::AppHandle,
@@ -66,7 +51,8 @@ pub async fn projects_home_choose(
     account: String,
 ) -> Result<Option<String>, String> {
     person_window(&webview)?;
-    let Some(folder) = pick_folder_from(&app, "Choose where your projects go", dirs::home_dir()).await?
+    let Some(folder) =
+        pick_folder_from(&app, "Choose where your projects go", dirs::home_dir()).await?
     else {
         return Ok(None);
     };
@@ -78,8 +64,6 @@ pub async fn projects_home_choose(
     Ok(Some(text))
 }
 
-/// Lets the person pick another folder for the next project only, in the system's dialog opening
-/// on the projects folder. `None` when they cancel.
 #[tauri::command]
 pub async fn project_parent_pick(
     app: tauri::AppHandle,
@@ -95,7 +79,8 @@ pub async fn project_parent_pick(
     }
     .map(PathBuf::from)
     .or_else(dirs::home_dir);
-    let Some(folder) = pick_folder_from(&app, "Choose where this project goes", start).await? else {
+    let Some(folder) = pick_folder_from(&app, "Choose where this project goes", start).await?
+    else {
         return Ok(None);
     };
     check_parent(&app, &folder)?;
@@ -107,8 +92,6 @@ pub async fn project_parent_pick(
     Ok(Some(text))
 }
 
-/// Makes the chat a project: a folder named `name` in `parent` (the projects folder, or the one
-/// just picked for it), its scratch files moved in. Returns the project's path.
 #[tauri::command]
 pub async fn chat_open_in_code(
     app: tauri::AppHandle,
@@ -123,8 +106,6 @@ pub async fn chat_open_in_code(
     folder_name(&conversation)?;
     let name = project_name(&name)?;
     let db = state.environment.store();
-    // The place must be one the person chose in the system's dialog: the projects folder, or the
-    // folder they just picked for this project.
     let home = {
         let (db, account) = (db.clone(), account.clone());
         blocking(move || Ok(store::projects_home(&db, &account))).await?
@@ -144,7 +125,6 @@ pub async fn chat_open_in_code(
     let target = parent.join(&name);
     let scratch = scratch_for(&db, &conversation)?;
 
-    // Only the new project is reached, never the folder it sits in.
     file_access::allow_linked_folder(&target);
     let moved = {
         let (target, scratch) = (target.clone(), scratch.clone());
@@ -157,13 +137,11 @@ pub async fn chat_open_in_code(
             if !file_access::fs::is_dir(&scratch) {
                 return file_access::fs::create_dir(&target).map_err(|error| error.to_string());
             }
-            // One move on the same disk; across disks, copied and then removed.
             if file_access::fs::rename(&scratch, &target).is_ok() {
                 return Ok(());
             }
-            file_access::fs::copy_tree(&scratch, &target).map_err(|error| {
-                format!("Misty couldn't move the chat's files: {error}")
-            })?;
+            file_access::fs::copy_tree(&scratch, &target)
+                .map_err(|error| format!("Misty couldn't move the chat's files: {error}"))?;
             let _ = file_access::fs::remove_dir_all(&scratch);
             Ok(())
         })
@@ -184,7 +162,6 @@ pub async fn chat_open_in_code(
     Ok(text)
 }
 
-/// The chats that work in a project, by id, with the project's path.
 #[tauri::command]
 pub async fn chat_folder_projects(
     webview: tauri::Webview,

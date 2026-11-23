@@ -1,12 +1,3 @@
-//! The one bridge from the engine layer to the chat. desktop-cc-gui's dispatch writes each engine
-//! event as a wire payload (`{runId, sessionId, engine, seq, kind, data}`); this turns them into
-//! the run events Misty's own agent produces (`invocationEventTypes.ts`) and publishes them
-//! through `local_runs.rs`, so one chat shows every engine. Only numbers, names and the engine's
-//! own output leave native code; nothing here reaches a server.
-//!
-//! Anything that isn't an engine event (the history scan's progress, a sessions change) goes to
-//! the windows as it is.
-
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 use std::time::Instant;
@@ -29,44 +20,28 @@ use tools::{close_tool, detail, find_tool, start_tool, OpenTool};
 pub(crate) use values::context_usage;
 use values::{clip, question_cards, result_failed};
 
-/// What one run has shown so far.
 #[derive(Default)]
 struct RunView {
     sent: u64,
-    /// The answer since the last tool row: what the chat shows as the reply when the turn ends.
     answer: String,
     thinking: bool,
     tools: Vec<OpenTool>,
     rows: u64,
-    /// The engine sub-agent the next rows belong to (Claude Code's `parent_tool_use_id`).
     parent: Option<String>,
-    /// The engine's session id, once it said.
     session: Option<String>,
-    /// When the turn began and the model the engine said answered, for the run's details.
     began: Option<Instant>,
     model: Option<String>,
-    /// The engine reported its context's own size (`used`) this run.
     sized: bool,
     ended: bool,
-    /// Background tasks the engine still has running (Claude Code's `run_in_background`).
     pending: u64,
-    /// The engine kept its process warm for the chat's next message (`done`'s `warm`).
     warm: bool,
 }
 
-/// What the bridge tells the run's owner (`runs.rs`) as it happens.
 pub(crate) enum RunNote {
-    /// The engine's own session id for this chat, to continue it next time.
     Session(String),
-    /// The turn ended, however it ended, and nothing of it runs on.
     Ended,
-    /// The turn ended in the chat, but the engine's process lives on for a background task: the
-    /// next message is written into it, or the engine's own follow-up turn reopens this one.
     Parked,
-    /// The turn ended in the chat, and the engine's process stays warm for the chat's next
-    /// message with nothing running: as `Parked`, but idle.
     Warm,
-    /// A parked turn reopened for the engine's own follow-up turn.
     Resumed,
 }
 
@@ -77,17 +52,12 @@ static RUNS: LazyLock<Mutex<HashMap<String, RunView>>> =
 static APP: OnceLock<AppHandle> = OnceLock::new();
 static LISTENER: OnceLock<Listener> = OnceLock::new();
 
-/// Follow-up parking (desktop-cc-gui's): a Claude Code process whose turn ended with a background
-/// task still running stays alive, and the chat's next message is written into it instead of
-/// starting a new one, which would stop the task. Its events keep the run id it was launched
-/// with; this is which chat run shows them.
 static ALIAS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
-/// Engine runs that may park.
 static PARKABLE: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
-/// Parked engine runs: the chat run that last showed them, its event count and pending tasks.
-static PARKED: LazyLock<Mutex<HashMap<String, (String, u64, u64)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+type ParkedRuns = HashMap<String, (String, u64, u64)>;
+
+static PARKED: LazyLock<Mutex<ParkedRuns>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn runs() -> std::sync::MutexGuard<'static, HashMap<String, RunView>> {
     RUNS.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -97,7 +67,6 @@ fn held<T>(lock: &'static LazyLock<Mutex<T>>) -> std::sync::MutexGuard<'static, 
     lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The chat run an engine run's events show under.
 pub(crate) fn chat_run_of(engine_run: &str) -> String {
     held(&ALIAS)
         .get(engine_run)
@@ -105,7 +74,6 @@ pub(crate) fn chat_run_of(engine_run: &str) -> String {
         .unwrap_or_else(|| engine_run.to_string())
 }
 
-/// The engine run (its process) behind a chat run.
 pub(crate) fn engine_run_of(chat_run: &str) -> String {
     held(&ALIAS)
         .iter()
@@ -114,12 +82,9 @@ pub(crate) fn engine_run_of(chat_run: &str) -> String {
         .unwrap_or_else(|| chat_run.to_string())
 }
 
-/// A parked engine run took the chat's next message: its events show under `chat_run` now.
 pub(crate) fn redirect(engine_run: &str, chat_run: &str) {
     held(&ALIAS).insert(engine_run.to_string(), chat_run.to_string());
     let parked = held(&PARKED).remove(engine_run);
-    // A chat turn that showed this process before (not its first, which owns the process's
-    // access until it ends) is over now that another turn took the process.
     if let Some((before, _, _)) = parked.as_ref() {
         if before != engine_run && before != chat_run {
             notify(before, RunNote::Ended);
@@ -130,12 +95,10 @@ pub(crate) fn redirect(engine_run: &str, chat_run: &str) {
     }
 }
 
-/// The message couldn't be written after all; the chat run launches on its own.
 pub(crate) fn unredirect(engine_run: &str) {
     held(&ALIAS).remove(engine_run);
 }
 
-/// An engine run is over for good: whatever it still held goes.
 fn release(engine_run: &str) {
     let chat = held(&ALIAS).remove(engine_run);
     held(&PARKED).remove(engine_run);
@@ -146,8 +109,6 @@ fn release(engine_run: &str) {
     }
 }
 
-/// The engine started a follow-up turn of its own in a parked process: the chat run that last
-/// showed it opens again, and goes on from its last event.
 fn reopen(engine_run: &str, chat_run: &str) -> bool {
     let Some((chat, sent, pending)) = held(&PARKED).remove(engine_run) else {
         return false;
@@ -172,7 +133,6 @@ fn reopen(engine_run: &str, chat_run: &str) -> bool {
     true
 }
 
-/// The emitter the engine layer's sink writes to.
 pub(crate) struct Bridge;
 
 impl Bridge {
@@ -206,8 +166,6 @@ impl Emit for Bridge {
     }
 }
 
-/// Starts showing a run: its events from now on go to its chat. A `parkable` run (Claude Code in a
-/// chat) may stay alive past its turn for a background task.
 pub(crate) fn open(run_id: &str, parkable: bool) {
     if parkable {
         held(&PARKABLE).insert(run_id.to_string());
@@ -225,12 +183,10 @@ pub(crate) fn open(run_id: &str, parkable: bool) {
     );
 }
 
-/// Ends a run that never got going, or that the engine layer won't settle (a failed launch).
 pub(crate) fn fail(run_id: &str, error: &str) {
     finish(run_id, Err(error.to_string()), false);
 }
 
-/// Ends a run the person stopped.
 pub(crate) fn cancel(run_id: &str) {
     finish(run_id, Ok(()), true);
 }
@@ -272,7 +228,6 @@ fn route(payload: &Value) {
     if !runs().contains_key(run_id) {
         match kind {
             "turn_resumed" if reopen(engine_run, run_id) => {}
-            // A parked process went away without another turn.
             "process_closed" => {
                 release(engine_run);
                 return;
@@ -301,8 +256,6 @@ fn route(payload: &Value) {
         "usage" => {
             let (mut used, window) = context_usage(data);
             if let Some(view) = runs().get_mut(run_id) {
-                // A turn's total adds up every call in it, so once the engine said how full
-                // its context is, a later turn total doesn't replace that.
                 if data["used"].as_u64().is_some_and(|tokens| tokens > 0) {
                     view.sized = true;
                 } else if view.sized && values::only_turn_total(data) {
@@ -320,8 +273,6 @@ fn route(payload: &Value) {
                     event[field] = json!(value);
                 }
             }
-            // OpenAI-style reports (Codex) count cached tokens inside the input; the buckets
-            // sent on don't overlap.
             if let (Some(cached), Some(input)) = (
                 number(&["cached_input_tokens"]),
                 event.get("input").and_then(Value::as_u64),
@@ -458,8 +409,6 @@ fn route(payload: &Value) {
             run_id,
             json!({ "type": "engine.model", "model": data["model"], "effort": data["effort"], "requested": true }),
         ),
-        // The engine changed its own session in the turn (a slash command, say): the chat
-        // follows, naming the engine so the mode is looked up in its own list.
         "session_title" => send_to(
             run_id,
             json!({ "type": "engine.title", "title": clip(data.as_str().unwrap_or(""), 200) }),
@@ -481,7 +430,6 @@ fn route(payload: &Value) {
                 json!({ "type": "engine.background", "pending": data["pending"] }),
             )
         }
-        // The process ended while a message written into it waited for its answer.
         "process_closed" => finish(
             run_id,
             Err("The engine stopped before it answered.".to_string()),
@@ -558,8 +506,6 @@ fn thinking(run_id: &str, text: &str) {
 fn message(run_id: &str, data: &Value) {
     let role = data["role"].as_str().unwrap_or("");
     if role == "assistant" {
-        // A whole message from an engine that doesn't stream (or a snapshot of what it already
-        // streamed, which the engine layer leaves out).
         let text = data["text"].as_str().unwrap_or("");
         if !text.trim().is_empty() {
             let separated = runs()
@@ -598,7 +544,6 @@ fn message(run_id: &str, data: &Value) {
                 });
                 match id {
                     Some(id) => detail(run_id, &id, &name, args),
-                    // An argument patch for a row that never opened (a resumed stream).
                     None => start_tool(run_id, wire, &name, Some(args)),
                 }
             }
@@ -610,8 +555,6 @@ fn message(run_id: &str, data: &Value) {
     }
 }
 
-/// Settles the run in the chat, once: open tool rows end, the reply is set, and the run ends as
-/// finished, failed or stopped.
 fn finish(run_id: &str, outcome: Result<(), String>, stopped: bool) {
     let (open, answer, sent, took, model, pending, warm) = {
         let mut held = runs();
@@ -633,8 +576,6 @@ fn finish(run_id: &str, outcome: Result<(), String>, stopped: bool) {
         )
     };
     let engine_run = engine_run_of(run_id);
-    // The engine layer keeps the process for the background task's follow-up turn, or warm
-    // for the chat's next message.
     let parked = !stopped
         && outcome.is_ok()
         && (pending > 0 || warm)

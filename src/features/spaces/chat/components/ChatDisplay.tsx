@@ -3,9 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChannelDivider } from "@misty/ui";
 
 import { spacesApi } from "../../api/api";
-import { useSpacesStore } from "../../list/useSpacesStore";
+import { useSpacesStore } from "../../list/use_spaces_store";
 import type { SpaceMessage } from "../../api/dto/entities";
-import { isAgentAuthoredMessage } from "./messageText";
+import { isAgentAuthoredMessage } from "./message_text";
 
 interface ChatDisplayRow {
   message: SpaceMessage;
@@ -55,10 +55,6 @@ export function formatChatMessageTime(value: string): string {
   }).format(new Date(value));
 }
 
-/**
- * A message's time beside its sender, as Discord writes it: "Today at 10:50 PM", "Yesterday at
- * 10:50 PM", then the date with the time.
- */
 export function formatChatMessageStamp(value: string, now = new Date()): string {
   const date = new Date(value);
   const time = formatChatMessageTime(value);
@@ -95,7 +91,6 @@ function messageIdentity(message: SpaceMessage): string {
   ].join(":");
 }
 
-/** A day's line across the history. */
 export function ChatDateDivider({ label }: { label: string }) {
   return <ChannelDivider label={label} />;
 }
@@ -107,8 +102,6 @@ export function useMemberAvatarUrls(
   const members = useSpacesStore((state) => state.membersBySpace[spaceId]);
   const avatarRequests = useMemo(() => {
     const versionsByMember = new Map<string, number>();
-    // A member's picture as the member list has it now, which a change elsewhere refreshes
-    // (`member.updated`); a message only carries the version it was sent with.
     const current = new Map(
       (members ?? []).map((member) => [member.user_id, member.avatar_version ?? 0] as const),
     );

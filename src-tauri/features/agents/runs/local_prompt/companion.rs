@@ -1,33 +1,38 @@
-//! The cursor's part of a run's system prompt (`ai_cursor_companion.go`).
 use crate::web_search::tool::WEB_SEARCH_TOOL;
 
 use super::{request::RunRequest, teach::SKETCH_PROMPT};
 
-// The cursor's voice and pointing rules (agent.entry.cursor).
 const TEACH_PROMPT: &str = include_str!("companion_teach_prompt.txt");
-// The map of Misty's own interface. src/features/agents/tutor/cursor/mistyGuide.test.ts names its controls.
 const MISTY_GUIDE: &str = include_str!("companion_misty_guide.md");
 const COMPANION_TURN: &str = include_str!("companion_turn.txt");
 const WINDOW_CAPTURE: &str = "window1";
 
-/// The guide goes on a turn about Misty itself: one whose captures show Misty's controls, or whose
-/// request names Misty. Other apps' questions don't pay for it.
 pub(super) fn misty_guide_section(request: &RunRequest) -> String {
-    let about = request.prompt.to_lowercase().contains("misty") || request.display_captures.iter().any(|capture| capture.has_controls);
+    let about = request.prompt.to_lowercase().contains("misty")
+        || request
+            .display_captures
+            .iter()
+            .any(|capture| capture.has_controls);
     if !about {
         return String::new();
     }
     format!("\n\n{}\n", MISTY_GUIDE.trim())
 }
 
-/// `tools` is the run's catalog, which decides how a screen question without captures is answered.
 pub(super) fn companion_system_prompt(request: &RunRequest, tools: &[String]) -> String {
     let has = |name: &str| tools.iter().any(|tool| tool == name);
-    let mut prompt = format!("\n{TEACH_PROMPT}\n{}\n{}", SKETCH_PROMPT.trim(), misty_guide_section(request));
+    let mut prompt = format!(
+        "\n{TEACH_PROMPT}\n{}\n{}",
+        SKETCH_PROMPT.trim(),
+        misty_guide_section(request)
+    );
     prompt.push_str(COMPANION_TURN);
     if !has(WEB_SEARCH_TOOL) {
-        // Web search runs on the device's own search key; without one, pages are read with web_fetch alone.
-        prompt = prompt.replacen("use web_search and web_fetch to answer", "use web_fetch to answer", 1);
+        prompt = prompt.replacen(
+            "use web_search and web_fetch to answer",
+            "use web_fetch to answer",
+            1,
+        );
     }
     if !request.display_captures.is_empty() {
         for capture in &request.display_captures {
@@ -44,13 +49,7 @@ pub(super) fn companion_system_prompt(request: &RunRequest, tools: &[String]) ->
     prompt
 }
 
-/// The cursor's voice, pointing and walkthrough rules for an outside engine's turn (Claude Code,
-/// Codex and the like), with the screenshots it was handed as images, in order. Its reply's
-/// [POINT] and [GUIDE] tags are read by the companion exactly as Misty's own runtime's are, so the
-/// engine answers and points across every display. `captures` is each screenshot's name
-/// (screen1, screen2, window1) with its width and height in pixels.
 pub fn companion_engine_note(captures: &[(String, u32, u32)]) -> String {
-    // Drawing rides along with pointing, so an engine draws exactly as Misty's own runtime does.
     let mut note = format!("{}\n{}\n", TEACH_PROMPT.trim(), SKETCH_PROMPT.trim());
     if captures.is_empty() {
         note.push_str("No screenshots came with this turn. For a question about the user's screen, say you can't see it right now and use [POINT:none].\n");
@@ -65,7 +64,10 @@ pub fn companion_engine_note(captures: &[(String, u32, u32)]) -> String {
         } else {
             "another display"
         };
-        note.push_str(&format!("{}. {screen}: {width}x{height} pixels, {what}\n", index + 1));
+        note.push_str(&format!(
+            "{}. {screen}: {width}x{height} pixels, {what}\n",
+            index + 1
+        ));
     }
     note.push_str("Point in those pixels with the screenshot's name. Answer from the screenshots; don't edit files or run commands to answer a question about the screen.\n");
     note

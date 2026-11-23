@@ -1,11 +1,5 @@
-//! The keyboard guard while Misty has control: Escape, or the stop shortcut,
-//! from the person ends control at once. Keys Misty sends carry its tag and
-//! pass through.
 use super::*;
 
-/// Watches the person's keyboard while Misty controls the desktop: Escape
-/// stops control and goes no further; the voice shortcut (Ctrl+Alt) stops it
-/// too. Everything else passes through untouched.
 pub(super) fn start_guard() -> Result<(), String> {
     if GUARD_THREAD.load(Ordering::Acquire) != 0 {
         return Ok(());
@@ -57,7 +51,6 @@ pub(super) unsafe extern "system" fn guard(code: i32, message: WPARAM, data: LPA
         let up = matches!(message as u32, WM_KEYUP | WM_SYSKEYUP);
         if person && event.vkCode == u32::from(VK_ESCAPE) {
             if down {
-                // Never stop inside the hook: it must return quickly.
                 thread::spawn(|| {
                     stop_by_person("Desktop control stopped with Escape. You have control.")
                 });

@@ -1,8 +1,3 @@
-//! The page reader on macOS, under `sandbox-exec`, and on Linux, under Landlock, seccomp and
-//! namespaces (`sandbox::linux`). A worker written to a fresh file took about 160 ms per call on
-//! macOS in testing and one kept on disk about 9 ms, nearly all of the difference being the system
-//! checking a binary it hasn't seen, so one staged copy lasts the app's lifetime. That copy is checked
-//! against the bytes in the signed app before each use, and replaced if anything changed it.
 use std::{
     os::unix::fs::{MetadataExt, PermissionsExt},
     path::{Path, PathBuf},
@@ -22,14 +17,12 @@ use file_access::fs;
 #[cfg(target_os = "macos")]
 const PROFILE: &str = include_str!("../../../../tauri-permissions/permissions/page-reader.sb");
 
-/// What has to stay alive until the worker has started.
 #[cfg(target_os = "macos")]
 type Keep = ();
 #[cfg(target_os = "linux")]
 type Keep = sandbox::linux::Confinement;
 
 struct Staged {
-    /// Holds the private folder for as long as a read may use it.
     _folder: tempfile::TempDir,
     folder_path: PathBuf,
     executable: PathBuf,
@@ -41,7 +34,6 @@ fn worker() -> Result<&'static [u8], String> {
     crate::app::embedded_workers::builtin_worker("page-reader", PROTOCOL)
 }
 
-/// Not a link, private to this user, and exactly the bytes the app was signed with.
 fn still_intact(executable: &Path, bytes: &[u8]) -> bool {
     let Ok(metadata) = fs::symlink_metadata(executable) else {
         return false;
@@ -61,7 +53,6 @@ fn stage(bytes: &[u8]) -> Result<Staged, String> {
     fs::write(&executable, bytes).map_err(|_| "the reader couldn't be staged")?;
     fs::set_permissions(&executable, fs::Permissions::from_mode(0o500))
         .map_err(|_| "the reader couldn't be staged")?;
-    // Seatbelt matches real paths, and the temp folder's own path goes through a link.
     let executable = fs::canonicalize(&executable).map_err(|_| "the reader couldn't be staged")?;
     let folder_path =
         fs::canonicalize(folder.path()).map_err(|_| "the reader couldn't be staged")?;
@@ -72,7 +63,6 @@ fn stage(bytes: &[u8]) -> Result<Staged, String> {
     })
 }
 
-/// The staged worker, staged now if it's the first read or the copy on disk has changed.
 fn staged() -> Result<Arc<Staged>, String> {
     let bytes = worker()?;
     let mut slot = STAGED.lock().unwrap_or_else(PoisonError::into_inner);
@@ -97,16 +87,12 @@ fn command(worker: &Staged) -> Result<(Command, Keep), String> {
         .arg(&worker.executable)
         .process_group(0);
     plain(&mut command, worker);
-    // Only async-signal-safe resource-limit calls run between fork and exec. It has no file to write,
-    // so no size is allowed, which doesn't touch the pipes it answers on.
     unsafe {
         command.pre_exec(|| sandbox::macos::set_limits(&LIMITS));
     }
     Ok((command, ()))
 }
 
-/// The same walls on Linux: it reads only itself and its folder, writes nothing, has no network
-/// and dies with Misty. Without Landlock no page is read.
 #[cfg(target_os = "linux")]
 fn command(worker: &Staged) -> Result<(Command, Keep), String> {
     use sandbox::linux::{Access, Confinement, Policy};
@@ -119,7 +105,6 @@ fn command(worker: &Staged) -> Result<(Command, Keep), String> {
     })?;
     let mut command = Command::new(&worker.executable);
     plain(&mut command, worker);
-    // The hook starts the worker's own session, which is its process group too.
     unsafe {
         command.pre_exec(confinement.hook());
     }
@@ -138,7 +123,6 @@ const LIMITS: [(Resource, libc::rlim_t); 4] = [
     (libc::RLIMIT_CORE, 0),
 ];
 
-/// Nothing of Misty's environment, pipes for the page and the answer, and an end with the read.
 fn plain(command: &mut Command, worker: &Staged) {
     command
         .current_dir(&worker.folder_path)
@@ -150,7 +134,6 @@ fn plain(command: &mut Command, worker: &Staged) {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        // Dropping the read, when its run is cancelled, ends the worker too.
         .kill_on_drop(true);
 }
 
@@ -162,9 +145,7 @@ async fn run_in(worker: &Staged, input: Vec<u8>) -> Result<Vec<u8>, String> {
     let mut stdin = child.stdin.take().ok_or("the reader has no input")?;
     let stdout = child.stdout.take().ok_or("the reader has no output")?;
     let finished = tokio::time::timeout(Duration::from_secs(super::TIME_LIMIT_SECONDS), async {
-        // Writing and reading together: a worker that stops reading must not stall this.
         let send = async move {
-            // A worker gone early shows in its exit status.
             let _ = stdin.write_all(&input).await;
         };
         let mut output = Vec::new();
@@ -189,7 +170,6 @@ async fn run_in(worker: &Staged, input: Vec<u8>) -> Result<Vec<u8>, String> {
     }
 }
 
-/// The worker's whole output for this input. There's no permissive fallback: any failure is the error.
 pub(super) async fn run(input: Vec<u8>) -> Result<Vec<u8>, String> {
     let worker = tokio::task::spawn_blocking(staged)
         .await

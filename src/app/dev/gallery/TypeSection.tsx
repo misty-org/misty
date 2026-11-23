@@ -13,7 +13,8 @@ const sizes: ReadonlyArray<{ size: TextSize; px: number; use: string }> = [
 const tones: ReadonlyArray<TextTone> = ["default", "muted", "bright", "danger"];
 const weights: ReadonlyArray<TextWeight> = ["regular", "medium", "semibold"];
 
-const longName = "misty-org/misty/src/features/agents/conversations/view/AgentWorkspaceConversation.test.tsx";
+const longName =
+  "misty-org/misty/src/features/agents/conversations/view/AgentWorkspaceConversation.test.tsx";
 
 export function TypeSection() {
   return (

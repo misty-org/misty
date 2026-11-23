@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import { Separator, Surface, Text } from "@misty/ui";
 
-/** The card a signed-out page's form sits in: a raised card with a hairline edge, no shadow. */
 export default function AuthCard({ title, description, children, footer }: AuthCardProps) {
   return (
     <Surface tone="card" edge="hairline" radius="xl" className="flex w-full flex-col gap-6 p-6">

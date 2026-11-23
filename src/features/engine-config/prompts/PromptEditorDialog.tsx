@@ -19,22 +19,16 @@ import {
   SelectValue,
   Textarea,
 } from "@misty/ui";
-import type { CustomPromptEntry, PromptScope } from "./promptsApi";
+import type { CustomPromptEntry, PromptScope } from "./prompts_api";
 
 export interface PromptEditorValue {
   name: string;
   description?: string;
   argumentHint?: string;
   content: string;
-  /** Only when creating: an edit keeps the file's scope (the row's menu moves it). */
   scope: PromptScope;
 }
 
-/**
- * Creates or edits one prompt (a Markdown file with front matter). The section owns the change;
- * this dialog collects the fields and hands them over trimmed. The scope is chosen only when
- * creating, and only when the chat has a linked folder to keep it in.
- */
 export function PromptEditorDialog({
   initial,
   initialScope,
@@ -42,7 +36,6 @@ export function PromptEditorDialog({
   onSubmit,
   onCancel,
 }: {
-  /** Present when editing; absent creates a new prompt. */
   initial?: CustomPromptEntry;
   initialScope: PromptScope;
   folderAvailable: boolean;

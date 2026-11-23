@@ -1,13 +1,9 @@
-//! Which folders a person can share with agents, read-only: never the disk, the
-//! home folder itself, system or library folders, hidden folders in the home
-//! folder (they hold keys and app settings), or Misty's own data.
 #[cfg(desktop)]
 pub mod commands;
 pub mod folder_changes;
 
 use std::path::{Path, PathBuf};
 
-/// Windows' verbatim prefixes (`\\?\`) removed, so paths compare as people see them.
 pub fn plain_path(path: &Path) -> PathBuf {
     if !cfg!(windows) {
         return path.to_path_buf();
@@ -19,19 +15,14 @@ pub fn plain_path(path: &Path) -> PathBuf {
     }
 }
 
-/// Whether `root` is, or is inside, a mounted Space drive: `~/.misty/mnt/<Space>` (`mnt-dev` in
-/// debug builds) or, on macOS, `~/Library/CloudStorage/Misty-<Space>`, and the file gate has it
-/// as a mounted drive.
 fn is_space_drive_root(root: &Path, home: Option<&Path>) -> bool {
     let Some(home) = home else {
         return false;
     };
-    let mounts = ["mnt", "mnt-dev"]
-        .iter()
-        .any(|folder| {
-            root.strip_prefix(home.join(".misty").join(folder))
-                .is_ok_and(|inside| inside.components().next().is_some())
-        });
+    let mounts = ["mnt", "mnt-dev"].iter().any(|folder| {
+        root.strip_prefix(home.join(".misty").join(folder))
+            .is_ok_and(|inside| inside.components().next().is_some())
+    });
     let cloud = cfg!(target_os = "macos")
         && root
             .strip_prefix(home.join("Library").join("CloudStorage"))
@@ -41,7 +32,6 @@ fn is_space_drive_root(root: &Path, home: Option<&Path>) -> bool {
     (mounts || cloud) && file_access::is_in_space_drive(root)
 }
 
-/// Why a folder can't be shared, or Ok.
 pub fn check_root(root: &Path, protected: &[PathBuf], home: Option<&Path>) -> Result<(), String> {
     let refuse = |why: &str| Err(why.to_owned());
     let root = &plain_path(root);
@@ -72,9 +62,6 @@ pub fn check_root(root: &Path, protected: &[PathBuf], home: Option<&Path>) -> Re
     if !root.is_absolute() || root.parent().is_none() {
         return refuse("Choose a folder, not the whole disk.");
     }
-    // The one place inside `~/.misty` (and on macOS inside `~/Library`) that may be shared: a
-    // Space's drive while it is mounted (`~/.misty/mnt*/<Space>`, `~/Library/CloudStorage/Misty-*`).
-    // The file gate knows those roots only from the drive's own mounting.
     if is_space_drive_root(root, home) {
         return Ok(());
     }
@@ -125,7 +112,6 @@ pub fn check_root(root: &Path, protected: &[PathBuf], home: Option<&Path>) -> Re
     Ok(())
 }
 
-// The paths are Unix paths; a path like /Users/me is not absolute on Windows.
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;

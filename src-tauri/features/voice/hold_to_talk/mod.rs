@@ -1,8 +1,3 @@
-//! System-wide hold-to-talk chords with key-down and key-up.
-//!
-//! One listen-only hook per process (a CGEventTap on macOS, a low-level
-//! keyboard hook on Windows, the X server's key state on Linux) serves every chord: Control+Option for the agent
-//! at the cursor and the dictation key. Input is observed, never consumed.
 use serde::{Deserialize, Serialize};
 use std::sync::{
     mpsc::{self, Receiver, Sender},
@@ -22,23 +17,18 @@ mod linux;
 #[cfg(target_os = "linux")]
 use linux as platform;
 
-/// A modifier a chord can use. `Option` is Alt on Windows and `Command` is the
-/// Windows key. The `Right*` keys match only the right-hand key; plain ones
-/// match either side.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Key {
     Control,
     Option,
     Command,
     Shift,
-    /// The Fn/Globe key (macOS only; Windows never reports it).
     Fn,
     RightControl,
     RightOption,
     RightCommand,
 }
 
-/// Which physical modifiers are down right now.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Modifiers {
     pub left_control: bool,
@@ -70,17 +60,14 @@ impl Modifiers {
     }
 }
 
-/// Keys held together. Held means every key is down.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Chord(pub Vec<Key>);
 
 impl Chord {
-    /// Talk to the agent at your cursor.
     pub fn companion() -> Self {
         Chord(vec![Key::Control, Key::Option])
     }
 
-    /// Dictation: Fn/Globe on macOS, Right Alt on Windows.
     pub fn dictation_default() -> Self {
         if cfg!(target_os = "macos") {
             Chord(vec![Key::Fn])
@@ -89,7 +76,6 @@ impl Chord {
         }
     }
 
-    /// Reads "Fn", "RightAlt", "Control+Option" and similar settings values.
     pub fn parse(value: &str) -> Option<Self> {
         let mut keys = Vec::new();
         for part in value.split('+') {
@@ -121,21 +107,14 @@ pub enum HotkeyEvent {
     Down,
     Up,
     Click(f64, f64),
-    /// Control tapped twice on its own, quickly (opens Tutor's text box). Shortcuts like
-    /// Control+C or Control and a click never count. macOS and Windows only.
     DoubleTap,
-    /// Escape pressed anywhere (macOS only): what Tutor shows at the cursor, such as its tour,
-    /// gives way. The key still reaches the app in front.
     Escape,
     Error(String),
 }
 
-/// Two taps of Control on its own, each short, close together. A third tap starts a new pair.
 #[derive(Default)]
 pub(crate) struct DoubleTap {
-    /// When Control went down alone, and whether nothing else has happened since.
     down: Option<(std::time::Instant, bool)>,
-    /// When the last clean tap ended, if it was the first of a pair.
     last: Option<std::time::Instant>,
 }
 
@@ -143,7 +122,6 @@ impl DoubleTap {
     const TAP: std::time::Duration = std::time::Duration::from_millis(300);
     const BETWEEN: std::time::Duration = std::time::Duration::from_millis(450);
 
-    /// A modifier change; true when it completes a double tap.
     pub fn modifiers(&mut self, modifiers: &Modifiers, now: std::time::Instant) -> bool {
         let control = modifiers.left_control || modifiers.right_control;
         let others = modifiers.left_option
@@ -162,7 +140,6 @@ impl DoubleTap {
             self.interrupt();
             return false;
         }
-        // Everything is up.
         let Some((since, clean)) = self.down.take() else {
             return false;
         };
@@ -171,7 +148,6 @@ impl DoubleTap {
             return false;
         }
         match self.last.take() {
-            // The pair is complete; the next tap starts another.
             Some(previous) if now.duration_since(previous) <= Self::BETWEEN => true,
             _ => {
                 self.last = Some(now);
@@ -180,7 +156,6 @@ impl DoubleTap {
         }
     }
 
-    /// Any other key, a click or a scroll: no tap is under way.
     pub fn interrupt(&mut self) {
         if let Some((_, clean)) = self.down.as_mut() {
             *clean = false;
@@ -189,7 +164,6 @@ impl DoubleTap {
     }
 }
 
-/// Turns modifier state into Down/Up transitions for each registered chord.
 #[derive(Default)]
 pub(crate) struct Tracker {
     entries: Vec<(u64, Chord, bool)>,
@@ -248,7 +222,6 @@ fn hub() -> &'static Arc<Mutex<Hub>> {
     })
 }
 
-/// A registered chord. Dropping it unregisters the chord.
 pub struct Subscription {
     id: u64,
     pub events: Receiver<HotkeyEvent>,
@@ -265,8 +238,6 @@ impl Drop for Subscription {
     }
 }
 
-/// Registers a chord and starts the shared hook on first use. Clicks and hook
-/// errors reach every subscriber.
 pub fn subscribe(chord: Chord) -> Subscription {
     let (tx, events) = mpsc::channel();
     let mut state = hub()
@@ -287,17 +258,13 @@ pub fn subscribe(chord: Chord) -> Subscription {
     Subscription { id, events }
 }
 
-/// Input from the platform hook.
 pub(crate) enum Input {
     Modifiers(Modifiers),
     Click(f64, f64),
-    /// Any key that isn't a modifier: breaks a double tap, and counts toward typing.
     #[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
     Key,
-    /// Escape: like any other key, and Tutor's tour gives way.
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     Escape,
-    /// A scroll: only breaks a double tap.
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     Scroll,
     Error(String),
@@ -321,11 +288,10 @@ fn dispatch(input: Input) {
                     let _ = tx.send(event);
                 }
             }
-            // Linux's hook sees only modifiers, so it can't tell Control+C from a tap.
-            if cfg!(any(target_os = "macos", windows)) {
-                if state.taps.modifiers(&modifiers, std::time::Instant::now()) {
-                    broadcast(&state, HotkeyEvent::DoubleTap);
-                }
+            if cfg!(any(target_os = "macos", windows))
+                && state.taps.modifiers(&modifiers, std::time::Instant::now())
+            {
+                broadcast(&state, HotkeyEvent::DoubleTap);
             }
         }
         Input::Key => {
@@ -346,8 +312,6 @@ fn dispatch(input: Input) {
     }
 }
 
-/// Whether the person is typing now: several keys in quick succession, seen by the same hook.
-/// Only the timing is kept, never which keys. Tutor's Misty steps out of the way while it holds.
 pub fn typing() -> bool {
     typing::now()
 }
@@ -357,9 +321,7 @@ mod typing {
     use std::sync::OnceLock;
     use std::time::Instant;
 
-    /// Keys closer together than this are one run of typing.
     const RUN_MS: u64 = 700;
-    /// How many keys in a run before it counts as typing, so a shortcut doesn't.
     const KEYS: u32 = 3;
 
     static START: OnceLock<Instant> = OnceLock::new();
@@ -367,7 +329,6 @@ mod typing {
     static RUN: AtomicU32 = AtomicU32::new(0);
 
     fn now_ms() -> u64 {
-        // Starts at 1, so a key at the first instant still reads as one.
         START.get_or_init(Instant::now).elapsed().as_millis() as u64 + 1
     }
 
@@ -387,7 +348,6 @@ mod typing {
     }
 }
 
-/// The modifiers currently held, so paste can wait for the person to let go.
 pub fn held_modifiers() -> Modifiers {
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     return platform::current_modifiers();

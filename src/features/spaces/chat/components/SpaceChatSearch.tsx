@@ -1,13 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import type { SpaceConversation } from "../../api/dto/entities";
-import { spaceChatConversationPath, spaceChatPath } from "../chatRoute";
-import { conversationName } from "../sidebar/conversationGroups";
+import { spaceChatConversationPath, spaceChatPath } from "../chat_route";
+import { conversationName } from "../sidebar/conversation_groups";
 import { ChatSearchResults } from "./ChatSearchResults";
 
-/**
- * Message search results beside a chat, each saying where it was said; opening one brings it into
- * view. In a DM there is only the one chat, so a result opens on the DM's own page.
- */
 export function SpaceChatSearch(props: {
   spaceId: string;
   query: string;

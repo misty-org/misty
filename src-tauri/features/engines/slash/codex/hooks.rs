@@ -1,5 +1,3 @@
-//! `/hooks`: the hooks Codex runs for the chat's folder.
-
 use super::*;
 
 pub(super) async fn hooks(context: &Context) -> Result<Output, String> {

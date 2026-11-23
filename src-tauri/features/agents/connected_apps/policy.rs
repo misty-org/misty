@@ -1,5 +1,3 @@
-//! What running an app tool does to the person's accounts, and what that needs from them. Native on
-//! purpose: the model and the page can't reach it.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -11,11 +9,8 @@ use crate::agents::run_control::tool_question::{shown_fields, MAX_SHOWN};
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
     Read,
-    /// Creates or changes the person's own data.
     Write,
-    /// Reaches other people or money: sending, publishing, sharing, inviting, paying, changing access.
     Consequential,
-    /// Removes data.
     Destructive,
 }
 
@@ -59,12 +54,10 @@ const CONSEQUENTIAL: &[&str] = &[
     "DEPLOY",
     "CANCEL",
 ];
-/// Things that reach other people when one is made, past the verbs above: `*_CREATE_MESSAGE`.
 const SEND_NOUNS: &[&str] = &[
     "MESSAGE", "MESSAGES", "EMAIL", "EMAILS", "COMMENT", "COMMENTS", "DM", "SMS",
 ];
 const MAKES: &[&str] = &["CREATE", "ADD", "NEW", "WRITE", "COMPOSE", "START"];
-/// Made for the person alone: a draft or a label stays with them.
 const STAYS_PRIVATE: &[&str] = &["DRAFT", "DRAFTS", "LABEL", "LABELS", "FOLDER", "FILTER"];
 const READ: &[&str] = &[
     "GET", "LIST", "FETCH", "SEARCH", "FIND", "READ", "RETRIEVE", "QUERY", "LOOKUP", "VIEW",
@@ -75,8 +68,6 @@ const PAYMENT: &[&str] = &[
     "REFUND", "CAPTURE",
 ];
 
-/// The tool's behavior tags first, then the action the slug names. It classifies a tool, never the
-/// person's request.
 pub fn classify(slug: &str, tags: &[String]) -> Kind {
     let tagged = |tag: &str| tags.iter().any(|item| item == tag);
     let upper = slug.to_uppercase();
@@ -94,7 +85,6 @@ pub fn classify(slug: &str, tags: &[String]) -> Kind {
     if names(CONSEQUENTIAL) {
         return Kind::Consequential;
     }
-    // Untagged tools name their action after the toolkit: GMAIL_FETCH_EMAILS.
     if !tagged("createHint") && !tagged("updateHint") && parts.len() > 1 && READ.contains(&parts[1])
     {
         return Kind::Read;
@@ -111,21 +101,17 @@ fn is_payment(slug: &str) -> bool {
         .any(|word| PAYMENT.contains(&word))
 }
 
-/// A payment's amount, and a payment grant's per-payment cap.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Amount {
     pub max_amount_minor: i64,
     pub currency: String,
 }
 
-/// What one action needs from the person: the action, the one resource it touches and, for payments,
-/// the amount. Derived from the call about to run, never from what the person answered.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GrantNeed {
     pub action: &'static str,
     pub scope_kind: &'static str,
     pub scope_id: String,
-    /// Names the scope for people: "act in Gmail (me@example.com)".
     pub label: String,
     pub amount: Option<Amount>,
 }
@@ -211,7 +197,6 @@ pub fn grant_need(info: &ToolInfo, arguments: &Value, account: &str, kind: Kind)
 }
 
 impl GrantNeed {
-    /// Whether this can become a grant: one concrete resource, and a payment with an amount to cap.
     pub fn rememberable(&self) -> bool {
         let concrete = !self.scope_id.is_empty()
             && self.scope_id.len() <= 300
@@ -223,7 +208,6 @@ impl GrantNeed {
         }
     }
 
-    /// Whether a stored grant's cap allows this exact action.
     pub fn covered_by(&self, cap: Option<&Amount>) -> bool {
         if self.action != ACTION_PAYMENT {
             return true;
@@ -244,8 +228,6 @@ pub enum Decision {
     Pause,
 }
 
-/// The rule for one write in one mode. Ask pauses before everything and ignores grants. Auto continues
-/// on smaller writes, and on the rest only when a remembered approval covers them.
 pub fn decide(mode: &str, need: &GrantNeed, covered: bool) -> Decision {
     if mode != "auto" {
         return Decision::Pause;
@@ -257,8 +239,6 @@ pub fn decide(mode: &str, need: &GrantNeed, covered: bool) -> Decision {
     }
 }
 
-/// The approval card: the app and action, then the exact arguments being approved, all of them. Too
-/// long to show whole is `None`, and the call is refused with word to make a smaller one.
 pub fn action_summary(
     info: &ToolInfo,
     arguments: &Value,
@@ -294,7 +274,6 @@ fn canonical(value: &Value) -> Value {
     }
 }
 
-/// Binds an approval to one exact tool, arguments and account.
 pub fn arguments_hash(slug: &str, arguments: &Value, account: &str) -> String {
     let canonical = Value::Array(vec![slug.into(), canonical(arguments), account.into()]);
     hex::encode(Sha256::digest(canonical.to_string().as_bytes()))

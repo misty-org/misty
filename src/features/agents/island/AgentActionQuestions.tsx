@@ -7,15 +7,10 @@ import {
   actionQuestionVerb,
   answerActionQuestion,
   useIslandQuestions,
-} from "./actionQuestions";
-import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
+} from "./action_questions";
+import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import { StatusRow, StatusTable } from "../progress/StatusTable";
 
-/**
- * Questions from agents about to pay, send, delete or post, in the control
- * island. Nothing happens until the person allows it; no answer in three
- * minutes means no.
- */
 export function AgentActionQuestions() {
   const questions = useIslandQuestions();
   const agents = usePersonalAgentsStore((state) => state.agents);

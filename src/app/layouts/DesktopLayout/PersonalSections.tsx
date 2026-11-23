@@ -25,11 +25,11 @@ import {
   Skeleton,
   Text,
 } from "@misty/ui";
-import { toggleSection, useCollapsedSections } from "./collapsedSections";
-import { openWorkspaceRoute } from "./spaceNavigation";
-import { chatSectionClass, markSlotClass } from "./styles";
+import { toggleSection, useCollapsedSections } from "./collapsed_sections";
+import { openWorkspaceRoute } from "./space_navigation";
+import { SidebarShortcut } from "./SidebarRow";
+import { chatSectionClass, faceSlotClass, markSlotClass } from "./styles";
 
-/** A count at a row's end, such as unread messages or friend requests. */
 function RowCount({ count, label }: { count: number; label: string }) {
   return count > 0 ? (
     <Text size="caption" tone="chrome" aria-label={`${count} ${label}`}>
@@ -38,22 +38,16 @@ function RowCount({ count, label }: { count: number; label: string }) {
   ) : null;
 }
 
-/** A DM's face: the other person's, with their status; a group's first other member's. */
 function DmFace({ dm, myUserId }: { dm: DirectConversation; myUserId: string | undefined }) {
   const other = dmOthers(dm, myUserId)[0];
   const presence = usePresence(dm.kind === "direct" ? other?.user_id : undefined);
   const picture = useMemberPicture(dm.id, other?.user_id ?? "", other?.avatar_version ?? 0);
   if (!other) return null;
   const face = (
-    <ChatAvatar
-      id={other.user_id}
-      name={other.username}
-      src={picture ?? undefined}
-      size="xs"
-    />
+    <ChatAvatar id={other.user_id} name={other.username} src={picture ?? undefined} size="sm" />
   );
   return dm.kind === "direct" ? (
-    <PresenceFace presence={presence} ring="sidebar">
+    <PresenceFace presence={presence} face="sm">
       {face}
     </PresenceFace>
   ) : (
@@ -66,7 +60,7 @@ function DmRowSkeletons() {
     <>
       {Array.from({ length: 3 }, (_, index) => (
         <NavRow key={index} still aria-hidden="true">
-          <Skeleton className="size-4 rounded-md" />
+          <Skeleton className="size-6 rounded-full" />
           <Skeleton className="h-3 w-28" />
         </NavRow>
       ))}
@@ -74,31 +68,35 @@ function DmRowSkeletons() {
   );
 }
 
-/**
- * Friends, one of Personal's places: it sits with them, before More, which always comes last. The
- * count at its end is the friend requests waiting.
- */
-export function FriendsRow({ route, onOpen }: { route: string; onOpen(view: WorkspaceView): void }) {
+export function FriendsRow({
+  route,
+  onOpen,
+}: {
+  route: string;
+  onOpen(view: WorkspaceView): void;
+}) {
   const friends = useFriends();
   const incoming = friends.data?.incoming.length ?? 0;
   return (
-    <NavRow current={route.split("?")[0] === friendsRoute} onClick={() => openWorkspaceRoute(friendsRoute, onOpen)}>
+    <NavRow
+      current={route.split("?")[0] === friendsRoute}
+      onClick={() => openWorkspaceRoute(friendsRoute, onOpen)}
+    >
       <span className={markSlotClass}>
         <Users aria-hidden="true" />
       </span>
       <NavRowLabel bright={incoming > 0} className="flex-1">
         Friends
       </NavRowLabel>
-      <RowCount count={incoming} label="friend requests" />
+      {incoming > 0 ? (
+        <RowCount count={incoming} label="friend requests" />
+      ) : (
+        <SidebarShortcut command="app.open_friends" />
+      )}
     </NavRow>
   );
 }
 
-/**
- * Personal's own part of the sidebar, under its places (Friends is one of them): Direct messages: the
- * person's DMs with other people, then each of their agents as one long thread (`children`).
- * Personal is private: nobody else is ever in it.
- */
 export function PersonalSections({
   route,
   onOpen,
@@ -106,7 +104,6 @@ export function PersonalSections({
 }: {
   route: string;
   onOpen(view: WorkspaceView): void;
-  /** The person's agents, each as one thread, listed under the people. */
   children?: ReactNode;
 }) {
   useDmListUpdates();
@@ -152,7 +149,7 @@ export function PersonalSections({
                 const target = dmPath(dm.id);
                 return (
                   <NavRow key={dm.id} current={path === target} onClick={() => open(target)}>
-                    <span className={markSlotClass}>
+                    <span className={faceSlotClass}>
                       <DmFace dm={dm} myUserId={user?.id} />
                     </span>
                     <NavRowLabel bright={unread > 0} className="flex-1">

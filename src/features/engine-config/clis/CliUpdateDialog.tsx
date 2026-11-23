@@ -1,45 +1,29 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * Installing or updating an engine CLI: what will run, then a plain sentence while it runs, with
- * the plan and the installer's output under Show details. The state lives in useCliUpdateFlow;
- * this only draws it.
- *
- * Every install runs inside the app: nobody types into a terminal. A missing engine goes into
- * Misty's folder, and an npm engine on a computer without Node.js gets Misty's own first ("Getting
- * a helper this AI needs first."). While a run is active the dialog can't be closed: closing would
- * suggest the install stopped when it didn't.
- *
- * `plain` is the first-run version, for someone who has never seen a terminal: the row's Install
- * starts the install at once, with no plan to confirm first.
- *
- * An engine whose installer needs Git on a Mac without Apple's developer tools (Hermes Agent) asks
- * for those first, with one button that opens Apple's installer, instead of the installer opening
- * it by surprise. Once it is open, Continue plans the install again.
- */
-import { Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { engineName } from "../channels/engines";
 import {
   Badge,
   Button,
-  cn,
   CodeBlock,
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
+  DisclosureButton,
   PaneLoading,
   Spinner,
   Text,
+  DialogFooter,
 } from "@misty/ui";
 import type { CliUpdatePlan } from "./api";
-import type { CliUpdateFlow, CliUpdateFlowState } from "./useCliUpdateFlow";
+import type { CliUpdateFlow, CliUpdateFlowState } from "./use_cli_update_flow";
 
-/** After this long, a still-running install says where its output is. */
 const SLOW_INSTALL_MS = 60_000;
 
 export function CliUpdateDialog({
@@ -49,12 +33,10 @@ export function CliUpdateDialog({
 }: {
   engine: string;
   flow: CliUpdateFlow;
-  /** First run: no plan to confirm, the install starts at once. */
   plain?: boolean;
 }) {
   const { state, confirm } = flow;
   const running = state.status === "running";
-  // In the first-run dialog the row's Install was the go-ahead, so a plan that can run starts.
   const developerTools = Boolean(state.plan?.needsDeveloperTools);
   const autoStart =
     plain && state.status === "ready" && Boolean(state.plan?.canRun) && !developerTools;
@@ -64,7 +46,6 @@ export function CliUpdateDialog({
   if (state.status === "idle") return null;
   const name = engineName(engine);
   const title = state.plan?.action === "update" ? `Update ${name}` : `Install ${name}`;
-  // Before a run, the full dialog shows the plan to confirm; after it starts, its sentence.
   const confirming =
     !plain && !developerTools && (state.status === "ready" || state.status === "planning");
   return (
@@ -73,10 +54,10 @@ export function CliUpdateDialog({
         aria-describedby={undefined}
         className="flex max-h-[86vh] w-120 max-w-[94vw] flex-col gap-4 p-5"
       >
-        <DialogTitle className="pr-10 text-base">{title}</DialogTitle>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
         <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto pr-1">
-          {/* While the plan is asked for, the full dialog holds the plan's own shape: the badges,
-              the "Will run" label and the steps. Nothing runs yet, so nothing says it does. */}
           {state.status === "planning" && !plain ? (
             <PlanSummarySkeleton />
           ) : confirming && state.plan ? (
@@ -86,13 +67,12 @@ export function CliUpdateDialog({
           )}
           {!confirming && state.plan ? <RunDetails state={state} /> : null}
         </div>
-        <DialogFooter flow={flow} plain={plain} />
+        <UpdateFooter flow={flow} plain={plain} />
       </DialogContent>
     </Dialog>
   );
 }
 
-/** One sentence on where the run is, with a spinner while it works. */
 function RunStatus({
   engine,
   state,
@@ -153,17 +133,15 @@ function RunStatus({
   );
 }
 
-/** The plan and the output, folded under Show details. */
 function RunDetails({ state }: { state: CliUpdateFlowState }) {
   const [open, setOpen] = useState(false);
   if (!state.plan) return null;
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
-        <Button variant="quiet" size="sm" className="justify-self-start">
-          <ChevronDown className={cn("transition-transform", open && "rotate-180")} />
+        <DisclosureButton open={open} size="sm">
           {open ? "Hide details" : "Show details"}
-        </Button>
+        </DisclosureButton>
       </CollapsibleTrigger>
       <CollapsibleContent className="grid gap-3 pt-3">
         <PlanSummary plan={state.plan} />
@@ -173,7 +151,6 @@ function RunDetails({ state }: { state: CliUpdateFlowState }) {
   );
 }
 
-/** How the plan installs, anything blocking it, and what runs, step by step. */
 function PlanSummary({ plan }: { plan: CliUpdatePlan }) {
   return (
     <div className="grid gap-3">
@@ -205,12 +182,10 @@ function PlanSummary({ plan }: { plan: CliUpdatePlan }) {
   );
 }
 
-/** PlanSummary's shape while the plan is asked for: the badges, "Will run" and the steps. */
 function PlanSummarySkeleton() {
   return <PaneLoading label="Preparing the plan" inline />;
 }
 
-/** The installer's output, kept on the newest line while it streams. */
 function LiveLog({ state }: { state: CliUpdateFlowState }) {
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -237,16 +212,14 @@ function LiveLog({ state }: { state: CliUpdateFlowState }) {
   );
 }
 
-function DialogFooter({ flow, plain }: { flow: CliUpdateFlow; plain: boolean }) {
+function UpdateFooter({ flow, plain }: { flow: CliUpdateFlow; plain: boolean }) {
   const { state } = flow;
-  const footer = "flex justify-end gap-2";
-  // A run can't be stopped halfway, so it offers nothing until it ends.
   if (state.status === "running") return null;
   const plan = state.plan;
   if (plan?.needsDeveloperTools && plan.canRun && state.status !== "error") {
     const done = state.status === "done";
     return (
-      <div className={footer}>
+      <DialogFooter>
         <Button
           variant="primary"
           autoFocus
@@ -255,21 +228,23 @@ function DialogFooter({ flow, plain }: { flow: CliUpdateFlow; plain: boolean }) 
         >
           {done ? "Continue" : "Install developer tools"}
         </Button>
-      </div>
+      </DialogFooter>
     );
   }
   if (state.status === "done") {
     return (
-      <div className={footer}>
+      <DialogFooter>
         <Button variant="primary" autoFocus onClick={flow.checkAgain}>
           Done
         </Button>
-      </div>
+      </DialogFooter>
     );
   }
   return (
-    <div className={footer}>
-      <Button onClick={flow.close}>{state.status === "error" ? "Close" : "Cancel"}</Button>
+    <DialogFooter>
+      <Button variant="quiet" onClick={flow.close}>
+        {state.status === "error" ? "Close" : "Cancel"}
+      </Button>
       {state.status === "error" ? (
         <Button
           variant="primary"
@@ -288,6 +263,6 @@ function DialogFooter({ flow, plain }: { flow: CliUpdateFlow; plain: boolean }) 
           {plan?.action === "update" ? "Update" : "Install"}
         </Button>
       ) : null}
-    </div>
+    </DialogFooter>
   );
 }

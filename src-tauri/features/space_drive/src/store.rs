@@ -1,26 +1,3 @@
-//! `drive.db`: the three trees and everything the sync keeps between launches.
-//!
-//! - `items`: the server's tree, every item as the change sequence last told it, tombstones too.
-//! - `base`: what this computer last agreed on with the server for each item (kuragine's copy
-//!   record): the version, content and place it saw.
-//! - `nodes`: the local tree, what this computer shows. A node equal to its base is in step; one
-//!   that differs carries a local change waiting to go up (`dirty_content`, `dirty_place`,
-//!   `trash_pending`, or `created` for an item the server hasn't seen yet).
-//! - The text of each text file at its base version is kept beside `drive.db`, in
-//!   `bases/<item id>` (`crate::bases`), for three-way merges.
-//! - `cursor`: the last sequence number applied, per Space.
-//! - `local_cursor` and `nodes.local_seq`: the local change feed, for what changes only on this
-//!   computer and the extension shows (when it was last used).
-//! - `transfers`: uploads under way, with a multipart upload's id and the parts already sent, so
-//!   an upload carries on after a restart.
-//! Which agent and chat trashed an item isn't kept here: it is one row of `files_agent_trash` in
-//! `misty.db`, shared with Files, which the glue writes when `Events::agent_trashed` says so.
-//! - `pins`: Keep downloaded.
-//! - `blobs`: the content cache, for eviction.
-//!
-//! WAL mode, one connection behind a mutex, and numbered migrations in `user_version`. A node's
-//! `path` is kept materialized so a subtree is one index range (kuragine's `SUBTREE` trick:
-//! `path > p || '/' AND path < p || '0'`, since `'0'` follows `'/'`).
 use std::{
     path::Path,
     sync::{Mutex, MutexGuard},
@@ -34,7 +11,6 @@ use crate::names;
 use crate::DriveError;
 
 const MIGRATIONS: &[&str] = &[
-    // 1: the three trees, the cursor, transfers, pins and the cache.
     "CREATE TABLE items (
         space TEXT NOT NULL,
         id TEXT NOT NULL,
@@ -124,28 +100,15 @@ const MIGRATIONS: &[&str] = &[
         size INTEGER NOT NULL,
         last_used_ms INTEGER NOT NULL
      );",
-    // 2: the local change feed. What the macOS extension sees of an item beyond the server's
-    // (whether it is writable here, when it was last used) changes with no change on the server,
-    // so it has a sequence of its own: `local_cursor` counts per Space, and a node's `local_seq`
-    // is the count when it last changed that way.
     "ALTER TABLE nodes ADD COLUMN local_seq INTEGER NOT NULL DEFAULT 0;
      CREATE INDEX nodes_local_seq ON nodes(space, local_seq);
      CREATE TABLE local_cursor (
         space TEXT PRIMARY KEY,
         seq INTEGER NOT NULL DEFAULT 0
      );",
-    // 3: the simple model. A trashed copy names the item whose replaced content it keeps
-    // (`replaced_of`); a pending save remembers the older version it was made against, when it
-    // was (`content_base`); conflicting copies are gone, and with them `conflict`.
     "ALTER TABLE items ADD COLUMN replaced_of TEXT;
      ALTER TABLE nodes ADD COLUMN content_base INTEGER;
      ALTER TABLE nodes DROP COLUMN conflict;",
-    // 4: one drive for the account, a folder per Space. `space_folders` is every Space the
-    // drive shows and its folder's name there, kept until the person leaves the Space (an
-    // unmounted Space stays shown, waiting for Misty). `anchors` keeps the macOS extension's
-    // sync anchors, each every Space's place in its change feeds, which no longer fit in the
-    // anchor itself. An item's id is unique across Spaces, so the extension names items by id
-    // alone and Misty finds their Space (`nodes_by_id`).
     "CREATE TABLE space_folders (
         space TEXT PRIMARY KEY,
         folder TEXT NOT NULL
@@ -158,11 +121,8 @@ const MIGRATIONS: &[&str] = &[
      CREATE INDEX items_by_id ON items(id);",
 ];
 
-/// How many sync anchors `drive.db` keeps. macOS asks from its newest one; an older one that's
-/// gone only makes it list the drive again.
 const KEPT_ANCHORS: i64 = 64;
 
-/// A subtree of `nodes` by its materialized path: `?1` is the space, `?2` the folder's path.
 const SUBTREE: &str =
     "space = ?1 AND (?2 = '/' OR path = ?2 OR (path > ?2 || '/' AND path < ?2 || '0'))";
 
@@ -174,17 +134,13 @@ const ITEM_COLUMNS: &str = "space, id, parent, name, kind, sha256, size, mtime_m
      modified_by, modified_by_name, modified_at, trashed, trashed_at, trashed_by, trash_hold, \
      deleted, replaced_of";
 
-/// One node of the local tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NodeRow {
-    /// Stable for the node's life on this computer: the FUSE inode, less one.
     pub ino: i64,
     pub space: SpaceId,
     pub id: ItemId,
     pub parent: Option<ItemId>,
-    /// This computer's name for it: safe here and unique among its siblings.
     pub name: String,
-    /// Its name on the server, or the one a pending create or rename will send.
     pub server_name: String,
     pub kind: Kind,
     pub sha256: Option<String>,
@@ -195,30 +151,22 @@ pub struct NodeRow {
     pub dirty_content: bool,
     pub dirty_place: bool,
     pub trash_pending: bool,
-    /// A held trash (an agent's): it never empties itself.
     pub trash_held: bool,
-    /// The agent and chat whose trash this is, until the server has it; then the glue records
-    /// them in `files_agent_trash` and they leave `drive.db`.
     pub trash_agent: Option<String>,
     pub trash_chat: Option<String>,
     pub not_synced: bool,
     pub downloaded: bool,
-    /// The version a waiting content change was made against, when that is older than its base
-    /// (an app or the macOS extension saved over a copy from before the newest version). It goes
-    /// up as `base_version`, so the server keeps what it replaces; `None` is the base itself.
     pub content_base: Option<Version>,
     pub last_used_ms: i64,
 }
 
 impl NodeRow {
-    /// A change waiting to go up.
     pub fn dirty(&self) -> bool {
         !self.not_synced
             && (self.created || self.dirty_content || self.dirty_place || self.trash_pending)
     }
 }
 
-/// A multipart upload's progress, kept so it resumes after a restart.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TransferRow {
     pub space: SpaceId,
@@ -226,12 +174,9 @@ pub struct TransferRow {
     pub sha256: String,
     pub size: u64,
     pub upload_id: String,
-    /// `single`, `multipart` or `present`.
     pub mode: String,
     pub part_size: u64,
-    /// `[{number, url}]` as the server gave them.
     pub parts: String,
-    /// `[{number, etag}]` already sent.
     pub done: String,
     pub started_ms: i64,
     pub attempts: i64,
@@ -314,8 +259,6 @@ fn base_from(row: &Row<'_>) -> rusqlite::Result<Base> {
 }
 
 impl Store {
-    /// Opens (or makes) `drive.db` at `path` through the file gate, in WAL mode, and runs any
-    /// migrations it hasn't had.
     pub fn open(path: &Path) -> Result<Self, DriveError> {
         if let Some(parent) = path.parent() {
             file_access::fs::create_dir_all(parent).map_err(DriveError::io)?;
@@ -359,7 +302,6 @@ impl Store {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    /// Runs `work` in one transaction.
     pub fn transaction<T>(
         &self,
         work: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T, DriveError>,
@@ -370,8 +312,6 @@ impl Store {
         tx.commit().map_err(db)?;
         Ok(out)
     }
-
-    // The server's tree.
 
     pub fn put_item(&self, item: &Item) -> Result<(), DriveError> {
         put_item(&self.lock(), item)
@@ -384,7 +324,9 @@ impl Store {
     pub fn items(&self, space: &SpaceId) -> Result<Vec<Item>, DriveError> {
         let connection = self.lock();
         let mut statement = connection
-            .prepare(&format!("SELECT {ITEM_COLUMNS} FROM items WHERE space = ?1"))
+            .prepare(&format!(
+                "SELECT {ITEM_COLUMNS} FROM items WHERE space = ?1"
+            ))
             .map_err(db)?;
         let rows = statement
             .query_map([space.as_str()], item_from)
@@ -394,7 +336,6 @@ impl Store {
         rows
     }
 
-    /// Items whose last change is after `since`, in order, for the extension's sync anchor.
     pub fn items_since(
         &self,
         space: &SpaceId,
@@ -415,15 +356,12 @@ impl Store {
         rows
     }
 
-    /// Forgets the server's tree of a Space, for a resync.
     pub fn clear_items(&self, space: &SpaceId) -> Result<(), DriveError> {
         self.lock()
             .execute("DELETE FROM items WHERE space = ?1", [space.as_str()])
             .map(|_| ())
             .map_err(db)
     }
-
-    // The base tree.
 
     pub fn base(&self, space: &SpaceId, id: &ItemId) -> Result<Option<Base>, DriveError> {
         base(&self.lock(), space, id)
@@ -457,8 +395,6 @@ impl Store {
             .map(|_| ())
             .map_err(db)
     }
-
-    // The local tree.
 
     pub fn node(&self, space: &SpaceId, id: &ItemId) -> Result<Option<NodeRow>, DriveError> {
         node(&self.lock(), space, id)
@@ -497,8 +433,6 @@ impl Store {
         children(&self.lock(), space, parent)
     }
 
-    /// The node named `name` in `parent`, matched the way the server matches names: in NFC and
-    /// ignoring case.
     pub fn child_named(
         &self,
         space: &SpaceId,
@@ -515,7 +449,9 @@ impl Store {
     pub fn nodes(&self, space: &SpaceId) -> Result<Vec<NodeRow>, DriveError> {
         let connection = self.lock();
         let mut statement = connection
-            .prepare(&format!("SELECT {NODE_COLUMNS} FROM nodes WHERE space = ?1"))
+            .prepare(&format!(
+                "SELECT {NODE_COLUMNS} FROM nodes WHERE space = ?1"
+            ))
             .map_err(db)?;
         let rows = statement
             .query_map([space.as_str()], node_from)
@@ -525,7 +461,6 @@ impl Store {
         rows
     }
 
-    /// The node at `path` and everything under it.
     pub fn subtree(&self, space: &SpaceId, path: &str) -> Result<Vec<NodeRow>, DriveError> {
         subtree(&self.lock(), space, path)
     }
@@ -534,12 +469,10 @@ impl Store {
         insert_node(&self.lock(), node)
     }
 
-    /// Writes every field of `node` but its place; a place change goes through `move_node`.
     pub fn update_node(&self, node: &NodeRow) -> Result<(), DriveError> {
         update_node(&self.lock(), node)
     }
 
-    /// Moves a node to `parent` under `name` and rewrites its subtree's paths.
     pub fn move_node(
         &self,
         space: &SpaceId,
@@ -550,8 +483,6 @@ impl Store {
         self.transaction(|tx| move_node(tx, space, id, parent, name))
     }
 
-    /// A node and everything under it, by parent links (never by path, which a node made since
-    /// under the same name would share). Parents come before their children.
     pub fn descendants(&self, space: &SpaceId, id: &ItemId) -> Result<Vec<NodeRow>, DriveError> {
         let connection = self.lock();
         let Some(top) = node(&connection, space, id)? else {
@@ -569,7 +500,6 @@ impl Store {
         Ok(out)
     }
 
-    /// Removes a node and everything under it from the local tree, and their base records.
     pub fn remove_subtree(&self, space: &SpaceId, id: &ItemId) -> Result<Vec<NodeRow>, DriveError> {
         let gone = self.descendants(space, id)?;
         self.transaction(|tx| {
@@ -600,9 +530,6 @@ impl Store {
             .map_err(db)
     }
 
-    /// Gives a node a new id, its children following, and forgets the old id's base: the node
-    /// becomes a new item (a folder recreated at a deleted one's place, or an edit kept after its
-    /// item was purged).
     pub fn rekey(&self, space: &SpaceId, from: &ItemId, to: &ItemId) -> Result<(), DriveError> {
         self.transaction(|tx| {
             tx.execute(
@@ -634,9 +561,6 @@ impl Store {
         })
     }
 
-    // The Spaces the drive shows.
-
-    /// Shows a Space in the drive, in a folder of this name.
     pub fn set_space_folder(&self, space: &SpaceId, folder: &str) -> Result<(), DriveError> {
         self.lock()
             .execute(
@@ -648,7 +572,6 @@ impl Store {
             .map_err(db)
     }
 
-    /// Every Space the drive shows, with its folder's name, by name.
     pub fn space_folders(&self) -> Result<Vec<(SpaceId, String)>, DriveError> {
         let connection = self.lock();
         let mut statement = connection
@@ -662,30 +585,30 @@ impl Store {
         rows
     }
 
-    /// The Space an item is in, from this computer's tree or the server's.
     pub fn space_of_item(&self, id: &ItemId) -> Result<Option<SpaceId>, DriveError> {
         let connection = self.lock();
         let found = connection
-            .query_row("SELECT space FROM nodes WHERE id = ?1", [id.as_str()], |row| {
-                row.get::<_, String>(0)
-            })
+            .query_row(
+                "SELECT space FROM nodes WHERE id = ?1",
+                [id.as_str()],
+                |row| row.get::<_, String>(0),
+            )
             .optional()
             .map_err(db)?;
         let found = match found {
             Some(space) => Some(space),
             None => connection
-                .query_row("SELECT space FROM items WHERE id = ?1", [id.as_str()], |row| {
-                    row.get::<_, String>(0)
-                })
+                .query_row(
+                    "SELECT space FROM items WHERE id = ?1",
+                    [id.as_str()],
+                    |row| row.get::<_, String>(0),
+                )
                 .optional()
                 .map_err(db)?,
         };
         Ok(found.map(SpaceId))
     }
 
-    // Sync anchors.
-
-    /// Keeps an anchor's text (every Space's place) and answers its token.
     pub fn save_anchor(&self, spaces: &str) -> Result<i64, DriveError> {
         self.transaction(|tx| {
             tx.execute("INSERT INTO anchors (spaces) VALUES (?1)", [spaces])
@@ -700,17 +623,16 @@ impl Store {
         })
     }
 
-    /// The text kept for an anchor's token, while it's still kept.
     pub fn anchor(&self, token: i64) -> Result<Option<String>, DriveError> {
         self.lock()
-            .query_row("SELECT spaces FROM anchors WHERE token = ?1", [token], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT spaces FROM anchors WHERE token = ?1",
+                [token],
+                |row| row.get(0),
+            )
             .optional()
             .map_err(db)
     }
-
-    // The cursor.
 
     pub fn cursor(&self, space: &SpaceId) -> Result<Seq, DriveError> {
         Ok(Seq(self
@@ -736,10 +658,6 @@ impl Store {
             .map_err(db)
     }
 
-    // The local change feed.
-
-    /// The item's local-only state changed (last used): it takes the Space's next local sequence
-    /// number.
     pub fn touch_local(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
         self.transaction(|tx| {
             tx.execute(
@@ -764,7 +682,6 @@ impl Store {
         })
     }
 
-    /// The Space's newest local sequence number.
     pub fn local_cursor(&self, space: &SpaceId) -> Result<i64, DriveError> {
         Ok(self
             .lock()
@@ -778,8 +695,6 @@ impl Store {
             .unwrap_or(0))
     }
 
-    /// Nodes whose local-only state changed after `since`, in order, with each one's local
-    /// sequence number.
     pub fn nodes_since_local(
         &self,
         space: &SpaceId,
@@ -803,9 +718,11 @@ impl Store {
         rows
     }
 
-    // Transfers.
-
-    pub fn transfer(&self, space: &SpaceId, id: &ItemId) -> Result<Option<TransferRow>, DriveError> {
+    pub fn transfer(
+        &self,
+        space: &SpaceId,
+        id: &ItemId,
+    ) -> Result<Option<TransferRow>, DriveError> {
         self.lock()
             .query_row(
                 "SELECT space, id, sha256, size, upload_id, mode, part_size, parts, done, started_ms,
@@ -873,8 +790,6 @@ impl Store {
             .map_err(db)
     }
 
-    // Keep downloaded.
-
     pub fn set_pin(&self, space: &SpaceId, id: &ItemId, keep: bool) -> Result<(), DriveError> {
         let connection = self.lock();
         let sql = if keep {
@@ -900,7 +815,6 @@ impl Store {
             .map_err(db)
     }
 
-    /// Whether `id` or a folder holding it is kept downloaded.
     pub fn kept(&self, space: &SpaceId, node: &NodeRow) -> Result<bool, DriveError> {
         let mut current = Some(node.clone());
         while let Some(at) = current {
@@ -915,8 +829,6 @@ impl Store {
         Ok(false)
     }
 
-    // The content cache.
-
     pub fn touch_blob(&self, sha256: &str, size: u64, at_ms: i64) -> Result<(), DriveError> {
         self.lock()
             .execute(
@@ -928,8 +840,6 @@ impl Store {
             .map_err(db)
     }
 
-    /// The cache's blobs, least lately used first, with whether any node still needs each one:
-    /// a change not uploaded yet, Keep downloaded, or open now (`open` lists the open ids).
     pub fn blobs_by_age(&self) -> Result<Vec<(String, u64)>, DriveError> {
         let connection = self.lock();
         let mut statement = connection
@@ -937,7 +847,10 @@ impl Store {
             .map_err(db)?;
         let rows = statement
             .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?.max(0) as u64))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?.max(0) as u64,
+                ))
             })
             .map_err(db)?
             .collect::<rusqlite::Result<Vec<_>>>()
@@ -955,11 +868,12 @@ impl Store {
             .max(0) as u64)
     }
 
-    /// The nodes that hold `sha256` as their content, in any Space.
     pub fn nodes_with_blob(&self, sha256: &str) -> Result<Vec<NodeRow>, DriveError> {
         let connection = self.lock();
         let mut statement = connection
-            .prepare(&format!("SELECT {NODE_COLUMNS} FROM nodes WHERE sha256 = ?1"))
+            .prepare(&format!(
+                "SELECT {NODE_COLUMNS} FROM nodes WHERE sha256 = ?1"
+            ))
             .map_err(db)?;
         let rows = statement
             .query_map([sha256], node_from)
@@ -976,16 +890,21 @@ impl Store {
             .map_err(db)
     }
 
-    /// Forgets everything of a Space: it was left, or its drive removed.
     pub fn forget_space(&self, space: &SpaceId) -> Result<(), DriveError> {
         self.transaction(|tx| {
             for table in ["items", "base", "nodes", "transfers", "pins"] {
-                tx.execute(&format!("DELETE FROM {table} WHERE space = ?1"), [space.as_str()])
-                    .map_err(db)?;
+                tx.execute(
+                    &format!("DELETE FROM {table} WHERE space = ?1"),
+                    [space.as_str()],
+                )
+                .map_err(db)?;
             }
             for table in ["cursor", "local_cursor", "space_folders"] {
-                tx.execute(&format!("DELETE FROM {table} WHERE space = ?1"), [space.as_str()])
-                    .map_err(db)?;
+                tx.execute(
+                    &format!("DELETE FROM {table} WHERE space = ?1"),
+                    [space.as_str()],
+                )
+                .map_err(db)?;
             }
             Ok(())
         })
@@ -1069,7 +988,11 @@ fn put_base(connection: &Connection, space: &SpaceId, base: &Base) -> Result<(),
         .map_err(db)
 }
 
-fn node(connection: &Connection, space: &SpaceId, id: &ItemId) -> Result<Option<NodeRow>, DriveError> {
+fn node(
+    connection: &Connection,
+    space: &SpaceId,
+    id: &ItemId,
+) -> Result<Option<NodeRow>, DriveError> {
     connection
         .query_row(
             &format!("SELECT {NODE_COLUMNS} FROM nodes WHERE space = ?1 AND id = ?2"),
@@ -1101,7 +1024,11 @@ fn children(
     rows
 }
 
-fn subtree(connection: &Connection, space: &SpaceId, path: &str) -> Result<Vec<NodeRow>, DriveError> {
+fn subtree(
+    connection: &Connection,
+    space: &SpaceId,
+    path: &str,
+) -> Result<Vec<NodeRow>, DriveError> {
     let mut statement = connection
         .prepare(&format!(
             "SELECT {NODE_COLUMNS} FROM nodes WHERE {SUBTREE} ORDER BY path"
@@ -1218,20 +1145,22 @@ fn move_node(
     connection
         .execute(
             "UPDATE nodes SET parent = ?3, name = ?4 WHERE space = ?1 AND id = ?2",
-            params![space.as_str(), id.as_str(), parent.map(ItemId::as_str), name],
+            params![
+                space.as_str(),
+                id.as_str(),
+                parent.map(ItemId::as_str),
+                name
+            ],
         )
         .map_err(db)?;
     connection
         .execute(
-            &format!(
-                "UPDATE nodes SET path = ?3 || substr(path, length(?2) + 1) WHERE {SUBTREE}"
-            ),
+            &format!("UPDATE nodes SET path = ?3 || substr(path, length(?2) + 1) WHERE {SUBTREE}"),
             params![space.as_str(), current.path, to],
         )
         .map_err(db)?;
     node(connection, space, id)?.ok_or(DriveError::NotFound)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1273,15 +1202,31 @@ mod tests {
         let store = store();
         let space = SpaceId("s".into());
         store.insert_node(&folder(&space, "a", None, "A")).unwrap();
-        store.insert_node(&folder(&space, "b", Some("a"), "B")).unwrap();
+        store
+            .insert_node(&folder(&space, "b", Some("a"), "B"))
+            .unwrap();
         store.insert_node(&folder(&space, "c", None, "A2")).unwrap();
         store.insert_node(&folder(&space, "d", None, "X")).unwrap();
         let moved = store
             .move_node(&space, &ItemId("a".into()), Some(&ItemId("d".into())), "A")
             .unwrap();
         assert_eq!(moved.path, "/X/A");
-        assert_eq!(store.node(&space, &ItemId("b".into())).unwrap().unwrap().path, "/X/A/B");
-        assert_eq!(store.node(&space, &ItemId("c".into())).unwrap().unwrap().path, "/A2");
+        assert_eq!(
+            store
+                .node(&space, &ItemId("b".into()))
+                .unwrap()
+                .unwrap()
+                .path,
+            "/X/A/B"
+        );
+        assert_eq!(
+            store
+                .node(&space, &ItemId("c".into()))
+                .unwrap()
+                .unwrap()
+                .path,
+            "/A2"
+        );
         assert_eq!(store.subtree(&space, "/X").unwrap().len(), 3);
         assert!(store
             .move_node(&space, &ItemId("d".into()), Some(&ItemId("b".into())), "X")

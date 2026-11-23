@@ -6,7 +6,7 @@ export { CliUpdateDialog } from "./CliUpdateDialog";
 export { EngineUpdatesPrompt } from "./EngineUpdatesPrompt";
 export { SignInButton } from "./SignInButton";
 export { SignInDialog } from "./SignInDialog";
-export { useCliUpdateFlow } from "./useCliUpdateFlow";
+export { useCliUpdateFlow } from "./use_cli_update_flow";
 export {
   hasCliUpdate,
   noteCliStatus,
@@ -14,6 +14,6 @@ export {
   updateCli,
   useCliStatuses,
   useCliVersionStatus,
-} from "./useCliVersionStatus";
+} from "./use_cli_version_status";
 export { versionText } from "./ClisSection";
 export type { CliVersionStatus } from "./api";

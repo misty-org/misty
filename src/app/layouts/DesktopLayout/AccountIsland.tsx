@@ -1,47 +1,47 @@
 import { Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
+  FileInput,
   IconButton,
   Text,
   Tooltip,
   useNotice,
 } from "@misty/ui";
-import { useMyPresence } from "@/features/direct";
-import { preloadSettingsWorkspace } from "@/features/settings";
+import { BannerDialog } from "@/features/account";
+import { CallAudioControls } from "@/features/direct";
+import { openSettings, preloadSettingsWorkspace } from "@/features/settings";
+import { PICTURE_TYPES } from "@/shared/lib/square_png";
 import { AccountNavButton } from "./NavRail";
 import { AccountMenu } from "./AccountMenu";
-import { StatusMenu, useMyCustomStatus } from "./StatusMenu";
+import {
+  CustomStatusDialog,
+  useMyCustomStatus,
+  useMyShownPresence,
+  useStatusMirror,
+} from "./StatusMenu";
 
-// As wide as the name needs, shrinking to truncate a long one. The padding keeps the avatar and the
-// name clear of the edges of the hover wash.
-const rowButtonClass = [
-  "flex h-auto min-h-8 min-w-0 shrink items-center gap-2 rounded-lg border-0 bg-transparent py-0 pr-2.5 pl-1",
-  "text-sm font-medium hover:bg-control-hover",
-].join(" ");
+const rowButtonClass =
+  "flex h-auto min-h-8 min-w-0 shrink items-center gap-2 rounded-lg py-0 pr-2.5 pl-1";
 
-/**
- * The sidebar's closing row, inside its panel: the signed-in account (their face with their status,
- * and their custom status under the name), then Status and Settings as quiet buttons. When the
- * session expires the account is a Sign in button, and a notice says why: nothing on this computer
- * is removed, and signing in brings the account back.
- */
 export function AccountIsland(props: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenAccountSettings: () => void;
   settingsOpen: boolean;
   onSettingsClick: () => void;
-  /** The server rejected the account's session. */
   sessionExpired?: boolean;
-  /** Opens the sign-in sheet; `again` signs the current account in again. */
   onSignIn: (again: boolean) => void;
 }) {
   const expired = Boolean(props.sessionExpired);
-  const presence = useMyPresence();
+  useStatusMirror();
+  const presence = useMyShownPresence();
   const customStatus = useMyCustomStatus();
+  const bannerInput = useRef<HTMLInputElement>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
   useEffect(() => {
     if (!expired) setNoticeDismissed(false);
@@ -59,9 +59,6 @@ export function AccountIsland(props: {
   });
   return (
     <div
-      // The account row closes the sidebar's one panel, with no line above it. Agents and Settings
-      // sit 6px apart, like the header's buttons. The account button's own 4px padding holds its
-      // 24px avatar, so the row needs no more room; the height holds with no account button.
       className="mt-1 flex min-h-8 shrink-0 items-center gap-1.5 pt-1 pr-0.5"
       data-browser-toolbar
       data-sidebar
@@ -88,7 +85,6 @@ export function AccountIsland(props: {
                 showAccountName
                 presence={presence}
                 line={customStatus || undefined}
-                avatarClassName="size-6"
                 className={rowButtonClass}
               />
             </DropdownMenuTrigger>
@@ -96,12 +92,31 @@ export function AccountIsland(props: {
           <AccountMenu
             onClose={() => props.onOpenChange(false)}
             onOpenAccountSettings={props.onOpenAccountSettings}
+            onChangeBanner={() => {
+              props.onOpenChange(false);
+              bannerInput.current?.click();
+            }}
+            onCustomStatus={() => {
+              props.onOpenChange(false);
+              setStatusOpen(true);
+            }}
           />
         </DropdownMenu>
       )}
+      <FileInput
+        ref={bannerInput}
+        accept={PICTURE_TYPES}
+        aria-label="Banner"
+        onChange={(event) => {
+          setBannerFile(event.target.files?.[0] ?? null);
+          event.target.value = "";
+        }}
+      />
+      <BannerDialog file={bannerFile} onClose={() => setBannerFile(null)} />
+      <CustomStatusDialog open={statusOpen} onOpenChange={setStatusOpen} />
       {expired ? null : (
-        <div className="ml-auto flex">
-          <StatusMenu />
+        <div className="ml-auto flex flex-none items-center gap-0.5">
+          <CallAudioControls onVoiceSettings={() => openSettings("voice")} />
         </div>
       )}
       <IconButton

@@ -1,12 +1,3 @@
-//! The extension's half of the socket to Misty. `space_drive::socket` is the other half, and its
-//! module doc is the protocol's reference; this follows it field for field.
-//!
-//! Each request opens a connection of its own, so a long download never holds up a listing. A
-//! frame is a 4-byte big-endian length, then that many bytes of one JSON object. A request is
-//! `{"id", "op", …}` and its reply `{"id", "ok", "error"?: {"code", "message"}, …}`.
-//!
-//! The domain is the account's whole drive. Its root holds a folder for each Space
-//! (`space:<space id>`), and every other item is named by its own id; Misty finds its Space.
 use std::{
     io::{Read, Write},
     os::unix::net::UnixStream,
@@ -18,21 +9,14 @@ use std::{
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
-/// A message's most bytes, as Misty allows.
 const MAX_FRAME: usize = 16 * 1024 * 1024;
-/// A fetch, an upload or a trash (which waits for every computer to answer) may take long;
-/// anything else answers well within a minute.
 const SLOW: Duration = Duration::from_secs(60 * 60);
 const QUICK: Duration = Duration::from_secs(60);
-/// How many items a page of a folder holds.
 const PAGE: u32 = 500;
 
-/// Why a call couldn't be answered, as File Provider understands it (`extension::error`).
 #[derive(Debug)]
 pub enum LinkError {
-    /// Misty isn't running, or its socket isn't there yet.
     Unreachable,
-    /// Misty answered with an error of its own (`space_drive::socket`'s codes).
     Refused { code: String, message: String },
 }
 
@@ -45,7 +29,6 @@ impl LinkError {
     }
 }
 
-/// An item as Misty sends it.
 #[derive(Debug, Clone, Deserialize)]
 struct WireItem {
     id: String,
@@ -60,7 +43,6 @@ struct WireItem {
     sha256: Option<String>,
     #[serde(default)]
     version: Option<i64>,
-    /// macOS's last-used date, if Misty keeps it (`used`); absent, the extension keeps macOS's own.
     #[serde(default)]
     last_used_ms: Option<i64>,
     #[serde(default)]
@@ -69,10 +51,6 @@ struct WireItem {
     deleted: bool,
 }
 
-/// One item as the extension describes it to macOS. `parent` is `"root"`, `"trash"`, a Space's
-/// folder (`space:…`) or an item id. Its content version is the file's SHA-256, so a rename never
-/// makes macOS fetch the file again; its metadata version is the server's version, which every
-/// change bumps, or for a Space's folder its name.
 #[derive(Debug, Clone)]
 pub struct ItemInfo {
     pub id: String,
@@ -91,7 +69,6 @@ impl ItemInfo {
         self.kind == "folder"
     }
 
-    /// A Space's folder at the drive's root, which stays where it is.
     pub fn is_space(&self) -> bool {
         is_space(&self.id)
     }
@@ -100,7 +77,6 @@ impl ItemInfo {
         let content_version = match (&item.sha256, item.kind.as_str()) {
             (_, "folder") => "folder".to_owned(),
             (Some(sha), _) => sha.clone(),
-            // Not hashed yet (made on this Mac moments ago): the version Misty has is all there is.
             (None, _) => format!("local-{}-{}", item.size, item.mtime_ms),
         };
         let meta_version = if is_space(&item.id) {
@@ -121,45 +97,37 @@ impl ItemInfo {
         }
     }
 
-    /// The server version this item came from, as Misty's `base_version`.
     pub fn base_version(meta_version: &str) -> Option<i64> {
         meta_version.parse::<i64>().ok().filter(|version| *version > 0)
     }
 }
 
-/// A page of a folder's items.
 pub struct Page {
     pub items: Vec<ItemInfo>,
     pub next_page: Option<String>,
 }
 
-/// What changed after a sync anchor (Misty's change sequence).
 pub struct Changes {
     pub updated: Vec<ItemInfo>,
-    /// Trashed or purged: gone from the drive as macOS shows it.
     pub deleted: Vec<String>,
     pub anchor: String,
     pub more: bool,
 }
 
-/// What a fetch hands back: the staged file macOS takes, and the item it is.
 pub struct Fetched {
     pub path: PathBuf,
     pub item: ItemInfo,
 }
 
-/// The item a create or modify left, and whether macOS should fetch its contents again.
 pub struct Changed {
     pub item: ItemInfo,
     pub refetch: bool,
 }
 
-/// Whether an id is a Space's folder (`space:<space id>`).
 pub fn is_space(id: &str) -> bool {
     id.starts_with("space:")
 }
 
-/// Misty's name for a parent: `null` is the root.
 fn parent_value(parent: &str) -> Value {
     if parent == "root" {
         Value::Null
@@ -168,7 +136,6 @@ fn parent_value(parent: &str) -> Value {
     }
 }
 
-/// The link to Misty for the account's drive.
 pub struct Link {
     socket: Option<PathBuf>,
     staging: Option<PathBuf>,
@@ -226,8 +193,6 @@ impl Link {
         Self::item_of(&mut reply)
     }
 
-    /// A folder's items. macOS's working set and trash are kept from Misty's changes (and what
-    /// Misty trashes leaves the drive at once), so listing them starts and ends empty.
     pub fn list(&self, parent: &str, page: Option<&str>) -> Result<Page, LinkError> {
         if parent == "working_set" || parent == "trash" {
             return Ok(Page {
@@ -248,8 +213,6 @@ impl Link {
         })
     }
 
-    /// Changes after `since`, the anchor macOS keeps. Misty keeps what it stands for (each
-    /// Space's place in its changes), and answers `anchor_expired` for one it no longer keeps.
     pub fn changes(&self, since: &str) -> Result<Changes, LinkError> {
         let reply = self.call("changes_since", json!({ "since": since, "limit": PAGE }), false)?;
         let items: Vec<WireItem> = serde_json::from_value(
@@ -301,8 +264,6 @@ impl Link {
         })
     }
 
-    /// Clones what macOS hands over into the app group's staging folder, where Misty takes it over
-    /// once it answers. APFS makes the copy a clone, so it costs no space or time.
     pub fn stage(&self, contents: &Path) -> Result<PathBuf, LinkError> {
         let staging = self.staging.as_deref().ok_or(LinkError::Unreachable)?;
         std::fs::create_dir_all(staging).map_err(|error| refused("io", error))?;
@@ -311,9 +272,6 @@ impl Link {
         Ok(staged)
     }
 
-    /// Clears staging files a crash left behind: macOS clones and unlinks a fetched file once it is
-    /// handed over, and Misty moves a staged upload once it answers, so anything a day old is
-    /// nobody's.
     pub fn sweep_staging(&self) {
         let Some(staging) = self.staging.as_deref() else {
             return;
@@ -336,7 +294,6 @@ impl Link {
         }
     }
 
-    /// A staged file Misty didn't take over (its answer was an error).
     pub fn unstage(staged: Option<&Path>) {
         if let Some(staged) = staged {
             let _ = std::fs::remove_file(staged);
@@ -371,8 +328,6 @@ impl Link {
         })
     }
 
-    /// A rename, a move, new content or a new modification date. `parent` is `None` when it
-    /// didn't change; the trash is never a parent here (`trash` is its own call).
     pub fn modify(
         &self,
         item: &str,
@@ -406,21 +361,16 @@ impl Link {
         })
     }
 
-    /// Every delete is a trash move in the Space, of the item as it is by then. Misty waits for
-    /// the other computers to say whether it's in use, so this may take a few seconds.
     pub fn trash(&self, item: &str) -> Result<(), LinkError> {
         self.call("trash", json!({ "item_id": item }), true).map(|_| ())
     }
 
-    /// The person opened the item on this Mac (its last-used date), which marks it in use.
     pub fn used(&self, item: &str, at_ms: i64) -> Result<(), LinkError> {
         self.call("used", json!({ "item_id": item, "at_ms": at_ms }), false)
             .map(|_| ())
     }
 }
 
-/// Where Misty listens, by `space_drive::socket::socket_path`'s rule: `drive.sock` in the group
-/// container, or `d.sock` when that path would pass the 103 bytes a socket path may have.
 fn socket_path(container: &Path) -> Option<PathBuf> {
     ["drive.sock", "d.sock"]
         .into_iter()

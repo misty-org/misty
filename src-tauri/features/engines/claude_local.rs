@@ -1,12 +1,7 @@
-//! A local command's output (`/context`, `/config`, …): Claude Code runs it without a model turn
-//! and streams no text, so its output arrives only as a `<synthetic>` snapshot and the zero-turn
-//! `result`, and is shown as the turn's reply.
-
 use super::{ClaudeEngine, EngineEvent};
 use serde_json::Value;
 
 impl ClaudeEngine {
-    /// Notes that the turn streamed text of its own, when a stream event gave `events` a delta.
     pub(super) fn note_streamed_text(&self, events: &[EngineEvent]) {
         if events
             .iter()
@@ -18,8 +13,6 @@ impl ClaudeEngine {
         }
     }
 
-    /// A local command's output (or a locally made error): kept until the
-    /// `result` says which, since only a command's output is shown.
     pub(super) fn keep_local_text(&self, value: &Value) {
         if let Ok(mut lock) = self.local_text.lock() {
             for text in snapshot_texts(value) {
@@ -31,8 +24,6 @@ impl ClaudeEngine {
         }
     }
 
-    /// What this turn showed so far (whether it streamed text, and its synthetic text), cleared
-    /// for the next turn on a live process.
     pub(super) fn take_local_output(&self) -> (bool, String) {
         let streamed = self
             .streamed_text
@@ -48,8 +39,6 @@ impl ClaudeEngine {
     }
 }
 
-/// A local command ran no model turn and streamed nothing: its output is the
-/// synthetic snapshot's text, or the result's own, shown as the reply.
 pub(super) fn local_command_reply(
     streamed: bool,
     local_text: String,
@@ -70,7 +59,6 @@ pub(super) fn local_command_reply(
     (!text.trim().is_empty()).then_some(text)
 }
 
-/// The text blocks of an assistant snapshot, in order.
 fn snapshot_texts(value: &Value) -> Vec<String> {
     value
         .pointer("/message/content")
@@ -89,8 +77,6 @@ mod tests {
     use super::*;
     use crate::engines::Engine;
 
-    /// Live wire (2.1.322, `/context` in `-p`): a local command streams nothing, sends its
-    /// output as a `<synthetic>` snapshot and ends with a zero-turn result carrying it too.
     #[test]
     fn local_command_output_is_shown_once_as_the_reply() {
         let engine = ClaudeEngine::new();
@@ -124,7 +110,6 @@ mod tests {
         assert_eq!(texts, vec!["## Context Usage"]);
         assert!(matches!(out.last(), Some(EngineEvent::Done { .. })));
 
-        // A locally made error is reported by the result as an error, not repeated as text.
         let mut out = Vec::new();
         engine.parse_line(
             &serde_json::json!({
@@ -149,11 +134,6 @@ mod tests {
             .any(|event| matches!(event, EngineEvent::Delta(_))));
     }
 
-    /// The same, on the wire Claude Code 2.1.322 actually wrote for `/context` sent as a
-    /// stream-json user message (`-p --input-format stream-json --output-format stream-json
-    /// --verbose`), trimmed of the account's own tools and skills: init, the `<synthetic>`
-    /// snapshot (with `local_command_source`, the raw `<local-command-stdout>`), then the
-    /// zero-turn result carrying `local_command`.
     #[test]
     fn real_local_command_wire_gives_its_output_as_one_delta() {
         let engine = ClaudeEngine::new();
@@ -181,7 +161,6 @@ mod tests {
         assert!(!out
             .iter()
             .any(|event| matches!(event, EngineEvent::Error(_))));
-        // `<synthetic>` is no served model.
         assert!(!out
             .iter()
             .any(|event| matches!(event, EngineEvent::Served { model: Some(_), .. })));

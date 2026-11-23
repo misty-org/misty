@@ -1,4 +1,3 @@
-/** A run waiting for the person to do something on screen, held on this computer (`localWaits.ts`). */
 export interface AgentInterventionWait {
   id: string;
   runId: string;

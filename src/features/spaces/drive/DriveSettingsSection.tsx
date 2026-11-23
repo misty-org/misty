@@ -3,11 +3,11 @@ import {
   DesktopSettingsSection as SettingsSectionBlock,
 } from "@/features/settings";
 import { notify } from "@misty/ui";
-import { createDeviceSetting } from "@/shared/lib/deviceSetting";
+import { createDeviceSetting } from "@/shared/lib/device_setting";
 import { useEffect, useState } from "react";
 import { DropdownControl, SwitchControl } from "@/features/settings/SettingsControls";
-import type { SettingsContentProps } from "@/features/settings/settingsTypes";
-import { driveNative } from "./driveNative";
+import type { SettingsContentProps } from "@/features/settings/settings_types";
+import { driveNative } from "./drive_native";
 
 const GB = 1024 * 1024 * 1024;
 const choices = [
@@ -17,7 +17,6 @@ const choices = [
   { value: "none", label: "No limit" },
 ];
 
-/** The cache size the person picked, kept for the device; native code applies and keeps the limit. */
 const savedCacheChoice = createDeviceSetting<string>({
   scope: "drive-cache-choice",
   defaults: "none",
@@ -25,7 +24,6 @@ const savedCacheChoice = createDeviceSetting<string>({
     typeof stored === "string" && choices.some((item) => item.value === stored) ? stored : "none",
 });
 
-/** Settings › Server › Drive: how much of the Spaces' files this computer keeps downloaded. */
 export function DriveSettingsSection(props: SettingsContentProps) {
   const chosen = savedCacheChoice((state) => state.value);
   const [paused, setPaused] = useState<boolean | null>(null);
@@ -48,7 +46,9 @@ export function DriveSettingsSection(props: SettingsContentProps) {
             driveNative
               .setPaused(value)
               .then(setPaused)
-              .catch(() => notify({ message: "Syncing couldn't be changed. Try again.", tone: "error" }))
+              .catch(() =>
+                notify({ message: "Syncing couldn't be changed. Try again.", tone: "error" }),
+              )
           }
         />
       </SettingsRow>
@@ -65,7 +65,12 @@ export function DriveSettingsSection(props: SettingsContentProps) {
             driveNative
               .setCacheLimit(bytes)
               .then(() => savedCacheChoice.getState().set(value))
-              .catch(() => notify({ message: "The drive's limit couldn't be changed. Try again.", tone: "error" }));
+              .catch(() =>
+                notify({
+                  message: "The drive's limit couldn't be changed. Try again.",
+                  tone: "error",
+                }),
+              );
           }}
         />
       </SettingsRow>

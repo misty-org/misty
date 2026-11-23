@@ -1,9 +1,3 @@
-/**
- * At launch, the installed engines that have a newer release, offered in one dialog: each with its
- * version now and the new one, then Update all or Later. Updates run the way Settings › Agents › Setup
- * runs them, one engine after another, inside the app. Later keeps it quiet for a while; Settings
- * still updates any engine on its own. It follows "Check for updates automatically".
- */
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { settingsBoolean, useSettingsStore } from "@/features/settings";
@@ -17,21 +11,18 @@ import {
   DialogHeader,
   DialogTitle,
   ListRow,
+  Mark,
   Spinner,
   Text,
 } from "@misty/ui";
 import { ENGINE_IDS, ENGINE_NAMES, type EngineId } from "../channels/engines";
-import { EngineMark } from "../EngineMark";
 import { cliApi, type CliVersionStatus } from "./api";
-import { hasCliUpdate, noteCliStatus } from "./useCliVersionStatus";
+import { hasCliUpdate, noteCliStatus } from "./use_cli_version_status";
 
-/** Wait after launch, so the check never competes with the window coming up. */
 const startDelayMs = 15_000;
-/** After a check (and after Later), no window checks again for this long. */
 const quietMs = 6 * 60 * 60_000;
 const checkedKey = "misty.engines.updatesChecked:v1";
 
-/** Every window runs this, so the first one claims the check for all of them. */
 function claimCheck(): boolean {
   try {
     const at = Number(localStorage.getItem(checkedKey) ?? 0);
@@ -61,7 +52,6 @@ export function EngineUpdatesPrompt({ accountScope }: { accountScope: string }) 
       void Promise.all(ENGINE_IDS.map((engine) => cliApi.status(engine).catch(() => null))).then(
         (statuses) => {
           if (closed) return;
-          // Explore's Updates counts from these too, without checking again.
           for (const status of statuses) if (status) noteCliStatus(status);
           setBehind(statuses.filter((status): status is CliVersionStatus => hasCliUpdate(status)));
         },
@@ -107,7 +97,7 @@ export function EngineUpdatesPrompt({ accountScope }: { accountScope: string }) 
             return (
               <ListRow
                 key={engine}
-                leading={<EngineMark engine={engine} />}
+                leading={<Mark of={`engine:${engine}`} size="1em" />}
                 label={ENGINE_NAMES[engine] ?? engine}
                 trailing={
                   outcome === "updating" ? (

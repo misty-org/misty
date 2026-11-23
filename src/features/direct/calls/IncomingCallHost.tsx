@@ -3,18 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { isE2EESupported } from "livekit-client";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { Button, SideCard, Text, ViewportLayer, notify } from "@misty/ui";
-import { useDirectUserId } from "../directAccount";
+import { useDirectUserId } from "../direct_account";
 import { onRealtimeMessage } from "@/features/spaces";
-import { dmPath, peekDm, useDms, useFriends } from "../directData";
-import { isDoNotDisturb } from "../statusStore";
-import { deviceCallKey } from "./callKeys";
+import { dmPath, peekDm, useDms, useFriends } from "../direct_data";
+import { isDoNotDisturb } from "../status_store";
+import { deviceCallKey } from "./call_keys";
 import { CallSession } from "./CallSession";
-import { loopCallSound } from "./callSounds";
+import { loopCallSound } from "./call_sounds";
 import { CallFullscreen, CallMiniPlayer } from "./CallView";
-import { dmOf, useCallStore } from "./callStore";
-import { useMissedCalls } from "./missedCalls";
+import { watchSpeakerForSpeech } from "./call_devices";
+import { dmOf, useCallStore } from "./call_store";
+import { useMissedCalls } from "./missed_calls";
 
-/** How long a call rings with nobody answering before it is given up, as a phone's does. */
 const RING_SECONDS = 30;
 
 function readSealedKeys(value: unknown): Record<string, string> {
@@ -26,14 +26,8 @@ function readSealedKeys(value: unknown): Record<string, string> {
   );
 }
 
-/**
- * Calls for the signed-in account, mounted once at the window's root: it publishes this computer's
- * call key so others can seal a call's key for it, shows a ring from someone in a DM ("Ana is
- * calling", with Accept and Decline) unless Do not disturb is on, and holds the call panel while a
- * call is on (`CallSession`), with the mini player and full screen. A ring missed during Do not
- * disturb isn't kept.
- */
 export function IncomingCallHost() {
+  useEffect(() => watchSpeakerForSpeech(), []);
   const myId = useDirectUserId();
   const incoming = useCallStore((state) => state.incoming);
   const active = useCallStore((state) => state.active);
@@ -59,7 +53,6 @@ export function IncomingCallHost() {
           return;
         }
         if (message.state === "declined") {
-          // Only the caller, still waiting for an answer, hears of it; a one-to-one call ends.
           const active = store.active;
           if (!active || dmOf(active) !== dmId || !active.caller || active.answered) return;
           const dm = peekDm(dmId);
@@ -70,7 +63,6 @@ export function IncomingCallHost() {
         }
         if (message.state !== "ringing" || !from || from === myId) return;
         if (!isE2EESupported()) return;
-        // Do not disturb never rings: the call shows as missed in its DM instead.
         if (isDoNotDisturb()) {
           useMissedCalls
             .getState()
@@ -87,14 +79,11 @@ export function IncomingCallHost() {
     [myId],
   );
 
-  // The ring while someone calls; the quieter ringback while this person waits for an answer.
   const ringing = Boolean(incoming);
   const waiting = Boolean(active?.caller && !active.answered);
   useEffect(() => (ringing ? loopCallSound("ring") : undefined), [ringing]);
   useEffect(() => (waiting ? loopCallSound("ringback") : undefined), [waiting]);
 
-  // Nobody answered: the caller's side gives up, which stops it ringing for the others. The ring
-  // here gives up a little later too, in case the caller's end never arrives.
   useEffect(() => {
     if (!waiting) return;
     const timer = window.setTimeout(() => {
@@ -131,7 +120,6 @@ export function IncomingCallHost() {
   if (!incoming && !active) return null;
   return (
     <>
-      {/* The call itself, joined once here; its page, a DM, full screen and the mini player draw it. */}
       {active ? <CallSession key={active.room} call={active} maxPeople={maxPeople} /> : null}
       <CallFullscreen />
       <ViewportLayer layer="chrome" passthrough>
@@ -157,7 +145,6 @@ export function IncomingCallHost() {
                     disabled={Boolean(active)}
                     onClick={() => {
                       const dmId = incoming.dmId;
-                      // Answering opens the DM, where its call shows above the messages.
                       void useCallStore
                         .getState()
                         .accept()

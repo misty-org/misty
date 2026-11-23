@@ -1,17 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong): CliEngineSettingsCard.tsx.
 // See NOTICE.
 
-/**
- * An engine's program in Agents › Channels:
- *   Program path — the program to start instead of the one found on PATH (`binOverrides`). Codex
- *     shows its home folder instead, which also finds `<home>/bin/codex`; DeepSeek Harness keeps
- *     its path beside the host settings.
- *   Codex home — the folder Codex keeps its config and sessions in (`codexHome`).
- *   Custom models — model names offered beside the engine's own in model menus (`customModels`).
- *
- * Native code checks a path before keeping it (an absolute path that resolves, never under a temp
- * folder) and the launch path reads the same settings. Each save is applied to a fresh read.
- */
 import { open } from "@tauri-apps/plugin-dialog";
 import { X } from "lucide-react";
 import { useState } from "react";
@@ -24,12 +13,19 @@ import {
   Badge,
   Button,
   Dialog,
+  DialogBody,
   DialogContent,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
+  EmptyState,
   ErrorState,
+  FieldError,
   Input,
   IconButton,
-  Surface,
+  ListRow,
+  RowGroup,
+  RowTools,
   Text,
 } from "@misty/ui";
 import { notifyCliConfigChanged } from "../channels/providers";
@@ -38,13 +34,12 @@ import { binKey, useEngineSettings, type EngineSettings } from "./api";
 
 type Save = (change: (settings: EngineSettings) => EngineSettings) => Promise<string | null>;
 
-const pathText = "min-w-0 max-w-65 text-xs";
+const pathText = "min-w-0 max-w-65";
 
 function stringOf(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
-/** A path, typed or picked, with Clear when one is set. */
 function PathDialog({
   title,
   current,
@@ -74,33 +69,36 @@ function PathDialog({
   };
   return (
     <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent aria-describedby={undefined} className="grid w-120 max-w-[94vw] gap-4 p-5">
-        <DialogTitle className="pr-10 text-base">{title}</DialogTitle>
-        <div className="flex items-center gap-2">
-          <Input
-            aria-label={title}
-            placeholder={directory ? "Default folder" : "Found on PATH"}
-            value={draft}
-            spellCheck={false}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              setError("");
-            }}
-          />
-          <Button onClick={() => void choose()}>Choose</Button>
-        </div>
-        {error ? (
-          <Text role="alert" tone="muted" wrap className="text-sm">
-            {error}
-          </Text>
-        ) : null}
-        <div className="flex justify-end gap-2">
+      <DialogContent aria-describedby={undefined} size="md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="grid gap-2">
+          <div className="flex items-center gap-2">
+            <Input
+              aria-label={title}
+              aria-invalid={error ? true : undefined}
+              placeholder={directory ? "Default folder" : "Found on PATH"}
+              value={draft}
+              spellCheck={false}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setError("");
+              }}
+            />
+            <Button onClick={() => void choose()}>Choose</Button>
+          </div>
+          <FieldError message={error} />
+        </DialogBody>
+        <DialogFooter>
           {current ? (
             <Button disabled={saving} onClick={() => void commit(null)}>
               Clear
             </Button>
           ) : null}
-          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="quiet" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             variant="primary"
             disabled={saving || !draft.trim() || draft.trim() === (current ?? "")}
@@ -108,7 +106,7 @@ function PathDialog({
           >
             Save
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -129,7 +127,7 @@ function ProgramPathRow({
   const title = `${ENGINE_NAMES[engine]} program`;
   return (
     <DesktopSettingsRow label="Program path">
-      <Text full tone="muted" className={pathText}>
+      <Text full size="meta" tone="muted" className={pathText}>
         {current ?? "Found on PATH"}
       </Text>
       <Button onClick={() => setOpen(true)}>{current ? "Change" : "Set"}</Button>
@@ -161,7 +159,7 @@ function CodexHomeRow({ settings, save }: { settings: EngineSettings; save: Save
   const current = stringOf(settings.codexHome);
   return (
     <DesktopSettingsRow label="Codex home">
-      <Text full tone="muted" className={pathText}>
+      <Text full size="meta" tone="muted" className={pathText}>
         {current ?? "~/.codex"}
       </Text>
       <Button onClick={() => setOpen(true)}>{current ? "Change" : "Set"}</Button>
@@ -220,73 +218,72 @@ function CustomModelsDialog({
       setError(failed);
       return;
     }
-    // Model menus read the list again on this.
     notifyCliConfigChanged();
     onClose();
   };
   return (
     <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent aria-describedby={undefined} className="grid w-120 max-w-[94vw] gap-4 p-5">
-        <DialogTitle className="pr-10 text-base">{ENGINE_NAMES[engine]} custom models</DialogTitle>
-        <div className="grid gap-2">
-          {draft.length === 0 ? (
-            <Text as="p" tone="muted" className="text-sm">
-              No custom models
-            </Text>
-          ) : null}
-          {draft.map((model) => (
-            <Surface
-              key={model}
-              tone="none"
-              edge="hairline"
-              radius="lg"
-              className="flex items-center gap-2 px-3 py-1.5"
-            >
-              <Text full tone="default" className="min-w-0 flex-1 text-xs">
-                {model}
-              </Text>
-              <IconButton
-                size="sm"
-                label={`Remove ${model}`}
-                onClick={() => setDraft((list) => list.filter((item) => item !== model))}
-              >
-                <X />
-              </IconButton>
-            </Surface>
-          ))}
-          <div className="flex items-center gap-2">
-            <Input
-              aria-label="Model name"
-              placeholder="Model name"
-              value={adding}
-              spellCheck={false}
-              onChange={(event) => {
-                setAdding(event.target.value);
-                setError("");
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  add();
-                }
-              }}
-            />
-            <Button disabled={!adding.trim()} onClick={add}>
-              Add
-            </Button>
+      <DialogContent aria-describedby={undefined} size="md">
+        <DialogHeader>
+          <DialogTitle>{ENGINE_NAMES[engine]} custom models</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="grid gap-3">
+          <RowGroup>
+            {draft.length === 0 ? (
+              <EmptyState inline line="No custom models" />
+            ) : (
+              draft.map((model) => (
+                <ListRow
+                  key={model}
+                  label={model}
+                  trailing={
+                    <RowTools>
+                      <IconButton
+                        label={`Remove ${model}`}
+                        onClick={() => setDraft((list) => list.filter((item) => item !== model))}
+                      >
+                        <X />
+                      </IconButton>
+                    </RowTools>
+                  }
+                />
+              ))
+            )}
+          </RowGroup>
+          <div className="grid gap-1.5">
+            <div className="flex items-center gap-2">
+              <Input
+                aria-label="Model name"
+                aria-invalid={error ? true : undefined}
+                placeholder="Model name"
+                value={adding}
+                spellCheck={false}
+                onChange={(event) => {
+                  setAdding(event.target.value);
+                  setError("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    add();
+                  }
+                }}
+              />
+              <Button disabled={!adding.trim()} onClick={add}>
+                Add
+              </Button>
+            </div>
+            <FieldError message={error} />
           </div>
-        </div>
-        {error ? (
-          <Text role="alert" tone="muted" wrap className="text-sm">
-            {error}
-          </Text>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <Button onClick={onClose}>Cancel</Button>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="quiet" onClick={onClose}>
+            Cancel
+          </Button>
           <Button variant="primary" disabled={saving} onClick={() => void commit()}>
             Save
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -319,7 +316,6 @@ function CustomModelsRow({
   );
 }
 
-/** The engine's program path (or Codex's home) and its custom models. */
 export function EngineProgramSection({ engine }: { engine: EngineId }) {
   const { settings, loadError, retry, save } = useEngineSettings();
   return (
@@ -340,8 +336,6 @@ export function EngineProgramSection({ engine }: { engine: EngineId }) {
           action={{ label: "Try again", onClick: retry }}
         />
       ) : (
-        // The rows it stands for: the program path (or Codex home) and custom models, each ending
-        // in its button. DeepSeek Harness keeps its path beside the host, so it has one row.
         <DesktopSettingsRowSkeleton
           label="Reading the engine's settings"
           rows={engine === "dsh" ? 1 : 2}

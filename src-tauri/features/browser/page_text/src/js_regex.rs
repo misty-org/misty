@@ -1,16 +1,7 @@
-//! Regular expressions that match as JavaScript's do, so patterns can be copied from the TypeScript
-//! runtime unchanged. Without the `u` flag JavaScript's `\b`, `\w`, `\d` and case folding are ASCII
-//! only, its `\s` has its own set of characters, and `.` stops at four line endings. The `regex`
-//! crate is Unicode-aware by default, which would move thresholds on text with accents.
-//!
-//! Lookaround and backreferences aren't supported by the `regex` crate, so those are written by
-//! hand where they're used.
 use regex::Regex;
 
-/// The characters JavaScript's `\s` matches, for use inside a class.
 const SPACE: &str = r"\t\n\x0B\x0C\r \u{A0}\u{1680}\u{2000}-\u{200A}\u{2028}\u{2029}\u{202F}\u{205F}\u{3000}\u{FEFF}";
 
-/// Rewrites a JavaScript pattern for the `regex` crate.
 fn translate(pattern: &str, ignore_case: bool) -> String {
     let characters: Vec<char> = pattern.chars().collect();
     let mut out = String::with_capacity(pattern.len() * 2);
@@ -46,7 +37,6 @@ fn translate(pattern: &str, ignore_case: bool) -> String {
                     in_class = false;
                     out.push(']');
                 }
-                // Literal in JavaScript, and class syntax in the `regex` crate.
                 '[' | '&' | '~' => {
                     out.push('\\');
                     out.push(character);
@@ -60,9 +50,13 @@ fn translate(pattern: &str, ignore_case: bool) -> String {
                     if range_end.is_some() {
                         index += 2;
                     }
-                    let (lower_start, lower_end) = (letter.to_ascii_lowercase(), end.to_ascii_lowercase());
-                    let (upper_start, upper_end) = (letter.to_ascii_uppercase(), end.to_ascii_uppercase());
-                    out.push_str(&format!("{lower_start}-{lower_end}{upper_start}-{upper_end}"));
+                    let (lower_start, lower_end) =
+                        (letter.to_ascii_lowercase(), end.to_ascii_lowercase());
+                    let (upper_start, upper_end) =
+                        (letter.to_ascii_uppercase(), end.to_ascii_uppercase());
+                    out.push_str(&format!(
+                        "{lower_start}-{lower_end}{upper_start}-{upper_end}"
+                    ));
                 }
                 other => out.push(other),
             }
@@ -79,7 +73,11 @@ fn translate(pattern: &str, ignore_case: bool) -> String {
             }
             '.' => out.push_str(r"[^\n\r\u{2028}\u{2029}]"),
             letter if ignore_case && letter.is_ascii_alphabetic() => {
-                out.push_str(&format!("[{}{}]", letter.to_ascii_lowercase(), letter.to_ascii_uppercase()));
+                out.push_str(&format!(
+                    "[{}{}]",
+                    letter.to_ascii_lowercase(),
+                    letter.to_ascii_uppercase()
+                ));
             }
             other => out.push(other),
         }
@@ -87,12 +85,11 @@ fn translate(pattern: &str, ignore_case: bool) -> String {
     out
 }
 
-/// Compiles a fixed pattern written for JavaScript. `ignore_case` is the `i` flag.
 pub fn js_regex(pattern: &str, ignore_case: bool) -> Regex {
-    Regex::new(&translate(pattern, ignore_case)).expect("a fixed pattern from the TypeScript runtime compiles")
+    Regex::new(&translate(pattern, ignore_case))
+        .expect("a fixed pattern from the TypeScript runtime compiles")
 }
 
-/// `js_regex` for a pattern from outside the runtime, such as a tool schema's.
 pub fn try_js_regex(pattern: &str, ignore_case: bool) -> Option<Regex> {
     Regex::new(&translate(pattern, ignore_case)).ok()
 }
@@ -104,7 +101,6 @@ mod tests {
     #[test]
     fn word_classes_stay_ascii() {
         assert!(js_regex(r"\bcafe\b", false).is_match("a cafe."));
-        // In JavaScript `é` isn't a word character, so a boundary falls before it.
         assert!(js_regex(r"\bcaf\b", false).is_match("café"));
         assert!(!js_regex(r"\d", false).is_match("٣"));
         assert!(!js_regex(r"^\w+$", false).is_match("é"));
@@ -125,7 +121,6 @@ mod tests {
         let word = js_regex(r"^sky$", true);
         assert!(word.is_match("SKY"));
         assert!(word.is_match("sKy"));
-        // Unicode folding would match the long s and the Kelvin sign.
         assert!(!word.is_match("ſky"));
         assert!(!word.is_match("s\u{212A}y"));
         let class = js_regex(r"^[a-c_x]+$", true);

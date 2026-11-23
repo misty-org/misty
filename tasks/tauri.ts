@@ -1,9 +1,7 @@
 import { run } from "@tauri-apps/cli";
-import { prepareTauriDevelopment } from "./dev-signing.ts";
+import { prepareTauriDevelopment } from "./dev_signing.ts";
 import { stopDescendants, whenStranded } from "./stranded.ts";
 
-// The Tauri CLI runs in this process and leaves its cargo build, the app and Vite behind when this process is
-// stopped, so this stops them first. Ctrl+C is the CLI's own and reaches the whole foreground group anyway.
 let stopping = false;
 async function stop(code: number) {
   if (stopping) return;

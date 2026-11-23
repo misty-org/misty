@@ -1,6 +1,6 @@
-import type { AccountRequestInit } from "./native-account-fetch";
-import { cookieSessionFetch } from "./cookie-session";
-import { rateLimitResponse, recordRateLimit } from "./rate-limit";
+import type { AccountRequestInit } from "./native_account_fetch";
+import { cookieSessionFetch } from "./cookie_session";
+import { rateLimitResponse, recordRateLimit } from "./rate_limit";
 const TRANSIENT_NETWORK_PATTERNS = [
   "load failed",
   "failed to fetch",
@@ -28,10 +28,6 @@ function isAbortError(error: unknown): boolean {
   return false;
 }
 
-// After a request exhausts its retries against an unavailable server, later
-// requests make a single attempt until one succeeds or the cooling period ends.
-// Without this, every caller's own retry loop multiplies these retries during
-// an outage or a deploy.
 let outageUntil = 0;
 let outageStreak = 0;
 
@@ -76,13 +72,11 @@ export async function httpRequest(
       if (coolingDown) return coolingDown;
       const response = await cookieSessionFetch(input, init);
       recordRateLimit(input, init, response);
-      // A JSON 503 is the server's own answer (a feature it runs without, say), not an outage.
       const answered =
         response.status === 503 &&
         (response.headers.get("Content-Type") ?? "").includes("application/json");
       if ([502, 503, 504].includes(response.status) && !answered) {
         const waitMs = retryAfterMs(response);
-        // A server asking for more than a short pause is not retried here.
         if (isIdempotent && attempt < maxAttempts && waitMs <= 2_000 && !init.signal?.aborted) {
           await response.body?.cancel();
           await backoffDelay(attempt, init.signal, waitMs);
@@ -113,8 +107,6 @@ export async function httpRequest(
   throw new HttpRequestError(input.toString(), lastError);
 }
 
-/** Exponential backoff with equal jitter (half fixed, half random), so clients
- * that failed together do not retry together. */
 function backoffDelay(attempt: number, signal?: AbortSignal | null, minimumMs = 0): Promise<void> {
   const cap = Math.min(2_000, 250 * 2 ** (attempt - 1));
   const delay = Math.max(minimumMs, cap / 2 + Math.floor(Math.random() * (cap / 2)));
@@ -147,8 +139,6 @@ export async function httpBlob(input: RequestInfo | URL, init?: RequestInit): Pr
   return response.blob();
 }
 
-/** How long other transports (event stream, Space socket) should still wait
- * before reconnecting to a server this client found unavailable. */
 export function httpOutageRemainingMs(): number {
   return Math.max(0, outageUntil - Date.now());
 }
@@ -175,7 +165,6 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Clears outage memory, for tests. */
 export function resetHttpOutageForTests(): void {
   noteAvailable();
 }

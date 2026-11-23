@@ -7,7 +7,6 @@ export type MistyFilePickerMode = "file" | "folder";
 
 export interface MistyFilePickerProps {
   mode: MistyFilePickerMode;
-  /** Inside the shared picker beside the Space's Files: a button, since the system dialog opens on top of it. */
   embedded?: boolean;
   active?: boolean;
   multiple?: boolean;
@@ -23,11 +22,6 @@ function chooseLabel(mode: MistyFilePickerMode, multiple: boolean): string {
   return multiple ? "Choose files" : "Choose a file";
 }
 
-/**
- * Picks files through the system's own dialog, the one thing that grants a file: what it returns
- * is the only thing Misty's windows can then read. Misty has no view of
- * a person's folders of its own.
- */
 export function MistyFilePicker({
   mode,
   embedded = false,
@@ -38,7 +32,6 @@ export function MistyFilePicker({
   onSelect,
   onSelectMany,
 }: MistyFilePickerProps) {
-  // The dialog opens in the person's home folder.
   const startingFolder = useAppStore((s) => s.app?.environment.homeDir) || undefined;
 
   const choose = async () => {
@@ -54,7 +47,6 @@ export function MistyFilePicker({
     const paths = chosen === null ? [] : Array.isArray(chosen) ? chosen : [chosen];
     if (paths.length && multiple && onSelectMany) onSelectMany(paths);
     else if (paths.length) onSelect(paths[0]);
-    // Inside the shared picker, the person can still choose from the Space's Files.
     else if (!embedded) onCancel();
   };
 

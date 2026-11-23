@@ -1,33 +1,38 @@
 import { useId, useState, type FormEvent } from "react";
-import { Ban, Check, MessageCircle, ShieldOff, Trash2, UserPlus, X } from "lucide-react";
+import { Ban, MessageCircle, Phone, ShieldOff, Trash2, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
-  Avatar,
-  AvatarFallback,
   Button,
-  CollectionHeading,
-  CollectionPage,
+  CopyButton,
   EmptyState,
   ErrorState,
   FieldError,
+  FramedPage,
   IconButton,
   Input,
-  Label,
-  ListRow,
   ListRowSkeleton,
   MenuItem,
-  PresenceFace,
-  SectionHeading,
+  PersonRow,
+  Popover,
+  PopoverActions,
+  PopoverBody,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTrigger,
+  RowGroupSection,
+  RowGroupStack,
+  SearchField,
+  Text,
   notify,
   useConfirmDelete,
-  type ActionBarItem,
 } from "@misty/ui";
 import { ApiRequestError } from "@/api/client";
-import { personTone } from "@/shared/lib/personTone";
-import { personInitials } from "@/shared/lib/personInitials";
+import { useUserStore } from "@/features/account";
 import { directApi, type Person, type PresenceStatus } from "./api";
-import { dmPath, reloadDms, reloadFriends, useFriends } from "./directData";
-import { useCustomStatus, usePresence, useStatusStore } from "./statusStore";
+import { dmPath, reloadDms, reloadFriends, useFriends } from "./direct_data";
+import { ActiveNow, Face, activityLine, useActivities, type Activity } from "./FriendsActivity";
+import { useCallStore } from "./calls/call_store";
+import { useCustomStatus, usePresence, useStatusStore } from "./status_store";
 
 const statusWords: Record<PresenceStatus, string> = {
   online: "Online",
@@ -40,38 +45,37 @@ function failure(reason: unknown, fallback: string) {
   notify({ tone: "error", message: reason instanceof Error ? reason.message : fallback });
 }
 
-/** A person's face with their status on its corner. */
-function PersonFace({ person }: { person: Person }) {
-  const presence = usePresence(person.user_id);
-  return (
-    <PresenceFace presence={presence}>
-      <Avatar size="sm" tone={personTone(person.user_id)}>
-        <AvatarFallback>{personInitials(person.username)}</AvatarFallback>
-      </Avatar>
-    </PresenceFace>
-  );
-}
-
-/** A friend: their status line, Message, and Remove friend or Block under ⋯. */
 function FriendRow(props: {
   person: Person;
+  activity?: Activity;
   onMessage: (person: Person) => void;
+  onCall: (person: Person) => void;
   onRemove: (person: Person) => void;
   onBlock: (person: Person) => void;
 }) {
   const { person } = props;
   const presence = usePresence(person.user_id);
   const custom = useCustomStatus(person.user_id);
+  const away = presence === "offline";
+  const line = away
+    ? statusWords.offline
+    : (activityLine(props.activity) ?? (custom || statusWords[presence]));
   return (
-    <ListRow
-      label={person.username}
-      leading={<PersonFace person={person} />}
-      description={custom || statusWords[presence]}
+    <PersonRow
+      face={<Face userId={person.user_id} name={person.username} />}
+      name={person.username}
+      line={line}
+      away={away}
       onOpen={() => props.onMessage(person)}
-      trailing={
-        <IconButton label="Message" onClick={() => props.onMessage(person)}>
-          <MessageCircle />
-        </IconButton>
+      tools={
+        <>
+          <IconButton label="Message" onClick={() => props.onMessage(person)}>
+            <MessageCircle />
+          </IconButton>
+          <IconButton label="Call" onClick={() => props.onCall(person)}>
+            <Phone />
+          </IconButton>
+        </>
       }
       menu={
         <>
@@ -88,11 +92,11 @@ function FriendRow(props: {
   );
 }
 
-/** Where friend requests are sent: a username, then Send request. */
-function AddFriendRow() {
+function AddFriendForm(props: { onDone: () => void }) {
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const mine = useUserStore((state) => state.me?.username ?? "");
   const fieldId = useId();
   const errorId = `${fieldId}-error`;
   const send = async (event: FormEvent) => {
@@ -106,6 +110,7 @@ function AddFriendRow() {
       setUsername("");
       notify({ message: "Friend request sent" });
       void reloadFriends().catch(() => undefined);
+      props.onDone();
     } catch (reason) {
       if (
         reason instanceof ApiRequestError &&
@@ -118,15 +123,15 @@ function AddFriendRow() {
     }
   };
   return (
-    <form className="grid w-full max-w-3xl gap-1.5" onSubmit={(event) => void send(event)}>
-      <Label htmlFor={fieldId}>Username</Label>
-      <div className="flex min-w-0 items-center gap-2">
+    <form onSubmit={(event) => void send(event)}>
+      <PopoverHeader title="Add friend" />
+      <PopoverBody>
         <Input
           id={fieldId}
           autoFocus
-          containerClassName="min-w-0 flex-1"
           value={username}
           placeholder="Username"
+          aria-label="Username"
           aria-describedby={error ? errorId : undefined}
           aria-invalid={error ? true : undefined}
           onChange={(event) => {
@@ -134,27 +139,39 @@ function AddFriendRow() {
             setError("");
           }}
         />
-        <Button type="submit" disabled={!username.trim() || sending}>
+        <FieldError id={errorId} message={error || undefined} />
+        {mine ? (
+          <div className="flex min-w-0 items-center gap-1">
+            <Text size="meta" tone="muted">
+              {`Your username is ${mine}`}
+            </Text>
+            <CopyButton label="Copy your username" value={mine} />
+          </div>
+        ) : null}
+      </PopoverBody>
+      <PopoverActions>
+        <Button variant="quiet" type="button" onClick={props.onDone}>
+          Cancel
+        </Button>
+        <Button variant="primary" type="submit" disabled={!username.trim() || sending}>
           Send request
         </Button>
-      </div>
-      <FieldError id={errorId} message={error || undefined} />
+      </PopoverActions>
     </form>
   );
 }
 
-/**
- * The person's friends, grouped one under another: pending requests, then who is online, offline
- * and blocked, each under its heading with its count. Add friend sends a request by username.
- */
 export function FriendsPage() {
   const navigate = useNavigate();
   const friends = useFriends();
   const statuses = useStatusStore((state) => state.byUser);
   const [adding, setAdding] = useState(false);
+  const [query, setQuery] = useState("");
   const { confirm, dialog } = useConfirmDelete();
   const list = friends.data;
   const incoming = list?.incoming ?? [];
+  const everyone = list?.friends ?? [];
+  const activities = useActivities(everyone);
 
   const message = async (person: Person) => {
     try {
@@ -163,6 +180,16 @@ export function FriendsPage() {
       navigate(dmPath(dm.id));
     } catch (reason) {
       failure(reason, "The conversation couldn't be opened.");
+    }
+  };
+  const call = async (person: Person) => {
+    try {
+      const dm = await directApi.openDm(person.user_id);
+      void reloadDms().catch(() => undefined);
+      navigate(dmPath(dm.id));
+      await useCallStore.getState().start(dm.id, false);
+    } catch (reason) {
+      failure(reason, "The call couldn't be started.");
     }
   };
   const remove = (person: Person) =>
@@ -194,29 +221,23 @@ export function FriendsPage() {
     }
   };
 
-  const actions: ActionBarItem[] = [
-    {
-      id: "add-friend",
-      icon: UserPlus,
-      label: "Add friend",
-      variant: "primary",
-      priority: 3,
-      pressed: adding,
-      onSelect: () => setAdding((open) => !open),
-    },
-  ];
+  const matches = (person: Person) =>
+    !query.trim() || person.username.toLowerCase().includes(query.trim().toLowerCase());
 
   const friendRow = (person: Person) => (
     <FriendRow
       key={person.user_id}
       person={person}
+      activity={activities.get(person.user_id)}
       onMessage={(who) => void message(who)}
+      onCall={(who) => void call(who)}
       onRemove={remove}
       onBlock={block}
     />
   );
 
-  // Every group stacks under its heading, pending first, as Discord's friends list: no tabs.
+  const requestFace = (person: Person) => <Face userId={person.user_id} name={person.username} />;
+
   const body = () => {
     if (!list && friends.loading)
       return <ListRowSkeleton label="Loading friends" leading lines={2} trailing="icon" />;
@@ -233,41 +254,47 @@ export function FriendsPage() {
       );
     const pending = incoming.length + list.outgoing.length;
     if (!list.friends.length && !pending && !list.blocked.length)
-      return <EmptyState inline title="No friends yet" line="Add a friend by their username." />;
-    const online = list.friends.filter(
+      return (
+        <EmptyState
+          title="No friends yet"
+          line="Add someone by their username to message and call them."
+          action={{ label: "Add friend", icon: UserPlus, onClick: () => setAdding(true) }}
+        />
+      );
+    const shown = list.friends.filter(matches);
+    const online = shown.filter(
       (person) => (statuses[person.user_id]?.status ?? "offline") !== "offline",
     );
-    const offline = list.friends.filter((person) => !online.includes(person));
+    const offline = shown.filter((person) => !online.includes(person));
     return (
       <>
         {pending ? (
-          <section aria-label="Pending">
-            <SectionHeading
-              title="Pending"
-              count={pending}
-              action={
-                incoming.length
-                  ? {
-                      label: "Clear all",
-                      onSelect: () =>
-                        void act(
-                          () => directApi.clearIncomingRequests(),
-                          "The requests couldn't be cleared.",
-                        ),
-                    }
-                  : undefined
-              }
-            />
+          <RowGroupSection
+            title="Requests"
+            count={pending}
+            action={
+              incoming.length
+                ? {
+                    label: "Clear all",
+                    onSelect: () =>
+                      void act(
+                        () => directApi.clearIncomingRequests(),
+                        "The requests couldn't be cleared.",
+                      ),
+                  }
+                : undefined
+            }
+          >
             {incoming.map((person) => (
-              <ListRow
+              <PersonRow
                 key={`in-${person.user_id}`}
-                label={person.username}
-                leading={<PersonFace person={person} />}
-                description="Incoming friend request"
-                trailing={
+                face={requestFace(person)}
+                name={person.username}
+                line="Wants to be your friend"
+                actions={
                   <>
-                    <IconButton
-                      label="Accept"
+                    <Button
+                      size="sm"
                       onClick={() =>
                         void act(async () => {
                           await directApi.acceptFriendRequest(person.user_id);
@@ -275,10 +302,11 @@ export function FriendsPage() {
                         }, "The request couldn't be accepted.")
                       }
                     >
-                      <Check />
-                    </IconButton>
-                    <IconButton
-                      label="Ignore"
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="quiet"
                       onClick={() =>
                         void act(
                           () => directApi.removeFriendRequest(person.user_id),
@@ -286,21 +314,22 @@ export function FriendsPage() {
                         )
                       }
                     >
-                      <X />
-                    </IconButton>
+                      Ignore
+                    </Button>
                   </>
                 }
               />
             ))}
             {list.outgoing.map((person) => (
-              <ListRow
+              <PersonRow
                 key={`out-${person.user_id}`}
-                label={person.username}
-                leading={<PersonFace person={person} />}
-                description="Outgoing friend request"
-                trailing={
-                  <IconButton
-                    label="Cancel request"
+                face={requestFace(person)}
+                name={person.username}
+                line="You sent a request"
+                actions={
+                  <Button
+                    size="sm"
+                    variant="quiet"
                     onClick={() =>
                       void act(
                         () => directApi.removeFriendRequest(person.user_id),
@@ -308,34 +337,35 @@ export function FriendsPage() {
                       )
                     }
                   >
-                    <X />
-                  </IconButton>
+                    Cancel
+                  </Button>
                 }
               />
             ))}
-          </section>
+          </RowGroupSection>
         ) : null}
         {online.length ? (
-          <section aria-label="Online">
-            <SectionHeading title="Online" count={online.length} />
+          <RowGroupSection title="Online" count={online.length}>
             {online.map(friendRow)}
-          </section>
+          </RowGroupSection>
         ) : null}
         {offline.length ? (
-          <section aria-label="Offline">
-            <SectionHeading title="Offline" count={offline.length} />
+          <RowGroupSection title="Offline" count={offline.length}>
             {offline.map(friendRow)}
-          </section>
+          </RowGroupSection>
+        ) : null}
+        {query.trim() && list.friends.length && !shown.length ? (
+          <EmptyState inline title="No friends match" line={`Nobody called “${query.trim()}”.`} />
         ) : null}
         {list.blocked.length ? (
-          <section aria-label="Blocked">
-            <SectionHeading title="Blocked" count={list.blocked.length} />
+          <RowGroupSection title="Blocked" count={list.blocked.length}>
             {list.blocked.map((person) => (
-              <ListRow
+              <PersonRow
                 key={person.user_id}
-                label={person.username}
-                leading={<PersonFace person={person} />}
-                trailing={
+                face={requestFace(person)}
+                name={person.username}
+                away
+                tools={
                   <IconButton
                     label="Unblock"
                     onClick={() =>
@@ -350,18 +380,58 @@ export function FriendsPage() {
                 }
               />
             ))}
-          </section>
+          </RowGroupSection>
         ) : null}
       </>
     );
   };
 
+  const hasAny = Boolean(list && (list.friends.length || incoming.length || list.outgoing.length));
+
   return (
-    <CollectionPage>
-      <CollectionHeading actions={actions} actionsLabel="Friends actions" />
-      {adding ? <AddFriendRow /> : null}
-      <div className="flex w-full max-w-3xl flex-col gap-4">{body()}</div>
+    <FramedPage
+      autoSaveId="friends"
+      toolbar={
+        <div className="flex h-full min-w-0 items-center gap-2 pr-3 pl-6">
+          {hasAny ? (
+            <div className="w-64 min-w-0">
+              <SearchField
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search friends"
+                aria-label="Search friends"
+              />
+            </div>
+          ) : null}
+          <div className="ml-auto">
+            {hasAny || adding ? (
+              <Popover open={adding} onOpenChange={setAdding}>
+                <PopoverTrigger asChild>
+                  <Button variant="primary" icon={UserPlus}>
+                    Add friend
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end">
+                  <AddFriendForm onDone={() => setAdding(false)} />
+                </PopoverContent>
+              </Popover>
+            ) : null}
+          </div>
+        </div>
+      }
+      end={{
+        id: "friends-active",
+        label: "Resize the active column",
+        defaultSize: 28,
+        minSize: 20,
+        maxSize: 40,
+        content: <ActiveNow friends={everyone} activities={activities} />,
+      }}
+    >
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <RowGroupStack className="h-full w-full max-w-180 px-6 pt-4 pb-10">{body()}</RowGroupStack>
+      </main>
       {dialog}
-    </CollectionPage>
+    </FramedPage>
   );
 }

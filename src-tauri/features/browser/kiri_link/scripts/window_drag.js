@@ -1,9 +1,4 @@
-  // The top edge of a page moves the window, as a titlebar would: press on empty space there
-  // and drag. Links, controls, text and anything the page gives a special cursor keep their
-  // clicks. The drag starts only once the pointer has moved, so a plain click is the page's.
   const dragZone = () => Math.min(72, window.innerHeight * 0.05);
-  // A wrapper that spans the page (an app shell with a tabindex, or a pointer cursor set on a
-  // whole layout) must not turn the whole top edge into content.
   const spansPage = (element) => {
     const box = element.getBoundingClientRect();
     return box.width >= window.innerWidth * 0.8 && box.height >= window.innerHeight * 0.5;
@@ -21,7 +16,6 @@
     }
     const cursor = getComputedStyle(element).cursor;
     if (cursor === 'auto' || cursor === 'default') return false;
-    // The cursor is inherited: find where it starts, and ignore it when that is a page-wide wrapper.
     let origin = element;
     while (origin.parentElement && getComputedStyle(origin.parentElement).cursor === cursor)
       origin = origin.parentElement;
@@ -36,7 +30,6 @@
       lastTopPress = null;
       return;
     }
-    // A second press in the same spot is the titlebar's double-click: zoom or restore.
     const now = performance.now();
     if (lastTopPress && now - lastTopPress.time <= 500 &&
         Math.abs(event.clientX - lastTopPress.x) + Math.abs(event.clientY - lastTopPress.y) <= 8) {

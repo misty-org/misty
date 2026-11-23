@@ -3,7 +3,6 @@
 
 use std::path::PathBuf;
 
-/// Expand a leading `~` and reject empty paths.
 pub(crate) fn expand_user_path(path: &str) -> Result<PathBuf, String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {

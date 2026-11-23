@@ -1,9 +1,3 @@
-//! Cross-origin frames on WebKitGTK. WebKitGTK can only run script in a page's main frame from
-//! the app, so each cross-origin frame comes to Misty instead: a script in Misty's private script
-//! world of every frame asks Misty, through a reply-carrying message handler that exists only in
-//! that world, for the next thing to run, runs it there, and brings the answer with its next
-//! request. Pages can neither see the world nor reach the handler, so they cannot forge a frame
-//! or read what Misty runs in it.
 use super::Frame;
 use gtk::glib::{self, prelude::*, translate::ToGlibPtr};
 use javascriptcore::ValueExt;
@@ -15,17 +9,11 @@ use std::{
 };
 use webkit2gtk::{UserContentManagerExt, WebViewExt};
 
-/// The page layer's world (page_agent/mod.rs), so a frame's commands share its globals.
 const WORLD: &str = "misty-agent-page";
 const HANDLER: &str = "mistyFrame";
-/// Frames remembered per tab; the oldest are forgotten first.
 const MAX_FRAMES: usize = 24;
-/// Marks a content manager that already carries the frame script.
 const INSTALLED: &str = "misty-frames";
 
-/// Each frame says where it is when its document starts. The top document's word means a new
-/// page, so the frames of the previous one are forgotten. A cross-origin frame then keeps one
-/// request open with Misty, which answers it with the next script to run in the frame.
 const ANNOUNCE: &str = r#"(() => {
   try {
     const handler = window.webkit?.messageHandlers?.mistyFrame;
@@ -58,10 +46,8 @@ const ANNOUNCE: &str = r#"(() => {
   } catch {}
 })();"#;
 
-/// A frame's open request, answered once.
 struct Reply {
     reply: *mut webkit2gtk::ffi::WebKitScriptMessageReply,
-    /// The message's value, whose context the answer is made in.
     value: javascriptcore::Value,
 }
 
@@ -126,7 +112,6 @@ impl Entry {
         }
     }
 
-    /// Hands the frame its next command if it is waiting for one.
     fn pump(&mut self) {
         if self.open.is_none() {
             return;
@@ -141,7 +126,6 @@ impl Entry {
 }
 
 thread_local! {
-    /// Tab label → its cross-origin frames, newest last. GTK thread only.
     static FRAMES: RefCell<HashMap<String, Vec<Entry>>> = RefCell::new(HashMap::new());
     static NEXT: Cell<u64> = const { Cell::new(1) };
 }
@@ -194,7 +178,6 @@ fn received(label: &str, message: Message, reply: Reply) {
             reply.answer(r#"{"stop":true}"#);
             return;
         }
-        // Closed tabs leave their entries behind; past this many tabs, start afresh.
         if frames.len() > 256 && !frames.contains_key(label) {
             for list in frames.values_mut() {
                 list.iter_mut().for_each(Entry::fail_all);
@@ -233,7 +216,6 @@ fn received(label: &str, message: Message, reply: Reply) {
                 });
             }
         }
-        // A frame keeps one request open at a time.
         if let Some(stale) = entry.open.replace(reply) {
             stale.answer("{}");
         }
@@ -241,7 +223,6 @@ fn received(label: &str, message: Message, reply: Reply) {
     });
 }
 
-/// Adds the frame script and its reply handler to the view's content manager.
 pub(crate) fn install(view: &webkit2gtk::WebView, label: String) -> Result<(), String> {
     let manager = view
         .user_content_manager()
@@ -298,7 +279,6 @@ pub(crate) fn install(view: &webkit2gtk::WebView, label: String) -> Result<(), S
     Ok(())
 }
 
-/// The tab's cross-origin frames, oldest first. GTK thread.
 pub(crate) fn list(label: &str) -> Vec<Frame> {
     FRAMES.with(|frames| {
         frames
@@ -316,7 +296,6 @@ pub(crate) fn list(label: &str) -> Vec<Frame> {
     })
 }
 
-/// Forgets a frame that no longer answers, such as one its page removed. GTK thread.
 pub(crate) fn forget(label: &str, id: u64) {
     FRAMES.with(|frames| {
         if let Some(list) = frames.borrow_mut().get_mut(label) {
@@ -327,8 +306,6 @@ pub(crate) fn forget(label: &str, id: u64) {
     });
 }
 
-/// Runs `function_body` as an async function in Misty's world of one frame and returns the
-/// string it resolves to. A frame that doesn't answer in time is forgotten.
 pub(crate) async fn evaluate(
     webview: &tauri::Webview,
     frame: u64,

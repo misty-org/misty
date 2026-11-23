@@ -7,7 +7,6 @@ type OverlayProps = {
 export function SettingsOverlay(props: OverlayProps) {
   return (
     <WorkspaceOverlay {...props} ariaLabel="Settings">
-      {/* No tour button: Settings is a list of labeled rows that explains itself. */}
       <SettingsWorkspace presentation="overlay" onClose={props.onClose} />
     </WorkspaceOverlay>
   );

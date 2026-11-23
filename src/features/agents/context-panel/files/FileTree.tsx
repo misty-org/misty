@@ -25,14 +25,13 @@ import { FileTreeSkeleton } from "../PanelSkeletons";
 import { FileTreeContextMenu } from "./FileTreeContextMenu";
 import { TreeChildErrorRow, TreeChildRowsSkeleton, TreeRow } from "./FileTreeRow";
 import { FileTreeToolbar, type FileTreeToolbarOptions } from "./FileTreeToolbar";
-import { fileName, useFilesStore } from "./filesStore";
-import { sendPathToComposer } from "./sendToComposer";
-import { COLLAPSE_ALL_SHORTCUT, EXPAND_LOADED_SHORTCUT } from "./treeShortcuts";
-import { useFileTreeOperations, type PromptState } from "./useFileTreeOperations";
-import { useFileTreeVirtualList } from "./useFileTreeVirtualList";
-import type { VisibleNode } from "./visibleNodes";
+import { fileName, useFilesStore } from "./files_store";
+import { sendPathToComposer } from "./send_to_composer";
+import { COLLAPSE_ALL_SHORTCUT, EXPAND_LOADED_SHORTCUT } from "./tree_shortcuts";
+import { useFileTreeOperations, type PromptState } from "./use_file_tree_operations";
+import { useFileTreeVirtualList } from "./use_file_tree_virtual_list";
+import type { VisibleNode } from "./visible_nodes";
 
-/** `alt+shift+arrowright` against a key event, the platform's way. */
 function matchesShortcut(event: KeyboardEvent, shortcut: string): boolean {
   const parts = shortcut.split("+");
   const key = parts.pop() ?? "";
@@ -57,7 +56,6 @@ const titles: Record<PromptState["kind"], string> = {
   rename: "Rename",
 };
 
-/** The name asked for by New file, New folder and Rename. */
 function NameDialog(props: {
   prompt: PromptState | null;
   onSubmit(name: string): void;
@@ -78,7 +76,6 @@ function NameDialog(props: {
           const input = inputRef.current;
           if (!input) return;
           input.focus();
-          // A rename selects the name before its extension, as Finder does.
           const dot = input.value.lastIndexOf(".");
           input.setSelectionRange(
             0,
@@ -119,12 +116,6 @@ function NameDialog(props: {
   );
 }
 
-/**
- * The folder's files as a virtualized tree, starting at the folder's own row, which carries the
- * tree's actions. With a `toolbar` (the Code page) the actions move to a row of their own above
- * the tree, the folder is named under them, and the root row goes. A right-click anywhere opens
- * the file menu: on a row for that row, on empty space for the folder.
- */
 export function FileTree({ toolbar }: { toolbar?: FileTreeToolbarOptions } = {}) {
   const hideRoot = Boolean(toolbar);
   const { parentRef, virtualizer, visible } = useFileTreeVirtualList({ hideRoot });
@@ -143,8 +134,6 @@ export function FileTree({ toolbar }: { toolbar?: FileTreeToolbarOptions } = {})
   const selectPath = useFilesStore((state) => state.selectPath);
   const openFile = useFilesStore((state) => state.openFile);
   const rowHit = useRef(false);
-  // A newly selected folder (a breadcrumb picks one) scrolls into view once the tree has opened
-  // down to its row; a row clicked in place is already in view, so nothing moves.
   const reveal = useRef<string | null>(null);
   useEffect(() => {
     reveal.current = selectedPath;
@@ -192,7 +181,6 @@ export function FileTree({ toolbar }: { toolbar?: FileTreeToolbarOptions } = {})
       </Text>
     );
   } else if (rootLoading && visible.length <= (hideRoot ? 0 : 1)) {
-    // Only a folder never read this session: one shown before comes back as it was.
     body = <FileTreeSkeleton />;
   } else {
     body = (
@@ -217,8 +205,6 @@ export function FileTree({ toolbar }: { toolbar?: FileTreeToolbarOptions } = {})
                 onContextMenu={handleRowMenu}
                 onMention={handleMention}
               />
-              {/* An opened folder's children while they're read, or why they couldn't be. The
-                  root has its own skeleton and error above. */}
               {node.isDir && node.expanded && node.path !== root ? (
                 node.loading ? (
                   <TreeChildRowsSkeleton depth={node.depth + 1} label={node.name} />
@@ -238,8 +224,6 @@ export function FileTree({ toolbar }: { toolbar?: FileTreeToolbarOptions } = {})
   }
 
   return (
-    // tabIndex -1: WebKit doesn't focus a clicked button but its nearest focusable ancestor, so
-    // without it a click on a row leaves focus outside the tree and its keys never arrive.
     <div
       tabIndex={-1}
       className="relative flex min-h-0 flex-1 flex-col outline-none"
@@ -273,7 +257,6 @@ export function FileTree({ toolbar }: { toolbar?: FileTreeToolbarOptions } = {})
             ref={parentRef}
             className="min-h-0 flex-1 overflow-auto py-1"
             onContextMenu={(event) => {
-              // A row already named itself; empty space means the folder.
               if (!rowHit.current && root) {
                 ops.openContextMenu(event, {
                   name: fileName(root),

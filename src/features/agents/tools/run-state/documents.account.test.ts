@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-vi.mock("../../personal/agentAccount", () => ({ agentAccountId: () => "the-account" }));
+vi.mock("../../personal/agent_account", () => ({ agentAccountId: () => "the-account" }));
 
 import { runStateAccount, setRunStateAccount } from "./documents";
 

@@ -1,9 +1,3 @@
-/**
- * The page API a browser_run program sees, defined
- * inside the sandbox over its one host call. Targets are a ref from a read ("e12"), a locator
- * ({ role, name, index }), or words describing the control ("Search button"); the host keeps
- * each tab's document, so a program never copies ids.
- */
 export const programPrelude = String.raw`
 "use strict";
 const __call = (name, args) => __op(name, JSON.stringify(args === undefined ? {} : args)).then((text) => JSON.parse(text));

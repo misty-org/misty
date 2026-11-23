@@ -5,7 +5,7 @@ import {
   appZoomStep,
   setAppZoom,
   useAppZoomValue,
-} from "@/shared/hooks/useAppZoom";
+} from "@/shared/hooks/use_app_zoom";
 import { useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
@@ -17,12 +17,12 @@ import {
   SliderControl,
   stringSetting,
 } from "../../settings/SettingsControls";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import type { SettingsContentProps } from "../../settings/settings_types";
 import { Input } from "@misty/ui";
 import { validClockTime } from "@/features/settings";
-import { normalizeDockingLayout, rememberDockingLayout } from "@/app/shell/dockingLayout";
-import { useWindowDockingLayout } from "../panes/useWindowDockingLayout";
-import { useWorkspaceStore } from "../tabs/useWorkspaceStore";
+import { normalizeDockingLayout, rememberDockingLayout } from "@/app/shell/docking_layout";
+import { useWindowDockingLayout } from "../panes/use_window_docking_layout";
+import { useWorkspaceStore } from "../tabs/use_workspace_store";
 
 export function AppearanceSection(props: SettingsContentProps) {
   const appZoom = useAppZoomValue();
@@ -117,7 +117,6 @@ export function AppearanceSection(props: SettingsContentProps) {
   );
 }
 
-/** A local time for the night light schedule; only complete times are saved. */
 function ClockTimeControl(props: {
   value: string;
   disabled: boolean;
@@ -136,7 +135,6 @@ function ClockTimeControl(props: {
   );
 }
 
-/** Which side of this window the tab sidebar sits on. Each window keeps its own. */
 function WindowTabsRow() {
   const layout = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
@@ -152,7 +150,6 @@ function WindowTabsRow() {
         onValueChange={(value) => {
           const next = normalizeDockingLayout({ navigation: layout.navigation, tabs: value });
           setLayout(next);
-          // New windows open with the side last picked.
           rememberDockingLayout(next);
         }}
       />

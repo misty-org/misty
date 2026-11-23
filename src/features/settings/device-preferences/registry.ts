@@ -26,10 +26,7 @@ type SettingSearchEntry = Pick<
   SettingDefinition,
   "id" | "label" | "page" | "owner" | "platforms" | "keywords"
 >;
-// Controls with their own server APIs are searchable alongside preferences.
-// Preference serialization and updates use settingDefinitions exclusively.
 export const settingSearchEntries: SettingSearchEntry[] = [
-  // Tab orders are edited in place.
   ...settingDefinitions.filter((definition) => !definition.id.startsWith("collections.tabs.")),
   {
     id: "agents.payments.ask",
@@ -113,8 +110,6 @@ interface SettingRuntimeAdapter {
   read(document: Record<string, unknown>): PreferenceValue;
   write(document: Record<string, unknown>, value: PreferenceValue): void;
 }
-// Adapters only translate values. Runtime effects happen through the settings
-// store after its durable commit, for both local and remote changes.
 const runtimeAdapters = new Map<string, SettingRuntimeAdapter>(
   settingDefinitions.map((d) => [
     d.id,

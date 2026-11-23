@@ -1,28 +1,3 @@
-//! Each Space mounted on the computer as a drive: the sync core.
-//!
-//! The Space's server is the one authority. Every change (new content, rename, move, trash,
-//! restore) is one transaction there, so the server puts every change in one order, the order
-//! they reach it, and that order decides (`rules`): a text save merges with what came since, a
-//! save of anything else is the last and wins, with what it replaced unseen kept in the trash, and
-//! a file can't be trashed while anyone has it open. This computer is a cache that asks the
-//! server to apply its changes, one at a time, and accepts the answer; it never compares clocks
-//! with anyone.
-//!
-//! - [`Drive`] is one account's drives: `drive.db` (`store`), the change sequence, in-use marks
-//!   (`in_use`), the content cache (`cache`) and transfers (`transfer`). One per signed-in
-//!   account, inside Misty's own process. It has no Tauri in it; Misty's glue
-//!   (`features/spaces_drive`) hands it the network ([`api::Http`]) and hears its [`Events`].
-//! - [`OsFace`] is how one OS shows a Space: FUSE on Linux (`face::fuse`), a folder in the
-//!   account's one File Provider domain on macOS (`face::file_provider`, which talks to the
-//!   extension over `socket`), Cloud Files on Windows.
-//!   A face calls back into [`Drive`] through the methods under "The faces' calls" below.
-//!
-//! Every delete in a drive becomes a trash move on the server; nothing here deletes for good
-//! except [`Drive::purge`], which only the person's own `drive_purge` command calls.
-//!
-//! Paths: `drive.db` and the cache live in `misty_shared_dir("drive")/<account id>/`; mounts in
-//! `~/.misty/mnt/<Space>` (`mnt-dev` for debug builds), named by the glue.
-
 pub mod api;
 pub mod bases;
 pub mod cache;
@@ -58,7 +33,6 @@ pub use api::{Api, ApiError, Device, Http, HttpError};
 pub use model::*;
 use store::{NodeRow, Store};
 
-/// What can go wrong, in words a person can read.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum DriveError {
     #[error("It isn't there any more.")]
@@ -69,20 +43,14 @@ pub enum DriveError {
     NotEmpty,
     #[error("{0}")]
     InUse(String),
-    /// Not answered by the drive any more (a delete is never refused for a change made since);
-    /// kept for the faces that map it.
     #[error("It changed since.")]
     Changed,
     #[error("That Space's drive isn't on this computer.")]
     NotMounted,
-    /// Something the drive's own layout holds in place: a Space's folder can't be renamed,
-    /// moved or deleted, nothing goes beside them at the top, and nothing moves between Spaces.
     #[error("{0}")]
     Fixed(String),
-    /// A delete from the OS that the delete guard stopped (`guard`): the item stays.
     #[error("{0}")]
     Held(String),
-    /// The extension's sync anchor is one `drive.db` no longer keeps: macOS lists it all again.
     #[error("Misty's drive records were made again.")]
     AnchorExpired,
     #[error("Misty couldn't reach the server.")]
@@ -108,7 +76,6 @@ impl DriveError {
         Self::Io(error.to_string())
     }
 
-    /// The errno a file system call answers with.
     #[cfg(unix)]
     pub fn errno(&self) -> i32 {
         match self {
@@ -135,7 +102,6 @@ impl DriveError {
         }
     }
 
-    /// A short code for the socket protocol and the renderer.
     pub fn code(&self) -> &'static str {
         match self {
             Self::NotFound => "not_found",
@@ -183,66 +149,39 @@ impl From<ApiError> for DriveError {
     }
 }
 
-/// One mounted Space, as the glue names it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpaceMount {
     pub space: SpaceId,
-    /// The Space's own name.
     pub name: String,
-    /// Its folder's name on this computer, safe and unique among the mounted Spaces
-    /// (`Design team`, `Design team (2)`).
     pub mount_name: String,
-    /// `~/.misty/mnt/<mount_name>` (`mnt-dev` in debug builds).
     pub path: PathBuf,
-    /// `<account id>.<space id>`: the Space's own registration with the OS where it has one
-    /// (Windows' sync root). On macOS every Space shares the account's one domain.
     pub domain: String,
 }
 
-/// How one OS shows a Space. One face per mounted Space; it calls back into [`Drive`].
 pub trait OsFace: Send + Sync {
-    /// Registers or mounts the Space at its path.
     fn mount(&self, space: &SpaceMount) -> Result<(), DriveError>;
     fn unmount(&self, space: &SpaceId) -> Result<(), DriveError>;
-    /// Server changes landed in `drive.db`: these items are new, changed, trashed or purged. A
-    /// file whose content changed under a local save (a merge written back) is among them.
     fn changed(&self, space: &SpaceId, items: &[Item]);
-    /// Drops the item's downloaded content, keeping its name.
     fn evict(&self, space: &SpaceId, item: &ItemId) -> Result<(), DriveError>;
 }
 
-/// What the drive tells Misty: the glue turns these into `misty://drive-status`,
-/// `misty://drive-changed` and `misty://drive-notice`, and records agents' trash.
 pub trait Events: Send + Sync {
     fn status(&self, status: &DriveStatus);
     fn changed(&self, space: &SpaceId, entries: &[ChangedEntry]);
     fn notice(&self, notice: &Notice);
-    /// An agent's trash reached the server (held). The glue keeps which agent and chat in
-    /// `files_agent_trash`; the drive forgets them.
     fn agent_trashed(&self, record: &AgentTrash);
 }
 
-/// One account's drive settings, from the glue.
 #[derive(Clone, Debug)]
 pub struct DriveConfig {
-    /// `misty_shared_dir("drive")/<account id>`: `drive.db`, the cache and temporary files.
     pub data_dir: PathBuf,
     pub account_id: String,
     pub device: Device,
-    /// The signed-in person's name, for what this computer shows as theirs. Asked of the server
-    /// when missing.
     pub person_name: Option<String>,
-    /// The content cache's limit at start (a device setting; `u64::MAX` is no limit). The
-    /// running drive's is changed with `Drive::set_cache_limit`.
     pub cache_limit_bytes: u64,
-    /// Whether downloaded content lives in the cache (the FUSE face) or with the OS.
     pub content_in_cache: bool,
-    /// Wait out throttling and lost connections with backoff. Tests turn it off.
     pub patient: bool,
-    /// The longest Misty waits after asking whether an item is in use before trashing it.
     pub in_use_wait_cap: Duration,
-    /// Run sync rounds by themselves (on a nudge, a local change and every 30 s). Tests turn it
-    /// off and call `sync_now`.
     pub background: bool,
 }
 
@@ -262,44 +201,31 @@ impl DriveConfig {
     }
 }
 
-/// What the person asked to make with [`Drive::create`].
 #[derive(Clone, Debug)]
 pub struct NewNode {
-    /// `None` is the drive's root.
     pub parent: Option<ItemId>,
     pub name: String,
     pub kind: Kind,
-    /// A file's content, moved into the cache. `None` is an empty file.
     pub content: Option<PathBuf>,
     pub mtime_ms: i64,
-    /// The id to give it, when the caller made one already (the macOS extension hands its id to
-    /// the system at creation, offline too). Made here when `None`.
     pub id: Option<ItemId>,
 }
 
-/// One item as a face sees it.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Node {
-    /// Stable for the item's life on this computer: FUSE's inode is this plus one (1 is a
-    /// mount's root).
     pub ino: u64,
     pub space: SpaceId,
     pub id: ItemId,
     pub parent: Option<ItemId>,
-    /// This computer's name for it.
     pub name: String,
     pub kind: Kind,
     pub size: u64,
     pub mtime_ms: i64,
     pub sha256: Option<String>,
-    /// The server version this computer last agreed on; `None` before the server has it.
     pub version: Option<Version>,
-    /// `/`-rooted path in the drive.
     pub path: String,
     pub state: LocalState,
     pub downloaded: bool,
-    /// When it was last used on this computer (an open that lasted, or the OS's last-used
-    /// date), in milliseconds since 1970; 0 when never.
     #[serde(default)]
     pub last_used_ms: i64,
 }
@@ -309,18 +235,13 @@ pub(crate) type Key = (SpaceId, ItemId);
 pub(crate) struct Mounted {
     pub mount: SpaceMount,
     pub face: Arc<dyn OsFace>,
-    /// Where the OS shows the Space's files, for open-file checks: the mount, or on macOS the
-    /// domain's folder in `~/Library/CloudStorage`.
     pub os_root: RwLock<PathBuf>,
     pub kick: Notify,
     pub stop: AtomicBool,
     pub round: tokio::sync::Mutex<()>,
     pub status: Mutex<DriveStatus>,
-    /// Items this computer holds a server mark on, and when it was last renewed.
     pub marked: Mutex<HashMap<ItemId, std::time::Instant>>,
-    /// A read of the Space's marks is waiting out its debounce after a `drive.in_use`.
     pub marks_pending: AtomicBool,
-    /// How the last trash move of each item went, for `trash_now`.
     pub trash_results: Mutex<HashMap<ItemId, Result<(), DriveError>>>,
     pub task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
@@ -330,33 +251,24 @@ pub(crate) struct Inner {
     pub store: Store,
     pub api: Api,
     pub cache: cache::Cache,
-    /// Each text file's content at its base version, for merges.
     pub bases: bases::Bases,
     pub events: Arc<dyn Events>,
     pub opens: in_use::Opens,
-    /// Every computer's in-use marks in each mounted Space, as the server last listed them.
     pub marks: in_use::Marks,
     pub spaces: RwLock<HashMap<SpaceId, Arc<Mounted>>>,
     pub runtime: Handle,
     pub person: RwLock<Option<String>>,
-    /// Downloads under way, by content, so two asks for one file fetch it once.
     pub fetching: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub downloading: Mutex<HashSet<Key>>,
-    /// The content cache's limit now, from the config and then `Drive::set_cache_limit`.
     pub cache_limit: AtomicU64,
-    /// Syncing is paused (Settings › Server › Drive): local changes wait, nothing goes up or down,
-    /// until it is turned back on. Not kept across a restart.
     pub paused: AtomicBool,
-    /// The brake on deleting a lot at once from the OS.
     pub guard: guard::Guard,
 }
 
-/// Why a delete from the OS was refused while the delete guard holds a Space.
 fn held_message(space: &str) -> String {
     format!("Too much was deleted from {space} at once, so Misty kept the rest.")
 }
 
-/// One account's drives. Cheap to clone; every clone is the same drives.
 #[derive(Clone)]
 pub struct Drive {
     pub(crate) inner: Arc<Inner>,
@@ -367,16 +279,17 @@ fn read<T>(lock: &RwLock<T>) -> std::sync::RwLockReadGuard<'_, T> {
 }
 
 fn write<T>(lock: &RwLock<T>) -> std::sync::RwLockWriteGuard<'_, T> {
-    lock.write().unwrap_or_else(|poisoned| poisoned.into_inner())
+    lock.write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 pub(crate) fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 impl Drive {
-    /// Opens the account's `drive.db` and cache. Nothing is mounted yet. (`open` is a face's
-    /// call: opening an item.)
     pub fn start(
         config: DriveConfig,
         http: Arc<dyn Http>,
@@ -419,7 +332,6 @@ impl Drive {
         &self.inner.config
     }
 
-    /// Runs `work` to its end from a thread outside the runtime, such as a FUSE thread.
     pub fn block_on<F: Future>(&self, work: F) -> F::Output {
         self.inner.runtime.block_on(work)
     }
@@ -428,8 +340,6 @@ impl Drive {
         &self.inner.runtime
     }
 
-    /// A new limit for the content cache (`u64::MAX`: no limit), from Settings. What's over it
-    /// is evicted with each Space's next round, which this asks for.
     pub fn set_cache_limit(&self, bytes: u64) {
         self.inner.cache_limit.store(bytes, Ordering::SeqCst);
         let spaces: Vec<SpaceId> = read(&self.inner.spaces).keys().cloned().collect();
@@ -438,7 +348,6 @@ impl Drive {
         }
     }
 
-    /// Pauses or resumes syncing for every Space. Resuming asks each Space for a round at once.
     pub fn set_paused(&self, paused: bool) {
         self.inner.paused.store(paused, Ordering::SeqCst);
         if !paused {
@@ -449,26 +358,20 @@ impl Drive {
         }
     }
 
-    /// Whether syncing is paused now.
     pub fn paused(&self) -> bool {
         self.inner.paused.load(Ordering::SeqCst)
     }
 
-    /// The content cache's limit now.
     pub fn cache_limit(&self) -> u64 {
         self.inner.cache_limit.load(Ordering::SeqCst)
     }
 
-    /// The person's name, once known.
     pub fn set_person_name(&self, name: Option<String>) {
         if name.is_some() {
             *write(&self.inner.person) = name;
         }
     }
 
-    // Mounting.
-
-    /// Mounts a Space through `face` and starts keeping it in sync.
     pub fn mount(&self, mount: SpaceMount, face: Arc<dyn OsFace>) -> Result<(), DriveError> {
         let space = mount.space.clone();
         if read(&self.inner.spaces).contains_key(&space) {
@@ -494,8 +397,6 @@ impl Drive {
             task: Mutex::new(None),
         });
         write(&self.inner.spaces).insert(space.clone(), mounted.clone());
-        // The drive shows the Space from now until the person leaves it, so its folder is there
-        // before the face asks the OS to look.
         if let Err(error) = self.inner.store.set_space_folder(&space, &mount.mount_name) {
             write(&self.inner.spaces).remove(&space);
             return Err(error);
@@ -514,8 +415,6 @@ impl Drive {
         Ok(())
     }
 
-    /// Stops syncing a Space and takes its face down. What `drive.db` knows stays, so mounting
-    /// again carries on; `forget` drops it too (the person left the Space).
     pub fn unmount(&self, space: &SpaceId, forget: bool) -> Result<(), DriveError> {
         let Some(mounted) = write(&self.inner.spaces).remove(space) else {
             if forget {
@@ -543,7 +442,6 @@ impl Drive {
         self.inner.store.forget_space(space)
     }
 
-    /// Every mounted Space.
     pub fn mounted(&self) -> Vec<SpaceMount> {
         read(&self.inner.spaces)
             .values()
@@ -557,35 +455,28 @@ impl Drive {
             .map(|mounted| mounted.mount.clone())
     }
 
-    /// Every Space the drive shows, mounted or not, with its folder's name, by name. A Space
-    /// stays shown from its first mount until the person leaves it.
     pub fn space_folders(&self) -> Result<Vec<(SpaceId, String)>, DriveError> {
         self.inner.store.space_folders()
     }
 
-    /// The Space an item is in. Item ids are unique across Spaces.
     pub fn space_of_item(&self, id: &ItemId) -> Result<Option<SpaceId>, DriveError> {
         self.inner.store.space_of_item(id)
     }
 
-    /// Keeps a sync anchor's text, answering its token (`socket`).
     pub fn save_anchor(&self, spaces: &str) -> Result<i64, DriveError> {
         self.inner.store.save_anchor(spaces)
     }
 
-    /// A sync anchor's text, while `drive.db` still keeps it.
     pub fn anchor(&self, token: i64) -> Result<Option<String>, DriveError> {
         self.inner.store.anchor(token)
     }
 
-    /// Where the OS shows a Space's files, when that isn't the mount itself (macOS).
     pub fn set_os_root(&self, space: &SpaceId, root: PathBuf) {
         if let Some(mounted) = read(&self.inner.spaces).get(space) {
             *write(&mounted.os_root) = root;
         }
     }
 
-    /// Unmounts everything, as Misty quits or the account signs out.
     pub fn shutdown(&self) {
         let spaces: Vec<SpaceId> = read(&self.inner.spaces).keys().cloned().collect();
         for space in spaces {
@@ -593,17 +484,12 @@ impl Drive {
         }
     }
 
-    // Syncing.
-
-    /// Asks for a sync round soon.
     pub fn kick(&self, space: &SpaceId) {
         if let Some(mounted) = read(&self.inner.spaces).get(space) {
             mounted.kick.notify_one();
         }
     }
 
-    /// Runs one whole sync round now and waits for it: changes down, local changes up, marks
-    /// renewed.
     pub async fn sync_now(&self, space: &SpaceId) -> Result<(), DriveError> {
         sync::round(&self.inner, space).await
     }
@@ -621,10 +507,6 @@ impl Drive {
             .collect()
     }
 
-    /// A realtime `drive.*` event the renderer forwarded (`drive_realtime_event`): `drive.changed
-    /// {seq}`, `drive.in_use_check {item_id}`, `drive.in_use {item_id}` (who has something open changed: the Space's marks are read again).
-    /// `age` is how long ago the server sent it, when known: an in-use check older than ten
-    /// seconds was replayed from the realtime cursor and is ignored.
     pub async fn realtime(
         &self,
         space: &SpaceId,
@@ -635,9 +517,6 @@ impl Drive {
         sync::realtime(&self.inner, space, kind, payload, age).await;
     }
 
-    // The faces' calls.
-
-    /// The children of a folder (`None`: the drive's root), without what waits to be trashed.
     pub fn list(&self, space: &SpaceId, folder: Option<&ItemId>) -> Result<Vec<Node>, DriveError> {
         Ok(self
             .inner
@@ -649,8 +528,6 @@ impl Drive {
             .collect())
     }
 
-    /// The child of `folder` named `name`, matched in NFC; exactly on Linux, ignoring case
-    /// elsewhere (as the OS's own disks do).
     pub fn lookup(
         &self,
         space: &SpaceId,
@@ -672,7 +549,6 @@ impl Drive {
         Ok(found.map(|node| self.inner.node_view(node)))
     }
 
-    /// One item by id.
     pub fn node(&self, space: &SpaceId, id: &ItemId) -> Result<Option<Node>, DriveError> {
         Ok(self
             .inner
@@ -682,7 +558,6 @@ impl Drive {
             .map(|node| self.inner.node_view(&node)))
     }
 
-    /// Whether an item shows: neither it nor a folder it is in waits to go to the trash.
     fn shown(&self, node: &NodeRow) -> bool {
         if node.trash_pending {
             return false;
@@ -698,7 +573,6 @@ impl Drive {
         true
     }
 
-    /// One item by its inode less one (FUSE).
     pub fn node_by_ino(&self, ino: u64) -> Result<Option<Node>, DriveError> {
         Ok(self
             .inner
@@ -708,7 +582,6 @@ impl Drive {
             .map(|node| self.inner.node_view(&node)))
     }
 
-    /// One item by its drive path.
     pub fn node_at(&self, space: &SpaceId, path: &str) -> Result<Option<Node>, DriveError> {
         let path = names::drive_path(path).map_err(DriveError::Invalid)?;
         Ok(self
@@ -719,30 +592,31 @@ impl Drive {
             .map(|node| self.inner.node_view(&node)))
     }
 
-    /// The item's content in the cache, fetched first if this computer doesn't have it, checked
-    /// against its SHA-256. Answers the cached file's path, to read from.
     pub async fn content(&self, space: &SpaceId, id: &ItemId) -> Result<PathBuf, DriveError> {
         sync::content(&self.inner, space, id).await
     }
 
-    /// Fetches the item's content into `to` (the extension's staging file), checked against its
-    /// SHA-256 first.
-    pub async fn fetch_to(&self, space: &SpaceId, id: &ItemId, to: &Path) -> Result<Node, DriveError> {
+    pub async fn fetch_to(
+        &self,
+        space: &SpaceId,
+        id: &ItemId,
+        to: &Path,
+    ) -> Result<Node, DriveError> {
         let cached = self.content(space, id).await?;
         if let Some(parent) = to.parent() {
             file_access::fs::create_dir_all(parent).map_err(DriveError::io)?;
         }
         file_access::fs::copy(&cached, to).map_err(DriveError::io)?;
-        // The system fetching a file isn't someone using it (Quick Look and Spotlight fetch too);
-        // macOS reports real use through the last-used date (`used`).
-        let mut node = self.inner.store.node(space, id)?.ok_or(DriveError::NotFound)?;
+        let mut node = self
+            .inner
+            .store
+            .node(space, id)?
+            .ok_or(DriveError::NotFound)?;
         node.downloaded = true;
         self.inner.store.update_node(&node)?;
         Ok(self.inner.node_view(&node))
     }
 
-    /// A fresh path in the drive's own temporary folder, for content a face gathers before
-    /// handing it to `create` or `write` (which move it into the cache).
     pub fn temp_path(&self) -> PathBuf {
         let path = self.inner.cache.temp_path();
         if let Some(parent) = path.parent() {
@@ -751,7 +625,6 @@ impl Drive {
         path
     }
 
-    /// Where an open file's writes gather until it is closed or synced (the FUSE face).
     pub fn work_path(&self, ino: u64, handle: u64) -> PathBuf {
         let path = self.inner.cache.work_path(ino as i64, handle);
         if let Some(parent) = path.parent() {
@@ -760,28 +633,18 @@ impl Drive {
         path
     }
 
-    /// Makes an item here: a folder, or a file whose content is moved from `content`. It gets its
-    /// `drv_` id at once, kept in `drive.db` before anything uploads. Names that an ignore rule,
-    /// a junk name or a secret's name leaves out stay on this computer as `not_synced`.
     pub fn create(&self, space: &SpaceId, new: NewNode) -> Result<Node, DriveError> {
         let node = sync::create_local(&self.inner, space, new)?;
         self.kick(space);
         Ok(self.inner.node_view(&node))
     }
 
-    /// `create`, as the macOS extension and the Windows face need it: it never fails because the
-    /// name is taken. A new file whose name a file there has is written into that file (a text
-    /// save merges, anything else is the last save, the replaced content kept in the trash) and
-    /// that file is answered; a new folder whose name a folder has is that folder. Taken by the
-    /// other kind, it takes a numbered name. `may_exist` (the system's "may already exist" after
-    /// a reset) needs nothing of its own any more: writing the same content changes nothing.
     pub fn create_resolving(
         &self,
         space: &SpaceId,
         mut new: NewNode,
         _may_exist: bool,
     ) -> Result<Node, DriveError> {
-        // The same create asked again (its reply was lost): the item it made.
         if let Some(id) = &new.id {
             if let Some(made) = self.node(space, id)? {
                 if made.parent == new.parent && made.kind == new.kind {
@@ -806,7 +669,6 @@ impl Drive {
                         empty
                     }
                 };
-                // Made from no version of that file: the server keeps all it replaces.
                 let node = sync::write_local(
                     &self.inner,
                     space,
@@ -820,20 +682,13 @@ impl Drive {
                 Ok(self.inner.node_view(&node))
             }
             _ => {
-                new.name = sync::unique_name(&self.inner, space, new.parent.as_ref(), &new.name, None)?;
+                new.name =
+                    sync::unique_name(&self.inner, space, new.parent.as_ref(), &new.name, None)?;
                 self.create(space, new)
             }
         }
     }
 
-    /// A change the macOS extension or the Windows face reports, made against `base_version` (the
-    /// version its copy came from). It never fails for being out of date, since the system would
-    /// only send it again. A rename or move is the latest one, and onto a name another item holds
-    /// it trashes that item (both come back if someone has it open). New content goes up saying
-    /// it came from `base_version`: a text save merges with what came since, anything else is the
-    /// last save, the replaced content kept in the trash. `parent` is `Some(None)` for a move to
-    /// the root. The second value is true when the item's content is no longer what was sent, so
-    /// the system fetches it again.
     #[allow(clippy::too_many_arguments)]
     pub fn modify(
         &self,
@@ -852,8 +707,6 @@ impl Drive {
             match self.rename(space, id, folder.as_ref(), &wanted) {
                 Ok(_) => {}
                 Err(DriveError::Exists) => {
-                    // The name is another item's: the later rename wins, and that item goes to
-                    // the trash.
                     if let Some(holder) = self
                         .lookup(space, folder.as_ref(), &wanted)?
                         .filter(|holder| &holder.id != id)
@@ -867,7 +720,8 @@ impl Drive {
         }
         let mut refetch = false;
         if let Some(content) = content {
-            let written = sync::write_local(&self.inner, space, id, content, mtime_ms, base_version)?;
+            let written =
+                sync::write_local(&self.inner, space, id, content, mtime_ms, base_version)?;
             sync::wrote(&self.inner, space, id);
             self.kick(space);
             let now = self.node(space, id)?.ok_or(DriveError::NotFound)?;
@@ -877,7 +731,6 @@ impl Drive {
         Ok((now, refetch))
     }
 
-    /// New content for a file, moved from `content`.
     pub fn write(
         &self,
         space: &SpaceId,
@@ -891,7 +744,6 @@ impl Drive {
         Ok(self.inner.node_view(&node))
     }
 
-    /// Renames or moves an item within its Space. `folder` `None` is the root.
     pub fn rename(
         &self,
         space: &SpaceId,
@@ -901,25 +753,18 @@ impl Drive {
     ) -> Result<Node, DriveError> {
         let node = sync::rename_local(&self.inner, space, id, folder, name)?;
         if &node.id != id {
-            // A save over another file (a temp file renamed into place): that file was written.
             sync::wrote(&self.inner, space, &node.id);
         }
         self.kick(space);
         Ok(self.inner.node_view(&node))
     }
 
-    /// Deletes an item: it leaves the local tree at once and goes to the Space's trash with the
-    /// next round, after asking whether anyone has it open. It trashes the item as it is by then,
-    /// whatever changed since; only when someone has it open does the server refuse, and then it
-    /// comes back with a notice.
     pub fn trash(&self, space: &SpaceId, id: &ItemId, by: TrashBy) -> Result<(), DriveError> {
         sync::trash_local(&self.inner, space, id, &by)?;
         self.kick(space);
         Ok(())
     }
 
-    /// A delete that came through the OS (Finder, the terminal, Explorer, any app): a trash move,
-    /// unless the delete guard stops it (`Held`), when the item stays and the OS puts it back.
     pub fn trash_from_os(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
         let files = self.guard_delete(space, id)?;
         self.trash(space, id, TrashBy::Person)?;
@@ -927,7 +772,6 @@ impl Drive {
         Ok(())
     }
 
-    /// The same, waiting for the server's answer.
     pub async fn trash_from_os_now(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
         let files = self.guard_delete(space, id)?;
         self.trash_now(space, id, TrashBy::Person).await?;
@@ -935,15 +779,12 @@ impl Drive {
         Ok(())
     }
 
-    /// Asks the delete guard about a delete from the OS, telling the person once when it stops a
-    /// burst. Answers how many files the delete takes.
     fn guard_delete(&self, space: &SpaceId, id: &ItemId) -> Result<u64, DriveError> {
         let subtree = self.inner.store.descendants(space, id)?;
         let Some(top) = subtree.iter().find(|node| node.id == *id) else {
             return Err(DriveError::NotFound);
         };
         if top.not_synced || top.created {
-            // Only on this computer: nothing in the Space to lose.
             return Ok(0);
         }
         let files = guard::files_in(&subtree);
@@ -955,7 +796,10 @@ impl Drive {
         match self.inner.guard.check(space, files, space_files) {
             guard::Verdict::Go => Ok(files),
             guard::Verdict::Held => Err(DriveError::Held(held_message(&name))),
-            guard::Verdict::Stopped { files: taken, burst } => {
+            guard::Verdict::Stopped {
+                files: taken,
+                burst,
+            } => {
                 self.inner.events.notice(&Notice {
                     kind: NoticeKind::DeletesHeld,
                     space_id: space.clone(),
@@ -972,14 +816,11 @@ impl Drive {
         }
     }
 
-    /// Puts back everything a burst of deletes from the OS trashed (the delete guard's Undo),
-    /// newest first. Answers how many came back; one that can't is left in the trash.
     pub async fn restore_burst(&self, space: &SpaceId, burst: &str) -> Result<u64, DriveError> {
         let mut restored = 0;
         for id in self.inner.guard.take(space, burst) {
             match self.restore(space, &id).await {
                 Ok(_) => restored += 1,
-                // Already back, or never reached the server's trash.
                 Err(DriveError::NotFound) => {}
                 Err(DriveError::Offline) => return Err(DriveError::Offline),
                 Err(_) => {}
@@ -988,8 +829,12 @@ impl Drive {
         Ok(restored)
     }
 
-    /// The same, waiting for the server's answer: `InUse` when it refused.
-    pub async fn trash_now(&self, space: &SpaceId, id: &ItemId, by: TrashBy) -> Result<(), DriveError> {
+    pub async fn trash_now(
+        &self,
+        space: &SpaceId,
+        id: &ItemId,
+        by: TrashBy,
+    ) -> Result<(), DriveError> {
         sync::trash_local(&self.inner, space, id, &by)?;
         self.sync_now(space).await?;
         let mounted = self.inner.mounted(space)?;
@@ -1001,20 +846,19 @@ impl Drive {
         }
     }
 
-    /// Opens an item, for reading or for `editing`. It is never refused: being open only stops a
-    /// delete. The server marks it in use only if it is still open after `in_use::REPORT_AFTER`
-    /// or is written to first, so a brief open (an indexer, a thumbnailer, an antivirus scan)
-    /// never marks it on everyone's computers.
-    pub async fn open(&self, space: &SpaceId, id: &ItemId, editing: bool) -> Result<(), DriveError> {
+    pub async fn open(
+        &self,
+        space: &SpaceId,
+        id: &ItemId,
+        editing: bool,
+    ) -> Result<(), DriveError> {
         sync::open(&self.inner, space, id, editing).await
     }
 
-    /// Closes what `open` opened, with the same `editing`.
     pub async fn close(&self, space: &SpaceId, id: &ItemId, editing: bool) {
         sync::close(&self.inner, space, id, editing).await;
     }
 
-    /// The item was used at `at_ms` (macOS's last-used date, a preview).
     pub fn used(&self, space: &SpaceId, id: &ItemId, at_ms: i64) -> Result<(), DriveError> {
         if let Some(mut node) = self.inner.store.node(space, id)? {
             if at_ms > node.last_used_ms {
@@ -1026,8 +870,6 @@ impl Drive {
         Ok(())
     }
 
-    /// Items whose last change is after `seq`, from `drive.db`, for the extension's sync anchor;
-    /// the second value is the next anchor.
     pub fn changes_since(
         &self,
         space: &SpaceId,
@@ -1040,22 +882,20 @@ impl Drive {
         Ok((items, next, more))
     }
 
-    /// The Space's newest applied sequence number.
     pub fn current_seq(&self, space: &SpaceId) -> Result<Seq, DriveError> {
         self.inner.store.cursor(space)
     }
 
-    /// Items whose local-only state (last used) changed after the local sequence
-    /// number `local`, for the extension's anchor; the second value is the next local number and
-    /// the third whether more wait. Items on their way to the trash are left out (the server's
-    /// feed brings their end).
     pub fn local_changes_since(
         &self,
         space: &SpaceId,
         local: i64,
         limit: usize,
     ) -> Result<(Vec<Node>, i64, bool), DriveError> {
-        let rows = self.inner.store.nodes_since_local(space, local, limit.max(1))?;
+        let rows = self
+            .inner
+            .store
+            .nodes_since_local(space, local, limit.max(1))?;
         let next = rows.last().map(|(_, seq)| *seq).unwrap_or(local);
         let more = rows.len() >= limit.max(1);
         let nodes = rows
@@ -1066,19 +906,14 @@ impl Drive {
         Ok((nodes, next, more))
     }
 
-    /// The Space's newest local sequence number.
     pub fn current_local_seq(&self, space: &SpaceId) -> Result<i64, DriveError> {
         self.inner.store.local_cursor(space)
     }
 
-    /// The server's item, as `drive.db` last heard it.
     pub fn server_item(&self, space: &SpaceId, id: &ItemId) -> Result<Option<Item>, DriveError> {
         self.inner.store.item(space, id)
     }
 
-    // The renderer's calls (the Tauri commands).
-
-    /// One page of a folder's entries.
     pub fn entries(
         &self,
         space: &SpaceId,
@@ -1099,7 +934,11 @@ impl Drive {
             .map(|node| self.inner.entry(&node)))
     }
 
-    pub fn entry_by_id(&self, space: &SpaceId, id: &ItemId) -> Result<Option<DriveEntry>, DriveError> {
+    pub fn entry_by_id(
+        &self,
+        space: &SpaceId,
+        id: &ItemId,
+    ) -> Result<Option<DriveEntry>, DriveError> {
         Ok(self
             .inner
             .store
@@ -1108,7 +947,6 @@ impl Drive {
             .map(|node| self.inner.entry(&node)))
     }
 
-    /// A file's bytes, fetched first if needed.
     pub async fn read_bytes(&self, space: &SpaceId, path: &str) -> Result<Vec<u8>, DriveError> {
         let node = self.node_at(space, path)?.ok_or(DriveError::NotFound)?;
         if node.kind != Kind::File {
@@ -1118,22 +956,24 @@ impl Drive {
         file_access::fs::read(cached).map_err(DriveError::io)
     }
 
-    /// Where this computer already holds a file's content, without fetching it: what Files draws
-    /// a picture of (its grid's thumbnails, its preview). None while the file is only on the
-    /// server, so looking at a folder never downloads it.
-    pub fn local_content(&self, space: &SpaceId, path: &str) -> Result<Option<PathBuf>, DriveError> {
+    pub fn local_content(
+        &self,
+        space: &SpaceId,
+        path: &str,
+    ) -> Result<Option<PathBuf>, DriveError> {
         let Some(node) = self.node_at(space, path)? else {
             return Ok(None);
         };
         let Some(sha256) = node.sha256.filter(|_| node.kind == Kind::File) else {
             return Ok(None);
         };
-        Ok(self.inner.cache.has(&sha256).then(|| self.inner.cache.blob_path(&sha256)))
+        Ok(self
+            .inner
+            .cache
+            .has(&sha256)
+            .then(|| self.inner.cache.blob_path(&sha256)))
     }
 
-    /// Writes `bytes` as a file `name` in the folder at `folder`. With `replace`, it is new content
-    /// for that item, made against `version`: a text save merges with what came since it,
-    /// anything else is the last save, the replaced content kept in the trash.
     pub fn write_bytes(
         &self,
         space: &SpaceId,
@@ -1148,26 +988,30 @@ impl Drive {
         Ok(entry)
     }
 
-    /// Copies a local folder into the drive at `folder`, under its own name, following its
-    /// `.gitignore` and `.mistyignore` and leaving out junk and secrets.
-    pub fn copy_in(&self, space: &SpaceId, source: &Path, folder: &str) -> Result<(DriveEntry, CopyReport), DriveError> {
+    pub fn copy_in(
+        &self,
+        space: &SpaceId,
+        source: &Path,
+        folder: &str,
+    ) -> Result<(DriveEntry, CopyReport), DriveError> {
         let out = sync::copy_in(&self.inner, space, source, folder)?;
         self.kick(space);
         Ok(out)
     }
 
-    /// Keep downloaded on or off, for an item and what's under it.
-    pub async fn keep_downloaded(&self, space: &SpaceId, path: &str, keep: bool) -> Result<(), DriveError> {
+    pub async fn keep_downloaded(
+        &self,
+        space: &SpaceId,
+        path: &str,
+        keep: bool,
+    ) -> Result<(), DriveError> {
         sync::keep_downloaded(&self.inner, space, path, keep).await
     }
 
-    /// Frees the space of an item's downloaded content (and what's under it), keeping names.
-    /// What has changes not uploaded yet, or is open, stays.
     pub fn remove_download(&self, space: &SpaceId, path: &str) -> Result<(), DriveError> {
         sync::remove_download(&self.inner, space, path)
     }
 
-    /// One page of the Space's trash: top-level trashed items, newest first.
     pub async fn trash_list(
         &self,
         space: &SpaceId,
@@ -1177,7 +1021,6 @@ impl Drive {
         sync::trash_list(&self.inner, space, after, limit).await
     }
 
-    /// Puts a trashed item back. It comes down with the next round.
     pub async fn restore(&self, space: &SpaceId, id: &ItemId) -> Result<Item, DriveError> {
         let item = self.inner.api.restore(space, id).await?;
         self.inner.store.put_item(&item)?;
@@ -1185,15 +1028,12 @@ impl Drive {
         Ok(item)
     }
 
-    /// Deletes a trashed item for good. Only the person's own `drive_purge` calls this; nothing
-    /// in the sync does.
     pub async fn purge(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
         self.inner.api.purge(space, id).await?;
         self.kick(space);
         Ok(())
     }
 
-    /// The drive path of a run's folder for a Space, and the mount it is under.
     pub fn mount_path(&self, space: &SpaceId) -> Option<PathBuf> {
         self.mount_of(space).map(|mount| mount.path)
     }
@@ -1251,8 +1091,6 @@ impl Inner {
         }
     }
 
-    /// The item's local-only state changed (last used): it goes on the local change feed, so the
-    /// macOS extension hears of it with its next `changes_since`.
     pub(crate) fn local_changed(&self, space: &SpaceId, id: &ItemId) {
         let _ = self.store.touch_local(space, id);
     }
@@ -1267,8 +1105,6 @@ impl Inner {
             .flatten()
             .map(|base| base.version);
         let editing_here = self.opens.is_writing(&key);
-        // Other people first, then the person's other computers, then this one. This computer's
-        // own server marks are left out: what it has open is known here, exactly.
         let mut in_use: Vec<InUse> = self
             .marks
             .on(&node.space, &node.id, now_ms())

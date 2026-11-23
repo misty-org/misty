@@ -2,30 +2,24 @@ import { UserRound, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
 import { cn, IconButton, Skeleton, Surface, Text, windowToolbarClass } from "@misty/ui";
-import { useTitlePending } from "../conversations/state/conversationTitles";
+import { useTitlePending } from "../conversations/state/conversation_titles";
 import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
 import { AgentAvatar } from "../personal/AgentAvatar";
 import { AgentIdentity } from "../personal/AgentIdentity";
-import { useContextPanel } from "../context-panel/contextPanelStore";
-import { useRailShown } from "../context-panel/railLayoutStore";
+import { useContextPanel } from "../context-panel/context_panel_store";
+import { useRailShown } from "../context-panel/rail_layout_store";
 
-/**
- * The open chat's name, as its title call made it: a skeleton while that call runs, "New chat"
- * before the first message. The tab above names the agent; the chat itself shows only this.
- */
 export function ChatTitle({
   conversation,
   agent,
 }: {
   conversation?: { id: string; title?: string };
-  /** The chat's agent: the title reads "Juno · what's good", the agent first, as a direct message does. */
   agent?: AgentProfile;
 }) {
   const titlePending = useTitlePending(conversation);
   if (titlePending)
     return (
       <span className="min-w-0 flex-1" aria-busy>
-        {/* A new conversation's name while its separate title call runs. */}
         <Skeleton className="inline-block h-[0.75em] w-[min(--spacing(36),70%)] rounded-full align-middle" />
         <span className="sr-only">Naming this conversation</span>
       </span>
@@ -46,12 +40,6 @@ export function ChatTitle({
   );
 }
 
-/**
- * The direct message's own buttons, at the end of the chat's own bar under the window's tabs, as
- * Discord keeps a DM's. Profile opens the agent's card in the chat's side panel, where a channel
- * would show its members; Tools shows or hides the rail of the agent's tools (its task, goal,
- * memory, session, project views and browser), folded away by default so the page reads as a chat.
- */
 export function ChatHeaderButtons() {
   const profileOpen = useContextPanel((state) => state.tab === "profile");
   const railShown = useRailShown((state) => state.value);
@@ -77,14 +65,8 @@ export function ChatHeaderButtons() {
   );
 }
 
-/** The header's avatar is a step smaller than the agent's own (AgentAvatar sizes it). */
 const headingAvatarClass = "[&_.agent-avatar]:size-8! [&_.agent-avatar]:text-control!";
 
-/**
- * The conversation title bar outside the agent workspace (loading): it names the chat's agent and
- * keeps the conversation's actions. Inside the workspace the studio bar shows `ChatTitle` instead.
- * It never switches the agent.
- */
 export function AgentConversationHeading({
   conversation,
   agent,
@@ -93,20 +75,15 @@ export function AgentConversationHeading({
   panelPicker,
 }: {
   conversation?: { id: string; title?: string };
-  /** The chat's agent. */
   agent?: AgentProfile;
   disabled: boolean;
-  /** Extra controls after New chat, for a host that is not the Agents page. */
   actions?: ReactNode;
-  /** The Misty panel's conversation picker. Given, the bar shows only the agent's avatar. */
   panelPicker?: ReactNode;
 }) {
   return (
-    // On the window's own surface, so the conversation scrolls under it unseen.
     <Surface
       as="header"
       tone="workspace"
-      // A page header's 16px sides, so the title lines up with the tab row's first tab above.
       className={cn(
         "agent-conversation-heading flex h-13.5 shrink-0 items-center justify-between gap-2 px-4",
         windowToolbarClass,
@@ -120,7 +97,6 @@ export function AgentConversationHeading({
           <AgentAvatar agent={agent} />
         </span>
       ) : (
-        // Sized to its avatar and name; only a long name fades.
         <AgentIdentity
           agent={agent}
           className={cn(
@@ -130,7 +106,6 @@ export function AgentConversationHeading({
         />
       )}
       {panelPicker}
-      {/* The buttons keep their size; a narrow header squeezes the title, never them. */}
       <div className="ml-auto flex flex-none items-center justify-end [&>*]:shrink-0">
         {conversation && (
           <AgentConversationActions conversation={conversation} disabled={disabled} />

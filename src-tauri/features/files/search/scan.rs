@@ -18,7 +18,6 @@ use walkdir::WalkDir;
 use super::catalog::{self, Catalog, Signature};
 use super::filter::{Pacer, ScanFilter, MAX_DEPTH};
 
-/// A long walk commits this often, so search works part way through the first one.
 const COMMIT_EVERY: u64 = 25_000;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -33,16 +32,13 @@ fn key_hash(path: &str) -> u64 {
     BuildHasherDefault::<DefaultHasher>::default().hash_one(path)
 }
 
-/// Takes walked entries and writes what changed to both halves of the catalog.
 pub(super) struct Sink<'a> {
     catalog: &'a Catalog,
     writer: Option<IndexWriter>,
-    /// A manifest transaction is open.
     open: bool,
     pending: u64,
     seen: HashSet<u64>,
     pub changes: Changes,
-    /// Something was committed since the caller last asked.
     pub committed: bool,
 }
 
@@ -118,8 +114,6 @@ impl<'a> Sink<'a> {
         Ok(())
     }
 
-    /// Removes what the catalog holds below a fully walked `root` that the walk didn't see.
-    /// Counting first avoids reading every path when nothing went.
     pub(super) fn remove_missing(&mut self, root: &str) -> Result<(), String> {
         let seen = self.changes.unchanged + self.changes.updated + self.changes.added;
         if catalog::count_below(&self.catalog.manifest, root)? == seen {
@@ -132,7 +126,6 @@ impl<'a> Sink<'a> {
         self.remove(missing)
     }
 
-    /// Removes the entry at `path` and everything below it, except what this update has seen.
     pub(super) fn remove_unseen(&mut self, path: &str) -> Result<(), String> {
         let mut paths = catalog::paths_below(&self.catalog.manifest, path)?;
         if self.lookup(path)?.is_some() {
@@ -142,10 +135,11 @@ impl<'a> Sink<'a> {
         self.remove(paths)
     }
 
-    /// Commits both halves, the index first.
     fn commit(&mut self) -> Result<(), String> {
         if let Some(writer) = self.writer.as_mut() {
-            writer.commit().map_err(|error| format!("The search index couldn't be saved: {error}"))?;
+            writer
+                .commit()
+                .map_err(|error| format!("The search index couldn't be saved: {error}"))?;
         }
         if self.open {
             self.catalog
@@ -161,7 +155,6 @@ impl<'a> Sink<'a> {
         Ok(())
     }
 
-    /// Commits what is left and lets the writer finish its merges.
     pub(super) fn finish(mut self) -> Result<Changes, String> {
         self.commit()?;
         if let Some(writer) = self.writer.take() {
@@ -175,16 +168,12 @@ impl<'a> Sink<'a> {
 
 impl Drop for Sink<'_> {
     fn drop(&mut self) {
-        // Not finished (a failure or a stop): the manifest goes back with the writer's
-        // uncommitted documents, which dropping the writer discards.
         if self.open {
             let _ = self.catalog.manifest.execute_batch("ROLLBACK");
         }
     }
 }
 
-/// Walks `start` (at `depth` below the home folder) as a scan would and hands every entry to the
-/// sink; the start itself too, unless it is the home folder. `keep_going` is asked as it walks.
 fn walk(
     start: &Path,
     depth: usize,
@@ -222,8 +211,11 @@ fn walk(
     Ok(count)
 }
 
-/// Walks the whole home folder and brings the catalog in step with it.
-pub(super) fn scan(catalog: &Catalog, home: &Path, keep_going: &dyn Fn() -> bool) -> Result<Changes, String> {
+pub(super) fn scan(
+    catalog: &Catalog,
+    home: &Path,
+    keep_going: &dyn Fn() -> bool,
+) -> Result<Changes, String> {
     let filter = ScanFilter::new(home);
     let mut sink = Sink::new(catalog);
     let mut pacer = Pacer::default();
@@ -232,10 +224,6 @@ pub(super) fn scan(catalog: &Catalog, home: &Path, keep_going: &dyn Fn() -> bool
     sink.finish()
 }
 
-/// Applies changes at `changed` without walking the home folder: what exists now is added or
-/// updated, what is gone is removed with everything below it, and a folder new to the catalog is
-/// indexed with its contents. Folders in `rescan` (events below them were dropped) are walked and
-/// reconciled. Paths a scan wouldn't reach are left alone.
 pub(super) fn apply(
     catalog: &Catalog,
     home: &Path,
@@ -246,16 +234,17 @@ pub(super) fn apply(
     let filter = ScanFilter::new(home);
     let mut sink = Sink::new(catalog);
     let mut pacer = Pacer::default();
-    // Sorted, so a folder comes before what is inside it.
     let changed: BTreeSet<&PathBuf> = changed.iter().collect();
     for path in changed {
-        let Some(depth) = filter.reach(path).filter(|depth| *depth > 0) else { continue };
+        let Some(depth) = filter.reach(path).filter(|depth| *depth > 0) else {
+            continue;
+        };
         let text = path.to_string_lossy().into_owned();
         match fs_disk::symlink_metadata(path) {
-            // Scans skip links, so a link in an entry's place removes it.
             Ok(meta) if !meta.file_type().is_symlink() => {
-                let Some(doc) = catalog::local_doc(path, &meta) else { continue };
-                // A folder made or moved in brings its contents, often without an event for each.
+                let Some(doc) = catalog::local_doc(path, &meta) else {
+                    continue;
+                };
                 if meta.is_dir() && sink.lookup(&doc.path)?.is_none() {
                     walk(path, depth, &filter, &mut sink, &mut pacer, keep_going)?;
                     sink.remove_unseen(&text)?;
@@ -264,13 +253,17 @@ pub(super) fn apply(
                 }
             }
             Ok(_) => sink.remove_unseen(&text)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => sink.remove_unseen(&text)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                sink.remove_unseen(&text)?
+            }
             Err(_) => {}
         }
     }
     let rescan: BTreeSet<&PathBuf> = rescan.iter().collect();
     for path in rescan {
-        let Some(depth) = filter.reach(path) else { continue };
+        let Some(depth) = filter.reach(path) else {
+            continue;
+        };
         if fs_disk::is_dir(path) {
             walk(path, depth, &filter, &mut sink, &mut pacer, keep_going)?;
         }

@@ -12,11 +12,11 @@ import {
   type Navigator,
   type To,
 } from "react-router-dom";
-import { workspaceSurfaceFromRoute } from "./routeSurface";
-import { dockLeaves } from "../panes/dockTree";
-import type { WorkspaceView } from "./workspaceViews";
-import { useWorkspaceStore } from "./useWorkspaceStore";
-import { useStableCallback } from "@/shared/hooks/useStableCallback";
+import { workspaceSurfaceFromRoute } from "./route_surface";
+import { dockLeaves } from "../panes/dock_tree";
+import type { WorkspaceView } from "./workspace_views";
+import { useWorkspaceStore } from "./use_workspace_store";
+import { useStableCallback } from "@/shared/hooks/use_stable_callback";
 
 interface WorkspaceViewRouteHistory {
   entries: string[];
@@ -26,7 +26,6 @@ interface WorkspaceViewRouteHistory {
 const routeHistories = new Map<string, WorkspaceViewRouteHistory>();
 const WorkspaceViewIdContext = createContext<string | null>(null);
 
-/** The id of the workspace view this component is mounted in, or null outside one. */
 export function useWorkspaceViewId(): string | null {
   return useContext(WorkspaceViewIdContext);
 }
@@ -42,10 +41,6 @@ export function useWorkspaceViewFocused(): boolean {
   });
 }
 
-/**
- * Whether the view this component is mounted in is on screen: the open view of one of the active
- * window tab's panes, focused or not. True outside a view.
- */
 export function useWorkspaceViewShown(): boolean {
   const tabId = useContext(WorkspaceViewIdContext);
   return useWorkspaceStore((state) => {
@@ -94,17 +89,7 @@ function recordWorkspaceViewRoute(tabId: string, route: string, replace: boolean
   routeHistories.set(tabId, history);
 }
 
-/**
- * Gives a mounted workspace tab its own React Router location.
- *
- * Nested apps can continue using `useLocation`, `useSearchParams`, links, and
- * `useNavigate`, but those APIs now read and update this tab's route. Only the
- * focused tab mirrors its route to the desktop address bar.
- */
 export function WorkspaceViewRouteScope(props: { tab: WorkspaceView; children: ReactNode }) {
-  // React Router replaces `navigate` on every app route change. Read it
-  // through a stable callback so this tab's navigator, and every link and
-  // navigate hook in the tab, stays the same while other tabs navigate.
   const navigateOuter = useNavigate();
   const outerNavigate = useStableCallback((to: To, options?: NavigateOptions) =>
     navigateOuter(to, options),
@@ -143,8 +128,6 @@ export function WorkspaceViewRouteScope(props: { tab: WorkspaceView; children: R
         (pane) => pane.id === workspace.layout.focusedPaneId,
       );
       if (focusedPane?.activeViewId === props.tab.id) {
-        // The pane owns its route stack. The address bar mirrors the focused
-        // entry without duplicating that stack in the shell's browser history.
         outerNavigate(nextRoute, { ...options, state, replace: true });
       }
     };

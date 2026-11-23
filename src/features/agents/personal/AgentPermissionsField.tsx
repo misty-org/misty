@@ -1,6 +1,6 @@
 import { ClipboardList, Shield, ShieldCheck, ShieldOff, type LucideIcon } from "lucide-react";
 import { Field, OptionSelect } from "@misty/ui";
-import { resolveEngineMode, useEngineModes, type EngineModeKind } from "../engines/engineModes";
+import { resolveEngineMode, useEngineModes, type EngineModeKind } from "../engines/engine_modes";
 
 const kindIcons: Record<EngineModeKind, LucideIcon> = {
   asks: Shield,
@@ -9,11 +9,6 @@ const kindIcons: Record<EngineModeKind, LucideIcon> = {
   no_asking: ShieldOff,
 };
 
-/**
- * How new chats with this agent start: one of its engine's own modes, by the engine's names. An
- * older saved Ask or Auto shows as the engine's mode it maps to. Any chat can switch in its
- * composer. Not shown for an engine with only one mode.
- */
 export function AgentPermissionsField(props: {
   engine?: string;
   value: string;

@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import type { AgentProfile, AgentProfileInput } from "@/shared/schemas";
-import { Button, ChoiceTile, Input, Pressable, Surface, Text } from "@misty/ui";
+import {
+  Button,
+  ChoiceTile,
+  Field,
+  Input,
+  Pressable,
+  RowGroupSection,
+  RowGroupStack,
+  Text,
+} from "@misty/ui";
 import { AgentAvatar, AgentCloudImage } from "./AgentAvatar";
-import { agentCloudAvatar, agentCloudVariants } from "./agentCloudAvatars";
+import { agentCloudAvatar, agentCloudVariants } from "./agent_cloud_avatars";
 
-/** The profile's avatar, and the cloud and emoji choices that open under it. */
 export function AgentAvatarPicker({
   profile,
   name,
@@ -59,12 +67,9 @@ export function AgentAvatarPicker({
         </div>
       </div>
       {avatarEditing && (
-        <Surface tone="page" edge="hairline" radius="xl" className="p-4 space-y-4">
-          <div>
-            <Text bare as="div" tone="muted" className="text-xs font-medium mb-2">
-              Cloud avatar
-            </Text>
-            <div role="group" aria-label="Cloud avatar" className="grid grid-cols-2 gap-2">
+        <RowGroupStack>
+          <RowGroupSection title="Cloud avatar">
+            <div className="grid grid-cols-2 gap-0.5">
               {agentCloudVariants.map((variant) => {
                 const chosen =
                   !avatar?.emoji &&
@@ -77,8 +82,8 @@ export function AgentAvatarPicker({
                 return (
                   <ChoiceTile
                     key={variant.id}
-                    look="outline"
                     label={`${variant.name}, ${variant.expression}`}
+                    caption={variant.expression}
                     selected={chosen}
                     disabled={busy}
                     onSelect={() =>
@@ -88,32 +93,19 @@ export function AgentAvatarPicker({
                         cloudVariant: variant.id,
                       })
                     }
-                    className="gap-1 whitespace-normal p-2.5 text-center"
                   >
-                    <div className="size-14 shrink-0 flex items-center justify-center">
+                    <div className="flex size-14 shrink-0 items-center justify-center">
                       <AgentCloudImage variant={variant} fill />
                     </div>
-                    <Text bare tone="default" className="text-xs font-medium leading-none">
-                      {variant.name}
-                    </Text>
-                    <Text bare tone="muted" className="text-meta leading-tight">
-                      {variant.expression}
-                    </Text>
+                    <Text size="control">{variant.name}</Text>
                   </ChoiceTile>
                 );
               })}
             </div>
-          </div>
-          <div className="flex items-center gap-3 pt-2 border-t">
-            <label htmlFor="agent-custom-emoji" className="text-xs font-medium shrink-0">
-              <Text bare tone="muted">
-                Custom emoji
-              </Text>
-            </label>
+          </RowGroupSection>
+          <Field label="Custom emoji">
             <Input
-              id="agent-custom-emoji"
-              className="w-24 text-center text-base"
-              aria-label="Avatar emoji"
+              className="w-24"
               maxLength={12}
               value={typeof avatar?.emoji === "string" ? avatar.emoji : ""}
               placeholder="Optional"
@@ -125,11 +117,8 @@ export function AgentAvatarPicker({
                 })
               }
             />
-            <Text bare tone="muted" className="text-xs">
-              Replaces cloud avatar when set
-            </Text>
-          </div>
-        </Surface>
+          </Field>
+        </RowGroupStack>
       )}
     </>
   );

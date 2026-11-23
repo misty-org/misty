@@ -14,7 +14,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
-vi.mock("@/features/app-windows/recovery/recoveryStorage", () => ({
+vi.mock("@/features/app-windows/recovery/recovery_storage", () => ({
   flushWorkspaceRecovery: mocks.flush,
 }));
 import { UnsavedQuitGuard } from "./UnsavedQuitGuard";

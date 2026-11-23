@@ -6,16 +6,6 @@
 use super::{same_or_child, SessionFile};
 use std::path::{Path, PathBuf};
 
-/// Bounded head peek: parse up to `max_lines` JSON lines from the head of a
-/// file (plain or zstd). Reads in 16 KiB chunks and stops as soon as
-/// `max_lines` complete lines have arrived, so a file costs ~tens of KB,
-/// never the full cap. Codex embeds its full base_instructions system
-/// prompt in the `session_meta` line, so line 1 alone runs to tens of KB —
-/// a fixed 16 KiB read truncated it mid-JSON and every newer rollout failed
-/// identification, while a fixed 1 MiB read would pull ~1 GB per 1000 files
-/// on a cold scan for lines it never uses. Total reads stay bounded by
-/// MAX_HEAD_BYTES. Newer pi-family files prepend a `title` line before the
-/// `session` line, so line 1 alone is not enough either.
 pub(super) fn peek_head_json_lines(
     path: &Path,
     zstd_compressed: bool,
@@ -24,8 +14,10 @@ pub(super) fn peek_head_json_lines(
     try_peek_head_json_lines(path, zstd_compressed, max_lines).unwrap_or_default()
 }
 
-/// Fallible variant for callers that must not confuse an unreadable file with
-/// a successfully inspected file carrying no usable identity.
+#[allow(
+    clippy::disallowed_types,
+    reason = "reads the engine's own session file in place, wherever the engine keeps it"
+)]
 fn try_peek_head_json_lines(
     path: &Path,
     zstd_compressed: bool,
@@ -41,8 +33,6 @@ fn try_peek_head_json_lines(
         Box::new(file)
     };
     let mut buf = Vec::new();
-    // Incremental newline count: re-scanning the whole buffer per chunk is
-    // O(n²) on a long head.
     let mut newline_count = 0usize;
     let mut eof = false;
     while newline_count < max_lines && buf.len() < MAX_HEAD_BYTES {
@@ -62,9 +52,6 @@ fn try_peek_head_json_lines(
     let head = String::from_utf8_lossy(&buf);
     let mut lines: Vec<&str> = head.split('\n').collect();
     if !eof {
-        // The cap (or an unlucky chunk boundary) can leave the tail segment
-        // mid-line; a partial line never parses, so drop it. At EOF the tail
-        // is a complete final line.
         lines.pop();
     }
     Ok(lines
@@ -74,9 +61,11 @@ fn try_peek_head_json_lines(
         .collect())
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 pub(super) fn discover_claude(workspace: &Path) -> Vec<SessionFile> {
-    // The CLI's config root honors CLAUDE_CONFIG_DIR; pinning ~/.claude here
-    // would lose the history of users who relocate it.
     let base = crate::engines::engine_home(Some("CLAUDE_CONFIG_DIR"), ".claude").join("projects");
     let mut out = Vec::new();
     let mut seen_sessions = std::collections::HashSet::new();
@@ -106,8 +95,6 @@ pub(super) fn discover_claude(workspace: &Path) -> Vec<SessionFile> {
     out
 }
 
-/// One CodeBuddy transcript found on disk. `session_id`/`cwd` come from its
-/// head lines; the project directory name is CLI-private.
 pub(super) struct CodebuddyTranscript {
     pub session_id: String,
     pub cwd: String,
@@ -127,8 +114,6 @@ struct CachedCodebuddyHead {
     identity: Option<CodebuddyIdentity>,
 }
 
-// Keep identity peeks out of no-op scans. Clearing at the bound is cheaper
-// than LRU bookkeeping and mirrors the other small, rebuildable disk caches.
 const CODEBUDDY_HEAD_CACHE_CAPACITY: usize = 4096;
 static CODEBUDDY_HEAD_CACHE: std::sync::LazyLock<
     parking_lot::Mutex<std::collections::HashMap<PathBuf, CachedCodebuddyHead>>,
@@ -160,18 +145,6 @@ pub(super) fn inject_codebuddy_head_io_error(path: &Path) {
         .insert(path.to_path_buf());
 }
 
-/// Enumerate every CodeBuddy transcript once per scan.
-///
-/// The CLI names project dirs with its own encoding (drops the leading
-/// separator, keeps spaces/underscores/case: /Users/a/CCGUI 项目/b →
-/// Users-a-CCGUI 项目-b), which differs from claude_encode_project_path and is
-/// not publicly specified. Attribution therefore uses the cwd recorded on each
-/// transcript. A bounded (path, size, mtime) cache keeps unchanged heads out
-/// of no-op scans; a changed or new file is identified once, not once per
-/// workspace (the scan used to pay O(workspaces × transcripts) head reads).
-/// Deduping by session id here, newest transcript wins, makes the retained
-/// file deterministic: read_dir order is unspecified, and a session
-/// can appear under several project dirs after a resume or workspace move.
 pub(super) fn codebuddy_transcripts() -> Vec<CodebuddyTranscript> {
     let mut by_session: std::collections::HashMap<String, CodebuddyTranscript> =
         std::collections::HashMap::new();
@@ -190,13 +163,14 @@ pub(super) fn codebuddy_transcripts() -> Vec<CodebuddyTranscript> {
         }
     }
     let mut found: Vec<CodebuddyTranscript> = by_session.into_values().collect();
-    // Stable candidate order regardless of hash iteration order.
     found.sort_by(|a, b| a.path.cmp(&b.path));
     found
 }
 
-/// Every transcript path on disk, without reading content. Scanning and
-/// deletion share this enumeration so a damaged duplicate remains deletable.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn codebuddy_transcript_paths() -> Vec<PathBuf> {
     let base =
         crate::engines::engine_home(Some("CODEBUDDY_CONFIG_DIR"), ".codebuddy").join("projects");
@@ -222,23 +196,21 @@ fn codebuddy_transcript_paths() -> Vec<PathBuf> {
     found
 }
 
-/// Every parseable transcript on disk (no dedupe). Newest-wins selection must
-/// compare all copies before choosing the retained one.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads CodeBuddy's own history in place and resolves the folders its sessions ran in, which may not be linked"
+)]
 fn codebuddy_raw_transcripts() -> Vec<CodebuddyTranscript> {
     let mut found = Vec::new();
     for path in codebuddy_transcript_paths() {
         let metadata = std::fs::metadata(&path).ok();
-        let signature = metadata
-            .as_ref()
-            .and_then(|metadata| codebuddy_metadata_signature(metadata));
+        let signature = metadata.as_ref().and_then(codebuddy_metadata_signature);
         let Ok(Some(identity)) = codebuddy_head_with_signature(&path, signature) else {
             continue;
         };
         let modified = metadata
             .and_then(|metadata| metadata.modified().ok())
             .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-        // Resolve once per transcript per scan, not once per workspace. Keep
-        // this outside the content cache so retargeting a symlink is observed.
         let canonical_cwd = std::fs::canonicalize(&identity.cwd).ok();
         found.push(CodebuddyTranscript {
             session_id: identity.session_id,
@@ -251,12 +223,14 @@ fn codebuddy_raw_transcripts() -> Vec<CodebuddyTranscript> {
     found
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "compares the person's project folder against an engine's records; the folder may not be linked"
+)]
 pub(super) fn discover_codebuddy_in(
     transcripts: &[CodebuddyTranscript],
     workspace: &Path,
 ) -> Vec<SessionFile> {
-    // Canonicalize each workspace once per scan. Transcript cwd resolution was
-    // done once during enumeration, avoiding a canonicalize per workspace×transcript.
     let canonical_workspace = std::fs::canonicalize(workspace).ok();
     transcripts
         .iter()
@@ -307,8 +281,6 @@ fn codebuddy_head_with_signature(
         }
     }
 
-    // Only successful reads enter the cache, including confirmed malformed or
-    // identity-free files. A transient error must be retried on the next scan.
     let identity = read_codebuddy_head(path)?;
     if let Some(signature) = signature {
         let mut cache = CODEBUDDY_HEAD_CACHE.lock();
@@ -326,15 +298,6 @@ fn codebuddy_head_with_signature(
     Ok(identity)
 }
 
-/// Session identity from a CodeBuddy transcript's head lines: every
-/// conversation line carries `sessionId` and `cwd` (e.g.
-/// `{"type":"message","role":"user",...,"sessionId":...,"cwd":...}`).
-/// Non-conversation head lines (file-history-snapshot, ai-title) are skipped
-/// while scanning. Falls back to the file stem when the line carries cwd
-/// but no sessionId. Bookkeeping lines consume the same budget as
-/// conversation lines, and `peek_head_json_lines` already caps total bytes,
-/// so a generous line budget costs nothing and avoids dropping sessions whose
-/// head carries many snapshots.
 fn read_codebuddy_head(path: &Path) -> std::io::Result<Option<CodebuddyIdentity>> {
     #[cfg(test)]
     if CODEBUDDY_HEAD_TEST_IO_ERRORS.lock().remove(path) {
@@ -378,16 +341,14 @@ fn read_codebuddy_head(path: &Path) -> std::io::Result<Option<CodebuddyIdentity>
     Ok(None)
 }
 
-/// Strip the `\\?\` verbatim prefix Windows `canonicalize` adds — the CLI
-/// encodes the plain path, so the prefix would break the match.
 fn strip_verbatim_prefix(path: &str) -> &str {
     path.strip_prefix(r"\\?\").unwrap_or(path)
 }
 
-/// Candidate `<projects>/<encoded>` dirs for one workspace. Windows terminals
-/// disagree on drive-letter case, slash direction, and trailing separators,
-/// and the CLI encodes whatever cwd spelling it saw — so try the raw
-/// spelling, a trailing-separator-trimmed one, and the canonicalized path.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "compares the person's project folder against an engine's records; the folder may not be linked"
+)]
 fn claude_project_dirs(base: &Path, workspace: &Path) -> Vec<PathBuf> {
     fn push(
         out: &mut Vec<PathBuf>,
@@ -414,10 +375,10 @@ fn claude_project_dirs(base: &Path, workspace: &Path) -> Vec<PathBuf> {
     out
 }
 
-/// v0.9 managed provider homes (`~/.ccgui/<engine>-provider-homes/<id>/`):
-/// sessions launched under a managed provider profile wrote into these
-/// CLI-home-shaped dirs. Scanned so users upgrading from v0.9 keep that
-/// history instead of watching it vanish from the sidebar.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "lists the legacy ~/.ccgui provider homes, which sit outside the folders the gate grants"
+)]
 fn legacy_provider_homes(dir_name: &str) -> Vec<PathBuf> {
     let root = crate::engines::support::paths::legacy_home().join(dir_name);
     let Ok(entries) = std::fs::read_dir(&root) else {
@@ -444,6 +405,10 @@ pub(super) fn discover_kimi(workspace: &Path) -> Vec<SessionFile> {
     out
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn discover_kimi_in(base: &Path, workspace: &Path) -> Vec<SessionFile> {
     let Ok(raw) = std::fs::read_to_string(base.join("session_index.jsonl")) else {
         return Vec::new();
@@ -494,8 +459,6 @@ fn discover_kimi_in(base: &Path, workspace: &Path) -> Vec<SessionFile> {
     out
 }
 
-/// `/Users/foo/bar` → `-Users-foo-bar` (qodercli project dir names; reference
-/// engine/qoder_history.rs::encode_qoder_project_slug).
 fn qoder_encode_project_slug(path: &str) -> String {
     let mut value = path.trim().replace('\\', "/");
     while value.ends_with('/') && value.len() > 1 {
@@ -504,16 +467,9 @@ fn qoder_encode_project_slug(path: &str) -> String {
     if value.is_empty() {
         return String::new();
     }
-    // Windows rejects a drive colon in a directory name (mkdir fails with
-    // `目录名称无效`, ERROR_DIRECTORY), so `C:\ws\proj` has to encode to
-    // `C--ws-proj`. The old `C:-ws-proj` could never exist on disk — and
-    // `Path::join` reads it as a *drive-relative* path, which replaced the
-    // whole base, sending both distributions to the process's working
-    // directory instead of their own home.
     value.replace(['/', ':'], "-")
 }
 
-/// qodercli replaces non-ASCII-alphanumeric UTF-16 units with dashes.
 fn qoder_cli_project_slug(path: &str) -> String {
     const PREFIX_LEN: usize = 200;
     let mut slug = String::new();
@@ -551,9 +507,6 @@ static QODER_CWD_CACHE: std::sync::LazyLock<
 
 fn read_qoder_transcript_cwd(path: &Path, bucket: &str) -> Option<String> {
     const HEAD_LINES: usize = 64;
-    // Use the first cwd consistent with the containing directory. Later
-    // turns can record another cwd (for example after entering a worktree).
-    // The shared head reader bounds both lines and bytes.
     try_peek_head_json_lines(path, false, HEAD_LINES)
         .ok()?
         .into_iter()
@@ -596,16 +549,16 @@ fn qoder_transcript_cwd(path: &Path, bucket: &str, metadata: &std::fs::Metadata)
     cwd
 }
 
-/// Candidate `<projects>/<slug>` dirs for one workspace — same spelling
-/// spread as [`claude_project_dirs`] (raw / trailing-trimmed / canonical).
-/// `cli_encoded` marks the lossy qodercli namespace, where a transcript
-/// without a usable cwd must not be assigned by directory name alone.
 #[derive(Debug)]
 struct QoderProjectDir {
     path: PathBuf,
     cli_encoded: bool,
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "compares the person's project folder against an engine's records; the folder may not be linked"
+)]
 fn qoder_project_dirs(base: &Path, workspace: &Path) -> Vec<QoderProjectDir> {
     fn push(
         out: &mut Vec<QoderProjectDir>,
@@ -613,8 +566,6 @@ fn qoder_project_dirs(base: &Path, workspace: &Path) -> Vec<QoderProjectDir> {
         base: &Path,
         spelling: &str,
     ) {
-        // Qoder also uses ASCII-sanitized project names (notably for Chinese
-        // and spaces). Prefer that spelling while retaining legacy dirs.
         for (slug, cli_encoded) in [
             (qoder_cli_project_slug(spelling), true),
             (qoder_encode_project_slug(spelling), false),
@@ -642,6 +593,10 @@ fn qoder_project_dirs(base: &Path, workspace: &Path) -> Vec<QoderProjectDir> {
     out
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "compares the person's project folder against an engine's records; the folder may not be linked"
+)]
 fn qoder_cwd_matches_workspace(
     cwd: &str,
     workspace: &Path,
@@ -654,11 +609,10 @@ fn qoder_cwd_matches_workspace(
         })
 }
 
-/// Qoder sessions: `<config-home>/projects/<cwd-slug>/<sessionId>.jsonl`, one
-/// claude-shaped NDJSON file per session (reference qoder_history.rs). Each
-/// distribution (Global `~/.qoder` / CN `~/.qoder-cn`) owns an independent
-/// home. Directory candidates narrow the scan; the transcript cwd resolves
-/// collisions before session IDs are deduplicated.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Qoder's own history in place and compares the person's project folder against it; the folder may not be linked"
+)]
 pub(super) fn discover_qoder(
     workspace: &Path,
     distribution: crate::engines::qoder::QoderDistribution,
@@ -699,9 +653,6 @@ pub(super) fn discover_qoder(
                 {
                     continue;
                 }
-                // A lossy CLI bucket can contain sessions from several
-                // workspaces. Without a matching cwd there is no safe way to
-                // choose one; retain the old fallback only for legacy dirs.
                 None if dir.cli_encoded => continue,
                 _ => {}
             }
@@ -719,8 +670,10 @@ pub(super) fn discover_qoder(
     out
 }
 
-/// True only when a readable transcript positively identifies another
-/// workspace. Unknown or unreadable ownership stays conservative during GC.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads a Qoder transcript in place and compares the person's project folder against it; the folder may not be linked"
+)]
 pub(super) fn qoder_transcript_conflicts_with_workspace(path: &Path, workspace: &Path) -> bool {
     let Some(bucket) = path
         .parent()
@@ -736,15 +689,10 @@ pub(super) fn qoder_transcript_conflicts_with_workspace(path: &Path, workspace: 
         return false;
     }
     let canonical_workspace = std::fs::canonicalize(workspace).ok();
-    // A destructive GC decision must not depend on a cached head if the file
-    // was replaced while preserving its size and mtime.
     read_qoder_transcript_cwd(path, bucket).is_some_and(|cwd| {
         if Path::new(&cwd) == workspace {
             return false;
         }
-        // A dangling symlink or detached volume makes canonicalization fail.
-        // Without it, a spelling difference is not positive evidence that the
-        // transcript belongs elsewhere; preserve the user's indexed metadata.
         let Some(canonical) = canonical_workspace.as_deref() else {
             return false;
         };
@@ -752,9 +700,6 @@ pub(super) fn qoder_transcript_conflicts_with_workspace(path: &Path, workspace: 
     })
 }
 
-/// OpenCode data roots holding `storage/{session,message,part}/…` and
-/// `opencode.db` (reference commands_opencode_catalog.rs
-/// ::opencode_data_candidate_roots).
 fn opencode_data_roots(workspace: &Path) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Some(home) = std::env::var_os("OPENCODE_HOME") {
@@ -766,10 +711,6 @@ fn opencode_data_roots(workspace: &Path) -> Vec<PathBuf> {
     if let Some(dir) = dirs::data_dir() {
         roots.push(dir.join("opencode"));
     }
-    // `dirs::home_dir()` reads the Windows Known Folder API, which ignores
-    // HOME/USERPROFILE, so a scratch home never reached this root. Same split
-    // `paths::home_dir` already applies for the v0.9 legacy homes; production
-    // resolves identically either way.
     roots.push(
         crate::engines::support::paths::home_dir()
             .join(".local")
@@ -786,16 +727,14 @@ fn opencode_data_roots(workspace: &Path) -> Vec<PathBuf> {
     deduped
 }
 
-// OpenCode scan budgets. Session metadata files are ~400 bytes of pretty
-// JSON; the caps exist so a bloated storage tree costs a bounded readdir
-// count plus a few KB per file, never an unbounded walk (the repo has a
-// 287MB-scan incident in its history).
 const MAX_OPENCODE_PROJECT_DIRS: usize = 64;
 const MAX_OPENCODE_SESSION_FILES: usize = 512;
 const MAX_OPENCODE_META_BYTES: u64 = 64 * 1024;
 
-/// Parse a small JSON file (opencode pretty-prints, so line readers do not
-/// apply), reading at most `max_bytes`. Truncated or invalid JSON → None.
+#[allow(
+    clippy::disallowed_types,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn read_small_json(path: &Path, max_bytes: u64) -> Option<serde_json::Value> {
     use std::io::Read;
     let file = std::fs::File::open(path).ok()?;
@@ -804,18 +743,10 @@ fn read_small_json(path: &Path, max_bytes: u64) -> Option<serde_json::Value> {
     serde_json::from_str(&buf).ok()
 }
 
-/// True when a one-row probe (`SELECT 1 …`) matches. Used to feature-detect
-/// optional OpenCode schema (`session.parent_id`, the `message` table) before
-/// referencing it in a query, so a database that predates a column still
-/// scans instead of silently returning nothing.
 fn sqlite_has(conn: &rusqlite::Connection, probe: &str) -> bool {
     conn.query_row(probe, [], |_| Ok(())).is_ok()
 }
 
-/// `AND …` fragment restricting `session` rows to those the sidebar should
-/// show: no spawned subagents (`parent_id` set) and at least one message.
-/// Empty when the schema predates `parent_id` / the `message` table, so such a
-/// database degrades to "show everything" instead of "show nothing".
 fn opencode_visible_filter(conn: &rusqlite::Connection) -> String {
     let mut filter = String::new();
     if sqlite_has(
@@ -833,9 +764,10 @@ fn opencode_visible_filter(conn: &rusqlite::Connection) -> String {
     filter
 }
 
-/// Of `session_ids`, the subset still visible in the sidebar. `None` when the
-/// address is not a db one or the database can't be read — callers must then
-/// leave the indexed rows alone rather than prune on a transient failure.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 pub(super) fn opencode_db_visible_sessions(
     db: &Path,
     session_ids: &[String],
@@ -847,8 +779,6 @@ pub(super) fn opencode_db_visible_sessions(
         rusqlite::Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
             .ok()?;
     let mut filter = opencode_visible_filter(&conn);
-    // Discovery lists only unarchived rows; an archived one indexed earlier
-    // must leave the sidebar too.
     if sqlite_has(
         &conn,
         "SELECT 1 FROM pragma_table_info('session') WHERE name='time_archived'",
@@ -856,7 +786,6 @@ pub(super) fn opencode_db_visible_sessions(
         filter.insert_str(0, " AND time_archived IS NULL");
     }
     let mut visible = std::collections::HashSet::new();
-    // Chunk to stay well under SQLite's bound-variable limit.
     for chunk in session_ids.chunks(200) {
         let placeholders = std::iter::repeat_n("?", chunk.len())
             .collect::<Vec<_>>()
@@ -875,10 +804,6 @@ pub(super) fn opencode_db_visible_sessions(
     Some(visible)
 }
 
-/// OpenCode sessions, from each storage generation. Legacy (≤1.1.x) keeps one JSON tree per
-/// data root (`<root>/storage/session/<projectId>/<id>.json`, shape `{id, projectID, directory,
-/// title, time:{created,updated}}`); ≥1.18 keeps one SQLite database per root (`opencode.db`,
-/// its 2.x tables read by `opencode_v2.rs`). Each matches a workspace by its `directory`.
 pub(super) fn discover_opencode(workspace: &Path) -> Vec<SessionFile> {
     let mut out = Vec::new();
     let mut seen_sessions = std::collections::HashSet::new();
@@ -891,9 +816,10 @@ pub(super) fn discover_opencode(workspace: &Path) -> Vec<SessionFile> {
     out
 }
 
-/// `time_updated` of every session row, hidden (archived / subagent) rows
-/// included. Empty when the database is missing, unreadable or predates the
-/// column: its sessions are not discovered either, so the tree stays in use.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 pub(super) fn opencode_db_updated_times(root: &Path) -> std::collections::HashMap<String, i64> {
     let db = root.join("opencode.db");
     if !db.is_file() {
@@ -915,14 +841,9 @@ pub(super) fn opencode_db_updated_times(root: &Path) -> std::collections::HashMa
     }) else {
         return Default::default();
     };
-    // All or nothing: a partial set would flip a session between its copies
-    // from one scan to the next.
     rows.collect::<Result<_, _>>().unwrap_or_default()
 }
 
-/// OpenCode 1.2+ copies the JSON tree into `opencode.db` once, never reads the
-/// tree again and leaves it on disk. The database copy wins unless the tree
-/// was updated later (a 1.1 binary still writing it after trying 1.2).
 fn opencode_tree_superseded(
     in_database: &std::collections::HashMap<String, i64>,
     session_id: &str,
@@ -938,7 +859,6 @@ fn opencode_tree_superseded(
         .is_some_and(|db_updated| *db_updated >= tree_updated)
 }
 
-/// `<root>` of a tree session file `<root>/storage/session/<project>/<id>.json`.
 pub(super) fn opencode_tree_root(file: &Path) -> Option<&Path> {
     let session_dir = file.parent()?.parent()?;
     let storage = session_dir.parent()?;
@@ -947,8 +867,6 @@ pub(super) fn opencode_tree_root(file: &Path) -> Option<&Path> {
         .flatten()
 }
 
-/// Whether an indexed tree session file is superseded by its root's database
-/// (see [`opencode_tree_superseded`]); unreadable metadata never is.
 pub(super) fn opencode_tree_file_superseded(
     in_database: &std::collections::HashMap<String, i64>,
     session_id: &str,
@@ -958,8 +876,10 @@ pub(super) fn opencode_tree_file_superseded(
         .is_some_and(|meta| opencode_tree_superseded(in_database, session_id, &meta))
 }
 
-/// Legacy JSON storage tree: `storage/session/<projectId>/<sessionId>.json`
-/// (opencode ≤1.1.x). Attribution comes from the metadata's `directory`.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn discover_opencode_tree(
     root: &Path,
     workspace: &Path,
@@ -1023,11 +943,10 @@ fn discover_opencode_tree(
     }
 }
 
-/// OpenCode ≥1.18 collapsed the tree into one SQLite database per data root
-/// (`<root>/opencode.db`, `session`/`message`/`part` tables). Without this
-/// arm a restart finds no OpenCode session at all — the old tree no longer
-/// exists to scan. Each row gets a virtual [`super::opencode_db_session_path`]
-/// address so the path-keyed pipeline can read/delete it.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn discover_opencode_db(
     root: &Path,
     workspace: &Path,
@@ -1038,21 +957,11 @@ fn discover_opencode_db(
     if !db.is_file() {
         return;
     }
-    // Read-only: a live `opencode serve` holds the database (WAL), and a scan
-    // must never mutate it.
     let Ok(conn) =
         rusqlite::Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
     else {
         return;
     };
-    // Since 1.18 a spawned subagent is its own `session` row: `parent_id` is
-    // set and `directory` is the parent's workspace, so an unfiltered scan
-    // lists every subagent next to its parent — the same duplicate-conversation
-    // problem the codex/dsh subagent arms below already drop (the live turn
-    // surfaces subagents in the subagent strip instead). A row that never
-    // received a message is an abandoned new-chat and belongs in the same
-    // bucket. `opencode_visible_filter` probes the columns/tables first: a
-    // database whose schema predates them degrades to "list everything".
     let query = format!(
         "SELECT id, directory FROM session WHERE time_archived IS NULL{} \
          ORDER BY time_updated DESC LIMIT ?1",
@@ -1113,15 +1022,9 @@ pub(super) fn discover_grok(workspace: &Path) -> Vec<SessionFile> {
     out
 }
 
-/// The anchor roots of directory-based engines' session dirs (kimi/grok/dsh). kimi's session
-/// dirs sit directly under each home (session_index records absolute paths); grok/dsh sit in a
-/// cwd subfolder of <home>/sessions/. Discovery (this module) and deletion (reader) share this
-/// list, so any session that is found can be deleted, including v0.9 legacy/provider homes.
 pub(crate) fn dir_session_anchor_roots(engine: &str) -> Vec<PathBuf> {
     match engine {
         "kimi" => {
-            // Current CLI home, the v0.9-era CLI home (`~/.kimi`, KIMI_HOME
-            // override), and every v0.9 managed provider home.
             let mut homes = vec![crate::engines::engine_home(None, ".kimi-code")];
             homes.push(crate::engines::engine_home(Some("KIMI_HOME"), ".kimi"));
             homes.extend(legacy_provider_homes("kimi-provider-homes"));
@@ -1137,8 +1040,6 @@ pub(crate) fn dir_session_anchor_roots(engine: &str) -> Vec<PathBuf> {
             roots
         }
         "dsh" => vec![crate::engines::engine_home(Some("DSH_HOME"), ".dsh").join("sessions")],
-        // minimax: session dirs live under <data>/v2/sessions/<date>/…-session_<id>/, and the db
-        // row's history_relative_dir holds the relative path; the anchor matches discovery.
         "minimax" => {
             vec![
                 crate::engines::engine_home(Some("MINIMAX_DATA_DIR"), ".minimax")
@@ -1150,6 +1051,10 @@ pub(crate) fn dir_session_anchor_roots(engine: &str) -> Vec<PathBuf> {
     }
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn discover_grok_in(sessions_root: &Path, workspace: &Path) -> Vec<SessionFile> {
     let Ok(cwd_dirs) = std::fs::read_dir(sessions_root) else {
         return Vec::new();
@@ -1191,8 +1096,10 @@ fn discover_grok_in(sessions_root: &Path, workspace: &Path) -> Vec<SessionFile> 
     out
 }
 
-/// Antigravity conversations live under `~/.gemini/antigravity-cli/` as
-/// sqlite files, indexed by `conversation_summaries.db` (`workspace_uris`).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 pub(super) fn discover_agy(workspace: &Path) -> Vec<SessionFile> {
     let home = crate::engines::agy::agy_home();
     let conv_dir = home.join("conversations");
@@ -1249,12 +1156,10 @@ pub(super) fn discover_agy(workspace: &Path) -> Vec<SessionFile> {
         .collect()
 }
 
-/// MiniMax Code indexes its conversations in the runtime sqlite
-/// (`<data>/v2/sqlite/runtime-state.sqlite`, columns `workspace_dir` /
-/// `history_relative_dir`); transcripts live at
-/// `<data>/v2/sessions/<history_relative_dir>/messages.jsonl`. The dated
-/// directory names carry no workspace, so the db row is the only
-/// workspace→session link.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 pub(super) fn discover_minimax(workspace: &Path) -> Vec<SessionFile> {
     let data_dir = crate::engines::engine_home(Some("MINIMAX_DATA_DIR"), ".minimax");
     let sessions_root = data_dir.join("v2").join("sessions");
@@ -1297,8 +1202,6 @@ pub(super) fn discover_minimax(workspace: &Path) -> Vec<SessionFile> {
         if !matches(workspace_dir.trim()) && !matches(project_dir.trim()) {
             continue;
         }
-        // The db row can outlive a GUI-side delete (the CLI keeps its own
-        // ledger); a missing transcript simply drops out of the list.
         let messages = sessions_root.join(relative).join("messages.jsonl");
         if !messages.is_file() {
             continue;
@@ -1353,10 +1256,6 @@ fn from_hex(b: u8) -> Option<u8> {
     }
 }
 
-/// Codex Desktop / `codex exec` writes one rollout per spawned subagent.
-/// Those files reuse the parent's first user line as the title, so listing
-/// them next to the parent looks like duplicate conversations. The live
-/// turn already surfaces them in the subagent strip.
 fn is_codex_subagent_source(source: &serde_json::Value) -> bool {
     source
         .get("subagent")
@@ -1378,10 +1277,6 @@ pub(super) fn is_codex_subagent_file(path: &Path) -> bool {
         .any(is_codex_subagent_head)
 }
 
-/// DSH writes one session file per spawned child. The header stamps
-/// `origin: "subagent"` (and a positive `delegationDepth`); listing those
-/// next to the parent looks like leftover review chats. The live turn
-/// already surfaces them in the subagent strip.
 fn is_dsh_subagent_source(source: &serde_json::Value) -> bool {
     if source.get("origin").and_then(|v| v.as_str()) == Some("subagent") {
         return true;
@@ -1402,16 +1297,12 @@ pub(super) fn is_dsh_subagent_file(path: &Path) -> bool {
         .any(is_dsh_subagent_head)
 }
 
-/// Engine file identity from the first JSON line (codex session_meta /
-/// pi-family & dsh session line). Returns (session_id, cwd).
 pub(super) fn identify_head(engine: &str, path: &Path) -> Option<(String, String)> {
     let expected = match engine {
         "codex" => "session_meta",
         "pi" | "omp" | "dsh" => "session",
         _ => return None,
     };
-    // Scan the first few head lines: newer pi-family files prepend a
-    // `title` line before the `session` line.
     for head in peek_head_json_lines(path, engine == "dsh", 8) {
         if head.get("type").and_then(|v| v.as_str()) != Some(expected) {
             continue;
@@ -1437,10 +1328,11 @@ pub(super) fn identify_head(engine: &str, path: &Path) -> Option<(String, String
     None
 }
 
-/// Codex rollout files (readdir only, no content reads).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Codex's own history in place, in its home and the legacy ~/.ccgui provider homes"
+)]
 pub(super) fn codex_candidates() -> Vec<PathBuf> {
-    // Beyond the active home, every v0.9 managed provider home keeps its
-    // own sessions tree.
     let mut homes = vec![crate::engines::codex_home()];
     homes.extend(legacy_provider_homes("codex-provider-homes"));
     let mut out = Vec::new();
@@ -1470,6 +1362,10 @@ pub(super) fn codex_candidates() -> Vec<PathBuf> {
     out
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 pub(super) fn pi_family_candidates(home_dir_name: &str) -> Vec<PathBuf> {
     let root = crate::engines::engine_home(None, home_dir_name)
         .join("agent")
@@ -1492,8 +1388,6 @@ pub(super) fn pi_family_candidates(home_dir_name: &str) -> Vec<PathBuf> {
     out
 }
 
-/// Canonical compressed DSH log generation. v0 is `session.jsonl.zstd`;
-/// later formats are `session.vN.jsonl.zstd` (no leading zeros).
 pub(crate) fn dsh_log_generation(name: &str) -> Option<u32> {
     const SUFFIX: &str = ".jsonl.zstd";
     let stem = name.strip_suffix(SUFFIX)?;
@@ -1507,6 +1401,10 @@ pub(crate) fn dsh_log_generation(name: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 fn dsh_session_log(dir: &Path) -> Option<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return None;
@@ -1533,6 +1431,10 @@ fn dsh_session_log(dir: &Path) -> Option<PathBuf> {
     best.map(|(_, path)| path)
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own history in place, wherever the engine keeps it"
+)]
 pub(super) fn dsh_candidates() -> Vec<PathBuf> {
     let mut out = Vec::new();
     for root in dir_session_anchor_roots("dsh") {
@@ -1553,6 +1455,10 @@ pub(super) fn dsh_candidates() -> Vec<PathBuf> {
     out
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves a session's folder and an engine's home to compare them; neither need be granted"
+)]
 pub(super) fn path_is_under(path: &str, home: &Path) -> bool {
     let path = Path::new(path);
     if path.starts_with(home) {
@@ -1569,8 +1475,6 @@ mod tests {
     use super::super::scanner::tests::{scratch_dir, write_zstd_jsonl, HomeGuard, HOME_LOCK};
     use super::*;
 
-    /// Env-mutating guard for CLAUDE_CONFIG_DIR; shares HOME_LOCK so every
-    /// env-dependent scanner test stays serialized.
     struct ClaudeConfigDirGuard {
         _lock: parking_lot::MutexGuard<'static, ()>,
         prev: Option<std::ffi::OsString>,
@@ -1592,8 +1496,6 @@ mod tests {
         }
     }
 
-    /// Env-mutating guard for CODEBUDDY_CONFIG_DIR; shares HOME_LOCK so every
-    /// env-dependent scanner test stays serialized.
     struct CodebuddyConfigDirGuard {
         _lock: parking_lot::MutexGuard<'static, ()>,
         prev: Option<std::ffi::OsString>,
@@ -1746,9 +1648,6 @@ mod tests {
         );
     }
 
-    /// A workspace recorded with a trailing separator must still find the
-    /// history the CLI wrote under the trimmed spelling, and the config root
-    /// must honor CLAUDE_CONFIG_DIR.
     #[test]
     fn discover_claude_matches_trailing_slash_spelling_under_config_dir() {
         let home = scratch_dir("discover-claude");
@@ -1775,9 +1674,6 @@ mod tests {
         let config_dir = home.join("codebuddy-config");
         let workspace = home.join("ws").join("CCGUI 项目");
         std::fs::create_dir_all(&workspace).unwrap();
-        // Real CLI v2.175.0 dir naming: leading separator dropped,
-        // spaces/underscores/case kept — nothing like the Claude slug the
-        // old code derived. A name the app cannot recompute on purpose.
         let project_dir = config_dir
             .join("projects")
             .join("Users-someone-CCGUI 项目-ws_backup");
@@ -1790,7 +1686,6 @@ mod tests {
             ),
         )
         .unwrap();
-        // A sibling project dir whose sessions belong to another workspace.
         let other_dir = config_dir.join("projects").join("elsewhere");
         std::fs::create_dir_all(&other_dir).unwrap();
         std::fs::write(
@@ -1835,8 +1730,6 @@ mod tests {
             original_stat
         );
 
-        // No size/mtime change: only a transient error not entering the cache
-        // allows the second discovery to see this session.
         let found = discover_codebuddy(&workspace);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].session_id, "recovered");
@@ -1874,14 +1767,10 @@ mod tests {
         write_transcript("linked", "linked.jsonl", "linked", &linked_cwd);
 
         let _guard = CodebuddyConfigDirGuard::set(&config_dir);
-        // The recorded cwd uses the alias while the registered workspace is
-        // its real path. Raw starts_with alone cannot attribute this session.
         let found = discover_codebuddy(&workspace);
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].session_id, "linked");
 
-        // The reverse spelling must work too: a raw transcript cwd belongs to
-        // a workspace registered through its symlink.
         write_transcript("raw", "raw.jsonl", "raw", &nested);
         let found = discover_codebuddy(&alias);
         let mut ids: Vec<&str> = found.iter().map(|file| file.session_id.as_str()).collect();
@@ -1937,8 +1826,6 @@ mod tests {
             .unwrap();
             paths.push(path);
         }
-        // Make the second copy strictly newer: read_dir order is unspecified,
-        // so selection must come from mtime, not enumeration order.
         let newer = std::time::SystemTime::now() + std::time::Duration::from_secs(60);
         std::fs::File::options()
             .write(true)
@@ -1978,9 +1865,6 @@ mod tests {
         std::fs::write(index_dir.join("session_index.jsonl"), format!("{line}\n")).unwrap();
     }
 
-    /// v0.9 upgrade path: sessions under the old CLI home (~/.kimi) and under
-    /// managed provider homes (~/.ccgui/kimi-provider-homes/<id>/) must both
-    /// stay discoverable next to the current ~/.kimi-code home.
     #[test]
     fn discover_kimi_reads_legacy_and_provider_homes() {
         let home = scratch_dir("discover-kimi-legacy");
@@ -2009,8 +1893,6 @@ mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// v0.9 upgrade path: grok sessions written under a managed provider home
-    /// keep their <encoded-cwd>/<session>/chat_history.jsonl shape.
     #[test]
     fn discover_grok_reads_provider_homes() {
         let home = scratch_dir("discover-grok-legacy");
@@ -2092,7 +1974,6 @@ mod tests {
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].engine, "qoder-cn");
         assert_eq!(found[0].session_id, "sess-cn");
-        // The CN distribution never reads the Global home.
         assert!(
             discover_qoder(&workspace, crate::engines::qoder::QoderDistribution::Global).is_empty()
         );
@@ -2159,8 +2040,6 @@ mod tests {
         std::fs::remove_dir_all(&home).unwrap();
     }
 
-    /// OpenCode session metadata jsons are matched to the workspace by their
-    /// `directory` field; the project dir name is a content hash.
     #[test]
     fn discover_opencode_matches_directory_field() {
         let home = scratch_dir("discover-opencode");
@@ -2192,10 +2071,6 @@ mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// OpenCode ≥1.18 dropped the JSON storage tree for a single
-    /// `<root>/opencode.db`. Sessions attributed to the workspace by the
-    /// `session.directory` column must still be discovered, addressed by a
-    /// virtual path that round-trips to the db file + session id.
     #[test]
     fn discover_opencode_reads_sqlite_database() {
         let home = scratch_dir("discover-opencode-db");
@@ -2234,11 +2109,6 @@ mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// Since 1.18 a spawned subagent is its own `session` row: `parent_id` set,
-    /// `directory` = the parent's workspace. A never-used new chat is a row
-    /// with no `message`. An unfiltered scan lists both next to real sessions;
-    /// the live turn already surfaces subagents in the subagent strip, so both
-    /// must be dropped here while a top-level session with a message stays.
     #[test]
     fn discover_opencode_db_skips_subagent_and_empty_sessions() {
         let home = scratch_dir("discover-opencode-db-filter");
@@ -2273,11 +2143,11 @@ mod tests {
             )
             .unwrap();
         };
-        insert("ses_top", &ws, None, None, 5); // top-level, has message: kept
-        insert("ses_subagent", &ws, Some("ses_top"), None, 4); // subagent: dropped
-        insert("ses_empty", &ws, None, None, 3); // no message: dropped
-        insert("ses_archived", &ws, None, Some(9), 2); // archived: dropped
-        insert("ses_elsewhere", "/elsewhere", None, None, 1); // other ws: dropped
+        insert("ses_top", &ws, None, None, 5);
+        insert("ses_subagent", &ws, Some("ses_top"), None, 4);
+        insert("ses_empty", &ws, None, None, 3);
+        insert("ses_archived", &ws, None, Some(9), 2);
+        insert("ses_elsewhere", "/elsewhere", None, None, 1);
         message("msg_top", "ses_top");
         message("msg_subagent", "ses_subagent");
         message("msg_archived", "ses_archived");
@@ -2292,11 +2162,6 @@ mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// OpenCode 1.2+ migrates the JSON tree into opencode.db and leaves the
-    /// tree behind, frozen. A migrated session must resolve to its database
-    /// row (history and editing), and a row the database hides (archived) must
-    /// not resurface from the stale tree. Tree-only sessions stay visible, and
-    /// a tree a 1.1 binary kept updating after a 1.2 trial stays authoritative.
     #[test]
     fn discover_opencode_prefers_database_rows_over_frozen_tree_copies() {
         let home = scratch_dir("discover-opencode-migrated");
@@ -2353,8 +2218,6 @@ mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// v0.9 upgrade path: codex rollouts under managed provider homes are
-    /// enumerated alongside the active home's sessions.
     #[test]
     fn codex_candidates_include_provider_homes() {
         let home = scratch_dir("codex-candidates-legacy");
@@ -2389,9 +2252,6 @@ mod tests {
         std::fs::remove_dir_all(&home).ok();
     }
 
-    /// A first line past MAX_HEAD_BYTES must terminate the chunked read at
-    /// the cap — no full-file read, no hang; identification just comes back
-    /// empty and the file is skipped.
     #[test]
     fn peek_head_stays_bounded_when_line_exceeds_cap() {
         let dir = scratch_dir("peek-cap");
@@ -2409,9 +2269,6 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// minimax: runtime sqlite rows are the only workspace→session link; a
-    /// row without a transcript on disk (GUI-side delete leaves the CLI's
-    /// row behind) must drop out instead of resurrecting.
     #[test]
     fn discover_minimax_links_runtime_rows_to_transcripts() {
         let home = scratch_dir("discover-minimax");
@@ -2481,8 +2338,6 @@ mod tests {
         std::fs::remove_dir_all(&home).unwrap();
     }
 
-    /// Expected values come from qodercli 1.1.83's encoder: non-alphanumerics are replaced per
-    /// UTF-16 code unit, and past 200 characters the name is cut and a hash of the path appended.
     #[test]
     fn qoder_project_dirs_match_cli_for_astral_and_long_paths() {
         let base = Path::new("projects");

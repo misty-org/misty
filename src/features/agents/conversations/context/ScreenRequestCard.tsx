@@ -1,9 +1,9 @@
 import { AppWindow } from "lucide-react";
-import type { ScreenRequest } from "../../runs/invocations/invocationTypes";
+import type { ScreenRequest } from "../../runs/invocations/invocation_types";
 import { Button } from "@misty/ui";
 import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
-import { declineScreenRequest, openScreenAndContinue } from "./screenRequests";
-import { useMistyStore } from "../state/useMistyStore";
+import { declineScreenRequest, openScreenAndContinue } from "./screen_requests";
+import { useMistyStore } from "../state/use_misty_store";
 
 function status(request: ScreenRequest) {
   const look = request.kind === "look";
@@ -29,7 +29,6 @@ function status(request: ScreenRequest) {
   }
 }
 
-/** Shows a screen the agent asked for; with "Ask each time", asks before opening it. */
 export function ScreenRequestCard({
   messageId,
   request,
@@ -46,7 +45,6 @@ export function ScreenRequestCard({
   const working = useMistyStore((state) => state.working);
   const asking =
     request.state === "pending" && request.kind === "open" && request.location === "ask";
-  // A request restored after a reload no longer continues on its own.
   const stalled = request.state === "pending" && !asking && !working;
   const choose = () => {
     if (conversationId)

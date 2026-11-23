@@ -1,13 +1,8 @@
-//! The deliverable deadline. A long Odysseys task reached the turn
-//! limit while still browsing and ended with no answer, losing every page it read. Two turns before
-//! the limit the run is told to write its answer; on the last turn only agent_finish is offered, so
-//! a run always reports what it found and what remains.
 use super::transcript::said;
 use crate::model_calls::Message;
 
 const MARKER: &str = "Turn budget";
 
-/// The note to add before this turn, once, or `None`.
 pub(crate) fn deadline_note(turn: i64, limit: i64, messages: &[Message]) -> Option<String> {
     let left = limit - turn;
     if limit < 6 || left > 2 || said(messages, MARKER) {

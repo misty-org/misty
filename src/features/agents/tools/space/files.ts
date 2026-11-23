@@ -1,20 +1,13 @@
-import { agentFolderOf } from "../../artifacts/agentArtifacts";
-import { spacesGateway, type SpaceDriveFile } from "../../spaces-gateway/spacesGateway";
+import { agentFolderOf } from "../../artifacts/agent_artifacts";
+import { spacesGateway, type SpaceDriveFile } from "../../spaces-gateway/spaces_gateway";
 import type { LocalToolHandler, LocalToolRequest } from "../host";
-import { loadRunEntry } from "../runContexts";
+import { loadRunEntry } from "../run_contexts";
 import { refuse } from "./api";
 import { integer, onlyFields, text } from "./args";
 import { routedTool } from "./routing";
 
-/**
- * The `file_*` tools work in the Space's drive: its Files, the same folders everyone in the Space and
- * its apps see, by path from its root (`/Design/Report.pdf`). What an agent makes goes into its own
- * folder there, `/Agents/<agent name>/`, unless it names another.
- */
-
 const UNAVAILABLE = "The Space's Files can't be reached from here.";
 
-/** The text files an agent can write, by extension. */
 const textTypes: Record<string, string> = {
   html: "text/html",
   md: "text/markdown",
@@ -24,11 +17,8 @@ const textTypes: Record<string, string> = {
   svg: "image/svg+xml",
 };
 
-/** As large as a file written in one call may be. */
 const MAX_TEXT_FILE_BYTES = 1_500_000;
-/** As large as a text file `file.read` hands back whole. */
 const MAX_READ_TEXT_BYTES = 200_000;
-/** How many entries a search reads at most, folder by folder from where it starts. */
 const SEARCH_BUDGET = 2_000;
 
 const messageOf = (cause: unknown) =>
@@ -40,7 +30,6 @@ const gatewayOf = () => {
   return gateway;
 };
 
-/** A drive call: what native refuses is said to the model, which can correct it. */
 async function drive<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
@@ -49,7 +38,6 @@ async function drive<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
-/** A drive path from the model's words: from the root, with no `..`. */
 function drivePathOf(value: string, what = "path"): string {
   const parts = value.split("/").filter(Boolean);
   if (parts.some((part) => part === "." || part === ".."))
@@ -67,7 +55,6 @@ const facts = (entry: SpaceDriveFile) => ({
   modified_by: entry.modified_by_name || undefined,
 });
 
-/** The folder a run's files go to: the one it names, or its agent's own. */
 async function targetFolder(request: LocalToolRequest): Promise<string> {
   const named = text(request.input, "folder", { max: 1000 }).trim();
   if (named) return drivePathOf(named, "folder");
@@ -85,7 +72,6 @@ const search = routedTool("read", async (request, space) => {
   const found: SpaceDriveFile[] = [];
   const folders = [start];
   let read = 0;
-  // Without words it lists the folder; with them it looks through the folders under it too.
   while (folders.length && found.length < count && read < SEARCH_BUDGET) {
     const folder = folders.shift()!;
     let cursor: string | undefined;
@@ -118,7 +104,6 @@ const read = routedTool("read", async (request, space) => {
   return { ...facts(entry), text: new TextDecoder().decode(bytes) };
 });
 
-/** A text file's name and bytes from the call, checked. */
 function textFile(input: Record<string, unknown>) {
   const name = text(input, "name", { required: true, min: 1, max: 200 }).trim();
   const content = text(input, "content", { required: true, min: 1, max: MAX_TEXT_FILE_BYTES });
@@ -133,7 +118,6 @@ function textFile(input: Record<string, unknown>) {
   return { name, bytes, type: textTypes[extension] };
 }
 
-/** Writes a new text file into the Space's drive, in the agent's folder unless it names another. */
 const create = routedTool("create", async (request, space) => {
   onlyFields(request.input, ["name", "content", "folder", "space"]);
   const file = textFile(request.input);
@@ -145,7 +129,6 @@ const create = routedTool("create", async (request, space) => {
   return { ...facts(saved), space: space.name };
 });
 
-/** Writes new content into a text file already in the drive, made from the version it has now. */
 const update = routedTool("change", async (request, space) => {
   onlyFields(request.input, ["path", "content", "space"]);
   const path = drivePathOf(text(request.input, "path", { required: true, min: 1, max: 1000 }));
@@ -160,7 +143,6 @@ const update = routedTool("change", async (request, space) => {
   return { ...facts(saved), space: space.name };
 });
 
-/** Saves a chat attachment into the Space's drive under the name given. */
 const promote = routedTool("change", async (request, space) => {
   onlyFields(request.input, ["attachmentId", "name", "folder", "space"]);
   const id = text(request.input, "attachmentId", { max: 200 }).trim();

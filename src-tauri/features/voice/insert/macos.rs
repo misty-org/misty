@@ -3,7 +3,6 @@ use crate::voice::insert::{Desktop, PasteKeys};
 use crate::voice::macos::{keys, pasteboard};
 use std::time::Duration;
 
-/// A copy of every pasteboard item; released if never restored.
 pub type Saved = pasteboard::Snapshot;
 
 pub struct System;
@@ -32,7 +31,6 @@ impl Desktop for System {
     }
 
     fn request_post_keys(&self) {
-        // Shows the system prompt once; the next dictation pastes directly.
         keys::accessibility_trusted(true);
     }
 

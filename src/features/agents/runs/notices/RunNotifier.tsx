@@ -3,24 +3,22 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveSetting, useDevicePreferences } from "@/features/settings";
-import { useDoNotDisturb } from "@/shared/lib/doNotDisturb";
+import { useDoNotDisturb } from "@/shared/lib/do_not_disturb";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { runtimeAiApi } from "../../AgentsRuntime";
-import { localDocuments } from "../../conversations/state/localChats";
-import { useMistyStore } from "../../conversations/state/useMistyStore";
-import { useAgentAccountId } from "../../personal/agentAccount";
-import { usePersonalAgentsStore } from "../../personal/personalAgentsStore";
-import { watchAllRunEvents } from "../local-run/localRunEvents";
-import { RunNoticeTracker, noticeRoute, noticeTitle, type RunNotice } from "./runNotices";
+import { runtimeAiApi } from "../../agents_runtime";
+import { localDocuments } from "../../conversations/state/local_chats";
+import { useMistyStore } from "../../conversations/state/use_misty_store";
+import { useAgentAccountId } from "../../personal/agent_account";
+import { usePersonalAgentsStore } from "../../personal/personal_agents_store";
+import { watchAllRunEvents } from "../local-run/local_run_events";
+import { RunNoticeTracker, noticeRoute, noticeTitle, type RunNotice } from "./run_notices";
 
 const RUN_NOTICES_SETTING = "agents.run_notifications";
 const openEvent = "misty://agent-run-notice-open";
 
 function noticesOn(): boolean {
   const state = useDevicePreferences.getState().state;
-  // Do not disturb silences every notice, whatever the chat setting says.
   if (useDoNotDisturb.getState().value) return false;
-  // Before this computer's settings are read, the default holds.
   return state ? Boolean(resolveSetting(state, RUN_NOTICES_SETTING).value) : true;
 }
 
@@ -32,7 +30,6 @@ function agentName(agentId: string): string {
   return agent?.name ?? "";
 }
 
-/** The chat's title, and nothing else from it. */
 async function chatTitle(accountId: string, conversationId: string): Promise<string> {
   const known = useMistyStore
     .getState()
@@ -57,11 +54,6 @@ async function send(accountId: string, notice: RunNotice) {
   });
 }
 
-/**
- * Tells the person through the system when a chat's run finishes, fails or waits on them while
- * Misty isn't in front. Rendered once in each person's window; native code shows one notice for
- * all of them, and only when none is focused. Clicking it opens the chat here.
- */
 export function RunNotifier() {
   const accountId = useAgentAccountId();
   const navigate = useNavigate();
@@ -84,7 +76,6 @@ export function RunNotifier() {
     let timer: number | undefined;
     const tracker = new RunNoticeTracker();
     const refresh = () =>
-      // Before the agents' services are mounted there is nothing to ask yet.
       void Promise.resolve()
         .then(() => runtimeAiApi.activity(""))
         .then((result) => {
@@ -97,7 +88,6 @@ export function RunNotifier() {
     refresh();
     const stop = watchAllRunEvents((runId, event) => {
       tracker.noteEvent(runId, event);
-      // One run streaming never holds back another's ending.
       if (timer !== undefined) return;
       timer = window.setTimeout(() => {
         timer = undefined;

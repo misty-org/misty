@@ -1,5 +1,3 @@
-//! Download file names: what a suggested name becomes on disk, and a path no
-//! other download in this session has claimed.
 use std::path::{Path, PathBuf};
 
 use crate::browser::BrowserSessionState;

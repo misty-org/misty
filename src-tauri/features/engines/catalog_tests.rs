@@ -1,5 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-#![allow(clippy::disallowed_methods)] // Fixtures are built with the standard library.
+#![allow(clippy::disallowed_methods)]
 use super::*;
 use std::fs;
 
@@ -29,7 +29,6 @@ fn reads_descriptions_from_front_matter_or_first_line() {
 
 #[test]
 fn lists_user_and_project_items_and_prefers_the_project() {
-    // catalog_for follows CLAUDE_CONFIG_DIR and CODEX_HOME, which other tests steer.
     let _env = crate::engine_config::support::HOME_ENV_LOCK.lock();
     let root = std::env::temp_dir().join(format!("misty-catalog-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
@@ -133,8 +132,6 @@ fn discovers_skills_from_skill_md_directories() {
 fn collects_plugin_skills_dirs_at_any_nesting() {
     let root = scratch_dir("plugin-cache");
     let cache = root.join("plugins").join("cache");
-    // Two layouts seen in the wild: cache/<plugin>/<version>/skills and
-    // cache/<marketplace>/<plugin>/<version>/skills.
     let flat = cache.join("gsd").join("1.2.0").join("skills");
     let nested = cache
         .join("market")
@@ -143,7 +140,6 @@ fn collects_plugin_skills_dirs_at_any_nesting() {
         .join("skills");
     fs::create_dir_all(&flat).unwrap();
     fs::create_dir_all(&nested).unwrap();
-    // A `skills` file (not a folder) and a version folder without skills are ignored.
     fs::write(cache.join("gsd").join("skills"), "not a dir").unwrap();
     fs::create_dir_all(cache.join("empty").join("9.9.9")).unwrap();
 
@@ -213,7 +209,6 @@ fn discovers_nested_category_skills() {
 
 #[test]
 fn codex_reads_project_agents_codex_and_plugin_skills() {
-    // catalog_for follows CLAUDE_CONFIG_DIR and CODEX_HOME, which other tests steer.
     let _env = crate::engine_config::support::HOME_ENV_LOCK.lock();
     let root = scratch_dir("codex-catalog");
     let home = root.join("home");
@@ -259,7 +254,6 @@ fn codex_reads_project_agents_codex_and_plugin_skills() {
 
 #[test]
 fn other_engines_read_the_shared_layouts() {
-    // catalog_for follows CLAUDE_CONFIG_DIR and CODEX_HOME, which other tests steer.
     let _env = crate::engine_config::support::HOME_ENV_LOCK.lock();
     let ws = scratch_dir("shared-layouts");
     let home = ws.join("home");

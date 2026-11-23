@@ -12,15 +12,13 @@ import {
   type RefObject,
 } from "react";
 import { Checkbox, Pressable, Surface, Text } from "@misty/ui";
-import { buildGitTree, flattenGitTree } from "./git-tree";
-import type { GitFileEntry, GitStatus } from "./gitApi";
+import { buildGitTree, flattenGitTree } from "./git_tree";
+import type { GitFileEntry, GitStatus } from "./git_api";
 import { DirectoryRow, FileRow } from "./GitTreeRow";
 import { uiPx } from "@misty/ui";
 
-/** A row's height in design pixels; uiPx gives the CSS pixels the virtualizer places rows by. */
 const ROW_HEIGHT = 32;
 
-/** A group's text action (Stage all, Discard all) in its sticky head. */
 const groupActionClass = "flex-none rounded-sm px-1.5 py-0.5";
 
 export const ChangesSummary = memo(function ChangesSummary(props: {
@@ -69,7 +67,6 @@ interface GroupSectionProps {
   rowActionLabel: string;
   rowActionKind: "stage" | "unstage";
   onRowAction: (file: string) => void;
-  /** Only the folder-side groups (unstaged and untracked) can throw changes away. */
   rowDiscardLabel?: string;
   onRowDiscard?: (file: string) => void;
   groupDiscardLabel?: string;
@@ -80,7 +77,6 @@ interface GroupSectionProps {
   isNew?: boolean;
 }
 
-/** One group of files with its tick-all box and actions; long groups render only the rows in view. */
 export const GroupSection = memo(function GroupSection(props: GroupSectionProps) {
   const { entries, viewMode, selectedFiles, scrollElement } = props;
   const [open, setOpen] = useState(true);
@@ -183,8 +179,6 @@ export const GroupSection = memo(function GroupSection(props: GroupSectionProps)
           onCheckedChange={() => props.onToggleSelectMany(allPaths)}
           aria-label={props.title}
         />
-        {/* The title gives way first in a narrow column: it fades rather than run under the
-            group's actions, and the count stays whole. */}
         <Pressable
           className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-meta"
           onClick={() => setOpen(!open)}
@@ -196,7 +190,6 @@ export const GroupSection = memo(function GroupSection(props: GroupSectionProps)
             {entries.length}
           </Text>
         </Pressable>
-        {/* Quiet text actions: muted at rest, brightening under the pointer; discarding stays red. */}
         <Text bare tone="muted" className="flex flex-none items-center gap-1.5 text-micro">
           {props.groupDiscardLabel !== undefined && props.onGroupDiscard ? (
             <Pressable

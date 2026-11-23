@@ -5,7 +5,6 @@ use super::{
     requests::Request,
 };
 
-/// The card as the app shows it. The hash and what a grant holds stay here.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestView {

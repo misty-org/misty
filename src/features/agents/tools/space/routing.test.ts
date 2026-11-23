@@ -1,15 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { answerFor, registerLocalTools, LocalToolUncertain, type LocalToolRejected } from "../host";
-import { spaceTools } from "../spaceTools";
-import { runSpaceId } from "../runContexts";
-import { SPACES, call, refusedWith, serve } from "./testRoutes";
+import { spaceTools } from "../space_tools";
+import { runSpaceId } from "../run_contexts";
+import { SPACES, call, refusedWith, serve } from "./test_routes";
 
 vi.mock("@/api/client", async (original) => ({
   ...(await original<object>()),
   apiRequest: vi.fn(),
 }));
-// The run works in its agent's home Space, Work.
-vi.mock("../runContexts", async (original) => ({
+vi.mock("../run_contexts", async (original) => ({
   ...(await original<object>()),
   runSpaceId: vi.fn(async () => "s1"),
 }));

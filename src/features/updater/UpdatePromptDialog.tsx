@@ -1,8 +1,3 @@
-/**
- * A new version of Misty, found by the launch check: what changed (the release's own notes), and
- * Install and restart or Later. Later keeps it quiet for a while; Settings › Updates can still
- * install it any time.
- */
 import { reserveMistyUpdate } from "@/features/app-windows";
 import { MistyMarkdown } from "@/features/agents";
 import { relaunch } from "@/shared/platform/relaunch";
@@ -19,13 +14,13 @@ import {
   Progress,
   Text,
 } from "@misty/ui";
-import { rememberReleaseNotes } from "./releaseNotes";
+import { rememberReleaseNotes } from "./release_notes";
 import {
   applyUpdateProgress,
   EMPTY_UPDATE_PROGRESS,
   readableUpdateError,
   type UpdateProgress,
-} from "./updateProgress";
+} from "./update_progress";
 
 export function UpdatePromptDialog({ update, onLater }: { update: Update; onLater: () => void }) {
   const [installing, setInstalling] = useState(false);
@@ -41,7 +36,6 @@ export function UpdatePromptDialog({ update, onLater }: { update: Update; onLate
     let release = () => {};
     try {
       release = reserveMistyUpdate();
-      // Its notes wait for the restart, to be shown once the new version runs.
       rememberReleaseNotes(update);
       await update.downloadAndInstall((event) => {
         setProgress((current) => applyUpdateProgress(current, event));

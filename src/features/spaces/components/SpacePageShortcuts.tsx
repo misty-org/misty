@@ -22,8 +22,7 @@ export function SpacePageShortcuts({ space }: { space: Space }) {
       await preloadSpaceSection(path.split("?")[0].split("/")[3]);
       if (request !== requestRef.current) return;
       navigate(path);
-    } catch {
-    }
+    } catch {}
   }
 
   const base = `/spaces/${encodeURIComponent(space.id)}`;

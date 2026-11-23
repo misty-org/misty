@@ -1,5 +1,3 @@
-//! Page actions the agent runs: inspect, click, wait for downloads and evaluate.
-
 use crate::browser::*;
 
 mod click;

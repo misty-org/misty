@@ -1,6 +1,3 @@
-//! What the `ai` package does to a call on its way to a provider. Ported from
-//! `convertToLanguageModelPrompt` and `prepareToolChoice`. A model's `stream` takes options as they
-//! are, so everything that talks to a model goes through [`prepare_call`] first.
 use std::collections::BTreeSet;
 
 use crate::model_calls::call::{CallOptions, ToolChoice};
@@ -24,8 +21,6 @@ fn missing_results(ids: BTreeSet<String>) -> ModelError {
     }
 }
 
-/// Empty text says nothing and some providers refuse it. Assistant text with provider options stays,
-/// because a signature can arrive on an empty part.
 fn without_empty_parts(message: Message) -> Message {
     match message {
         Message::User { content, provider_options } => Message::User {
@@ -48,17 +43,26 @@ fn without_empty_parts(message: Message) -> Message {
     }
 }
 
-/// `convertToLanguageModelPrompt`: tidies the messages, joins neighbouring tool results and checks
-/// that every tool call has its result before the conversation moves on.
 pub fn to_model_prompt(prompt: Vec<Message>) -> Result<Vec<Message>, ModelError> {
-    if !prompt.iter().any(|message| !matches!(message, Message::System { .. })) {
+    if !prompt
+        .iter()
+        .any(|message| !matches!(message, Message::System { .. }))
+    {
         return Err(invalid_prompt("messages must not be empty"));
     }
     let mut combined: Vec<Message> = Vec::with_capacity(prompt.len());
     for message in prompt {
         let message = without_empty_parts(message);
-        if let (Message::Tool { content, provider_options }, Some(Message::Tool { content: earlier, provider_options: earlier_options })) =
-            (&message, combined.last_mut())
+        if let (
+            Message::Tool {
+                content,
+                provider_options,
+            },
+            Some(Message::Tool {
+                content: earlier,
+                provider_options: earlier_options,
+            }),
+        ) = (&message, combined.last_mut())
         {
             earlier.extend(content.iter().cloned());
             *earlier_options = provider_options.clone();
@@ -97,7 +101,6 @@ pub fn to_model_prompt(prompt: Vec<Message>) -> Result<Vec<Message>, ModelError>
         .collect())
 }
 
-/// Readies a call for a model: the prompt tidied, and a tool choice of `auto` unless one was named.
 pub fn prepare_call(mut options: CallOptions) -> Result<CallOptions, ModelError> {
     options.prompt = to_model_prompt(options.prompt)?;
     options.tool_choice = options.tool_choice.or(Some(ToolChoice::Auto));
@@ -156,7 +159,10 @@ mod tests {
             { "role": "assistant", "content": [{ "type": "tool-call", "toolCallId": "a", "toolName": "t", "input": {} }] },
             { "role": "user", "content": [{ "type": "text", "text": "Next." }] },
         ])));
-        assert_eq!(one.unwrap_err().to_string(), "Tool result is missing for tool call a.");
+        assert_eq!(
+            one.unwrap_err().to_string(),
+            "Tool result is missing for tool call a."
+        );
         let two = to_model_prompt(prompt(json!([
             { "role": "user", "content": [{ "type": "text", "text": "Go." }] },
             { "role": "assistant", "content": [
@@ -164,23 +170,42 @@ mod tests {
                 { "type": "tool-call", "toolCallId": "b", "toolName": "t", "input": {} },
             ] },
         ])));
-        assert_eq!(two.unwrap_err().to_string(), "Tool results are missing for tool calls a, b.");
+        assert_eq!(
+            two.unwrap_err().to_string(),
+            "Tool results are missing for tool calls a, b."
+        );
     }
 
     #[test]
     fn a_prompt_needs_more_than_system_text() {
-        let error = to_model_prompt(prompt(json!([{ "role": "system", "content": "Be brief." }]))).unwrap_err();
-        assert_eq!(error.to_string(), "Invalid prompt: messages must not be empty");
+        let error = to_model_prompt(prompt(
+            json!([{ "role": "system", "content": "Be brief." }]),
+        ))
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Invalid prompt: messages must not be empty"
+        );
     }
 
     #[test]
     fn the_tool_choice_defaults_to_auto() {
         let options = |choice: Option<ToolChoice>| CallOptions {
-            prompt: prompt(json!([{ "role": "user", "content": [{ "type": "text", "text": "Go." }] }])),
+            prompt: prompt(
+                json!([{ "role": "user", "content": [{ "type": "text", "text": "Go." }] }]),
+            ),
             tool_choice: choice,
             ..CallOptions::default()
         };
-        assert!(matches!(prepare_call(options(None)).unwrap().tool_choice, Some(ToolChoice::Auto)));
-        assert!(matches!(prepare_call(options(Some(ToolChoice::None))).unwrap().tool_choice, Some(ToolChoice::None)));
+        assert!(matches!(
+            prepare_call(options(None)).unwrap().tool_choice,
+            Some(ToolChoice::Auto)
+        ));
+        assert!(matches!(
+            prepare_call(options(Some(ToolChoice::None)))
+                .unwrap()
+                .tool_choice,
+            Some(ToolChoice::None)
+        ));
     }
 }

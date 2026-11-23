@@ -1,11 +1,3 @@
-//! Which apps Misty offers to connect directly: servers run by the app's own maker, never a
-//! middleman that would hold the person's tokens on its servers.
-//!
-//! Browsing shows the makers below. Searching asks the official MCP Registry, keeping a server only
-//! when the registry verified its publisher owns a domain (`app.linear/…`), it is served from that
-//! domain, the publisher isn't one that lists other companies' apps, and its name doesn't claim
-//! another company's brand. Whether an app takes a sign-in Misty can do without a key of its own is
-//! checked separately (`oauth::discover`), and only those are offered.
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -14,14 +6,10 @@ use serde::Serialize;
 use serde_json::Value;
 
 const REGISTRY: &str = "https://registry.modelcontextprotocol.io/v0/servers";
-/// The apps checked when this build was made (`generate.rs`).
 const CATALOG: &str = include_str!("catalog.json");
 const SEARCH_LIMIT: usize = 100;
-/// What a server's sign-in takes changes rarely; ask again after this long.
 const CHECK_KEPT: Duration = Duration::from_secs(24 * 60 * 60);
 
-/// Makers whose own servers take a sign-in with no key of Misty's, checked 2026-11-11. Each is
-/// checked again before it is offered.
 pub const MAKERS: &[(&str, &str)] = &[
     ("Notion", "https://mcp.notion.com/mcp"),
     ("Linear", "https://mcp.linear.app/mcp"),
@@ -62,8 +50,6 @@ pub const MAKERS: &[(&str, &str)] = &[
     ("Jam", "https://mcp.jam.dev/mcp"),
 ];
 
-/// Brands whose name in another publisher's server means a middleman, with the domains that are
-/// really theirs.
 const BRANDS: &[(&str, &[&str])] = &[
     ("notion", &["notion.com", "notion.so"]),
     ("linear", &["linear.app"]),
@@ -113,8 +99,6 @@ const BRANDS: &[(&str, &[&str])] = &[
     ("supabase", &["supabase.com"]),
 ];
 
-/// Publishers that list many other companies' apps under their own domain, from the registry as
-/// read on 2026-11-11 (more than five servers on one domain). Anything they publish is skipped.
 const HOSTS_OF_OTHERS: &[&str] = &[
     "smithery.ai",
     "waystation.ai",
@@ -168,21 +152,16 @@ const HOSTS_OF_OTHERS: &[&str] = &[
     "glama.ai",
 ];
 
-/// One app a person can connect.
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct CatalogApp {
     pub name: String,
     pub description: String,
     pub url: String,
-    /// The short name its tools are filed under: `notion`.
     pub app: String,
-    /// The maker's own logo, an https address; empty when none was found.
     pub icon: String,
-    /// Its sign-in was found keyless when this build's catalog was made; others are checked live.
     pub checked: bool,
 }
 
-/// The second-to-last part of a host: `mcp.notion.com` → `notion`.
 pub fn app_key(url: &str) -> String {
     let host = url::Url::parse(url)
         .ok()
@@ -213,8 +192,6 @@ fn within(host: &str, domain: &str) -> bool {
     host == domain || host.ends_with(&format!(".{domain}"))
 }
 
-/// The domain a registry name's publisher proved they own: `app.linear/linear` → `linear.app`.
-/// GitHub and GitLab namespaces prove only an account there, so they give none.
 fn proven_domain(name: &str) -> Option<String> {
     let namespace = name.split('/').next()?.to_lowercase();
     if namespace.starts_with("io.github.") || namespace.starts_with("io.gitlab.") {
@@ -224,7 +201,6 @@ fn proven_domain(name: &str) -> Option<String> {
     (parts.len() >= 2).then(|| parts.into_iter().rev().collect::<Vec<_>>().join("."))
 }
 
-/// Whether a server is run by its app's own maker, as far as the registry shows.
 pub fn by_maker(name: &str, title: &str, url: &str) -> bool {
     let (Some(domain), Some(host)) = (proven_domain(name), host_of(url)) else {
         return false;
@@ -245,7 +221,6 @@ pub fn by_maker(name: &str, title: &str, url: &str) -> bool {
     })
 }
 
-/// The makers, for browsing.
 pub fn makers() -> Vec<CatalogApp> {
     static APPS: std::sync::LazyLock<Vec<CatalogApp>> = std::sync::LazyLock::new(|| {
         #[derive(serde::Deserialize)]
@@ -270,7 +245,6 @@ pub fn makers() -> Vec<CatalogApp> {
                 checked: true,
             })
             .collect();
-        // A build whose catalog is missing still offers the named makers.
         if apps.is_empty() {
             apps = MAKERS
                 .iter()
@@ -289,12 +263,10 @@ pub fn makers() -> Vec<CatalogApp> {
     APPS.clone()
 }
 
-/// Whether an app came from the shipped catalog, whose sign-ins were checked when it was built.
 pub fn shipped(url: &str) -> bool {
     makers().iter().any(|app| app.url == url)
 }
 
-/// One page of the makers matching `search` (all of them when it is empty), and how many match.
 pub fn page(search: &str, offset: usize, limit: usize) -> (Vec<CatalogApp>, usize) {
     let needle = search.trim().to_lowercase();
     let matching: Vec<CatalogApp> = makers()
@@ -313,7 +285,6 @@ pub fn page(search: &str, offset: usize, limit: usize) -> (Vec<CatalogApp>, usiz
     )
 }
 
-/// The makers' servers among one registry page.
 pub fn from_registry(page: &Value) -> Vec<CatalogApp> {
     let mut seen = HashSet::new();
     let mut found = Vec::new();
@@ -365,8 +336,6 @@ pub fn from_registry(page: &Value) -> Vec<CatalogApp> {
     found
 }
 
-/// Servers the registry has for `search` that the shipped catalog doesn't: makers' servers
-/// published since it was built.
 pub async fn search_registry(
     http: &reqwest::Client,
     search: &str,
@@ -396,8 +365,6 @@ fn checks() -> &'static Mutex<HashMap<String, (String, Instant)>> {
     CHECKS.get_or_init(Default::default)
 }
 
-/// What a sign-in to `url` takes (`keyless`, `open`, `needs_app` or `unreachable`), remembered for
-/// a day.
 pub async fn check(http: &reqwest::Client, url: &str) -> String {
     if let Some((code, at)) = checks()
         .lock()
@@ -410,7 +377,6 @@ pub async fn check(http: &reqwest::Client, url: &str) -> String {
         }
     }
     let code = super::oauth::discover(http, url).await.code().to_owned();
-    // An answer that may be a passing outage isn't remembered.
     if code != "unreachable" {
         checks()
             .lock()

@@ -1,4 +1,3 @@
-//! One model call's settings.
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -20,8 +19,6 @@ pub struct CallOptions {
     pub stop_sequences: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
-    /// How hard the model should think: `low`, `high` and so on. Providers that can't take it
-    /// have it removed when the model is resolved.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -36,7 +33,6 @@ pub struct CallOptions {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ToolDefinition {
-    /// Always `function`: Misty uses no provider-defined tools.
     #[serde(rename = "type", default = "function_kind")]
     pub kind: String,
     pub name: String,

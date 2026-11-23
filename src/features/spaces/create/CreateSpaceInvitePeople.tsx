@@ -1,8 +1,18 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import type { SpacePerson } from "../api/dto/entities";
-import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatarPalette";
-import { Avatar, AvatarFallback, Checkbox, IconButton, Input, ListRow, Text, cn } from "@misty/ui";
+import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatar_palette";
+import {
+  Avatar,
+  AvatarFallback,
+  Checkbox,
+  IconButton,
+  Input,
+  ListRow,
+  RowGroup,
+  Text,
+  cn,
+} from "@misty/ui";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,17 +29,13 @@ function initials(label: string) {
 function PersonAvatar({ label }: { label: string }) {
   return (
     <Avatar className="size-6">
-      <AvatarFallback className={cn("text-3xs", avatarColorClass(label), avatarInkClass)}>
+      <AvatarFallback className={cn("text-micro", avatarColorClass(label), avatarInkClass)}>
         {initials(label)}
       </AvatarFallback>
     </Avatar>
   );
 }
 
-/**
- * People the person already shares a Space with are rows to tick; anyone else is added by email
- * and listed as a row with its own remove button.
- */
 export function CreateSpaceInvitePeople({
   people,
   invites,
@@ -37,7 +43,6 @@ export function CreateSpaceInvitePeople({
   onChange,
 }: {
   people: SpacePerson[];
-  /** Lower-cased emails, in the order they were added. */
   invites: string[];
   disabled: boolean;
   onChange: (invites: string[]) => void;
@@ -58,10 +63,12 @@ export function CreateSpaceInvitePeople({
   };
 
   return (
-    <Text bare as="div" tone="muted" className="grid gap-2 text-xs font-medium">
-      <span id="create-space-invite-label">Invite people</span>
+    <div className="grid gap-1.5">
+      <Text bare id="create-space-invite-label" size="control" tone="default" weight="medium">
+        Invite people
+      </Text>
       {people.length || extra.length ? (
-        <ul className="m-0 grid list-none p-0" aria-labelledby="create-space-invite-label">
+        <RowGroup as="ul" aria-labelledby="create-space-invite-label">
           {people.map((person) => {
             const email = person.email.toLowerCase();
             const label = person.name || person.email;
@@ -102,7 +109,7 @@ export function CreateSpaceInvitePeople({
               />
             </li>
           ))}
-        </ul>
+        </RowGroup>
       ) : null}
       <div className="flex gap-1.5">
         <Input
@@ -113,7 +120,6 @@ export function CreateSpaceInvitePeople({
           disabled={disabled}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
-            // Enter adds the address; it never submits the dialog from here.
             if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
             event.preventDefault();
             add();
@@ -129,7 +135,9 @@ export function CreateSpaceInvitePeople({
           <Plus aria-hidden="true" />
         </IconButton>
       </div>
-      <span className="font-normal">Invitations send once the Space exists.</span>
-    </Text>
+      <Text as="p" size="meta" tone="muted" wrap className="m-0">
+        Invitations send once the Space exists.
+      </Text>
+    </div>
   );
 }

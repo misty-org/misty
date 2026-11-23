@@ -1,4 +1,3 @@
-//! Failures of the tool service's transport: which are worth retrying, and what they mean.
 use super::runtime_errors::RuntimeError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -14,8 +13,16 @@ pub(crate) fn classify_tool_transport_error(error: &RuntimeError) -> ToolTranspo
     if error.name() == "ProtocolError" {
         let unavailable = error.to_string().to_lowercase().contains("unknown tool");
         return ToolTransportFailure {
-            code: if unavailable { "tool_unavailable" } else { "mcp_protocol_error" },
-            message: if unavailable { "That tool is not available for this run." } else { "Misty's tool service rejected the request protocol." },
+            code: if unavailable {
+                "tool_unavailable"
+            } else {
+                "mcp_protocol_error"
+            },
+            message: if unavailable {
+                "That tool is not available for this run."
+            } else {
+                "Misty's tool service rejected the request protocol."
+            },
             transient: false,
             recognized: true,
             retry_after_ms: 0,

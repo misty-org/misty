@@ -1,7 +1,3 @@
-//! Tutor's link sources, read on this computer so a notebook keeps their text: a web page through
-//! the confined page reader, a PDF through the confined document worker, and a YouTube video as its
-//! caption track. Every request goes through `web_fetch`, so only public addresses are contacted,
-//! with no cookies or sign-ins. Nothing reaches Misty's server.
 use agent_runs::PageReader;
 use serde::Serialize;
 
@@ -22,12 +18,10 @@ const TEXT_LIMIT: usize = 400_000;
 pub struct ReadLink {
     pub title: String,
     pub text: String,
-    /// "page", "pdf" or "video".
     pub kind: &'static str,
     pub truncated: bool,
 }
 
-/// Reads a link's text. Fails with a sentence for the person when the link can't be read.
 #[tauri::command]
 pub async fn tutor_read_link(webview: tauri::Webview, url: String) -> Result<ReadLink, String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
@@ -90,11 +84,13 @@ async fn page(address: &url::Url) -> Result<ReadLink, String> {
     })
 }
 
-/// A PDF from the web, parsed by the confined document worker from a temporary copy.
 async fn pdf(bytes: &[u8], address: &url::Url) -> Result<ReadLink, String> {
-    let folder = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let folder = tempfile::Builder::new()
+        .prefix("misty-")
+        .tempdir()
+        .map_err(|error| error.to_string())?;
     let path = folder.path().join("source.pdf");
-    tokio::fs::write(&path, bytes)
+    file_access::fs_async::write(&path, bytes)
         .await
         .map_err(|error| error.to_string())?;
     let document = documents::prepare_document(path, crate::app::embedded_workers::builtin_worker)
@@ -125,19 +121,15 @@ async fn pdf(bytes: &[u8], address: &url::Url) -> Result<ReadLink, String> {
     })
 }
 
-/// The largest picture Tutor shows in a drawing; it's shrunk before it's drawn.
 const PICTURE_BYTES: usize = 8 << 20;
 
 fn picture_type(content_type: &str) -> bool {
-    // No SVG: a drawing only shows pictures, never documents that can carry scripts.
     matches!(
         content_type.split(';').next().unwrap_or("").trim(),
         "image/png" | "image/jpeg" | "image/webp" | "image/gif"
     )
 }
 
-/// A picture from the web for one of Tutor's drawings (a photo the engine found), as a data URL.
-/// Fetched like a link: public addresses only, with no cookies or sign-ins.
 #[tauri::command]
 pub async fn tutor_picture(webview: tauri::Webview, url: String) -> Result<String, String> {
     use base64::{engine::general_purpose::STANDARD, Engine};
@@ -177,9 +169,6 @@ pub async fn tutor_picture(webview: tauri::Webview, url: String) -> Result<Strin
     ))
 }
 
-/// A file dropped on a notebook: its bytes come as the request body and its name in a header, so
-/// the window hands over only what the person dropped, never a path. Parsed by the confined
-/// document worker from a temporary copy.
 #[tauri::command]
 pub async fn tutor_read_dropped(
     webview: tauri::Webview,
@@ -198,7 +187,7 @@ pub async fn tutor_read_dropped(
         .headers()
         .get("x-file-name")
         .and_then(|value| value.to_str().ok())
-        .map(|value| percent_decode(value))
+        .map(percent_decode)
         .unwrap_or_else(|| "Dropped file".to_owned());
     let extension = std::path::Path::new(&name)
         .extension()
@@ -206,9 +195,12 @@ pub async fn tutor_read_dropped(
         .map(|value| value.to_ascii_lowercase())
         .filter(|value| value.len() <= 8 && value.chars().all(|c| c.is_ascii_alphanumeric()))
         .unwrap_or_else(|| "txt".to_owned());
-    let folder = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let folder = tempfile::Builder::new()
+        .prefix("misty-")
+        .tempdir()
+        .map_err(|error| error.to_string())?;
     let path = folder.path().join(format!("source.{extension}"));
-    tokio::fs::write(&path, bytes)
+    file_access::fs_async::write(&path, bytes)
         .await
         .map_err(|error| error.to_string())?;
     let mut document =
@@ -219,9 +211,6 @@ pub async fn tutor_read_dropped(
     Ok(document)
 }
 
-/// Saves something Tutor made (a video overview, an infographic) to the file the person chose in the
-/// system's save dialog, which granted that one path. The bytes come as the body, the path in a
-/// header; any other path is refused by the file gate.
 #[tauri::command]
 pub async fn tutor_save_export(
     webview: tauri::Webview,
@@ -246,7 +235,6 @@ pub async fn tutor_save_export(
         .map_err(|_| "Misty couldn't save there.".to_owned())
 }
 
-/// A percent-encoded path, decoded byte for byte (no name cleanup: it must match the grant).
 fn percent_decode_path(value: &str) -> String {
     let bytes = value.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());

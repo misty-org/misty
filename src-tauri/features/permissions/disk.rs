@@ -1,7 +1,3 @@
-//! Files' two answers: the disk grant (`grant:disk`), asked the first time Files opens, and
-//! letting agents delete files (`permission:agent-delete`), off unless the person turns it on
-//! through a warning. Both live in `settings_state` on this device and never sync, and only a
-//! native prompt turns either on, so nothing in a page can.
 use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
@@ -19,8 +15,6 @@ pub fn disk_granted(app: &AppHandle) -> bool {
     store::read(app, DISK)
 }
 
-/// True if the disk grant is on; otherwise asks. A no isn't saved, so the next time Files opens it
-/// asks again. Waits for the answer: async callers use [`ensure_disk_grant_async`].
 pub fn ensure_disk_grant(app: &AppHandle) -> bool {
     if disk_granted(app) {
         file_access::disk::allow_disk();
@@ -44,7 +38,6 @@ pub async fn ensure_disk_grant_async(app: &AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-/// Gives the file gate the disk again at startup, when it was granted before.
 pub fn restore_disk_grant(app: &AppHandle) {
     if disk_granted(app) {
         file_access::disk::allow_disk();
@@ -56,13 +49,10 @@ pub fn revoke_disk_grant(app: &AppHandle) {
     file_access::disk::revoke_disk();
 }
 
-/// Whether the person let agents delete files. Off unless they turned it on.
 pub fn agent_delete_on(app: &AppHandle) -> bool {
     store::read(app, AGENT_DELETE)
 }
 
-/// Shows the warning and turns deleting on only if the person picks "Let agents delete". There
-/// is no saved yes to skip it: every turn-on asks.
 pub fn allow_agent_delete(app: &AppHandle) -> bool {
     let Some(_asking) = Asking::start(AGENT_DELETE) else {
         return false;
@@ -95,7 +85,6 @@ pub async fn allow_agent_delete_async(app: &AppHandle) -> bool {
         .unwrap_or(false)
 }
 
-/// Turning it off needs no prompt.
 pub fn stop_agent_delete(app: &AppHandle) {
     store::write(app, AGENT_DELETE, false);
 }

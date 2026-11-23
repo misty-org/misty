@@ -1,17 +1,3 @@
-// Codex's published build, downloaded by Misty instead of running `install.sh` or `install.ps1`.
-// Both scripts add their folder to the person's shell profile (or Windows' user PATH) and take no
-// option to skip it, and they keep the program itself in `~/.codex/packages`. This fetches what
-// they fetch, from where they fetch it:
-//
-// - The release: `releases.openai.com/codex/channels/latest`, else GitHub's latest `rust-v*`
-//   release, as the scripts fall back to it.
-// - The build: `codex-package-<target>.tar.gz` from that release, checked against the SHA-256 the
-//   release lists for it (the scripts check the same file against `codex-package_SHA256SUMS`,
-//   whose own SHA-256 comes from that same release listing).
-//
-// The package unpacks whole into `~/.misty/shared/engines/codex` (`bin/codex`, with its `codex-path` and
-// `codex-resources` beside it, where Codex looks for them).
-
 use std::path::Path;
 
 use super::super::downloads::{self, Checksum};
@@ -23,7 +9,6 @@ const RELEASES: &str = "https://releases.openai.com/codex";
 const GITHUB_LATEST: &str = "https://api.github.com/repos/openai/codex/releases/latest";
 const GITHUB_DOWNLOADS: &str = "https://github.com/openai/codex/releases/download";
 
-/// Codex's target triple for this system, as its scripts name it. Linux builds are static (musl).
 pub(in super::super) fn codex_target(target: Target) -> Option<String> {
     let arch = match target.arch {
         "aarch64" => "aarch64",
@@ -39,12 +24,10 @@ pub(in super::super) fn codex_target(target: Target) -> Option<String> {
     Some(format!("{arch}-{rest}"))
 }
 
-/// The build's file name in a release.
 pub(in super::super) fn package_name(target: &str) -> String {
     format!("codex-package-{target}.tar.gz")
 }
 
-/// The version a release names (`rust-v0.168.0` → `0.168.0`).
 pub(in super::super) fn release_version(release: &serde_json::Value) -> Option<String> {
     let tag = release.get("tag_name")?.as_str()?;
     let version = tag.strip_prefix("rust-v")?;
@@ -54,7 +37,6 @@ pub(in super::super) fn release_version(release: &serde_json::Value) -> Option<S
     (plain && super::super::parse_version(version).is_some()).then(|| version.to_string())
 }
 
-/// The SHA-256 a release lists for `asset` (`"digest": "sha256:<hex>"`).
 pub(in super::super) fn asset_checksum(
     release: &serde_json::Value,
     asset: &str,
@@ -70,7 +52,6 @@ pub(in super::super) fn asset_checksum(
         .and_then(Checksum::sha256_hex)
 }
 
-/// Downloads and checks Codex's build, then puts it in its folder in place of an older one.
 pub(super) async fn install(target: Target<'_>, reporter: &ProgressReporter) -> Result<(), String> {
     let build = codex_target(target).ok_or("Codex isn't built for this system.")?;
     let asset = package_name(&build);
@@ -99,7 +80,6 @@ pub(super) async fn install(target: Target<'_>, reporter: &ProgressReporter) -> 
     placed
 }
 
-/// Moves the unpacked package's top-level entries into `folder`, each replacing an older one.
 fn place(staging: &Path, folder: &Path) -> Result<(), String> {
     let program = staging
         .join("bin")

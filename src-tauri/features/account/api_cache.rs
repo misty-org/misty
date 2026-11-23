@@ -1,10 +1,3 @@
-//! Local copies of account data fetched from the Misty server, so a page can paint from them
-//! at once while the fresh data loads (stale-while-revalidate, driven by `src/api/cache`).
-//!
-//! Entries live in one SQLite file under `~/.misty/cache/api`. Each body is encrypted with
-//! AES-256-GCM under a key held in Misty's credential store (the OS keychain), and bound to
-//! its account and key, so a copied database file reveals nothing. The cache is a copy: it
-//! can be deleted at any time and the server stays the source of truth.
 use file_access::fs;
 use std::{
     path::PathBuf,
@@ -26,9 +19,7 @@ use crate::app::runtime::MistyRuntime;
 
 const KEY_SERVICE: &str = "com.misty.api-cache";
 const KEY_ACCOUNT: &str = "key";
-/// The cache holds at most this much; the oldest entries go first.
 const MAX_BYTES: i64 = 128 * 1024 * 1024;
-/// One response larger than this is not worth keeping.
 const MAX_ENTRY_BYTES: usize = 8 * 1024 * 1024;
 const NONCE_LEN: usize = 12;
 
@@ -43,7 +34,6 @@ static CACHE: OnceLock<Mutex<Option<Cache>>> = OnceLock::new();
 #[serde(rename_all = "camelCase")]
 pub struct ApiCacheHit {
     pub body: String,
-    /// Unix milliseconds when the entry was fetched.
     pub fetched_at: i64,
 }
 
@@ -139,7 +129,6 @@ fn get(cache: &Cache, account: &str, key: &str) -> Result<Option<ApiCacheHit>, S
             aad: &aad(account, key),
         },
     );
-    // An entry that no longer opens (a new key, a damaged file) is a miss, never an error.
     Ok(opened
         .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok())
@@ -176,7 +165,6 @@ fn put(cache: &Cache, account: &str, key: &str, body: &str) -> Result<(), String
     evict(cache)
 }
 
-/// Drops the oldest entries while the cache is over its size.
 fn evict(cache: &Cache) -> Result<(), String> {
     loop {
         let total: i64 = cache
@@ -218,7 +206,6 @@ pub async fn api_cache_put(
     with_cache(&runtime, |cache| put(cache, &account, &key, &body))
 }
 
-/// Removes every entry of the account whose key starts with `prefix`.
 #[tauri::command]
 pub async fn api_cache_delete_prefix(
     runtime: State<'_, MistyRuntime>,
@@ -237,7 +224,6 @@ pub async fn api_cache_delete_prefix(
     })
 }
 
-/// Removes everything cached for the account (sign-out, account removal).
 #[tauri::command]
 pub async fn api_cache_clear(
     runtime: State<'_, MistyRuntime>,

@@ -1,4 +1,3 @@
-//! Running the action a person chose from a page's context menu.
 use super::*;
 
 pub(super) fn menu_action_allowed(menu: &PendingMenu, key: &str, action: &str) -> bool {

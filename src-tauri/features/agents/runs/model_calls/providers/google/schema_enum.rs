@@ -1,4 +1,3 @@
-//! Enums in a schema, in the form Google takes. Ported from `addEnumToSchema` and `getEnumType`.
 use crate::model_calls::error::ModelError;
 use crate::model_calls::providers::ordered::Ordered;
 use crate::model_calls::providers::ordered_ext::OrderedExt;
@@ -16,11 +15,17 @@ fn enum_type(values: &[Ordered], kind: Option<&Ordered>) -> Option<&'static str>
     if values.is_empty() {
         return None;
     }
-    if type_allows(kind, "string") && values.iter().all(|value| matches!(value, Ordered::String(_))) {
+    if type_allows(kind, "string")
+        && values
+            .iter()
+            .all(|value| matches!(value, Ordered::String(_)))
+    {
         return Some("string");
     }
     let numbers = (type_allows(kind, "number") || type_allows(kind, "integer"))
-        && values.iter().all(|value| matches!(value, Ordered::Number(_)));
+        && values
+            .iter()
+            .all(|value| matches!(value, Ordered::Number(_)));
     if numbers {
         if type_allows(kind, "number") {
             return Some("number");
@@ -33,13 +38,13 @@ fn enum_type(values: &[Ordered], kind: Option<&Ordered>) -> Option<&'static str>
             return Some("integer");
         }
     }
-    if type_allows(kind, "boolean") && values.iter().all(|value| matches!(value, Ordered::Bool(_))) {
+    if type_allows(kind, "boolean") && values.iter().all(|value| matches!(value, Ordered::Bool(_)))
+    {
         return Some("boolean");
     }
     None
 }
 
-/// `String(value)` for an enum's numbers and booleans.
 fn js_string(value: &Ordered) -> String {
     match value {
         Ordered::String(text) => text.clone(),
@@ -47,18 +52,27 @@ fn js_string(value: &Ordered) -> String {
     }
 }
 
-pub(super) fn add_enum(values: &[Ordered], kind: Option<&Ordered>, result: &mut Ordered) -> Result<(), ModelError> {
+pub(super) fn add_enum(
+    values: &[Ordered],
+    kind: Option<&Ordered>,
+    result: &mut Ordered,
+) -> Result<(), ModelError> {
     let kind = kind.filter(|kind| !matches!(kind, Ordered::Null));
     let is_null = |value: &Ordered| matches!(value, Ordered::Null);
     let array_with_null = matches!(kind, Some(Ordered::Array(kinds)) if kinds.iter().any(|kind| kind.as_str() == Some("null")));
     let nullable = array_with_null || (kind.is_none() && values.iter().any(is_null));
     let kept: Vec<Ordered> = if nullable {
-        values.iter().filter(|value| !is_null(value)).cloned().collect()
+        values
+            .iter()
+            .filter(|value| !is_null(value))
+            .cloned()
+            .collect()
     } else {
         values.to_vec()
     };
     if !values.is_empty() && values.iter().all(is_null) {
-        let allows_null = kind.is_none() || kind.and_then(Ordered::as_str) == Some("null") || array_with_null;
+        let allows_null =
+            kind.is_none() || kind.and_then(Ordered::as_str) == Some("null") || array_with_null;
         if allows_null {
             result.put("type", Ordered::text("null"));
             if matches!(kind, Some(Ordered::Array(_))) {
@@ -83,7 +97,14 @@ pub(super) fn add_enum(values: &[Ordered], kind: Option<&Ordered>, result: &mut 
         result.put("enum", Ordered::Array(kept));
     } else {
         result.put("format", Ordered::text("enum"));
-        result.put("enum", Ordered::Array(kept.iter().map(|value| Ordered::String(js_string(value))).collect()));
+        result.put(
+            "enum",
+            Ordered::Array(
+                kept.iter()
+                    .map(|value| Ordered::String(js_string(value)))
+                    .collect(),
+            ),
+        );
     }
     Ok(())
 }

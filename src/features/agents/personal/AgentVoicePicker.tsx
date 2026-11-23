@@ -8,7 +8,7 @@ import {
   voicesFor,
   type VoiceView,
 } from "@/features/voice";
-import { voiceProgress, voiceSetupLine } from "./agentVoice";
+import { voiceProgress, voiceSetupLine } from "./agent_voice";
 
 const languageNames = (() => {
   try {
@@ -18,7 +18,6 @@ const languageNames = (() => {
   }
 })();
 
-/** What a voice speaks, as words: "English, US". */
 export function voiceLine(voice: VoiceView) {
   const languages = voice.languages
     .filter((code) => code !== "*")
@@ -26,13 +25,6 @@ export function voiceLine(voice: VoiceView) {
   return [...languages, ...(voice.accent ? [voice.accent] : [])].join(", ");
 }
 
-/**
- * The agent's own voice, picked by its person from the voices that speak their languages
- * (Settings › Voice). Each voice says its name and what it speaks; one on this computer can be
- * heard first. Picking one that isn't here yet starts its download in the background, so the agent
- * can be made at once; until it arrives the agent says "Setting up Ada's voice" where it would
- * speak. Misty never picks one for them.
- */
 export function AgentVoicePicker({
   id,
   name,
@@ -40,9 +32,7 @@ export function AgentVoicePicker({
   disabled,
   onChange,
 }: {
-  /** The list's id, given by the Field that labels it. */
   id?: string;
-  /** The agent's name, for "Setting up Ada's voice" and what a sample says. */
   name: string;
   voice: string | undefined;
   disabled?: boolean;

@@ -1,17 +1,14 @@
 import { useMemo, type RefObject } from "react";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { FindBar } from "@misty/ui";
-import type { GlobalAiMessage } from "../../state/conversationTypes";
+import type { GlobalAiMessage } from "../../state/conversation_types";
 import { MessageAnchorRail } from "./MessageAnchorRail";
-import { createAnchorsBuilder } from "./timelineAnchors";
-import { useAnchorRailScroll } from "./useAnchorRailScroll";
-import { useConversationSearch } from "./useConversationSearch";
+import { createAnchorsBuilder } from "./timeline_anchors";
+import { useAnchorRailScroll } from "./use_anchor_rail_scroll";
+import { useConversationSearch } from "./use_conversation_search";
 
 const EMPTY: GlobalAiMessage[] = [];
-/** The find bar sits under the chat's title, which the transcript scrolls beneath. */
 
-/** Ways around a long chat: the rail of the person's messages, search inside the chat, and the
- * shortcuts that jump between messages. */
 export function ConversationNavigation({
   conversationId,
   messages = EMPTY,
@@ -37,8 +34,6 @@ export function ConversationNavigation({
         onScrollToAnchor={rail.scrollToAnchor}
       />
       {search.open ? (
-        // The shared find bar, floating below the chat's see-through title, since the transcript
-        // scrolls under it.
         <div className="contents [--find-bar-inset:var(--agent-conversation-inset,0px)]">
           <FindBar
             floating

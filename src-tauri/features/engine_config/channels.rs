@@ -17,11 +17,9 @@ use std::collections::{BTreeMap, HashMap};
 use super::support;
 
 pub const LOCAL_PROVIDER_ID: &str = "__local_settings_json__";
-/// The older spelling of the same "use the CLI's own config" choice, kept for imported data.
 pub(crate) const LEGACY_LOCAL_CONFIG_TOML_ID: &str = "__local_config_toml__";
 pub const DISABLED_PROVIDER_ID: &str = "__disabled__";
 
-/// The engines a channel can be set for.
 pub const ENGINES: [&str; 16] = [
     "claude",
     "codex",
@@ -56,19 +54,15 @@ pub(crate) fn checked_engine(engine: &str) -> Result<String, String> {
 pub struct ProviderSection {
     #[serde(default)]
     pub providers: Map<String, Value>,
-    /// The order channels are listed and tried in. `providers` is a sorted map, so the order is
-    /// kept here.
     #[serde(default)]
     pub order: Vec<String>,
     #[serde(default)]
     pub current: Option<String>,
-    /// The channel in use when the engine was turned off, brought back when it is turned on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disabled_from: Option<String>,
 }
 
 impl ProviderSection {
-    /// Channel ids in list order: `order` first, then any it doesn't name.
     pub fn ordered_ids(&self) -> Vec<String> {
         let mut ids: Vec<String> = self
             .order
@@ -97,7 +91,6 @@ impl ProviderSection {
     }
 }
 
-/// Every engine's channels, by engine id.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct CliConfig {
     #[serde(flatten)]
@@ -124,7 +117,6 @@ impl CliConfig {
 
 static CONFIG_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
-/// Held by every read-modify-write of the channel list.
 pub(crate) fn lock() -> parking_lot::MutexGuard<'static, ()> {
     CONFIG_LOCK.lock()
 }
@@ -137,17 +129,12 @@ fn write_config(config: &CliConfig) -> Result<(), String> {
     support::save_value(STORE_KEY, config)
 }
 
-// ── Secrets ─────────────────────────────────────────────────────────────────
-
-/// A channel's secrets by JSON pointer into the channel (`/apiKey`,
-/// `/settingsConfig/env/ANTHROPIC_AUTH_TOKEN`, …), as kept in the credential store.
 type Secrets = BTreeMap<String, String>;
 
 fn secret_account(engine: &str, id: &str) -> String {
     format!("{engine}/{id}")
 }
 
-/// Whether a field or variable named `key` holds a secret.
 fn is_secret_name(key: &str) -> bool {
     let upper = key.to_ascii_uppercase();
     ["KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL"]
@@ -160,7 +147,6 @@ fn escape_pointer(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 
-/// Takes every secret out of `provider`, leaving the rest to be stored as device data.
 fn split_secrets(provider: &mut Value) -> Secrets {
     let mut secrets = Secrets::new();
     let Some(root) = provider.as_object_mut() else {
@@ -200,8 +186,6 @@ fn split_secrets(provider: &mut Value) -> Secrets {
         if let Some(auth) = settings.get_mut("auth").and_then(Value::as_object_mut) {
             take_from(auth, "/settingsConfig/auth", true);
         }
-        // A Codex provider document can authenticate with a literal bearer token or headers:
-        // the whole document is then kept as a secret.
         let secret_config = settings
             .get("config")
             .and_then(Value::as_str)
@@ -217,7 +201,6 @@ fn split_secrets(provider: &mut Value) -> Secrets {
     secrets
 }
 
-/// Puts `secrets` back into `provider` at their pointers.
 fn merge_secrets(provider: &mut Value, secrets: &Secrets) {
     for (pointer, value) in secrets {
         let segments: Vec<String> = pointer
@@ -258,7 +241,6 @@ mod secret_store {
     }
 }
 
-/// Tests keep secrets in memory, apart from the credential store.
 #[cfg(test)]
 pub(crate) mod secret_store {
     use std::collections::HashMap;
@@ -306,16 +288,12 @@ fn save_secrets(engine: &str, id: &str, secrets: &Secrets) -> Result<(), String>
     secret_store::store(&account, &raw)
 }
 
-/// The channel with its secrets put back, for starting a CLI or probing its models.
 fn with_secrets(engine: &str, id: &str, provider: &Value) -> Result<Value, String> {
     let mut provider = provider.clone();
     merge_secrets(&mut provider, &load_secrets(engine, id)?);
     Ok(provider)
 }
 
-// ── Resolving the channel a start uses ─────────────────────────────────────
-
-/// Refuses a start while the engine is turned off in Settings.
 pub fn ensure_engine_enabled(engine: &str) -> Result<(), String> {
     let config = read_config()?;
     let section = config
@@ -331,9 +309,6 @@ fn is_official_provider(id: &str) -> bool {
     id.is_empty() || id == LOCAL_PROVIDER_ID || id == LEGACY_LOCAL_CONFIG_TOML_ID
 }
 
-/// A channel by exact id, or by a prefix or suffix match (`custom_123` finds
-/// `plugin_model-switcher_custom_123` and the other way round). More than one fuzzy match is an
-/// error: choosing by order could send the chat to the wrong endpoint.
 pub(crate) fn find_provider<'a>(
     section: &'a ProviderSection,
     id: &str,
@@ -355,8 +330,6 @@ pub(crate) fn find_provider<'a>(
     Ok(first.map(|(k, v)| (k.as_str(), v)))
 }
 
-/// The channel one start uses, secrets included: `provider_id` when given, else the engine's
-/// current one. `None` means the CLI's own config applies.
 pub(crate) fn resolve_provider(
     engine: &str,
     provider_id: Option<&str>,
@@ -377,19 +350,14 @@ pub(crate) fn resolve_provider(
         return with_secrets(engine, key, provider).map(Some);
     }
     if explicit.is_some() {
-        // A chosen channel that no longer exists must not quietly send the chat to whatever
-        // channel is current: the person picked an endpoint.
         return Err(format!("Channel {id} was not found for {engine}"));
     }
-    // Only a stored current id can be stale (its channel was deleted): fall back to the official
-    // config rather than fail every start.
     eprintln!(
         "[engine channels] current channel {id} not found for {engine}; using the CLI's own config"
     );
     Ok(None)
 }
 
-/// The environment a start of `engine` gets for `provider_id` (or the current channel), for tests.
 #[cfg(test)]
 pub fn resolve_provider_env(
     engine: &str,
@@ -400,9 +368,6 @@ pub fn resolve_provider_env(
         .unwrap_or_else(|| Ok(HashMap::new()))
 }
 
-/// The provider channel's environment for `engine`. Includes what
-/// [`channel_launch`] would add to the environment. An engine that is turned off, or a channel
-/// that can't be read, gives nothing here; [`ensure_engine_enabled`] is the gate for that.
 pub fn channel_env(engine: &str) -> HashMap<String, String> {
     match channel_launch(engine, None, None) {
         Ok(launch) => launch.env,
@@ -413,24 +378,14 @@ pub fn channel_env(engine: &str) -> HashMap<String, String> {
     }
 }
 
-/// Everything a start of `engine` on its current channel needs: environment, extra arguments and
-/// the private files those arguments name (to remove when the run ends).
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ChannelLaunch {
     pub env: HashMap<String, String>,
     pub args: Vec<String>,
     pub cleanup_files: Vec<std::path::PathBuf>,
-    /// For Claude Code, the `--model` to pass, resolved through the channel's model aliases.
     pub model: Option<String>,
 }
 
-/// The launch for `engine` on its current channel. `model` and `effort` are the chat's own
-/// choices, which win over the channel's.
-///
-/// Claude Code reads the `env` of its own `settings.json` after the process environment, so a
-/// channel also gets a private `--settings` overlay that masks the native routing keys. Codex
-/// reads its provider from `config.toml`, so a channel is applied with `-c` overrides; its key
-/// travels in the environment (`MISTY_CODEX_API_KEY`), never in the arguments.
 pub fn channel_launch(
     engine: &str,
     model: Option<&str>,
@@ -469,8 +424,6 @@ pub fn channel_launch(
     Ok(launch)
 }
 
-// ── Claude Code: a private --settings overlay ───────────────────────────────
-
 const CLAUDE_ROUTING_KEYS: &[&str] = &[
     "ANTHROPIC_BASE_URL",
     "ANTHROPIC_AUTH_TOKEN",
@@ -489,8 +442,6 @@ const CLAUDE_ROUTING_KEYS: &[&str] = &[
     "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
 ];
 
-/// The model to pass for a channel: the chat's choice, through the channel's alias variables
-/// (`sonnet` → `ANTHROPIC_DEFAULT_SONNET_MODEL`), else the channel's own model.
 fn claude_resolve_model(
     selected: Option<&str>,
     provider: &Value,
@@ -505,8 +456,6 @@ fn claude_resolve_model(
                 .and_then(Value::as_str)
         })
         .filter(|model| !model.trim().is_empty());
-    // "default" (or nothing chosen) means the channel's own default. With none configured there
-    // is nothing to pass, and the overlay masks the native model instead.
     let selected = match selected.filter(|s| !s.trim().is_empty()) {
         None | Some("default") => configured?,
         Some(s) => s,
@@ -527,9 +476,6 @@ fn claude_resolve_model(
     })
 }
 
-/// `settingsConfig` keys a channel may keep in the overlay. `hooks` and `apiKeyHelper` are shell
-/// commands and `permissions` rewrites the tool policy, so an imported channel must not carry
-/// them into a start.
 const CLAUDE_PASSTHROUGH_SETTINGS_KEYS: &[&str] = &["model", "alwaysThinkingEnabled"];
 
 fn claude_stage(
@@ -546,8 +492,6 @@ fn claude_stage(
             }
         }
     }
-    // Empty values mask the native routing and sign-in settings; the person's hooks,
-    // permissions and managed settings keep the CLI's own precedence.
     let mut overlay: Map<String, Value> = CLAUDE_ROUTING_KEYS
         .iter()
         .map(|key| (key.to_string(), Value::String(String::new())))
@@ -566,7 +510,6 @@ fn claude_stage(
                 .to_string(),
         ),
     );
-    // Mask a native apiKeyHelper (a shell command the CLI runs) so the channel's key wins.
     settings.insert("apiKeyHelper".into(), Value::String(String::new()));
     let content = serde_json::to_string(&settings)
         .map_err(|_| "Couldn't write the Claude Code channel settings")?;
@@ -575,11 +518,6 @@ fn claude_stage(
     Ok(path)
 }
 
-// ── Codex: -c overrides ─────────────────────────────────────────────────────
-
-/// The `-c key=value` arguments that apply a channel to one Codex start, and (in `env`) the
-/// variables its key, bearer token and headers travel in, so they never show in a process
-/// listing. The chat's own model and effort win.
 fn codex_channel_args(
     provider: &Value,
     channel_env: &HashMap<String, String>,
@@ -592,7 +530,6 @@ fn codex_channel_args(
         .pointer("/settingsConfig/config")
         .and_then(Value::as_str)
         .unwrap_or("");
-    // No parser diagnostics here: they can quote credentials from the TOML.
     let mut config: toml::Table = toml::from_str(text)
         .map_err(|_| "This Codex channel's config.toml isn't valid".to_string())?;
     let api_key = channel_env.get("OPENAI_API_KEY");
@@ -606,7 +543,6 @@ fn codex_channel_args(
             config.insert("model".into(), Toml::String(model.into()));
         }
     }
-    // A flat channel selects its own provider, even when the native file selects another.
     if !config.contains_key("model_provider") && (base_url.is_some() || api_key.is_some()) {
         config.insert("model_provider".into(), Toml::String("misty".into()));
         let table = toml::Table::from_iter([
@@ -653,8 +589,6 @@ fn codex_channel_args(
         table.remove("experimental_bearer_token");
         env.insert("MISTY_CODEX_API_KEY".into(), key.clone());
     }
-    // A provider document may sign in with a literal bearer token or headers: move those into the
-    // environment too.
     if let Some(providers) = config
         .get_mut("model_providers")
         .and_then(Toml::as_table_mut)
@@ -694,7 +628,6 @@ fn codex_channel_args(
                         })
                         .as_str()
                         .ok_or("Codex channel header variable must be a string")?;
-                    // Keep the CLI's rule that a header variable wins over a literal header.
                     if !channel_env.contains_key(key) && std::env::var_os(key).is_none() {
                         env.insert(key.to_string(), value.to_string());
                     }
@@ -702,8 +635,6 @@ fn codex_channel_args(
             }
         }
     }
-    // The person's own hooks, trust and MCP settings stay; only the provider keys are replaced.
-    // `disable_response_storage` is retired by current Codex versions and isn't passed.
     let mut args = Vec::new();
     for key in [
         "model",
@@ -727,9 +658,6 @@ fn codex_channel_args(
     Ok(args)
 }
 
-// ── What a window sees ──────────────────────────────────────────────────────
-
-/// One channel as Settings shows it: everything but its secrets.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelView {
@@ -775,10 +703,6 @@ pub fn channels_view() -> Result<Vec<EngineChannels>, String> {
         .collect()
 }
 
-// ── Changes ─────────────────────────────────────────────────────────────────
-
-/// Applies `mutate` to one engine's channels and saves, for a caller already holding [`lock`].
-/// An error from `mutate` leaves everything as it was.
 pub(crate) fn mutate_section_unlocked(
     engine: &str,
     mutate: impl FnOnce(&mut ProviderSection) -> Result<(), String>,
@@ -799,9 +723,6 @@ fn mutate_section(
     mutate_section_unlocked(engine, mutate)
 }
 
-/// Adds or replaces a channel, for a caller holding [`lock`]. Secrets in `json` go to the
-/// credential store and replace the ones saved under the same field; saved ones the edit doesn't
-/// carry are kept, since a window never has them to send back.
 pub(crate) fn upsert_provider_unlocked(
     engine: &str,
     id: &str,
@@ -834,12 +755,10 @@ pub fn upsert_provider(engine: &str, id: &str, json: Value) -> Result<(), String
     upsert_provider_unlocked(engine, id, json)
 }
 
-/// Removes a channel and its secrets, for a caller holding [`lock`].
 pub(crate) fn delete_provider_unlocked(engine: &str, id: &str) -> Result<(), String> {
     mutate_section_unlocked(engine, |section| {
         section.remove(id);
         if section.current.as_deref() == Some(id) {
-            // Back to the official config: a start then adds nothing.
             section.current = None;
         }
         Ok(())
@@ -852,9 +771,6 @@ pub fn delete_provider(engine: &str, id: &str) -> Result<(), String> {
     delete_provider_unlocked(engine, id)
 }
 
-/// Turning an engine off remembers its channel in `disabled_from` and parks `current` on
-/// `__disabled__`; turning it on brings the channel back (or the official config when it was
-/// deleted meanwhile).
 pub fn set_engine_enabled(engine: &str, enabled: bool) -> Result<(), String> {
     mutate_section(engine, |section| {
         if enabled {
@@ -873,8 +789,6 @@ pub fn set_engine_enabled(engine: &str, enabled: bool) -> Result<(), String> {
     })
 }
 
-/// The channel new chats of `engine` start on. Chats already running keep theirs; the CLI's own
-/// files are never written.
 pub fn set_current_provider(engine: &str, id: &str) -> Result<(), String> {
     mutate_section(engine, |section| {
         if id != LOCAL_PROVIDER_ID
@@ -894,7 +808,6 @@ pub fn set_current_provider(engine: &str, id: &str) -> Result<(), String> {
 
 pub fn reorder_providers(engine: &str, ids: Vec<String>) -> Result<(), String> {
     mutate_section(engine, |section| {
-        // The requested order, then any channel it doesn't name.
         let mut order: Vec<String> = ids
             .into_iter()
             .filter(|id| section.providers.contains_key(id))
@@ -908,8 +821,6 @@ pub fn reorder_providers(engine: &str, ids: Vec<String>) -> Result<(), String> {
         Ok(())
     })
 }
-
-// ── Commands ────────────────────────────────────────────────────────────────
 
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, String> + Send + 'static,
@@ -949,7 +860,6 @@ pub async fn engine_channels_reorder(engine: String, ids: Vec<String>) -> Result
     blocking(move || reorder_providers(&checked_engine(&engine)?, ids)).await
 }
 
-/// The base URL and key of a saved channel, for the model-list probe. Stays in native code.
 pub(crate) fn probe_config(
     engine: &str,
     id: &str,
@@ -1026,7 +936,6 @@ mod tests {
         assert!(resolve_provider_env("claude", Some(LOCAL_PROVIDER_ID))
             .unwrap()
             .is_empty());
-        // An empty id falls back to the current channel.
         let empty = resolve_provider_env("claude", Some("")).unwrap();
         assert_eq!(
             empty.get("ANTHROPIC_BASE_URL").map(String::as_str),
@@ -1064,7 +973,6 @@ mod tests {
         assert!(claude.channels[0].has_key);
         assert!(!serde_json::to_string(&view).unwrap().contains("sk-"));
 
-        // An edit without the key keeps it; a new key replaces it; clearKey removes it.
         upsert_provider(
             "claude",
             "chan",
@@ -1113,7 +1021,6 @@ mod tests {
             env.get("ANTHROPIC_AUTH_TOKEN").map(String::as_str),
             Some("sk-test")
         );
-        // A stale explicit id fails rather than quietly using whatever is current.
         let stale = resolve_provider_env("claude", Some("deleted_channel_123"));
         assert!(stale.unwrap_err().contains("deleted_channel_123"));
     }
@@ -1287,7 +1194,6 @@ mod tests {
             !joined.contains("sk-codex"),
             "keys never ride the arguments"
         );
-        // The chat's own model wins.
         let launch = channel_launch("codex", Some("chosen"), Some("high")).unwrap();
         assert!(!launch.args.iter().any(|arg| arg.starts_with("model=")));
     }
@@ -1302,7 +1208,6 @@ mod tests {
             Some("doc"),
             json!({ "settingsConfig": { "config": config } }),
         );
-        // The whole document is a secret here, so the stored list doesn't carry the token.
         assert!(!serde_json::to_string(&read_config().unwrap())
             .unwrap()
             .contains("tok-1"));

@@ -1,6 +1,3 @@
-//! Shows a file a chat links to in the system's file manager. Like every panel call, the path is
-//! checked against the folders the account linked, so a reply can't point Finder anywhere else.
-
 use super::{linked_path, person_window};
 
 #[tauri::command]

@@ -1,6 +1,3 @@
-// Misty's Space-files shim, added beside an app that doesn't know the SDK (`shim: true` in its manifest).
-// It makes the app's own Open (a file input) pick from the Space's Media, and its own Save (a download link)
-// save into Media. It speaks the SDK channel's `files.*` calls and changes nothing else about the page.
 (function () {
   "use strict";
   var nextId = 1;
@@ -33,7 +30,6 @@
     });
   }
 
-  // Whether Misty answered the handshake; without it the page keeps the browser's own Open and Save.
   var connected = false;
   ready.then(function (ok) { connected = ok; });
 
@@ -83,7 +79,6 @@
         });
       })
       .catch(function () {
-        // Misty couldn't take it: the page's own download goes ahead.
         originalAnchorClick.call(link);
       });
   };

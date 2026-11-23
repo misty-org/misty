@@ -1,10 +1,9 @@
 import { InUseMark, type CollectionColumn, type CollectionItem } from "@misty/ui";
 import { imageFileUrl, personTone } from "@/features/agents";
 import { FileNameIcon } from "@/features/files";
-import { driveInUsePeople, driveSyncMark, formatDriveBytes } from "../../drive/driveEntries";
-import { isFolderEntry, type PickerEntry } from "./usePickerListing";
+import { driveInUsePeople, driveSyncMark, formatDriveBytes } from "../../drive/drive_entries";
+import { isFolderEntry, type PickerEntry } from "./use_picker_listing";
 
-/** The images `misty-file:` serves from a project folder, for a grid card's picture. */
 const PREVIEWED = new Set("png apng jpg jpeg gif webp avif svg bmp ico".split(" "));
 
 const extensionOf = (name: string) =>
@@ -29,7 +28,6 @@ const changedText = (entry: PickerEntry) => {
   });
 };
 
-/** Finder's list columns: Date modified, Size and Kind, each sorted by its own value. */
 export const pickerColumns: CollectionColumn[] = [
   {
     key: "changed",
@@ -51,20 +49,17 @@ export const pickerColumns: CollectionColumn[] = [
   },
 ];
 
-/** A project image's own picture. A drive file shows its icon: it may not be on this computer yet. */
 function Preview({ path, changedAt }: { path: string; changedAt: number }) {
   return <img alt="" loading="lazy" src={imageFileUrl(path, changedAt)} />;
 }
 
-/** An entry as a row or a card. A press goes to `onSelect`, which decides between picking and opening. */
 export function pickerItem(
   _spaceId: string,
   entry: PickerEntry,
   onOpen: (entry: PickerEntry) => void,
 ): CollectionItem {
   const folder = isFolderEntry(entry);
-  const pictured =
-    entry.kind === "local" && !folder && PREVIEWED.has(extensionOf(entry.name));
+  const pictured = entry.kind === "local" && !folder && PREVIEWED.has(extensionOf(entry.name));
   const inUse = entry.kind === "drive" ? driveInUsePeople(entry.entry, personTone) : [];
   return {
     id: entry.id,

@@ -1,5 +1,3 @@
-//! JSON with its keys in their written order, for the places a client has to look inside a tool
-//! schema or call input and write it back. `serde_json::Value` would sort the keys (`raw_json.rs`).
 use std::fmt;
 
 use serde::{
@@ -23,19 +21,20 @@ impl Ordered {
         serde_json::from_str(text)
     }
 
-    /// The same text `JSON.stringify` writes.
     pub(crate) fn to_text(&self) -> String {
         serde_json::to_string(self).unwrap_or_default()
     }
 
     pub(crate) fn get(&self, key: &str) -> Option<&Ordered> {
         match self {
-            Self::Object(fields) => fields.iter().find(|(name, _)| name == key).map(|(_, value)| value),
+            Self::Object(fields) => fields
+                .iter()
+                .find(|(name, _)| name == key)
+                .map(|(_, value)| value),
             _ => None,
         }
     }
 
-    /// The value of a key, unless it is missing or null, which is how the SDK's `!= null` reads.
     pub(crate) fn present(&self, key: &str) -> Option<&Ordered> {
         self.get(key).filter(|value| !matches!(value, Self::Null))
     }
@@ -47,7 +46,6 @@ impl Ordered {
         }
     }
 
-    /// Adds a key, or replaces it in place, as assigning to a JavaScript object does.
     pub(crate) fn set(fields: &mut Vec<(String, Ordered)>, key: &str, value: Ordered) {
         match fields.iter_mut().find(|(name, _)| name == key) {
             Some((_, slot)) => *slot = value,
@@ -62,7 +60,6 @@ impl Serialize for Ordered {
             Self::Null => serializer.serialize_unit(),
             Self::Bool(value) => serializer.serialize_bool(*value),
             Self::Number(value) => match value.as_f64().filter(|_| value.is_f64()) {
-                // JavaScript has one number type, so `1.0` comes back out as `1`.
                 Some(float) if float.fract() == 0.0 && float.abs() < 9_007_199_254_740_992.0 => {
                     serializer.serialize_i64(float as i64)
                 }
@@ -149,8 +146,12 @@ mod tests {
 
     #[test]
     fn keys_stay_in_order_and_numbers_read_as_javascript_writes_them() {
-        let ordered = Ordered::from_text(r#"{"z":1.0,"a":[{"y":1.5,"b":null}],"m":"é\n"}"#).unwrap();
-        assert_eq!(ordered.to_text(), r#"{"z":1,"a":[{"y":1.5,"b":null}],"m":"é\n"}"#);
+        let ordered =
+            Ordered::from_text(r#"{"z":1.0,"a":[{"y":1.5,"b":null}],"m":"é\n"}"#).unwrap();
+        assert_eq!(
+            ordered.to_text(),
+            r#"{"z":1,"a":[{"y":1.5,"b":null}],"m":"é\n"}"#
+        );
     }
 
     #[test]

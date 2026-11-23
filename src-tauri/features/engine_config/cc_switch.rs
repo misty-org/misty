@@ -21,9 +21,6 @@ use std::path::{Path, PathBuf};
 
 use super::{channels, support};
 
-/// Our engine id -> cc-switch app key (legacy json `apps` key / db
-/// `app_type`). Engines cc-switch doesn't manage (kimi/pi/omp/dsh) have no
-/// mapping and are skipped on import.
 fn ccs_app_key(engine: &str) -> Option<&'static str> {
     match engine {
         "claude" => Some("claude"),
@@ -47,7 +44,6 @@ fn ccs_config_path() -> PathBuf {
     ccs_dir().join("config.json")
 }
 
-/// The file cc-switch currently writes: the v3 db wins over the legacy json.
 fn ccs_source_path() -> Option<PathBuf> {
     let db = ccs_db_path();
     if file_access::fs::is_file(&db) {
@@ -64,24 +60,17 @@ fn is_json_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Import bookkeeping, kept on this computer in `misty.db`.
 const SYNC_STATE_KEY: &str = "cc_switch_sync";
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SyncState {
-    /// Fingerprint of the cc-switch source file we last imported.
     #[serde(default)]
     seen_hash: String,
-    /// Fingerprint the person dismissed with "Later"; not offered again until it changes.
     #[serde(default)]
     dismissed_hash: String,
 }
 
-/// Cheap change token: mtime + length. cc-switch mutates its store through
-/// SQLite writes, so any real change bumps mtime; content-hashing the whole
-/// file meant reading tens of MB on every settings-page mount (and, as a
-/// sync command, on Tauri's main thread — that was the visible freeze).
 fn fingerprint(path: &Path) -> Option<(String, u64)> {
     let meta = file_access::fs::metadata(path).ok()?;
     let mtime_ms = meta
@@ -104,18 +93,10 @@ fn write_sync_state(state: &SyncState) -> Result<(), String> {
     support::save_value(SYNC_STATE_KEY, state)
 }
 
-/// One cc-switch provider, normalized to the legacy JSON entry shape
-/// (`{ name, settingsConfig, icon?, iconColor? }`) so `convert_provider`
-/// handles both sources unchanged.
 type CcsProviders = Vec<(String, Value)>;
 
-/// Per-engine provider lists keyed by our engine id. `None` = cc-switch
-/// never managed that app (import skips it, no pruning); `Some([])` = the
-/// app exists but has no providers (import may prune).
 type EngineProviders = Vec<(String, Option<CcsProviders>)>;
 
-/// Legacy v2 JSON: `apps.<app>.providers` as a map (id → entry) or an array
-/// (entries carry their own `id`).
 fn json_engine_providers(root: &Value, engine: &str) -> Option<CcsProviders> {
     let app_key = ccs_app_key(engine)?;
     let section = root["apps"].get(app_key)?;
@@ -133,9 +114,6 @@ fn json_engine_providers(root: &Value, engine: &str) -> Option<CcsProviders> {
     Some(list)
 }
 
-/// v3 SQLite: `providers` table filtered by `app_type`. A corrupt
-/// `settings_config` row degrades to an empty object instead of failing the
-/// whole batch.
 fn db_engine_providers(conn: &Connection, engine: &str) -> Result<Option<CcsProviders>, String> {
     let Some(app_key) = ccs_app_key(engine) else {
         return Ok(None);
@@ -192,7 +170,6 @@ fn load_from_db(path: &Path, engines: &[&str]) -> Result<EngineProviders, String
 pub struct CcSwitchStatus {
     pub installed: bool,
     pub changed: bool,
-    /// Total providers across the engines we can import.
     pub providers: usize,
     pub hash: String,
     pub modified_ms: u64,
@@ -230,7 +207,6 @@ fn count_json_providers(root: &Value) -> usize {
 
 #[tauri::command]
 pub async fn engine_cc_switch_check() -> Result<CcSwitchStatus, String> {
-    // Off the main thread: this runs every time the Settings page opens.
     tauri::async_runtime::spawn_blocking(check_cc_switch_blocking)
         .await
         .map_err(|e| e.to_string())?
@@ -252,8 +228,6 @@ fn check_cc_switch_blocking() -> Result<CcSwitchStatus, String> {
     };
     let state = read_sync_state();
     let changed = hash != state.seen_hash && hash != state.dismissed_hash;
-    // Counting opens the db — only worth the io when the sync banner can
-    // actually show.
     let providers = if !changed {
         0
     } else if is_json_file(&path) {
@@ -292,9 +266,7 @@ pub async fn engine_cc_switch_dismiss(hash: String) -> Result<(), String> {
 pub struct CcSwitchImportResult {
     pub added: usize,
     pub updated: usize,
-    /// Id collides with a manually created channel — left untouched.
     pub skipped: usize,
-    /// cc-switch-sourced channels that disappeared upstream.
     pub removed: usize,
 }
 
@@ -306,9 +278,6 @@ fn env_str(env: &Value, key: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// One CC Switch provider as a channel. Keeps its `settingsConfig` as it is: a start applies the
-/// raw `env` and `config` first, so extra keys (such as ANTHROPIC_SMALL_FAST_MODEL) survive. Keys
-/// in it are moved to the credential store when the channel is saved.
 fn convert_provider(engine: &str, id: &str, p: &Value) -> Value {
     let mut out = serde_json::Map::new();
     let name = p["name"].as_str().unwrap_or(id);
@@ -325,7 +294,6 @@ fn convert_provider(engine: &str, id: &str, p: &Value) -> Value {
 
     let sc = &p["settingsConfig"];
     match engine {
-        // Claude/Grok: convention fields live in settingsConfig.env.
         "claude" | "grok" => {
             let env = &sc["env"];
             let (base, key, model) = if engine == "claude" {
@@ -347,7 +315,6 @@ fn convert_provider(engine: &str, id: &str, p: &Value) -> Value {
                 out.insert("model".into(), Value::String(v));
             }
         }
-        // Codex: { auth: { OPENAI_API_KEY }, config: <config.toml text> }.
         "codex" => {
             if let Some(v) = env_str(&sc["auth"], "OPENAI_API_KEY") {
                 out.insert("apiKey".into(), Value::String(v));
@@ -357,7 +324,6 @@ fn convert_provider(engine: &str, id: &str, p: &Value) -> Value {
                     if let Some(m) = tbl["model"].as_str() {
                         out.insert("model".into(), Value::String(m.to_string()));
                     }
-                    // First model_providers.*.base_url wins.
                     if let Some(providers) = tbl["model_providers"].as_object() {
                         for mp in providers.values() {
                             if let Some(u) = mp["base_url"].as_str() {
@@ -377,9 +343,6 @@ fn convert_provider(engine: &str, id: &str, p: &Value) -> Value {
     Value::Object(out)
 }
 
-/// Merges one engine's CC Switch providers into its channels. `prune` removes imported channels
-/// that are gone from CC Switch: only for CC Switch's own store, never a picked file, which may be
-/// a partial export. Called with [`channels::lock`] held.
 fn merge_engine(
     engine: &str,
     providers: &CcsProviders,
@@ -404,7 +367,6 @@ fn merge_engine(
                 continue;
             }
         }
-        // The imported keys replace whatever an earlier import saved for this channel.
         converted["clearKey"] = Value::Bool(true);
         channels::upsert_provider_unlocked(engine, id, converted)?;
     }
@@ -451,12 +413,9 @@ fn run_import(
             merge_engine(engine, list, prune, &mut result)?;
         }
     }
-    // An import changes only Misty's channel list; the CLIs' own files stay as they are.
     Ok(result)
 }
 
-/// Imports CC Switch's providers from its own store (the SQLite database first, the JSON file
-/// otherwise). `engine` is an engine id or "all".
 fn import_detected(engine: &str) -> Result<CcSwitchImportResult, String> {
     let path = ccs_source_path().ok_or_else(|| {
         "CC Switch wasn't found (~/.cc-switch/cc-switch.db or config.json).".to_string()
@@ -488,9 +447,6 @@ pub async fn engine_cc_switch_import(engine: String) -> Result<CcSwitchImportRes
         .map_err(|e| e.to_string())?
 }
 
-/// Imports from a file the person picks: `.json` reads as CC Switch 2's JSON, anything else as
-/// CC Switch 3's database. Never removes channels: a picked file may be a partial export. A
-/// database is read from a private copy, so the picked file is only ever read.
 fn import_file(path: &Path, engine: &str) -> Result<CcSwitchImportResult, String> {
     let engines = import_engines(engine);
     if is_json_file(path) {
@@ -503,8 +459,6 @@ fn import_file(path: &Path, engine: &str) -> Result<CcSwitchImportResult, String
     result
 }
 
-/// Asks for a CC Switch export with the system's dialog, shown from here so a window can't name
-/// a path of its own. `None` when the person cancels.
 #[tauri::command]
 pub async fn engine_cc_switch_import_file(
     app: tauri::AppHandle,
@@ -571,10 +525,8 @@ mod tests {
         let codex = loaded[1].1.as_ref().unwrap();
         assert_eq!(codex.len(), 1);
         assert_eq!(codex[0].0, "p2");
-        // grokbuild section absent → None (no import, no prune).
         assert!(loaded[2].1.is_none());
 
-        // Flat fields extract through convert_provider for both shapes.
         let converted = convert_provider("claude", "p1", &claude[0].1);
         assert_eq!(converted["baseUrl"], "https://a.example");
         assert_eq!(converted["source"], "cc-switch");
@@ -602,7 +554,6 @@ mod tests {
             [r#"{"env": {"ANTHROPIC_BASE_URL": "https://c.example", "ANTHROPIC_AUTH_TOKEN": "sk-y"}}"#],
         )
         .unwrap();
-        // A corrupt settings_config row degrades to an empty object.
         conn.execute(
             "INSERT INTO providers VALUES ('d2', 'Broken', NULL, NULL, 'not json', 'claude', 1, 1)",
             [],
@@ -618,9 +569,7 @@ mod tests {
         assert_eq!(converted["name"], "Db Entry");
         assert_eq!(converted["baseUrl"], "https://c.example");
         assert_eq!(converted["apiKey"], "sk-y");
-        // Corrupt row still imports, with an empty settingsConfig.
         assert!(claude[1].1["settingsConfig"].is_object());
-        // Unmapped engine → None.
         let loaded = load_from_db(&path, &["kimi"]).unwrap();
         assert!(loaded[0].1.is_none());
     }

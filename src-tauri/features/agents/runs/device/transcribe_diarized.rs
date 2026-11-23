@@ -1,4 +1,3 @@
-//! Who said what in a file or a finished capture (`transcribe-diarized.ts`).
 use serde_json::{json, Map, Value};
 
 use super::super::{
@@ -36,29 +35,33 @@ impl SpeakerTurn {
     }
 }
 
-/// `String(token.speaker)`, with no speaker reading as `?`.
 fn speaker_of(token: &Value) -> String {
     match token.get("speaker") {
         None | Some(Value::Null) => "?".to_owned(),
         Some(Value::String(text)) => text.clone(),
-        Some(Value::Number(number)) => number.as_f64().map_or_else(|| number.to_string(), number_text),
+        Some(Value::Number(number)) => number
+            .as_f64()
+            .map_or_else(|| number.to_string(), number_text),
         Some(other) => other.to_string(),
     }
 }
 
-/// Groups Soniox tokens into consecutive speaker turns.
 fn speaker_turns(tokens: &[Value]) -> Vec<SpeakerTurn> {
     let mut turns: Vec<SpeakerTurn> = Vec::new();
     for token in tokens {
         let text = token.get("text").and_then(Value::as_str).unwrap_or("");
-        let translated = token.get("translation_status").and_then(Value::as_str) == Some("translation");
+        let translated =
+            token.get("translation_status").and_then(Value::as_str) == Some("translation");
         if text.is_empty() || translated || text == "<end>" || text == "<fin>" {
             continue;
         }
         let speaker = speaker_of(token);
         let milliseconds = |key: &str| token.get(key).and_then(Value::as_f64);
         let start = milliseconds("start_ms").unwrap_or(0.0) / 1000.0;
-        let end = milliseconds("end_ms").or(milliseconds("start_ms")).unwrap_or(0.0) / 1000.0;
+        let end = milliseconds("end_ms")
+            .or(milliseconds("start_ms"))
+            .unwrap_or(0.0)
+            / 1000.0;
         match turns.last_mut() {
             Some(last) if last.speaker == speaker => {
                 last.text.push_str(text);
@@ -66,7 +69,11 @@ fn speaker_turns(tokens: &[Value]) -> Vec<SpeakerTurn> {
             }
             _ => turns.push(SpeakerTurn {
                 speaker,
-                language: token.get("language").and_then(Value::as_str).filter(|language| !language.is_empty()).map(str::to_owned),
+                language: token
+                    .get("language")
+                    .and_then(Value::as_str)
+                    .filter(|language| !language.is_empty())
+                    .map(str::to_owned),
                 start,
                 end,
                 text: text.trim_start_matches(js_is_space).to_owned(),
@@ -80,14 +87,26 @@ fn speaker_turns(tokens: &[Value]) -> Vec<SpeakerTurn> {
     turns
 }
 
-/// A file or finished capture, transcribed with speaker labels.
-pub(super) async fn transcribe_diarized_call(calls: &DeviceCalls, model: &str, route: &ModelRoute, body: &JsValue) -> Result<Value, CallError> {
+pub(super) async fn transcribe_diarized_call(
+    calls: &DeviceCalls,
+    model: &str,
+    route: &ModelRoute,
+    body: &JsValue,
+) -> Result<Value, CallError> {
     let (audio, languages, context) = checked(|| {
         let request = object(body)?;
-        js_regex(r"^(audio|video)\/[\w.+-]+$", false).is_match(request.get("mediaType")?.as_str()?).then_some(())?;
-        let audio = request.get("audio")?.as_str().filter(|audio| !audio.is_empty())?;
+        js_regex(r"^(audio|video)\/[\w.+-]+$", false)
+            .is_match(request.get("mediaType")?.as_str()?)
+            .then_some(())?;
+        let audio = request
+            .get("audio")?
+            .as_str()
+            .filter(|audio| !audio.is_empty())?;
         let languages = optional(request.get("languages"), |value| {
-            array(value, 0, 10)?.iter().map(|language| string(Some(language), 16)).collect::<Option<Vec<_>>>()
+            array(value, 0, 10)?
+                .iter()
+                .map(|language| string(Some(language), 16))
+                .collect::<Option<Vec<_>>>()
         })?;
         let context = optional(request.get("context"), |value| {
             let context = object(value?)?;
@@ -96,7 +115,10 @@ pub(super) async fn transcribe_diarized_call(calls: &DeviceCalls, model: &str, r
                 kept.insert("text".to_owned(), json!(text));
             }
             let terms = optional(context.get("terms"), |value| {
-                array(value, 0, 200)?.iter().map(|term| string(Some(term), 160)).collect::<Option<Vec<_>>>()
+                array(value, 0, 200)?
+                    .iter()
+                    .map(|term| string(Some(term), 160))
+                    .collect::<Option<Vec<_>>>()
             })?;
             if let Some(terms) = terms {
                 kept.insert("terms".to_owned(), json!(terms));
@@ -117,8 +139,17 @@ pub(super) async fn transcribe_diarized_call(calls: &DeviceCalls, model: &str, r
     }
     let mut options = ProviderOptions::new();
     options.insert("soniox".to_owned(), Value::Object(soniox));
-    let result = transcribe(resolved.as_ref(), &node_base64(audio), Some(&options), Some(1)).await?;
-    let tokens = result.provider_metadata.as_ref().and_then(|metadata| metadata.get("soniox")?.get("tokens")?.as_array());
+    let result = transcribe(
+        resolved.as_ref(),
+        &node_base64(audio),
+        Some(&options),
+        Some(1),
+    )
+    .await?;
+    let tokens = result
+        .provider_metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("soniox")?.get("tokens")?.as_array());
     let turns = speaker_turns(tokens.map_or(&[], Vec::as_slice));
     Ok(json!({
         "text": result.text,
@@ -134,8 +165,10 @@ mod tests {
 
     #[test]
     fn groups_a_two_speaker_transcript_into_turns_and_drops_translations() {
-        let fixture: Value =
-            serde_json::from_str(include_str!("../tests/fixtures/runtime_device/soniox-async-two-speakers.json")).unwrap();
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/runtime_device/soniox-async-two-speakers.json"
+        ))
+        .unwrap();
         let turns = speaker_turns(fixture["tokens"].as_array().unwrap());
         let values: Vec<Value> = turns.iter().map(SpeakerTurn::to_value).collect();
         assert_eq!(
@@ -150,7 +183,10 @@ mod tests {
 
     #[test]
     fn a_missing_speaker_reads_as_unknown() {
-        let turns = speaker_turns(&[json!({ "text": " hi", "start_ms": 1000 }), json!({ "text": "  ", "speaker": 3 })]);
+        let turns = speaker_turns(&[
+            json!({ "text": " hi", "start_ms": 1000 }),
+            json!({ "text": "  ", "speaker": 3 }),
+        ]);
         assert_eq!(turns.len(), 1);
         assert_eq!(turns[0].speaker, "?");
         assert_eq!(turns[0].text, "hi");

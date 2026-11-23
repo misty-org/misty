@@ -7,38 +7,25 @@
 use parking_lot::Mutex;
 use rusqlite::Connection;
 
-/// Folded into the scanner's stat signature so a schema/derivation change
-/// still invalidates cached parse results. Version 3 also revalidates the
-/// workspace attribution of unchanged Qoder transcripts.
 pub const CACHE_VERSION: &str = "3";
 
 static GLOBAL: std::sync::OnceLock<std::sync::Arc<Db>> = std::sync::OnceLock::new();
 
-/// The store the app opened at startup, for the settings reads that have no handle.
 pub fn global() -> Option<&'static std::sync::Arc<Db>> {
     GLOBAL.get()
 }
 
-/// Remembers the store the app opened, once.
 pub fn set_global(db: std::sync::Arc<Db>) {
     let _ = GLOBAL.set(db);
 }
 
-/// Writer plus a dedicated read-only connection. WAL lets the reader run on
-/// its own snapshot while the writer holds an index transaction; sharing one
-/// connection made every `list_sessions`/`search` wait for a full FTS rebuild.
 pub struct Db(pub Mutex<Connection>, Mutex<Connection>);
 
 impl Db {
-    /// Reader for hot query paths. Never use it for INSERT/UPDATE/DELETE:
-    /// the connection runs with `query_only`, which rejects writes.
     pub fn read(&self) -> parking_lot::MutexGuard<'_, Connection> {
         self.1.lock()
     }
 
-    /// Non-blocking passive WAL checkpoint so long-lived reader/writer
-    /// connections do not let `app.db-wal` grow without bound after background
-    /// index passes settle.
     pub fn wal_checkpoint_passive(&self) -> Result<(i64, i64), String> {
         let conn = self.0.lock();
         conn.query_row("PRAGMA wal_checkpoint(PASSIVE)", [], |r| {
@@ -47,27 +34,20 @@ impl Db {
         .map_err(|e| e.to_string())
     }
 
-    /// Opens the engine tables in Misty's database, through the same connection setup and
-    /// migrations as every other store.
     pub fn open_store(store: &database::store::Store) -> rusqlite::Result<Self> {
         let conn = store.connect()?;
         migrate(&conn)?;
         retire_unused(&conn)?;
-        // A separate connection takes its own WAL snapshot. `query_only` turns an accidental
-        // write here into an immediate SQLITE_READONLY instead of a second writer racing the
-        // indexer.
         let reader = store.connect()?;
         reader.pragma_update(None, "query_only", true)?;
         Ok(Self(Mutex::new(conn), Mutex::new(reader)))
     }
 
-    /// A standalone database file, for tests.
     #[cfg(test)]
     pub fn open_at(path: &std::path::Path) -> rusqlite::Result<Self> {
         Self::open_store(&database::store::Store::at(path))
     }
 
-    /// All registered workspace roots (session attribution + path confinement).
     pub fn workspace_paths(&self) -> Result<Vec<String>, String> {
         let conn = self.read();
         let mut stmt = conn
@@ -86,8 +66,6 @@ impl Db {
         Ok(out)
     }
 
-    /// Directories the user explicitly granted file access to on top of the
-    /// registered workspaces (the on-demand grant flow, files::grant_root).
     pub fn granted_roots(&self) -> Result<Vec<String>, String> {
         let conn = self.read();
         let mut stmt = conn
@@ -245,10 +223,6 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     )
 }
 
-/// The tables and columns earlier builds kept and nothing reads or writes any more: per-session
-/// model, effort and channel memory, archive markers, recorded internal frames, and the
-/// workspace grouping, ordering and remote metadata. Dropped on every open; once they are gone
-/// this does nothing. Never edit a statement here, only add.
 const RETIRED_TABLES: &[&str] = &[
     "cli_session_models",
     "cli_session_efforts",
@@ -268,7 +242,6 @@ const RETIRED_COLUMNS: &[(&str, &str)] = &[
 
 fn retire_unused(conn: &Connection) -> rusqlite::Result<()> {
     for table in RETIRED_TABLES {
-        // Its indexes go with it.
         conn.execute_batch(&format!("DROP TABLE IF EXISTS {table};"))?;
     }
     for (table, column) in RETIRED_COLUMNS {
@@ -334,7 +307,6 @@ mod tests {
         assert_eq!(db.workspace_paths().unwrap(), ["/ws"]);
         drop(conn);
         drop(db);
-        // Opening again finds nothing left to retire.
         Db::open_at(&path).unwrap();
         std::fs::remove_dir_all(&dir).ok();
     }

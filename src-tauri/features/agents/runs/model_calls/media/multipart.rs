@@ -1,5 +1,3 @@
-//! A multipart form, written by hand because nothing else in Misty needs reqwest's `multipart`
-//! feature and the forms here are only a few fields.
 use crate::model_calls::ids::generate_id;
 
 pub(super) struct Form {
@@ -9,7 +7,10 @@ pub(super) struct Form {
 
 impl Form {
     pub(super) fn new() -> Self {
-        Self { boundary: format!("----misty-form-{}", generate_id()), body: Vec::new() }
+        Self {
+            boundary: format!("----misty-form-{}", generate_id()),
+            body: Vec::new(),
+        }
     }
 
     fn opening(&mut self) {
@@ -20,7 +21,9 @@ impl Form {
 
     pub(super) fn text(&mut self, name: &str, value: &str) {
         self.opening();
-        self.body.extend_from_slice(format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes());
+        self.body.extend_from_slice(
+            format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
+        );
         self.body.extend_from_slice(value.as_bytes());
         self.body.extend_from_slice(b"\r\n");
     }
@@ -56,7 +59,10 @@ mod tests {
         form.text("model", "whisper-1");
         form.file("file", "audio.wav", "audio/wav", &[0, 255]);
         let boundary = form.boundary.clone();
-        assert_eq!(form.content_type(), format!("multipart/form-data; boundary={boundary}"));
+        assert_eq!(
+            form.content_type(),
+            format!("multipart/form-data; boundary={boundary}")
+        );
         let mut expected = format!(
             "--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nwhisper-1\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"audio.wav\"\r\nContent-Type: audio/wav\r\n\r\n"
         )

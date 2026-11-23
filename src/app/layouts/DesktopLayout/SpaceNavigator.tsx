@@ -11,12 +11,13 @@ import {
 } from "@/features/agents";
 import { dockLeaves, useWorkspaceStore, type WorkspaceView } from "@/features/app-windows";
 import {
+  friendsRoute,
   joinVoiceChannel,
   useActiveVoiceChannel,
   useCallSpeaking,
   voicePath,
 } from "@/features/direct";
-import { personInitials } from "@/shared/lib/personInitials";
+import { personInitials } from "@/shared/lib/person_initials";
 import type { Space } from "@/features/spaces";
 import {
   ChannelRowMenu,
@@ -49,18 +50,19 @@ import {
   Text,
   VoicePerson,
 } from "@misty/ui";
-import { toggleSection, useCollapsedSections } from "./collapsedSections";
+import { toggleSection, useCollapsedSections } from "./collapsed_sections";
 import { FriendsRow, PersonalSections } from "./PersonalSections";
-import { usePlace, useSharedSpaces } from "./placeStore";
+import { usePlace, useSharedSpaces } from "./place_store";
 import { JoinWithLink } from "./JoinWithLink";
 import { SidebarAgentThreads } from "./SidebarAgentThreads";
 import { SpaceInvitations } from "./SpaceInvitations";
 import { SidebarMore, SidebarPinnedPlaces, type SidebarPlace } from "./SidebarPins";
-import { useSidebarPins, type SidebarPlaceId } from "./sidebarPinsStore";
+import { useSidebarPins, type SidebarPlaceId } from "./sidebar_pins_store";
 import { SidebarRow as Row } from "./SidebarRow";
+import { useShortcutHandler } from "@/features/shortcuts";
 import { chatSectionClass, markSlotClass } from "./styles";
-import { useSearchDialog } from "./search/searchStore";
-import { agentChatRoute, openWorkspaceRoute } from "./spaceNavigation";
+import { useSearchDialog } from "./search/search_store";
+import { agentChatRoute, openWorkspaceRoute } from "./space_navigation";
 
 const ExploreIcon = spaceIcons.explore;
 
@@ -273,16 +275,9 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
     !conversations.length && (conversationsLoading || chatsReadFor !== accountId);
 
   const chats = useMemo(() => {
-    return (
-      conversations
-        .filter(
-          (chat) =>
-            chat.messages.length > 0 &&
-            !chat.place &&
-            !lessons[chat.id],
-        )
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    );
+    return conversations
+      .filter((chat) => chat.messages.length > 0 && !chat.place && !lessons[chat.id])
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [conversations, lessons]);
   const [path, query = ""] = route.split("?");
   const params = new URLSearchParams(query);
@@ -299,12 +294,21 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
       id,
       {
         label: placeLabels[id],
+        command: `app.open_${id}`,
         icon: spaceIcons[id],
         current: view === id,
         open: () => open(placeRoutes[id]),
       } satisfies SidebarPlace,
     ]),
   ) as Record<SidebarPlaceId, SidebarPlace>;
+  useShortcutHandler("app.open_explore", () => open(`${base}/explore`), Boolean(space));
+  useShortcutHandler("app.open_files", () => open(placeRoutes.files), Boolean(space));
+  useShortcutHandler(
+    "app.open_apps",
+    () => useAppLauncher.getState().setOpen(true),
+    Boolean(space),
+  );
+  useShortcutHandler("app.open_friends", () => open(friendsRoute), Boolean(space));
 
   if (place === "spaces" && allSpaces.length > 0 && !sharedSpaces.length)
     return (
@@ -344,7 +348,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         <Row
           label="Search"
           icon={<Search aria-hidden="true" />}
-          shortcut="Meta+K"
+          command="app.command_palette"
           onOpen={() => useSearchDialog.getState().setOpen(true)}
           data-tour="sidebar-search"
         />
@@ -352,6 +356,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
           label="Explore"
           icon={<ExploreIcon aria-hidden="true" />}
           current={Boolean(space) && path === `${base}/explore`}
+          command="app.open_explore"
           onOpen={() => open(`${base}/explore`)}
           data-tour="sidebar-explore"
         />
@@ -359,6 +364,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         <Row
           label="Apps"
           icon={<LayoutGrid aria-hidden="true" />}
+          command="app.open_apps"
           onOpen={() => useAppLauncher.getState().setOpen(true)}
           data-tour="sidebar-apps"
         />

@@ -3,9 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { ShapeSelection, Surface, Text, ViewportLayer } from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
 
-/** Below this far (in pixels) a press is a click, not a drag. */
 const LEAST_DRAG = 6;
-/** How far from the pointer its line sits. */
 const LINE_OFFSET = 18;
 
 interface Point {
@@ -13,16 +11,11 @@ interface Point {
   y: number;
 }
 
-/**
- * While Tutor's text box is open, the rest of the screen takes pictures for it, as Claude's quick
- * entry does (`cursor/host/ask.rs`): a drag draws the part to capture and hands it to the box, and
- * a click that doesn't drag closes the box. Beside the pointer, one line says what a drag does.
- */
 export function TutorShotLayer() {
   const [on, setOn] = useState(false);
   const [pointer, setPointer] = useState<Point>();
   const [from, setFrom] = useState<Point>();
-  const start = useRef<Point>();
+  const start = useRef<Point | undefined>(undefined);
 
   useEffect(() => {
     const stop = listen<{ on: boolean }>("misty://tutor-ask-capture", (event) => {

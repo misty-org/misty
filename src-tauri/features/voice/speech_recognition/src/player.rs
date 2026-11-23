@@ -1,6 +1,3 @@
-//! Playing speech through the computer's default output (cpal). Each playback runs on a thread
-//! of its own, which owns the output stream until the speech has been played or is stopped.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
@@ -11,7 +8,6 @@ use cpal::{SampleFormat, StreamConfig};
 
 use crate::{reason, Speech};
 
-/// A playback under way; `wait` returns once it has ended, played through or stopped.
 pub struct Playback {
     done: std::sync::mpsc::Receiver<Result<(), String>>,
 }
@@ -22,20 +18,40 @@ impl Playback {
     }
 }
 
-/// Plays `speech` on the default output and returns at once with its playback. Setting `stopped`
-/// ends it: the output reads it with every buffer it fills, so nothing has to watch it.
-pub fn play(speech: Speech, stopped: Arc<AtomicBool>) -> Playback {
+pub fn play(speech: Speech, stopped: Arc<AtomicBool>, output: Option<String>) -> Playback {
     let (done, finished) = channel();
     std::thread::spawn(move || {
-        let _ = done.send(run(speech, stopped));
+        let _ = done.send(run(speech, stopped, output.as_deref()));
     });
     Playback { done: finished }
 }
 
-fn run(speech: Speech, stopped: Arc<AtomicBool>) -> Result<(), String> {
+fn named_output(host: &cpal::Host, wanted: &str) -> Option<cpal::Device> {
+    let wanted = wanted.to_lowercase();
+    let devices: Vec<(String, cpal::Device)> = host
+        .output_devices()
+        .ok()?
+        .filter_map(|device| device.name().ok().map(|name| (name.to_lowercase(), device)))
+        .collect();
+    let at = devices
+        .iter()
+        .position(|(name, _)| *name == wanted)
+        .or_else(|| {
+            devices
+                .iter()
+                .enumerate()
+                .filter(|(_, (name, _))| !name.is_empty() && wanted.contains(name.as_str()))
+                .max_by_key(|(_, (name, _))| name.len())
+                .map(|(index, _)| index)
+        })?;
+    devices.into_iter().nth(at).map(|(_, device)| device)
+}
+
+fn run(speech: Speech, stopped: Arc<AtomicBool>, output: Option<&str>) -> Result<(), String> {
     let host = cpal::default_host();
-    let device = host
-        .default_output_device()
+    let device = output
+        .and_then(|wanted| named_output(&host, wanted))
+        .or_else(|| host.default_output_device())
         .ok_or_else(|| reason("output"))?;
     let supported = device
         .default_output_config()
@@ -44,7 +60,6 @@ fn run(speech: Speech, stopped: Arc<AtomicBool>) -> Result<(), String> {
     let config: StreamConfig = supported.config();
     let channels = config.channels.max(1) as usize;
     let rate = config.sample_rate.0;
-    // The speech at the output's own rate, by linear interpolation: plenty for a voice.
     let samples = Arc::new(at_rate(&speech.samples, speech.rate, rate));
     let position = Arc::new(Mutex::new(0usize));
     let (ended, end) = channel::<()>();
@@ -86,17 +101,18 @@ fn run(speech: Speech, stopped: Arc<AtomicBool>) -> Result<(), String> {
 
     let stream = match format {
         SampleFormat::F32 => stream_of!(f32, |sample: f32| sample),
-        SampleFormat::I16 => stream_of!(i16, |sample: f32| (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16),
-        SampleFormat::U16 => stream_of!(u16, |sample: f32| ((sample.clamp(-1.0, 1.0) * 0.5 + 0.5) * u16::MAX as f32) as u16),
-        SampleFormat::I32 => stream_of!(i32, |sample: f32| (sample.clamp(-1.0, 1.0) as f64 * i32::MAX as f64) as i32),
+        SampleFormat::I16 => stream_of!(i16, |sample: f32| (sample.clamp(-1.0, 1.0)
+            * i16::MAX as f32) as i16),
+        SampleFormat::U16 => stream_of!(u16, |sample: f32| ((sample.clamp(-1.0, 1.0) * 0.5 + 0.5)
+            * u16::MAX as f32) as u16),
+        SampleFormat::I32 => stream_of!(i32, |sample: f32| (sample.clamp(-1.0, 1.0) as f64
+            * i32::MAX as f64) as i32),
         _ => return Err(reason("output")),
     }
     .map_err(|_| reason("output"))?;
     stream.play().map_err(|_| reason("output"))?;
-    // The longest it can take, so a device that stops calling back never holds the thread.
     let seconds = samples.len() as f64 / rate.max(1) as f64;
     let _ = end.recv_timeout(Duration::from_secs_f64(seconds + 2.0));
-    // Let the last buffer reach the speakers before the stream closes.
     std::thread::sleep(Duration::from_millis(60));
     drop(stream);
     Ok(())

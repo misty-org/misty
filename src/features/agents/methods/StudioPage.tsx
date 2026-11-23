@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
 import { cn, Surface } from "@misty/ui";
 
-/**
- * A page the Agents sidebar opens beside the chats (notebooks), after Polar's: the
- * page's own fill, running the canvas's full height, in the controls' type.
- */
 export function StudioPage({ className, children }: { className?: string; children: ReactNode }) {
   return (
     <Surface
@@ -16,10 +12,6 @@ export function StudioPage({ className, children }: { className?: string; childr
   );
 }
 
-/**
- * The scroller inside a StudioPage. Its gutter is kept, so content that grows past the fold never
- * narrows the page and shifts it sideways.
- */
 export function StudioPageScroll({ children }: { children: ReactNode }) {
   return <div className="min-w-0 flex-1 overflow-auto [scrollbar-gutter:stable]">{children}</div>;
 }

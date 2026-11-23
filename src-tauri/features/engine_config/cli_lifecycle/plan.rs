@@ -1,25 +1,16 @@
-// The plan the install dialog shows before anything runs: what will run, step by step, and what
-// stands in the way, worked out the way the run works it out, so what it shows is what runs.
-
 use serde::Serialize;
 
 use super::routes::{self, Route};
 use super::{developer_tools, maker_builds, support};
 
-/// What the install dialog shows: what will run, step by step, under Show details.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CliUpdatePlan {
     pub engine: String,
-    /// "install" | "update"
     pub action: &'static str,
-    /// "npm" | "native" | "none"
     pub kind: &'static str,
-    /// What runs or is downloaded, one line per step.
     pub steps: Vec<String>,
-    /// Node.js has to be fetched into Misty's folder first.
     pub needs_helper: bool,
-    /// Apple's developer tools have to be installed first; running the plan opens their installer.
     pub needs_developer_tools: bool,
     pub can_run: bool,
     pub blockers: Vec<String>,
@@ -38,7 +29,6 @@ fn platform_name() -> &'static str {
     }
 }
 
-/// The plan for `engine`, whose program is at `bin`.
 pub(super) async fn build(engine: String, bin: &str, installed: bool) -> CliUpdatePlan {
     let route = super::route_for(&engine, bin, installed);
     let mut needs_developer_tools = false;

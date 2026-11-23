@@ -1,6 +1,3 @@
-//! ScreenCaptureKit stills shared by the companion's captures, window control,
-//! and screen context. Every wait ends after eight seconds; the completion
-//! blocks own their state even after that.
 use std::{sync::mpsc, time::Duration};
 
 use base64::Engine;
@@ -18,13 +15,11 @@ use super::support::{error_json, jpeg};
 
 pub(crate) const WAIT: Duration = Duration::from_secs(8);
 
-/// A framework error's description.
 pub(crate) fn error_text(error: *mut NSError) -> Option<String> {
     // SAFETY: the framework passes null or a live error for the call's duration.
     unsafe { error.as_ref() }.map(|error| error.localizedDescription().to_string())
 }
 
-/// The JSON a finished capture reports: the JPEG as base64 and its pixel size.
 pub(crate) fn image_json(image: &CGImage, quality: f64, empty: &str) -> Value {
     match jpeg(image, quality) {
         Some(bytes) => json!({
@@ -36,7 +31,6 @@ pub(crate) fn image_json(image: &CGImage, quality: f64, empty: &str) -> Value {
     }
 }
 
-/// Windows of this process whose title is one of `titles`, to leave out.
 pub(crate) fn own_windows(
     content: &SCShareableContent,
     titles: &[&str],
@@ -69,7 +63,6 @@ pub(crate) fn display_for(content: &SCShareableContent, id: u32) -> Option<Retai
     }
 }
 
-/// Words for the errors of one still capture.
 pub(crate) struct StillMessages {
     pub disconnected: &'static str,
     pub timeout: &'static str,
@@ -77,8 +70,6 @@ pub(crate) struct StillMessages {
     pub empty: &'static str,
 }
 
-/// A still of one display, leaving out this app's cursor overlays. `configure`
-/// sets the size and area; its map is merged into the result.
 pub(crate) fn display_still(
     display_id: u32,
     quality: f64,

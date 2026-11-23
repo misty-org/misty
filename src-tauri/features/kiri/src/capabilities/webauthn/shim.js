@@ -1,6 +1,3 @@
-// webauthn: passkeys and security keys for navigator.credentials, answered by
-// the OS authenticator through Kiri. Password and federated requests keep the
-// engine's own handling.
 {
   const credentials = navigator.credentials;
   const PublicKey = window.PublicKeyCredential;

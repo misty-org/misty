@@ -12,7 +12,6 @@ import {
   Input,
 } from "@misty/ui";
 
-/** The invitation's token from a pasted link (`misty://open/invite/…`, a web link to it) or the token alone. */
 export function inviteToken(text: string): string {
   const trimmed = text.trim();
   const fromPath = /\/invite\/([^/?#\s]+)/.exec(trimmed)?.[1];
@@ -20,10 +19,6 @@ export function inviteToken(text: string): string {
   return /^[A-Za-z0-9_-]{16,}$/.test(trimmed) ? trimmed : "";
 }
 
-/**
- * Joins a Space from an invite link someone sent: a quiet button that asks for the link, then opens
- * the invitation's own page, which shows the Space and asks to join.
- */
 export function JoinWithLink() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);

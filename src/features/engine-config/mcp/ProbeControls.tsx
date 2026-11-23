@@ -1,21 +1,13 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * What a connection check shows: a status badge, the check in the details and its tools.
- *
- * The badge sits beside the entry's action on its shelf (to see everything at a glance); the
- * details give the error, the server's own name, its tools and how long it took. Results are kept
- * in `useMcpProbeStore`.
- */
 import { AlertTriangle, Check, X } from "lucide-react";
 import { useMemo } from "react";
 import { Badge, Button, Spinner, Text, Tooltip } from "@misty/ui";
 import { copy } from "./copy";
-import { probeStateFor, useMcpProbeStore } from "./probe-store";
+import { probeStateFor, useMcpProbeStore } from "./probe_store";
 import type { McpConfigEntry } from "./types";
 
-/** The connection state beside an entry's action; takes no room without a result. */
 export function ProbeStatusChip({ entry }: { entry: McpConfigEntry }) {
   const results = useMcpProbeStore((state) => state.results);
   const pending = useMcpProbeStore((state) => Boolean(state.pending[entry.id]));
@@ -31,7 +23,6 @@ export function ProbeStatusChip({ entry }: { entry: McpConfigEntry }) {
   if (!state) return null;
   const { result } = state;
   if (result.status === "connected") {
-    // A working connection is the one state that carries color; the rest stay neutral.
     return (
       <Tooltip content={result.serverName ?? ""}>
         <Badge tone="green">
@@ -61,7 +52,6 @@ export function ProbeStatusChip({ entry }: { entry: McpConfigEntry }) {
   );
 }
 
-/** The check in the details: the latest result's state, the Check button, then what it found. */
 export function ProbeDetail({
   entry,
   workspacePath,
@@ -121,7 +111,6 @@ export function ProbeDetail({
   );
 }
 
-/** The tools the latest check found, one name a line, or nothing before a check. */
 export function useProbeTools(entry: McpConfigEntry): { tools: string[]; total: number } | null {
   const results = useMcpProbeStore((state) => state.results);
   const state = probeStateFor(results, entry);

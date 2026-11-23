@@ -1,13 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! Calendar math without chrono: civil-date <-> day-number conversion
-//! (Howard Hinnant's algorithms), strict `YYYY-MM-DD` parsing and the ISO-8601
-//! timestamps the CLIs write.
-
 pub(crate) const DAY_MS: i64 = 86_400_000;
 
-/// Days since 1970-01-01 for a proleptic Gregorian date.
 pub(crate) fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
     let y = if month <= 2 { year - 1 } else { year };
     let era = if y >= 0 { y } else { y - 399 } / 400;
@@ -18,7 +13,6 @@ pub(crate) fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-/// Inverse of [`days_from_civil`].
 pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
@@ -37,8 +31,6 @@ pub(crate) fn format_day(days: i64) -> String {
     format!("{y:04}-{m:02}-{d:02}")
 }
 
-/// Strict `YYYY-MM-DD` → day number. Rejects impossible dates (2026-02-30)
-/// by round-tripping through the inverse conversion.
 pub(crate) fn parse_day(text: &str) -> Result<i64, String> {
     let bytes = text.as_bytes();
     let shape_ok = bytes.len() == 10
@@ -77,8 +69,6 @@ fn digits(bytes: &[u8], start: usize, len: usize) -> Option<i64> {
     })
 }
 
-/// `YYYY-MM-DDTHH:MM:SS[.fff…][Z|±HH:MM|±HHMM]` → epoch ms. A missing zone
-/// is read as UTC (every CLI here writes `Z`).
 pub(crate) fn parse_iso_ms(text: &str) -> Option<i64> {
     let b = text.trim().as_bytes();
     if b.len() < 19 || b[4] != b'-' || b[7] != b'-' || b[13] != b':' || b[16] != b':' {
@@ -139,7 +129,6 @@ pub(crate) fn parse_iso_ms(text: &str) -> Option<i64> {
     Some(secs * 1000 + millis)
 }
 
-/// Epoch-ms from a JSON number that may be seconds or milliseconds.
 pub(crate) fn epoch_ms_from_number(value: f64) -> Option<i64> {
     if !value.is_finite() || value <= 0.0 {
         return None;
@@ -155,12 +144,10 @@ pub(crate) fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// Today's UTC date (`YYYY-MM-DD`), used to stamp downloaded price tables.
 pub(crate) fn utc_today() -> String {
     format_day(now_ms().div_euclid(DAY_MS))
 }
 
-/// Local calendar day of `ts_ms` for a fixed UTC offset in minutes.
 pub(crate) fn local_day(ts_ms: i64, tz_offset_minutes: i32) -> i64 {
     (ts_ms + i64::from(tz_offset_minutes) * 60_000).div_euclid(DAY_MS)
 }

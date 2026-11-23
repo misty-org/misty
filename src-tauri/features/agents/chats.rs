@@ -1,12 +1,3 @@
-//! Agent chats kept on this computer, per account, in `misty.db`: conversations with their
-//! messages, and the folders that group them. Like Claude Code and Codex, a chat lives on the
-//! computer it was started on and never syncs; the server only runs its turns
-//! Documents are the app's own JSON, stored as they are; a conversation's messages live separately
-//! so the transcript can page them. A lesson is a Teach-mode chat's progress (goal, objectives,
-//! hint level), kept beside its chat.
-//! A chat's run state (plans, goals, questions, checklists) and notebook live here too, and a run
-//! notes which chat it belongs to.
-
 mod adoption;
 pub mod commands;
 mod messages;
@@ -20,7 +11,6 @@ use serde_json::{json, Value};
 
 use database::store::Store;
 
-/// What one row holds.
 const KINDS: &[&str] = &[
     "conversation",
     "folder",
@@ -32,20 +22,14 @@ const KINDS: &[&str] = &[
     "agent",
     "attachment",
     "artifact",
-    // A chat's composer choices: the model and effort its next turn asks the engine for.
     "composer",
-    // Tutor: notebooks with their sources and notes, flashcard decks, guides, and the agent runs
-    // that make them.
     "tutor_notebook",
     "tutor_deck",
     "tutor_guide",
     "tutor_job",
-    // A notebook's chunks and their vectors, for search by meaning.
     "tutor_index",
-    // The virtual studio on this computer: each Space's room and how each agent looks in it.
     "studio",
 ];
-/// Bound every local document at the IPC boundary.
 const MAX_DOCUMENT_BYTES: usize = 16 * 1024 * 1024;
 const CHAT_MESSAGE_PAGE_SIZE: usize = 50;
 const MAX_CHAT_MESSAGE_PAGE_SIZE: usize = 100;
@@ -70,11 +54,8 @@ fn check_document(document: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The longest catalog voice id an agent's profile may name.
 const MAX_VOICE_ID: usize = 64;
 
-/// An agent's voice is a catalog voice id ("kokoro-heart"): lowercase letters, digits and dashes,
-/// at most 64 of them. Absent or empty means it has none yet and speaks in Misty's voice.
 fn valid_voice(voice: &str) -> bool {
     voice.len() <= MAX_VOICE_ID
         && voice
@@ -82,7 +63,6 @@ fn valid_voice(voice: &str) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
-/// What a kind's document must hold beyond being JSON: an agent's profile names its voice by id.
 fn check_kind_document(kind: &str, document: &str) -> Result<(), String> {
     check_document(document)?;
     if kind != "agent" {
@@ -99,9 +79,7 @@ fn check_kind_document(kind: &str, document: &str) -> Result<(), String> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentChatMessagePage {
-    /// Messages in display order, oldest to newest within this page.
     pub messages: Vec<String>,
-    /// The cursor for the next older page.
     pub before_seq: Option<i64>,
     pub has_older: bool,
 }
@@ -135,8 +113,6 @@ fn read_message_page(
     })
 }
 
-/// Replaces one finished-message recall row, or removes its old row when the message is no longer
-/// complete. The FTS entry and message row are always changed in the same SQLite transaction.
 fn update_recall(
     transaction: &rusqlite::Transaction<'_>,
     account: &str,
@@ -230,8 +206,6 @@ impl AgentChatsService {
         Self { store }
     }
 
-
-    /// Every document of one kind for the account, newest first.
     pub async fn list(&self, account: String, kind: String) -> Result<Vec<String>, String> {
         check(&account, &kind, "list")?;
         let store = self.store.clone();
@@ -257,14 +231,9 @@ impl AgentChatsService {
                     let Some(id) = value["id"].as_str() else {
                         continue;
                     };
-                    let page = read_message_page(
-                        &connection,
-                        &account,
-                        id,
-                        None,
-                        CHAT_MESSAGE_PAGE_SIZE,
-                    )
-                    .map_err(|e| e.to_string())?;
+                    let page =
+                        read_message_page(&connection, &account, id, None, CHAT_MESSAGE_PAGE_SIZE)
+                            .map_err(|e| e.to_string())?;
                     let messages: Vec<Value> = page
                         .messages
                         .iter()
@@ -281,7 +250,6 @@ impl AgentChatsService {
         .await
         .map_err(|e| e.to_string())?
     }
-
 
     pub async fn get(
         &self,
@@ -306,9 +274,6 @@ impl AgentChatsService {
         .map_err(|e| e.to_string())?
     }
 
-    /// Writes only if the row still holds `expected` (`None`: no row yet), and says whether it did.
-    /// Two windows can change one document, and a question's answer must reach exactly one of a
-    /// waiting run or a new turn.
     pub async fn swap(
         &self,
         account: String,
@@ -391,8 +356,8 @@ impl AgentChatsService {
                     .map_err(|e| e.to_string())?;
                 transaction
                     .execute(
-                    "DELETE FROM chat_recall_seen WHERE account = ?1 AND conversation = ?2",
-                    rusqlite::params![account, id],
+                        "DELETE FROM chat_recall_seen WHERE account = ?1 AND conversation = ?2",
+                        rusqlite::params![account, id],
                     )
                     .map_err(|e| e.to_string())?;
                 transaction

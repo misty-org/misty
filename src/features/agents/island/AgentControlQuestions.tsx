@@ -1,8 +1,7 @@
 import { Surface } from "@misty/ui";
 import { AgentActionQuestions } from "./AgentActionQuestions";
-import { islandClass } from "./agentControlStatus";
+import { islandClass } from "./agent_control_status";
 
-/** The island with no task here: only an agent's question waiting for the person's OK. */
 export function AgentControlQuestions() {
   return (
     <Surface

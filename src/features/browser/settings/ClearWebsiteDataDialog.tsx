@@ -1,5 +1,5 @@
 import { CalendarDays, Clock, History } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import {
   Button,
   Checkbox,
@@ -7,8 +7,10 @@ import {
   DialogContent,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
   DialogTitle,
   Field,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -19,7 +21,6 @@ import {
 } from "@misty/ui";
 import { browserLibrary, type BrowserWebsiteDataKind } from "../library/native";
 
-// Every menu row starts with an icon: a clock for the recent spans, history for all of it.
 const ranges = [
   { label: "Last hour", ms: 3_600_000, icon: Clock },
   { label: "Last 24 hours", ms: 86_400_000, icon: Clock },
@@ -36,7 +37,6 @@ const choices: { id: BrowserWebsiteDataKind; label: string; detail: string }[] =
   },
 ];
 
-/** Clears what websites stored on this computer for the pages agents open. */
 export function ClearWebsiteDataDialog(props: {
   open: boolean;
   onOpenChange(open: boolean): void;
@@ -45,6 +45,7 @@ export function ClearWebsiteDataDialog(props: {
   const [range, setRange] = useState(1);
   const [selected, setSelected] = useState<Set<BrowserWebsiteDataKind>>(new Set(["cache"]));
   const [working, setWorking] = useState(false);
+  const choiceId = useId();
   const [error, setError] = useState<string | null>(null);
   useNotice(Boolean(error), {
     message: error ?? "",
@@ -74,8 +75,10 @@ export function ClearWebsiteDataDialog(props: {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogTitle>Clear website data</DialogTitle>
-        <DialogDescription>Applies to the pages agents open on this computer.</DialogDescription>
+        <DialogHeader>
+          <DialogTitle>Clear website data</DialogTitle>
+          <DialogDescription>Applies to the pages agents open on this computer.</DialogDescription>
+        </DialogHeader>
         <Field label="Time range">
           <Select value={String(range)} onValueChange={(value) => setRange(Number(value))}>
             <SelectTrigger className="w-full">
@@ -95,8 +98,10 @@ export function ClearWebsiteDataDialog(props: {
         </Field>
         <div className="grid gap-3">
           {choices.map((choice) => (
-            <label key={choice.id} className="flex items-start gap-3 text-sm">
+            <div key={choice.id} className="flex items-start gap-3">
               <Checkbox
+                id={`${choiceId}-${choice.id}`}
+                aria-describedby={`${choiceId}-${choice.id}-detail`}
                 className="mt-0.5"
                 checked={selected.has(choice.id)}
                 onCheckedChange={(checked) =>
@@ -108,15 +113,17 @@ export function ClearWebsiteDataDialog(props: {
                   })
                 }
               />
-              <span>
-                <Text bare tone="bright" className="block">
-                  {choice.label}
-                </Text>
-                <Text bare tone="muted" className="block text-xs">
+              <div className="grid min-w-0 gap-0.5">
+                <Label htmlFor={`${choiceId}-${choice.id}`}>
+                  <Text as="span" size="control" tone="default" weight="regular" wrap>
+                    {choice.label}
+                  </Text>
+                </Label>
+                <Text id={`${choiceId}-${choice.id}-detail`} size="meta" tone="muted" wrap>
                   {choice.detail}
                 </Text>
-              </span>
-            </label>
+              </div>
+            </div>
           ))}
         </div>
         <DialogFooter>

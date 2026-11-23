@@ -1,7 +1,3 @@
-// The element picker Misty runs in a preview page (preview.rs). It is evaluated in the person's
-// own local app, changes nothing there that outlives the pick, and reports through
-// `window.__MISTY_PREVIEW_PICKED__`: a JSON string for a picked element, "" for a cancelled pick.
-// It also keeps the page's last few errors, from the moment it is first installed.
 (() => {
   if (window.__MISTY_PREVIEW__) return;
   const HTML_LIMIT = 4096;
@@ -34,7 +30,6 @@
     try {
       note(args.map((arg) => (arg instanceof Error ? arg.message : String(arg))).join(" "));
     } catch (_) {
-      // A value that cannot be turned into text is not worth breaking the page's own logging.
     }
     return consoleError.apply(this, args);
   };
@@ -50,7 +45,6 @@
       return 0;
     }
   };
-  // Class names a build generates (hashes, long utility strings) change between builds.
   const stableClasses = (element) =>
     [...element.classList]
       .filter((name) => /^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(name) && name.length <= 32)
@@ -74,7 +68,6 @@
     }
     return part;
   };
-  /** A selector that finds only this element: an id or test id where one is unique, else a path. */
   const selector = (element) => {
     const root = element.ownerDocument;
     const parts = [];
@@ -97,7 +90,6 @@
         break;
       }
       parts.unshift(step(node));
-      // A bare tag that happens to be alone on the page says little, so it keeps its parent.
       const bare = parts.length === 1 && /^[a-z0-9-]+$/.test(parts[0]);
       if (!bare && count(parts.join(" > "), root) === 1) break;
     }
@@ -105,7 +97,6 @@
   };
 
   const px = (value) => Math.round(value * 10) / 10;
-  /** What Misty tells the agent about an element. */
   const describe = (element) => {
     const rect = element.getBoundingClientRect();
     const style = getComputedStyle(element);
@@ -140,7 +131,6 @@
   const cancel = () => {
     if (stop) stop("");
   };
-  /** Starts a pick: the element under the pointer is outlined, a click reports it, Escape cancels. */
   const start = () => {
     cancel();
     window.__MISTY_PREVIEW_PICKED__ = undefined;

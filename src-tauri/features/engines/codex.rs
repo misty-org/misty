@@ -2,13 +2,8 @@
 use super::{command_for_binary, BuiltCommand, Engine, SendRequest};
 use serde_json::Value;
 
-/// Codex runs over its app-server (`codex_app.rs`): only that protocol carries the model's
-/// question tool (`item/tool/requestUserInput`).
 pub struct CodexEngine;
 
-/// TOML basic-string literal for a `-c key=<value>` override. codex parses
-/// the value as TOML, so a Windows path's backslashes would otherwise read
-/// as escape sequences.
 fn toml_string(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + 2);
     out.push('"');
@@ -27,22 +22,12 @@ fn toml_string(value: &str) -> String {
     out
 }
 
-/// Mount Misty's Space MCP server, and an agent's own servers, on this one launch. codex
-/// discovers MCP servers from `config.toml`, but `-c key=value` overrides apply to this process
-/// only: no file is written, so nothing in the person's config changes. Values go in the
-/// environment, never on the command line, where other programs could read them: a bearer token
-/// and any other header through `bearer_token_env_var` and `env_http_headers`, and a stdio
-/// server's env through Codex's own environment and that server's `env_vars`, which Codex passes
-/// on to it.
-///
-/// `-c` is a top-level option, so every caller has to add these BEFORE the subcommand.
 fn apply_misty_mcp(cmd: &mut tokio::process::Command, req: &SendRequest) {
     let Some(servers) = req.mcp_servers.as_ref().and_then(Value::as_object) else {
         return;
     };
     let mut args: Vec<String> = Vec::new();
     let mut env: Vec<(String, String)> = Vec::new();
-    // What Codex's own environment holds by now: what the command sets, or the servers before.
     let mut held: std::collections::HashMap<String, String> = cmd
         .as_std()
         .get_envs()
@@ -55,10 +40,7 @@ fn apply_misty_mcp(cmd: &mut tokio::process::Command, req: &SendRequest) {
         let prefix = format!("mcp_servers.{name}");
         let tag = name.to_ascii_uppercase().replace('-', "_");
         if let Some(command) = server["command"].as_str() {
-            // An agent's stdio server: command, arguments, env and folder as its config wrote them.
             let Some(forwarded) = stdio_env(&server["env"], &mut held) else {
-                // A name that has to hold another value for Codex or an earlier server can't
-                // reach this one without the command line, so the server is left out.
                 continue;
             };
             args.push(format!("{prefix}.command={}", toml_string(command)));
@@ -72,9 +54,6 @@ fn apply_misty_mcp(cmd: &mut tokio::process::Command, req: &SendRequest) {
             args.push(format!("{prefix}.args=[{}]", list.join(",")));
             let mut names: Vec<String> = Vec::new();
             for (key, value) in forwarded {
-                // Codex starts a stdio server with the variables it uses itself (PATH, HOME and
-                // the like) as Codex has them, so a different one is set in `env`: those hold
-                // paths and names, never keys. Every other value goes through the environment.
                 if codex_own(&key) {
                     if std::env::var(&key).ok().as_deref() != Some(value.as_str()) {
                         args.push(format!("{prefix}.env.{key}={}", toml_string(&value)));
@@ -137,7 +116,6 @@ fn apply_misty_mcp(cmd: &mut tokio::process::Command, req: &SendRequest) {
     }
 }
 
-/// The variables Codex hands every stdio server from its own environment.
 fn codex_own(key: &str) -> bool {
     const OWN: &[&str] = &[
         "HOME",
@@ -165,8 +143,6 @@ fn codex_own(key: &str) -> bool {
     OWN.iter().any(|own| own.eq_ignore_ascii_case(key))
 }
 
-/// A stdio server's env as the names Codex passes on, each claimed in `held`. None when one of
-/// them already holds a different value, since Codex's environment can carry only one.
 fn stdio_env(
     env: &Value,
     held: &mut std::collections::HashMap<String, String>,
@@ -192,7 +168,6 @@ fn stdio_env(
     Some(pairs)
 }
 
-/// A key `-c` takes as one dotted-path segment.
 fn bare_key(key: &str) -> bool {
     !key.is_empty()
         && key
@@ -200,8 +175,6 @@ fn bare_key(key: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
-/// Process-scoped equivalents of the provider keys formerly written into
-/// config.toml/auth.json. Explicit model/effort picks still win.
 pub(super) fn apply_channel(
     command: &mut tokio::process::Command,
     provider: &Value,
@@ -213,7 +186,6 @@ pub(super) fn apply_channel(
         .pointer("/settingsConfig/config")
         .and_then(Value::as_str)
         .unwrap_or("");
-    // Do not put parser diagnostics here: they can contain credentials from TOML.
     let mut config: toml::Table =
         toml::from_str(text).map_err(|_| "Invalid Codex channel config.toml".to_string())?;
     let api_key = env.get("OPENAI_API_KEY");
@@ -227,8 +199,6 @@ pub(super) fn apply_channel(
             config.insert("model".into(), Toml::String(model.into()));
         }
     }
-    // A flat channel must select its own provider, even when the native file
-    // selects a different relay. Credentials travel in env, never in argv.
     if !config.contains_key("model_provider") && (base_url.is_some() || api_key.is_some()) {
         config.insert("model_provider".into(), Toml::String("ccgui".into()));
         let table = toml::Table::from_iter([
@@ -275,8 +245,6 @@ pub(super) fn apply_channel(
         table.remove("experimental_bearer_token");
         command.env("CCGUI_CODEX_API_KEY", key);
     }
-    // Provider documents may authenticate via literal headers or a bearer
-    // token. Move those to env too, so process listings do not reveal them.
     if let Some(providers) = config
         .get_mut("model_providers")
         .and_then(Toml::as_table_mut)
@@ -316,7 +284,6 @@ pub(super) fn apply_channel(
                         })
                         .as_str()
                         .ok_or("Codex channel header env key must be a string")?;
-                    // Preserve the CLI's env-header-over-literal-header precedence.
                     if !env.contains_key(key) && std::env::var_os(key).is_none() {
                         command.env(key, value);
                     }
@@ -324,11 +291,6 @@ pub(super) fn apply_channel(
             }
         }
     }
-    // Keep the existing provider contract: unrelated native hooks, trust and
-    // MCP settings are inherited, not replaced by a channel's document.
-    // `disable_response_storage` is retired by current Codex versions: they
-    // log it as an ignored session flag, so saved legacy channels must not
-    // keep injecting it as a process override.
     for key in [
         "model",
         "model_provider",
@@ -350,8 +312,6 @@ pub(super) fn apply_channel(
     Ok(())
 }
 
-/// Codex's Read Only preset as a launch level: the `read-only` sandbox, with each edit or command
-/// asked for (`on-request`) and every ask going to Misty's gate (`codex_app.rs`).
 pub(crate) const READ_ONLY: &str = "read-only";
 
 impl Engine for CodexEngine {
@@ -359,35 +319,18 @@ impl Engine for CodexEngine {
         "codex"
     }
 
-    /// Codex's app-server is the only transport that can hand the user a
-    /// question: `codex exec` declares `request_user_input is not supported in
-    /// exec mode` and picks the answers itself.
     fn drives_own_transport(&self) -> bool {
         true
     }
 
-    /// The command the driver spawns. Model/effort/provider flags land on it
-    /// from [`apply_channel`] like any child; only the app-server's own
-    /// switches live here (the question tool on, skill MCP auto-install off).
     fn host_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
         let mut cmd = command_for_binary(bin);
         apply_misty_mcp(&mut cmd, req);
-        // The native client identity (codex_app::initialize_params) makes Codex
-        // treat this client as first-party, which unlocks skill MCP-dependency
-        // auto-install: with approval "never" and full access, naming a skill
-        // (repo-provided ones included) writes its MCP servers into the global
-        // config.toml without asking. Keep it off as before; Codex ignores
-        // unknown feature keys, so older CLIs still start.
         cmd.arg("-c");
         cmd.arg("features.skill_mcp_dependency_install=false");
         cmd.arg("app-server");
-        // Without this the model never asks: it emits a plain agent message
-        // (plus a sleep item) instead of a client request.
         cmd.arg("--enable");
         cmd.arg("default_mode_request_user_input");
-        // Fast mode is a Codex service tier, by the id Codex's own catalog lists for the model;
-        // the driver's thread/start carries model and sandbox, but not the tier. Only a plain
-        // id reaches the config line.
         if let Some(tier) = req.service_tier.as_deref() {
             if tier.is_empty()
                 || !tier
@@ -406,11 +349,8 @@ impl Engine for CodexEngine {
         Ok(BuiltCommand {
             command: cmd,
             stdin_payload: None,
-            // The driver answers parked questions on this pipe.
             keep_stdin_open: true,
             cleanup_files: Vec::new(),
-            // The app-server assigns the thread id; a resume passes
-            // thread/resume with the id the conversation already holds.
             preassigned_session_id: None,
         })
     }
@@ -422,16 +362,12 @@ impl Engine for CodexEngine {
         true
     }
 
-    /// The CLI ships its own web search tool.
     fn supports_web_search(&self) -> bool {
         true
     }
     fn supports_effort(&self) -> bool {
         true
     }
-    /// Codex's approval presets (`/approvals`: Read Only, Default) and its Plan collaboration
-    /// mode. Full Access isn't offered: it leaves the folder, and Default already works without
-    /// asking inside `workspace-write` (`codex_app_sandbox.rs`).
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[
@@ -442,9 +378,6 @@ impl Engine for CodexEngine {
         MODES
     }
 
-    /// Human plan review follows the next_turn lifecycle (turn/start collaborationMode.plan →
-    /// the complete plan item → on approval, one default execution turn), carried out by the
-    /// app-server transport (codex_app.rs).
     fn plan_approval(&self) -> super::plan_review::PlanApproval {
         super::plan_review::PlanApproval::Typed {
             review_kind: super::plan_review::PlanReviewKind::NextTurn,

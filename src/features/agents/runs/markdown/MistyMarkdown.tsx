@@ -1,10 +1,16 @@
 import "katex/dist/katex.min.css";
-import "./mistyMarkdown.css";
-import { Button, IconButton, lazyTool, ToolSuspense } from "@misty/ui";
 import {
-  Check,
+  Button,
+  CopyButton,
+  lazyTool,
+  Prose,
+  ProseCallout,
+  ProseCode,
+  ProseTable,
+  ToolSuspense,
+} from "@misty/ui";
+import {
   CircleAlert,
-  Copy,
   Image as ImageIcon,
   Info,
   Lightbulb,
@@ -13,8 +19,11 @@ import {
 } from "lucide-react";
 import {
   isValidElement,
+  createContext,
+  Fragment,
   memo,
   startTransition,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -27,21 +36,25 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { FileLink } from "./fileLinks/FileLink";
-import { isLinkableFilePath, toFileLink } from "./fileLinks/fileLinks";
-import { readableJson } from "./readableJson";
-import { createCachedHighlighter } from "./streaming/cachedHighlight";
-import { splitMarkdown } from "./streaming/markdownChunks";
-import { createRevealPlan } from "./streaming/revealPlan";
+import { isLinkableFilePath, toFileLink } from "./fileLinks/file_links";
+import { readableJson } from "./readable_json";
+import { healMarkdown } from "./streaming/heal_markdown";
+import { closedFence, useCodeTokens } from "./streaming/shiki_tokens";
+import { splitMarkdown } from "./streaming/markdown_chunks";
+import { createRevealPlan } from "./streaming/reveal_plan";
 import { RevealText } from "./streaming/RevealText";
-import type { StreamReveal } from "./streaming/streamReveal";
-import { useLiveReveal } from "./streaming/useLiveReveal";
+import type { StreamReveal } from "./streaming/stream_reveal";
+import { useLiveReveal } from "./streaming/use_live_reveal";
 
-// Drawings are rare and their renderer is large: it loads when the first one appears.
 const SketchBlock = lazyTool(() =>
   import("@/features/agents/tutor/cursor/SketchBlock").then(({ SketchBlock }) => ({
     default: SketchBlock,
   })),
 );
+
+type HastPosition = { start: { offset?: number }; end: { offset?: number } };
+
+const MarkdownSource = createContext({ source: "", live: false });
 
 type HastNode = {
   type: string;
@@ -51,7 +64,6 @@ type HastNode = {
   children?: HastNode[];
 };
 
-/** The plain text inside a node, through any highlighting spans. */
 function hastText(node: HastNode | undefined): string {
   if (!node) return "";
   if (node.type === "text") return node.value ?? "";
@@ -67,10 +79,6 @@ const callouts = {
 } as const;
 type CalloutKind = keyof typeof callouts;
 
-/**
- * GitHub-style alerts: a blockquote that opens with `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`,
- * `[!WARNING]` or `[!CAUTION]` becomes a callout. The marker is removed from the text.
- */
 function rehypeCallouts() {
   const walk = (node: HastNode) => {
     if (node.type === "element" && node.tagName === "blockquote") {
@@ -88,15 +96,12 @@ function rehypeCallouts() {
   return (tree: HastNode) => walk(tree);
 }
 
-// Module constants, so memoized messages never see new plugin arrays.
-// Single dollars are prices in replies ("$24 or $12"), never math; math takes $$ blocks.
 const remarkPlugins: ComponentProps<typeof ReactMarkdown>["remarkPlugins"] = [
   remarkGfm,
   [remarkMath, { singleDollarTextMath: false }],
 ];
 type PluginList = NonNullable<ComponentProps<typeof ReactMarkdown>["rehypePlugins"]>;
 
-/** The components every reply shares; the streaming ones are added per message. */
 const baseComponents: Components = {
   pre: ({ node, children }) => {
     const code = (node as unknown as HastNode | undefined)?.children?.find(
@@ -107,7 +112,6 @@ const baseComponents: Components = {
       .map(String)
       .find((name) => name.startsWith("language-"))
       ?.slice("language-".length);
-    // A companion drawing (companionSketch.ts) shows as the drawing, not its source.
     if (language === "misty-sketch")
       return (
         <ToolSuspense
@@ -118,32 +122,32 @@ const baseComponents: Components = {
           <SketchBlock source={hastText(code)} />
         </ToolSuspense>
       );
-    return <CodeBlock language={language}>{children}</CodeBlock>;
+    const position = (node as unknown as { position?: HastPosition } | undefined)?.position;
+    return (
+      <CodeBlock
+        language={language}
+        code={hastText(code).replace(/\n$/, "")}
+        start={position?.start.offset}
+        end={position?.end.offset}
+      >
+        {children}
+      </CodeBlock>
+    );
   },
-  table: ({ children }) => (
-    // Wide tables scroll inside the message instead of stretching it.
-    <div className="misty-markdown-table">
-      <table>{children}</table>
-    </div>
-  ),
+  table: ({ children }) => <ProseTable>{children}</ProseTable>,
   blockquote: ({ node, children }) => {
     const kind = (node as unknown as HastNode | undefined)?.properties?.dataCallout as
       CalloutKind | undefined;
     if (!kind) return <blockquote>{children}</blockquote>;
     const { label, Icon } = callouts[kind];
     return (
-      <aside className="misty-markdown-callout" data-callout={kind} aria-label={label}>
-        <p className="misty-markdown-callout-title">
-          <Icon aria-hidden="true" />
-          {label}
-        </p>
+      <ProseCallout kind={kind} label={label} icon={Icon}>
         {children}
-      </aside>
+      </ProseCallout>
     );
   },
   img: ({ src, alt }) =>
     typeof src === "string" && src ? <ReplyImage src={src} alt={alt ?? ""} /> : null,
-  // A link whose target is a local file path opens it in the editor (fileLinks/).
   a: ({ node: _node, href, children, ...rest }) =>
     href && !/^[a-z][a-z0-9+.-]*:/i.test(href) && isLinkableFilePath(href) ? (
       <FileLink href={href} path={href}>
@@ -154,7 +158,6 @@ const baseComponents: Components = {
         {children}
       </a>
     ),
-  // So does inline code that is a file path. Block code keeps its newline and is left alone.
   code: ({ node: _node, className, children, ...rest }) => {
     const raw = nodeText(children);
     const value = raw.trim();
@@ -172,7 +175,6 @@ const baseComponents: Components = {
   },
 };
 
-/** The raw text of rendered children (highlighting and reveal spans wrap it in elements). */
 function nodeText(node: ReactNode): string {
   if (node == null || typeof node === "boolean") return "";
   if (typeof node === "string" || typeof node === "number") return String(node);
@@ -181,19 +183,13 @@ function nodeText(node: ReactNode): string {
   return "";
 }
 
-/**
- * Replies can repeat text from web pages and files, so a prompt-injected reply
- * could name an image URL that carries private conversation text to another
- * server the moment it renders. Remote images load only when the person asks.
- */
 function ReplyImage({ src, alt }: { src: string; alt: string }) {
   const [shown, setShown] = useState(false);
   const host = remoteImageHost(src);
   if (!host || shown) return <img src={src} alt={alt} loading="lazy" />;
   return (
-    <Button type="button" className="misty-markdown-remote-image" onClick={() => setShown(true)}>
-      <ImageIcon aria-hidden="true" />
-      <span>{alt ? `Show image "${alt}" from ${host}` : `Show image from ${host}`}</span>
+    <Button type="button" size="sm" icon={ImageIcon} onClick={() => setShown(true)}>
+      {alt ? `Show image "${alt}" from ${host}` : `Show image from ${host}`}
     </Button>
   );
 }
@@ -208,14 +204,8 @@ function remoteImageHost(src: string): string | null {
   }
 }
 
-/**
- * Above this size one Markdown tree is split into independent chunks of about 8,000 characters
- * (streaming/markdownChunks.ts): while a reply streams only its growing last chunk is parsed
- * again, and a long settled reply mounts its chunks a couple per frame.
- */
 const PROGRESSIVE_MARKDOWN_FROM = 16_000;
 
-/** Lets the plain text paint before the transition starts parsing. */
 function afterPaint(callback: () => void): () => void {
   if (typeof requestAnimationFrame === "function") {
     const id = requestAnimationFrame(callback);
@@ -225,26 +215,30 @@ function afterPaint(callback: () => void): () => void {
   return () => clearTimeout(id);
 }
 
-/** One independently parsed slice of a large reply, memoized so later slices never re-parse it. */
 const MarkdownChunk = memo(function MarkdownChunk({
   text,
   rehypePlugins,
   components,
+  live,
 }: {
   text: string;
   rehypePlugins: PluginList;
   components: Components;
+  live: boolean;
 }) {
+  const source = useMemo(() => ({ source: text, live }), [text, live]);
   return (
-    <div className="misty-markdown-chunk">
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
-        components={components}
-      >
-        {text}
-      </ReactMarkdown>
-    </div>
+    <MarkdownSource.Provider value={source}>
+      <div className="contents">
+        <ReactMarkdown
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePlugins}
+          components={components}
+        >
+          {text}
+        </ReactMarkdown>
+      </div>
+    </MarkdownSource.Provider>
   );
 });
 
@@ -253,8 +247,6 @@ function streamingComponents(controller: StreamReveal): Components {
     ...baseComponents,
     span: ({ node, className, children, ...rest }) => {
       const start = node?.properties.dataStreamStart;
-      // Every other prop goes through: KaTeX places superscripts and fractions with inline styles
-      // on bare spans, and dropping them collapses a formula onto the baseline.
       return typeof start === "number" && typeof children === "string" ? (
         <RevealText controller={controller} start={start}>
           {children}
@@ -268,30 +260,37 @@ function streamingComponents(controller: StreamReveal): Components {
   };
 }
 
-/**
- * Markdown for Misty's replies: GitHub-flavored Markdown (tables, task lists,
- * strikethrough, autolinks, footnotes), math, monochrome code highlighting with a
- * language label and Copy, and GitHub-style callouts. Raw HTML is never rendered.
- *
- * While `streaming`, received text is revealed at a steady pace across frames
- * (streaming/streamReveal.ts) without re-rendering the tree each frame, highlighted code is
- * cached between parses, and long replies are parsed in chunks.
- */
+type MarkdownSize = ComponentProps<typeof Prose>["size"];
+
 export const MistyMarkdown = memo(function MistyMarkdown({
   children,
   streaming = false,
+  size,
+  className,
 }: {
   children: string;
   streaming?: boolean;
+  size?: MarkdownSize;
+  className?: string;
 }) {
-  // JSON is indented once the reply settles; while it streams it can't parse yet.
+  return (
+    <Prose size={size} className={className}>
+      <MarkdownBody streaming={streaming}>{children}</MarkdownBody>
+    </Prose>
+  );
+});
+
+const MarkdownBody = memo(function MarkdownBody({
+  children,
+  streaming,
+}: {
+  children: string;
+  streaming: boolean;
+}) {
   const text = useMemo(
-    () => (streaming ? children : readableJson(children)),
+    () => (streaming ? healMarkdown(children) : readableJson(children)),
     [children, streaming],
   );
-  const cachedHighlight = useMemo(() => createCachedHighlighter(), []);
-  // Settled replies need no reveal spans. Once a live reply used them, keep its DOM shape when it
-  // settles so a selection doesn't jump.
   const [revealEnabled, setRevealEnabled] = useState(streaming);
   if (streaming && !revealEnabled) setRevealEnabled(true);
   const large = text.length > PROGRESSIVE_MARKDOWN_FROM;
@@ -340,30 +339,63 @@ export const MistyMarkdown = memo(function MistyMarkdown({
       cancelAnimationFrame(frame);
     };
   }, [streaming, revealEnabled, showMarkdown, large, visibleChunks, chunks.length]);
-  // Reveal spans count characters through one whole document; a chunked one shows its text whole.
   const reveal = revealEnabled && !large;
-  const plan = useMemo(createRevealPlan, [text]);
-  // Text already received shows at once on mount; only later arrivals are paced.
-  const controller = useLiveReveal(plan, streaming && reveal);
-  // A new components object makes ReactMarkdown parse the whole document again.
+  const blocks = useMemo(
+    () => (reveal ? splitMarkdown(text, LIVE_BLOCK_TARGET) : []),
+    [reveal, text],
+  );
+  const parts = useRef({
+    starts: [] as number[],
+    visible: new Map<number, string>(),
+    plugins: new Map<string, PluginList>(),
+  });
+  const liveText = useMemo(() => {
+    const current = parts.current;
+    current.starts = blocks.map((block) => block.start);
+    const keys = new Set(blocks.map(blockKey));
+    for (const start of [...current.visible.keys()])
+      if (!current.starts.includes(start)) current.visible.delete(start);
+    for (const key of [...current.plugins.keys()]) if (!keys.has(key)) current.plugins.delete(key);
+    return {
+      get text() {
+        return current.starts.map((start) => current.visible.get(start) ?? "").join("");
+      },
+    };
+  }, [blocks]);
+  const controller = useLiveReveal(liveText, streaming && reveal);
   const components = useMemo(() => streamingComponents(controller), [controller]);
-  const settledPlugins = useMemo(
-    () => [rehypeKatex, [cachedHighlight, { streaming: false }], rehypeCallouts] as PluginList,
-    [cachedHighlight],
-  );
-  const rehypePlugins = useMemo(
-    () =>
-      [
-        // Math first: a display formula arrives as a `language-math` code block, which the
-        // highlighter would otherwise treat as source code.
-        rehypeKatex,
-        [cachedHighlight, { streaming }],
-        rehypeCallouts,
-        ...(reveal ? [plan.plugin] : []),
-      ] as PluginList,
-    [cachedHighlight, streaming, reveal, plan],
-  );
-  if (!showMarkdown) return <div className="misty-markdown-plain">{text}</div>;
+  const settledPlugins = useMemo(() => [rehypeKatex, rehypeCallouts] as PluginList, []);
+  const blockPlugins = (block: { start: number; text: string }) => {
+    const current = parts.current;
+    const key = blockKey(block);
+    const known = current.plugins.get(key);
+    if (known) return known;
+    const plan = createRevealPlan({
+      base: () =>
+        current.starts
+          .filter((start) => start < block.start)
+          .reduce((sum, start) => sum + (current.visible.get(start)?.length ?? 0), 0),
+      onText: (visible) => current.visible.set(block.start, visible),
+    });
+    const plugins = [rehypeKatex, rehypeCallouts, plan.plugin] as PluginList;
+    current.plugins.set(key, plugins);
+    return plugins;
+  };
+  if (!showMarkdown) return <div className="whitespace-pre-wrap">{text}</div>;
+  if (reveal)
+    return (
+      <>
+        {blocks.map((block, index) => (
+          <MarkdownChunk
+            key={block.start}
+            text={block.text}
+            rehypePlugins={blockPlugins(block)}
+            components={components}
+            live={streaming && index === blocks.length - 1}
+          />
+        ))}
+      </>
+    );
   if (large)
     return (
       <>
@@ -372,54 +404,73 @@ export const MistyMarkdown = memo(function MistyMarkdown({
             <MarkdownChunk
               key={chunk.start}
               text={chunk.text}
-              rehypePlugins={
-                streaming && index === chunks.length - 1 ? rehypePlugins : settledPlugins
-              }
+              rehypePlugins={settledPlugins}
               components={components}
+              live={streaming && index === chunks.length - 1}
             />
           ) : (
-            <div className="misty-markdown-chunk" key={chunk.start} aria-busy="true">
-              <div className="misty-markdown-plain">{chunk.text}</div>
+            <div className="contents" key={chunk.start} aria-busy="true">
+              <div className="whitespace-pre-wrap">{chunk.text}</div>
             </div>
           ),
         )}
       </>
     );
   return (
-    <ReactMarkdown
-      remarkPlugins={remarkPlugins}
-      rehypePlugins={rehypePlugins}
+    <MarkdownChunk
+      text={text}
+      rehypePlugins={settledPlugins}
       components={components}
-    >
-      {text}
-    </ReactMarkdown>
+      live={streaming}
+    />
   );
 });
 
-function CodeBlock({ language, children }: { language?: string; children: ReactNode }) {
+const LIVE_BLOCK_TARGET = 1_500;
+
+const blockKey = (block: { start: number; text: string }) => `${block.start}\u0000${block.text}`;
+
+function CodeBlock({
+  language,
+  code,
+  start,
+  end,
+  children,
+}: {
+  language?: string;
+  code: string;
+  start?: number;
+  end?: number;
+  children: ReactNode;
+}) {
   const pre = useRef<HTMLPreElement>(null);
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1500);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
+  const { source, live } = useContext(MarkdownSource);
+  const settled = !live || (start != null && end != null && closedFence(source.slice(start, end)));
+  const lines = useCodeTokens(code, language, settled);
   return (
-    <div className="misty-markdown-code">
-      <div className="misty-markdown-code-header">
-        <span>{language ?? "Code"}</span>
-        <IconButton
-          label="Copy code"
-          onClick={() =>
-            void navigator.clipboard
-              .writeText(pre.current?.textContent ?? "")
-              .then(() => setCopied(true))
-          }
-        >
-          {copied ? <Check /> : <Copy />}
-        </IconButton>
-      </div>
-      <pre ref={pre}>{children}</pre>
-    </div>
+    <ProseCode
+      ref={pre}
+      language={language}
+      actions={
+        <CopyButton label="Copy code" size="sm" value={() => pre.current?.textContent ?? ""} />
+      }
+    >
+      {lines ? (
+        <code>
+          {lines.map((line, row) => (
+            <Fragment key={row}>
+              {row ? "\n" : null}
+              {line.map((token, index) => (
+                <span key={index} style={{ color: token.color }}>
+                  {token.content}
+                </span>
+              ))}
+            </Fragment>
+          ))}
+        </code>
+      ) : (
+        children
+      )}
+    </ProseCode>
   );
 }

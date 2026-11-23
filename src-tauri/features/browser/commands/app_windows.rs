@@ -1,6 +1,3 @@
-//! Browser commands for app windows, named here so the command table can list them with their
-//! hidden `__cmd__*` macros.
-
 #[cfg(windows)]
 pub(crate) use crate::browser::app_windows::windows::snap::{
     __cmd__window_show_snap_layouts, __tauri_command_name_window_show_snap_layouts,

@@ -8,7 +8,6 @@ import {
   AlertDialogTitle,
 } from "@misty/ui";
 
-/** Confirms leaving unsaved agent edits or an unsent message. */
 export function AgentDiscardDialog({
   open,
   onCancel,
@@ -18,7 +17,6 @@ export function AgentDiscardDialog({
   open: boolean;
   onCancel(): void;
   onDiscard(): void;
-  /** Returns focus to whichever control started the change. */
   restoreFocus?(): void;
 }) {
   return (

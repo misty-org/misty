@@ -28,7 +28,6 @@ const LIMIT_CODES = [
   "space_people_limit_reached",
 ];
 
-/** Explains refusals the model can act on; nothing changed. */
 function adminRefusal(refused: SpaceCallRefused): string | undefined {
   if (refused.code === "forbidden") return "only the Space owner can do that";
   if (refused.status === 404) return "that Space, member or invitation was not found";
@@ -42,7 +41,6 @@ function adminRefusal(refused: SpaceCallRefused): string | undefined {
 
 const list: LocalToolHandler = async (request) => {
   onlyFields(request.input, []);
-  // The run sees only its agent's home Space, the one Space it works in.
   const spaces = await listSpaces(request);
   return {
     spaces: spaces.map((space) => ({
@@ -117,7 +115,6 @@ const manage: LocalToolHandler = async (request) => {
   if (action === "create") {
     const name = text(input, "name", { min: 1, max: 80 });
     if (!name.trim()) throw refuse("create needs a name");
-    // A retried create with this key answers with the Space the first one made.
     const headers = { "Idempotency-Key": `agent:${request.runId}:${request.callId}` };
     const created = await rewordRefusal(
       () =>

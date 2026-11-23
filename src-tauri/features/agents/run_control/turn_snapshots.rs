@@ -1,14 +1,3 @@
-//! What a chat's turns did to the person's files, so a rewind can put them back.
-//!
-//! Before each turn, the folder it works in is saved as a Git tree in a store of Misty's own
-//! (`~/.misty/turn-snapshots`, one bare repository per folder), never in the folder's own `.git`,
-//! and again when the turn ends. The folder's ignore rules apply, so build output stays out.
-//!
-//! A rewind reads those trees in order: what changed between a turn's start and its end is the
-//! agent's, what changed between turns or since the last one is the person's. The agent's files go
-//! back to how they were before the first removed turn; one the person changed too is listed for
-//! them to decide, never put back silently. The idea follows OpenCode's snapshots; this is written
-//! from scratch over libgit2.
 use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -17,13 +6,9 @@ use git2::{IndexAddOption, ObjectType, Oid, Repository, Tree};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-/// A file bigger than this isn't saved, and so is never put back.
 const MAX_FILE_BYTES: u64 = 20 * 1024 * 1024;
-/// How long one snapshot may take before the turn goes ahead without it.
 const SNAPSHOT_TIME: Duration = Duration::from_secs(20);
-/// Turns older than this can no longer be rewound with their files.
 pub(super) const KEPT_DAYS: i64 = 30;
-/// Folders nobody wants in a snapshot even without an ignore file.
 const ALWAYS_IGNORED: &str = "node_modules/\n.DS_Store\n";
 
 fn hex_key(text: &str, length: usize) -> String {
@@ -37,7 +22,6 @@ fn hex_key(text: &str, length: usize) -> String {
         .collect()
 }
 
-/// The store a folder's trees live in.
 fn store_dir(root: &Path, folder: &Path) -> PathBuf {
     let canonical = file_access::fs::canonicalize(folder).unwrap_or_else(|_| folder.to_path_buf());
     root.join("stores")
@@ -48,8 +32,6 @@ fn git_text(error: git2::Error) -> String {
     error.message().to_string()
 }
 
-/// Opens (or makes) the folder's store with the folder as its working tree. The folder gets no
-/// `.git` file of ours: the link lives only in this handle.
 fn open(root: &Path, folder: &Path) -> Result<Repository, String> {
     let dir = store_dir(root, folder);
     let repository = match Repository::open_bare(&dir) {
@@ -58,7 +40,6 @@ fn open(root: &Path, folder: &Path) -> Result<Repository, String> {
             file_access::fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
             let repository = Repository::init_bare(&dir).map_err(git_text)?;
             let mut config = repository.config().map_err(git_text)?;
-            // The saved bytes are the file's own bytes, whatever the person's Git settings say.
             config.set_bool("core.autocrlf", false).map_err(git_text)?;
             config.set_str("core.safecrlf", "false").map_err(git_text)?;
             let info = dir.join("info");
@@ -78,9 +59,7 @@ fn too_big(folder: &Path, path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// Saves the folder as it is now and returns its tree.
 pub(super) fn snapshot(root: &Path, folder: &Path) -> Result<Oid, String> {
-    // libgit2 reads the folder itself, so the file gate is asked first.
     file_access::check(folder, file_access::Access::Read).map_err(|error| error.to_string())?;
     let repository = open(root, folder)?;
     let mut index = repository.index().map_err(git_text)?;
@@ -91,8 +70,6 @@ pub(super) fn snapshot(root: &Path, folder: &Path) -> Result<Oid, String> {
             if started.elapsed() > SNAPSHOT_TIME {
                 return -1;
             }
-            // A folder inside the folder that is a repository of its own comes as `dir/`; its
-            // files aren't the agent's to put back from here.
             if path.to_string_lossy().ends_with('/') {
                 return 1;
             }
@@ -117,7 +94,6 @@ pub(super) fn snapshot(root: &Path, folder: &Path) -> Result<Oid, String> {
     for path in skipped {
         let _ = index.remove_path(&path);
     }
-    // Any link to such a repository a store already held goes too.
     let links: Vec<PathBuf> = index
         .iter()
         .filter(|entry| entry.mode == 0o160000)
@@ -134,7 +110,6 @@ fn tree<'r>(repository: &'r Repository, id: Oid) -> Result<Tree<'r>, String> {
     repository.find_tree(id).map_err(git_text)
 }
 
-/// The paths that differ between two trees.
 fn changed(repository: &Repository, from: Oid, to: Oid) -> Result<BTreeSet<String>, String> {
     if from == to {
         return Ok(BTreeSet::new());
@@ -154,14 +129,11 @@ fn changed(repository: &Repository, from: Oid, to: Oid) -> Result<BTreeSet<Strin
     Ok(paths)
 }
 
-/// A file's blob and mode in a tree, or nothing when the tree hasn't it.
 fn entry(tree: &Tree, path: &str) -> Option<(Oid, i32)> {
     let found = tree.get_path(Path::new(path)).ok()?;
     (found.kind() == Some(ObjectType::Blob)).then(|| (found.id(), found.filemode()))
 }
 
-/// One turn's two trees. `before` is missing when the folder couldn't be saved as it started,
-/// `after` when the turn hasn't ended or Misty closed while it ran.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Turn {
     pub(super) before: Option<Oid>,
@@ -172,23 +144,17 @@ pub(super) struct Turn {
 #[serde(rename_all = "camelCase")]
 pub struct FileChange {
     pub path: String,
-    /// `restore` writes the file back as it was; `remove` takes away one the turns made.
     pub change: &'static str,
-    /// The person changed this file too (or nobody can tell who did), so it waits for their say.
     pub changed_by_you: bool,
 }
 
-/// What a rewind would do to one folder.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct Plan {
-    /// The tree the folder goes back to.
     pub(super) target: Option<Oid>,
     pub(super) files: Vec<FileChange>,
-    /// Some turn's start or end wasn't saved, so not every change could be placed.
     pub(super) incomplete: bool,
 }
 
-/// What a rewind of these turns (oldest first) would do, against the folder's tree `now`.
 pub(super) fn plan(repository: &Repository, turns: &[Turn], now: Oid) -> Result<Plan, String> {
     let Some(target) = turns.first().and_then(|turn| turn.before) else {
         return Ok(Plan {
@@ -196,9 +162,6 @@ pub(super) fn plan(repository: &Repository, turns: &[Turn], now: Oid) -> Result<
             ..Plan::default()
         });
     };
-    // The saved moments in order: each turn's start and end, then now. A span from a turn's
-    // start to its own end is the agent's; one from an end to the next start (or now) is the
-    // person's; one that skips a moment that wasn't saved could be either's.
     #[derive(Clone, Copy, PartialEq)]
     enum Moment {
         Start(usize),
@@ -254,7 +217,6 @@ pub(super) fn plan(repository: &Repository, turns: &[Turn], now: Oid) -> Result<
     })
 }
 
-/// A path from a saved tree, which must stay inside the folder.
 fn inside(path: &str) -> Option<&Path> {
     let path = Path::new(path);
     let plain = !path.as_os_str().is_empty()
@@ -264,8 +226,6 @@ fn inside(path: &str) -> Option<&Path> {
     plain.then_some(path)
 }
 
-/// The nearest folder above `path` that exists lies inside `folder`, so writing there can't follow
-/// a link out of it.
 fn stays_inside(folder: &Path, path: &Path) -> bool {
     let Ok(root) = file_access::fs::canonicalize(folder) else {
         return false;
@@ -279,7 +239,6 @@ fn stays_inside(folder: &Path, path: &Path) -> bool {
     false
 }
 
-/// Takes away a file the turns made, then any folder that leaves empty (never the folder itself).
 fn remove(folder: &Path, path: &Path) -> Result<(), String> {
     let full = folder.join(path);
     match file_access::fs::symlink_metadata(&full) {
@@ -296,7 +255,6 @@ fn remove(folder: &Path, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Puts these files of the folder back as `target` holds them. Returns the paths it couldn't.
 pub(super) fn restore(
     root: &Path,
     folder: &Path,
@@ -306,8 +264,6 @@ pub(super) fn restore(
     let repository = open(root, folder)?;
     let target_tree = tree(&repository, target)?;
     let mut failed = Vec::new();
-    // Only where the file gate lets Misty write: a linked folder, never a shared folder only the
-    // chat's sandboxed shell may change.
     let writable =
         |path: &Path| file_access::check(&folder.join(path), file_access::Access::Write).is_ok();
     let mut writes = Vec::new();
@@ -324,8 +280,6 @@ pub(super) fn restore(
         }
     }
     if !writes.is_empty() {
-        // Checkout writes each file with its mode, links as links, through the folder's own
-        // attributes, the way the snapshot read it.
         let mut options = git2::build::CheckoutBuilder::new();
         options
             .force()
@@ -349,12 +303,10 @@ pub(super) fn restore(
     Ok(failed)
 }
 
-/// Opens the folder's store for reading plans.
 pub(super) fn repository(root: &Path, folder: &Path) -> Result<Repository, String> {
     open(root, folder)
 }
 
-/// One turn's record: whose it is, where it worked and its two trees.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub(super) struct Record {
     pub(super) run_id: String,
@@ -395,7 +347,6 @@ pub(super) fn write_record(root: &Path, record: &Record) -> Result<(), String> {
     file_access::fs::rename(&partial, &path).map_err(|error| error.to_string())
 }
 
-/// Forgets turns older than `oldest`, and the stores of folders no remaining turn worked in.
 pub(super) fn prune(root: &Path, oldest: i64) {
     let mut kept = BTreeSet::new();
     if let Ok(entries) = file_access::fs::read_dir(root.join("runs")) {

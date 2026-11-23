@@ -38,11 +38,8 @@ use watch::IndexWatch;
 
 pub const EVENT: &str = "files://index";
 
-/// A walk of the whole home folder runs this long after the last one finished.
 const RESCAN_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
-/// How often the waiting thread looks whether the disk grant was taken back.
 const GRANT_CHECK: Duration = Duration::from_secs(5);
-/// The most results one search returns.
 const MOST_RESULTS: usize = 500;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -53,7 +50,6 @@ pub enum IndexState {
     Ready,
 }
 
-/// `IndexStatus` in `disk.ts`.
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IndexStatus {
@@ -65,9 +61,7 @@ pub(super) struct Service {
     app: AppHandle,
     root: PathBuf,
     home: PathBuf,
-    /// The writing side, held by whoever changes the catalog (a walk, a batch of changes).
     catalog: Mutex<Option<Catalog>>,
-    /// The reading side, which searches take without waiting for a walk.
     reader: RwLock<Option<(IndexReader, Fields)>>,
     running: AtomicBool,
     state: AtomicU8,
@@ -78,7 +72,9 @@ pub(super) struct Service {
 static SERVICE: OnceLock<Arc<Service>> = OnceLock::new();
 
 fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn service(app: &AppHandle) -> Option<&'static Arc<Service>> {
@@ -109,8 +105,15 @@ impl Service {
             2 => IndexState::Ready,
             _ => IndexState::Off,
         };
-        let state = if disk_allowed() { state } else { IndexState::Off };
-        IndexStatus { state, files: self.files.load(Ordering::SeqCst) }
+        let state = if disk_allowed() {
+            state
+        } else {
+            IndexState::Off
+        };
+        IndexStatus {
+            state,
+            files: self.files.load(Ordering::SeqCst),
+        }
     }
 
     fn emit(&self) {
@@ -128,24 +131,29 @@ impl Service {
         }
     }
 
-    /// Something was committed: searches see it now, and the window hears the new count.
     fn published(&self) {
-        let reader = self.reader.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let reader = self
+            .reader
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if let Some((reader, _)) = reader.as_ref() {
             if reader.reload().is_ok() {
-                self.files.store(reader.searcher().num_docs(), Ordering::SeqCst);
+                self.files
+                    .store(reader.searcher().num_docs(), Ordering::SeqCst);
             }
         }
         drop(reader);
         self.emit();
     }
 
-    /// Opens the catalog and starts the watch, once each.
     fn prepare(self: &Arc<Self>) -> Result<(), String> {
         let mut catalog = lock(&self.catalog);
         if catalog.is_none() {
             let opened = catalog::open(&self.root)?;
-            *self.reader.write().unwrap_or_else(|poisoned| poisoned.into_inner()) =
+            *self
+                .reader
+                .write()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
                 Some((opened.reader.clone(), opened.fields));
             *catalog = Some(opened);
         }
@@ -198,8 +206,11 @@ impl Service {
         self.emit();
     }
 
-    /// Applies one batch of changes. None while a walk holds the catalog: try again later.
-    pub(super) fn apply(&self, changed: &[PathBuf], rescan: &[PathBuf]) -> Option<Result<(), String>> {
+    pub(super) fn apply(
+        &self,
+        changed: &[PathBuf],
+        rescan: &[PathBuf],
+    ) -> Option<Result<(), String>> {
         if !disk_allowed() {
             return Some(Ok(()));
         }
@@ -220,8 +231,16 @@ impl Service {
         }))
     }
 
-    fn search(&self, text: &str, scope: Option<&Path>, limit: usize) -> Result<Vec<FileEntry>, String> {
-        let reader = self.reader.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+    fn search(
+        &self,
+        text: &str,
+        scope: Option<&Path>,
+        limit: usize,
+    ) -> Result<Vec<FileEntry>, String> {
+        let reader = self
+            .reader
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let Some((reader, fields)) = reader.as_ref() else {
             return Ok(Vec::new());
         };
@@ -230,22 +249,18 @@ impl Service {
             .iter()
             .map(|doc| PathBuf::from(&doc.path))
             .filter(|path| check_disk(path, Access::Read).is_ok())
-            // The index can be a moment behind the disk: what is gone now isn't shown.
             .filter_map(|path| entry_for(&path).ok())
             .take(limit)
             .collect())
     }
 }
 
-/// A commit landed part way through a walk.
 fn published() {
     if let Some(service) = SERVICE.get() {
         service.published();
     }
 }
 
-/// Starts indexing the home folder, if the disk grant is on and it isn't running already. It
-/// stops by itself when the grant is taken back.
 pub fn start_indexing(app: &AppHandle) {
     if !disk_allowed() {
         return;
@@ -274,23 +289,19 @@ fn note(path: &Path) {
     }
 }
 
-/// Files made something at `path` (a new folder, a copy, a zip).
 pub fn note_added(path: &Path) {
     note(path);
 }
 
-/// Files removed `path` (moved to the Trash, deleted).
 pub fn note_removed(path: &Path) {
     note(path);
 }
 
-/// Files renamed or moved `from` to `to`.
 pub fn note_renamed(from: &Path, to: &Path) {
     note(from);
     note(to);
 }
 
-/// Items in the home folder whose names match `query`, best first, inside `scope` when given.
 #[tauri::command]
 pub async fn files_search(
     webview: tauri::Webview,
@@ -299,7 +310,10 @@ pub async fn files_search(
     limit: usize,
 ) -> Result<Vec<FileEntry>, String> {
     person_window(&webview)?;
-    let scope = scope.filter(|scope| !scope.trim().is_empty()).map(|scope| asked_path(&scope)).transpose()?;
+    let scope = scope
+        .filter(|scope| !scope.trim().is_empty())
+        .map(|scope| asked_path(&scope))
+        .transpose()?;
     if query.trim().is_empty() || !disk_allowed() {
         return Ok(Vec::new());
     }
@@ -309,12 +323,14 @@ pub async fn files_search(
     blocking(move || service.search(&query, scope.as_deref(), limit.clamp(1, MOST_RESULTS))).await
 }
 
-/// Whether the index is off, being built, or ready, and how many items it holds.
 #[tauri::command]
 pub fn files_index_status(webview: tauri::Webview) -> Result<IndexStatus, String> {
     person_window(&webview)?;
     Ok(SERVICE
         .get()
         .map(|service| service.status())
-        .unwrap_or(IndexStatus { state: IndexState::Off, files: 0 }))
+        .unwrap_or(IndexStatus {
+            state: IndexState::Off,
+            files: 0,
+        }))
 }

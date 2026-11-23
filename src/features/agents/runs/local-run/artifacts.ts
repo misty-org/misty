@@ -1,27 +1,19 @@
-import { agentAccountId } from "../../personal/agentAccount";
-import { localDocuments } from "../../conversations/state/localChats";
-import { endProposalRun, publishLocalRunEvent } from "./localRunEvents";
+import { agentAccountId } from "../../personal/agent_account";
+import { localDocuments } from "../../conversations/state/local_chats";
+import { endProposalRun, publishLocalRunEvent } from "./local_run_events";
 import type {
   AiArtifact,
   AiCitation,
   AiContextReference,
   AiSelectionSnapshot,
-} from "../invocations/invocationTypes";
-import { artifactSpecs } from "./artifactSpecs";
-
-/**
- * Reviewable proposals, in misty.db (`ai_artifact_decisions.go`, `ai_artifact_state.go`,
- * `ai_invocation_runtime_completion.go`). A run that was asked for a proposal hands its answer over as
- * `local.artifact_answer`; this builds the proposal and ends the run, and a person's decision comes
- * back here. Nothing is applied here: the surface that owns the target applies it.
- */
+} from "../invocations/invocation_types";
+import { artifactSpecs } from "./artifact_specs";
 
 const artifactLifetimeMs = 24 * 3_600_000;
 const maxProposalBytes = 256 << 10;
 const maxSummary = 500;
 const reviewable = "I prepared a reviewable proposal. Nothing has been applied.";
 
-/** What a proposal needs from the request, kept from the moment the run starts. */
 export interface ArtifactRequest {
   runId: string;
   account: string;
@@ -63,7 +55,6 @@ async function load(account: string, id: string): Promise<{ raw: string; artifac
   return { raw, artifact: JSON.parse(raw) as AiArtifact };
 }
 
-/** The model's answer as a proposal envelope: its summary and operations, and nothing else. */
 export function parseProposal(answer: string): {
   summary: string;
   operations: Record<string, unknown>;
@@ -109,7 +100,6 @@ function targetOf(request: ArtifactRequest): { target: AiArtifact["target"]; rev
   };
 }
 
-/** Builds the proposal for a run's answer. Throws when the answer can't be one: the run then fails. */
 export function buildArtifact(request: ArtifactRequest, answer: string, now: number): AiArtifact {
   const base = {
     id: `artifact_${crypto.randomUUID()}`,
@@ -156,7 +146,6 @@ export function buildArtifact(request: ArtifactRequest, answer: string, now: num
   } as unknown as AiArtifact;
 }
 
-/** The events that end a run whose answer became a proposal. */
 export async function finishWithProposal(runId: string, answer: string, account: string) {
   const raw = await localDocuments.get(account, "artifact", requestId(runId));
   const request = raw ? (JSON.parse(raw) as ArtifactRequest) : null;
@@ -197,7 +186,6 @@ export async function finishWithProposal(runId: string, answer: string, account:
 
 type Decision = "accept" | "reject" | "refine";
 
-/** A person's answer to a proposal. It's decided once: a second answer is refused. */
 export async function decideLocalArtifact(artifactId: string, decision: Decision) {
   const account = agentAccountId();
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -220,7 +208,6 @@ export async function decideLocalArtifact(artifactId: string, decision: Decision
   throw new ArtifactRefused("artifact_already_decided", "This draft has already been decided.");
 }
 
-/** What the surface did with an accepted proposal. */
 export async function completeLocalArtifact(
   artifactId: string,
   state: "applied" | "failed",

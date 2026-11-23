@@ -1,4 +1,3 @@
-//! Account sessions: tokens held natively, account HTTP and cached account data.
 pub mod commands;
 
 pub mod api_cache;

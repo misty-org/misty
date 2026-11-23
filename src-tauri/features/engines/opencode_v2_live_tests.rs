@@ -1,9 +1,6 @@
-//! Misty's 2.x turn path against a real OpenCode install and a free model, run by hand (ignored).
-
 use super::forms::render_form;
 use super::*;
 
-/// What one live turn collected: the run's engine events as `(kind, data)`.
 #[derive(Default)]
 pub(super) struct Collected(std::sync::Mutex<Vec<String>>);
 
@@ -27,8 +24,6 @@ impl Collected {
     }
 }
 
-/// One live turn on Misty's real path (`run_server_turn_with_probe_port`), started on its own
-/// task; the caller waits on the handle.
 pub(super) struct LiveTurn {
     pub(super) emitter: Arc<Collected>,
     registry: Arc<crate::engines::ProcessRegistry>,
@@ -114,7 +109,6 @@ impl LiveTurn {
             .await
             .expect("the turn never settled")
             .expect("turn task");
-        // The sink flushes on its own beat; give the last batch a moment.
         tokio::time::sleep(Duration::from_millis(400)).await;
         let kinds = self.emitter.kinds();
         for (kind, data) in &kinds {
@@ -124,7 +118,6 @@ impl LiveTurn {
         kinds
     }
 
-    /// The parked question card's answer context, once one parks.
     async fn parked_question(&self) -> Option<(String, Value)> {
         for _ in 0..600 {
             let parked = self.registry.get(&self.run_id).and_then(|entry| {
@@ -161,8 +154,6 @@ pub(super) fn text_of(kinds: &[(String, Value)]) -> String {
         .collect()
 }
 
-/// Every frame the server streams, printed as it comes, so a live run shows the raw wire
-/// beside what Misty made of it.
 pub(super) fn tap_raw_events(origin: &str) {
     let origin = origin.to_owned();
     tokio::spawn(async move {
@@ -197,15 +188,6 @@ pub(super) fn tap_raw_events(origin: &str) {
     });
 }
 
-/// Misty's whole 2.x turn path against a real model OpenCode serves for free without an account
-/// (its own "zen" models, `apiKey: public`): streamed text, a tool, `/compact`, a permission ask,
-/// a question form and a stop mid-turn. Spends a handful of tiny prompts:
-/// `OPENCODE_BIN=/path/to/opencode cargo test --lib live_v2_turns -- --ignored --nocapture`
-/// (`OPENCODE_FREE_MODEL` picks another free model; the default is the server's own default).
-/// `OPENCODE_PAID_MODEL` runs it on a priced model from a provider the person signed in to, and
-/// then also checks that the turn's cost reaches Misty. `OPENCODE_LIVE_PAUSE` waits that many
-/// seconds between steps, for a key whose provider allows only a few requests a minute.
-/// Waits between the live test's steps when `OPENCODE_LIVE_PAUSE` asks for it.
 async fn pace() {
     let seconds = std::env::var("OPENCODE_LIVE_PAUSE")
         .ok()
@@ -242,7 +224,6 @@ async fn live_v2_turns() {
         std::env::temp_dir().join(format!("misty-opencode-v2-live-{}", std::process::id()));
     std::fs::create_dir_all(&folder).unwrap();
     std::fs::write(folder.join("notes.txt"), "hello\n").unwrap();
-    // OpenCode's agents ask before reading a `.env` file, so this one triggers a permission ask.
     std::fs::write(folder.join(".env"), "FAKE=1\n").unwrap();
     let directory = folder.to_string_lossy().to_string();
     let server = Arc::new(opencode_server::OpencodeServerState::default());
@@ -250,7 +231,6 @@ async fn live_v2_turns() {
         .await
         .expect("server");
     assert!(opencode_server::is_v2(&origin));
-    // The model must be one the server serves for nothing.
     let models = call(Method::GET, &origin, "/api/model", Some(&directory), None)
         .await
         .expect("models");
@@ -266,10 +246,8 @@ async fn live_v2_turns() {
     let free = listed["cost"]
         .as_array()
         .is_some_and(|costs| costs.iter().all(|c| c["input"] == 0 && c["output"] == 0));
-    // Only a model the person asked for by name may cost anything.
     assert!(free || paid.is_some(), "not a free model: {listed}");
     tap_raw_events(&origin);
-    // Misty's gate answers permission asks; here it allows each and remembers what it saw.
     let asked: Arc<std::sync::Mutex<Vec<(String, Value)>>> = Arc::default();
     {
         let asked = Arc::clone(&asked);
@@ -360,8 +338,6 @@ async fn live_v2_turns() {
         !text_of(&kinds).is_empty(),
         "the summary didn't stream: {kinds:?}"
     );
-    // OpenCode reports no compacted size, so the last report clears the count; the summarizing
-    // call's tokens still come with it.
     let usage = of_kind(&kinds, "usage");
     let last = usage.last().expect("no usage after /compact");
     assert!(last["model_context_window"].as_u64().is_some(), "{last}");
@@ -458,7 +434,6 @@ async fn live_v2_turns() {
     let done = of_kind(&kinds, "done");
     assert_eq!(done.len(), 1, "{kinds:?}");
     assert!(of_kind(&kinds, "error").is_empty(), "{kinds:?}");
-    // The server stops the turn too: the session's outcome says it was interrupted.
     let mut outcome = Value::Null;
     for _ in 0..50 {
         let info = call(

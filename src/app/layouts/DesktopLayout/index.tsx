@@ -1,6 +1,6 @@
 import { CursorCompanionController, TutorTraySync } from "@/features/agents";
 import { CapturePanel, DictationController } from "@/features/voice";
-import { DirectRoot } from "@/features/direct";
+import { CallDock, DirectRoot } from "@/features/direct";
 import { type AppTab } from "@/app/shell";
 import {
   AccountClosingNotice,
@@ -14,12 +14,12 @@ import {
 import { blockIfUnsaved } from "@/features/settings";
 import { setBrowserWebviewsSuspended } from "@/features/app-windows";
 import { useWindowDockingLayout } from "@/features/app-windows";
-import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/useAppZoom";
+import { appZoomRenderScale, useAppZoomValue } from "@/shared/hooks/use_app_zoom";
 import { cn, Surface } from "@misty/ui";
 import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
-import { isTopEdgeDragPress } from "./windowChromeDrag";
-import { useDockingTransition } from "./useDockingTransition";
+import { isTopEdgeDragPress } from "./window_chrome_drag";
+import { useDockingTransition } from "./use_docking_transition";
 import { DeferUntilIdle } from "./DeferUntilIdle";
 import { DesktopShellOverlays } from "./DesktopShellOverlays";
 import { FramePacingOverlay } from "./FramePacingOverlay";
@@ -27,20 +27,23 @@ import { AccountIsland } from "./AccountIsland";
 import { AppNoticePublisher } from "./RouteNotices";
 import { StandaloneRouteSurface } from "./StandaloneRouteSurface";
 import * as styles from "./styles";
-import { useDesktopBootstrap } from "./useDesktopBootstrap";
-import { useDesktopFrameStyle } from "./useDesktopFrameStyle";
-import { useDesktopRouteEffects } from "./useDesktopRouteEffects";
-import { useDesktopShellStatus } from "./useDesktopShellStatus";
+import { useDesktopBootstrap } from "./use_desktop_bootstrap";
+import { useDesktopFrameStyle } from "./use_desktop_frame_style";
+import { useDesktopRouteEffects } from "./use_desktop_route_effects";
+import { useDesktopShellStatus } from "./use_desktop_shell_status";
 import { HelpDialog } from "./HelpDialog";
 import { TourHost } from "@/features/onboarding";
-import { useDesktopShortcuts } from "./useDesktopShortcuts";
-import { useDesktopTitlebarGeometry } from "./useDesktopTitlebarGeometry";
-import { useDesktopWindowChrome } from "./useDesktopWindowChrome";
-import { useOtherWindowsHiddenWhileAddingAccount, useSignedOutWindow } from "./useSignedOutWindow";
-import { useStrayBrowserPages } from "./useStrayBrowserPages";
-import { useSettingsOverlay } from "./useSettingsOverlay";
+import { useDesktopShortcuts } from "./use_desktop_shortcuts";
+import { useDesktopTitlebarGeometry } from "./use_desktop_titlebar_geometry";
+import { useDesktopWindowChrome } from "./use_desktop_window_chrome";
+import {
+  useOtherWindowsHiddenWhileAddingAccount,
+  useSignedOutWindow,
+} from "./use_signed_out_window";
+import { useStrayBrowserPages } from "./use_stray_browser_pages";
+import { useSettingsOverlay } from "./use_settings_overlay";
 import { WindowsTitlebarControls } from "./WindowsTitlebarControls";
-import { useCaptionSlot } from "./useCaptionSlot";
+import { useCaptionSlot } from "./use_caption_slot";
 import { WorkspaceCanvas } from "./WorkspaceCanvas";
 export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab }) {
   useStrayBrowserPages();
@@ -93,7 +96,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
   useDockingTransition(shellRef, `${docking.navigation}:${docking.tabs}`);
 
   const shouldShowWindowsControls = shouldShowWindowsTitlebarControls;
-  // Seated at the tab row's end when there is one, so they share its height and line.
   const captionSlot = useCaptionSlot(shellRef, shouldShowWindowsControls);
   const {
     isAuthRoute,
@@ -114,23 +116,26 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
     isAuthRoute && Boolean((location.state as { addingAccount?: boolean } | null)?.addingAccount),
   );
   const stripAccount = !isAuthRoute ? (
-    <AccountIsland
-      open={accountMenuOpen}
-      onOpenChange={(open) => {
-        if (open) {
-          if (blockIfUnsaved()) return;
-          setSettingsOpen(false);
+    <>
+      <CallDock />
+      <AccountIsland
+        open={accountMenuOpen}
+        onOpenChange={(open) => {
+          if (open) {
+            if (blockIfUnsaved()) return;
+            setSettingsOpen(false);
+          }
+          setAccountMenuOpen(open);
+        }}
+        onOpenAccountSettings={openAccountSettings}
+        settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
+        onSettingsClick={openSettingsOverlay}
+        sessionExpired={sessionExpired}
+        onSignIn={(again) =>
+          again ? openSignInSheet("expired", user?.email) : openSignInSheet("account")
         }
-        setAccountMenuOpen(open);
-      }}
-      onOpenAccountSettings={openAccountSettings}
-      settingsOpen={settingsOpen || location.pathname.startsWith("/settings")}
-      onSettingsClick={openSettingsOverlay}
-      sessionExpired={sessionExpired}
-      onSignIn={(again) =>
-        again ? openSignInSheet("expired", user?.email) : openSignInSheet("account")
-      }
-    />
+      />
+    </>
   ) : null;
   return (
     <Surface
@@ -138,20 +143,19 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       tone="chrome"
       ref={shellRef}
       className={cn(
-        // A marker for code that finds the window's frame.
         "misty-docking-frame",
         "relative isolate grid h-full min-h-0 overflow-hidden",
         "animate-[misty-fade-in_220ms_cubic-bezier(0.22,0.61,0.36,1)_both] motion-reduce:animate-none",
         "transition-[grid-template-columns,grid-template-rows]",
         styles.navigatorMotionClass,
-        // Nothing opaque may sit behind a page: while a popover is open the native pages drop
-        // below the app layer and show only through transparent CSS, so the backdrop is painted
-        // only where no page is, the panes' margin and the gaps between split panes.
         "has-[[data-panel-resize-handle-id]]:![--misty-window-chrome:var(--misty-theme-workspace)]",
       )}
       style={
         isAuthRoute
-          ? { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: "calc(var(--spacing) * 9.5) minmax(0, 1fr)" }
+          ? {
+              gridTemplateColumns: "minmax(0, 1fr)",
+              gridTemplateRows: "calc(var(--spacing) * 9.5) minmax(0, 1fr)",
+            }
           : geometry.frame
       }
       data-misty-desktop-frame
@@ -164,8 +168,6 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
           handleDesktopTitlebarPointerDown(event);
           return;
         }
-        // Pages drawn by the app itself move the window from their top edge too, as native
-        // browser pages do. Portalled menus and dialogs sit outside this element.
         if (shellRef.current?.contains(target) && isTopEdgeDragPress(event))
           handleTopEdgePointerDown(event);
       }}
@@ -232,13 +234,11 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       </Surface>
 
       <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
-      {/* Also the setup wizard, which the first-run welcome opens. */}
       <SignInSheet />
       {!isAuthRoute && user ? <SignOutSheet /> : null}
       <AccountSuspendedNotice />
       <AccountClosingNotice />
       {!isAuthRoute && user ? <ServerAlertsNotice /> : null}
-      {/* Status, notices and incoming calls for the account's own side: friends and DMs. */}
       {!isAuthRoute ? <DirectRoot key={user?.id ?? "signed-out"} accountId={user?.id} /> : null}
       {!isAuthRoute ? <HelpDialog /> : null}
       {!isAuthRoute ? <TourHost /> : null}

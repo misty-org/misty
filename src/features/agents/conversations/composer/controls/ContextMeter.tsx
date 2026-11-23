@@ -12,20 +12,17 @@ import {
   Text,
   Tooltip,
 } from "@misty/ui";
-import { rememberContextWindow, resolveContextMax } from "../../view/meta/contextWindowMemory";
+import { rememberContextWindow, resolveContextMax } from "../../view/meta/context_window_memory";
 import { formatTokens } from "../../view/meta/format";
-import { USAGE_PART_LABELS, usageBreakdown } from "../../view/meta/usageBreakdown";
-import type { ContextUsage } from "./contextUsage";
+import { USAGE_PART_LABELS, usageBreakdown } from "../../view/meta/usage_breakdown";
+import type { ContextUsage } from "./context_usage";
 
-/** Bucket shades: neutral steps, since a token bucket carries no meaning that needs a hue. */
 const SHADES = ["var(--color-cream)", "var(--color-cream-muted)", "#8a8a8a", "#5f5f5f", "#474747"];
 
-/** The free share's swatch: the bar's own empty track. */
 const freeSwatch = (
   <Surface as="span" tone="track" radius="sm" className="size-2.5 shrink-0" aria-hidden="true" />
 );
 
-/** One bucket of the breakdown: its swatch, its name, its tokens and its share of the window. */
 function LegendRow(props: { swatch: ReactNode; label: string; tokens: string; share: string }) {
   return (
     <div className="flex items-center gap-2 py-1">
@@ -47,17 +44,7 @@ function share(tokens: number, max: number) {
   return max > 0 ? Math.max(0, Math.min(100, (tokens / max) * 100)) : 0;
 }
 
-/**
- * How full the engine's context is: a small ring that opens to a breakdown of the last report,
- * one row per token bucket with its share of the window, then the free space. A window the engine
- * never reported reads as unknown: nothing is measured against a guess.
- */
-export function ContextMeter(props: {
-  usage?: ContextUsage;
-  /** The engine and the model chosen, to remember the window a report gave for next time. */
-  engine?: string;
-  model?: string;
-}) {
+export function ContextMeter(props: { usage?: ContextUsage; engine?: string; model?: string }) {
   const { usage, engine = "", model } = props;
   const slotModel = usage?.model || model;
   useEffect(() => {

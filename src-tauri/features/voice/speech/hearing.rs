@@ -1,5 +1,3 @@
-//! Hearing sessions: named inputs (the microphone, each person in a call), each through the voice
-//! activity detector, what is heard pushed to the window as `misty://speech`.
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -11,10 +9,6 @@ use voice_speech::{Hearing, HearingEvent};
 use super::super::speech_models;
 use super::*;
 
-/// Opens a hearing session for the asking window. What happens is pushed as `misty://speech`:
-/// `{ session, input, kind: "started" | "stopped" }`, `{ session, input, kind: "heard", text,
-/// start, end, words }`, `{ session, kind: "failed", error }` and, once it is stopped and
-/// everything said has been told, `{ session, kind: "closed" }`.
 #[tauri::command]
 pub async fn speech_hear_start(
     app: AppHandle,
@@ -75,7 +69,10 @@ fn session_hearing(
     webview: &Webview,
     session: u64,
 ) -> Result<Arc<Hearing>, String> {
-    let sessions = state.sessions.lock().map_err(|_| voice_speech::reason("failed"))?;
+    let sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| voice_speech::reason("failed"))?;
     let found = sessions
         .get(&session)
         .filter(|found| found.owner == webview.label())
@@ -83,7 +80,6 @@ fn session_hearing(
     Ok(found.hearing.clone())
 }
 
-/// Feeds a session 16 kHz mono PCM16 little-endian samples, as base64, from `input`.
 #[tauri::command]
 pub async fn speech_hear_push(
     webview: Webview,
@@ -106,7 +102,6 @@ pub async fn speech_hear_push(
         .map_err(|_| voice_speech::reason("failed"))?
 }
 
-/// Has a session hear this computer's microphone directly, as `input`.
 #[tauri::command]
 pub async fn speech_hear_mic(
     app: AppHandle,
@@ -119,7 +114,6 @@ pub async fn speech_hear_mic(
     let hearing = session_hearing(&state, &webview, session)?;
     let owner = webview.label().to_string();
     let failed_app = app.clone();
-    // The microphone's prompt can wait on the person, so it opens off the async runtime.
     let capture = tokio::task::spawn_blocking(move || {
         let heard_input = input.clone();
         voice_capture::start(
@@ -144,7 +138,10 @@ pub async fn speech_hear_mic(
     })
     .await
     .map_err(|_| voice_speech::reason("failed"))??;
-    let mut sessions = state.sessions.lock().map_err(|_| voice_speech::reason("failed"))?;
+    let mut sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| voice_speech::reason("failed"))?;
     match sessions.get_mut(&session) {
         Some(found) => {
             if let Some(previous) = found.mic.replace(capture) {
@@ -156,7 +153,6 @@ pub async fn speech_hear_mic(
     Ok(())
 }
 
-/// Forgets what `input` has said so far, such as Misty's own voice heard through the speakers.
 #[tauri::command]
 pub fn speech_hear_reset(
     webview: Webview,
@@ -169,7 +165,6 @@ pub fn speech_hear_reset(
     Ok(())
 }
 
-/// Stops hearing `input` (someone left the call).
 #[tauri::command]
 pub fn speech_hear_remove(
     webview: Webview,
@@ -182,7 +177,6 @@ pub fn speech_hear_remove(
     Ok(())
 }
 
-/// Ends every hearing session a window opened, as it closes: its microphone stops with it.
 pub fn close_window(app: &AppHandle, label: &str) {
     let state = app.state::<SpeechState>();
     let closing: Vec<Session> = match state.sessions.lock() {
@@ -192,7 +186,9 @@ pub fn close_window(app: &AppHandle, label: &str) {
                 .filter(|(_, session)| session.owner == label)
                 .map(|(id, _)| *id)
                 .collect();
-            ids.into_iter().filter_map(|id| sessions.remove(&id)).collect()
+            ids.into_iter()
+                .filter_map(|id| sessions.remove(&id))
+                .collect()
         }
         Err(_) => return,
     };
@@ -204,8 +200,6 @@ pub fn close_window(app: &AppHandle, label: &str) {
     }
 }
 
-/// Ends a session: the microphone closes, what each input was saying is recognized and told,
-/// then `closed` is pushed.
 #[tauri::command]
 pub fn speech_hear_stop(
     webview: Webview,
@@ -214,7 +208,10 @@ pub fn speech_hear_stop(
 ) -> Result<(), String> {
     require_person(&webview)?;
     let found = {
-        let mut sessions = state.sessions.lock().map_err(|_| voice_speech::reason("failed"))?;
+        let mut sessions = state
+            .sessions
+            .lock()
+            .map_err(|_| voice_speech::reason("failed"))?;
         match sessions.get(&session) {
             Some(found) if found.owner == webview.label() => sessions.remove(&session),
             _ => None,

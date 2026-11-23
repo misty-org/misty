@@ -77,8 +77,6 @@ fn npm_package_covers_every_npm_engine() {
     }
     assert_eq!(npm_package("grok"), None);
     assert_eq!(npm_package("agy"), None);
-    // qodercli/qoderclicn ship via their own installer (like grok/agy):
-    // no npm lifecycle.
     assert_eq!(npm_package("qoder"), None);
     assert_eq!(npm_package("qoder-cn"), None);
 }
@@ -117,13 +115,11 @@ async fn run_streaming_emits_scoped_lines_then_finished() {
         .await
         .unwrap();
 
-    // Captured text is unchanged from run_capture semantics.
     assert_eq!(output.stdout, "out1\nout2\n");
     assert_eq!(output.stderr, "err1\n");
     assert_eq!(output.status.map(|s| s.success()), Some(true));
     assert!(!output.timed_out);
 
-    // Events arrive as JSON arrays; flatten them.
     let events: Vec<serde_json::Value> = collector
         .raws
         .lock()
@@ -131,7 +127,6 @@ async fn run_streaming_emits_scoped_lines_then_finished() {
         .iter()
         .flat_map(|raw| serde_json::from_str::<Vec<serde_json::Value>>(raw).unwrap())
         .collect();
-    // Every event carries the run scope.
     assert!(events.iter().all(|e| e["runId"] == "run-test"));
     assert_eq!(events.first().unwrap()["phase"], "started");
     assert_eq!(events.last().unwrap()["phase"], "finished");
@@ -147,8 +142,6 @@ async fn run_streaming_emits_scoped_lines_then_finished() {
     );
 }
 
-/// Windows npm globals are `%APPDATA%\npm\<cli>.cmd` shims next to a `node_modules` tree; the
-/// shim path itself has no `node_modules` in it, so the shim must still count as an npm copy.
 #[test]
 fn npm_global_shims_are_the_npm_channel() {
     let root = std::env::temp_dir().join(format!("misty-npm-shim-{}", uuid::Uuid::new_v4()));
@@ -170,9 +163,6 @@ fn npm_global_shims_are_the_npm_channel() {
     let _ = std::fs::remove_dir_all(root);
 }
 
-/// A bare command name has no install directory: resolving
-/// `node_modules` against the app's working directory would let any
-/// folder named that way decide the channel.
 #[test]
 fn npm_shim_detection_ignores_relative_paths() {
     let base = std::path::PathBuf::from("target")
@@ -188,15 +178,12 @@ fn npm_shim_detection_ignores_relative_paths() {
 #[test]
 fn a_copy_already_on_the_computer_updates_the_way_it_was_installed() {
     let found = |engine: &str, bin: &str| routes::route(engine, bin, true, false);
-    // npm engines update through npm, whatever the program's path.
     assert_eq!(found("dsh", "/usr/local/bin/dsh"), Some(Route::NpmGlobal));
-    // Grok has no lifecycle action.
     assert_eq!(found("grok", "/usr/local/bin/grok"), None);
     assert_eq!(
         found("agy", "/usr/local/bin/agy"),
         Some(Route::VendorScript)
     );
-    // A node_modules path is the npm copy; anything else came from the maker's installer.
     assert_eq!(
         found(
             "claude",

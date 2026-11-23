@@ -1,22 +1,3 @@
-//! The Gemini CLI and Qwen Code commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Both run over ACP (`grok_acp.rs`). Gemini CLI's ACP mode runs six commands of its own in the
-//! turn (`/about`, `/help`, `/init`, `/memory`, `/extensions`, `/restore`), and Misty expands
-//! its custom `.toml` commands before the prompt goes (`gemini::expand_custom_command`). The
-//! terminal app's other commands work on files (`~/.gemini`), open a page, or need the live
-//! terminal session; the file and page ones are answered here.
-//!
-//! Qwen Code's ACP mode reports and runs every command it supports there; the ones listed as
-//! turns are among those, so the `/` menu has them before the first run. The rest are its
-//! terminal-only commands, answered from `~/.qwen`, a page, Qwen's own prompts, or its ACP
-//! extension methods.
-//!
-//! Left out: Gemini's `/stats` (in-process counters only; the composer's `/usage` covers it),
-//! `/mcp auth` (an OAuth flow inside the terminal app with no CLI subcommand), `/compress`
-//! (its ACP mode has no compression call), and `/chat save|resume|share`, which need the live
-//! session. Qwen's `/fork` spawns a background agent inside the running terminal session rather
-//! than copying it, so it's left to the composer's own fork.
-
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
@@ -49,8 +30,6 @@ pub fn commands(engine: &str) -> &'static [Command] {
     }
 }
 
-/// Descriptions and hints follow Gemini CLI 0.68's ACP command registry and its terminal app's
-/// built-in commands.
 const GEMINI: &[Command] = &[
     turn("about", "Show version and environment info"),
     turn("help", "Show available commands"),
@@ -84,8 +63,6 @@ const GEMINI: &[Command] = &[
     misty("policies", "List all active policies"),
 ];
 
-/// The turns are commands Qwen Code 0.27 marks as running in ACP mode; descriptions and hints
-/// are its own.
 const QWEN: &[Command] = &[
     turn(
         "init",
@@ -177,12 +154,5 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
 #[cfg(test)]
 mod tests;
 
-/// Runs Misty's out-of-turn Gemini CLI and Qwen Code commands against the installed CLIs and
-/// prints each Output to read. None makes a model call: the commands read files or open pages,
-/// and the sessions are made with ACP's `initialize` and `session/new` alone, started the way
-/// the adapter starts them (`host_command`). Neither CLI is signed in here, so each session
-/// runs on a stand-in key that no provider takes, in a scratch home of its own (Qwen's points
-/// at a closed local port, so nothing leaves the computer). The real home is only read.
-/// `cargo test --lib engines::slash::gemini::live_tests -- --ignored --nocapture --test-threads 1`
 #[cfg(all(test, unix))]
 mod live_tests;

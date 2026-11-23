@@ -1,8 +1,3 @@
-//! JSON kept as text, with its keys in their original order. Key order must not change between
-//! turns, or providers can't reuse their prompt cache. `serde_json::Value` would sort the keys, and
-//! its `preserve_order` feature would turn on for the whole app, where signed payloads depend on
-//! sorted keys. `RawValue` alone can't pass through the tagged enums the prompt is made of, so
-//! reading goes through a visitor that writes the text itself.
 use std::fmt;
 
 use serde::{
@@ -15,12 +10,10 @@ use serde_json::value::RawValue;
 pub struct RawJson(Box<RawValue>);
 
 impl RawJson {
-    /// Takes JSON text as it is, or fails if it isn't valid JSON.
     pub fn from_text(text: String) -> Result<Self, serde_json::Error> {
         RawValue::from_string(text).map(Self)
     }
 
-    /// An empty object, which the model gets when its own input couldn't be read.
     pub fn empty_object() -> Self {
         Self::from_text("{}".to_owned()).expect("an empty object is valid JSON")
     }
@@ -44,7 +37,6 @@ impl<'de> Deserialize<'de> for RawJson {
     }
 }
 
-/// Appends one JSON value to the text as it's read.
 struct JsonText<'a>(&'a mut String);
 
 impl<'de> DeserializeSeed<'de> for JsonText<'_> {
@@ -87,8 +79,8 @@ impl<'de> Visitor<'de> for JsonText<'_> {
     }
 
     fn visit_f64<E: de::Error>(self, value: f64) -> Result<(), E> {
-        // JSON has no NaN or infinity, so they can't arrive from a real document.
-        self.0.push_str(&serde_json::to_string(&value).map_err(E::custom)?);
+        self.0
+            .push_str(&serde_json::to_string(&value).map_err(E::custom)?);
         Ok(())
     }
 
@@ -157,9 +149,13 @@ mod tests {
 
     #[test]
     fn key_order_survives_a_tagged_enum() {
-        let text = r#"{"type":"Holder","input":{"z":1,"a":[true,null,{"y":"é\n","b":1.5}],"m":{}}}"#;
+        let text =
+            r#"{"type":"Holder","input":{"z":1,"a":[true,null,{"y":"é\n","b":1.5}],"m":{}}}"#;
         let Tagged::Holder { input } = serde_json::from_str(text).unwrap();
-        assert_eq!(input.get(), r#"{"z":1,"a":[true,null,{"y":"é\n","b":1.5}],"m":{}}"#);
+        assert_eq!(
+            input.get(),
+            r#"{"z":1,"a":[true,null,{"y":"é\n","b":1.5}],"m":{}}"#
+        );
     }
 
     #[test]

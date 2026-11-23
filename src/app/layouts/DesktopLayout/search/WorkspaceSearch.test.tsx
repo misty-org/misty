@@ -24,7 +24,7 @@ vi.mock("@/features/settings", () => ({
   searchSettings: () => [],
   useSettingsStore: (select: (state: { settings: null }) => unknown) => select({ settings: null }),
 }));
-vi.mock("../spaceNavigation", () => ({
+vi.mock("../space_navigation", () => ({
   agentChatRoute: (agent: string, chat?: string) => `/agents?agent=${agent}&conversation=${chat}`,
   openNewChat: vi.fn(),
   openWorkspaceRoute: (route: string) => calls.routes.push(route),
@@ -100,7 +100,7 @@ vi.mock("@/features/spaces", () => {
   };
 });
 
-import { useSearchDialog } from "./searchStore";
+import { useSearchDialog } from "./search_store";
 import { WorkspaceSearch } from "./WorkspaceSearch";
 
 let host: HTMLDivElement;

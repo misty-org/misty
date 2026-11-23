@@ -14,25 +14,22 @@ import {
   Text,
   Tooltip,
 } from "@misty/ui";
-import { currentSpaceKey } from "../../engines/enginesApi";
-import { useMistyStore } from "../../conversations/state/useMistyStore";
-import { multirunFolderOf } from "../../multirun/multirunFolders";
-import { useChatFolders } from "../../shared-folders/chatFolder";
-import { useTerminalStore } from "../terminal/terminalStore";
-import { defaultBaseRef, dirNameOf } from "./prInput";
-import { worktreeApi, type BranchInfo, type WorktreeInfo } from "./worktreeApi";
-import { useWorktreeStore } from "./worktreeStore";
+import { currentSpaceKey } from "../../engines/engines_api";
+import { useMistyStore } from "../../conversations/state/use_misty_store";
+import { multirunFolderOf } from "../../multirun/multirun_folders";
+import { useChatFolders } from "../../shared-folders/chat_folder";
+import { useTerminalStore } from "../terminal/terminal_store";
+import { defaultBaseRef, dirNameOf } from "./pr_input";
+import { worktreeApi, type BranchInfo, type WorktreeInfo } from "./worktree_api";
+import { useWorktreeStore } from "./worktree_store";
 
-/** What removing would lose, read before the dialog offers to: `null` while it is read. */
 interface Preflight {
   uncommitted: number;
   samples: string[];
   unpushed: number;
-  /** Unknown (no branch, or the check failed): no line for it. */
   merged: boolean | null;
 }
 
-/** The warning lines for what removing would lose. */
 export function warningsFor(
   preflight: Preflight | null,
   branch: string | null,
@@ -57,7 +54,6 @@ export function warningsFor(
   return warnings;
 }
 
-/** What removing would lose or stop, beside an amber warning mark. */
 function Warning({ alert = false, children }: { alert?: boolean; children: ReactNode }) {
   return (
     <Surface
@@ -78,10 +74,6 @@ function Warning({ alert = false, children }: { alert?: boolean; children: React
 
 const samePath = (a: string, b: string) => a.replace(/[\\/]+$/, "") === b.replace(/[\\/]+$/, "");
 
-/**
- * Whether something works in the worktree now: a chat's reply running there (a multi-run lane's,
- * or any chat whose folder it is), or a terminal open in it.
- */
 function useWorktreeBusy(path: string, open: boolean): boolean {
   const terminals = useTerminalStore((s) =>
     Object.values(s.tabsByChat).some((tabs) => tabs.some((tab) => samePath(tab.folder, path))),
@@ -108,12 +100,6 @@ function useWorktreeBusy(path: string, open: boolean): boolean {
   return terminals || runHere;
 }
 
-/**
- * Removing a worktree, said plainly: what is uncommitted, unpushed or unmerged is listed first,
- * and the branch stays unless the person ticks it. A reply running there or an open terminal is
- * said too, since removing the folder ends what works in it. The removal runs in the background and the
- * dialog closes at once. A locked worktree can't be removed.
- */
 export function DeleteWorktreeDialog({
   folder,
   worktree,
@@ -121,7 +107,6 @@ export function DeleteWorktreeDialog({
   open,
   onOpenChange,
 }: {
-  /** The linked folder the worktree belongs to. */
   folder: string;
   worktree: WorktreeInfo;
   branches: BranchInfo[];
@@ -187,7 +172,6 @@ export function DeleteWorktreeDialog({
             {worktree.lockReason || "Git has locked this worktree, so it can't be removed"}
           </Warning>
         ) : !preflight ? (
-          // Git is asked what removing it would lose: a box the size of its one-line answer.
           <Skeleton className="h-10 rounded-lg" />
         ) : warnings.length ? (
           <Warning>

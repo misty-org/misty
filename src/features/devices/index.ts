@@ -1,2 +1,1 @@
-// Public surface used by other features.
-export { devicesNative } from "./api/native-devices";
+export { devicesNative } from "./api/native_devices";

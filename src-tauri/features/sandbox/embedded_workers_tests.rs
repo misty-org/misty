@@ -1,4 +1,3 @@
-//! The embedded document worker, run through the documents crate.
 use documents::windows::process;
 use std::sync::atomic::AtomicBool;
 

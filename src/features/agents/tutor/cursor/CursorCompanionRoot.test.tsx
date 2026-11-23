@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
-vi.mock("@tauri-apps/api/event", () => ({ emit: mocks.emit }));
+vi.mock("@tauri-apps/api/event", () => ({ emit: mocks.emit, listen: async () => () => {} }));
 vi.mock("@tauri-apps/api/webview", () => ({
   getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }),
 }));
@@ -77,10 +77,8 @@ it("shows the cursor exactly while the presentation says so", async () => {
     });
   };
   expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_snapshot");
-  // Startup must work without a subsequent presentation broadcast.
   sample(0, 100);
   expect(group.style.opacity).toBe("1");
-  // A still pointer doesn't hide it; the turn decides.
   sample(3000, 100);
   expect(group.style.opacity).toBe("1");
   for (const phase of ["listening", "processing", "responding"] as const) {
@@ -91,9 +89,7 @@ it("shows the cursor exactly while the presentation says so", async () => {
   present(true, "idle", "Request failed");
   sample(10_000, 120);
   expect(group.style.opacity).toBe("1");
-  expect(container.querySelector(".cursor-error-bubble")?.textContent).toContain(
-    "Open Agents to retry",
-  );
+  expect(container.querySelector(".cursor-error-bubble")?.textContent).toContain("Request failed");
   present(false, "idle", "Request failed");
   sample(11_000, 140);
   expect(group.style.opacity).toBe("0");
@@ -168,7 +164,6 @@ it("marks the exact spot, says the step, and holds a walkthrough step until it i
   expect(container.querySelector(".cursor-point-bubble")?.textContent).toBe(
     "Step 1 of 2: click Commit",
   );
-  // The bubble sits beside the ring instead of covering it.
   const group = container.querySelector<HTMLElement>(".cursor-group")!;
   const [x] = /translate\(([\d.]+)px/.exec(group.style.transform)!.slice(1).map(Number);
   expect(x - 16).toBeGreaterThan(411);
@@ -212,12 +207,10 @@ it("rests beside the pointer while it shows, and goes away with it", async () =>
   };
   sample(0, { cursorShown: true });
   expect(group.style.opacity).toBe("1");
-  // An app hid the pointer (typing, a video): Misty goes with it.
   sample(16, { cursorShown: false });
   expect(group.style.opacity).toBe("0");
   sample(32, { cursorShown: true });
   expect(group.style.opacity).toBe("1");
-  // Typing and a full-screen app send her away too.
   sample(48, { cursorShown: true, typing: true });
   expect(group.style.opacity).toBe("0");
   sample(64, { cursorShown: true, fullscreen: true });

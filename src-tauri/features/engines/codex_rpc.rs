@@ -1,13 +1,3 @@
-//! Short conversations with the person's own `codex app-server`, out of turn: start it, shake
-//! hands, make a few calls in order, stop it. A chat's turns each start their own app-server
-//! (`codex_app.rs`), so nothing is running between them to ask; a command that reads or changes
-//! a thread, the config or the account starts one here instead.
-//!
-//! [`chat_command`] builds the process exactly as a chat's turn would (the same program, the
-//! current channel's flags and env, the person's own variables and provider credentials), so
-//! a command sees the threads and settings its turns do. Callers with their own needs (the
-//! usage-limits reader) build the command themselves and hand it to [`Session::start`].
-
 use std::collections::VecDeque;
 use std::path::Path;
 use std::process::Stdio;
@@ -24,23 +14,16 @@ use super::qoder_session::{
 };
 use super::{read_line_capped, LineRead};
 
-/// Notifications kept while a call waits for its reply, for a later [`Session::next_notification`].
-/// Only the newest are kept: a caller that never reads them must not grow the backlog for ever.
 const BACKLOG: usize = 512;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum RpcError {
-    /// No Codex CLI could be started on this computer.
     NotInstalled,
-    /// Codex answered the call with a JSON-RPC error.
     Refused { code: i64, message: String },
-    /// Codex could not be started, stopped before answering, or took too long.
     Failed(String),
 }
 
 impl RpcError {
-    /// Whether Codex refused because the thread isn't loaded in this process. A thread is
-    /// loaded by resuming it; some calls only work on a loaded thread.
     pub(crate) fn thread_not_loaded(&self) -> bool {
         match self {
             Self::Refused { message, .. } => {
@@ -65,8 +48,6 @@ impl std::fmt::Display for RpcError {
     }
 }
 
-/// The app-server command a chat's turn starts with, working in `folder` (the home folder
-/// when the chat has none).
 pub(crate) async fn chat_command(folder: Option<&Path>) -> Result<Command, RpcError> {
     let workspace = folder
         .map(Path::to_path_buf)
@@ -92,13 +73,10 @@ pub(crate) async fn chat_command(folder: Option<&Path>) -> Result<Command, RpcEr
     .map_err(RpcError::Failed)?;
     let mut command = launch.built.command;
     command.current_dir(&workspace);
-    // A turn resolves the provider's credentials just before it spawns; so does this.
     super::codex_provider_env::apply(&mut command).await;
     Ok(command)
 }
 
-/// One running app-server, after `initialize`. Dropping it stops the process and everything
-/// it started (MCP servers included).
 pub(crate) struct Session {
     child: Child,
     pid: Option<u32>,
@@ -113,10 +91,6 @@ pub(crate) struct Session {
 }
 
 impl Session {
-    /// Starts `command` (a complete `codex … app-server` line) and shakes hands. Every call
-    /// after this has to be answered within `limit` of now, unless [`Session::allow`] gives more.
-    /// `experimental` opts into the app-server's experimental API, which some methods and
-    /// fields need.
     pub(crate) async fn start(
         mut command: Command,
         experimental: bool,
@@ -171,13 +145,10 @@ impl Session {
         Ok(session)
     }
 
-    /// Gives what follows `limit` from now, for a call that can take long (a turn).
     pub(crate) fn allow(&mut self, limit: Duration) {
         self.deadline = Instant::now() + limit;
     }
 
-    /// Calls `method` and returns its result. Notifications that arrive first are kept for
-    /// [`Session::next_notification`]; requests from Codex are declined.
     pub(crate) async fn call(&mut self, method: &str, params: Value) -> Result<Value, RpcError> {
         let id = self.next_id;
         self.next_id += 1;
@@ -207,7 +178,6 @@ impl Session {
         }
     }
 
-    /// The next notification (`{method, params}`), the kept ones first.
     pub(crate) async fn next_notification(&mut self) -> Result<Value, RpcError> {
         if let Some(message) = self.backlog.pop_front() {
             return Ok(message);
@@ -225,7 +195,6 @@ impl Session {
         }
     }
 
-    /// Stops the app-server and everything it started.
     pub(crate) async fn stop(mut self) {
         if let Some(pid) = self.pid.take() {
             super::kill_process_group(pid);
@@ -233,8 +202,6 @@ impl Session {
         let _ = tokio::time::timeout(Duration::from_secs(5), self.child.wait()).await;
     }
 
-    /// A notification is kept; a request from Codex (an approval, a question) is declined at
-    /// once, since nobody is there to answer it and Codex would wait for ever.
     async fn keep(&mut self, message: Value) -> Result<(), RpcError> {
         if message.get("id").is_some_and(|id| !id.is_null()) {
             return self.decline(&message).await;
@@ -263,7 +230,6 @@ impl Session {
         self.stdin.flush().await.map_err(stopped)
     }
 
-    /// The next JSON message on stdout, skipping anything that isn't JSON.
     async fn read(&mut self) -> Result<Value, RpcError> {
         loop {
             let read = timeout_at(
@@ -292,8 +258,6 @@ impl Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
-        // An early return (a refused call, a timeout) must not leave the app-server or its MCP
-        // servers running; `kill_on_drop` alone only reaches the direct child.
         if let Some(pid) = self.pid.take() {
             super::kill_process_group(pid);
         }

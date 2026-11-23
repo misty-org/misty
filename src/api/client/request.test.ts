@@ -14,7 +14,7 @@ import { configureApiSession } from "./session";
 beforeEach(() => {
   vi.restoreAllMocks();
   session.transitioning = false;
-  session.generation++; // Each test starts a new authenticated session.
+  session.generation++;
   configureApiSession({
     isTransitioning: () => session.transitioning,
     readGeneration: () => session.generation,

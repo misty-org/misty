@@ -7,18 +7,11 @@ import {
   Text,
 } from "@misty/ui";
 import { StepsSkeleton } from "../activity/StepsSkeleton";
-import type { ContextPanelSurface } from "./contextPanelStore";
+import type { ContextPanelSurface } from "./context_panel_store";
 import { fileName } from "./files/paths";
-
-/*
- * The context panel's first paint, before a view's code or its first read has arrived: each one
- * shaped like the view that replaces it, row for row, so nothing moves when it does.
- */
 
 const nameWidths = ["w-2/5", "w-1/2", "w-1/3", "w-3/5", "w-1/4", "w-2/5", "w-1/2", "w-1/3"];
 
-/** The folder's tools at the end of the panel's header row: worktrees, the launch script, and
- * the app the folder opens in (an icon with its menu's chevron). */
 export function FolderToolsSkeleton() {
   return (
     <SidePanelHeader>
@@ -35,8 +28,6 @@ export function FolderToolsSkeleton() {
   );
 }
 
-/** The file tree's rows: the folder's own row, then its top level, one indent in. It sits in the
- * tree's scroll area, which has the rows' top and bottom inset. */
 export function FileTreeSkeleton({ rows = 12 }: { rows?: number }) {
   return (
     <div role="status" aria-label="Files" aria-busy="true" className="grid px-1">
@@ -55,10 +46,6 @@ export function FileTreeSkeleton({ rows = 12 }: { rows?: number }) {
   );
 }
 
-/**
- * An open file before its text is first read: the editor's bar with the file's own name, then
- * one spinner where its text goes, since a file's lines aren't known until they're read.
- */
 export function EditorSkeleton({ path }: { path: string }) {
   const name = fileName(path);
   return (
@@ -71,8 +58,6 @@ export function EditorSkeleton({ path }: { path: string }) {
   );
 }
 
-/** The Git changes list: the summary bar, a group's head, then its file rows (tick, letter,
- * name, line counts). */
 export function ChangesSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div role="status" aria-label="Changes" aria-busy="true" className="grid">
@@ -103,7 +88,6 @@ export function ChangesSkeleton({ rows = 6 }: { rows?: number }) {
   );
 }
 
-/** The changes view's header row: the branch, then list or tree, refresh, pull and push. */
 function ChangesHeadSkeleton() {
   return (
     <SidePanelHeader>
@@ -120,15 +104,10 @@ function ChangesHeadSkeleton() {
   );
 }
 
-/** A terminal starting is a tool getting ready, so it says so in words. */
 function TerminalSkeleton() {
   return <SetupState tool="terminal" />;
 }
 
-/**
- * The open view's skeleton, with the folder's tools in the header for the views a folder has.
- * `tools` is false where the panel already shows them.
- */
 export function ContextPanelSkeleton({
   tab,
   tools = true,

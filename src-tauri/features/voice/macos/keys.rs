@@ -1,5 +1,3 @@
-//! The Accessibility check, the frontmost app, and the Command+V that pastes dictated text.
-
 use objc2::rc::autoreleasepool;
 use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{kAXTrustedCheckOptionPrompt, AXIsProcessTrustedWithOptions};
@@ -8,10 +6,8 @@ use objc2_core_graphics::{
     CGEvent, CGEventFlags, CGEventSource, CGEventSourceStateID, CGEventTapLocation,
 };
 
-/// `kVK_ANSI_V`.
 const KEY_V: u16 = 9;
 
-/// Pasting into another app needs Accessibility; `prompt` shows the system prompt if it's missing.
 pub(crate) fn accessibility_trusted(prompt: bool) -> bool {
     // SAFETY: the dictionary maps the documented prompt key to a CFBoolean.
     unsafe {
@@ -42,7 +38,6 @@ pub(crate) fn post_command_v() -> bool {
     let (Some(down), Some(up)) = (down, up) else {
         return false;
     };
-    // Only Command: the person's own modifiers were released before this.
     CGEvent::set_flags(Some(&down), CGEventFlags::MaskCommand);
     CGEvent::set_flags(Some(&up), CGEventFlags::MaskCommand);
     CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&down));

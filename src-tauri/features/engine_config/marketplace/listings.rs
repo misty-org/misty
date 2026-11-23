@@ -1,7 +1,3 @@
-//! Listing the plugins of the engines whose CLIs don't answer like Claude Code and Codex: Oh My
-//! Pi, Qoder, CodeBuddy and MiniMax, and Gemini CLI and Qwen Code, which install from Gemini's
-//! public extension gallery.
-
 use serde_json::Value;
 use std::time::Duration;
 
@@ -9,14 +5,10 @@ use super::parse::{author, text, valid_name, MarketItem, MarketSource};
 use super::parse_more::*;
 use super::{parse_json, plugin_word, run_ok, LIST_LIMIT};
 
-/// Gemini's public extension gallery: every extension it lists, ranked by GitHub stars.
 const GALLERY_URL: &str = "https://geminicli.com/extensions.json";
-/// The gallery changes daily at most; it's read again after this long.
 const GALLERY_KEPT: Duration = Duration::from_secs(60 * 60);
-/// The gallery is a couple of megabytes; anything far bigger is not it.
 const GALLERY_LIMIT: usize = 16 << 20;
 
-/// Oh My Pi lists what it has installed as JSON, and each marketplace's plugins as text.
 pub(super) async fn list_omp() -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {
     let (installed, sources) = tokio::join!(
         run_ok("omp", &["plugin", "list", "--json"], LIST_LIMIT),
@@ -34,26 +26,19 @@ pub(super) async fn list_omp() -> Result<(Vec<MarketItem>, Vec<MarketSource>), S
     Ok((items, sources))
 }
 
-/// Qoder, CodeBuddy and MiniMax: Claude-style `plugin list --available --json`. CodeBuddy's docs
-/// show `--json` but not `--available`, so a refusal falls back to the installed list.
 pub(super) async fn list_loose(
     engine: &'static str,
 ) -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {
     let word = plugin_word(engine);
     let available = [word, "list", "--available", "--json"];
     let installed = [word, "list", "--json"];
-    // CodeBuddy's `marketplace list` takes no `--json` and prints JSON without it.
     let marketplaces: &[&str] = if engine == "codebuddy" {
         &[word, "marketplace", "list"]
     } else {
         &[word, "marketplace", "list", "--json"]
     };
-    // One after the other: MiniMax's first run sets up its home, and two at once race on its
-    // config file (EEXIST), which failed the plugin list and showed an empty marketplace.
     let plugins = match run_ok(engine, &available, LIST_LIMIT).await {
         Ok(output) => parse_json(engine, &output)?,
-        // Only what's installed, so everything on it is; CodeBuddy's offers come from the
-        // catalogs it keeps.
         Err(_) => {
             let installed = parse_json(engine, &run_ok(engine, &installed, LIST_LIMIT).await?)?;
             let installed = match installed {
@@ -79,7 +64,6 @@ pub(super) async fn list_loose(
     Ok((loose_items(engine, &plugins), sources))
 }
 
-/// A marketplace catalog (`.claude-plugin/marketplace.json`); Claude's official one is ~200 KB.
 const CATALOG_LIMIT: u64 = 8 << 20;
 
 pub(super) fn read_json(path: &std::path::Path) -> Option<Value> {
@@ -89,9 +73,6 @@ pub(super) fn read_json(path: &std::path::Path) -> Option<Value> {
     serde_json::from_slice(&file_access::fs::read(path).ok()?).ok()
 }
 
-/// What CodeBuddy's marketplaces offer. Its `plugin list` shows only what's installed, so the
-/// plugins come from the catalog it keeps of each marketplace it knows
-/// (`~/.codebuddy/plugins/known_marketplaces.json`), each with its `name@marketplace` id.
 fn codebuddy_catalogs() -> Vec<Value> {
     let plugins = crate::engine_config::support::home_dir()
         .join(".codebuddy")
@@ -105,8 +86,6 @@ fn codebuddy_catalogs() -> Vec<Value> {
             .as_str()
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| plugins.join("marketplaces").join(&marketplace));
-        // CodeBuddy keeps the catalog in `.codebuddy-plugin`; one copied from Claude Code's form
-        // keeps `.claude-plugin`.
         let Some(catalog) = [".codebuddy-plugin", ".claude-plugin"]
             .iter()
             .find_map(|dir| read_json(&folder.join(dir).join("marketplace.json")))
@@ -126,9 +105,6 @@ fn codebuddy_catalogs() -> Vec<Value> {
     offered
 }
 
-/// What Claude Code's plugin list leaves out: who made each plugin, and a page for one that lives
-/// inside its marketplace's own repository (`./plugins/code-review`). Both come from the catalog
-/// Claude Code keeps of each marketplace it knows (`~/.claude/plugins/known_marketplaces.json`).
 pub(super) fn claude_catalog_details(items: &mut [MarketItem]) {
     let plugins = crate::engine_config::support::claude_home().join("plugins");
     let Some(Value::Object(known)) = read_json(&plugins.join("known_marketplaces.json")) else {
@@ -144,7 +120,6 @@ pub(super) fn claude_catalog_details(items: &mut [MarketItem]) {
         else {
             continue;
         };
-        // A GitHub marketplace: its plugins' folders have pages on GitHub.
         let repo = text(&entry["source"], "repo").filter(|repo| valid_repo(repo));
         for plugin in catalog["plugins"].as_array().into_iter().flatten() {
             let Some(name) = plugin["name"].as_str() else {
@@ -174,7 +149,6 @@ pub(super) fn claude_catalog_details(items: &mut [MarketItem]) {
     }
 }
 
-/// `owner/name` on GitHub.
 fn valid_repo(repo: &str) -> bool {
     let mut parts = repo.split('/');
     let ok = |part: Option<&str>| {
@@ -188,7 +162,6 @@ fn valid_repo(repo: &str) -> bool {
     ok(parts.next()) && ok(parts.next()) && parts.next().is_none()
 }
 
-/// A folder inside a repository, written plainly: no `..`, no leading `/`, nothing to escape.
 fn valid_folder(path: &str) -> bool {
     !path.is_empty()
         && !path.starts_with('/')
@@ -204,8 +177,6 @@ fn valid_folder(path: &str) -> bool {
 static GALLERY: std::sync::Mutex<Option<(std::time::Instant, std::sync::Arc<Value>)>> =
     std::sync::Mutex::new(None);
 
-/// Gemini's extension gallery, kept for an hour. It's public: nothing about the person goes with
-/// the request.
 async fn gallery() -> Result<std::sync::Arc<Value>, String> {
     if let Some((at, value)) = GALLERY
         .lock()
@@ -237,7 +208,6 @@ async fn gallery() -> Result<std::sync::Arc<Value>, String> {
     Ok(value)
 }
 
-/// Where an engine keeps its extensions, and the manifest and install-record names it uses.
 fn extension_folder(engine: &str) -> (std::path::PathBuf, &'static [&'static str]) {
     match engine {
         "gemini" => (
@@ -252,7 +222,6 @@ fn extension_folder(engine: &str) -> (std::path::PathBuf, &'static [&'static str
     }
 }
 
-/// The extensions an engine has installed, from each folder's manifest and install record.
 fn installed_extensions(engine: &str) -> Vec<InstalledExtension> {
     let (folder, manifests) = extension_folder(engine);
     let Ok(entries) = file_access::fs::read_dir(&folder) else {
@@ -292,7 +261,6 @@ fn installed_extensions(engine: &str) -> Vec<InstalledExtension> {
         .collect()
 }
 
-/// Gemini CLI and Qwen Code: the gallery, with what the engine has installed marked.
 pub(super) async fn list_gallery(
     engine: &'static str,
 ) -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {

@@ -21,10 +21,7 @@ function ViewHeader({ name, meta }: { name: string; meta?: string }) {
   );
 }
 
-/** An image file: its picture, its size in pixels and bytes. The webview loads `src` itself; the
- * bytes never cross IPC. */
 export function ImageFileView({ name, src, size }: { name: string; src: string; size: number }) {
-  // Tagged with the URL, so an old decode or failure never shows for the next image.
   const [loaded, setLoaded] = useState<{ url: string; width: number; height: number } | null>(null);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const current = loaded && loaded.url === src ? loaded : null;

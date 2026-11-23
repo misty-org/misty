@@ -23,7 +23,6 @@ use super::transfer::keep_both_name;
 use super::undo::{record, Change};
 use super::{asked_path, blocking, display_name, failed, person_window};
 
-/// `name` in `dir`, or Finder's "name 2" when it is taken.
 pub(crate) fn free_name(dir: &Path, name: &str) -> PathBuf {
     let wanted = dir.join(name);
     if fs_disk::exists(&wanted) {
@@ -37,16 +36,12 @@ fn new_op_id() -> String {
     format!("files-{}", uuid::Uuid::new_v4())
 }
 
-// ── Compress ────────────────────────────────────────────────────────────────────────────────────
-
 enum Item {
     Folder,
     File(u64),
     Link(String),
 }
 
-/// What goes into the zip: every item under each source, named from the folder the sources are
-/// in, links kept as links. `.DS_Store` files stay out, as Finder leaves them.
 fn plan(sources: &[PathBuf]) -> Result<Vec<(PathBuf, String, Item)>, String> {
     let mut items = Vec::new();
     for source in sources {
@@ -76,7 +71,6 @@ fn plan(sources: &[PathBuf]) -> Result<Vec<(PathBuf, String, Item)>, String> {
     Ok(items)
 }
 
-/// A path inside an archive, with `/` between its parts. None for one that would leave it.
 fn entry_name(relative: &Path) -> Option<String> {
     safe_relative(&relative.to_string_lossy()).map(|path| {
         path.components()
@@ -86,7 +80,6 @@ fn entry_name(relative: &Path) -> Option<String> {
     })
 }
 
-/// A file's modified time as a zip keeps it, in local time to the even second.
 fn zip_time(path: &Path) -> Option<zip::DateTime> {
     use chrono::{Datelike, Timelike};
     let modified = fs_disk::symlink_metadata(path).ok()?.modified().ok()?;
@@ -119,8 +112,11 @@ fn options_for(path: &Path, size: u64) -> SimpleFileOptions {
     options
 }
 
-/// Writes the zip; false when it was cancelled part way.
-fn write_zip(target: &Path, items: &[(PathBuf, String, Item)], mut op: Option<&mut Op>) -> Result<bool, String> {
+fn write_zip(
+    target: &Path,
+    items: &[(PathBuf, String, Item)],
+    mut op: Option<&mut Op>,
+) -> Result<bool, String> {
     let file = fs_disk::create_new(target).map_err(|error| failed(target, error))?;
     let mut writer = ZipWriter::new(file);
     let stopped = |op: &Option<&mut Op>| op.as_ref().is_some_and(|op| op.cancelled());
@@ -142,11 +138,14 @@ fn write_zip(target: &Path, items: &[(PathBuf, String, Item)], mut op: Option<&m
                 let mut source = fs_disk::open(path).map_err(|error| failed(path, error))?;
                 let mut buffer = vec![0u8; 256 * 1024];
                 loop {
-                    let read = source.read(&mut buffer).map_err(|error| failed(path, error))?;
+                    let read = source
+                        .read(&mut buffer)
+                        .map_err(|error| failed(path, error))?;
                     if read == 0 {
                         break;
                     }
-                    io::Write::write_all(&mut writer, &buffer[..read]).map_err(|error| failed(path, error))?;
+                    io::Write::write_all(&mut writer, &buffer[..read])
+                        .map_err(|error| failed(path, error))?;
                     if let Some(op) = op.as_mut() {
                         op.advance(read as u64, name);
                     }
@@ -161,17 +160,28 @@ fn write_zip(target: &Path, items: &[(PathBuf, String, Item)], mut op: Option<&m
     Ok(true)
 }
 
-/// Compresses `sources` (all in one folder) into a zip beside them, as one step of Undo, and
-/// returns the zip's path. With `app`, it reports on `files://progress` and can be cancelled.
 pub(crate) fn compress(app: Option<&AppHandle>, sources: &[PathBuf]) -> Result<PathBuf, String> {
-    let first = sources.first().ok_or_else(|| "Choose something to compress.".to_owned())?;
-    let dir = first.parent().ok_or_else(|| failed(first, "it can't be compressed"))?;
+    let first = sources
+        .first()
+        .ok_or_else(|| "Choose something to compress.".to_owned())?;
+    let dir = first
+        .parent()
+        .ok_or_else(|| failed(first, "it can't be compressed"))?;
     let name = match sources {
         [one] => format!("{}.zip", display_name(one)),
         _ => "Archive.zip".to_owned(),
     };
     let items = plan(sources)?;
-    let total = items.iter().map(|(_, _, item)| if let Item::File(size) = item { *size } else { 0 }).sum::<u64>();
+    let total = items
+        .iter()
+        .map(|(_, _, item)| {
+            if let Item::File(size) = item {
+                *size
+            } else {
+                0
+            }
+        })
+        .sum::<u64>();
     let target = free_name(dir, &name);
     let mut op = app.map(|app| Op::start(app, &new_op_id(), "Compressing", total));
     let written = write_zip(&target, &items, op.as_mut());
@@ -193,7 +203,6 @@ pub(crate) fn compress(app: Option<&AppHandle>, sources: &[PathBuf]) -> Result<P
     }
 }
 
-/// Compresses `paths` (all in one folder) into a zip beside them; returns the zip's path.
 #[tauri::command]
 pub async fn files_compress(
     app: AppHandle,
@@ -201,24 +210,24 @@ pub async fn files_compress(
     paths: Vec<String>,
 ) -> Result<String, String> {
     person_window(&webview)?;
-    let sources = paths.iter().map(|path| asked_path(path)).collect::<Result<Vec<_>, _>>()?;
-    blocking(move || compress(Some(&app), &sources).map(|target| target.display().to_string())).await
+    let sources = paths
+        .iter()
+        .map(|path| asked_path(path))
+        .collect::<Result<Vec<_>, _>>()?;
+    blocking(move || compress(Some(&app), &sources).map(|target| target.display().to_string()))
+        .await
 }
-
-// ── Extract ─────────────────────────────────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Format {
     Zip,
     Tar,
     TarGz,
-    /// tar.bz2, tar.xz and the like, for the system's `tar`.
     OtherTar,
     SevenZip,
     Rar,
 }
 
-/// The format and the archive's name without its extension.
 fn format_of(name: &str) -> Option<(Format, &str)> {
     let lower = name.to_ascii_lowercase();
     let formats: [(&str, Format); 12] = [
@@ -236,11 +245,12 @@ fn format_of(name: &str) -> Option<(Format, &str)> {
         (".cbz", Format::Zip),
     ];
     formats.iter().find_map(|(ending, format)| {
-        lower.ends_with(ending).then(|| (*format, &name[..name.len() - ending.len()]))
+        lower
+            .ends_with(ending)
+            .then(|| (*format, &name[..name.len() - ending.len()]))
     })
 }
 
-/// A path from inside an archive, kept only if it stays inside: no root, no drive, no `..`.
 fn safe_relative(name: &str) -> Option<PathBuf> {
     let normalized = name.replace('\\', "/");
     let mut relative = PathBuf::new();
@@ -274,9 +284,14 @@ fn extract_zip(archive: &Path, folder: &Path) -> Result<(), String> {
     let file = fs_disk::open(archive).map_err(|error| failed(archive, error))?;
     let mut zip = ZipArchive::new(file).map_err(|error| failed(archive, error))?;
     for index in 0..zip.len() {
-        let mut entry = zip.by_index(index).map_err(|error| failed(archive, error))?;
+        let mut entry = zip
+            .by_index(index)
+            .map_err(|error| failed(archive, error))?;
         let Some(relative) = safe_relative(entry.name()) else {
-            return Err(failed(archive, "an item in it would land outside its folder"));
+            return Err(failed(
+                archive,
+                "an item in it would land outside its folder",
+            ));
         };
         if relative.starts_with("__MACOSX") || entry.is_symlink() {
             continue;
@@ -302,9 +317,16 @@ fn extract_tar(archive: &Path, folder: &Path, gzipped: bool) -> Result<(), Strin
     let mut tar = tar::Archive::new(reader);
     for entry in tar.entries().map_err(|error| failed(archive, error))? {
         let mut entry = entry.map_err(|error| failed(archive, error))?;
-        let name = entry.path().map_err(|error| failed(archive, error))?.to_string_lossy().into_owned();
+        let name = entry
+            .path()
+            .map_err(|error| failed(archive, error))?
+            .to_string_lossy()
+            .into_owned();
         let Some(relative) = safe_relative(&name) else {
-            return Err(failed(archive, "an item in it would land outside its folder"));
+            return Err(failed(
+                archive,
+                "an item in it would land outside its folder",
+            ));
         };
         let out = folder.join(relative);
         let kind = entry.header().entry_type();
@@ -318,7 +340,6 @@ fn extract_tar(archive: &Path, folder: &Path, gzipped: bool) -> Result<(), Strin
     Ok(())
 }
 
-/// The first of `tools` installed on this computer.
 fn installed(tools: &[&str]) -> Option<PathBuf> {
     tools.iter().find_map(|tool| which::which(tool).ok())
 }
@@ -337,13 +358,21 @@ fn run_tool(archive: &Path, mut command: Command) -> Result<(), String> {
         return Ok(());
     }
     let said = String::from_utf8_lossy(&output.stderr);
-    let line = said.lines().map(str::trim).find(|line| !line.is_empty()).unwrap_or("it couldn't be opened");
+    let line = said
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("it couldn't be opened");
     Err(failed(archive, line))
 }
 
-/// Hands the archive to an installed tool, which writes into `folder`.
 fn extract_with_tool(archive: &Path, folder: &Path, format: Format) -> Result<(), String> {
-    let missing = |tool: &str| failed(archive, format!("opening it needs {tool}, which isn't installed"));
+    let missing = |tool: &str| {
+        failed(
+            archive,
+            format!("opening it needs {tool}, which isn't installed"),
+        )
+    };
     match format {
         Format::OtherTar => {
             let tar = installed(&["tar"]).ok_or_else(|| missing("tar"))?;
@@ -354,16 +383,27 @@ fn extract_with_tool(archive: &Path, folder: &Path, format: Format) -> Result<()
         Format::SevenZip | Format::Rar => {
             let seven = installed(&["7z", "7zz", "7za"]);
             let unar = installed(&["unar"]);
-            let (first, second) = if format == Format::Rar { (unar, seven) } else { (seven, unar) };
+            let (first, second) = if format == Format::Rar {
+                (unar, seven)
+            } else {
+                (seven, unar)
+            };
             let mut command = match (first.or(second), format) {
                 (Some(tool), _) if tool.file_stem().is_some_and(|stem| stem == "unar") => {
                     let mut command = Command::new(tool);
-                    command.arg("-quiet").arg("-no-directory").arg("-output-directory").arg(folder);
+                    command
+                        .arg("-quiet")
+                        .arg("-no-directory")
+                        .arg("-output-directory")
+                        .arg(folder);
                     command
                 }
                 (Some(tool), _) => {
                     let mut command = Command::new(tool);
-                    command.arg("x").arg("-y").arg(format!("-o{}", folder.display()));
+                    command
+                        .arg("x")
+                        .arg("-y")
+                        .arg(format!("-o{}", folder.display()));
                     command
                 }
                 (None, _) => return Err(missing("7-Zip or The Unarchiver")),
@@ -375,17 +415,21 @@ fn extract_with_tool(archive: &Path, folder: &Path, format: Format) -> Result<()
     }
 }
 
-/// Extracts `archive` into a new folder beside it named after it, as one step of Undo, and
-/// returns the folder's path.
 pub(crate) fn extract(archive: &Path) -> Result<PathBuf, String> {
     let name = display_name(archive);
-    let (format, stem) = format_of(&name).ok_or_else(|| failed(archive, "it isn't an archive Files can open"))?;
-    let dir = archive.parent().ok_or_else(|| failed(archive, "it can't be opened here"))?;
+    let (format, stem) =
+        format_of(&name).ok_or_else(|| failed(archive, "it isn't an archive Files can open"))?;
+    let dir = archive
+        .parent()
+        .ok_or_else(|| failed(archive, "it can't be opened here"))?;
     check_disk(archive, Access::Read).map_err(|error| failed(archive, error))?;
-    let stem = if stem.trim().is_empty() { "Archive" } else { stem };
+    let stem = if stem.trim().is_empty() {
+        "Archive"
+    } else {
+        stem
+    };
     let folder = free_name(dir, stem);
     fs_disk::create_dir(&folder).map_err(|error| failed(&folder, error))?;
-    // A tool writes into the folder itself, so the gate checks it first.
     check_disk(&folder, Access::Write).map_err(|error| failed(&folder, error))?;
     let result = match format {
         Format::Zip => extract_zip(archive, &folder),
@@ -406,7 +450,6 @@ pub(crate) fn extract(archive: &Path) -> Result<PathBuf, String> {
     }
 }
 
-/// Extracts an archive into a new folder beside it, named after it; returns the folder's path.
 #[tauri::command]
 pub async fn files_extract(webview: tauri::Webview, path: String) -> Result<String, String> {
     person_window(&webview)?;

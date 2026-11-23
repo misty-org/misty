@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const saved = vi.hoisted(() => ({ state: null as unknown, revision: 0 }));
-vi.mock("@/shared/platform/nativeInvoke", () => ({
+vi.mock("@/shared/platform/native_invoke", () => ({
   invoke: vi.fn(async (command: string, args: { revision?: number; document?: unknown }) => {
     if (command === "settings_session_state")
       return { revision: saved.revision, state: saved.state };
@@ -16,7 +16,7 @@ vi.mock("@/shared/platform/nativeInvoke", () => ({
 }));
 
 const deployment = await import("@/api/deployment/api");
-const choice = await import("@/api/deployment/serverChoice");
+const choice = await import("@/api/deployment/server_choice");
 
 describe("hosted deployment routing", () => {
   beforeEach(() => localStorage.clear());
@@ -42,7 +42,7 @@ describe("hosted deployment routing", () => {
     saved.state = { version: 1, choice: { mode: "server", url: "http://127.0.0.1:8081/v1" } };
     vi.stubEnv("DEV", false);
     vi.resetModules();
-    const release = await import("@/api/deployment/serverChoice");
+    const release = await import("@/api/deployment/server_choice");
     expect(await release.loadServerChoice()).toBeNull();
     expect(release.currentApiBase()).toBe("");
     vi.unstubAllEnvs();
@@ -53,7 +53,7 @@ describe("hosted deployment routing", () => {
     saved.state = { version: 1, choice: chosen };
     vi.resetModules();
     const { invoke } = await import("@/native/invoke");
-    const fresh = await import("@/api/deployment/serverChoice");
+    const fresh = await import("@/api/deployment/server_choice");
     vi.useFakeTimers();
     try {
       vi.mocked(invoke)
@@ -72,7 +72,7 @@ describe("hosted deployment routing", () => {
     saved.state = { version: 1, choice: { mode: "server", url: "https://misty.example.org/v1" } };
     vi.resetModules();
     const { invoke } = await import("@/native/invoke");
-    const fresh = await import("@/api/deployment/serverChoice");
+    const fresh = await import("@/api/deployment/server_choice");
     vi.useFakeTimers();
     try {
       vi.mocked(invoke).mockClear();

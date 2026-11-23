@@ -46,29 +46,17 @@ use super::qoder_session::{
 };
 use super::{BuiltCommand, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
 
-/// The agent-initiated request that asks the user to choose. `session/update`
-/// notifications never carry it; it is the only method this driver parks.
 const ASK_METHOD: &str = "_x.ai/ask_user_question";
-/// grok's answer outcomes (`accepted | chat_about_this | skip_interview |
-/// cancelled`). A dismissal maps to `cancelled`, which the CLI turns into
-/// "carry on with your best judgment".
 const ACCEPTED_OUTCOME: &str = "accepted";
 const DISMISS_OUTCOME: &str = "cancelled";
 
-/// Per-turn projection state: usage from the prompt result (the Done payload)
-/// and the tool names seen at tool_call start, so a later name-less
-/// tool_call_update can patch the row it belongs to.
 #[derive(Default)]
 struct TurnView {
     last_usage: Option<Value>,
     tool_names: HashMap<String, String>,
-    /// Antigravity's sub-agents, read from their own transcripts (`agy_subagents.rs`). While it
-    /// is set, tool rows carry the agent's call ids, so a sub-agent's rows nest under its call.
     subagents: Option<super::agy::Subagents>,
 }
 
-/// Shows what Antigravity's sub-agents did since the last look (`now` skips the wait between
-/// looks).
 fn follow_subagents(
     core: &TurnCore,
     state: &mut TurnState,
@@ -87,11 +75,6 @@ fn follow_subagents(
     moved
 }
 
-/// Drive one send as a grok ACP turn. Mirrors the shared settle contract
-/// (qoder/dsh): events until a terminal done/error, pending question cards
-/// settled first, then this run's registry entries drained. Transport and rpc
-/// failures surface as `EngineEvent::Error` — except on interrupt, where the
-/// partial output commits as a normal turn end.
 pub(super) async fn run_acp_turn(
     core: TurnCore,
     mut req: SendRequest,
@@ -110,9 +93,6 @@ pub(super) async fn run_acp_turn(
     let mut state = TurnState::new(req.session_id.clone());
     let mut view = TurnView::default();
     let preassigned_session_id = req.session_id.clone();
-    // Abort-safe backstop: the by-name removals below only run when the task
-    // finishes normally. An abort or a panic would otherwise leave this run's
-    // keys pinning a concurrency slot until app exit.
     let _registry_guard =
         VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
     let mut cleanup_files = cleanup_files;
@@ -126,10 +106,6 @@ pub(super) async fn run_acp_turn(
         &mut cleanup_files,
     )
     .await;
-    // Pending questions and parked plan reviews die with the turn: settle the
-    // cards and expire the reviews BEFORE any terminal dispatch, or the
-    // monotonic saw_done/saw_error guard in dispatch_event would drop these
-    // and leave answerable surfaces pointing at a settled turn.
     let parked_keys = [
         state.native_session_id.clone(),
         Some(core.run_id.clone()),
@@ -151,8 +127,6 @@ pub(super) async fn run_acp_turn(
         core.dispatch_event(&mut state, EngineEvent::Done { session_id, usage });
     }
     core.registry.remove_if_pid(&core.run_id, virtual_pid);
-    // A resumed conversation was keyed under the incoming session id, and the
-    // handshake may have rekeyed it to the CLI's own id: drop both aliases.
     if let Some(session_id) = state.native_session_id.clone() {
         core.registry.remove_if_pid(&session_id, virtual_pid);
     }
@@ -160,19 +134,9 @@ pub(super) async fn run_acp_turn(
         core.registry.remove_if_pid(&session_id, virtual_pid);
     }
     core.sink.flush();
-    // The staged GROK_HOME channel dir holds this send's credentials and is
-    // private to this run; the CLI is gone, so nothing may read it again.
-    // Misty: a process kept warm took its files along (`warm.rs`), removed when it ends; a
-    // warm process this turn reused never read this send's.
     super::cleanup_staged_files(&cleanup_files);
 }
 
-/// Shared settle contract for every key this run was registered under
-/// (native session id, run id, preassigned alias): pending question cards are
-/// settled first, then parked plan reviews expire with the run (the settle duty of
-/// ccgui's plan-review design). kimi never parks plan events, so the expiry is always a
-/// no-op on that path; calling it unconditionally keeps the shared driver
-/// honest if either engine ever parks a plan.
 fn settle_parked(core: &TurnCore, state: &mut TurnState, keys: [Option<String>; 3]) {
     for key in keys.into_iter().flatten() {
         for request_id in core.registry.take_questions(&key) {
@@ -191,24 +155,17 @@ async fn turn_inner(
     killed: &Arc<AtomicBool>,
     cleanup_files: &mut Vec<PathBuf>,
 ) -> Result<(), String> {
-    // Misty: the chat's process from its last turn, still on this session, takes the prompt
-    // straight away (`warm.rs`); otherwise one starts and opens the session.
     let fingerprint = super::warm::claim(&core.run_id);
     let mut warm = match super::warm::take_acp(core, req, fingerprint) {
         Some(warm) => warm,
         None => {
             let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
             spawned.acp.reports_as = Some(core.engine_id.clone());
-            // The registry entry exists before this task runs, so a parked question's
-            // answer always finds this child's stdin (and the session-id alias clones
-            // it later, making `answer_question` work by either key).
             core.registry
                 .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
             let (session_id, effort) = match handshake(&mut spawned.acp, core, req, killed).await {
                 Ok(opened) => opened,
                 Err(error) => {
-                    // ACP is a session protocol: the CLI stays resident after the prompt
-                    // response, so every exit path tears the tree down.
                     teardown(&mut spawned.child).await;
                     return Err(terminal_message(error, &spawned.stderr_buf));
                 }
@@ -239,15 +196,11 @@ async fn turn_inner(
     )
     .await
     .map_err(|error| terminal_message(error, &warm.item.spawned.stderr_buf));
-    // A clean turn leaves the process warm for the chat's next message; anything else ends it.
     let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
     super::warm::park_acp(core, req, fingerprint, clean, warm);
     result
 }
 
-/// Opens the turn's session on a new process: `initialize`, then the session re-attached (or a
-/// new one), with the model and mode an engine takes over ACP. Returns the session id and the
-/// effort the handshake reported.
 async fn handshake(
     acp: &mut AcpProcess,
     core: &TurnCore,
@@ -268,30 +221,25 @@ async fn handshake(
             &mut |_| None,
         )
         .await?;
-    // Antigravity takes HTTP servers without listing them in its capabilities.
     let agent = match core.engine_id.as_str() {
         "agy" => super::agy::mcp_capable(&agent),
         _ => agent,
     };
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
-    // Kimi and Antigravity set their model, effort and mode in their own handshakes.
     let (session_id, effort) = match core.engine_id.as_str() {
         "kimi" => super::kimi_acp::attach_session(acp, req, servers, killed).await?,
         "agy" => super::agy::attach_session(acp, req, servers, killed).await?,
         _ => (attach_session(acp, req, servers, killed).await?, None),
     };
-    // Hermes takes the chosen model over ACP (`set_session_model`); the others take it as a flag.
     if let Some(model) = req.model.as_deref().filter(|_| core.engine_id == "hermes") {
         super::hermes::set_model(acp, &session_id, model, killed).await?;
     }
-    // Hermes takes its mode over ACP too; Kimi's is set in its own handshake.
     if core.engine_id == "hermes" {
         super::hermes::set_mode(acp, &session_id, req.permission.as_deref(), killed).await?;
     }
     Ok((session_id, effort))
 }
 
-/// Runs the turn's prompt on an open session.
 #[allow(clippy::too_many_arguments)]
 async fn prompt(
     acp: &mut AcpProcess,
@@ -312,7 +260,6 @@ async fn prompt(
         view.subagents = Some(super::agy::Subagents::of(session_id));
     }
 
-    // Gemini runs no custom TOML command over ACP: Misty expands it into its prompt first.
     let expanded = (core.engine_id == "gemini")
         .then(|| super::gemini::expand_custom_command(&req.prompt, &req.workspace))
         .flatten();
@@ -322,12 +269,9 @@ async fn prompt(
         &req.workspace,
     )?;
     let workspace = req.workspace.clone();
-    // One router for the whole prompt: updates, agent requests and the ask all
-    // mutate the same turn state, so they cannot live in separate callbacks.
     let result = {
         let mut router = |line: &AcpLine| route(core, state, view, &gate, &workspace, line);
         let mut prompt = json!({ "sessionId": session_id, "prompt": blocks });
-        // Grok's mode for one prompt rides its `_meta.mode`, which outranks the session's own.
         if let Some(mode) =
             super::grok::prompt_mode(req.permission.as_deref()).filter(|_| core.engine_id == "grok")
         {
@@ -351,7 +295,6 @@ async fn prompt(
     Ok(())
 }
 
-/// One line the agent sent during the turn, with no request of this client's waiting on it.
 fn route(
     core: &TurnCore,
     state: &mut TurnState,
@@ -363,13 +306,11 @@ fn route(
     follow_subagents(core, state, view, false);
     match line {
         AcpLine::Notification { method, params } if method == "session/update" => {
-            // An `invoke_subagent` call is noted as the row its sub-agent's rows nest under.
             let followed = view
                 .subagents
                 .as_mut()
                 .and_then(|subagents| subagents.update(params));
             let params = followed.as_ref().unwrap_or(params);
-            // ACP's `usage_update`: how full the context is, from any engine that sends it.
             if let Some(usage) = super::kimi_acp::usage(params) {
                 view.last_usage = Some(usage.clone());
                 core.dispatch_event(state, EngineEvent::Usage(usage));
@@ -392,9 +333,6 @@ fn route(
         {
             super::agy::park_question(core, state, id, params)
         }
-        // The ask is the user's line to answer: return None so the frame is
-        // written by `answer_question` (via the registry-held stdin), not
-        // by the read loop.
         AcpLine::AgentRequest { id, method, params } if method == ASK_METHOD => {
             park_question(core, state, id, params)
         }
@@ -405,9 +343,6 @@ fn route(
     }
 }
 
-/// Antigravity's sub-agents work on after the prompt that started them has answered: the turn
-/// stays open while they do, showing their steps and whatever the main agent says once one
-/// reports back, and ends once all of it has gone quiet (`agy_subagents.rs`).
 async fn follow_on(
     acp: &mut AcpProcess,
     core: &TurnCore,
@@ -432,17 +367,11 @@ async fn follow_on(
         match acp.listen(KILL_POLL, &mut router).await {
             Ok(true) => heard = Instant::now(),
             Ok(false) => {}
-            // The prompt itself answered: an agent gone after it ends the turn as it was.
             Err(_) => return,
         }
     }
 }
 
-/// Re-attach the conversation's session, or open a fresh one. grok cannot be
-/// handed a session id at launch, so the id adopted from the previous
-/// handshake is the only resume key there is; an unknown or expired id is the
-/// normal failure here, and a fresh session keeps the user's message alive
-/// instead of failing the whole send.
 async fn attach_session(
     acp: &mut AcpProcess,
     req: &SendRequest,
@@ -464,8 +393,6 @@ async fn attach_session(
             .await;
         match load {
             Ok(result) => loaded = Some(result),
-            // An interrupt is not a failed resume: retrying it as a new
-            // session would spawn work the user just cancelled.
             Err(error) => {
                 if killed.load(Ordering::SeqCst) {
                     return Err(error);
@@ -492,7 +419,6 @@ async fn attach_session(
         .ok_or_else(|| "grok session handshake returned no sessionId".to_string())
 }
 
-/// ACP prompt content blocks: text plus base64 image blocks.
 fn prompt_blocks(text: &str, images: &[String], workspace: &Path) -> Result<Vec<Value>, String> {
     let mut blocks = vec![json!({ "type": "text", "text": text })];
     for raw in images {
@@ -506,10 +432,6 @@ fn prompt_blocks(text: &str, images: &[String], workspace: &Path) -> Result<Vec<
     Ok(blocks)
 }
 
-/// The session id from a handshake result. `session/new` returns it at the top
-/// level; `session/load` reports only the id it actually attached to, under
-/// `_meta.sessionId` — the authoritative one if the CLI ever re-keys a loaded
-/// conversation. The aliases cover a CLI that spells the key differently.
 fn extract_session_id(value: &Value) -> Option<String> {
     value
         .get("sessionId")
@@ -522,9 +444,6 @@ fn extract_session_id(value: &Value) -> Option<String> {
         .map(str::to_string)
 }
 
-/// One `session/update` notification projected to engine events. grok speaks
-/// the same ACP update vocabulary qoder does, so the mapping is shared rather
-/// than re-derived.
 fn handle_session_update(
     core: &TurnCore,
     state: &mut TurnState,
@@ -572,12 +491,6 @@ fn handle_session_update(
     }
 }
 
-/// Park one ask as a question card. `dispatch_event` stores the very `input`
-/// payload it emits, so the parked value carries both what the card renders
-/// (`questions`) and the context `answer_frame` needs to rebuild the response
-/// (`grokAcp.rpcId`). Returns `Some` when there is nothing to ask: a card with
-/// no question can never be answered, and parking it would hold the CLI until
-/// the prompt times out.
 fn park_question(
     core: &TurnCore,
     state: &mut TurnState,
@@ -609,25 +522,17 @@ fn park_question(
     None
 }
 
-/// Build the JSON-RPC response frame that releases one parked grok ask.
-/// `parked` is the `grokAcp` context stored with the question, `answers` the
-/// frontend's map (question text → label, or labels for a multi-select).
-/// Rejecting a malformed answer beats dropping it: the card stays answerable
-/// instead of silently releasing the CLI with nothing.
 pub(super) fn answer_frame(parked: &Value, answers: Option<&Value>) -> Result<Value, String> {
     let id = parked
         .get("rpcId")
         .filter(|id| !id.is_null())
         .ok_or_else(|| "grok question answer context is missing the request id".to_string())?;
-    // Antigravity's question is an ACP form, answered with the form's own values.
     if let Some(fields) = parked.get("agyForm") {
         return super::agy::answer_frame(id, fields, answers);
     }
     Ok(jsonrpc_result_response(id, answer_outcome(answers)?))
 }
 
-/// The answer payload grok's protocol expects. `None` is the user dismissing
-/// the card — the CLI is told to continue without answers, never left parked.
 fn answer_outcome(answers: Option<&Value>) -> Result<Value, String> {
     let Some(answers) = answers else {
         return Ok(json!({ "outcome": DISMISS_OUTCOME }));
@@ -648,11 +553,6 @@ fn answer_outcome(answers: Option<&Value>) -> Result<Value, String> {
     Ok(json!({ "outcome": ACCEPTED_OUTCOME, "answers": Value::Object(map.clone()) }))
 }
 
-/// Project grok's `questions` array onto the card contract (`QuestionSpec`):
-/// `header` is a required short chip and grok sends none, so synthesise
-/// `Q{n}`; `multiSelect` arrives as an explicit `null` for single-select asks
-/// and must not reach the card as null. Options pass through untouched — their
-/// `label`/`description`/`preview` are exactly what the card renders.
 fn normalize_questions(params: &Value) -> Vec<Value> {
     params
         .get("questions")
@@ -691,10 +591,6 @@ fn normalize_questions(params: &Value) -> Vec<Value> {
         .unwrap_or_default()
 }
 
-/// grok reports the turn's totals in the prompt result's `_meta`. Project them
-/// onto the names the frontend's usage parser reads: it knows `totalTokens`,
-/// `inputTokens` and `outputTokens`, but not grok's `cachedReadTokens` — an
-/// unrecognized cache key reports zero cache hits.
 fn prompt_usage(result: &Value) -> Option<Value> {
     if let Some(usage) = turn_usage(result) {
         return Some(usage);
@@ -720,9 +616,6 @@ fn prompt_usage(result: &Value) -> Option<Value> {
     Some(Value::Object(usage))
 }
 
-/// Gemini CLI and Qwen Code put the turn's tokens in the prompt result's own `usage`
-/// (`inputTokens`, `outputTokens`, `cachedReadTokens`, `thoughtTokens`, `totalTokens`). Their
-/// input count includes the cached part, so the cached tokens are taken out of it here.
 fn turn_usage(result: &Value) -> Option<Value> {
     let usage = result.get("usage").filter(|usage| usage.is_object())?;
     let number = |name: &str| usage.get(name).and_then(Value::as_u64);
@@ -746,8 +639,6 @@ fn turn_usage(result: &Value) -> Option<Value> {
     (!out.is_empty()).then_some(Value::Object(out))
 }
 
-/// Terminal message precedence (mirrors qoder): the rpc error's message part,
-/// then the CLI's stderr tail, then the raw error.
 fn terminal_message(raw: String, stderr_buf: &Arc<Mutex<String>>) -> String {
     let bare = raw
         .strip_prefix("rpc:")

@@ -9,7 +9,6 @@ const choices = [
   { value: "shared_spaces", label: "People I share a Space with" },
 ];
 
-/** Settings › Profile › Requests: who may send the person a friend request. Kept on the account. */
 export function RequestsSection() {
   const privacy = useSpaceResource<FriendPrivacy>("/me/privacy", directApi.privacy);
   const choose = (value: string) =>

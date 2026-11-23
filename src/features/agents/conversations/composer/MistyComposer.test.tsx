@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MistyComposer } from "./MistyComposer";
-import type { MistyImageAttachment } from "../state/conversationTypes";
+import type { MistyImageAttachment } from "../state/conversation_types";
 
 afterEach(cleanup);
 

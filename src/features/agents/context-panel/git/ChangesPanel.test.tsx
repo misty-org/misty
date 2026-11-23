@@ -2,13 +2,13 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../files/filesStore", () => {
+vi.mock("../files/files_store", () => {
   const state = { selectedPath: null, repositories: {}, openFile: vi.fn(), refreshTree: vi.fn() };
   const useFilesStore = (select: (value: typeof state) => unknown) => select(state);
   useFilesStore.getState = () => state;
   return { useFilesStore };
 });
-vi.mock("../../runs/local-run/localRunEvents", () => ({ watchAllRunEvents: () => () => {} }));
+vi.mock("../../runs/local-run/local_run_events", () => ({ watchAllRunEvents: () => () => {} }));
 
 import { ChangesPanel } from "./ChangesPanel";
 import { useGitStore } from "./store";
@@ -166,7 +166,6 @@ describe("ChangesPanel", () => {
   it("offers to initialize a folder that isn't a repository", async () => {
     setStatus(undefined, { notRepoByWorkspace: { "/repo": true } });
     render(<ChangesPanel folder="/repo" />);
-    // Nothing Git does applies yet, so the head shows none of it.
     expect(screen.queryByRole("button", { name: /View as/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Pull" })).toBeNull();

@@ -17,17 +17,12 @@ import { UnsavedQuitGuard } from "@/features/app-windows";
 import { SpaceWindowBridge } from "@/features/spaces";
 import { accountScopeFor } from "@/features/app-windows";
 
-// Load the layout alongside account/workspace restore so they share one stable loading scene
-// instead of swapping Suspense fallbacks. The scene fades out once the app is ready
-// (`LoadingScreen`), but never before it has shown for `minimumSplashMs`.
 const desktopLayoutPromise = import("@/app/layouts/DesktopLayout").then((layout) => ({
   default: layout.DesktopLayout,
 }));
 const DesktopLayout = lazy(() => desktopLayoutPromise);
-/** Half of each of Misty's sweeps (6s across, 4.5s up and down). */
 const splashStartsCentered =
   "[&_.misty-fly-x]:[animation-delay:-3s] [&_.misty-fly-y]:[animation-delay:-2.25s]";
-/** A splash shorter than this reads as a flicker, so a quick load still shows Misty this long. */
 const minimumSplashMs = 1000;
 
 export function AppFrameLayout() {
@@ -50,22 +45,15 @@ export function AppFrameLayout() {
   const accountScope = accountScopeFor(user?.id);
   useWorkspaceRecoveryRetry(user && !isAuthRoute && !transitioning ? accountScope : "");
 
-  // A person is signed in to use Misty. Signed out, only the welcome and the sign-in pages show:
-  // anything else, invite links included, goes to sign in (the welcome on first run) and comes
-  // back once signed in. The first sign-in sets up the person's AI and apps before the app opens.
   const here = `${location.pathname}${location.search}${location.hash}`;
   const returnTo = isAuthRoute || location.pathname === routes.root ? undefined : here;
   const signInFirst = !user && !transitioning && !isSignedOutPath(location.pathname);
-  // Misty has no model of its own: someone set up before that rule, or whose engine is gone, picks
-  // a default engine again before the shell shows.
   const engines = useEnginesList();
   const noEngine = Boolean(engines.data) && defaultChoices(engines.data ?? []).length === 0;
   const onSetup = location.pathname === routes.setup;
   const engineFirst =
     Boolean(user) && !transitioning && welcomed && noEngine && !isAuthRoute && !onSetup;
   const setUpFirst = (Boolean(user) && !transitioning && !welcomed && !isAuthRoute) || engineFirst;
-  // Account transitions finish before the shell shows; the window then waits for the account's
-  // saved windows and tabs.
   const readyLabel =
     transitioning && !isAuthRoute
       ? "Restoring account"
@@ -79,19 +67,13 @@ export function AppFrameLayout() {
             ? "Opening Misty"
             : null;
   const loadingLabel = useMinimumSplash(readyLabel);
-  // Keep hook order stable as identity changes: every hook runs before the returns below.
   const [leavingLabel, clearLeaving] = useLeavingLoadingScreen(loadingLabel);
 
-  // One splash, keyed, from loading through leaving: the same Misty keeps flying while the shell
-  // mounts under her, instead of a new one starting her flight over as the old one goes.
   const splashLabel = loadingLabel ?? leavingLabel;
   const leavingScreen = splashLabel ? (
     <LoadingScreen
       key="splash"
       fullScreen
-      // Misty's sweep starts at the left end of her track, so a window that paints its first
-      // frame and then holds it (hidden right after a reload) showed her stuck at the edge. Half a
-      // pass in, she starts in the middle, heading out.
       className={splashStartsCentered}
       label={splashLabel}
       leaving={!loadingLabel}
@@ -132,7 +114,6 @@ export function AppFrameLayout() {
 
   return (
     <>
-      {/* Another account starts the shell over, with nothing of the last one's left mounted. */}
       <Suspense key={`account:${user?.id ?? "anonymous"}`} fallback={null}>
         <DesktopLayout getRouteId={desktopRouteIdFromPath} />
       </Suspense>
@@ -148,10 +129,6 @@ export function AppFrameLayout() {
   );
 }
 
-/**
- * `loadingLabel`, held for at least `minimumSplashMs` from when the splash first showed: a load that
- * finishes sooner keeps its last label until then, and one that takes longer ends as it finishes.
- */
 function useMinimumSplash(loadingLabel: string | null): string | null {
   const [splash, setSplash] = useState(() =>
     loadingLabel ? { label: loadingLabel, since: performance.now() } : null,
@@ -172,7 +149,6 @@ function useMinimumSplash(loadingLabel: string | null): string | null {
   return loadingLabel ?? (done ? null : (splash?.label ?? null));
 }
 
-/** The loading screen the shell just replaced, kept while it fades out over the shell. */
 function useLeavingLoadingScreen(loadingLabel: string | null) {
   const [shown, setShown] = useState(loadingLabel);
   const [leaving, setLeaving] = useState<string | null>(null);

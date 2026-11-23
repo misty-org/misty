@@ -36,28 +36,13 @@ const steps: { id: Step; title: string }[] = [
   { id: "apps", title: "Which apps should agents use?" },
 ];
 
-/**
- * First-run setup, after the first sign-in and from Help › Run setup again: how Misty works, then
- * the person's own AI, installed and signed in without a terminal command to type, then their
- * language and Misty's own voice, then the apps agents may use. An engine can't be left for
- * later: Misty has no model of its own, so one that can run Misty's own work (images, Misty's
- * tools, web search) must be ready, and the person picks which is the default. It ends on the page that sent the person here, or on Agents.
- *
- * Moving on from the voice step saves the language and the voice and starts speech setting itself
- * up in the background (`ensureSpeech` picks the hearing model and downloads both); nothing waits
- * on it. Finishing saves the default engine, makes an agent for each engine now installed (as
- * listing the agents always does) and starts new chats with the default engine's agent.
- */
 export function SetupPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
-  // Sent back only to pick a default engine (theirs is gone, or setup came before engines were
-  // required): the engines step alone.
   const engineOnly = Boolean((location.state as { engineOnly?: boolean } | null)?.engineOnly);
   const [step, setStep] = useState<Step>(engineOnly ? "engines" : "how");
   const [finishing, setFinishing] = useState(false);
-  // The engines that are ready, in the order they became so.
   const [ready, setReady] = useState<EngineId[]>([]);
   const onState = useCallback((engine: EngineId, state: EngineSetupState) => {
     setReady((current) => {
@@ -69,7 +54,6 @@ export function SetupPage() {
   }, []);
   const index = steps.findIndex((item) => item.id === step);
   const current = steps[index]!;
-  // Which ready engines can be the default, and the one picked (the first that became ready).
   const engines = useEnginesList();
   const unfit = useCallback(
     (engine: EngineId) => {
@@ -82,7 +66,6 @@ export function SetupPage() {
   const [picked, setPicked] = useState<EngineId>();
   const chosen = picked && capable.includes(picked) ? picked : capable[0];
 
-  // The language and Misty's voice, picked on the voice step and saved as the person moves on.
   const [language, setLanguage] = useState(
     () => voiceSettings(useSettingsStore.getState().settings?.document).language,
   );
@@ -143,8 +126,6 @@ export function SetupPage() {
             </Button>
           </>
         ) : step === "voice" ? (
-          // A voice is the person's to pick; only a catalog that couldn't be read lets them on
-          // without one, since nothing in setup waits on speech.
           <Button
             variant="primary"
             disabled={catalogFailed ? false : !catalog || (voices.length > 0 && !voicePicked)}
@@ -162,8 +143,6 @@ export function SetupPage() {
       }
     >
       {step === "how" ? <HowMistyWorksStep /> : null}
-      {/* The engines step mounts from the start, so its checks run while the person reads, and
-            going back never probes the engines again. */}
       <div hidden={step !== "engines"}>
         <EnginesStep onState={onState} chosen={chosen} onChoose={setPicked} unfit={unfit} />
       </div>

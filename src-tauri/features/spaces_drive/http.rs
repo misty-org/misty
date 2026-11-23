@@ -1,7 +1,3 @@
-//! The drive's network, with Misty's own session: the account client's bearer on every server
-//! request, rotated tokens taken from every answer, and one rotation and retry on a 401, as
-//! `account/http.rs` does for the renderer. Presigned storage addresses get no session at all,
-//! through a client that follows Settings' proxy. Nothing here is logged.
 use std::time::Duration;
 
 use futures_util::{future::BoxFuture, StreamExt};
@@ -12,11 +8,9 @@ use space_drive::{Http, HttpError};
 use crate::account::session::{self, Captured};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-/// The most of a server answer kept; drive answers are small JSON.
 const MAX_ANSWER: usize = 16 * 1024 * 1024;
 
 pub(crate) struct AccountHttp {
-    /// The API base the renderer named, such as `https://misty.example/v1`.
     base: url::Url,
     account_id: String,
     transfer: reqwest::Client,
@@ -24,7 +18,6 @@ pub(crate) struct AccountHttp {
 
 impl AccountHttp {
     pub(crate) fn new(base: url::Url, account_id: String) -> Result<Self, String> {
-        // Misty's builds carry rustls without a default provider; the app installs ring at launch.
         let _ = rustls::crypto::ring::default_provider().install_default();
         let transfer = crate::engine_config::proxy::apply_to_client(
             reqwest::Client::builder()
@@ -66,7 +59,6 @@ fn method_of(method: Method) -> reqwest::Method {
     }
 }
 
-/// A response's headers without the session's: tokens never leave the account client.
 fn headers_of(response: &reqwest::Response) -> Vec<(String, String)> {
     response
         .headers()
@@ -101,7 +93,10 @@ impl Http for AccountHttp {
         Box::pin(async move {
             let url = self.url(&request.path)?;
             let client = session::current(&self.base).map_err(|_| HttpError::SignedOut)?;
-            if client.require_account(&self.base, &self.account_id).is_err() {
+            if client
+                .require_account(&self.base, &self.account_id)
+                .is_err()
+            {
                 return Err(HttpError::SignedOut);
             }
             for attempt in 0..2 {
@@ -168,13 +163,18 @@ impl Http for AccountHttp {
             let url = reqwest::Url::parse(&url)
                 .ok()
                 .filter(|url| matches!(url.scheme(), "http" | "https"))
-                .ok_or_else(|| HttpError::Other("The server sent an address Misty can't use.".into()))?;
+                .ok_or_else(|| {
+                    HttpError::Other("The server sent an address Misty can't use.".into())
+                })?;
             let method = match method.to_ascii_uppercase().as_str() {
                 "PUT" => reqwest::Method::PUT,
                 "POST" => reqwest::Method::POST,
-                _ => return Err(HttpError::Other("The server asked for an upload Misty can't make.".into())),
+                _ => {
+                    return Err(HttpError::Other(
+                        "The server asked for an upload Misty can't make.".into(),
+                    ))
+                }
             };
-            // Object storage wants the length up front rather than a chunked body.
             let mut builder = self
                 .transfer
                 .request(method, url)
@@ -210,7 +210,9 @@ impl Http for AccountHttp {
             let url = reqwest::Url::parse(&url)
                 .ok()
                 .filter(|url| matches!(url.scheme(), "http" | "https"))
-                .ok_or_else(|| HttpError::Other("The server sent an address Misty can't use.".into()))?;
+                .ok_or_else(|| {
+                    HttpError::Other("The server sent an address Misty can't use.".into())
+                })?;
             let response = self
                 .transfer
                 .get(url)
@@ -218,9 +220,11 @@ impl Http for AccountHttp {
                 .await
                 .map_err(|_| HttpError::Offline)?;
             let status = response.status().as_u16();
-            let stream: ByteStream = Box::pin(response.bytes_stream().map(|chunk| {
-                chunk.map_err(|error| std::io::Error::new(std::io::ErrorKind::Other, error))
-            }));
+            let stream: ByteStream = Box::pin(
+                response
+                    .bytes_stream()
+                    .map(|chunk| chunk.map_err(std::io::Error::other)),
+            );
             Ok((status, stream))
         })
     }

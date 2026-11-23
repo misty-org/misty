@@ -12,11 +12,6 @@ use std::sync::OnceLock;
 use serde::{de::DeserializeOwned, Serialize};
 use tauri::Emitter;
 
-// ---------------------------------------------------------------------------------------------
-// Homes
-
-/// The person's home folder. Tests point it at a scratch folder with `MISTY_TEST_ENGINE_HOME`
-/// (holding [`HOME_ENV_LOCK`]) so they never touch `HOME`, which the rest of Misty's tests rely on.
 pub fn home_dir() -> PathBuf {
     #[cfg(test)]
     {
@@ -28,11 +23,9 @@ pub fn home_dir() -> PathBuf {
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
 }
 
-/// Serializes tests that steer `MISTY_TEST_ENGINE_HOME`, `CLAUDE_CONFIG_DIR` or `CODEX_HOME`.
 #[cfg(test)]
 pub static HOME_ENV_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
-/// Points [`home_dir`] at `home` (and clears the engines' own home variables) until dropped.
 #[cfg(test)]
 pub struct TestHome {
     _lock: parking_lot::MutexGuard<'static, ()>,
@@ -74,7 +67,6 @@ impl Drop for TestHome {
     }
 }
 
-/// `~` and `~/…` expanded against [`home_dir`].
 pub fn expand_user_path(text: &str) -> PathBuf {
     if text == "~" {
         return home_dir();
@@ -85,8 +77,6 @@ pub fn expand_user_path(text: &str) -> PathBuf {
     PathBuf::from(text)
 }
 
-/// An engine's home: `$env_key` when set and not empty (with `~` expanded, as the CLIs do), else
-/// `~/<default_dir>`.
 pub fn engine_home(env_key: Option<&str>, default_dir: &str) -> PathBuf {
     if let Some(key) = env_key {
         if let Some(value) = std::env::var_os(key).filter(|v| !v.is_empty()) {
@@ -96,18 +86,14 @@ pub fn engine_home(env_key: Option<&str>, default_dir: &str) -> PathBuf {
     home_dir().join(default_dir)
 }
 
-/// Codex's config and session home (`$CODEX_HOME`, else `~/.codex`).
 pub fn codex_home() -> PathBuf {
     engine_home(Some("CODEX_HOME"), ".codex")
 }
 
-/// Claude Code's config folder (`$CLAUDE_CONFIG_DIR`, else `~/.claude`).
 pub fn claude_home() -> PathBuf {
     engine_home(Some("CLAUDE_CONFIG_DIR"), ".claude")
 }
 
-/// Misty's own folder for this feature's caches and backups: `~/.misty/engine-config`. Tests get
-/// one inside their scratch home.
 pub fn app_home() -> PathBuf {
     #[cfg(test)]
     {
@@ -120,7 +106,6 @@ pub fn app_home() -> PathBuf {
         .join("engine-config")
 }
 
-/// Hermes Agent's home: `HERMES_HOME`, else `%LOCALAPPDATA%\\hermes` on Windows, else `~/.hermes`.
 pub fn hermes_home() -> PathBuf {
     if let Some(home) = std::env::var_os("HERMES_HOME").filter(|v| !v.is_empty()) {
         return PathBuf::from(home);
@@ -132,14 +117,11 @@ pub fn hermes_home() -> PathBuf {
     home_dir().join(".hermes")
 }
 
-/// The engine folders and files Settings › Engines reads and edits, granted to the file gate when
-/// the app starts. Everything else stays behind its own grant.
 pub fn engine_config_locations() -> (Vec<PathBuf>, Vec<(PathBuf, &'static str)>) {
     let home = home_dir();
     let folders = vec![
         claude_home(),
         codex_home(),
-        // Codex's bundled runtime plugins (documents, pdf, spreadsheets) live outside its home.
         home.join(".cache").join("codex-runtimes"),
         engine_home(Some("GEMINI_CLI_HOME"), ".gemini"),
         home.join(".agents"),
@@ -164,9 +146,6 @@ pub fn engine_config_locations() -> (Vec<PathBuf>, Vec<(PathBuf, &'static str)>)
     if let Some(config) = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
         folders.push(PathBuf::from(config).join("opencode"));
     }
-    // OpenCode keeps its sessions in the system's data folder on macOS and Windows
-    // (`~/Library/Application Support/opencode`), or `$OPENCODE_HOME`, where the chat history
-    // finds them (`history/discovery.rs`, `opencode_data_roots`).
     let opencode_data = [dirs::data_dir(), dirs::data_local_dir()]
         .into_iter()
         .flatten()
@@ -189,7 +168,6 @@ pub fn engine_config_locations() -> (Vec<PathBuf>, Vec<(PathBuf, &'static str)>)
     (folders, files)
 }
 
-/// Grants the gate the locations in [`engine_config_locations`].
 pub fn allow_engine_config_locations() {
     let (folders, files) = engine_config_locations();
     for folder in folders {
@@ -200,8 +178,6 @@ pub fn allow_engine_config_locations() {
     }
 }
 
-/// Whether `path` is somewhere Misty may read: a folder the person linked to a Space, an engine's
-/// configuration, or Misty's own data. Takes the place of desktop-cc-gui's workspace check.
 pub fn ensure_allowed(path: &str) -> Result<PathBuf, String> {
     if path.trim().is_empty() {
         return Err("No folder was given.".to_string());
@@ -213,11 +189,6 @@ pub fn ensure_allowed(path: &str) -> Result<PathBuf, String> {
     Ok(file_access::fs::canonicalize(&path).unwrap_or(path))
 }
 
-// ---------------------------------------------------------------------------------------------
-// Safe writes
-
-/// Writes `content` to `path` through a staged file in the same folder and a rename, owner-only
-/// (keeping the owner's execute bit). A link (dotfile managers) is written through, not replaced.
 pub fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
     let target = write_target(path)?;
     let dir = target
@@ -232,7 +203,6 @@ pub fn atomic_write(path: &Path, content: &str) -> Result<(), String> {
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-    // Named after the file so the gate's rule for the file covers it too.
     let tmp = dir.join(format!(
         "{name}.misty-{}.tmp",
         uuid::Uuid::new_v4().simple()
@@ -287,10 +257,6 @@ fn write_staged(tmp: &Path, target: &Path, content: &str) -> Result<(), String> 
         .map_err(|e| format!("write {}: {e}", tmp.display()))
 }
 
-// ---------------------------------------------------------------------------------------------
-// Device store in misty.db
-
-/// `misty.db`, this computer's database. Nothing kept here syncs.
 pub fn store() -> database::store::Store {
     #[cfg(test)]
     {
@@ -302,9 +268,6 @@ pub fn store() -> database::store::Store {
     database::store::Store::in_home(&home)
 }
 
-/// Opens `misty.db` with this feature's own tables in place. They are created here rather than as
-/// numbered migrations: they hold only this computer's engine settings and caches, and a missing
-/// table is simply made again.
 pub fn connect() -> Result<rusqlite::Connection, String> {
     let connection = store().connect().map_err(|e| e.to_string())?;
     connection
@@ -319,7 +282,6 @@ pub fn connect() -> Result<rusqlite::Connection, String> {
     Ok(connection)
 }
 
-/// A value this feature keeps on the device, by key, as JSON.
 pub fn load_value<T: DeserializeOwned>(key: &str) -> Result<Option<T>, String> {
     use rusqlite::OptionalExtension;
     let connection = connect()?;
@@ -357,12 +319,6 @@ pub fn now_ms() -> i64 {
         .map_or(0, |elapsed| elapsed.as_millis() as i64)
 }
 
-// ---------------------------------------------------------------------------------------------
-// Secrets
-
-/// The credential-store service engine channel keys are kept under. Keys stay on this computer
-/// (sealed in `misty.db` under the master key in the OS keychain), never sync, and reach only the
-/// provider the person chose for the channel.
 pub const CHANNEL_KEY_SERVICE: &str = "com.misty.engine-channels";
 
 pub fn load_secret(account: &str) -> Result<Option<String>, String> {
@@ -380,12 +336,8 @@ pub fn delete_secret(account: &str) -> Result<(), String> {
         .map_err(|_| "The key couldn't be removed from the keychain.".to_string())
 }
 
-// ---------------------------------------------------------------------------------------------
-// Events
-
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
-/// Keeps the app handle for [`emit`]. Called once from `setup`.
 pub fn set_app(app: &tauri::AppHandle) {
     let _ = APP.set(app.clone());
 }
@@ -394,14 +346,12 @@ pub fn app() -> Option<&'static tauri::AppHandle> {
     APP.get()
 }
 
-/// Sends `payload` to the app's windows as `name`. Does nothing before setup and in tests.
 pub fn emit<T: Serialize + Clone>(name: &str, payload: T) {
     if let Some(app) = APP.get() {
         let _ = app.emit(name, payload);
     }
 }
 
-/// Where adapted code emits events. The app handle and test doubles both implement it.
 pub trait Emit: Send + Sync {
     fn emit_json(&self, name: &str, raw_json: &str);
 }
@@ -414,10 +364,6 @@ impl<R: tauri::Runtime> Emit for tauri::AppHandle<R> {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Processes
-
-/// Keeps Windows from opening a console window for a console program Misty starts.
 #[cfg(windows)]
 pub fn hide_console(command: &mut std::process::Command) {
     use std::os::windows::process::CommandExt;
@@ -431,15 +377,12 @@ pub fn hide_console_tokio(command: &mut tokio::process::Command) {
     command.creation_flags(CREATE_NO_WINDOW);
 }
 
-/// Kills a child started with `process_group(0)` and everything it started.
 #[cfg(unix)]
 pub fn kill_process_group(pid: u32) {
     // SAFETY: kill with a negated process group id signals the group; no memory is touched.
     unsafe { libc::kill(-(pid as i32), libc::SIGKILL) };
 }
 
-/// Windows has no process groups; `taskkill /T` walks the tree from the wrapper down, and has to
-/// finish before the caller ends the direct child.
 #[cfg(not(unix))]
 pub fn kill_process_group(pid: u32) {
     let mut command = std::process::Command::new("taskkill");
@@ -455,18 +398,14 @@ pub fn kill_process_group(pid: u32) {
     }
 }
 
-/// Where an engine's program is, found the way Misty finds engines to run.
 pub fn find_program(name: &str) -> Option<PathBuf> {
     crate::engines::resolve::find_program(name)
 }
 
-/// The PATH Misty starts engines with, so the tools they run (node, npm, git) are found too.
 pub fn search_path() -> std::ffi::OsString {
     crate::engines::resolve::search_path()
 }
 
-/// The environment a program Misty starts for engine config gets on top of its own: the search
-/// PATH and the proxy from Settings.
 pub fn child_env() -> HashMap<String, String> {
     let mut env = super::proxy::proxy_env();
     env.insert(
@@ -476,14 +415,7 @@ pub fn child_env() -> HashMap<String, String> {
     env
 }
 
-// ---------------------------------------------------------------------------------------------
-// HTTP
-
-/// A client for this feature's own requests (GitHub for skills, npm for versions, a channel's
-/// model list, the price table), through the proxy from Settings.
 pub fn http_client() -> Result<reqwest::Client, String> {
-    // Misty's builds carry rustls without a default provider; the app installs ring at launch,
-    // and tests and the MCP proxy process do it here.
     let _ = rustls::crypto::ring::default_provider().install_default();
     super::proxy::apply_to_client(
         reqwest::Client::builder()

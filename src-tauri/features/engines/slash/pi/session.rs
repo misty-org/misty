@@ -1,8 +1,5 @@
-//! The session commands pi and omp answer over rpc.
-
 use super::*;
 
-/// `/session`: pi's get_state and get_session_stats, as the TUI's session panel shows them.
 pub(super) async fn session_info(rpc: &mut RpcSession) -> Result<Output, String> {
     let state = rpc.call("get_state", json!({})).await?;
     let stats = rpc.call("get_session_stats", json!({})).await?;
@@ -21,7 +18,6 @@ pub(super) fn session_sections(state: &Value, stats: &Value) -> Vec<Section> {
     push_some(&mut about, "Name", text(state, "sessionName"));
     push_some(&mut about, "Session", text(state, "sessionId"));
     push_some(&mut about, "File", text(state, "sessionFile"));
-    // pi with no model to run says `{"id": "unknown", "provider": "unknown"}`.
     let model = state.get("model").and_then(|model| {
         let id = text(model, "id").filter(|id| id != "unknown")?;
         Some(match text(model, "provider") {
@@ -71,7 +67,6 @@ pub(super) fn session_sections(state: &Value, stats: &Value) -> Vec<Section> {
             (Some(used), Some(percent)) => {
                 format!("{} of {} ({percent:.1}%)", count(used), count(window))
             }
-            // pi doesn't know until the next reply after a compaction.
             _ => format!("Unknown of {}", count(window)),
         }
     });
@@ -94,7 +89,6 @@ pub(super) fn session_sections(state: &Value, stats: &Value) -> Vec<Section> {
     ]
 }
 
-/// `/name <name>`: pi's own session name, which the chat takes as its title.
 pub(super) async fn rename(rpc: &mut RpcSession, name: &str) -> Result<Output, String> {
     rpc.call("set_session_name", json!({ "name": name }))
         .await?;
@@ -103,9 +97,6 @@ pub(super) async fn rename(rpc: &mut RpcSession, name: &str) -> Result<Output, S
     })
 }
 
-/// The calls one engine names its forking by: pi's `get_fork_messages` / `fork`, omp's
-/// `get_branch_messages` / `branch`. Both take a user message's entryId and answer
-/// `{text, cancelled}`, with the session switched to the new one.
 #[derive(Clone, Copy)]
 pub(super) struct Flavor {
     list: &'static str,
@@ -126,10 +117,6 @@ impl Flavor {
     };
 }
 
-/// `/fork` (pi) and `/branch` (omp): a new session from before one of the person's messages,
-/// opened as a new chat. With no argument, the latest message; `list` shows them, numbered.
-/// The message itself isn't in the new session (the terminal app puts it back in the editor), so
-/// nothing is sent there on its own.
 pub(super) async fn fork(
     rpc: &mut RpcSession,
     flavor: Flavor,
@@ -200,7 +187,6 @@ fn fork_list(messages: &[(&str, &str)], flavor: Flavor) -> Output {
     )
 }
 
-/// `/clone`: the whole session, up to where it is now, copied into a new chat.
 pub(super) async fn clone(rpc: &mut RpcSession) -> Result<Output, String> {
     let cloned = rpc.call("clone", json!({})).await?;
     if cloned.get("cancelled").and_then(Value::as_bool) == Some(true) {
@@ -209,7 +195,6 @@ pub(super) async fn clone(rpc: &mut RpcSession) -> Result<Output, String> {
     new_chat(rpc).await
 }
 
-/// After a fork, the process is on the new session: its id opens the new chat.
 async fn new_chat(rpc: &mut RpcSession) -> Result<Output, String> {
     let state = rpc.call("get_state", json!({})).await?;
     let session = state
@@ -228,8 +213,6 @@ async fn new_chat(rpc: &mut RpcSession) -> Result<Output, String> {
     })
 }
 
-/// `/export [path]`: pi's HTML export; a relative path is taken from the chat's folder, as pi
-/// takes it from its own.
 pub(super) async fn export(
     rpc: &mut RpcSession,
     folder: &Path,
@@ -245,15 +228,12 @@ pub(super) async fn export(
         .get("path")
         .and_then(Value::as_str)
         .ok_or("pi didn't say where it wrote the export.")?;
-    // pi 1.5.2 answers with the path as given, which is relative to its folder.
     Ok(Output::done(format!(
         "Exported to {}",
         folder.join(written).display()
     )))
 }
 
-/// `/tree`: pi's session tree, as an indented list. A run of single replies stays at one level;
-/// each branch at a fork goes one level in. The entry the session is on is marked.
 pub(super) async fn tree(rpc: &mut RpcSession) -> Result<Output, String> {
     let data = rpc.call("get_tree", json!({})).await?;
     let roots: Vec<&Value> = data
@@ -264,7 +244,6 @@ pub(super) async fn tree(rpc: &mut RpcSession) -> Result<Output, String> {
         .collect();
     let current = current_entry(&roots, data.get("leafId").and_then(Value::as_str));
     let mut lines = Vec::new();
-    // Iterative: a long session is a chain thousands of entries deep.
     let mut stack: Vec<(&Value, usize)> = roots.iter().rev().map(|node| (*node, 0)).collect();
     let mut hidden = 0;
     while let Some((node, depth)) = stack.pop() {
@@ -309,8 +288,6 @@ pub(super) async fn tree(rpc: &mut RpcSession) -> Result<Output, String> {
 
 const TREE_MOST: usize = 400;
 
-/// The shown entry the session is on: the leaf, or the nearest of its parents that is shown
-/// (the leaf is often a model or label change).
 pub(super) fn current_entry<'a>(roots: &[&'a Value], leaf: Option<&'a str>) -> Option<&'a str> {
     let mut parents: HashMap<&str, &str> = HashMap::new();
     let mut shown: HashSet<&str> = HashSet::new();
@@ -342,7 +319,6 @@ pub(super) fn current_entry<'a>(roots: &[&'a Value], leaf: Option<&'a str>) -> O
     None
 }
 
-/// One entry's line: the person's and pi's messages, compactions and branch summaries.
 pub(super) fn tree_line(entry: &Value) -> Option<String> {
     match entry["type"].as_str()? {
         "message" => {
@@ -361,7 +337,6 @@ pub(super) fn tree_line(entry: &Value) -> Option<String> {
     }
 }
 
-/// A message's text: a plain string, or its text blocks.
 fn content_text(content: &Value) -> String {
     match content {
         Value::String(text) => text.clone(),
@@ -375,7 +350,6 @@ fn content_text(content: &Value) -> String {
     }
 }
 
-/// A message's first line, short enough for a row.
 fn excerpt(text: &str) -> String {
     let line = text
         .lines()
@@ -395,7 +369,6 @@ fn push_some(rows: &mut Vec<Row>, label: &str, value: Option<String>) {
     }
 }
 
-/// A whole number with thousands separators.
 pub(super) fn count(value: f64) -> String {
     let digits = format!("{}", value.max(0.0).round() as u64);
     let mut out = String::new();

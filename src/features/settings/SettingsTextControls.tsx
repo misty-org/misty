@@ -1,7 +1,7 @@
 import { cn, Input, Textarea } from "@misty/ui";
 import { type ChangeEvent } from "react";
 
-import { settingsDisabledControlClass } from "./settingsConstants";
+import { settingsDisabledControlClass } from "./settings_constants";
 
 import { useSettingsControlLabel } from "./SettingsControls";
 
@@ -31,7 +31,6 @@ export function TextControl(props: {
         if (event.key === "Enter") {
           event.currentTarget.blur();
         } else if (event.key === "Escape") {
-          // Cancel: restore the saved value; blurring then commits nothing.
           event.currentTarget.value = props.value;
           event.currentTarget.blur();
         }
@@ -40,7 +39,6 @@ export function TextControl(props: {
   );
 }
 
-/** A continuous value with its current reading, e.g. panel opacity or zoom. */
 export function TextAreaControl(props: {
   value: string;
   placeholder?: string;

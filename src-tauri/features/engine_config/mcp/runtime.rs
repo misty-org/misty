@@ -1,16 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-//! The MCP runtime list: what real sessions observed, not guesses.
-//!
-//! Source: the Claude CLI's `system/init` event (`mcp_servers` plus `tools`). The engines pass it
-//! to [`record_from_run`], which keeps a snapshot keyed by workspace with when and from which
-//! session it was collected. When the session ends the status only becomes "session ended" and
-//! the snapshot stays (the person still sees the last real connections); it never poses as live.
-//!
-//! Codex has no runtime channel for this: `engine_mcp_inventory` reports it as unsupported and
-//! starts no extra CLI.
-
 use super::{now_ms, McpRuntimeEntry, McpRuntimeSection};
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -33,7 +23,6 @@ fn snapshots() -> &'static parking_lot::Mutex<HashMap<String, Snapshot>> {
     CELL.get_or_init(|| parking_lot::Mutex::new(HashMap::new()))
 }
 
-/// Records run → workspace: later events carry only the run id, and the workspace is known at spawn.
 pub fn register_run(run_id: &str, workspace: &str) {
     if run_id.is_empty() || workspace.is_empty() {
         return;
@@ -43,7 +32,6 @@ pub fn register_run(run_id: &str, workspace: &str) {
         .insert(run_id.to_string(), workspace.to_string());
 }
 
-/// Records one session's MCP snapshot (claude `system/init`).
 pub fn record_from_run(
     run_id: &str,
     session_id: Option<&str>,
@@ -51,7 +39,6 @@ pub fn record_from_run(
     tools: Vec<String>,
 ) {
     let Some(workspace) = run_workspace().lock().get(run_id).cloned() else {
-        // A run that was never registered: don't guess the workspace; better to show nothing.
         return;
     };
     let entries: Vec<McpRuntimeEntry> = servers
@@ -100,7 +87,6 @@ pub fn record_from_run(
     }
 }
 
-/// The session settled (done/error): the snapshot stays but is marked ended; the run is forgotten.
 pub fn mark_run_ended(run_id: &str) {
     let workspace = run_workspace().lock().remove(run_id);
     let Some(workspace) = workspace else {
@@ -113,7 +99,6 @@ pub fn mark_run_ended(run_id: &str) {
     }
 }
 
-/// Claude's runtime section. No workspace, no session and no snapshot each give their own reason.
 pub(crate) fn claude_section(workspace: Option<&str>) -> McpRuntimeSection {
     let Some(workspace) = workspace else {
         return McpRuntimeSection {
@@ -127,8 +112,6 @@ pub(crate) fn claude_section(workspace: Option<&str>) -> McpRuntimeSection {
     };
     match snapshots().lock().get(workspace).cloned() {
         Some(snapshot) => McpRuntimeSection {
-            // Statuses are enumerable; the UI localizes them. `reason` stays
-            // for genuinely unexpected diagnostics only.
             status: if snapshot.ended {
                 "session_ended"
             } else {
@@ -142,7 +125,6 @@ pub(crate) fn claude_section(workspace: Option<&str>) -> McpRuntimeSection {
             entries: snapshot.entries,
         },
         None => McpRuntimeSection {
-            // The status key carries the explanation; the UI localizes it.
             status: "no_session".to_string(),
             reason: None,
             workspace: Some(workspace.to_string()),

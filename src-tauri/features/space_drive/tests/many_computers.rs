@@ -1,24 +1,3 @@
-//! Randomized runs of several computers against the fake server, after Dropbox's testing of its
-//! sync engine: random saves, renames and deletes on three computers of three people, with syncs
-//! in between, computers going offline and coming back, and replies lost after the server applied
-//! the change. Every file is a few lines of text, and each computer edits only its own line, so
-//! two computers' edits never overlap. After everyone comes back and settles, each run checks:
-//!
-//! - no content is ever lost: every line a computer last wrote and didn't replace itself is on
-//!   the server, in a live file (where a merge kept it beside the others' lines) or in the trash
-//!   (a replaced copy, or what someone trashed);
-//! - nothing trashed shows on any computer (a write after a trash brings the item back, so what
-//!   shows is what the server has live);
-//! - the server's order decides everything else: every computer shows the server's tree.
-//!
-//! `conflicts.rs` holds the same rules one scenario at a time: two computers' non-overlapping text
-//! edits both surviving, a write after a trash reviving the file, a delete refused only while the
-//! file is open.
-//!
-//! The network is simulated in the fake's `Http` rather than with `turmoil`: the sync core opens
-//! no sockets of its own (the glue's `Http` does), so a socket-level simulator would have nothing
-//! to intercept; dropped connections, offline computers and lost replies are injected where the
-//! core meets the network instead.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 mod common;
@@ -34,13 +13,35 @@ const COMPUTERS: usize = 3;
 
 #[derive(Clone, Debug)]
 enum Action {
-    Save { computer: usize, folder: u8, file: u8 },
-    Rename { computer: usize, folder: u8, file: u8, to: u8 },
-    Trash { computer: usize, folder: u8, file: u8 },
-    TrashFolder { computer: usize },
-    Sync { computer: usize },
-    Offline { computer: usize, offline: bool },
-    LoseReply { computer: usize },
+    Save {
+        computer: usize,
+        folder: u8,
+        file: u8,
+    },
+    Rename {
+        computer: usize,
+        folder: u8,
+        file: u8,
+        to: u8,
+    },
+    Trash {
+        computer: usize,
+        folder: u8,
+        file: u8,
+    },
+    TrashFolder {
+        computer: usize,
+    },
+    Sync {
+        computer: usize,
+    },
+    Offline {
+        computer: usize,
+        offline: bool,
+    },
+    LoseReply {
+        computer: usize,
+    },
 }
 
 fn action() -> impl Strategy<Value = Action> {
@@ -76,7 +77,6 @@ fn folder_path(folder: u8) -> &'static str {
     }
 }
 
-/// A file's lines: each computer's own line, with a line between them so edits never touch.
 fn template() -> Vec<String> {
     let mut lines = Vec::new();
     for computer in 0..COMPUTERS {
@@ -88,7 +88,6 @@ fn template() -> Vec<String> {
     lines
 }
 
-/// The line computer `computer` owns in a file, as `content` has it.
 fn own_line(content: &str, computer: usize) -> Option<String> {
     let prefix = format!("c{computer} ");
     content
@@ -97,14 +96,12 @@ fn own_line(content: &str, computer: usize) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// The lines each computer last wrote and still means to keep.
 #[derive(Default)]
 struct Intent {
     must: HashSet<String>,
 }
 
 impl Intent {
-    /// `computer` replaced its own line `before` (what it saw of the file) with `now`.
     fn wrote(&mut self, before: Option<&str>, now: String) {
         if let Some(before) = before {
             self.must.remove(before);
@@ -112,7 +109,6 @@ impl Intent {
         self.must.insert(now);
     }
 
-    /// `computer` deleted `id`: a line of its own in a file that never went up is let go.
     async fn deleted(&mut self, computer: usize, drive: &Drive, id: &ItemId) {
         let mut queue = vec![id.clone()];
         while let Some(at) = queue.pop() {
@@ -151,7 +147,9 @@ fn run(actions: Vec<Action>) {
     runtime.block_on(async {
         let server = FakeServer::new();
         let people = [("ana", "Ana"), ("ben", "Ben"), ("cy", "Cy")];
-        let dirs: Vec<tempfile::TempDir> = (0..COMPUTERS).map(|_| tempfile::tempdir().unwrap()).collect();
+        let dirs: Vec<tempfile::TempDir> = (0..COMPUTERS)
+            .map(|_| tempfile::tempdir().unwrap())
+            .collect();
         let computers: Vec<_> = people
             .iter()
             .map(|(user, name)| server.computer(user, name, &format!("{name}'s computer")))
@@ -159,17 +157,21 @@ fn run(actions: Vec<Action>) {
         let drives: Vec<Drive> = computers
             .iter()
             .zip(&dirs)
-            .map(|(computer, dir)| server.open_drive(computer, dir.path().to_path_buf(), runtime.handle().clone()))
+            .map(|(computer, dir)| {
+                server.open_drive(computer, dir.path().to_path_buf(), runtime.handle().clone())
+            })
             .collect();
         let mut intent = Intent::default();
         let mut counter = 0u64;
         for action in actions {
             match action {
-                Action::Save { computer, folder, file } => {
+                Action::Save {
+                    computer,
+                    folder,
+                    file,
+                } => {
                     let drive = &drives[computer];
                     let at = path(folder, file);
-                    // A person edits what they can open: the file as this computer has it, or a
-                    // new one. A file they can't open (offline, not downloaded) isn't edited.
                     let current = match drive.node_at(&space(), &at).unwrap() {
                         Some(node) if node.kind == Kind::File => {
                             match drive.read_bytes(&space(), &at).await {
@@ -198,7 +200,12 @@ fn run(actions: Vec<Action>) {
                     save(drive, &at, &bytes);
                     intent.wrote(before.as_deref(), line);
                 }
-                Action::Rename { computer, folder, file, to } => {
+                Action::Rename {
+                    computer,
+                    folder,
+                    file,
+                    to,
+                } => {
                     let drive = &drives[computer];
                     let Some(node) = drive.node_at(&space(), &path(folder, file)).unwrap() else {
                         continue;
@@ -208,9 +215,18 @@ fn run(actions: Vec<Action>) {
                         continue;
                     }
                     let folder_id = folder_id(drive, folder_path(folder));
-                    let _ = drive.rename(&space(), &node.id, folder_id.as_ref(), &format!("f{to}.txt"));
+                    let _ = drive.rename(
+                        &space(),
+                        &node.id,
+                        folder_id.as_ref(),
+                        &format!("f{to}.txt"),
+                    );
                 }
-                Action::Trash { computer, folder, file } => {
+                Action::Trash {
+                    computer,
+                    folder,
+                    file,
+                } => {
                     let drive = &drives[computer];
                     if let Some(node) = drive.node_at(&space(), &path(folder, file)).unwrap() {
                         intent.deleted(computer, drive, &node.id).await;
@@ -231,7 +247,9 @@ fn run(actions: Vec<Action>) {
                     computers[computer].offline.store(offline, Ordering::SeqCst);
                 }
                 Action::LoseReply { computer } => {
-                    computers[computer].lose_next_reply.store(true, Ordering::SeqCst);
+                    computers[computer]
+                        .lose_next_reply
+                        .store(true, Ordering::SeqCst);
                 }
             }
         }
@@ -241,21 +259,22 @@ fn run(actions: Vec<Action>) {
         }
         settle(&server, &drives).await;
 
-        // No content is ever lost: every line someone meant to keep is in a live file or in the
-        // trash.
         let contents = server.all_contents();
         for line in &intent.must {
             assert!(
-                contents.iter().any(|content| content.lines().any(|held| held == line)),
+                contents
+                    .iter()
+                    .any(|content| content.lines().any(|held| held == line)),
                 "{line} was lost"
             );
         }
-        // Nothing trashed shows on any computer.
         let trashed = server.trashed_ids();
         for drive in &drives {
-            assert!(ids(drive).is_disjoint(&trashed), "a trashed item shows on a computer");
+            assert!(
+                ids(drive).is_disjoint(&trashed),
+                "a trashed item shows on a computer"
+            );
         }
-        // The server's order decides the rest: every computer shows the server's tree.
         let wanted = server.live_tree();
         for drive in &drives {
             let shown: HashMap<String, (Kind, Option<String>)> = local_tree(drive)
@@ -276,154 +295,309 @@ proptest! {
     }
 }
 
-// Cases the randomized runs found, kept as they were shrunk.
-
-/// Deleted and saved again under its name before the delete went up: the version it replaced
-/// waits in the trash.
 #[test]
 fn a_file_saved_again_after_its_delete_keeps_the_old_one_in_the_trash() {
     run(vec![
-        Action::Save { computer: 0, folder: 1, file: 2 },
+        Action::Save {
+            computer: 0,
+            folder: 1,
+            file: 2,
+        },
         Action::Sync { computer: 0 },
-        Action::Trash { computer: 0, folder: 1, file: 2 },
-        Action::Save { computer: 0, folder: 1, file: 2 },
+        Action::Trash {
+            computer: 0,
+            folder: 1,
+            file: 2,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 1,
+            file: 2,
+        },
     ]);
 }
 
-/// An edit goes up while someone else's rename is already there: the editor takes the new name.
 #[test]
 fn an_edit_takes_a_rename_that_went_up_first() {
     run(vec![
-        Action::Save { computer: 1, folder: 0, file: 0 },
+        Action::Save {
+            computer: 1,
+            folder: 0,
+            file: 0,
+        },
         Action::Sync { computer: 1 },
         Action::Sync { computer: 0 },
-        Action::Rename { computer: 0, folder: 0, file: 0, to: 1 },
-        Action::Save { computer: 1, folder: 0, file: 0 },
+        Action::Rename {
+            computer: 0,
+            folder: 0,
+            file: 0,
+            to: 1,
+        },
+        Action::Save {
+            computer: 1,
+            folder: 0,
+            file: 0,
+        },
     ]);
 }
 
-/// A rename goes up after someone else wrote into the file: the renamer takes their content.
 #[test]
 fn a_rename_takes_content_that_went_up_first() {
     run(vec![
-        Action::Save { computer: 0, folder: 1, file: 0 },
+        Action::Save {
+            computer: 0,
+            folder: 1,
+            file: 0,
+        },
         Action::Sync { computer: 0 },
-        Action::Save { computer: 2, folder: 1, file: 0 },
-        Action::Rename { computer: 0, folder: 1, file: 0, to: 1 },
+        Action::Save {
+            computer: 2,
+            folder: 1,
+            file: 0,
+        },
+        Action::Rename {
+            computer: 0,
+            folder: 1,
+            file: 0,
+            to: 1,
+        },
         Action::Sync { computer: 2 },
     ]);
 }
 
-/// A new file's create landed but its answer was lost, and it was saved again here: that save
-/// still goes up.
 #[test]
 fn a_save_after_a_lost_create_answer_still_goes_up() {
     run(vec![
-        Action::Save { computer: 1, folder: 1, file: 0 },
+        Action::Save {
+            computer: 1,
+            folder: 1,
+            file: 0,
+        },
         Action::Sync { computer: 1 },
         Action::Sync { computer: 2 },
-        Action::Save { computer: 2, folder: 1, file: 1 },
+        Action::Save {
+            computer: 2,
+            folder: 1,
+            file: 1,
+        },
         Action::LoseReply { computer: 2 },
         Action::Sync { computer: 2 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
-        Action::Save { computer: 2, folder: 1, file: 1 },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
+        Action::Save {
+            computer: 2,
+            folder: 1,
+            file: 1,
+        },
     ]);
 }
 
-/// A file in a folder deleted here is gone with it: nothing under the folder is found by its path,
-/// so a rename can't move it over another file.
 #[test]
 fn nothing_in_a_deleted_folder_is_found_by_its_path() {
     run(vec![
-        Action::Save { computer: 0, folder: 0, file: 1 },
-        Action::Save { computer: 0, folder: 1, file: 0 },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 1,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 1,
+            file: 0,
+        },
         Action::Sync { computer: 0 },
-        Action::Trash { computer: 0, folder: 1, file: 1 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Trash {
+            computer: 0,
+            folder: 1,
+            file: 1,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
         Action::TrashFolder { computer: 0 },
-        Action::Rename { computer: 0, folder: 1, file: 0, to: 1 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Rename {
+            computer: 0,
+            folder: 1,
+            file: 0,
+            to: 1,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
     ]);
 }
 
-/// A folder deleted and made again here (`rm -r`, then `mkdir`) comes back empty, and what was in
-/// it waits in the trash.
 #[test]
 fn a_folder_made_again_after_its_delete_comes_back_empty() {
     run(vec![
-        Action::Save { computer: 0, folder: 1, file: 0 },
+        Action::Save {
+            computer: 0,
+            folder: 1,
+            file: 0,
+        },
         Action::Sync { computer: 0 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
         Action::TrashFolder { computer: 0 },
-        Action::Save { computer: 0, folder: 1, file: 0 },
+        Action::Save {
+            computer: 0,
+            folder: 1,
+            file: 0,
+        },
     ]);
 }
 
-/// A new file's create landed, its answer was lost, and someone's rename took its name meanwhile:
-/// once its creator learns of it, it is in the trash there too.
 #[test]
 fn a_file_trashed_before_its_lost_create_answer_is_learned_goes_here_too() {
     run(vec![
-        Action::Save { computer: 2, folder: 0, file: 1 },
+        Action::Save {
+            computer: 2,
+            folder: 0,
+            file: 1,
+        },
         Action::Sync { computer: 2 },
         Action::LoseReply { computer: 0 },
-        Action::Rename { computer: 2, folder: 0, file: 1, to: 0 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Rename {
+            computer: 2,
+            folder: 0,
+            file: 1,
+            to: 0,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
         Action::Sync { computer: 0 },
         Action::Sync { computer: 2 },
     ]);
 }
 
-/// A rename onto a taken name by a computer whose last create answer was lost, with a delete
-/// waiting to go up elsewhere at the end.
 #[test]
 fn a_delete_waiting_at_the_end_still_reaches_everyone() {
     run(vec![
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
         Action::LoseReply { computer: 2 },
-        Action::Save { computer: 2, folder: 0, file: 1 },
+        Action::Save {
+            computer: 2,
+            folder: 0,
+            file: 1,
+        },
         Action::Sync { computer: 0 },
         Action::Sync { computer: 2 },
-        Action::Offline { computer: 2, offline: true },
-        Action::Rename { computer: 2, folder: 0, file: 1, to: 0 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Offline {
+            computer: 2,
+            offline: true,
+        },
+        Action::Rename {
+            computer: 2,
+            folder: 0,
+            file: 1,
+            to: 0,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
         Action::Sync { computer: 0 },
-        Action::Rename { computer: 0, folder: 0, file: 0, to: 0 },
-        Action::Trash { computer: 1, folder: 0, file: 0 },
+        Action::Rename {
+            computer: 0,
+            folder: 0,
+            file: 0,
+            to: 0,
+        },
+        Action::Trash {
+            computer: 1,
+            folder: 0,
+            file: 0,
+        },
     ]);
 }
 
-/// An edit whose answer was lost, of a file someone's rename then trashed: sent again, the edit is
-/// already there, so the file goes to the trash here too.
 #[test]
 fn an_edit_sent_again_after_its_file_was_trashed_lets_it_go() {
     run(vec![
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
         Action::LoseReply { computer: 2 },
-        Action::Save { computer: 2, folder: 0, file: 1 },
+        Action::Save {
+            computer: 2,
+            folder: 0,
+            file: 1,
+        },
         Action::Sync { computer: 0 },
         Action::Sync { computer: 2 },
         Action::LoseReply { computer: 0 },
-        Action::Rename { computer: 2, folder: 0, file: 1, to: 0 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
+        Action::Rename {
+            computer: 2,
+            folder: 0,
+            file: 1,
+            to: 0,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
         Action::Sync { computer: 0 },
         Action::Sync { computer: 2 },
         Action::Sync { computer: 2 },
     ]);
 }
 
-/// A new file takes a name its creator's other file is moving away from (renamed here after its
-/// create answer was lost): it waits for the move, rather than writing into that file.
 #[test]
 fn a_new_file_waits_for_its_name_to_be_moved_off() {
     run(vec![
-        Action::Save { computer: 1, folder: 0, file: 0 },
+        Action::Save {
+            computer: 1,
+            folder: 0,
+            file: 0,
+        },
         Action::LoseReply { computer: 1 },
         Action::Sync { computer: 1 },
-        Action::Rename { computer: 1, folder: 0, file: 0, to: 2 },
-        Action::Save { computer: 0, folder: 0, file: 0 },
-        Action::Save { computer: 1, folder: 0, file: 2 },
-        Action::Save { computer: 1, folder: 0, file: 0 },
+        Action::Rename {
+            computer: 1,
+            folder: 0,
+            file: 0,
+            to: 2,
+        },
+        Action::Save {
+            computer: 0,
+            folder: 0,
+            file: 0,
+        },
+        Action::Save {
+            computer: 1,
+            folder: 0,
+            file: 2,
+        },
+        Action::Save {
+            computer: 1,
+            folder: 0,
+            file: 0,
+        },
     ]);
 }

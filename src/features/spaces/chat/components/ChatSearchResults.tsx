@@ -11,14 +11,13 @@ import {
   Text,
 } from "@misty/ui";
 import type { SpaceMessage } from "../../api/dto/entities";
-import { searchSpaceMessages } from "../../search/spaceSearch";
-import { spansToText } from "./messageText";
+import { searchSpaceMessages } from "../../search/space_search";
+import { spansToText } from "./message_text";
 import { ChatAvatar } from "./ChatAvatar";
 
 type Found =
   { status: "loading" } | { status: "done"; messages: SpaceMessage[] } | { status: "failed" };
 
-/** Splits "from:alice in:general budget" into its filters and its words. */
 function parseQuery(query: string) {
   let from = "";
   let into = "";
@@ -40,11 +39,6 @@ const stampFormat = new Intl.DateTimeFormat(undefined, {
   minute: "2-digit",
 });
 
-/**
- * A message search's results, in the member list's place: how many, the order, then each match
- * under the channel it was said in, its words marked. Picking one opens it in its chat. The
- * server matches the words; `from:` and `in:` narrow them here.
- */
 export function ChatSearchResults(props: {
   spaceId: string;
   query: string;
@@ -191,7 +185,6 @@ export function ChatSearchResults(props: {
   );
 }
 
-/** The text with each searched word marked. */
 function Highlighted(props: { text: string; terms: string[] }) {
   if (!props.terms.length) return <>{props.text}</>;
   const pattern = new RegExp(

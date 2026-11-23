@@ -1,15 +1,10 @@
-import type { GlobalAiMessage } from "../state/conversationTypes";
+import type { GlobalAiMessage } from "../state/conversation_types";
 import { Button } from "@misty/ui";
 import { LedgerTable } from "../../checkpoints/LedgerTable";
 import type { LedgerRow } from "../../checkpoints/ledger";
 import { StatusRow, StatusTable } from "../../progress/StatusTable";
 import type { UnfinishedItem } from "../../progress/unfinished";
 
-/**
- * How a run that did not finish ends, in the transcript where it happened and
- * never as a popup over the composer: its unfinished requirements with their
- * reasons, a plain failure, or a stop.
- */
 export function AgentRunOutcome({
   message,
   remaining,
@@ -25,13 +20,11 @@ export function AgentRunOutcome({
 }: {
   message: GlobalAiMessage;
   remaining: UnfinishedItem[];
-  /** The failure's own words, when the run failed without an answer. */
   failure: string;
   retryPrompt?: string;
   retryFrom?: string;
   working: boolean;
   onRetry: (prompt: string, fromMessageId?: string) => void;
-  /** The rows the run kept (src/features/agents/checkpoints/ledger.ts). */
   ledger?: LedgerRow[];
   conversationId?: string;
   onResume?: (rows: LedgerRow[], only?: string[]) => void;

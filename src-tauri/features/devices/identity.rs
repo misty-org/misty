@@ -1,6 +1,3 @@
-//! This computer's key for agent run grants, kept in the credential store. The private key never
-//! leaves native code: every signature here prefixes an allow-listed domain, so one made for one
-//! purpose is never valid for another.
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 
@@ -9,7 +6,6 @@ use crate::devices::key;
 
 pub const RUN_GRANT_DOMAIN: &str = "misty.device.run-grant.v1";
 
-/// Records this key may sign as JSON arrays, by their leading domain.
 const RECORD_DOMAINS: [&str; 1] = [RUN_GRANT_DOMAIN];
 
 pub struct DeviceIdentity {
@@ -17,7 +13,6 @@ pub struct DeviceIdentity {
 }
 
 impl DeviceIdentity {
-    /// Loads (or creates) this install's key for an account.
     pub fn load(account_id: &str, local_device_id: &str) -> ApiResult<Self> {
         let seed = key::load_or_create(account_id, local_device_id)?;
         Ok(Self {
@@ -36,8 +31,6 @@ impl DeviceIdentity {
         STANDARD.encode(self.signing.verifying_key().as_bytes())
     }
 
-    /// Signs a record whose bytes are a JSON array starting with an allowed
-    /// domain string.
     pub fn sign_record(&self, payload: &[u8]) -> ApiResult<String> {
         let allowed = RECORD_DOMAINS
             .iter()
@@ -51,7 +44,6 @@ impl DeviceIdentity {
     }
 }
 
-/// Verifies a device-signed record against a base64 public key.
 pub fn verify_device_signature(public_key: &str, payload: &[u8], signature: &str) -> bool {
     let (Ok(key), Ok(signature)) = (STANDARD.decode(public_key), STANDARD.decode(signature)) else {
         return false;

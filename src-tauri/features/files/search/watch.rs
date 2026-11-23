@@ -22,20 +22,15 @@ use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use super::filter::ScanFilter;
 use super::Service;
 
-/// Quiet time after the last event before a batch is applied.
 const DEBOUNCE: Duration = Duration::from_millis(100);
-/// A batch that never goes quiet is still applied this often.
 const MAX_DELAY: Duration = Duration::from_secs(1);
-/// While a walk holds the catalog, a waiting batch is tried again this often.
 const RETRY: Duration = Duration::from_millis(500);
 
 pub(super) enum Signal {
     Changed(PathBuf),
-    /// Events below this folder were dropped; it has to be walked.
     Rescan(PathBuf),
 }
 
-/// The running watch. Dropping it stops the watcher, and with it the thread that applies batches.
 pub(super) struct IndexWatch {
     _watcher: RecommendedWatcher,
     sender: mpsc::Sender<Signal>,
@@ -43,47 +38,54 @@ pub(super) struct IndexWatch {
 
 impl IndexWatch {
     pub(super) fn start(service: Weak<Service>, home: &Path) -> Result<Self, String> {
-        let failed = |error: &dyn std::fmt::Display| format!("The search index can't follow changes: {error}");
-        // notify reads the folder itself, so the gate checks it here.
+        let failed = |error: &dyn std::fmt::Display| {
+            format!("The search index can't follow changes: {error}")
+        };
         check_disk(home, Access::Read).map_err(|error| failed(&error))?;
         let paths = PathMap::new(home);
         let filter = ScanFilter::new(home);
         let (sender, receiver) = mpsc::channel::<Signal>();
         let events = sender.clone();
-        let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            let Ok(event) = event else { return };
-            if matches!(event.kind, EventKind::Access(_)) {
-                return;
-            }
-            let rescan = event.need_rescan();
-            if rescan && event.paths.is_empty() {
-                let _ = events.send(Signal::Rescan(paths.home.clone()));
-            }
-            for path in event.paths.iter().filter_map(|path| paths.indexed(path)) {
-                // Most events land in caches and app data, which the index skips anyway.
-                if filter.reach(&path).is_none() {
-                    continue;
+        let mut watcher =
+            notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+                let Ok(event) = event else { return };
+                if matches!(event.kind, EventKind::Access(_)) {
+                    return;
                 }
-                let _ = events.send(if rescan { Signal::Rescan(path) } else { Signal::Changed(path) });
-            }
-        })
-        .map_err(|error| failed(&error))?;
-        watcher.watch(home, RecursiveMode::Recursive).map_err(|error| failed(&error))?;
+                let rescan = event.need_rescan();
+                if rescan && event.paths.is_empty() {
+                    let _ = events.send(Signal::Rescan(paths.home.clone()));
+                }
+                for path in event.paths.iter().filter_map(|path| paths.indexed(path)) {
+                    if filter.reach(&path).is_none() {
+                        continue;
+                    }
+                    let _ = events.send(if rescan {
+                        Signal::Rescan(path)
+                    } else {
+                        Signal::Changed(path)
+                    });
+                }
+            })
+            .map_err(|error| failed(&error))?;
+        watcher
+            .watch(home, RecursiveMode::Recursive)
+            .map_err(|error| failed(&error))?;
         std::thread::Builder::new()
             .name("misty-files-index-watch".into())
             .spawn(move || apply_batches(receiver, service))
             .map_err(|error| failed(&error))?;
-        Ok(Self { _watcher: watcher, sender })
+        Ok(Self {
+            _watcher: watcher,
+            sender,
+        })
     }
 
-    /// Hands a change Files made itself to the watch.
     pub(super) fn note(&self, path: &Path) {
         let _ = self.sender.send(Signal::Changed(path.to_path_buf()));
     }
 }
 
-/// Gathers events until they go quiet, then applies them as one update. Ends when the watch is
-/// dropped.
 fn apply_batches(receiver: mpsc::Receiver<Signal>, service: Weak<Service>) {
     let mut changed = BTreeSet::new();
     let mut rescan = BTreeSet::new();
@@ -122,11 +124,12 @@ fn apply_batches(receiver: mpsc::Receiver<Signal>, service: Weak<Service>) {
                 }
             }
         }
-        let Some(service) = service.upgrade() else { return };
+        let Some(service) = service.upgrade() else {
+            return;
+        };
         let paths: Vec<PathBuf> = changed.iter().cloned().collect();
         let folders: Vec<PathBuf> = rescan.iter().cloned().collect();
         match service.apply(&paths, &folders) {
-            // A walk holds the catalog; keep the batch and try again.
             None => continue,
             Some(Err(error)) => eprintln!("Files' search index couldn't take a change: {error}"),
             Some(Ok(())) => {}
@@ -136,8 +139,6 @@ fn apply_batches(receiver: mpsc::Receiver<Signal>, service: Weak<Service>) {
     }
 }
 
-/// Maps event paths, which FSEvents reports with links resolved (`/private/var/...`), back to the
-/// form the home folder is indexed under.
 struct PathMap {
     real: PathBuf,
     home: PathBuf,
@@ -168,9 +169,18 @@ mod tests {
 
     #[test]
     fn event_paths_map_back_to_the_indexed_home() {
-        let map = PathMap { real: PathBuf::from("/private/var/home"), home: PathBuf::from("/var/home") };
-        assert_eq!(map.indexed(Path::new("/private/var/home/a/b.txt")), Some(PathBuf::from("/var/home/a/b.txt")));
-        assert_eq!(map.indexed(Path::new("/var/home/c.txt")), Some(PathBuf::from("/var/home/c.txt")));
+        let map = PathMap {
+            real: PathBuf::from("/private/var/home"),
+            home: PathBuf::from("/var/home"),
+        };
+        assert_eq!(
+            map.indexed(Path::new("/private/var/home/a/b.txt")),
+            Some(PathBuf::from("/var/home/a/b.txt"))
+        );
+        assert_eq!(
+            map.indexed(Path::new("/var/home/c.txt")),
+            Some(PathBuf::from("/var/home/c.txt"))
+        );
         assert_eq!(map.indexed(Path::new("/private/var/other")), None);
     }
 }

@@ -5,19 +5,8 @@ use super::{
 };
 use serde_json::{json, Value};
 
-/// CodeBuddy's own "skip these questions" answer: the tool settles with a
-/// non-error "the user chose not to answer, continue" result.
 const SKIP_QUESTION_ACTION: &str = "skip_question";
 
-/// Reply to a parked AskUserQuestion `can_use_tool` request in CodeBuddy's
-/// shape, `{allowed, updatedInput}` (a claude-style `behavior: "allow"` reads
-/// as a denial there). Answers are keyed by question text and the CLI's
-/// schema takes string values only, so multi-select picks are joined ", ".
-///
-/// A skip (`None`) is CodeBuddy's native `_action: "skip_question"`, not a
-/// denial: a denial lands in the turn's `permission_denials` (a bogus
-/// permission card) and hands the model an error result. An empty map is a
-/// skip too: allowed with no answers parks the CLI on answers forever.
 pub(super) fn question_response(
     request_id: &str,
     context: &Value,
@@ -46,8 +35,6 @@ pub(super) fn question_response(
     }))
 }
 
-/// Each answer as the single string CodeBuddy's schema accepts. Malformed
-/// values fail before any frame is written, so the card stays answerable.
 fn answer_texts(
     answers: serde_json::Map<String, Value>,
 ) -> Result<serde_json::Map<String, Value>, String> {
@@ -72,12 +59,6 @@ fn malformed_answer(question: &str) -> String {
     format!("answer to \"{question}\" must be a string or a list of strings")
 }
 
-/// Provider-selection env keys a codebuddy channel owns outright once a
-/// channel drives the launch. Like the claude adapter (claude_channel.rs),
-/// they are masked with empty strings in the `--settings` overlay so a stale
-/// key/endpoint in the user's native settings.json cannot silently override
-/// the channel: CodeBuddy applies settings.json `env` on top of the inherited
-/// process environment, and `--settings` has the CLI's highest precedence.
 const CHANNEL_SETTINGS_ENV_KEYS: &[&str] = &[
     "CODEBUDDY_BASE_URL",
     "CODEBUDDY_API_KEY",
@@ -85,15 +66,6 @@ const CHANNEL_SETTINGS_ENV_KEYS: &[&str] = &[
     "CODEBUDDY_INTERNET_ENVIRONMENT",
 ];
 
-/// Route a selected channel through a `--settings <path>` overlay (highest
-/// precedence) instead of relying on the inherited process env alone, which
-/// native settings.json would otherwise beat.
-///
-/// The overlay carries CODEBUDDY_API_KEY, so it is staged in a private
-/// 0600 file (mirroring claude_channel::stage) rather than inlined on argv —
-/// an inline JSON would expose the key to `ps`, /proc/<pid>/cmdline, and
-/// diagnostic collectors for the process's whole lifetime. The file is
-/// removed via cleanup_files once the child exits.
 pub(super) fn apply_channel(
     built: &mut BuiltCommand,
     env: &std::collections::HashMap<String, String>,
@@ -108,10 +80,6 @@ pub(super) fn apply_channel(
         overlay.insert(key.clone(), serde_json::Value::String(value.clone()));
     }
     let mut settings = serde_json::json!({ "env": overlay });
-    // A stale top-level `model` in the user's native settings.json survives a
-    // `--settings` merge (that is exactly how models/codebuddy.rs reads the
-    // configured default). Mirror the selected model, or the channel's own
-    // CODEBUDDY_MODEL when no request model was selected, into the overlay.
     let model = model.map(str::trim).filter(|m| !m.is_empty()).or_else(|| {
         env.get("CODEBUDDY_MODEL")
             .map(String::as_str)
@@ -135,9 +103,6 @@ fn stage_overlay(
     Ok(())
 }
 
-/// Stage a JSON document in a private 0600 file for argv flags that would
-/// otherwise expose credentials (`--settings`, `--mcp-config`) to `ps` /
-/// `/proc/<pid>/cmdline for the child's whole lifetime.
 pub(super) fn stage_private_json(
     directory: &std::path::Path,
     prefix: &str,
@@ -153,28 +118,25 @@ fn stage_private_json_with_writer(
     directory: &std::path::Path,
     prefix: &str,
     value: &serde_json::Value,
-    write: impl FnOnce(&mut std::fs::File, &[u8]) -> std::io::Result<()>,
+    write: impl FnOnce(&mut file_access::fs::File, &[u8]) -> std::io::Result<()>,
 ) -> Result<std::path::PathBuf, String> {
     let content = serde_json::to_vec(value)
         .map_err(|_| format!("Cannot serialize CodeBuddy {prefix} settings"))?;
-    std::fs::create_dir_all(directory)
+    file_access::fs::create_dir_all(directory)
         .map_err(|e| format!("create CodeBuddy staging directory: {e}"))?;
     let path = directory.join(format!("{prefix}-{}.json", uuid::Uuid::new_v4()));
-    let mut options = std::fs::OpenOptions::new();
+    let mut options = file_access::fs::OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
     let mut file = options
         .open(&path)
         .map_err(|e| format!("create private CodeBuddy settings: {e}"))?;
     if let Err(error) = write(&mut file, &content) {
-        // Close before removal so this also works on Windows. The original
-        // write error is more useful than a best-effort cleanup error.
         drop(file);
-        let _ = std::fs::remove_file(&path);
+        let _ = file_access::fs::remove_file(&path);
         return Err(format!("write private CodeBuddy settings: {error}"));
     }
     Ok(path)
@@ -191,6 +153,12 @@ impl CodeBuddyEngine {
     }
 }
 
+impl Default for CodeBuddyEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Engine for CodeBuddyEngine {
     fn id(&self) -> &'static str {
         "codebuddy"
@@ -203,7 +171,6 @@ impl Engine for CodeBuddyEngine {
     fn supports_mcp(&self) -> bool {
         true
     }
-    /// The CLI ships its own web search tool.
     fn supports_web_search(&self) -> bool {
         true
     }
@@ -211,17 +178,9 @@ impl Engine for CodeBuddyEngine {
         true
     }
 
-    /// Its help lists the modes this install has (`modes::learn_reported`).
     fn modes_help_flag(&self) -> Option<&'static str> {
         Some("--permission-mode")
     }
-    /// CodeBuddy's permission modes (`--permission-mode default | auto | plan`). Headless
-    /// CodeBuddy has no --permission-prompt-tool, so in Default what it would ask about is
-    /// refused, and the model is told so. It lists three more that aren't offered:
-    /// `bypassPermissions` (no sandbox keeps it inside its folder), `acceptEdits` (it approves
-    /// only edits, so a headless run's commands have no one to approve them; `auto`, its own
-    /// reviewer, replaced it) and `dontAsk` (refusing instead of asking is what Default already
-    /// does headless).
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[
@@ -247,8 +206,6 @@ impl Engine for CodeBuddyEngine {
         cmd.arg("--include-partial-messages");
 
         let mut preapproved: Vec<&str> = Vec::new();
-        // Files staged for this child (private settings / MCP config); removed
-        // once the child exits, and swept at startup if the app dies mid-run.
         let mut cleanup_files: Vec<std::path::PathBuf> = Vec::new();
         let allowed: Vec<&str> = req
             .allowed_tools
@@ -265,10 +222,6 @@ impl Engine for CodeBuddyEngine {
             return Err("tool constraints must not be empty".to_string());
         }
 
-        // MCP servers first: their pre-approved tool names must land in the
-        // SAME --allowedTools emission as everything else — if the CLI treats
-        // a repeated flag as last-wins, a second emission would clobber the
-        // user's tool whitelist.
         let mcp_servers = req
             .mcp_servers
             .as_ref()
@@ -277,8 +230,6 @@ impl Engine for CodeBuddyEngine {
             .unwrap_or_default();
         if !mcp_servers.is_empty() {
             let config = serde_json::json!({ "mcpServers": mcp_servers });
-            // The Space server's bearer token rides in it; inline JSON would expose it on argv
-            // for the child's whole lifetime, so stage it in a private file like the channel overlay.
             let path = stage_private_json(
                 &crate::engines::support::paths::app_home().join("codebuddy-staging"),
                 "mcp",
@@ -291,10 +242,6 @@ impl Engine for CodeBuddyEngine {
         if !allowed.is_empty() {
             cmd.arg("--permission-mode");
             cmd.arg("plan");
-            // --allowedTools only pre-approves without prompting; it is not a
-            // whitelist. The real tool-set restriction is --tools
-            // (comma-separated): anything not listed is unavailable to the
-            // model, including tools a future CLI version adds.
             cmd.arg("--tools");
             cmd.arg(
                 allowed
@@ -311,14 +258,6 @@ impl Engine for CodeBuddyEngine {
             for tool in &preapproved {
                 cmd.arg(*tool);
             }
-            // Defense in depth on top of --tools: deny the known write/exec/
-            // sub-agent tools explicitly so a read-only whitelist stays
-            // read-only even if the whitelist flag is ignored.
-            //
-            // CodeBuddy names differ from Claude's: PowerShell is the shell
-            // tool on Windows and Agent/Workflow/TeamCreate spawn sub-agents.
-            // Deny both families so a read-only whitelist stays read-only
-            // even when the user's settings.json permissions.allow lists them.
             let denied: Vec<&str> = [
                 "Bash",
                 "PowerShell",
@@ -333,8 +272,6 @@ impl Engine for CodeBuddyEngine {
             .into_iter()
             .filter(|tool| !allowed.contains(tool))
             .collect();
-            // Never emit a flag with zero values: the next flag would be
-            // consumed as its argument.
             if !denied.is_empty() {
                 cmd.arg("--disallowedTools");
                 for tool in denied {
@@ -344,10 +281,6 @@ impl Engine for CodeBuddyEngine {
         } else {
             let mode = self.resolve_permission(req.permission.as_deref());
             cmd.arg("--permission-mode");
-            // "auto" maps to the CLI's own auto classifier (officially
-            // supported under -p). The old acceptEdits fallback only
-            // auto-approves file edits, so headless Bash/network calls
-            // had no one to approve them and were denied outright.
             cmd.arg(match mode {
                 "plan" => "plan",
                 "auto" => "auto",
@@ -377,10 +310,6 @@ impl Engine for CodeBuddyEngine {
             let trimmed = effort.trim();
             if !trimmed.is_empty() {
                 cmd.arg("--effort");
-                // The UI's top level is "ultra"; the CLI names it "max".
-                // Other levels (low/medium/high/xhigh/max) pass through as-is:
-                // an unsupported value fails loudly in the CLI's own error
-                // output rather than being silently remapped to a wrong tier.
                 cmd.arg(match trimmed {
                     "ultra" => "max",
                     other => other,
@@ -407,11 +336,9 @@ impl Engine for CodeBuddyEngine {
         }
 
         let user_message = images::claude_stdin_message(&req.prompt, &req.images, &req.workspace)
-            .map_err(|error| {
+            .inspect_err(|_| {
             super::cleanup_staged_files(&cleanup_files);
-            error
         })?;
-        // CodeBuddy processes the first initialize before the queued user frame.
         let initialize = json!({
             "type": "control_request",
             "request_id": uuid::Uuid::new_v4().to_string(),
@@ -459,10 +386,6 @@ mod tests {
         }
     }
 
-    /// Endpoint security treats a GUI app enumerating the OS credential store
-    /// as credential discovery (v1.2.0 was flagged for a hidden `cmdkey /list`).
-    /// CodeBuddy's login state stays CLI-owned: this engine never shells out
-    /// to a credential-store tool.
     #[test]
     fn never_spawns_credential_store_tools() {
         let source = include_str!("codebuddy.rs");
@@ -669,11 +592,6 @@ mod tests {
         );
     }
 
-    /// A skip must not be a denial: CodeBuddy lists denied calls in the
-    /// turn's `permission_denials`, which surfaced as a bogus "permission
-    /// required" card, and the model got an error result. The native skip is
-    /// allowed with `answers._action = "skip_question"`. An empty map is a
-    /// skip too — allowed with no answers parks the CLI on answers forever.
     #[test]
     fn skipped_question_uses_codebuddys_native_skip_not_a_denial() {
         let context = json!({
@@ -697,9 +615,6 @@ mod tests {
         }
     }
 
-    /// Malformed answers fail before a frame is written (the card stays
-    /// answerable) instead of silently degrading into a skip or a dropped
-    /// label.
     #[test]
     fn malformed_question_answers_are_rejected() {
         let context = json!({"input": {"questions": []}, "toolUseId": "tool"});
@@ -730,7 +645,6 @@ mod tests {
 
     #[test]
     fn build_command_never_passes_dash_y() {
-        // No folder sandbox, so no bypass mode: a stray request runs in CodeBuddy's first mode.
         let engine = CodeBuddyEngine::new();
         let mut req = sample_req();
         req.permission = Some("bypass".to_string());
@@ -763,8 +677,6 @@ mod tests {
         };
 
         let args = args_of(vec!["Read".to_string(), "Glob".to_string()]);
-        // --tools is the real whitelist: exactly the allowed tools, and
-        // nothing else (a comma-separated single argument).
         let whitelist = &args[args
             .iter()
             .position(|a| a == "--tools")
@@ -781,10 +693,6 @@ mod tests {
             .position(|a| a == "--disallowedTools")
             .expect("--disallowedTools must be emitted")
             + 1..];
-        // CodeBuddy's own tool names: PowerShell is the shell tool on
-        // Windows; Agent/Workflow/TeamCreate spawn sub-agents. A read-only
-        // whitelist must deny both the Claude-named and CodeBuddy-named
-        // write/exec/delegate tools.
         for tool in [
             "Bash",
             "PowerShell",
@@ -799,7 +707,6 @@ mod tests {
             assert!(denied.iter().any(|a| a == tool), "missing deny for {tool}");
         }
 
-        // An explicitly allowed tool must not also be denied.
         let args = args_of(vec!["Bash".to_string()]);
         let denied = &args[args.iter().position(|a| a == "--disallowedTools").unwrap() + 1..];
         assert!(!denied.iter().any(|a| a == "Bash"));
@@ -836,8 +743,6 @@ mod tests {
             .collect();
         assert_eq!(args.len(), 2);
         assert_eq!(args[0], "--settings");
-        // The API key must never appear on argv: ps, /proc/<pid>/cmdline and
-        // diagnostic collectors would expose it for the child's lifetime.
         assert!(
             args.iter().all(|a| !a.contains("sk-test")),
             "api key leaked onto argv: {args:?}"
@@ -862,9 +767,6 @@ mod tests {
         );
         assert_eq!(staged["env"]["CODEBUDDY_API_KEY"], "sk-test");
         assert_eq!(staged["env"]["CODEBUDDY_INTERNET_ENVIRONMENT"], "internal");
-        // Convention keys the channel does not set are masked with empty
-        // strings, so a stale native settings.json value cannot win over the
-        // channel (--settings has the CLI's highest precedence).
         assert_eq!(staged["env"]["CODEBUDDY_MODEL"], "");
         super::super::cleanup_staged_files(&built.cleanup_files);
         assert!(!staged_path.exists());
@@ -892,7 +794,6 @@ mod tests {
         let staged_path = built.cleanup_files[0].clone();
         let staged: serde_json::Value =
             serde_json::from_slice(&std::fs::read(&staged_path).unwrap()).unwrap();
-        // A selected model must outrank a stale native settings.json `model`.
         assert_eq!(staged["model"], "glm-5.3");
         super::super::cleanup_staged_files(&built.cleanup_files);
         std::fs::remove_dir(dir).unwrap();
@@ -965,8 +866,6 @@ mod tests {
         let mut out = Vec::new();
         let sample = r#"{"type":"assistant","uuid":"u1","session_id":"s1","message":{"id":"m1","content":[{"type":"text","text":"hello world"}],"model":"custom:kimi-k3","role":"assistant"}}"#;
         engine.parse_line(sample, &mut out);
-        // An assistant snapshot surfaces the session id and the served model
-        // (message text arrives via stream_event lines, not this snapshot).
         assert!(out
             .iter()
             .any(|e| matches!(e, EngineEvent::SessionId(id) if id == "s1")));

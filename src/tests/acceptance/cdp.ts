@@ -1,4 +1,3 @@
-/** A minimal Chrome DevTools Protocol client and the key tables its input events use. */
 export class Cdp {
   private next = 0;
   private pending = new Map<

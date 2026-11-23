@@ -1,6 +1,3 @@
-//! Anthropic's token counts. Ported from `convert-anthropic-usage.ts`. Reading a cached token costs
-//! about a tenth of a fresh one, and writing one a little more, so these numbers decide what a run
-//! costs and have to stay exact.
 use serde_json::{json, Map, Value};
 
 use crate::model_calls::stream::{InputTokens, OutputTokens, Usage};
@@ -20,7 +17,9 @@ fn count(usage: &Value, name: &str) -> Option<u64> {
 }
 
 fn number_or_absent(usage: &Value, name: &str) -> bool {
-    usage.get(name).map_or(true, |value| value.is_null() || value.is_number())
+    usage
+        .get(name)
+        .map_or(true, |value| value.is_null() || value.is_number())
 }
 
 pub(super) fn valid_start(usage: &Value) -> Result<(), &'static str> {
@@ -35,7 +34,12 @@ pub(super) fn valid_start(usage: &Value) -> Result<(), &'static str> {
     }
 }
 
-const ITERATION_TYPES: [&str; 4] = ["compaction", "message", "advisor_message", "fallback_message"];
+const ITERATION_TYPES: [&str; 4] = [
+    "compaction",
+    "message",
+    "advisor_message",
+    "fallback_message",
+];
 
 fn valid_iteration(iteration: &Value) -> bool {
     iteration
@@ -82,11 +86,13 @@ fn keep(object: &Value, names: &[&str]) -> Value {
     Value::Object(kept)
 }
 
-/// A delta's usage keeps fields nobody has heard of, but its nested parts keep only the known ones.
 pub(super) fn known_fields(usage: &Value) -> Value {
     let mut fields = usage.clone();
     if let Some(object) = fields.as_object_mut() {
-        if let Some(details) = object.get_mut("output_tokens_details").filter(|details| details.is_object()) {
+        if let Some(details) = object
+            .get_mut("output_tokens_details")
+            .filter(|details| details.is_object())
+        {
             *details = keep(details, &["thinking_tokens"]);
         }
         if let Some(Value::Array(iterations)) = object.get_mut("iterations") {
@@ -120,7 +126,10 @@ impl TokenCounts {
             self.input = input;
         }
         self.output = count(usage, "output_tokens").unwrap_or(0);
-        if let Some(details) = usage.get("output_tokens_details").filter(|details| !details.is_null()) {
+        if let Some(details) = usage
+            .get("output_tokens_details")
+            .filter(|details| !details.is_null())
+        {
             self.thinking = count(details, "thinking_tokens");
         }
         if let Some(read) = count(usage, "cache_read_input_tokens") {
@@ -134,25 +143,41 @@ impl TokenCounts {
         }
     }
 
-    /// Iterations are the real totals when compaction or the advisor ran, except advisor ones,
-    /// which bill at another rate. After a server-side fallback the top-level totals already
-    /// describe the answer that was served, and the blocked attempt must not count.
     fn totals(&self) -> (u64, u64) {
-        let Some(iterations) = self.iterations.as_ref().filter(|iterations| !iterations.is_empty()) else {
+        let Some(iterations) = self
+            .iterations
+            .as_ref()
+            .filter(|iterations| !iterations.is_empty())
+        else {
             return (self.input, self.output);
         };
-        let kind = |iteration: &Value| iteration.get("type").and_then(Value::as_str).map(str::to_owned);
-        if iterations.iter().any(|iteration| kind(iteration).as_deref() == Some("fallback_message")) {
+        let kind = |iteration: &Value| {
+            iteration
+                .get("type")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        };
+        if iterations
+            .iter()
+            .any(|iteration| kind(iteration).as_deref() == Some("fallback_message"))
+        {
             return (self.input, self.output);
         }
         let executors: Vec<&Value> = iterations
             .iter()
-            .filter(|iteration| matches!(kind(iteration).as_deref(), Some("compaction" | "message")))
+            .filter(|iteration| {
+                matches!(kind(iteration).as_deref(), Some("compaction" | "message"))
+            })
             .collect();
         if executors.is_empty() {
             return (self.input, self.output);
         }
-        let sum = |name: &str| executors.iter().map(|iteration| count(iteration, name).unwrap_or(0)).sum();
+        let sum = |name: &str| {
+            executors
+                .iter()
+                .map(|iteration| count(iteration, name).unwrap_or(0))
+                .sum()
+        };
         (sum("input_tokens"), sum("output_tokens"))
     }
 
@@ -167,7 +192,9 @@ impl TokenCounts {
             },
             output_tokens: OutputTokens {
                 total: Some(output),
-                text: self.thinking.map(|thinking| output.saturating_sub(thinking)),
+                text: self
+                    .thinking
+                    .map(|thinking| output.saturating_sub(thinking)),
                 reasoning: self.thinking,
             },
             raw: Some(raw.unwrap_or_else(|| self.zeros())),
@@ -193,12 +220,27 @@ impl TokenCounts {
                 .iter()
                 .map(|iteration| {
                     let mut mapped = Map::new();
-                    mapped.insert("type".into(), iteration.get("type").cloned().unwrap_or(Value::Null));
+                    mapped.insert(
+                        "type".into(),
+                        iteration.get("type").cloned().unwrap_or(Value::Null),
+                    );
                     if let Some(model) = iteration.get("model").filter(|model| !model.is_null()) {
                         mapped.insert("model".into(), model.clone());
                     }
-                    mapped.insert("inputTokens".into(), iteration.get("input_tokens").cloned().unwrap_or(Value::Null));
-                    mapped.insert("outputTokens".into(), iteration.get("output_tokens").cloned().unwrap_or(Value::Null));
+                    mapped.insert(
+                        "inputTokens".into(),
+                        iteration
+                            .get("input_tokens")
+                            .cloned()
+                            .unwrap_or(Value::Null),
+                    );
+                    mapped.insert(
+                        "outputTokens".into(),
+                        iteration
+                            .get("output_tokens")
+                            .cloned()
+                            .unwrap_or(Value::Null),
+                    );
                     for (from, to) in [
                         ("cache_creation_input_tokens", "cacheCreationInputTokens"),
                         ("cache_read_input_tokens", "cacheReadInputTokens"),

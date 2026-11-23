@@ -1,11 +1,9 @@
 import type { ComponentProps, ReactNode } from "react";
 import { Button } from "@misty/ui";
 import { AgentPlanCard } from "../../plans/AgentPlanCard";
-import type { AgentPlan, AgentPlanVersion } from "../../plans/planTypes";
+import type { AgentPlan, AgentPlanVersion } from "../../plans/plan_types";
 import { AgentConversationView } from "./AgentConversationView";
 
-/** What the conversation's scroll area shows: the transcript and any proposed plan, or an
- * empty state while there are no messages. */
 export function AgentConversationTranscript({
   view,
   plan,
@@ -22,7 +20,6 @@ export function AgentConversationTranscript({
   onRunPlan: (prompt: string) => void;
   onKeepPlanning: () => void;
   emptyContent?: ReactNode;
-  /** No agent exists yet and conversations have loaded. */
   showCreate: boolean;
   onCreate: () => void;
 }) {

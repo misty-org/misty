@@ -1,4 +1,4 @@
-#![allow(clippy::disallowed_methods)] // Fixtures are built with the standard library.
+#![allow(clippy::disallowed_methods)]
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
@@ -21,8 +21,6 @@ struct Scratch {
     db: database::store::Store,
 }
 
-/// The test binary points HOME at a scratch folder (`isolate_for_tests`); the CLIs' files
-/// live in the person's real one, which their account record names.
 fn use_real_home() {
     // SAFETY: getpwuid returns the calling user's static record, read before anything else.
     let home = unsafe {
@@ -98,9 +96,6 @@ fn info_text(output: &Output) -> String {
     serde_json::to_string(output).unwrap()
 }
 
-/// The engine started as the adapter starts it for a turn in Ask mode, with the scratch's
-/// extra folder added, then `initialize` and `session/new`. A `session/set_mode` to the mode
-/// it already has reads on past the commands the CLI announces once the session is open.
 async fn open_session(
     engine: &dyn Engine,
     scratch: &Scratch,
@@ -182,7 +177,6 @@ fn menu(engine: &str) -> Vec<(String, Option<String>, String)> {
         .collect()
 }
 
-/// Gemini CLI's file commands on the person's real `~/.gemini`, read only.
 #[tokio::test]
 #[ignore = "reads the installed Gemini CLI's files"]
 async fn gemini_commands_on_the_real_home() {
@@ -213,8 +207,6 @@ async fn gemini_commands_on_the_real_home() {
     assert!(failed.is_empty(), "failed: {failed:?}");
 }
 
-/// Gemini CLI on a scratch home Misty fills in: its real ACP session registers the scratch
-/// project (and its checkpoint folder), and every file command reads what was put there.
 #[tokio::test]
 #[ignore = "runs the installed Gemini CLI"]
 async fn gemini_commands_on_a_scratch_home() {
@@ -226,10 +218,8 @@ async fn gemini_commands_on_a_scratch_home() {
         "GEMINI_CLI_SYSTEM_SETTINGS_PATH",
         scratch.root.join("system.json"),
     );
-    // A stand-in key: Gemini CLI opens a session with any key, and no call is made.
     std::env::set_var("GEMINI_API_KEY", "misty-live-test-not-a-key");
     let folder = scratch.folder.to_string_lossy().into_owned();
-    // Gemini CLI writes its trust rules in lower case on macOS.
     let rule = if cfg!(target_os = "macos") {
         folder.to_lowercase()
     } else {
@@ -269,7 +259,6 @@ async fn gemini_commands_on_a_scratch_home() {
         "[[rule]]\ntoolName = \"run_shell_command\"\ncommandPrefix = \"git push\"\ndecision = \"ask_user\"\npriority = 100\n",
     );
 
-    // The real session, as the adapter starts it.
     let engine = crate::engines::gemini::gemini();
     crate::engines::reported::forget("gemini");
     let (mut spawned, session, result) = open_session(&engine, &scratch)
@@ -300,7 +289,6 @@ async fn gemini_commands_on_a_scratch_home() {
     assert_eq!(hint("restore"), "list");
     assert!(!rows.iter().any(|row| row.0.contains(' ')));
 
-    // The checkpoint folder Gemini CLI made for the project, found as `/chat` finds it.
     let dirs = project_temp_dirs(&scratch.folder);
     println!("checkpoint folders: {dirs:?}");
     let tmp = dirs.first().expect("Gemini CLI registered the project");
@@ -382,7 +370,6 @@ async fn gemini_commands_on_a_scratch_home() {
         "{policies}"
     );
 
-    // `/restore` with checkpointing off, then on in the trusted project's settings.
     let off = info_text(
         &show(context("gemini", &scratch, None, ""), "restore")
             .await
@@ -398,7 +385,6 @@ async fn gemini_commands_on_a_scratch_home() {
         other => panic!("restore list: {other:?}"),
     }
 
-    // The `/` menu: the custom commands with their descriptions, over the engine's report.
     let catalog = crate::engines::catalog::catalog_for(
         "gemini",
         &dirs::home_dir().unwrap(),

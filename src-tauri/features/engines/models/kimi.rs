@@ -3,9 +3,6 @@ use super::{
     alias_table_catalog, config_toml_model, promote_default, run_probe, AliasFields, EngineModel,
 };
 
-/// `kimi provider list --json` → {"providers":{…},"models":{"selector":
-/// {displayName,maxContextSize,provider,…}}}. The selectors ("kimi-code/k3")
-/// are what `kimi -m` accepts.
 pub(super) async fn run_kimi_provider_list(bin: &str) -> Result<Vec<EngineModel>, String> {
     Ok(parse_kimi_provider_list(
         &run_probe(bin, &["provider", "list", "--json"], "provider list").await?,
@@ -40,8 +37,10 @@ pub fn parse_kimi_provider_list(stdout: &str) -> Vec<EngineModel> {
         .collect()
 }
 
-/// Kimi's local catalog: the `[models."<alias>"]` tables in
-/// $KIMI_CODE_HOME/config.toml — id = alias, what `kimi -m` resolves.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Kimi's own config in place, which KIMI_CODE_HOME may move outside the engine folders the gate grants"
+)]
 pub(super) fn kimi_local_models() -> Vec<EngineModel> {
     let home = crate::engines::engine_home(Some("KIMI_CODE_HOME"), ".kimi-code");
     let Ok(content) = std::fs::read_to_string(home.join("config.toml")) else {
@@ -50,10 +49,6 @@ pub(super) fn kimi_local_models() -> Vec<EngineModel> {
     parse_kimi_config_models(&content)
 }
 
-/// `[models."<alias>"]` tables → catalog entries (id = alias; label =
-/// `display_name`, else the inner `model`; context window from
-/// `max_context_size`/`context_window` when present). `default_model` leads;
-/// remaining aliases follow sorted. Malformed TOML yields an empty catalog.
 pub fn parse_kimi_config_models(content: &str) -> Vec<EngineModel> {
     const FIELDS: AliasFields = AliasFields {
         name_keys: &["display_name", "model"],
@@ -74,8 +69,6 @@ pub fn parse_kimi_config_models(content: &str) -> Vec<EngineModel> {
     models
 }
 
-/// Kimi's configured default: top-level `default_model = "…"` in
-/// $KIMI_CODE_HOME/config.toml.
 pub(super) fn kimi_default_model() -> Option<EngineModel> {
     let home = crate::engines::engine_home(Some("KIMI_CODE_HOME"), ".kimi-code");
     config_toml_model(&home, "default_model", "kimi")
@@ -103,7 +96,6 @@ max_context_size = 1048576
         let models = parse_kimi_config_models(toml);
         let ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
         assert_eq!(ids, vec!["kimi-code/k3", "kimi-code/kimi-for-coding"]);
-        // Inner `model` == alias suffix is a fine label when display_name is absent…
         assert_eq!(models[0].name.as_deref(), Some("k3"));
         assert_eq!(models[0].provider, "managed:kimi-code");
         assert_eq!(models[0].context_window, Some(1_048_576));

@@ -1,8 +1,5 @@
-// Tests for resolve.rs (moved out of it).
 use super::*;
 
-/// macOS checks a new program on its first launch, which under the full suite's load could
-/// stall past the probe's 2s budget: each fake `npm` runs once (`npm warm`) before it's timed.
 #[cfg(unix)]
 fn fake_npm(script: &str) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
@@ -50,9 +47,9 @@ fn npm_probe_times_out_and_reaps_child() {
     let descendant = sysinfo::Pid::from_u32(descendant);
     system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[descendant]), true);
     assert!(
-        system.process(descendant).map_or(true, |process| {
-            process.status() == sysinfo::ProcessStatus::Zombie
-        }),
+        system
+            .process(descendant)
+            .is_none_or(|process| { process.status() == sysinfo::ProcessStatus::Zombie }),
         "timed-out npm left a running descendant"
     );
 }
@@ -94,8 +91,6 @@ fn cli_search_path_covers_well_known_unix_bins() {
     );
 }
 
-/// Regression: absolute shebang shim + launchd-like PATH → `env: node: No
-/// such file`. Injecting the search PATH (as plugin_exec does) fixes it.
 #[cfg(unix)]
 #[test]
 fn cli_search_path_lets_env_shebang_find_interpreter() {
@@ -271,7 +266,6 @@ fn prefer_windows_executable_variant_prefers_cmd_over_posix_shim() {
         prefer_windows_executable_variant(posix_shim.clone()),
         cmd_path
     );
-    // Already-executable variants and missing dirs pass through.
     assert_eq!(
         prefer_windows_executable_variant(cmd_path.clone()),
         cmd_path
@@ -351,8 +345,6 @@ fn strip_verbatim_drops_local_prefix_and_keeps_unc() {
 
 #[test]
 fn windows_extra_search_paths_cover_openai_codex_installer() {
-    // The Programs dir must exist for the installer path to be pushed;
-    // emulate %LOCALAPPDATA% with a temp dir.
     let temp = std::env::temp_dir().join(format!("ccgui-openai-codex-{}", std::process::id()));
     let programs = temp.join("Programs");
     std::fs::create_dir_all(&programs).expect("create Programs dir");
@@ -371,14 +363,9 @@ fn windows_extra_search_paths_cover_openai_codex_installer() {
 #[test]
 fn windows_extra_search_paths_cover_codemoss_bundled_claude() {
     let temp = std::env::temp_dir().join(format!("ccgui-codemoss-sdk-{}", std::process::id()));
-    // Build the expectation the same way the resolver does: the
-    // read_dir entry joins with a platform separator, so the final
-    // segment is its own component even though the parents carry
-    // Windows-style literals.
     let scope_dir = temp.join(".codemoss\\dependencies\\claude-sdk\\node_modules\\@anthropic-ai");
     let sdk_dir = scope_dir.join("claude-agent-sdk-win32-x64");
     std::fs::create_dir_all(&sdk_dir).expect("create sdk dir");
-    // An unrelated package under the same scope must not be picked up.
     std::fs::create_dir_all(scope_dir.join("sdk")).expect("create unrelated dir");
 
     let paths = build_windows_extra_search_paths(None, Some(&temp), None, None, None);
@@ -423,7 +410,6 @@ fn parse_registry_path_value_splits_and_expands() {
 #[test]
 fn resolve_launchable_cli_binary_passthrough_rules() {
     assert_eq!(resolve_launchable_cli_binary(""), "");
-    // Missing absolute paths stay as-is so the spawn error names them.
     let missing = if cfg!(windows) {
         r"C:\definitely\missing\claude.cmd"
     } else {

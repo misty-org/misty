@@ -6,10 +6,6 @@ import { providerEntries, stripConventionEnv } from "./providers";
 
 describe("stripConventionEnv", () => {
   it("keeps CODEBUDDY_INTERNET_ENVIRONMENT when editing an env-configured channel", () => {
-    // A hand-edited channel (or a future cc-switch import) carries this key;
-    // the channel form has no field for it, so stripping it would lose the
-    // enterprise environment on any edit (the backend cannot derive it for
-    // custom domains, and the wrong environment 401s per official docs).
     const stripped = stripConventionEnv("codebuddy", {
       env: { CODEBUDDY_INTERNET_ENVIRONMENT: "cloudhosted" },
       settingsConfig: {

@@ -1,13 +1,7 @@
-//! Gemini CLI's `/restore`, and turning its checkpointing on.
-
 use super::*;
 
 const RESTORE_TITLE: &str = "Gemini CLI checkpoints";
 
-/// `/restore` needs Gemini CLI's checkpointing (`general.checkpointing.enabled`), which no flag
-/// turns on for one run: off, it saves no checkpoints and its ACP `/restore` has nothing to
-/// restore. On, the command goes to the turn, where Gemini runs it; off, `/restore enable` turns
-/// it on in the user's settings (the confirmation is the composer's).
 pub(super) fn restore(folder: Option<&Path>, args: &str) -> Result<Output, String> {
     let (enabled, set_in) = checkpointing(folder);
     let blocked_by = set_in
@@ -69,9 +63,6 @@ fn restore_off(text: String) -> Output {
     )
 }
 
-/// Whether checkpointing is on, and the settings that say so: the system settings win over a
-/// trusted project's, which win over the user's, as Gemini CLI merges them. Off when none does.
-/// The settings' older flat `checkpointing.enabled` counts too.
 fn checkpointing(folder: Option<&Path>) -> (bool, Option<(&'static str, PathBuf)>) {
     let mut layers = Vec::new();
     if let Some(path) = adapter::system_settings_path() {
@@ -98,10 +89,8 @@ fn checkpointing(folder: Option<&Path>) -> (bool, Option<(&'static str, PathBuf)
     (false, None)
 }
 
-/// Sets `general.checkpointing.enabled` to true in the settings at `path`, creating the file
-/// when there is none.
 fn enable_checkpointing(path: &Path) -> Result<(), String> {
-    let text = match std::fs::read_to_string(path) {
+    let text = match file_access::fs::read_to_string(path) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(error) => return Err(format!("Gemini CLI's settings couldn't be read: {error}")),
@@ -113,9 +102,6 @@ fn enable_checkpointing(path: &Path) -> Result<(), String> {
     crate::engine_config::support::atomic_write(path, &written)
 }
 
-/// `text` with `general.checkpointing.enabled` set to true. Only that is written into the text,
-/// so the rest of the file (its order, layout and comments) stays as the person left it. None
-/// when the file isn't a JSON object, or a level on the way isn't an object.
 pub(super) fn with_checkpointing(text: &str) -> Option<String> {
     const PATH: [&str; 3] = ["general", "checkpointing", "enabled"];
     if text.trim().is_empty() {
@@ -168,9 +154,7 @@ pub(super) fn with_checkpointing(text: &str) -> Option<String> {
     checks.then_some(written)
 }
 
-/// Finding a member's value in JSON text that may carry comments, to change it in place.
 mod json_text {
-    /// The first byte at or after `at` that isn't whitespace or a comment.
     pub fn skip_blank(text: &str, mut at: usize) -> usize {
         let bytes = text.as_bytes();
         loop {
@@ -190,7 +174,6 @@ mod json_text {
         }
     }
 
-    /// Just past the string that opens at `at`.
     fn skip_string(bytes: &[u8], at: usize) -> Option<usize> {
         let mut i = at + 1;
         while i < bytes.len() {
@@ -203,7 +186,6 @@ mod json_text {
         None
     }
 
-    /// Just past the value that starts at `at`.
     fn skip_value(text: &str, at: usize) -> Option<usize> {
         let bytes = text.as_bytes();
         match *bytes.get(at)? {
@@ -243,8 +225,6 @@ mod json_text {
         }
     }
 
-    /// Where `key`'s value starts and ends in the object whose `{` is at `open`, when it has
-    /// that key.
     pub fn member(text: &str, open: usize, key: &str) -> Option<(usize, usize)> {
         let bytes = text.as_bytes();
         let mut at = skip_blank(text, open + 1);

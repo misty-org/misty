@@ -5,13 +5,13 @@ const mocks = vi.hoisted(() => ({
   apiRequest: vi.fn(),
   cachedRequest: vi.fn(),
 }));
-vi.mock("@/shared/platform/nativeInvoke", () => ({ invoke: mocks.invoke }));
+vi.mock("@/shared/platform/native_invoke", () => ({ invoke: mocks.invoke }));
 vi.mock("@/api/client", () => ({ apiRequest: mocks.apiRequest }));
-vi.mock("@/api/cache/cached-request", () => ({ cachedRequest: mocks.cachedRequest }));
+vi.mock("@/api/cache/cached_request", () => ({ cachedRequest: mocks.cachedRequest }));
 
 import { grantsApi } from "../grants/api";
 import { appsApi } from "./api";
-import { localAppsApi } from "./localApi";
+import { localAppsApi } from "./local_api";
 
 beforeEach(() => {
   mocks.invoke.mockReset();

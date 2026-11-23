@@ -1,26 +1,15 @@
-//! Cross-origin frames for the agent page layer. Embedded widgets such as class schedules, booking calendars and forms often live
-//! in a frame from another origin, which the page layer's script in the top document can
-//! neither read nor reach. Every frame of a tab announces itself from a private content
-//! world, so pages cannot forge or see it, and Misty keeps each cross-origin frame's
-//! handle to run the page layer inside it. On Windows the frame trees of the tab's
-//! DevTools sessions say the same (frames/windows.rs). On WebKitGTK each frame keeps a
-//! request open with Misty from that world instead (frames/linux.rs).
 #[cfg(target_os = "linux")]
 pub(crate) mod linux;
 #[cfg(windows)]
 pub(crate) mod windows;
 
-/// Content world of the announcement script and its handler.
 #[cfg(target_os = "macos")]
 const WORLD: &str = "misty-frames";
 #[cfg(target_os = "macos")]
 const HANDLER: &str = "mistyFrame";
-/// Frames remembered per tab; the oldest are forgotten first.
 #[cfg(target_os = "macos")]
 const MAX_FRAMES: usize = 24;
 
-/// Each frame says where it is when its document starts. The top document's announcement
-/// means a new page, so the frames of the previous one are forgotten.
 #[cfg(target_os = "macos")]
 const ANNOUNCE: &str = r#"(() => {
   try {
@@ -36,7 +25,6 @@ const ANNOUNCE: &str = r#"(() => {
   } catch {}
 })();"#;
 
-/// One cross-origin frame of a tab, as the page layer reaches it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Frame {
     pub id: u64,
@@ -69,7 +57,6 @@ mod macos {
     }
 
     thread_local! {
-        /// Web view → its cross-origin frames, newest last. Main thread only.
         static FRAMES: RefCell<HashMap<usize, Vec<Entry>>> = RefCell::new(HashMap::new());
         static NEXT: Cell<u64> = const { Cell::new(1) };
     }
@@ -91,7 +78,6 @@ mod macos {
             if !(url.starts_with("https://") || url.starts_with("http://")) || url.len() > 2_048 {
                 return;
             }
-            // Closed tabs leave their entries behind; past this many tabs, start afresh.
             if frames.len() > 256 && !frames.contains_key(&view) {
                 frames.clear();
             }
@@ -151,13 +137,10 @@ mod macos {
         }
     }
 
-    /// Adds the announcement script and its handler to the view's content controller.
     pub(crate) fn install(view: &WKWebView) -> Result<(), String> {
         let mtm = MainThreadMarker::new().ok_or("Frames are prepared on the main thread.")?;
         unsafe {
             let controller = view.configuration().userContentController();
-            // A controller announces frames once; the script's presence says so even when a
-            // closed tab's controller address is reused by a new one.
             if controller
                 .userScripts()
                 .iter()
@@ -184,7 +167,6 @@ mod macos {
         Ok(())
     }
 
-    /// The view's cross-origin frames, oldest first.
     pub(crate) fn list(view: &WKWebView) -> Vec<Frame> {
         let key = view as *const WKWebView as usize;
         FRAMES.with(|frames| {
@@ -203,7 +185,6 @@ mod macos {
         })
     }
 
-    /// The handle of one remembered frame, to run script inside it.
     pub(crate) fn info(view: &WKWebView, id: u64) -> Option<Retained<WKFrameInfo>> {
         let key = view as *const WKWebView as usize;
         FRAMES.with(|frames| {
@@ -215,7 +196,6 @@ mod macos {
         })
     }
 
-    /// Forgets a frame that no longer answers, such as one its page removed.
     pub(crate) fn forget(view: &WKWebView, id: u64) {
         let key = view as *const WKWebView as usize;
         FRAMES.with(|frames| {
@@ -234,7 +214,6 @@ use crate::browser::agent_pages::frames::windows as cdp_frames;
 #[cfg(windows)]
 pub(crate) use cdp_frames::{forget, target};
 
-/// Starts announcing a tab's frames; call it when the tab's web view is created.
 pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -245,8 +224,7 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
                 let _ = send.send(macos::install(view));
             })
             .map_err(|error| error.to_string())?;
-        // with_webview runs on the main thread; from there it has already run.
-        return receive.try_recv().unwrap_or(Ok(()));
+        receive.try_recv().unwrap_or(Ok(()))
     }
     #[cfg(windows)]
     {
@@ -261,7 +239,6 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
                 let _ = send.send(linux::install(&platform.inner(), label));
             })
             .map_err(|error| error.to_string())?;
-        // with_webview runs on the GTK thread; from there it has already run.
         return receive.try_recv().unwrap_or(Ok(()));
     }
     #[cfg(not(any(target_os = "macos", windows, target_os = "linux")))]
@@ -271,7 +248,6 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
     }
 }
 
-/// The tab's cross-origin frames that have announced themselves, oldest first.
 pub(crate) async fn list(webview: &tauri::Webview) -> Vec<Frame> {
     #[cfg(target_os = "macos")]
     {

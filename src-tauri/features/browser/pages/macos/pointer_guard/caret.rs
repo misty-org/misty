@@ -1,19 +1,13 @@
-//! Where the system's AutoFill suggestions open. WebKit answers the text input system's "where is
-//! the caret" question from the page, and on a page view placed inside Misty's window the answer
-//! lands at the view's left edge. The page reports its focused field's rectangle instead, and the
-//! page view answers with that.
 use super::*;
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use std::collections::HashMap;
 
-/// The focused field of each page view, in page pixels: x, y, width, height.
 static CARET_RECTS: OnceLock<Mutex<HashMap<usize, [f64; 4]>>> = OnceLock::new();
 
 fn caret_rects() -> &'static Mutex<HashMap<usize, [f64; 4]>> {
     CARET_RECTS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Records (or clears) a page view's focused field.
 pub(crate) fn set_caret_rect(webview: &tauri::Webview, rect: Option<[f64; 4]>) {
     let _ = webview.with_webview(move |platform_webview| {
         let key = platform_webview.inner() as usize;
@@ -47,10 +41,16 @@ pub(super) unsafe fn install_caret_override(class: &AnyClass) {
         TextRange,
         *mut TextRange,
     ) -> NSRect = first_rect;
-    install_method_override(class, selector, std::mem::transmute(replacement));
+    install_method_override(
+        class,
+        selector,
+        std::mem::transmute::<
+            unsafe extern "C-unwind" fn(&NSView, Sel, TextRange, *mut TextRange) -> NSRect,
+            objc2::runtime::Imp,
+        >(replacement),
+    );
 }
 
-/// The field's rectangle on the screen, if the page reported one.
 unsafe fn field_on_screen(view: &NSView) -> Option<NSRect> {
     let [x, y, w, h] = *caret_rects()
         .lock()
@@ -62,7 +62,6 @@ unsafe fn field_on_screen(view: &NSView) -> Option<NSRect> {
     } else {
         1.0
     };
-    // A web view is flipped, so page pixels times its zoom are points from its top left.
     let local = NSRect::new(
         NSPoint::new(x * zoom, y * zoom),
         NSSize::new(w * zoom, h * zoom),

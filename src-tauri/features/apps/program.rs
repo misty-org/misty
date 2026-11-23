@@ -16,11 +16,13 @@ use super::manifest::{valid_id, valid_version};
 use super::mcp;
 
 mod archive;
+mod confine;
 mod server;
 #[cfg(test)]
 mod tests;
 
 use archive::{from_tar_gz, from_zip};
+use confine::confined;
 use server::{Server, Trouble};
 
 #[cfg(target_os = "macos")]
@@ -86,7 +88,9 @@ fn flag_ok(flag: &str) -> bool {
     flag.len() <= 64
         && flag.strip_prefix("--").is_some_and(|rest| {
             rest.starts_with(|c: char| c.is_ascii_lowercase())
-                && rest.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                && rest
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         })
 }
 
@@ -94,7 +98,9 @@ fn env_ok(key: &str, value: &str) -> bool {
     let reserved = ["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "IFS"];
     !key.is_empty()
         && key.len() <= 64
-        && key.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        && key
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
         && !reserved.contains(&key)
         && !key.starts_with("LD_")
         && !key.starts_with("DYLD_")
@@ -106,12 +112,22 @@ impl McpProgram {
     fn validate(&self) -> Result<(), String> {
         let name_ok = !self.program.is_empty()
             && self.program.len() <= 64
-            && self.program.starts_with(|c: char| c.is_ascii_alphanumeric())
-            && self.program.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+            && self
+                .program
+                .starts_with(|c: char| c.is_ascii_alphanumeric())
+            && self
+                .program
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
         if !name_ok {
             return Err("The catalog's program name isn't a plain file name.".into());
         }
-        if self.args.len() > 16 || self.args.iter().any(|arg| arg.len() > 100 || arg.contains('\0')) {
+        if self.args.len() > 16
+            || self
+                .args
+                .iter()
+                .any(|arg| arg.len() > 100 || arg.contains('\0'))
+        {
             return Err("The catalog gives the program too many or too long arguments.".into());
         }
         if !flag_ok(&self.read_root_flag) || !flag_ok(&self.write_root_flag) {
@@ -124,14 +140,21 @@ impl McpProgram {
     }
 
     fn build(&self, upstream_prefix: &str) -> Result<&Build, String> {
-        let platform = platform().ok_or_else(|| "Misty can't run this app's tools on this computer yet.".to_owned())?;
+        let platform = platform()
+            .ok_or_else(|| "Misty can't run this app's tools on this computer yet.".to_owned())?;
         let build = self
             .builds
             .get(platform)
             .ok_or_else(|| "The app has no build of its tools for this computer.".to_owned())?;
         let kind_ok = build.url.ends_with(".zip") || build.url.ends_with(".tar.gz");
-        if !build.url.starts_with(upstream_prefix) || !kind_ok || build.sha256.len() != 64 || build.size > MAX_ARCHIVE_BYTES {
-            return Err("The catalog's build of the app's tools isn't the maker's own release.".into());
+        if !build.url.starts_with(upstream_prefix)
+            || !kind_ok
+            || build.sha256.len() != 64
+            || build.size > MAX_ARCHIVE_BYTES
+        {
+            return Err(
+                "The catalog's build of the app's tools isn't the maker's own release.".into(),
+            );
         }
         Ok(build)
     }
@@ -142,8 +165,8 @@ pub fn pinned(app_id: &str, version: &str) -> Result<(McpProgram, Build), String
 }
 
 fn pinned_in(catalog: &str, app_id: &str, version: &str) -> Result<(McpProgram, Build), String> {
-    let catalog: Catalog =
-        serde_json::from_str(catalog).map_err(|error| format!("Misty's app registry isn't valid: {error}"))?;
+    let catalog: Catalog = serde_json::from_str(catalog)
+        .map_err(|error| format!("Misty's app registry isn't valid: {error}"))?;
     let app = catalog
         .apps
         .into_iter()
@@ -154,14 +177,26 @@ fn pinned_in(catalog: &str, app_id: &str, version: &str) -> Result<(McpProgram, 
     }
     let upstream_ok = app.upstream.split('/').count() == 2
         && app.upstream.split('/').all(|part| {
-            !part.is_empty() && part != "." && part != ".." && part.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+            !part.is_empty()
+                && part != "."
+                && part != ".."
+                && part
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
         });
     if !upstream_ok {
         return Err("The catalog doesn't name the app's maker.".into());
     }
-    let program = app.mcp_program.ok_or_else(|| "The app has no tools of its own to run.".to_owned())?;
+    let program = app
+        .mcp_program
+        .ok_or_else(|| "The app has no tools of its own to run.".to_owned())?;
     program.validate()?;
-    let build = program.build(&format!("https://github.com/{}/releases/download/", app.upstream))?.clone();
+    let build = program
+        .build(&format!(
+            "https://github.com/{}/releases/download/",
+            app.upstream
+        ))?
+        .clone();
     Ok((program, build))
 }
 
@@ -186,13 +221,23 @@ fn listing_dir(dir: &Path) -> PathBuf {
     dir.join("listing")
 }
 
-pub fn installed(app_id: &str, version: &str, program: &McpProgram) -> Result<Option<PathBuf>, String> {
+pub fn installed(
+    app_id: &str,
+    version: &str,
+    program: &McpProgram,
+) -> Result<Option<PathBuf>, String> {
     let dir = program_dir_in(&programs_root()?, app_id, version)?;
     let path = program_path(&dir, program);
     Ok(fs::is_file(&path).then_some(path))
 }
 
-pub fn install(app_id: &str, version: &str, program: &McpProgram, build: &Build, archive: &[u8]) -> Result<PathBuf, String> {
+pub fn install(
+    app_id: &str,
+    version: &str,
+    program: &McpProgram,
+    build: &Build,
+    archive: &[u8],
+) -> Result<PathBuf, String> {
     install_in(&programs_root()?, app_id, version, program, build, archive)
 }
 
@@ -205,8 +250,14 @@ fn install_in(
     archive: &[u8],
 ) -> Result<PathBuf, String> {
     let final_dir = program_dir_in(root, app_id, version)?;
-    if !build.sha256.eq_ignore_ascii_case(&hex::encode(Sha256::digest(archive))) {
-        return Err("The downloaded tools don't match the catalog's checksum, so they weren't installed.".into());
+    if !build
+        .sha256
+        .eq_ignore_ascii_case(&hex::encode(Sha256::digest(archive)))
+    {
+        return Err(
+            "The downloaded tools don't match the catalog's checksum, so they weren't installed."
+                .into(),
+        );
     }
     let bytes = if build.url.ends_with(".tar.gz") {
         from_tar_gz(archive, &program.program)?
@@ -239,64 +290,6 @@ fn install_in(
     Ok(program_path(&final_dir, program))
 }
 
-#[cfg(target_os = "macos")]
-fn confined(program: &Path, work: &Path) -> Result<(tokio::process::Command, ()), String> {
-    let failed = |_| "Misty couldn't confine the app's tools, so they weren't started.".to_owned();
-    let program = fs::canonicalize(program).map_err(failed)?;
-    let work = fs::canonicalize(work).map_err(failed)?;
-    let program_dir = program.parent().map(Path::to_path_buf).ok_or_else(|| failed(std::io::Error::other("")))?;
-    let mut command = tokio::process::Command::new(sandbox::macos::SANDBOX_EXEC);
-    command
-        .args(sandbox::macos::arguments(
-            PROFILE,
-            &[("TOOL", &program), ("PROGRAM_DIR", &program_dir), ("WORK", &work)],
-        ))
-        .arg(&program);
-    command.process_group(0);
-    unsafe {
-        command.pre_exec(|| {
-            sandbox::macos::set_limits(&[
-                (libc::RLIMIT_CPU, 3_600),
-                (libc::RLIMIT_FSIZE, 2 << 30),
-                (libc::RLIMIT_NOFILE, 256),
-                (libc::RLIMIT_CORE, 0),
-            ])
-        });
-    }
-    Ok((command, ()))
-}
-
-#[cfg(target_os = "linux")]
-fn confined(program: &Path, work: &Path) -> Result<(tokio::process::Command, sandbox::linux::Confinement), String> {
-    use sandbox::linux::{Access, Confinement, Policy};
-    let failed = |_| "Misty couldn't confine the app's tools, so they weren't started.".to_owned();
-    let program = fs::canonicalize(program).map_err(failed)?;
-    let work = fs::canonicalize(work).map_err(failed)?;
-    let program_dir = program.parent().map(Path::to_path_buf).ok_or_else(|| failed(std::io::Error::other("")))?;
-    let confinement = Confinement::new(&Policy {
-        program: program.clone(),
-        required: vec![(work, Access::Private), (program_dir, Access::Read)],
-        optional: vec![(PathBuf::from("/usr/share"), Access::Read), (PathBuf::from("/etc/localtime"), Access::Read)],
-        forks: false,
-        limits: vec![
-            (libc::RLIMIT_CPU, 3_600),
-            (libc::RLIMIT_FSIZE, 2 << 30),
-            (libc::RLIMIT_NOFILE, 256),
-            (libc::RLIMIT_CORE, 0),
-        ],
-    })?;
-    let mut command = tokio::process::Command::new(&program);
-    unsafe {
-        command.pre_exec(confinement.hook());
-    }
-    Ok((command, confinement))
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
-fn confined(_: &Path, _: &Path) -> Result<(tokio::process::Command, ()), String> {
-    Err("Misty can't confine the app's tools on this computer yet, so they don't run here.".into())
-}
-
 #[derive(Clone)]
 struct Offered {
     version: String,
@@ -304,24 +297,38 @@ struct Offered {
     spec: McpProgram,
 }
 
-static OFFERED: LazyLock<StdMutex<HashMap<String, Offered>>> = LazyLock::new(|| StdMutex::new(HashMap::new()));
+static OFFERED: LazyLock<StdMutex<HashMap<String, Offered>>> =
+    LazyLock::new(|| StdMutex::new(HashMap::new()));
 type Slot = Arc<Mutex<Option<Server>>>;
-static SERVERS: LazyLock<StdMutex<HashMap<(String, PathBuf), Slot>>> = LazyLock::new(|| StdMutex::new(HashMap::new()));
+static SERVERS: LazyLock<StdMutex<HashMap<(String, PathBuf), Slot>>> =
+    LazyLock::new(|| StdMutex::new(HashMap::new()));
 
 fn offered() -> MutexGuard<'static, HashMap<String, Offered>> {
-    OFFERED.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    OFFERED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn servers() -> MutexGuard<'static, HashMap<(String, PathBuf), Slot>> {
-    SERVERS.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    SERVERS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 pub fn any_offered() -> bool {
     !offered().is_empty()
 }
 
-pub async fn offer(app_id: &str, version: &str, spec: &McpProgram, path: &Path) -> Result<usize, String> {
-    if offered().get(app_id).is_some_and(|known| known.version == version && known.path == path) {
+pub async fn offer(
+    app_id: &str,
+    version: &str,
+    spec: &McpProgram,
+    path: &Path,
+) -> Result<usize, String> {
+    if offered()
+        .get(app_id)
+        .is_some_and(|known| known.version == version && known.path == path)
+    {
         return Ok(0);
     }
     let listing = path
@@ -329,13 +336,21 @@ pub async fn offer(app_id: &str, version: &str, spec: &McpProgram, path: &Path) 
         .and_then(Path::parent)
         .map(listing_dir)
         .ok_or_else(|| "The app's tools aren't where Misty keeps them.".to_owned())?;
-    fs::create_dir_all(&listing).map_err(|error| format!("Couldn't prepare the app's tools: {error}"))?;
+    fs::create_dir_all(&listing)
+        .map_err(|error| format!("Couldn't prepare the app's tools: {error}"))?;
     let mut lister = Server::start(path, spec, &listing).await?;
     let tools = lister.list_tools().await?;
     drop(lister);
     let count = mcp::register_program(app_id, &tools)?;
     servers().retain(|(app, _), _| app != app_id);
-    offered().insert(app_id.to_owned(), Offered { version: version.to_owned(), path: path.to_owned(), spec: spec.clone() });
+    offered().insert(
+        app_id.to_owned(),
+        Offered {
+            version: version.to_owned(),
+            path: path.to_owned(),
+            spec: spec.clone(),
+        },
+    );
     Ok(count)
 }
 
@@ -352,7 +367,9 @@ fn reap() {
             return false;
         }
         match slot.try_lock() {
-            Ok(guard) => guard.as_ref().is_some_and(|server| server.last_used.elapsed() < IDLE_LIMIT),
+            Ok(guard) => guard
+                .as_ref()
+                .is_some_and(|server| server.last_used.elapsed() < IDLE_LIMIT),
             Err(_) => true,
         }
     });
@@ -365,13 +382,22 @@ pub enum Outcome {
 }
 
 fn failed(code: &str, message: impl Into<String>) -> Outcome {
-    Outcome::Failed { code: code.to_owned(), message: message.into() }
+    Outcome::Failed {
+        code: code.to_owned(),
+        message: message.into(),
+    }
 }
 
 fn text_of(result: &Value) -> String {
     result["content"]
         .as_array()
-        .map(|parts| parts.iter().filter_map(|part| part["text"].as_str()).collect::<Vec<_>>().join("\n"))
+        .map(|parts| {
+            parts
+                .iter()
+                .filter_map(|part| part["text"].as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
         .unwrap_or_default()
 }
 
@@ -383,13 +409,22 @@ pub async fn call(run_id: &str, app_id: &str, tool: &str, input: Value) -> Outco
         );
     };
     let Ok(folder) = fs::canonicalize(&folder) else {
-        return failed("app_tool_no_folder", "Misty can't open this chat's folder. Nothing was done.");
+        return failed(
+            "app_tool_no_folder",
+            "Misty can't open this chat's folder. Nothing was done.",
+        );
     };
     let Some(app) = offered().get(app_id).cloned() else {
-        return failed("app_tool_gone", "That app's tools aren't available any more. Nothing was done.");
+        return failed(
+            "app_tool_gone",
+            "That app's tools aren't available any more. Nothing was done.",
+        );
     };
     reap();
-    let slot = servers().entry((app_id.to_owned(), folder.clone())).or_default().clone();
+    let slot = servers()
+        .entry((app_id.to_owned(), folder.clone()))
+        .or_default()
+        .clone();
     let mut guard = slot.lock().await;
     if guard.is_none() {
         match Server::start(&app.path, &app.spec, &folder).await {
@@ -400,7 +435,8 @@ pub async fn call(run_id: &str, app_id: &str, tool: &str, input: Value) -> Outco
     let Some(server) = guard.as_mut() else {
         return failed("app_tool_unavailable", "The app's tools didn't start.");
     };
-    let params = json!({ "name": tool, "arguments": if input.is_object() { input } else { json!({}) } });
+    let params =
+        json!({ "name": tool, "arguments": if input.is_object() { input } else { json!({}) } });
     let outcome = tokio::time::timeout(CALL_LIMIT, server.request("tools/call", params)).await;
     match outcome {
         Ok(Ok(result)) => {
@@ -409,11 +445,19 @@ pub async fn call(run_id: &str, app_id: &str, tool: &str, input: Value) -> Outco
                 let message = text_of(&result);
                 return failed(
                     "app_tool_error",
-                    if message.is_empty() { "The app's tool failed.".to_owned() } else { message },
+                    if message.is_empty() {
+                        "The app's tool failed.".to_owned()
+                    } else {
+                        message
+                    },
                 );
             }
-            let mut done = json!({ "content": result.get("content").cloned().unwrap_or_else(|| json!([])) });
-            if let Some(structured) = result.get("structuredContent").filter(|value| !value.is_null()) {
+            let mut done =
+                json!({ "content": result.get("content").cloned().unwrap_or_else(|| json!([])) });
+            if let Some(structured) = result
+                .get("structuredContent")
+                .filter(|value| !value.is_null())
+            {
                 done["structuredContent"] = structured.clone();
             }
             Outcome::Done(done)

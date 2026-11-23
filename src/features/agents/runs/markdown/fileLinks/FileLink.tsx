@@ -5,16 +5,17 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
+  InlineLink,
   MenuItem,
   Tooltip,
 } from "@misty/ui";
-import { resolveFilePath } from "./fileLinks";
+import { resolveFilePath } from "./file_links";
 import {
   copyChatFilePath,
   openChatFilePath,
   revealChatFilePath,
   useReplyFolder,
-} from "./openChatFile";
+} from "./open_chat_file";
 
 const revealLabel =
   typeof navigator !== "undefined" && navigator.platform.includes("Mac")
@@ -23,11 +24,6 @@ const revealLabel =
       ? "Show in Explorer"
       : "Show in file manager";
 
-/**
- * A file path in a reply: a click opens it in the editor beside the chat, and right-click offers
- * to open it, show it in the file manager or copy its path. Failures are quiet, as a missing file
- * isn't worth an error in the transcript.
- */
 export function FileLink({
   href,
   path,
@@ -43,17 +39,18 @@ export function FileLink({
     <ContextMenu>
       <Tooltip content={resolved ?? path}>
         <ContextMenuTrigger asChild>
-          <a
-            className="misty-markdown-file-link"
-            href={href}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              openChatFilePath(path, folder);
-            }}
-          >
-            {children}
-          </a>
+          <InlineLink asChild>
+            <a
+              href={href}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                openChatFilePath(path, folder);
+              }}
+            >
+              {children}
+            </a>
+          </InlineLink>
         </ContextMenuTrigger>
       </Tooltip>
       <ContextMenuContent data-misty-layer-portal>

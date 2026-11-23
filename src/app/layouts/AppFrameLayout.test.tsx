@@ -1,10 +1,9 @@
-import "@/app/featureSeams";
+import "@/app/feature_seams";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// The layout waits for Misty's opening flight, a timer started when the module loads.
 vi.hoisted(() => vi.useFakeTimers({ toFake: ["setTimeout"] }));
 
 const mocks = vi.hoisted(() => ({
@@ -12,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   transitioning: false,
   nativeRecovery: false,
 }));
-vi.mock("@/features/app-windows/recovery/workspaceRecoveryPlatform", async (original) => ({
+vi.mock("@/features/app-windows/recovery/workspace_recovery_platform", async (original) => ({
   ...(await original<object>()),
   nativeWorkspaceRecoveryEnabled: () => mocks.nativeRecovery,
 }));
@@ -32,7 +31,7 @@ vi.mock("@/features/spaces", async (importOriginal) => ({
     selector({ spaces: [], snapshotReady: true }),
 }));
 
-vi.mock("@/features/spaces/routes/defaultSpace", async (importOriginal) => ({
+vi.mock("@/features/spaces/routes/default_space", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   preferredDefaultSpace: () => null,
 }));
@@ -67,10 +66,9 @@ beforeAll(async () => {
   await vi.advanceTimersByTimeAsync(2_000);
   vi.useRealTimers();
 });
-import { useWorkspaceRecoveryState } from "@/features/app-windows/recovery/nativeWorkspaceRecovery";
-import { useSetupStore } from "@/features/account/setup/useSetupStore";
+import { useWorkspaceRecoveryState } from "@/features/app-windows/recovery/native_workspace_recovery";
+import { useSetupStore } from "@/features/account/setup/use_setup_store";
 
-/** The shell keeps its splash up for at least a second (`useMinimumSplash`); wait it out. */
 async function waitOutSplash() {
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 1_050));
@@ -91,8 +89,6 @@ describe("AppFrameLayout", () => {
   let container: HTMLDivElement;
   let root: Root;
 
-  // AppFrameLayout holds the layout back until a two second opening flight, started when the
-  // module loads, has finished. Wait it out once so no test depends on how quickly it runs.
   beforeAll(async () => {
     await new Promise((resolve) => setTimeout(resolve, 2_100));
   }, 5_000);
@@ -107,7 +103,6 @@ describe("AppFrameLayout", () => {
     mocks.user = null;
     mocks.transitioning = false;
     mocks.nativeRecovery = false;
-    // Past the first-run welcome, as every later launch is.
     useSetupStore.setState({ welcomed: true });
     useWorkspaceRecoveryState.setState({
       accountId: null,
@@ -251,7 +246,6 @@ describe("AppFrameLayout", () => {
 
     await waitOutSplash();
     expect(container.querySelector('[data-testid="desktop-layout"]')).not.toBeNull();
-    // The auth route renders no background app panels.
     expect(container.querySelector('[data-testid="update-notices"]')).toBeNull();
   });
 

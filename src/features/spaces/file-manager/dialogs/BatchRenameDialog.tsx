@@ -31,17 +31,12 @@ const places = [
   { value: "after", label: "After name" },
 ];
 
-/**
- * Finder's Rename Items: one rule for several names (replace text, add text, or a name and a number), with
- * the new names shown as they'll be before anything changes. Names that would clash are left as they are.
- */
 export function BatchRenameDialog({
   paths,
   onDone,
   onClose,
 }: {
   paths: string[];
-  /** After the rename ran, with the new paths. */
   onDone(created: string[]): void;
   onClose(): void;
 }) {
@@ -123,7 +118,11 @@ export function BatchRenameDialog({
                   <Input autoFocus value={base} onChange={(event) => setBase(event.target.value)} />
                 </Field>
                 <Field label="Start numbers at">
-                  <Input inputMode="numeric" value={start} onChange={(event) => setStart(event.target.value)} />
+                  <Input
+                    inputMode="numeric"
+                    value={start}
+                    onChange={(event) => setStart(event.target.value)}
+                  />
                 </Field>
               </>
             )}
@@ -142,7 +141,10 @@ export function BatchRenameDialog({
               <ul className="m-0 grid list-none gap-0.5 p-0" aria-label="New names">
                 {preview.map((row) => (
                   <li key={row.from}>
-                    <ListRow label={row.to || row.from} description={row.clash ? "Name taken: stays as it is" : row.from} />
+                    <ListRow
+                      label={row.to || row.from}
+                      description={row.clash ? "Name taken: stays as it is" : row.from}
+                    />
                   </li>
                 ))}
               </ul>
@@ -154,7 +156,12 @@ export function BatchRenameDialog({
           <Button variant="quiet" size="lg" disabled={busy} onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" size="lg" disabled={busy || changes === 0} onClick={() => void apply()}>
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={busy || changes === 0}
+            onClick={() => void apply()}
+          >
             Rename
           </Button>
         </DialogFooter>

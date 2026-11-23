@@ -1,28 +1,40 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
-import { Kbd, NavRow, OverflowFadeText } from "@misty/ui";
+import { useShortcutLabel } from "@/features/shortcuts";
+import { cn, Kbd, NavRow, OverflowFadeText } from "@misty/ui";
 import { markSlotClass } from "./styles";
 
-/** One row of the sidebar's places: an icon, a label and, for some, a key hint. */
+export function SidebarShortcut({ command }: { command: string }) {
+  const label = useShortcutLabel(command);
+  if (!label) return null;
+  return (
+    <Kbd
+      size="micro"
+      outline={false}
+      className={cn(
+        "ml-auto opacity-0 transition-opacity @max-[14.375rem]/misty-sidebar:hidden",
+        "group-hover/nav-row:opacity-100 group-focus-visible/nav-row:opacity-100",
+      )}
+    >
+      {label}
+    </Kbd>
+  );
+}
+
 export const SidebarRow = forwardRef<
   HTMLButtonElement,
   Omit<ComponentPropsWithoutRef<"button">, "children"> & {
     current?: boolean;
     icon?: ReactNode;
     label: string;
-    shortcut?: string;
+    command?: string;
     onOpen?(): void;
   }
->(function SidebarRow({ current, icon, label, shortcut, onOpen, ...props }, ref) {
+>(function SidebarRow({ current, icon, label, command, onOpen, ...props }, ref) {
   return (
-    <NavRow ref={ref} current={current} aria-keyshortcuts={shortcut} onClick={onOpen} {...props}>
+    <NavRow ref={ref} current={current} onClick={onOpen} {...props}>
       {icon ? <span className={markSlotClass}>{icon}</span> : null}
       <OverflowFadeText>{label}</OverflowFadeText>
-      {shortcut ? (
-        // A key hint, as in "Search ⌘K". A narrow sidebar drops it; the row keeps its label.
-        <Kbd size="micro" outline={false} className="ml-auto @max-[14.375rem]/misty-sidebar:hidden">
-          {shortcut.replace("Meta+", "⌘")}
-        </Kbd>
-      ) : null}
+      {command ? <SidebarShortcut command={command} /> : null}
     </NavRow>
   );
 });

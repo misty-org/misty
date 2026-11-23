@@ -17,12 +17,11 @@ it("shows each sub-agent's progress in words and stops a running one", async () 
       ]}
     />,
   );
-  expect(screen.getByText("Running 1 of 3 helpers")).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Sub-agents" })).toBeTruthy();
   expect(screen.getByText("Working")).toBeTruthy();
   expect(screen.getByText("Done")).toBeTruthy();
   expect(screen.getByText("$12 a month")).toBeTruthy();
   expect(screen.getByText("Didn’t finish")).toBeTruthy();
-  // Only the running one can be stopped.
   const stops = screen.getAllByRole("button", { name: /Stop sub-agent/ });
   expect(stops).toHaveLength(1);
   await act(async () => fireEvent.click(stops[0]!));

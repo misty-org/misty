@@ -1,8 +1,5 @@
-//! Placing what frames show into the top document's tree, skills and Markdown.
 use super::*;
 
-/// A frame's address as the tree shows it: without its fragment (some apps pack their whole
-/// configuration there) and at most 200 characters.
 pub(super) fn shown_url(url: &str) -> String {
     let mut shown = url::Url::parse(url)
         .map(|mut url| {
@@ -33,9 +30,6 @@ fn clip(text: &str, max: usize) -> &str {
     &text[..end]
 }
 
-/// Puts each frame's tree under the iframe line that shows it, matching by origin and
-/// then by order; frames no line claims go at the end. Frames add at most
-/// FRAME_TREES_CHARS in all.
 pub(in crate::browser::agent_pages::page_agent) fn splice_trees(
     tree: &str,
     frames: &[FrameRead],
@@ -107,7 +101,6 @@ pub(in crate::browser::agent_pages::page_agent) fn splice_trees(
     out.join("\n")
 }
 
-/// The top document's skills followed by the frames' that it lacks.
 pub(in crate::browser::agent_pages::page_agent) fn merge_skills(
     skills: &Value,
     frames: &[FrameRead],
@@ -121,7 +114,6 @@ pub(in crate::browser::agent_pages::page_agent) fn merge_skills(
     json!(merged)
 }
 
-/// The page's Markdown followed by each frame's, labeled with where it comes from.
 pub(in crate::browser::agent_pages::page_agent) fn append_markdown(
     markdown: &str,
     frames: &[FrameRead],

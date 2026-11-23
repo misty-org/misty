@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use super::super::{run, Context, Output};
 
-/// `/tasks` on a real turn's background shell (one haiku turn).
 mod tasks;
 
 struct Scratch {
@@ -11,10 +10,6 @@ struct Scratch {
     db: database::store::Store,
 }
 
-/// The test binary points HOME at a scratch folder (`isolate_for_tests`); Claude Code's
-/// sign-in, settings and sessions live in the person's real one, which their account
-/// record names. Only these ignored tests run when they are asked for, so the swap reaches
-/// nothing else.
 fn use_real_home() {
     // SAFETY: getpwuid returns the calling user's static record, read before anything else.
     let home = unsafe {
@@ -30,7 +25,6 @@ fn use_real_home() {
 fn scratch() -> Scratch {
     use_real_home();
     let dir = tempfile::tempdir().expect("a scratch folder");
-    // Claude Code files sessions under the folder's real path.
     std::fs::create_dir_all(dir.path().join("project")).unwrap();
     let folder = dir.path().join("project").canonicalize().unwrap();
     let db = database::store::Store::at(dir.path().join("misty.db"));
@@ -53,8 +47,6 @@ fn context(scratch: &Scratch, session: Option<&str>, args: &str) -> Context {
     }
 }
 
-/// A real session at $0: `/context` is a local command, so Claude Code records the session
-/// and answers without a model turn.
 fn local_session(folder: &Path) -> String {
     let output = std::process::Command::new("claude")
         .args(["-p", "/context", "--output-format", "json"])
@@ -130,7 +122,6 @@ async fn read_only_commands_in_a_session() {
             failed.push(*name);
         }
     }
-    // Arguments the person may type that Misty answers itself.
     for (name, args) in [
         ("plan", "open"),
         ("plan", "add tests"),
@@ -138,7 +129,6 @@ async fn read_only_commands_in_a_session() {
         ("tasks", "list everything"),
         ("mcp", "frobnicate"),
         ("mcp", "reconnect"),
-        // Asks the process for its servers, then finds no such one: changes nothing.
         ("mcp", "reconnect no-such-server"),
     ] {
         let _ = show(context(&scratch, Some(&session), args), name).await;
@@ -159,7 +149,6 @@ async fn rename_branch_and_fork_a_session() {
     .await
     .expect("rename");
     assert!(matches!(&renamed, Output::Rename { title } if title == "Live test chat"));
-    // The name lands in the session, where `/status` reads it.
     let status = show(context(&scratch, Some(&session), ""), "status")
         .await
         .expect("status");
@@ -183,7 +172,6 @@ async fn rename_branch_and_fork_a_session() {
     assert_ne!(copy, &session);
     assert_eq!(title.as_deref(), Some("Live test chat (Branch)"));
     assert!(prompt.is_none());
-    // The copy is a session of its own that Claude Code resumes.
     show(context(&scratch, Some(copy), ""), "status")
         .await
         .expect("the branch resumes");

@@ -1,18 +1,12 @@
 import { ApiRequestError, apiRequest } from "@/api/client";
 import { LocalToolRejected, LocalToolUncertain, type LocalToolRequest } from "../host";
 
-/**
- * A Space tool is the person using the app by hand, through the server's normal signed-in routes. The
- * server checks it like any other request of theirs. The words here are the ones these tools gave the
- * model when the server ran them, so a run sees the same answers.
- */
 const NOT_COMPLETED = "Misty could not complete this tool call.";
 export const NOT_ALLOWED = "This tool call is not allowed for the current run.";
 export const BAD_SCHEMA = "The arguments do not match this tool's input schema.";
 const BAD_VALUES = "The tool arguments are invalid.";
 const MAY_HAVE_HAPPENED = "The action may have completed. Reconcile its outcome before retrying.";
 
-/** A route's answer that nothing changed, with what it said, so a tool can word its own refusal. */
 export class SpaceCallRefused extends LocalToolRejected {
   constructor(
     code: string,
@@ -39,7 +33,6 @@ function refusalMessage(error: ApiRequestError): string {
   return NOT_COMPLETED;
 }
 
-/** Any answer under 500 means nothing happened. Anything else on a write leaves it unknown. */
 function classify(error: unknown, writes: boolean): Error {
   if (error instanceof LocalToolRejected || error instanceof LocalToolUncertain) return error;
   const refused = error instanceof ApiRequestError && (error.status < 500 || isUnconfigured(error));
@@ -59,7 +52,6 @@ const isUnconfigured = (error: ApiRequestError) => error.code === "collaboration
 const json = (body: unknown): RequestInit =>
   body === undefined ? {} : { body: JSON.stringify(body) };
 
-/** A request that changes nothing, or a repeat of it would be harmless: failing leaves no doubt. */
 export async function readRoute<T>(
   request: Pick<LocalToolRequest, "signal">,
   path: string,
@@ -73,7 +65,6 @@ export async function readRoute<T>(
   }
 }
 
-/** A request that changes something: a failure with no answer may still have taken effect. */
 export async function writeRoute<T = unknown>(
   request: Pick<LocalToolRequest, "signal">,
   path: string,
@@ -88,7 +79,6 @@ export async function writeRoute<T = unknown>(
   }
 }
 
-/** A change made in several requests, such as an upload: a failure is read as a write route's. */
 export async function writeSteps<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
@@ -97,7 +87,6 @@ export async function writeSteps<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Runs a route and swaps the refusals the model can correct for words that say how. */
 export async function rewordRefusal<T>(
   call: () => Promise<T>,
   message: (refused: SpaceCallRefused) => string | undefined,

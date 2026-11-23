@@ -1,12 +1,9 @@
-//! The tools themselves. Each comes from uutils, the Rust rewrite of the standard Unix commands, or
-//! from `archive` for the few it doesn't have.
 use crate::archive;
 use std::{
     ffi::OsString,
     io::Write,
 };
 
-/// Gets a uutils tool's messages ready and runs it the way its own program does.
 fn uutils(name: &str, tool: impl FnOnce() -> i32) -> i32 {
     uucore::panic::mute_sigpipe_panic();
     if let Err(error) = uucore::locale::setup_localization(name) {
@@ -18,8 +15,6 @@ fn uutils(name: &str, tool: impl FnOnce() -> i32) -> i32 {
     code
 }
 
-/// Tools that read their arguments as text. A name that isn't valid text is refused rather than
-/// altered, since a changed name could mean a different file.
 fn with_text_args(name: &str, args: &[OsString], tool: impl FnOnce(&[&str]) -> i32) -> i32 {
     let Some(text) = args.iter().map(|arg| arg.to_str()).collect::<Option<Vec<_>>>() else {
         eprintln!("{name}: a file name isn't valid text");
@@ -30,7 +25,6 @@ fn with_text_args(name: &str, args: &[OsString], tool: impl FnOnce(&[&str]) -> i
 
 macro_rules! uutils_tools {
     ($($name:literal => $crate_name:ident),+ $(,)?) => {
-        /// Every tool from uutils coreutils, by the name it's called.
         #[cfg(test)]
         const COREUTILS: &[&str] = &[$($name),+];
 
@@ -89,17 +83,14 @@ uutils_tools! {
     "wc" => uu_wc,
 }
 
-/// The tools from other uutils projects and from `archive`.
 #[cfg(test)]
 const OTHERS: &[&str] = &[
     "find", "grep", "sed", "xargs", "tar", "zip", "unzip", "gzip", "gunzip",
 ];
 
-/// The names Misty links to this program.
 #[cfg(test)]
 const NAMES: &[&str] = include!("tool_names.in");
 
-/// Runs the tool called `name`, or says there's none, in which case this program is the shell.
 pub fn run(name: &str, args: &[OsString]) -> Option<i32> {
     coreutils(name).or_else(|| {
         Some(match name {
@@ -119,7 +110,6 @@ pub fn run(name: &str, args: &[OsString]) -> Option<i32> {
     })
 }
 
-/// uutils grep is built on an older uucore, which has its own messages to get ready.
 fn uutils_grep() -> i32 {
     if let Err(error) = uucore_for_grep::locale::setup_localization("grep") {
         eprintln!("grep: {error}");
@@ -135,7 +125,6 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
-    /// A name Misty links but nothing here answers would run the shell instead of failing.
     #[test]
     fn the_list_misty_links_is_exactly_the_tools_here() {
         let linked: BTreeSet<&str> = NAMES.iter().copied().collect();

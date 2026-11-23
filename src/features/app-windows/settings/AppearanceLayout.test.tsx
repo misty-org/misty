@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { defaultDockingLayout, useDockingLayoutStore } from "@/app/shell/dockingLayout";
+import { defaultDockingLayout, useDockingLayoutStore } from "@/app/shell/docking_layout";
 import { useWorkspaceStore } from "@/features/app-windows";
-import { useWindowDockingLayout } from "@/features/app-windows/panes/useWindowDockingLayout";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import { useWindowDockingLayout } from "@/features/app-windows/panes/use_window_docking_layout";
+import type { SettingsContentProps } from "../../settings/settings_types";
 import { AppearanceSection } from "./AppearanceSection";
 
 const props: SettingsContentProps = {

@@ -1,8 +1,3 @@
-//! Runs an agent's tools on this computer.
-//!
-//! The run asks here, and the window that runs the device's agent jobs does the work: most tools drive
-//! its browser. What keeps a run honest stays here, out of the model's reach and out of the page: the
-//! journal, which keeps a restart from repeating a write and tells it apart from one that never ran.
 use std::{
     collections::HashMap,
     sync::{Mutex, OnceLock, PoisonError},
@@ -24,18 +19,11 @@ use super::{
 };
 use database::store::Store;
 
-/// Long enough for the slowest tool: a screen goal waits on its own 10-minute limit, and a person may
-/// be answering a question.
 const CALL_LIMIT: Duration = Duration::from_secs(20 * 60);
-/// How often a waiting call checks that the window running it is still open.
 const WINDOW_CHECK: Duration = Duration::from_secs(2);
-/// A run picked up as Misty opens gets here before any window can answer, and so does a call while the
-/// window that ran tools hands over to the next one. Both have this long to come up.
 const HOST_WAIT: Duration = Duration::from_secs(90);
 const HOST_CHECK: Duration = Duration::from_millis(100);
 
-/// The tools this computer runs: every one a run can be offered (`local_prompt/catalog.json`), apart
-/// from what the crate answers itself. `src/features/agents/localTools/index.ts` registers the same list.
 const LOCAL_TOOLS: &[&str] = &[
     "agent.configure",
     "agent.delegate",
@@ -64,7 +52,6 @@ const LOCAL_TOOLS: &[&str] = &[
     "file.search",
     "file.update",
     "file.upload",
-    // Answered here in native code, never by a window (`files/agent_tools.rs`).
     "files.copy",
     "files.create_folder",
     "files.delete",
@@ -112,8 +99,6 @@ const LOCAL_TOOLS: &[&str] = &[
     "media.fetch",
 ];
 
-/// Tools that change nothing, so an interrupted one is simply run again. A wait for the person counts:
-/// the person's answer is what matters, and asking again is safe.
 pub(super) const READ_ONLY: &[&str] = &[
     "browser.snapshot",
     "browser.find",
@@ -150,8 +135,6 @@ pub(super) const READ_ONLY: &[&str] = &[
     "thread.read",
 ];
 
-/// What the window answers. `Failed` means nothing happened, so the model may correct the call;
-/// `Uncertain` means it may have.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum Answer {
@@ -169,8 +152,6 @@ struct Asked<'a> {
     input: &'a Value,
 }
 
-/// A call the window is working on. `replay` is what to ask again if its page reloads, for a call
-/// that's safe to repeat.
 struct PendingCall {
     send: oneshot::Sender<Answer>,
     replay: Option<Value>,
@@ -181,16 +162,10 @@ fn pending() -> &'static Mutex<HashMap<String, PendingCall>> {
     PENDING.get_or_init(Default::default)
 }
 
-/// Whether a call can simply be asked again when the page running it reloads: it changes nothing, or,
-/// for `agent.delegate`, a repeat waits for the children the first try started.
 fn repeats_safely(name: &str) -> bool {
-    READ_ONLY.contains(&name)
-        || name == "agent.delegate"
-        || crate::apps::mcp::is_read_only(name)
+    READ_ONLY.contains(&name) || name == "agent.delegate" || crate::apps::mcp::is_read_only(name)
 }
 
-/// A window that just loaded knows nothing of the calls its last page was running. Those that can't be
-/// repeated end now, as ones that may have happened, and the rest are what to ask again.
 fn after_page_load(calls: &mut HashMap<String, PendingCall>) -> Vec<Value> {
     calls.retain(|_, call| call.replay.is_some());
     calls
@@ -199,15 +174,12 @@ fn after_page_load(calls: &mut HashMap<String, PendingCall>) -> Vec<Value> {
         .collect()
 }
 
-/// The window that runs agent jobs.
 static HOST: Mutex<Option<String>> = Mutex::new(None);
 
 fn host() -> Option<String> {
     HOST.lock().unwrap_or_else(PoisonError::into_inner).clone()
 }
 
-/// What the journal knows a call by: its id and its turn, since a provider may repeat an id in a later
-/// turn, and only a repeat in the same saved turn is the same call.
 fn journal_key(call: &LocalToolCall) -> String {
     format!("{}:{}", call.turn, call.call_id)
 }
@@ -227,7 +199,6 @@ const INTERRUPTED: &str =
     "Misty closed while this was running, so it may or may not have happened. \
                            Check before doing it again.";
 
-/// Forgets a call's question however its wait ends, and tells the window when the run stopped waiting.
 struct Waiting<'a> {
     id: String,
     app: &'a AppHandle,
@@ -261,7 +232,6 @@ impl AppToolHost {
             .store()
     }
 
-    /// The window that answers calls, once there is one.
     async fn open_host(&self) -> Option<String> {
         let deadline = tokio::time::Instant::now() + HOST_WAIT;
         loop {
@@ -275,7 +245,6 @@ impl AppToolHost {
         }
     }
 
-    /// The runs that may still resume, whose journal rows are kept however old they are.
     async fn saved_runs(&self) -> Vec<String> {
         super::ensure(&self.app)
             .await
@@ -318,9 +287,7 @@ impl AppToolHost {
                 }
                 () = &mut limit => return None,
                 () = tokio::time::sleep(WINDOW_CHECK) => {
-                    if self.app.get_webview(&label).is_none() {
-                        return None;
-                    }
+                    self.app.get_webview(&label)?;
                 }
             }
         }
@@ -340,8 +307,8 @@ impl LocalToolHost for AppToolHost {
 
     fn call<'a>(&'a self, call: LocalToolCall) -> BoxFuture<'a, LocalToolOutcome> {
         Box::pin(async move {
-            let read_only =
-                READ_ONLY.contains(&call.name.as_str()) || crate::apps::mcp::is_read_only(&call.name);
+            let read_only = READ_ONLY.contains(&call.name.as_str())
+                || crate::apps::mcp::is_read_only(&call.name);
             let store = self.store();
             let facts = tool_gate::facts_of_run(&self.app, &call.run_id).await;
             let journal = ToolJournal::new(store.clone(), &facts.account, self.saved_runs().await);
@@ -354,7 +321,6 @@ impl LocalToolHost for AppToolHost {
                         message: "This run used that call id for another tool, so nothing was done. Call the tool again.".to_owned(),
                     }
                 }
-                // Nobody could account for a write after a restart, so it never starts.
                 Begun::Unavailable if !read_only => {
                     return LocalToolOutcome::Rejected {
                         code: "journal_unavailable".to_owned(),
@@ -375,21 +341,41 @@ impl LocalToolHost for AppToolHost {
                 input,
                 ..call.clone()
             };
-            // Files' tools and an app whose server is its maker's own program are answered here (the program in the
-            // run's folder); every other tool by the window that runs agent jobs.
             let files = call.name.starts_with("files.");
             let answer = match crate::apps::mcp::served_by_program(&call.name).filter(|_| !files) {
                 None if files => Some(
-                    match crate::files::agent_paths::tools::call(&self.app, &facts.agent_id, &facts.conversation_id, &call.name, admitted.input.clone()).await {
+                    match crate::files::agent_paths::tools::call(
+                        &self.app,
+                        &facts.agent_id,
+                        &facts.conversation_id,
+                        &call.name,
+                        admitted.input.clone(),
+                    )
+                    .await
+                    {
                         Ok(result) => Answer::Done { result },
-                        Err(refused) => Answer::Failed { code: refused.code.to_owned(), message: refused.message },
+                        Err(refused) => Answer::Failed {
+                            code: refused.code.to_owned(),
+                            message: refused.message,
+                        },
                     },
                 ),
                 Some((app_id, tool)) => Some(
-                    match crate::apps::program::call(&call.run_id, &app_id, &tool, admitted.input.clone()).await {
+                    match crate::apps::program::call(
+                        &call.run_id,
+                        &app_id,
+                        &tool,
+                        admitted.input.clone(),
+                    )
+                    .await
+                    {
                         crate::apps::program::Outcome::Done(result) => Answer::Done { result },
-                        crate::apps::program::Outcome::Failed { code, message } => Answer::Failed { code, message },
-                        crate::apps::program::Outcome::Uncertain(message) => Answer::Uncertain { message },
+                        crate::apps::program::Outcome::Failed { code, message } => {
+                            Answer::Failed { code, message }
+                        }
+                        crate::apps::program::Outcome::Uncertain(message) => {
+                            Answer::Uncertain { message }
+                        }
                     },
                 ),
                 None => self.ask(&admitted, &facts).await,
@@ -403,7 +389,6 @@ impl LocalToolHost for AppToolHost {
                     LocalToolOutcome::Rejected { code, message }
                 }
                 Some(Answer::Uncertain { message }) => uncertain(&message),
-                // The window never answered. A read just didn't happen; a write may have.
                 None if read_only => unavailable(),
                 None if self.open_host_now().is_none() => unavailable(),
                 None => uncertain(INTERRUPTED),
@@ -428,7 +413,6 @@ impl LocalToolHost for AppToolHost {
     }
 }
 
-/// This window runs the device's agent jobs from now on.
 #[tauri::command]
 pub fn agent_tool_host_ready(app: AppHandle, webview: tauri::Webview) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
@@ -442,7 +426,6 @@ pub fn agent_tool_host_ready(app: AppHandle, webview: tauri::Webview) -> Result<
     let running = calls.len();
     let again = after_page_load(&mut calls);
     drop(calls);
-    // A call ended this way reads to the agent as "Misty closed while this was running": say why here.
     if running > again.len() {
         eprintln!(
             "agent tool host: {} announced itself (was {}), ending {} running call(s) that can't be repeated",
@@ -457,7 +440,6 @@ pub fn agent_tool_host_ready(app: AppHandle, webview: tauri::Webview) -> Result<
     Ok(())
 }
 
-/// The window's answer to one call. Only the window that was asked can answer.
 #[tauri::command]
 pub fn agent_tool_finish(
     webview: tauri::Webview,

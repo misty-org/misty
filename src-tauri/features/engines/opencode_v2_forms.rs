@@ -1,12 +1,8 @@
-//! OpenCode 2.x forms: a form the session waits on as an answer card, and the answer back.
-
 use reqwest::Method;
 use serde_json::{json, Value};
 
 use super::{call, EngineEvent, TurnCore, TurnState};
 
-/// Parks a form the session is waiting on (the `question` tool's, or an MCP server's ask) as an
-/// answer card, with what the answer needs to go back.
 pub(super) fn park_form(
     core: &TurnCore,
     state: &mut TurnState,
@@ -49,8 +45,6 @@ pub(super) fn park_form(
     }
 }
 
-/// The fields a card can answer: text (with or without choices), several choices, yes or no,
-/// and numbers as text. Hidden fields and links to open elsewhere aren't asked.
 fn askable(field: &Value) -> bool {
     let kind = field.get("type").and_then(Value::as_str).unwrap_or("");
     field.get("hidden").and_then(Value::as_bool) != Some(true)
@@ -60,8 +54,6 @@ fn askable(field: &Value) -> bool {
         )
 }
 
-/// A form's fields as the card's questions. The question tool puts its header in `title` and
-/// the question in `description`; each option's label is its value.
 pub(crate) fn render_form(form: &Value) -> Vec<Value> {
     form.get("fields")
         .and_then(Value::as_array)
@@ -110,9 +102,6 @@ pub(crate) fn render_form(form: &Value) -> Vec<Value> {
         .collect()
 }
 
-/// The form reply's `answer` from the card's answers (rendered question → label(s) or text): each
-/// field's key with a value of its type. A chosen label goes back as its option's value; text
-/// that matches no option goes as typed (the question tool takes free text).
 pub(crate) fn form_answer(form: &Value, answers: &Value) -> Option<Value> {
     let map = answers.as_object()?;
     let fields: Vec<&Value> = form
@@ -165,8 +154,6 @@ pub(crate) fn form_answer(form: &Value, answers: &Value) -> Option<Value> {
     Some(Value::Object(answer))
 }
 
-/// Answers a parked form: the card's answers as the reply, or dismissed as a cancel (the question
-/// tool tells the model the person dismissed it).
 pub(crate) async fn answer_form(context: &Value, answers: Option<&Value>) -> Result<(), String> {
     let text = |key: &str| context.get(key).and_then(Value::as_str);
     let origin = text("origin").ok_or("question answer context is missing the server origin")?;

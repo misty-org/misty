@@ -1,14 +1,11 @@
-// Core shell contract. Keep desktop-only multi-pane widgets out of this
-// surface so account routes do not pull them into their bundles.
-export * from "./panes/dockRegistry";
-export * from "./panes/dockTree";
-export * from "./tabs/MistyBrandIcon";
-export * from "./tabs/workspaceViews";
-export * from "./panes/paneNavigation";
-export * from "./tabs/routeSurface";
-export * from "./tabs/useWorkspaceStore";
-export * from "./tabs/useWorkspaceViewTitle";
+export * from "./panes/dock_registry";
+export * from "./panes/dock_tree";
+export * from "./tabs/workspace_views";
+export * from "./panes/pane_navigation";
+export * from "./tabs/route_surface";
+export * from "./tabs/use_workspace_store";
+export * from "./tabs/use_workspace_view_title";
 export * from "./tabs/WorkspaceAppIcon";
-export * from "./tabs/workspaceDefaultView";
-export * from "./tabs/workspaceViewOperations";
+export * from "./tabs/workspace_default_view";
+export * from "./tabs/workspace_view_operations";
 export * from "./tabs/WorkspaceViewRouteScope";

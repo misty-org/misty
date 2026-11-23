@@ -1,4 +1,3 @@
-//! Whether the person has allowed the microphone and screen capture.
 #[cfg(target_os = "macos")]
 pub fn microphone_access() -> Result<(), String> {
     use objc2::{msg_send, runtime::AnyClass};
@@ -33,10 +32,6 @@ pub fn microphone_access() -> Result<(), String> {
         }
     }
 }
-/// Windows keeps the microphone switches in the capability consent store:
-/// one for the whole device and one for desktop apps such as Misty. Either
-/// set to "Deny" blocks the input stream with an unhelpful error, so the
-/// person is told which switch to turn on instead.
 #[cfg(windows)]
 pub fn microphone_access() -> Result<(), String> {
     use crate::app::windows::registry::read_string;
@@ -76,8 +71,6 @@ pub fn screen_access() -> Result<(), String> {
     Ok(())
 }
 
-/// Linux asks for neither: the microphone opens through PipeWire or PulseAudio as it is, and
-/// screen captures go through X11 or the desktop's own Screenshot portal prompt.
 #[cfg(target_os = "linux")]
 pub fn microphone_access() -> Result<(), String> {
     Ok(())

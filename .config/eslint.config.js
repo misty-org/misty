@@ -3,20 +3,8 @@ import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
-/**
- * Frontend architecture boundaries.
- *
- *   app  →  features  →  api / native / shared
- *
- * A layer may import from layers to its right, never to its left. Features are
- * mutually opaque: they talk to each other through `index.ts` only.
- *
- * Architectural, state-safety, and readability rules are release-blocking.
- * There is no warning baseline: every finding is an error.
- */
 const REFACTOR = "error";
 
-/** @param {Array<[string[], string]>} groups */
 const restrict = (groups) => [
   REFACTOR,
   { patterns: groups.map(([group, message]) => ({ group, message })) },
@@ -54,12 +42,6 @@ const forbidRawButtonRule = {
   },
 };
 
-/**
- * A component declared inside another function is a new component type on every render, so
- * React unmounts and remounts its whole subtree each time. With Radix primitives (whose refs set
- * state on mount) that loops into "Maximum update depth exceeded". Declare components at module
- * level and pass what they need as props.
- */
 const noNestedComponentRule = {
   meta: {
     type: "problem",
@@ -118,13 +100,11 @@ export default tseslint.config(
       "**/.output/**",
       "vendor/**",
       "src-tauri/**",
-      // Tooling that is not application source.
       ".config/**",
       "docs/**",
       "tasks/**",
       "*.config.js",
       "*.config.ts",
-      // Vendored, minified third-party bundles.
       "**/*.min.js",
     ],
   },
@@ -146,11 +126,8 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
 
-      // TypeScript already resolves identifiers; the ESLint core rule cannot see
-      // type-space or TS lib globals and reports thousands of false positives.
       "no-undef": "off",
 
-      // Prettier owns formatting — no stylistic rules here.
       "@typescript-eslint/no-explicit-any": REFACTOR,
       "@typescript-eslint/no-unused-vars": [
         REFACTOR,
@@ -162,7 +139,6 @@ export default tseslint.config(
       ],
       "react-hooks/exhaustive-deps": REFACTOR,
 
-      // Real defects — these stay errors.
       "no-empty": ["error", { allowEmptyCatch: true }],
 
       "shared-ui/no-raw-button": "warn",
@@ -170,7 +146,6 @@ export default tseslint.config(
     },
   },
 
-  // Tests may render raw elements; the components themselves live in @misty/ui (misty-ui).
   {
     files: ["**/*.test.{ts,tsx}", "src/tests/**/*.{ts,tsx}"],
     rules: {
@@ -178,7 +153,6 @@ export default tseslint.config(
     },
   },
 
-  // Layer boundaries.
   {
     files: ["src/shared/**/*.{ts,tsx}"],
     rules: {
@@ -225,7 +199,6 @@ export default tseslint.config(
     },
   },
 
-  // Network access belongs to the API boundary.
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [
@@ -247,23 +220,21 @@ export default tseslint.config(
     },
   },
 
-  // Tests get node globals and a looser leash.
   {
     files: [
       "src/**/*.test.{ts,tsx}",
       "src/**/*.testFixtures.{ts,tsx}",
+      "src/**/*.test_fixtures.ts",
       "src/tests/**/*.{ts,tsx}",
     ],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "no-restricted-imports": "off",
-      // Test harness components often close over the test's own state.
       "shared-ui/no-nested-component": "off",
     },
   },
 
-  // Node scripts and config-adjacent JS.
   {
     files: ["**/*.{js,mjs,cjs}"],
     languageOptions: { globals: { ...globals.node } },

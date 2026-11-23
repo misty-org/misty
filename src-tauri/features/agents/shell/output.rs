@@ -1,5 +1,3 @@
-//! A command's output, kept within what a model can use. Command output goes back to the model, so
-//! it keeps the start and the end, where errors and results usually are, and drops the middle.
 const HEAD_BYTES: usize = 40 * 1024;
 const TAIL_BYTES: usize = 20 * 1024;
 
@@ -28,7 +26,6 @@ impl CappedOutput {
         }
     }
 
-    /// The text, and whether anything was left out.
     pub(super) fn finish(self) -> (String, bool) {
         let head = String::from_utf8_lossy(&self.head);
         if self.tail.is_empty() {

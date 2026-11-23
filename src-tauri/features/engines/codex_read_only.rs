@@ -59,12 +59,8 @@ pub(super) fn stage(
             "Codex read-only planning currently requires a fresh local macOS session".into(),
         );
     }
-    let workspace = std::fs::canonicalize(&req.workspace)
-        .map_err(|_| "Codex read-only workspace must be an existing local directory")?;
-    if !workspace.is_dir() {
-        return Err("Codex read-only workspace must be a directory".into());
-    }
-    let native_config = match std::fs::read_to_string(native_home.join("config.toml")) {
+    let workspace = resolve_workspace(&req.workspace)?;
+    let native_config = match read_native_config(native_home) {
         Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(_) => return Err("Cannot read native Codex provider configuration".into()),
@@ -86,9 +82,9 @@ pub(super) fn stage(
         &Default::default(),
         req,
     )?;
-    std::fs::create_dir_all(staging_root)
+    file_access::fs::create_dir_all(staging_root)
         .map_err(|_| "Cannot create Codex planning staging root")?;
-    if std::fs::symlink_metadata(staging_root)
+    if file_access::fs::symlink_metadata(staging_root)
         .map_err(|_| "Cannot inspect Codex staging root")?
         .file_type()
         .is_symlink()
@@ -96,29 +92,24 @@ pub(super) fn stage(
         return Err("Codex planning staging root must not be a symlink".into());
     }
     let directory = staging_root.join(uuid::Uuid::new_v4().simple().to_string());
-    let mut builder = std::fs::DirBuilder::new();
+    let mut builder = file_access::fs::DirBuilder::new();
     #[cfg(unix)]
     {
-        use std::os::unix::fs::DirBuilderExt;
         builder.mode(0o700);
     }
     builder
         .create(&directory)
         .map_err(|_| "Cannot create private Codex planning home")?;
     let result = (|| {
-        std::fs::write(
+        file_access::fs::write(
             directory.join("config.toml"),
             "cli_auth_credentials_store = \"file\"\n",
         )
         .map_err(|_| "Cannot initialize private Codex planning home")?;
-        let auth = native_home.join("auth.json");
-        if auth.is_file() {
-            #[cfg(unix)]
-            std::os::unix::fs::symlink(
-                std::fs::canonicalize(auth).map_err(|_| "Cannot resolve Codex auth file")?,
-                directory.join("auth.json"),
-            )
-            .map_err(|_| "Cannot reference Codex authentication in private planning home")?;
+        #[cfg(unix)]
+        if let Some(auth) = native_auth_file(native_home)? {
+            file_access::fs::symlink(auth, directory.join("auth.json"))
+                .map_err(|_| "Cannot reference Codex authentication in private planning home")?;
         }
         built.command.env("CODEX_HOME", &directory);
         for name in DISABLED_FEATURES {
@@ -149,6 +140,42 @@ pub(super) fn stage(
         built.cleanup_files.push(directory);
     }
     result
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "resolves the person's project folder for the run, which may not be linked"
+)]
+fn resolve_workspace(workspace: &Path) -> Result<PathBuf, String> {
+    let workspace = std::fs::canonicalize(workspace)
+        .map_err(|_| "Codex read-only workspace must be an existing local directory")?;
+    if !workspace.is_dir() {
+        return Err("Codex read-only workspace must be a directory".into());
+    }
+    Ok(workspace)
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads Codex's own config in place, which may sit outside the engine folders the gate grants"
+)]
+fn read_native_config(native_home: &Path) -> std::io::Result<String> {
+    std::fs::read_to_string(native_home.join("config.toml"))
+}
+
+#[cfg(unix)]
+#[allow(
+    clippy::disallowed_methods,
+    reason = "finds Codex's own sign-in file in place, which may sit outside the engine folders the gate grants"
+)]
+fn native_auth_file(native_home: &Path) -> Result<Option<PathBuf>, &'static str> {
+    let auth = native_home.join("auth.json");
+    if !auth.is_file() {
+        return Ok(None);
+    }
+    std::fs::canonicalize(auth)
+        .map(Some)
+        .map_err(|_| "Cannot resolve Codex auth file")
 }
 
 pub(super) fn validate_version(response: &Value) -> Result<(), String> {
@@ -237,6 +264,10 @@ pub(super) fn validate_config(response: &Value, isolated_home: &Path) -> Result<
     Ok(())
 }
 
+#[allow(
+    clippy::disallowed_methods,
+    reason = "checks for rules beside a Codex config layer, which may be the system's own config outside the gate"
+)]
 fn no_exec_policy(config_file: &Path) -> bool {
     if !config_file.is_absolute() {
         return false;
@@ -308,7 +339,6 @@ mod tests {
     #[test]
     fn rejects_unaudited_versions_and_unconfirmed_sandbox() {
         assert!(validate_version(&json!({"userAgent":"ccgui/0.154.0 (Mac OS)"})).is_ok());
-        // The app-server handshake keeps the CLI's native identity.
         assert!(validate_version(
             &json!({"userAgent":"codex_cli_rs/0.154.0 (Mac OS 15.5.0; arm64) unknown"})
         )

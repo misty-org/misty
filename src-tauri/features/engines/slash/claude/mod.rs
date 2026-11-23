@@ -1,12 +1,3 @@
-//! The claude commands Misty lists and runs (see `slash/mod.rs`).
-//!
-//! Claude Code run headless (`-p`) runs its local commands (`/context`, `/config`, `/compact`,
-//! …) inside a turn, so those are listed as `Runs::Turn`, with the names, descriptions and hints
-//! its `initialize` answer gives (2.1.322), for the menu before Claude has run once. Its dialogs
-//! (`/status`, `/hooks`, `/memory`, …) exist only in its terminal app; Misty asks a short-lived
-//! Claude Code process for the same facts over its control protocol (`claude_control.rs`), which
-//! makes no model call, and shows them. Its claude.ai pages open in Misty's browser.
-
 use std::path::PathBuf;
 
 use serde_json::{json, Value};
@@ -28,7 +19,6 @@ use session::{branch, feedback, rename, side_question};
 use tasks::tasks;
 
 pub const COMMANDS: &[Command] = &[
-    // Run by Claude Code itself inside the turn.
     turn("advisor", "Let Claude consult a stronger model at key moments")
         .hint("[fable|opus|sonnet|off]"),
     turn(
@@ -95,7 +85,6 @@ pub const COMMANDS: &[Command] = &[
         "team-onboarding",
         "Help teammates ramp on Claude Code with a guide from your usage",
     ),
-    // Its terminal app's dialogs, answered over the control protocol.
     misty(
         "status",
         "Show Claude Code status including version, model, account, API connectivity, and tool statuses",
@@ -139,7 +128,6 @@ pub const COMMANDS: &[Command] = &[
         "doctor",
         "Check Claude Code's setup: account, MCP servers and sandbox",
     ),
-    // Its claude.ai and documentation pages.
     misty("release-notes", "View release notes"),
     misty(
         "upgrade",
@@ -159,7 +147,6 @@ pub const COMMANDS: &[Command] = &[
     ),
     misty("desktop", "Get Claude Desktop"),
     misty("teleport", "Resume a cloud session from claude.ai"),
-    // Terminal-only (Claude Code's `terminal_slash_commands`): what they mean in Misty.
     misty("color", "Set the prompt bar color for this session"),
     misty(
         "focus",
@@ -171,7 +158,6 @@ pub const COMMANDS: &[Command] = &[
     ),
 ];
 
-/// The pages Claude Code's own commands open, as its 2.1.322 build names them.
 const PAGES: &[(&str, &str)] = &[
     ("release-notes", "https://code.claude.com/docs/en/changelog"),
     ("upgrade", "https://claude.ai/upgrade/max"),
@@ -230,10 +216,6 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     }
 }
 
-// ── the control process ──────────────────────────────────────────────────────
-
-/// Where the process runs: the chat's folder, or the home folder for a chat with none (then it
-/// has no session either, and answers for Claude Code as a whole).
 fn folder(context: &Context) -> PathBuf {
     context
         .folder
@@ -259,8 +241,6 @@ fn session(context: &Context) -> Result<&str, String> {
         .ok_or_else(|| "Send Claude a message in this chat first.".to_string())
 }
 
-// ── reading answers ──────────────────────────────────────────────────────────
-
 fn text(value: &Value) -> String {
     match value {
         Value::Null => String::new(),
@@ -283,7 +263,6 @@ fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
         .unwrap_or_default()
 }
 
-/// A token count as Claude Code writes it: 940, 26.6k, 1m.
 fn tokens(count: u64) -> String {
     let short = |value: f64, unit: &str| {
         let text = format!("{value:.1}");
@@ -296,8 +275,6 @@ fn tokens(count: u64) -> String {
     }
 }
 
-/// A description's first sentence or line, at most 160 characters: skills' descriptions are
-/// written for the model and can run to a paragraph.
 fn brief(description: &str) -> String {
     const MOST: usize = 160;
     let line = description.trim().lines().next().unwrap_or_default().trim();
@@ -328,7 +305,6 @@ fn note(heading: Option<&str>, text: impl Into<String>) -> Section {
     }
 }
 
-/// Claude Code's names for where a setting came from.
 fn source_name(source: &str) -> String {
     match source {
         "userSettings" => "User settings".into(),
@@ -341,10 +317,6 @@ fn source_name(source: &str) -> String {
     }
 }
 
-/// `get_status`'s sections, as its terminal dialog shows them, less what describes the
-/// short-lived process rather than the chat: its socket (`Peer address`), its kind (always
-/// `interactive`, though it runs headless) and, in a chat Claude hasn't run in, the id of the
-/// throwaway session it opened, which is never saved.
 fn status_sections(answer: &Value, session: Option<&str>) -> Vec<Section> {
     list(answer, "sections")
         .iter()
@@ -359,7 +331,6 @@ fn status_sections(answer: &Value, session: Option<&str>) -> Vec<Section> {
                 })
                 .map(|item| {
                     let label = field(item, "label");
-                    // Its one lowercase label, in the words the rest of the dialog uses.
                     let label = if label == "cwd" {
                         "Folder".to_string()
                     } else {
@@ -373,9 +344,5 @@ fn status_sections(answer: &Value, session: Option<&str>) -> Vec<Section> {
         .collect()
 }
 
-/// Runs Misty's out-of-turn Claude Code commands against the installed CLI, signed in, and
-/// prints each Output to read. They make no model call: each command is a control request,
-/// and the scratch session is made by a local command (`/context`), which runs no turn.
-/// `cargo test --lib engines::slash::claude::live_tests -- --ignored --nocapture --test-threads 1`
 #[cfg(all(test, unix))]
 mod live_tests;

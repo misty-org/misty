@@ -15,9 +15,6 @@ use crate::agents::shared_folders::check_root;
 use crate::app::runtime::MistyRuntime;
 use crate::project::person_window;
 
-/// The folder a grant for `path` covers, worked out from the path's text alone: nothing is read
-/// before the person agrees. A name with an extension is a file, so its folder is meant. `..`
-/// and relative paths are refused rather than guessed.
 pub(crate) fn grant_dir_for(path: &str) -> Result<PathBuf, String> {
     let asked = Path::new(path.trim());
     if !asked.is_absolute()
@@ -43,16 +40,12 @@ pub(crate) fn grant_dir_for(path: &str) -> Result<PathBuf, String> {
     Ok(folder.components().collect())
 }
 
-/// The folder a grant for `path` would cover, so the chat can show it before anyone answers.
 #[tauri::command]
 pub fn space_folder_grant_scope(webview: tauri::Webview, path: String) -> Result<String, String> {
     person_window(&webview)?;
     Ok(grant_dir_for(&path)?.to_string_lossy().to_string())
 }
 
-/// Asks the person, natively, to let their agents work in the folder `path` is in, and makes it
-/// one of their projects if they agree. Returns the folder, or nothing if they declined. `space`
-/// is only checked: projects belong to the person on this computer, not to a Space.
 #[tauri::command]
 pub async fn space_folder_grant(
     app: tauri::AppHandle,
@@ -88,8 +81,6 @@ pub async fn space_folder_grant(
     if !receive.await.unwrap_or(false) {
         return Ok(None);
     }
-    // The person agreed, which is what lets Misty reach it. A folder an engine means to write
-    // into may not exist yet, and engines skip a folder that's missing.
     file_access::allow_linked_folder(&folder);
     let real = file_access::fs::create_dir_all(&folder)
         .and_then(|()| file_access::fs::canonicalize(&folder))
@@ -99,7 +90,6 @@ pub async fn space_folder_grant(
         })?;
     if real != folder {
         file_access::revoke_linked_folder(&folder);
-        // A link may lead somewhere the checks above never saw.
         check_root(&real, &protected, home.as_deref())?;
         file_access::allow_linked_folder(&real);
     }
@@ -109,8 +99,6 @@ pub async fn space_folder_grant(
     tokio::task::spawn_blocking(move || store::add_project(&db, &account, &kept))
         .await
         .map_err(|error| error.to_string())??;
-    // Engine CLIs get every folder the person granted as an extra directory (`--add-dir` and the
-    // like) on their next launch, so the step that was refused can be retried.
     if let Some(engines) = super::support::state() {
         if let Err(error) = engines.db.add_granted_root(&text) {
             eprintln!("[folder grant] engines won't see {text} yet: {error}");

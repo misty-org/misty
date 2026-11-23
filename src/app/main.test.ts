@@ -4,7 +4,7 @@ vi.mock("./HostMain", () => {
   loads.host();
   return { startup: Promise.resolve() };
 });
-vi.mock("./cursorEntry", () => {
+vi.mock("./cursor_entry", () => {
   loads.cursor();
   return { cursorStartup: Promise.resolve() };
 });

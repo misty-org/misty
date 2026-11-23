@@ -1,9 +1,5 @@
-//! The command line and environment block a process starts with.
 use super::*;
 
-/// A command line for `arguments`, quoted the way programs built with the
-/// Microsoft C runtime split it back (`CommandLineToArgvW`), so each argument
-/// arrives whole whatever spaces, quotes or backslashes it holds.
 pub fn command_line<I, S>(arguments: I) -> OsString
 where
     I: IntoIterator<Item = S>,
@@ -31,7 +27,6 @@ where
                 backslashes += 1;
                 continue;
             }
-            // Backslashes double only before a quote, which is escaped.
             let repeat = if unit == u16::from(b'"') {
                 backslashes * 2 + 1
             } else {
@@ -47,8 +42,6 @@ where
     std::os::windows::ffi::OsStringExt::from_wide(&line)
 }
 
-/// A Unicode environment block holding exactly `variables`, sorted by name
-/// as Windows expects.
 pub fn environment_block<I, K, V>(variables: I) -> Vec<u16>
 where
     I: IntoIterator<Item = (K, V)>,

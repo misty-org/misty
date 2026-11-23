@@ -1,4 +1,3 @@
-//! Reads the title a page's own webview reports.
 use crate::browser::*;
 
 #[cfg(target_os = "macos")]

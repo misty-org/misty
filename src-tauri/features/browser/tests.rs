@@ -4,8 +4,17 @@ use tempfile::tempdir;
 #[test]
 fn popup_download_requires_exact_live_source_authority() {
     let fixture = || {
-        let mut source = BrowserSession::default();
-        source.scope_id = "source-scope".into();
+        let mut source = BrowserSession {
+            scope_id: "source-scope".into(),
+            pending_agent_download: Some(PendingAgentDownload {
+                grant_id: "grant".into(),
+                agent_id: "agent".into(),
+                task_id: Some("task".into()),
+                expires_at: Utc::now() + chrono::Duration::seconds(30),
+                popup_id: Some("popup".into()),
+            }),
+            ..Default::default()
+        };
         source.grants.insert(
             "grant".into(),
             BrowserGrant {
@@ -14,13 +23,6 @@ fn popup_download_requires_exact_live_source_authority() {
                 expires_at: Utc::now() + chrono::Duration::minutes(1),
             },
         );
-        source.pending_agent_download = Some(PendingAgentDownload {
-            grant_id: "grant".into(),
-            agent_id: "agent".into(),
-            task_id: Some("task".into()),
-            expires_at: Utc::now() + chrono::Duration::seconds(30),
-            popup_id: Some("popup".into()),
-        });
         source
     };
     assert_eq!(
@@ -64,8 +66,6 @@ fn browser_navigation_accepts_only_web_urls() {
     assert!(external_url("https://example.com").is_ok());
     assert!(external_url("javascript:alert(1)").is_err());
     assert!(external_url("file:///tmp/private").is_err());
-    // Ordinary browsing can follow federated login redirects; this does not
-    // grant the destination provider-specific native or automation access.
     assert!(external_url("https://tenant.identity.example/login").is_ok());
     assert!(external_url("https://user:password@example.com").is_err());
     assert!(external_url("misty-extension://localhost/app.js").is_err());

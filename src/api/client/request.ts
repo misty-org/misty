@@ -1,9 +1,9 @@
 import { parseRetryAfter } from "./errors";
 import { resolveApiBase } from "@/api/deployment/api";
-import { addRequestCorrelation } from "@/shared/platform/requestCorrelation";
+import { addRequestCorrelation } from "@/shared/platform/request_correlation";
 import { ApiRequestError, decodeApiError } from "./errors";
 import { httpRequest } from "./http";
-import { deleteApiCachePrefix, mutationScope } from "@/api/cache/api-cache";
+import { deleteApiCachePrefix, mutationScope } from "@/api/cache/api_cache";
 import {
   apiRequestCredentials,
   isApiSessionTransitioning,
@@ -15,7 +15,6 @@ import {
 
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
 
-/** Authenticated request primitive for every Misty server domain. */
 export async function apiRequest<T = void>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method || "GET").toUpperCase();
   const canDeduplicate = method === "GET" && !init.body && !init.signal;
@@ -44,7 +43,6 @@ export async function apiRequest<T = void>(path: string, init: RequestInit = {})
   }
 
   const { response, accountGeneration } = await authenticatedResponse(path, init);
-  // A change makes the saved copies around it out of date; they are revalidated on next read.
   if (method !== "GET" && method !== "HEAD") {
     const account = readApiAccountId();
     if (account) void deleteApiCachePrefix(account, mutationScope(path));
@@ -54,10 +52,6 @@ export async function apiRequest<T = void>(path: string, init: RequestInit = {})
   return result;
 }
 
-/**
- * The answer's JSON, or nothing for an answer with no body: a 204, or a 202 that only says the
- * server took the request (sending a friend request).
- */
 async function responseBody<T>(response: Response): Promise<T> {
   if (response.status === 204) return undefined as T;
   const text = await response.text();

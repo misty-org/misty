@@ -1,27 +1,18 @@
-// Misty's own Node.js, fetched the first time an engine install needs npm and none is on this
-// computer: the pinned official LTS for this system from nodejs.org, checked against nodejs.org's
-// `SHASUMS256.txt`, then unpacked into `~/.misty/runtime/node`. It is never put on the person's
-// own PATH: only engine installs and engine runs use it (the engines' search PATH ends with it).
-
 use std::path::{Path, PathBuf};
 
 use super::downloads::{self, Checksum};
 use super::ProgressReporter;
 use crate::engines::support::paths::{node_runtime_bin_dir, node_runtime_dir};
 
-/// The Node.js LTS Misty fetches, moved up with releases.
 pub(super) const NODE_VERSION: &str = "24.22.3";
 const NODE_DIST: &str = "https://nodejs.org/dist";
 
-/// The official archive for one system: its top folder and its file name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct NodeArchive {
     pub(super) folder: String,
     pub(super) file: String,
 }
 
-/// nodejs.org's archive for `os` and `arch` (Rust's names: `macos`, `linux`, `windows`;
-/// `aarch64`, `x86_64`), or nothing for a system it doesn't build for.
 pub(super) fn node_archive(os: &str, arch: &str) -> Option<NodeArchive> {
     let os = match os {
         "macos" => "darwin",
@@ -50,13 +41,10 @@ fn shasums_url() -> String {
     format!("{NODE_DIST}/v{NODE_VERSION}/SHASUMS256.txt")
 }
 
-/// `node` in a Node.js folder laid out the way nodejs.org ships it.
 fn node_in(bin_dir: &Path) -> PathBuf {
     bin_dir.join(if cfg!(windows) { "node.exe" } else { "node" })
 }
 
-/// npm's own entry script in a Node.js folder: `lib/node_modules` on macOS and Linux,
-/// `node_modules` beside `node.exe` on Windows.
 fn npm_cli_in(root: &Path) -> PathBuf {
     let modules = if cfg!(windows) {
         root.join("node_modules")
@@ -66,13 +54,11 @@ fn npm_cli_in(root: &Path) -> PathBuf {
     modules.join("npm").join("bin").join("npm-cli.js")
 }
 
-/// Whether Misty's Node.js is unpacked and whole.
 pub(super) fn installed() -> bool {
     file_access::fs::is_file(node_in(&node_runtime_bin_dir()))
         && file_access::fs::is_file(npm_cli_in(&node_runtime_dir()))
 }
 
-/// npm through Misty's Node.js: the program and the arguments before npm's own.
 pub(super) fn npm_argv() -> (String, Vec<String>) {
     (
         node_in(&node_runtime_bin_dir())
@@ -84,7 +70,6 @@ pub(super) fn npm_argv() -> (String, Vec<String>) {
     )
 }
 
-/// What a plan says this step does, for Show details.
 pub(super) fn plan_step() -> String {
     match node_archive(std::env::consts::OS, std::env::consts::ARCH) {
         Some(archive) => format!(
@@ -97,7 +82,6 @@ pub(super) fn plan_step() -> String {
     }
 }
 
-/// Makes sure Misty's Node.js is there, fetching it if not.
 pub(super) async fn ensure(reporter: &ProgressReporter) -> Result<(), String> {
     if installed() {
         return Ok(());
@@ -137,7 +121,6 @@ pub(super) async fn ensure(reporter: &ProgressReporter) -> Result<(), String> {
         let _ = file_access::fs::remove_dir_all(&staging);
         return Err("The Node.js download didn't hold the program Misty expected.".into());
     }
-    // A half-unpacked folder from an earlier try goes first.
     if file_access::fs::exists(&runtime) {
         file_access::fs::remove_dir_all(&runtime).map_err(|error| error.to_string())?;
     }

@@ -1,8 +1,5 @@
-//! Closing the pages of one account when another takes its place.
 use crate::browser::*;
 
-/// Caller holds the browser lifecycle write lease. Enumerate real native views
-/// as well as registered sessions so failed/partial creation is also closed.
 pub(crate) fn close_account_views(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<BrowserSessionState>();
     let mut ids: HashSet<String> = state
@@ -17,6 +14,7 @@ pub(crate) fn close_account_views(app: &AppHandle) -> Result<(), String> {
             .keys()
             .filter_map(|label| label.strip_prefix("misty-browser-").map(str::to_owned)),
     );
+    crate::browser::pages::app_pages::close_app_pages(app)?;
     for id in ids {
         close_browser_webview(
             app.clone(),

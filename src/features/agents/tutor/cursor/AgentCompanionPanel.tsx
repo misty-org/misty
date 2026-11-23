@@ -1,18 +1,18 @@
-import { useMistyStore } from "../../conversations/state/useMistyStore";
+import { useMistyStore } from "../../conversations/state/use_misty_store";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, IconButton, Kbd, Switch, Slider, Text, useNotice } from "@misty/ui";
 import { RotateCcw, Square, VolumeX } from "lucide-react";
 import { useState } from "react";
-import { setCompanionOn, useCompanionOn } from "./companionOn";
-import { companionControl, useCompanionState, type CompanionControl } from "./companionState";
+import { setCompanionOn, useCompanionOn } from "./companion_on";
+import { companionControl, useCompanionState, type CompanionControl } from "./companion_state";
 import {
   companionSizeDefault,
   companionSizeMin,
   companionSizeMax,
   companionSizeStep,
   normalizeCompanionSize,
-} from "./companionSize";
+} from "./companion_size";
 
 const teachLine =
   "Misty teaches one step at a time and checks your work when you ask, instead of doing it for " +
@@ -96,7 +96,6 @@ export function AgentCompanionPanel() {
             onCheckedChange={(ask) => act({ kind: "ask", ask })}
           />
         </DesktopSettingsRow>
-        {/* The panel gives it the rows' inset and the hairline above it. */}
         <div>
           <div className="mb-4 flex items-center gap-2.5">
             <span className="mr-auto">Companion size</span>

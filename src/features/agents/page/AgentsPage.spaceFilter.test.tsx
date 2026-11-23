@@ -9,10 +9,9 @@ import {
 } from "./AgentsPage.testFixtures";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it } from "vitest";
-import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
-import { useRailShown } from "../context-panel/railLayoutStore";
+import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
+import { useRailShown } from "../context-panel/rail_layout_store";
 
-// New task lives in the chat's rail, which is folded away behind Tools until the person opens it.
 beforeEach(() => useRailShown.setState({ value: true }));
 
 it("edits a global agent without requiring a work Space", async () => {
@@ -32,7 +31,6 @@ it("continues the open chat and starts new work", async () => {
       { ...conversation("shared", "Team draft"), spaceId: "team" },
     ],
   });
-  // The window's sidebar lists the Space's chats now; a chat is opened by its address.
   useMistyStore.setState({ activeConversationId: "private" });
   renderAgentsPage();
   typeDraft("Continue this conversation");
@@ -88,7 +86,7 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
   expect(screen.getByRole("button", { name: "Lavender, Wink" }).getAttribute("aria-pressed")).toBe(
     "true",
   );
-  expect((screen.getByLabelText("Avatar emoji") as HTMLInputElement).value).toBe("");
+  expect((screen.getByLabelText("Custom emoji") as HTMLInputElement).value).toBe("");
   fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
   await waitFor(() =>
     expect(fixture.save).toHaveBeenCalledWith(
@@ -103,7 +101,6 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
 it("names the chat, not its agent, with nothing to switch", () => {
   fixture.includeSecond = true;
   renderAgentsPage();
-  // The chat's bar reads "Agent · chat title", as a direct message does, and is not a switch.
   expect(screen.getByRole("heading", { name: /^Communications New chat$/ })).toBeTruthy();
   expect(screen.getByRole("heading", { name: /^Communications/ })).toBeTruthy();
   openChat("research");

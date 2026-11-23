@@ -27,6 +27,7 @@ import {
 } from "@/features/settings";
 import { DriveSettingsSection } from "@/features/spaces/drive";
 import { FilesSettingsSection } from "@/features/spaces/file-manager";
+import { AppsSettingsSection } from "@/features/spaces/apps";
 import { ShortcutsSection } from "@/features/shortcuts";
 import { UpdatesSection } from "@/features/updater";
 import { DevicesSection, VoiceSection } from "@/features/voice";
@@ -36,10 +37,6 @@ import { agentsSettingsSections } from "./AgentsSettingsSections";
 import { BottomBarSettings } from "./layouts/DesktopLayout/BottomBarSettings";
 import { SearchSettings } from "./layouts/DesktopLayout/search/SearchSettings";
 
-/**
- * Each feature owns the settings blocks of its own area. The settings page only knows block ids,
- * so this is the one place that hands the components over, once, before a settings page opens.
- */
 const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>> = {
   general: GeneralSection,
   updates: UpdatesSection,
@@ -71,6 +68,7 @@ const sections: Partial<Record<SettingsSection, ComponentType<SettingsContentPro
   "bottom-bar": BottomBarSettings,
   search: SearchSettings,
   thumbnails: FilesSettingsSection,
+  "apps-data": AppsSettingsSection,
   ...agentsSettingsSections,
 };
 

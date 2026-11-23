@@ -9,7 +9,7 @@ const native = vi.hoisted(() => ({
   focus: vi.fn(async () => {}),
   stop: vi.fn(),
 }));
-vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
+vi.mock("@/features/app-windows/page-runtime/browser_overlay_runtime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   browserOverlayReady: vi.fn(async () => {}),
   setBrowserWebviewsSuspended: native.suspend,

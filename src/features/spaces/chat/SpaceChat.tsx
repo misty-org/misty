@@ -5,40 +5,40 @@ import { SpaceChatComposer } from "./composer/SpaceChatComposer";
 import { ChatMemberList } from "./components/ChatMemberList";
 import { ChatStageSplit } from "./components/ChatStageSplit";
 import { SpaceChatSearch } from "./components/SpaceChatSearch";
-import { useSpacesStore } from "../list/useSpacesStore";
-import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/useSpaceRoles";
-import { isPrivateChannel } from "./sidebar/conversationGroups";
-import { useChatSidebarPreferences } from "./sidebar/chatSidebarPreferences";
-import { useSpaceEveryoneUnread } from "./spaceConversationsResource";
+import { useSpacesStore } from "../list/use_spaces_store";
+import { spaceCan, useMemberColors, useSpaceRoles } from "../roles/use_space_roles";
+import { isPrivateChannel } from "./sidebar/conversation_groups";
+import { useChatSidebarPreferences } from "./sidebar/chat_sidebar_preferences";
+import { useSpaceEveryoneUnread } from "./space_conversations_resource";
 import { useAuth } from "@/features/account";
 import { useNativeSessionStore } from "@/features/account";
-import { useSpaceChatDraft } from "./composer/useSpaceChatDraft";
+import { useSpaceChatDraft } from "./composer/use_space_chat_draft";
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { SpaceSetupCards } from "../components/SpaceSetupCards";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { spaceChatPath } from "./chatRoute";
+import { spaceChatPath } from "./chat_route";
 import { DeleteMessageDialog } from "./components/ChatMessages";
-import { conversationName, isGroupDirectMessage } from "./sidebar/conversationGroups";
+import { conversationName, isGroupDirectMessage } from "./sidebar/conversation_groups";
 import { SpaceChatThread } from "./components/SpaceChatThread";
-import { useChatScrollRestoration } from "./hooks/useChatScrollRestoration";
-import { useChatSuggestions } from "./hooks/useChatSuggestions";
-import { useComposerInput } from "./hooks/useComposerInput";
-import { useMessageDeleteTarget } from "./hooks/useMessageDeleteTarget";
-import { useMessageEditing } from "./hooks/useMessageEditing";
-import { useSpaceChatScope, useSpaceChatStore } from "./hooks/useSpaceChatData";
-import { useSpaceChatMessageActions } from "./hooks/useSpaceChatMessageActions";
-import { useSpaceChatAccess } from "./hooks/useSpaceChatAccess";
-import { useSpaceChatTyping } from "./hooks/useSpaceChatTyping";
-import { useSpaceConversationChat } from "./hooks/useSpaceConversationChat";
-import { useSpaceChatAiAdapter } from "./hooks/useSpaceChatAiAdapter";
-import { useChatReadReceipts } from "./hooks/useChatReadReceipts";
+import { useChatScrollRestoration } from "./hooks/use_chat_scroll_restoration";
+import { useChatSuggestions } from "./hooks/use_chat_suggestions";
+import { useComposerInput } from "./hooks/use_composer_input";
+import { useMessageDeleteTarget } from "./hooks/use_message_delete_target";
+import { useMessageEditing } from "./hooks/use_message_editing";
+import { useSpaceChatScope, useSpaceChatStore } from "./hooks/use_space_chat_data";
+import { useSpaceChatMessageActions } from "./hooks/use_space_chat_message_actions";
+import { useSpaceChatAccess } from "./hooks/use_space_chat_access";
+import { useSpaceChatTyping } from "./hooks/use_space_chat_typing";
+import { useSpaceConversationChat } from "./hooks/use_space_conversation_chat";
+import { useSpaceChatAiAdapter } from "./hooks/use_space_chat_ai_adapter";
+import { useChatReadReceipts } from "./hooks/use_chat_read_receipts";
 import { ConversationLoadState, ConversationUnavailable } from "./components/ConversationStates";
-import { useBringMentionedAgents, useOwnMentionableAgents } from "./ownAgents";
+import { useBringMentionedAgents, useOwnMentionableAgents } from "./own_agents";
 import { ChatThreadColumn } from "./components/ChatThreadColumn";
 import { ChatThreadsList } from "./components/ChatThreadsList";
-import { useSpaceThread } from "./hooks/useSpaceThread";
-import { useChatSidePanel } from "./chatSidePanelStore";
+import { useSpaceThread } from "./hooks/use_space_thread";
+import { useChatSidePanel } from "./chat_side_panel_store";
 export function SpaceChat({
   spaceId,
   spaceName,
@@ -55,22 +55,12 @@ export function SpaceChat({
   spaceId: string;
   spaceName: string;
   workspaceTabId?: string;
-  /** The chat to show instead of the page's `conversation` parameter, as the side panel does. */
   conversationId?: string;
-  /** In the side panel the header switcher names the chat, so no title row is drawn. */
   panel?: boolean;
-  /** Where "Back to chat" goes when the open chat is gone; defaults to the chat page. */
   onBack?: () => void;
-  /** The message search run from the page's controls; its results take the member list's place. */
   searchedText?: string;
-  /** The chat's icon buttons in its bar under the tabs (the chat page's); none in the side panel. */
   actions?: ReadonlyArray<ActionBarItem>;
-  /** The message search, last in the chat's bar. */
   search?: ReactNode;
-  /** The chat is a DM (a Space of kind "direct"): named for its people, no setup cards, and no
-   * composer while it is read-only. Its page names the tab. It brings what a Space can't know
-   * about its people: the face in its bar (`face`), the opening of its history (`welcome`) and
-   * what sits beside the messages (`members`: the other person's profile, or a group's people). */
   dm?: {
     name: string;
     group: boolean;
@@ -79,8 +69,6 @@ export function SpaceChat({
     welcome?: ReactNode;
     members?: ReactNode;
   };
-  /** What sits between the chat's bar and its messages, such as a DM's call: the bar stays on top,
-   * and a handle between the stage and the messages gives either more room. */
   stage?: ReactNode;
 }) {
   const [searchParams] = useSearchParams();
@@ -93,9 +81,7 @@ export function SpaceChat({
   const threadRootId = useChatSidePanel((panel) => panel.threadRootId);
   const threadSnapshot = useChatSidePanel((panel) => panel.threadRoot);
   const threadsListOpen = useChatSidePanel((panel) => panel.threadsListOpen);
-  // Panels belong to the chat they were opened in.
   useEffect(() => useChatSidePanel.getState().reset(), [spaceId, conversationId]);
-  // A link to a thread (a file's, opened from the app it's open in) opens it beside the chat.
   const threadParam = searchParams.get("thread") ?? "";
   useEffect(() => {
     if (threadParam) useChatSidePanel.getState().openThread(threadParam);
@@ -124,7 +110,6 @@ export function SpaceChat({
     (state) =>
       state.membersBySpace[spaceId]?.find((member) => member.user_id === user?.id)?.role_ids,
   );
-  // The roles the person may @mention: those open to it, or every one for the owner and admins.
   const mentionableRoles = useMemo(() => {
     const anyRole = space?.role === "owner" || spaceCan(space, "administrator");
     return (roles ?? []).filter((role) => !role.is_default && (role.mentionable || anyRole));
@@ -134,13 +119,11 @@ export function SpaceChat({
   const preferences = useChatSidebarPreferences((state) => state.value);
   const membersShown = !preferences.hideMembers;
   const conversation = scope.activeConversation;
-  // A DM is a Space of its own whose chat has no conversation of kind "dm", so its page says so.
   const isDirect = Boolean(dm) || conversation?.kind === "dm";
   const channelName =
     dm?.name ?? (conversation ? conversationName(conversation, user?.id) : "everyone");
   const defaultRoleId = roles?.find((role) => role.is_default)?.id;
   const privateChannel = Boolean(conversation && isPrivateChannel(conversation, defaultRoleId));
-  // In a channel the server says what the person may do there; elsewhere the Space's word holds.
   const canManageMessages = conversation?.permissions
     ? conversation.permissions.includes("messages.manage") ||
       spaceCan(space, "administrator") ||
@@ -150,8 +133,6 @@ export function SpaceChat({
     dm ? undefined : workspaceTabId,
     isDirect ? `@${channelName} in ${spaceName}` : `#${channelName} in ${spaceName}`,
   );
-  // Where the unread messages begin, as they were when the chat opened: reading them clears the
-  // count, but the line stays until another chat opens.
   const unreadAtOpen = useRef<{ key: string; count: number } | null>(null);
   const openKey = `${spaceId}:${conversationId}`;
   if (unreadAtOpen.current?.key !== openKey && (conversationId ? conversation : true))
@@ -168,7 +149,6 @@ export function SpaceChat({
     : undefined;
   const draft = useSpaceChatDraft(spaceId, conversationId);
   const editing = useMessageEditing();
-  // Only the person's own agents can be @mentioned, and so run; nobody runs anyone else's.
   const agents = useOwnMentionableAgents(user?.id);
   const bringMentionedAgents = useBringMentionedAgents(
     spaceId,
@@ -203,8 +183,6 @@ export function SpaceChat({
   const markRead = store.markRead;
   const loadEveryone = store.loadMessages;
   const referenceOnly = store.referenceOnly;
-  // Everyone's history loads when the chat opens, however it was opened (a saved tab, the side
-  // panel, a relaunch); a channel or direct chat loads its own (`useSpaceConversationChat`).
   useEffect(() => {
     if (conversationId || referenceOnly) return;
     void Promise.resolve(loadEveryone(spaceId)).catch(() => undefined);
@@ -245,7 +223,6 @@ export function SpaceChat({
     ? conversationChat.error
     : (store.messageErrorsBySpace[spaceId] ?? "");
   const conversationAvailable = !conversationId || Boolean(scope.activeConversation);
-  // How far back the open chat can still read, and reading the page before what it shows.
   const history = conversationId
     ? conversationChat.history
     : (store.messageHistoryBySpace[spaceId] ?? "more");
@@ -259,8 +236,6 @@ export function SpaceChat({
   const historyReady =
     !messagesLoading &&
     (!conversationId || conversationChat.loadedConversationId === conversationId);
-  // A message to bring into view that isn't drawn yet (a reply's original from further back):
-  // older pages load until it is. A search hit in the address does the same.
   const [jumpTargetId, setJumpTargetId] = useState("");
   useEffect(() => setJumpTargetId(""), [spaceId, conversationId]);
   const targetMessageId = jumpTargetId || searchParams.get("message") || "";
@@ -270,7 +245,6 @@ export function SpaceChat({
   useEffect(() => {
     if (!targetMessageId || !historyReady) return;
     if (targetLoaded) {
-      // In view now (the scroll hook has moved to it); a later click starts afresh.
       if (jumpTargetId) setJumpTargetId("");
       return;
     }
@@ -299,7 +273,6 @@ export function SpaceChat({
     onReachTop: history === "more" ? loadOlder : undefined,
   });
 
-  // Transient menus close on navigation; drafts remain scoped to their conversation.
   useEffect(() => {
     resetEditing();
     clearDeleteTarget();
@@ -464,7 +437,6 @@ export function SpaceChat({
       ownerUserId={space.owner_user_id}
       currentUserId={user?.id}
       visibleTo={
-        // A DM, or a private channel, lists only the people who can read it.
         conversation && (isDirect || privateChannel)
           ? (member) =>
               conversation.participants.some((person) => person.user_id === member.user_id)
@@ -482,7 +454,6 @@ export function SpaceChat({
       dm={Boolean(dm)}
     />
   ) : null;
-  // The side panel has no room for the page's controls or a member list: the chat and its thread.
   if (panel)
     return (
       <div className="flex h-full min-h-0 min-w-0">
@@ -490,7 +461,6 @@ export function SpaceChat({
         {thread}
       </div>
     );
-  // The chat's own bar, under the window's tabs, as Discord's: what the chat is, then its controls.
   const header = (
     <SpaceChatHeader
       direct={isDirect}
@@ -502,7 +472,6 @@ export function SpaceChat({
       end={search}
     />
   );
-  // Search results, then a thread, take the member list's place.
   return (
     <ChannelMain header={header} side={searchResults ?? thread ?? members ?? undefined}>
       {stage ? <ChatStageSplit stage={stage}>{chat}</ChatStageSplit> : chat}

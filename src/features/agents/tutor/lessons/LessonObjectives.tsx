@@ -1,24 +1,19 @@
 import { useState } from "react";
 import { Button, Text } from "@misty/ui";
-import { useMistyStore } from "../../conversations/state/useMistyStore";
+import { useMistyStore } from "../../conversations/state/use_misty_store";
 import { useCollaborationStore } from "../../plans/store";
 import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
-import { lessonProgress } from "./lessonRouter";
-import { nextCourseLesson, useLessonStore } from "./lessonStore";
-import type { LessonObjective } from "./lessonTypes";
+import { lessonProgress } from "./lesson_router";
+import { nextCourseLesson, useLessonStore } from "./lesson_store";
+import type { LessonObjective } from "./lesson_types";
 
 const rowState = (objective: LessonObjective, current: boolean): [StatusState, string] => {
   if (objective.status === "done") return ["done", "Done"];
   if (objective.status === "skipped") return ["skipped", "Skipped"];
-  // The step in progress waits on the person, not on Misty.
   if (current || objective.status === "in_progress") return ["waiting", "Your turn"];
   return ["next", "Next"];
 };
 
-/**
- * Starts a course's next lesson in a new Teach chat: the tutor plans it from its
- * title and goal, the same way a new lesson starts at the cursor.
- */
 async function startNextLesson(courseId: string, index: number, title: string, goal?: string) {
   const misty = useMistyStore.getState();
   const conversationId = await misty.newConversation(undefined, misty.selectedAgentId);
@@ -36,11 +31,6 @@ async function startNextLesson(courseId: string, index: number, title: string, g
     );
 }
 
-/**
- * A lesson chat's objectives above its transcript (Teach mode): the shared status
- * table, one row per objective, updated by each reply. A finished lesson shows what
- * was achieved, and in a course, the button that starts the next lesson.
- */
 export function LessonObjectives({ conversationId }: { conversationId: string }) {
   const lesson = useLessonStore((s) => s.lessons[conversationId]);
   const courses = useLessonStore((s) => s.courses);
@@ -77,7 +67,7 @@ export function LessonObjectives({ conversationId }: { conversationId: string })
               Next lesson: {next.part.title}
             </Button>
             {notice && (
-              <Text bare tone="muted" role="status" className="text-xs">
+              <Text size="meta" bare tone="muted" role="status">
                 {notice}
               </Text>
             )}

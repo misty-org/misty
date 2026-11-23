@@ -9,6 +9,7 @@
 //!      `provider  model  ctx  max-out  thinking  images`; extensions slow
 //!      the probe by ~10x (upstream evidence), so skip their boot.
 //!   3. `<bin> --list-models` — bare retry for binaries that reject the flag.
+//!
 //! Codex ships its catalog inside the binary: `codex debug models` renders
 //! it as JSON (the picker's entries are the ones with `visibility: "list"`).
 //! Fallback when the probe fails (old binary): the CLI's own config names
@@ -52,27 +53,18 @@ pub(crate) mod usable;
 
 pub(crate) use acp::{acp_modes, acp_thought_levels};
 
-/// Claude launch-time model resolution: picker alias → the custom id its
-/// ANTHROPIC_DEFAULT_<FAMILY>_MODEL override maps to (pass-through when
-/// unmapped), so the request carries the model the picker displayed even
-/// when the CLI build skips its own env remap.
 pub(crate) fn resolve_claude_launch_model(selector: &str) -> String {
     claude::resolve_launch_model(selector)
 }
 
-/// One reasoning-effort level as the engine offers it for a model: its id (what the run passes)
-/// and, when the engine names or explains it, that name and line.
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EffortLevel {
     pub id: String,
-    /// The engine's own name for it ("Extra"), when it gives one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// The engine's own line about it ("Greater reasoning depth for complex problems").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    /// A short tag the engine puts on it ("Recommended", "3.5× or more usage").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub badge: Option<String>,
 }
@@ -86,19 +78,13 @@ impl EffortLevel {
     }
 }
 
-/// A model's fast mode, as the engine names it: Claude Code's "Fast mode" (`--fast-mode on`),
-/// a Codex service tier (`service_tier`).
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FastMode {
-    /// The engine's name for it ("Fast mode", "Priority").
     pub label: String,
-    /// What the run passes to turn it on ("fast", or the tier's id).
     pub tier: String,
 }
 
-/// Whether Claude Code's own catalog gives this model a fast mode: the model named, or the CLI's
-/// current one when the run names none.
 pub(crate) fn claude_fast_offered(model: Option<&str>) -> bool {
     let Some((_, details)) = claude::account_catalog(None) else {
         return false;
@@ -111,27 +97,16 @@ pub(crate) fn claude_fast_offered(model: Option<&str>) -> bool {
     }
 }
 
-/// What the engine's own catalog says about one of its models beyond its id and name. Misty only
-/// shows this; every field comes from the engine (its CLI, its cache, its config, its handshake).
 #[derive(Debug, Clone, Default)]
 pub struct ModelDetails {
-    /// The model's own name when it beats the row's ("Opus 5.5" for the "opus" alias).
     pub name: Option<String>,
-    /// The engine's line under it: a description, or the concrete id an alias runs.
     pub detail: Option<String>,
-    /// Effort levels it takes, weakest first. None when the engine doesn't say; empty when it
-    /// says the model takes none.
     pub efforts: Option<Vec<EffortLevel>>,
-    /// The level the engine itself would use for it: its remembered one, else its default.
     pub default_effort: Option<String>,
     pub context_window: Option<u64>,
-    /// Where the engine's own menu puts it: `main`, or "more" for its "More models".
     pub section: Option<String>,
-    /// The engine's fast mode for this model, when it has one.
     pub fast: Option<FastMode>,
-    /// A note the engine shows with it (usage warnings and the like).
     pub notice: Option<String>,
-    /// The engine's own current pick, used when the chat names none.
     pub current: bool,
 }
 
@@ -147,20 +122,13 @@ pub(crate) fn claude_comparison_model(
 
 use serde::Serialize;
 
-/// Catalog probe budget; with extension boot skipped the call lands in ~1s,
-/// this is pure slow-machine headroom.
 const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
-/// Run one catalog probe (`bin args…`) under the shared budget; stdout as
-/// lossy UTF-8 on success. `probe` names the subcommand in error messages
-/// ("models --json").
 pub(super) async fn run_probe(bin: &str, args: &[&str], probe: &str) -> Result<String, String> {
     let mut cmd = super::command_for_binary(bin);
     for arg in args {
         cmd.arg(arg);
     }
-    // A timed-out probe must not outlive its budget: kill_on_drop kills the
-    // child with the handle instead of leaking a half-finished CLI.
     cmd.kill_on_drop(true);
     #[cfg(windows)]
     super::hide_console(&mut cmd);
@@ -177,16 +145,11 @@ pub(super) async fn run_probe(bin: &str, args: &[&str], probe: &str) -> Result<S
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineModel {
-    /// Selector accepted by `--model` ("provider/model").
     pub id: String,
-    /// Display name when the catalog carries one (JSON probe only).
     pub name: Option<String>,
-    /// Secondary line under the name (e.g. "Custom Opus model"), mirroring
-    /// the CLI's own /model menu descriptions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     pub provider: String,
-    /// Context window parsed from the table ("131.1K" -> 131_100).
     pub context_window: Option<u64>,
 }
 
@@ -194,12 +157,8 @@ pub struct EngineModel {
 #[serde(rename_all = "camelCase")]
 pub struct EngineCatalog {
     pub models: Vec<EngineModel>,
-    /// What the engine says about each model beyond its row, by model id.
     #[serde(skip)]
     pub details: std::collections::HashMap<String, ModelDetails>,
-    /// True when `models` is exactly what the CLI's model flag resolves
-    /// (config/registry/binary-derived). A stored pick outside it cannot
-    /// run, so the frontend resets it to the leading entry.
     pub authoritative: bool,
 }
 
@@ -212,8 +171,6 @@ impl EngineCatalog {
         }
     }
 
-    /// The engine couldn't be asked: no list of ours stands in for its own. Not authoritative, so
-    /// a model the person pinned still runs, and the picker says the engine didn't list any.
     pub(super) fn unknown() -> Self {
         Self {
             authoritative: false,
@@ -221,7 +178,6 @@ impl EngineCatalog {
         }
     }
 
-    /// The same catalog, carrying the engine's details for its models.
     fn with_details(mut self, details: std::collections::HashMap<String, ModelDetails>) -> Self {
         self.details = details;
         self
@@ -229,12 +185,6 @@ impl EngineCatalog {
 }
 
 pub async fn list_engine_models(engine: String) -> Result<EngineCatalog, String> {
-    // Disabling an engine gates the catalog too: every branch below either
-    // runs the engine's CLI or asks it (`opencode models`,
-    // `mcode acp`, …), and a user who turned the engine off must not see it
-    // launched — the chat picker and the plugin agent catalog already hide
-    // disabled engines, so no consumer needs this answer. Same contract as the
-    // send path (config::ensure_engine_enabled).
     crate::engines::support::config::ensure_engine_enabled(&engine)?;
     match engine.as_str() {
         "codex" => Ok(codex_catalog().await),
@@ -247,9 +197,6 @@ pub async fn list_engine_models(engine: String) -> Result<EngineCatalog, String>
         "opencode" => Ok(opencode_catalog().await),
         "qoder" => qoder_catalog("qoder").await,
         "qoder-cn" => qoder_catalog("qoder-cn").await,
-        // MiniMax's catalog comes from a live `mcode acp` probe (the /model
-        // menu only exists on the session handshake), cached last-success;
-        // a failed probe falls back to the static stock list.
         "minimax" => {
             let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
             let bin = super::engine_bin(&settings, "minimax");
@@ -260,17 +207,10 @@ pub async fn list_engine_models(engine: String) -> Result<EngineCatalog, String>
             let bin = super::engine_bin(&settings, "codebuddy");
             Ok(codebuddy::codebuddy_catalog(&bin).await)
         }
-        // Unknown engine: no CLI-sourced catalog — the frontend fills the
-        // picker from the configured provider channels.
         _ => Ok(EngineCatalog::authoritative(Vec::new())),
     }
 }
 
-/// DSH has no CLI-side catalog: the model list lives on the running host
-/// (`session/modelCatalog` RPC — 0.1.2 removed `llm.models`), grouped by
-/// provider with `default` carrying the host's current model. Never spawns
-/// the host — a down host is an error so the frontend keeps whatever catalog
-/// it already has instead of blanking the picker.
 async fn agy_catalog() -> EngineCatalog {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = super::engine_bin(&settings, "agy");
@@ -304,10 +244,6 @@ async fn dsh_catalog() -> Result<EngineCatalog, String> {
     )))
 }
 
-/// `session/modelCatalog` value `{groups: [{id, name, models: [{id, name,
-/// description, default}]}], default: {provider, model}}` → flat catalog
-/// entries with `provider/model` selector ids. The host's current model
-/// (`default`) or the group-marked default leads.
 fn flatten_llm_models(
     catalog: &serde_json::Value,
     describe: Option<&serde_json::Value>,
@@ -372,8 +308,6 @@ fn flatten_llm_models(
             });
         }
     }
-    // The frontend auto-selects the leading entry when nothing is pinned:
-    // make it the host's current (or the catalog's default) model.
     if let Some(default_id) = default_id {
         if let Some(index) = models.iter().position(|model| model.id == default_id) {
             models.rotate_left(index);
@@ -388,17 +322,11 @@ async fn codex_catalog() -> EngineCatalog {
     if let Ok((mut models, details)) = codex::run_codex_debug_models(&bin).await {
         if !models.is_empty() {
             let configured = codex::codex_config_model();
-            // The explicit CLI setting overrides its catalog default (e.g.
-            // a configured 1M window). max_context_window alone is capability,
-            // not the window this request actually uses.
             if let Some(window) = configured.as_ref().and_then(|model| model.context_window) {
                 for model in &mut models {
                     model.context_window = Some(window);
                 }
             }
-            // Only the models Codex lists for the account: a config `model` it doesn't list
-            // can't run on it (`usable.rs`). One on a provider of the person's own
-            // (`model_provider`) is theirs, so it still leads the list.
             let own_provider =
                 configured.is_some() && usable::configured_default("codex").is_none();
             let models = if own_provider {
@@ -416,10 +344,6 @@ async fn codex_catalog() -> EngineCatalog {
 }
 
 async fn kimi_catalog() -> EngineCatalog {
-    // The CLI's own registry is ground truth for `-m` aliases; the
-    // config's [models.*] tables are the offline equivalent (same alias
-    // semantics), then the CLI's configured default as a single-entry
-    // fallback. No relay probe: `kimi -m` takes aliases, not raw API ids.
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = super::engine_bin(&settings, "kimi");
     if let Ok(models) = kimi::run_kimi_provider_list(&bin).await {
@@ -438,23 +362,13 @@ async fn kimi_catalog() -> EngineCatalog {
 }
 
 fn grok_catalog() -> EngineCatalog {
-    // No provider-channel probe here: `grok -m` resolves
-    // `[model.<alias>]` sections or built-in names only, so relay API ids
-    // would list entries the CLI cannot run. The frontend already merges
-    // the app channel's configured model into the picker.
     EngineCatalog::authoritative(grok::grok_local_models())
 }
 
 fn claude_catalog() -> EngineCatalog {
-    // CLI-sourced, and every entry is something `claude --model`
-    // resolves — authoritative, so the frontend resets stale stored
-    // picks (e.g. leftovers from the removed channel probe). The binary
-    // path feeds the embedded-registry read (alias → concrete model id).
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = super::engine_bin(&settings, "claude");
     let bin_path = super::resolve::find_cli_binary("claude", Some(&bin));
-    // The account's own menu (the CLI's cached catalog) when there is one; the CLI's aliases,
-    // named from its embedded registry, for a custom endpoint, another cloud or no cache yet.
     if let Some((models, details)) = claude::account_catalog(bin_path.as_deref()) {
         return EngineCatalog::authoritative(models).with_details(details);
     }
@@ -475,7 +389,6 @@ async fn pi_family_catalog(engine: &str) -> EngineCatalog {
             );
         }
     }
-    // Fresh binaries skip extension boot; old ones fall back to a bare run.
     for extra in [&["--no-extensions"][..], &[][..]] {
         if let Ok(models) = pi::run_list_models(&bin, extra).await {
             if !models.is_empty() {
@@ -486,15 +399,9 @@ async fn pi_family_catalog(engine: &str) -> EngineCatalog {
             }
         }
     }
-    // A missing/broken CLI is not an error here: the picker falls back to
-    // provider-config models.
     EngineCatalog::authoritative(configured)
 }
 
-/// Top-level `key = "…"` only: stop at the first `[table]` header so a
-/// same-named key inside a table never leaks in. Handles both TOML string
-/// quote styles and trailing comments; a full TOML parse is overkill for
-/// one scalar.
 fn parse_top_level_toml_string(content: &str, key: &str) -> Option<String> {
     for line in content.lines() {
         let line = line.trim();
@@ -522,8 +429,10 @@ fn parse_top_level_toml_string(content: &str, key: &str) -> Option<String> {
     None
 }
 
-/// Single-entry catalog from one top-level TOML string key in
-/// `<home>/config.toml` (codex `model`, kimi `default_model`).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads an engine's own config in place, which its home's env override may move outside the engine folders the gate grants"
+)]
 pub(super) fn config_toml_model(
     home: &std::path::Path,
     key: &str,
@@ -540,19 +449,12 @@ pub(super) fn config_toml_model(
     })
 }
 
-/// Which entry keys feed each EngineModel field — the alias-table skeleton
-/// is shared by grok and kimi, only these key names differ.
 pub(super) struct AliasFields {
-    /// First string-valued key wins; a label equal to the alias is dropped.
     pub name_keys: &'static [&'static str],
     pub context_keys: &'static [&'static str],
-    /// Per-entry provider override; absent → the engine default.
     pub provider_key: Option<&'static str>,
 }
 
-/// `[<table>."<alias>"]` TOML tables → catalog entries, sorted by alias.
-/// Callers extract the default first (their key shapes differ) and promote
-/// it with `promote_default`.
 pub(super) fn alias_table_catalog(
     root: &toml::Value,
     table: &str,
@@ -598,8 +500,6 @@ pub(super) fn alias_table_catalog(
     models
 }
 
-/// Move the entry matching `default` to the front (in-place no-op when the
-/// default is unknown or unlisted).
 pub(super) fn promote_default(models: &mut Vec<EngineModel>, default: Option<&str>) {
     if let Some(default) = default {
         if let Some(index) = models.iter().position(|m| m.id == default) {
@@ -609,9 +509,6 @@ pub(super) fn promote_default(models: &mut Vec<EngineModel>, default: Option<&st
     }
 }
 
-/// The frontend auto-selects the first catalog entry when the user has no
-/// stored pick, so the CLI's effective default leads: moved to the front
-/// when already listed, prepended when the catalog doesn't name it.
 pub(super) fn with_default_first(
     models: Vec<EngineModel>,
     default: Option<EngineModel>,

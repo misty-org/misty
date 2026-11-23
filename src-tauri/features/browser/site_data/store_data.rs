@@ -1,5 +1,3 @@
-//! Where a website data store lives on disk.
-
 use crate::browser::*;
 
 pub(crate) fn store_data_directory(
@@ -11,7 +9,6 @@ pub(crate) fn store_data_directory(
     let path = crate::browser::site_data::profile_store::store_home(&home, store)?;
     #[cfg(target_os = "macos")]
     {
-        // WebKit picks the store's folder; `webview` links to it.
         let library = dirs::home_dir()
             .ok_or("The home folder is unavailable.")?
             .join("Library");
@@ -31,9 +28,6 @@ pub(crate) fn store_data_directory(
     Ok(path)
 }
 
-/// Points a view at its store's data directory. WebView2 needs every view
-/// of one directory to create its environment with the same options, so
-/// every view of a store is built through here.
 pub(crate) fn with_store_data(
     builder: tauri::WebviewBuilder<tauri::Wry>,
     app: &AppHandle,

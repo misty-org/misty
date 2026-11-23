@@ -17,7 +17,6 @@ use serde_json::{json, Value};
 
 use crate::model::{InUseBy, Item, ItemId, Kind, Seq, SpaceId, TrashPage, Version};
 
-/// A body streamed from or to a file.
 pub type ByteStream = Pin<Box<dyn Stream<Item = io::Result<Bytes>> + Send>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,14 +40,11 @@ impl Method {
     }
 }
 
-/// A request to the Misty server. `path` is relative to the server's API base (the address the
-/// renderer handed over, which ends in `/v1`), query included: `/spaces/s/drive/changes?since=4`.
 #[derive(Clone, Debug)]
 pub struct Request {
     pub method: Method,
     pub path: String,
     pub headers: Vec<(String, String)>,
-    /// JSON.
     pub body: Option<Vec<u8>>,
 }
 
@@ -70,23 +66,16 @@ impl Response {
 
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum HttpError {
-    /// The server couldn't be reached: offline, DNS, a dropped connection, a timeout.
     #[error("Misty couldn't reach the server.")]
     Offline,
-    /// Signed out, or signed in to another account than the drive's.
     #[error("Sign in to Misty again.")]
     SignedOut,
     #[error("{0}")]
     Other(String),
 }
 
-/// The network, as the glue provides it. `api` is authenticated with the person's session (the
-/// glue renews it on a 401); `put_blob` and `get_blob` reach presigned storage addresses and send
-/// no session at all.
 pub trait Http: Send + Sync {
     fn api(&self, request: Request) -> BoxFuture<'_, Result<Response, HttpError>>;
-    /// Sends `length` bytes of `body` to a presigned address. The answer's headers carry the
-    /// part's `ETag` for a multipart upload.
     fn put_blob(
         &self,
         url: String,
@@ -95,16 +84,13 @@ pub trait Http: Send + Sync {
         length: u64,
         body: ByteStream,
     ) -> BoxFuture<'_, Result<Response, HttpError>>;
-    /// Fetches a presigned address: its status and its body as a stream.
     fn get_blob(&self, url: String) -> BoxFuture<'_, Result<(u16, ByteStream), HttpError>>;
 }
 
-/// What a route refused, as the server says it.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum ApiError {
     #[error("The file changed since.")]
     VersionConflict(Box<Item>),
-    /// Only a trash move of something already trashed answers this now.
     #[error("The file was deleted.")]
     Trashed(Box<Item>),
     #[error("That name is taken.")]
@@ -125,11 +111,8 @@ pub enum ApiError {
     Offline,
     #[error("Sign in to Misty again.")]
     SignedOut,
-    /// The content a create or change names didn't land whole (`blob_missing`,
-    /// `upload_incomplete`, `upload_conflict`, `422 upload_verification_failed`): send it again.
     #[error("The upload didn't arrive whole.")]
     UploadIncomplete,
-    /// The server can't take or hand out files (`503 drive_direct_transfer_unavailable`).
     #[error("This server can't move files yet.")]
     TransferUnavailable,
     #[error("The server refused it ({status}): {message}")]
@@ -137,7 +120,6 @@ pub enum ApiError {
 }
 
 impl ApiError {
-    /// Worth trying again later, unchanged.
     pub fn is_transient(&self) -> bool {
         matches!(self, Self::Offline)
             || matches!(self, Self::Server { status, .. } if *status >= 500 || *status == 429)
@@ -181,7 +163,6 @@ pub struct DonePart {
     pub etag: String,
 }
 
-/// `POST /drive/uploads`: the blob is there already, or where to send it.
 #[derive(Clone, Debug, Deserialize)]
 pub struct UploadStart {
     pub upload_id: String,
@@ -206,7 +187,6 @@ pub struct Lease {
     pub expires_at: Option<String>,
 }
 
-/// One computer's unexpired in-use mark, as `GET /drive/in-use` lists it for the whole Space.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct InUseMark {
     pub item_id: ItemId,
@@ -220,7 +200,6 @@ pub struct InUseMark {
     pub device_name: String,
     #[serde(default)]
     pub editing: bool,
-    /// RFC 3339.
     #[serde(default)]
     pub expires_at: Option<String>,
 }
@@ -231,7 +210,6 @@ struct InUseMarks {
     marks: Vec<InUseMark>,
 }
 
-/// A new item for `POST /drive/items`.
 #[derive(Clone, Debug, Serialize)]
 pub struct NewItem {
     pub id: ItemId,
@@ -248,12 +226,10 @@ pub struct NewItem {
     pub upload_id: Option<String>,
 }
 
-/// The fields of a `PATCH`; only those set are sent.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct Change {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    /// `Some(None)` moves it to the root.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<Option<ItemId>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -264,11 +240,8 @@ pub struct Change {
     pub mtime_ms: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upload_id: Option<String>,
-    /// The version the sender's copy came from (at least 1); absent when it came from none (a new
-    /// file written into one whose name it took). Content it never saw is kept in the trash.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub base_version: Option<i64>,
-    /// A new name or place that a live item holds trashes that item first.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub replace: bool,
 }
@@ -283,12 +256,9 @@ impl Change {
     }
 }
 
-/// This computer, as every request names it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Device {
-    /// `dev_<uuid>`, kept in `settings_state` as `drive:device`.
     pub id: String,
-    /// The computer's own name, such as "Ben's MacBook".
     pub name: String,
 }
 
@@ -296,17 +266,13 @@ const MAX_ATTEMPTS: u32 = 5;
 const MAX_BACKOFF: Duration = Duration::from_secs(32);
 const MAX_RETRY_AFTER: Duration = Duration::from_secs(120);
 
-/// The routes, for one account on one server.
 #[derive(Clone)]
 pub struct Api {
     http: Arc<dyn Http>,
     device: Device,
-    /// Waits between retries; tests turn it off.
     pub patient: bool,
 }
 
-/// What a path segment or header value may carry as it is: URI's unreserved characters. Ids
-/// (`drv_…`, `dev_…`) pass unchanged, so the server's router sees them as they are.
 const ENCODED: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
     .remove(b'-')
     .remove(b'_')
@@ -342,7 +308,6 @@ fn item_in(body: &Value) -> Option<Box<Item>> {
         .map(Box::new)
 }
 
-/// The server's refusal, from its status and `{code, …}` body.
 pub fn refusal(status: u16, body: &[u8]) -> ApiError {
     let value: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
     let code = value
@@ -419,10 +384,7 @@ impl Api {
     ) -> Result<Response, ApiError> {
         let mut headers = vec![
             ("X-Misty-Device".to_owned(), self.device.id.clone()),
-            (
-                "X-Misty-Device-Name".to_owned(),
-                segment(&self.device.name),
-            ),
+            ("X-Misty-Device-Name".to_owned(), segment(&self.device.name)),
             ("Accept".to_owned(), "application/json".to_owned()),
         ];
         if let Some(version) = if_match {
@@ -457,7 +419,8 @@ impl Api {
                 return Ok(response);
             }
             let unavailable = response.status == 503
-                && String::from_utf8_lossy(&response.body).contains("drive_direct_transfer_unavailable");
+                && String::from_utf8_lossy(&response.body)
+                    .contains("drive_direct_transfer_unavailable");
             let throttled = (response.status == 429 || response.status >= 500) && !unavailable;
             if throttled && attempt < MAX_ATTEMPTS && self.patient {
                 tokio::time::sleep(retry_after(&response).unwrap_or_else(|| backoff(attempt)))
@@ -482,7 +445,6 @@ impl Api {
         })
     }
 
-    /// `GET /me`: the signed-in person's display name, for what the drive shows as theirs.
     pub async fn my_name(&self) -> Option<String> {
         let me: Value = self
             .json(Method::Get, "/me".to_owned(), None, None)
@@ -506,7 +468,11 @@ impl Api {
             Method::Get,
             space_path(
                 space,
-                &format!("/changes?since={}&limit={}", since.0.max(0), limit.clamp(1, 1000)),
+                &format!(
+                    "/changes?since={}&limit={}",
+                    since.0.max(0),
+                    limit.clamp(1, 1000)
+                ),
             ),
             None,
             None,
@@ -550,8 +516,6 @@ impl Api {
         .map(|_| ())
     }
 
-    /// An item the server answered: the item itself, with what it says besides (`replaced`,
-    /// `revived`) left aside.
     async fn item_answer(
         &self,
         method: Method,
@@ -577,7 +541,6 @@ impl Api {
             .await
     }
 
-    /// `PATCH`: with `if_match` only for a merged save; otherwise it applies as it arrives.
     pub async fn change(
         &self,
         space: &SpaceId,
@@ -586,23 +549,32 @@ impl Api {
         change: &Change,
     ) -> Result<Item, ApiError> {
         let body = serde_json::to_value(change).unwrap_or(Value::Null);
-        self.item_answer(Method::Patch, item_path(space, id, ""), if_match, Some(body))
-            .await
+        self.item_answer(
+            Method::Patch,
+            item_path(space, id, ""),
+            if_match,
+            Some(body),
+        )
+        .await
     }
 
-    /// Asks every online computer whether it has the item open; answers how long to wait before
-    /// the trash move.
     pub async fn check_in_use(&self, space: &SpaceId, id: &ItemId) -> Result<Duration, ApiError> {
         let answer: Value = self
-            .json(Method::Post, item_path(space, id, "/check-in-use"), None, None)
+            .json(
+                Method::Post,
+                item_path(space, id, "/check-in-use"),
+                None,
+                None,
+            )
             .await?;
         Ok(Duration::from_millis(
-            answer.get("wait_ms").and_then(Value::as_u64).unwrap_or(2000),
+            answer
+                .get("wait_ms")
+                .and_then(Value::as_u64)
+                .unwrap_or(2000),
         ))
     }
 
-    /// A trash move, with no version: it trashes the item as it is by then. Refused only while
-    /// someone has it open (`423`).
     pub async fn trash(&self, space: &SpaceId, id: &ItemId, held: bool) -> Result<Item, ApiError> {
         self.item_answer(
             Method::Post,
@@ -638,7 +610,6 @@ impl Api {
         .await
     }
 
-    /// Every unexpired in-use mark in the Space, every computer's, this one's included.
     pub async fn in_use_marks(&self, space: &SpaceId) -> Result<Vec<InUseMark>, ApiError> {
         let page: InUseMarks = self
             .json(Method::Get, space_path(space, "/in-use"), None, None)
@@ -658,18 +629,15 @@ impl Api {
         after: Option<&str>,
         limit: u32,
     ) -> Result<TrashPage, ApiError> {
-        // The server takes pages of 1 to 200.
         let mut path = space_path(space, &format!("/trash?limit={}", limit.clamp(1, 200)));
         if let Some(after) = after.filter(|after| !after.is_empty()) {
             path.push_str(&format!("&after={}", segment(after)));
         }
         let mut page: TrashPage = self.json(Method::Get, path, None, None).await?;
-        // The last page says `next_after: ""`.
         page.next_after = page.next_after.filter(|next| !next.is_empty());
         Ok(page)
     }
 
-    /// Deletes a trashed item for good. Only the person's own `drive_purge` calls this.
     pub async fn purge(&self, space: &SpaceId, id: &ItemId) -> Result<(), ApiError> {
         self.send(Method::Delete, item_path(space, id, ""), None, None)
             .await
@@ -688,7 +656,10 @@ mod tests {
             "name": "a", "kind": "file", "version": 3, "seq": 9
         });
         let body = json!({ "code": "version_conflict", "item": item }).to_string();
-        assert!(matches!(refusal(409, body.as_bytes()), ApiError::VersionConflict(_)));
+        assert!(matches!(
+            refusal(409, body.as_bytes()),
+            ApiError::VersionConflict(_)
+        ));
         let body = json!({ "code": "in_use", "who": [{ "user_id": "u", "name": "Ben",
             "device_name": "Mac", "editing": true }] })
         .to_string();
@@ -696,8 +667,14 @@ mod tests {
             ApiError::InUse(who) => assert_eq!(who[0].name, "Ben"),
             other => panic!("{other:?}"),
         }
-        assert!(matches!(refusal(410, b"{\"code\":\"resync_required\"}"), ApiError::ResyncRequired));
-        assert!(matches!(refusal(404, b"{\"code\":\"parent_missing\"}"), ApiError::ParentMissing));
+        assert!(matches!(
+            refusal(410, b"{\"code\":\"resync_required\"}"),
+            ApiError::ResyncRequired
+        ));
+        assert!(matches!(
+            refusal(404, b"{\"code\":\"parent_missing\"}"),
+            ApiError::ParentMissing
+        ));
     }
 
     #[test]
@@ -706,7 +683,10 @@ mod tests {
             parent_id: Some(None),
             ..Change::default()
         };
-        assert_eq!(serde_json::to_value(&change).unwrap(), json!({ "parent_id": null }));
+        assert_eq!(
+            serde_json::to_value(&change).unwrap(),
+            json!({ "parent_id": null })
+        );
     }
 
     #[test]

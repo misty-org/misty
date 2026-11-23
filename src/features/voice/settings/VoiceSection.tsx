@@ -30,9 +30,9 @@ import {
   type HearingModelView,
   type InstallProgress,
   type VoiceView,
-} from "../speechModels";
-import { voiceSettings } from "../voiceSettings";
-import { speechLanguages, voiceLabel, voiceSample } from "./speechChoices";
+} from "../speech_models";
+import { voiceSettings } from "../voice_settings";
+import { speechLanguages, voiceLabel, voiceSample } from "./speech_choices";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsRowSkeleton,
@@ -44,10 +44,9 @@ import {
   SwitchControl,
   TextAreaControl,
 } from "../../settings/SettingsControls";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import type { SettingsContentProps } from "../../settings/settings_types";
 
 const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform);
-// The empty value is the platform's own dictation key.
 const shortcuts = [
   { value: "", label: isMac ? "Fn / Globe" : "Right Alt", icon: Keyboard },
   ...(isMac
@@ -57,7 +56,6 @@ const shortcuts = [
       ]
     : [{ value: "RightControl", label: "Right Ctrl", icon: Keyboard }]),
 ];
-// Text alone: every row would repeat the same icon.
 const secondLanguages = [
   { value: "none", label: "None" },
   ...speechLanguages
@@ -80,7 +78,6 @@ const rates = [
 const megabytes = (entry: { disk_mb: number }) =>
   entry.disk_mb >= 1000 ? `${(entry.disk_mb / 1000).toFixed(1)} GB` : `${entry.disk_mb} MB`;
 
-/** Where a model or voice is when it isn't on this computer yet, for its row's line. */
 function arrivalLine(
   entry: { id: string; installed: boolean } | undefined,
   progress: Record<string, InstallProgress>,
@@ -98,13 +95,6 @@ function arrivalLine(
   return "Not on this computer yet.";
 }
 
-/**
- * Settings › Voice: dictation everywhere, voice captures, and speech on this computer through open
- * models from Misty's catalog: the speech model Misty picked for hearing (with Change), Misty's
- * own voice (Tutor, read-alouds outside an agent), and the models and voices on this computer
- * that aren't in use, each with Remove. Speech is recognized and spoken on this computer, with no
- * key. Device-only.
- */
 export function VoiceSection(props: SettingsContentProps) {
   const voice = voiceSettings(props.document);
   const catalog = useSpeechModels((state) => state.catalog);
@@ -115,7 +105,6 @@ export function VoiceSection(props: SettingsContentProps) {
   useEffect(() => {
     void useSpeechModels.getState().load();
   }, []);
-  // Read here so a change of language on this page offers that language's models and voices.
   const languages = catalog ? personLanguages() : [];
   const hearing = catalog?.hearing.find((model) => model.id === voice.hearingModel);
   const ranked = catalog ? rankHearing(catalog.hearing, languages, catalog.machine) : [];
@@ -127,8 +116,6 @@ export function VoiceSection(props: SettingsContentProps) {
     mistyVoice && !offeredVoices.some((entry) => entry.id === mistyVoice.id)
       ? [mistyVoice, ...offeredVoices]
       : offeredVoices;
-  // What's on this computer but not in use, one row per download: voices that share one model
-  // go together, and one that shares Misty's voice's download is in use.
   const inUse = new Set([hearing?.packageKey, mistyVoice?.packageKey].filter(Boolean));
   const spare = new Map<string, (HearingModelView | VoiceView)[]>();
   for (const entry of [...(catalog?.hearing ?? []), ...(catalog?.voices ?? [])]) {
@@ -136,7 +123,6 @@ export function VoiceSection(props: SettingsContentProps) {
     spare.set(entry.packageKey, [...(spare.get(entry.packageKey) ?? []), entry]);
   }
   const installing = catalog?.installing ?? [];
-  // A model under CC-BY carries its credit wherever it's named.
   const hearingLine = [arrivalLine(hearing, progress, installing, failures), hearing?.credit]
     .filter(Boolean)
     .join(" ");

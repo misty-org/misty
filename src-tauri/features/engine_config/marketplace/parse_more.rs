@@ -1,19 +1,9 @@
-//! Parsing for the engines whose plugin listings aren't Claude Code's or Codex's own: Oh My Pi's
-//! text, Qoder's, CodeBuddy's and MiniMax's Claude-style JSON, and Gemini's extension gallery.
-
 use serde_json::Value;
 
 use super::parse::{
     author, readable, source_link, split_id, text, valid_id, valid_name, MarketItem, MarketSource,
 };
 
-// ===== Oh My Pi =====
-//
-// OMP reads Claude Code's marketplace format (`.claude-plugin/marketplace.json`) as well as its
-// own. Only its installed list has a `--json`; the marketplace list and `plugin discover` print
-// text, read here line by line with any colour codes taken out.
-
-/// Text without ANSI colour sequences.
 pub fn plain(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
@@ -34,7 +24,6 @@ pub fn plain(text: &str) -> String {
     out
 }
 
-/// `omp plugin marketplace list`: a heading, then `  <name>  <source>` per marketplace.
 pub fn omp_sources(output: &str) -> Vec<MarketSource> {
     plain(output)
         .lines()
@@ -50,8 +39,6 @@ pub fn omp_sources(output: &str) -> Vec<MarketSource> {
         .collect()
 }
 
-/// `omp plugin discover <marketplace>`: `  <name>[@<version>]`, then its description indented
-/// four spaces.
 pub fn omp_available(output: &str, marketplace: &str) -> Vec<MarketItem> {
     let mut items: Vec<MarketItem> = Vec::new();
     for line in plain(output).lines() {
@@ -93,8 +80,6 @@ pub fn omp_available(output: &str, marketplace: &str) -> Vec<MarketItem> {
     items
 }
 
-/// `omp plugin list --json`: `{ npm: [...], marketplace: [{ id, scope, entries: [{ enabled }] }] }`.
-/// Marks the available items installed and adds the installed ones no marketplace lists any more.
 pub fn omp_mark_installed(items: &mut Vec<MarketItem>, listing: &Value) {
     for entry in listing["marketplace"].as_array().into_iter().flatten() {
         let Some(id) = text(entry, "id") else {
@@ -125,16 +110,7 @@ pub fn omp_mark_installed(items: &mut Vec<MarketItem>, listing: &Value) {
     }
 }
 
-// ===== Qoder, CodeBuddy and MiniMax =====
-//
-// Their plugin commands follow Claude Code's (`plugin list --available --json`,
-// `plugin marketplace list --json`), but this build has none of them to record output from, so
-// their JSON is read loosely: an array, or an object holding `installed`, `available` or
-// `plugins`, with the field names Claude Code and Codex use.
-
-/// Plugins from a Claude-style `--json` listing whose exact shape isn't known.
 pub fn loose_items(engine: &str, listing: &Value) -> Vec<MarketItem> {
-    // Each list, and whether being on it means installed.
     let lists: Vec<(&Value, bool)> = if listing.is_array() {
         vec![(listing, false)]
     } else {
@@ -196,7 +172,6 @@ pub fn loose_items(engine: &str, listing: &Value) -> Vec<MarketItem> {
     items
 }
 
-/// Marketplaces from a Claude-style `--json` list: an array, or `{ marketplaces: [...] }`.
 pub fn loose_sources(listing: &Value) -> Vec<MarketSource> {
     let list = if listing.is_array() {
         listing
@@ -220,24 +195,13 @@ pub fn loose_sources(listing: &Value) -> Vec<MarketSource> {
         .collect()
 }
 
-// ===== Gemini CLI and Qwen Code =====
-//
-// Gemini's public extension gallery (geminicli.com/extensions.json) lists extensions by their
-// GitHub repository, ranked by stars. Gemini installs them with `extensions install <url>`, and
-// Qwen Code, which converts Gemini extensions, takes the same address.
-
-/// An installed extension, from its folder's manifest.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstalledExtension {
     pub name: String,
     pub description: String,
-    /// The address it was installed from, when the engine recorded it.
     pub source: Option<String>,
 }
 
-/// The gallery's entries as items, with installed extensions marked by name (or by address) and
-/// the installed ones the gallery doesn't list added. Gallery items install by their address and
-/// installed ones remove by name, so an installed item's id is its name.
 pub fn gallery_items(
     engine: &str,
     gallery: &Value,
@@ -310,7 +274,6 @@ pub fn gallery_items(
     items
 }
 
-/// An extension address Gemini's gallery lists and an install may pass on: a GitHub repository.
 pub fn valid_gallery_url(url: &str) -> bool {
     let Some(path) = url.strip_prefix("https://github.com/") else {
         return false;

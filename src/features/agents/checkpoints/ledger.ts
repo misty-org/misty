@@ -1,8 +1,3 @@
-/**
- * The requirements ledger a run ends with (the crate's
- * src-tauri/features/agents/runs/ledger.rs writes it). It rides at the end of the run's final
- * text as a comment, so each assistant message carries the ledger as it stood at that turn.
- */
 type LedgerState = "pending" | "done" | "failed" | "blocked" | "skipped";
 
 export interface LedgerRow {
@@ -18,7 +13,6 @@ export interface LedgerRow {
 const marker = "<!--misty-ledger:";
 const states = new Set<string>(["pending", "done", "failed", "blocked", "skipped"]);
 
-/** The text without its ledger comment, and the rows it held. */
 export function splitLedger(text: string): { text: string; rows: LedgerRow[] } {
   const start = text.lastIndexOf(marker);
   if (start < 0) return { text, rows: [] };
@@ -42,7 +36,6 @@ export function splitLedger(text: string): { text: string; rows: LedgerRow[] } {
   }
 }
 
-/** The text with its ledger replaced by these rows. */
 export function withLedgerRows(text: string, rows: LedgerRow[]): string {
   const { text: body } = splitLedger(text);
   return body + encodeLedger(rows);
@@ -54,11 +47,6 @@ function encodeLedger(rows: LedgerRow[]): string {
 
 export const isOpen = (row: LedgerRow) => row.state !== "done" && row.state !== "skipped";
 
-/**
- * The turn that carries on from a ledger: the done rows stay done, the open ones are the work.
- * `only` names the rows to work; other open rows wait. The rows travel in the text so the
- * runtime starts from them (it reads them back with ledgerFromPrompt).
- */
 export function resumePrompt(rows: LedgerRow[], only?: string[]): string {
   const work = rows.filter((row) => isOpen(row) && (!only || only.includes(row.id)));
   const waiting = rows.filter((row) => isOpen(row) && !work.includes(row));

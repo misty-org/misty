@@ -2,27 +2,17 @@
 // CodeBuddyAuthSection.tsx.
 // See NOTICE.
 
-/**
- * What an engine's page in Agents › Channels holds besides its channels: its program (path,
- * Codex's home, custom models) and how it signs in. Pi and Oh My Pi list their providers,
- * CodeBuddy opens its own `/login`, DeepSeek Harness shows its local host.
- */
 import { LogIn } from "lucide-react";
 import { useState } from "react";
 import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
 import { Button } from "@misty/ui";
 import type { EngineId } from "../channels/engines";
-import { refreshCliStatus } from "../clis/useCliVersionStatus";
+import { refreshCliStatus } from "../clis/use_cli_version_status";
 import { SignInDialog } from "../clis/SignInDialog";
 import { DshHostSection } from "./DshHostSection";
 import { EngineProgramSection } from "./EngineProgramSection";
 import { PiFamilyAuthSection } from "./PiFamilyAuthSection";
 
-/**
- * CodeBuddy keeps its sign-in in the OS credential store under names of its own. Telling whether
- * it is signed in would mean searching that store, which Misty never does: the CLI owns the
- * state, and this only opens its `/login`.
- */
 function CodeBuddySignIn() {
   const [open, setOpen] = useState(false);
   return (

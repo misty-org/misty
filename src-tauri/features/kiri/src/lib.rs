@@ -1,10 +1,3 @@
-//! Kiri (霧, "mist") is Misty's native web platform layer.
-//!
-//! OS webviews (WKWebView, WebView2, WebKitGTK) supply an engine, but not the
-//! browser layer Chromium and Gecko build above theirs, such as WebAuthn. Kiri supplies that layer from Rust. Each
-//! capability presents a web API to the page through a thin shim and does the
-//! real work natively, behind one envelope check and one gate.
-
 mod envelope;
 mod error;
 mod gate;
@@ -37,8 +30,6 @@ pub struct Kiri {
 }
 
 impl Kiri {
-    /// Serves webviews whose labels start with `webview_prefix`, with every
-    /// built-in capability.
     pub fn new(webview_prefix: impl Into<String>, host: impl Host) -> Self {
         Self {
             webview_prefix: webview_prefix.into(),
@@ -50,15 +41,12 @@ impl Kiri {
         }
     }
 
-    /// Adds (or replaces) a capability, for embedder-specific APIs.
     pub fn with(mut self, capability: impl Capability) -> Self {
         self.capabilities
             .insert(capability.name(), Box::new(capability));
         self
     }
 
-    /// Routes one page call. `webview` and `page_url` come from the engine:
-    /// the webview that delivered the call and its committed top-level URL.
     pub async fn dispatch(
         &self,
         webview: &str,
@@ -90,8 +78,6 @@ impl Kiri {
     }
 }
 
-/// The page-side script: the transport plus every capability's shim. Inject
-/// it into top-level documents before site scripts run.
 pub fn page_script() -> String {
     include_str!("page/transport.js")
         .replace("__KIRI_CAPABILITIES__", &capabilities::shims().join("\n"))

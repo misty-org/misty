@@ -1,4 +1,3 @@
-//! Full-resolution crops of one display around a companion point.
 use super::RegionCapture;
 
 #[cfg(target_os = "macos")]
@@ -45,8 +44,6 @@ pub fn capture_region(
     capture_legacy_region(monitor, region, max_side)
 }
 
-/// Crops a full display capture. The display's units map to its pixels by the
-/// capture's own width, which also covers Retina displays on macOS 12–13.
 fn capture_legacy_region(
     monitor: &xcap::Monitor,
     region: (f64, f64, f64, f64),

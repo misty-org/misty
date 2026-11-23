@@ -1,13 +1,7 @@
-//! pi/omp rpc processes for the commands Misty runs out of turn, and the answer frames for
-//! omp's rpc-ui dialogs.
 use super::{attempt_error, report_commands, strip_terminal_codes, CONFIRM_YES_LABEL};
 use crate::engines::command_for_binary;
 use serde_json::Value;
 
-/// An engine's own command in the chat's folder, with the environment a turn gives it (the
-/// person's variables decide where its sessions and agent folder are) and piped output: the rpc
-/// process here, and the plain subcommands Misty runs for a command (`omp cleanse`, `hermes
-/// sessions export`). The binary's name comes back for errors.
 pub(crate) fn cli_command(
     engine: &str,
     folder: &std::path::Path,
@@ -33,15 +27,8 @@ pub(crate) fn cli_command(
     Ok((cmd, bin))
 }
 
-/// How long one out-of-turn call may take, startup included (omp loads its plugins and skills
-/// before it reads stdin).
 const RPC_CALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(45);
 
-/// A short-lived pi/omp rpc process opened on one of a chat's sessions, for the commands Misty
-/// runs out of turn (`slash/pi/`). It opens the session the way a turn does (`--session` for
-/// pi, `--resume` for omp, the same mode and environment), or a fork of it. Only `prompt`
-/// reaches a model, for the side flows the person asked for. Calls go one at a time; the process
-/// exits when this is dropped.
 pub(crate) struct RpcSession {
     engine: String,
     child: tokio::process::Child,
@@ -65,9 +52,6 @@ impl RpcSession {
         Self::spawn(engine, folder, session, &[flag, session]).await
     }
 
-    /// An omp rpc process on a new copy of the chat's session (`--fork`), as omp's `/tan` and
-    /// side flows clone it: the copy has the whole conversation so far and the chat's own
-    /// session is never touched. `extra` adds launch flags (`--no-tools` for a side question).
     pub(crate) async fn fork(
         engine: &str,
         folder: &std::path::Path,
@@ -94,7 +78,6 @@ impl RpcSession {
         if !matches!(engine, "pi" | "omp") {
             return Err(format!("{engine} has no rpc mode"));
         }
-        // A leading dash would be read as a flag.
         if session.trim().is_empty() || session.starts_with('-') {
             return Err("This chat has no session to open yet.".into());
         }
@@ -109,8 +92,6 @@ impl RpcSession {
             .stdout
             .take()
             .ok_or_else(|| format!("{engine} gave no output pipe"))?;
-        // Drained alongside, so a chatty stderr can't fill its pipe and stall the process; kept
-        // to explain an early exit (omp prints "Session … not found" there).
         let stderr = child.stderr.take().map(|mut stderr| {
             tokio::spawn(async move {
                 use tokio::io::AsyncReadExt;
@@ -129,8 +110,6 @@ impl RpcSession {
         })
     }
 
-    /// Sends `{type, ...fields}` and waits for its response; the response's `data` (Null when it
-    /// has none). Frames that pass meanwhile are only read for the commands they report.
     pub(crate) async fn call(&mut self, kind: &str, fields: Value) -> Result<Value, String> {
         use tokio::io::AsyncWriteExt;
         self.next_id += 1;
@@ -172,9 +151,6 @@ impl RpcSession {
         }
     }
 
-    /// Sends `message` as a prompt and waits, up to `limit`, for the agent's last answer to end
-    /// (omp marks it `isTerminal`). Nobody is there to answer an ask out of turn, so each one is
-    /// cancelled. Errs with the turn's own error when it failed.
     pub(crate) async fn prompt(
         &mut self,
         message: &str,
@@ -223,7 +199,6 @@ impl RpcSession {
         }
     }
 
-    /// Why the process stopped answering: its own words on stderr when it left any.
     async fn exit_error(&mut self) -> String {
         self.stdin = None;
         let _ = tokio::time::timeout(std::time::Duration::from_secs(5), self.child.wait()).await;
@@ -247,7 +222,6 @@ impl RpcSession {
         }
     }
 
-    /// Closes stdin so the engine saves the session and exits on its own; killed if it lingers.
     pub(crate) async fn close(mut self) {
         self.stdin = None;
         if tokio::time::timeout(std::time::Duration::from_secs(10), self.child.wait())
@@ -259,11 +233,6 @@ impl RpcSession {
     }
 }
 
-/// The answer to call `id` (a `kind` command) in one rpc frame: its `data` (Null when it has
-/// none), its error, or None when the frame answers something else. omp 18 answers a command it
-/// doesn't know with no id at all (`{"type":"response","command":"get_tree","success":false,
-/// "error":"Unknown command: get_tree"}`), so a failure naming the command counts as the answer
-/// rather than leaving the call to time out.
 fn rpc_answer(value: &Value, id: &str, kind: &str) -> Option<Result<Value, String>> {
     if value.get("type").and_then(Value::as_str) != Some("response") {
         return None;
@@ -285,9 +254,6 @@ fn rpc_answer(value: &Value, id: &str, kind: &str) -> Option<Result<Value, Strin
     })
 }
 
-/// Builds the omp rpc-ui answer frame. answers is the UI's map (question text → the chosen
-/// label or free text); omp's fallback chain asks one question at a time, so the one value is
-/// taken. None = the person dismissed it (cancelled; the CLI carries on as cancelled).
 pub(crate) fn extension_ui_answer_frame(
     method: &str,
     request_id: &str,
@@ -303,8 +269,6 @@ pub(crate) fn extension_ui_answer_frame(
             "cancelled": true,
         });
     };
-    // select/input/editor answers are single strings; an array can only come from the UI's
-    // multi-select card (omp's select frame is single choice), so it is joined as a fallback.
     let text = match answer {
         Value::String(s) => s.clone(),
         Value::Array(labels) => labels
@@ -332,7 +296,6 @@ pub(crate) fn extension_ui_answer_frame(
 mod tests {
     use super::*;
 
-    /// Frames captured from omp 18.0.3 and pi 1.5.2 in rpc mode.
     #[test]
     fn rpc_answers_match_by_id_or_by_an_unknown_command_without_one() {
         let ok = serde_json::json!({"id":"misty-1","type":"response","command":"get_branch_messages",
@@ -344,13 +307,11 @@ mod tests {
             "bccb0406"
         );
         assert!(rpc_answer(&ok, "misty-2", "get_branch_messages").is_none());
-        // pi's set_session_name answers with no data.
         let bare = serde_json::json!({"id":"misty-3","type":"response","command":"set_session_name","success":true});
         assert_eq!(
             rpc_answer(&bare, "misty-3", "set_session_name").unwrap(),
             Ok(Value::Null)
         );
-        // omp drops the id when it doesn't know the command.
         let unknown = serde_json::json!({"type":"response","command":"get_tree","success":false,
             "error":"Unknown command: get_tree"});
         assert_eq!(
@@ -358,7 +319,6 @@ mod tests {
             Err("Unknown command: get_tree".to_string())
         );
         assert!(rpc_answer(&unknown, "misty-4", "get_state").is_none());
-        // pi keeps it.
         let pi_unknown = serde_json::json!({"id":"misty-5","type":"response","command":"bogus","success":false,
             "error":"Unknown command: bogus"});
         assert!(rpc_answer(&pi_unknown, "misty-5", "bogus")
@@ -374,8 +334,6 @@ mod tests {
 
     #[test]
     fn extension_ui_answer_frame_builds_the_response_per_method() {
-        // select: the value is returned as it is (the CLI matches labels exactly, and free text
-        // falls back to the chosen item).
         let frame = extension_ui_answer_frame(
             "select",
             "r1",
@@ -385,7 +343,6 @@ mod tests {
         assert_eq!(frame["id"], "r1");
         assert_eq!(frame["value"], "prod");
 
-        // Free text goes in value too.
         let frame = extension_ui_answer_frame(
             "editor",
             "r2",
@@ -393,7 +350,6 @@ mod tests {
         );
         assert_eq!(frame["value"], "anything");
 
-        // confirm maps to the confirmed boolean.
         let yes = extension_ui_answer_frame(
             "confirm",
             "r3",
@@ -404,7 +360,6 @@ mod tests {
             extension_ui_answer_frame("confirm", "r3", Some(&serde_json::json!({ "q": "Cancel" })));
         assert_eq!(no["confirmed"], false);
 
-        // Dismissed = cancelled.
         let cancel = extension_ui_answer_frame("select", "r4", None);
         assert_eq!(cancel["cancelled"], true);
     }

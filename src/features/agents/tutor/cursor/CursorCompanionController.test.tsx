@@ -1,5 +1,5 @@
 import "./CompanionController.testFixtures";
-import { effectiveValues } from "@/features/settings/device-preferences/settingResolution";
+import { effectiveValues } from "@/features/settings/device-preferences/setting_resolution";
 import { useDevicePreferences } from "@/features/settings/device-preferences/store";
 import { act, render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -11,10 +11,10 @@ import {
   saveCompanion,
   opened,
 } from "./CompanionController.testFixtures";
-import { companionControl, useCompanionState } from "./companionState";
+import { companionControl, useCompanionState } from "./companion_state";
 import { CursorCompanionController } from "./CursorCompanionController";
 import type { DisplayCapture } from "./protocol";
-import type { MistyImageAttachment } from "@/features/agents/conversations/state/conversationTypes";
+import type { MistyImageAttachment } from "@/features/agents/conversations/state/conversation_types";
 const attachment: MistyImageAttachment = {
   id: "fixture-file",
   name: "notes.txt",
@@ -284,7 +284,6 @@ describe("native companion lifecycle", () => {
   });
 
   it("publishes native startup failures in Agents and retries through the page control", async () => {
-    // The first native setup fails, whichever native call comes before it.
     const native = mocks.invoke.getMockImplementation()!;
     let failing = true;
     mocks.invoke.mockImplementation((name, args) => {
@@ -393,7 +392,6 @@ describe("Clicky capture ordering and shared entry points", () => {
     await waitFor(() =>
       expect(useCompanionState.getState().presentation.error).toContain("answer is saved"),
     );
-    // The request carried the screens; the answer had no point to show.
     expect(useCompanionState.getState().presentation).toMatchObject({
       visible: true,
       phase: "idle",
@@ -453,7 +451,6 @@ describe("Clicky capture ordering and shared entry points", () => {
         conversationId: "conversation",
       }),
     );
-    // Every request at the cursor carries the screens.
     expect(mocks.invoke).toHaveBeenCalledWith("cursor_companion_capture", expect.anything());
     mocks.state.working = false;
     await act(async () =>

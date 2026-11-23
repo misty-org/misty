@@ -28,7 +28,6 @@ import {
 
 const fileField = (field: FontField) => (field === "fontFamily" ? "fontFile" : "codeFontFile");
 
-/** Last part of a path, for the picker button. */
 const fileName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
 function FontFamilyRow({
@@ -41,7 +40,7 @@ function FontFamilyRow({
   onPickFile,
 }: {
   label: string;
-  description: string;
+  description?: string;
   value: string;
   filePath: string;
   busy: boolean;
@@ -82,7 +81,6 @@ function FontFamilyRow({
       setPendingMode("custom");
       if (filePath && !uploaded) {
         void onModeChange(CUSTOM_FONT_VALUE).then((saved) => {
-          // A failed save goes back to the option in effect, as the default does.
           if (!saved) setPendingMode(null);
         });
       }
@@ -155,12 +153,7 @@ function FontFamilyRow({
   );
 }
 
-/**
- * Settings › Interface › Fonts: the interface font and the code font (chat code, the editor, diffs
- * and the terminal). Kept on this computer; a picked file is copied into Misty's own folder.
- */
 export function FontsSection() {
-  // The copy applied at launch paints the rows at once; the saved settings replace it when read.
   const [settings, setSettings] = useState<FontPreferences | null>(readCache);
   const [busy, setBusy] = useState<FontField | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -194,7 +187,6 @@ export function FontsSection() {
     }
   };
 
-  /** Every family change goes through here; a failed save leaves the applied font as it was. */
   const onModeChange = async (field: FontField, value: string): Promise<boolean> => {
     if (!settings || busy) return false;
     const normalized = normalizeFontMode(value);
@@ -204,7 +196,6 @@ export function FontsSection() {
       const next = { ...settings, [field]: normalized };
       const path = next[fileField(field)];
       if (normalized === CUSTOM_FONT_VALUE && path) {
-        // Load first, so a broken file never becomes the saved font.
         await ensureCustomFontLoaded(fontRole(field), path, { force: true });
       }
       return await save(next);
@@ -241,7 +232,6 @@ export function FontsSection() {
           <>
             <FontFamilyRow
               label="Interface font"
-              description="Menus, chats and pages."
               value={settings.fontFamily}
               filePath={settings.fontFile}
               busy={busy !== null}
@@ -250,7 +240,6 @@ export function FontsSection() {
             />
             <FontFamilyRow
               label="Code font"
-              description="Code in chats, the editor, diffs and the terminal."
               value={settings.codeFontFamily}
               filePath={settings.codeFontFile}
               busy={busy !== null}
@@ -259,8 +248,6 @@ export function FontsSection() {
             />
           </>
         ) : (
-          // Only before fonts were ever applied on this computer: the two rows, each with its
-          // description and its menu.
           ["w-32", "w-28"].map((width, index) => (
             <div
               key={width}

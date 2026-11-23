@@ -1,12 +1,11 @@
 import { useState } from "react";
-import type { EnginePlanReview as PlanReview } from "../../../runs/invocations/invocationTypes";
+import type { EnginePlanReview as PlanReview } from "../../../runs/invocations/invocation_types";
 import { MistyMarkdown } from "../../../runs/markdown/MistyMarkdown";
-import { setPermissionMode } from "../../../plans/permissionMode";
+import { setPermissionMode } from "../../../plans/permission_mode";
 import { useCollaborationStore } from "../../../plans/store";
 import { Button, Surface, Text, Textarea } from "@misty/ui";
-import { respondToPlan, type PlanDecision } from "./engineApi";
+import { respondToPlan, type PlanDecision } from "./engine_api";
 
-/** What the chat sends the engine once the person approves its plan, in Auto. */
 const PLAN_APPROVED_PROMPT = "The plan is approved. Go ahead and carry it out.";
 
 const settledLabel: Record<string, string> = {
@@ -18,11 +17,6 @@ const settledLabel: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
-/**
- * A plan an outside engine finished in Plan mode. Approving switches the chat to Auto and lets
- * the engine carry it out (in the same turn when the engine is still waiting on the answer);
- * asking for changes sends the feedback back while the chat keeps planning.
- */
 export function EnginePlanReview(props: {
   plan: PlanReview;
   draft?: boolean;
@@ -50,8 +44,6 @@ export function EnginePlanReview(props: {
       );
       setStatus(decided.review.status);
       if (decision === "approve") {
-        // A plan the person approved is carried out in the engine's mode that works without asking
-        // (an old "auto", mapped to the engine's own mode as it is read).
         await setPermissionMode(props.conversationId, "auto");
         await useCollaborationStore.getState().setMode(props.conversationId, "act");
         if (decided.continueInAuto) props.onSend?.(PLAN_APPROVED_PROMPT);
@@ -69,8 +61,7 @@ export function EnginePlanReview(props: {
   return (
     <Surface
       as="section"
-      tone="card"
-      edge="hairline"
+      tone="faint"
       radius="xl"
       className="grid gap-3 px-4 py-3.5"
       aria-label="Plan"
@@ -90,7 +81,7 @@ export function EnginePlanReview(props: {
           </Text>
         ) : null}
       </header>
-      <div className="misty-markdown-message max-h-105 overflow-auto">
+      <div className="max-h-105 overflow-auto">
         <MistyMarkdown>{plan.content}</MistyMarkdown>
       </div>
       {open ? (

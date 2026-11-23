@@ -1,34 +1,17 @@
 import { useCallback, useState } from "react";
 import type { Space } from "../../api/dto/entities";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  NavTitleButton,
-  Popover,
-  PopoverAnchor,
-} from "@misty/ui";
+import { DropdownMenu, DropdownMenuContent, MenuTrigger, Popover, PopoverAnchor } from "@misty/ui";
 import { GlobalCreateSpaceDialog } from "../../create/GlobalCreateSpaceDialog";
-import { spaceNavigationName } from "../../routes/defaultSpace";
+import { spaceNavigationName } from "../../routes/default_space";
 import { SpaceAvatar } from "../SpaceAvatar";
 import { isSpacePanel, SpaceDialogs, type SpaceDialog } from "./SpaceDialogs";
 import { SpaceMenuItems } from "./SpaceMenuItems";
 
-/**
- * The first row of the Space's sidebar: the Space's avatar, its name in bold and a chevron, one
- * compact button that opens the Space menu (your Spaces, a new Space, inviting people for the one
- * who can, then the Space's people, shared folders, name and leaving or deleting it). A Space has
- * no home page. The name is shown whole, never faded; a Space's name is at most 64 characters.
- */
 export function SpaceSelector({
   space,
   place = "spaces",
 }: {
   space: Space;
-  /**
-   * The sidebar's side: Personal names the person's own Space "Personal" and switches nowhere;
-   * Spaces lists only the shared Spaces.
-   */
   place?: "personal" | "spaces";
 }) {
   const [dialog, setDialog] = useState<SpaceDialog>(null);
@@ -41,19 +24,18 @@ export function SpaceSelector({
           <GlobalCreateSpaceDialog>
             {(create) => (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <NavTitleButton
-                    aria-label={place === "personal" ? name : `${name}, switch Space`}
-                    name={name}
-                    mark={
-                      <SpaceAvatar
-                        space={space}
-                        className="size-4 shrink-0 rounded-sm"
-                        fallbackClassName="text-3xs font-semibold"
-                      />
-                    }
-                  />
-                </DropdownMenuTrigger>
+                <MenuTrigger
+                  heading
+                  label={place === "personal" ? name : `${name}, switch Space`}
+                  value={name}
+                  mark={
+                    <SpaceAvatar
+                      space={space}
+                      className="size-4 shrink-0 rounded-sm"
+                      fallbackClassName="text-micro font-semibold"
+                    />
+                  }
+                />
                 <DropdownMenuContent
                   side="bottom"
                   align="start"

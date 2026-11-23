@@ -1,16 +1,3 @@
-//! Desktop control on Windows: Misty uses the person's apps with its own
-//! cursor, the counterpart of
-//! `MistyDesktopControl.m`.
-//!
-//! The person's pointer and keyboard stay theirs: controls are pressed,
-//! focused, filled and scrolled through UI Automation, and only the named
-//! keys an action asks for are typed into the app in front, tagged as
-//! Misty's. Escape from the person stops control at once, as does the voice
-//! shortcut or the island's Stop. A 30-second lease, renewed while the task
-//! runs, ends control when Misty stops renewing it. Registration takes
-//! nothing: the first capture enters control (after asking, when the person
-//! wants to be asked), so a question answered from the first screenshot
-//! never takes the desktop.
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
@@ -56,11 +43,9 @@ pub use capture::capture;
 use capture::display_of;
 use guard::{end_guard, start_guard};
 
-/// Marks the keys Misty types, so the guard never takes them for the person's.
 const AGENT_TAG: usize = 0x4D49_5354;
 const LEASE: Duration = Duration::from_secs(30);
 const ASK_TIMEOUT: Duration = Duration::from_secs(25);
-/// The longest edge of a desktop frame the agent sees.
 const MAX_EDGE: u32 = 2000;
 
 #[derive(Default)]
@@ -78,11 +63,8 @@ struct Control {
 }
 
 static CONTROL: Mutex<Option<Control>> = Mutex::new(None);
-/// Read by the keyboard guard, which can't take the lock.
 static CONTROLLING: AtomicBool = AtomicBool::new(false);
-/// The guard's thread, to end it; 0 when none runs.
 static GUARD_THREAD: AtomicU32 = AtomicU32::new(0);
-/// Bumped on every prepare, so an old watchdog ends.
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 
 fn with<T>(work: impl FnOnce(&mut Control) -> T) -> T {
@@ -92,7 +74,6 @@ fn with<T>(work: impl FnOnce(&mut Control) -> T) -> T {
     work(control.get_or_insert_with(Control::default))
 }
 
-/// Registers `task` for desktop control. Nothing is captured or taken yet.
 pub fn prepare(app: &AppHandle, task: &str, ask: bool) {
     stop_control(None);
     let generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
@@ -138,15 +119,12 @@ pub fn renew(task: &str) {
     });
 }
 
-/// The task waits for the person: hand the desktop back, keep the task.
 pub fn yield_control(task: &str) {
     if with(|control| !control.stopped && control.task == task) {
         release_control(true);
     }
 }
 
-/// What the island shows: status, meta, and what the person needs to do
-/// while the task waits.
 pub fn island(task: &str, value: &Value) {
     let text = |key: &str| {
         value[key]
@@ -174,7 +152,6 @@ pub fn island(task: &str, value: &Value) {
     }
 }
 
-/// Misty stopped the task: end control without announcing it.
 pub fn stop(task: &str) {
     if with(|control| control.task == task) {
         stop_control(None);
@@ -182,12 +159,10 @@ pub fn stop(task: &str) {
     }
 }
 
-/// The person stopped control (Escape, the voice shortcut, the island).
 pub fn stop_by_person(reason: &str) {
     stop_control(Some(reason));
 }
 
-/// A press on the island that Misty's own island performs.
 pub fn island_press(action: &str, text: &str) {
     let target = with(|control| {
         (!control.task.is_empty())
@@ -203,8 +178,6 @@ pub fn island_press(action: &str, text: &str) {
     }
 }
 
-/// Gives the desktop back: the guard, pointer and capture go. While the task
-/// waits for the person, the island stays (showing Done) and the mist thins.
 fn release_control(waiting: bool) {
     CONTROLLING.store(false, Ordering::Release);
     end_guard();
@@ -243,8 +216,6 @@ fn stop_control(reason: Option<&str>) {
     }
 }
 
-/// Asks the person once before control begins, when they want to be asked.
-/// Until they allow it there is no guard, capture or actionable frame.
 fn confirm(task: &str) -> Result<(), String> {
     let pending = with(|control| {
         if control.stopped || control.task != task {

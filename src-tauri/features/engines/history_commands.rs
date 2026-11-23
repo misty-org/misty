@@ -1,8 +1,3 @@
-//! What a window may ask about the sessions in the engines' own history files: list, search,
-//! read and rename them. Every folder the history shows a chat in is listed (`history/past_folders.rs`),
-//! not only the person's projects. Listing a chat gives nothing access to its folder: continuing
-//! one works there only if it is one of their projects (`engine_chat_resume`).
-
 use std::sync::Arc;
 
 use tauri::State;
@@ -15,8 +10,6 @@ use super::commands::person_window;
 use super::store;
 use super::support::EngineState;
 
-/// The sessions each engine's own files hold, from every folder they ran in, each with its
-/// folder. A background scan follows, so chats started outside Misty since show up next time.
 #[tauri::command]
 pub async fn engine_history_list(
     webview: tauri::Webview,
@@ -29,9 +22,6 @@ pub async fn engine_history_list(
     Ok(sessions)
 }
 
-/// The sessions each engine's own files hold right now: their files are read again first, so an
-/// agent's sync finds chats started outside Misty since the last scan. Waits for a scan already
-/// running.
 #[tauri::command]
 pub async fn engine_history_rescan(
     webview: tauri::Webview,
@@ -47,7 +37,6 @@ pub async fn engine_history_rescan(
     .map_err(|error| error.to_string())?
 }
 
-/// Full-text search over every indexed session's messages.
 #[tauri::command]
 pub async fn engine_history_search(
     webview: tauri::Webview,
@@ -60,7 +49,6 @@ pub async fn engine_history_search(
     super::history::search::search_messages(state, query, limit, offset).await
 }
 
-/// Renames a session, written back where the engine keeps its own title.
 #[tauri::command]
 pub async fn engine_history_rename(
     webview: tauri::Webview,
@@ -75,7 +63,6 @@ pub async fn engine_history_rename(
         .map(|_| ())
 }
 
-/// One session's messages, read from the engine's own file, for a chat that resumes it.
 #[tauri::command]
 pub async fn engine_history_messages(
     webview: tauri::Webview,
@@ -87,7 +74,6 @@ pub async fn engine_history_messages(
     super::history::reader::read_session(state, engine, session_id).await
 }
 
-/// The engine session a chat runs, so Sync can read what happened in it outside Misty.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatSession {

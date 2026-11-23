@@ -1,16 +1,8 @@
-//! The companion on Linux: the pointer and the window in front from the X server (EWMH), and the
-//! overlays as override-redirect or layer-shell windows (desktop_control/linux/overlay.rs).
-//!
-//! Units: xcap reports displays in logical units (X pixels over the desktop's scale), so every
-//! point and frame read from the X server is brought into those units here. A Wayland session
-//! tells apps neither where the pointer is nor which window is in front, so both are unknown
-//! there: the companion doesn't follow the pointer and captures start from the first display.
 use std::sync::OnceLock;
 
 use super::ForegroundWindow;
 use crate::agents::desktop_control::linux::{overlay, wayland_session, x11};
 
-/// The desktop's scale as xcap applies it (Xft.dpi over 96), read once.
 fn xcap_scale() -> f64 {
     static SCALE: OnceLock<f64> = OnceLock::new();
     *SCALE.get_or_init(|| {
@@ -53,7 +45,6 @@ pub fn foreground_window(ignored: &[isize]) -> Option<ForegroundWindow> {
     )
 }
 
-/// The X window behind one of Misty's windows; none on Wayland.
 pub fn x11_window_id(window: &tauri::WebviewWindow) -> Option<isize> {
     use gtk::{glib::translate::ToGlibPtr, prelude::*};
     extern "C" {
@@ -68,7 +59,6 @@ pub fn x11_window_id(window: &tauri::WebviewWindow) -> Option<isize> {
     (id != 0).then_some(id as isize)
 }
 
-/// Covers one display with its overlay. xcap's logical units become GTK's.
 pub fn position_overlay(
     window: &tauri::WebviewWindow,
     display: &super::super::Display,

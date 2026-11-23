@@ -1,10 +1,11 @@
-//! Decodo's Web Scraping API returns Google's results as parsed JSON, with the key as a bearer token.
-//! Every kind is the google_search target, with google_tbm picking the tab.
 use crate::js_json::JsValue;
 use crate::text::js_trim;
 use crate::tool_transport::{object, string};
 
-use super::provider::{clip, compact_hit, field, google_recency, items, number, post_json, site_query, web_link, HitField, WebSearchAnswer, WebSearchFailed, WebSearchRequest};
+use super::provider::{
+    clip, compact_hit, field, google_recency, items, number, post_json, site_query, web_link,
+    HitField, WebSearchAnswer, WebSearchFailed, WebSearchRequest,
+};
 
 pub(crate) const DECODO_ENDPOINT: &str = "https://data.decodo.com/v1/scrape";
 
@@ -19,8 +20,6 @@ fn tab(kind: &str) -> Option<&'static str> {
     }
 }
 
-// Where each kind's results sit in the parsed page (seen live 2026-11-01): news under main,
-// videos under organic_videos.
 fn lists(kind: &str) -> &'static [&'static str] {
     match kind {
         "news" => &["main", "organic"],
@@ -32,7 +31,10 @@ fn lists(kind: &str) -> &'static [&'static str] {
 pub(crate) fn decodo_body(request: &WebSearchRequest) -> JsValue {
     let mut body = object([
         ("target", string("google_search")),
-        ("query", string(site_query(&request.query, &request.domains))),
+        (
+            "query",
+            string(site_query(&request.query, &request.domains)),
+        ),
         ("parse", JsValue::Bool(true)),
         ("page_count", JsValue::Number(1.0)),
     ]);
@@ -42,7 +44,12 @@ pub(crate) fn decodo_body(request: &WebSearchRequest) -> JsValue {
     if let Some(tbs) = google_recency(request.recency.as_deref()) {
         body = body.with_field("google_tbs", string(tbs));
     }
-    if let Some(location) = request.location.as_deref().map(js_trim).filter(|location| !location.is_empty()) {
+    if let Some(location) = request
+        .location
+        .as_deref()
+        .map(js_trim)
+        .filter(|location| !location.is_empty())
+    {
         body = body.with_field("geo", string(location));
     }
     body
@@ -56,7 +63,14 @@ fn decodo_hit(item: &JsValue) -> Option<JsValue> {
     let text = |names: &[&str]| HitField::Text(field(item, names));
     let title = field(item, &["title"]);
     Some(compact_hit([
-        ("title", HitField::Text(if title.is_empty() { link.clone() } else { title })),
+        (
+            "title",
+            HitField::Text(if title.is_empty() {
+                link.clone()
+            } else {
+                title
+            }),
+        ),
         ("url", HitField::Text(link)),
         ("snippet", text(&["desc", "description", "snippet"])),
         ("published", text(&["relative_publish_date", "date"])),
@@ -68,8 +82,6 @@ fn decodo_hit(item: &JsValue) -> Option<JsValue> {
     ]))
 }
 
-/// Reads results[0].content.results.results: the first list that has results, and for a
-/// web search Google's AI overview as the direct answer.
 pub(crate) fn decodo_answer(body: &JsValue, kind: &str, limit: u32) -> WebSearchAnswer {
     let mut answer = WebSearchAnswer::default();
     let empty = JsValue::Object(Vec::new());
@@ -103,8 +115,16 @@ pub(crate) fn decodo_answer(body: &JsValue, kind: &str, limit: u32) -> WebSearch
     answer
 }
 
-pub(crate) async fn search(client: &reqwest::Client, endpoint: &str, key: &str, request: &WebSearchRequest) -> Result<WebSearchAnswer, WebSearchFailed> {
-    let headers = [("Authorization", format!("Bearer {key}")), ("Accept", "application/json".to_owned())];
+pub(crate) async fn search(
+    client: &reqwest::Client,
+    endpoint: &str,
+    key: &str,
+    request: &WebSearchRequest,
+) -> Result<WebSearchAnswer, WebSearchFailed> {
+    let headers = [
+        ("Authorization", format!("Bearer {key}")),
+        ("Accept", "application/json".to_owned()),
+    ];
     let body = post_json(client, "decodo", endpoint, &headers, &decodo_body(request)).await?;
     Ok(decodo_answer(&body, &request.kind, request.limit))
 }

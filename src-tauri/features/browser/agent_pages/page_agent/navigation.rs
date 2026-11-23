@@ -1,9 +1,5 @@
-//! A tab's first load and the page a navigation lands on.
 use super::*;
 
-/// A new agent tab's first page, loaded: it has left about:blank and reports ready, and a bot
-/// check is waited out as in `landed`. Without it a new tab's first read was a blank page, and a
-/// run that opened tabs in batches worked from blanks (Odysseys, October 20). True once loaded.
 pub(in crate::browser) async fn first_load(app: &AppHandle, id: &str) -> bool {
     let started = tokio::time::Instant::now();
     loop {
@@ -31,8 +27,6 @@ pub(in crate::browser) async fn first_load(app: &AppHandle, id: &str) -> bool {
     }
 }
 
-/// Marks the tab's document before a navigation (page_read.js), so `landed` can tell the new
-/// page from the old one still showing. None when the page did not answer.
 pub(in crate::browser) async fn mark_document(app: &AppHandle, id: &str) -> Option<String> {
     let view = webview(app, id).ok()?;
     let token = uuid::Uuid::new_v4().to_string();
@@ -42,14 +36,6 @@ pub(in crate::browser) async fn mark_document(app: &AppHandle, id: &str) -> Opti
     (marked["ok"] == true).then_some(token)
 }
 
-/// The page a navigation lands on, once its document has loaded and gone quiet, as the
-/// model reads it: the agent sees the new page in the same step instead of guessing its
-/// next look. None when the page never answered.
-///
-/// With the old document's `mark`, a page counts as landed only when another document
-/// replaced it, or the same one moved to the target (a fragment). A bot check that passes
-/// by waiting is waited out. When the old page is still showing at the end, the snapshot
-/// says so, instead of passing the old page off as the new one.
 pub(in crate::browser) async fn landed(
     app: &AppHandle,
     id: &str,

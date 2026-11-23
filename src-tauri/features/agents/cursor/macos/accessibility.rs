@@ -1,18 +1,14 @@
-//! A small owned wrapper over the Accessibility API (`AXUIElement`), shared by
-//! the agent's desktop actions, the companion's pointing, and the live check.
 use std::{ffi::c_void, ptr::NonNull};
 
 use objc2_application_services::{AXError, AXIsProcessTrusted, AXUIElement, AXValue, AXValueType};
 use objc2_core_foundation::{CFArray, CFBoolean, CFIndex, CFRange, CFRetained, CFString, CFType};
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 
-/// Whether this process may use Accessibility.
 pub(crate) fn trusted() -> bool {
     // SAFETY: a plain query.
     unsafe { AXIsProcessTrusted() }
 }
 
-/// One element of another app's interface (or the system-wide element).
 #[derive(Clone)]
 pub(crate) struct Element(CFRetained<AXUIElement>);
 
@@ -27,7 +23,6 @@ impl Element {
         Self(unsafe { AXUIElement::new_application(pid) })
     }
 
-    /// The element under a global point, if Accessibility finds one.
     pub(crate) fn at_position(&self, x: f64, y: f64) -> Option<Element> {
         let mut found: *const AXUIElement = std::ptr::null();
         // SAFETY: `found` is a valid out pointer for the call.
@@ -64,7 +59,6 @@ impl Element {
         NonNull::new(value.cast_mut()).map(|value| unsafe { CFRetained::from_raw(value) })
     }
 
-    /// A string attribute, or empty when missing or of another type.
     pub(crate) fn string(&self, name: &str) -> String {
         self.attribute(name)
             .and_then(|value| value.downcast::<CFString>().ok())
@@ -72,7 +66,6 @@ impl Element {
             .unwrap_or_default()
     }
 
-    /// A web address attribute (`AXURL`), which apps give as a URL or, now and then, a string.
     pub(crate) fn url(&self, name: &str) -> String {
         #[link(name = "CoreFoundation", kind = "framework")]
         extern "C" {
@@ -91,10 +84,11 @@ impl Element {
         // SAFETY: a live CFURL; the string follows the get rule and lives as long as the URL.
         let text = unsafe { CFURLGetString((&*url as *const objc2_core_foundation::CFURL).cast()) };
         // SAFETY: null or a CFString owned by `url`, which is alive here.
-        unsafe { text.as_ref() }.map(|text| text.to_string()).unwrap_or_default()
+        unsafe { text.as_ref() }
+            .map(|text| text.to_string())
+            .unwrap_or_default()
     }
 
-    /// The element that has the keyboard focus in an application element.
     pub(crate) fn focused_element(&self) -> Option<Element> {
         self.attribute("AXFocusedUIElement")
             .and_then(|value| value.downcast::<AXUIElement>().ok())
@@ -122,14 +116,12 @@ impl Element {
             .unwrap_or_default()
     }
 
-    /// An application element's focused window.
     pub(crate) fn focused_window(&self) -> Option<Element> {
         self.attribute("AXFocusedWindow")
             .and_then(|value| value.downcast::<AXUIElement>().ok())
             .map(Element)
     }
 
-    /// The title of the window that holds this element.
     pub(crate) fn window_title(&self) -> String {
         self.attribute("AXWindow")
             .and_then(|value| value.downcast::<AXUIElement>().ok())
@@ -181,7 +173,6 @@ impl Element {
         self.set(attribute, CFString::from_str(value).as_ref())
     }
 
-    /// Selects a range of characters in a text field.
     pub(crate) fn set_selected_range(&self, location: isize, length: isize) -> bool {
         let mut range = CFRange { location, length };
         // SAFETY: the range outlives the call; the value is copied.
@@ -199,14 +190,11 @@ impl Element {
         unsafe { self.0.perform_action(&CFString::from_str(action)) == AXError::Success }
     }
 
-    /// Per element, never on the system-wide object: that would change the timeout
-    /// for every Accessibility call Misty makes, desktop control included.
     pub(crate) fn set_timeout(&self, seconds: f32) {
         // SAFETY: a live element.
         unsafe { self.0.set_messaging_timeout(seconds) };
     }
 
-    /// The element's frame in global display points.
     pub(crate) fn frame(&self) -> Option<NSRect> {
         let position = self.attribute("AXPosition")?.downcast::<AXValue>().ok()?;
         let size = self.attribute("AXSize")?.downcast::<AXValue>().ok()?;

@@ -16,28 +16,22 @@ use serde::{Deserialize, Serialize};
 
 use super::support;
 
-/// The ceiling for one font file. Large CJK families with several weights reach about 30 MB;
-/// past this it is a mistake (or not a font), and the bytes cross IPC base64-encoded.
 const MAX_FONT_BYTES: u64 = 64 * 1024 * 1024;
 
-/// SFNT, TrueType and OpenType collections and the WOFF containers. The first four bytes are the
-/// format tag, so a wrong extension can't sneak a non-font through.
 const FONT_MAGICS: [&[u8; 4]; 7] = [
-    b"\x00\x01\x00\x00", // TrueType outlines (also variable fonts)
-    b"\x00\x00\x01\x00", // Apple's legacy TrueType tag
-    b"OTTO",             // CFF-based OpenType
-    b"ttcf",             // TrueType / OpenType collection
-    b"true",             // legacy Apple TrueType
-    b"wOFF",             // WOFF
-    b"wOF2",             // WOFF2
+    b"\x00\x01\x00\x00",
+    b"\x00\x00\x01\x00",
+    b"OTTO",
+    b"ttcf",
+    b"true",
+    b"wOFF",
+    b"wOF2",
 ];
 
 const FONT_EXTENSIONS: [&str; 5] = ["ttf", "otf", "ttc", "woff", "woff2"];
 
 const VALUE_KEY: &str = "fonts";
 
-/// What each font row is set to. An empty family keeps Misty's own font, `custom` uses the file
-/// picked for that row, and anything else is a CSS font-family list.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct FontPreferences {
@@ -51,8 +45,6 @@ fn fonts_dir() -> PathBuf {
     support::app_home().join("fonts")
 }
 
-/// Reads one font file, base64-encoded. Errors are stable codes the settings page words
-/// (`fontErrorMessage` in the window).
 pub fn read_font_file(path: &Path) -> Result<String, String> {
     let meta = file_access::fs::metadata(path).map_err(|_| "font.err.read_failed".to_string())?;
     if !meta.is_file() {
@@ -74,8 +66,6 @@ fn looks_like_font(bytes: &[u8]) -> bool {
         .any(|magic| bytes.starts_with(&magic[..]))
 }
 
-/// Copies a picked font into Misty's fonts folder as `<role>.<ext>` and returns where it went.
-/// The file is checked first, so a non-font never replaces the saved one.
 fn adopt_font_file(source: &Path, role: &str) -> Result<PathBuf, String> {
     read_font_file(source)?;
     let extension = source
@@ -86,7 +76,6 @@ fn adopt_font_file(source: &Path, role: &str) -> Result<PathBuf, String> {
         .unwrap_or_else(|| "ttf".to_string());
     let dir = fonts_dir();
     file_access::fs::create_dir_all(&dir).map_err(|_| "font.err.read_failed".to_string())?;
-    // Older copies for this row go, whatever their extension.
     if let Ok(entries) = file_access::fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -100,8 +89,6 @@ fn adopt_font_file(source: &Path, role: &str) -> Result<PathBuf, String> {
     Ok(target)
 }
 
-/// Only files in Misty's own fonts folder are read for a window, found by name: a saved path can
-/// name the folder of the version that saved it, and the same file is in this version's.
 fn ensure_in_fonts_dir(path: &Path) -> Result<PathBuf, String> {
     let dir = file_access::fs::canonicalize(fonts_dir()).map_err(|_| "font.err.read_failed")?;
     let name = path.file_name().ok_or("font.err.read_failed")?;
@@ -129,13 +116,11 @@ async fn blocking<T: Send + 'static>(
         .map_err(|e| e.to_string())?
 }
 
-/// The saved font choices.
 #[tauri::command]
 pub async fn engine_fonts_get() -> Result<FontPreferences, String> {
     blocking(|| Ok(support::load_value::<FontPreferences>(VALUE_KEY)?.unwrap_or_default())).await
 }
 
-/// Saves the font choices and returns them as stored.
 #[tauri::command]
 pub async fn engine_fonts_set(preferences: FontPreferences) -> Result<FontPreferences, String> {
     blocking(move || {
@@ -152,9 +137,6 @@ pub async fn engine_fonts_set(preferences: FontPreferences) -> Result<FontPrefer
     .await
 }
 
-/// Asks for a font file with the system's dialog, shown from here so a window can't name a path
-/// of its own, and copies it into Misty's fonts folder for `role` (`ui` or `code`). Returns the
-/// copy's path, or `None` when the person cancels.
 #[tauri::command]
 pub async fn engine_fonts_pick(
     app: tauri::AppHandle,
@@ -183,7 +165,6 @@ pub async fn engine_fonts_pick(
     .await
 }
 
-/// A saved font file's bytes, base64-encoded.
 #[tauri::command]
 pub async fn engine_fonts_read(path: String) -> Result<String, String> {
     blocking(move || {
@@ -200,7 +181,6 @@ mod tests {
 
     use super::*;
 
-    /// A scratch file in the temp folder, removed on drop.
     struct Scratch(std::path::PathBuf);
 
     impl Scratch {
@@ -263,7 +243,6 @@ mod tests {
     #[test]
     fn rejects_files_over_the_size_cap_before_reading() {
         let scratch = Scratch::new("large");
-        // A sparse file: only the length matters, no bytes land on disk.
         let file = std::fs::File::create(&scratch.0).unwrap();
         file.set_len(MAX_FONT_BYTES + 1).unwrap();
         drop(file);
@@ -292,13 +271,11 @@ mod tests {
         assert_eq!(copy.file_name().unwrap(), "code.woff2");
         assert!(ensure_in_fonts_dir(&copy).is_ok());
         assert!(ensure_in_fonts_dir(&source).is_err());
-        // A new pick replaces the row's old copy whatever its extension.
         let other = scratch.dir().join("Mono.ttf");
         std::fs::write(&other, b"\x00\x01\x00\x00rest").unwrap();
         let replaced = adopt_font_file(&other, "code").unwrap();
         assert_eq!(replaced.file_name().unwrap(), "code.ttf");
         assert!(!copy.exists());
-        // A non-font never replaces the saved one.
         let text = scratch.dir().join("notes.ttf");
         std::fs::write(&text, b"not a font").unwrap();
         assert_eq!(

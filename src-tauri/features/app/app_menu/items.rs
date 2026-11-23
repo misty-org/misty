@@ -1,4 +1,3 @@
-//! Menu items for shortcut commands and their native accelerators.
 use super::*;
 
 #[cfg(target_os = "macos")]
@@ -9,12 +8,6 @@ pub(super) fn command_item<R: Runtime, M: Manager<R>>(
     label: &str,
     default: &str,
 ) -> tauri::Result<MenuItem<R>> {
-    // These global shortcuts intentionally overlap focused-tool commands
-    // (Code uses Cmd+K for Inline AI and Cmd+Shift+P for its command palette).
-    // Giving AppKit ownership of the accelerators would bypass the renderer's
-    // scope-aware dispatcher and always run the global command. Keep the menu
-    // items clickable, but let the renderer/browser forwarding layer own the
-    // keystrokes so the focused tool can shadow them correctly.
     let accelerator = (!renderer_owned_accelerator(command_id))
         .then(|| effective_primary(snapshot, command_id, default))
         .flatten()

@@ -9,8 +9,6 @@ import { EditorSearchPanel, type EditorSearchDirection } from "./EditorSearchPan
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// jsdom has no layout engine. CodeMirror measures text ranges when a search
-// match is scrolled into view; an empty rect list is enough for these tests.
 if (typeof Range.prototype.getClientRects !== "function") {
   Object.defineProperty(Range.prototype, "getClientRects", { value: () => [] });
 }
@@ -140,7 +138,6 @@ describe("EditorSearchPanel", () => {
     renderPanel();
     const find = input("Find");
 
-    // Pauses longer than the debounce, as in normal typing.
     for (const value of ["f", "fo", "foo"]) {
       typeInto(find, value);
       act(() => {
@@ -157,7 +154,6 @@ describe("EditorSearchPanel", () => {
     makeView("one two one");
     renderPanel({ isMac: true, onShowReplaceChange });
     const find = input("Find");
-    // Values measured in a real WKWebView; with Shift it reports key "Ï".
     keyDown(find, {
       key: "Ï",
       code: "KeyF",
@@ -251,7 +247,6 @@ describe("EditorSearchPanel", () => {
       vi.advanceTimersByTime(200);
     });
 
-    // The first match is selected and the counter reflects it.
     expect(view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)).toBe(
       "one",
     );
@@ -286,7 +281,6 @@ describe("EditorSearchPanel", () => {
     renderPanel({ showReplace: true, readOnly: true });
 
     expect(container.querySelector(`button[aria-label="${"Show replace"}"]`)).toBeNull();
-    // A read-only file never shows the replace row.
     expect(container.querySelector('input[placeholder="Replace"]')).toBeNull();
     expect(button("Select all matches")).not.toBeNull();
   });

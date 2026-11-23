@@ -1,17 +1,9 @@
-//! The Misty mark for the menu bar, drawn from its strokes rather than read from a picture. It is
-//! a template image: black on clear, so macOS paints it white on a dark menu bar, dark on a light
-//! one, and dims it with the rest of the bar. The shape is the same as `MistyMark` in
-//! `src/shared/ui/icons/MistyMark.tsx`, a little bolder so it holds up at menu bar size.
-
 use tauri::image::Image;
 
-/// A point in the mark's 512-unit square, y down.
 type Point = (f32, f32);
 
 enum Stroke {
     Line(Point, Point),
-    /// An arc around `center`, from `from` degrees turning `sweep` degrees (positive turns
-    /// clockwise on screen).
     Arc {
         center: Point,
         radius: f32,
@@ -20,9 +12,6 @@ enum Stroke {
     },
 }
 
-/// Two strokes. The left one runs from its foot up the side, over the top, down the diagonal and
-/// round the drop; the right one from its foot up the side, over the top and down its diagonal,
-/// stopping short of the left one where it would cross.
 const STROKES: [Stroke; 10] = [
     Stroke::Arc {
         center: (125.5, 386.0),
@@ -61,12 +50,9 @@ const STROKES: [Stroke; 10] = [
     Stroke::Line((340.4, 87.6), (289.2, 149.1)),
 ];
 
-/// The stroke in the mark's units: the app icon's 27, made bolder for the menu bar.
 const STROKE_WIDTH: f32 = 36.0;
-/// The part of the 512 square the image shows: the mark with a little air around it.
 const VIEW_ORIGIN: f32 = 36.0;
 const VIEW_SIZE: f32 = 440.0;
-/// 18 points tall in the menu bar, drawn for a 2x screen.
 const PIXELS: u32 = 36;
 
 fn distance_to_segment(p: Point, a: Point, b: Point) -> f32 {
@@ -118,7 +104,6 @@ fn distance(p: Point) -> f32 {
         .fold(f32::INFINITY, f32::min)
 }
 
-/// The mark as straight RGBA: black, with each pixel's coverage in its alpha.
 fn pixels() -> Vec<u8> {
     let units_per_pixel = VIEW_SIZE / PIXELS as f32;
     let mut rgba = Vec::with_capacity((PIXELS * PIXELS * 4) as usize);
@@ -128,7 +113,6 @@ fn pixels() -> Vec<u8> {
                 VIEW_ORIGIN + (column as f32 + 0.5) * units_per_pixel,
                 VIEW_ORIGIN + (row as f32 + 0.5) * units_per_pixel,
             );
-            // How far inside the stroke's edge this pixel's center is, in pixels, as coverage.
             let inside = (STROKE_WIDTH / 2.0 - distance(p)) / units_per_pixel;
             let alpha = (inside + 0.5).clamp(0.0, 1.0);
             rgba.extend_from_slice(&[0, 0, 0, (alpha * 255.0).round() as u8]);
@@ -137,7 +121,6 @@ fn pixels() -> Vec<u8> {
     rgba
 }
 
-/// The menu bar's Misty mark, to be shown as a template image.
 pub fn image() -> Image<'static> {
     Image::new_owned(pixels(), PIXELS, PIXELS)
 }
@@ -155,11 +138,9 @@ mod tests {
         let rgba = pixels();
         assert_eq!(rgba.len(), (PIXELS * PIXELS * 4) as usize);
         assert!(rgba.chunks(4).all(|pixel| pixel[..3] == [0, 0, 0]));
-        // The middle of the left side is solid, the space inside the drop is clear.
         let to_pixel = |units: f32| ((units - VIEW_ORIGIN) / VIEW_SIZE * PIXELS as f32) as u32;
         assert_eq!(alpha_at(&rgba, to_pixel(65.5), to_pixel(256.0)), 255);
         assert_eq!(alpha_at(&rgba, to_pixel(261.0), to_pixel(309.0)), 0);
-        // Corners are clear: no tile behind the mark.
         assert_eq!(alpha_at(&rgba, 0, 0), 0);
         assert_eq!(alpha_at(&rgba, PIXELS - 1, PIXELS - 1), 0);
     }

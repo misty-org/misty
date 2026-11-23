@@ -4,16 +4,6 @@ fn main() {
     misty_native::run();
 }
 
-/// A development build started from a terminal answers for its own privacy prompts.
-///
-/// `npm run tauri dev` starts Misty straight from the terminal, which makes the terminal app the
-/// one macOS holds responsible for it. Asking for speech recognition or the microphone then reads
-/// the usage descriptions from the terminal's Info.plist, not Misty's, and a terminal that lacks
-/// one (most have none for speech recognition) has Misty killed on the spot. So a development
-/// build starts itself again, disclaimed from whoever launched it, and only waits for that copy:
-/// passing on the signals that stop it, and handing back how it ended. The copy quits if this one
-/// is killed outright, so a reload never leaves two Mistys running. Release builds are opened by
-/// Launch Services and are always their own.
 #[cfg(all(target_os = "macos", debug_assertions))]
 mod dev_responsibility {
     use std::ffi::CString;
@@ -21,7 +11,6 @@ mod dev_responsibility {
     use std::sync::atomic::{AtomicI32, Ordering};
     use std::time::Duration;
 
-    /// Set on the copy, to the pid of the one that started it.
     const MARK: &str = "MISTY_DEV_DISCLAIMED_BY";
 
     extern "C" {
@@ -40,7 +29,6 @@ mod dev_responsibility {
         }
     }
 
-    /// The copy leaves with the one that started it.
     fn follow(parent: libc::pid_t) {
         std::thread::spawn(move || loop {
             std::thread::sleep(Duration::from_millis(500));
@@ -111,7 +99,6 @@ mod dev_responsibility {
                 envp.as_ptr(),
             );
             libc::posix_spawnattr_destroy(&mut attrs);
-            // Couldn't start the copy: run here, as before.
             if spawned != 0 {
                 return;
             }
@@ -136,7 +123,6 @@ mod dev_responsibility {
             } else {
                 1
             };
-            // A quit nobody asked for leaves at least this line in the terminal.
             if libc::WIFSIGNALED(status) {
                 eprintln!("Misty was stopped by signal {}", libc::WTERMSIG(status));
             } else if code == 101 {

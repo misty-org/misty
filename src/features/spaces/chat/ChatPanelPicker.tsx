@@ -12,16 +12,11 @@ import {
   Popover,
   PopoverContent,
 } from "@misty/ui";
-import { conversationName } from "./sidebar/conversationGroups";
+import { conversationName } from "./sidebar/conversation_groups";
 
-/**
- * The chat panel's one header control: names the open chat and switches it. The panel has no
- * sidebar, so Everyone and every channel or conversation live here, searchable.
- */
 export function ChatPanelPicker(props: {
   conversations: SpaceConversation[];
   currentUserId?: string;
-  /** "" is the Space-wide Everyone chat. */
   selected: string;
   onSelect(conversationId: string): void;
 }) {

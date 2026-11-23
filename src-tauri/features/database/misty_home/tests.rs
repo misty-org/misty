@@ -56,7 +56,6 @@ fn is_idempotent_and_leaves_current_homes_alone() {
     let root = base.join(".misty");
     let trash = base.join("Trash");
     ensure_at(&root, &Trash::Folder(trash.clone())).unwrap();
-    // A path that looks retired but appears after the upgrade is not touched.
     fs::create_dir_all(root.join("notes")).unwrap();
 
     let report = ensure_at(&root, &Trash::Folder(trash.clone())).unwrap();
@@ -96,10 +95,16 @@ fn moves_data_and_sync_out_of_dot_local_with_everything_in_them() {
     misty_credential_store::move_out_of_dot_local(&root).unwrap();
 
     for file in ["misty.db", "misty.db-wal", "misty.db-shm"] {
-        assert_eq!(fs::read_to_string(root.join("data").join(file)).unwrap(), file);
+        assert_eq!(
+            fs::read_to_string(root.join("data").join(file)).unwrap(),
+            file
+        );
     }
     assert!(root.join("data/workspace-recovery/a").is_dir());
-    assert_eq!(fs::read_to_string(root.join("sync/a/records.sqlite")).unwrap(), "records");
+    assert_eq!(
+        fs::read_to_string(root.join("sync/a/records.sqlite")).unwrap(),
+        "records"
+    );
     assert!(!root.join(".local").exists());
     let _ = fs::remove_dir_all(base);
 }
@@ -118,9 +123,18 @@ fn takes_the_place_of_an_empty_folder_but_never_one_in_use() {
 
     misty_credential_store::move_out_of_dot_local(&root).unwrap();
 
-    assert_eq!(fs::read_to_string(root.join("data/misty.db")).unwrap(), "new");
-    assert_eq!(fs::read_to_string(root.join(".local/data/misty.db")).unwrap(), "old");
-    assert_eq!(fs::read_to_string(root.join("sync/records")).unwrap(), "old");
+    assert_eq!(
+        fs::read_to_string(root.join("data/misty.db")).unwrap(),
+        "new"
+    );
+    assert_eq!(
+        fs::read_to_string(root.join(".local/data/misty.db")).unwrap(),
+        "old"
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("sync/records")).unwrap(),
+        "old"
+    );
     let _ = fs::remove_dir_all(base);
 }
 
@@ -136,7 +150,10 @@ fn an_upgrade_never_trashes_data_still_in_dot_local() {
     ensure_at(&root, &Trash::Folder(trash)).unwrap();
 
     assert!(!root.join(".local/bin").exists());
-    assert_eq!(fs::read_to_string(root.join(".local/data/misty.db")).unwrap(), "old");
+    assert_eq!(
+        fs::read_to_string(root.join(".local/data/misty.db")).unwrap(),
+        "old"
+    );
     let _ = fs::remove_dir_all(base);
 }
 

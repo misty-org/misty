@@ -1,48 +1,19 @@
-// How an engine is installed, updated and removed. An engine already on the computer is used as
-// it is and updated the way it was installed; a missing one always goes into Misty's folder,
-// `~/.misty/shared/engines/<engine>`. Every route runs inside the app, with no terminal to type into;
-// its output streams to the dialog's Show details.
-//
-// - npm engines: `npm install --prefix <folder>` (never `-g`), with Misty's own Node.js when the
-//   computer has none (`node_runtime.rs`).
-// - Hermes Agent: its official script, non-interactive, with its source checkout (`--dir`, or
-//   `-InstallDir` on Windows) in the folder. Its launcher lives in the checkout's `.hermes/bin`,
-//   and its data stays in `~/.hermes`. Hermes publishes no build of its own, and its script
-//   always adds `~/.local/bin` to the shell profile and writes `hermes` wrappers there, so on
-//   macOS and Linux the script gets a home of its own inside Misty's folder (`HOME`), with
-//   `HERMES_HOME` still the person's `~/.hermes`: what it writes for a shell lands in Misty's
-//   folder and goes with Remove. On Windows its launchers go in `%LOCALAPPDATA%\hermes\bin`
-//   (`hermes_launchers.rs`), and the script adds that folder to the user PATH, which Misty takes
-//   back out afterwards when it wasn't there before (`user_path.rs`).
-//   Wrappers an older install left in `~/.local/bin` for Misty's checkout go with Remove too.
-// - Claude Code, OpenCode, Codex and Antigravity: their published builds, downloaded and checked
-//   by Misty (`maker_builds.rs`), since their scripts take no folder or change the shell profile.
-//   OpenCode on Windows uses npm.
-
 use std::path::Path;
 
 use super::{hermes_launchers, maker_builds, node_runtime, npm_package, support, ProgressReporter};
 use crate::engines::support::paths::{engine_install_dir, InstallRoot};
 
-/// One way of installing or updating an engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Route {
-    /// `npm install --prefix ~/.misty/shared/engines/<engine>`.
     MistyNpm,
-    /// The maker's build, downloaded by Misty into `~/.misty/shared/engines/<engine>/bin`.
     MistyDownload,
-    /// The maker's script, pointed at `~/.misty/shared/engines/<engine>/bin`.
     MistyScript,
-    /// A copy npm put on the computer globally before; it updates the same way.
     NpmGlobal,
-    /// A copy the maker's script put on the computer before; the script updates it in place.
     VendorScript,
-    /// Claude Code's own `claude update`, for a copy its installer put on the computer.
     SelfUpdate,
 }
 
 impl Route {
-    /// How the frontend groups routes: "npm" or "native".
     pub(super) fn kind(self) -> &'static str {
         match self {
             Route::MistyNpm | Route::NpmGlobal => "npm",
@@ -51,14 +22,10 @@ impl Route {
     }
 }
 
-/// Whether `bin` is inside Misty's folder for `engine`. The folders are compared, not the
-/// program: Codex's script leaves a link in `bin` that points into `~/.codex`. For Hermes Agent,
-/// the wrapper its installer leaves in `~/.local/bin` counts when it names Misty's checkout.
 pub(super) fn installed_by_misty(engine: &str, bin: &str) -> bool {
     installed_by_misty_in(&InstallRoot::here(), engine, bin)
 }
 
-/// [`installed_by_misty`] for Misty's folder at `root`.
 pub(super) fn installed_by_misty_in(root: &InstallRoot, engine: &str, bin: &str) -> bool {
     let path = Path::new(bin);
     if !path.is_absolute() {
@@ -80,7 +47,6 @@ fn real(path: &Path) -> std::path::PathBuf {
     super::resolve_link(&path.to_string_lossy()).unwrap_or_else(|_| path.to_path_buf())
 }
 
-/// Where a maker's script puts Misty's copy: the folder's `bin`, or Hermes Agent's checkout.
 pub(super) fn script_target(root: &InstallRoot, engine: &str) -> std::path::PathBuf {
     if engine == "hermes" {
         root.checkout_dir(engine)
@@ -89,12 +55,10 @@ pub(super) fn script_target(root: &InstallRoot, engine: &str) -> std::path::Path
     }
 }
 
-/// The route for `engine`, given where its program was found (`bin`) and whether it runs.
 pub(super) fn route(engine: &str, bin: &str, installed: bool, windows: bool) -> Option<Route> {
     route_in(&InstallRoot::here(), engine, bin, installed, windows)
 }
 
-/// [`route`] for Misty's folder at `root`.
 pub(super) fn route_in(
     root: &InstallRoot,
     engine: &str,
@@ -133,7 +97,6 @@ pub(super) fn route_in(
     }
 }
 
-/// npm's arguments for an install into the engine's folder `dir` in Misty's.
 pub(super) fn npm_prefix_args(dir: &Path, package: &str) -> Vec<String> {
     vec![
         "install".into(),
@@ -147,7 +110,6 @@ pub(super) fn npm_prefix_args(dir: &Path, package: &str) -> Vec<String> {
     ]
 }
 
-/// npm's arguments for updating a copy npm put on the computer globally.
 fn npm_global_args(package: &str) -> Vec<String> {
     vec![
         "install".into(),
@@ -158,19 +120,16 @@ fn npm_global_args(package: &str) -> Vec<String> {
     ]
 }
 
-/// The computer's own npm, when there is one outside Misty's folder.
 pub(super) fn computer_npm() -> Option<String> {
     let found = support::find_program("npm")?;
     let runtime = crate::engines::support::paths::node_runtime_dir();
     (!found.starts_with(&runtime)).then(|| found.to_string_lossy().into_owned())
 }
 
-/// Whether an npm install into Misty's folder has to fetch Node.js first.
 pub(super) fn needs_node() -> bool {
     !node_runtime::installed() && computer_npm().is_none()
 }
 
-/// The maker's script, its URL, and how it is pointed at a folder.
 fn script_url(engine: &str, windows: bool) -> &'static str {
     match (engine, windows) {
         ("codex", false) => "https://chatgpt.com/codex/install.sh",
@@ -183,10 +142,6 @@ fn script_url(engine: &str, windows: bool) -> &'static str {
     }
 }
 
-/// A maker's script as a program, its arguments and the environment it gets. `into` is the
-/// folder for Misty's own copy (Hermes Agent's checkout), or `None` to update a copy where the
-/// script put it before. Paths reach the script through the environment, never spliced into the
-/// line.
 pub(super) fn script_argv(
     engine: &str,
     into: Option<&Path>,
@@ -205,7 +160,6 @@ pub(super) fn script_argv(
             env.push(("HOME".into(), home.to_string_lossy().into_owned()));
         }
     }
-    // The flags each script takes: answering nothing, and the folder to install into.
     let quiet = match (engine, windows) {
         ("hermes", false) => Some("--non-interactive"),
         ("hermes", true) => Some("-NonInteractive"),
@@ -243,7 +197,6 @@ pub(super) fn script_argv(
         } else {
             format!(" -s -- {}", flags.join(" "))
         };
-        // pipefail, so a failed download doesn't read as success.
         let line = format!("set -o pipefail; curl -fsSL {url} | bash{rest}");
         let bash = if super::is_file_outside_gate(Path::new("/bin/bash")) {
             "/bin/bash"
@@ -254,8 +207,6 @@ pub(super) fn script_argv(
     }
 }
 
-/// The home Hermes Agent's script gets on macOS and Linux, beside its checkout in Misty's folder:
-/// `~/.misty/shared/engines/hermes/home`. Its shell profile lines and `~/.local/bin` wrappers land there.
 pub(super) fn installer_home(
     engine: &str,
     into: &Path,
@@ -266,8 +217,6 @@ pub(super) fn installer_home(
         .flatten()
 }
 
-/// `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`, never a bare name a folder
-/// could shadow.
 fn windows_powershell_path() -> String {
     let root = std::env::var("SystemRoot")
         .ok()
@@ -279,7 +228,6 @@ fn windows_powershell_path() -> String {
     )
 }
 
-/// What the plan shows under Show details, step by step.
 pub(super) fn plan_steps(engine: &str, route: Route, bin: &str, helper: bool) -> Vec<String> {
     let windows = cfg!(windows);
     let package = npm_package(engine).unwrap_or_default();
@@ -323,7 +271,6 @@ fn shown_args(args: &[String]) -> String {
         .join(" ")
 }
 
-/// Runs `route` for `engine`, streaming its output.
 pub(super) async fn run(
     engine: &str,
     route: Route,
@@ -334,8 +281,6 @@ pub(super) async fn run(
     let package = npm_package(engine).unwrap_or_default();
     match route {
         Route::MistyNpm => {
-            // Misty's Node.js once it is there, else the computer's npm, else Node.js is
-            // fetched first.
             let computer = (!node_runtime::installed()).then(computer_npm).flatten();
             let (program, mut args, misty_node) = match computer {
                 Some(npm) => (npm, Vec::new(), false),
@@ -368,25 +313,20 @@ pub(super) async fn run(
             let into =
                 (route == Route::MistyScript).then(|| script_target(&InstallRoot::here(), engine));
             if let Some(into) = &into {
-                // Hermes Agent's script clones its checkout itself, so only its parent is made.
                 let folder = into.parent().unwrap_or(into);
                 file_access::fs::create_dir_all(folder).map_err(|error| error.to_string())?;
                 if let Some(home) = installer_home(engine, into, windows) {
                     file_access::fs::create_dir_all(home).map_err(|error| error.to_string())?;
                 }
             }
-            // On Windows, which of Hermes Agent's launchers this install creates.
             let launchers = (engine == "hermes" && windows && into.is_some())
                 .then(|| hermes_launchers::absent(&hermes_launchers::dirs()));
-            // The user PATH before Hermes Agent's script adds its folder to it (`user_path.rs`).
-            // Misty updates its copy by running the script again, so updates pass here too.
             #[cfg(windows)]
             let path_guard = launchers
                 .is_some()
                 .then(|| super::user_path::Guard::take(&support::hermes_home().join("bin")));
             let (program, args, env) = script_argv(engine, into.as_deref(), windows);
             let ran = run_program("The installer", &program, &args, &env, false, reporter).await;
-            // Put right even when the script stopped halfway, after it may have written.
             #[cfg(windows)]
             if let Some(guard) = path_guard {
                 guard.restore(reporter);
@@ -406,8 +346,6 @@ pub(super) async fn run(
     }
 }
 
-/// Runs a program to its end, its output streamed to the dialog. `misty_node` puts Misty's
-/// Node.js first on that one program's PATH, so npm's install scripts run on it too.
 async fn run_program(
     name: &str,
     program: &str,
@@ -449,13 +387,10 @@ async fn run_program(
     })
 }
 
-/// Removes an engine Misty installed: its whole folder in `~/.misty/shared/engines`. A copy that was
-/// on the computer before is never touched.
 pub(super) fn remove(engine: &str, bin: &str) -> Result<(), String> {
     remove_in(&InstallRoot::here(), &hermes_launchers::dirs(), engine, bin)
 }
 
-/// [`remove`] for Misty's folder at `root`, with Hermes Agent's wrappers in `wrapper_dirs`.
 pub(super) fn remove_in(
     root: &InstallRoot,
     wrapper_dirs: &[std::path::PathBuf],

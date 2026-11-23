@@ -8,7 +8,6 @@ use serde_json::{json, Value};
 use std::path::{Component, Path, PathBuf};
 
 use super::core::*;
-// ===== Small helpers: JSON / fs / encoding / JavaScript-compatible semantics =====
 
 pub(super) fn read_text(path: &Path) -> Option<String> {
     fs::read(path)
@@ -24,7 +23,6 @@ pub(super) fn ensure_dir(path: &Path) -> std::io::Result<()> {
     fs::create_dir_all(path)
 }
 
-/// Narrows a file to 0o600 on unix (registry, caches and activity); a no-op on Windows.
 pub(super) fn set_private_permissions(path: &Path) -> std::io::Result<()> {
     #[cfg(unix)]
     {
@@ -36,13 +34,11 @@ pub(super) fn set_private_permissions(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Writes a file as 0o600 on unix (a plain write on Windows; registry, caches and activity).
 pub(super) fn write_file_private(path: &Path, contents: &str) -> std::io::Result<()> {
     fs::write(path, contents)?;
     set_private_permissions(path)
 }
 
-/// upstream writeJson: pretty with 2 spaces, a trailing newline, 0o600.
 pub(super) fn write_json(path: &Path, value: &Value) -> SkillResult<()> {
     if let Some(parent) = path.parent() {
         ensure_dir(parent)?;
@@ -53,7 +49,6 @@ pub(super) fn write_json(path: &Path, value: &Value) -> SkillResult<()> {
     write_file_private(path, &text).map_err(SkillError::from)
 }
 
-/// Appends one line (activity.jsonl), created as 0o600.
 pub(super) fn append_line_private(path: &Path, line: &str) -> std::io::Result<()> {
     use std::io::Write;
     let mut options = fs::OpenOptions::new();
@@ -71,10 +66,6 @@ pub(super) fn is_symlink(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// upstream removePath: deletes only an entity or a dangling link that exists, recursively, swallowing errors.
-/// Links are removed the platform's way: a folder link on Windows only goes with `remove_dir`
-/// (`remove_file` says Access denied), Unix is the other way round, so `remove_file` is tried first,
-/// then `remove_dir`; a link left behind would otherwise be written through by a later copy.
 pub(super) fn remove_path(path: &Path) {
     let Ok(meta) = fs::symlink_metadata(path) else {
         return;
@@ -90,7 +81,6 @@ pub(super) fn remove_path(path: &Path) {
     }
 }
 
-/// Like Node's `path.resolve`: an absolute path normalized lexically (no links followed, no disk touched).
 pub(super) fn resolve_lexical(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
@@ -106,7 +96,7 @@ pub(super) fn resolve_lexical(path: &Path) -> PathBuf {
             Component::RootDir => out.push(component.as_os_str()),
             Component::CurDir => {}
             Component::ParentDir => {
-                out.pop(); // a `..` at the root is dropped (pop at the root returns false)
+                out.pop();
             }
             Component::Normal(part) => out.push(part),
         }
@@ -114,7 +104,6 @@ pub(super) fn resolve_lexical(path: &Path) -> PathBuf {
     out
 }
 
-/// upstream pathStrictlyWithin: child must lie strictly inside parent (lexically).
 pub(super) fn path_strictly_within(parent: &Path, child: &Path) -> bool {
     match child.strip_prefix(parent) {
         Ok(rest) => !rest.as_os_str().is_empty(),
@@ -122,7 +111,6 @@ pub(super) fn path_strictly_within(parent: &Path, child: &Path) -> bool {
     }
 }
 
-/// upstream removeEmptyAncestors: removes empty folders from startDir up to stopDir.
 pub(super) fn remove_empty_ancestors(start_dir: &Path, stop_dir: &Path) {
     let stop = resolve_lexical(stop_dir);
     let mut current = resolve_lexical(start_dir);
@@ -137,7 +125,6 @@ pub(super) fn remove_empty_ancestors(start_dir: &Path, stop_dir: &Path) {
     }
 }
 
-/// fs.cpSync(source, dest, {recursive, force}) (follows links by default).
 pub(super) fn copy_dir_recursive(source: &Path, dest: &Path) -> std::io::Result<()> {
     fs::create_dir_all(dest)?;
     for entry in fs::read_dir(source)? {
@@ -153,12 +140,9 @@ pub(super) fn copy_dir_recursive(source: &Path, dest: &Path) -> std::io::Result<
     Ok(())
 }
 
-/// upstream copyDir: refuse nesting, clear dest, then copy the whole folder.
 pub(super) fn copy_dir(source: &Path, dest: &Path) -> SkillResult<()> {
     assert_not_nested(source, dest)?;
     remove_path(dest);
-    // A link that couldn't be removed mustn't be written as an empty folder: create_dir_all would pour
-    // the files into where it points (the SSOT or the person's own folder).
     if is_symlink(dest) {
         return Err(SkillError::other(format!(
             "Could not clear symbolic link before copy: {}",
@@ -168,7 +152,6 @@ pub(super) fn copy_dir(source: &Path, dest: &Path) -> SkillResult<()> {
     copy_dir_recursive(source, dest).map_err(SkillError::from)
 }
 
-/// A folder link for the platform; the caller falls back to a copy on any failure.
 pub(super) fn symlink_dir(source: &Path, dest: &Path) -> std::io::Result<()> {
     #[cfg(unix)]
     return fs::symlink(source, dest);
@@ -178,7 +161,6 @@ pub(super) fn symlink_dir(source: &Path, dest: &Path) -> std::io::Result<()> {
     unreachable!("unsupported platform")
 }
 
-/// JavaScript `encodeURIComponent`: keeps A-Za-z0-9 and `- _ . ! ~ * ' ( )`.
 pub(super) fn encode_uri_component(value: &str) -> String {
     const UNRESERVED: &[u8] =
         b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()";
@@ -193,7 +175,6 @@ pub(super) fn encode_uri_component(value: &str) -> String {
     out
 }
 
-/// URLSearchParams' form-urlencoding: space becomes `+`, keeps A-Za-z0-9 and `* - . _`.
 pub(super) fn encode_form_param(value: &str) -> String {
     const KEEP: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789*-._";
     let mut out = String::new();
@@ -209,7 +190,6 @@ pub(super) fn encode_form_param(value: &str) -> String {
     out
 }
 
-/// encodeURIComponent on each segment of a GitHub raw/doc URL path.
 pub(super) fn encode_url_path(path: &str) -> String {
     path.split('/')
         .map(encode_uri_component)
@@ -229,13 +209,11 @@ pub(super) fn github_doc_url(owner: &str, name: &str, branch: &str, file_path: &
     )
 }
 
-/// The name an uninstalled skill gets in the trash: `base64url(directory)` without padding.
 pub(super) fn base64url_no_pad(value: &str) -> String {
     use base64::Engine as _;
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(value.as_bytes())
 }
 
-/// Close to JavaScript `String(value)`: null/missing → "", scalars as strings, object/array → "".
 pub(super) fn js_string(value: Option<&Value>) -> String {
     match value {
         None | Some(Value::Null) => String::new(),
@@ -246,7 +224,6 @@ pub(super) fn js_string(value: Option<&Value>) -> String {
     }
 }
 
-/// Close to JavaScript `Number(value)`: strings trimmed, empty → 0, invalid → NaN.
 pub(super) fn js_f64(value: &Value) -> f64 {
     match value {
         Value::Null => 0.0,
@@ -270,7 +247,6 @@ pub(super) fn js_f64(value: &Value) -> f64 {
     }
 }
 
-/// JavaScript `Number(x || default)`: anything falsy (missing/null/false/0/""/NaN) → default.
 pub(super) fn js_number_or(value: Option<&Value>, default: f64) -> f64 {
     match value {
         None | Some(Value::Null) => default,
@@ -285,7 +261,6 @@ pub(super) fn js_number_or(value: Option<&Value>, default: f64) -> f64 {
     }
 }
 
-/// A JavaScript Number as JSON: whole values as integers (so serde_json doesn't print 5.0 as "5.0").
 pub(super) fn json_number(n: f64) -> Value {
     if n.fract() == 0.0 && n.abs() <= 9.0e15 {
         json!(n as i64)
@@ -294,14 +269,10 @@ pub(super) fn json_number(n: f64) -> Value {
     }
 }
 
-/// JavaScript's Unicode case-insensitive comparison (`a.toLowerCase() === b.toLowerCase()`).
 pub(super) fn eq_ignore_case(a: &str, b: &str) -> bool {
     a.to_lowercase() == b.to_lowercase()
 }
 
-// ===== Safety: the three sanitizers, targetSkillPath and assertNotNested =====
-
-/// upstream sanitizePathSegment: refuses empty, `.`, `..` and anything with `/` `\` `\0`; allows `.hidden`.
 pub(super) fn sanitize_path_segment(value: &str) -> Option<String> {
     let segment = value.trim();
     if segment.is_empty() || segment == "." || segment == ".." {
@@ -313,7 +284,6 @@ pub(super) fn sanitize_path_segment(value: &str) -> Option<String> {
     Some(segment.to_string())
 }
 
-/// Node's `path.win32.isAbsolute`: starts with `/` or `\`, or `X:` and a separator.
 pub(super) fn is_win32_absolute(value: &str) -> bool {
     let bytes = value.as_bytes();
     if bytes.is_empty() {
@@ -328,7 +298,6 @@ pub(super) fn is_win32_absolute(value: &str) -> bool {
         && (bytes[2] == b'/' || bytes[2] == b'\\')
 }
 
-/// upstream sanitizeRelativePath: `\` to `/`, refuses absolute paths, NUL, `.`, `..` and segments with `:`.
 pub(super) fn sanitize_relative_path(value: &str) -> Option<String> {
     let input = value.trim();
     let raw = input.replace('\\', "/");
@@ -349,7 +318,6 @@ pub(super) fn sanitize_relative_path(value: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// upstream sanitizeLocalSkillPath = sanitizeRelativePath and no segment starting with `.`.
 pub(super) fn sanitize_local_skill_path(value: &str) -> Option<String> {
     let safe = sanitize_relative_path(value)?;
     if safe.split('/').any(|part| part.starts_with('.')) {
@@ -358,13 +326,11 @@ pub(super) fn sanitize_local_skill_path(value: &str) -> Option<String> {
     Some(safe)
 }
 
-/// upstream installNameFromDirectory: the last segment, through sanitizePathSegment again.
 pub(super) fn install_name_from_directory(directory: &str) -> Option<String> {
     let safe = sanitize_relative_path(directory)?;
     safe.rsplit('/').next().and_then(sanitize_path_segment)
 }
 
-/// upstream targetSkillPath: lexical normalizing, strict containment and an lstat of every ancestor in between.
 pub(super) fn target_skill_path(base_dir: &Path, directory: &str) -> Option<PathBuf> {
     let safe = sanitize_relative_path(directory)?;
     let root = resolve_lexical(base_dir);
@@ -372,14 +338,12 @@ pub(super) fn target_skill_path(base_dir: &Path, directory: &str) -> Option<Path
     if !path_strictly_within(&root, &target) {
         return None;
     }
-    // root, if it exists, must be a folder; a missing one is fine.
     match fs::metadata(&root) {
         Ok(meta) if meta.is_dir() => {}
         Ok(_) => return None,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => return None,
     }
-    // Each ancestor in between is lstat'ed: missing goes on, a link or non-folder → None.
     let parts: Vec<&str> = safe.split('/').collect();
     let mut current = root.clone();
     for part in &parts[..parts.len() - 1] {
@@ -394,13 +358,11 @@ pub(super) fn target_skill_path(base_dir: &Path, directory: &str) -> Option<Path
     Some(target)
 }
 
-/// upstream managedSkillPath: the path under the SSOT's managed/.
 pub(super) fn managed_skill_path(directory: &str) -> SkillResult<PathBuf> {
     target_skill_path(&ssot_dir(), directory)
         .ok_or_else(|| SkillError::other(format!("Invalid skill directory: {directory}")))
 }
 
-/// upstream assertNotNested: equal after resolving is fine, either strictly inside the other is refused.
 pub(super) fn assert_not_nested(source: &Path, dest: &Path) -> SkillResult<()> {
     let a = resolve_lexical(source);
     let b = resolve_lexical(dest);

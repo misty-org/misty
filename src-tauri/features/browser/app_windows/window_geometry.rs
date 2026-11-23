@@ -25,30 +25,19 @@ mod tests;
 pub use placement::SavedGeometry;
 use placement::*;
 
-/// A window measured: its geometry in record units, and whether it is maximized or full screen.
 type Measured = (Rect, bool, bool);
 
-// ---------------------------------------------------------------------------
-// Tracking open windows
-// ---------------------------------------------------------------------------
-
 struct Tracker {
-    /// Measures the window; nothing once it is gone. Held as a closure so any runtime's window fits.
     measure: std::sync::Arc<dyn Fn() -> Option<Measured> + Send + Sync>,
-    /// Applies maximize or full screen.
     flags: std::sync::Arc<dyn Fn((bool, bool)) + Send + Sync>,
     window_id: String,
     state: SavedGeometry,
     dirty: bool,
     last_change: Instant,
-    /// Maximize or full screen waiting for the window to be shown (macOS needs it visible).
     pending: Option<(bool, bool)>,
 }
 
-/// Open windows, by label.
 static TRACKERS: Mutex<BTreeMap<String, Tracker>> = Mutex::new(BTreeMap::new());
-/// The last record of every window this launch has seen, by window id, including closed ones:
-/// a window that takes over a closed one's tabs takes its place too.
 static KNOWN: Mutex<BTreeMap<String, SavedGeometry>> = Mutex::new(BTreeMap::new());
 
 fn trackers() -> std::sync::MutexGuard<'static, BTreeMap<String, Tracker>> {
@@ -63,19 +52,16 @@ fn known() -> std::sync::MutexGuard<'static, BTreeMap<String, SavedGeometry>> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// The record to save for a window id, for `registry::save`.
 pub(crate) fn geometry_for(window_id: &str) -> Option<SavedGeometry> {
     known().get(window_id).cloned()
 }
 
-/// Remembers what the last launch saved, so a window reopened under that id finds it.
 pub(crate) fn remember(window_id: &str, geometry: Option<&SavedGeometry>) {
     if let Some(geometry) = geometry.filter(|state| state.is_plausible()) {
         known().insert(window_id.to_owned(), geometry.clone());
     }
 }
 
-/// The window's inner size and outer position in record units.
 fn measure<R: Runtime>(window: &Window<R>) -> Option<Rect> {
     let (Ok(size), Ok(position)) = (window.inner_size(), window.outer_position()) else {
         return None;
@@ -93,8 +79,6 @@ fn measure<R: Runtime>(window: &Window<R>) -> Option<Rect> {
     ))
 }
 
-/// Places the window in record units: position first, then size, so the system doesn't fit
-/// the new size to the old screen.
 fn place<R: Runtime>(window: &Window<R>, rect: Rect) -> Result<(), String> {
     if LOGICAL_UNITS {
         window
@@ -116,7 +100,6 @@ fn place<R: Runtime>(window: &Window<R>, rect: Rect) -> Result<(), String> {
     }
 }
 
-/// The screens there are, the main one first.
 fn displays<R: Runtime>(window: &Window<R>) -> Vec<Display> {
     let display = |monitor: &tauri::Monitor| {
         let area = monitor.work_area();
@@ -144,8 +127,6 @@ fn displays<R: Runtime>(window: &Window<R>) -> Vec<Display> {
     displays
 }
 
-/// Measures the window now, keeping the normal geometry while maximized. Gone windows (after
-/// `Destroyed`) give nothing, and the record stays as it was.
 fn sample(
     measure: &(dyn Fn() -> Option<Measured> + Send + Sync),
     previous: &SavedGeometry,
@@ -160,9 +141,6 @@ fn sample(
     ))
 }
 
-/// Places a new window where its record says, before it is first shown, and starts tracking
-/// it. Maximize and full screen wait for the window's reveal on macOS, where they need it on
-/// screen.
 pub(crate) fn apply_and_track<R: Runtime>(window: &Window<R>, window_id: &str) {
     let saved = geometry_for(window_id);
     let resolution = resolve(saved.as_ref(), &displays(window));
@@ -223,8 +201,6 @@ fn apply_flags<R: Runtime>(window: &Window<R>, (maximized, fullscreen): (bool, b
     }
 }
 
-/// The window was revealed (`reveal_main_window`): apply a maximize or full screen that had to
-/// wait for it to be on screen. Once only.
 pub(crate) fn shown(label: &str) {
     let job = {
         let mut trackers = trackers();
@@ -238,7 +214,6 @@ pub(crate) fn shown(label: &str) {
     }
 }
 
-/// A move or resize: measured and saved once things settle.
 pub(crate) fn mark_dirty(label: &str) {
     if let Some(tracker) = trackers().get_mut(label) {
         tracker.dirty = true;
@@ -246,7 +221,6 @@ pub(crate) fn mark_dirty(label: &str) {
     }
 }
 
-/// Measures a window that is about to close and keeps its record.
 pub(crate) fn flush(label: &str) {
     let job = trackers().get(label).map(|tracker| {
         (
@@ -268,12 +242,10 @@ pub(crate) fn flush(label: &str) {
     }
 }
 
-/// Stops tracking a closed window. Its record stays known for a window that takes its place.
 pub(crate) fn forget(label: &str) {
     trackers().remove(label);
 }
 
-/// Measures every window, as Misty quits.
 pub(crate) fn flush_all() {
     let labels: Vec<String> = trackers().keys().cloned().collect();
     for label in labels {
@@ -281,8 +253,6 @@ pub(crate) fn flush_all() {
     }
 }
 
-/// Saves windows whose last change has settled. Window calls wait on the main thread, so no
-/// lock is held while measuring.
 fn settle() -> bool {
     type Due = (
         String,
@@ -309,7 +279,6 @@ fn settle() -> bool {
         let Some(tracker) = trackers.get_mut(&label) else {
             continue;
         };
-        // A change that arrived while measuring makes this sample stale; the next round redoes it.
         if tracker.state != previous || tracker.last_change.elapsed() < DEBOUNCE {
             continue;
         }

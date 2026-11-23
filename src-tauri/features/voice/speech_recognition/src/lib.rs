@@ -24,8 +24,6 @@ pub use player::{play, Playback};
 pub use recognizer::Recognizer;
 pub use voice::{Speech, Voice};
 
-/// A phrase recognized from audio, with its time in seconds from the audio's start, and its
-/// words with theirs when the model times its tokens.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct Phrase {
     pub text: String,
@@ -37,7 +35,6 @@ pub struct Phrase {
     pub words: Vec<Word>,
 }
 
-/// One word and when it was said, in seconds from the audio's start.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub struct Word {
     pub text: String,
@@ -45,11 +42,12 @@ pub struct Word {
     pub end: f64,
 }
 
-/// Why speech couldn't run, in words for the person.
 pub fn reason(code: &str) -> String {
     match code {
         "no_model" => "Speech isn't set up on this computer yet.".into(),
-        "model" => "The speech model couldn't be opened. Set it up again in Settings › Voice.".into(),
+        "model" => {
+            "The speech model couldn't be opened. Set it up again in Settings › Voice.".into()
+        }
         "voice" => "The voice couldn't be opened. Set it up again in Settings › Voice.".into(),
         "file" => "That recording couldn't be read.".into(),
         "output" => "Misty couldn't play sound on this computer.".into(),

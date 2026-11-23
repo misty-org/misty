@@ -13,9 +13,7 @@ use super::http::*;
 use super::registry::*;
 use super::scan::*;
 use super::target_sync::*;
-// ===== mutations：install / uninstall / restore / set_targets / import_local / delete_local =====
 
-/// upstream installSkill: GitHub tree → download into tmp → rename into the SSOT → registry → sync targets.
 pub(super) async fn install_skill(
     skill_input: &Value,
     target_ids: &[String],
@@ -41,7 +39,6 @@ pub(super) async fn install_skill(
         ));
     }
     let source_dir = sanitize_relative_path(&directory_input);
-    // A GitHub skill keeps its flat installName even when its sourceDirectory is nested.
     let install_name = source_dir.as_deref().and_then(install_name_from_directory);
     let (source_dir, install_name) = match (source_dir, install_name) {
         (Some(dir), Some(name)) => (dir, name),
@@ -83,10 +80,6 @@ pub(super) async fn install_skill(
 
     let client = http_client()?;
     let (branch, tree) = get_repo_tree(&client, &repo_owner, &repo_name, &repo_branch).await?;
-    // A skills.sh id isn't always the folder name in the repo (`vercel-react-best-practices` is
-    // `skills/react-best-practices` in vercel-labs/agent-skills): when the given folder has no
-    // SKILL.md, resolve it again by the same matching rules rather than failing the install on a
-    // folder name (the details panel reads the remote SKILL.md from the same tree).
     let Some(source_dir) = resolve_existing_skill_dir(&tree, &source_dir) else {
         return Err(SkillError::coded(
             "invalid_input",
@@ -96,8 +89,6 @@ pub(super) async fn install_skill(
     let files = skill_dir_files(&tree, &source_dir);
 
     let dest = managed_skill_path(&install_name)?;
-    // Local edits are protected: when the managed copy's hash on disk differs from the registry's,
-    // overwriting is refused unless the caller passes force (the person confirmed the update).
     if fs::exists(&dest) && !force {
         let recorded = registry
             .skills
@@ -119,7 +110,6 @@ pub(super) async fn install_skill(
     let temp = tmp_dir().join(format!("{install_name}-{}", now_ms()));
     remove_path(&temp);
     ensure_dir(&temp)?;
-    // Files are downloaded one at a time; any failure cleans up tmp and is returned.
     let download = async {
         for entry in &files {
             let path = entry.get("path").and_then(Value::as_str).unwrap_or("");
@@ -157,7 +147,6 @@ pub(super) async fn install_skill(
         return Err(error);
     }
 
-    // Read name and description again from the SKILL.md on disk (uppercase first, then skill.md).
     let marker = find_skill_marker(&dest);
     let skill_md = marker.and_then(|m| read_text(&m)).unwrap_or_default();
     let fallback_name = if skill_name_input.is_empty() {
@@ -182,7 +171,6 @@ pub(super) async fn install_skill(
     installed.insert("description".to_string(), json!(description));
     installed.insert("directory".to_string(), json!(install_name));
     installed.insert("sourceDirectory".to_string(), json!(source_dir));
-    // readmeUrl always uses uppercase SKILL.md (as upstream).
     installed.insert(
         "readmeUrl".to_string(),
         json!(github_doc_url(
@@ -222,8 +210,6 @@ pub(super) async fn install_skill(
     Ok(json!({"ok": true, "skill": Value::Object(skill), "targetResults": target_results}))
 }
 
-/// upstream uninstallSkill: once every target is removed the SSOT copy moves to .trash (restorable for
-/// 5 minutes); when the rename fails or the SSOT copy is missing it is deleted for good.
 pub(super) fn uninstall_skill(id: &str) -> SkillResult<Value> {
     let mut registry = read_registry();
     let Some(position) = find_skill_position(&registry.skills, id) else {
@@ -270,7 +256,6 @@ pub(super) fn uninstall_skill(id: &str) -> SkillResult<Value> {
                 "targetResults": target_results,
             }));
         }
-        // The rename failed: delete it for good instead.
         remove_path(&ssot_path);
         if let Some(parent) = ssot_path.parent() {
             remove_empty_ancestors(parent, &ssot_dir());
@@ -284,7 +269,6 @@ pub(super) fn uninstall_skill(id: &str) -> SkillResult<Value> {
     Ok(json!({"ok": true, "trashed": false, "targetResults": target_results}))
 }
 
-/// upstream restoreSkill: within the trash window, renames it back into the SSOT and links previousTargets again.
 pub(super) fn restore_skill(id: &str) -> SkillResult<Value> {
     let mut registry = read_registry();
     let Some(index) = find_skill_position(&registry.skills, id) else {
@@ -337,7 +321,6 @@ pub(super) fn restore_skill(id: &str) -> SkillResult<Value> {
     Ok(json!({"ok": true, "skill": Value::Object(restored), "targetResults": target_results}))
 }
 
-/// upstream setSkillTargets: syncs newly turned-on targets and removes turned-off ones.
 pub(super) fn set_skill_targets(id: &str, target_ids: &[String]) -> SkillResult<Value> {
     let mut registry = read_registry();
     let Some(index) = find_skill_position(&registry.skills, id) else {
@@ -374,7 +357,6 @@ pub(super) fn set_skill_targets(id: &str, target_ids: &[String]) -> SkillResult<
     Ok(json!({"ok": true, "skill": Value::Object(updated), "targetResults": target_results}))
 }
 
-/// upstream findLocalSkillSource: the source folder holding a marker under one target.
 pub(super) fn find_local_skill_source(directory: &str) -> Option<(PathBuf, String)> {
     let source_dir = sanitize_local_skill_path(directory)?;
     for target in TARGETS.iter() {
@@ -390,9 +372,6 @@ pub(super) fn find_local_skill_source(directory: &str) -> Option<(PathBuf, Strin
     None
 }
 
-/// upstream importLocalSkill: copies (doesn't link) a local skill into the SSOT and records it as `local:<dir>`.
-/// Read-only sources (built-in / system / plugin) can't be imported: a copy in the SSOT would overwrite
-/// the original of the same name in the engine's folder, getting around the read-only protection.
 pub(super) fn import_local_skill(directory: &str, target_ids: &[String]) -> SkillResult<Value> {
     let Some(source_dir) = sanitize_local_skill_path(directory) else {
         return Err(SkillError::other("Invalid skill directory"));
@@ -445,7 +424,6 @@ pub(super) fn import_local_skill(directory: &str, target_ids: &[String]) -> Skil
     let Some((source_path, _target_id)) = find_local_skill_source(&source_dir) else {
         return Err(SkillError::coded("not_found", "Local skill not found"));
     };
-    // Remember the source folder: it belongs to the person, and sync, remove and uninstall must never overwrite or delete it.
     let preserved_source = source_path.to_string_lossy().into_owned();
     let dest = managed_skill_path(&source_dir)?;
     copy_dir(&source_path, &dest)?;
@@ -506,9 +484,6 @@ pub(super) fn import_local_skill(directory: &str, target_ids: &[String]) -> Skil
     Ok(json!({"ok": true, "skill": Value::Object(skill), "targetResults": target_results}))
 }
 
-/// upstream deleteLocalSkill: deletes a local skill from the given targets (all by default).
-/// Read-only sources and managed entries are refused here: the first are the app's or engine's own
-/// files, the second have to go through uninstall to keep the registry and the disk in step.
 pub(super) fn delete_local_skill(directory: &str, target_ids: &[String]) -> SkillResult<Value> {
     let Some(install_name) = sanitize_local_skill_path(directory) else {
         return Err(SkillError::other("Invalid skill directory"));

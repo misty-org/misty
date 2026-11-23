@@ -22,11 +22,11 @@ vi.mock("@tauri-apps/api/window", () => ({
     },
   }),
 }));
-vi.mock("../runs/jobs/workspaceAutopilot", () => ({
+vi.mock("../runs/jobs/workspace_autopilot", () => ({
   watchWorkspaceAutopilot: mocks.watch,
   autopilotStopShortcut: () => "Cmd+Shift+Escape",
 }));
-vi.mock("../runs/local-execution/localExecution", async () => {
+vi.mock("../runs/local-execution/local_execution", async () => {
   const { create } = await import("zustand");
   return {
     useLocalExecution: create(() => ({ execution: null as unknown })),
@@ -37,7 +37,7 @@ vi.mock("../runs/local-execution/localExecution", async () => {
     queueLocalFollowup: mocks.queue,
   };
 });
-vi.mock("@/features/agents/conversations/state/useMistyStore", async () => {
+vi.mock("@/features/agents/conversations/state/use_misty_store", async () => {
   const { create } = await import("zustand");
   return {
     useMistyStore: create(() => ({
@@ -48,15 +48,15 @@ vi.mock("@/features/agents/conversations/state/useMistyStore", async () => {
     })),
   };
 });
-vi.mock("../personal/personalAgentsStore", async () => {
+vi.mock("../personal/personal_agents_store", async () => {
   const { create } = await import("zustand");
   return { usePersonalAgentsStore: create(() => ({ agents: [{ id: "agent", name: "Misty" }] })) };
 });
-vi.mock("../runs/hosted-sessions/hostedSessionsState", async () => {
+vi.mock("../runs/hosted-sessions/hosted_sessions_state", async () => {
   const { create } = await import("zustand");
   return { useHostedSessions: create(() => ({ sessions: [] as unknown[] })) };
 });
-vi.mock("../runs/hosted-sessions/hostedSessions", () => ({ endHostedSession: mocks.endHosted }));
+vi.mock("../runs/hosted-sessions/hosted_sessions", () => ({ endHostedSession: mocks.endHosted }));
 vi.mock("@/features/agents/interventions/store", async () => {
   const { create } = await import("zustand");
   return { useAgentInterventions: create(() => ({ items: [] as unknown[] })) };
@@ -68,10 +68,10 @@ vi.mock("@/features/agents/interventions/WaitingForYouCard", () => ({
   releasePendingWait: mocks.release,
 }));
 import { useAgentInterventions } from "@/features/agents/interventions/store";
-import { useMistyStore } from "@/features/agents/conversations/state/useMistyStore";
+import { useMistyStore } from "@/features/agents/conversations/state/use_misty_store";
 import { AgentControlIsland } from "./AgentControlIsland";
-import { useHostedSessions } from "../runs/hosted-sessions/hostedSessionsState";
-import { useLocalExecution, type Execution } from "../runs/local-execution/localExecution";
+import { useHostedSessions } from "../runs/hosted-sessions/hosted_sessions_state";
+import { useLocalExecution, type Execution } from "../runs/local-execution/local_execution";
 
 const execution: Execution = {
   taskId: "task",

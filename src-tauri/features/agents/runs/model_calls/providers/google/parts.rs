@@ -1,5 +1,3 @@
-//! The pieces of Google's `contents`, and tool results in them. Ported from `appendToolResultParts`
-//! and `appendLegacyToolResultParts` in `convert-to-google-messages.ts`.
 use serde::Serialize;
 use serde_json::Value;
 
@@ -51,7 +49,11 @@ pub(super) enum Part {
 
 impl Part {
     pub(super) fn plain(text: impl Into<String>) -> Self {
-        Self::Text { text: text.into(), thought: None, thought_signature: None }
+        Self::Text {
+            text: text.into(),
+            thought: None,
+            thought_signature: None,
+        }
     }
 }
 
@@ -105,12 +107,10 @@ struct ResponsePart {
     inline_data: InlineData,
 }
 
-/// The `UnsupportedFunctionalityError` message.
 pub(super) fn unsupported(functionality: &str) -> ModelError {
     ModelError::Unsupported(format!("'{functionality}' functionality not supported."))
 }
 
-/// `resolveFullMediaType`.
 pub(super) fn full_media_type(media_type: &str, data: &FileData) -> Result<String, ModelError> {
     if is_full(media_type) {
         return Ok(media_type.to_owned());
@@ -129,14 +129,14 @@ pub(super) fn full_media_type(media_type: &str, data: &FileData) -> Result<Strin
     }
 }
 
-/// `readProviderOpts`, reading the part's options for this provider.
 fn part_options(options: Option<&ProviderOptions>) -> Option<&Value> {
     let options = options?;
     let non_null = |name: &str| options.get(name).filter(|value| !value.is_null());
-    non_null("google").or_else(|| non_null("googleVertex")).or_else(|| non_null("vertex"))
+    non_null("google")
+        .or_else(|| non_null("googleVertex"))
+        .or_else(|| non_null("vertex"))
 }
 
-/// `String(thoughtSignature)`.
 pub(super) fn thought_signature(options: Option<&ProviderOptions>) -> Option<String> {
     match part_options(options)?.get("thoughtSignature")? {
         Value::Null => None,
@@ -145,12 +145,12 @@ pub(super) fn thought_signature(options: Option<&ProviderOptions>) -> Option<Str
     }
 }
 
-/// `parseBase64DataUrl`: `/^data:([^;,]+);base64,(.+)$/s`.
 fn base64_data_url(url: &str) -> Option<(&str, &str)> {
     let rest = url.strip_prefix("data:")?;
     let (head, data) = rest.split_once(',')?;
     let media_type = head.strip_suffix(";base64")?;
-    (!media_type.is_empty() && !media_type.contains(';') && !data.is_empty()).then_some((media_type, data))
+    (!media_type.is_empty() && !media_type.contains(';') && !data.is_empty())
+        .then_some((media_type, data))
 }
 
 pub(super) fn tool_result_parts(
@@ -164,33 +164,52 @@ pub(super) fn tool_result_parts(
     for item in items {
         match item {
             OutputItem::Text { text } => texts.push(text.clone()),
-            OutputItem::File { data: FileData::Data { data }, media_type } => {
-                let mime_type = full_media_type(media_type, &FileData::Data { data: data.clone() })?;
+            OutputItem::File {
+                data: FileData::Data { data },
+                media_type,
+            } => {
+                let mime_type =
+                    full_media_type(media_type, &FileData::Data { data: data.clone() })?;
                 inline.push(ResponsePart {
-                    inline_data: InlineData { mime_type, data: data.clone() },
+                    inline_data: InlineData {
+                        mime_type,
+                        data: data.clone(),
+                    },
                 });
             }
-            OutputItem::File { data: FileData::Url { url }, .. } => match base64_data_url(url) {
+            OutputItem::File {
+                data: FileData::Url { url },
+                ..
+            } => match base64_data_url(url) {
                 Some((media_type, data)) => inline.push(ResponsePart {
-                    inline_data: InlineData { mime_type: media_type.to_owned(), data: data.to_owned() },
+                    inline_data: InlineData {
+                        mime_type: media_type.to_owned(),
+                        data: data.to_owned(),
+                    },
                 }),
                 None => texts.push(serde_json::to_string(item).unwrap_or_default()),
             },
         }
     }
-    let content = if texts.is_empty() { "Tool executed successfully.".to_owned() } else { texts.join("\n") };
+    let content = if texts.is_empty() {
+        "Tool executed successfully.".to_owned()
+    } else {
+        texts.join("\n")
+    };
     parts.push(Part::FunctionResponse {
         function_response: FunctionResponse {
             id: call_id.to_owned(),
             name: tool_name.to_owned(),
-            response: ResponseBody { name: tool_name.to_owned(), content: ResponseContent::Text(content) },
+            response: ResponseBody {
+                name: tool_name.to_owned(),
+                content: ResponseContent::Text(content),
+            },
             parts: (!inline.is_empty()).then_some(inline),
         },
     });
     Ok(())
 }
 
-/// Models before Gemini 3 can't take parts inside a function response, so files follow it.
 pub(super) fn legacy_tool_result_parts(
     parts: &mut Vec<Part>,
     tool_name: &str,
@@ -199,18 +218,36 @@ pub(super) fn legacy_tool_result_parts(
 ) -> Result<(), ModelError> {
     for item in items {
         match item {
-            OutputItem::Text { text } => parts.push(function_response(tool_name, call_id, ResponseContent::Text(text.clone()))),
-            OutputItem::File { data: FileData::Data { data }, media_type } => {
-                let mime_type = full_media_type(media_type, &FileData::Data { data: data.clone() })?;
+            OutputItem::Text { text } => parts.push(function_response(
+                tool_name,
+                call_id,
+                ResponseContent::Text(text.clone()),
+            )),
+            OutputItem::File {
+                data: FileData::Data { data },
+                media_type,
+            } => {
+                let mime_type =
+                    full_media_type(media_type, &FileData::Data { data: data.clone() })?;
                 parts.push(Part::InlineData {
-                    inline_data: InlineData { mime_type, data: data.clone() },
+                    inline_data: InlineData {
+                        mime_type,
+                        data: data.clone(),
+                    },
                 });
-                let kind = if top_level(media_type) == "image" { "image" } else { "file" };
+                let kind = if top_level(media_type) == "image" {
+                    "image"
+                } else {
+                    "file"
+                };
                 parts.push(Part::plain(format!(
                     "Tool executed successfully and returned this {kind} as a response"
                 )));
             }
-            OutputItem::File { data: FileData::Url { .. }, .. } => {
+            OutputItem::File {
+                data: FileData::Url { .. },
+                ..
+            } => {
                 parts.push(Part::plain(serde_json::to_string(item).unwrap_or_default()));
             }
         }
@@ -223,7 +260,10 @@ pub(super) fn function_response(tool_name: &str, call_id: &str, content: Respons
         function_response: FunctionResponse {
             id: call_id.to_owned(),
             name: tool_name.to_owned(),
-            response: ResponseBody { name: tool_name.to_owned(), content },
+            response: ResponseBody {
+                name: tool_name.to_owned(),
+                content,
+            },
             parts: None,
         },
     }
@@ -235,7 +275,10 @@ mod tests {
 
     #[test]
     fn data_urls_need_base64_and_a_type() {
-        assert_eq!(base64_data_url("data:image/png;base64,AAAA"), Some(("image/png", "AAAA")));
+        assert_eq!(
+            base64_data_url("data:image/png;base64,AAAA"),
+            Some(("image/png", "AAAA"))
+        );
         assert_eq!(base64_data_url("data:image/png,AAAA"), None);
         assert_eq!(base64_data_url("data:;base64,AAAA"), None);
         assert_eq!(base64_data_url("data:image/png;base64,"), None);

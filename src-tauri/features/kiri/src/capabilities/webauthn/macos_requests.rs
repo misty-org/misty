@@ -1,7 +1,3 @@
-//! Builds AuthenticationServices requests from what Kiri validated: the
-//! platform (passkey) request and, where the system supports it, a security
-//! key request, so one system sheet offers both.
-
 use super::{array, class, data, made, responds, string, Id};
 use crate::capabilities::webauthn::{Attachment, CreateRequest, GetRequest};
 use crate::KiriError;

@@ -2,13 +2,11 @@
 import { ChevronRight, RotateCw, Save, Search, WrapText } from "lucide-react";
 import { Fragment } from "react";
 import { Button, ChoiceGroup, cn, IconButton, Surface, Text, Tooltip } from "@misty/ui";
-import type { EditorAppearance } from "./editorAddons";
-import { getFileTreeIconSvg } from "../files/fileIcons";
-import { useFilesStore } from "../files/filesStore";
-import type { EditorViewMode } from "./editorViewMode";
+import type { EditorAppearance } from "./editor_addons";
+import { getFileTreeIconSvg } from "../files/file_icons";
+import { useFilesStore } from "../files/files_store";
+import type { EditorViewMode } from "./editor_view_mode";
 
-/** The folders between the tree's root and a file, outermost first; none for a file at the top
- * or outside the root. */
 function folderTrail(root: string | null, path: string): string[] {
   if (!root || !path.startsWith(`${root}/`)) return [];
   return path
@@ -17,8 +15,6 @@ function folderTrail(root: string | null, path: string): string[] {
     .slice(0, -1);
 }
 
-/** The bar over an open file: its name, whether it has unsaved edits, the edit and preview
- * switch for Markdown and HTML, find in a Markdown preview, word wrap and save. */
 export function FileEditorHeader({
   path,
   name,
@@ -43,9 +39,7 @@ export function FileEditorHeader({
   dirty: boolean;
   readOnly: boolean;
   canPreview: boolean;
-  /** The Markdown preview also has a find bar. */
   isMarkdown: boolean;
-  /** The HTML preview has a reload. */
   isHtml: boolean;
   viewMode: EditorViewMode;
   onViewModeChange(mode: EditorViewMode): void;
@@ -56,8 +50,6 @@ export function FileEditorHeader({
   onToggleSearch(): void;
   wordWrap: boolean;
   onToggleWordWrap(): void;
-  /** On the Code page the tab already names the file and marks unsaved edits, and ⌘S saves: the
-   * bar shows where the file sits instead, with no Save button. */
   appearance?: EditorAppearance;
 }) {
   const page = appearance === "page";
@@ -67,13 +59,10 @@ export function FileEditorHeader({
     <div
       className={cn(
         "flex flex-none items-center gap-2 pr-2 text-meta",
-        // On the Code page it is a quiet breadcrumb bar flush with the code under it.
         page ? "h-8 pl-4" : "h-10 border-b pl-3",
       )}
     >
       {page ? (
-        // VS Code's breadcrumbs: each folder, a chevron between, then the file with its own
-        // icon. In a narrow pane the folders fade first; the file's name stays whole.
         <Tooltip content={path}>
           <nav aria-label="Path" className="flex min-w-0 items-center gap-0.5 text-caption">
             {folders.map((folder, index) => (

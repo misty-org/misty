@@ -19,12 +19,18 @@
 //! launch.
 
 use serde_json::Value;
+#[allow(
+    clippy::disallowed_types,
+    reason = "tails Codex's own session log in place, wherever its home keeps it"
+)]
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-/// One run's rollout tail: the byte offset already read plus the newest
-/// context window seen (records do not carry one themselves).
+#[allow(
+    clippy::disallowed_types,
+    reason = "tails Codex's own session log in place, wherever its home keeps it"
+)]
 #[derive(Debug)]
 pub struct UsageTail {
     file: File,
@@ -33,20 +39,17 @@ pub struct UsageTail {
 }
 
 impl UsageTail {
-    /// Open the rollout backing `thread_id`, reporting only what the CLI
-    /// appends from here on. None until the CLI has created the file, so
-    /// callers retry while the run streams.
     pub fn open(thread_id: &str) -> Option<Self> {
         let home = crate::engines::codex_home();
         Self::open_in(&home, thread_id)
     }
 
+    #[allow(
+        clippy::disallowed_types,
+        reason = "tails Codex's own session log in place, wherever its home keeps it"
+    )]
     fn open_in(home: &Path, thread_id: &str) -> Option<Self> {
         let mut file = File::open(rollout_path(home, thread_id)?).ok()?;
-        // Anything already in the file belongs to earlier turns — a resumed
-        // thread's rollout carries the entire thread. Start where the CLI
-        // will write next; a half-written trailing line fails to parse and is
-        // skipped, so starting mid-line costs nothing.
         let offset = file.seek(SeekFrom::End(0)).ok()?;
         Some(Self {
             file,
@@ -55,8 +58,6 @@ impl UsageTail {
         })
     }
 
-    /// Usage reports appended since the previous call, oldest first. A partial
-    /// trailing line stays unread until the CLI finishes writing it.
     pub fn poll(&mut self) -> Vec<Value> {
         let mut out = Vec::new();
         if self.file.seek(SeekFrom::Start(self.offset)).is_err() {
@@ -75,8 +76,6 @@ impl UsageTail {
             if let Some(usage) = self.line_usage(line) {
                 out.push(usage);
             } else if self.context_window != previous_window {
-                // token_count commonly follows its response record. Carry the
-                // newly reported window (including 1M) with that same response.
                 if let (Some(window), Some(last)) = (self.context_window, out.last_mut()) {
                     if let Some(object) = last.as_object_mut() {
                         object.insert("model_context_window".into(), Value::from(window));
@@ -87,18 +86,13 @@ impl UsageTail {
         out
     }
 
-    /// Usage one rollout line reported, if any.
     fn line_usage(&mut self, line: &str) -> Option<Value> {
         let value: Value = serde_json::from_str(line).ok()?;
         match value.get("type").and_then(Value::as_str)? {
-            // One per model response: the response's own tokens, so a turn's
-            // usage is the sum of its records.
             "token_usage_record" => {
                 let usage = value.get("payload")?.get("usage")?;
                 Some(self.with_window(usage))
             }
-            // A context-only snapshot: its `last_token_usage` repeats until
-            // the next response, so it updates the window and reports nothing.
             "event_msg" => {
                 let payload = value.get("payload")?;
                 if payload.get("type").and_then(Value::as_str) != Some("token_count") {
@@ -115,8 +109,6 @@ impl UsageTail {
         }
     }
 
-    /// Stamp the newest reported window onto a report: records carry none,
-    /// and the context meter needs the denominator.
     pub(super) fn with_window(&self, usage: &Value) -> Value {
         let mut usage = usage.clone();
         if let (Some(window), Some(object)) = (self.context_window, usage.as_object_mut()) {
@@ -128,9 +120,10 @@ impl UsageTail {
     }
 }
 
-/// Rollout file of `thread_id` under a codex home: `sessions/**` first, then
-/// the archived tree (`codex exec resume` keeps the original file where it
-/// was written, whatever day that was).
+#[allow(
+    clippy::disallowed_methods,
+    reason = "finds Codex's own session log in place, wherever its home keeps it"
+)]
 fn rollout_path(home: &Path, thread_id: &str) -> Option<PathBuf> {
     let suffix = format!("{thread_id}.jsonl");
     for root in [home.join("sessions"), home.join("archived_sessions")] {
@@ -211,7 +204,6 @@ mod tests {
         )
     }
 
-    /// A tail over a rollout file the test appends to, like the CLI does.
     fn tail_over(dir: &Path, thread_id: &str) -> (UsageTail, PathBuf) {
         let day = dir.join("sessions").join("2026").join("09").join("11");
         std::fs::create_dir_all(&day).unwrap();
@@ -245,10 +237,6 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// `codex exec resume` appends to the rollout the thread wrote the first
-    /// time, so the file already holds every past response. One real thread's
-    /// 47 MB rollout carried 771 records summing to 102M tokens; reading from
-    /// byte 0 ledgered all of them again on every launch.
     #[test]
     fn history_already_in_the_rollout_is_not_reported() {
         let dir = scratch("resume");

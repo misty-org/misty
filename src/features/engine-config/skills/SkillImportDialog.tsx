@@ -1,13 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * Import a local skill: pick a folder (mapped back to a path relative to an engine's skills
- * folder), choose which engines get a managed copy, then import.
- *
- * The backend only accepts a relative folder inside a known skills root, so no arbitrary path
- * crosses IPC. The picker maps an absolute pick onto a root; anything else must be typed as a
- * relative folder and is still checked natively.
- */
 import { open } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
 import {
@@ -22,7 +14,7 @@ import {
   Label,
   Text,
 } from "@misty/ui";
-import { EngineGlyph } from "./components";
+import { EngineGlyph } from "./Components";
 import { t } from "./strings";
 import type { SkillTargetId, SkillTargetInfo } from "./types";
 import { defaultTargets, relativeToRoot } from "./utils";
@@ -38,8 +30,6 @@ export function SkillImportDialog({
   onClose: () => void;
   onImport: (directory: string, engineTargets: SkillTargetId[]) => void;
 }) {
-  // Installed CLIs first: importing into an engine that isn't installed would write a copy
-  // nothing reads. (The backend accepts every id.)
   const offered = useMemo(() => targets.filter((target) => target.available !== false), [targets]);
   const offeredList = offered.length > 0 ? offered : targets;
   const [directory, setDirectory] = useState("");
@@ -92,17 +82,24 @@ export function SkillImportDialog({
             <Button onClick={() => void pick()}>{t("import.pick")}</Button>
           </div>
           {pickerError ? (
-            <Text bare as="p" role="alert" tone="bright" className="whitespace-pre-line text-xs">
+            <Text
+              size="meta"
+              bare
+              as="p"
+              role="alert"
+              tone="bright"
+              className="whitespace-pre-line"
+            >
               {pickerError}
             </Text>
           ) : null}
         </div>
         <div className="grid gap-2">
-          <Text bare as="p" tone="bright" weight="medium" className="text-sm">
+          <Text size="control" bare as="p" tone="bright" weight="medium">
             {t("import.targets")}
           </Text>
           {offeredList.map((target) => (
-            <label key={target.id} className="flex cursor-pointer items-center gap-2 text-sm">
+            <label key={target.id} className="flex cursor-pointer items-center gap-2 text-control">
               <Checkbox
                 checked={selectedSet.has(target.id as SkillTargetId)}
                 onCheckedChange={(next) => toggleTarget(target.id as SkillTargetId, next === true)}

@@ -1,5 +1,3 @@
-//! Read-only metadata about what could be captured. No audio is opened.
-
 use super::{global, SYSTEM};
 use crate::{CaptureError, CaptureSource, CaptureSources};
 use objc2::rc::Retained;
@@ -56,7 +54,6 @@ fn name(object: AudioObjectID) -> Option<String> {
     unsafe { Retained::from_raw(value) }.map(|name| name.to_string())
 }
 
-/// The process objects Core Audio knows about (macOS 14.2+).
 pub(super) fn process_objects() -> Vec<AudioObjectID> {
     let address = global(kAudioHardwarePropertyProcessObjectList);
     let mut size: u32 = 0;
@@ -91,14 +88,10 @@ pub(super) fn process_objects() -> Vec<AudioObjectID> {
     if status != 0 {
         return Vec::new();
     }
-    // The list can shrink between the two calls; keep only what was written.
     objects.truncate(size as usize / size_of::<AudioObjectID>());
     objects
 }
 
-/// Read-only metadata: the default microphone's name and the apps currently
-/// playing audio, grouped by app name with their PIDs, both sorted.
-/// No audio is opened.
 pub(crate) fn capture_sources() -> Result<CaptureSources, CaptureError> {
     let microphone = number(SYSTEM, kAudioHardwarePropertyDefaultInputDevice)
         .and_then(name)

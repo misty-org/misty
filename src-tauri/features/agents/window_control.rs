@@ -1,4 +1,3 @@
-//! Foreground, task-bound whole-window control. No authority survives Stop or Space changes.
 use crate::browser::BrowserAgentExecuteRequest;
 use serde_json::{json, Value};
 use std::{
@@ -139,7 +138,6 @@ pub async fn execute(
             )
         }
         "browser.workspace.interact" => {
-            // Misty's own Allow and Approve controls are on this screen, and only the person presses them.
             let store = app
                 .state::<crate::app::runtime::MistyRuntime>()
                 .environment
@@ -165,8 +163,6 @@ pub async fn execute(
                 .to_owned();
             #[cfg(windows)]
             {
-                // Checked here, then acted on off the UI thread: UI Automation
-                // calls that reach Misty's own windows would wait on it.
                 crate::browser::authorize_workspace_dispatch(&app, &scope, &agent, &grant, &task)?;
                 let (desktop, input) = take_snapshot(&task, &document, action)?;
                 return crate::agents::window_control::windows::perform(&app, desktop, input).await;
@@ -184,11 +180,9 @@ pub async fn execute(
             #[cfg(target_os = "macos")]
             app.run_on_main_thread(move || {
                 let result = (|| {
-                    // Recheck inside the dispatch closure: a queued action must not outlive Stop.
                     crate::browser::authorize_workspace_dispatch(
                         &main, &scope, &agent, &grant, &task,
                     )?;
-                    // State is released before native events reach the app's handlers.
                     let (desktop, input) = take_snapshot(&task, &document, action)?;
                     decode(if desktop {
                         crate::agents::desktop_control::macos::action(&input)
@@ -206,8 +200,6 @@ pub async fn execute(
     }
 }
 
-/// Takes the inspected snapshot an action acts on: the one the agent saw, and
-/// recent. Whether it shows the desktop, and its geometry with the action.
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 fn take_snapshot(task: &str, document: &str, action: Value) -> Result<(bool, Value), String> {
     let mut state = session().lock().map_err(|_| "workspace_unavailable")?;
@@ -228,7 +220,6 @@ fn take_snapshot(task: &str, document: &str, action: Value) -> Result<(bool, Val
     Ok((desktop, input))
 }
 
-/// One capture of the display under control, or of the Misty window.
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Result<Value, String> {
     #[cfg(target_os = "macos")]

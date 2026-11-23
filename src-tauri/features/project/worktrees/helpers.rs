@@ -4,11 +4,6 @@
 
 use super::*;
 
-// ---------------------------------------------------------------------------
-// Pure helpers
-// ---------------------------------------------------------------------------
-
-/// Accepts "1842", "#1842", or a GitHub pull request link (anything after the number).
 pub fn parse_pr_input(input: &str) -> Option<u64> {
     let t = input.trim();
     let bare = t.strip_prefix('#').unwrap_or(t);
@@ -24,7 +19,6 @@ pub fn parse_pr_input(input: &str) -> Option<u64> {
     digits.parse::<u64>().ok().filter(|n| *n > 0)
 }
 
-/// "owner/repo" from a GitHub remote URL (https, ssh:// or scp style).
 pub fn github_owner_repo(url: &str) -> Option<String> {
     let path = if let Some(rest) = url.strip_prefix("git@github.com:") {
         rest
@@ -43,8 +37,6 @@ pub fn github_owner_repo(url: &str) -> Option<String> {
     Some(format!("{owner}/{repo}"))
 }
 
-/// Reads `git worktree list --porcelain`. The first block is the main checkout; `locked
-/// [reason]` and `prunable` lines follow the block they belong to.
 pub fn parse_worktree_porcelain(text: &str) -> Vec<WorktreeInfo> {
     let mut out: Vec<WorktreeInfo> = Vec::new();
     let mut cur: Option<WorktreeInfo> = None;
@@ -94,7 +86,6 @@ pub fn parse_worktree_porcelain(text: &str) -> Vec<WorktreeInfo> {
     out
 }
 
-/// A branch name made safe as one folder name: `feature/x` becomes `feature-x`.
 pub fn sanitize_dir_name(name: &str) -> String {
     let mut flat = String::new();
     let mut last_dash = false;
@@ -112,7 +103,6 @@ pub fn sanitize_dir_name(name: &str) -> String {
     flat.trim_start_matches('.').trim().to_string()
 }
 
-/// Where a repository's worktree for `branch` goes: `<parent>/<repo>-worktrees/<branch>`.
 pub fn worktree_path(repo: &Path, branch: &str) -> Result<PathBuf, String> {
     let name = sanitize_dir_name(branch);
     if name.is_empty() || name == "." || name == ".." || name.contains('\0') {
@@ -121,7 +111,6 @@ pub fn worktree_path(repo: &Path, branch: &str) -> Result<PathBuf, String> {
     Ok(worktrees_root(repo)?.join(name))
 }
 
-/// The folder that holds a repository's worktrees, beside it.
 pub(super) fn worktrees_root(repo: &Path) -> Result<PathBuf, String> {
     let parent = repo
         .parent()
@@ -157,7 +146,6 @@ pub(super) fn summarize_stderr(stderr: &str) -> String {
     }
 }
 
-/// The same rule as the Space folder commands: a Space key, or the personal one when empty.
 pub(super) fn space_key(space: &str) -> Result<String, String> {
     let key = space.trim();
     if key.len() > 200 || key.chars().any(char::is_control) {

@@ -50,7 +50,6 @@ fn newer_clis_sign_in_with_a_command_that_opens_the_browser() {
     assert_eq!((pi.then_type, pi.asks), (None, Asks::Nothing));
     let out = sign_in_plan("pi", Some("openai"), true, &found((1, 5, 2))).unwrap();
     assert_eq!(out.args, ["auth", "logout", "openai"]);
-    // GitHub Copilot's Enterprise question gets Return (github.com), then its page wants a code.
     let copilot = sign_in_plan("pi", Some("github-copilot"), false, &found((1, 6, 0))).unwrap();
     assert_eq!(copilot.then_type.as_deref(), Some(""));
     assert_eq!(copilot.asks, Asks::DeviceCode);
@@ -138,7 +137,6 @@ fn gemini_settings_get_only_the_sign_in_choice() {
         )),
         GoogleChoice::Chosen
     );
-    // Another way chosen, comments, or a `security` section of its own: left for `/auth`.
     for text in [
         r#"{"security":{"auth":{"selectedType":"gemini-api-key"}}}"#,
         r#"{"selectedAuthType":"vertex-ai"}"#,
@@ -165,11 +163,9 @@ fn engines_without_a_status_command_remember_a_sign_in() {
     ] {
         assert!(!remembers_sign_in(engine), "{engine}");
     }
-    // Ways of their own: a status command, settings, or nothing to sign in to.
     for engine in ["claude", "codex", "gemini", "qwen", "opencode", "dsh"] {
         assert_eq!(remembered_sign_in(engine), None, "{engine}");
     }
-    // Pi and Oh My Pi say it in their own stores.
     assert!(remembered_sign_in("pi").is_some());
 }
 
@@ -188,7 +184,6 @@ fn what_each_sign_in_asks_of_the_person() {
     assert_eq!(asked("opencode", None, false), Asks::Menu);
     assert_eq!(asked("hermes", None, false), Asks::Menu);
     assert_eq!(asked("hermes", None, true), Asks::Nothing);
-    // Signing out never takes a code.
     assert_eq!(asked("claude", None, true), Asks::Nothing);
     assert_eq!(asked("agy", None, true), Asks::Menu);
     assert_eq!(serde_json::to_value(Asks::Code).unwrap(), "code");
@@ -206,7 +201,6 @@ fn a_pasted_code_is_one_plain_line() {
     assert!(pasted_code("abc\u{1b}[A").is_err());
     assert!(pasted_code("abc\u{3}").is_err());
     assert!(pasted_code(&"x".repeat(4096)).is_err());
-    // An error never repeats what was pasted.
     let error = pasted_code("secret\ncode").unwrap_err();
     assert!(!error.contains("secret"));
 }

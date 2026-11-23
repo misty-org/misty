@@ -19,17 +19,13 @@ export function SpaceSetupCards({
   if (dismissed || !showInvitation || !isOwner) return null;
 
   return (
-    <Surface
-      tone="active"
-      radius="xl"
-      className="mx-4 mt-3 grid gap-3 overflow-hidden p-3 text-body"
-    >
+    <Surface tone="faint" radius="xl" className="mx-4 mt-3 grid gap-3 overflow-hidden p-3">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <Text tone="default" wrap className="m-0 text-sm font-medium">
+          <Text as="p" size="control" tone="default" weight="medium" wrap className="m-0">
             Your Space is ready
           </Text>
-          <Text tone="muted" wrap className="mb-0 mt-1 text-xs">
+          <Text as="p" size="meta" tone="muted" wrap className="mb-0 mt-1">
             Invite someone to chat, write docs, draw and share files here, with their agents.
           </Text>
         </div>
@@ -39,7 +35,7 @@ export function SpaceSetupCards({
           </IconButton>
         ) : null}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex gap-2">
         <Button asChild variant="secondary">
           <Link to={`/spaces/${encodeURIComponent(spaceId)}/settings/members?invite=1`}>
             <UserPlus /> Invite people

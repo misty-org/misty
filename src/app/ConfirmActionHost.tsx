@@ -8,12 +8,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@misty/ui";
-import { useConfirmRequest } from "@/shared/lib/confirmAction";
+import { useConfirmRequest } from "@/shared/lib/confirm_action";
 
-/**
- * Where `confirmAction` asks, mounted once at the app's root: Misty's own small dialog with the
- * question, then Cancel and Continue. Misty never asks through the system's panels.
- */
 export function ConfirmActionHost() {
   const request = useConfirmRequest((state) => state.request);
   if (!request) return null;

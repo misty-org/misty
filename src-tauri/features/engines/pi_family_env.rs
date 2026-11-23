@@ -45,9 +45,6 @@ impl SessionCache {
     }
 
     fn store(&mut self, fingerprint: &str, values: &BTreeMap<String, String>) {
-        // "Asked but not found" isn't kept: once the person adds the export, the next send must
-        // probe again. Each found value has its own timer, so a new variable can't extend an
-        // old key's life.
         if self.fingerprint != fingerprint {
             self.fingerprint = fingerprint.to_string();
             self.values.clear();
@@ -67,11 +64,19 @@ pub(crate) async fn apply(command: &mut Command, engine: &str) {
     let Some(path) = config_source(engine) else {
         return;
     };
-    let text = tokio::fs::read_to_string(path).await.unwrap_or_default();
+    let text = read_config_text(&path).await;
     let Some(probe) = login_probe() else {
         return;
     };
     inject_from_probe_cached(command, engine, &text, &probe, &CACHE).await;
+}
+
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the engine's own model config in place, which PI_CODING_AGENT_DIR may put outside the engine folders the gate grants"
+)]
+async fn read_config_text(path: &std::path::Path) -> String {
+    tokio::fs::read_to_string(path).await.unwrap_or_default()
 }
 
 async fn inject_from_probe_cached(
@@ -90,9 +95,6 @@ async fn inject_from_probe_cached(
         return;
     }
     let fingerprint = texts_fingerprint(&[engine, text, &probe.program.to_string_lossy()]);
-    // Take this send's snapshot before the await, so a concurrent send switching configs can't
-    // wipe this result. The lock isn't held across the await; without the cache it still probes
-    // and injects directly.
     let mut values = cache
         .lock()
         .ok()
@@ -142,8 +144,6 @@ fn collect_refs(engine: &str, text: &str) -> BTreeSet<String> {
 }
 
 fn collect_pi_value_refs(value: &serde_json::Value, refs: &mut BTreeSet<String>) {
-    // Parse the config before scanning strings, so comments, JSON escapes or neighboring fields
-    // can't disturb template boundaries.
     match value {
         serde_json::Value::String(text) => refs.extend(collect_env_refs(text)),
         serde_json::Value::Array(items) => {
@@ -171,7 +171,6 @@ fn collect_omp_env_refs(text: &str) -> BTreeSet<String> {
         .flat_map(|providers| providers.values())
         .filter_map(|provider| provider.get("apiKey"))
         .filter_map(serde_json::Value::as_str)
-        // OMP takes the whole string as the variable name: no trim, no $ expansion, no ! command.
         .filter(|key| is_valid_env_name(key))
         .map(ToOwned::to_owned)
         .collect()
@@ -179,7 +178,7 @@ fn collect_omp_env_refs(text: &str) -> BTreeSet<String> {
 
 fn collect_env_refs(text: &str) -> BTreeSet<String> {
     if text.starts_with('!') {
-        return BTreeSet::new(); // PI runs commands itself; shell expressions in them aren't templates.
+        return BTreeSet::new();
     }
     let chars: Vec<char> = text.chars().collect();
     let mut refs = BTreeSet::new();
@@ -191,7 +190,7 @@ fn collect_env_refs(text: &str) -> BTreeSet<String> {
         }
         index += 1;
         if matches!(chars.get(index), Some('$' | '!')) {
-            index += 1; // PI's $$ / $! escape to a literal $ / !.
+            index += 1;
             continue;
         }
         if chars.get(index) == Some(&'{') {
@@ -201,11 +200,8 @@ fn collect_env_refs(text: &str) -> BTreeSet<String> {
                 if is_valid_env_name(&name) {
                     refs.insert(name);
                 }
-                // With a closing brace, PI treats the whole invalid template as a literal, so
-                // its nested $ must not be probed.
                 index = end + 1;
             }
-            // Unclosed: consume only the $ and keep scanning, so later valid references survive.
             continue;
         }
         let start = index;
@@ -216,7 +212,6 @@ fn collect_env_refs(text: &str) -> BTreeSet<String> {
         if is_valid_env_name(&name) {
             refs.insert(name);
         }
-        // The unbraced form consumes only a valid name, so $KEY-suffix still collects KEY.
     }
     refs
 }
@@ -231,8 +226,6 @@ fn config_source(engine: &str) -> Option<PathBuf> {
 }
 
 fn texts_fingerprint(texts: &[&str]) -> String {
-    // FNV-1a: the engine, the config content and the shell path together key the cache, which
-    // never stores the config itself.
     let mut hash: u64 = 0xcbf29ce484222325;
     for text in texts {
         for byte in text.as_bytes() {
@@ -391,8 +384,6 @@ mod tests {
         )
         .await;
         assert_eq!(command_env(&first, key).as_deref(), Some("old-key"));
-        // Only the cache clock moves: no sleep and no change to the process environment, so
-        // parallel tests stay independent.
         cache.lock().unwrap().values.get_mut(key).unwrap().0 = Instant::now() - CACHE_TTL;
         let mut second = Command::new("pi");
         inject_from_probe_cached(

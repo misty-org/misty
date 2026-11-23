@@ -1,21 +1,15 @@
-import { type ShortcutCommandDefinition } from "@/shared/shortcuts/shortcutTypes";
+import { type ShortcutCommandDefinition } from "@/shared/shortcuts/shortcut_types";
 import type { ShortcutBindingSet } from "@/native/ipc";
 import { Button, IconButton, ShortcutField } from "@misty/ui";
 import { RotateCcw } from "lucide-react";
 import { DesktopSettingsRow } from "@/features/settings";
-import { settingsDisabledControlClass } from "../../settings/settingsConstants";
+import { settingsDisabledControlClass } from "../../settings/settings_constants";
 
-/** A shortcut that clashes with another command's, held until the person reassigns it. */
 export interface ShortcutConflict {
   message: string;
   onReassign: () => void;
 }
 
-/**
- * One command as a settings row: its name on the left, its shortcut in one ordinary field on the
- * right, recorded in place and cleared with its ×. A clash shows under the field with a Reassign
- * that moves the shortcut here.
- */
 export function ShortcutCommandRow(props: {
   definition: ShortcutCommandDefinition;
   binding: ShortcutBindingSet;

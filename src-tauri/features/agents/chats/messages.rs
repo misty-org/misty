@@ -1,9 +1,6 @@
-//! A chat's messages, paged for the transcript and saved one changed message at a time.
-
 use super::*;
 
 impl AgentChatsService {
-    /// One bounded window of messages, oldest to newest within the page.
     pub async fn messages_page(
         &self,
         account: String,
@@ -22,7 +19,6 @@ impl AgentChatsService {
         .map_err(|error| error.to_string())?
     }
 
-    /// Upserts only the changed message documents and removes messages discarded by a rewind.
     pub async fn upsert_messages(
         &self,
         account: String,
@@ -38,8 +34,12 @@ impl AgentChatsService {
             .into_iter()
             .map(|document| {
                 check_document(&document)?;
-                let value: Value = serde_json::from_str(&document).map_err(|_| "invalid_agent_chat")?;
-                let id = value["id"].as_str().filter(|id| valid_key(id)).ok_or("invalid_agent_chat")?;
+                let value: Value =
+                    serde_json::from_str(&document).map_err(|_| "invalid_agent_chat")?;
+                let id = value["id"]
+                    .as_str()
+                    .filter(|id| valid_key(id))
+                    .ok_or("invalid_agent_chat")?;
                 Ok((id.to_string(), value, document))
             })
             .collect::<Result<Vec<_>, String>>()?;

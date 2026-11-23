@@ -1,7 +1,7 @@
-import { observeAccountChanges } from "@/api/account-events";
-import { directAppsApi, type DirectConnection } from "../connected-apps/directApi";
-import { agentsDeviceSnapshot } from "./useAgentsStore";
-import type { AgentDeviceSnapshot } from "./agentScope";
+import { observeAccountChanges } from "@/api/account_events";
+import { directAppsApi, type DirectConnection } from "../connected-apps/direct_api";
+import { agentsDeviceSnapshot } from "./use_agents_store";
+import type { AgentDeviceSnapshot } from "./agent_scope";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, ListRow, ListRowSkeleton, Text, useNotice } from "@misty/ui";
 import { Cable, Layers } from "lucide-react";
@@ -9,7 +9,6 @@ import { useCallback, useEffect, useState } from "react";
 
 type AccessConnection = {
   id: string;
-  /** The app's catalog id, which also names its brand artwork. */
   app: string;
   name: string;
   status: string;
@@ -42,15 +41,9 @@ const toConnections = (apps: DirectConnection[]) =>
     detail: "Connected app",
   }));
 
-/** The last access each account showed this session, so reopening setup paints it at once. */
 const shownAccess = new Map<string, AccessSnapshot>();
 const lastAccess = (accountId: string) => shownAccess.get(accountId) ?? emptyAccess(accountId);
 
-/**
- * Read-only account access. Profile setup never silently grants new permissions.
- * Refreshes keep the last result on screen, and the saved connections paint before the fresh
- * ones; only a first load with nothing saved reports `loading`.
- */
 export function useAgentAccess(accountId: string, agentId = "") {
   const [state, setStateNow] = useState<AccessSnapshot>(() => lastAccess(accountId));
   const setState = useCallback((next: (previous: AccessSnapshot) => AccessSnapshot) => {
@@ -99,7 +92,6 @@ export function useAgentAccess(accountId: string, agentId = "") {
 }
 export type AgentAccessState = ReturnType<typeof useAgentAccess>;
 
-/** Agent setup's read-only summary of what every agent can use. */
 export function AgentAccess({
   access,
   onConnections,
@@ -115,7 +107,7 @@ export function AgentAccess({
   return (
     <div className="grid gap-5">
       <section aria-label="Context" className="grid gap-2">
-        <Text bare as="h3" tone="muted" className="text-xs font-medium">
+        <Text weight="medium" size="meta" bare as="h3" tone="muted">
           Context
         </Text>
         <div className="flex items-start gap-3 py-1">
@@ -123,13 +115,13 @@ export function AgentAccess({
             <Layers />
           </Text>
           <div>
-            <p className="text-sm">Your Misty account</p>
-            <Text bare as="p" tone="muted" className="mt-1 text-xs">
+            <p className="text-control">Your Misty account</p>
+            <Text size="meta" bare as="p" tone="muted" className="mt-1">
               Space access follows your account permissions.
             </Text>
           </div>
         </div>
-        <Text bare as="p" tone="muted" className="text-xs">
+        <Text size="meta" bare as="p" tone="muted">
           Connected apps belong to your account. Every agent can use them.
         </Text>
         {access.loading ? (
@@ -154,7 +146,7 @@ export function AgentAccess({
             />
           ))
         ) : !access.loading && !access.connectionsError ? (
-          <Text bare as="p" tone="muted" className="text-xs">
+          <Text size="meta" bare as="p" tone="muted">
             No tool connections.
           </Text>
         ) : null}

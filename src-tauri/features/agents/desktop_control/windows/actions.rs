@@ -1,9 +1,5 @@
-//! What Misty does in the app in front: press or focus the control under its
-//! cursor, scroll, fill a field, or type the named keys an action asks for.
 use super::*;
 
-/// Performs one validated action on the controlled display. Called on a
-/// worker thread, after the task, grant and one-use frame were checked.
 pub fn action(input: &Value) -> Result<Value, String> {
     let (app, display) = with(|control| {
         let live = !control.stopped
@@ -107,7 +103,6 @@ pub(super) fn editable(element: &Element) -> bool {
     matches!(element.role(), "Edit" | "ComboBox" | "Document")
 }
 
-/// Presses or focuses the control under a point, without the real pointer.
 pub(super) fn point_at(automation: &Automation, point: (f64, f64)) -> Result<Effect, String> {
     if is_misty_at(point) {
         return Err("That is Misty's own control. Never operate the control strip or Stop.".into());
@@ -135,8 +130,6 @@ pub(super) fn point_at(automation: &Automation, point: (f64, f64)) -> Result<Eff
     Err("That spot has no button or field Misty can use without the real pointer. Try a nearby labeled control.".into())
 }
 
-/// Scroll steps for a pixel delta: about one per wheel notch (120 pixels),
-/// at least one, at most 20, in the delta's direction.
 pub(super) fn steps(delta: i64) -> i32 {
     if delta == 0 {
         return 0;
@@ -176,7 +169,6 @@ pub(super) fn scroll_at(
     Err("Nothing at that point scrolls.".into())
 }
 
-/// Adds text to the field Misty focused. Password fields are refused.
 pub(super) fn type_text(automation: &Automation, text: &str) -> Result<Effect, String> {
     if text.chars().count() > 16000 {
         return Err("Invalid text.".into());
@@ -195,7 +187,6 @@ pub(super) fn type_text(automation: &Automation, text: &str) -> Result<Effect, S
     Ok(("appended", Some((field.role().to_owned(), field.name()))))
 }
 
-/// Types one named key into the app in front, which must not be Misty.
 pub(super) fn press_key(key: &str) -> Result<Effect, String> {
     let (code, control): (VIRTUAL_KEY, bool) = match key {
         "Enter" => (VK_RETURN, false),

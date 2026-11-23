@@ -3,19 +3,12 @@
 
 use super::*;
 
-// ---------------------------------------------------------------------------
-// Git
-// ---------------------------------------------------------------------------
-
 pub(super) struct GitOutput {
     pub(super) stdout: String,
     pub(super) stderr: String,
     pub(super) success: bool,
 }
 
-/// Runs `git -C <repo> <args>` to the end, reading both pipes so a chatty fetch can't fill one
-/// and stall. With `cancel`, the process and its helpers (ssh) are killed when the person
-/// cancels, and the second value says so.
 pub(super) async fn run_git(
     repo: &Path,
     args: &[&str],
@@ -99,8 +92,6 @@ pub(super) fn open_repo(path: &Path) -> Result<git2::Repository, String> {
     })
 }
 
-/// The main checkout of the repository `folder` is in. A linked worktree's main checkout is the
-/// folder its common Git directory belongs to.
 pub(super) fn main_checkout(folder: &Path) -> Result<PathBuf, String> {
     let repo = open_repo(folder)?;
     let common = repo.commondir().to_path_buf();
@@ -113,7 +104,6 @@ pub(super) fn main_checkout(folder: &Path) -> Result<PathBuf, String> {
     file_access::fs::canonicalize(&main).map_err(|error| error.to_string())
 }
 
-/// Locals first, then remote-tracking branches; `origin/HEAD` is an alias, not a branch.
 pub(super) fn list_branches(repo: &git2::Repository) -> Vec<BranchInfo> {
     let mut out = Vec::new();
     for kind in [git2::BranchType::Local, git2::BranchType::Remote] {
@@ -150,7 +140,6 @@ pub(super) fn current_branch(repo: &git2::Repository) -> Option<String> {
     })
 }
 
-/// A worktree's uncommitted files (the first two named) and unpushed commits.
 pub(super) fn worktree_changes(path: &Path) -> (Option<usize>, Vec<String>, Option<usize>) {
     let Ok(repo) = git2::Repository::open(path) else {
         return (None, Vec::new(), None);
@@ -179,7 +168,6 @@ pub(super) fn worktree_changes(path: &Path) -> (Option<usize>, Vec<String>, Opti
     (changed, samples, ahead)
 }
 
-/// The remote part of a ref like "origin/main", when "origin" is a real remote.
 pub(super) fn split_remote<'a>(
     repo: &git2::Repository,
     base: &'a str,
@@ -195,8 +183,6 @@ pub(super) fn split_remote<'a>(
     None
 }
 
-/// Tidies up after a failed or cancelled `worktree add`: the half-made checkout and its
-/// registration go; branch refs stay, since they are harmless and may be wanted.
 pub(super) async fn cleanup_partial_add(repo: &Path, target: &Path) {
     if file_access::fs::exists(target) {
         let target = target.to_string_lossy().into_owned();
@@ -205,8 +191,6 @@ pub(super) async fn cleanup_partial_add(repo: &Path, target: &Path) {
     let _ = run_git(repo, &["worktree", "prune"], None).await;
 }
 
-/// A new branch is made with `--no-track`, so its first push would need `-u`. Set the
-/// repository's default once, only where the person configured nothing at any level.
 pub(super) async fn ensure_push_auto_setup(repo: &Path) {
     let unset = match run_git(repo, &["config", "--get", "push.autoSetupRemote"], None).await {
         Ok((out, _)) => !out.success || out.stdout.trim().is_empty(),
@@ -217,10 +201,8 @@ pub(super) async fn ensure_push_auto_setup(repo: &Path) {
     }
 }
 
-/// libgit2's `GIT_INDEX_ENTRY_SKIP_WORKTREE`: tracked, but left out of the working folder.
 pub(super) const INDEX_ENTRY_SKIP_WORKTREE: u16 = 1 << 14;
 
-/// Every indexed path is skip-worktree: sparse-checkout rules left the new worktree empty.
 pub(super) fn worktree_is_empty_checkout(path: &Path) -> bool {
     let Ok(repo) = git2::Repository::open(path) else {
         return false;

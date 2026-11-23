@@ -2,4 +2,4 @@
 // See NOTICE.
 
 export { PromptsSection } from "./PromptsSection";
-export { matchPrompts, promptsFor } from "./promptStore";
+export { matchPrompts, promptsFor } from "./prompt_store";

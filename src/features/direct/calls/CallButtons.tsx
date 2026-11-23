@@ -1,12 +1,8 @@
 import { useEffect } from "react";
 import { Phone, Video } from "lucide-react";
 import { Button, IconButton } from "@misty/ui";
-import { useCallStore, useCallsAvailable } from "./callStore";
+import { useCallStore, useCallsAvailable } from "./call_store";
 
-/**
- * Voice call and Video call in a DM's bar. They show only once the server offers calls and this
- * computer can encrypt them end to end; starting one rings the DM's other people, then joins.
- */
 export function CallButtons({ dmId }: { dmId: string }) {
   const available = useCallsAvailable();
   const inCall = useCallStore((state) => Boolean(state.active));
@@ -25,7 +21,6 @@ export function CallButtons({ dmId }: { dmId: string }) {
   );
 }
 
-/** Call, as a button under a DM's opening: a voice call, shown only where calls can be made. */
 export function CallButton({ dmId }: { dmId: string }) {
   const available = useCallsAvailable();
   const inCall = useCallStore((state) => Boolean(state.active));

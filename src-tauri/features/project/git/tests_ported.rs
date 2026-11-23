@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 
 use git2::Repository;
 
-/// A scratch folder named `misty-*` in the temp folder, which the file gate always reaches.
 pub(super) struct Scratch(pub(super) PathBuf);
 
 impl Scratch {
@@ -49,8 +48,6 @@ pub(super) fn commit_file(repo: &Repository, relative: &str, content: &str) {
     .unwrap();
 }
 
-/// A clone with `core.autocrlf` pinned off before its checkout, so a global `autocrlf=true`
-/// can't make an untouched file read as changed.
 pub(super) fn clone_lf(origin: &Path, into: &Path) -> Repository {
     let mut builder = git2::build::RepoBuilder::new();
     builder.with_checkout(git2::build::CheckoutBuilder::new());

@@ -4,16 +4,10 @@ import { Badge, Button, IconButton, SideCard, Text } from "@misty/ui";
 import type { AgentProfile } from "@/shared/schemas";
 import { useSpacesDirectory } from "@/features/app-windows";
 import { AgentAvatar } from "../personal/AgentAvatar";
-import { mistyEngine, useEnginesList } from "../engines/enginesApi";
+import { mistyEngine, useEnginesList } from "../engines/engines_api";
 
 const madeOn = new Intl.DateTimeFormat(undefined, { dateStyle: "medium" });
 
-/**
- * Who the chat is with, as Discord shows a direct message's profile: a narrow card beside the
- * chat, only as tall as it needs. The agent's face, its name with the Agent tag, one line of its
- * engine and home Space, what it is for, when it was made, and Edit agent, which opens its
- * settings. Its instructions stay in those settings.
- */
 export function AgentProfileCard(props: { agent: AgentProfile; onClose(): void }) {
   const { agent } = props;
   const [, setParams] = useSearchParams();

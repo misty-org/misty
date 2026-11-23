@@ -22,40 +22,20 @@ use tokio::process::Command;
 use tokio::process::{Child, ChildStderr, ChildStdout};
 use tokio::sync::Mutex as TokioMutex;
 
-/// Grace between a Stop kill and force-aborting the reader task. A healthy
-/// settle (kill → EOF → wait → terminal event) finishes in milliseconds;
-/// the abort only fires when a killed child still won't die and the reader
-/// would otherwise park on `wait()` forever.
 pub(crate) const READER_SETTLE_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
-/// Silence timeout for draining the stdout pipe after the child exits. The
-/// bytes the CLI wrote before dying are already buffered by the OS, so a
-/// read either completes immediately or never will: a background
-/// grandchild that inherited the pipe keeps it open with nothing to say.
-/// Bounded by silence rather than EOF, the reader settles the run instead
-/// of parking on the grandchild forever (which leaked the run's registry
-/// entries — ps shows no process, yet the concurrency gate stays full).
 pub(crate) const POST_EXIT_DRAIN: std::time::Duration = std::time::Duration::from_millis(200);
-/// Hard cap on one NDJSON line from an engine. Real events are kilobytes;
-/// `BufReader::lines` has no limit, so a runaway engine writing without
-/// newlines would buffer the line whole and OOM the host.
 pub(crate) const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
-/// Stdin payload writer: engines consuming stream-json stdin get the payload,
-/// then EOF (drop closes the pipe) — unless `keep_open`, where the handle is
-/// returned instead so control responses can follow on the same pipe.
 pub(crate) fn spawn_stdin_writer(
     child: &mut Child,
     payload: Option<String>,
     keep_open: bool,
 ) -> Option<Arc<TokioMutex<Option<tokio::process::ChildStdin>>>> {
     if !keep_open {
-        let Some(payload) = payload else {
-            return None;
-        };
+        let payload = payload?;
         if let Some(mut stdin) = child.stdin.take() {
             tokio::spawn(async move {
                 let _ = stdin.write_all(payload.as_bytes()).await;
                 let _ = stdin.write_all(b"\n").await;
-                // drop closes stdin -> EOF
             });
         }
         return None;
@@ -73,7 +53,6 @@ pub(crate) fn spawn_stdin_writer(
     }
     Some(keep)
 }
-/// Diagnostics ring: keeps the last 4KB for the error banner.
 pub(crate) fn ring_push(buf: &Arc<Mutex<String>>, text: &str) {
     const CAP: usize = 4096;
     let mut guard = match buf.lock() {
@@ -82,9 +61,6 @@ pub(crate) fn ring_push(buf: &Arc<Mutex<String>>, text: &str) {
     };
     guard.push_str(text);
     if guard.len() > CAP {
-        // drain panics on a non-char-boundary start — snap forward. The old
-        // stderr ring could panic mid-CJK here, silently killing the
-        // capture task and starving the error banner of the failure text.
         let mut keep = guard.len() - CAP;
         while !guard.is_char_boundary(keep) {
             keep += 1;
@@ -92,7 +68,6 @@ pub(crate) fn ring_push(buf: &Arc<Mutex<String>>, text: &str) {
         guard.drain(..keep);
     }
 }
-/// Stderr capture ring: keeps the last 4KB for the error banner.
 pub(crate) fn spawn_stderr_capture(stderr: ChildStderr) -> Arc<Mutex<String>> {
     let buf = Arc::new(Mutex::new(String::new()));
     let target = Arc::clone(&buf);
@@ -109,10 +84,7 @@ pub(crate) fn spawn_stderr_capture(stderr: ChildStderr) -> Arc<Mutex<String>> {
     });
     buf
 }
-// ==================== stderr redaction ====================
 
-/// Engine stderr can echo the channel credentials from the CLI's own config files; redact credential
-/// shapes before the tail is shown to the user in an error banner.
 pub(super) fn redact_secrets(text: &str) -> String {
     use std::sync::LazyLock;
     static PATTERNS: LazyLock<Vec<regex::Regex>> = LazyLock::new(|| {
@@ -132,33 +104,19 @@ pub(super) fn redact_secrets(text: &str) -> String {
     }
     out
 }
-/// Mutable per-run streaming state shared by the reader loop's dispatch.
 pub(crate) struct TurnState {
     seq: u64,
     pub(crate) native_session_id: Option<String>,
     pub(crate) saw_done: bool,
     pub(crate) saw_error: bool,
     attempt_error: Option<String>,
-    // TurnState lives for the whole process (one run_reader per
-    // spawn), so once saw_error is set every later event in this process
-    // is suppressed. That is correct for the current one-process-per-turn
-    // engines (omp --print, codex exec); a future multi-turn-per-process
-    // engine must reset this per turn instead.
     saw_any_output: bool,
     pending_terminal: Option<(String, Value)>,
     exit_confirmed: bool,
-    /// Start of the model-generation window currently open, if any.
     gen_open_since: Option<Instant>,
-    /// The open window was opened by an explicit start marker
-    /// (`Generation{active:true}`), so only an explicit end / usage report
-    /// may close it — tool rows stream inside such a response.
     gen_explicit: bool,
-    /// Generation milliseconds closed but not yet attached to a usage report.
     gen_ms: u64,
-    /// Background tasks the CLI reported as still running.
     pending_background_tasks: usize,
-    /// `done` went out while a background task was still running and the CLI
-    /// is kept alive: its self-started follow-up turn is still to come.
     awaiting_followup: bool,
 }
 impl TurnState {
@@ -191,7 +149,6 @@ impl TurnState {
         self.push_meta(sink, run_id, engine_id, kind, data, None)
     }
 
-    /// Push a usage/done report carrying the measured generation window.
     fn push_with_gen_ms(
         &mut self,
         sink: &Arc<event_sink::EventSink>,
@@ -229,26 +186,17 @@ impl TurnState {
             "seq": self.seq,
             "kind": kind,
             "data": data,
-            // Emit-side timestamp (Unix ms): plugins compute throughput from
-            // consecutive reports; arrival time would add IPC batching jitter.
             "ts": std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0),
         });
         if let Some(gen_ms) = gen_ms {
-            // Measured generation window (stream open → close, tool execution
-            // excluded) for the report that just landed. Absent on every
-            // report the host could not time; consumers fall back to
-            // consecutive-report timing in that case.
             payload["genMs"] = Value::from(gen_ms);
         }
         sink.push(payload);
     }
 
-    /// Mark the model as generating: opens the window when none is open.
-    /// `explicit` records an engine-provided start marker (message_start),
-    /// which only an explicit end or a usage report may close.
     fn gen_begin(&mut self, explicit: bool) {
         if self.gen_open_since.is_none() {
             self.gen_open_since = Some(Instant::now());
@@ -256,7 +204,6 @@ impl TurnState {
         }
     }
 
-    /// Close the open window, accumulating its span.
     fn gen_end(&mut self) {
         if let Some(since) = self.gen_open_since.take() {
             self.gen_ms += since.elapsed().as_millis() as u64;
@@ -264,9 +211,6 @@ impl TurnState {
         self.gen_explicit = false;
     }
 
-    /// Close the open window and consume the accumulated span as this
-    /// report's `genMs`. None when nothing measurable was collected, so the
-    /// consumer keeps its report-to-report fallback.
     fn take_gen_ms(&mut self) -> Option<u64> {
         self.gen_end();
         let ms = std::mem::take(&mut self.gen_ms);
@@ -280,29 +224,14 @@ impl TurnState {
         }
     }
 }
-/// Event-routing core shared by process runs ([`RunContext`]) and virtual
-/// host-stream runs ([`dsh_session::run_host_turn`]): the fields
-/// `dispatch_event` needs to route engine events to the UI sink and keep the
-/// registry's session aliasing in step.
 pub(crate) struct TurnCore {
     pub(crate) sink: Arc<event_sink::EventSink>,
     pub(crate) registry: Arc<ProcessRegistry>,
     pub(crate) engine_id: String,
     pub(crate) run_id: String,
-    /// The plan review store: plan events are written as they arrive (engine/plan_review.rs).
-    /// None inside drivers and tests that have no db handle; those paths raise no plan events.
     pub(crate) db: Option<Arc<crate::engines::support::db::Db>>,
-    /// Launch settings of a chat run eligible for background-follow-up
-    /// parking (`Some` only for chat-sink claude runs). `None` — plugin
-    /// turns, other engines, tests — keeps the old settle behavior:
-    /// stdin closes at `done` and the process exits instead of idling.
     pub(crate) followup: Option<FollowupPrefs>,
 }
-/// A parked plan review dies with its run: the native request is no longer valid, so the
-/// record expires and PlanReviewSettled goes out, and no view may pretend it can still be
-/// approved. Host-transport drivers (dsh/grok/qoder/codex/omp-acp) call this once per
-/// registered key in their own settle step, matching run_reader's. Paths without a db handle
-/// raise no plan events, so their plans are always empty.
 pub(crate) fn expire_parked_plans(core: &TurnCore, state: &mut TurnState, key: &str) {
     let Some(db) = &core.db else {
         return;
@@ -328,8 +257,6 @@ pub(crate) fn expire_parked_plans(core: &TurnCore, state: &mut TurnState, key: &
 }
 
 impl TurnCore {
-    /// Adopt a native session id: rekey the registry entry (no overwrite) and
-    /// remember it for subsequent event payloads.
     fn adopt_session_id(&self, state: &mut TurnState, id: &str, announce: bool) {
         if state.native_session_id.as_deref() == Some(id) {
             return;
@@ -348,16 +275,9 @@ impl TurnCore {
     }
 
     pub(crate) fn dispatch_event(&self, state: &mut TurnState, event: EngineEvent) {
-        // Terminal state is monotonic, even if a CLI or its usage tail emits
-        // more data before exiting: no late retry/content/warn event may
-        // revive a settled run. The one exception is SessionId — a done that
-        // raced the CLI's session announcement must still rekey/announce, or
-        // the conversation strands under its provisional key.
         if (state.saw_done || state.saw_error) && !matches!(event, EngineEvent::SessionId(_)) {
             return;
         }
-        // The CLI's follow-up turn (after a background task) streams under a
-        // run the UI already settled: tell it to reopen the run first.
         if state.awaiting_followup
             && matches!(
                 event,
@@ -396,7 +316,6 @@ impl TurnCore {
                 )
             }
             EngineEvent::Generation { active } => {
-                // Internal marker: never streamed, only folded into genMs.
                 if active {
                     state.gen_begin(true);
                 } else {
@@ -413,12 +332,6 @@ impl TurnCore {
                 patch,
                 tool_call_id,
             } => {
-                // A tool row opening (or its arg patch), or a completed
-                // assistant snapshot (codex/kimi report whole messages), ends
-                // the response stream that preceded it. Windows opened by an
-                // explicit start marker keep running: claude streams tool
-                // arguments inside the same response and closes it at
-                // message_stop.
                 let response_end = role == "assistant" || (role == "tool" && result.is_none());
                 if response_end && !state.gen_explicit {
                     state.gen_end();
@@ -438,9 +351,6 @@ impl TurnCore {
                 if let Some(result) = result {
                     payload["result"] = result;
                 }
-                // The engine's own call id, when it reported one: the
-                // frontend pairs a result with its call on this rather than
-                // on the tool name, which collides across parallel calls.
                 if let Some(tool_call_id) = tool_call_id {
                     payload["toolCallId"] = Value::String(tool_call_id);
                 }
@@ -479,26 +389,11 @@ impl TurnCore {
                     "error",
                     Value::String(plain_error_text(error)),
                 );
-                // The turn failed terminally: the frontend settles (send
-                // button back to idle) on this event, so a still-running
-                // CLI process would keep burning tokens invisibly while the
-                // UI claims the session ended. Kill the process tree now —
-                // the killed flag makes the runner's EOF path a no-op
-                // (saw_error already settled the turn) and the registry
-                // entry drains as usual.
-                //
-                // Off the reader thread: the kill blocks on the Windows tree
-                // walk, and stalling this task would also stall the stdout
-                // drain it owns. saw_error already settled the turn, so
-                // nothing here depends on the kill completing first.
                 let registry = Arc::clone(&self.registry);
                 let run_id = self.run_id.clone();
                 tokio::task::spawn_blocking(move || registry.kill(&run_id));
             }
             EngineEvent::Compaction { active, reason } => {
-                // Not terminal: compaction is a mid-turn pause while the CLI
-                // summarizes; the UI swaps its status label until the end
-                // event (or turn settle) clears it.
                 state.gen_end();
                 state.push(
                     &self.sink,
@@ -509,8 +404,6 @@ impl TurnCore {
                 );
             }
             EngineEvent::Warn(error) => {
-                // Not terminal: no saw_error — EOF settle still decides the
-                // turn's fate if the CLI gives up after this notice.
                 state.gen_end();
                 state.push(
                     &self.sink,
@@ -525,10 +418,6 @@ impl TurnCore {
                 max,
                 message,
             } => {
-                // Not terminal: the CLI is backing off and will re-issue the
-                // request. The frontend renders it as live progress in the
-                // run status line (not as an error banner) and clears it on
-                // the next content event.
                 state.gen_end();
                 state.push(
                     &self.sink,
@@ -544,8 +433,6 @@ impl TurnCore {
                 message,
                 tool_use_id,
             } => {
-                // Not terminal either: the CLI works around the denial and
-                // the turn continues — the UI offers the grant alongside.
                 state.gen_end();
                 state.push(
                     &self.sink,
@@ -565,9 +452,6 @@ impl TurnCore {
                 tool_use_id,
                 input,
             } => {
-                // Park the ask: the answer command rebuilds updatedInput from
-                // this exact input (the control protocol wants the full tool
-                // input back, with the answers merged in).
                 state.gen_end();
                 if let Some(entry) = self.registry.get(&self.run_id) {
                     if let Ok(mut questions) = entry.questions.lock() {
@@ -598,7 +482,6 @@ impl TurnCore {
                 text,
                 replace,
             } => {
-                // A draft is only a preview: never stored as a reviewable revision, never approvable.
                 state.push(
                     &self.sink,
                     &self.run_id,
@@ -613,17 +496,11 @@ impl TurnCore {
             }
             EngineEvent::PlanReviewReady { record, context } => {
                 state.gen_end();
-                // Stored and sent as awaiting_review only with the full body and a confirmed
-                // wait point; the native reply context stays in the native registry and never
-                // rides the event payload.
                 let mut record = *record;
                 if let Some(db) = &self.db {
                     match plan_review::record_review(db, &record) {
                         Ok(revision) => record.revision = revision,
                         Err(error) => {
-                            // A plan that can't be stored can't pretend to be reviewable: settle
-                            // as an error, park no native context, let the wait point die with
-                            // the run.
                             self.dispatch_event(
                                 state,
                                 EngineEvent::Error(format!(
@@ -634,13 +511,6 @@ impl TurnCore {
                         }
                     }
                 }
-                // next_turn (Codex) has no live native request: the plan turn ended normally
-                // and approval starts a new turn. Its review metadata lives on the record
-                // (session_id = thread, native_plan_id = item, content_hash), so nothing is
-                // parked; otherwise it would expire as the run ends and could never be
-                // approved. Only native_request parks, in the shape respond_plan_review reads:
-                // {revision, route, frames, ...} flat at the top level. The context is the
-                // adapter's object; native code injects `revision`, which adapters must not use.
                 if record.review_kind == plan_review::PlanReviewKind::NativeRequest {
                     if let Some(entry) = self.registry.get(&self.run_id) {
                         if let Ok(mut plans) = entry.plans.lock() {
@@ -693,9 +563,6 @@ impl TurnCore {
                 );
             }
             EngineEvent::AgentSettled => {
-                // The same as a one-shot run's EOF settle (see finalize below): an attempt
-                // error that wasn't recovered settles as Error, otherwise Done. Done closes
-                // stdin, the rpc process drains and exits, and the EOF settle finds saw_done.
                 let event = match state.attempt_error.take() {
                     Some(error) => EngineEvent::Error(error),
                     None => EngineEvent::Done {
@@ -724,8 +591,6 @@ impl TurnCore {
                 tool_name,
                 input,
             } => {
-                // Misty's gate decides under the run's mode and the answer goes back on the same
-                // pipe. Best effort: if the pipe is gone the CLI is already dead.
                 state.gen_end();
                 crate::engines::gate::answer_control_permission(
                     Arc::clone(&self.registry),
@@ -736,11 +601,6 @@ impl TurnCore {
                 );
             }
             EngineEvent::ElicitationDecline { request_id } => {
-                // No elicitation form in this client: decline in place so the
-                // MCP tool call settles with a declined result instead of
-                // parking the turn forever (issue #1432). The reply is an MCP
-                // elicitation result (`action`), not a permission decision
-                // (`behavior`). Best effort, same as the deny above.
                 let registry = Arc::clone(&self.registry);
                 let run_id = self.run_id.clone();
                 let line = serde_json::json!({
@@ -760,10 +620,6 @@ impl TurnCore {
                 request_id,
                 subtype,
             } => {
-                // Unknown control_request subtype: reply with an error so the
-                // CLI is not left parked on a response that never comes (the
-                // official SDK's fallback for unsupported subtypes). Best
-                // effort, same as the deny above.
                 let registry = Arc::clone(&self.registry);
                 let run_id = self.run_id.clone();
                 let line = serde_json::json!({
@@ -849,8 +705,6 @@ impl TurnCore {
                 );
             }
             EngineEvent::McpServers { servers, tools } => {
-                // Not a chat event: the MCP settings page reads this snapshot
-                // (workspace-scoped, timestamped) instead of the stream.
                 crate::engines::support::mcp::record_from_run(
                     &self.run_id,
                     state.native_session_id.as_deref(),
@@ -888,13 +742,6 @@ impl TurnCore {
                 });
                 let warm = park_prefs.is_some() && !background;
                 if let Some(prefs) = park_prefs {
-                    // A background task is still running: the CLI opens a
-                    // follow-up turn by itself when it finishes. Settle the
-                    // visible turn now so the UI is usable, but keep stdin and
-                    // the reader alive (saw_done stays false) so that turn is
-                    // still received; `turn_resumed` reopens the run for it.
-                    // Misty: with none running, a chat's process stays warm the same way, so its
-                    // next message is written into it instead of starting the CLI again.
                     state.awaiting_followup = true;
                     if let Some(id) = state.native_session_id.as_deref() {
                         if warm {
@@ -918,8 +765,6 @@ impl TurnCore {
                     state.awaiting_followup = false;
                     self.registry.clear_awaiting_followup(&self.run_id);
                     crate::engines::support::mcp::mark_run_ended(&self.run_id);
-                    // The turn is over: EOF the interactive stdin so the CLI
-                    // exits instead of waiting for a next message forever.
                     self.registry.close_stdin(&self.run_id);
                 }
                 state.push_with_gen_ms(
@@ -934,12 +779,10 @@ impl TurnCore {
         }
     }
 }
-/// Everything the stdout reader task needs (moved in at spawn).
 pub(crate) struct RunContext {
     pub(crate) core: TurnCore,
     pub(crate) engine_impl: Box<dyn Engine>,
     pub(crate) pid: u32,
-    /// Session id fixed before spawn (grok `-s`); seeds TurnState.
     pub(crate) preassigned_session_id: Option<String>,
     pub(crate) initial_model: Option<String>,
     pub(crate) comparison_model: Option<Option<String>>,
@@ -947,31 +790,14 @@ pub(crate) struct RunContext {
     pub(crate) child: Arc<TokioMutex<Child>>,
     pub(crate) killed: Arc<std::sync::atomic::AtomicBool>,
     pub(crate) cleanup_files: Vec<PathBuf>,
-    /// omp computer-use workspace injection; restored with the same
-    /// lifetime as cleanup_files (every exit path funnels through here).
     pub(crate) stderr_buf: Arc<Mutex<String>>,
-    /// Off-protocol stdout lines (plain text from CLI startup failures,
-    /// wrapper errors, node crashes): parse_line drops non-JSON lines, so
-    /// without this ring a failed run with empty stderr surfaces as a bare
-    /// "exited with status" banner.
     pub(crate) stdout_plain_buf: Arc<Mutex<String>>,
-    /// Kill-on-close job guard: drops with this context at settle, sweeping
-    /// any grandchild the CLI orphaned (Windows pwsh.exe/conhost.exe).
     #[cfg(windows)]
     pub(crate) _tree_guard: Option<Arc<job::KillOnCloseJob>>,
 }
 impl Drop for RunContext {
     fn drop(&mut self) {
-        // Also runs when the reader is aborted during interrupt or shutdown.
         cleanup_staged_files(&self.cleanup_files);
-        // Last line of defence for the run's concurrency slot. The settle
-        // path removes keys by name and `kill`'s abort backstop drains them
-        // by run id, but a reader that dies any other way (a panic inside
-        // dispatch, a task dropped without either path running) never
-        // reaches those — and nothing sweeps dead pids, so the slot would
-        // stay pinned until app exit and sending would eventually wedge on
-        // "too many concurrent runs". Idempotent: on a healthy settle the
-        // keys are already gone and this finds nothing.
         self.core
             .registry
             .remove_run_if_pid(&self.core.run_id, self.pid);
@@ -982,9 +808,6 @@ impl RunContext {
         self.core.dispatch_event(state, event);
     }
 }
-/// An engine's error as the person reads it. Some CLIs pass the provider's raw JSON reply on as
-/// their message (Codex: `{"type":"error","status":400,"error":{"message":"The 'x' model is not
-/// supported…"}}`): its own message is what the chat shows. Anything else is kept as it came.
 pub(crate) fn plain_error_text(error: String) -> String {
     let trimmed = error.trim();
     if !trimmed.starts_with('{') {
@@ -1002,11 +825,6 @@ pub(crate) fn plain_error_text(error: String) -> String {
         .unwrap_or(error)
 }
 
-/// Abort-safe registry cleanup for virtual (host-stream) runs, which own no
-/// [`RunContext`]: their settle code sits at the end of the transport task,
-/// so an abort (`kill`'s force-abort, shutdown) or a panic inside the turn
-/// would strand their keys and pin a concurrency slot until app exit. Held
-/// by the task for its whole life; idempotent on a healthy settle.
 pub(crate) struct VirtualRunGuard {
     registry: Arc<ProcessRegistry>,
     run_id: String,
@@ -1030,11 +848,6 @@ impl Drop for VirtualRunGuard {
     }
 }
 
-/// Remove leftover staging dirs (`claude-staging`/`grok-staging`/
-/// `codex-plan-staging`/`codebuddy-staging` under app_home) from a crashed
-/// run: they hold per-send credentials and must not linger on disk. Live runs
-/// recreate them per send, so sweeping at startup is safe. Only these known
-/// names are touched.
 pub fn sweep_staging_dirs() {
     let home = crate::engines::support::paths::app_home();
     for name in [
@@ -1044,8 +857,8 @@ pub fn sweep_staging_dirs() {
         "codebuddy-staging",
     ] {
         let dir = home.join(name);
-        if dir.exists() {
-            if let Err(error) = std::fs::remove_dir_all(&dir) {
+        if file_access::fs::exists(&dir) {
+            if let Err(error) = file_access::fs::remove_dir_all(&dir) {
                 eprintln!(
                     "[engine] failed to sweep staging dir {}: {error}",
                     dir.display()
@@ -1056,10 +869,10 @@ pub fn sweep_staging_dirs() {
 }
 pub(crate) fn cleanup_staged_files(paths: &[PathBuf]) {
     for path in paths {
-        let result = if path.is_dir() {
-            std::fs::remove_dir_all(path)
+        let result = if file_access::fs::is_dir(path) {
+            file_access::fs::remove_dir_all(path)
         } else {
-            std::fs::remove_file(path)
+            file_access::fs::remove_file(path)
         };
         if let Err(error) = result {
             if error.kind() != std::io::ErrorKind::NotFound {
@@ -1071,26 +884,11 @@ pub(crate) fn cleanup_staged_files(paths: &[PathBuf]) {
         }
     }
 }
-/// One line read from the engine's stdout, size-capped.
 pub(crate) enum LineRead {
-    /// A complete line, newline terminator stripped (may be empty).
     Line(Vec<u8>),
-    /// Clean EOF.
     Eof,
-    /// No newline within MAX_LINE_BYTES: the run must be torn down.
     TooLong,
 }
-/// Cancellation-safe replacement for `BufReader::lines().next_line()` with a
-/// hard byte cap: partial bytes live in the caller-owned `line`, and the
-/// only await is `fill_buf`, so a `tokio::select!` tick landing mid-line
-/// consumes and drops nothing — the property the old code relied on
-/// `next_line` for (a cancelled `read_line` would lose the partial bytes).
-/// Resuming the buffer is the whole point: a `line.clear()` here wiped the
-/// bytes a cancelled call had already consumed from the reader, so a tick
-/// landing mid-line truncated that line (a long `item.completed` parsed as
-/// broken JSON and was dropped). The caller hands back the same buffer every
-/// call, and `mem::take` empties it on a complete line while Eof/TooLong end
-/// the run, so this only ever appends.
 pub(crate) async fn read_line_capped(
     reader: &mut BufReader<ChildStdout>,
     line: &mut Vec<u8>,
@@ -1101,7 +899,6 @@ pub(crate) async fn read_line_capped(
             return Ok(if line.is_empty() {
                 LineRead::Eof
             } else {
-                // EOF mid-line: deliver the partial line, like next_line.
                 LineRead::Line(std::mem::take(line))
             });
         }
@@ -1114,17 +911,12 @@ pub(crate) async fn read_line_capped(
         }
         line.extend_from_slice(&available[..end]);
         let has_newline = end < available.len();
-        // Consume the newline too when present. No await between extend and
-        // consume, so cancellation cannot split the pair.
         reader.consume(end + usize::from(has_newline));
         if has_newline {
             return Ok(LineRead::Line(std::mem::take(line)));
         }
     }
 }
-/// `{model?, effort?}` for the launch/served selection events. Absent sides
-/// are omitted, not nulled: a sparse report must never read as an
-/// authoritative empty one.
 fn selection_payload(model: Option<String>, effort: Option<String>) -> Value {
     let mut out = serde_json::Map::new();
     if let Some(model) = model.filter(|m| !m.trim().is_empty()) {
@@ -1135,13 +927,8 @@ fn selection_payload(model: Option<String>, effort: Option<String>) -> Value {
     }
     Value::Object(out)
 }
-/// Read NDJSON stdout until EOF, dispatch events, then settle the turn:
-/// registry cleanup, temp-file cleanup, and the terminal done/error event.
 pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
     let mut state = TurnState::new(ctx.preassigned_session_id.clone());
-    // The launch selection is one `launch` event, not `model`/`effort`
-    // reports: the response check compares it against what the stream later
-    // reports as served, and neither side may be read as the other.
     if ctx.initial_model.is_some() || ctx.initial_effort.is_some() {
         ctx.dispatch_event(
             &mut state,
@@ -1153,37 +940,14 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
             },
         );
     }
-    // codex reports usage into its own session log instead of the stdout
-    // stream (the stream only carries it with `turn.completed`), so a long
-    // turn would otherwise show nothing until it ended. Poll that log
-    // alongside the stream once the thread id is known. `read_line_capped`
-    // is what makes the select safe: partial bytes stay in the caller-owned
-    // buffer across polls, so a tick landing mid-line consumes and drops
-    // nothing, and one runaway line can't grow without bound.
     let mut reader = BufReader::new(stdout);
     let mut line_buf = Vec::new();
     let is_codex = ctx.core.engine_id == "codex";
     let mut usage_tail: Option<codex_usage::UsageTail> = None;
-    // Only the stream's own thread id (thread.started) may open the log: a
-    // resumed run's preassigned id can name a thread the CLI is no longer
-    // writing to, and tailing that file would miss this run's reports.
     let mut stream_session_id = false;
-    // The CLI writes the rollout at thread start, so the open normally
-    // succeeds on the first tick. Bound the retries anyway: each one walks
-    // the whole `sessions/**` tree, and a run whose home is not the one being
-    // written would walk it every tick for the length of the turn.
     let mut tail_attempts = 0u32;
     let mut poll = tokio::time::interval(std::time::Duration::from_millis(500));
     poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    // Pipe EOF alone cannot settle a run: a background grandchild that
-    // inherited stdout keeps the pipe open after the CLI's death and parked
-    // this loop forever — wait()/registry cleanup never ran and the run's
-    // slots leaked. Watch the child directly; once it exits, reads are
-    // bounded by POST_EXIT_DRAIN silence and the settle path below runs as
-    // usual (its process-group sweep also kills the pipe-holding grandchild).
-    // The watcher reaps the child early, so the post-loop wait() returns the
-    // cached status; kill()/kill_all() signal the process group directly
-    // when try_lock finds this waiter holding the child lock.
     let (exit_tx, mut exit_rx) = tokio::sync::oneshot::channel::<()>();
     {
         let child = Arc::clone(&ctx.child);
@@ -1207,10 +971,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
                         ctx.dispatch_event(&mut state, EngineEvent::Usage(usage));
                     }
                 } else if stream_session_id && tail_attempts < 20 {
-                    // The CLI creates the log a moment after the thread
-                    // id arrives. Attempt every tick rather than backing
-                    // off: the tail starts at the file's end, so any wait
-                    // here is a window in which a record lands unread.
                     tail_attempts += 1;
                     usage_tail = state
                         .native_session_id
@@ -1225,9 +985,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
             Ok(LineRead::Line(bytes)) => bytes,
             Ok(LineRead::Eof) => break,
             Ok(LineRead::TooLong) => {
-                // A line this large is never a real event — the engine is
-                // stuck writing garbage. Settle the turn as a terminal
-                // error; dispatch also kills the process tree off-thread.
                 ctx.dispatch_event(
                     &mut state,
                     EngineEvent::Error(format!(
@@ -1247,9 +1004,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
         }
         state.saw_any_output = true;
         if serde_json::from_str::<Value>(trimmed).is_err() {
-            // Every engine protocol here is NDJSON: a non-JSON line is
-            // off-protocol diagnostics (clap usage errors, shell wrapper
-            // complaints, node crashes) that no parse_line would keep.
             ring_push(&ctx.stdout_plain_buf, &format!("{trimmed}\n"));
         }
         let mut events = Vec::new();
@@ -1258,8 +1012,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
             .iter()
             .any(|event| matches!(event, EngineEvent::SessionId(_)));
         for mut event in events {
-            // Flush the final rollout records BEFORE done/error. Sending them
-            // afterwards made observers adopt the already-finished run again.
             if matches!(event, EngineEvent::Done { .. } | EngineEvent::Error(_))
                 && !state.saw_done
                 && !state.saw_error
@@ -1280,8 +1032,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
         }
     }
 
-    // Last look at the session log: the final response's record may have
-    // landed after the last poll tick.
     if let Some(tail) = usage_tail.as_mut() {
         for usage in tail.poll() {
             ctx.dispatch_event(&mut state, EngineEvent::Usage(usage));
@@ -1292,24 +1042,16 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
         let mut guard = ctx.child.lock().await;
         guard.wait().await.ok()
     };
-    // Unix mirror of the Windows kill-on-close job guard: grandchildren the
-    // CLI orphaned (background shells that outlived the turn) are still in
-    // the run's process group — sweep them so a settled turn leaks nothing.
-    // Clean exit → empty group → ESRCH no-op; a pid-reuse hit would need a
-    // fresh process to take the just-reaped pid AND lead a new group within
-    // microseconds. pid 0 is never signalled: kill(0, …) targets OUR group.
     #[cfg(unix)]
     if ctx.pid != 0 {
         kill_process_group(ctx.pid);
     }
     for path in &ctx.cleanup_files {
-        let _ = std::fs::remove_file(path);
+        let _ = file_access::fs::remove_file(path);
     }
     ctx.core.registry.clear_awaiting_followup(&ctx.core.run_id);
     if state.awaiting_followup {
         crate::engines::support::mcp::mark_run_ended(&ctx.core.run_id);
-        // Misty: the turn already settled, so nothing else says the parked process is gone;
-        // the bridge lets go of the run's access with this.
         state.push(
             &ctx.core.sink,
             &ctx.core.run_id,
@@ -1318,12 +1060,9 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
             Value::Null,
         );
     }
-    // The provider-model sidecar belongs to this run only.
-    let _ = std::fs::remove_file(crate::engines::pi_family::served_models_path(
+    let _ = file_access::fs::remove_file(crate::engines::pi_family::served_models_path(
         &ctx.core.run_id,
     ));
-    // Pending questions die with the run: settle their cards so the UI never
-    // leaves an answerable question pointing at a dead process.
     for key in [
         state.native_session_id.clone(),
         Some(ctx.core.run_id.clone()),
@@ -1336,24 +1075,13 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
         }
         expire_parked_plans(&ctx.core, &mut state, &key);
     }
-    // Drain this run's registry entries: under the native session id after
-    // rekey, and under the run id when the session id never arrived.
     if let Some(key) = state.native_session_id.clone() {
         ctx.core.registry.remove_if_pid(&key, ctx.pid);
     }
     ctx.core.registry.remove_if_pid(&ctx.core.run_id, ctx.pid);
-    // Also clean up the preassigned session id alias if one was registered
-    // at spawn (grok/codex resume): a resumed session was keyed under
-    // ctx.preassigned_session_id, so we must remove that alias even if the
-    // native id differs or never arrived.
     if let Some(key) = ctx.preassigned_session_id.as_deref() {
         ctx.core.registry.remove_if_pid(key, ctx.pid);
     }
-    // omp writes some failures (upstream 403/5xx, quota exhaustion) to
-    // stderr and then exits — sometimes cleanly, after a normal turn_end.
-    // A non-empty stderr on a failed exit must reach the user even when a
-    // done/error event already settled the turn; dropping it hides exactly
-    // the errors the user cannot otherwise see.
     let stderr_tail = ctx
         .stderr_buf
         .lock()
@@ -1373,8 +1101,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
     if !state.saw_done && !state.saw_error && !state.awaiting_followup {
         let killed = ctx.killed.load(std::sync::atomic::Ordering::SeqCst);
         if killed {
-            // User-initiated stop: commit whatever streamed so far as a
-            // normal turn end — a SIGKILL'd child is not a failure.
             state.push(
                 &ctx.core.sink,
                 &ctx.core.run_id,
@@ -1395,9 +1121,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
             if !stderr_tail.is_empty() {
                 message.push_str(&format!(": {stderr_tail}"));
             } else {
-                // Startup failures of old/odd CLIs often land on stdout as
-                // plain text instead of stderr; without this fallback the
-                // banner is a bare exit code.
                 let stdout_tail = ctx
                     .stdout_plain_buf
                     .lock()
@@ -1415,7 +1138,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
                 Value::String(message),
             );
         } else {
-            // Clean EOF without an explicit done line (kimi).
             state.push(
                 &ctx.core.sink,
                 &ctx.core.run_id,
@@ -1436,21 +1158,15 @@ mod staging_tests {
     use crate::engines::ChildEntry;
     use std::collections::HashMap;
 
-    /// The ring truncates by byte count: a naive drain start can land
-    /// mid-CJK and panic (killing the stderr capture task silently).
     #[test]
     fn ring_push_snaps_truncation_to_char_boundary() {
         let buf = Arc::new(Mutex::new(String::new()));
         ring_push(&buf, &"引擎错误".repeat(1000));
-        // std Mutex stays: ring buffers are deliberately poison-tolerant
-        // (a panicked capture task must not take down error reporting).
         let kept = buf.lock().unwrap_or_else(|p| p.into_inner());
         assert!(kept.len() <= 4096);
         assert!(kept.ends_with("引擎错误"));
     }
 
-    /// Absent sides stay absent: a sparse report must never read as an
-    /// authoritative empty one.
     #[test]
     fn selection_payload_omits_unreported_sides() {
         assert_eq!(
@@ -1557,8 +1273,6 @@ mod staging_tests {
                 cleanup_files: vec![directory.clone()],
                 stderr_buf: Arc::new(Mutex::new(String::new())),
                 stdout_plain_buf: Arc::new(Mutex::new(String::new())),
-                // Upstream's own constructor omits this Windows-only guard
-                // field (E0063 on Windows); a plain test child owns no job.
                 #[cfg(windows)]
                 _tree_guard: None,
             };
@@ -1577,11 +1291,6 @@ mod staging_tests {
         }
     }
 
-    /// Slot accounting must survive a reader that dies without reaching
-    /// either settle path (abort here; a panic inside dispatch is the same
-    /// shape). Nothing sweeps dead pids, so a stranded key pins a
-    /// concurrency slot until app exit and sending eventually wedges on
-    /// "too many concurrent runs".
     #[tokio::test]
     async fn dropping_a_run_context_frees_the_runs_concurrency_slot() {
         let mut command = Command::new(if cfg!(windows) { "cmd.exe" } else { "sh" });
@@ -1645,8 +1354,6 @@ mod staging_tests {
         );
     }
 
-    /// Virtual (host-stream) runs own no RunContext: the guard is what frees
-    /// their keys when the transport task is aborted instead of settling.
     #[tokio::test]
     async fn dropping_a_virtual_run_guard_frees_every_key_of_that_run() {
         let registry = Arc::new(ProcessRegistry::default());
@@ -1662,7 +1369,6 @@ mod staging_tests {
         };
         registry.insert("run-v".into(), entry.clone());
         registry.insert_alias("session-v".into(), entry);
-        // Another run's entry must be left alone.
         registry.insert(
             "run-other".into(),
             ChildEntry {
@@ -1768,8 +1474,6 @@ mod terminal_event_tests {
             tool_call_id: None,
         };
 
-        // Explicit window: a mid-response tool row (claude streams tool args
-        // inside the same message) must not close it.
         core.dispatch_event(&mut state, EngineEvent::Generation { active: true });
         core.dispatch_event(&mut state, EngineEvent::Delta("hi".into()));
         tokio::time::sleep(std::time::Duration::from_millis(30)).await;
@@ -1780,8 +1484,6 @@ mod terminal_event_tests {
             EngineEvent::Usage(serde_json::json!({"output_tokens": 3})),
         );
 
-        // Implicit (delta-opened) window: the tool row closes it, so the
-        // next usage report only measures what ran before the tool.
         core.dispatch_event(&mut state, EngineEvent::Delta("mid".into()));
         tokio::time::sleep(std::time::Duration::from_millis(30)).await;
         core.dispatch_event(&mut state, tool_start());

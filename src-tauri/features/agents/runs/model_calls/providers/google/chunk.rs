@@ -1,4 +1,3 @@
-//! Reading one generate-content chunk: its schema, and the fields each part of it keeps.
 use serde_json::{json, Map, Value};
 
 use crate::model_calls::stream::{InputTokens, OutputTokens, Usage};
@@ -18,7 +17,10 @@ pub(super) fn google_metadata(payload: Value) -> Value {
 }
 
 pub(super) fn signature_metadata(part: &Value) -> Option<Value> {
-    let signature = part.get("thoughtSignature")?.as_str().filter(|text| !text.is_empty())?;
+    let signature = part
+        .get("thoughtSignature")?
+        .as_str()
+        .filter(|text| !text.is_empty())?;
     Some(google_metadata(json!({ "thoughtSignature": signature })))
 }
 
@@ -27,13 +29,14 @@ pub(super) fn mapped_reason(reason: &str, has_tool_calls: bool) -> &'static str 
         "STOP" if has_tool_calls => "tool-calls",
         "STOP" => "stop",
         "MAX_TOKENS" => "length",
-        "IMAGE_SAFETY" | "RECITATION" | "SAFETY" | "BLOCKLIST" | "PROHIBITED_CONTENT" | "SPII" => "content-filter",
+        "IMAGE_SAFETY" | "RECITATION" | "SAFETY" | "BLOCKLIST" | "PROHIBITED_CONTENT" | "SPII" => {
+            "content-filter"
+        }
         "MALFORMED_FUNCTION_CALL" => "error",
         _ => "other",
     }
 }
 
-/// Copies the fields a schema names, as parsing with it does: anything else is dropped.
 pub(super) fn pick(value: &Value, keys: &[&str]) -> Value {
     let Some(fields) = value.as_object() else {
         return value.clone();
@@ -65,7 +68,14 @@ pub(super) fn picked_usage(usage: &Value) -> Value {
 }
 
 pub(super) fn picked_ratings(ratings: &Value) -> Value {
-    let keys = ["category", "probability", "probabilityScore", "severity", "severityScore", "blocked"];
+    let keys = [
+        "category",
+        "probability",
+        "probabilityScore",
+        "severity",
+        "severityScore",
+        "blocked",
+    ];
     match ratings.as_array() {
         Some(list) => Value::Array(list.iter().map(|rating| pick(rating, &keys)).collect()),
         None => ratings.clone(),
@@ -130,16 +140,19 @@ fn candidate_fits(candidate: &Value) -> bool {
         && nullish(candidate.get("content"), |content| {
             content.is_object()
                 && nullish(content.get("parts"), |parts| {
-                    parts.as_array().is_some_and(|parts| parts.iter().all(Value::is_object))
+                    parts
+                        .as_array()
+                        .is_some_and(|parts| parts.iter().all(Value::is_object))
                 })
         })
 }
 
-/// The chunk schema's main shape. A chunk that doesn't fit is a failure the stream reports.
 pub(super) fn valid_chunk(chunk: &Value) -> bool {
     chunk.is_object()
         && nullish(chunk.get("candidates"), |candidates| {
-            candidates.as_array().is_some_and(|list| list.iter().all(candidate_fits))
+            candidates
+                .as_array()
+                .is_some_and(|list| list.iter().all(candidate_fits))
         })
         && nullish(chunk.get("responseId"), Value::is_string)
         && nullish(chunk.get("usageMetadata"), usage_fits)

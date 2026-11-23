@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { useId, useState, type KeyboardEvent } from "react";
 import { cn, Pressable, RailTick, Surface, Text } from "@misty/ui";
-import type { MessageAnchor } from "./timelineAnchors";
+import type { MessageAnchor } from "./timeline_anchors";
 
 type VisibleMessageAnchor = {
   anchor: MessageAnchor;
@@ -9,10 +9,7 @@ type VisibleMessageAnchor = {
   placement: "down" | "center" | "up";
 };
 
-/** Past this many messages the rail buckets them into a bounded number of dashes, keeping the
- * active one inside its bucket. */
 const MAX_VISIBLE_ANCHOR_DASHES = 32;
-/** Rows near either end flip their preview so it never clips outside the rail. */
 const PREVIEW_EDGE_ROW_COUNT = 6;
 
 function getVisibleAnchorDashes(
@@ -48,14 +45,8 @@ function getVisibleAnchorDashes(
   });
 }
 
-/** Dash widths by distance from the hovered one, so the rail reads as one stack. */
 const PROXIMITY_WIDTHS = [32, 26, 22, 18];
 
-/**
- * A rail of dashes beside the transcript, one per message the person sent: the active dash follows
- * the scroll, a click jumps to its message, and hovering or focusing one shows a short preview.
- * It never grows into a full outline of the chat.
- */
 export function MessageAnchorRail({
   activeAnchorId,
   anchors,
@@ -67,7 +58,6 @@ export function MessageAnchorRail({
 }) {
   const previewId = useId();
   const [previewAnchorId, setPreviewAnchorId] = useState<string | null>(null);
-  // One message needs no way to jump between messages.
   if (anchors.length < 2) return null;
   const visible = getVisibleAnchorDashes(anchors, activeAnchorId);
   const previewIndex = previewAnchorId
@@ -85,8 +75,6 @@ export function MessageAnchorRail({
   return (
     <nav
       aria-label="Your messages"
-      // Takes no layout space: it floats over the conversation's left edge, under the transcript's
-      // padding, centered up and down between the chat's header and the composer.
       className={cn(
         "pointer-events-none absolute top-[calc(var(--agent-conversation-inset,0px)+var(--spacing)*14)] bottom-35 left-3",
         "z-[var(--stack-sticky)] flex w-10 flex-col items-start justify-center-safe gap-0.5 overflow-visible",

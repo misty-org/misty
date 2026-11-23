@@ -19,13 +19,12 @@ import { countText, formatBytes, messageOf } from "../format";
 import { nameOf, parentOf } from "../model";
 import type { TransferWhere } from "../transfers";
 
-type Run = <T>(label: string, work: (opId: string) => Promise<T>, where?: TransferWhere) => Promise<T>;
+type Run = <T>(
+  label: string,
+  work: (opId: string) => Promise<T>,
+  where?: TransferWhere,
+) => Promise<T>;
 
-/**
- * Files in a folder whose content is the same, in groups. The person ticks the copies to let go of and
- * moves them to the Trash; the first of each group stays unticked. The search shows its progress in the
- * bottom bar, where Cancel stops it.
- */
 export function DuplicatesDialog({
   dir,
   run,
@@ -80,17 +79,28 @@ export function DuplicatesDialog({
               inline
               title="Duplicates couldn't be found"
               line={error}
-              action={{ label: "Try again", variant: "secondary", onClick: () => setAttempt((n) => n + 1) }}
+              action={{
+                label: "Try again",
+                variant: "secondary",
+                onClick: () => setAttempt((n) => n + 1),
+              }}
             />
           ) : groups === null ? (
             <ListRowSkeleton label="Finding duplicates" lines={2} />
           ) : groups.length === 0 ? (
-            <EmptyState inline title="No duplicates" line="Every file in this folder is different." />
+            <EmptyState
+              inline
+              title="No duplicates"
+              line="Every file in this folder is different."
+            />
           ) : (
             <div className="flex flex-col gap-4">
               {groups.map((group) => (
                 <section key={group.hash} className="grid gap-1">
-                  <SectionHeading as="h3" title={`${countText(group.paths.length, "copy", "copies")} of ${formatBytes(group.size)} each`} />
+                  <SectionHeading
+                    as="h3"
+                    title={`${countText(group.paths.length, "copy", "copies")} of ${formatBytes(group.size)} each`}
+                  />
                   <ul className="m-0 grid list-none gap-0.5 p-0">
                     {group.paths.map((path) => (
                       <li key={path}>
@@ -117,7 +127,12 @@ export function DuplicatesDialog({
           <Button variant="quiet" size="lg" disabled={busy} onClick={onClose}>
             Close
           </Button>
-          <Button variant="primary" size="lg" disabled={busy || picked.length === 0} onClick={() => void trash()}>
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={busy || picked.length === 0}
+            onClick={() => void trash()}
+          >
             {picked.length ? `Move ${countText(picked.length)} to Trash` : "Move to Trash"}
           </Button>
         </DialogFooter>

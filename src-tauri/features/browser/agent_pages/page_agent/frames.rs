@@ -1,8 +1,3 @@
-//! The page layer inside a tab's cross-origin frames (agent_pages/frames.rs): snapshots,
-//! page text and waits include embedded widgets, such as a class schedule, a booking
-//! calendar or a document editor, under the iframe that shows them. Each frame a snapshot
-//! reads takes a slot, and its refs come from that slot's range (slot 1 is e1000001 and
-//! up), so a step or skill on one of them runs in its frame (`frame_of`).
 use super::{RUNTIME, WORLD};
 use crate::browser::agent_pages::frames::{self, Frame};
 use serde_json::{json, Value};
@@ -20,22 +15,18 @@ mod splice;
 use splice::shown_url;
 pub(super) use splice::{append_markdown, merge_skills, splice_trees};
 
-/// Frames read per call, newest first, and how much each and all may add.
 const MAX_FRAMES: usize = 6;
 const FRAME_TREE_CHARS: usize = 6_000;
 const FRAME_TREES_CHARS: usize = 16_000;
 const FRAME_MARKDOWN_CHARS: usize = 40_000;
 const FRAME_REFS: u64 = 300;
-/// Refs of frame slot n start at n × REF_RANGE + 1; the top document's stay below.
 pub(super) const REF_RANGE: u64 = 1_000_000;
 const SLOTS: usize = 9;
 
-/// What one frame showed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct FrameRead {
     pub url: String,
     pub text: String,
-    /// Skills the frame's page offers, such as a rich-text editor.
     pub skills: Vec<Value>,
 }
 
@@ -46,7 +37,6 @@ struct Slot {
     used: u64,
 }
 
-/// Tab → its frame slots (index 0 is slot 1).
 fn slots() -> &'static Mutex<HashMap<String, Vec<Option<Slot>>>> {
     static BY_TAB: OnceLock<Mutex<HashMap<String, Vec<Option<Slot>>>>> = OnceLock::new();
     BY_TAB.get_or_init(Mutex::default)
@@ -57,7 +47,6 @@ fn tick() -> u64 {
     TICK.fetch_add(1, Ordering::Relaxed)
 }
 
-/// The frame's slot in its tab: the one it had, a free one, or the least recently used.
 fn slot_for(tab: &str, frame: u64) -> u64 {
     let Ok(mut all) = slots().lock() else {
         return 1;
@@ -99,8 +88,6 @@ fn remember_document(tab: &str, slot: u64, document: &str) {
     }
 }
 
-/// The frame a ref belongs to and the document id its steps must name; None for a ref of
-/// the top document.
 pub(super) fn frame_of(tab: &str, reference: &str) -> Option<(u64, String)> {
     let number: u64 = reference.strip_prefix('e')?.parse().ok()?;
     let slot = number / REF_RANGE;
@@ -118,7 +105,6 @@ async fn call_in_frame(view: &Webview, frame: u64, operation: &str, args: Value)
         serde_json::to_string(&args).ok()?
     );
     let operation = serde_json::to_string(operation).ok()?;
-    // Tracking pixels and hidden frames say nothing a person can see.
     let body = format!(
         "{RUNTIME}\n{invocation}\nif (innerWidth < 80 || innerHeight < 40) return JSON.stringify({{ ok: false, hidden: true }});\nreturn JSON.stringify(await page.call({operation}, args));"
     );
@@ -138,12 +124,10 @@ fn recent(mut frames: Vec<Frame>) -> Vec<Frame> {
     frames
 }
 
-/// The frames' accessibility trees, with refs from each frame's range, in announcement order.
 pub(super) async fn trees(view: &Webview) -> Vec<FrameRead> {
     read(view, "snapshot", "tree", FRAME_TREE_CHARS, true).await
 }
 
-/// The frames' page text as Markdown, for extraction.
 pub(super) async fn markdown(view: &Webview) -> Vec<FrameRead> {
     read(view, "markdown", "markdown", FRAME_MARKDOWN_CHARS, false).await
 }
@@ -189,7 +173,6 @@ async fn read(
         .into_iter()
         .flatten()
     {
-        // A frame that navigated may have announced twice; its content counts once.
         if !out.iter().any(|seen| seen.text == read.text) {
             out.push(read);
         }
@@ -197,7 +180,6 @@ async fn read(
     out
 }
 
-/// Whether any frame shows `text` now, for waits on content inside a widget.
 pub(super) async fn shows(view: &Webview, condition: &Value) -> bool {
     let frames = recent(frames::list(view).await);
     let checks = frames

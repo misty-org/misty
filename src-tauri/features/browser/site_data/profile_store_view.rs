@@ -1,17 +1,10 @@
-//! A hidden, off-screen page in one website data store. Native code uses it to
-//! reach a store's cookies and cached data when none of its tabs is open.
 use tauri::Webview;
 
-/// Opens a hidden `about:blank` page in `store` (the original store when
-/// `None`). The caller closes it; [`StoreView`] does so on drop.
-// Windows reaches store data through it.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn open_hidden_store_view(
     app: &tauri::AppHandle,
     store: Option<&str>,
 ) -> Result<Webview, String> {
-    // Any app window can hold the off-screen page; the store, not the window,
-    // decides whose data it reaches.
     let owner = crate::browser::app_windows::primary(app).ok_or("No Misty window is open")?;
     let builder = tauri::WebviewBuilder::new(
         format!("misty-browser-capture-{}", uuid::Uuid::new_v4()),
@@ -38,7 +31,6 @@ pub(crate) fn open_hidden_store_view(
     Ok(view)
 }
 
-/// A hidden store page that closes when dropped (Windows reaches store data through one).
 #[cfg(windows)]
 pub(crate) struct StoreView(Webview);
 

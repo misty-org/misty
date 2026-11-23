@@ -1,6 +1,3 @@
-//! Honor HTTP attachment responses even when WebKit can display their MIME type.
-//! Wry 0.55 otherwise only selects Download for non-displayable responses.
-//! Also reports failed loads as finished, which Wry 0.55 never does on macOS.
 #![allow(unexpected_cfgs)]
 use objc::{msg_send, sel, sel_impl};
 use objc2_foundation::{NSHTTPURLResponse, NSString};
@@ -39,7 +36,6 @@ extern "C" fn response_policy(
             block.call((WKNavigationResponsePolicy::Download,));
             return;
         }
-        // Preserve Wry's existing policy and native WKDownload delegate lifecycle.
         let superclass = objc::runtime::Class::get(DELEGATE_CLASS)
             .unwrap()
             .superclass()
@@ -49,9 +45,6 @@ extern "C" fn response_policy(
     }
 }
 
-/// WebKit reports a failed or cancelled load through didFail instead of
-/// didFinish, and Wry only forwards didFinish, so the tab would keep showing
-/// a spinner. Finish it like WebView2 does, unless a newer load is underway.
 extern "C" fn load_failed(
     delegate: &objc::runtime::Object,
     _selector: objc::runtime::Sel,

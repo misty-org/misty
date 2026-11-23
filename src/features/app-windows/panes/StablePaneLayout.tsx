@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 
-/** Layout slots may be rebuilt; their live contents stay under one stable parent. */
 export function StablePaneLayout({
   children,
   panes,
@@ -19,9 +18,6 @@ export function StablePaneLayout({
     },
     [],
   );
-  // Runs after every commit because layout slots may be rebuilt by any render.
-  // Finding them is cheap; measuring is not, so geometry is read only when the
-  // mounted slots or contents change. The observer covers every resize after that.
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -39,11 +35,8 @@ export function StablePaneLayout({
     const position = () => {
       const origin = root.getBoundingClientRect();
       const computed = getComputedStyle(root);
-      // DOMRects include app zoom and ancestor transforms; absolute CSS lengths do not.
       const scaleX = origin.width / parseFloat(computed.width) || 1;
       const scaleY = origin.height / parseFloat(computed.height) || 1;
-      // Read all geometry before writing styles. ResizeObserver also covers live
-      // splitter drags, including siblings whose position changes without resizing.
       const bounds = slots.map((slot) => ({
         id: slot.dataset.paneLayoutSlot,
         rect: slot.getBoundingClientRect(),
@@ -67,12 +60,8 @@ export function StablePaneLayout({
           changed = true;
         }
       }
-      // Native webviews are siblings of the renderer, outside this CSS layout.
-      // Notify after all pane writes, including position-only moves/reparenting.
       if (changed) window.dispatchEvent(new Event("misty:workspace-geometry-changed"));
     };
-    // Reuse the observer while the same slots and contents are mounted; rebuilding it on
-    // every render forced a fresh layout pass per observed element.
     const elements = [...slots, ...contents.values()];
     const previous = observed.current;
     if (
@@ -101,8 +90,6 @@ export function StablePaneLayout({
         )
           return;
         resizeCleanupRef.current?.();
-        // Live panes sit outside the resize library's panels. Mirror its pointer
-        // blocking so iframe documents cannot swallow the rest of the gesture.
         const contents = Array.from(event.currentTarget.children).filter(
           (child): child is HTMLElement =>
             child instanceof HTMLElement && child.hasAttribute("data-pane-layout-content"),
@@ -126,8 +113,6 @@ export function StablePaneLayout({
       }}
     >
       {children}
-      {/* Keep DOM order independent of visual order: moving an iframe DOM node
-          can reload its document even when React preserves its component. */}
       {[...panes]
         .sort((a, b) => a.id.localeCompare(b.id))
         .map(({ id, content }) => (

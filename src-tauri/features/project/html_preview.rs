@@ -17,11 +17,8 @@ use regex::Regex;
 
 use super::{linked_path, person_window};
 
-/// The page itself, as text.
 const MAX_DOCUMENT_BYTES: u64 = 2 * 1024 * 1024;
-/// One stylesheet, image or font.
 const MAX_RESOURCE_BYTES: u64 = 5 * 1024 * 1024;
-/// Everything inlined into one document.
 const MAX_TOTAL_BYTES: usize = 24 * 1024 * 1024;
 
 const PREVIEW_CSP: &str = "default-src 'none'; style-src 'unsafe-inline' data:; \
@@ -54,9 +51,6 @@ fn hex_digit(byte: u8) -> Option<u8> {
     }
 }
 
-/// Decodes one `%XX`-escaped URL segment. A decoded `/`, `\`, NUL or dot segment would change
-/// the path's shape, so it is refused rather than pointed at another file. On Windows a `:` would
-/// name a drive or a data stream.
 fn decode_segment(segment: &str) -> Option<String> {
     let mut bytes = Vec::with_capacity(segment.len());
     let mut input = segment.bytes();
@@ -80,8 +74,6 @@ fn decode_segment(segment: &str) -> Option<String> {
     Some(decoded)
 }
 
-/// A reference relative to `base` (a folder inside `root`), resolved and required to stay a file
-/// inside `root`. Absolute URLs, `//host` and fragments are left alone (None).
 fn resolve_reference(root: &Path, base: &Path, reference: &str) -> Option<PathBuf> {
     let reference = reference.trim();
     if reference.is_empty()
@@ -92,13 +84,11 @@ fn resolve_reference(root: &Path, base: &Path, reference: &str) -> Option<PathBu
     {
         return None;
     }
-    // The query and fragment never name a file.
     let path = reference.split(['?', '#']).next()?;
     let mut candidate = base.to_path_buf();
     for segment in path.split('/') {
         match segment {
             "" | "." => {}
-            // A step up is fine while it stays inside the root; the check below decides.
             ".." => {
                 candidate.pop();
             }
@@ -109,7 +99,6 @@ fn resolve_reference(root: &Path, base: &Path, reference: &str) -> Option<PathBu
     (resolved.starts_with(root) && file_access::fs::is_file(&resolved)).then_some(resolved)
 }
 
-/// By extension only; anything unlisted isn't inlined.
 fn mime_for(path: &Path) -> Option<&'static str> {
     let extension = path
         .extension()
@@ -149,7 +138,6 @@ impl Inliner {
         Some(bytes)
     }
 
-    /// `reference` as a data URL, if it names an image or font inside the root.
     fn data_url_for(&mut self, base: &Path, reference: &str) -> Option<String> {
         let path = resolve_reference(&self.root, base, reference)?;
         let mime = mime_for(&path).filter(|mime| *mime != "text/css")?;
@@ -157,7 +145,6 @@ impl Inliner {
         Some(data_url(mime, &bytes))
     }
 
-    /// A stylesheet with its own `url(...)` references inlined, relative to its folder.
     fn stylesheet(&mut self, css: &str, base: &Path) -> String {
         let pattern = Regex::new(r#"url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)"#).unwrap();
         pattern
@@ -187,7 +174,6 @@ impl Inliner {
     }
 }
 
-/// The value of `name="..."` (or single-quoted, or bare) in one tag's text.
 fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
     let pattern = Regex::new(&format!(
         r#"(?i)\s{name}\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#
@@ -201,8 +187,6 @@ fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
         .map(|found| found.as_str())
 }
 
-/// The document with its stylesheets, images and fonts from the file's folder inlined and the
-/// preview's policy placed first in it.
 pub(crate) fn build_document(file: &Path, html: &str) -> Result<String, String> {
     let root = file
         .parent()
@@ -212,7 +196,6 @@ pub(crate) fn build_document(file: &Path, html: &str) -> Result<String, String> 
         root: root.clone(),
         spent: 0,
     };
-    // <link rel="stylesheet" href="…"> becomes <style>…</style>.
     let links = Regex::new(r"(?is)<link\b[^>]*>").unwrap();
     let html = links.replace_all(html, |captures: &regex::Captures| {
         let tag = &captures[0];
@@ -226,7 +209,6 @@ pub(crate) fn build_document(file: &Path, html: &str) -> Result<String, String> 
                     .linked_stylesheet(&root, href)
                     .map(|css| format!("<style>{css}</style>"))
             } else {
-                // An icon or the like: its href becomes a data URL.
                 inliner
                     .data_url_for(&root, href)
                     .map(|url| tag.replacen(href, &url, 1))
@@ -234,7 +216,6 @@ pub(crate) fn build_document(file: &Path, html: &str) -> Result<String, String> 
         });
         inlined.unwrap_or_else(|| tag.to_string())
     });
-    // <style> blocks may name images and fonts by url(...).
     let styles = Regex::new(r"(?is)(<style\b[^>]*>)(.*?)(</style>)").unwrap();
     let html = styles.replace_all(&html, |captures: &regex::Captures| {
         format!(
@@ -244,7 +225,6 @@ pub(crate) fn build_document(file: &Path, html: &str) -> Result<String, String> 
             &captures[3]
         )
     });
-    // src= on images and media, and inline style="…url(…)".
     let sources = Regex::new(r#"(?i)(\s(?:src|poster)\s*=\s*)(?:"([^"]*)"|'([^']*)')"#).unwrap();
     let html = sources.replace_all(&html, |captures: &regex::Captures| {
         let reference = captures
@@ -260,7 +240,6 @@ pub(crate) fn build_document(file: &Path, html: &str) -> Result<String, String> 
         "<meta http-equiv=\"Content-Security-Policy\" content=\"{PREVIEW_CSP}\">\
          <meta name=\"referrer\" content=\"no-referrer\">"
     );
-    // The policy goes before anything the page has, so nothing of its own runs ahead of it.
     let head = Regex::new(r"(?i)<head\b[^>]*>").unwrap();
     Ok(match head.find(&html) {
         Some(found) => format!("{}{policy}{}", &html[..found.end()], &html[found.end()..]),
@@ -268,7 +247,6 @@ pub(crate) fn build_document(file: &Path, html: &str) -> Result<String, String> 
     })
 }
 
-/// The HTML file at `path` as one self-contained document for the editor's preview frame.
 #[tauri::command]
 pub async fn project_html_preview_open(
     app: tauri::AppHandle,

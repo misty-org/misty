@@ -1,7 +1,5 @@
-//! Reads a page's preview metadata (Open Graph, Twitter Card, `<title>`) from its HTML head.
 use std::collections::HashMap;
 
-/// What a page says about itself, before any image is fetched.
 #[derive(Debug, Default, PartialEq)]
 pub struct PageMeta {
     pub site_name: String,
@@ -10,7 +8,6 @@ pub struct PageMeta {
     pub image_url: Option<String>,
 }
 
-/// The first value for each `property` or `name` of the page's `<meta>` tags, and its title.
 pub fn parse(html: &str, base: &url::Url) -> PageMeta {
     let lower = html.to_ascii_lowercase();
     let head_end = lower.find("</head>").unwrap_or(lower.len());
@@ -77,7 +74,6 @@ fn title_tag(html: &str, lower: &str) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-/// `name="value"` pairs from the inside of a tag, names lowercased. Values may be quoted or bare.
 fn attributes(tag: &str) -> Vec<(String, String)> {
     let bytes = tag.as_bytes();
     let mut out = Vec::new();

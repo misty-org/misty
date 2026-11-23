@@ -1,5 +1,3 @@
-//! The window procedures: hover, click and leave on the button, for the target
-//! and for the main window.
 use super::*;
 
 pub(super) unsafe extern "system" fn on_target(
@@ -18,8 +16,6 @@ pub(super) unsafe extern "system" fn on_target(
     }
 }
 
-/// Hover and click on the button, for whichever window receives them. `None`
-/// passes the message on to the system, which runs Snap Layouts from the hover.
 unsafe fn button_message(
     main: HWND,
     receiver: HWND,
@@ -30,8 +26,6 @@ unsafe fn button_message(
     match message {
         WM_NCMOUSEMOVE => {
             if on_button {
-                // Re-armed on every move: a leave the system never sent (the window
-                // resized under the pointer) must not leave the hover stuck on.
                 let mut track = TRACKMOUSEEVENT {
                     cbSize: std::mem::size_of::<TRACKMOUSEEVENT>() as u32,
                     dwFlags: TME_LEAVE | TME_NONCLIENT,
@@ -53,8 +47,6 @@ unsafe fn button_message(
             leave(main);
             None
         }
-        // The system would draw a classic caption button for these; the page
-        // draws Misty's and acts on the click.
         WM_NCLBUTTONDOWN | WM_NCLBUTTONDBLCLK if on_button => {
             set_flag(main, |target| {
                 target.pressed = true;
@@ -66,7 +58,6 @@ unsafe fn button_message(
             if set_flag(main, |target| std::mem::take(&mut target.pressed)) {
                 emit(main, "misty://maximize-button-click", true);
             }
-            // Maximizing moves the button; the next move over it starts a fresh hover.
             leave(main);
             Some(0)
         }

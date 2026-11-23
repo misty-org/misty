@@ -1,12 +1,9 @@
-import type { AgentQuestionAnswer, AgentQuestionSet } from "../../plans/planTypes";
-import { nowText, type ConversationState, type StoredQuestionSet } from "./conversationState";
+import type { AgentQuestionAnswer, AgentQuestionSet } from "../../plans/plan_types";
+import { nowText, type ConversationState, type StoredQuestionSet } from "./conversation_state";
 import { RunStateError } from "./documents";
-
-/** Structured questions an agent asks inside a run, and the answers to them. */
 
 const maxQuestions = 4;
 const maxQuestionOptions = 4;
-/** The asking run waits this long inside its call, then hands off: an answer after that starts a new turn. */
 const questionWaitMs = 45_000;
 const questionTtlMs = 7 * 24 * 60 * 60 * 1000;
 const keepSets = 20;
@@ -25,7 +22,6 @@ export const confirmationRefused =
   "The person already asked for this, so don't ask them to confirm it: do it now. " +
   "Misty shows its own approval card when their settings require one. Ask only about a choice that changes the result.";
 
-/** Asking the person to approve what they already asked for only stalls the run. */
 export function confirmationQuestion(question: Question): boolean {
   if (confirmHeader.test(question.header.trim())) return true;
   const [first, ...rest] = question.options;
@@ -33,7 +29,6 @@ export function confirmationQuestion(question: Question): boolean {
   return rest.some((option) => holdOption.test(option.label.trim()));
 }
 
-/** The limits mirror what the composer card can show. */
 function normalizeQuestions(questions: Question[]): Question[] {
   if (questions.length < 1 || questions.length > maxQuestions) throw invalid();
   return questions.map((question) => {
@@ -62,7 +57,6 @@ function normalizeQuestions(questions: Question[]): Question[] {
   });
 }
 
-/** One answer per question, only offered labels, and something chosen or written for each. */
 export function validateAnswers(
   questions: Question[],
   answers: AgentQuestionAnswer[],
@@ -99,7 +93,6 @@ function withSet(state: ConversationState, set: StoredQuestionSet): Conversation
   };
 }
 
-/** Records one call's questions. Repeating the call returns its set; a new call replaces the run's open one. */
 export function openQuestionSet(
   state: ConversationState,
   input: { id: string; runId: string; callId: string; questions: Question[]; now: number },
@@ -129,12 +122,6 @@ export function openQuestionSet(
   return { next: withSet({ ...state, questionSets: others }, set), result: { set, created: true } };
 }
 
-/**
- * Accepts the person's answers exactly once. While the asking run still waits it picks them up itself;
- * otherwise they continue the conversation. A run can't be waiting past `waitUntil`, nor from a launch
- * before this window's: Misty may have closed mid-wait, and only the card survives that. If a run does
- * turn out to be waiting, it sees `continued` and stands down, so the answer is never used twice.
- */
 export function answerQuestionSet(
   state: ConversationState,
   id: string,
@@ -161,7 +148,6 @@ export function answerQuestionSet(
   return { next: withSet(state, answered), result: answered };
 }
 
-/** Ends the asking run's wait. An answer that just landed is returned instead. */
 export function handOffQuestionSet(
   state: ConversationState,
   id: string,
@@ -173,7 +159,6 @@ export function handOffQuestionSet(
   return { next: withSet(state, handedOff), result: handedOff };
 }
 
-/** Ends open sets: superseded by a new message, or canceled with their run. */
 export function endOpenQuestionSets(
   state: ConversationState,
   ending: "superseded" | "canceled",
@@ -189,7 +174,6 @@ export function endOpenQuestionSets(
   return { state: ended.length ? { ...state, questionSets } : state, ended };
 }
 
-/** The visible turn that carries answers given after the asking run handed off. */
 export function questionContinuationPrompt(set: AgentQuestionSet): string {
   const lines = set.questions.flatMap((question, index) => {
     const answer = set.answers?.[index];

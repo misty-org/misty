@@ -1,56 +1,38 @@
-//! Dropbox's three trees: the server's tree, the local tree and the last agreed (base) tree. Each
-//! change is planned from how they differ, in an order that always works:
-//!
-//! - **Up** (a local change the server hasn't seen): creates, parents before children; then
-//!   renames, moves and new content, shallowest first; then trash moves, only the topmost of a
-//!   deleted subtree. Each goes up saying which version it came from, and where the server has
-//!   moved on in the same respect the rules (`rules.rs`) settle it as it lands: text merges,
-//!   otherwise the later change wins.
-//! - **Down** (a server change this computer hasn't applied): new items, parents first; then
-//!   changes; then removals of what was trashed or purged. A down change never touches what has
-//!   a local change waiting in the same respect (that change goes up and settles there), and a
-//!   removal keeps whatever holds unsynced work, which brings the item back when it lands.
-//!
-//! The planner is pure: it reads the three trees and answers operations. `sync.rs` runs them.
 use std::collections::{HashMap, HashSet};
 
 use crate::model::{Base, Item, ItemId};
 use crate::names;
 use crate::store::NodeRow;
 
-/// The three trees of one Space, keyed by item id.
 #[derive(Default)]
 pub struct Trees {
     pub server: HashMap<ItemId, Item>,
     pub base: HashMap<ItemId, Base>,
     pub local: HashMap<ItemId, NodeRow>,
-    /// The server tree is the whole of the Space (read from sequence 0), so a local item it
-    /// doesn't list was purged long ago.
     pub complete: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
-    /// A new item made here.
     Create(ItemId),
-    /// New content, a new name or place, or both.
-    Update { id: ItemId, content: bool, place: bool },
-    /// A delete made here.
+    Update {
+        id: ItemId,
+        content: bool,
+        place: bool,
+    },
     Trash(ItemId),
-    /// An item made and deleted here before the server saw it: it just goes.
     DropLocal(ItemId),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Down {
-    /// An item this computer doesn't show yet.
     Add(ItemId),
-    /// New content, a new name or place, or both, from the server.
-    Apply { id: ItemId, content: bool, place: bool },
-    /// The server moved on in nothing this computer shows (who changed it, say): only the base
-    /// moves up.
+    Apply {
+        id: ItemId,
+        content: bool,
+        place: bool,
+    },
     Rebase(ItemId),
-    /// Trashed or purged on the server.
     Remove(ItemId),
 }
 
@@ -59,8 +41,6 @@ fn depth(path: &str) -> usize {
 }
 
 impl Trees {
-    /// Whether the server shows `id`: neither it nor a folder holding it is trashed or purged.
-    /// `None` when the server tree doesn't say (a parent it hasn't sent).
     pub fn server_live(&self, id: &ItemId) -> Option<bool> {
         let mut current = id.clone();
         for _ in 0..4096 {
@@ -84,12 +64,14 @@ impl Trees {
             if depth > 4096 {
                 break;
             }
-            current = self.server.get(&parent).and_then(|item| item.parent_id.clone());
+            current = self
+                .server
+                .get(&parent)
+                .and_then(|item| item.parent_id.clone());
         }
         depth
     }
 
-    /// The local paths that hold work not uploaded yet.
     fn dirty_paths(&self) -> Vec<&str> {
         self.local
             .values()
@@ -99,7 +81,6 @@ impl Trees {
     }
 }
 
-/// Whether a node or anything under it holds work not uploaded yet.
 pub fn holds_work(node: &NodeRow, dirty_paths: &[&str]) -> bool {
     dirty_paths
         .iter()
@@ -114,7 +95,6 @@ fn place_differs(item: &Item, base: &Base) -> bool {
     item.parent_id != base.parent || item.name != base.name
 }
 
-/// The local changes to send, in order.
 pub fn plan_up(trees: &Trees) -> Vec<Up> {
     let trashing: Vec<&str> = trees
         .local
@@ -122,7 +102,6 @@ pub fn plan_up(trees: &Trees) -> Vec<Up> {
         .filter(|node| node.trash_pending && !node.not_synced)
         .map(|node| node.path.as_str())
         .collect();
-    // Inside a folder being deleted, nothing else goes up: the delete takes it all.
     let under_trash = |node: &NodeRow| {
         trashing
             .iter()
@@ -164,7 +143,6 @@ pub fn plan_up(trees: &Trees) -> Vec<Up> {
     ops
 }
 
-/// The server changes to apply, in order.
 pub fn plan_down(trees: &Trees) -> Vec<Down> {
     let dirty = trees.dirty_paths();
     let mut adds = Vec::new();
@@ -201,8 +179,6 @@ pub fn plan_down(trees: &Trees) -> Vec<Down> {
             Some(node) if node.created => {}
             Some(node) => {
                 let Some(base) = trees.base.get(id) else {
-                    // Shown here with no base (a resync): take the server's word unless this
-                    // computer has a change waiting.
                     if live == Some(true) && !node.dirty() {
                         applies.push((
                             trees.server_depth(id),
@@ -220,8 +196,6 @@ pub fn plan_down(trees: &Trees) -> Vec<Down> {
                 }
                 if live == Some(false) {
                     if node.trash_pending || holds_work(node, &dirty) {
-                        // The work waiting here brings it back when it lands; a delete here is
-                        // already the server's.
                         continue;
                     }
                     let parent_goes = item.parent_id.as_ref().is_some_and(|parent| {
@@ -237,12 +211,10 @@ pub fn plan_down(trees: &Trees) -> Vec<Down> {
                 }
                 let content = content_differs(item, base);
                 let place = place_differs(item, base);
-                // A clash in the same respect is the up side's to send: a merge, or the later wins.
                 if (content && node.dirty_content) || (place && node.dirty_place) {
                     continue;
                 }
                 if node.trash_pending {
-                    // The delete goes up after it and trashes the file as it is by then.
                     continue;
                 }
                 if content || place {
@@ -290,7 +262,11 @@ mod tests {
             space_id: SpaceId("s".into()),
             parent_id: parent.map(|p| ItemId(p.into())),
             name: name.into(),
-            kind: if sha.is_some() { Kind::File } else { Kind::Folder },
+            kind: if sha.is_some() {
+                Kind::File
+            } else {
+                Kind::Folder
+            },
             sha256: sha.map(String::from),
             size: sha.map_or(0, |_| 1),
             mtime_ms: 0,
@@ -344,8 +320,13 @@ mod tests {
     #[test]
     fn new_server_items_come_down_parents_first() {
         let mut trees = Trees::default();
-        trees.server.insert(ItemId("b".into()), item("b", Some("a"), "B.txt", 1, Some("x")));
-        trees.server.insert(ItemId("a".into()), item("a", None, "A", 1, None));
+        trees.server.insert(
+            ItemId("b".into()),
+            item("b", Some("a"), "B.txt", 1, Some("x")),
+        );
+        trees
+            .server
+            .insert(ItemId("a".into()), item("a", None, "A", 1, None));
         assert_eq!(
             plan_down(&trees),
             vec![Down::Add(ItemId("a".into())), Down::Add(ItemId("b".into()))]
@@ -356,9 +337,16 @@ mod tests {
     fn a_local_edit_is_never_overwritten_by_a_server_edit() {
         let mut trees = Trees::default();
         agreed(&mut trees, item("f", None, "F.txt", 1, Some("x")), "/F.txt");
-        trees.local.get_mut(&ItemId("f".into())).unwrap().dirty_content = true;
+        trees
+            .local
+            .get_mut(&ItemId("f".into()))
+            .unwrap()
+            .dirty_content = true;
         trees.local.get_mut(&ItemId("f".into())).unwrap().sha256 = Some("mine".into());
-        trees.server.insert(ItemId("f".into()), item("f", None, "F.txt", 2, Some("theirs")));
+        trees.server.insert(
+            ItemId("f".into()),
+            item("f", None, "F.txt", 2, Some("theirs")),
+        );
         assert!(plan_down(&trees).is_empty());
         assert_eq!(
             plan_up(&trees),
@@ -388,7 +376,11 @@ mod tests {
     fn a_server_delete_removes_what_holds_no_work() {
         let mut trees = Trees::default();
         agreed(&mut trees, item("d", None, "D", 1, None), "/D");
-        agreed(&mut trees, item("f", Some("d"), "f.txt", 1, Some("x")), "/D/f.txt");
+        agreed(
+            &mut trees,
+            item("f", Some("d"), "f.txt", 1, Some("x")),
+            "/D/f.txt",
+        );
         let mut gone = item("d", None, "D", 2, None);
         gone.trashed = true;
         trees.server.insert(ItemId("d".into()), gone);
@@ -399,9 +391,17 @@ mod tests {
     fn only_the_topmost_delete_goes_up() {
         let mut trees = Trees::default();
         agreed(&mut trees, item("d", None, "D", 1, None), "/D");
-        agreed(&mut trees, item("f", Some("d"), "f.txt", 1, Some("x")), "/D/f.txt");
+        agreed(
+            &mut trees,
+            item("f", Some("d"), "f.txt", 1, Some("x")),
+            "/D/f.txt",
+        );
         for id in ["d", "f"] {
-            trees.local.get_mut(&ItemId(id.into())).unwrap().trash_pending = true;
+            trees
+                .local
+                .get_mut(&ItemId(id.into()))
+                .unwrap()
+                .trash_pending = true;
         }
         assert_eq!(plan_up(&trees), vec![Up::Trash(ItemId("d".into()))]);
     }
@@ -413,7 +413,9 @@ mod tests {
         let node = trees.local.get_mut(&ItemId("f".into())).unwrap();
         node.dirty_place = true;
         node.server_name = "G.txt".into();
-        trees.server.insert(ItemId("f".into()), item("f", None, "F.txt", 2, Some("new")));
+        trees
+            .server
+            .insert(ItemId("f".into()), item("f", None, "F.txt", 2, Some("new")));
         assert_eq!(
             plan_down(&trees),
             vec![Down::Apply {

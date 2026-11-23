@@ -1,19 +1,13 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * One MCP config entry in detail, as a store page: its mark, name and how it connects, the on/off
- * action for writable sources, facts (engine, scope, state, tools), the connection check, the
- * tools it found, then where it lives, the (already redacted) address and the *names* of its
- * variables (never their values). A read-only source says why.
- */
 import { FolderOpen } from "lucide-react";
 import { useState } from "react";
 import {
   AppLogoImage,
-  BrandIcon,
-  brandIconAsset,
   Button,
+  Mark,
+  markFor,
   PropertyList,
   StoreDetail,
   StoreDetailSection,
@@ -27,21 +21,16 @@ import { copy, engineLabel, readonlyReasonText, scopeLabels, sourceLabel } from 
 import { ProbeDetail, useProbeTools } from "./ProbeControls";
 import type { McpConfigEntry } from "./types";
 
-/**
- * A server's logo at the tile size: the brand's official mark when Misty has its artwork (a
- * server named "github" or "linear"), else its initial, as a third-party app without an icon.
- */
 export function ConnectorLogo({ name }: { name: string }) {
-  return brandIconAsset(name) ? (
+  return markFor(name) ? (
     <LogoTile size="tile">
-      <BrandIcon brand={name} size={40} />
+      <Mark of={name} size={40} />
     </LogoTile>
   ) : (
     <AppLogoImage name={name} size="tile" />
   );
 }
 
-/** How an entry connects, in one line: its command or address, then its transport. */
 export function connectorLine(entry: McpConfigEntry): string {
   const target = entry.command
     ? `${entry.command}${entry.argsCount > 0 ? ` +${entry.argsCount}` : ""}`
@@ -58,7 +47,6 @@ export function McpDetailDialog({
 }: {
   entry: McpConfigEntry;
   pending: boolean;
-  /** The folder a check runs against (project sources are found through it). */
   workspacePath: string | null;
   onToggle: (enabled: boolean) => void;
   onClose: () => void;
@@ -74,7 +62,6 @@ export function McpDetailDialog({
       );
   };
 
-  // Read-only sources have no action: their state shows in the facts, the reason below.
   const action = entry.writable ? (
     entry.enabled ? (
       <Button size="lg" disabled={pending} onClick={() => onToggle(false)}>
@@ -94,7 +81,9 @@ export function McpDetailDialog({
   ];
   if (tools) facts.push({ label: "Tools", value: String(tools.total) });
 
-  const config: PropertyListItem[] = [{ label: copy.detailSource, value: sourceLabel(entry.source) }];
+  const config: PropertyListItem[] = [
+    { label: copy.detailSource, value: sourceLabel(entry.source) },
+  ];
   if (entry.transport) config.push({ label: copy.detailTransport, value: entry.transport });
   if (entry.command) {
     config.push({
@@ -103,7 +92,8 @@ export function McpDetailDialog({
     });
   }
   if (entry.url) config.push({ label: copy.detailUrl, value: entry.url });
-  if (entry.envKeys.length > 0) config.push({ label: copy.detailEnv, value: entry.envKeys.join(", ") });
+  if (entry.envKeys.length > 0)
+    config.push({ label: copy.detailEnv, value: entry.envKeys.join(", ") });
   if (entry.headerKeys.length > 0) {
     config.push({ label: copy.detailHeaders, value: entry.headerKeys.join(", ") });
   }

@@ -1,5 +1,3 @@
-//! Native visual actions stay inside the granted browser view. This is the small
-//! device adapter beneath Midscene; it never posts global desktop input.
 use crate::browser::{BrowserAgentExecuteRequest, BrowserSessionState};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager, Webview};
@@ -13,8 +11,6 @@ mod linux_dispatch;
 #[cfg(target_os = "linux")]
 use linux_dispatch::dispatch_linux;
 
-/// The modifiers that make a key a browser or system shortcut: Command on
-/// macOS; Control (and the Windows key) elsewhere.
 const COMMAND_MODIFIERS: &[&str] = if cfg!(target_os = "macos") {
     &["Meta"]
 } else {
@@ -84,8 +80,6 @@ pub(in crate::browser) fn validate(input: &Value) -> Result<(), String> {
         }
         _ => false,
     };
-    // Command shortcuts are limited to select-all and undo/redo, so an agent
-    // can never close tabs, open the address bar or reach the clipboard.
     let is_command = |v: &Value| v.as_str().is_some_and(|m| COMMAND_MODIFIERS.contains(&m));
     let safe_shortcut = input["kind"] != "key"
         || !input["modifiers"]
@@ -107,8 +101,6 @@ pub(in crate::browser) fn validate(input: &Value) -> Result<(), String> {
     }
 }
 
-/// Where an action puts the agent cursor, as a fraction of the viewport. Typing
-/// and keys act where the cursor already is, so they leave it in place.
 pub(in crate::browser) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
     let (x, y) = match input["kind"].as_str()? {
         "click" | "scroll" | "move" => ("x", "y"),
@@ -118,9 +110,6 @@ pub(in crate::browser) fn cursor_target(input: &Value) -> Option<(f64, f64)> {
     Some((input[x].as_f64()?, input[y].as_f64()?))
 }
 
-/// Script that glides the agent's in-page cursor to a viewport point and keeps
-/// it there, so the next screenshot shows where the agent is pointing. It is a
-/// drawing only: the user's own pointer never moves.
 pub(in crate::browser) fn cursor_script(input: &Value, viewport: &Value) -> Option<String> {
     let (x, y) = match input["kind"].as_str()? {
         "drag" => (input["fromX"].as_f64()?, input["fromY"].as_f64()?),
@@ -191,7 +180,6 @@ pub(in crate::browser) async fn dispatch(
         let url_view = webview.clone();
         let target = cursor_target(input);
         if let Some(script) = cursor_script(input, &observed["viewport"]) {
-            // Let the user watch the cursor arrive before the input lands.
             let _ = webview.eval(script);
             tokio::time::sleep(std::time::Duration::from_millis(
                 crate::browser::agent_pages::page_agent::CURSOR_GLIDE_MS,
@@ -202,8 +190,6 @@ pub(in crate::browser) async fn dispatch(
         webview
             .with_webview(move |platform| {
                 let result = (|| {
-                    // This closure runs on the main queue. A queued native event
-                    // cannot outlive revoked ownership, takeover, or its grant.
                     crate::agents::task_scopes::authorize_scope(
                         &app,
                         &request.scope_id,
@@ -252,8 +238,6 @@ mod tests;
 #[cfg(windows)]
 pub(crate) mod windows;
 
-/// The agent still owns the task, the page has not navigated or changed since
-/// it was observed, and its origin is the one the agent saw.
 #[cfg(any(windows, target_os = "linux"))]
 fn authorize_native_input(
     app: &AppHandle,

@@ -1,20 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMistyStore, useStudioAgents, useTeammateAgents } from "@/features/agents";
-import { useWindowSpace } from "../components/space-row/useWindowSpace";
-import { useSpaceItemCreator } from "../overview/useSpaceItemCreator";
-import { memberPicture } from "../members/memberPictures";
-import { useSpacesStore } from "./useSpacesStore";
-import { sendAgentStatuses } from "./createSpacesRealtimeActions";
-import { doingLabel, memberAgentsIn, useMemberAgents } from "./memberAgents";
+import { useWindowSpace } from "../components/space-row/use_window_space";
+import { useSpaceItemCreator } from "../overview/use_space_item_creator";
+import { memberPicture } from "../members/member_pictures";
+import { useSpacesStore } from "./use_spaces_store";
+import { sendAgentStatuses } from "./create_spaces_realtime_actions";
+import { doingLabel, memberAgentsIn, useMemberAgents } from "./member_agents";
 
-/** How often a status is repeated while nothing changes, so members who just arrived hear it. */
 const REPEAT_EVERY = 30_000;
 
-/**
- * Keeps a shared Space's members in step on what each other's agents are doing: it tells the
- * others what this person's agents are doing now, as fixed codes, and hands what the others say
- * to the views that show teammates. Nothing is sent for a Space nobody else is in.
- */
 export function SpaceAgentsBroadcast() {
   const space = useWindowSpace();
   const spaceId = space?.id ?? "";
@@ -22,7 +16,6 @@ export function SpaceAgentsBroadcast() {
   const { agents } = useStudioAgents();
   const person = useSpaceItemCreator(spaceId);
   const heard = useMemberAgents((state) => state.bySpace[spaceId]);
-  // The pictures of members whose agents are heard, as they arrive.
   const [faces, setFaces] = useState<Record<string, string | null>>({});
   const members = useSpacesStore((state) => state.membersBySpace[spaceId]);
   const conversations = useMistyStore((state) => state.conversations);
@@ -56,13 +49,11 @@ export function SpaceAgentsBroadcast() {
         ),
       );
     show();
-    // A member who goes quiet drops out without anything arriving to say so.
     const timer = window.setInterval(show, 20_000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `person` is rebuilt every render
   }, [spaceId, heard, faces]);
   useEffect(() => {
-    // Members say which of them have a picture; wait for them before asking.
     if (!spaceId || !shared || !members) return;
     let live = true;
     const owners = new Set(
@@ -82,11 +73,6 @@ export function SpaceAgentsBroadcast() {
   return null;
 }
 
-/**
- * What this person's agents are doing, as told to one Space's members. Agents belong to the
- * person, not to a Space, so an agent busy with a chat in another Space is told as resting here:
- * its work and the files it is changing stay with the Space that work is for.
- */
 export function spaceAgentStatuses(
   agents: readonly {
     agent: { id: string; name: string };
@@ -99,8 +85,6 @@ export function spaceAgentStatuses(
   conversations: readonly { id: string; spaceId?: string }[],
 ) {
   const spaceOf = new Map(conversations.map((chat) => [chat.id, chat.spaceId]));
-  // As much as the server keeps (12 agents, 5 files each): a longer message would be over the
-  // realtime connection's limit, and the server closes a connection that sends one.
   return agents.slice(0, 12).map(({ agent, state, doingCode, files, conversationId }) => {
     const here = state !== "resting" && spaceOf.get(conversationId) === spaceId;
     return {

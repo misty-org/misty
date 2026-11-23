@@ -1,17 +1,15 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { create } from "zustand";
-import { gitApi, gitErrorText, isNotARepo, type BranchInfo, type GitStatus } from "./gitApi";
-import { useFilesStore } from "../files/filesStore";
+import { gitApi, gitErrorText, isNotARepo, type BranchInfo, type GitStatus } from "./git_api";
+import { useFilesStore } from "../files/files_store";
 
 const TTL_MS = 30_000;
 
-/** A file whose diff is shown: staged (index against HEAD) or unstaged and untracked. */
 export interface DiffTarget {
   file: string;
   staged: boolean;
 }
 
-/** Marks a repository path as not a repository after a NOT_A_REPO answer. */
 function notRepoPatch(repository: string) {
   return (state: GitStore) => ({
     notRepoByWorkspace: { ...state.notRepoByWorkspace, [repository]: true },
@@ -24,20 +22,15 @@ interface GitStore {
   notRepoByWorkspace: Record<string, boolean>;
   errorByWorkspace: Record<string, string | null>;
   branchesByWorkspace: Record<string, BranchInfo[] | undefined>;
-  /** When each repository's status was last read, successfully or not, for the TTL. */
   fetchedAtByWorkspace: Record<string, number>;
-  /** The diff open in the panel; null shows the list of changes. */
   diffView: { workspacePath: string; target: DiffTarget } | null;
   openDiff: (workspacePath: string, target: DiffTarget) => void;
   closeDiff: () => void;
-  /** Dismisses a repository's refresh error. */
   clearError: (workspacePath: string) => void;
 
-  /** Reads the status again, unless it was read less than 30 seconds ago and `force` is unset. */
   refresh: (workspacePath: string, force?: boolean) => Promise<void>;
   loadBranches: (workspacePath: string) => Promise<void>;
 
-  // Each change reads the status again afterwards. Errors are thrown on so callers show them.
   stage: (workspacePath: string, files: string[]) => Promise<void>;
   unstage: (workspacePath: string, files: string[]) => Promise<void>;
   discard: (workspacePath: string, files: string[]) => Promise<void>;
@@ -46,16 +39,12 @@ interface GitStore {
   pull: (workspacePath: string) => Promise<void>;
   checkout: (workspacePath: string, branch: string) => Promise<void>;
   createBranch: (workspacePath: string, name: string) => Promise<void>;
-  /** `git init`; resolves once the status has been read out of the not-a-repository state. */
   init: (workspacePath: string) => Promise<void>;
 }
 
-/** One status read in flight per repository. */
 const inflight = new Map<string, Promise<void>>();
 
-/** The file tree's Git colors and badges go stale after any change; it reads them again. */
 function refreshFileTree() {
-  // The files store imports this one's diff view; its binding is read only here, at run time.
   void useFilesStore
     .getState()
     .refreshTree()
@@ -70,7 +59,6 @@ export const useGitStore = create<GitStore>((set, get) => {
       if (isNotARepo(error)) set(notRepoPatch(workspacePath));
       throw new Error(gitErrorText(error));
     } finally {
-      // The status changed, or may have: drop the TTL and read it again.
       set((state) => ({
         fetchedAtByWorkspace: { ...state.fetchedAtByWorkspace, [workspacePath]: 0 },
       }));
@@ -163,10 +151,7 @@ export const useGitStore = create<GitStore>((set, get) => {
     },
     init: async (workspacePath) => {
       await runMutation(workspacePath, () => gitApi.init(workspacePath));
-      // runMutation's refresh isn't awaited; join it (the in-flight map shares it) so the caller
-      // stays busy until the panel leaves the not-a-repository state.
       await get().refresh(workspacePath, true);
-      // That shared read may have started before the repository existed; its answer is stale.
       if (get().notRepoByWorkspace[workspacePath]) await get().refresh(workspacePath, true);
     },
   };

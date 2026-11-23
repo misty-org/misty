@@ -13,13 +13,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  cn,
   IconButton,
+  Mark,
   SkeletonList,
   Text,
   Textarea,
 } from "@misty/ui";
-import { BrandTile } from "../brands/BrandMark";
 import { notifyCliConfigChanged } from "../channels/providers";
 
 import { piFamilyApi, type PiFamilyModelsConfigReadResult } from "./api";
@@ -27,17 +26,12 @@ import {
   extractProviderBlock,
   removeProviderBlock,
   replaceProviderBlock,
-} from "./piFamilyModelsBlocks";
+} from "./pi_family_models_blocks";
 
 import { errorText, ROW, RowsCard, State, type PiEngine } from "./PiFamilyParts";
 
-// ── Custom providers ────────────────────────────────────────────────────────
-
 type ProviderSummary = PiFamilyModelsConfigReadResult["providers"][number];
 
-/** The whole file in one editor, or one provider's block of it at a time (ccgui's per-provider
- *  editor): a block edit is spliced back into the file's own text, so comments, key order and
- *  the other providers stay as they were, and the whole file still gets the loose check. */
 export function CustomProviders({
   engine,
   config,
@@ -90,7 +84,6 @@ export function CustomProviders({
       return;
     }
     const block = extractProviderBlock(config?.text ?? "", format, id);
-    // A provider the block reader can't find (an unusual layout) opens the whole file instead.
     if (!block) {
       edit(`${id} couldn't be found on its own in ${file}; edit it in the whole file.`);
       return;
@@ -149,7 +142,7 @@ export function CustomProviders({
   };
 
   const errorLine = error ? (
-    <Text role="alert" tone="muted" wrap className="text-sm">
+    <Text size="meta" role="alert" tone="muted" wrap>
       {error}
     </Text>
   ) : null;
@@ -199,8 +192,6 @@ export function CustomProviders({
         <div className="grid gap-2">
           <RowsCard>
             {!config ? (
-              // Most people have none or one, so one row: its tile, name and address, the model
-              // count, and Edit and Remove.
               <SkeletonList
                 variant="card"
                 label="Reading custom providers"
@@ -210,20 +201,26 @@ export function CustomProviders({
                 trailing={["text", "icon", "icon"]}
               />
             ) : config.parseError ? (
-              <Text bare as="div" role="alert" tone="muted" className={cn(ROW, "text-sm")}>
+              <Text size="meta" bare as="div" role="alert" tone="muted" className={ROW}>
                 {file} can't be read: {config.parseError}
               </Text>
             ) : config.providers.length === 0 ? (
-              <Text bare as="div" tone="muted" className={cn(ROW, "text-sm")}>
+              <Text size="meta" bare as="div" tone="muted" className={ROW}>
                 No custom providers
               </Text>
             ) : (
               config.providers.map((provider) => (
-                <div key={provider.id} className="border-b last:border-b-0">
-                  <div className={cn(ROW, "border-b-0")}>
-                    <BrandTile mark={null} />
+                <div key={provider.id}>
+                  <div className={ROW}>
+                    <Text
+                      bare
+                      tone="muted"
+                      className="flex size-8 shrink-0 items-center justify-center"
+                    >
+                      <Mark of={null} label={provider.name ?? provider.id} size={20} aria-hidden />
+                    </Text>
                     <div className="grid min-w-0 flex-1">
-                      <Text as="p" full tone="bright" className="text-sm">
+                      <Text size="control" as="p" full>
                         {provider.name ?? provider.id}
                       </Text>
                       {provider.baseUrl ? (
@@ -232,7 +229,7 @@ export function CustomProviders({
                         </Text>
                       ) : null}
                     </div>
-                    <Text bare tone="muted" className="shrink-0 text-xs">
+                    <Text size="meta" bare tone="muted" className="shrink-0">
                       {provider.modelCount === 1 ? "1 model" : `${provider.modelCount} models`}
                     </Text>
                     <State on={provider.hasApiKey} label={provider.hasApiKey ? "Key" : "No key"} />

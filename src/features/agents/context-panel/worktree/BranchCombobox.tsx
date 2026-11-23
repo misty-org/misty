@@ -13,13 +13,10 @@ import {
   Tooltip,
   rowShape,
 } from "@misty/ui";
-import type { BranchInfo } from "./worktreeApi";
+import type { BranchInfo } from "./worktree_api";
 
-/** A branch row: the check column, the name, then where it lives or why it can't be picked. */
 const rowClass = cn(rowShape, "text-meta");
 
-/** A branch picker with a search field, like the changes panel's. `blocked` names show as
- * disabled rows with the reason, never as buttons that do nothing. */
 export function BranchCombobox({
   branches,
   value,
@@ -32,7 +29,6 @@ export function BranchCombobox({
   branches: BranchInfo[];
   value: string | null;
   onSelect(name: string): void;
-  /** The accessible name of the picker. */
   label: string;
   placeholder: string;
   blocked?: Set<string>;

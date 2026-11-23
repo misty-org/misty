@@ -1,11 +1,9 @@
-// The skills hub and the installed-skills cache other features may read.
 export { skillsHubApi } from "./api";
-export { useInstalledSkills } from "./useInstalledSkills";
+export { useInstalledSkills } from "./use_installed_skills";
 export type { DiscoveredSkill, SkillRow, SkillTargetId } from "./types";
-// The pieces Explore's Skills section and a skill's store page (in agents) build from.
 export type { SkillTargetInfo, SkillUsageEntry } from "./types";
-export { EngineGlyph, type Feedback } from "./components";
-export { SkillMarkdown } from "./SkillDetailDialog";
+export { EngineGlyph, type Feedback } from "./Components";
+export { SkillMarkdown } from "./SkillMarkdown";
 export { t as skillsText } from "./strings";
 export { daysSince, relevantTargets, sourceKindOf, usageForSkill } from "./utils";
 export { createInstalledPaneActions } from "./InstalledPane";
@@ -18,4 +16,4 @@ export {
 export { SkillImportDialog } from "./SkillImportDialog";
 export { SkillReposDialog } from "./SkillReposDialog";
 export { SkillUsagePane } from "./SkillUsagePane";
-export { useSkillUsage } from "./useSkillUsage";
+export { useSkillUsage } from "./use_skill_usage";

@@ -5,7 +5,7 @@ function guard(locked, view = window, depth = 0, nativeGuard = false) {
   const visitFrame = frame => {
     try {
       if (frame.contentDocument?.defaultView) guard(view.__MISTY_AGENT_INPUT_LOCKED__, frame.contentDocument.defaultView, depth + 1, nativeGuard);
-    } catch { /* Never bypass a frame's origin or sandbox boundary. */ }
+    } catch {}
   };
   for (const frame of view.document.querySelectorAll("iframe,frame")) visitFrame(frame);
   if (view.__MISTY_AGENT_INPUT_GUARD__) return;
@@ -28,10 +28,6 @@ function guard(locked, view = window, depth = 0, nativeGuard = false) {
         event.preventDefault();
         event.stopImmediatePropagation();
       } else if (type === 'click' && event.target instanceof view.HTMLInputElement && event.target.type === 'file') {
-        // Agent uploads use inspected file inputs and authorized task receipts.
-        // Preserve the site's input and handlers, but do not open an OS picker
-        // that the browser agent cannot observe or operate. Human takeover
-        // restores the input's ordinary default behavior.
         event.preventDefault();
       }
     }, { capture: true, passive: false });

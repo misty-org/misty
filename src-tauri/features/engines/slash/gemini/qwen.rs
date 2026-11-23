@@ -1,24 +1,13 @@
-//! Qwen Code's commands Misty runs out of turn.
-
 use super::*;
 
-// ==================== Qwen Code ====================
-
-/// How long Qwen Code may take to start, attach a session and branch it.
 const QWEN_ACP_TIMEOUT: Duration = Duration::from_secs(120);
-/// The extensions pages Qwen Code's `/extensions explore` opens (`EXTENSION_EXPLORE_URL`).
 const QWEN_EXTENSIONS_URLS: &[(&str, &str)] = &[
     ("Gemini", "https://geminicli.com/extensions/"),
     ("ClaudeCode", "https://claudemarketplaces.com/"),
 ];
-/// `/upgrade`'s page: Qwen Chat's plans, with the parameters Qwen Code adds
-/// (`getQwenSubscriptionPlansUrl("cli")`).
 const QWEN_PLANS_URL: &str =
     "https://chat.qwen.ai/?memberPlan=qwen_code&entry=qwen_code&paywallScene=cli";
-/// The GitHub Action `/setup-github` installs, at its quick start.
 const QWEN_ACTION_URL: &str = "https://github.com/QwenLM/qwen-code-action#quick-start";
-/// `/recap` as a message: Qwen Code's own recap instructions (`RECAP_SYSTEM_PROMPT`), without
-/// the tags its side query parses.
 const QWEN_RECAP_PROMPT: &str = "The user stepped away and is coming back. Recap this session in under 40 words, 1-2 plain sentences, no markdown. Lead with the overall goal and current task, then the one next action. Skip root-cause narrative, fix internals, secondary to-dos, and em-dash tangents.";
 
 pub(super) async fn run_qwen(context: Context, name: &str) -> Result<Output, String> {
@@ -51,7 +40,6 @@ pub(super) async fn run_qwen(context: Context, name: &str) -> Result<Output, Str
     }
 }
 
-/// Qwen Code's folder: `QWEN_HOME`, else `~/.qwen`.
 fn qwen_dir() -> Option<PathBuf> {
     std::env::var_os("QWEN_HOME")
         .filter(|dir| !dir.is_empty())
@@ -59,8 +47,6 @@ fn qwen_dir() -> Option<PathBuf> {
         .or_else(|| files::home().map(|home| home.join(".qwen")))
 }
 
-/// `/extensions explore [source]` opens the page (Gemini's extensions by default); every other
-/// subcommand runs over ACP, so it goes to the turn.
 fn qwen_extensions(args: &str) -> Result<Output, String> {
     let (sub, rest) = args.split_once(char::is_whitespace).unwrap_or((args, ""));
     if sub != "explore" {
@@ -79,8 +65,6 @@ fn qwen_extensions(args: &str) -> Result<Output, String> {
         .ok_or_else(|| format!("Unknown extensions source: {source}. Use Gemini or ClaudeCode."))
 }
 
-/// The memory files Qwen Code loads: `context.fileName` from its settings (QWEN.md and
-/// AGENTS.md by default) in `~/.qwen` and in the project's folders.
 fn qwen_memory(folder: Option<&Path>) -> Output {
     let dir = qwen_dir();
     let configured = dir
@@ -113,8 +97,6 @@ fn qwen_memory(folder: Option<&Path>) -> Output {
     )
 }
 
-/// `/commit` as a message: Qwen Code's own `/commit` prompt, read from the installed CLI so it
-/// matches its version, with the person's instructions after it as the CLI adds them.
 fn qwen_commit(instructions: &str) -> Result<Output, String> {
     let prompt = qwen_commit_prompt().ok_or(
         "Couldn't find Qwen Code's /commit prompt in the installed CLI. Update Qwen Code, or ask for the commit in a message.",
@@ -126,8 +108,10 @@ fn qwen_commit(instructions: &str) -> Result<Output, String> {
     }))
 }
 
-/// `COMMIT_PROMPT` from the installed Qwen Code: the package beside the `qwen` program keeps
-/// its code in `chunks/*.js`, and the prompt is a template literal there.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "reads the /commit prompt from Qwen Code's installed package, which lives outside the gate"
+)]
 fn qwen_commit_prompt() -> Option<String> {
     const START: &str = "var COMMIT_PROMPT=`";
     let package = qwen_package_dir()?;
@@ -150,7 +134,10 @@ fn qwen_commit_prompt() -> Option<String> {
     None
 }
 
-/// The folder of the installed Qwen Code package: where the `qwen` program's link points.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "finds the package of Qwen Code's installed program, which lives outside the gate"
+)]
 fn qwen_package_dir() -> Option<PathBuf> {
     let settings = crate::engines::support::settings::read_settings().unwrap_or_default();
     let bin = crate::engines::engine_bin(&settings, "qwen");
@@ -166,9 +153,6 @@ fn qwen_package_dir() -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-/// A JavaScript template literal's text, from just after its opening backtick to the closing
-/// one, with its escapes undone. None for one that interpolates (`${`), which can't be read
-/// without running it.
 fn template_literal(text: &str) -> Option<String> {
     let mut out = String::new();
     let mut chars = text.chars();
@@ -200,10 +184,6 @@ fn template_literal(text: &str) -> Option<String> {
     None
 }
 
-/// `/branch [name]`: Qwen Code's own session branch (`qwen/control/session/branch`, the ACP
-/// extension method behind its terminal app's `/branch`), which copies the session's records
-/// into a new one without a model call. The session has to be live in the process, so it's
-/// loaded first. The new session opens as a new chat.
 async fn qwen_branch(context: &Context) -> Result<Output, String> {
     let session = context
         .session
@@ -285,7 +265,6 @@ async fn qwen_branch(context: &Context) -> Result<Output, String> {
     })
 }
 
-/// An out-of-turn ACP call has nothing to grant: any request the CLI makes is refused.
 pub(super) fn refuse_requests(line: &AcpLine) -> Option<Value> {
     match line {
         AcpLine::AgentRequest { id, .. } => Some(acp::jsonrpc_error_response(
@@ -297,7 +276,6 @@ pub(super) fn refuse_requests(line: &AcpLine) -> Option<Value> {
     }
 }
 
-/// The message part of an `rpc:<code>:<method>: <message>` error.
 fn bare_rpc_error(error: &str) -> String {
     error
         .strip_prefix("rpc:")

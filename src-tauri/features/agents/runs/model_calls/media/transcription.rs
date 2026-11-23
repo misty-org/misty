@@ -1,5 +1,3 @@
-//! Transcription. `transcribe` is ported from the `ai` package, and the models from `@ai-sdk/openai`
-//! and `@ai-sdk/gateway`, with Soniox in its own file.
 use std::sync::Arc;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -49,7 +47,6 @@ pub trait TranscriptionModel: Send + Sync {
     ) -> BoxFuture<'a, Result<TranscriptionResponse, ModelError>>;
 }
 
-/// `max_retries` of `None` is the SDK's default of 2.
 pub async fn transcribe(
     model: &dyn TranscriptionModel,
     audio: &[u8],
@@ -97,7 +94,6 @@ struct OpenAiTranscript {
     segments: Option<Vec<OpenAiSegment>>,
 }
 
-/// OpenAI names a language in full, and the SDK reports its ISO-639-1 code.
 fn language_code(language: &str) -> Option<&'static str> {
     Some(match language {
         "afrikaans" => "af",
@@ -169,7 +165,6 @@ struct OpenAiTranscriptionModel {
 }
 
 impl TranscriptionModel for OpenAiTranscriptionModel {
-    // The runtime passes OpenAI no provider options, so none are read.
     fn do_generate<'a>(
         &'a self,
         audio: &'a [u8],
@@ -177,7 +172,9 @@ impl TranscriptionModel for OpenAiTranscriptionModel {
         _provider_options: Option<&'a ProviderOptions>,
     ) -> BoxFuture<'a, Result<TranscriptionResponse, ModelError>> {
         Box::pin(async move {
-            if self.model == "gpt-realtime-whisper" || self.model.starts_with("gpt-realtime-whisper-") {
+            if self.model == "gpt-realtime-whisper"
+                || self.model.starts_with("gpt-realtime-whisper-")
+            {
                 return Err(ModelError::Unsupported(format!(
                     "'non-streaming transcription with {}' functionality not supported.",
                     self.model
@@ -185,13 +182,26 @@ impl TranscriptionModel for OpenAiTranscriptionModel {
             }
             let mut form = Form::new();
             form.text("model", &self.model);
-            form.file("file", &format!("audio.{}", extension(media_type)), media_type, audio);
+            form.file(
+                "file",
+                &format!("audio.{}", extension(media_type)),
+                media_type,
+                audio,
+            );
             if self.model == "whisper-1" {
                 form.text("response_format", "verbose_json");
             }
             let content_type = form.content_type();
             let headers = [("authorization", format!("Bearer {}", self.api_key))];
-            let response = post_body(&self.client, &self.url, &headers, &content_type, form.finish(), &self.api_key).await?;
+            let response = post_body(
+                &self.client,
+                &self.url,
+                &headers,
+                &content_type,
+                form.finish(),
+                &self.api_key,
+            )
+            .await?;
             if !response.status().is_success() {
                 return Err(failure(response, &self.api_key, openai_error_message).await);
             }
@@ -199,18 +209,30 @@ impl TranscriptionModel for OpenAiTranscriptionModel {
             let segments = match (parsed.segments, parsed.words) {
                 (Some(segments), _) => segments
                     .into_iter()
-                    .map(|segment| TranscriptSegment { text: segment.text, start_second: segment.start, end_second: segment.end })
+                    .map(|segment| TranscriptSegment {
+                        text: segment.text,
+                        start_second: segment.start,
+                        end_second: segment.end,
+                    })
                     .collect(),
                 (None, Some(words)) => words
                     .into_iter()
-                    .map(|word| TranscriptSegment { text: word.word, start_second: word.start, end_second: word.end })
+                    .map(|word| TranscriptSegment {
+                        text: word.word,
+                        start_second: word.start,
+                        end_second: word.end,
+                    })
                     .collect(),
                 (None, None) => Vec::new(),
             };
             Ok(TranscriptionResponse {
                 text: parsed.text,
                 segments,
-                language: parsed.language.as_deref().and_then(language_code).map(str::to_owned),
+                language: parsed
+                    .language
+                    .as_deref()
+                    .and_then(language_code)
+                    .map(str::to_owned),
                 duration_in_seconds: parsed.duration,
                 warnings: Vec::new(),
                 provider_metadata: None,
@@ -250,18 +272,29 @@ impl TranscriptionModel for GatewayTranscriptionModel {
         provider_options: Option<&'a ProviderOptions>,
     ) -> BoxFuture<'a, Result<TranscriptionResponse, ModelError>> {
         Box::pin(async move {
-            // The SDK always passes provider options here, even when there are none.
             let body = json!({
                 "audio": STANDARD.encode(audio),
                 "mediaType": media_type,
                 "providerOptions": provider_options.cloned().unwrap_or_default(),
             });
-            let bytes = serde_json::to_vec(&body)
-                .map_err(|error| ModelError::Unsupported(format!("The request couldn't be built: {error}")))?;
+            let bytes = serde_json::to_vec(&body).map_err(|error| {
+                ModelError::Unsupported(format!("The request couldn't be built: {error}"))
+            })?;
             let mut headers = auth_headers(&self.api_key);
-            headers.push(("ai-transcription-model-specification-version", "4".to_owned()));
+            headers.push((
+                "ai-transcription-model-specification-version",
+                "4".to_owned(),
+            ));
             headers.push(("ai-model-id", self.model.clone()));
-            let response = post_body(&self.client, &self.url, &headers, "application/json", bytes, &self.api_key).await?;
+            let response = post_body(
+                &self.client,
+                &self.url,
+                &headers,
+                "application/json",
+                bytes,
+                &self.api_key,
+            )
+            .await?;
             let response = checked(response, &self.api_key).await?;
             let parsed: GatewayTranscript = read_json(response).await?;
             Ok(TranscriptionResponse {
@@ -276,7 +309,6 @@ impl TranscriptionModel for GatewayTranscriptionModel {
     }
 }
 
-/// `resolveTranscriptionModel`: one transcription model on the route's key.
 pub fn resolve_transcription_model(
     model_id: &str,
     route: &ModelRoute,
@@ -292,16 +324,27 @@ pub fn resolve_transcription_model(
         )?)),
         ProviderId::Openai => Ok(Arc::new(OpenAiTranscriptionModel {
             client: client.clone(),
-            url: format!("{}/audio/transcriptions", target.base_url.as_deref().unwrap_or(OPENAI_BASE_URL)),
+            url: format!(
+                "{}/audio/transcriptions",
+                target.base_url.as_deref().unwrap_or(OPENAI_BASE_URL)
+            ),
             api_key: target.api_key,
             model: target.model,
         })),
         ProviderId::Gateway => Ok(Arc::new(GatewayTranscriptionModel {
             client: client.clone(),
-            url: format!("{}/transcription-model", target.base_url.as_deref().unwrap_or(gateway::DEFAULT_BASE_URL)),
+            url: format!(
+                "{}/transcription-model",
+                target
+                    .base_url
+                    .as_deref()
+                    .unwrap_or(gateway::DEFAULT_BASE_URL)
+            ),
             api_key: target.api_key,
             model: target.model,
         })),
-        _ => Err(ModelError::unsupported_model("This provider has no transcription models.")),
+        _ => Err(ModelError::unsupported_model(
+            "This provider has no transcription models.",
+        )),
     }
 }

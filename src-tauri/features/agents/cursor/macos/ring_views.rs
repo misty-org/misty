@@ -1,5 +1,3 @@
-//! The mist inside one browser page and inside a whole Misty window while an
-//! agent controls it.
 use std::{cell::RefCell, ffi::c_void};
 
 use block2::RcBlock;
@@ -32,10 +30,6 @@ thread_local! {
     static WINDOW_RING: RefCell<Option<WindowRing>> = const { RefCell::new(None) };
 }
 
-/// The same mist inside one browser page while an agent holds it. `view` is the
-/// page's WKWebView; the mist is its subview, so it follows the page's bounds
-/// and rounded corners. WebKit snapshots draw web content only, so the agent's
-/// captures never include it.
 pub(crate) fn page_ring(view: *mut c_void, active: bool) {
     // SAFETY: the caller passes a live WKWebView, retained here as the block capture was.
     let page = unsafe { Retained::retain(view.cast::<NSView>()) }.map(MainOnly);
@@ -57,7 +51,6 @@ pub(crate) fn page_ring(view: *mut c_void, active: bool) {
     });
 }
 
-/// The window's own corner radius, which varies by macOS version and style.
 fn window_corner_radius(window: &NSWindow) -> f64 {
     if window.styleMask().contains(NSWindowStyleMask::FullScreen) {
         return 0.0;
@@ -93,9 +86,6 @@ fn remove_window_ring() {
     ring.panel.orderOut(None);
 }
 
-/// The same mist inside a whole Misty window while an agent controls it. `view`
-/// is any view in that window. The mist is a click-through child panel, so it
-/// moves with the window, and window capture (one window only) leaves it out.
 pub(crate) fn window_ring(view: *mut c_void, active: bool) {
     // SAFETY: the caller passes null or a live view of the window.
     let anchor = unsafe { Retained::retain(view.cast::<NSView>()) }.map(MainOnly);
@@ -123,7 +113,6 @@ pub(crate) fn window_ring(view: *mut c_void, active: bool) {
         }
         remove_window_ring();
         let panel = ring_panel(mtm, window.frame());
-        // Above the window it covers, not above other apps.
         panel.setLevel(window.level());
         panel.setCollectionBehavior(
             NSWindowCollectionBehavior::FullScreenAuxiliary
@@ -168,7 +157,6 @@ pub(crate) fn window_ring(view: *mut c_void, active: bool) {
     });
 }
 
-/// While an agent waits for the person every mist thins instead of disappearing.
 pub(crate) fn mist_waiting(waiting: bool) {
     on_main_later(move |_| set_waiting(waiting));
 }

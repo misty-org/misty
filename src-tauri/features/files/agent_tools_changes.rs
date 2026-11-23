@@ -1,7 +1,3 @@
-//! The `files.*` tools that change something: new folders, renames, moves and copies, Agent trash,
-//! tags, and (only while the person allows it) deleting. Each path is admitted for writing first;
-//! a copy's sources only for reading. Nothing here overwrites: a name that is taken is refused,
-//! and a move that would cross drives (a copy and a delete) is refused too.
 use std::path::Path;
 
 use file_access::{disk::fs_disk, Access};
@@ -17,12 +13,10 @@ use crate::files::{
     failed, search,
 };
 
-/// A path as a result shows it.
 fn shown(path: &Path) -> String {
     path.display().to_string()
 }
 
-/// A name for an item: not empty, no folder separators, short enough for every drive.
 fn valid_name(name: &str) -> Result<&str, String> {
     let name = name.trim();
     let bad = name.is_empty()
@@ -31,17 +25,18 @@ fn valid_name(name: &str) -> Result<&str, String> {
         || name.len() > 255
         || name.contains(['/', '\\', '\0']);
     if bad {
-        return Err(format!("{name:?} can't be a name: use one without slashes."));
+        return Err(format!(
+            "{name:?} can't be a name: use one without slashes."
+        ));
     }
     Ok(name)
 }
 
-/// Whether a rename failed because the two places are on different drives.
 fn crosses_drives(error: &std::io::Error) -> bool {
     #[cfg(unix)]
     let code = libc::EXDEV;
     #[cfg(windows)]
-    let code = 17; // ERROR_NOT_SAME_DEVICE
+    let code = 17;
     #[cfg(not(any(unix, windows)))]
     let code = -1;
     error.raw_os_error() == Some(code)
@@ -73,7 +68,6 @@ pub(super) fn rename(input: &Value) -> Result<Value, String> {
     if target == path {
         return Ok(json!({ "renamed": { "from": shown(&path), "to": shown(&target) } }));
     }
-    // A change of case alone renames in place, though a case-blind drive says the name is taken.
     let case_only = display_name(&path).to_lowercase() == name.to_lowercase();
     if !case_only && fs_disk::exists(&target) {
         return Err(format!("An item named {name} is there already."));
@@ -83,7 +77,6 @@ pub(super) fn rename(input: &Value) -> Result<Value, String> {
     Ok(json!({ "renamed": { "from": shown(&path), "to": shown(&target) } }))
 }
 
-/// Copies one item to `target`: a folder whole, a link as a link.
 fn copy_item(source: &Path, target: &Path) -> std::io::Result<()> {
     let meta = fs_disk::symlink_metadata(source)?;
     if meta.file_type().is_symlink() {
@@ -96,7 +89,6 @@ fn copy_item(source: &Path, target: &Path) -> std::io::Result<()> {
     fs_disk::copy(source, target).map(|_| ())
 }
 
-/// Moves or copies one item into `folder`, answering where it went.
 fn transfer_one(source: &str, folder: &Path, copy: bool) -> Result<Value, String> {
     let source = admit(source, if copy { Access::Read } else { Access::Write })?;
     let name = display_name(&source);
@@ -150,7 +142,6 @@ pub(super) fn transfer(input: &Value, copy: bool) -> Result<Value, String> {
     Ok(result)
 }
 
-/// Into Agent trash, never the system Trash: the person looks it over and decides.
 pub(super) fn trash(app: &AppHandle, agent: &Agent, input: &Value) -> Result<Value, String> {
     let paths = path_list(input, "paths")?;
     let (mut done, mut failures) = (Vec::new(), Vec::new());
@@ -173,7 +164,6 @@ pub(super) fn trash(app: &AppHandle, agent: &Agent, input: &Value) -> Result<Val
     }))
 }
 
-/// Sets an item's Finder tags (all of them: the list replaces what it had).
 pub(super) fn tag(input: &Value) -> Result<Value, String> {
     if !cfg!(target_os = "macos") {
         return Err("Tags are Finder's, so they work only on a Mac.".into());
@@ -211,8 +201,6 @@ pub(super) fn tag(input: &Value) -> Result<Value, String> {
     Ok(json!({ "tagged": done, "tags": tags, "failed": failures }))
 }
 
-/// Deletes for good. Offered only while the person let agents delete files, and every call has
-/// asked them first (`tool_policy.rs`), whatever the mode.
 pub(super) fn delete(input: &Value) -> Result<Value, String> {
     let paths = path_list(input, "paths")?;
     let (mut done, mut failures) = (Vec::new(), Vec::new());

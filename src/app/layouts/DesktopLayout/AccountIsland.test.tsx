@@ -7,8 +7,15 @@ vi.mock("@/features/agents", () => ({
   useMistyPanelStore: (select: (state: { chatOpen: boolean }) => boolean) =>
     select({ chatOpen: false }),
 }));
-vi.mock("@/features/account", () => ({ openSignInSheet: agents.openSignInSheet }));
-vi.mock("@/features/settings", () => ({ preloadSettingsWorkspace: () => Promise.resolve() }));
+vi.mock("@/features/account", () => ({
+  openSignInSheet: agents.openSignInSheet,
+  BannerDialog: () => null,
+}));
+vi.mock("@/features/settings", () => ({
+  openSettings: vi.fn(),
+  preloadSettingsWorkspace: () => Promise.resolve(),
+}));
+vi.mock("@/features/direct", () => ({ CallAudioControls: () => null }));
 vi.mock("./NavRail", () => ({
   AccountNavButton: (props: object) => (
     <button type="button" {...props}>
@@ -17,8 +24,12 @@ vi.mock("./NavRail", () => ({
   ),
 }));
 vi.mock("./AccountMenu", () => ({ AccountMenu: () => null }));
-vi.mock("./StatusMenu", () => ({ StatusMenu: () => null, useMyCustomStatus: () => "" }));
-vi.mock("@/features/direct", () => ({ useMyPresence: () => "online" }));
+vi.mock("./StatusMenu", () => ({
+  CustomStatusDialog: () => null,
+  useMyCustomStatus: () => "",
+  useMyShownPresence: () => "online",
+  useStatusMirror: () => undefined,
+}));
 
 import { NoticeViewport } from "@misty/ui";
 import { AccountIsland } from "./AccountIsland";

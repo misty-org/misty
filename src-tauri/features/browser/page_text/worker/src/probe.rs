@@ -1,7 +1,3 @@
-//! Debug builds only, so it can't exist in a release: lets a test ask the real worker, inside its
-//! real profile, to do what the profile forbids. A test of the profile alone wouldn't show that this
-//! binary is the thing being held to it.
-// The point here is to try the plain calls and be refused by the OS, not by the app's file gate.
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use std::{
@@ -12,7 +8,6 @@ use std::{
     time::Duration,
 };
 
-/// `probe <what> <argument>` answers `ok` or `refused`.
 pub(super) fn run(input: &[u8]) -> Option<String> {
     let line = std::str::from_utf8(input).ok()?.strip_prefix("probe ")?;
     let (what, argument) = line.trim().split_once(' ')?;

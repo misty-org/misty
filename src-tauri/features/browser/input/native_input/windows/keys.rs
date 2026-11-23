@@ -1,4 +1,3 @@
-//! CDP's descriptions of mouse events, modifiers and keys.
 use super::*;
 
 pub(super) fn mouse(kind: &str, x: f64, y: f64, button: &str, buttons: u8, clicks: u64) -> Value {
@@ -12,7 +11,6 @@ pub(super) fn mouse(kind: &str, x: f64, y: f64, button: &str, buttons: u8, click
     })
 }
 
-/// CDP's modifier bits: Alt 1, Control 2, Meta 4, Shift 8.
 pub(super) fn modifier_bits(modifiers: &Value) -> u8 {
     modifiers.as_array().map_or(0, |list| {
         list.iter().fold(0, |bits, value| {
@@ -27,8 +25,6 @@ pub(super) fn modifier_bits(modifiers: &Value) -> u8 {
     })
 }
 
-/// A key as CDP describes it: its `key`, physical `code`, Windows virtual-key
-/// code, the text it types, and whether it needs Shift on a US layout.
 pub(super) struct Key {
     pub(super) key: String,
     pub(super) code: String,
@@ -62,13 +58,11 @@ pub(super) fn key(name: &str) -> Option<Key> {
     })
 }
 
-/// A single printable ASCII character on a US layout.
 pub(super) fn printable(name: &str) -> Option<Key> {
     let &[byte] = name.as_bytes() else {
         return None;
     };
     let character = byte as char;
-    // Shifted punctuation types through its unshifted key.
     const SHIFTED: &str = r#"!@#$%^&*()_+{}|:"<>?~"#;
     const BASE: &str = r#"1234567890-=[]\;',./`"#;
     let base = SHIFTED
@@ -102,8 +96,6 @@ pub(super) fn printable(name: &str) -> Option<Key> {
     })
 }
 
-/// The editing command a select-all or undo shortcut runs in an editable
-/// field, so it acts on the page's own editor, as WebKit's does.
 pub(super) fn editing_command(name: &str, bits: u8) -> Option<&'static str> {
     match name.to_ascii_lowercase().as_str() {
         "a" => Some("selectAll"),

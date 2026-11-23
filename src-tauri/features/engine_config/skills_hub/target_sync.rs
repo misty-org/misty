@@ -11,11 +11,7 @@ use super::core::*;
 use super::fsutil::*;
 use super::registry::*;
 use super::scan::*;
-// ===== classify / scan / sync / remove / the installed list =====
 
-/// The three disk states of one (skill, target) (the multi-folder core of upstream classifyTargetSkill):
-/// present under any baseDir (a resolvable link or a real folder) → "synced" (short-circuits);
-/// else a dangling link → "orphan"; else "off".
 pub(super) fn classify_in_dirs(directory: &str, base_dirs: &[PathBuf]) -> &'static str {
     let mut state = "off";
     for base_dir in base_dirs {
@@ -39,7 +35,6 @@ pub(super) fn classify_target_skill(directory: &str, target_id: &str) -> &'stati
     classify_in_dirs(directory, &target_dirs(target))
 }
 
-/// upstream scanTargetSkill: true when the candidate exists under any baseDir (links included).
 pub(super) fn scan_target_skill(directory: &str, target_id: &str) -> bool {
     let Some(target) = target_by_id(target_id) else {
         return false;
@@ -51,8 +46,6 @@ pub(super) fn scan_target_skill(directory: &str, target_id: &str) -> bool {
     })
 }
 
-/// The local source folder recorded at import: the person's own files, which sync and remove must
-/// avoid, or managing it would silently overwrite or delete their local copy.
 fn preserved_source_for(directory: &str) -> Option<PathBuf> {
     let registry = read_registry();
     registry
@@ -66,7 +59,6 @@ fn preserved_source_for(directory: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-/// upstream syncSkillToTarget: a link from the SSOT into the target, falling back to a full recursive copy on any failure.
 pub(super) fn sync_skill_to_target(directory: &str, target_id: &str) -> SkillResult<()> {
     let target = target_by_id(target_id)
         .ok_or_else(|| SkillError::other(format!("Unsupported target: {target_id}")))?;
@@ -80,7 +72,6 @@ pub(super) fn sync_skill_to_target(directory: &str, target_id: &str) -> SkillRes
     for base_dir in target_dirs(target) {
         let dest = target_skill_path(&base_dir, directory)
             .ok_or_else(|| SkillError::other(format!("Invalid skill directory: {directory}")))?;
-        // The person's own source copy stays as it is; it already counts as this target's copy.
         if preserved.as_deref() == Some(dest.as_path()) {
             continue;
         }
@@ -96,7 +87,6 @@ pub(super) fn sync_skill_to_target(directory: &str, target_id: &str) -> SkillRes
     Ok(())
 }
 
-/// upstream removeSkillFromTarget: removePath, then clear empty ancestors up to baseDir.
 pub(super) fn remove_skill_from_target(directory: &str, target_id: &str) {
     let Some(target) = target_by_id(target_id) else {
         return;
@@ -116,10 +106,6 @@ pub(super) fn remove_skill_from_target(directory: &str, target_id: &str) {
     }
 }
 
-// ===== Multi-target results (reported per target, a partial failure never hidden behind one ok) =====
-
-/// Syncs each target and collects the results, so the UI can tell "all synced" from "some failed"
-/// rather than getting a blanket success.
 pub(super) fn sync_targets_with_results(
     directory: &str,
     target_ids: &[String],
@@ -138,15 +124,10 @@ pub(super) fn sync_targets_with_results(
     (all_ok, results)
 }
 
-/// Removes from each target and reads the result back: ok = no folder or dangling link of the skill
-/// left there. Deleting is best-effort (as upstream), but the result isn't silent: the UI can say
-/// which engine's copy wasn't fully removed. `kept` marks a target holding the person's own source
-/// copy (never in scope for deletion, so keeping it is the right result), which the UI mustn't call removed.
 pub(super) fn remove_targets_with_results(directory: &str, target_ids: &[String]) -> Vec<Value> {
     let preserved = preserved_source_for(directory);
     let mut results = Vec::new();
     for target_id in target_ids {
-        // The person's own source copy isn't in scope for deletion: keeping it is the right result.
         let keep_preserved = preserved.as_deref().is_some_and(|path| {
             target_by_id(target_id).is_some_and(|target| {
                 target_dirs(target)
@@ -166,7 +147,6 @@ pub(super) fn remove_targets_with_results(directory: &str, target_ids: &[String]
     results
 }
 
-/// Checks the target list from the renderer: an unknown id is refused (not silently dropped).
 pub(super) fn validate_targets(target_ids: &[String]) -> SkillResult<()> {
     for id in target_ids {
         if target_by_id(id).is_none() {
@@ -179,7 +159,6 @@ pub(super) fn validate_targets(target_ids: &[String]) -> SkillResult<()> {
     Ok(())
 }
 
-/// Finds a registry skill by `id == id || key == id` (shared by several upstream mutations).
 pub(super) fn find_skill_position(skills: &[Value], id: &str) -> Option<usize> {
     skills.iter().position(|entry| {
         entry.get("id").and_then(Value::as_str) == Some(id)
@@ -187,7 +166,6 @@ pub(super) fn find_skill_position(skills: &[Value], id: &str) -> Option<usize> {
     })
 }
 
-/// upstream listInstalledSkills: purge the trash, then merge managed and unmanaged, sorted by name.
 pub(super) fn list_installed_skills() -> Vec<Value> {
     purge_expired_trash();
     let registry = read_registry();
@@ -211,7 +189,6 @@ pub(super) fn list_installed_skills() -> Vec<Value> {
         let mut targets: Vec<Value> = Vec::new();
         for target in TARGETS.iter() {
             let mut state = classify_target_skill(&directory, target.id);
-            // The registry wants it but it's gone from disk → orphan.
             if state == "off" && intended.contains(target.id) {
                 state = "orphan";
             }
@@ -232,13 +209,9 @@ pub(super) fn list_installed_skills() -> Vec<Value> {
         .map(|skill| js_string(skill.get("directory")).to_lowercase())
         .collect();
 
-    // Unmanaged: the local skills of every target plus the read-only sources (Codex `.system`, Codex
-    // plugin cache), merged across sources by lowercased directory. Skills from read-only sources are
-    // marked with sourceKind/readonly so the UI turns off their delete.
     let mut unmanaged: Vec<Value> = Vec::new();
     let mut unmanaged_index: HashMap<String, usize> = HashMap::new();
 
-    /// Source priority when merging the same skill: read-only protection outranks a plain local entry.
     fn kind_rank(kind: &str) -> u8 {
         match kind {
             "builtin" => 4,
@@ -270,8 +243,6 @@ pub(super) fn list_installed_skills() -> Vec<Value> {
             let fallback =
                 install_name_from_directory(&directory).unwrap_or_else(|| directory.clone());
             let metadata = read_skill_metadata(&markdown, &fallback);
-            // Built-in skill names (Misty ships none today) and the read-only source
-            // folders themselves are all read-only.
             let kind = if is_bundled_skill_name(&directory) {
                 "builtin".to_string()
             } else if let Some(kind) = readonly_kind {
@@ -315,7 +286,6 @@ pub(super) fn list_installed_skills() -> Vec<Value> {
                 entry["sourceKind"] = json!(kind);
                 entry["readonly"] = json!(kind != "local");
             }
-            // A read-only source isn't any engine's managed copy: it takes no part in targetStates' synced flags.
             let Some(target) = target else {
                 if let Some(paths) = entry.get_mut("targetPaths").and_then(Value::as_object_mut) {
                     let label = format!("{}:{}", kind, base_dir.to_string_lossy());
@@ -334,7 +304,6 @@ pub(super) fn list_installed_skills() -> Vec<Value> {
                 states.insert(target.id.to_string(), json!("synced"));
             }
             if let Some(paths) = entry.get_mut("targetPaths").and_then(Value::as_object_mut) {
-                // Only the first target path that matches is recorded.
                 paths
                     .entry(target.id.to_string())
                     .or_insert_with(|| json!(base_dir.join(&directory).to_string_lossy()));
@@ -343,14 +312,10 @@ pub(super) fn list_installed_skills() -> Vec<Value> {
     }
 
     managed.extend(unmanaged);
-    // Code point order (a planned difference from upstream's localeCompare); Rust's sort_by is stable.
     managed.sort_by_key(|a| js_string(a.get("name")));
     managed
 }
 
-/// Reads an installed or local skill's SKILL.md (for the details panel). The folder argument goes
-/// through the same relative-path sanitizing and link checks as every other entry point; only the
-/// text and a truncation flag come back, and no absolute path from the renderer is accepted.
 pub(super) const SKILL_CONTENT_MAX_BYTES: usize = 512 * 1024;
 
 pub(super) fn read_skill_content(directory: &str) -> SkillResult<Value> {
@@ -400,11 +365,6 @@ pub(super) fn read_skill_content(directory: &str) -> SkillResult<Value> {
     ))
 }
 
-/// Repoints engines' skill links that lead into another of Misty's folders at this one's copy of
-/// the skill. A new release version's folder starts as a copy of the last one, and the layout from
-/// before profiles moved into the first profile, so a link made then still leads to the old place.
-/// Dev builds only take over links from the layout before profiles: links into a release
-/// version's folder belong to whichever release ran last.
 pub(super) fn repoint_links_from_other_folders() {
     use file_access::paths::{self, Profile};
     let (Some(root), Some(own)) = (paths::misty_root_dir(), paths::misty_home_dir()) else {
@@ -438,9 +398,6 @@ pub(super) fn repoint_links_from_other_folders() {
     }
 }
 
-/// The skill `points_at` names when it lies in another of Misty's folders' skills hub: the layout
-/// from before profiles (`~/.misty/engine-config/...`), or, for a release build, another release
-/// version's (`~/.misty/rel/<version>/engine-config/...`).
 fn skill_in_other_folder(
     points_at: &Path,
     root: &Path,

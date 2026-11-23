@@ -1,10 +1,7 @@
-//! Push-to-talk microphone for the agent at your cursor, on the voice capture crate.
-//! Captures 16 kHz mono and hands the realtime voice session 24 kHz PCM16.
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 use voice_capture::{AudioSource, Capture, Resampler};
 
-/// One minute of 16 kHz audio; the host also stops the turn at 60 s.
 const LIMIT: usize = 16_000 * 60;
 
 pub struct Recording {
@@ -15,7 +12,6 @@ pub struct Recording {
     sequence: usize,
 }
 impl Recording {
-    /// Starts recording.
     pub fn start(app: AppHandle, turn: u64) -> Result<Self, String> {
         super::platform::microphone_access()?;
         let samples = Arc::new(Mutex::new(Vec::new()));
@@ -34,7 +30,7 @@ impl Recording {
                 );
             },
             move |e| {
-                let _ = crate::browser::app_windows::emit_to_primary(
+                crate::browser::app_windows::emit_to_primary(
                     &app,
                     "misty://cursor-error",
                     serde_json::json!({"turn":turn,"error":format!("Microphone stopped: {e}")}),
@@ -71,8 +67,6 @@ impl Recording {
             .unwrap_or(0);
         (self.sequence, pcm, duration)
     }
-    /// Audio captured since the last call, as 24 kHz mono PCM16 bytes. The
-    /// resampler keeps its phase across calls, so chunks join without a click.
     fn pending(&mut self) -> Option<Vec<u8>> {
         let fresh: Vec<i16> = {
             let samples = self.samples.lock().ok()?;

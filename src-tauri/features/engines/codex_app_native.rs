@@ -1,10 +1,5 @@
-//! Codex's own terminal commands (`/compact`, `/review`, `/init`) as the app-server runs them,
-//! and the turn id a turn they start reports in its `turn/started`.
-
 use serde_json::{json, Value};
 
-/// The turn id a `turn/started` notification gives for `thread`; another thread's (a
-/// sub-agent's) is not this turn's.
 pub(super) fn started_turn_id<'a>(value: &'a Value, thread: &str) -> Option<&'a str> {
     if value.get("method").and_then(Value::as_str) != Some("turn/started")
         || value.pointer("/params/threadId").and_then(Value::as_str) != Some(thread)
@@ -17,17 +12,12 @@ pub(super) fn started_turn_id<'a>(value: &'a Value, thread: &str) -> Option<&'a 
         .filter(|id| !id.is_empty())
 }
 
-/// What a message that is one of Codex's own commands turns into.
 #[derive(Debug, PartialEq)]
 pub(super) enum NativeCommand {
-    /// An app-server call that starts the turn itself.
     Call(&'static str, Value),
-    /// An ordinary turn with this text instead of the message.
     Prompt(&'static str),
 }
 
-/// Codex's own prompt for `/init`, as its terminal app sends it (`prompt_for_init_command.md`,
-/// codex 0.147.0). The prompt itself tells the model to leave an existing AGENTS.md alone.
 const INIT_PROMPT: &str = r#"Generate a file named AGENTS.md that serves as a contributor guide for this repository.
 Before writing, check whether AGENTS.md already exists in the current working directory. If it does, do not overwrite or modify it.
 Your goal is to produce a clear, concise, and well-structured document with descriptive headings and actionable explanations for each section.
@@ -71,10 +61,6 @@ Commit & Pull Request Guidelines
 (Optional) Add other sections if relevant, such as Security & Configuration Tips, Architecture Overview, or Agent-Specific Instructions.
 "#;
 
-/// The app-server call for a message that is one of Codex's own commands, if it is: `/compact`
-/// alone compacts the thread; `/review` reviews the uncommitted changes, or follows the
-/// instructions written after it; `/init` alone asks for an AGENTS.md with Codex's own prompt.
-/// Anything else, or a message with images, is a turn.
 pub(super) fn native_command(
     prompt: &str,
     images: &[String],
@@ -148,8 +134,6 @@ mod tests {
         assert_eq!(native_command("please /compact", &[], "t1"), None);
     }
 
-    /// `thread/compact/start` answers without a turn id, so the id comes from the main
-    /// thread's `turn/started`; a sub-agent's turn or another frame is not it.
     #[test]
     fn the_turn_id_comes_from_the_main_threads_turn_started() {
         let started = |thread: &str, turn: &str| {
@@ -171,8 +155,6 @@ mod tests {
         assert_eq!(started_turn_id(&completed, "t1"), None);
     }
 
-    /// Stopping `/compact`: its reply had no turn id, so the pump interrupts the turn
-    /// `turn/started` named instead of ending the CLI.
     #[cfg(unix)]
     #[tokio::test(start_paused = true)]
     async fn stopping_a_compact_interrupts_the_turn_it_started() {

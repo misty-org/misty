@@ -5,7 +5,6 @@ export const TERMINAL_FONT_SIZE = 12.5;
 export const DEFAULT_MONO_STACK =
   'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace';
 
-/** The live `--font-mono` stack as the browser resolves it, or "" where it can't be read. */
 export function computedMonoFontStack(): string {
   if (typeof window === "undefined" || typeof document === "undefined") return "";
   try {
@@ -15,12 +14,10 @@ export function computedMonoFontStack(): string {
   }
 }
 
-/** The terminal's face: the window's code font, so the terminal matches code everywhere else. */
 export function terminalFontFamily(): string {
   return computedMonoFontStack() || DEFAULT_MONO_STACK;
 }
 
-/** xterm reads only hex and rgb() colors; anything else (color-mix, oklch) is passed over. */
 function xtermColor(value: string): string | undefined {
   const color = value.trim();
   return /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color) || /^rgba?\(/i.test(color)
@@ -36,12 +33,6 @@ function themeVariable(name: string): string | undefined {
   }
 }
 
-/**
- * The terminal's colors. The background and text follow the window's theme, read from its CSS
- * variables, so the terminal is the surface it sits on: a card's (a dialog), or with `panel` the
- * side panel's, filling it with no box of its own. The sixteen ANSI colors follow VS Code's dark
- * and light palettes, picked by the window's `dark` class.
- */
 export function terminalTheme(on: "card" | "panel" = "card"): ITheme {
   const dark = document.documentElement.classList.contains("dark");
   const background =

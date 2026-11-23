@@ -1,8 +1,3 @@
-//! Each run's steps on this computer, whatever engine ran it, for the person's own activity view:
-//! one row per tool call with the tool, the file or page it worked on, and how it ended. The
-//! window turns them into plain sentences. A row holds no argument, result, prompt or answer, lives
-//! in `misty.db` and never syncs or reaches the server. A sub-agent's run files its steps under the
-//! run that started it.
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
@@ -11,20 +6,15 @@ use tauri::{AppHandle, Manager, Webview};
 use super::windows::account_of_window;
 use database::store::Store;
 
-/// Steps older than this go when a run starts, the same as the ledger's rows.
 const KEPT_DAYS: i64 = 90;
-/// Past this a run's further steps aren't kept.
 const MAX_STEPS: i64 = 2000;
-/// The longest address, path or title kept.
 const MAX_TEXT: usize = 400;
-/// How many runs up a sub-agent's steps are followed to find the run they belong to.
 const MAX_DEPTH: usize = 8;
 
 fn clip(text: &str) -> String {
     text.trim().chars().take(MAX_TEXT).collect()
 }
 
-/// A tool result that came back as text is often JSON.
 fn as_object(value: &Value) -> Option<Value> {
     match value {
         Value::Object(_) => Some(value.clone()),
@@ -35,9 +25,6 @@ fn as_object(value: &Value) -> Option<Value> {
     }
 }
 
-/// A tool's name as it is kept. Some engines name a shell call by its command line (Codex does),
-/// which is an argument and may hold anything: what doesn't look like a tool's name is kept as
-/// `shell`.
 fn tool_name(raw: &str) -> String {
     let name = raw.trim();
     let plain = !name.is_empty()
@@ -52,7 +39,6 @@ fn tool_name(raw: &str) -> String {
     }
 }
 
-/// The file or address a call's arguments name.
 fn target_of(args: &Value) -> String {
     let args = as_object(args).unwrap_or(Value::Null);
     ["file_path", "path", "notebook_path", "url", "href"]
@@ -62,12 +48,10 @@ fn target_of(args: &Value) -> String {
         .unwrap_or_default()
 }
 
-/// The page a result says the call ended on: its address and title.
 fn page_of(result: &Value) -> (String, String) {
     let Some(mut result) = as_object(result) else {
         return Default::default();
     };
-    // An MCP result carries the tool's own result as text in its content.
     if let Some(inner) = result["content"]
         .as_array()
         .and_then(|parts| parts.iter().find_map(|part| as_object(&part["text"])))
@@ -81,7 +65,6 @@ fn page_of(result: &Value) -> (String, String) {
     };
     let text = |key: &str| page[key].as_str().map(clip).unwrap_or_default();
     let url = text("url");
-    // Only a web address is a page; a result's `url` can name anything.
     if url.starts_with("http://") || url.starts_with("https://") {
         (url, text("title"))
     } else {
@@ -89,7 +72,6 @@ fn page_of(result: &Value) -> (String, String) {
     }
 }
 
-/// The run a run's steps are filed under: the first one up its chain with no parent.
 pub(super) fn root_of(connection: &Connection, run_id: &str) -> rusqlite::Result<(String, bool)> {
     let mut current = run_id.to_owned();
     for _ in 0..MAX_DEPTH {
@@ -132,7 +114,6 @@ pub(super) fn record_start(
     Ok(())
 }
 
-/// Notes what an event says about a run's steps. Events of other kinds change nothing.
 pub(super) fn record_event(
     connection: &Connection,
     run_id: &str,
@@ -144,7 +125,6 @@ pub(super) fn record_event(
         return Ok(());
     }
     let (root, nested_run) = root_of(connection, run_id)?;
-    // Only a run the ledger knows is someone's.
     let account: Option<String> = connection
         .query_row(
             "SELECT account FROM agent_run_ledger WHERE run_id = ?1",
@@ -156,7 +136,6 @@ pub(super) fn record_event(
         return Ok(());
     };
     let call = event["toolCallId"].as_str().unwrap_or("");
-    // Calls are keyed by run as well, so two sub-agents' ids never meet.
     let call_id = format!("{run_id}:{call}");
     match kind {
         "tool.started" => {
@@ -176,7 +155,6 @@ pub(super) fn record_event(
                 None => target_of(&event["args"]),
             };
             if let Some(seq) = known {
-                // A call whose arguments arrive after its name names its target then.
                 if !target.is_empty() {
                     connection.execute(
                         "UPDATE agent_run_steps SET target = ?3 WHERE run_id = ?1 AND seq = ?2 AND target = ''",
@@ -222,7 +200,6 @@ pub(super) fn record_event(
             let (url, title) = page_of(&event["result"]);
             let target = target_of(&event["args"]);
             let duration = event["durationMs"].as_i64().unwrap_or(0).max(0);
-            // A page the call ended on is where it was, over the address it set out for.
             connection.execute(
                 "UPDATE agent_run_steps SET state = ?3,
                      duration_ms = CASE WHEN ?4 > 0 THEN ?4 ELSE MAX(?5 - at, 0) END,
@@ -233,7 +210,6 @@ pub(super) fn record_event(
             )?;
         }
         _ => {
-            // The run ended: a call nobody saw finish ended with it.
             let state = if kind == "invocation.completed" {
                 "completed"
             } else {
@@ -249,7 +225,6 @@ pub(super) fn record_event(
     Ok(())
 }
 
-/// Whether an event changes a run's steps.
 pub(super) fn matters(kind: &str) -> bool {
     matches!(
         kind,
@@ -262,7 +237,6 @@ pub(super) fn matters(kind: &str) -> bool {
     )
 }
 
-/// Keeps the picture taken for a step, a file name in the run's picture folder.
 pub(crate) fn record_picture(
     connection: &Connection,
     run_id: &str,
@@ -289,7 +263,6 @@ pub struct StepRow {
     pub duration_ms: i64,
     pub nested: bool,
     pub picture: String,
-    /// The tool call, as the browser log keys its actions (`<run>:<call>`).
     pub call_id: String,
 }
 
@@ -319,7 +292,6 @@ pub(super) fn rows(
     rows.collect()
 }
 
-/// The latest step of each of these runs, for the lines that say what a run is doing now.
 pub(super) fn latest(
     connection: &Connection,
     account: &str,
@@ -354,8 +326,6 @@ pub(super) fn latest(
     Ok(found)
 }
 
-/// Forgets every step of an account's runs. The ledger's rows stay. Returns the pictures that
-/// went with them, by run, for the caller to delete.
 pub(super) fn clear(connection: &Connection, account: &str) -> rusqlite::Result<Vec<String>> {
     let mut statement = connection.prepare(
         "SELECT DISTINCT run_id FROM agent_run_steps WHERE account = ?1 AND picture <> ''",
@@ -384,7 +354,6 @@ fn person_account(webview: &Webview) -> Result<String, String> {
     Ok(account_of_window(webview.label()).unwrap_or_default())
 }
 
-/// A run's steps, oldest first. Steps of another account's run never come back.
 #[tauri::command]
 pub async fn agent_run_steps(
     app: AppHandle,
@@ -408,7 +377,6 @@ pub struct LatestStep {
     pub step: StepRow,
 }
 
-/// The latest step of each of these runs.
 #[tauri::command]
 pub async fn agent_run_latest_steps(
     app: AppHandle,
@@ -433,7 +401,6 @@ pub async fn agent_run_latest_steps(
     .map_err(|error| error.to_string())?
 }
 
-/// Forgets every step this person's runs took, and their pictures.
 #[tauri::command]
 pub async fn agent_run_steps_clear(app: AppHandle, webview: Webview) -> Result<(), String> {
     let account = person_account(&webview)?;

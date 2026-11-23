@@ -1,4 +1,4 @@
-import "@/app/featureSeams";
+import "@/app/feature_seams";
 import type * as DeploymentApi from "@/api/deployment/api";
 import type * as AgentsModule from "@/features/agents";
 import { act } from "react";
@@ -35,7 +35,6 @@ vi.mock("@/features/app-windows", async (importOriginal) => ({
     }),
   workspaceSurfaceFromRoute: () => null,
   findDockLeaf: () => null,
-  MistyBrandIcon: () => <span />,
 }));
 
 vi.mock("./AccountIsland", () => ({ AccountIsland: () => null, AccountTab: () => null }));
@@ -47,7 +46,7 @@ vi.mock("./WorkspaceCanvas", () => ({
   ),
 }));
 
-vi.mock("./useDesktopWindowChrome", () => ({
+vi.mock("./use_desktop_window_chrome", () => ({
   useDesktopWindowChrome: () => ({
     shouldShowWindowsTitlebarControls: false,
     isWindowMaximized: false,
@@ -59,7 +58,7 @@ vi.mock("./useDesktopWindowChrome", () => ({
   }),
 }));
 
-vi.mock("./useDesktopBootstrap", () => ({
+vi.mock("./use_desktop_bootstrap", () => ({
   useDesktopBootstrap: () => {
     const location = useLocation();
     return {
@@ -74,11 +73,11 @@ vi.mock("./useDesktopBootstrap", () => ({
   },
 }));
 
-vi.mock("./useDesktopShellStatus", () => ({
+vi.mock("./use_desktop_shell_status", () => ({
   useDesktopShellStatus: () => false,
 }));
 
-vi.mock("./useDesktopFrameStyle", () => ({
+vi.mock("./use_desktop_frame_style", () => ({
   useDesktopFrameStyle: () => ({ app: null }),
 }));
 
@@ -110,7 +109,7 @@ vi.mock("@/features/browser/webviews/BrowserRuntimeBridge", async (importOrigina
   ...(await importOriginal<Record<string, unknown>>()),
   BrowserRuntimeBridge: () => null,
 }));
-vi.mock("@/features/app-windows/page-runtime/browserOverlayRuntime", async (importOriginal) => ({
+vi.mock("@/features/app-windows/page-runtime/browser_overlay_runtime", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setBrowserWebviewsSuspended: vi.fn(),
 }));
@@ -133,9 +132,9 @@ vi.mock("@/features/agents", async (importOriginal) => {
   };
 });
 
-import { SavedAccountSessionUnavailableError } from "@/features/account/sessions/sessionErrors";
+import { SavedAccountSessionUnavailableError } from "@/features/account/sessions/session_errors";
 import SignIn from "@/features/account/pages/SignInPage";
-import { notifyAccountScopeReset } from "@/features/account/sessions/accountEvents";
+import { notifyAccountScopeReset } from "@/features/account/sessions/account_events";
 import { useSettingsStore } from "@/features/settings";
 import { useMistyPanelStore } from "@/features/agents";
 import { NoticeViewport } from "@misty/ui";
@@ -183,7 +182,6 @@ describe("DesktopLayout on Auth Routes", () => {
     await act(async () => {
       root.render(
         <>
-          {/* App mounts the notices' viewport; errors show there. */}
           <NoticeViewport />
           <MemoryRouter initialEntries={["/signin"]}>
             <Routes>
@@ -202,7 +200,6 @@ describe("DesktopLayout on Auth Routes", () => {
     });
     expect(container.querySelector('[aria-label="Signing in"]')).not.toBeNull();
     await act(async () => rejectResume(error));
-    // Errors show as a notification, which renders in the page-level viewport.
     expect(document.body.textContent).toContain(message);
     if (error instanceof SavedAccountSessionUnavailableError) {
       expect(container.querySelector<HTMLInputElement>('input[type="email"]')?.value).toBe(

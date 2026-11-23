@@ -1,15 +1,9 @@
 use crate::SAMPLE_RATE;
 
-/// Stateful downmix and linear resample from any device format to 16 kHz
-/// mono PCM16. Position carries across calls, so packet boundaries never
-/// click or drift.
 pub struct Resampler {
     rate: u32,
     channels: usize,
     step: f64,
-    /// Output samples produced and input frames dropped so far. Position is
-    /// derived from these integers, so it never accumulates rounding and the
-    /// output is identical however the input is chunked.
     produced: u64,
     dropped: u64,
     pending: Vec<f32>,
@@ -20,8 +14,6 @@ impl Resampler {
         Self::to_rate(rate, channels, SAMPLE_RATE)
     }
 
-    /// Resample to a rate other than 16 kHz (for example 24 kHz for a
-    /// transcriber that wants it).
     pub fn to_rate(rate: u32, channels: usize, output_rate: u32) -> Self {
         assert!(rate > 0 && output_rate > 0 && channels > 0);
         Self {
@@ -38,7 +30,6 @@ impl Resampler {
         self.rate
     }
 
-    /// Interleaved float input in -1..=1.
     pub fn push_f32(&mut self, interleaved: &[f32], output: &mut Vec<i16>) {
         for frame in interleaved.chunks_exact(self.channels) {
             self.pending
@@ -47,7 +38,6 @@ impl Resampler {
         self.drain(output);
     }
 
-    /// Interleaved PCM16 input.
     pub fn push_i16(&mut self, interleaved: &[i16], output: &mut Vec<i16>) {
         for frame in interleaved.chunks_exact(self.channels) {
             self.pending.push(
@@ -59,12 +49,9 @@ impl Resampler {
 
     fn drain(&mut self, output: &mut Vec<i16>) {
         loop {
-            // Absolute input positions, computed from integers each time.
             let start = self.produced as f64 * self.step;
             let index = start.floor() as u64 - self.dropped;
             let index = index as usize;
-            // Downsampling averages the span one output sample covers, so
-            // high frequencies fold in less; wait until that span is whole.
             let end = if self.step > 1.0 {
                 ((self.produced + 1) as f64 * self.step).floor() as u64 - self.dropped
             } else {
@@ -107,7 +94,6 @@ mod tests {
     fn stereo_48k_becomes_mono_16k() {
         let mut resampler = Resampler::new(48_000, 2);
         let mut output = Vec::new();
-        // One second of a constant stereo signal at different channel levels.
         let input: Vec<f32> = (0..48_000).flat_map(|_| [0.6f32, 0.2]).collect();
         resampler.push_f32(&input, &mut output);
         assert!(

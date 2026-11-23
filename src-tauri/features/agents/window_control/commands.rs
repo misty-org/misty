@@ -1,5 +1,3 @@
-//! The commands that bind a window or the desktop to a task, yield it to the
-//! person and mirror the island.
 use super::*;
 
 #[tauri::command]
@@ -31,8 +29,6 @@ pub fn agent_workspace_context(
         context["accountId"].as_str().unwrap_or(""),
         context["spaceId"].as_str().unwrap_or(""),
     )?;
-    // The one way into desktop control, on either system. Only a person's window gets here. The
-    // lock waits until after asking, since it can take the person a while to answer.
     if start
         && context["desktopControl"] == true
         && !permissions::ensure(&app, permissions::Permission::DesktopControl)
@@ -52,8 +48,6 @@ pub fn agent_workspace_context(
             snapshot: None,
         };
         drop(state);
-        // Controlling the Misty window itself: ring the window. Desktop control
-        // rings the controlled display instead, once control begins.
         #[cfg(target_os = "macos")]
         let _ = webview.with_webview(move |platform| {
             crate::agents::cursor::macos::ring_views::window_ring(
@@ -92,10 +86,6 @@ pub fn agent_workspace_context(
     }
     Ok(())
 }
-/// The task waits for the person (a sign-in, a challenge, a review): give back
-/// the window or desktop, its control ring and Misty's cursor, but keep the
-/// task so the run continues on the same screen. `yielded: false` takes the
-/// window back; the desktop is taken back by the next visual tool call.
 #[tauri::command]
 pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> Result<(), String> {
     if !crate::browser::app_windows::is_person_window(webview.label()) {
@@ -117,7 +107,6 @@ pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> 
         } else if yielded {
             hide_cursor();
         }
-        // The mist stays while the task waits for the person, thinner.
         crate::agents::cursor::macos::ring_views::mist_waiting(yielded);
     }
     #[cfg(windows)]
@@ -141,8 +130,6 @@ pub fn agent_control_yield(webview: Webview, task_id: String, yielded: bool) -> 
     let _ = (desktop, yielded);
     Ok(())
 }
-/// What the in-app island shows, mirrored on the desktop island while Misty
-/// controls the desktop: `status`, `meta` and, while waiting, `waiting`.
 #[tauri::command]
 pub fn agent_control_island(
     webview: Webview,

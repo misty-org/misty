@@ -1,5 +1,3 @@
-//! Which provider, model and key a call uses. Models run on the device's own key for the model's
-//! provider, and only on that key.
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -55,7 +53,6 @@ impl ProviderId {
         Some(match prefix {
             "openai" => Self::Openai,
             "anthropic" => Self::Anthropic,
-            // Older prefixes kept so existing model IDs keep working.
             "google" | "gemini" => Self::Google,
             "openrouter" => Self::Openrouter,
             "gateway" => Self::Gateway,
@@ -69,12 +66,10 @@ impl ProviderId {
         })
     }
 
-    /// Providers that run without a key: a local server.
     fn key_optional(self) -> bool {
         matches!(self, Self::Ollama | Self::OpenaiCompatible)
     }
 
-    /// Where a chat-completions provider lives unless the person's settings say otherwise.
     pub(crate) fn default_compatible_base(self) -> Option<&'static str> {
         match self {
             Self::Openrouter => Some("https://openrouter.ai/api/v1"),
@@ -86,7 +81,6 @@ impl ProviderId {
     }
 }
 
-/// `<provider>/<model as that provider names it>`, with the old aliases resolved.
 pub fn parse_model_id(model_id: &str) -> Result<(ProviderId, &str), ModelError> {
     let invalid = || ModelError::unsupported_model("Use a model ID of the form provider/model.");
     let (prefix, model) = model_id.split_once('/').ok_or_else(invalid)?;
@@ -97,8 +91,6 @@ pub fn parse_model_id(model_id: &str) -> Result<(ProviderId, &str), ModelError> 
     Ok((provider, model))
 }
 
-/// The device's key for one provider. Its base URL may name a server on the person's own computer
-/// or network, such as a local Ollama. It deliberately has no `Debug`, which could print the key.
 #[derive(Clone, Deserialize)]
 pub struct Credential {
     pub provider: ProviderId,
@@ -108,7 +100,6 @@ pub struct Credential {
     pub base_url: Option<String>,
 }
 
-/// The device's key for a model, and how hard it should think.
 #[derive(Clone, Deserialize)]
 pub struct ModelRoute {
     #[serde(default)]
@@ -122,19 +113,25 @@ fn normalized_base_url(value: Option<&str>) -> Result<Option<String>, ModelError
     };
     let url = reqwest::Url::parse(value)
         .map_err(|_| ModelError::bad_base_url("The model's base URL isn't a valid URL."))?;
-    if !matches!(url.scheme(), "http" | "https") || !url.username().is_empty() || url.password().is_some() {
-        return Err(ModelError::bad_base_url("The model's base URL must be an http(s) address."));
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(ModelError::bad_base_url(
+            "The model's base URL must be an http(s) address.",
+        ));
     }
     Ok(Some(url.as_str().trim_end_matches('/').to_owned()))
 }
 
-/// Moves screenshots out of tool results. Chat completions carry tool results as text only, so a
-/// screenshot there would reach the model as base64 text. They move to a user message right after
-/// the results, where they are images, and the results say so.
 pub(crate) fn images_out_of_tool_results(prompt: Vec<Message>) -> Vec<Message> {
     let mut moved = Vec::with_capacity(prompt.len());
     for message in prompt {
-        let Message::Tool { content, provider_options } = message else {
+        let Message::Tool {
+            content,
+            provider_options,
+        } = message
+        else {
             moved.push(message);
             continue;
         };
@@ -143,13 +140,19 @@ pub(crate) fn images_out_of_tool_results(prompt: Vec<Message>) -> Vec<Message> {
             .into_iter()
             .map(|part| screenshots_taken_from(part, &mut images))
             .collect();
-        moved.push(Message::Tool { content, provider_options });
+        moved.push(Message::Tool {
+            content,
+            provider_options,
+        });
         if !images.is_empty() {
             let mut parts = vec![UserPart::Text {
                 text: "Screenshots from the tool results above:".into(),
             }];
             parts.append(&mut images);
-            moved.push(Message::User { content: parts, provider_options: None });
+            moved.push(Message::User {
+                content: parts,
+                provider_options: None,
+            });
         }
     }
     moved
@@ -159,16 +162,17 @@ fn screenshots_taken_from(part: ToolResultPart, images: &mut Vec<UserPart>) -> T
     let ToolOutput::Content { value } = &part.output else {
         return part;
     };
-    let is_image = |item: &&OutputItem| {
-        matches!(item, OutputItem::File { media_type, .. } if media_type.starts_with("image"))
-    };
+    let is_image = |item: &&OutputItem| matches!(item, OutputItem::File { media_type, .. } if media_type.starts_with("image"));
     let shots = value.iter().filter(is_image).count();
     if shots == 0 {
         return part;
     }
     for item in value.iter().filter(is_image) {
         if let OutputItem::File { data, media_type } = item {
-            images.push(UserPart::File { data: data.clone(), media_type: media_type.clone() });
+            images.push(UserPart::File {
+                data: data.clone(),
+                media_type: media_type.clone(),
+            });
         }
     }
     let text = value
@@ -188,14 +192,12 @@ fn screenshots_taken_from(part: ToolResultPart, images: &mut Vec<UserPart>) -> T
     }
 }
 
-/// Gateway routing options mean nothing to any other provider.
 fn without_gateway_options(options: &mut CallOptions) {
     if let Some(provider_options) = &mut options.provider_options {
         provider_options.remove("gateway");
     }
 }
 
-/// Gateway model lists name models as the Gateway does, without a `gateway/` prefix.
 fn gateway_options(options: &mut CallOptions) {
     let models = options
         .provider_options
@@ -204,18 +206,19 @@ fn gateway_options(options: &mut CallOptions) {
         .and_then(|routing| routing.get_mut("models"))
         .and_then(serde_json::Value::as_array_mut);
     for model in models.into_iter().flatten() {
-        if let Some(name) = model.as_str().and_then(|name| name.strip_prefix("gateway/")) {
+        if let Some(name) = model
+            .as_str()
+            .and_then(|name| name.strip_prefix("gateway/"))
+        {
             *model = name.into();
         }
     }
 }
 
-/// The Gateway names `claude-haiku-5.5`, and Anthropic's own API names `claude-haiku-5-5`.
 fn anthropic_model_name(model: &str) -> String {
     model.replace('.', "-")
 }
 
-/// Which provider, model name and key one call uses.
 pub(crate) struct Target {
     pub(crate) provider: ProviderId,
     pub(crate) model: String,
@@ -223,11 +226,9 @@ pub(crate) struct Target {
     pub(crate) base_url: Option<String>,
 }
 
-/// `resolveTarget`, for every kind of model.
 pub(crate) fn resolve_target(model_id: &str, route: &ModelRoute) -> Result<Target, ModelError> {
     let (provider, model) = parse_model_id(model_id)?;
     let credential = &route.credential;
-    // A key is used only for its own provider.
     if credential.provider != provider {
         return Err(ModelError::key_needed());
     }
@@ -237,21 +238,36 @@ pub(crate) fn resolve_target(model_id: &str, route: &ModelRoute) -> Result<Targe
     }
     let base_url = normalized_base_url(credential.base_url.as_deref())?;
     if provider == ProviderId::OpenaiCompatible && base_url.is_none() {
-        return Err(ModelError::bad_base_url("An OpenAI-compatible model needs a base URL."));
+        return Err(ModelError::bad_base_url(
+            "An OpenAI-compatible model needs a base URL.",
+        ));
     }
-    Ok(Target { provider, model: model.to_owned(), api_key, base_url })
+    Ok(Target {
+        provider,
+        model: model.to_owned(),
+        api_key,
+        base_url,
+    })
 }
 
-/// One call's model on the route's key, with the call's options adjusted for that provider.
 pub fn resolve_model(
     model_id: &str,
     mut options: CallOptions,
     route: &ModelRoute,
     client: &reqwest::Client,
 ) -> Result<(Arc<dyn LanguageModel>, CallOptions), ModelError> {
-    let Target { provider, model, api_key, base_url } = resolve_target(model_id, route)?;
+    let Target {
+        provider,
+        model,
+        api_key,
+        base_url,
+    } = resolve_target(model_id, route)?;
     let model = model.as_str();
-    options.reasoning = route.reasoning.clone().filter(|value| !value.is_empty()).or(options.reasoning);
+    options.reasoning = route
+        .reasoning
+        .clone()
+        .filter(|value| !value.is_empty())
+        .or(options.reasoning);
     match provider {
         ProviderId::Openrouter
         | ProviderId::Nvidia
@@ -259,8 +275,6 @@ pub fn resolve_model(
         | ProviderId::OllamaCloud
         | ProviderId::OpenaiCompatible => {
             options.prompt = images_out_of_tool_results(options.prompt);
-            // Only OpenRouter takes `reasoning_effort`. The others switch thinking their own way
-            // and may refuse it.
             if provider != ProviderId::Openrouter {
                 options.reasoning = None;
             }
@@ -268,40 +282,59 @@ pub fn resolve_model(
                 .or_else(|| provider.default_compatible_base().map(str::to_owned))
                 .unwrap_or_default();
             Ok((
-                Arc::new(OpenAiCompatibleModel::new(client.clone(), &base, &api_key, provider, model)),
+                Arc::new(OpenAiCompatibleModel::new(
+                    client.clone(),
+                    &base,
+                    &api_key,
+                    provider,
+                    model,
+                )),
                 options,
             ))
         }
-        ProviderId::Elevenlabs | ProviderId::Soniox => {
-            Err(ModelError::unsupported_model("This provider has no language models."))
-        }
+        ProviderId::Elevenlabs | ProviderId::Soniox => Err(ModelError::unsupported_model(
+            "This provider has no language models.",
+        )),
         ProviderId::Google => {
             without_gateway_options(&mut options);
             let base = base_url.as_deref().unwrap_or(google::DEFAULT_BASE_URL);
-            Ok((Arc::new(GoogleModel::new(client.clone(), base, &api_key, model)), options))
+            Ok((
+                Arc::new(GoogleModel::new(client.clone(), base, &api_key, model)),
+                options,
+            ))
         }
         ProviderId::Gateway => {
             gateway_options(&mut options);
             let base = base_url.as_deref().unwrap_or(gateway::DEFAULT_BASE_URL);
-            Ok((Arc::new(GatewayModel::new(client.clone(), base, &api_key, model)), options))
+            Ok((
+                Arc::new(GatewayModel::new(client.clone(), base, &api_key, model)),
+                options,
+            ))
         }
         ProviderId::Openai => {
             without_gateway_options(&mut options);
-            // Responses normalizes an omitted strict flag, which can turn optional capability
-            // arguments into required fields. The admitted schema stays as it is unless the caller
-            // asked for strict function calling.
             for tool in &mut options.tools {
                 tool.strict.get_or_insert(false);
             }
             Ok((
-                Arc::new(OpenAiResponsesModel::new(client.clone(), base_url.as_deref(), &api_key, model)),
+                Arc::new(OpenAiResponsesModel::new(
+                    client.clone(),
+                    base_url.as_deref(),
+                    &api_key,
+                    model,
+                )),
                 options,
             ))
         }
         ProviderId::Anthropic => {
             without_gateway_options(&mut options);
             Ok((
-                Arc::new(AnthropicModel::new(client.clone(), base_url.as_deref(), &api_key, &anthropic_model_name(model))),
+                Arc::new(AnthropicModel::new(
+                    client.clone(),
+                    base_url.as_deref(),
+                    &api_key,
+                    &anthropic_model_name(model),
+                )),
                 options,
             ))
         }
@@ -337,9 +370,21 @@ mod tests {
 
     #[test]
     fn model_ids_resolve_aliases_and_refuse_nonsense() {
-        assert_eq!(parse_model_id("nim/z-ai/glm").unwrap(), (ProviderId::Nvidia, "z-ai/glm"));
-        assert_eq!(parse_model_id("gemini/flash").unwrap(), (ProviderId::Google, "flash"));
-        for bad in ["plain", "nope/model", "nvidia/", "/model", "nvidia/has space"] {
+        assert_eq!(
+            parse_model_id("nim/z-ai/glm").unwrap(),
+            (ProviderId::Nvidia, "z-ai/glm")
+        );
+        assert_eq!(
+            parse_model_id("gemini/flash").unwrap(),
+            (ProviderId::Google, "flash")
+        );
+        for bad in [
+            "plain",
+            "nope/model",
+            "nvidia/",
+            "/model",
+            "nvidia/has space",
+        ] {
             assert!(parse_model_id(bad).is_err(), "{bad}");
         }
     }
@@ -347,32 +392,65 @@ mod tests {
     #[test]
     fn a_key_only_works_for_its_own_provider() {
         let client = client();
-        let wrong = resolve_model("nvidia/m", CallOptions::default(), &route(ProviderId::Openrouter, "key", None), &client);
+        let wrong = resolve_model(
+            "nvidia/m",
+            CallOptions::default(),
+            &route(ProviderId::Openrouter, "key", None),
+            &client,
+        );
         assert_eq!(code(wrong.err().unwrap()), "model_key_needed");
     }
 
     #[test]
     fn only_local_servers_may_skip_the_key() {
         let client = client();
-        let missing = resolve_model("nvidia/m", CallOptions::default(), &route(ProviderId::Nvidia, " ", None), &client);
+        let missing = resolve_model(
+            "nvidia/m",
+            CallOptions::default(),
+            &route(ProviderId::Nvidia, " ", None),
+            &client,
+        );
         assert_eq!(code(missing.err().unwrap()), "model_key_needed");
-        assert!(resolve_model("ollama/m", CallOptions::default(), &route(ProviderId::Ollama, "", None), &client).is_ok());
+        assert!(resolve_model(
+            "ollama/m",
+            CallOptions::default(),
+            &route(ProviderId::Ollama, "", None),
+            &client
+        )
+        .is_ok());
     }
 
     #[test]
     fn base_urls_must_be_plain_http() {
         let client = client();
-        for bad in ["file:///etc/passwd", "https://user:pw@example.com", "not a url"] {
-            let result = resolve_model("ollama/m", CallOptions::default(), &route(ProviderId::Ollama, "", Some(bad)), &client);
-            assert_eq!(code(result.err().unwrap()), "model_base_url_invalid", "{bad}");
+        for bad in [
+            "file:///etc/passwd",
+            "https://user:pw@example.com",
+            "not a url",
+        ] {
+            let result = resolve_model(
+                "ollama/m",
+                CallOptions::default(),
+                &route(ProviderId::Ollama, "", Some(bad)),
+                &client,
+            );
+            assert_eq!(
+                code(result.err().unwrap()),
+                "model_base_url_invalid",
+                "{bad}"
+            );
         }
-        let none = resolve_model("openai-compatible/m", CallOptions::default(), &route(ProviderId::OpenaiCompatible, "", None), &client);
+        let none = resolve_model(
+            "openai-compatible/m",
+            CallOptions::default(),
+            &route(ProviderId::OpenaiCompatible, "", None),
+            &client,
+        );
         assert_eq!(code(none.err().unwrap()), "model_base_url_invalid");
     }
 
     #[test]
     fn credentials_cannot_be_printed() {
-        // A compile-time promise made visible: `Credential` and `ModelRoute` don't implement Debug.
         fn no_debug<T>(_: &T) {}
         no_debug(&route(ProviderId::Nvidia, "secret-value", None));
     }

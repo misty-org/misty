@@ -40,7 +40,6 @@ fn keeps_mode_engine_tools_and_written_files() {
     assert_eq!(found.len(), 1);
     let row = &found[0];
     assert_eq!(row.engine, "codex");
-    // An old Auto, kept as the engine's own mode it maps to: Codex's Default.
     assert_eq!(row.mode, "default");
     assert_eq!(row.state, "completed");
     assert_eq!(row.tools, 3);
@@ -160,6 +159,5 @@ fn a_run_cut_off_by_an_earlier_launch_reads_as_stopped() {
     assert_eq!(state("old"), "canceled");
     assert_eq!(state("resumed"), "running");
     assert_eq!(state("done"), "completed");
-    // Started in this launch: its engine may not have come up yet.
     assert_eq!(state("new"), "running");
 }

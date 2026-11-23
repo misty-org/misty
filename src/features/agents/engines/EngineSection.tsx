@@ -7,13 +7,9 @@ import {
 } from "@/features/settings";
 import { EmptyState } from "@misty/ui";
 import { DropdownControl } from "../../settings/SettingsControls";
-import { openAgentsHub } from "../hub/agentsHubStore";
-import { setDefaultEngine, useDefaultEngine } from "./defaultEngine";
+import { openAgentsHub } from "../hub/agents_hub_store";
+import { setDefaultEngine, useDefaultEngine } from "./default_engine";
 
-/**
- * Settings › Agents › Engine: the default engine, which does all of Misty's own work (the Lab,
- * Tutor, pointing, reading pages). Only installed engines that can do all of it are offered.
- */
 export function EngineSection() {
   const { engine, choices, ready } = useDefaultEngine();
   const working = useSettingsStore((state) => state.working);

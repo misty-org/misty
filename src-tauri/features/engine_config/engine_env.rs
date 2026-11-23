@@ -1,19 +1,9 @@
-// An engine's own environment variables: the ones the person sets for a CLI in the Agents
-// window, added to its environment each time Misty starts it.
-//
-// They belong to this computer and never sync. Since any of them may hold a key, every value is
-// kept in the credential store, sealed under the master key in the OS keychain, one entry per
-// engine. Windows read back the names, and the values of those whose names don't look secret;
-// a secret's value only ever goes into the CLI's environment. A provider channel chosen for a
-// chat is more specific, so its variables win over these.
-
 use std::collections::{BTreeMap, HashMap};
 
 use serde::Serialize;
 
 use super::support;
 
-/// Name → value, as kept in the credential store.
 type Vars = BTreeMap<String, String>;
 
 const MAX_VARS: usize = 64;
@@ -23,7 +13,6 @@ fn account(engine: &str) -> String {
     format!("env/{engine}")
 }
 
-/// An engine id as the app writes them (`claude`, `qoder-cn`), never a path or anything else.
 fn checked_engine(engine: &str) -> Result<String, String> {
     let engine = engine.trim();
     let valid = !engine.is_empty()
@@ -38,7 +27,6 @@ fn checked_engine(engine: &str) -> Result<String, String> {
     }
 }
 
-/// A POSIX variable name. PATH is Misty's: it finds the CLI's interpreter with it.
 fn checked_name(name: &str) -> Result<String, String> {
     let name = name.trim();
     let mut chars = name.chars();
@@ -66,7 +54,6 @@ fn checked_value(value: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Whether a variable named `name` holds a secret, by the same words channels use.
 fn is_secret(name: &str) -> bool {
     let upper = name.to_ascii_uppercase();
     ["KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "AUTH"]
@@ -90,7 +77,6 @@ fn save(engine: &str, vars: &Vars) -> Result<(), String> {
     support::store_secret(&account(engine), &raw)
 }
 
-/// The variables the person set for `engine`, for its start. Empty when there are none.
 pub fn env_for(engine: &str) -> Result<HashMap<String, String>, String> {
     let Ok(engine) = checked_engine(engine) else {
         return Ok(HashMap::new());
@@ -98,7 +84,6 @@ pub fn env_for(engine: &str) -> Result<HashMap<String, String>, String> {
     Ok(load(&engine)?.into_iter().collect())
 }
 
-/// One variable as a window sees it: a secret's value never leaves native code.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvVarView {
@@ -130,7 +115,6 @@ fn set(
     let name = checked_name(name)?;
     checked_value(value)?;
     let mut vars = load(&engine)?;
-    // A rename moves the value: the old name goes once the new one is stored.
     if let Some(previous) = previous
         .map(str::trim)
         .filter(|p| !p.is_empty() && *p != name)
@@ -182,7 +166,6 @@ pub async fn engine_env_list(
     .await
 }
 
-/// Sets `name` to `value`; `previous` is the name it had, when the person renamed it.
 #[tauri::command]
 pub async fn engine_env_set(
     webview: tauri::Webview,

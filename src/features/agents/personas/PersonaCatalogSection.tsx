@@ -1,11 +1,4 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-/**
- * Explore › Templates: the bundled agency-agents personas, as shelves. The person sees them as
- * templates: ready-made instructions to start an agent from. Each can be made into one of the
- * person's own agents, read in full, and offered or not in the composer's `#` menu;
- * a category can be offered or withdrawn at once. Personas work with every engine: their prompt
- * is added to whichever engine's run names them.
- */
 import { BookOpen, MoreHorizontal, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -32,7 +25,7 @@ import {
   personaTone,
   useNotice,
 } from "@misty/ui";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   disabledPersonas,
   makeAgentFromPersona,
@@ -43,10 +36,9 @@ import {
   type CatalogPersona,
   type CatalogPrompt,
   type CatalogView,
-} from "./catalogApi";
-import { personaGlyph } from "./personaGlyph";
+} from "./catalog_api";
+import { personaGlyph } from "./persona_glyph";
 
-/** How many each category's shelf shows before See all, when every category is listed. */
 const perShelf = 4;
 
 function Logo({ persona }: { persona: CatalogPersona }) {
@@ -60,11 +52,8 @@ export function PersonaCatalogSection({
   onSeeAll,
 }: {
   query?: string;
-  /** On All: only these personas, in this order, on one shelf. */
   picks?: readonly string[];
-  /** The shelf's title when `picks` is given. */
   title?: string;
-  /** On All: See all, which opens the Agents section. */
   onSeeAll?: () => void;
 }) {
   const [catalog, setCatalog] = useState<CatalogView>();
@@ -184,7 +173,6 @@ export function PersonaCatalogSection({
   const label = (id: string) => divisions.find((entry) => entry.id === id)?.label ?? id;
   const inDivision = (id: string) => shown.filter((persona) => persona.divisionId === id);
 
-  /** The ⋯ beside a category's title: offer or withdraw all of it at once. */
   const divisionMenu = (id: string) => {
     const ids = catalog.agents.filter((agent) => agent.divisionId === id).map((a) => a.id);
     return (

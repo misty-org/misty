@@ -1,10 +1,3 @@
-//! Creates and maintains `~/.misty` on every launch.
-//!
-//! The home lives outside the app bundle, so installing or updating Misty never
-//! replaces it. This module only ever adds what is missing and tightens
-//! permissions; it never deletes. Paths retired by an earlier layout are moved
-//! to the Trash (the Recycle Bin on Windows) so the user can still recover
-//! them.
 use file_access::fs;
 use file_access::paths;
 use serde::Deserialize;
@@ -20,7 +13,6 @@ const LAYOUT_JSON: &str = include_str!("misty-home-layout.json");
 struct Layout {
     layout_version: u32,
     directories: Vec<String>,
-    /// Owner-only files; Windows keeps the whole home private instead.
     #[cfg(unix)]
     private_files: Vec<String>,
     retired: Vec<String>,
@@ -30,7 +22,6 @@ struct Layout {
 pub struct HomeReport {
     pub created: Vec<String>,
     pub retired: Vec<String>,
-    /// Retired paths that could not be moved and were left in place.
     pub kept: Vec<String>,
 }
 
@@ -38,7 +29,6 @@ fn layout() -> Layout {
     serde_json::from_str(LAYOUT_JSON).expect("misty-home-layout.json is valid")
 }
 
-/// Ensures the signed-in user's Misty home exists and matches the current layout.
 pub fn ensure_misty_home() -> io::Result<HomeReport> {
     let root = paths::misty_home_dir()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no home directory"))?;
@@ -52,7 +42,6 @@ fn ensure_at(root: &Path, trash: &Trash) -> io::Result<HomeReport> {
 
     if manifest_version(root) < layout.layout_version {
         retire(root, &layout.retired, trash, &mut report)?;
-        // Holds nothing once its old folders have gone; refused if it still holds anything.
         let _ = fs::remove_dir(root.join(".local"));
     }
     for relative in &layout.directories {
@@ -105,9 +94,7 @@ fn retire(
     Ok(())
 }
 
-/// Where retired paths go, so the person can still recover them.
 pub(crate) enum Trash {
-    // Windows retires to the Recycle Bin; its tests still use a folder.
     #[cfg_attr(all(windows, not(test)), allow(dead_code))]
     Folder(PathBuf),
     #[cfg(windows)]
@@ -115,13 +102,10 @@ pub(crate) enum Trash {
 }
 
 impl Trash {
-    /// Moves `path` to the Trash, as `<batch>/<relative>` where the Trash is a folder.
     pub(crate) fn take(&self, path: &Path, batch: &str, relative: &str) -> io::Result<()> {
         match self {
             Self::Folder(folder) => {
                 let target = folder.join(batch).join(relative);
-                // A cross-volume Trash cannot take a rename; the path stays
-                // rather than user data being copied and deleted.
                 target
                     .parent()
                     .map_or(Ok(()), fs::create_dir_all)
@@ -143,16 +127,12 @@ impl Trash {
             if cfg!(target_os = "macos") {
                 Self::Folder(home.join(".Trash"))
             } else {
-                // Linux has no portable user Trash without a desktop service;
-                // retired paths stay inside the home, recoverable and out of
-                // the live layout.
                 Self::Folder(home.join(".misty").join(".retired"))
             }
         }
     }
 }
 
-/// Moves `path` to the Recycle Bin, where the person can restore it.
 #[cfg(windows)]
 fn recycle(path: &Path) -> io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
@@ -160,7 +140,6 @@ fn recycle(path: &Path) -> io::Result<()> {
         SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE,
         SHFILEOPSTRUCTW,
     };
-    // A double-NUL-terminated list of one path.
     let from: Vec<u16> = path.as_os_str().encode_wide().chain([0, 0]).collect();
     // SAFETY: zeroed input, then the fields the operation reads.
     let mut operation: SHFILEOPSTRUCTW = unsafe { std::mem::zeroed() };
@@ -190,8 +169,6 @@ fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Resul
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(path, fs::Permissions::from_mode(0o700))?;
     }
-    // The home's own DACL admits only its owner and SYSTEM; everything
-    // inside inherits it.
     #[cfg(windows)]
     if relative.is_empty() {
         misty_credential_store::restrict_private_directory(path)?;
@@ -200,6 +177,5 @@ fn secure_dir(path: &Path, report: &mut HomeReport, relative: &str) -> io::Resul
 }
 
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

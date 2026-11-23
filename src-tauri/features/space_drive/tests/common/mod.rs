@@ -1,14 +1,3 @@
-//! A fake Misty server for the drive's tests, after kuragine's `FakeDrive`: the Space drive routes
-//! in memory, with the simple model's semantics as misty-server builds them: versions with an
-//! optional `If-Match`, `base_version` judged against the version the content last changed at, a
-//! trashed `(replaced …)` copy of content a save replaced unseen, writes that revive trashed
-//! items, `replace` for a rename onto a taken name, trash moves with no version, one change
-//! sequence per Space, tombstones, trash and restore, and in-use leases with the check before a
-//! trash move. It also keeps what a real server wouldn't, for the tests to check: every content
-//! any item ever held (`accepted`) and how many trashed items a write brought back.
-//!
-//! Faults: each computer can be offline, and can lose the reply to its next change after the
-//! server applied it.
 #![allow(dead_code, clippy::disallowed_methods, clippy::disallowed_types)]
 
 use std::{
@@ -52,7 +41,6 @@ struct State {
     blobs: HashMap<String, Vec<u8>>,
     uploads: HashMap<String, (String, u64)>,
     marks: Vec<Mark>,
-    /// The version at which each item's content last changed: what a `base_version` is judged by.
     content_version: HashMap<String, i64>,
     accepted: HashSet<String>,
     revived_by_write: u64,
@@ -60,7 +48,6 @@ struct State {
     next: u64,
 }
 
-/// One computer's view: who it is and its faults.
 pub struct Computer {
     pub user: String,
     pub name: String,
@@ -114,7 +101,6 @@ impl State {
         self.seq
     }
 
-    /// Trashed or purged itself, or under a trashed folder.
     fn hidden(&self, id: &str) -> bool {
         let mut current = Some(id.to_owned());
         let mut depth = 0;
@@ -148,7 +134,12 @@ impl State {
         false
     }
 
-    fn name_taken(&self, parent: Option<&ItemId>, name: &str, except: Option<&str>) -> Option<Item> {
+    fn name_taken(
+        &self,
+        parent: Option<&ItemId>,
+        name: &str,
+        except: Option<&str>,
+    ) -> Option<Item> {
         self.items
             .values()
             .find(|item| {
@@ -166,19 +157,18 @@ impl State {
         self.marks.retain(|mark| mark.expires > now);
     }
 
-    /// Someone's live mark on `id` or anything inside it.
     fn open_in(&mut self, id: &str) -> Vec<Value> {
         self.live_marks();
         self.marks
             .iter()
             .filter(|mark| self.within(&mark.item, id))
-            .map(|mark| json!({ "user_id": mark.user, "name": mark.user_name,
-                "device_name": mark.device_name, "editing": mark.editing }))
+            .map(|mark| {
+                json!({ "user_id": mark.user, "name": mark.user_name,
+                "device_name": mark.device_name, "editing": mark.editing })
+            })
             .collect()
     }
 
-    /// Brings `id` and the trashed folders above it back, as `by`'s write to them does. Answers
-    /// whether anything came back.
     fn revive(&mut self, id: &str, by: &Computer) -> bool {
         let mut chain = Vec::new();
         let mut current = Some(id.to_owned());
@@ -192,7 +182,6 @@ impl State {
             current = item.parent_id.as_ref().map(|parent| parent.0.clone());
         }
         let any = !chain.is_empty();
-        // The topmost first, so a name clash is judged among what is live.
         for at in chain.into_iter().rev() {
             let mut item = self.items[&at].clone();
             item.trashed = false;
@@ -201,7 +190,10 @@ impl State {
             item.trashed_by = None;
             item.modified_by = by.user.clone();
             item.modified_by_name = by.name.clone();
-            if self.name_taken(item.parent_id.as_ref(), &item.name, Some(&at)).is_some() {
+            if self
+                .name_taken(item.parent_id.as_ref(), &item.name, Some(&at))
+                .is_some()
+            {
                 item.name = space_drive::names::noted(&item.name, "restored");
             }
             item.version = Version(item.version.0 + 1);
@@ -214,12 +206,13 @@ impl State {
         any
     }
 
-    /// Keeps `current`'s content as a trashed copy beside it, replaced by `writer`'s save.
     fn keep_replaced(&mut self, space: &str, current: &Item, writer: &Computer) -> Item {
         let mut name = space_drive::names::noted(&current.name, "replaced 2026-11-20 1200");
         let mut n = 2;
         while self.items.values().any(|other| {
-            other.parent_id == current.parent_id && !other.deleted && other.name.to_lowercase() == name.to_lowercase()
+            other.parent_id == current.parent_id
+                && !other.deleted
+                && other.name.to_lowercase() == name.to_lowercase()
         }) {
             name = space_drive::names::numbered(
                 &space_drive::names::noted(&current.name, "replaced 2026-11-20 1200"),
@@ -254,7 +247,6 @@ impl State {
         copy
     }
 
-    /// Trashes `id` for `by`.
     fn trash(&mut self, id: &str, by: &Computer, held: bool) -> Item {
         let mut next = self.items[id].clone();
         next.trashed = true;
@@ -288,17 +280,14 @@ impl FakeServer {
         self.state.lock().unwrap()
     }
 
-    /// Every content any item has held, live, trashed or overwritten since.
     pub fn accepted(&self) -> HashSet<String> {
         self.state().accepted.clone()
     }
 
-    /// How many times a write brought a trashed item back.
     pub fn revived_by_write(&self) -> u64 {
         self.state().revived_by_write
     }
 
-    /// Every trashed item that isn't purged: what people trashed, and the replaced copies.
     pub fn trashed_items(&self) -> Vec<Item> {
         self.state()
             .items
@@ -308,7 +297,6 @@ impl FakeServer {
             .collect()
     }
 
-    /// The content of every item not purged, live or trashed, as text.
     pub fn all_contents(&self) -> Vec<String> {
         let state = self.state();
         state
@@ -325,7 +313,6 @@ impl FakeServer {
             .collect()
     }
 
-    /// An item's content on the server, as text.
     pub fn content_of(&self, item: &Item) -> String {
         let state = self.state();
         item.sha256
@@ -335,7 +322,6 @@ impl FakeServer {
             .unwrap_or_default()
     }
 
-    /// The live tree: drive path → (kind, sha256).
     pub fn live_tree(&self) -> HashMap<String, (Kind, Option<String>)> {
         let state = self.state();
         let mut out = HashMap::new();
@@ -353,7 +339,10 @@ impl FakeServer {
                 current = folder.parent_id.clone();
             }
             parts.reverse();
-            out.insert(format!("/{}", parts.join("/")), (item.kind, item.sha256.clone()));
+            out.insert(
+                format!("/{}", parts.join("/")),
+                (item.kind, item.sha256.clone()),
+            );
         }
         out
     }
@@ -380,7 +369,6 @@ impl FakeServer {
         self.state().seq
     }
 
-    /// Makes a computer of `user` (`name` is the person's name), signed in to this server.
     pub fn computer(self: &Arc<Self>, user: &str, name: &str, device_name: &str) -> Arc<Computer> {
         let number = self.counter.fetch_add(1, Ordering::SeqCst);
         let computer = Arc::new(Computer {
@@ -400,9 +388,14 @@ impl FakeServer {
         computer
     }
 
-    /// Opens the computer's drive in `dir` and mounts the test Space with no OS face.
-    pub fn open_drive(self: &Arc<Self>, computer: &Arc<Computer>, dir: PathBuf, runtime: tokio::runtime::Handle) -> Drive {
-        let mut config = DriveConfig::new(dir.clone(), computer.user.clone(), computer.device.clone());
+    pub fn open_drive(
+        self: &Arc<Self>,
+        computer: &Arc<Computer>,
+        dir: PathBuf,
+        runtime: tokio::runtime::Handle,
+    ) -> Drive {
+        let mut config =
+            DriveConfig::new(dir.clone(), computer.user.clone(), computer.device.clone());
         config.person_name = Some(computer.name.clone());
         config.patient = false;
         config.background = false;
@@ -438,7 +431,9 @@ impl FakeServer {
             .lock()
             .unwrap()
             .iter()
-            .filter(|other| other.device.id != from.device.id && !other.offline.load(Ordering::SeqCst))
+            .filter(|other| {
+                other.device.id != from.device.id && !other.offline.load(Ordering::SeqCst)
+            })
             .cloned()
             .collect();
         for other in others {
@@ -461,7 +456,11 @@ impl FakeServer {
             .path
             .split_once('?')
             .unwrap_or((request.path.as_str(), ""));
-        let parts: Vec<String> = path.split('/').filter(|p| !p.is_empty()).map(decode).collect();
+        let parts: Vec<String> = path
+            .split('/')
+            .filter(|p| !p.is_empty())
+            .map(decode)
+            .collect();
         let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
         let body: Value = request
             .body
@@ -485,7 +484,10 @@ impl FakeServer {
         match (request.method, parts.as_slice()) {
             (Method::Get, ["spaces", _, "drive", "changes"]) => {
                 let since: i64 = query.get("since").and_then(|v| v.parse().ok()).unwrap_or(0);
-                let limit: usize = query.get("limit").and_then(|v| v.parse().ok()).unwrap_or(500);
+                let limit: usize = query
+                    .get("limit")
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(500);
                 let mut items: Vec<Item> = state
                     .items
                     .values()
@@ -500,7 +502,10 @@ impl FakeServer {
                 } else {
                     state.seq.max(since)
                 };
-                reply(200, json!({ "items": items, "next_since": next, "more": more, "head": state.seq }))
+                reply(
+                    200,
+                    json!({ "items": items, "next_since": next, "more": more, "head": state.seq }),
+                )
             }
             (Method::Get, ["spaces", _, "drive", "items", id]) => match state.items.get(*id) {
                 Some(item) => reply(200, json!(item)),
@@ -515,8 +520,11 @@ impl FakeServer {
                     return reply(200, json!({ "upload_id": upload, "present": true }));
                 }
                 state.uploads.insert(upload.clone(), (sha, size));
-                reply(200, json!({ "upload_id": upload,
-                    "single": { "url": format!("fake://put/{upload}"), "method": "PUT", "headers": {} } }))
+                reply(
+                    200,
+                    json!({ "upload_id": upload,
+                    "single": { "url": format!("fake://put/{upload}"), "method": "PUT", "headers": {} } }),
+                )
             }
             (Method::Post, ["spaces", _, "drive", "uploads", _, "complete"]) => {
                 reply(200, json!({ "upload_id": parts[4] }))
@@ -525,10 +533,17 @@ impl FakeServer {
                 let id = body["id"].as_str().unwrap_or_default().to_owned();
                 let parent = body["parent_id"].as_str().map(|p| ItemId(p.to_owned()));
                 let name = body["name"].as_str().unwrap_or_default().to_owned();
-                let kind = if body["kind"] == "folder" { Kind::Folder } else { Kind::File };
+                let kind = if body["kind"] == "folder" {
+                    Kind::Folder
+                } else {
+                    Kind::File
+                };
                 let sha = body["sha256"].as_str().map(str::to_owned);
                 if let Some(existing) = state.items.get(&id) {
-                    let same = existing.parent_id == parent && existing.name == name && existing.kind == kind && existing.sha256 == sha;
+                    let same = existing.parent_id == parent
+                        && existing.name == name
+                        && existing.kind == kind
+                        && existing.sha256 == sha;
                     return if same {
                         reply(200, json!(existing))
                     } else {
@@ -545,8 +560,9 @@ impl FakeServer {
                         Some(folder) if folder.kind != Kind::Folder => {
                             return reply(409, json!({ "code": "parent_not_folder" }))
                         }
-                        // A trashed folder it goes into comes back first.
-                        Some(_) if state.hidden(&parent.0) => revived = state.revive(&parent.0, computer),
+                        Some(_) if state.hidden(&parent.0) => {
+                            revived = state.revive(&parent.0, computer)
+                        }
                         Some(_) => {}
                     }
                 }
@@ -555,8 +571,8 @@ impl FakeServer {
                 }
                 if kind == Kind::File {
                     let sha = sha.clone().unwrap_or_default();
-                    // An empty file has no blob, as on the real server.
-                    if sha != space_drive::transfer::EMPTY_SHA256 && !state.blobs.contains_key(&sha) {
+                    if sha != space_drive::transfer::EMPTY_SHA256 && !state.blobs.contains_key(&sha)
+                    {
                         return reply(409, json!({ "code": "blob_missing" }));
                     }
                     state.accepted.insert(sha);
@@ -612,13 +628,16 @@ impl FakeServer {
                         if state.within(&parent.0, id) {
                             return reply(409, json!({ "code": "invalid_move" }));
                         }
-                        if state.items.get(&parent.0).is_none_or(|folder| folder.deleted) {
+                        if state
+                            .items
+                            .get(&parent.0)
+                            .is_none_or(|folder| folder.deleted)
+                        {
                             return reply(404, json!({ "code": "parent_missing" }));
                         }
                     }
                 }
                 let moved = next.name != current.name || next.parent_id != current.parent_id;
-                // Checked before anything changes.
                 let holder = if moved {
                     state.name_taken(next.parent_id.as_ref(), &next.name, Some(id))
                 } else {
@@ -633,14 +652,16 @@ impl FakeServer {
                         return reply(423, json!({ "code": "in_use", "who": who }));
                     }
                 }
-                let new_sha = body.get("sha256").and_then(Value::as_str).map(str::to_owned);
+                let new_sha = body
+                    .get("sha256")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned);
                 if let Some(sha) = &new_sha {
-                    if sha != space_drive::transfer::EMPTY_SHA256 && !state.blobs.contains_key(sha) {
+                    if sha != space_drive::transfer::EMPTY_SHA256 && !state.blobs.contains_key(sha)
+                    {
                         return reply(409, json!({ "code": "blob_missing" }));
                     }
                 }
-                // A write to something trashed (or inside a trashed folder) brings it back, and a
-                // move into a trashed folder brings that back.
                 let mut revived = state.revive(id, computer);
                 if let Some(parent) = &next.parent_id {
                     if state.hidden(&parent.0) {
@@ -665,7 +686,9 @@ impl FakeServer {
                     let seen = body["base_version"]
                         .as_i64()
                         .or(if_match)
-                        .is_some_and(|base| base >= state.content_version.get(*id).copied().unwrap_or(1));
+                        .is_some_and(|base| {
+                            base >= state.content_version.get(*id).copied().unwrap_or(1)
+                        });
                     if changes && !seen && current.size > 0 {
                         replaced = json!(state.keep_replaced(space, &current, computer));
                     }
@@ -674,7 +697,9 @@ impl FakeServer {
                     next.size = body["size"].as_u64().unwrap_or(0);
                     next.mtime_ms = body["mtime_ms"].as_i64().unwrap_or(0);
                     if changes {
-                        state.content_version.insert((*id).to_owned(), next.version.0 + 1);
+                        state
+                            .content_version
+                            .insert((*id).to_owned(), next.version.0 + 1);
                     }
                 }
                 next.version = Version(next.version.0 + 1);
@@ -702,15 +727,18 @@ impl FakeServer {
                         return reply(409, json!({ "code": "version_conflict", "item": current }));
                     }
                 }
-                // A computer's own marks never block its own trash move.
-                let device = header(request, "X-Misty-Device").unwrap_or_default().to_owned();
+                let device = header(request, "X-Misty-Device")
+                    .unwrap_or_default()
+                    .to_owned();
                 state.live_marks();
                 let who: Vec<Value> = state
                     .marks
                     .iter()
                     .filter(|mark| mark.device_id != device && state.within(&mark.item, id))
-                    .map(|mark| json!({ "user_id": mark.user, "name": mark.user_name,
-                        "device_name": mark.device_name, "editing": mark.editing }))
+                    .map(|mark| {
+                        json!({ "user_id": mark.user, "name": mark.user_name,
+                        "device_name": mark.device_name, "editing": mark.editing })
+                    })
                     .collect();
                 if !who.is_empty() {
                     return reply(423, json!({ "code": "in_use", "who": who }));
@@ -727,7 +755,10 @@ impl FakeServer {
                 }
                 item.trashed = false;
                 item.trash_hold = false;
-                if state.name_taken(item.parent_id.as_ref(), &item.name, Some(id)).is_some() {
+                if state
+                    .name_taken(item.parent_id.as_ref(), &item.name, Some(id))
+                    .is_some()
+                {
                     item.name = format!("{} (restored)", item.name);
                 }
                 item.version = Version(item.version.0 + 1);
@@ -736,19 +767,30 @@ impl FakeServer {
                 state.items.insert((*id).to_owned(), item.clone());
                 reply(200, json!(item))
             }
-            (Method::Get, ["spaces", _, "drive", "items", id, "content"]) => match state.items.get(*id) {
-                Some(item) if item.size == 0 => reply(200, json!({ "url": "", "expires_at": now_text() })),
-                Some(item) => reply(200, json!({ "url": format!("fake://get/{}", item.sha256.clone().unwrap_or_default()),
-                    "expires_at": now_text() })),
-                None => reply(404, json!({ "code": "not_found" })),
-            },
+            (Method::Get, ["spaces", _, "drive", "items", id, "content"]) => {
+                match state.items.get(*id) {
+                    Some(item) if item.size == 0 => {
+                        reply(200, json!({ "url": "", "expires_at": now_text() }))
+                    }
+                    Some(item) => reply(
+                        200,
+                        json!({ "url": format!("fake://get/{}", item.sha256.clone().unwrap_or_default()),
+                    "expires_at": now_text() }),
+                    ),
+                    None => reply(404, json!({ "code": "not_found" })),
+                }
+            }
             (Method::Put, ["spaces", _, "drive", "items", id, "in-use"]) => {
                 if !state.items.contains_key(*id) {
                     return reply(404, json!({ "code": "not_found" }));
                 }
-                let device = header(request, "X-Misty-Device").unwrap_or_default().to_owned();
+                let device = header(request, "X-Misty-Device")
+                    .unwrap_or_default()
+                    .to_owned();
                 let editing = body["editing"].as_bool().unwrap_or(false);
-                state.marks.retain(|mark| !(mark.item == *id && mark.device_id == device));
+                state
+                    .marks
+                    .retain(|mark| !(mark.item == *id && mark.device_id == device));
                 state.marks.push(Mark {
                     item: (*id).to_owned(),
                     user: computer.user.clone(),
@@ -776,9 +818,17 @@ impl FakeServer {
                 reply(200, json!({ "marks": marks }))
             }
             (Method::Delete, ["spaces", _, "drive", "items", id, "in-use"]) => {
-                let device = header(request, "X-Misty-Device").unwrap_or_default().to_owned();
-                state.marks.retain(|mark| !(mark.item == *id && mark.device_id == device));
-                Response { status: 204, headers: Vec::new(), body: Vec::new() }
+                let device = header(request, "X-Misty-Device")
+                    .unwrap_or_default()
+                    .to_owned();
+                state
+                    .marks
+                    .retain(|mark| !(mark.item == *id && mark.device_id == device));
+                Response {
+                    status: 204,
+                    headers: Vec::new(),
+                    body: Vec::new(),
+                }
             }
             (Method::Get, ["spaces", _, "drive", "trash"]) => {
                 let items: Vec<Item> = state
@@ -800,7 +850,11 @@ impl FakeServer {
                 item.parent_id = None;
                 item.seq = Seq(state.next_seq());
                 state.items.insert((*id).to_owned(), item);
-                Response { status: 204, headers: Vec::new(), body: Vec::new() }
+                Response {
+                    status: 204,
+                    headers: Vec::new(),
+                    body: Vec::new(),
+                }
             }
             _ => reply(404, json!({ "code": "not_found" })),
         }
@@ -855,10 +909,18 @@ impl Http for Session {
             let upload = url.trim_start_matches("fake://put/").to_owned();
             let mut state = self.server.state();
             let Some((sha, size)) = state.uploads.get(&upload).cloned() else {
-                return Ok(Response { status: 403, headers: Vec::new(), body: Vec::new() });
+                return Ok(Response {
+                    status: 403,
+                    headers: Vec::new(),
+                    body: Vec::new(),
+                });
             };
             if sha_of(&bytes) != sha || bytes.len() as u64 != size {
-                return Ok(Response { status: 400, headers: Vec::new(), body: Vec::new() });
+                return Ok(Response {
+                    status: 400,
+                    headers: Vec::new(),
+                    body: Vec::new(),
+                });
             }
             state.blobs.insert(sha, bytes);
             Ok(Response {
@@ -899,17 +961,18 @@ impl Events for Recorder {
         self.computer.notices.lock().unwrap().push(notice.clone());
     }
     fn agent_trashed(&self, record: &AgentTrash) {
-        self.computer.agent_trash.lock().unwrap().push(record.clone());
+        self.computer
+            .agent_trash
+            .lock()
+            .unwrap()
+            .push(record.clone());
     }
 }
-
-// What the tests do on a computer, through the faces' calls.
 
 pub fn space() -> SpaceId {
     SpaceId(SPACE.into())
 }
 
-/// A file with `bytes` in the drive's temp folder, to hand to `create` or `write`.
 pub fn staged(drive: &Drive, bytes: &[u8]) -> PathBuf {
     let path = drive.temp_path();
     std::fs::write(&path, bytes).unwrap();
@@ -923,7 +986,6 @@ pub fn folder_id(drive: &Drive, path: &str) -> Option<ItemId> {
     drive.node_at(&space(), path).unwrap().map(|node| node.id)
 }
 
-/// Makes the folders of `path` and writes `bytes` there, as a person saving a file would.
 pub fn save(drive: &Drive, path: &str, bytes: &[u8]) -> ItemId {
     let mut parent: Option<ItemId> = None;
     let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
@@ -935,14 +997,17 @@ pub fn save(drive: &Drive, path: &str, bytes: &[u8]) -> ItemId {
             Some(node) => Some(node.id),
             None => Some(
                 drive
-                    .create(&space(), space_drive::NewNode {
-                        parent: parent.clone(),
-                        name: (*folder).to_owned(),
-                        kind: Kind::Folder,
-                        content: None,
-                        mtime_ms: 1,
-                        id: None,
-                    })
+                    .create(
+                        &space(),
+                        space_drive::NewNode {
+                            parent: parent.clone(),
+                            name: (*folder).to_owned(),
+                            kind: Kind::Folder,
+                            content: None,
+                            mtime_ms: 1,
+                            id: None,
+                        },
+                    )
                     .unwrap()
                     .id,
             ),
@@ -951,22 +1016,28 @@ pub fn save(drive: &Drive, path: &str, bytes: &[u8]) -> ItemId {
     let content = staged(drive, bytes);
     match drive.node_at(&space(), path).unwrap() {
         Some(node) => drive.write(&space(), &node.id, &content, 2).unwrap().id,
-        None => drive
-            .create(&space(), space_drive::NewNode {
-                parent,
-                name: (*name).to_owned(),
-                kind: Kind::File,
-                content: Some(content),
-                mtime_ms: 1,
-                id: None,
-            })
-            .unwrap()
-            .id,
+        None => {
+            drive
+                .create(
+                    &space(),
+                    space_drive::NewNode {
+                        parent,
+                        name: (*name).to_owned(),
+                        kind: Kind::File,
+                        content: Some(content),
+                        mtime_ms: 1,
+                        id: None,
+                    },
+                )
+                .unwrap()
+                .id
+        }
     }
 }
 
-/// The computer's tree: drive path → (kind, sha256, state).
-pub fn local_tree(drive: &Drive) -> HashMap<String, (Kind, Option<String>, space_drive::LocalState)> {
+pub fn local_tree(
+    drive: &Drive,
+) -> HashMap<String, (Kind, Option<String>, space_drive::LocalState)> {
     let mut out = HashMap::new();
     let mut queue: Vec<Option<ItemId>> = vec![None];
     while let Some(folder) = queue.pop() {
@@ -974,7 +1045,10 @@ pub fn local_tree(drive: &Drive) -> HashMap<String, (Kind, Option<String>, space
             if node.kind == Kind::Folder {
                 queue.push(Some(node.id.clone()));
             }
-            out.insert(node.path.clone(), (node.kind, node.sha256.clone(), node.state));
+            out.insert(
+                node.path.clone(),
+                (node.kind, node.sha256.clone(), node.state),
+            );
         }
     }
     out
@@ -984,7 +1058,6 @@ pub fn sha(bytes: &[u8]) -> String {
     sha_of(bytes)
 }
 
-/// Syncs every online computer until nothing is left to send and everyone is at the head.
 pub async fn settle(server: &Arc<FakeServer>, drives: &[Drive]) {
     for _ in 0..12 {
         for drive in drives {
@@ -997,8 +1070,6 @@ pub async fn settle(server: &Arc<FakeServer>, drives: &[Drive]) {
                 && drive.current_seq(&space()).unwrap().0 >= server.head()
         });
         if quiet {
-            // One more pass; it may send what the tree doesn't show (a delete waiting to go up),
-            // so it is quiet only if that pass changed nothing on the server.
             let head = server.head();
             for drive in drives {
                 let _ = drive.sync_now(&space()).await;

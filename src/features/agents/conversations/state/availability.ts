@@ -1,10 +1,6 @@
 import { isApiSessionTransitioning, readApiSessionGeneration } from "@/api/client/session";
-import { agentAccountId } from "../../personal/agentAccount";
+import { agentAccountId } from "../../personal/agent_account";
 
-/**
- * A turn belongs to whoever this window is working for, the signed-in account. It asks nothing of
- * the server: agents run on this computer.
- */
 export async function assertMistyAvailable(
   accountId: string,
   _legacySpaceId?: string,

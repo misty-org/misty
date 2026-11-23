@@ -1,6 +1,3 @@
-//! Trusted agent input for WebView2 pages through the Chrome DevTools
-//! Protocol. Events go to the granted page's renderer only: never to Misty's
-//! window, another tab, or another app, and never as global desktop input.
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex, OnceLock},
@@ -15,7 +12,6 @@ use crate::browser::pages::windows::webview2::{self, CdpError};
 mod keys;
 use keys::*;
 
-/// Pages whose person-made input is ignored while an agent drives them.
 fn locked_pages() -> &'static Mutex<HashSet<String>> {
     static LOCKED: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
     LOCKED.get_or_init(Mutex::default)
@@ -27,9 +23,6 @@ fn is_locked(view: &Webview) -> bool {
         .is_ok_and(|pages| pages.contains(view.label()))
 }
 
-/// Chromium drops every input event, including the agent's, while a page
-/// ignores input. The lock stays on between actions and lifts only for the
-/// moment each agent event is delivered.
 pub(in crate::browser) fn set_locked(view: &Webview, locked: bool) -> Result<(), String> {
     {
         let mut pages = locked_pages()
@@ -57,12 +50,8 @@ async fn ignore_input(view: &Webview, ignore: bool) -> Result<Value, CdpError> {
     .await
 }
 
-/// A check that runs on the page's UI thread right before each event, so an
-/// event cannot outlive revoked ownership, a takeover or a navigation.
 pub(in crate::browser) type Authorize = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
 
-/// Sends one CDP input event, after `authorize` passes, with the input lock
-/// lifted for just this event.
 async fn send(
     view: &Webview,
     authorize: &Authorize,
@@ -100,8 +89,6 @@ async fn send(
     }
 }
 
-/// Delivers one validated action. `point` turns a viewport fraction into CSS
-/// pixels. Returns the same receipt the WebKit adapter does.
 pub(in crate::browser) async fn act(
     view: &Webview,
     authorize: Authorize,

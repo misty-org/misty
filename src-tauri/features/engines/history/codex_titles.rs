@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-/// Codex app task names are stored separately from rollout messages. The
-/// append-only index can contain multiple names for an ID; the last one wins.
+#[allow(
+    clippy::disallowed_types,
+    reason = "reads Codex's own session index in place, wherever its home keeps it"
+)]
 fn read_names(path: &Path) -> HashMap<String, String> {
     let Ok(file) = std::fs::File::open(path) else {
         return HashMap::new();
@@ -28,9 +30,6 @@ fn read_names(path: &Path) -> HashMap<String, String> {
     names
 }
 
-/// Run even when rollout stat signatures match: renaming a task does not
-/// modify its rollout. Update the derived title, leaving local custom titles
-/// and message timestamps intact.
 pub(super) fn sync(db: &crate::engines::support::db::Db) -> Result<bool, String> {
     let home = crate::engines::codex_home();
     sync_from(db, &home.join("session_index.jsonl"))
@@ -122,7 +121,6 @@ mod tests {
                 .unwrap();
             assert_eq!(fallback, 2);
         }
-        // Only the external title index changes; no rollout needs reparsing.
         std::fs::write(&index, "{\"id\":\"a\",\"thread_name\":\"Renamed\"}\n").unwrap();
         assert!(sync_from(&db, &index)?);
         let title: String =

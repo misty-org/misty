@@ -1,20 +1,20 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AiArtifact } from "@/features/agents/runs/invocations/invocationTypes";
+import type { AiArtifact } from "@/features/agents/runs/invocations/invocation_types";
 const fixture = vi.hoisted(() => ({
   decide: vi.fn(),
   state: {} as Record<string, unknown>,
 }));
-vi.mock("../state/useMistyStore", () => ({
+vi.mock("../state/use_misty_store", () => ({
   useMistyStore: Object.assign((select: (state: unknown) => unknown) => select(fixture.state), {
     getState: () => fixture.state,
     setState: vi.fn(),
   }),
 }));
-vi.mock("@/features/agents/AgentsRuntime", () => ({
+vi.mock("@/features/agents/agents_runtime", () => ({
   runtimeAiApi: { decideArtifact: fixture.decide },
 }));
-vi.mock("../context/contextBridge", () => ({ requestHostContext: vi.fn() }));
+vi.mock("../context/context_bridge", () => ({ requestHostContext: vi.fn() }));
 vi.mock("../state/availability", () => ({ assertMistyAvailable: vi.fn() }));
 import { MistyContextBar } from "./MistyContextBar";
 beforeEach(() => {

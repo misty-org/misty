@@ -1,4 +1,3 @@
-//! What a command can reach: tools, installed software, the shared folder and other workspaces.
 use super::*;
 
 #[tokio::test]
@@ -31,8 +30,6 @@ async fn a_writable_folder_holds_links_quarantine_and_files_that_run_by_themselv
     }
 }
 
-/// What keeps commands from reading other programs' environments, turning off login items or running
-/// something an agent wrote: nothing but Misty's own tools can start.
 #[tokio::test]
 async fn only_mistys_own_tools_can_start() {
     let scene = scene();
@@ -101,7 +98,6 @@ async fn what_a_command_adds_to_a_shared_folder_is_quarantined() {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
     let scene = scene();
     file_access::allow_shared_folder(&scene.folder, file_access::Access::Read);
-    // Files the fixture just made would count as changed by the command.
     tokio::time::sleep(Duration::from_secs(3)).await;
     shell(
         &scene,
@@ -139,8 +135,6 @@ async fn what_a_command_adds_to_a_shared_folder_is_quarantined() {
 #[tokio::test]
 async fn nothing_from_misty_leaks_into_a_command() {
     let scene = scene();
-    // Asked of a tool: the shell's own runtime has files open that it marks to close on exec, and the
-    // tool's only other file is the folder it opened to answer.
     let tried = shell(&scene, "chat", "ls /dev/fd", None).await;
     let open: Vec<i32> = tried
         .stdout

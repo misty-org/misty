@@ -1,10 +1,8 @@
 import { Server } from "lucide-react";
-import { currentApiBase, isMistyCloud, useServerChoice } from "@/api/deployment/serverChoice";
+import { currentApiBase, isMistyCloud, useServerChoice } from "@/api/deployment/server_choice";
 import { useSpacesConnection } from "@/features/spaces";
 import { openSettings } from "@/features/settings";
 import { Button, StateMark } from "@misty/ui";
-
-// The bottom bar's server items: the server this device uses and, while it is down, the problem.
 
 function useServerName(): string {
   const choice = useServerChoice((state) => state.choice);
@@ -18,7 +16,6 @@ function useServerName(): string {
   }
 }
 
-/** The server this device uses, with its live connection's state. Opens Settings › Server. */
 export function ServerStatus() {
   const name = useServerName();
   const connection = useSpacesConnection((state) => state.state);
@@ -44,7 +41,6 @@ export function ServerStatus() {
 
 const markLabel = { online: "Connected", waiting: "Reconnecting", working: "Connecting" } as const;
 
-/** Only while the live line to the server is down. Opens Settings › Server. */
 export function ConnectionProblem() {
   const name = useServerName();
   const connection = useSpacesConnection((state) => state.state);

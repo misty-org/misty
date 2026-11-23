@@ -17,28 +17,21 @@ use super::support;
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomPromptEntry {
-    /// File stem (`plan.md` → `plan`).
     pub name: String,
-    /// Absolute file path; the window sends it back as `promptPath`.
     pub path: String,
     pub description: Option<String>,
     pub argument_hint: Option<String>,
-    /// The Markdown body without the front matter.
     pub content: String,
-    /// "workspace" or "global".
     pub scope: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptsDirs {
-    /// Empty when no folder was given.
     pub workspace: String,
     pub global: String,
 }
 
-/// Partial edits for `engine_prompts_update`: absent keys keep the stored value, and `Some("")`
-/// on the description or argument hint clears it.
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptUpdates {
@@ -56,9 +49,6 @@ fn global_prompts_dir() -> PathBuf {
     support::app_home().join("prompts")
 }
 
-/// Both scopes' folders for a linked folder, the folder's first. The folder itself must pass the
-/// file gate as a linked folder, so a window can't point `path` anywhere else. Without a folder,
-/// only the global scope is there.
 fn prompt_roots(path: &str) -> Result<Vec<(PathBuf, &'static str)>, String> {
     let mut roots = Vec::with_capacity(2);
     if !path.trim().is_empty() {
@@ -69,8 +59,6 @@ fn prompt_roots(path: &str) -> Result<Vec<(PathBuf, &'static str)>, String> {
     Ok(roots)
 }
 
-/// Every change through a prompt path must land on a file inside one of the scope folders, with
-/// both sides resolved so `..` and linked parents can't get out.
 fn ensure_within_roots(path: &Path, roots: &[(PathBuf, &'static str)]) -> Result<(), String> {
     let canonical = fs::canonicalize(path).map_err(|_| "Invalid prompt path.".to_string())?;
     for (root, _) in roots {
@@ -113,7 +101,6 @@ fn move_file(src: &Path, dest: &Path) -> Result<(), String> {
     }
 }
 
-/// A front matter value with one pair of matching quotes taken off; `None` when empty.
 fn sanitize_meta_value(value: &str) -> Option<String> {
     let mut val = value.trim().to_string();
     if val.len() >= 2 {
@@ -132,8 +119,6 @@ fn sanitize_meta_value(value: &str) -> Option<String> {
     }
 }
 
-/// One `key: value` line of front matter, read with the same rules as the `/` menu
-/// (`argument-hint` and its spellings).
 fn parse_meta_line(
     line: &str,
     description: &mut Option<String>,
@@ -159,8 +144,6 @@ fn parse_meta_line(
     }
 }
 
-/// `---`-fenced front matter and the body. Front matter that never closes means the file has
-/// none and all of it is body.
 fn parse_frontmatter(content: &str) -> (Option<String>, Option<String>, String) {
     let mut segments = content.split_inclusive('\n');
     let Some(first_segment) = segments.next() else {
@@ -222,7 +205,6 @@ fn build_prompt_contents(
     output
 }
 
-/// A prompt's name becomes its file stem, so spaces and path separators are refused.
 fn sanitize_prompt_name(name: &str) -> Result<String, String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
@@ -280,8 +262,6 @@ fn prompts_list_blocking(path: &str) -> Result<Vec<CustomPromptEntry>, String> {
     let roots = prompt_roots(path)?;
     let mut out = Vec::new();
     for (dir, scope) in &roots {
-        // The folder's prompts come first; each list is sorted by name. Listing makes no folders,
-        // so a project that never had a prompt gets no `.misty` folder.
         out.extend(discover_prompts_in(dir, scope));
     }
     Ok(out)
@@ -358,8 +338,6 @@ fn prompts_update_blocking(
         .ok_or("Invalid prompt path.".to_string())?
         .to_string();
 
-    // Absent keys keep the stored value; Some("") on the meta fields clears them through the
-    // trim-to-empty rule below.
     let name = match updates.name {
         Some(name) => sanitize_prompt_name(&name)?,
         None => old_name,
@@ -454,14 +432,11 @@ async fn blocking<T: Send + 'static>(
         .map_err(|e| e.to_string())?
 }
 
-/// The folder's prompts, then the global ones. `path` is the linked folder, or empty.
 #[tauri::command]
 pub async fn engine_prompts_list(path: String) -> Result<Vec<CustomPromptEntry>, String> {
     blocking(move || prompts_list_blocking(&path)).await
 }
 
-/// Opens one scope's prompts folder (`workspace` or `global`) in the file manager, made if missing.
-/// The folder is worked out here, so a window can't open anything else.
 #[tauri::command]
 pub async fn engine_prompts_reveal(
     app: tauri::AppHandle,
@@ -522,9 +497,6 @@ mod tests {
     #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
     use super::*;
 
-    // The two scopes are exercised through the helpers with scratch folders; the commands'
-    // folder check is the file gate's, covered in file_access.
-
     fn scratch_dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("misty-prompts-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -553,13 +525,11 @@ mod tests {
         assert_eq!(hint.as_deref(), Some("[target]"));
         assert_eq!(body, "Body\n");
 
-        // No fence: the whole file is body.
         let (description, hint, body) = parse_frontmatter("plain body\n");
         assert_eq!(description, None);
         assert_eq!(hint, None);
         assert_eq!(body, "plain body\n");
 
-        // A fence that never closes is body too, and its meta is dropped.
         let (description, _, body) = parse_frontmatter("---\ndescription: x\nnever closed\n");
         assert_eq!(description, None);
         assert_eq!(body, "---\ndescription: x\nnever closed\n");
@@ -596,7 +566,6 @@ mod tests {
         let workspace_dir = roots[0].0.clone();
         let global_dir = roots[1].0.clone();
 
-        // Create, through the same helpers the command uses.
         let name = sanitize_prompt_name("plan").unwrap();
         let target = workspace_dir.join(format!("{name}.md"));
         let body = build_prompt_contents(Some("Plan"), Some("[t]"), "Body\n");
@@ -609,7 +578,6 @@ mod tests {
         assert_eq!(entries[0].argument_hint.as_deref(), Some("[t]"));
         assert_eq!(entries[0].content, "Body\n");
 
-        // Update: rewritten with merged meta and renamed.
         let renamed = workspace_dir.join("plan-v2.md");
         let body = build_prompt_contents(None, None, "New body\n");
         std::fs::write(&renamed, body).unwrap();
@@ -619,7 +587,6 @@ mod tests {
         assert_eq!(entry.description, None);
         assert_eq!(entry.content, "New body\n");
 
-        // Move to global.
         let dest = global_dir.join("plan-v2.md");
         move_file(&renamed, &dest).unwrap();
         assert!(!renamed.exists());
@@ -627,7 +594,6 @@ mod tests {
         assert_eq!(entry.scope, "global");
         assert_eq!(entry.content, "New body\n");
 
-        // Delete.
         std::fs::remove_file(&dest).unwrap();
         assert!(discover_prompts_in(&global_dir, "global").is_empty());
     }
@@ -639,11 +605,9 @@ mod tests {
         std::fs::write(&outside, "not a prompt").unwrap();
         assert!(ensure_within_roots(&outside, &roots).is_err());
 
-        // `..` out of the prompts folder is refused once resolved.
         let escape = roots[0].0.join("..").join("outside.md");
         assert!(ensure_within_roots(&escape, &roots).is_err());
 
-        // A real prompt inside the folder's prompts passes.
         let inside = roots[0].0.join("ok.md");
         std::fs::write(&inside, "body").unwrap();
         assert!(ensure_within_roots(&inside, &roots).is_ok());

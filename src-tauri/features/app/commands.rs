@@ -1,4 +1,3 @@
-//! The app-wide commands.
 use serde::Serialize;
 use tauri::State;
 

@@ -1,5 +1,3 @@
-//! A local server that records requests and gives canned answers.
-// Each test file uses a different part of this.
 #![allow(dead_code)]
 
 pub mod run_backend;
@@ -30,10 +28,12 @@ pub struct MockServer {
 }
 
 fn ends_at(bytes: &[u8]) -> Option<usize> {
-    bytes.windows(4).position(|window| window == b"\r\n\r\n").map(|at| at + 4)
+    bytes
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .map(|at| at + 4)
 }
 
-/// One canned answer.
 #[derive(Clone, Debug)]
 pub struct Reply {
     pub status: u16,
@@ -44,7 +44,12 @@ pub struct Reply {
 
 impl Reply {
     pub fn new(status: u16, content_type: &str, body: impl Into<Vec<u8>>) -> Self {
-        Self { status, content_type: content_type.to_owned(), headers: Vec::new(), body: body.into() }
+        Self {
+            status,
+            content_type: content_type.to_owned(),
+            headers: Vec::new(),
+            body: body.into(),
+        }
     }
 
     pub fn with_header(mut self, name: &str, value: &str) -> Self {
@@ -53,12 +58,10 @@ impl Reply {
     }
 }
 
-/// Serves `body` with `status` to every connection, until the test ends.
 pub async fn serve(status: u16, content_type: &str, body: String) -> MockServer {
     serve_replies(vec![Reply::new(status, content_type, body)]).await
 }
 
-/// What a request body reads as: JSON, a multipart form with its random boundary gone, or base64.
 fn parsed_body(headers: &BTreeMap<String, String>, raw: &[u8]) -> Value {
     if raw.is_empty() {
         return Value::Null;
@@ -71,16 +74,20 @@ fn parsed_body(headers: &BTreeMap<String, String>, raw: &[u8]) -> Value {
 }
 
 fn find(haystack: &[u8], needle: &[u8], from: usize) -> Option<usize> {
-    haystack[from..].windows(needle.len()).position(|window| window == needle).map(|at| at + from)
+    haystack[from..]
+        .windows(needle.len())
+        .position(|window| window == needle)
+        .map(|at| at + from)
 }
 
 fn quoted_value(line: &str, name: &str) -> Option<String> {
-    let start = line.find(&format!("{name}=\"")).map(|at| at + name.len() + 2)?;
+    let start = line
+        .find(&format!("{name}=\""))
+        .map(|at| at + name.len() + 2)?;
     let end = line[start..].find('"')? + start;
     Some(line[start..end].to_owned())
 }
 
-/// Each field in order, with its contents in base64 so audio survives.
 fn multipart_fields(raw: &[u8], boundary: &str) -> Value {
     let marker = format!("--{boundary}");
     let mut fields = Vec::new();
@@ -98,7 +105,10 @@ fn multipart_fields(raw: &[u8], boundary: &str) -> Value {
         let Some(body_end) = find(raw, closing.as_bytes(), body_start) else {
             break;
         };
-        let disposition = head.lines().find(|line| line.to_lowercase().starts_with("content-disposition")).unwrap_or("");
+        let disposition = head
+            .lines()
+            .find(|line| line.to_lowercase().starts_with("content-disposition"))
+            .unwrap_or("");
         let field_type = head
             .lines()
             .find(|line| line.to_lowercase().starts_with("content-type"))
@@ -115,7 +125,6 @@ fn multipart_fields(raw: &[u8], boundary: &str) -> Value {
     serde_json::json!({ "multipart": fields })
 }
 
-/// Serves the replies in order, repeating the last one for any further request, until the test ends.
 pub async fn serve_replies(replies: Vec<Reply>) -> MockServer {
     assert!(!replies.is_empty(), "a mock server needs a reply");
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -148,7 +157,10 @@ pub async fn serve_replies(replies: Vec<Reply>) -> MockServer {
                     headers.insert(name.trim().to_lowercase(), value.trim().to_owned());
                 }
             }
-            let length: usize = headers.get("content-length").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let length: usize = headers
+                .get("content-length")
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
             while buffer.len() < head_end + length {
                 let read = socket.read(&mut chunk).await.unwrap();
                 if read == 0 {
@@ -157,10 +169,19 @@ pub async fn serve_replies(replies: Vec<Reply>) -> MockServer {
                 buffer.extend_from_slice(&chunk[..read]);
             }
             let parsed = parsed_body(&headers, &buffer[head_end..]);
-            log.lock().unwrap().push(Captured { method, path, headers, body: parsed });
+            log.lock().unwrap().push(Captured {
+                method,
+                path,
+                headers,
+                body: parsed,
+            });
             let reply = &replies[served.min(replies.len() - 1)];
             served += 1;
-            let extra: String = reply.headers.iter().map(|(name, value)| format!("{name}: {value}\r\n")).collect();
+            let extra: String = reply
+                .headers
+                .iter()
+                .map(|(name, value)| format!("{name}: {value}\r\n"))
+                .collect();
             let head = format!(
                 "HTTP/1.1 {} Status\r\ncontent-type: {}\r\n{extra}content-length: {}\r\nconnection: close\r\n\r\n",
                 reply.status,
@@ -175,8 +196,6 @@ pub async fn serve_replies(replies: Vec<Reply>) -> MockServer {
     MockServer { base_url, captured }
 }
 
-/// Answers each request from `handler`, each on its own task, until the test ends. A handler may take
-/// as long as it likes: a client that gives up just drops the connection.
 pub async fn serve_fn<F, Fut>(handler: F) -> String
 where
     F: Fn(Captured) -> Fut + Send + Sync + 'static,
@@ -195,7 +214,9 @@ where
                     if let Some(end) = ends_at(&buffer) {
                         break end;
                     }
-                    let Ok(read) = socket.read(&mut chunk).await else { return };
+                    let Ok(read) = socket.read(&mut chunk).await else {
+                        return;
+                    };
                     if read == 0 {
                         return;
                     }
@@ -212,16 +233,27 @@ where
                         headers.insert(name.trim().to_lowercase(), value.trim().to_owned());
                     }
                 }
-                let length: usize = headers.get("content-length").and_then(|v| v.parse().ok()).unwrap_or(0);
+                let length: usize = headers
+                    .get("content-length")
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0);
                 while buffer.len() < head_end + length {
-                    let Ok(read) = socket.read(&mut chunk).await else { return };
+                    let Ok(read) = socket.read(&mut chunk).await else {
+                        return;
+                    };
                     if read == 0 {
                         return;
                     }
                     buffer.extend_from_slice(&chunk[..read]);
                 }
                 let body = parsed_body(&headers, &buffer[head_end..]);
-                let reply = handler(Captured { method, path, headers, body }).await;
+                let reply = handler(Captured {
+                    method,
+                    path,
+                    headers,
+                    body,
+                })
+                .await;
                 let head = format!(
                     "HTTP/1.1 {} Status\r\ncontent-type: {}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
                     reply.status,

@@ -1,6 +1,3 @@
-//! What Misty reads from the X server through EWMH: where the pointer is and which window is in
-//! front, with its frame, title and app. On a Wayland session this reaches XWayland only, so the
-//! callers ask `super::wayland_session()` first.
 use std::sync::{Mutex, OnceLock};
 
 use x11rb::{
@@ -14,7 +11,6 @@ struct Server {
     root: Window,
 }
 
-/// One connection for the process, opened on first use; `None` without an X server.
 fn server() -> Option<&'static Mutex<Server>> {
     static SERVER: OnceLock<Option<Mutex<Server>>> = OnceLock::new();
     SERVER
@@ -78,7 +74,6 @@ impl Server {
             .unwrap_or_default()
     }
 
-    /// The class part of WM_CLASS ("instance\0Class\0"), which names the app.
     fn app(&self, window: Window) -> String {
         self.property(window, b"WM_CLASS", AtomEnum::STRING, 256)
             .map(|bytes| {
@@ -92,7 +87,6 @@ impl Server {
             .unwrap_or_default()
     }
 
-    /// The window's frame on the root window, its decorations included.
     fn frame(&self, window: Window) -> Option<(f64, f64, f64, f64)> {
         let geometry = self.connection.get_geometry(window).ok()?.reply().ok()?;
         let origin = self
@@ -124,7 +118,6 @@ impl Server {
     }
 }
 
-/// The pointer on the root window, in X pixels.
 pub(crate) fn pointer() -> Option<(f64, f64)> {
     with(|server| {
         let reply = server
@@ -137,7 +130,6 @@ pub(crate) fn pointer() -> Option<(f64, f64)> {
     })
 }
 
-/// The window in front, as EWMH window managers report it.
 #[derive(Clone, Debug)]
 pub(crate) struct ActiveWindow {
     pub id: u32,
@@ -165,7 +157,6 @@ pub(crate) fn active_window() -> Option<ActiveWindow> {
     })
 }
 
-/// Whether the key with this keysym is held, read from the server's key map.
 pub(crate) fn key_down(keysym: u32) -> bool {
     with(|server| {
         let setup = server.connection.setup();

@@ -1,4 +1,3 @@
-//! Works out a file's type from its first bytes. Ported from the SDK's `detectMediaType`.
 use base64::{
     alphabet,
     engine::{general_purpose::GeneralPurpose, DecodePaddingMode, GeneralPurposeConfig},
@@ -17,9 +16,44 @@ macro_rules! prefix {
     (@one $byte:expr) => { Some($byte) };
 }
 
-const FTYP_ANY: &[Option<u8>] = &[Some(0), Some(0), Some(0), None, Some(102), Some(116), Some(121), Some(112)];
-const RIFF_WEBP: &[Option<u8>] = &[Some(82), Some(73), Some(70), Some(70), None, None, None, None, Some(87), Some(69), Some(66), Some(80)];
-const RIFF_WAVE: &[Option<u8>] = &[Some(82), Some(73), Some(70), Some(70), None, None, None, None, Some(87), Some(65), Some(86), Some(69)];
+const FTYP_ANY: &[Option<u8>] = &[
+    Some(0),
+    Some(0),
+    Some(0),
+    None,
+    Some(102),
+    Some(116),
+    Some(121),
+    Some(112),
+];
+const RIFF_WEBP: &[Option<u8>] = &[
+    Some(82),
+    Some(73),
+    Some(70),
+    Some(70),
+    None,
+    None,
+    None,
+    None,
+    Some(87),
+    Some(69),
+    Some(66),
+    Some(80),
+];
+const RIFF_WAVE: &[Option<u8>] = &[
+    Some(82),
+    Some(73),
+    Some(70),
+    Some(70),
+    None,
+    None,
+    None,
+    None,
+    Some(87),
+    Some(65),
+    Some(86),
+    Some(69),
+];
 
 const IMAGE: &[Signature] = &[
     ("image/gif", prefix![71, 73, 70]),
@@ -29,8 +63,14 @@ const IMAGE: &[Signature] = &[
     ("image/bmp", prefix![66, 77]),
     ("image/tiff", prefix![73, 73, 42, 0]),
     ("image/tiff", prefix![77, 77, 0, 42]),
-    ("image/avif", prefix![0, 0, 0, 32, 102, 116, 121, 112, 97, 118, 105, 102]),
-    ("image/heic", prefix![0, 0, 0, 32, 102, 116, 121, 112, 104, 101, 105, 99]),
+    (
+        "image/avif",
+        prefix![0, 0, 0, 32, 102, 116, 121, 112, 97, 118, 105, 102],
+    ),
+    (
+        "image/heic",
+        prefix![0, 0, 0, 32, 102, 116, 121, 112, 104, 101, 105, 99],
+    ),
 ];
 
 const DOCUMENT: &[Signature] = &[("application/pdf", prefix![37, 80, 68, 70])];
@@ -53,7 +93,10 @@ const AUDIO: &[Signature] = &[
 const VIDEO: &[Signature] = &[
     ("video/mp4", FTYP_ANY),
     ("video/webm", prefix![26, 69, 223, 163]),
-    ("video/quicktime", prefix![0, 0, 0, 20, 102, 116, 121, 112, 113, 116]),
+    (
+        "video/quicktime",
+        prefix![0, 0, 0, 20, 102, 116, 121, 112, 113, 116],
+    ),
     ("video/x-msvideo", prefix![82, 73, 70, 70]),
 ];
 
@@ -67,7 +110,6 @@ fn table(top_level: &str) -> Option<&'static [Signature]> {
     }
 }
 
-/// Base64 as it comes from a model or a caller, which may lack padding.
 pub(crate) fn lenient_base64() -> GeneralPurpose {
     GeneralPurpose::new(
         &alphabet::STANDARD,
@@ -101,19 +143,21 @@ fn without_id3(bytes: &[u8]) -> &[u8] {
 }
 
 fn by_signature(bytes: &[u8], signatures: &[Signature]) -> Option<&'static str> {
-    let bytes = if has_id3(bytes) { without_id3(bytes) } else { &bytes[..bytes.len().min(SNIFF_BYTES)] };
+    let bytes = if has_id3(bytes) {
+        without_id3(bytes)
+    } else {
+        &bytes[..bytes.len().min(SNIFF_BYTES)]
+    };
     signatures
         .iter()
         .find(|(_, prefix)| matches(bytes, prefix))
         .map(|(media_type, _)| *media_type)
 }
 
-/// The type of raw bytes, if a signature in that family matches.
 pub(crate) fn detect_in_bytes(bytes: &[u8], top_level: &str) -> Option<&'static str> {
     by_signature(bytes, table(top_level)?)
 }
 
-/// The type of base64 data, reading only as much as a signature needs.
 pub(crate) fn detect_in_base64(data: &str, top_level: &str) -> Option<&'static str> {
     let signatures = table(top_level)?;
     let decode = |bytes: usize| {
@@ -123,24 +167,24 @@ pub(crate) fn detect_in_base64(data: &str, top_level: &str) -> Option<&'static s
     };
     let start = decode(SNIFF_BYTES)?;
     if has_id3(&start) {
-        return by_signature(&decode(MAX_ID3_TAG_BYTES + MAX_SIGNATURE_BYTES)?, signatures);
+        return by_signature(
+            &decode(MAX_ID3_TAG_BYTES + MAX_SIGNATURE_BYTES)?,
+            signatures,
+        );
     }
     by_signature(&start, signatures)
 }
 
-/// `getTopLevelMediaType`.
 pub(crate) fn top_level(media_type: &str) -> &str {
     media_type.split('/').next().unwrap_or(media_type)
 }
 
-/// `isFullMediaType`: a type with a real subtype, not `image` or `image/*`.
 pub(crate) fn is_full(media_type: &str) -> bool {
     media_type
         .split_once('/')
         .is_some_and(|(_, subtype)| !subtype.is_empty() && subtype != "*")
 }
 
-/// `mediaTypeToExtension`.
 pub(crate) fn extension(media_type: &str) -> String {
     let lower = media_type.to_lowercase();
     let subtype = lower.split('/').nth(1).unwrap_or("");
@@ -164,7 +208,10 @@ mod tests {
         assert_eq!(detect_in_bytes(wav, "image"), None);
         assert_eq!(detect_in_base64("iVBORw0KGgo=", "image"), Some("image/png"));
         assert_eq!(detect_in_base64("/9j/4AAQ", "image"), Some("image/jpeg"));
-        assert_eq!(detect_in_bytes(b"\x00\x00\x00\x18ftypM4A ", "audio"), Some("audio/mp4"));
+        assert_eq!(
+            detect_in_bytes(b"\x00\x00\x00\x18ftypM4A ", "audio"),
+            Some("audio/mp4")
+        );
         assert_eq!(detect_in_bytes(b"nothing here", "audio"), None);
         assert_eq!(detect_in_bytes(b"nothing here", "text"), None);
     }

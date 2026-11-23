@@ -1,19 +1,13 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-/**
- * Settings › Access › Computer use: the two macOS grants an engine needs to see and work the
- * screen, each with a link to its System Settings pane. A message starts screen control with
- * `/computer`; Escape stops it.
- */
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { DesktopSettingsRow } from "@/features/settings";
 import { Button, SetupState, useNotice, Text } from "@misty/ui";
-import { computerUseApi, type ComputerUsePermissions } from "./computerUseAttachment";
+import { computerUseApi, type ComputerUsePermissions } from "./computer_use_attachment";
 
 function Grant(props: {
   label: string;
   granted: boolean | undefined;
-  /** Why the native check failed, while nothing is known yet. */
   checkError: string | null;
   onOpen(): void;
   onRetry(): void;
@@ -29,7 +23,7 @@ function Grant(props: {
           onRetry={props.onRetry}
         />
       ) : props.granted ? (
-        <Text bare tone="muted" className="inline-flex items-center gap-1.5 text-sm">
+        <Text bare size="control" tone="muted" className="inline-flex items-center gap-1.5">
           <Check aria-hidden />
           Allowed
         </Text>
@@ -43,7 +37,6 @@ function Grant(props: {
 export function ComputerUseSection() {
   const [status, setStatus] = useState<ComputerUsePermissions>();
   const [error, setError] = useState("");
-  // The native check failing: the grants say so in their rows, with Try again.
   const [checkError, setCheckError] = useState<string | null>(null);
   const load = useCallback(() => {
     computerUseApi.permissions().then(
@@ -60,7 +53,6 @@ export function ComputerUseSection() {
   };
   useEffect(() => {
     load();
-    // A grant changes in System Settings; read it again when the person comes back.
     window.addEventListener("focus", load);
     return () => window.removeEventListener("focus", load);
   }, [load]);
@@ -70,7 +62,7 @@ export function ComputerUseSection() {
   if (status && !status.osPermissionsRequired) {
     return (
       <DesktopSettingsRow label="Permissions">
-        <Text bare tone="muted" className="text-sm">
+        <Text size="control" tone="muted">
           None needed
         </Text>
       </DesktopSettingsRow>

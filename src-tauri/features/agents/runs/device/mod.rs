@@ -1,9 +1,3 @@
-//! Model calls the desktop makes outside agent runs, on the runtime on its own computer:
-//! the desktop has the input, so the server is never asked. Each call runs
-//! on the device's model for its role and key for that model's provider.
-//!
-//! The `/v1/device/*` table in `src/index.ts` is one method here per route, and
-//! [`DeviceCalls::device_call`] dispatches by the route's name. Dropping a call's future cancels it.
 pub(crate) mod device_calls;
 mod device_routing;
 mod failure;
@@ -27,10 +21,8 @@ use super::js_json::JsValue;
 use crate::model_calls::{ModelError, ModelRoute};
 use failure::answered;
 
-/// The route's limit: the desktop's model calls carry screenshots and recordings.
 pub const MAX_DEVICE_BODY_BYTES: usize = 40 << 20;
 
-/// Every call [`DeviceCalls::device_call`] knows, by its route's name.
 pub const DEVICE_CALL_NAMES: [&str; 9] = [
     "cleanup",
     "voice-transcription",
@@ -43,11 +35,8 @@ pub const DEVICE_CALL_NAMES: [&str; 9] = [
     "follow-up",
 ];
 
-/// Two voices that sound apart: the person's chosen one (or the provider's default) and another of
-/// the provider's stock voices.
 fn dialogue_voices(model: &str, chosen: Option<String>) -> [Option<String>; 2] {
     if model.starts_with("elevenlabs/") {
-        // ElevenLabs' premade "Rachel" and "Adam".
         const FIRST: &str = "21m00Tcm4TlvDq8ikWAM";
         const SECOND: &str = "pNInz6obpgDQGcFmaJgB";
         let first = chosen.unwrap_or_else(|| FIRST.to_owned());
@@ -58,20 +47,22 @@ fn dialogue_voices(model: &str, chosen: Option<String>) -> [Option<String>; 2] {
     }
 }
 
-/// The body as `express.json` read it: within the limit, and an object or array. An empty body reads
-/// as `{}`. Text rather than a parsed value, because a run's schema goes to the model in its own key
-/// order.
 fn read_body(body: &str) -> Result<JsValue, CallError> {
     if body.len() > MAX_DEVICE_BODY_BYTES {
-        return Err(CallError::call(413, "body_too_large", "This model call is too large."));
+        return Err(CallError::call(
+            413,
+            "body_too_large",
+            "This model call is too large.",
+        ));
     }
     if body.is_empty() {
         return Ok(JsValue::Object(Vec::new()));
     }
-    JsValue::parse(body).filter(|value| value.is_object() || value.as_array().is_some()).ok_or_else(CallError::invalid)
+    JsValue::parse(body)
+        .filter(|value| value.is_object() || value.as_array().is_some())
+        .ok_or_else(CallError::invalid)
 }
 
-/// This computer's model calls.
 pub struct DeviceCalls {
     pub(crate) models: Arc<dyn DeviceModels>,
     pub(crate) client: reqwest::Client,
@@ -82,18 +73,18 @@ impl DeviceCalls {
         Self { models, client }
     }
 
-    /// `onDevice`: the model for a role, on this device's key for its provider.
     pub(crate) fn on_device(&self, role: DeviceRole) -> Result<(String, ModelRoute), ModelError> {
-        let model = self.models.model_id(role).ok_or_else(|| ModelError::Setup {
-            code: "model_key_needed",
-            detail: "Choose a model in Settings → Models.".to_owned(),
-        })?;
+        let model = self
+            .models
+            .model_id(role)
+            .ok_or_else(|| ModelError::Setup {
+                code: "model_key_needed",
+                detail: "Choose a model in Settings → Models.".to_owned(),
+            })?;
         let route = self.models.route(&model)?;
         Ok((model, route))
     }
 
-    /// One call by its route's name, with the route's validation, status and body. A name that isn't
-    /// in [`DEVICE_CALL_NAMES`] is the route's 404.
     pub async fn device_call(&self, name: &str, body: &str) -> Result<Value, DeviceCallFailure> {
         match name {
             "cleanup" => self.cleanup(body).await,
@@ -105,7 +96,10 @@ impl DeviceCalls {
             "voice-notes" => self.voice_notes(body).await,
             "transcribe-diarized" => self.transcribe_diarized(body).await,
             "follow-up" => self.follow_up(body).await,
-            _ => Err(DeviceCallFailure { status: 404, body: serde_json::json!({ "code": "not_found" }) }),
+            _ => Err(DeviceCallFailure {
+                status: 404,
+                body: serde_json::json!({ "code": "not_found" }),
+            }),
         }
     }
 
@@ -149,7 +143,6 @@ impl DeviceCalls {
         answered("extract", result)
     }
 
-    /// Vectors for search and memory, on the device's embedding model at the server's dimensions.
     pub async fn embed(&self, body: &str) -> Result<Value, DeviceCallFailure> {
         let result = match read_body(body) {
             Ok(body) => self.embed_body(&body).await,
@@ -166,12 +159,24 @@ impl DeviceCalls {
                 .iter()
                 .map(|value| string(Some(value), 256 << 10).map(str::to_owned))
                 .collect::<Option<Vec<_>>>()?;
-            Some((values, integer(request.get("dimensions"), 1.0, 4096.0)? as u32))
+            Some((
+                values,
+                integer(request.get("dimensions"), 1.0, 4096.0)? as u32,
+            ))
         })?;
         let (model, route) = self.on_device(DeviceRole::Embedding)?;
-        let call = EmbedCall { route: &route, model: &model, values: &values, dimensions: Some(dimensions), images: None };
+        let call = EmbedCall {
+            route: &route,
+            model: &model,
+            values: &values,
+            dimensions: Some(dimensions),
+            images: None,
+        };
         let embeddings = embed_call(&self.client, call).await?;
-        if embeddings.iter().any(|vector| vector.len() != dimensions as usize) {
+        if embeddings
+            .iter()
+            .any(|vector| vector.len() != dimensions as usize)
+        {
             return Err(CallError::Call {
                 status: 422,
                 code: "embedding_dimensions",
@@ -181,9 +186,6 @@ impl DeviceCalls {
         Ok(serde_json::json!({ "model": model, "embeddings": embeddings }))
     }
 
-    /// Tutor's audio overview: each line in its speaker's voice on the device's speech model and
-    /// key, with a short pause between lines, as one 24 kHz WAV file. Speaker 0 has the voice chosen
-    /// in Settings; speaker 1 another.
     pub async fn speak_dialogue(&self, lines: &[(u8, String)]) -> Result<Vec<u8>, CallError> {
         use crate::model_calls::resolve_speech_model;
         let (model, route) = self.on_device(DeviceRole::Speech)?;
@@ -196,7 +198,6 @@ impl DeviceCalls {
             if text.is_empty() {
                 continue;
             }
-            // The same speaker's neighbouring lines keep its delivery even across the other's turns.
             let around = |step: isize| {
                 let at = index as isize + step;
                 (at >= 0)
@@ -221,7 +222,6 @@ impl DeviceCalls {
         Ok(crate::voice::wav(&pcm))
     }
 
-    /// A Note from a recording's transcript, on the device's agent model (voice_notes_api.go).
     pub async fn voice_notes(&self, body: &str) -> Result<Value, DeviceCallFailure> {
         let result = async {
             let (model, route) = self.on_device(DeviceRole::Agent)?;
@@ -230,13 +230,12 @@ impl DeviceCalls {
         answered("voice-notes", result.await)
     }
 
-    /// Who said what in a Library recording. Speaker turns need Soniox's async model, so the device
-    /// needs a Soniox key for this, whatever its transcription model is.
     pub async fn transcribe_diarized(&self, body: &str) -> Result<Value, DeviceCallFailure> {
         const MODEL: &str = "soniox/stt-async-v4";
         let result = async {
             let route = self.models.route(MODEL)?;
-            transcribe_diarized::transcribe_diarized_call(self, MODEL, &route, &read_body(body)?).await
+            transcribe_diarized::transcribe_diarized_call(self, MODEL, &route, &read_body(body)?)
+                .await
         };
         answered("transcribe-diarized", result.await)
     }

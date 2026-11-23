@@ -1,8 +1,5 @@
-//! OpenCode's agents, skills and Console orgs.
-
 use super::*;
 
-/// OpenCode's agents (`GET /agent`), the ones it shows: primary agents, then subagents.
 pub(super) async fn agents(server: &Server) -> Result<Output, String> {
     let list = server.get(&server.path("/agent", "/api/agent")).await?;
     let visible: Vec<&Value> = data(&list)
@@ -39,7 +36,6 @@ pub(super) async fn agents(server: &Server) -> Result<Output, String> {
     Ok(Output::info("Agents", sections))
 }
 
-/// OpenCode's skills (`GET /skill`); each one is also a `/` command.
 pub(super) async fn skills(server: &Server) -> Result<Output, String> {
     let list = server.get(&server.path("/skill", "/api/skill")).await?;
     let rows: Vec<Row> = data(&list)
@@ -47,7 +43,6 @@ pub(super) async fn skills(server: &Server) -> Result<Output, String> {
         .into_iter()
         .flatten()
         .map(|skill| {
-            // 2.x's `/` name is the skill's id; `name` is its display name.
             row(
                 text_at(skill, "/id")
                     .or_else(|| text_at(skill, "/name"))
@@ -69,8 +64,6 @@ pub(super) async fn skills(server: &Server) -> Result<Output, String> {
     ))
 }
 
-/// The OpenCode Console orgs of the accounts signed in (`/experimental/console/orgs`): bare, it
-/// lists them; with a name (or id), it switches to that org.
 pub(super) async fn org(server: &Server, wanted: &str) -> Result<Output, String> {
     let list = server.get("/experimental/console/orgs").await?;
     let orgs: Vec<&Value> = list

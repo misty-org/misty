@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { Check, FolderGit2, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useCachedResource } from "@/api/cache/cached-resource";
+import { useCachedResource } from "@/api/cache/cached_resource";
 import {
   Button,
   IconButton,
@@ -16,18 +16,16 @@ import {
   Tooltip,
   useNotice,
 } from "@misty/ui";
-import { useChatFolders, useProjectFolders } from "../../shared-folders/chatFolder";
+import { useChatFolders, useProjectFolders } from "../../shared-folders/chat_folder";
 import { DeleteWorktreeDialog } from "./DeleteWorktreeDialog";
-import { dirNameOf } from "./prInput";
+import { dirNameOf } from "./pr_input";
 import { WorktreeCreateDialog } from "./WorktreeCreateDialog";
 import { WorktreeProgressRow } from "./WorktreeProgressRow";
-import { worktreeApi, type WorktreeInfo, type WorktreeListing } from "./worktreeApi";
-import { ensureWorktreeEvents, useWorktreeStore } from "./worktreeStore";
+import { worktreeApi, type WorktreeInfo, type WorktreeListing } from "./worktree_api";
+import { ensureWorktreeEvents, useWorktreeStore } from "./worktree_store";
 
 const errorText = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason));
 
-/** The menu's rows before its worktrees are first read: the main checkout (checked), then two
- * worktrees with their remove button. */
 const skeletonRows = (
   <div role="status" aria-label="Worktrees" aria-busy="true" className="flex flex-col gap-px">
     {["w-2/5", "w-1/2", "w-1/3"].map((width, index) => (
@@ -46,11 +44,6 @@ const skeletonRows = (
   </div>
 );
 
-/**
- * The folder's Git worktrees, as a menu in the panel's head: each worktree (the one the chat
- * works in checked), creations still running, and ways to make or remove one. Picking a
- * worktree that is one of the person's projects switches the chat's folder to it.
- */
 export function WorktreesButton({
   folder,
   conversationId,
@@ -69,8 +62,6 @@ export function WorktreesButton({
   });
   const pending = useWorktreeStore((s) => s.pending);
   const [open, setOpen] = useState(false);
-  // Git is asked only once the menu has been opened; from then on the last listing shows at once
-  // (this folder's, kept on this computer) and is read again each time the menu opens.
   const [opened, setOpened] = useState(false);
   const worktrees = useCachedResource<WorktreeListing>(
     opened ? `agents/worktrees:${folder}` : null,

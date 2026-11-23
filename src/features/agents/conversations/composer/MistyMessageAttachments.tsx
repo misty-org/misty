@@ -1,7 +1,7 @@
-import { readAgentsImage } from "@/features/agents/AgentsRuntime";
+import { readAgentsImage } from "@/features/agents/agents_runtime";
 import { ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { MistyImageAttachment } from "../state/conversationTypes";
+import type { MistyImageAttachment } from "../state/conversation_types";
 import { PlaceholderIcon, Surface } from "@misty/ui";
 
 export function MistyMessageAttachments({
@@ -19,13 +19,8 @@ export function MistyMessageAttachments({
   );
 }
 
-/** How many chat pictures stay ready to draw, newest used last; past it the oldest is let go. */
 const MOST_KEPT = 200;
 
-/**
- * Chat pictures read from `misty.db` this session, by attachment id, so a message drawn again (scrolling
- * back, switching chats and returning) shows its picture at once instead of reading it anew.
- */
 const kept = new Map<string, { url?: string; reading: Promise<string> }>();
 
 function keptPicture(id: string): Promise<string> {
@@ -52,7 +47,6 @@ function keptPicture(id: string): Promise<string> {
 }
 
 function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment }) {
-  // A blob is this session's own upload; a data URL is a picture from an engine's own session.
   const inline = /^(blob|data):/.test(attachment.previewUrl);
   const [source, setSource] = useState(() =>
     inline ? attachment.previewUrl : (kept.get(attachment.id)?.url ?? ""),
@@ -76,13 +70,7 @@ function MistyMessageImage({ attachment }: { attachment: MistyImageAttachment })
       className="max-h-64 min-h-24 w-full rounded-xl border object-cover"
     />
   ) : (
-    <Surface
-      as="span"
-      tone="well"
-      edge="hairline"
-      radius="xl"
-      className="grid min-h-24 place-items-center"
-    >
+    <Surface as="span" tone="well" radius="xl" className="grid min-h-24 place-items-center">
       <PlaceholderIcon icon={ImageIcon} />
     </Surface>
   );

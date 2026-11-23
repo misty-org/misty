@@ -1,6 +1,6 @@
 import { PaneSwapMode } from "./PaneSwapMode";
 import { routes } from "@/app/shell";
-import type { TabSide } from "@/app/shell/dockingLayout";
+import type { TabSide } from "@/app/shell/docking_layout";
 import {
   dockLeaves,
   findDockLeaf,
@@ -14,19 +14,20 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
-import { useClearTabsShortcut } from "./useClearTabsShortcut";
+import { useClearTabsShortcut } from "./UseClearTabsShortcut";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { TopEdge } from "./TopEdge";
 import { LayoutPopup } from "./LayoutPopup";
 import { WorkspaceTabBar } from "./WorkspaceTabBar";
 import { WorkspaceSearch } from "./search/WorkspaceSearch";
-import { openChatRoute, openNewChat, openWorkspaceRoute } from "./spaceNavigation";
+import { openChatRoute, openNewChat, openWorkspaceRoute } from "./space_navigation";
 import { openAgentsPageEvent, TrayAgentsSync } from "@/features/agents";
+import { openRouteEvent } from "@/shared/lib/open_route";
 import { useAppPrograms, useAppStandby, useWindowSpace } from "@/features/spaces";
 import type { WorkspaceTab } from "@/features/app-windows";
-import { useWorkspaceCanvasShortcuts } from "./useWorkspaceCanvasShortcuts";
-import { useWorkspaceTabShortcuts } from "./useWorkspaceTabShortcuts";
-import { disposeWorkspaceTab, workspaceTabsById } from "./workspaceViewLifecycle";
+import { useWorkspaceCanvasShortcuts } from "./use_workspace_canvas_shortcuts";
+import { useWorkspaceTabShortcuts } from "./use_workspace_tab_shortcuts";
+import { disposeWorkspaceTab, workspaceTabsById } from "./workspace_view_lifecycle";
 import { Surface } from "@misty/ui";
 
 export function WorkspaceCanvas(props: {
@@ -115,6 +116,15 @@ export function WorkspaceCanvas(props: {
     window.addEventListener(openAgentsPageEvent, open);
     return () => window.removeEventListener(openAgentsPageEvent, open);
   }, [openTab, windowSpace]);
+
+  useEffect(() => {
+    const open = (event: Event) => {
+      const route = (event as CustomEvent<{ route?: string }>).detail?.route;
+      if (route?.startsWith("/")) openWorkspaceRoute(route, openTab);
+    };
+    window.addEventListener(openRouteEvent, open);
+    return () => window.removeEventListener(openRouteEvent, open);
+  }, [openTab]);
 
   const closeWorkspaceTab = useCallback(
     (tab: WorkspaceView) => {

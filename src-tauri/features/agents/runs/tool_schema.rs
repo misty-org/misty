@@ -1,18 +1,8 @@
-//! Tool schemas as providers will take them.
 use crate::model_calls::RawJson;
 
 use super::js_json::JsValue;
 
-/// Older Go catalogs encode an empty required slice as null. Preserve every actual constraint while
-/// accepting that legacy representation during rollout. Do not coerce malformed non-null
-/// constraints or property schemas.
-///
-/// Providers take an object schema only: Anthropic refuses oneOf, anyOf and allOf at the top level,
-/// which failed every run that reached browser tools (browser.upload's exclusive sources). Misty's
-/// gateway enforces those rules before it runs a tool, so the model-facing schema drops them and
-/// keeps everything inside the properties.
 pub(crate) fn normalize_tool_input_schema(schema: &RawJson) -> RawJson {
-    // The TypeScript's object reached the provider through `JSON.stringify`, so this writes the same text.
     let Some(JsValue::Object(fields)) = JsValue::from_raw(schema) else {
         return schema.clone();
     };
@@ -27,8 +17,6 @@ pub(crate) fn normalize_tool_input_schema(schema: &RawJson) -> RawJson {
     RawJson::from_text(JsValue::Object(normalized).stringify()).unwrap_or_else(|_| schema.clone())
 }
 
-/// An MCP tool's schema in the order the TypeScript sent it: reading it through the MCP SDK put `type`
-/// first, and the benchmarks are tuned on those requests. Everything else, at every depth, stays put.
 pub(crate) fn type_first(schema: &RawJson) -> RawJson {
     let Some(JsValue::Object(mut fields)) = JsValue::from_raw(schema) else {
         return schema.clone();
@@ -49,12 +37,15 @@ mod tests {
         RawJson::from_text(text.to_owned()).unwrap()
     }
 
-    // The TypeScript also compiles each schema with Ajv. The crate has no JSON schema validator, so
-    // these check the schema's text, which is what a validator or provider would be given.
     #[test]
     fn lets_the_runtime_compile_a_no_argument_tool_whose_go_slice_was_nil() {
-        let input = raw(r#"{"type":"object","properties":{},"required":null,"additionalProperties":false}"#);
-        assert_eq!(normalize_tool_input_schema(&input).get(), r#"{"type":"object","properties":{},"required":[],"additionalProperties":false}"#);
+        let input = raw(
+            r#"{"type":"object","properties":{},"required":null,"additionalProperties":false}"#,
+        );
+        assert_eq!(
+            normalize_tool_input_schema(&input).get(),
+            r#"{"type":"object","properties":{},"required":[],"additionalProperties":false}"#
+        );
         assert!(input.get().contains(r#""required":null"#));
     }
 
@@ -90,7 +81,9 @@ mod tests {
 
     #[test]
     fn an_mcp_schema_goes_out_with_its_type_first_and_nothing_else_moved() {
-        let input = raw(r#"{"additionalProperties":false,"properties":{"a":{"maxLength":1,"type":"string"}},"required":["a"],"type":"object"}"#);
+        let input = raw(
+            r#"{"additionalProperties":false,"properties":{"a":{"maxLength":1,"type":"string"}},"required":["a"],"type":"object"}"#,
+        );
         assert_eq!(
             type_first(&input).get(),
             r#"{"type":"object","additionalProperties":false,"properties":{"a":{"maxLength":1,"type":"string"}},"required":["a"]}"#

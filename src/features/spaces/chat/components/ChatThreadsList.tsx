@@ -2,21 +2,15 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { spacesApi } from "../../api/api";
 import type { SpaceThread } from "../../api/dto/entities";
-import { IconButton, ListRow, Surface, Text } from "@misty/ui";
-import { useChatSidePanel } from "../chatSidePanelStore";
-import { spansToText } from "./messageText";
+import { EmptyState, IconButton, ListRow, Surface, Text } from "@misty/ui";
+import { useChatSidePanel } from "../chat_side_panel_store";
+import { spansToText } from "./message_text";
 
-/**
- * The threads the person follows in this chat (the ones they started or replied to), most recently
- * replied to first, in the same panel a thread opens in. A thread with replies they haven't read shows
- * the unread dot.
- */
 export function ChatThreadsList({
   spaceId,
   conversationId,
 }: {
   spaceId: string;
-  /** The chat whose threads are listed; "" for the Space's Everyone chat. */
   conversationId: string;
 }) {
   const [threads, setThreads] = useState<SpaceThread[] | null>(null);
@@ -28,7 +22,9 @@ export function ChatThreadsList({
         .threads(spaceId)
         .then(({ threads: next }) => {
           if (!active) return;
-          setThreads(next.filter((thread) => (thread.root.conversation_id ?? "") === conversationId));
+          setThreads(
+            next.filter((thread) => (thread.root.conversation_id ?? "") === conversationId),
+          );
           setError("");
         })
         .catch((reason) => {
@@ -36,7 +32,6 @@ export function ChatThreadsList({
             setError(reason instanceof Error ? reason.message : "Threads could not be loaded.");
         });
     void load();
-    // A reply anywhere in the Space moves a thread up and changes its unread.
     const onEvent = () => void load();
     window.addEventListener("misty:space-message-event", onEvent);
     return () => {
@@ -52,7 +47,14 @@ export function ChatThreadsList({
       className="flex w-[min(--spacing(90),40%)] shrink-0 flex-col"
     >
       <header className="flex min-h-12 items-center gap-2 border-b px-3 py-1.5">
-        <Text bare as="h2" tone="bright" className="m-0 min-w-0 flex-1 text-sm font-medium">
+        <Text
+          bare
+          as="h2"
+          size="control"
+          tone="bright"
+          weight="medium"
+          className="m-0 min-w-0 flex-1"
+        >
           Threads
         </Text>
         <IconButton
@@ -65,13 +67,11 @@ export function ChatThreadsList({
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {error && !threads ? (
-          <Text as="p" tone="failed" className="m-0 px-2 py-1 text-sm">
+          <Text as="p" size="control" tone="failed" wrap className="m-0 px-2 py-1">
             {error}
           </Text>
         ) : threads?.length === 0 ? (
-          <Text as="p" tone="muted" className="m-0 px-2 py-1 text-sm">
-            No threads yet. Start one from a message.
-          </Text>
+          <EmptyState inline title="No threads yet" line="Start one from a message." />
         ) : (
           (threads ?? []).map((thread) => (
             <ListRow
@@ -83,7 +83,9 @@ export function ChatThreadsList({
                   ? { kind: "unread" }
                   : { kind: "time", at: thread.last_reply_at }
               }
-              onOpen={() => useChatSidePanel.getState().openThread(thread.root.id, thread.root, true)}
+              onOpen={() =>
+                useChatSidePanel.getState().openThread(thread.root.id, thread.root, true)
+              }
             />
           ))
         )}

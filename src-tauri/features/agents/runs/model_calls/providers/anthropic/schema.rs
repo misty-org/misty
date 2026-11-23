@@ -1,10 +1,16 @@
-//! Removes JSON Schema keywords Anthropic rejects in `output_config.format.schema`, moving the
-//! constraints into the description. Ported from `sanitize-json-schema.ts`. Keys keep their order,
-//! since the model reads this schema and a change would miss the prompt cache.
 use crate::model_calls::providers::ordered::Ordered;
 
 const SUPPORTED_STRING_FORMATS: [&str; 10] = [
-    "date-time", "time", "date", "duration", "email", "hostname", "uri", "ipv4", "ipv6", "uuid",
+    "date-time",
+    "time",
+    "date",
+    "duration",
+    "email",
+    "hostname",
+    "uri",
+    "ipv4",
+    "ipv6",
+    "uuid",
 ];
 
 const DESCRIPTION_CONSTRAINT_KEYS: [&str; 14] = [
@@ -64,7 +70,6 @@ fn sanitize_schema(schema: &Ordered) -> Ordered {
             Ordered::set(&mut result, key, value.clone());
         }
     }
-    // These two count even when null, which is a real value for them.
     for key in ["default", "const"] {
         if let Some(value) = schema.get(key) {
             Ordered::set(&mut result, key, value.clone());
@@ -122,7 +127,11 @@ fn constraint_description(schema: &Ordered, format: Option<&str>) -> Option<Stri
     for key in DESCRIPTION_CONSTRAINT_KEYS {
         match schema.present(key) {
             None | Some(Ordered::Bool(false)) => {}
-            Some(value) => descriptions.push(format!("{}: {}", constraint_name(key), javascript_text(value))),
+            Some(value) => descriptions.push(format!(
+                "{}: {}",
+                constraint_name(key),
+                javascript_text(value)
+            )),
         }
     }
     if let Some(format) = format.filter(|format| !SUPPORTED_STRING_FORMATS.contains(format)) {
@@ -131,7 +140,6 @@ fn constraint_description(schema: &Ordered, format: Option<&str>) -> Option<Stri
     (!descriptions.is_empty()).then(|| format!("{}.", descriptions.join("; ")))
 }
 
-/// `minLength` reads as `min length`.
 fn constraint_name(key: &str) -> String {
     let mut name = String::with_capacity(key.len() + 2);
     for c in key.chars() {
@@ -163,14 +171,19 @@ mod tests {
     #[test]
     fn constraints_move_into_the_description_and_objects_close() {
         assert_eq!(
-            sanitized(r#"{"type":"object","properties":{"z":{"type":"string","minLength":2,"format":"slug"},"a":{"type":"integer","description":"Count","maximum":5,"exclusiveMinimum":0}},"required":["z"]}"#),
+            sanitized(
+                r#"{"type":"object","properties":{"z":{"type":"string","minLength":2,"format":"slug"},"a":{"type":"integer","description":"Count","maximum":5,"exclusiveMinimum":0}},"required":["z"]}"#
+            ),
             r#"{"type":"object","properties":{"z":{"type":"string","description":"min length: 2; format: slug."},"a":{"description":"Count\nmaximum: 5; exclusive minimum: 0.","type":"integer"}},"additionalProperties":false,"required":["z"]}"#,
         );
     }
 
     #[test]
     fn references_win_and_one_of_becomes_any_of() {
-        assert_eq!(sanitized(r##"{"$ref":"#/x","type":"string"}"##), r##"{"$ref":"#/x"}"##);
+        assert_eq!(
+            sanitized(r##"{"$ref":"#/x","type":"string"}"##),
+            r##"{"$ref":"#/x"}"##
+        );
         assert_eq!(
             sanitized(r#"{"oneOf":[{"type":"string","format":"email"},true],"default":null}"#),
             r#"{"default":null,"anyOf":[{"type":"string","format":"email"},true]}"#,
@@ -180,7 +193,9 @@ mod tests {
     #[test]
     fn arrays_and_definitions_are_sanitized_too() {
         assert_eq!(
-            sanitized(r#"{"type":"array","items":{"type":"object"},"minItems":1,"$defs":{"a":{"properties":{}}}}"#),
+            sanitized(
+                r#"{"type":"array","items":{"type":"object"},"minItems":1,"$defs":{"a":{"properties":{}}}}"#
+            ),
             r#"{"type":"array","$defs":{"a":{"properties":{},"additionalProperties":false}},"items":{"type":"object","additionalProperties":false},"description":"min items: 1."}"#,
         );
     }

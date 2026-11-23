@@ -1,5 +1,3 @@
-//! The chat-completions request body. Typed rather than built as a `Value`, because a `Value` would
-//! sort the keys of tool schemas (see `Cargo.toml`).
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -92,7 +90,6 @@ struct ChatFunction<'a> {
     strict: Option<bool>,
 }
 
-/// Builds the request, and the warnings the stream starts with.
 pub(super) fn build<'a>(
     model: &'a str,
     options: &'a CallOptions,
@@ -101,7 +98,6 @@ pub(super) fn build<'a>(
     let mut warnings = Vec::new();
     let response_format = match &options.response_format {
         Some(ResponseFormat::Json { schema, .. }) => {
-            // These servers aren't assumed to support schemas, so they get plain JSON mode.
             if schema.is_some() {
                 warnings.push(json!({
                     "type": "unsupported",
@@ -159,17 +155,27 @@ fn chat_tool_choice(choice: &ToolChoice) -> Value {
         ToolChoice::Auto => json!("auto"),
         ToolChoice::None => json!("none"),
         ToolChoice::Required => json!("required"),
-        ToolChoice::Tool { tool_name } => json!({ "type": "function", "function": { "name": tool_name } }),
+        ToolChoice::Tool { tool_name } => {
+            json!({ "type": "function", "function": { "name": tool_name } })
+        }
     }
 }
 
-fn chat_messages<'a>(prompt: &'a [Message], provider: &str) -> Result<Vec<ChatMessage<'a>>, ModelError> {
+fn chat_messages<'a>(
+    prompt: &'a [Message],
+    provider: &str,
+) -> Result<Vec<ChatMessage<'a>>, ModelError> {
     let mut messages = Vec::with_capacity(prompt.len());
     for message in prompt {
         match message {
-            Message::System { content, .. } => messages.push(ChatMessage::Plain { role: "system", content }),
+            Message::System { content, .. } => messages.push(ChatMessage::Plain {
+                role: "system",
+                content,
+            }),
             Message::User { content, .. } => messages.push(user_message(content)?),
-            Message::Assistant { content, .. } => messages.push(assistant_message(content, provider)),
+            Message::Assistant { content, .. } => {
+                messages.push(assistant_message(content, provider))
+            }
             Message::Tool { content, .. } => {
                 for part in content {
                     messages.push(ChatMessage::Tool {
@@ -186,10 +192,19 @@ fn chat_messages<'a>(prompt: &'a [Message], provider: &str) -> Result<Vec<ChatMe
 
 fn user_message(content: &[UserPart]) -> Result<ChatMessage<'_>, ModelError> {
     if let [UserPart::Text { text }] = content {
-        return Ok(ChatMessage::Plain { role: "user", content: text });
+        return Ok(ChatMessage::Plain {
+            role: "user",
+            content: text,
+        });
     }
-    let parts = content.iter().map(user_part).collect::<Result<Vec<_>, _>>()?;
-    Ok(ChatMessage::UserParts { role: "user", content: parts })
+    let parts = content
+        .iter()
+        .map(user_part)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ChatMessage::UserParts {
+        role: "user",
+        content: parts,
+    })
 }
 
 fn user_part(part: &UserPart) -> Result<Value, ModelError> {
@@ -216,11 +231,19 @@ fn assistant_message<'a>(content: &'a [AssistantPart], provider: &str) -> ChatMe
         match part {
             AssistantPart::Text { text: piece, .. } => text.push_str(piece),
             AssistantPart::Reasoning { text: piece, .. } => reasoning.push_str(piece),
-            AssistantPart::ToolCall { tool_call_id, tool_name, input, provider_options } => {
+            AssistantPart::ToolCall {
+                tool_call_id,
+                tool_name,
+                input,
+                provider_options,
+            } => {
                 calls.push(ChatToolCall {
                     id: tool_call_id,
                     kind: "function",
-                    function: ChatFunctionCall { name: tool_name, arguments: input.get() },
+                    function: ChatFunctionCall {
+                        name: tool_name,
+                        arguments: input.get(),
+                    },
                     extra_content: thought_signature(provider_options.as_ref(), provider),
                 });
             }
@@ -239,8 +262,10 @@ fn assistant_message<'a>(content: &'a [AssistantPart], provider: &str) -> ChatMe
     }
 }
 
-/// Gemini behind a compatible endpoint needs its thought signature back on the tool call.
-fn thought_signature(options: Option<&serde_json::Map<String, Value>>, provider: &str) -> Option<Value> {
+fn thought_signature(
+    options: Option<&serde_json::Map<String, Value>>,
+    provider: &str,
+) -> Option<Value> {
     let signature = options?
         .get(provider)
         .or_else(|| options?.get("google"))?

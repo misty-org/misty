@@ -1,8 +1,5 @@
-//! Which frames are cross-origin to the top document, from the tab's and its sessions' frame trees.
 use super::*;
 
-/// Whether the top document's script can't reach the frame. An opaque origin ("null"),
-/// as a sandboxed frame has, is cross-origin to everything.
 fn cross_origin(frame: &Value, top: &str) -> bool {
     match frame["securityOrigin"].as_str() {
         Some("null") | None => true,
@@ -17,9 +14,6 @@ fn walk<'a>(node: &'a Value, out: &mut Vec<&'a Value>) {
     }
 }
 
-/// The top document's loader and its cross-origin frame documents, from the tab's frame
-/// tree and those of its frame sessions. A frame runs in the session whose tree holds it,
-/// not the tab's.
 pub(super) fn cross_origin_frames(
     top: &Value,
     sessions: &[(String, Value)],

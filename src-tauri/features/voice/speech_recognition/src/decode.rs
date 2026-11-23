@@ -1,6 +1,3 @@
-//! Audio as the models take it: 16 kHz mono samples between -1 and 1, read from a recorded file
-//! (symphonia) or resampled from any other rate.
-
 use std::fs::File;
 use std::path::Path;
 
@@ -15,13 +12,10 @@ use symphonia::core::probe::Hint;
 
 use crate::reason;
 
-/// The rate every hearing model and the voice activity detector take.
 pub const SAMPLE_RATE: i32 = 16_000;
 
-/// The longest recording read at once: three hours.
 const MOST_SECONDS: usize = 3 * 60 * 60;
 
-/// Reads a recorded file (AAC in MP4 or M4A, WAV, MP3, FLAC, Ogg Vorbis, ALAC) as 16 kHz mono.
 pub fn decode_file(path: &Path) -> Result<Vec<f32>, String> {
     let file = File::open(path).map_err(|_| reason("file"))?;
     let stream = MediaSourceStream::new(Box::new(file), Default::default());
@@ -30,7 +24,12 @@ pub fn decode_file(path: &Path) -> Result<Vec<f32>, String> {
         hint.with_extension(extension);
     }
     let probed = symphonia::default::get_probe()
-        .format(&hint, stream, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            stream,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|_| reason("file"))?;
     let mut format = probed.format;
     let track = format
@@ -39,7 +38,10 @@ pub fn decode_file(path: &Path) -> Result<Vec<f32>, String> {
         .find(|track| track.codec_params.codec != CODEC_TYPE_NULL)
         .ok_or_else(|| reason("file"))?;
     let track_id = track.id;
-    let rate = track.codec_params.sample_rate.ok_or_else(|| reason("file"))?;
+    let rate = track
+        .codec_params
+        .sample_rate
+        .ok_or_else(|| reason("file"))?;
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|_| reason("file"))?;
@@ -49,7 +51,6 @@ pub fn decode_file(path: &Path) -> Result<Vec<f32>, String> {
     loop {
         let packet = match format.next_packet() {
             Ok(packet) => packet,
-            // The end of the file.
             Err(DecodeError::IoError(error))
                 if error.kind() == std::io::ErrorKind::UnexpectedEof =>
             {
@@ -63,7 +64,6 @@ pub fn decode_file(path: &Path) -> Result<Vec<f32>, String> {
         }
         let decoded = match decoder.decode(&packet) {
             Ok(decoded) => decoded,
-            // A damaged packet is skipped, as players do.
             Err(DecodeError::DecodeError(_)) | Err(DecodeError::IoError(_)) => continue,
             Err(_) => return Err(reason("file")),
         };
@@ -81,7 +81,6 @@ pub fn decode_file(path: &Path) -> Result<Vec<f32>, String> {
     Ok(resample(&mono, rate as i32))
 }
 
-/// `samples` at `rate`, as 16 kHz.
 pub fn resample(samples: &[f32], rate: i32) -> Vec<f32> {
     if rate == SAMPLE_RATE || samples.is_empty() {
         return samples.to_vec();

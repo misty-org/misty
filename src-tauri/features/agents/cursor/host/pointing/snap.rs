@@ -1,12 +1,7 @@
-//! The real control at or near a pointed-at spot: macOS Accessibility or
-//! Windows UI Automation. Linux has no such reader here yet, so the point stands as given.
-/// The actionable control at or near a global point, preferring one whose text
-/// matches the label. None when Accessibility is not allowed or nothing fits.
 #[cfg(target_os = "macos")]
 pub fn snap_point(x: f64, y: f64, label: &str) -> Result<Option<serde_json::Value>, String> {
     let value = crate::agents::cursor::macos::companion_pointing::snap_point(x, y, label);
     if value["error"].is_string() {
-        // Without Accessibility the raw point stands; it is never an error.
         return Ok(None);
     }
     Ok(value.get("element").cloned())
@@ -17,14 +12,10 @@ pub fn snap_point(_x: f64, _y: f64, _label: &str) -> Result<Option<serde_json::V
     Ok(None)
 }
 
-/// The actionable control at or near a global point (physical pixels),
-/// preferring one whose text matches the label, through UI Automation. Only
-/// reads; nothing is pressed or focused. None when nothing fits.
 #[cfg(windows)]
 pub fn snap_point(x: f64, y: f64, label: &str) -> Result<Option<serde_json::Value>, String> {
     use crate::app::windows::automation::{is_target_role, Automation, Element};
     let Ok(automation) = Automation::new() else {
-        // Without UI Automation the raw point stands; it is never an error.
         return Ok(None);
     };
     let words = label_words(label);
@@ -55,7 +46,6 @@ pub fn snap_point(x: f64, y: f64, label: &str) -> Result<Option<serde_json::Valu
                     && frame.height <= 240.0
             });
             if let Some(frame) = bounds.filter(|_| is_target_role(role) || current.pressable()) {
-                // Neighboring samples often land on the same control; score it once.
                 if seen.iter().any(|other| other.same_as(&current)) {
                     break;
                 }
@@ -71,8 +61,6 @@ pub fn snap_point(x: f64, y: f64, label: &str) -> Result<Option<serde_json::Valu
                 };
                 let (center_x, center_y) = frame.center();
                 let distance = (center_x - x).hypot(center_y - y);
-                // A named match anywhere nearby wins; otherwise only the
-                // control under the point itself is trusted.
                 let acceptable = score >= 0.5 || frame.contains(x, y);
                 let better = best.as_ref().is_none_or(|(best_score, best_distance, _)| {
                     score > *best_score || (score == *best_score && distance < *best_distance)
@@ -100,7 +88,6 @@ pub fn snap_point(x: f64, y: f64, label: &str) -> Result<Option<serde_json::Valu
     Ok(best.map(|(_, _, element)| element))
 }
 
-/// Words of the model's label that name the control, without the instruction.
 #[cfg(windows)]
 fn label_words(label: &str) -> Vec<String> {
     const SKIP: &[&str] = &[

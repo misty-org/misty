@@ -1,10 +1,3 @@
-//! `shell.run` jobs. The page script only passes a job along: this checks the job's signed grant
-//! itself, for the shell and for any folder it touches, so a compromised page can't run a command
-//! the run wasn't granted or widen what one reaches. The workspace comes from the grant's chat and
-//! write access from the person's native answer for that chat, so neither a window nor the server
-//! can point a command at another chat's files.
-#![cfg(desktop)]
-
 use std::{
     collections::HashMap,
     sync::{
@@ -34,7 +27,6 @@ struct ShellJobInput {
     command: String,
     #[serde(default)]
     timeout_seconds: Option<u64>,
-    /// The chat's shared folder, if it has one.
     #[serde(default)]
     folder_scope_id: Option<String>,
 }
@@ -44,7 +36,6 @@ fn running() -> &'static Mutex<HashMap<String, Arc<AtomicBool>>> {
     RUNNING.get_or_init(Default::default)
 }
 
-/// Forgets a running job when it ends, however it ends.
 struct RunningJob(String);
 
 impl Drop for RunningJob {
@@ -55,12 +46,10 @@ impl Drop for RunningJob {
     }
 }
 
-/// A chat's workspace goes by the chat, which stays the same when its account signs in or out.
 fn workspace_key(account_id: &str, chat_key: &str) -> String {
     format!("{account_id}\n{chat_key}")
 }
 
-/// Runs one claimed `shell.run` job after checking its grant.
 #[tauri::command]
 pub async fn device_shell_job(
     webview: tauri::Webview,
@@ -120,7 +109,6 @@ pub async fn device_shell_job(
     .await
 }
 
-/// Stops a running job, when its run is cancelled or its lease is lost.
 #[tauri::command]
 pub async fn device_shell_cancel(webview: tauri::Webview, job_id: String) -> Result<(), String> {
     require_device_window(&webview)?;
@@ -134,7 +122,6 @@ pub async fn device_shell_cancel(webview: tauri::Webview, job_id: String) -> Res
     Ok(())
 }
 
-/// Deletes a chat's workspace and its "Allow changes" answers when the chat is deleted.
 #[tauri::command]
 pub async fn agents_forget_workspace(
     webview: tauri::Webview,

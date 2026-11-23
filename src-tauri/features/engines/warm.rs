@@ -1,14 +1,3 @@
-//! Warm engine processes. A chat's engine stays running after its turn, so the chat's next
-//! message goes straight to it instead of starting the CLI, handshaking and loading the session
-//! again, which took from a third of a second (Codex) to five seconds (Qoder) before every reply.
-//! Claude Code keeps its process through follow-up parking (`reader.rs`, `registry.rs`); the
-//! engines that drive their own transport (the ACP engines, Codex's app-server) park theirs here.
-//!
-//! A parked process is taken only by the same chat session, launched the same way: the engine,
-//! program, folder, model, effort, mode, channel, folders and tools all match ([`fingerprint`]),
-//! since a live process can't take new launch flags. Anything else retires it and starts fresh.
-//! A process no message took within [`WARM_IDLE`] ends, and at most [`WARM_MAX`] wait per pool.
-
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex, MutexGuard};
@@ -17,25 +6,18 @@ use std::time::Instant;
 use super::registry::{WARM_IDLE, WARM_MAX};
 use super::SendRequest;
 
-/// A process a pool can hold: it ends itself for good, off the caller's thread, then removes
-/// the files it may still have read.
 pub(crate) trait Retire: Send + 'static {
     fn retire(self, cleanup: Vec<PathBuf>);
-    /// Ends the process at once, as the app quits: no task may run after this.
     fn kill_now(self, cleanup: Vec<PathBuf>);
 }
 
-/// A parked process, with what the next turn needs to take it over.
 pub(crate) struct Warm<T> {
     pub(crate) item: T,
-    /// Misty's MCP token the process's session was opened with (`mcp::rebind`).
     pub(crate) token: Option<String>,
-    /// Files the process may still read (a staged channel home): removed when it ends.
     pub(crate) cleanup: Vec<PathBuf>,
 }
 
 impl<T: Retire> Warm<T> {
-    /// The turn that takes this process answers its tool calls from now on.
     pub(crate) fn hand_to(&self, run_id: &str) {
         if let Some(token) = self.token.as_deref() {
             super::mcp::rebind(token, run_id);
@@ -50,7 +32,6 @@ impl<T: Retire> Warm<T> {
     }
 }
 
-/// Ends a child's whole tree now, for [`Retire::kill_now`].
 pub(crate) fn kill_child_now(child: &mut tokio::process::Child, cleanup: &[PathBuf]) {
     if let Some(pid) = child.id() {
         super::kill_process_group(pid);
@@ -61,14 +42,12 @@ pub(crate) fn kill_child_now(child: &mut tokio::process::Child, cleanup: &[PathB
 
 struct Entry<T> {
     key: String,
-    /// The folder the process works in.
     folder: PathBuf,
     fingerprint: u64,
     since: Instant,
     warm: Warm<T>,
 }
 
-/// One kind of parked process, keyed by engine and chat session.
 pub(crate) struct Pool<T> {
     held: Mutex<Vec<Entry<T>>>,
 }
@@ -86,8 +65,6 @@ impl<T: Retire> Pool<T> {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    /// The process parked for `key`, if it was launched as `fingerprint` says. One launched
-    /// otherwise can't serve this turn and is retired, so its session isn't open twice.
     pub(crate) fn take(&self, key: &str, fingerprint: u64) -> Option<Warm<T>> {
         let entry = {
             let mut held = self.held();
@@ -102,7 +79,6 @@ impl<T: Retire> Pool<T> {
         }
     }
 
-    /// Ends the processes parked in `folder`, which is about to go.
     pub(crate) fn retire_in(&self, folder: &std::path::Path) {
         let gone: Vec<Entry<T>> = {
             let mut held = self.held();
@@ -117,7 +93,6 @@ impl<T: Retire> Pool<T> {
         }
     }
 
-    /// Ends every parked process, as the app quits.
     pub(crate) fn kill_all(&self) {
         let held = std::mem::take(&mut *self.held());
         for entry in held {
@@ -125,7 +100,6 @@ impl<T: Retire> Pool<T> {
         }
     }
 
-    /// Parks a process that finished its turn cleanly for the chat's next message.
     pub(crate) fn park(
         &'static self,
         key: String,
@@ -173,14 +147,10 @@ impl<T: Retire> Pool<T> {
     }
 }
 
-/// Where a pool keeps a chat session's process.
 pub(crate) fn key(engine: &str, session_id: &str) -> String {
     format!("{engine}\u{0}{session_id}")
 }
 
-/// What a launch was, for telling whether a parked process can take the next turn: everything
-/// that becomes a flag, an environment variable or a handshake choice. The prompt, its images
-/// and attachments go into the turn itself and don't count.
 pub(crate) fn fingerprint(
     engine: &str,
     bin: &str,
@@ -212,8 +182,6 @@ pub(crate) fn fingerprint(
     hasher.finish()
 }
 
-/// Runs that may stay warm, with their launch's fingerprint: set by the launch
-/// (`send_host_stream`) and claimed once by the turn's driver as it starts.
 static INTENTS: LazyLock<Mutex<std::collections::HashMap<String, u64>>> =
     LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
 
@@ -227,29 +195,18 @@ pub(crate) fn intend(run_id: &str, fingerprint: u64) {
     intents().insert(run_id.to_string(), fingerprint);
 }
 
-/// The fingerprint of a run that may stay warm; None for one that ends its process with the
-/// turn (no chat session to come back to, or a launch that isn't a chat's).
 pub(crate) fn claim(run_id: &str) -> Option<u64> {
     intents().remove(run_id)
 }
 
-// ==================== ACP ====================
-
-/// An ACP agent idling on its session after a turn: the engines on `grok_acp`, Qoder, MiniMax
-/// and Oh My Pi's plan sessions.
 pub(crate) struct WarmAcp {
     pub(crate) spawned: super::qoder_session::SpawnedAcp,
-    /// The session the process has open, as the agent named it.
     pub(crate) session_id: String,
-    /// The effort the handshake reported (Kimi, Antigravity), shown again on the next turn.
     pub(crate) effort: Option<String>,
-    /// The session's title, mode, model and effort as last known (Qoder), so the next turn
-    /// shows only what it changes.
     pub(crate) known: super::qoder_session::AcpSessionState,
 }
 
 impl WarmAcp {
-    /// Whether the process is still running and can take a prompt.
     pub(crate) fn alive(&mut self) -> bool {
         matches!(self.spawned.child.try_wait(), Ok(None))
     }
@@ -269,20 +226,16 @@ impl Retire for WarmAcp {
 
 pub(crate) static ACP: Pool<WarmAcp> = Pool::new();
 
-/// Ends every warm process, as the app quits (`engines::shutdown`).
 pub(crate) fn shutdown() {
     ACP.kill_all();
     super::codex_app::kill_warm();
 }
 
-/// Ends the warm processes working in `folder` (a multi-run worktree about to be removed).
 pub(crate) fn retire_in(folder: &std::path::Path) {
     ACP.retire_in(folder);
     super::codex_app::retire_warm_in(folder);
 }
 
-/// Takes the ACP process parked for this turn's session, if it may take the turn and still
-/// runs; it then answers this run (its stdin in the registry, its tool calls). None starts one.
 pub(crate) fn take_acp(
     core: &super::TurnCore,
     req: &SendRequest,
@@ -303,9 +256,6 @@ pub(crate) fn take_acp(
     Some(warm)
 }
 
-/// After a turn that went cleanly, parks its ACP process for the chat's next message; otherwise
-/// ends it. A process this turn started has no token yet: its session was opened with the one
-/// in this turn's servers.
 pub(crate) fn park_acp(
     core: &super::TurnCore,
     req: &SendRequest,

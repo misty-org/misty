@@ -1,13 +1,9 @@
-//! One row per tool call, in `misty.db`, so a run that restarts never repeats a write it can't account
-//! for, and the next turn can check what earlier runs wrote.
 use agent_runs::local_tools::LocalToolOutcome;
 use serde_json::{json, Value};
 
 use super::local_tools::READ_ONLY;
 use database::store::Store;
 
-/// A finished call matters while its run can restart, however long that takes, and for this long to the
-/// turns after it.
 const JOURNAL_DAYS: i64 = 7;
 
 const MAX_RECEIPTS: usize = 12;
@@ -30,8 +26,6 @@ fn receipt(name: String, outcome: Option<String>) -> Value {
     json!({ "tool": name, "state": if uncertain { "uncertain" } else { "completed" }, "result": text })
 }
 
-/// The writes these runs made, newest first. A write that began and has no outcome counts as started,
-/// which tells the next turn to look before repeating it.
 pub(super) fn write_receipts(store: &Store, account: &str, run_ids: &[String]) -> Vec<Value> {
     let read = || -> rusqlite::Result<Vec<Value>> {
         let connection = store.connect()?;
@@ -55,25 +49,18 @@ pub(super) fn write_receipts(store: &Store, account: &str, run_ids: &[String]) -
     read().unwrap_or_default()
 }
 
-/// What the journal knew about a call as it began.
 #[derive(Debug, PartialEq)]
 pub(super) enum Begun {
     New,
-    /// It began once and nobody saw it end.
     Interrupted,
-    /// It ended. The same outcome is the answer.
     Replay(LocalToolOutcome),
-    /// The same id was another tool's call.
     Conflict,
-    /// The journal can't be read: a read may go on, a write may not.
     Unavailable,
 }
 
-/// One row per call, in `misty.db`, so a run that restarts never repeats a write it can't account for.
 pub(super) struct ToolJournal {
     store: Store,
     account: String,
-    /// Runs whose requests are still saved, whose rows stay whatever their age.
     saved_runs: Vec<String>,
 }
 
@@ -105,7 +92,6 @@ fn outcome_of(text: &str) -> Option<LocalToolOutcome> {
     })
 }
 
-/// Forgets rows past their time, unless their run can still resume.
 fn prune(connection: &rusqlite::Connection, saved_runs: &[String]) -> rusqlite::Result<()> {
     let oldest = now_ms() - JOURNAL_DAYS * 24 * 60 * 60 * 1000;
     for table in ["agent_tool_journal", "agent_run_taint"] {
@@ -279,7 +265,6 @@ mod tests {
     #[tokio::test]
     async fn a_journal_that_cant_be_read_says_so() {
         let directory = tempfile::tempdir().unwrap();
-        // A folder where the database should be.
         let store = Store::at(directory.path().to_path_buf());
         let journal = ToolJournal::new(store, "a", Vec::new());
         assert_eq!(

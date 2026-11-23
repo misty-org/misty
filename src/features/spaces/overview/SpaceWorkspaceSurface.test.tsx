@@ -15,7 +15,7 @@ const state = vi.hoisted(() => ({
   setViewingSpace: vi.fn(),
 }));
 vi.mock("@/features/account", () => ({ useAuth: () => ({ user: state.user }) }));
-vi.mock("../list/useSpacesStore", () => ({
+vi.mock("../list/use_spaces_store", () => ({
   useSpacesStore: (select: (value: typeof state) => unknown) => select(state),
 }));
 vi.mock("./SpaceSectionView", () => ({

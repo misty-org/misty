@@ -1,10 +1,5 @@
-//! macOS's quarantine flag, which makes Gatekeeper check a file from the web before it first runs.
-//! WebKit adds it to what a WKDownload saves. This
-//! is for the files Misty writes itself from something it received, like a saved page.
 use std::path::Path;
 
-/// Marks a file that came from the internet, unless it's already marked. Failing leaves the file
-/// as it is: a volume without extended attributes shouldn't fail the download.
 #[cfg(target_os = "macos")]
 pub fn mark_from_internet(path: &Path) {
     if super::check(path, super::Access::Write).is_ok() {
@@ -12,9 +7,6 @@ pub fn mark_from_internet(path: &Path) {
     }
 }
 
-/// Marks a file an agent's command added to a shared folder, so a program planted there still gets
-/// Gatekeeper's check when the person opens it. The gate only lets Misty read that folder; the
-/// command had the write access.
 #[cfg(target_os = "macos")]
 pub fn mark_from_agent(path: &Path) {
     if super::check(path, super::Access::Read).is_ok() {
@@ -53,8 +45,6 @@ fn mark(path: &Path) {
 #[cfg(not(target_os = "macos"))]
 pub fn mark_from_internet(_path: &Path) {}
 
-/// `flags;time;agent;id`, as the system's own downloads write it. Flag 0x81 means it was downloaded
-/// and hasn't been approved yet. The time is in hexadecimal.
 #[cfg_attr(not(any(target_os = "macos", test)), allow(dead_code))]
 fn quarantine_value(time: i64, id: &uuid::Uuid) -> String {
     format!(

@@ -33,7 +33,6 @@ fn format_exit_detail(code: Option<i32>) -> String {
         .unwrap_or_else(|| "it was stopped".to_string())
 }
 
-/// A path a window named, once it is known to be in a linked folder.
 async fn linked(
     app: &tauri::AppHandle,
     webview: &tauri::Webview,
@@ -44,7 +43,6 @@ async fn linked(
     linked_path(app, account, path).await
 }
 
-/// Windows' `canonicalize` adds `\\?\`, which Explorer and editors can't read.
 fn plain_path(path: &Path) -> PathBuf {
     let text = path.to_string_lossy();
     match text.strip_prefix(r"\\?\") {
@@ -53,7 +51,6 @@ fn plain_path(path: &Path) -> PathBuf {
     }
 }
 
-/// Opens a linked folder, or a file in one, in an app on the fixed list.
 #[tauri::command]
 pub async fn project_open_in(
     app: tauri::AppHandle,
@@ -75,8 +72,6 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-/// The person's own programs for "Open in": listed, added through the system's file dialog,
-/// removed, or opened by id.
 #[tauri::command]
 pub async fn project_open_custom(
     app: tauri::AppHandle,
@@ -151,21 +146,14 @@ pub async fn project_open_custom(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgramIcon {
-    /// The app is on this computer, so the menu offers it.
     pub installed: bool,
-    /// Its icon as a PNG data URL, where the system has one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
 }
 
-/// Whether a fixed-list app is installed, and its icon; `custom:<id>` names an added program.
 #[tauri::command]
 pub async fn project_program_icon(
     app: tauri::AppHandle,
@@ -208,7 +196,6 @@ fn preset_icon(preset: &Preset) -> ProgramIcon {
 #[cfg(not(target_os = "macos"))]
 fn preset_icon(preset: &Preset) -> ProgramIcon {
     if preset.id == "finder" {
-        // The system's file manager, always there.
         return ProgramIcon {
             installed: true,
             icon: None,
@@ -221,12 +208,6 @@ fn preset_icon(preset: &Preset) -> ProgramIcon {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Reveal and browser
-// ---------------------------------------------------------------------------
-
-/// `/select,` for `explorer.exe`, with the path quoted inside the switch: Explorer reads its
-/// own command line, and the default quoting would end the path at its first space.
 #[cfg(windows)]
 fn explorer_select_arg(path: &str) -> String {
     format!("/select,\"{path}\"")
@@ -254,7 +235,6 @@ async fn reveal(path: &Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        // `spawn`, not `status`: Explorer often exits with a failure code when it worked.
         std::process::Command::new("explorer")
             .raw_arg(explorer_select_arg(&path.to_string_lossy()))
             .spawn()
@@ -268,7 +248,6 @@ async fn reveal(path: &Path) -> Result<(), String> {
     }
 }
 
-/// Shows a file or folder of a linked folder in Finder or the system's file manager.
 #[tauri::command]
 pub async fn project_reveal(
     app: tauri::AppHandle,
@@ -280,7 +259,6 @@ pub async fn project_reveal(
     reveal(&path).await
 }
 
-/// Opens an HTML file of a linked folder in the person's default web browser.
 #[tauri::command]
 pub async fn project_open_in_browser(
     app: tauri::AppHandle,

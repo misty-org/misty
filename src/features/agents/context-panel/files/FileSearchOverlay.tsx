@@ -2,17 +2,16 @@
 import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconButton, Input, ChoiceGroup, SkeletonList, Surface, Text } from "@misty/ui";
-import { errorText } from "../projectApi";
-import { filesApi, type SearchHit } from "./filesApi";
-import { useFileIndex, type IndexEntry } from "./fileIndex";
-import { getFileTreeIconSvg } from "./fileIcons";
-import { searchEntries, workspaceRelativePrefix } from "./fileSearch";
-import { fileName, joinPath, useFilesStore, type SearchMode } from "./filesStore";
+import { errorText } from "../project_api";
+import { filesApi, type SearchHit } from "./files_api";
+import { useFileIndex, type IndexEntry } from "./file_index";
+import { getFileTreeIconSvg } from "./file_icons";
+import { searchEntries, workspaceRelativePrefix } from "./file_search";
+import { fileName, joinPath, useFilesStore, type SearchMode } from "./files_store";
 
 interface Row {
   key: string;
   name: string;
-  /** The folder it is in, or the matching line for a text hit. */
   detail: string;
   isDir: boolean;
   activate(): void;
@@ -20,11 +19,6 @@ interface Row {
 
 const TEXT_DEBOUNCE_MS = 250;
 
-/**
- * Search over the tree, scoped to one folder: by name, ranked name first, from the folder's
- * index (one walk, kept a minute), or through the files' text. Escape closes; the input keeps
- * focus, so the pointer and the keys both work without moving focus around.
- */
 export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
   const root = useFilesStore((state) => state.root);
   const mode = useFilesStore((state) => state.searchMode);
@@ -33,7 +27,6 @@ export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [hits, setHits] = useState<SearchHit[] | null>(null);
-  // A new search keeps the last one's lines up until its own arrive.
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +39,6 @@ export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
     inputRef.current?.focus();
   }, [mode]);
 
-  // The text search asks natively once typing pauses.
   useEffect(() => {
     if (mode !== "text") return;
     const needle = query.trim();
@@ -119,7 +111,6 @@ export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
 
   const active = rows.length > 0 ? Math.min(activeIndex, rows.length - 1) : -1;
 
-  // Keys live on the window, so the overlay stays keyboard-driven even if focus wanders.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
@@ -235,7 +226,6 @@ export function FileSearchOverlay({ searchRoot }: { searchRoot: string }) {
               data-active={position === active || undefined}
               tabIndex={-1}
               className="flex h-8 min-w-0 cursor-pointer items-center gap-2 px-2 text-meta"
-              // Focus stays in the input so typing never stops; the click still opens the row.
               onMouseDown={(event) => event.preventDefault()}
               onMouseMove={() => position !== active && setActiveIndex(position)}
               onClick={row.activate}

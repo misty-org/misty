@@ -1,4 +1,3 @@
-// Midscene hashes cache keys; a stable non-cryptographic digest is enough here.
 export function createHash() {
   let input = "";
   const hash = {

@@ -33,12 +33,11 @@ import {
   Surface,
   Text,
 } from "@misty/ui";
-import { dropZoneAt } from "./dockSplitFit";
+import { dropZoneAt } from "./dock_split_fit";
 import { ViewIcon } from "./WorkspaceViewGroupButton";
 
 const dragScope = "layout-popup";
 
-/** The part of a pane a drop on `zone` fills: its middle, or the half on that side. */
 function zoneRect(rect: DOMRect, zone: DockDropZone): DOMRect {
   const inset = 8;
   const { left, top, width, height } = rect;
@@ -53,10 +52,8 @@ function zoneRect(rect: DOMRect, zone: DockDropZone): DOMRect {
   return new DOMRect(left + inset, top + inset, width - inset * 2, height - inset * 2);
 }
 
-/** Nothing pressed inside the popup reaches the window behind it through React's tree. */
 const contained = (event: SyntheticEvent) => event.stopPropagation();
 
-/** A page in the list: a press adds it where the grid has room, and dragging it places it. */
 function LayoutListRow(props: { view: WorkspaceView; placed: boolean; onAdd(): void }) {
   const { view } = props;
   const drag = usePointerDrag({ id: view.id, label: paneViewLabel(view), scope: dragScope });
@@ -72,11 +69,12 @@ function LayoutListRow(props: { view: WorkspaceView; placed: boolean; onAdd(): v
       wash="control"
       className={cn(
         "flex h-8 w-full cursor-grab touch-none select-none items-center rounded-md px-2",
-        "text-sm active:cursor-grabbing",
+        "active:cursor-grabbing",
       )}
     >
       <Text
         bare
+        size="control"
         tone={props.placed ? "bright" : "muted"}
         className="flex min-w-0 flex-1 items-center gap-2"
       >
@@ -88,10 +86,6 @@ function LayoutListRow(props: { view: WorkspaceView; placed: boolean; onAdd(): v
   );
 }
 
-/**
- * One pane of the draft, drawn as a card. Dragging it moves it; a page dropped on its sides splits
- * it, and one dropped on its middle takes its place.
- */
 function DraftPane(props: {
   pane: WorkspacePane;
   canPlace(viewId: string, paneId: string, zone: DockDropZone): boolean;
@@ -110,7 +104,6 @@ function DraftPane(props: {
     scope: dragScope,
     hit(x, y, moving) {
       const rect = ref.current?.getBoundingClientRect();
-      // A pane dropped on itself stays where it is.
       if (!rect || moving.id === view?.id) return null;
       const zone = dropZoneAt(rect, x, y);
       if (!props.canPlace(moving.id, pane.id, zone)) return null;
@@ -141,12 +134,12 @@ function DraftPane(props: {
       }}
       className={cn(
         "group relative flex min-h-0 min-w-0 flex-1 cursor-grab touch-none select-none flex-col",
-        "items-center justify-center gap-2 p-3 text-center shadow-lg shadow-black/30",
+        "items-center justify-center gap-2 p-3 text-center",
         "active:cursor-grabbing",
       )}
     >
       <ViewIcon tab={view?.placeholder ? undefined : view} icon={Blocks} size={22} />
-      <Text lines={2} tone="bright" className="max-w-full text-sm">
+      <Text lines={2} size="control" tone="bright" className="max-w-full">
         {paneViewLabel(view)}
       </Text>
       <IconButton
@@ -187,7 +180,6 @@ function DraftTree(props: {
   );
 }
 
-/** The canvas with nothing on it: the first page dropped here becomes the only pane. */
 function EmptyCanvas(props: { onPlace(viewId: string): void }) {
   const ref = useRef<HTMLDivElement>(null);
   usePointerDropTarget(ref, {
@@ -215,20 +207,13 @@ function EmptyCanvas(props: { onPlace(viewId: string): void }) {
       ref={ref}
       className="grid flex-1 place-items-center border-2"
     >
-      <Text tone="muted" className="text-sm">
+      <Text size="control" tone="muted">
         Drag a tab here
       </Text>
     </Surface>
   );
 }
 
-/**
- * The layout popup: a small copy of the window. Tabs are on the left with search, and the page's
- * layout is on the right as panes. A tab is dragged onto a pane's sides to split it, or onto its
- * middle to take its place; a press adds it where the grid has room. Drags use the app's shared
- * pointer drag, which captures the pointer and never starts a native drag. Nothing in the window changes until Apply, and nothing
- * pressed here reaches the tabs behind it.
- */
 export function LayoutPopup(props: { onApplied: () => void }) {
   const active = useLayoutEditor((state) => state.active);
   const layout = useWorkspaceStore((state) => state.layout);
@@ -237,7 +222,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
   const [draft, setDraft] = useState<WorkspaceDockNode | null>(null);
   const [notice, setNotice] = useState("");
 
-  // The popup starts from the tab the window is showing when it opens.
   useEffect(() => {
     if (!active) return;
     const state = useWorkspaceStore.getState().layout;
@@ -260,7 +244,6 @@ export function LayoutPopup(props: { onApplied: () => void }) {
   const sourceOf = (viewId: string) =>
     allLayoutPanes(layout).find((pane) => pane.views[0]?.id === viewId);
 
-  /** Whether a page dropped on a pane's side or middle fits the grid. */
   const canPlace = (viewId: string, paneId: string, zone: DockDropZone) => {
     const view = views.find((item) => item.id === viewId);
     return Boolean(view && draft && draftPlace(draft, view, paneId, zone, sourceOf(viewId)));
@@ -277,14 +260,12 @@ export function LayoutPopup(props: { onApplied: () => void }) {
     }
     setNotice("");
     if (next) setDraft(next);
-    // On an empty canvas the page becomes the first pane.
     else if (!draft)
       setDraft(
         source ? { ...source, views: [view], activeViewId: view.id } : createDockLeaf([view]),
       );
   };
 
-  /** A tab pressed in the list joins where the grid has room, as a way in without dragging. */
   const addFromList = (view: WorkspaceView) => {
     if (placed.has(view.id)) return;
     const source = sourceOf(view.id);
@@ -363,7 +344,7 @@ export function LayoutPopup(props: { onApplied: () => void }) {
           <BottomBar
             aria-label="Layout"
             start={
-              <Text bare role="status" tone="muted" className="text-xs">
+              <Text bare role="status" size="meta" tone="muted">
                 {notice}
               </Text>
             }

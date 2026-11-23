@@ -1,15 +1,7 @@
-//! ACP framing for the Qoder driver: decoding one JSON-RPC line into a response, a notification
-//! or an agent-initiated request, and building the frames the client writes back.
-
 use serde_json::{json, Value};
 
 use super::JSONRPC_INTERNAL_ERROR;
 
-/// Routes the lines of one in-flight request that are not its response:
-/// `session/update` notifications and agent-initiated requests. Returning
-/// `Some` writes that frame back to the CLI; `None` means the driver has
-/// taken the line over — a question parked for the user must stay
-/// unanswered until the answer command posts its response.
 pub(crate) type LineRouter<'a> = dyn FnMut(&AcpLine) -> Option<Value> + Send + 'a;
 
 #[derive(Debug)]

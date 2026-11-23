@@ -36,7 +36,6 @@ impl AppEnvironmentService {
         self.inner.snapshot()
     }
 
-    /// The database every store lives in: `~/.misty/data/misty.db`.
     pub fn store(&self) -> crate::store::Store {
         crate::store::Store::in_home(&self.inner.misty_dir)
     }
@@ -45,12 +44,10 @@ impl AppEnvironmentService {
         self.inner.cache_dir.clone()
     }
 
-    /// Misty's own data root (never shareable with agents).
     pub fn misty_dir(&self) -> PathBuf {
         self.inner.misty_dir.clone()
     }
 
-    /// `~/.misty` itself: `misty.conf`, every data folder, and what they share in `shared/`.
     pub fn misty_root(&self) -> PathBuf {
         self.inner.home_dir.join(".misty")
     }

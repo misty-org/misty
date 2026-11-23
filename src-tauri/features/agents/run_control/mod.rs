@@ -1,13 +1,3 @@
-//! The agent runtime on this computer.
-//!
-//! Misty's own runtime, the `misty-agent` crate inside this process. Misty holds no keys and has no
-//! model of its own, so it gets an empty model document and no run is started on it
-//! (`local_runs`); every run goes to an outside engine. It stays in the code. Runs it kept from
-//! before are under `~/.misty/runtime/runs`.
-//!
-//! A run failing must never take down the browser. The crate runs each one as its own task, and
-//! everything called from here goes through [`contained`] or a session's task. That rests on panics
-//! unwinding, so a build that makes them abort doesn't compile.
 #[cfg(panic = "abort")]
 compile_error!(
     "Misty needs panics to unwind: with panic=abort, one failed agent run closes the whole browser."
@@ -45,9 +35,7 @@ use std::{
     time::Duration,
 };
 
-use agent_runs::{
-    runtime_client_builder, AgentRuntime, AgentRuntimeOptions, Logger,
-};
+use agent_runs::{runtime_client_builder, AgentRuntime, AgentRuntimeOptions, Logger};
 
 use crate::browser::page_text::host::ConfinedPageReader;
 use file_access::{fs, fs_async};
@@ -57,18 +45,12 @@ pub(crate) struct Running {
 }
 
 static RUNNING: Mutex<Option<Arc<Running>>> = Mutex::new(None);
-/// Held while the runtime starts, so there is only ever one, and a change to the models made while it
-/// starts waits and is applied afterwards.
 static STARTING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-/// One model document at a time, so an older one can't land after a newer one.
 static PUSHING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static STOPPED: AtomicBool = AtomicBool::new(false);
 static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 
-/// A Library recording may take minutes to transcribe. A call past this answers as one that wasn't
-/// answered.
 const CALL_LIMIT: Duration = Duration::from_secs(600);
-/// The limit for opening a connection, which nothing in the runtime sets per call.
 const CONNECT_LIMIT: Duration = Duration::from_secs(10);
 const NOT_ANSWERED: &str = "Misty's agent runtime didn't answer.";
 
@@ -79,7 +61,6 @@ fn current() -> Option<Arc<Running>> {
         .clone()
 }
 
-/// No proxy, as with the crate's page fetches: a proxy would also see every model key.
 fn client() -> Result<reqwest::Client, String> {
     runtime_client_builder()
         .no_proxy()
@@ -88,13 +69,10 @@ fn client() -> Result<reqwest::Client, String> {
         .map_err(|_| "Misty couldn't start its agent runtime.".to_owned())
 }
 
-/// The folder the runtime keeps its runs and log in.
 pub(crate) fn data_dir() -> Option<std::path::PathBuf> {
     file_access::paths::misty_home_dir().map(|home| home.join("runtime"))
 }
 
-/// Gives the runtime this device's models. A document that couldn't be read changes nothing, so a
-/// passing failure can't look like a person with no keys.
 async fn push_models(app: &tauri::AppHandle, runtime: &AgentRuntime) -> Result<(), String> {
     let _pushing = PUSHING.lock().await;
     let document = crate::agents::models::device_document(app)
@@ -121,10 +99,8 @@ async fn start(app: &tauri::AppHandle) -> Result<Running, String> {
         before_tool: None,
     })
     .map_err(|_| "Misty couldn't open the agent runtime's runs.")?;
-    // Before resuming: a run picked up with no models fails at once with `model_key_needed`.
     push_models(app, &runtime).await?;
     if let Err(error) = runtime.resume_unfinished().await {
-        // The files stay for the next launch, and everything else still works.
         eprintln!(
             "Could not resume the agent runtime's runs: {}",
             error.kind()
@@ -133,7 +109,6 @@ async fn start(app: &tauri::AppHandle) -> Result<Running, String> {
     Ok(Running { runtime })
 }
 
-/// The running runtime, starting it when it isn't running.
 pub(crate) async fn ensure(app: &tauri::AppHandle) -> Result<Arc<Running>, String> {
     if let Some(running) = current() {
         return Ok(running);
@@ -151,8 +126,6 @@ pub(crate) async fn ensure(app: &tauri::AppHandle) -> Result<Arc<Running>, Strin
     Ok(running)
 }
 
-/// Runs left unfinished when Misty last closed go on as it opens. With none on disk nothing starts, so someone who only browses never reaches the keychain
-/// for model keys.
 pub fn resume_at_launch(app: &tauri::AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -175,8 +148,6 @@ pub fn resume_at_launch(app: &tauri::AppHandle) {
     });
 }
 
-/// Runs a call on a task of its own: a panic in it fails this call alone, and so does a call that
-/// never ends.
 pub(crate) async fn contained<T: Send + 'static>(
     work: impl Future<Output = T> + Send + 'static,
 ) -> Result<T, String> {
@@ -190,7 +161,6 @@ async fn contained_within<T: Send + 'static>(
     let mut task = tokio::spawn(work);
     match tokio::time::timeout(limit, &mut task).await {
         Ok(Ok(value)) => Ok(value),
-        // What a panic says can't be trusted to be free of keys, so it isn't passed on.
         Ok(Err(_)) => Err(NOT_ANSWERED.to_owned()),
         Err(_) => {
             task.abort();
@@ -199,15 +169,11 @@ async fn contained_within<T: Send + 'static>(
     }
 }
 
-/// Gives the running runtime this device's new model choices and keys, and the ChatGPT token Rust
-/// just refreshed.
 pub fn models_changed() {
     let Some(app) = APP.get().cloned() else {
-        // Nothing has started, and starting reads the models fresh.
         return;
     };
     tauri::async_runtime::spawn(async move {
-        // If it's starting, what it read may already be out of date.
         drop(STARTING.lock().await);
         let Some(running) = current() else {
             return;
@@ -218,8 +184,6 @@ pub fn models_changed() {
     });
 }
 
-/// Stops the runtime with Misty. Its runs stop where they stand and wait in their files for the next
-/// launch.
 pub fn stop() {
     STOPPED.store(true, Ordering::SeqCst);
     let running = RUNNING
@@ -255,7 +219,6 @@ mod tests {
         assert_eq!(failed.unwrap_err(), NOT_ANSWERED);
     }
 
-    /// `cfg(panic)` above covers what's being built now; this covers the setting anyone would change.
     #[test]
     fn no_build_profile_makes_panics_abort() {
         let manifest = include_str!("../../../Cargo.toml");

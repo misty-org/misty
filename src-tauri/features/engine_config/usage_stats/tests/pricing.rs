@@ -31,26 +31,26 @@ fn table() -> PriceTable {
 fn matcher_walks_the_documented_fallbacks() {
     let t = table();
     let cases = [
-        ("gpt-5", Some("gpt-5")), // exact
-        ("GPT-5", Some("gpt-5")), // lowercase
+        ("gpt-5", Some("gpt-5")),
+        ("GPT-5", Some("gpt-5")),
         ("mixed-case-model", Some("Mixed-Case-Model")),
-        ("anthropic/claude-opus-4-5", Some("claude-opus-4-5")), // provider prefix
+        ("anthropic/claude-opus-4-5", Some("claude-opus-4-5")),
         (
             "openrouter/anthropic/claude-opus-4-5",
             Some("claude-opus-4-5"),
         ),
-        ("claude-haiku-4-5-20251001", Some("claude-haiku-4-5")), // date suffix
+        ("claude-haiku-4-5-20251001", Some("claude-haiku-4-5")),
         ("claude-opus-4-5@20251101", Some("claude-opus-4-5")),
         ("claude-opus-4-5[1m]", Some("claude-opus-4-5")),
-        ("claude-opus-4.5", Some("claude-opus-4-5")), // dotted Claude version
-        ("deepseek-v4-flash", Some("deepseek/deepseek-v4-flash")), // provider-prefixed key
-        ("gpt-5.6-sol-high", Some("gpt-5.6-sol")),    // longest prefix
+        ("claude-opus-4.5", Some("claude-opus-4-5")),
+        ("deepseek-v4-flash", Some("deepseek/deepseek-v4-flash")),
+        ("gpt-5.6-sol-high", Some("gpt-5.6-sol")),
         ("claude-opus-4-5-thinking", Some("claude-opus-4-5")),
-        ("gpt-5-high", Some("gpt-5")), // reasoning-effort mode of the same model
-        ("gpt-5-turbo", None),         // a different model: never borrow gpt-5's price
+        ("gpt-5-high", Some("gpt-5")),
+        ("gpt-5-turbo", None),
         ("gpt-5-spark", None),
         ("gpt-5-pro", None),
-        ("claude-opus-4-9", None), // never a numeric cut
+        ("claude-opus-4-9", None),
         ("gpt-5.9", None),
         ("k3.1-pro", None),
         ("no-output-price", None),
@@ -102,8 +102,6 @@ fn bundled_snapshot_prices_the_engines_models() {
     ] {
         assert!(t.price(model).is_some(), "{model} should be priced");
     }
-    // Variants missing from the snapshot stay unpriced instead of borrowing
-    // their base model's price (checked against the real table).
     for model in ["kimi-k2-turbo", "qwen3-coder-plus", "gpt-5.3-codex-spark"] {
         let resolved = t.resolve(model);
         assert!(

@@ -1,19 +1,15 @@
-import { isMistyCloud, mistyWebsite, useServerChoice } from "@/api/deployment/serverChoice";
+import { isMistyCloud, mistyWebsite, useServerChoice } from "@/api/deployment/server_choice";
 import { Button } from "@misty/ui";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { useAuth } from "../AuthContext";
-import { accountSignIn } from "../sessions/useAccountStore";
+import { accountSignIn } from "../sessions/use_account_store";
 import AuthField from "./AuthField";
 import AuthMessage from "./AuthMessage";
 import AuthSubmitButton from "./AuthSubmitButton";
 import GoogleSignInButton from "./GoogleSignInButton";
 
-/** Email and password, and Google: the sign-in page and the sign-in sheet share it. The email
- * and the error belong to the host, which keeps them across its other screens. On Misty Cloud a
- * forgotten password is reset with a sign-in link, which the website's page sends or says how to
- * get. */
 export default function SignInForm(props: {
   email: string;
   onEmailChange: (email: string) => void;
@@ -24,7 +20,6 @@ export default function SignInForm(props: {
   const { transitioning, authenticateAccount } = useAuth();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  // The website resets a Misty Cloud password; another server has no page of Misty's for it.
   const cloud = useServerChoice((state) => isMistyCloud(state.choice));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

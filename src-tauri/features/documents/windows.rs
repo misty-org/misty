@@ -1,6 +1,3 @@
-//! Untrusted documents are parsed on Windows by the same bundled
-//! worker macOS uses, confined in an AppContainer (see
-//! `platform::windows::sandbox`). Misty's own process never parses them.
 use file_access::fs::File;
 use std::{
     io::{Read, Write},
@@ -15,14 +12,15 @@ use sandbox::{Limits, Workspace};
 
 const PROTOCOL: u32 = 6;
 const CONTAINER: &str = "Misty.DocumentWorker";
-/// The largest response the worker returns.
 const MAX_RESPONSE: u64 = 4 * 1024 * 1024;
 
-/// The largest document the worker accepts, as on macOS.
 const INPUT_LIMIT: u64 = crate::MAX_AGENT_DOCUMENT_BYTES;
 
-/// Parses the document at `path` in the confined worker. `stop` cancels it.
-pub fn process(path: &Path, stop: &AtomicBool, worker: super::WorkerBytes) -> Result<Value, String> {
+pub fn process(
+    path: &Path,
+    stop: &AtomicBool,
+    worker: super::WorkerBytes,
+) -> Result<Value, String> {
     let display_name = path
         .file_name()
         .and_then(|name| name.to_str())
@@ -45,7 +43,6 @@ pub fn process(path: &Path, stop: &AtomicBool, worker: super::WorkerBytes) -> Re
         return Err("Input exceeds this operation's size limit.".into());
     }
     let workspace = Workspace::new(CONTAINER)?;
-    // The worker sees a private copy, never the person's own file.
     let mut staged = File::create(workspace.path().join(format!("input.{extension}")))
         .map_err(|_| "Could not stage document.")?;
     let copied = std::io::copy(&mut (&mut source).take(INPUT_LIMIT + 1), &mut staged)
@@ -70,7 +67,12 @@ pub fn process(path: &Path, stop: &AtomicBool, worker: super::WorkerBytes) -> Re
         work_bytes: 2 * INPUT_LIMIT + 64 * 1024 * 1024,
         processes: 1,
     };
-    let response = workspace.run(worker("document-processing", PROTOCOL)?, &body, &limits, stop)?;
+    let response = workspace.run(
+        worker("document-processing", PROTOCOL)?,
+        &body,
+        &limits,
+        stop,
+    )?;
     let value: Value =
         serde_json::from_slice(&response).map_err(|_| "Invalid document processor response.")?;
     if value.get("protocol").and_then(Value::as_u64) != Some(u64::from(PROTOCOL)) {

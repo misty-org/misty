@@ -1,8 +1,8 @@
-import { useCachedResource } from "@/api/cache/cached-resource";
-import { agentsDeviceSnapshot, forgetFolder, shareFolder } from "../personal/useAgentsStore";
+import { useCachedResource } from "@/api/cache/cached_resource";
+import { agentsDeviceSnapshot, forgetFolder, shareFolder } from "../personal/use_agents_store";
 import { shareFolderWarning } from "../plans/AgentFolderMenu";
 import { TutorSettings } from "../tutor/cursor/TutorSettings";
-import { confirmAction } from "@/shared/lib/confirmAction";
+import { confirmAction } from "@/shared/lib/confirm_action";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, useNotice } from "@misty/ui";
 import { useState } from "react";
@@ -14,9 +14,9 @@ import {
 import { definitionById, fromLegacy } from "@/features/settings";
 import { useDevicePreferences } from "@/features/settings";
 import { ChoiceControl, SwitchControl } from "../../settings/SettingsControls";
-import { useRailShown } from "../context-panel/railLayoutStore";
+import { useRailShown } from "../context-panel/rail_layout_store";
 import { useShowHiddenSteps } from "../activity/RunSteps";
-import { useComposerVim } from "../conversations/composer/controls/composerVim";
+import { useComposerVim } from "../conversations/composer/controls/composer_vim";
 import { useSettingsStore } from "@/features/settings";
 import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
@@ -44,7 +44,11 @@ function ComposerVimRow() {
   const on = useComposerVim((state) => state.on);
   return (
     <Row label="Vim keys in the message box">
-      <SwitchControl checked={on} disabled={false} onChange={(value) => useComposerVim.getState().toggle(value)} />
+      <SwitchControl
+        checked={on}
+        disabled={false}
+        onChange={(value) => useComposerVim.getState().toggle(value)}
+      />
     </Row>
   );
 }
@@ -111,8 +115,6 @@ function CollaborationModeRow() {
 export function CompanionSection() {
   return <TutorSettings />;
 }
-/** What agents may do: remembered approvals (server-owned), shared folders on a desktop, and
- * sites they only read. Then what Misty itself may reach on this computer. */
 export function AgentPermissionsSection() {
   return (
     <>
@@ -127,8 +129,6 @@ export function AgentPermissionsSection() {
   );
 }
 function AgentScopeList() {
-  // This computer's shared folders (names only), kept on it: the last list paints at once and is
-  // read again behind it.
   const snapshot = useCachedResource("agents/device-snapshot", agentsDeviceSnapshot, {
     persist: "device",
   });
@@ -138,7 +138,6 @@ function AgentScopeList() {
   const error = actionError || (loadFailed ? "Shared folders could not be loaded. Try again." : "");
   const refresh = snapshot.reload;
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
-  // Each folder's row, then Add a folder: label-only rows ending in a button.
   if (snapshot.loading)
     return (
       <Section title="Shared folders">

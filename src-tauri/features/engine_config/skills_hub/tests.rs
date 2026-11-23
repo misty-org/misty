@@ -7,7 +7,7 @@
 //! holding `support::HOME_ENV_LOCK`. Every write lands in a scratch folder and never touches the
 //! real home.
 
-#![allow(clippy::disallowed_methods, clippy::disallowed_types)] // Fixtures are built with the standard library.
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use super::*;
 use serde_json::{json, Value};
@@ -16,8 +16,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Environment changes are process-wide, so every test that makes them runs one at a time under
-/// the shared lock, never stepping on another module's home tests.
 struct EnvGuard {
     saved: Vec<(&'static str, Option<std::ffi::OsString>)>,
     _lock: parking_lot::MutexGuard<'static, ()>,
@@ -29,9 +27,6 @@ impl EnvGuard {
     fn new(vars: &[(&'static str, &Path)]) -> Self {
         let lock = crate::engine_config::support::HOME_ENV_LOCK.lock();
         let mut saved = Vec::new();
-        // The SSOT root defaults to Misty's app_home; tests override it explicitly, and those that
-        // don't (such as the engine-folder tests that only move the home) still never reach the
-        // person's real data.
         for (key, value) in vars {
             saved.push((*key, std::env::var_os(key)));
             std::env::set_var(key, value);
@@ -51,7 +46,6 @@ impl Drop for EnvGuard {
     }
 }
 
-/// A scratch folder, removed on drop.
 struct TestDir(PathBuf);
 
 impl TestDir {
@@ -77,7 +71,6 @@ impl Drop for TestDir {
     }
 }
 
-/// A test environment with both the SSOT and the home isolated.
 struct Sandbox {
     home: TestDir,
     _store: TestDir,
@@ -91,8 +84,6 @@ impl Sandbox {
         let env = EnvGuard::new(&[
             ("MISTY_TEST_ENGINE_HOME", home.path()),
             ("MISTY_SKILLS_HUB_HOME", store.path()),
-            // Every engine home and skills-root variable is cleared: CLAUDE_CONFIG_DIR, GROK_HOME and the
-            // like set on a development machine mustn't lead test writes outside the sandbox.
             ("CLAUDE_CONFIG_DIR", &PathBuf::new()),
             ("CODEX_HOME", &PathBuf::new()),
             ("KIMI_CODE_HOME", &PathBuf::new()),
@@ -113,7 +104,6 @@ impl Sandbox {
     }
 }
 
-/// Writes a skill under one of the sandbox's engine skills roots.
 fn write_skill(root: &Path, directory: &str, name: &str) -> PathBuf {
     let dir = root.join(directory);
     fs::create_dir_all(&dir).unwrap();
@@ -253,9 +243,6 @@ fn hash_directory_stable_and_sensitive() {
     }
 }
 
-/// Removing the copy synced into an engine must delete a folder link together with the link itself.
-/// Windows' `remove_file` says Access denied for a folder link, which would leave
-/// "copy still present" and let the next copy write through the link into the SSOT.
 #[test]
 fn remove_path_deletes_directory_and_dangling_symlinks() {
     let temp = TestDir::new("remove-link");
@@ -437,8 +424,6 @@ fn purge_expired_trash_ttl() {
     assert!(!old_trash.exists());
 }
 
-// ===== Read-only sources and delete protection =====
-
 #[test]
 fn system_and_plugin_sources_are_listed_readonly() {
     let sandbox = Sandbox::new("readonly-scan");
@@ -514,7 +499,6 @@ fn local_skills_are_deletable_and_managed_ones_need_uninstall() {
         "claude copy untouched"
     );
 
-    // A managed entry goes through uninstall, not delete_local.
     let store_managed = managed_skill_path("plain").unwrap();
     fs::create_dir_all(&store_managed).unwrap();
     fs::write(store_managed.join("SKILL.md"), "---\nname: plain\n---\n").unwrap();
@@ -554,7 +538,6 @@ fn unknown_targets_are_rejected_not_silently_filtered() {
         matches!(error, SkillError::Coded("invalid_input", _)),
         "got {error:?}"
     );
-    // Every id of the full target list is valid input (this checks the gate, not each write).
     for target in TARGETS.iter().filter(|t| t.visible) {
         validate_targets(&[target.id.to_string()]).expect(target.id);
     }
@@ -590,13 +573,10 @@ fn target_list_covers_every_cli_and_reports_availability() {
             "hermes",
         ]
     );
-    // The hidden agents target stays out of the UI list.
     assert!(!ids.contains(&"agents"));
-    // An empty sandbox: no engine installed.
     assert!(list
         .iter()
         .all(|t| t.get("available") == Some(&json!(false))));
-    // Only a target whose home exists is available; any Antigravity home counts as installed.
     for dir in [".claude", ".grok", ".gemini/antigravity", ".qoder-cn"] {
         fs::create_dir_all(home.join(dir)).unwrap();
     }
@@ -616,13 +596,10 @@ fn target_list_covers_every_cli_and_reports_availability() {
     assert!(!available("hermes"), "no hermes home");
 }
 
-/// Each installed engine gets the managed copy in its own skills root, and removing cleans each target:
-/// "every CLI supported" means sync and remove really reach each folder, not just a longer list.
 #[test]
 fn sync_and_remove_reach_every_engine_root() {
     let sandbox = Sandbox::new("all-engines");
     let home = sandbox.home.path();
-    // Every visible target's home exists → each is an available target.
     for target in TARGETS.iter().filter(|t| t.visible) {
         for home_dir in target_home_dirs(target) {
             fs::create_dir_all(&home_dir).unwrap();
@@ -652,7 +629,6 @@ fn sync_and_remove_reach_every_engine_root() {
             );
         }
     }
-    // The hidden agents target takes part too (`visible=false` only affects the list).
     let (agents_ok, _) = sync_targets_with_results("demo", &["agents".to_string()]);
     assert!(agents_ok);
     assert_eq!(classify_target_skill("demo", "agents"), "synced");
@@ -672,7 +648,6 @@ fn sync_and_remove_reach_every_engine_root() {
 fn sync_target_results_report_partial_failure() {
     let store = TestDir::new("syr");
     let _env = EnvGuard::new(&[("MISTY_SKILLS_HUB_HOME", store.path())]);
-    // The source doesn't exist: both targets fail, but each one's result is reported.
     let (all_ok, results) =
         sync_targets_with_results("missing-skill", &["claude".into(), "codex".into()]);
     assert!(!all_ok);
@@ -683,8 +658,6 @@ fn sync_target_results_report_partial_failure() {
         .all(|r| r.get("error").and_then(Value::as_str).is_some()));
 }
 
-/// Removing keeps the person's own source copy: the result must say `kept`, or the UI could only
-/// report "removed" while the icon is still there after a refresh.
 #[test]
 fn remove_reports_a_kept_user_copy_instead_of_claiming_removal() {
     let sandbox = Sandbox::new("kept");
@@ -696,7 +669,6 @@ fn remove_reports_a_kept_user_copy_instead_of_claiming_removal() {
     let id = js_string(skill.get("skill").and_then(|s| s.get("id")));
     assert_eq!(classify_target_skill("demo", "codex"), "synced");
 
-    // Every target turned off: the codex copy is deleted, claude is the person's own folder and stays.
     let removed = set_skill_targets(&id, &[]).expect("remove all");
     let results = removed
         .get("targetResults")
@@ -717,8 +689,6 @@ fn remove_reports_a_kept_user_copy_instead_of_claiming_removal() {
     assert!(!codex_skills.join("demo").exists());
     assert!(claude_skills.join("demo").join("SKILL.md").is_file());
 }
-
-// ===== skill usage =====
 
 fn write_transcript(projects_dir: &Path, project: &str, file: &str, lines: &[String]) {
     let dir = projects_dir.join(project);
@@ -749,7 +719,6 @@ fn read_skill_content_reads_engine_copy_and_rejects_traversal() {
     let payload = read_skill_content("plain").expect("content");
     assert!(js_string(payload.get("markdown")).contains("name: plain"));
     assert_eq!(payload.get("truncated"), Some(&json!(false)));
-    // Absolute paths and traversal are always refused.
     let error = read_skill_content("../plain").expect_err("traversal");
     assert!(
         matches!(error, SkillError::Coded("invalid_input", _)),
@@ -767,15 +736,12 @@ fn read_skill_content_reads_engine_copy_and_rejects_traversal() {
     );
 }
 
-/// The full local lifecycle (all in scratch folders): import → sync two engines → remove one copy
-/// → uninstall → restore; the person's own local source folder is never harmed.
 #[test]
 fn local_lifecycle_import_sync_remove_uninstall_restore() {
     let sandbox = Sandbox::new("lifecycle");
     let claude_skills = sandbox.home.path().join(".claude").join("skills");
     write_skill(&claude_skills, "demo", "demo");
 
-    // Import and sync to two engines; the claude side keeps the person's own folder (not a managed copy).
     let imported =
         import_local_skill("demo", &["claude".to_string(), "codex".to_string()]).expect("import");
     let id = js_string(imported.get("skill").and_then(|skill| skill.get("id")));
@@ -785,7 +751,6 @@ fn local_lifecycle_import_sync_remove_uninstall_restore() {
     assert!(managed_skill_path("demo").unwrap().is_dir());
     assert!(!is_symlink(&claude_skills.join("demo")));
 
-    // Remove the codex copy: codex goes, claude's own folder is untouched.
     let updated = set_skill_targets(&id, &["claude".to_string()]).expect("set targets");
     let results = updated.get("targetResults").unwrap().as_array().unwrap();
     assert!(
@@ -797,13 +762,11 @@ fn local_lifecycle_import_sync_remove_uninstall_restore() {
     assert_eq!(classify_target_skill("demo", "codex"), "off");
     assert_eq!(classify_target_skill("demo", "claude"), "synced");
 
-    // Uninstall: the copy the app made (codex) is removed, the managed original goes to the trash; the person's local copy stays.
     let uninstalled = uninstall_skill(&id).expect("uninstall");
     assert_eq!(uninstalled.get("trashed"), Some(&json!(true)));
     assert_eq!(classify_target_skill("demo", "codex"), "off");
     assert!(!managed_skill_path("demo").unwrap().exists());
     assert!(claude_skills.join("demo").join("SKILL.md").is_file());
-    // Uninstall reports each target: the protected personal copy isn't a failure.
     let removal_results = uninstalled
         .get("targetResults")
         .unwrap()
@@ -816,7 +779,6 @@ fn local_lifecycle_import_sync_remove_uninstall_restore() {
         "got {removal_results:?}"
     );
 
-    // Restore: rebuilds the targets recorded before the uninstall (claude); it points at the person's own folder and stays as it is.
     let restored = restore_skill(&id).expect("restore");
     assert_eq!(
         js_string(restored.get("skill").and_then(|skill| skill.get("managed"))),
@@ -980,8 +942,6 @@ fn usage_missing_transcripts_reports_zero_not_fabricated() {
     let _ = &sandbox;
 }
 
-/// A skills.sh id matched to a repo folder name: the same name, without the repo prefix, or `:` to `-`;
-/// no match gives None (better not_found than another skill's text in its place).
 #[test]
 fn resolve_skill_dir_in_tree_matches_skills_sh_ids() {
     let tree = vec![
@@ -999,26 +959,21 @@ fn resolve_skill_dir_in_tree_matches_skills_sh_ids() {
         dir_for("web-design-guidelines"),
         "skills/web-design-guidelines"
     );
-    // When a folder name appears in several places the shallowest wins.
     assert_eq!(
         dir_for("react-best-practices"),
         "skills/react-best-practices"
     );
-    // The skills.sh id carries the repo prefix (as vercel-labs/agent-skills really does).
     assert_eq!(
         dir_for("vercel-react-best-practices"),
         "skills/react-best-practices"
     );
-    // `react:components` is `react-components` in the repo.
     assert_eq!(
         dir_for("react:components"),
         "plugins/stitch-build/skills/react-components"
     );
     assert_eq!(dir_for("no-such-skill"), "");
-    // A SKILL.md at the root isn't the folder matcher's job.
     assert_eq!(dir_for("skills"), "");
 
-    // Install path: the given folder as is when it works, else the matched result.
     assert_eq!(
         resolve_existing_skill_dir(&tree, "skills/react-best-practices").unwrap_or_default(),
         "skills/react-best-practices"
@@ -1029,17 +984,12 @@ fn resolve_skill_dir_in_tree_matches_skills_sh_ids() {
     );
     assert_eq!(resolve_existing_skill_dir(&tree, "nope"), None);
     assert!(dir_has_skill_md(&tree, "skills/web-design-guidelines"));
-    // Folders are taken by prefix (as upstream): a folder without SKILL.md isn't installable.
     assert!(!dir_has_skill_md(
         &tree,
         "skills/react-best-practices/references"
     ));
 }
 
-/// A networked smoke test (ignored by default, run by hand):
-/// `cargo test --lib remote_skill_content_live -- --ignored --nocapture`
-/// covers skills.sh's real shape: an id with the repo prefix (`vercel-react-best-practices`)
-/// must still resolve to `skills/react-best-practices/SKILL.md` and read its front matter back.
 #[ignore = "network: hits api.github.com and raw.githubusercontent.com"]
 #[tokio::test]
 async fn remote_skill_content_live_reads_the_repo_file() {
@@ -1068,7 +1018,6 @@ async fn remote_skill_content_live_reads_the_repo_file() {
         "{payload:?}"
     );
 
-    // A skill that really isn't in the repo must report not_found, not pick some other SKILL.md.
     let missing = remote_skill_content(
         "github",
         "awesome-copilot",

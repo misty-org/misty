@@ -1,15 +1,9 @@
-//! A profile's website data store: the engine's cookies, site storage and cache for that profile's
-//! pages. A profile has exactly one, and which one comes from `browser::app_windows`. A store is named by
-//! a 64-character identity; `None` is this computer's original store.
 #[cfg(target_os = "macos")]
 use file_access::fs;
-// The store this computer has always browsed in, kept so nobody is signed out of their sites.
 const ORIGINAL_STORE_ID: [u8; 16] = [
     0x68, 0x25, 0x8f, 0x34, 0x88, 0x8a, 0x4a, 0xbd, 0xa6, 0x21, 0x8f, 0x4c, 0xe2, 0x63, 0x71, 0x96,
 ];
 
-/// Native-only alias for reading the existing embedded browser store during
-/// explicit initial capture. Never use the application's authentication store.
 pub(crate) fn original_store_identity() -> String {
     let mut identity: String = ORIGINAL_STORE_ID
         .iter()
@@ -19,10 +13,6 @@ pub(crate) fn original_store_identity() -> String {
     identity
 }
 
-/// The folder a store's website data is found in, under Misty's own:
-/// `~/.misty/profiles/<store>/webview`. WebView2 and WebKitGTK keep the data right there.
-/// WebKit on macOS chooses its own folder for a store, so there it is a symlink to that
-/// folder (see `link_store_data`). The original store is `default`.
 pub(crate) fn store_home(
     home: &std::path::Path,
     store: Option<&str>,
@@ -34,11 +24,6 @@ pub(crate) fn store_home(
     Ok(home.join("profiles").join(name).join("webview"))
 }
 
-/// The identifier WebKit knows a store by in this build. Every build of one app id shares
-/// WebKit's folder of stores (macOS picks it from the app id, not from Misty's data folder), so
-/// a dev or named build mixes its profile into the identifier and gets stores of its own. Release
-/// builds keep the store's own identifier, so every release version, before and after an update,
-/// browses in the same store.
 pub fn webkit_store_identifier(store: Option<&str>) -> Result<[u8; 16], String> {
     Ok(for_profile(
         data_store_identifier(store)?,
@@ -61,7 +46,6 @@ fn for_profile(identifier: [u8; 16], profile: &file_access::paths::Profile) -> [
     mixed
 }
 
-/// WebKit's folder for a store: `~/Library/WebKit/<bundle id>/WebsiteDataStore/<uuid>`.
 #[cfg(target_os = "macos")]
 fn webkit_store_folder(
     library: &std::path::Path,
@@ -75,14 +59,6 @@ fn webkit_store_folder(
         .join(uuid::Uuid::from_bytes(identifier).hyphenated().to_string())
 }
 
-/// On macOS, WebKit keeps a store at
-/// `~/Library/WebKit/<bundle id>/WebsiteDataStore/<uuid>`, where the uuid is the store's
-/// identifier in this build (`webkit_store_identifier`). Points `webview` at it so a store's data
-/// is reachable from Misty's folder. A store that doesn't exist yet gets its folder first, so the
-/// link never dangles. Never removes anything it does not own.
-///
-/// A dev build's store that doesn't exist yet starts as a copy of the one every build
-/// shared before stores were separated, so that build stays signed in to its sites.
 #[cfg(target_os = "macos")]
 pub(crate) fn link_store_data(
     home: &std::path::Path,
@@ -96,15 +72,10 @@ pub(crate) fn link_store_data(
     let target = webkit_store_folder(library, bundle_identifier, identifier);
     if identifier != shared && !fs::exists(&target) {
         let before = webkit_store_folder(library, bundle_identifier, shared);
-        if fs::is_dir(&before) {
-            // A copy that fails leaves the build a fresh store, signed out, which still works.
-            if fs::copy_tree(&before, &target).is_err() {
-                let _ = fs::remove_dir_all(&target);
-            }
+        if fs::is_dir(&before) && fs::copy_tree(&before, &target).is_err() {
+            let _ = fs::remove_dir_all(&target);
         }
     }
-    // A new store's folder is made here rather than left to WebKit: Tauri makes a view's data
-    // folder when it doesn't see one, and through a dangling link that fails with "File exists".
     if !fs::exists(&target) {
         fs::create_dir_all(&target).map_err(|error| error.to_string())?;
     }
@@ -118,7 +89,6 @@ pub(crate) fn link_store_data(
             }
             fs::remove_file(&link).map_err(|error| error.to_string())?;
         }
-        // An empty folder from an earlier layout gives way; one with files is left alone.
         Ok(meta) if meta.is_dir() => {
             if fs::remove_dir(&link).is_err() {
                 return Ok(());
@@ -129,7 +99,6 @@ pub(crate) fn link_store_data(
         Err(error) => return Err(error.to_string()),
     }
     match fs::symlink(&target, &link) {
-        // Another view of this store linked it first.
         Err(error)
             if error.kind() == std::io::ErrorKind::AlreadyExists
                 && fs::read_link(&link).is_ok_and(|current| current == target) =>
@@ -140,8 +109,6 @@ pub(crate) fn link_store_data(
     }
 }
 
-/// The host supplies a validated 256-bit identity (logical hash or native
-/// generation), never a filesystem path. WebKit uses the first 128 bits.
 pub fn data_store_identifier(store: Option<&str>) -> Result<[u8; 16], String> {
     let Some(store) = store else {
         return Ok(ORIGINAL_STORE_ID);
@@ -162,7 +129,6 @@ pub fn data_store_identifier(store: Option<&str>) -> Result<[u8; 16], String> {
 }
 
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests {
     use super::*;
@@ -255,7 +221,6 @@ mod tests {
             std::fs::read_to_string(own.join("cookies")).unwrap(),
             "signed in"
         );
-        // The shared store stays as it was, for the release build.
         assert!(shared.join("cookies").is_file());
     }
 
@@ -275,13 +240,10 @@ mod tests {
         assert!(target.ends_with(
             "WebKit/com.misty.desktop/WebsiteDataStore/01010101-0101-0101-0101-010101010101"
         ));
-        // The store's folder is made with the link, so the link never dangles (Tauri would fail
-        // making the view's data folder through it); a second call keeps both.
         assert!(link.is_dir());
         link_store_data(&home, &library, "com.misty.desktop", Some(&store), &release).unwrap();
         std::fs::write(target.join("cookies"), "kept").unwrap();
         assert!(link.join("cookies").is_file());
-        // Deleting the profile's folder removes the link, never what it points to.
         std::fs::remove_dir_all(link.parent().unwrap()).unwrap();
         assert!(target.join("cookies").is_file());
     }

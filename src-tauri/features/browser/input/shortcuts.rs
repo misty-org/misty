@@ -86,9 +86,6 @@ pub(crate) fn forward_navigation(app: &AppHandle, id: &str, url: &Url) -> bool {
     if !trusted {
         return true;
     }
-    // The native child WebView is outside the renderer's focus tree. Focus its
-    // owning dock tab before dispatching so a shortcut can never act on a
-    // different split while native focus is still catching up.
     let _ = app.emit_to(
         crate::browser::browser_owner_label(app, id),
         "misty://browser-focus",
@@ -127,7 +124,7 @@ pub fn browser_shortcuts_update(
         .lock()
         .map_err(|_| "Browser shortcut state is unavailable.")? = bindings;
     for (label, webview) in app.webviews() {
-        if label.starts_with("misty-browser-") {
+        if label.starts_with("misty-browser-") || crate::apps::frames::is_app_page(&label) {
             apply(&webview, &state)?;
         }
     }
@@ -141,8 +138,11 @@ pub(crate) fn apply(webview: &Webview, state: &BrowserSessionState) -> Result<()
         .map_err(|_| "Browser shortcut state is unavailable.")?
         .clone();
     let payload = serde_json::to_string(&bindings).map_err(|error| error.to_string())?;
+    if crate::apps::frames::is_app_page(webview.label()) {
+        return crate::browser::pages::app_pages::send_shortcuts(webview, &payload);
+    }
     webview
-        .eval(&format!("window.__MISTY_SET_SHORTCUTS__?.({payload});"))
+        .eval(format!("window.__MISTY_SET_SHORTCUTS__?.({payload});"))
         .map_err(|error| error.to_string())
 }
 

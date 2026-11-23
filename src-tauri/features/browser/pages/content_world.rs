@@ -1,11 +1,5 @@
-//! Named script worlds: Misty code that shares a page's DOM but not its
-//! JavaScript, so page scripts can neither observe nor patch it. WebKit calls
-//! them content worlds; Chromium calls them isolated worlds.
 use tauri::Webview;
 
-/// Runs `function_body` in the named Misty content world. Each world shares the
-/// DOM with the page but keeps its own globals, invisible to page scripts and
-/// to other worlds, for as long as the page lives.
 #[cfg(target_os = "macos")]
 pub(crate) async fn evaluate_in_content_world(
     webview: Webview,
@@ -15,8 +9,6 @@ pub(crate) async fn evaluate_in_content_world(
     evaluate_in(webview, Some(world_name), function_body, None).await
 }
 
-/// Runs `function_body` in the named world of one cross-origin frame the tab announced
-/// (agent_pages/frames.rs). A frame that no longer answers is forgotten.
 #[cfg(target_os = "macos")]
 pub(crate) async fn evaluate_in_frame(
     webview: Webview,
@@ -39,9 +31,6 @@ pub(crate) async fn evaluate_in_frame(
     result
 }
 
-/// Runs `function_body` in the named isolated world of one cross-origin frame the tab
-/// listed (agent_pages/frames/windows.rs), through the session that runs the frame. A frame
-/// that no longer answers is forgotten.
 #[cfg(windows)]
 pub(crate) async fn evaluate_in_frame(
     webview: Webview,
@@ -58,8 +47,6 @@ pub(crate) async fn evaluate_in_frame(
         .ok_or("The frame is gone.")?;
     let session = target.session.as_deref();
     let result = async {
-        // A frame keeps one world per name for as long as its document lives, so asking
-        // again returns the same world and the globals left in it.
         let parameters =
             json!({ "frameId": target.frame, "worldName": world_name, "grantUniveralAccess": false });
         let created = match session {
@@ -180,10 +167,6 @@ async fn evaluate_in(
         .map_err(|_| "Page state was canceled.".to_owned())?
 }
 
-/// Runs `function_body` in the named Misty isolated world of the page's main
-/// frame. Each world shares the DOM with the page but keeps its own globals,
-/// invisible to page scripts and to other worlds, for as long as the document
-/// lives: a world is created once per document and reused until it navigates.
 #[cfg(windows)]
 pub(crate) async fn evaluate_in_content_world(
     webview: Webview,
@@ -197,7 +180,6 @@ pub(crate) async fn evaluate_in_content_world(
         sync::{Mutex, OnceLock},
     };
 
-    /// (view, world) -> (document loader, execution context)
     type Worlds = HashMap<(String, &'static str), (String, i64)>;
     static WORLDS: OnceLock<Mutex<Worlds>> = OnceLock::new();
     let worlds = WORLDS.get_or_init(Mutex::default);
@@ -228,7 +210,6 @@ pub(crate) async fn evaluate_in_content_world(
                 .as_i64()
                 .ok_or(CdpError::Invalid)?;
             if let Ok(mut worlds) = worlds.lock() {
-                // Forget worlds of views that closed or navigated away.
                 worlds.retain(|(view, _), _| view != webview.label());
                 worlds.insert(key, (loader, context));
             }
@@ -239,8 +220,6 @@ pub(crate) async fn evaluate_in_content_world(
     answer(evaluate(&webview, expression, Some(context)).await)
 }
 
-/// Runs `function_body` in the named Misty script world of the page's main frame. WebKitGTK
-/// keeps one world per name for as long as the document lives, invisible to page scripts.
 #[cfg(target_os = "linux")]
 pub(crate) async fn evaluate_in_content_world(
     webview: Webview,
@@ -250,9 +229,6 @@ pub(crate) async fn evaluate_in_content_world(
     call_async_in_world(webview, Some(world_name), function_body, 10).await
 }
 
-/// Runs `function_body` in Misty's world of one cross-origin frame the tab announced
-/// (agent_pages/frames/linux.rs), where the frame's own script runs it. A frame that no longer
-/// answers is forgotten.
 #[cfg(target_os = "linux")]
 pub(crate) async fn evaluate_in_frame(
     webview: Webview,
@@ -260,13 +236,10 @@ pub(crate) async fn evaluate_in_frame(
     function_body: String,
     frame: u64,
 ) -> Result<String, String> {
-    // Frames run Misty's code in the page layer's world, the only one their script lives in.
     debug_assert_eq!(world_name, "misty-agent-page");
     crate::browser::agent_pages::frames::linux::evaluate(&webview, frame, function_body).await
 }
 
-/// Runs `function_body` as an async function in `world` (the page's own world when `None`) and
-/// returns the string it resolves to, as WebKit's callAsyncJavaScript does.
 #[cfg(target_os = "linux")]
 pub(crate) async fn call_async_in_world(
     webview: Webview,

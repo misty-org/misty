@@ -13,7 +13,6 @@ struct NoHost;
 
 impl Host for NoHost {}
 
-/// A powerful-feature stand-in: secure context required.
 struct Powerful;
 
 impl Capability for Powerful {
@@ -30,7 +29,6 @@ fn kiri() -> Kiri {
     Kiri::new("misty-browser-", NoHost).with(Powerful)
 }
 
-/// Every capability here resolves without suspending.
 fn run<F: Future>(future: F) -> F::Output {
     match pin!(future).poll(&mut Context::from_waker(Waker::noop())) {
         Poll::Ready(value) => value,
@@ -94,6 +92,5 @@ fn page_script_installs_the_transport() {
     let script = page_script();
     assert!(!script.contains("__KIRI_CAPABILITIES__"));
     assert!(script.contains("plugin:kiri|call"));
-    // The transport never navigates to report; navigations can cancel page loads.
     assert!(!script.contains("location.href"));
 }

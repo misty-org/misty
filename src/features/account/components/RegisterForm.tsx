@@ -2,19 +2,17 @@ import { Text } from "@misty/ui";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../AuthContext";
-import { ConfirmEmailSent } from "../sessions/confirmEmailSent";
+import { ConfirmEmailSent } from "../sessions/confirm_email_sent";
 import {
   accountRegister,
   accountSignIn,
   accountWaitForConfirmation,
-} from "../sessions/useAccountStore";
+} from "../sessions/use_account_store";
 import AuthField from "./AuthField";
 import AuthMessage from "./AuthMessage";
 import AuthSubmitButton from "./AuthSubmitButton";
 import GoogleSignInButton from "./GoogleSignInButton";
 
-/** Username, email and password, or Google: the Create account page and the sign-in sheet
- * share it. */
 export default function RegisterForm(props: { onSuccess: () => void }) {
   const { authenticateAccount } = useAuth();
   const [username, setUsername] = useState("");
@@ -25,8 +23,6 @@ export default function RegisterForm(props: { onSuccess: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [waitEnded, setWaitEnded] = useState(false);
 
-  // The password stays here while the link is opened, wherever that happens, so the app signs
-  // itself in as soon as the account exists.
   useEffect(() => {
     if (!confirming) return;
     const waiting = new AbortController();

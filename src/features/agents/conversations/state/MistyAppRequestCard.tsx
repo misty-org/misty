@@ -1,9 +1,8 @@
 import { AppRequestCard } from "../../connected-apps/AppRequestCard";
 import { type AppRequest } from "../../connected-apps/api";
-import { continueAfterAppRequest } from "./appRequests";
-import { useMistyStore } from "./useMistyStore";
+import { continueAfterAppRequest } from "./app_requests";
+import { useMistyStore } from "./use_misty_store";
 
-/** An app card in a Misty conversation that continues it once answered. */
 export function MistyAppRequestCard({
   messageId,
   request,

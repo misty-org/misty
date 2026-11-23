@@ -1,10 +1,3 @@
-//! Screen context for a Misty ask on Windows: the window the person was
-//! using when they brought Misty up.
-//!
-//! A foreground hook remembers the last window that wasn't Misty's. When
-//! Misty comes to the front, that window becomes the source, as on macOS;
-//! focusing Misty's own workspace clears it. A capture takes the source, or
-//! else the most recent window that wasn't Misty's.
 use std::{
     sync::atomic::{AtomicIsize, Ordering},
     thread,
@@ -22,11 +15,8 @@ use windows_sys::Win32::{
     },
 };
 
-/// The window Misty was brought up over, if any.
 static SOURCE: AtomicIsize = AtomicIsize::new(0);
-/// The last window in front that wasn't Misty's.
 static LAST_OTHER: AtomicIsize = AtomicIsize::new(0);
-/// The longest edge of a capture, as on macOS.
 const MAX_EDGE: u32 = 1600;
 
 fn is_misty(window: HWND) -> bool {
@@ -36,7 +26,6 @@ fn is_misty(window: HWND) -> bool {
     pid == std::process::id()
 }
 
-/// Whether the handle still names a visible, unminimized window.
 fn usable(window: isize) -> bool {
     let window = window as HWND;
     // SAFETY: plain queries; a stale handle answers false.
@@ -66,7 +55,6 @@ unsafe extern "system" fn foreground_changed(
     }
 }
 
-/// Starts remembering which window was in front; for the life of the app.
 pub fn start_foreground_watch() {
     let _ = thread::Builder::new()
         .name("misty-foreground-watch".into())
@@ -95,7 +83,6 @@ pub fn start_foreground_watch() {
         });
 }
 
-/// Misty's own workspace has focus: no other window is the source now.
 pub fn workspace_focused() {
     SOURCE.store(0, Ordering::Release);
 }
@@ -103,14 +90,12 @@ pub fn workspace_focused() {
 pub fn status() -> serde_json::Value {
     serde_json::json!({
         "supported": true,
-        // Windows asks no permission to capture another app's window.
         "allowed": true,
         "shortcutRegistered": false,
         "external": usable(SOURCE.load(Ordering::Acquire)),
     })
 }
 
-/// Captures the source window as a JPEG data URL, with its title and app.
 pub fn capture() -> serde_json::Value {
     match capture_window() {
         Ok(value) => value,
@@ -131,7 +116,6 @@ fn capture_window() -> Result<serde_json::Value, String> {
         Some(target) => windows
             .into_iter()
             .find(|window| window.id().is_ok_and(|id| id as isize == target)),
-        // Front to back: the first window that isn't Misty's.
         None => windows.into_iter().find(|window| {
             window.pid().is_ok_and(|pid| pid != own)
                 && !window.is_minimized().unwrap_or(true)

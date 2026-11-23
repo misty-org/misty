@@ -1,6 +1,3 @@
-//! The page reader on Windows: the same worker in an AppContainer with no network, as documents are
-//! (`worker_windows.rs`). The helper is written out for each read, because `Workspace` owns that; how
-//! long that takes hasn't been measured on Windows.
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -22,7 +19,6 @@ impl Drop for CancelOnDrop {
     }
 }
 
-/// The worker's whole output for this input. There's no permissive fallback: any failure is the error.
 pub(super) async fn run(input: Vec<u8>) -> Result<Vec<u8>, String> {
     let stop = Arc::new(AtomicBool::new(false));
     let _cancel = CancelOnDrop(stop.clone());
@@ -34,7 +30,6 @@ pub(super) async fn run(input: Vec<u8>) -> Result<Vec<u8>, String> {
             cpu: Duration::from_secs(super::TIME_LIMIT_SECONDS),
             wall: Duration::from_secs(super::TIME_LIMIT_SECONDS),
             output_bytes: MAX_ANSWER_BYTES as u64,
-            // Room for the helper's own copy and the input, which it doesn't write anywhere.
             work_bytes: 64 * 1024 * 1024 + MAX_INPUT_BYTES as u64,
             processes: 1,
         };

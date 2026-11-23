@@ -24,7 +24,6 @@ export async function spaceMembers(
 const sanitized = (members: Member[]) =>
   members.map(({ user_id, name, role }) => ({ user_id, name, role }));
 
-/** Lowercase, plain quotes and dashes, single spaces: names written two ways still match. */
 function normalizeName(value: string): string {
   return value
     .trim()
@@ -37,7 +36,6 @@ function normalizeName(value: string): string {
     .join(" ");
 }
 
-/** Whether a phrase appears in a text as whole words. */
 export function containsPhrase(value: string, phrase: string): boolean {
   const words = (input: string) =>
     normalizeName(input)

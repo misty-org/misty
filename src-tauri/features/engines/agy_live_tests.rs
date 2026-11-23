@@ -1,10 +1,4 @@
-//! Misty's ACP turn path against the installed, signed-in Antigravity CLI, run by hand (ignored):
-//! a text turn, a resumed turn whose file write asks Misty's gate, `/goal`, `/grill-me`
-//! answered through its question card, and `/teamwork`, whose sub-agent's steps nest under its
-//! call. Spends five tiny prompts on the cheapest Gemini model:
-//! `cargo test --lib agy_acp_live -- --ignored --nocapture --test-threads 1`
-//! (`AGY_BIN` names another binary; the default is the one Misty installs).
-#![allow(clippy::disallowed_methods)] // Fixtures are built with the standard library.
+#![allow(clippy::disallowed_methods)]
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
@@ -44,8 +38,6 @@ impl Collected {
     }
 }
 
-/// The person's real home, where the CLI keeps its sign-in (the test binary points HOME at a
-/// scratch folder).
 fn real_home() -> String {
     // SAFETY: getpwuid returns the calling user's static record, read before anything else.
     unsafe {
@@ -132,8 +124,6 @@ fn start(
 }
 
 impl LiveTurn {
-    /// Answers the first question card that parks with its first option, through the same frame
-    /// `answer_question` writes.
     async fn answer_first_question(&self) -> Option<Value> {
         for _ in 0..1800 {
             let parked = self.registry.get(&self.run_id).and_then(|entry| {
@@ -207,7 +197,6 @@ fn assert_done(kinds: &[(String, Value)]) {
 async fn agy_acp_live_turns() {
     let dir = tempfile::tempdir().unwrap();
     let folder = dir.path().canonicalize().unwrap();
-    // Misty's gate answers each permission ask: here it allows it and remembers it.
     let asked: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
     {
         let asked = Arc::clone(&asked);
@@ -218,13 +207,10 @@ async fn agy_acp_live_turns() {
         });
     }
 
-    // Sub-agents are read from the CLI's own home (`agy_home`), which this process's scratch HOME
-    // would hide. Only this ignored test runs in its process (`--test-threads 1`).
     std::env::set_var(
         "ANTIGRAVITY_HOME",
         format!("{}/.gemini/antigravity-cli", real_home()),
     );
-    // `AGY_LIVE_STEPS=34` runs only those steps; 2 resumes 1's conversation when 1 runs.
     let steps = std::env::var("AGY_LIVE_STEPS").unwrap_or_else(|_| "12345".into());
     let session = if steps.contains('1') {
         Some(text(&folder).await)
@@ -280,7 +266,6 @@ async fn write_that_asks(
         .finish()
         .await;
     assert_done(&kinds);
-    // The resumed id is the run's own from the start, so only a changed one would be reported.
     assert!(
         of_kind(&kinds, "session")
             .iter()
@@ -330,7 +315,6 @@ async fn teamwork(folder: &std::path::Path) {
         .unwrap_or_else(|| panic!("an invoke_subagent row: {kinds:?}"));
     let row = call["toolCallId"].as_str().expect("the row's id");
     assert!(call["args"]["prompt"].is_string(), "{call}");
-    // Its sub-agent's steps come inside a scope naming that row.
     let at = kinds
         .iter()
         .position(|(kind, data)| kind == "scope" && data["parent"] == row)

@@ -1,15 +1,14 @@
 import * as SettingsPageModule from "./SettingsPage";
 export * from "./components/DesktopSettingsUI";
-export * from "./hooks/useDocumentAppAppearance";
-export type { SettingsSection } from "./settingsTypes";
+export * from "./hooks/use_document_app_appearance";
+export type { SettingsSection } from "./settings_types";
 export type { DesktopSettingsNavGroup } from "./components/SettingsNavigation";
-export * from "./preferences/appTheme";
+export * from "./preferences/app_theme";
 export { settingsBoolean, settingsNumber, settingsString } from "./preferences/preferences";
-export { onSettingsApplied } from "./preferences/settingsSideEffects";
+export { onSettingsApplied } from "./preferences/settings_side_effects";
 export { PreferenceRow } from "./sections/PreferenceRow";
-export * from "./preferences/useAppThemeStore";
-export * from "./preferences/useSettingsStore";
-/** Resolves the already loaded Settings page for callers that warm it on hover. */
+export * from "./preferences/use_app_theme_store";
+export * from "./preferences/use_settings_store";
 export function preloadSettingsWorkspace(): Promise<typeof SettingsPageModule> {
   return Promise.resolve(SettingsPageModule);
 }
@@ -21,15 +20,14 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   return <SettingsPageModule.SettingsWorkspace {...props} />;
 }
 export { blockIfUnsaved, useDevicePreferences } from "./device-preferences/store";
-export { resolveSetting } from "./device-preferences/settingResolution";
+export { resolveSetting } from "./device-preferences/setting_resolution";
 export {
   openSettings,
   openSettingsEvent,
   useSettingsOpen,
   type OpenSettingsDetail,
-} from "./openSettings";
+} from "./open_settings";
 
-// Public surface used by other features.
 export {
   DesktopSettingsNotice,
   DesktopSettingsRow,
@@ -37,11 +35,11 @@ export {
 } from "./components/DesktopSettingsUI";
 export { mutateState } from "./device-preferences/persistence";
 export { definitionById, fromLegacy } from "./device-preferences/registry";
-export { validClockTime } from "./preferences/nightLight";
-export { applyCachedAppTheme } from "./preferences/appTheme";
-export { useSettingsStore } from "./preferences/useSettingsStore";
+export { validClockTime } from "./preferences/night_light";
+export { applyCachedAppTheme } from "./preferences/app_theme";
+export { useSettingsStore } from "./preferences/use_settings_store";
 export { GeneralSection } from "./sections/GeneralSection";
 export { NotificationsSection } from "./sections/NotificationsSection";
-export { registerSettingsSections } from "./settingsRegistry";
-export type { SettingsContentProps } from "./settingsTypes";
+export { registerSettingsSections } from "./SettingsRegistry";
+export type { SettingsContentProps } from "./settings_types";
 export { searchSettings } from "./components/SettingsSearchResults";

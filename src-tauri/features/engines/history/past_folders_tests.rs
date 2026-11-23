@@ -1,4 +1,4 @@
-#![allow(clippy::disallowed_methods, clippy::disallowed_types)] // Fixtures are built with the standard library.
+#![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use super::*;
 use crate::engines::history::past_folders_stores::{
@@ -26,7 +26,6 @@ fn folders(found: Found) -> Vec<String> {
 fn json_paths_take_real_keys_only() {
     let text = r#"{"note":"say \"cwd\":\"/fake\"","cwd": "/Users/me/app","x":{"cwd":"rel"}}"#;
     assert_eq!(json_paths(text, "cwd"), vec!["/Users/me/app".to_string()]);
-    // A value the read cut off is no value.
     assert_eq!(json_path(r#"{"cwd":"/Users/me/ap"#, "cwd"), None);
     assert_eq!(
         json_path(r#"{"cwd":"/Users/me/café"}"#, "cwd").as_deref(),
@@ -50,7 +49,6 @@ fn claude_folders_come_from_cwd_matching_the_project_name() {
     let projects = scratch("claude");
     let cwd = "/Users/me/code/my.app";
     let dir = projects.join(crate::engines::history::claude_encode_project_path(cwd));
-    // The `cwd` comes after a long message, and an unrelated `cwd` inside a tool input comes first.
     let big = "x".repeat(20_000);
     write(
         &dir.join("s1.jsonl"),
@@ -59,12 +57,10 @@ fn claude_folders_come_from_cwd_matching_the_project_name() {
              {{\"type\":\"user\",\"message\":{{\"content\":\"{big}\",\"input\":{{\"cwd\":\"/elsewhere\"}}}},\"cwd\":\"{cwd}\"}}\n"
         ),
     );
-    // A project folder whose chats name some other folder isn't trusted.
     write(
         &projects.join("-Users-me-other").join("s2.jsonl"),
         "{\"cwd\":\"/Users/me/not-other\"}\n",
     );
-    // Neither is a folder holding only the prompt history.
     write(
         &projects.join("-Users-me-history").join("history.jsonl"),
         "{\"cwd\":\"/Users/me/history\"}\n",
@@ -226,7 +222,6 @@ fn registered_folders_become_scan_workspaces_once() {
         Some(7),
         "a linked folder's own row is left as it was"
     );
-    // A folder that has dropped out of the newest ones stops being scanned; a linked one stays.
     register_into(&db, &["/Users/me/newer".to_string()]).unwrap();
     let mut paths = db.workspace_paths().unwrap();
     paths.sort();

@@ -1,6 +1,6 @@
 import { Download, ExternalLink, Power, Trash2 } from "lucide-react";
-import { useCachedResource } from "@/api/cache/cached-resource";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { useCachedResource } from "@/api/cache/cached_resource";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
   CatalogDone,
@@ -34,12 +34,6 @@ const kinds: { key: keyof Omit<PluginContents, "known" | "version">; title: stri
 
 const compact = new Intl.NumberFormat(undefined, { notation: "compact" });
 
-/**
- * One plugin up close, as a store page: its maker's logo, name and the one thing to do with it
- * (Install, or for an installed one, turn it on or off and Remove), its facts, what it does and
- * what it adds to the engine (its skills, commands, agents, hooks and MCP servers, read from its
- * folder), and where it comes from.
- */
 export function PluginStoreDetail({
   engine,
   engineName,
@@ -52,16 +46,13 @@ export function PluginStoreDetail({
 }: {
   engine: MarketEngine;
   engineName: string;
-  /** The plugin shown; null closes it. */
   item: MarketItem | null;
-  /** The plugin being installed or changed, if any. */
   busy: string | null;
   onClose(): void;
   onInstall(item: MarketItem): void;
   onRemove(item: MarketItem): void;
   onEnabledChange(item: MarketItem, enabled: boolean): void;
 }) {
-  // Read once per plugin and kept for the session: a plugin's folder changes only when it updates.
   const contents = useCachedResource(
     item ? `engines/market-details:${engine}:${item.id}:${item.installed}` : null,
     () => marketApi.details(engine, item?.id ?? ""),
@@ -89,7 +80,9 @@ export function PluginStoreDetail({
       onOpenChange={(open) => !open && onClose()}
       logo={<MakerTile maker={maker} name={item.name} />}
       title={item.name}
-      line={item.installed && !item.enabled ? "Installed but turned off" : (maker.name ?? undefined)}
+      line={
+        item.installed && !item.enabled ? "Installed but turned off" : (maker.name ?? undefined)
+      }
       action={
         item.installed ? (
           canTurnOff(engine) && !item.enabled ? (
@@ -121,7 +114,11 @@ export function PluginStoreDetail({
         item.installed || link ? (
           <>
             {link ? (
-              <MenuItem icon={ExternalLink} label="Open its page" onSelect={() => openExternalLink(link)} />
+              <MenuItem
+                icon={ExternalLink}
+                label="Open its page"
+                onSelect={() => openExternalLink(link)}
+              />
             ) : null}
             {item.installed && canTurnOff(engine) && item.enabled ? (
               <MenuItem

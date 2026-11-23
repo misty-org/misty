@@ -1,24 +1,19 @@
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { useEffect, useState } from "react";
-import { useAgentAccountId } from "../../personal/agentAccount";
-import { endAllHostedSessions } from "../hosted-sessions/hostedSessions";
+import { useAgentAccountId } from "../../personal/agent_account";
+import { endAllHostedSessions } from "../hosted-sessions/hosted_sessions";
 import { startLocalToolHost } from "../../tools/host";
 import { startLocalRunWork } from "../../tools";
-import { watchLocalExecutionForKeepAwake } from "./keepAwake";
-import { useLocalExecution } from "../local-execution/localExecution";
+import { watchLocalExecutionForKeepAwake } from "./keep_awake";
+import { useLocalExecution } from "../local-execution/local_execution";
 import { isHostWindow, onHostWindow } from "@/features/app-windows";
-import { useAgentTrashReminder } from "../../settings/agentTrashReminder";
+import { useAgentTrashReminder } from "../../settings/agent_trash_reminder";
 
-/** Whether this window runs the device's agent jobs: the oldest open window does, and the
- * next one takes over when it closes. */
 function useHostWindow() {
   const [host, setHost] = useState(false);
   useEffect(() => {
     let active = true;
     void isHostWindow().then((value) => active && setHost(value));
-    // The hand-off event reaches every window, so each asks whether it is the host now; taking
-    // it on the event alone started a worker in every window, agent windows too, and a job one
-    // of them claimed was lost when that window closed.
     const stop = onHostWindow(() => void isHostWindow().then((value) => active && setHost(value)));
     return () => {
       active = false;
@@ -28,7 +23,6 @@ function useHostWindow() {
   return host;
 }
 
-/** The work this computer owes its agents, in the one window that hosts it. An account isn't needed. */
 export function AgentJobWorker() {
   const accountId = useAgentAccountId();
   const host = useHostWindow();
@@ -36,7 +30,6 @@ export function AgentJobWorker() {
   useEffect(() => {
     if (!hasTauriInternals() || !host) return;
     const stopRunWork = startLocalRunWork();
-    // This computer stays awake while its own agent task runs.
     const unwatch = watchLocalExecutionForKeepAwake((listener) => {
       const running = (state: ReturnType<typeof useLocalExecution.getState>) =>
         state.execution?.state === "running" || state.execution?.state === "waiting";
@@ -46,18 +39,13 @@ export function AgentJobWorker() {
     return () => {
       stopRunWork();
       unwatch();
-      // The agent's own sessions end with this account here.
       void endAllHostedSessions();
     };
   }, [host, accountId]);
-  // Once per page, whatever the account does: restarting this would abandon the calls it's running,
-  // and the account reads as signed out for a moment on every load.
   useEffect(() => {
     if (!hasTauriInternals() || !host) return;
     return startLocalToolHost();
   }, [host]);
-  // Agent trash never empties itself: after 30 days, one notice a day suggests looking it over.
   useAgentTrashReminder(host);
-  // Sessions it hosts show in the control island.
   return null;
 }

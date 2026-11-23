@@ -1,8 +1,6 @@
-//! One ledger row.
 use crate::js_json::JsValue;
 use crate::model_calls::RawJson;
 
-/// What `ledgerInputSchema` becomes for a model, from `zodSchema` in the AI SDK.
 const INPUT_SCHEMA: &str = r##"{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"rows":{"minItems":1,"maxItems":40,"type":"array","items":{"type":"object","properties":{"id":{"type":"string","minLength":1,"maxLength":40},"requirement":{"type":"string","minLength":1,"maxLength":500},"state":{"type":"string","enum":["pending","done","failed","blocked","skipped"]},"evidence":{"type":"object","properties":{"kind":{"type":"string","enum":["tab","note","file","receipt"]},"ref":{"type":"string","minLength":1,"maxLength":500},"summary":{"default":"","type":"string","maxLength":500}},"required":["kind","ref"],"additionalProperties":false},"reason":{"type":"string","maxLength":500},"needs":{"type":"string","enum":["none","input","takeover"]},"hint":{"type":"string","maxLength":500}},"required":["requirement","state"],"additionalProperties":false}}},"required":["rows"],"additionalProperties":false}"##;
 
 pub(crate) fn ledger_input_schema() -> RawJson {
@@ -74,12 +72,10 @@ impl EvidenceKind {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LedgerEvidence {
     pub(crate) kind: EvidenceKind,
-    /// The address, note title, file path or receipt id that shows up in this run's tool calls.
     pub(crate) reference: String,
     pub(crate) summary: String,
 }
 
-/// What a person has to do before a row can go on: give a detail, or take over the browser.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Needs {
     None,
@@ -106,29 +102,26 @@ impl Needs {
     }
 }
 
-/// A row as the model sends it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SentRow {
-    /// Stable across updates; a new requirement may leave it out.
     pub(crate) id: Option<String>,
     pub(crate) requirement: String,
     pub(crate) state: RowState,
     pub(crate) evidence: Option<LedgerEvidence>,
     pub(crate) reason: Option<String>,
     pub(crate) needs: Option<Needs>,
-    /// What the person said about it on a resume (a link to use, a birthday).
     pub(crate) hint: Option<String>,
 }
 
 impl SentRow {
-    /// Whether this row updates `known`: by id when it has one, or by its requirement.
     pub(crate) fn matches(&self, known: &LedgerRow) -> bool {
-        self.id.as_deref().is_some_and(|id| !id.is_empty() && known.id == id) || known.requirement == self.requirement
+        self.id
+            .as_deref()
+            .is_some_and(|id| !id.is_empty() && known.id == id)
+            || known.requirement == self.requirement
     }
 }
 
-/// A row's fields. The run's final text carries its rows as JSON in the order each object gained
-/// them in JavaScript, and a resumed run's prompt holds that text, so the order is kept.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum RowField {
     Id,
@@ -149,13 +142,11 @@ pub(crate) struct LedgerRow {
     pub(crate) reason: Option<String>,
     pub(crate) needs: Option<Needs>,
     pub(crate) hint: Option<String>,
-    /// Carried over from an earlier attempt, so its evidence isn't checked against this run.
     pub(crate) carried: bool,
     pub(crate) order: Vec<RowField>,
 }
 
 impl LedgerRow {
-    /// `{ ...sent, id: sent.id ?? id }`.
     pub(crate) fn from_sent(sent: SentRow, id: String) -> Self {
         let mut order = Vec::new();
         if sent.id.is_some() {
@@ -178,10 +169,7 @@ impl LedgerRow {
         }
     }
 
-    /// `Object.assign(row, sent, { id: row.id, hint: sent.hint ?? row.hint })`, which leaves a field
-    /// the model didn't send as it was.
     pub(crate) fn apply(&mut self, sent: SentRow) {
-        // A carried row the run reopens is no longer carried: its new result needs its own evidence.
         let reopened = self.carried && sent.state != RowState::Done;
         let had_evidence = sent.evidence.is_some();
         for field in present_fields(&sent) {
@@ -218,7 +206,6 @@ impl LedgerRow {
         }
     }
 
-    /// The row as the app and a resume read it, without `carried`.
     pub(crate) fn to_js(&self) -> JsValue {
         let text = |value: &str| JsValue::String(value.to_owned());
         let fields = self
@@ -236,7 +223,10 @@ impl LedgerRow {
                     ];
                     ("evidence", JsValue::Object(fields))
                 }),
-                RowField::Reason => self.reason.as_deref().map(|reason| ("reason", text(reason))),
+                RowField::Reason => self
+                    .reason
+                    .as_deref()
+                    .map(|reason| ("reason", text(reason))),
                 RowField::Needs => self.needs.map(|needs| ("needs", text(needs.label()))),
                 RowField::Hint => self.hint.as_deref().map(|hint| ("hint", text(hint))),
             })
@@ -246,7 +236,6 @@ impl LedgerRow {
     }
 }
 
-/// The sent fields in the schema's order, which is how zod returns them, leaving out `id`.
 fn present_fields(sent: &SentRow) -> Vec<RowField> {
     let mut fields = vec![RowField::Requirement, RowField::State];
     if sent.evidence.is_some() {

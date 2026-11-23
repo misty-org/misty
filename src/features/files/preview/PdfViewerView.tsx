@@ -1,4 +1,4 @@
-import type { PreviewErrorComponent } from "./previewTypes";
+import type { PreviewErrorComponent } from "./preview_types";
 import { IconButton, SetupState, Surface, Text } from "@misty/ui";
 import { Minus, Plus } from "lucide-react";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -8,9 +8,6 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { uiPx } from "@misty/ui";
 
-// Bundle the pdf.js worker as a same-origin asset so it loads under the app's
-// strict CSP (no external script hosts). Its version is pinned to react-pdf's
-// pdfjs-dist so the worker and API versions always match.
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const MAX_PAGE_WIDTH = 900;
@@ -27,7 +24,6 @@ export default function PdfViewerView({
   Error: PreviewErrorComponent;
   url: string;
   name: string;
-  /** Toolbar-less, first-page-only rendering for small embedded previews. */
   compact?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -49,7 +45,6 @@ export default function PdfViewerView({
     return () => observer.disconnect();
   }, [compact]);
 
-  // Keep the page indicator in sync with whatever page is most in view.
   useEffect(() => {
     if (compact) return;
     const root = scrollRef.current;
@@ -93,11 +88,11 @@ export default function PdfViewerView({
           tone="page"
           className="flex h-12 flex-none items-center justify-between gap-3 border-b px-3"
         >
-          <Text full tone="default" className="text-sm font-medium">
+          <Text full size="control" weight="medium" tone="default">
             {name}
           </Text>
           <div className="flex flex-none items-center gap-3">
-            <Text bare tone="muted" className="text-xs tabular-nums">
+            <Text bare size="meta" tone="muted" className="tabular-nums">
               {numPages ? `Page ${currentPage} of ${numPages}` : "—"}
             </Text>
             <div className="flex items-center gap-0.5">
@@ -108,7 +103,7 @@ export default function PdfViewerView({
               >
                 <Minus />
               </IconButton>
-              <Text bare tone="muted" className="w-12 text-center text-xs tabular-nums">
+              <Text bare size="meta" tone="muted" className="w-12 text-center tabular-nums">
                 {Math.round(zoom * 100)}%
               </Text>
               <IconButton

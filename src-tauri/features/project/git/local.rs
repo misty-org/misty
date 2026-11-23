@@ -19,7 +19,6 @@ pub async fn project_git_status(
     blocking(move || repo::git_status_blocking(&folder)).await
 }
 
-/// One file's changes as a unified diff. On the unstaged side a new file shows as all added.
 #[tauri::command]
 pub async fn project_git_diff(
     app: tauri::AppHandle,
@@ -48,7 +47,6 @@ pub async fn project_git_diff_images(
     blocking(move || repo::git_diff_images_blocking(&folder, &file, staged)).await
 }
 
-/// Stages files: a file still in the folder is added, one that's gone is removed.
 #[tauri::command]
 pub async fn project_git_stage(
     app: tauri::AppHandle,
@@ -62,7 +60,6 @@ pub async fn project_git_stage(
     blocking(move || repo::git_stage_blocking(&top, &files)).await
 }
 
-/// Takes files back out of the next commit, leaving the folder as it is.
 #[tauri::command]
 pub async fn project_git_unstage(
     app: tauri::AppHandle,
@@ -76,7 +73,6 @@ pub async fn project_git_unstage(
     blocking(move || repo::git_unstage_blocking(&top, &files)).await
 }
 
-/// Throws away files' unstaged changes; an untracked file is deleted.
 #[tauri::command]
 pub async fn project_git_discard(
     app: tauri::AppHandle,
@@ -101,7 +97,6 @@ pub async fn project_git_branches(
     blocking(move || repo::git_branches_blocking(&folder)).await
 }
 
-/// Switches branch. A remote-tracking branch becomes a local branch that tracks it.
 #[tauri::command]
 pub async fn project_git_checkout(
     app: tauri::AppHandle,
@@ -115,7 +110,6 @@ pub async fn project_git_checkout(
     blocking(move || repo::git_checkout_blocking(&top, &branch)).await
 }
 
-/// Makes a branch at the current commit and switches to it.
 #[tauri::command]
 pub async fn project_git_create_branch(
     app: tauri::AppHandle,
@@ -129,7 +123,6 @@ pub async fn project_git_create_branch(
     blocking(move || repo::git_create_branch_blocking(&top, &name)).await
 }
 
-/// `git init` in a linked folder that isn't in a repository yet.
 #[tauri::command]
 pub async fn project_git_init(
     app: tauri::AppHandle,
@@ -141,8 +134,6 @@ pub async fn project_git_init(
     blocking(move || repo::init_repository(&folder)).await
 }
 
-/// Git colors and repository badges for the file tree's loaded levels, one status scan per
-/// repository for the whole batch. Every level must lie in a linked folder.
 #[tauri::command]
 pub async fn project_git_tree_status(
     app: tauri::AppHandle,
@@ -153,7 +144,6 @@ pub async fn project_git_tree_status(
     person_window(&webview)?;
     for level in &levels {
         linked_path(&app, &account, &level.path).await?;
-        // Each name is one entry of the listed folder, never a path.
         let named = level.files.iter().chain(&level.directories).all(|name| {
             !name.is_empty() && name != ".." && !name.contains('/') && !name.contains('\\')
         });
@@ -170,7 +160,6 @@ pub async fn project_git_tree_status(
     .await
 }
 
-/// The GitHub account behind a linked folder's `origin`, for its avatar in the folder lists.
 #[derive(Debug, serde::Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderOwner {
@@ -178,9 +167,6 @@ pub struct FolderOwner {
     pub login: String,
 }
 
-/// The owner login of each folder's `origin`, when it is on github.com. A folder that isn't
-/// linked, isn't a repository, or has no GitHub `origin` is left out, so its row keeps the
-/// folder icon rather than a guessed avatar.
 #[tauri::command]
 pub async fn project_git_owners(
     app: tauri::AppHandle,

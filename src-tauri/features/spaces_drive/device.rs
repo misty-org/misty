@@ -1,22 +1,10 @@
-//! This computer as the drive names it, and the drive's device settings, all in `settings_state`
-//! in `misty.db`, which never syncs:
-//!
-//! - `drive:device`: a random `dev_<uuid>`, made once, that every drive request carries as
-//!   `X-Misty-Device`.
-//! - `drive:cache-limit`: how many bytes the content cache may hold: a number, `null` for no
-//!   limit, or 10 GiB while unset. Only `drive_set_cache_limit` writes it.
-//!
-//! Windows can't write `drive:` scopes (`settings::profile_store::is_protected_scope`).
 use rusqlite::{params, OptionalExtension};
 
 const DEVICE_SCOPE: &str = "drive:device";
 const CACHE_LIMIT_SCOPE: &str = "drive:cache-limit";
 const DEFAULT_CACHE_LIMIT: u64 = 10 * 1024 * 1024 * 1024;
-/// The least a cache limit may be, so a cache can still hold what's open.
 pub(crate) const MIN_CACHE_LIMIT: u64 = 64 * 1024 * 1024;
-/// The drive's word for no limit.
 pub(crate) const NO_CACHE_LIMIT: u64 = u64::MAX;
-/// The server takes a device name of at most 64 characters.
 const MAX_NAME: usize = 64;
 
 fn read(store: &database::store::Store, scope: &str) -> Option<serde_json::Value> {
@@ -38,8 +26,11 @@ fn is_device_id(text: &str) -> bool {
         .is_some_and(|(rest, id)| rest == id.hyphenated().to_string())
 }
 
-/// This computer's drive id, made and kept the first time it is asked for.
-fn write(store: &database::store::Store, scope: &str, value: &serde_json::Value) -> Result<(), String> {
+fn write(
+    store: &database::store::Store,
+    scope: &str,
+    value: &serde_json::Value,
+) -> Result<(), String> {
     let connection = store
         .connect()
         .map_err(|_| "Misty couldn't read its settings.".to_string())?;
@@ -65,7 +56,6 @@ pub(crate) fn device_id(store: &database::store::Store) -> Result<String, String
     Ok(id)
 }
 
-/// The content cache's limit: the one set, `NO_CACHE_LIMIT` when set to none, else 10 GiB.
 pub(crate) fn cache_limit(store: &database::store::Store) -> u64 {
     match read(store, CACHE_LIMIT_SCOPE) {
         Some(serde_json::Value::Null) => NO_CACHE_LIMIT,
@@ -77,7 +67,6 @@ pub(crate) fn cache_limit(store: &database::store::Store) -> u64 {
     }
 }
 
-/// Keeps the content cache's limit (`None`: no limit) and answers the limit the drive takes.
 pub(crate) fn set_cache_limit(
     store: &database::store::Store,
     bytes: Option<u64>,
@@ -90,7 +79,6 @@ pub(crate) fn set_cache_limit(
     Ok(bytes.unwrap_or(NO_CACHE_LIMIT))
 }
 
-/// The computer's own name, such as "Ben's MacBook", as the person named it in the system.
 pub(crate) fn computer_name() -> String {
     let named = system_name().unwrap_or_default();
     let clean: String = named
@@ -139,6 +127,9 @@ fn host_name() -> Option<String> {
     if result != 0 {
         return None;
     }
-    let end = buffer.iter().position(|byte| *byte == 0).unwrap_or(buffer.len());
+    let end = buffer
+        .iter()
+        .position(|byte| *byte == 0)
+        .unwrap_or(buffer.len());
     Some(String::from_utf8_lossy(&buffer[..end]).into_owned())
 }

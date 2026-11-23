@@ -1,20 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-/**
- * Explore › Connectors: each engine's own MCP servers, as store shelves.
- *
- * Every engine Misty can run has a chip, whether or not it has MCP. Its shelves keep the two
- * lists apart: what the CLI's files declare ("Added", with on/off only for sources whose writes
- * were verified) and what a live session really connected ("At runtime", per folder and session,
- * with when it was collected). Engines that carry MCP through plugins say so; engines without MCP
- * say so instead of showing an empty list as if nothing were configured. A runtime Misty can't
- * query says that in its shelf's heading rather than pretending there are no servers. Misty's own
- * server is listed by the session but never offered for editing.
- */
 import { Activity, Info, Plus, Power, PowerOff, FolderOpen, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { EngineMark } from "../EngineMark";
 import { folderName } from "../host";
 import {
   Button,
@@ -24,6 +12,7 @@ import {
   EmptyState,
   ErrorState,
   IconButton,
+  Mark,
   MenuItem,
   MenuSeparator,
   notify,
@@ -46,12 +35,12 @@ import { mcpApi } from "./api";
 import { EngineNotices, McpSourceHint } from "./McpNotices";
 import { ConnectorLogo, connectorLine, McpDetailDialog } from "./McpDetailDialog";
 import { McpProbeConfirmHost } from "./McpProbeConfirmHost";
-import { useMcpFolder } from "./useMcpFolder";
+import { useMcpFolder } from "./use_mcp_folder";
 import { copy, engineLabel, readonlyReasonText, runtimeStatusText } from "./copy";
-import { probeable, useAutoProbe, useMcpProbeStore } from "./probe-store";
+import { probeable, useAutoProbe, useMcpProbeStore } from "./probe_store";
 import { ProbeStatusChip } from "./ProbeControls";
 import type { McpConfigEntry, McpEngineId, McpRuntimeEntry, McpRuntimeSection } from "./types";
-import { useMcpInventory } from "./useMcpInventory";
+import { useMcpInventory } from "./use_mcp_inventory";
 
 const NO_FOLDER = "__none__";
 
@@ -86,7 +75,6 @@ function FolderChoice({
   );
 }
 
-/** A configured server's one action: on is done, off turns on, a read-only off just says so. */
 function ConfigAction({
   entry,
   pending,
@@ -116,7 +104,6 @@ function ConfigAction({
   );
 }
 
-/** A configured server's ⋯: details, on/off, a check and where its file is. */
 function ConfigMenu({
   entry,
   pending,
@@ -164,7 +151,6 @@ function ConfigMenu({
   );
 }
 
-/** One quiet line across a shelf, in place of items: why it has none, or where they came from. */
 function ShelfLine({ children }: { children: ReactNode }) {
   return (
     <li className="pt-2 lg:col-span-2">
@@ -175,7 +161,6 @@ function ShelfLine({ children }: { children: ReactNode }) {
   );
 }
 
-/** What a session said about its servers, in one line for the runtime shelf's heading. */
 function runtimeStatus(section: McpRuntimeSection): string {
   const ready = section.status === "ready" || section.status === "session_ended";
   if (!ready) return section.reason ?? runtimeStatusText[section.status];
@@ -191,7 +176,6 @@ function runtimeStatus(section: McpRuntimeSection): string {
   return when ? `${base.replace(/\.$/, "")}, read ${when}` : base;
 }
 
-/** A runtime server's one line: Misty's own, then its tools or its status. */
 function runtimeLine(entry: McpRuntimeEntry): string {
   if (entry.toolNames.length > 0) {
     const tools = copy.runtimeTools(entry.toolNames.length);
@@ -201,7 +185,6 @@ function runtimeLine(entry: McpRuntimeEntry): string {
   return entry.builtin ? `${status}, from ${copy.builtin}` : status;
 }
 
-/** A server a session reported, in detail: its counts and the names of its tools. */
 function RuntimeDetail({ entry, onClose }: { entry: McpRuntimeEntry; onClose: () => void }) {
   const facts: StoreFact[] = [
     { label: "Tools", value: String(entry.toolNames.length) },
@@ -234,12 +217,6 @@ function RuntimeDetail({ entry, onClose }: { entry: McpRuntimeEntry; onClose: ()
   );
 }
 
-/**
- * The Connectors section. `query` is the Explore rail's search text; the rail owns the field, so
- * the section draws none of its own. `lead` adds the picked engine's own apps above its servers
- * (Claude Code's claude.ai connectors), and `after` closes the page with what every engine shares
- * (the apps Misty connects directly).
- */
 export function McpSection({
   query = "",
   lead,
@@ -260,14 +237,11 @@ export function McpSection({
   const probingAll = useMcpProbeStore((state) => state.runningAll);
   const probeError = useMcpProbeStore((state) => state.error);
 
-  // Reloads replace the inventory; memoizing the engines keeps the `engine` lookup (and all that
-  // follows from it) stable between renders that don't change it.
   const engines = useMemo(() => store.inventory?.engines ?? [], [store.inventory]);
   const engine = useMemo(
     () => engines.find((item) => item.id === engineId) ?? engines[0] ?? null,
     [engines, engineId],
   );
-  // The details follow the list as read back, so after a switch they show what's really in the file.
   const selected = useMemo(
     () => engine?.config.entries.find((entry) => entry.id === selectedId) ?? null,
     [engine, selectedId],
@@ -276,7 +250,6 @@ export function McpSection({
     () => engine?.runtime.entries.find((entry) => entry.name === runtimeName) ?? null,
     [engine, runtimeName],
   );
-  // Check on open (fresh results are reused; a changed config fills in only what's missing).
   useAutoProbe(engine?.config.entries, workspace);
 
   useEffect(() => {
@@ -301,7 +274,6 @@ export function McpSection({
     void store.reload().finally(() => setRefreshing(false));
   };
 
-  // Only a failed first read replaces the shelves; a failed write or refresh keeps them.
   const loadError =
     !store.inventory && store.error
       ? typeof store.error === "string"
@@ -309,8 +281,6 @@ export function McpSection({
         : store.error.message
       : null;
 
-  // One bar, as Plugins has: what the page shows (the engine, the folder) at its start, the
-  // page's actions at its end, every one of them bare but the one create action.
   const controls = (
     <div className="flex min-w-0 items-center gap-2">
       {engines.length ? (
@@ -326,7 +296,7 @@ export function McpSection({
           options={engines.map((item) => ({
             value: item.id,
             label: engineLabel(item.id),
-            icon: <EngineMark engine={item.id} />,
+            icon: <Mark of={`engine:${item.id}`} size="1em" />,
           }))}
         />
       ) : null}

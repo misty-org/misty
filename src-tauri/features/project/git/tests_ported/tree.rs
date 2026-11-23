@@ -121,7 +121,6 @@ fn summary_counts_changes_and_untracked_once() {
     let nested = scratch.0.join("nested");
     let repo = Repository::init(&nested).unwrap();
     commit_file(&repo, "tracked.txt", "clean\n");
-    // Modified in the index and again in the folder: one file.
     std::fs::write(nested.join("tracked.txt"), "staged\n").unwrap();
     let mut index = repo.index().unwrap();
     index.add_path(Path::new("tracked.txt")).unwrap();
@@ -203,7 +202,6 @@ fn folders_inherit_the_dirty_state_of_their_children() {
             "edited".to_string(),
         ],
     );
-    // Only new files below: new. Anything changed below: changed.
     assert_eq!(colors.get("clean.txt"), None, "colors={colors:?}");
     assert_eq!(colors.get("sub"), Some(&"untracked"));
     assert_eq!(colors.get("mixed"), Some(&"modified"));
@@ -236,7 +234,6 @@ fn colors_work_for_a_subdirectory_listing_inside_a_repo() {
 
 #[test]
 fn nested_repo_folder_is_marked_as_a_repository() {
-    // A tree whose root isn't a repository, with a changed repository two levels down.
     let scratch = Scratch::new();
     let workspace = scratch.0.join("ws");
     let nested = workspace.join("Project").join("inner-repo");

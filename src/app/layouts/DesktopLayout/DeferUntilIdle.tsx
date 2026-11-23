@@ -1,9 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 
-/**
- * Mounts background helpers after the window has painted and the app is idle, so the shell and
- * the first page are never waiting on work nobody is looking at yet.
- */
 export function DeferUntilIdle(props: { children: ReactNode; timeout?: number }) {
   const [ready, setReady] = useState(false);
   const { timeout = 2000 } = props;

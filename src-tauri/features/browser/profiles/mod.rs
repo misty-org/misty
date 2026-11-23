@@ -1,7 +1,3 @@
-//! What each profile keeps, on this computer: one encrypted database per account, reached
-//! through a [`ProfileRecords`] handle. It works with no account, and it never leaves this
-//! computer. Also the account-change barrier, which keeps browser views and data from outliving
-//! the account they belong to.
 use file_access::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -25,7 +21,6 @@ pub use records::*;
 pub use tabs::*;
 
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 
@@ -41,7 +36,6 @@ fn hashed(value: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(value))
 }
 
-/// The account's folder.
 fn account_identity(scope: &str) -> String {
     hashed(scope)
 }
@@ -61,8 +55,6 @@ pub(crate) fn account_dir(scope: &str) -> Result<PathBuf, String> {
     Ok(directory)
 }
 
-/// Sets aside a database whose key is confirmed gone. It can never open again, but it stays on
-/// disk rather than being deleted.
 fn set_aside(path: &std::path::Path) -> Result<(), String> {
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -80,13 +72,12 @@ fn set_aside(path: &std::path::Path) -> Result<(), String> {
 }
 
 fn open_key(identity: &str, path: &std::path::Path) -> Result<LocalKey, String> {
-    // A read that failed is an error and retries later: only a key confirmed missing is replaced.
     match secure_store::local_records_key(identity)
         .map_err(|_| "This computer's key storage is unavailable.")?
     {
         Some(key) => Ok(key),
         None => {
-            if fs::exists(&path) {
+            if fs::exists(path) {
                 set_aside(path)?;
             }
             secure_store::create_local_records_key(identity)
@@ -95,7 +86,6 @@ fn open_key(identity: &str, path: &std::path::Path) -> Result<LocalKey, String> 
     }
 }
 
-/// The current account's database, opened on first use.
 pub(crate) fn local_store() -> Result<Arc<Mutex<LocalStore>>, String> {
     let scope = app_windows::current_scope();
     let mut open = OPEN.lock().map_err(|_| "Local storage is unavailable.")?;
@@ -117,7 +107,6 @@ pub(crate) fn local_store() -> Result<Arc<Mutex<LocalStore>>, String> {
     Ok(store)
 }
 
-/// Closes the account's database, before another account's takes its place.
 pub(crate) fn close_store() {
     if let Ok(mut open) = OPEN.lock() {
         *open = None;
@@ -127,9 +116,6 @@ pub(crate) fn close_store() {
 const LOCK_ATTEMPTS: u32 = 10;
 const LOCK_RETRY: std::time::Duration = std::time::Duration::from_millis(25);
 
-/// Holds a database for this process. A process being spawned holds a copy of every open file
-/// until it execs, which keeps a lock this app just released looking held for a moment; only a
-/// lock that stays busy is another Misty's.
 pub(crate) fn lock_database(path: &std::path::Path) -> Result<fs::File, String> {
     let mut options = fs::OpenOptions::new();
     options.read(true).write(true).create(true).truncate(false);
@@ -149,11 +135,8 @@ pub(crate) fn lock_database(path: &std::path::Path) -> Result<fs::File, String> 
     Ok(file)
 }
 
-/// A browser view's lease on its store: the account can't change, and the store can't be erased,
-/// until the view that asked has finished opening.
 pub struct PageStore {
     _lifecycle: RwLockReadGuard<'static, ()>,
-    /// `None` is this computer's original store.
     pub store: Option<String>,
 }
 
@@ -175,8 +158,6 @@ pub(crate) fn browser_lifecycle() -> &'static RwLock<()> {
     LIFECYCLE.get_or_init(|| RwLock::new(()))
 }
 
-/// Takes the lifecycle lease when it is free: engines ask for popups on their UI thread, which
-/// must never wait on an account change.
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub(crate) fn popup_lifecycle_lease() -> Option<RwLockReadGuard<'static, ()>> {
     browser_lifecycle().try_read().ok()

@@ -1,5 +1,3 @@
-//! The default sound devices, read straight from Core Audio.
-
 use std::ffi::c_void;
 
 #[repr(C)]
@@ -38,7 +36,11 @@ const OUTPUT: u32 = code(b"outp");
 const MAIN: u32 = 0;
 
 fn read<T: Default>(object: u32, selector: u32, scope: u32) -> Option<T> {
-    let address = Address { selector, scope, element: MAIN };
+    let address = Address {
+        selector,
+        scope,
+        element: MAIN,
+    };
     let mut value = T::default();
     let mut size = std::mem::size_of::<T>() as u32;
     // SAFETY: `value` is a plain value of `size` bytes, written by the call.
@@ -65,7 +67,11 @@ pub(super) fn output_muted() -> bool {
 }
 
 fn write<T>(object: u32, selector: u32, scope: u32, value: T) {
-    let address = Address { selector, scope, element: MAIN };
+    let address = Address {
+        selector,
+        scope,
+        element: MAIN,
+    };
     // SAFETY: `value` is a plain value of the size passed, read by the call.
     unsafe {
         AudioObjectSetPropertyData(
@@ -93,7 +99,6 @@ pub(super) fn output_private() -> bool {
     let Some(device) = read::<u32>(SYSTEM, code(b"dOut"), GLOBAL).filter(|id| *id != 0) else {
         return false;
     };
-    // Bluetooth (AirPods and the like), or the built-in jack with headphones in it.
     let transport = read::<u32>(device, code(b"tran"), GLOBAL).unwrap_or(0);
     let wireless = transport == code(b"blue") || transport == code(b"blea");
     let wired = read::<u32>(device, code(b"ssrc"), OUTPUT) == Some(code(b"hdpn"));

@@ -1,16 +1,10 @@
 import { useState } from "react";
 import { accountApi } from "../api/api";
-import { accountClosingMessage, useAccountClosing } from "@/api/client/accountLimits";
+import { accountClosingMessage, useAccountClosing } from "@/api/client/account_limits";
 import { useNotice } from "@misty/ui";
 import { AccountExportDialog } from "../export/AccountExportDialog";
-import { useAuth } from "../sessions/authState";
+import { useAuth } from "../sessions/auth_state";
 
-/**
- * The account is closing (`/me`'s `delete_at`, or 403 `account_closing`): it is read-only until
- * the date it is deleted. The notice says so calmly and offers the account export. Dismissing it
- * hides it for this window; it comes back the next time the app starts while the account is
- * still closing.
- */
 export function AccountClosingNotice() {
   const deleteAt = useAccountClosing((state) => state.deleteAt);
   const { user } = useAuth();
@@ -19,7 +13,6 @@ export function AccountClosingNotice() {
   const [google, setGoogle] = useState(false);
   const openExport = () => {
     setExporting(true);
-    // A Google account confirms with Google instead of a password.
     void accountApi
       .me()
       .then((me) => setGoogle(me.provider === "google"))

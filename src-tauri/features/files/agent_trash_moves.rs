@@ -1,12 +1,3 @@
-//! Moving an item into its holding folder and back. Every move is a rename on one drive, never a
-//! copy and a delete, so nothing an agent trashes is ever copied away or lost on the way.
-//!
-//! - On the drive Misty's data is on, the holding folder is `~/.misty/agent-trash/`, which the disk
-//!   gate never opens: items go in and out only through `file_access::disk`'s two Agent trash
-//!   renames.
-//! - On any other drive it is `.misty-agent-trash` at that drive's root, reached through the disk
-//!   gate alone. Which drive an item is on is told by its folder's device id (the drive letter on
-//!   Windows).
 use std::{
     io,
     path::{Path, PathBuf},
@@ -14,30 +5,23 @@ use std::{
 
 use file_access::disk::fs_disk;
 
-/// The holding folder at the root of a drive other than Misty's own.
 pub(super) const VOLUME_HOLDING: &str = ".misty-agent-trash";
-/// How long a holding name may be, under the 255 bytes every file system allows.
 const NAME_BYTES: usize = 200;
 
-/// `~/.misty/agent-trash`: where items wait on the drive Misty's data is on.
 pub(crate) fn misty_holding() -> Option<PathBuf> {
     file_access::disk::agent_trash_folder()
 }
 
-/// Whether a holding path is in Misty's own holding folder, directly.
 pub(super) fn in_misty_holding(path: &Path) -> bool {
     misty_holding().is_some_and(|folder| path.parent() == Some(folder.as_path()))
 }
 
-/// Whether a holding path is directly in a drive's own holding folder.
 fn in_volume_holding(path: &Path) -> bool {
     path.parent()
         .and_then(Path::file_name)
         .is_some_and(|name| name == VOLUME_HOLDING)
 }
 
-/// A name no other held item has: a short random part, then the item's own name (cut short so
-/// the whole stays a legal name).
 fn holding_name(name: &str) -> String {
     let mut short = String::new();
     for character in name.chars() {
@@ -50,7 +34,6 @@ fn holding_name(name: &str) -> String {
     format!("{}-{short}", &id[..12])
 }
 
-/// Which drive a folder is on.
 #[cfg(unix)]
 fn device(folder: &Path, misty: bool) -> io::Result<u64> {
     use std::os::unix::fs::MetadataExt;
@@ -76,7 +59,6 @@ fn device(folder: &Path, _misty: bool) -> io::Result<u64> {
     Ok(hasher.finish())
 }
 
-/// The root of the drive `folder` is on: the highest folder above it on the same device.
 #[cfg(unix)]
 fn volume_root(folder: &Path) -> io::Result<PathBuf> {
     let own = device(folder, false)?;
@@ -99,7 +81,6 @@ fn volume_root(folder: &Path) -> io::Result<PathBuf> {
         .ok_or_else(|| io::Error::other("That path names no drive."))
 }
 
-/// Moves `source` into its holding folder and answers where it waits.
 pub(super) fn into_holding(source: &Path) -> Result<PathBuf, String> {
     let failed = |error: io::Error| super::super::failed(source, error);
     let name = super::super::display_name(source);
@@ -107,7 +88,9 @@ pub(super) fn into_holding(source: &Path) -> Result<PathBuf, String> {
         .parent()
         .ok_or_else(|| format!("{name} can't go to Agent trash."))?;
     let misty = misty_holding().ok_or("Misty couldn't find its data folder.")?;
-    let misty_root = misty.parent().ok_or("Misty couldn't find its data folder.")?;
+    let misty_root = misty
+        .parent()
+        .ok_or("Misty couldn't find its data folder.")?;
     if device(parent, false).map_err(failed)? != device(misty_root, true).map_err(failed)? {
         let folder = volume_root(parent).map_err(failed)?.join(VOLUME_HOLDING);
         fs_disk::create_dir_all(&folder).map_err(|error| {
@@ -123,7 +106,6 @@ pub(super) fn into_holding(source: &Path) -> Result<PathBuf, String> {
     Ok(target)
 }
 
-/// Moves a held item back out to `target`, which mustn't exist.
 pub(super) fn out_of_holding(holding: &Path, target: &Path) -> Result<(), String> {
     let failed = |error: io::Error| super::super::failed(target, error);
     if let Some(parent) = target.parent() {
@@ -140,10 +122,13 @@ pub(super) fn out_of_holding(holding: &Path, target: &Path) -> Result<(), String
     file_access::disk::rename_out_of_agent_trash(holding, target).map_err(failed)
 }
 
-/// Deletes a held item for good: only the person's own Delete and Empty agent trash call this.
-/// One that is gone already counts as deleted.
 pub(super) fn remove_held(holding: &Path) -> io::Result<()> {
-    let refused = || io::Error::new(io::ErrorKind::PermissionDenied, "That item isn't in Agent trash.");
+    let refused = || {
+        io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "That item isn't in Agent trash.",
+        )
+    };
     let missing = |result: io::Result<()>| match result {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         other => other,
@@ -173,8 +158,6 @@ pub(super) fn remove_held(holding: &Path) -> io::Result<()> {
     })
 }
 
-/// What a held item is and how much room it takes, read through the gate that reaches it. A big
-/// folder is counted only so far.
 pub(super) fn held_size(holding: &Path) -> (super::super::entry::FileKind, u64) {
     use super::super::entry::{is_package_name, FileKind};
     const MOST: usize = 50_000;
@@ -249,8 +232,12 @@ mod tests {
         let misty = misty_holding().expect("a data folder");
         assert!(in_misty_holding(&misty.join("abc-file.txt")));
         assert!(!in_misty_holding(&misty.join("x").join("file.txt")));
-        assert!(in_volume_holding(Path::new("/Volumes/USB/.misty-agent-trash/abc-a")));
-        assert!(!in_volume_holding(Path::new("/Volumes/USB/elsewhere/abc-a")));
+        assert!(in_volume_holding(Path::new(
+            "/Volumes/USB/.misty-agent-trash/abc-a"
+        )));
+        assert!(!in_volume_holding(Path::new(
+            "/Volumes/USB/elsewhere/abc-a"
+        )));
         assert!(remove_held(Path::new("/Users/someone/Documents/a.txt")).is_err());
     }
 }

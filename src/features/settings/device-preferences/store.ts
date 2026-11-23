@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useSettingsStore } from "../preferences/useSettingsStore";
+import { useSettingsStore } from "../preferences/use_settings_store";
 import { registerPreferenceWriter } from "./bridge";
 import {
   effectiveValues,
@@ -7,7 +7,7 @@ import {
   initialPreferencesState,
   migratePreferencesState,
   type DevicePreferencesState,
-} from "./settingResolution";
+} from "./setting_resolution";
 import { mutateState, readState } from "./persistence";
 import {
   resolvedSignature,
@@ -16,11 +16,10 @@ import {
   type Context,
   type DevicePreferencesStore,
   type PendingEdit,
-} from "./storeTypes";
+} from "./store_types";
 
 let context: Context | null = null,
   epoch = 0;
-/** True while the settings page is open; its edits are staged rather than committed. */
 let stagingOn = false;
 let projectionQueue: Promise<unknown> = Promise.resolve();
 const fresh = (ctx: Context) => context === ctx;
@@ -45,7 +44,6 @@ async function publish(ctx: Context, next: DevicePreferencesState) {
     const values = effectiveValues(current);
     const signature = signatureOf(values);
     if (ctx.projected === signature) return;
-    // A newer edit supersedes this projection; applying it would flash the old value back.
     const stillCurrent = () => {
       const latest = useDevicePreferences.getState().state;
       return fresh(ctx) && !!latest && signatureOf(effectiveValues(latest)) === signature;
@@ -54,7 +52,6 @@ async function publish(ctx: Context, next: DevicePreferencesState) {
       await useSettingsStore.getState().applyPreferenceValues(values, stillCurrent);
       if (stillCurrent()) ctx.projected = signature;
     } catch (error) {
-      // Failed platform effects can be retried by the next invalidation or focus.
       if (fresh(ctx))
         useSettingsStore.setState({
           error: `Could not apply settings: ${error instanceof Error ? error.message : String(error)}`,
@@ -83,7 +80,6 @@ async function mutate(
   if (notify && changed && fresh(ctx)) ctx.channel?.postMessage("changed");
   return next;
 }
-/** Commits an edit that is already on screen; on failure the screen returns to the saved value. */
 async function persist(ctx: Context, edit: PendingEdit) {
   const settle = () => (ctx.pending = ctx.pending.filter((pending) => pending !== edit));
   try {
@@ -103,7 +99,6 @@ async function persist(ctx: Context, edit: PendingEdit) {
     throw error;
   }
 }
-/** The settings page opens and closes staging; closing drops anything unsaved. */
 export function setSettingsStaging(on: boolean) {
   stagingOn = on;
   if (!on && useDevicePreferences.getState().dirty)
@@ -112,7 +107,6 @@ export function setSettingsStaging(on: boolean) {
       .discardStaged()
       .catch(() => {});
 }
-/** True, and the save bar draws attention, when leaving settings would lose unsaved edits. */
 export function blockIfUnsaved(): boolean {
   const { dirty, attention } = useDevicePreferences.getState();
   if (!dirty) return false;
@@ -193,7 +187,6 @@ export const useDevicePreferences = create<DevicePreferencesStore>((set, get) =>
     })();
     return ctx.refresh;
   },
-  // The screen and the app's behavior change first; saving to this device follows.
   edit: async (id, value, options) => {
     const ctx = requiredContext();
     let write: Promise<void>;
@@ -208,12 +201,10 @@ export const useDevicePreferences = create<DevicePreferencesStore>((set, get) =>
       set({ state: next, error: null });
       useSettingsStore.getState().previewPreferenceValues(effectiveValues(next));
       if (options?.stage && stagingOn) {
-        // Shown and previewed now; written to this device when the person saves.
         ctx.baseline ??= current;
         ctx.staged.push(edit);
         const changed = resolvedSignature(next) !== resolvedSignature(ctx.baseline);
         if (!changed) {
-          // Back to what is saved: nothing is left to save.
           ctx.pending = ctx.pending.filter((pending) => !ctx.staged.includes(pending));
           ctx.staged = [];
           ctx.baseline = undefined;
@@ -221,7 +212,6 @@ export const useDevicePreferences = create<DevicePreferencesStore>((set, get) =>
         set({ dirty: changed });
         return;
       }
-      // Edits commit in the order they were made, so the last one always wins on disk.
       write = ctx.writes.catch(() => {}).then(() => persist(ctx, edit));
       ctx.writes = write;
     } catch (error) {

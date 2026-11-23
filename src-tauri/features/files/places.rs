@@ -1,5 +1,3 @@
-//! The sidebar's fixed places (Home, Desktop, Documents, Downloads, Applications) and the drives
-//! mounted on this computer, and how much room a drive has left for the bottom bar.
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -40,9 +38,6 @@ fn text(path: PathBuf) -> String {
     path.display().to_string()
 }
 
-/// A drive the sidebar lists, by where it is mounted: on macOS what is under `/Volumes` (the
-/// startup disk's own entry there is a link to `/`, which sysinfo reports as `/` and is left
-/// out); on Windows every drive letter; on Linux what is under `/media` and `/run/media/$USER`.
 fn listed_mount(mount: &Path) -> bool {
     #[cfg(target_os = "macos")]
     {
@@ -81,8 +76,6 @@ fn drive_name(mount: &Path, label: &str) -> String {
     }
 }
 
-/// The mounted drives, by name. Read from the system's own list of mounts, so nothing here opens
-/// a folder (a drive Files may not open still lists; opening it is refused like any folder).
 fn drives() -> Vec<Drive> {
     let disks = sysinfo::Disks::new_with_refreshed_list();
     let mut drives: Vec<Drive> = disks
@@ -101,7 +94,10 @@ fn drives() -> Vec<Drive> {
 }
 
 #[tauri::command]
-pub async fn files_places(app: tauri::AppHandle, webview: tauri::Webview) -> Result<Places, String> {
+pub async fn files_places(
+    app: tauri::AppHandle,
+    webview: tauri::Webview,
+) -> Result<Places, String> {
     person_window(&webview)?;
     blocking(move || {
         super::trash::attach(&app);
@@ -119,7 +115,6 @@ pub async fn files_places(app: tauri::AppHandle, webview: tauri::Webview) -> Res
     .await
 }
 
-/// The room left on the drive `path` is on, as the system counts it for this user.
 #[cfg(unix)]
 fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
     use std::{ffi::CString, os::unix::ffi::OsStrExt};
@@ -142,7 +137,6 @@ fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
     })
 }
 
-/// On Windows, the drive whose mount point is the longest start of `path`.
 #[cfg(windows)]
 fn free_space(path: &Path) -> std::io::Result<FreeSpace> {
     let text = path.display().to_string().to_lowercase();

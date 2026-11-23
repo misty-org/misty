@@ -8,17 +8,10 @@ import { AppFrameLayout } from "../layouts/AppFrameLayout";
 import { AppPagesLayout } from "../layouts/AppPagesLayout";
 import { RootLayout } from "../layouts/RootLayout";
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "./navigation";
-/**
- * Honours the startup preference on the index route.
- *
- * Reads the last remembered route from the store rather than the URL, so
- * "Reopen last session" lands where the user actually left off.
- */
 function StartupRedirect() {
   const { user } = useAuth();
   const welcomed = useSetupStore((state) => state.welcomed);
   const lastAppRoute = useAppRouteMemoryStore((state) => state.lastAppRoute);
-  // Misty needs an account: the welcome shows on first run, and sign-in after that.
   if (!user) return <Navigate to={welcomed ? routes.signIn : routes.welcome} replace />;
   return <Navigate to={resolveStartupRoute(lastAppRoute)} replace />;
 }

@@ -1,10 +1,5 @@
 import { useNotice, type NoticeAction } from "@misty/ui";
 
-/**
- * A failure as an error notice that stays while `message` is set, at most with one way out. It
- * renders nothing itself, so it can sit where the failure happens, even inside a branch that
- * returns early. Forms show their failures under the field instead (`Field error`, `FieldError`).
- */
 export function ErrorNotice({
   message,
   action,

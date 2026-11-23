@@ -1,6 +1,3 @@
-//! The ASAuthorizationController delegate: reads the credential the system
-//! returns and anchors the system sheet to Misty's window.
-
 use super::{responds, Id};
 use crate::capabilities::webauthn::{Assertion, Attachment, Registration};
 use crate::KiriError;
@@ -21,7 +18,6 @@ pub(super) enum Outcome {
     Assertion(Assertion),
 }
 
-/// The one ceremony in flight. Touched only on the main thread.
 pub(super) struct Pending {
     pub controller: usize,
     pub delegate: usize,
@@ -65,8 +61,6 @@ pub(super) fn class() -> Result<&'static Class, KiriError> {
     Ok(declaration.register())
 }
 
-/// Ends the ceremony. The controller is mid-callback, so it and the delegate
-/// are released through the autorelease pool rather than immediately.
 unsafe fn finish(result: Result<Outcome, KiriError>) {
     let Some(pending) = pending().lock().ok().and_then(|mut slot| slot.take()) else {
         return;
@@ -126,7 +120,6 @@ unsafe fn read(credential: Id) -> Result<Outcome, KiriError> {
     if responds(credential, sel!(rawAttestationObject)) {
         let attestation: Id = msg_send![credential, rawAttestationObject];
         let transports = if !security_key {
-            // Synced passkeys can also be used from a phone.
             vec!["hybrid".to_owned(), "internal".to_owned()]
         } else if responds(credential, sel!(transports)) {
             let list: Id = msg_send![credential, transports];
@@ -180,7 +173,6 @@ extern "C" fn failed(_delegate: &Object, _selector: Sel, _controller: Id, error:
             msg_send![error, code]
         };
         finish(Err(match code {
-            // ASAuthorizationErrorMatchedExcludedCredential
             1006 => KiriError::invalid_state(
                 "This authenticator already has a passkey for this account.",
             ),

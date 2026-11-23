@@ -1,6 +1,3 @@
-//! What dictation needs from the X server on Linux: which keys are held, where the pointer is, which
-//! window is in front, and a paste keystroke. On Wayland this reaches XWayland, so it sees and
-//! types into X11 apps only.
 use crate::voice::hold_to_talk::Modifiers;
 use x11rb::{
     connection::Connection as _,
@@ -21,15 +18,12 @@ const XK_ALT_L: u32 = 0xffe9;
 const XK_ALT_R: u32 = 0xffea;
 const XK_SUPER_L: u32 = 0xffeb;
 const XK_SUPER_R: u32 = 0xffec;
-/// AltGr, which most layouts put on the right Alt key.
 const XK_ISO_LEVEL3_SHIFT: u32 = 0xfe03;
 const XK_V: u32 = 0x0076;
 
-/// One connection to the display, with its keyboard map.
 pub(crate) struct Display {
     connection: RustConnection,
     root: Window,
-    /// Every keycode with the keysyms it carries.
     keys: Vec<(Keycode, Vec<u32>)>,
 }
 
@@ -58,7 +52,6 @@ impl Display {
         })
     }
 
-    /// The keycodes that carry any of `keysyms`.
     fn codes(&self, keysyms: &[u32]) -> Vec<Keycode> {
         self.keys
             .iter()
@@ -79,7 +72,6 @@ impl Display {
         }
     }
 
-    /// The held modifiers, from the server's view of the whole keyboard. Nothing is grabbed.
     pub(crate) fn modifiers(&self, codes: &ModifierCodes) -> Option<Modifiers> {
         let keymap = self.connection.query_keymap().ok()?.reply().ok()?.keys;
         let down = |list: &[Keycode]| {
@@ -98,12 +90,10 @@ impl Display {
         })
     }
 
-    /// The pointer, in screen pixels.
     pub(crate) fn pointer(&self) -> Option<(i32, i32)> {
         self.pointer_and_button().map(|(x, y, _)| (x, y))
     }
 
-    /// The pointer, and whether the primary button is down.
     pub(crate) fn pointer_and_button(&self) -> Option<(i32, i32, bool)> {
         let reply = self
             .connection
@@ -146,12 +136,10 @@ impl Display {
             .filter(|window| *window != 0)
     }
 
-    /// The process that owns the window in front, as the window manager reports it.
     pub(crate) fn active_pid(&self) -> Option<u32> {
         self.property32(self.active_window()?, b"_NET_WM_PID", AtomEnum::CARDINAL)
     }
 
-    /// The front window's class (`org.gnome.Terminal`, `kitty`, …), lower-cased.
     pub(crate) fn active_class(&self) -> Option<String> {
         let reply = self
             .connection
@@ -166,14 +154,12 @@ impl Display {
             .ok()?
             .reply()
             .ok()?;
-        // "instance\0class\0": the class is the second name.
         let names: Vec<&[u8]> = reply.value.split(|byte| *byte == 0).collect();
         let class = names.get(1).or(names.first())?;
         let class = String::from_utf8_lossy(class).trim().to_ascii_lowercase();
         (!class.is_empty()).then_some(class)
     }
 
-    /// Presses Control (and Shift when `shift`) with V through XTEST.
     pub(crate) fn paste(&self, shift: bool) -> Result<(), String> {
         let first = |sym: u32| self.codes(&[sym]).first().copied();
         let failed = || "Paste couldn't be sent.".to_owned();
@@ -201,7 +187,6 @@ impl Display {
     }
 }
 
-/// The keycodes behind each modifier on this keyboard.
 pub(crate) struct ModifierCodes {
     left_control: Vec<Keycode>,
     right_control: Vec<Keycode>,
@@ -212,7 +197,6 @@ pub(crate) struct ModifierCodes {
     shift: Vec<Keycode>,
 }
 
-/// The held modifiers right now, or none when there is no X display.
 pub(crate) fn current_modifiers() -> Modifiers {
     Display::open()
         .and_then(|display| display.modifiers(&display.modifier_codes()))

@@ -1,5 +1,5 @@
 import type { SpaceInvitation, SpaceMember } from "./dto/entities";
-import type { SpaceRequest } from "./spaceRequestTypes";
+import type { SpaceRequest } from "./space_request_types";
 
 type ProtectedBlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
 

@@ -51,5 +51,4 @@ describe("engine marketplace", () => {
     expect(suggested).toContain("anthropics/skills");
     expect(unaddedSuggestions("codex", []).length).toBeGreaterThan(0);
   });
-
 });

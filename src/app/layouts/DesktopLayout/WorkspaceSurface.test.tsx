@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import type { WorkspaceView } from "@/features/app-windows/tabs/workspaceViews";
+import type { WorkspaceView } from "@/features/app-windows/tabs/workspace_views";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { WorkspaceSurface } from "./WorkspaceSurface";
 

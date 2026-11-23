@@ -7,7 +7,7 @@ const waits = vi.hoisted(() => ({
   changed: undefined as undefined | (() => void),
 }));
 
-vi.mock("./localWaits", () => ({
+vi.mock("./local_waits", () => ({
   listenForLocalWaits: () => undefined,
   localWaits: () => waits.held,
   decideLocalWait: (id: string, ready: boolean) => waits.decided.push([id, ready]),

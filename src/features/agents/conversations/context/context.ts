@@ -6,8 +6,8 @@ import { useAiSurfaceStore } from "../../runs/invocations/store";
 import type {
   AiContextReference,
   AiSelectionSnapshot,
-} from "../../runs/invocations/invocationTypes";
-import type { GlobalAiContextRef } from "../state/conversationTypes";
+} from "../../runs/invocations/invocation_types";
+import type { GlobalAiContextRef } from "../state/conversation_types";
 
 export interface MistyContextTarget {
   kind: "workspace" | "window" | "tab" | "pane" | "view";
@@ -87,7 +87,7 @@ export function resolveMistyContext(
       for (const tab of layoutTabs(window.layout)) {
         if (target.kind === "tab" && target.tabId && target.tabId !== tab.id) continue;
         for (const pane of dockLeaves(tab.root)) {
-          const view = pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0]; // History snapshots are deliberately excluded.
+          const view = pane.views.find((view) => view.id === pane.activeViewId) ?? pane.views[0];
           if (
             !view ||
             (target.paneId && target.paneId !== pane.id) ||

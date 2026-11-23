@@ -2,12 +2,8 @@ import { useEffect } from "react";
 import { Pin, PinOff } from "lucide-react";
 import { MenuItem } from "@misty/ui";
 import type { SpaceMessage } from "../../api/dto/entities";
-import { useCanPin, useIsPinned, usePinnedStore } from "./pinnedStore";
+import { useCanPin, useIsPinned, usePinnedStore } from "./pinned_store";
 
-/**
- * "Pin message" or "Unpin message" in a message's ⋯ and right-click menu, shown only where the
- * person may pin. The chat's pins are read the first time a menu asks.
- */
 export function PinMenuItem(props: {
   spaceId: string;
   message: SpaceMessage;

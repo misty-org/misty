@@ -68,8 +68,9 @@ desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 lobe-icons (https://github.com/lobehub/lobe-icons)
-  The engines' marks in src/features/engine-config/engineMarks.json and the providers' marks in
-  src/features/engine-config/brands/brandMarks.json are generated from
+  The engines' and providers' marks Misty shows come from @misty/ui's marks registry
+  (src/icons/marks.json and src/icons/marks/ in the misty-ui repository, credited in its own
+  NOTICE), where those whose `source` names lobe-icons are taken from
   @lobehub/icons-static-svg 1.102.0, in each brand's colored version where there is one. The
   marks belong to their owners and only name their products.
 
@@ -78,7 +79,8 @@ lobe-icons (https://github.com/lobehub/lobe-icons)
   Copyright (c) 2023 LobeHub
 
 Oh My Pi (https://github.com/can1357/oh-my-pi)
-  Oh My Pi's mark in src/features/engine-config/engineMarks.json is the gradient π of its
+  Oh My Pi's mark in @misty/ui's marks registry (src/icons/marks/omp.svg in the misty-ui
+  repository, credited in its own NOTICE) is the gradient π of its
   packages/collab-web/public/favicon.svg, without the favicon's dark tile. The mark belongs to its
   owners and only names their product.
 

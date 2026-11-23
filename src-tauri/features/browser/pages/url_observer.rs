@@ -1,10 +1,4 @@
-//! Tells Misty the moment a page's address changes without loading anything: the History API,
-//! the hash, or a single-page site such as YouTube moving between videos. WebKit reports these
-//! only by changing the view's `URL`, so this observes that property (key-value observing) and
-//! emits one event per change. Nothing is polled and nothing the page sends is trusted.
-// objc 0.2's msg_send! checks a `cargo-clippy` cfg that Cargo doesn't declare.
 #![allow(unexpected_cfgs)]
-#![cfg(target_os = "macos")]
 use objc::{
     class, msg_send,
     runtime::{Class, Object, Sel},
@@ -27,7 +21,6 @@ struct Target {
     last: String,
 }
 
-/// Observer object → the tab it serves.
 fn targets() -> &'static Mutex<HashMap<usize, Target>> {
     static TARGETS: OnceLock<Mutex<HashMap<usize, Target>>> = OnceLock::new();
     TARGETS.get_or_init(Mutex::default)
@@ -60,7 +53,6 @@ extern "C" fn observe(
     let Some(url) = (unsafe { url_of(object) }) else {
         return;
     };
-    // Only real pages: a blank placeholder or an internal scheme is not an address to show.
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return;
     }
@@ -80,7 +72,6 @@ extern "C" fn observe(
     crate::browser::emit_navigated(&app, &id, url);
 }
 
-/// Starts reporting this tab's address changes.
 pub(in crate::browser) fn install(
     app: &AppHandle,
     webview: &Webview,
@@ -107,14 +98,12 @@ pub(in crate::browser) fn install(
                     Target { app, id, view: view as usize, last: String::new() },
                 );
             }
-            let key: *mut Object = msg_send![class!(NSString), stringWithUTF8String: b"URL\0".as_ptr()];
+            let key: *mut Object = msg_send![class!(NSString), stringWithUTF8String: c"URL".as_ptr()];
             let _: () = msg_send![view, addObserver: observer forKeyPath: key options: 0usize context: std::ptr::null_mut::<c_void>()];
         })
         .map_err(|error| error.to_string())
 }
 
-/// Stops observing a tab. WebKit refuses to free a view that still has observers, so this runs
-/// before the view closes.
 pub(in crate::browser) fn remove(webview: &Webview, id: &str) {
     let id = id.to_owned();
     let _ = webview.with_webview(move |native| unsafe {
@@ -131,7 +120,7 @@ pub(in crate::browser) fn remove(webview: &Webview, id: &str) {
             .unwrap_or_default();
         for observer in observers {
             let key: *mut Object =
-                msg_send![class!(NSString), stringWithUTF8String: b"URL\0".as_ptr()];
+                msg_send![class!(NSString), stringWithUTF8String: c"URL".as_ptr()];
             let observer_object = observer as *mut Object;
             let _: () = msg_send![view, removeObserver: observer_object forKeyPath: key];
             if let Ok(mut targets) = targets().lock() {

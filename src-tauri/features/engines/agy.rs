@@ -24,7 +24,6 @@ pub(super) use acp::{
 mod subagents;
 pub(super) use subagents::Subagents;
 
-/// Antigravity CLI (`agy`) home: `$ANTIGRAVITY_HOME` or `~/.gemini/antigravity-cli`.
 pub(crate) fn agy_home() -> PathBuf {
     crate::engines::engine_home(Some("ANTIGRAVITY_HOME"), ".gemini/antigravity-cli")
 }
@@ -43,7 +42,6 @@ impl Engine for AgyEngine {
     fn host_command(&self, req: &SendRequest, bin: &str) -> Result<BuiltCommand, String> {
         let mut cmd = command_for_binary(bin);
         cmd.arg("acp");
-        // The session's own folder is its `cwd`; the folders the person added join it.
         let mut seen = std::collections::HashSet::new();
         for dir in &req.additional_dirs {
             let dir = dir.trim();
@@ -56,7 +54,6 @@ impl Engine for AgyEngine {
         Ok(BuiltCommand {
             command: cmd,
             stdin_payload: None,
-            // The gate's answers and question replies are written to this pipe for the turn.
             keep_stdin_open: true,
             cleanup_files: Vec::new(),
             preassigned_session_id: None,
@@ -73,10 +70,6 @@ impl Engine for AgyEngine {
         true
     }
 
-    /// Antigravity's ACP session modes: `default`, where each ask comes back through ACP,
-    /// `accept-edits` and `plan`. Its `auto` isn't offered: it lets Auto mode's own review clear a
-    /// command that leaves its terminal sandbox, and it has no sandbox that keeps its writes in
-    /// the folder. Neither is `--dangerously-skip-permissions`, for the same reason.
     fn modes(&self) -> &'static [super::modes::EngineMode] {
         use super::modes::{mode, ModeKind::*};
         const MODES: &[super::modes::EngineMode] = &[

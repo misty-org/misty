@@ -29,12 +29,8 @@ const ATLAS_COLUMNS: u32 = 8;
 const ATLAS_ROWS: u32 = 11;
 const CELL_WIDTH: u32 = 192;
 const CELL_HEIGHT: u32 = 208;
-/// `pet.json` is a tiny manifest; anything larger is refused before it is parsed.
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
-/// A 1536x2288 lossless webp atlas is a few MiB at most. The cap keeps a hostile package from
-/// forcing a huge buffered decode.
 const MAX_SPRITESHEET_BYTES: u64 = 64 * 1024 * 1024;
-/// The settings scope this device keeps the pet's choices under.
 const SETTINGS_SCOPE: &str = "device:pet";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,19 +62,15 @@ pub struct PetPackage {
     pub summary: PetSummary,
     pub spritesheet_path: String,
     pub spritesheet_data_url: String,
-    /// How many cells of each atlas row hold a frame, up to the last one that isn't transparent.
-    /// Some valid Codex v2 rows use fewer than eight cells and must not animate into the padding.
     pub frame_counts: Vec<u8>,
 }
 
-/// Where the pet sits, in logical desktop points (its top-left corner, without the bubble).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct PetPosition {
     pub x: f64,
     pub y: f64,
 }
 
-/// This device's pet choices.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PetSettings {
@@ -154,8 +146,6 @@ fn validate_manifest(manifest: &PetManifest) -> Result<(), String> {
         ));
     }
     let path = Path::new(&manifest.spritesheet_path);
-    // ParentDir covers ".."; RootDir and Prefix only parse on Windows ("\\foo", "C:foo") and would
-    // let join() replace the target path there, so they are refused here too.
     if path.is_absolute()
         || path.components().any(|component| {
             matches!(
@@ -184,7 +174,6 @@ fn package_dir(id: &str) -> Option<PathBuf> {
     fs::is_dir(&imported).then_some(imported)
 }
 
-/// The manifest and its spritesheet's real path, which must stay inside the package.
 fn package_metadata(root: &Path) -> Result<(PetManifest, PathBuf), String> {
     let manifest_path = root.join(MANIFEST_FILE);
     let manifest = read_manifest(&manifest_path)?;
@@ -211,7 +200,6 @@ fn package_files(root: &Path) -> Result<(PetManifest, PathBuf, Vec<u8>, Vec<u8>)
     Ok((manifest, sprite, bytes, frame_counts))
 }
 
-/// Checks a v2 atlas and counts each row's frames. Returns the file's bytes as read.
 fn validate_spritesheet(path: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
     let size = fs::metadata(path).map_err(|error| error.to_string())?.len();
     if size > MAX_SPRITESHEET_BYTES {
@@ -221,8 +209,6 @@ fn validate_spritesheet(path: &Path) -> Result<(Vec<u8>, Vec<u8>), String> {
     let reader = image::ImageReader::new(Cursor::new(&bytes))
         .with_guessed_format()
         .map_err(|error| format!("This spritesheet can't be read: {error}"))?;
-    // Read the dimensions from the header before decoding: a legal but huge image would otherwise
-    // force a very large RGBA allocation.
     let decoder = reader
         .into_decoder()
         .map_err(|error| format!("This spritesheet can't be read: {error}"))?;
@@ -274,8 +260,6 @@ fn list_from_root(root: &Path) -> Vec<PetSummary> {
         .map(|entry| entry.path())
         .filter(|path| fs::is_dir(path))
         .filter_map(|path| {
-            // Settings opens this list often. The manifest and paths are enough for the picker;
-            // the whole atlas is decoded only when the chosen package is loaded.
             let (manifest, _) = package_metadata(&path).ok()?;
             Some(summary(&manifest))
         })
@@ -292,8 +276,6 @@ async fn blocking<T: Send + 'static>(
         .map_err(|error| error.to_string())?
 }
 
-// ------------------------------------------------------------- settings ---
-
 fn store(app: &AppHandle) -> database::store::Store {
     app.state::<MistyRuntime>().environment.store()
 }
@@ -306,8 +288,6 @@ pub(crate) fn read_settings(app: &AppHandle) -> PetSettings {
         .unwrap_or_default()
 }
 
-/// Changes this device's pet settings. Two windows can't overwrite each other: a write that lost
-/// the race reads again and applies its change on top.
 pub(crate) fn change_settings(
     app: &AppHandle,
     change: impl Fn(&mut PetSettings),
@@ -335,9 +315,6 @@ pub(crate) fn change_settings(
     Err("Pet settings changed elsewhere. Try again.".to_string())
 }
 
-// ------------------------------------------------------------- commands ---
-
-/// The imported pets and this device's choices, for Settings.
 #[tauri::command]
 pub async fn pet_list(app: AppHandle) -> Result<Value, String> {
     let settings = read_settings(&app);
@@ -345,13 +322,11 @@ pub async fn pet_list(app: AppHandle) -> Result<Value, String> {
     Ok(json!({ "pets": pets, "settings": settings }))
 }
 
-/// This device's pet choices.
 #[tauri::command]
 pub fn pet_settings(app: AppHandle) -> PetSettings {
     read_settings(&app)
 }
 
-/// One package with its spritesheet, for the pet window to draw.
 #[tauri::command]
 pub async fn pet_get_package(id: String) -> Result<PetPackage, String> {
     blocking(move || {
@@ -368,8 +343,6 @@ pub async fn pet_get_package(id: String) -> Result<PetPackage, String> {
     .await
 }
 
-/// Imports the pet folder the person picks in the system's dialog, and chooses it. `None` when
-/// they cancel. The dialog runs here, so a window can't name a path of its own.
 #[tauri::command]
 pub async fn pet_import(app: AppHandle) -> Result<Option<PetSummary>, String> {
     use tauri_plugin_dialog::DialogExt;
@@ -397,8 +370,6 @@ pub async fn pet_import(app: AppHandle) -> Result<Option<PetSummary>, String> {
 }
 
 fn import_from(folder: &Path) -> Result<PetSummary, String> {
-    // The person picked this folder in the system's dialog. Misty reads only the package's two
-    // files from it: the manifest, then the spritesheet it names once that path is checked.
     let manifest_path = folder.join(MANIFEST_FILE);
     file_access::allow_picked_file(&manifest_path, file_access::Access::Read);
     let manifest = read_manifest(&manifest_path)?;
@@ -432,7 +403,6 @@ fn import_from(folder: &Path) -> Result<PetSummary, String> {
     Ok(summary(&manifest))
 }
 
-/// Removes an imported pet. When it was the chosen one, the pet is put away.
 #[tauri::command]
 pub async fn pet_remove(app: AppHandle, id: String) -> Result<(), String> {
     let removed = id.clone();
@@ -453,7 +423,6 @@ pub async fn pet_remove(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Chooses which imported pet is shown, and shows it again if it's on.
 #[tauri::command]
 pub async fn pet_select(app: AppHandle, id: String) -> Result<PetSettings, String> {
     if package_dir(&id).is_none() {
@@ -505,8 +474,6 @@ mod tests {
         .is_err());
     }
 
-    /// Windows-only component classes: "C:foo" parses with a Prefix and "\\foo" with a RootDir,
-    /// and neither is caught by ParentDir.
     #[cfg(windows)]
     #[test]
     fn rejects_windows_prefix_and_root_components() {

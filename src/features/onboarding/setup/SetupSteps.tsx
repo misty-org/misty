@@ -2,7 +2,7 @@ import {
   normalizeDockingLayout,
   rememberDockingLayout,
   type TabSide,
-} from "@/app/shell/dockingLayout";
+} from "@/app/shell/docking_layout";
 import { useProjectsHome, useProjectsHomePath } from "@/features/agents";
 import { useWindowDockingLayout, useWorkspaceStore } from "@/features/app-windows";
 import { Button, Surface, Text, useNotice } from "@misty/ui";
@@ -13,32 +13,24 @@ import { TabsPreview } from "./SetupPreviews";
 
 import type { SetupStep } from "@/features/account";
 
-/** This computer's setup, the step that ends the wizard that follows signing in. */
 export const setupStepCopy: Record<SetupStep, string> = {
   tabs: "Where do you want the sidebar?",
   projects: "Where do your projects go?",
 };
 
-/** The steps the wizard runs here: the side the sidebar sits on, then where projects go. */
 export function useSetupSteps(): SetupStep[] {
   return ["tabs", "projects"];
 }
 
-/** Whether a step can go on: the projects folder has to be chosen; the sidebar has a side. */
 export function useSetupStepDone(step: SetupStep | null): boolean {
   const projects = useProjectsHomePath();
   return step !== "projects" || Boolean(projects);
 }
 
-/** One step's body. */
 export function SetupStepBody(props: { step: SetupStep; onNext(): void }) {
   return props.step === "projects" ? <ProjectsStep /> : <TabsStep />;
 }
 
-/**
- * Where "Open in Code" makes a chat's project. The person picks it in the system's dialog, which
- * opens on their home folder; Misty suggests no place. It stays in Settings.
- */
 function ProjectsStep() {
   const path = useProjectsHomePath();
   const [busy, setBusy] = useState(false);
@@ -81,7 +73,6 @@ const tabSideChoices: Array<{ value: TabSide; label: string }> = [
   { value: "right", label: "Right" },
 ];
 
-/** The sidebar side applies immediately and stays in Settings. */
 function TabsStep() {
   const layout = useWindowDockingLayout();
   const setLayout = useWorkspaceStore((state) => state.setWindowDockingLayout);
@@ -99,7 +90,6 @@ function TabsStep() {
                 tabs: choice.value,
               });
               setLayout(next);
-              // New windows open with the side picked here too.
               rememberDockingLayout(next);
             }}
           >

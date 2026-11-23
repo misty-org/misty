@@ -14,8 +14,6 @@ fn store_all(scratch: &Scratch, events: &[UsageEvent]) -> rusqlite::Connection {
     conn
 }
 
-// ── Claude ──────────────────────────────────────────────────────────────────
-
 #[test]
 fn claude_lines_of_one_response_collapse_to_one_event() {
     let scratch = Scratch::new("claude-dedupe");
@@ -168,8 +166,6 @@ fn claude_without_message_id_falls_back_to_line_uuid() {
     assert!(events[0].key.starts_with("claude:uuid:"));
 }
 
-// ── Codex ───────────────────────────────────────────────────────────────────
-
 #[test]
 fn codex_token_count_normalizes_cached_input() {
     let lines = vec![
@@ -210,7 +206,6 @@ fn codex_repeated_token_count_is_counted_once() {
         codex_meta("sess-a", "/w", None),
         codex_turn("gpt-5"),
         codex_tc("2026-10-27T10:00:05.000Z", [100, 0, 10, 0], [100, 0, 10, 0]),
-        // Same cumulative total again (rate-limit refresh): not a response.
         codex_tc("2026-10-27T10:00:06.000Z", [100, 0, 10, 0], [100, 0, 10, 0]),
         codex_tc(
             "2026-10-27T10:00:09.000Z",
@@ -287,7 +282,6 @@ fn codex_fork_replay_collapses_onto_parent_events() {
             [300, 100, 30, 0],
         ),
     ];
-    // The fork replays the parent's token history at fork time, then works on.
     let child = vec![
         codex_meta("child", "/w", Some("parent")),
         codex_turn("gpt-5"),
@@ -303,7 +297,6 @@ fn codex_fork_replay_collapses_onto_parent_events() {
             [700, 400, 70, 0],
         ),
     ];
-    // A fork of the fork resolves to the same lineage root.
     let grandchild = vec![
         codex_meta("grandchild", "/w", Some("child")),
         codex_tc("2026-10-27T12:00:00.000Z", [100, 0, 10, 0], [100, 0, 10, 0]),
@@ -363,8 +356,6 @@ fn codex_state_survives_an_incremental_boundary() {
     assert_eq!(out[0].model, "gpt-5");
     assert_eq!(out[0].session_id.as_deref(), Some("sess-s"));
 }
-
-// ── pi / omp ────────────────────────────────────────────────────────────────
 
 #[test]
 fn pi_family_reads_header_and_assistant_usage() {

@@ -4,14 +4,10 @@ import { EmptyState } from "@misty/ui";
 import { lazy, Suspense, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { SpacePageLoadingPlaceholder } from "../components/SpacePageLoadingPlaceholder";
-import { voiceChannelPage } from "../apps/appCalls";
-import { useSpacesStore } from "../list/useSpacesStore";
+import { voiceChannelPage } from "../apps/app_calls";
+import { FilesPage } from "../file-manager/FilesPage";
+import { useSpacesStore } from "../list/use_spaces_store";
 
-async function loadFiles() {
-  const { FilesPage } = await import("../file-manager/FilesPage");
-  return { default: FilesPage };
-}
-const Files = lazy(loadFiles);
 async function loadChat() {
   const { SpaceChatEntry } = await import("../chat/SpaceChatEntry");
   return { default: SpaceChatEntry };
@@ -27,7 +23,6 @@ async function loadApp() {
   return { default: SpaceAppPage };
 }
 const App = lazy(loadApp);
-// The calls feature sits above Spaces, so it hands its page in at startup.
 async function loadVoice() {
   return { default: voiceChannelPage.get() };
 }
@@ -40,9 +35,6 @@ export async function preloadSpaceSection(section: string) {
     case "social":
     case "chat":
       await loadChat();
-      break;
-    case "files":
-      await loadFiles();
       break;
     case "agents":
     case "explore":
@@ -57,25 +49,13 @@ export async function preloadSpaceSection(section: string) {
   }
 }
 
-/** The tab's name for the pages that don't name it themselves (Files and Chat do), so a tab
- * that moves to one of them never keeps the last page's name. */
 const sectionTabTitles: Record<string, string> = {
   explore: "Explore",
 };
 
-/**
- * One Space section, rendered from props rather than the router.
- *
- * The dock can show the same Space in several panes at once, and there is only
- * one router URL — so pane content cannot come from the outlet. Everything
- * here is therefore driven by `spaceId`/`section`, and nothing in it navigates
- * on its own: a background pane that issued redirects would move the whole app
- * out from under the focused one. Route normalisation stays in `SpaceDetail`.
- */
 export function SpaceSectionView(props: {
   spaceId: string;
   section: string;
-  /** The app open on its page (`/app/<id>`), or the voice channel (`/voice/<id>`). */
   itemId?: string;
   workspaceTabId?: string;
 }) {
@@ -99,7 +79,6 @@ export function SpaceSectionView(props: {
   }, [loadSpace, spaceId, user]);
   useWorkspaceViewTitle(props.workspaceTabId, sectionTabTitles[section] ?? "");
 
-  // Switching accounts isn't a read of this page: it says so in words until the new account opens.
   if (transitioning) return <SpacePageLoadingPlaceholder label="Switching accounts" />;
 
   if (!snapshotReady && error) {
@@ -115,9 +94,7 @@ export function SpaceSectionView(props: {
     );
   }
 
-  // The page this opens, for its first-load skeleton.
   const shape = { section };
-  // The Space itself is read for the first time: the page it opens, in that page's shape.
   if (!snapshotReady || (!space && loading)) return <SpacePageLoadingPlaceholder shape={shape} />;
 
   if (!space) {
@@ -131,11 +108,9 @@ export function SpaceSectionView(props: {
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
-      {/* The page's code is on its way just ahead of its data: the page's own first-load
-          skeleton holds its place, so it never flashes blank. */}
       <Suspense fallback={<SpacePageLoadingPlaceholder shape={shape} />}>
         {section === "files" ? (
-          <Files />
+          <FilesPage />
         ) : section === "explore" ? (
           <Explore
             spaceId={spaceId}
@@ -145,8 +120,7 @@ export function SpaceSectionView(props: {
           <App space={space} appId={itemId} workspaceTabId={props.workspaceTabId} />
         ) : section === "voice" ? (
           <Voice spaceId={spaceId} channelId={itemId} workspaceTabId={props.workspaceTabId} />
-        ) : // A Space has no home page: its address, and the old settings links, open its chat.
-        section === "home" ||
+        ) : section === "home" ||
           section === "settings" ||
           section === "social" ||
           section === "chat" ? (

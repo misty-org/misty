@@ -46,8 +46,6 @@ async fn folder_of(
     linked_path(app, account, folder).await
 }
 
-/// The top of the repository holding `folder`, for a command that changes files: the whole
-/// repository has to lie in a linked folder, not only the part the panel shows.
 async fn repository_of(
     app: &tauri::AppHandle,
     webview: &tauri::Webview,
@@ -62,7 +60,6 @@ async fn repository_of(
         .map_err(|_| "This repository reaches outside the linked folder.".to_string())
 }
 
-/// A file named by the panel, which must stay inside the folder.
 fn inside(file: &str) -> Result<&str, String> {
     let path = Path::new(file);
     let escapes = path.is_absolute()
@@ -79,8 +76,6 @@ fn inside_all(files: &[String]) -> Result<(), String> {
     files.iter().try_for_each(|file| inside(file).map(|_| ()))
 }
 
-/// A branch name typed or picked in the panel. Git refuses bad names itself; this keeps one from
-/// ever being read as an option.
 fn branch_name(name: &str) -> Result<&str, String> {
     let name = name.trim();
     if name.is_empty() || name.starts_with('-') {

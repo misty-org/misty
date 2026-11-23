@@ -1,34 +1,22 @@
 import { ChatStart, ChatStartIdeas } from "./ChatStart";
-import { needsDefaultEngine, openEngineSettings } from "../engines/engineNeeded";
+import { needsDefaultEngine, openEngineSettings } from "../engines/engine_needed";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { AgentWorkspaceConversation } from "../conversations/view/AgentWorkspaceConversation";
 import { AgentConversationHeading, ChatHeaderButtons, ChatTitle } from "./AgentConversationHeading";
-import type { AgentsPageActions, AgentsPageView } from "./agentsPageActions";
-import type { AgentsPageState } from "./useAgentsPageState";
+import type { AgentsPageActions, AgentsPageView } from "./agents_page_actions";
+import type { AgentsPageState } from "./use_agents_page_state";
 import { AgentBrowserPip } from "../agent-browser/AgentBrowserPip";
-import { setBrowserExpanded } from "../agent-browser/agentBrowserStore";
-import { chatKey } from "../conversations/state/draftChat";
+import { setBrowserExpanded } from "../agent-browser/agent_browser_store";
+import { chatKey } from "../conversations/state/draft_chat";
 import { cn, Separator, Surface, windowToolbarClass } from "@misty/ui";
 
-/**
- * The chat's header (the heading, or the studio bar in the workspace) floats over the top of the
- * conversation and stops short of its scrollbar, so the scrollbar runs the column's full height.
- * The conversation's content starts below the header instead: `--agent-conversation-inset` is how
- * far, for the scroller and for anything floating over the conversation.
- */
 export const floatingHeaderClass = cn(
   "absolute inset-[0_var(--misty-scrollbar-size)_auto_0] z-[var(--stack-raised)]",
   "h-[var(--agents-chat-header)] min-h-0",
 );
 
-/** The studio bar: plain buttons in one row on the window's own surface. */
 export const studioBarClass = "box-border flex flex-none items-center gap-2 px-3";
 
-/**
- * The chat column. Rows keep their content height so the column overflows and scrolls instead of
- * squeezing; the conversation fills what is left. The agent browser's picture-in-picture floats
- * over the column, clear of the header. The Code page's chat column is built the same way.
- */
 export const chatColumnClass = cn(
   "agents-chat relative flex min-h-0 min-w-90 flex-1 flex-col overflow-hidden",
   "[&>:not(.agent-conversation)]:shrink-0",
@@ -50,7 +38,6 @@ type AgentsTaskContentProps = {
   view: AgentsPageView;
 };
 
-/* The task column: error notice, conversation heading, then the conversation. */
 export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentProps) {
   const {
     user,
@@ -71,9 +58,7 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
   return (
     <>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col in-data-[settings-open=true]:mr-105">
-        {/* Only the chat column (header and conversation) scrolls. */}
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden [container:agents-body/size]">
-          {/* Files dropped anywhere on the chat column go to its message box. */}
           <div className={chatColumnClass} data-file-drop-area="">
             <ErrorNotice
               message={error}
@@ -83,9 +68,6 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                   : { label: "Retry", onSelect: () => void load(user.id) }
               }
             />
-            {/* The header floats over the conversation's top, short of its scrollbar, so the
-                scrollbar runs the column's full height. In the workspace it is the studio bar,
-                naming the chat; the tab above names its agent. */}
             {!showWorkspace ? (
               <AgentConversationHeading
                 conversation={conversation}
@@ -93,9 +75,6 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                 disabled={disabled}
               />
             ) : state.workspacePage === "task" ? (
-              // The page's one top band, as tall as the sidebar's head, with plain buttons on it: a
-              // FramedPage toolbar row on the frame's color, closed by a hairline, so the
-              // conversation scrolls under it unseen.
               <Surface
                 as="header"
                 tone="sidebar"
@@ -112,8 +91,6 @@ export function AgentsTaskContent({ state, actions, view }: AgentsTaskContentPro
                 <Separator className="absolute inset-x-0 bottom-0" />
               </Surface>
             ) : null}
-            {/* The agent browser as a picture-in-picture floating over the chat; opening it puts
-                the browser back in its panel beside the chat. */}
             <AgentBrowserPip
               conversationId={chatKey(activeConversationId)}
               onDock={() => setBrowserExpanded(chatKey(activeConversationId), true)}

@@ -1,5 +1,5 @@
 import { spacesApi } from "../../api/api";
-import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import type { SpaceConversation } from "../../api/dto/entities";
 import {
   Button,
@@ -15,15 +15,11 @@ import {
   Text,
 } from "@misty/ui";
 import { Hash, Lock, Volume2 } from "lucide-react";
-import { useSpaceRoles } from "../../roles/useSpaceRoles";
-import { allowedRoleIds, withPrivacy } from "../../roles/channelPrivacy";
-import { isPrivateChannel } from "./conversationGroups";
+import { useSpaceRoles } from "../../roles/use_space_roles";
+import { allowedRoleIds, withPrivacy } from "../../roles/channel_privacy";
+import { isPrivateChannel } from "./conversation_groups";
 import { useEffect, useState, type FormEvent } from "react";
 
-/**
- * Creates or edits a channel: text or voice (when creating), its name, and whether it is private, seen
- * only by the roles picked (and whoever may manage channels), as in Discord.
- */
 export function CreateEditConversationDialog({
   spaceId,
   open,
@@ -34,7 +30,6 @@ export function CreateEditConversationDialog({
   spaceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Present when renaming an existing channel; absent when creating one. */
   conversation?: SpaceConversation | null;
   onSaved: (conversation: SpaceConversation) => void;
 }) {
@@ -114,7 +109,14 @@ export function CreateEditConversationDialog({
               ]}
             />
           )}
-          <Text bare as="label" tone="muted" weight="medium" className="mt-5 grid gap-2 text-xs">
+          <Text
+            bare
+            as="label"
+            size="meta"
+            tone="muted"
+            weight="medium"
+            className="mt-5 grid gap-2"
+          >
             Name
             <Input
               maxLength={80}

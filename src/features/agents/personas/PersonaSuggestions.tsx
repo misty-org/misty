@@ -1,20 +1,14 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-/**
- * The composer's `#` menu: personas from the bundled catalog. Picking one puts `#token` in the
- * message, and the run takes that persona's prompt as instructions for this message. The row in
- * focus also offers to make one of the person's own agents from the persona.
- */
 import { Check } from "lucide-react";
 import { useState, type PointerEvent } from "react";
 import { Button } from "@misty/ui";
-import { filterItems } from "../conversations/composer/controls/composerTriggers";
-import { enabledPersonas, makeAgentFromPersona, personaToken } from "./catalogApi";
+import { filterItems } from "../conversations/composer/controls/composer_triggers";
+import { enabledPersonas, makeAgentFromPersona, personaToken } from "./catalog_api";
 
 export async function personaSuggestions(query: string) {
   const personas = await enabledPersonas().catch(() => []);
   const items = personas.map((persona) => ({
     key: `persona:${persona.id}`,
-    // Matched on the token and the persona's own name together.
     name: personaToken(persona.id),
     label: persona.name,
     description: `${persona.icon ? `${persona.icon} ` : ""}${persona.description}`,
@@ -29,11 +23,9 @@ export async function personaSuggestions(query: string) {
   return [...matched, ...byName.filter((item) => !seen.has(item.key))].slice(0, 30);
 }
 
-/** "Make an agent from this", on the focused persona row. */
 export function PersonaMakeAgent({ id }: { id: string }) {
   const [state, setState] = useState<"idle" | "working" | "made" | "failed">("idle");
   const make = (event: PointerEvent) => {
-    // The row itself picks the persona; this button only makes the agent.
     event.preventDefault();
     event.stopPropagation();
     if (state === "working" || state === "made") return;

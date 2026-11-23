@@ -1,16 +1,12 @@
-//! Rotating a session's tokens. Rotations are serialized: the server treats two uses of one
-//! refresh token as a replay and ends the whole session.
 use super::{authorization, AccountClient, Captured, TOKEN_TRANSPORT};
 use std::{sync::Arc, time::Duration};
 
 const REFRESH_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_ANSWER_BYTES: usize = 64 << 10;
 
-/// How a refresh went, for a caller that passes it on.
 pub(crate) struct RefreshAnswer {
     pub status: u16,
     pub body: Vec<u8>,
-    /// The server ended the session, so the tokens are gone.
     pub ended: bool,
 }
 
@@ -28,7 +24,6 @@ impl RefreshAnswer {
     }
 }
 
-/// Native code only rotates through `account::http`; the tests rotate a session directly.
 #[cfg(test)]
 fn refresh_endpoint(base: &url::Url) -> url::Url {
     let mut endpoint = base.clone();
@@ -41,8 +36,6 @@ fn refresh_endpoint(base: &url::Url) -> url::Url {
 }
 
 impl AccountClient {
-    /// Rotates the session once. A caller that was waiting while another rotated it uses that
-    /// rotation instead of starting its own.
     #[cfg(test)]
     pub(crate) async fn refresh(self: &Arc<Self>, base: &url::Url) -> Result<(), String> {
         let used = self.access_header();
@@ -54,7 +47,6 @@ impl AccountClient {
         }
     }
 
-    /// Rotates the session after the server refused `used`, the `access_header` a request sent.
     #[cfg(test)]
     pub(crate) async fn refresh_after(
         self: &Arc<Self>,
@@ -65,8 +57,6 @@ impl AccountClient {
             .await
     }
 
-    /// Runs apart from the caller: a caller that gives up mid-request must not lose the tokens
-    /// the server has already rotated to, or the next attempt would look like a replay.
     pub(crate) async fn rotate(
         self: &Arc<Self>,
         endpoint: url::Url,
@@ -119,7 +109,6 @@ impl AccountClient {
             Captured::Nothing => false,
         };
         Ok(RefreshAnswer {
-            // A success that renewed nothing isn't one: a server too old to answer in headers.
             status: if (200..300).contains(&status) {
                 502
             } else {

@@ -17,14 +17,11 @@ function (target, action, expectedOrigin, expectedDocument) {
       return { ok: false, error: "This control requires user interaction." };
     const owner = element?.ownerDocument || document;
     const view = owner.defaultView;
-    // Consume the entire snapshot before an action, including a failed attempt.
     snapshot.consumed = true;
     targets?.clear();
     switch (action.kind) {
       case "native": {
         const input = action.input;
-        // Native dispatch remains scoped to this WKWebView. Never let visual
-        // control type credentials or open an unobservable system file picker.
         let control = document.activeElement;
         if (["click", "scroll", "drag"].includes(input.kind)) {
           const x = input.kind === "drag" ? input.fromX : input.x;
@@ -90,9 +87,6 @@ function (target, action, expectedOrigin, expectedDocument) {
           range.selectNodeContents(element);
           selection.removeAllRanges();
           selection.addRange(range);
-          // Rich editors reconcile direct DOM mutations away. Use the browser's
-          // editing transaction, allowing its synchronous trusted beforeinput.
-          // Physical input cannot interleave within this JavaScript task.
           const locked = view.__MISTY_AGENT_INPUT_LOCKED__;
           try {
             view.__MISTY_AGENT_INPUT_LOCKED__ = false;
@@ -102,10 +96,6 @@ function (target, action, expectedOrigin, expectedDocument) {
             view.__MISTY_AGENT_INPUT_LOCKED__ = locked;
           }
           window[Symbol.for("misty.browser.agent.cursor")]?.move(element);
-          // Canvas editors consume this temporary editable buffer into their
-          // document model. A successful editing transaction is an attempt, not
-          // proof the document saved. Never repeat it merely because the buffer
-          // was cleared; inspect the rendered document before continuing.
           return { ok: true, attempted: true,
             textRetained: element.innerText.replace(/\r\n/g, "\n") === action.text.replace(/\r\n/g, "\n"),
             websiteEditVerified: false };
@@ -126,8 +116,6 @@ function (target, action, expectedOrigin, expectedDocument) {
       }
       case "scroll": {
         if (![action.x, action.y].every(value => Number.isInteger(value) && Math.abs(value) <= 4000)) throw new Error("Invalid scroll distance.");
-        // Match scrolling over a control: its nearest scrollable ancestor owns
-        // the movement, including the containing page of an accessible frame.
         if (!element) {
           const beforeX = window.scrollX, beforeY = window.scrollY;
           window.scrollBy({ left: action.x, top: action.y, behavior: "instant" });
@@ -155,11 +143,8 @@ function (target, action, expectedOrigin, expectedDocument) {
         if (!element || !["Enter", "Escape", "Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(action.key)) throw new Error("Unsupported key.");
         element.focus();
         window[Symbol.for("misty.browser.agent.cursor")]?.move(element);
-        // Synthetic keys do not reproduce every browser default. The caller must
-        // inspect the result rather than assuming a form submitted or focus moved.
         const keyCode = { Enter: 13, Escape: 27, Tab: 9, ArrowUp: 38, ArrowDown: 40,
           ArrowLeft: 37, ArrowRight: 39, Home: 36, End: 35 }[action.key];
-        // Older web-app keyboard handlers still read keyCode/which.
         const keyboard = { key: action.key, code: action.key, keyCode, which: keyCode,
           bubbles: true, cancelable: true, composed: true };
         element.dispatchEvent(new KeyboardEvent("keydown", keyboard));

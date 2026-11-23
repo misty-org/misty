@@ -8,12 +8,12 @@ import CodeMirror from "@uiw/react-codemirror";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, Text } from "@misty/ui";
 import { EditorSkeleton } from "../PanelSkeletons";
-import { errorText } from "../projectApi";
-import { imageFileUrl, type FileContent } from "../files/filesApi";
-import { fileName, useFilesStore } from "../files/filesStore";
-import { editorCommands } from "./editorCommands";
-import { useEditorAddons, type EditorAddon, type EditorAppearance } from "./editorAddons";
-import { useEditorWordWrap } from "./editorSettings";
+import { errorText } from "../project_api";
+import { imageFileUrl, type FileContent } from "../files/files_api";
+import { fileName, useFilesStore } from "../files/files_store";
+import { editorCommands } from "./editor_commands";
+import { useEditorAddons, type EditorAddon, type EditorAppearance } from "./editor_addons";
+import { useEditorWordWrap } from "./editor_settings";
 import { BinaryFileView, ImageFileView } from "./EditorFallbackViews";
 import {
   EditorSearchPanel,
@@ -24,37 +24,31 @@ import {
   clearEditorSearchQuery,
   createEditorSearchExtensions,
   type EditorSearchKeymapActions,
-} from "./editorSearch";
+} from "./editor_search";
 import {
   canPreviewFile,
   isHtmlFile,
   isMarkdownFile,
   opensInPreview,
   type EditorViewMode,
-} from "./editorViewMode";
-import { useEditorReveal } from "./editorReveal";
+} from "./editor_view_mode";
+import { useEditorReveal } from "./editor_reveal";
 import {
   BASIC_SETUP,
   editorFrameClass,
   IS_MAC,
   LINE_SELECTION,
   PANEL_THEME,
-} from "./editorPaneSetup";
+} from "./editor_pane_setup";
 import { FileEditorHeader } from "./FileEditorHeader";
 import { HtmlPreview } from "./HtmlPreview";
 import { MarkdownPreview } from "./MarkdownPreview";
 
-/** What the pane holding an editor offers it: closing its tab and quick open (vim's `:q`, `:e`). */
 export interface EditorPaneActions {
   close(path: string): void;
   quickOpen(): void;
 }
 
-/**
- * One open file: its text in the code editor, an image, or why it can't be shown. `appearance`
- * says where it is shown: the chat's floating panel, or the Code page, which brings its own theme,
- * language servers and live sessions (`code/useEditorAddons.ts`).
- */
 export default function EditorPane({
   path,
   appearance = "panel",
@@ -67,7 +61,6 @@ export default function EditorPane({
   const entry = useFilesStore((state) => state.fileStates[path]);
   const root = useFilesStore((state) => state.root);
   const reloadFile = useFilesStore((state) => state.reloadFile);
-  // Wrapping is the editor's, not this file's: toggled here, it stays for every file and in Settings.
   const wordWrap = useEditorWordWrap((state) => state.value);
   const setWordWrap = useEditorWordWrap((state) => state.set);
   const diskText = entry?.content?.kind === "text" ? (entry.content.text ?? "") : "";
@@ -88,10 +81,7 @@ export default function EditorPane({
       </Text>
     );
   }
-  // A file read again keeps its text on screen until the new one arrives.
   if (!entry?.content) return <EditorSkeleton path={path} />;
-  // The key gives the editor a fresh draft whenever the file is read again, or an add-on (a live
-  // session) starts it from another text.
   return (
     <FileEditor
       key={`${path}:${entry.loadNonce}:${addon.document?.key ?? ""}`}
@@ -125,7 +115,6 @@ function FileEditor({
 }) {
   const setFileDirty = useFilesStore((state) => state.setFileDirty);
   const saveFile = useFilesStore((state) => state.saveFile);
-  // Hidden tabs stay mounted; only the shown one answers ⌘S.
   const isActiveTab = useFilesStore((state) => state.activeFilePath === path);
   const editorRef = useRef<EditorView | null>(null);
 
@@ -134,7 +123,6 @@ function FileEditor({
   const isHtml = isHtmlFile(name);
   const canPreview = canPreviewFile(name);
 
-  // A live session's shared text, when it has one, stands in for the file as read.
   const startText = addon.document?.text ?? content.text ?? "";
   const [draft, setDraft] = useState(startText);
   const [savedText, setSavedText] = useState(startText);
@@ -146,11 +134,8 @@ function FileEditor({
   const [previewReloadKey, setPreviewReloadKey] = useState(0);
   const [previewSearchOpen, setPreviewSearchOpen] = useState(false);
   const [languageExtension, setLanguageExtension] = useState<Extension[]>([]);
-  // A file too long to read whole is partial: saving it would cut off the rest.
   const readOnly = content.truncated;
 
-  // Find and replace: React draws the card, CodeMirror keeps the search state, the match
-  // highlighting and the stepping. Its own panel is a hidden element (editorSearch.ts).
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchReplace, setSearchReplace] = useState(false);
@@ -160,7 +145,6 @@ function FileEditor({
   });
   const searchOpenRef = useRef(false);
   const navigateRef = useRef<((direction: EditorSearchDirection) => void) | null>(null);
-  // A search result asked for a line of this file: put the cursor there and show it.
   const revealTarget = useEditorReveal((state) => state.target);
   useEffect(() => {
     if (!editorView || !revealTarget || revealTarget.path !== path) return;
@@ -180,7 +164,6 @@ function FileEditor({
 
   const openEditorSearch = useCallback((view: EditorView, replace: boolean) => {
     if (replace && readOnlyRef.current) return;
-    // Opening CodeMirror's panel state also turns on its match highlighting.
     openSearchPanel(view);
     searchOpenRef.current = true;
     setSearchOpen(true);
@@ -199,14 +182,11 @@ function FileEditor({
     const view = editorRef.current;
     if (view?.dom.isConnected) {
       closeSearchPanel(view);
-      // The query goes and one selection collapses to its end, so no highlight outlives the
-      // search. Cursors from "Select all matches" stay: closing and then typing edits them.
       clearEditorSearchQuery(view);
       const { selection } = view.state;
       if (selection.ranges.length === 1) {
         view.dispatch({ selection: EditorSelection.single(selection.main.head) });
       }
-      // Switching tabs must not pull focus into the now hidden editor.
       if (focusEditor) view.focus();
     }
     return true;
@@ -216,14 +196,12 @@ function FileEditor({
     [closeEditorSearchInternal],
   );
 
-  // The find card belongs to the shown tab; it closes when another tab is shown.
   useLayoutEffect(() => {
     if (isActiveTab) return;
     closeEditorSearchInternal(false);
     setPreviewSearchOpen(false);
   }, [isActiveTab, closeEditorSearchInternal]);
 
-  // F3 and ⌘G step through the card, keeping its count current, or open it when closed.
   const stepEditorSearch = useCallback(
     (view: EditorView, direction: EditorSearchDirection) => {
       if (!searchOpenRef.current) {
@@ -236,7 +214,6 @@ function FileEditor({
     [openEditorSearch],
   );
 
-  // A stable source for CodeMirror's keymap, built once yet always calling the latest callbacks.
   const searchActionsRef = useRef<EditorSearchKeymapActions>({
     openFind: (view) => {
       openEditorSearch(view, false);
@@ -252,7 +229,6 @@ function FileEditor({
     close: () => closeEditorSearch(),
   });
 
-  // A live session writes the file itself, so there is never anything left to save.
   const savesItself = Boolean(addon.savesItself);
   const dirty = !readOnly && !savesItself && draft !== savedText;
   const save = useCallback(async () => {
@@ -282,7 +258,6 @@ function FileEditor({
     () => createEditorSearchExtensions(searchActionsRef, IS_MAC),
     [],
   );
-  // ⌘S saves from inside the editor.
   const saveKeymap = useMemo(
     () =>
       keymap.of([
@@ -297,7 +272,6 @@ function FileEditor({
       ]),
     [],
   );
-  // What vim's `:w`, `:q` and `:e` do here, always calling the latest save and the pane's actions.
   const commands = useMemo(
     () =>
       editorCommands.of({
@@ -331,13 +305,11 @@ function FileEditor({
     ],
   );
 
-  // The tab strip marks a tab with unsaved edits and asks before closing it.
   useEffect(() => {
     setFileDirty(path, dirty);
     return () => setFileDirty(path, false);
   }, [dirty, path, setFileDirty]);
 
-  // ⌘S also works while focus is elsewhere in the panel, for the shown tab only.
   useEffect(() => {
     if (readOnly || !isActiveTab) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -351,7 +323,6 @@ function FileEditor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [readOnly, isActiveTab]);
 
-  // ⌘F opens the Markdown preview's find bar while that preview shows.
   useEffect(() => {
     if (!isActiveTab || !isMarkdown || viewMode !== "preview") return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -367,14 +338,12 @@ function FileEditor({
   const changeViewMode = useCallback(
     (mode: EditorViewMode) => {
       setPreviewSearchOpen(false);
-      // Closed before CodeMirror's view goes, or its panel state would be dropped unclosed.
       closeEditorSearch();
       setViewMode(mode);
     },
     [closeEditorSearch],
   );
 
-  // The language comes from the file's name, loaded on demand.
   useEffect(() => {
     let cancelled = false;
     setLanguageExtension([]);
@@ -404,7 +373,6 @@ function FileEditor({
   if (content.kind === "binary") return <BinaryFileView name={name} />;
 
   return (
-    // Clipped so the editor keeping its cursor in view never scrolls the pane around it.
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-clip">
       <FileEditorHeader
         path={path}
@@ -450,7 +418,6 @@ function FileEditor({
         )
       ) : (
         <>
-          {/* Find docks over the code, the same bar every document uses. */}
           <EditorSearchPanel
             view={editorView}
             open={searchOpen}
@@ -463,7 +430,6 @@ function FileEditor({
             onClose={closeEditorSearch}
             navigateRef={navigateRef}
           />
-          {/* In the chat's floating panel the code sits on the panel's own fill. */}
           <div className={editorFrameClass}>
             <CodeMirror
               className="min-h-0 flex-1 overflow-hidden"

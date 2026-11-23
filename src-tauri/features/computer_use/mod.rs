@@ -27,7 +27,6 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 
-/// Emitted when the person stops screen control with Escape: `{ runId }`.
 pub const STOPPED_EVENT: &str = "misty://computer-use-stopped";
 
 #[derive(Debug, Clone, Serialize)]
@@ -35,9 +34,7 @@ pub const STOPPED_EVENT: &str = "misty://computer-use-stopped";
 pub struct PermissionStatus {
     pub accessibility: bool,
     pub screen_recording: bool,
-    /// False where the OS has no grant to give, so Settings says nothing is needed.
     pub os_permissions_required: bool,
-    /// Some run is working the screen now, so Settings offers to stop it.
     pub active: bool,
 }
 
@@ -55,7 +52,6 @@ pub fn computer_use_permission_status() -> PermissionStatus {
     permission_status()
 }
 
-/// Opens the System Settings pane for one grant. Only these two fixed panes can be opened.
 #[tauri::command]
 pub fn computer_use_open_permission_settings(kind: String) -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -82,14 +78,9 @@ pub fn computer_use_open_permission_settings(kind: String) -> Result<(), String>
     }
 }
 
-// ---- Escape to stop ----
-
-/// The runs that are acting on the screen now, which Escape stops.
 static ACTIVE: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
-/// The runs the person stopped. Their next action is refused, whatever the engine does.
 static STOPPED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
 static WATCHING: AtomicBool = AtomicBool::new(false);
-/// While Misty itself presses keys, an Escape it sends isn't the person's.
 static ACTING: AtomicBool = AtomicBool::new(false);
 
 thread_local! {
@@ -108,7 +99,6 @@ fn stopped_runs() -> std::sync::MutexGuard<'static, HashSet<String>> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// Whether the run the driver is acting for was stopped.
 pub(crate) fn stopped() -> bool {
     CURRENT_RUN.with(|run| stopped_runs().contains(run.borrow().as_str()))
 }
@@ -138,35 +128,30 @@ fn escape_down() -> bool {
     }
 }
 
-/// Starts watching for Escape once a run acts. It watches only while some run is acting.
 fn watch_escape(app: &AppHandle) {
     if WATCHING.swap(true, Ordering::SeqCst) {
         return;
     }
     let app = app.clone();
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(Duration::from_millis(40));
-            let runs: Vec<String> = active().iter().cloned().collect();
-            if runs.is_empty() {
-                WATCHING.store(false, Ordering::SeqCst);
-                // A run that started acting between the check and now starts a new watcher.
-                if !active().is_empty() && !WATCHING.swap(true, Ordering::SeqCst) {
-                    continue;
-                }
-                return;
-            }
-            if ACTING.load(Ordering::SeqCst) || !escape_down() {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(40));
+        let runs: Vec<String> = active().iter().cloned().collect();
+        if runs.is_empty() {
+            WATCHING.store(false, Ordering::SeqCst);
+            if !active().is_empty() && !WATCHING.swap(true, Ordering::SeqCst) {
                 continue;
             }
-            for run in runs {
-                stop_run(&app, &run);
-            }
+            return;
+        }
+        if ACTING.load(Ordering::SeqCst) || !escape_down() {
+            continue;
+        }
+        for run in runs {
+            stop_run(&app, &run);
         }
     });
 }
 
-/// The person pressed Escape: the run stops acting, its turn is stopped and the cursor goes.
 fn stop_run(app: &AppHandle, run_id: &str) {
     stopped_runs().insert(run_id.to_string());
     let ended = remove_active(run_id);
@@ -178,18 +163,15 @@ fn stop_run(app: &AppHandle, run_id: &str) {
     }
 }
 
-/// Whether an agent is working the screen now, for the menu bar's Stop.
 pub(crate) fn screen_in_use() -> bool {
     !active().is_empty()
 }
 
-/// Takes a run off the screen; true when it was the last one.
 fn remove_active(run_id: &str) -> bool {
     let mut runs = active();
     runs.remove(run_id) && runs.is_empty()
 }
 
-/// A run's computer tools are done: the run ended or the person turned screen control off.
 pub(crate) fn release(run_id: &str) {
     let ended = remove_active(run_id);
     stopped_runs().remove(run_id);
@@ -198,13 +180,11 @@ pub(crate) fn release(run_id: &str) {
     }
     if active().is_empty() {
         overlay::hide();
-        // The portal session ends with the last run, so its sharing indicator goes too.
         #[cfg(target_os = "linux")]
         portal::end();
     }
 }
 
-/// Stops screen control for every run, as the Stop in Settings or the island does.
 #[tauri::command]
 pub fn computer_use_stop(app: AppHandle) {
     let runs: Vec<String> = active().iter().cloned().collect();
@@ -213,7 +193,6 @@ pub fn computer_use_stop(app: AppHandle) {
     }
 }
 
-/// Runs one driver action for a run, with Escape watched and Misty's own keys not counted.
 pub(crate) fn acting<T>(app: &AppHandle, run_id: &str, work: impl FnOnce() -> T) -> T {
     let started = {
         let mut runs = active();
@@ -222,7 +201,6 @@ pub(crate) fn acting<T>(app: &AppHandle, run_id: &str, work: impl FnOnce() -> T)
         first
     };
     if started {
-        // The menu bar offers Stop while the screen is in use.
         crate::app::tray::changed();
     }
     watch_escape(app);

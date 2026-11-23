@@ -1,5 +1,3 @@
-//! Running one app tool. The decisions that must hold whatever the renderer does live here: which account
-//! a call runs as, whether a write needs the person, and that one approval covers one exact action.
 use serde::Serialize;
 use serde_json::Value;
 
@@ -12,27 +10,26 @@ use super::{
     tools::{rejected, storage_failure, Failure},
 };
 
-/// One call's input, after the handler's own checks.
 pub struct ExecuteCall {
     pub run_id: String,
     pub tool_slug: String,
     pub arguments: Value,
     pub account: String,
-    /// The run's Ask or Auto. Anything else counts as Ask.
     pub mode: String,
 }
 
-/// The call ran, or it's waiting on the person.
 #[derive(Debug, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum Executed {
-    Done { result: Value },
-    Waiting { title: String, request: RequestView },
+    Done {
+        result: Value,
+    },
+    Waiting {
+        title: String,
+        request: Box<RequestView>,
+    },
 }
 
-/// What every app call goes through once its tool and account are known, wherever it runs: a read
-/// runs at once; a write runs when the mode, a remembered approval or an answered card allows it,
-/// and otherwise opens a card. `run` gets whether the call writes.
 pub(super) async fn approve_and_run<F, Fut>(
     store: &Store,
     call: &ExecuteCall,
@@ -108,7 +105,7 @@ where
         )),
         _ => Ok(Executed::Waiting {
             title,
-            request: request.view(),
+            request: Box::new(request.view()),
         }),
     }
 }

@@ -1,6 +1,3 @@
-//! The chat's thread: renaming, forking, side questions, archiving, approving a denied action,
-//! deleting, its goal, its background terminals, subagents and rollout.
-
 use super::*;
 
 pub(super) async fn rename(context: &Context) -> Result<Output, String> {
@@ -44,9 +41,6 @@ pub(super) async fn fork(context: &Context) -> Result<Output, String> {
     })
 }
 
-/// A side question: asked in an ephemeral fork, which Codex never saves, so the chat's own
-/// thread never sees it. The fork reads only and asks nothing, since nobody is there to approve
-/// anything outside a turn.
 pub(super) async fn side(context: &Context, name: &str) -> Result<Output, String> {
     let Some(thread) = context.session.as_deref() else {
         return Ok(Output::done(NO_THREAD));
@@ -94,7 +88,6 @@ async fn side_answer(rpc: &mut Session, thread: &str, question: &str) -> Result<
     )
     .await
     .map_err(text)?;
-    // The last agent message of the turn is its answer; earlier ones are commentary.
     let mut answer = String::new();
     loop {
         let message = rpc.next_notification().await.map_err(text)?;
@@ -125,7 +118,6 @@ async fn side_answer(rpc: &mut Session, thread: &str, question: &str) -> Result<
     Ok(answer)
 }
 
-/// Archives the thread; the composer archives the chat.
 pub(super) async fn archive(context: &Context) -> Result<Output, String> {
     let Some(thread) = context.session.as_deref() else {
         return Ok(Output::done(NO_THREAD));
@@ -140,9 +132,6 @@ pub(super) async fn archive(context: &Context) -> Result<Output, String> {
     Ok(Output::done("Archived this Codex thread."))
 }
 
-/// Approves one retry of the action Codex's auto-review last denied in this chat, as the
-/// terminal app's `/approve` does. The turn kept the denial (`codex_app_denials.rs`); Codex
-/// writes the approval into the thread for the model to read on the next turn.
 pub(super) async fn approve(context: &Context) -> Result<Output, String> {
     let Some(thread) = context.session.as_deref() else {
         return Ok(Output::done(NO_THREAD));
@@ -166,8 +155,6 @@ pub(super) async fn approve(context: &Context) -> Result<Output, String> {
 }
 
 async fn approve_denial(rpc: &mut Session, thread: &str, event: &Value) -> Result<(), String> {
-    // This app-server has just started, so the thread isn't loaded, and Codex approves only on
-    // a loaded thread; resuming also says where its rollout file is.
     let resumed = rpc
         .call(
             "thread/resume",
@@ -177,7 +164,7 @@ async fn approve_denial(rpc: &mut Session, thread: &str, event: &Value) -> Resul
         .map_err(text)?;
     let rollout = text_at(&resumed, "/thread/path").map(Path::new);
     let start = match rollout {
-        Some(path) => tokio::fs::metadata(path).await.map_or(0, |meta| meta.len()),
+        Some(path) => rollout_length(path).await,
         None => 0,
     };
     rpc.call(
@@ -186,8 +173,6 @@ async fn approve_denial(rpc: &mut Session, thread: &str, event: &Value) -> Resul
     )
     .await
     .map_err(text)?;
-    // Codex answers once the approval is queued and writes it into the thread after, so the
-    // app-server must not stop before the rollout file has it.
     match rollout {
         Some(path) => approval_saved(path, start).await,
         None => {
@@ -197,8 +182,14 @@ async fn approve_denial(rpc: &mut Session, thread: &str, event: &Value) -> Resul
     }
 }
 
-/// Waits until the rollout file has Codex's approval note past `start`, where it stood before
-/// the approval.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "measures the session log Codex reported, in place, wherever its home keeps it"
+)]
+async fn rollout_length(path: &Path) -> u64 {
+    tokio::fs::metadata(path).await.map_or(0, |meta| meta.len())
+}
+
 async fn approval_saved(path: &Path, start: u64) -> Result<(), String> {
     let deadline = tokio::time::Instant::now() + APPROVAL_SAVE_TIMEOUT;
     loop {
@@ -212,6 +203,10 @@ async fn approval_saved(path: &Path, start: u64) -> Result<(), String> {
     }
 }
 
+#[allow(
+    clippy::disallowed_types,
+    reason = "reads the session log Codex reported, in place, wherever its home keeps it"
+)]
 async fn rollout_has_note(path: &Path, start: u64) -> bool {
     let Ok(mut file) = tokio::fs::File::open(path).await else {
         return false;
@@ -352,8 +347,6 @@ pub(super) async fn stop_background_terminals(context: &Context) -> Result<Outpu
     Ok(Output::done("Stopped all background terminals."))
 }
 
-/// The subagent threads this chat's thread spawned, at any depth. Misty sends every message to
-/// the chat's own thread, so this lists them without switching to one.
 pub(super) async fn subagents(context: &Context) -> Result<Output, String> {
     let Some(thread) = context.session.as_deref() else {
         return Ok(Output::done(NO_THREAD));

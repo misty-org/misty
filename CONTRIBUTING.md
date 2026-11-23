@@ -59,7 +59,7 @@ component rather than adding a parallel one, and don't leave dead code behind.
 
 Everything visible is built from `@misty/ui`. A feature combines shared components and doesn't
 pick its own colors, borders, corners, sizes or spacing. If it needs a look the shared set doesn't
-have, add it to `@misty/ui` first. `src/tests/architecture/uiRules.ts` enforces this. Some of
+have, add it to `@misty/ui` first. `src/tests/architecture/ui_rules.ts` enforces this. Some of
 the rules:
 
 - Sentence case for labels, buttons and headings.

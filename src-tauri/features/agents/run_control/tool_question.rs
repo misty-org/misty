@@ -1,17 +1,11 @@
-//! What the person reads before answering: the whole of what's being approved, or nothing. A call that
-//! can't be shown in full is refused, with word to make a smaller one, and never shown cut short.
 use serde_json::{Map, Value};
 
-/// Past this the island's scrolling view stops being something a person can read. A shell command (up
-/// to 60,000 characters) and a program (up to 20,000) both fit.
 pub(crate) const MAX_SHOWN: usize = 64_000;
 
-/// What can't be shown, for the model to hear.
 pub(crate) const TOO_LONG: &str = "This call is too long to show the person in full, so it wasn't asked about and nothing was done. Make a smaller call.";
 
 const MASK: &str = "••••••";
 
-/// Handles the person has no use for, which change nothing about what happens.
 const INTERNAL: &[&str] = &[
     "scopeId",
     "documentId",
@@ -56,7 +50,6 @@ fn masked(value: &Value) -> Value {
     }
 }
 
-/// Every field of a call, for a question or an approval card.
 pub(crate) fn shown_fields(input: &Value) -> Vec<String> {
     let Some(fields) = input.as_object() else {
         return Vec::new();
@@ -75,7 +68,6 @@ pub(crate) fn shown_fields(input: &Value) -> Vec<String> {
         .collect()
 }
 
-/// A page control, as far as the page can name it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Control {
     pub(crate) name: String,
@@ -140,7 +132,6 @@ fn step_line(step: &Value, controls: &Controls) -> String {
     line
 }
 
-/// A sentence-case name for a tool: `memory.pref.update` is "Memory pref update".
 pub(crate) fn tool_title(name: &str) -> String {
     let words: Vec<&str> = name
         .split(['.', '_'])
@@ -154,7 +145,6 @@ pub(crate) fn tool_title(name: &str) -> String {
     )
 }
 
-/// Every reference a call's steps name, to look up on the page first.
 pub(crate) fn page_refs(name: &str, input: &Value) -> Vec<String> {
     let list = match name {
         "browser.steps" => &input["steps"],
@@ -168,7 +158,6 @@ pub(crate) fn page_refs(name: &str, input: &Value) -> Vec<String> {
         .collect()
 }
 
-/// The full text of what this call does. `Err` when it can't be shown whole.
 pub(crate) fn question_text(
     name: &str,
     input: &Value,

@@ -1,5 +1,3 @@
-//! Each chat's private folder. It lasts until the chat is deleted, has a size limit, and no other
-//! chat can see it.
 use file_access::fs;
 use std::{
     path::{Path, PathBuf},
@@ -13,24 +11,18 @@ use sha2::{Digest, Sha256};
 
 use super::SharedFolder;
 
-/// The most one workspace may hold before commands are refused.
 pub(super) const MAX_WORKSPACE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-/// How often a running command's workspace is measured.
 const SIZE_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(3);
-/// The name a chat's shared folder has inside its workspace. The agent never needs the real path.
 pub(super) const SHARED_FOLDER_LINK: &str = "shared-folder";
 
 fn root(misty_dir: &Path) -> PathBuf {
     misty_dir.join("agent-workspaces")
 }
 
-/// A key's folder. Keys come through the server, so they're hashed and can't name another path.
 fn folder(misty_dir: &Path, key: &str) -> PathBuf {
     root(misty_dir).join(hex::encode(Sha256::digest(key.as_bytes())))
 }
 
-/// Creates the workspace if needed and refuses one that's over its limit. Returns its real path,
-/// which is what an OS profile compares against.
 pub(super) fn prepare(misty_dir: &Path, key: &str) -> Result<PathBuf, String> {
     if key.trim().is_empty() {
         return Err("shell_workspace_missing".into());
@@ -46,7 +38,6 @@ pub(super) fn prepare(misty_dir: &Path, key: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-/// A command could otherwise fill the disk before the next one is refused. Stops it instead.
 pub(super) async fn stop_when_full(
     workspace: PathBuf,
     max_bytes: u64,
@@ -76,8 +67,6 @@ fn restrict_to_owner(path: &Path) {
 #[cfg(not(unix))]
 fn restrict_to_owner(_path: &Path) {}
 
-/// Points the workspace's link at the chat's shared folder, or removes a stale one. A link an agent
-/// changed gets nothing from it: the OS profile decides by real path, not by this link.
 pub(super) fn link_folder(
     workspace: &Path,
     folder: Option<&SharedFolder>,
@@ -113,8 +102,6 @@ fn make_link(target: &Path, link: &Path) -> std::io::Result<()> {
     fs::symlink(target, link)
 }
 
-/// A junction rather than a symbolic link, because Windows only lets administrators and developer
-/// mode make those.
 #[cfg(windows)]
 fn make_link(target: &Path, link: &Path) -> std::io::Result<()> {
     use std::os::windows::process::CommandExt;
@@ -134,7 +121,6 @@ fn make_link(target: &Path, link: &Path) -> std::io::Result<()> {
     }
 }
 
-/// The bytes held by the files under `folder`, without following links.
 fn folder_bytes(folder: &Path) -> u64 {
     fs::read_dir(folder)
         .into_iter()
@@ -148,8 +134,6 @@ fn folder_bytes(folder: &Path) -> u64 {
         .sum()
 }
 
-/// Deletes a chat's workspace, when the chat is deleted. Files a person's shared folder holds aren't
-/// touched: `remove_dir_all` removes a link rather than following it.
 pub fn forget(misty_dir: &Path, key: &str) -> Result<(), String> {
     let path = folder(misty_dir, key);
     match fs::remove_dir_all(&path) {

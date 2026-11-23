@@ -1,31 +1,17 @@
-//! Every folder an engine's own history shows a past chat in, found in each engine's own records
-//! and registered as a scan workspace, so the scanner and the search index cover chats from
-//! folders no Space links and no agent owns. It only reads, a bounded amount, through the file
-//! gate's grant for the engines' homes. Registering a folder lists its chats and nothing more: the
-//! folder itself is never granted, linked or opened.
-
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::engines::support::db::Db;
 
-/// The most folders kept, the most recently used first.
 const MAX_FOLDERS: usize = 200;
-/// Project (or cwd) folders looked at in one engine's history.
 const MAX_DIRS: usize = 500;
-/// Entries read from any one folder listing.
 const MAX_ENTRIES: usize = 2000;
-/// Chat files tried in one project folder before it's given up on.
 const MAX_FILES_PER_DIR: usize = 3;
-/// Codex rollouts looked at, newest first.
 const MAX_CODEX_FILES: usize = 1000;
-/// The most read from the start of one chat file, in chunks, stopping at the first folder named.
 const HEAD_BYTES: usize = 64 * 1024;
 const CHUNK_BYTES: usize = 8 * 1024;
-/// Folders remembered per project folder or chat file, so later scans read nothing again.
 const CACHE_CAPACITY: usize = 8192;
 
-/// A project folder's or chat file's folder never changes once written, so it is read once a run.
 static KNOWN: std::sync::LazyLock<parking_lot::Mutex<HashMap<PathBuf, String>>> =
     std::sync::LazyLock::new(Default::default);
 
@@ -41,7 +27,6 @@ fn remember(key: &Path, folder: &str) {
     known.insert(key.to_path_buf(), folder.to_string());
 }
 
-/// Each folder found, with the last time a chat there changed (ms).
 #[derive(Default)]
 pub(super) struct Found(HashMap<String, i64>);
 
@@ -54,7 +39,6 @@ impl Found {
         *last = (*last).max(at_ms);
     }
 
-    /// The folders, the most recently used first.
     pub(super) fn newest_first(self) -> Vec<String> {
         let mut folders: Vec<(String, i64)> = self.0.into_iter().collect();
         folders.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
@@ -62,7 +46,6 @@ impl Found {
     }
 }
 
-/// An absolute folder path as text, without a trailing separator. Anything else is refused.
 fn plain_folder(text: &str) -> Option<String> {
     let path = Path::new(text.trim());
     if !path.is_absolute()
@@ -76,12 +59,9 @@ fn plain_folder(text: &str) -> Option<String> {
     Some(plain.to_string_lossy().into_owned())
 }
 
-/// Finds the folders and registers the ones an agent could be given, as part of each scan.
 pub(super) fn register(db: &Db) {
     let protected: Vec<PathBuf> = file_access::paths::misty_root_dir().into_iter().collect();
     let home = dirs::home_dir();
-    // A folder no agent could ever be given (the home folder itself, system folders, app data,
-    // Misty's own) has no chats to continue, so it isn't listed.
     let folders: Vec<String> = find_all()
         .newest_first()
         .into_iter()
@@ -100,10 +80,6 @@ pub(super) fn register(db: &Db) {
     }
 }
 
-/// Adds each folder as a scan workspace; one already there is left as it is. Folders found this
-/// way have no `last_opened_at` (a linked folder always does), so one that has dropped out of the
-/// newest [`MAX_FOLDERS`] stops being scanned, and the scan's cost stays bounded. Its chats
-/// already indexed stay listed.
 pub(super) fn register_into(db: &Db, folders: &[String]) -> Result<(), String> {
     if folders.is_empty() {
         return Ok(());
@@ -135,7 +111,6 @@ pub(super) fn register_into(db: &Db, folders: &[String]) -> Result<(), String> {
     tx.commit().map_err(|e| e.to_string())
 }
 
-/// Every engine's history, in their homes as they are on this computer.
 fn find_all() -> Found {
     let mut found = Found::default();
     let claude = crate::engines::engine_home(Some("CLAUDE_CONFIG_DIR"), ".claude");
@@ -159,7 +134,6 @@ fn find_all() -> Found {
     found
 }
 
-/// A file's last change, in ms.
 pub(super) fn modified_ms(metadata: &std::fs::Metadata) -> i64 {
     metadata
         .modified()
@@ -169,7 +143,6 @@ pub(super) fn modified_ms(metadata: &std::fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
-/// Up to [`MAX_ENTRIES`] folders (or files) in `dir`, the most recently changed first.
 pub(super) fn newest_entries(dir: &Path, folders: bool) -> Vec<(PathBuf, i64)> {
     let Ok(entries) = file_access::fs::read_dir(dir) else {
         return Vec::new();
@@ -186,7 +159,6 @@ pub(super) fn newest_entries(dir: &Path, folders: bool) -> Vec<(PathBuf, i64)> {
     out
 }
 
-/// Files in `dir` whose name ends with `ending`, the most recently changed first.
 fn newest_files(dir: &Path, ending: &str) -> Vec<(PathBuf, i64)> {
     newest_entries(dir, false)
         .into_iter()
@@ -198,8 +170,6 @@ fn newest_files(dir: &Path, ending: &str) -> Vec<(PathBuf, i64)> {
         .collect()
 }
 
-/// Reads the start of a chat file a chunk at a time, up to [`HEAD_BYTES`], until `pick` finds
-/// what it wants in what has been read so far.
 pub(super) fn from_head(
     path: &Path,
     zstd_compressed: bool,
@@ -227,9 +197,6 @@ pub(super) fn from_head(
     None
 }
 
-/// The absolute paths recorded under the JSON key `key` in `text`, in order. A key inside a
-/// string value would be escaped (`\"cwd\"`), so a bare match is a real key; the string after it
-/// is decoded as JSON, and one cut off by the read limit doesn't count.
 pub(super) fn json_paths(text: &str, key: &str) -> Vec<String> {
     let needle = format!("\"{key}\"");
     let mut out = Vec::new();
@@ -256,14 +223,10 @@ pub(super) fn json_paths(text: &str, key: &str) -> Vec<String> {
     out
 }
 
-/// The first of [`json_paths`].
 pub(super) fn json_path(text: &str, key: &str) -> Option<String> {
     json_paths(text, key).into_iter().next()
 }
 
-/// Claude Code: `<projects>/<encoded folder>/<session>.jsonl`, each line carrying the `cwd`. The
-/// folder name is the path with every separator and dot turned into `-`, so it can't be read
-/// back; the `cwd` is kept only when it encodes to the folder's name, as the scanner finds it.
 pub(super) fn find_claude(projects: &Path, found: &mut Found) {
     for (dir, _) in newest_entries(projects, true).into_iter().take(MAX_DIRS) {
         let files: Vec<(PathBuf, i64)> = newest_files(&dir, ".jsonl")
@@ -295,9 +258,6 @@ pub(super) fn find_claude(projects: &Path, found: &mut Found) {
     }
 }
 
-/// Codex: `<home>/sessions/YYYY/MM/DD/rollout-*.jsonl` (and `archived_sessions`), whose first line
-/// is the `session_meta` with the `cwd`. The dated folders sort by name, so the newest are walked
-/// first and the walk stops at [`MAX_CODEX_FILES`].
 pub(super) fn find_codex(home: &Path, found: &mut Found) {
     let mut files = Vec::new();
     for root in [home.join("sessions"), home.join("archived_sessions")] {
@@ -350,8 +310,6 @@ fn newest_rollouts(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) {
     }
 }
 
-/// Pi and Oh My Pi: `<home>/agent/sessions/<folder>/<session>.jsonl`, whose `session` line names
-/// the `cwd`.
 pub(super) fn find_pi_family(sessions: &Path, found: &mut Found) {
     for (dir, _) in newest_entries(sessions, true).into_iter().take(MAX_DIRS) {
         let files = newest_files(&dir, ".jsonl");
@@ -371,8 +329,6 @@ pub(super) fn find_pi_family(sessions: &Path, found: &mut Found) {
     }
 }
 
-/// DeepSeek: `<sessions>/<folder>/<session>/session*.jsonl.zstd`, whose `session` line names the
-/// `cwd`.
 pub(super) fn find_dsh(sessions: &Path, found: &mut Found) {
     for (dir, _) in newest_entries(sessions, true).into_iter().take(MAX_DIRS) {
         let chats = newest_entries(&dir, true);
@@ -399,8 +355,6 @@ pub(super) fn find_dsh(sessions: &Path, found: &mut Found) {
     }
 }
 
-/// Gemini CLI and Qwen Code: `<home>/tmp/<project>/chats/*.jsonl`. Qwen's lines carry the `cwd`;
-/// Gemini's first line lists the `directories` the chat worked in, the first being its own.
 pub(super) fn find_gemini_family(tmp: &Path, found: &mut Found) {
     for (project, _) in newest_entries(tmp, true).into_iter().take(MAX_DIRS) {
         let files = newest_files(&project.join("chats"), ".jsonl");
@@ -421,7 +375,6 @@ pub(super) fn find_gemini_family(tmp: &Path, found: &mut Found) {
 }
 
 fn gemini_folder(head: &str) -> Option<String> {
-    // Only whole lines: the last one may be cut off by the read.
     let complete = head.rsplit_once('\n').map_or("", |(lines, _)| lines);
     complete.lines().find_map(|line| {
         let value: serde_json::Value = serde_json::from_str(line.trim()).ok()?;

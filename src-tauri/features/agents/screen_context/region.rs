@@ -1,10 +1,6 @@
-// The composer's "Capture part of the screen": the person drags a rectangle with the system's
-// own picker, and the picture comes back as an attachment. Nothing is taken without that drag.
-
 use base64::Engine as _;
 use serde_json::{json, Value};
 
-/// A PNG's size, from its header.
 fn png_size(bytes: &[u8]) -> Option<(u32, u32)> {
     if bytes.len() < 24 || &bytes[..8] != b"\x89PNG\r\n\x1a\n" {
         return None;
@@ -14,7 +10,6 @@ fn png_size(bytes: &[u8]) -> Option<(u32, u32)> {
     Some((width, height))
 }
 
-/// Runs the system's region picker. `None` when the person cancelled it.
 #[tauri::command]
 pub async fn misty_capture_region(window: tauri::Webview) -> Result<Option<Value>, String> {
     super::trusted(&window)?;
@@ -27,13 +22,12 @@ pub async fn misty_capture_region(window: tauri::Webview) -> Result<Option<Value
             .status()
             .await
             .map_err(|error| format!("Misty couldn't open the screen picker: {error}"))?;
-        let bytes = match tokio::fs::read(&file).await {
+        let bytes = match file_access::fs_async::read(&file).await {
             Ok(bytes) => bytes,
-            // Escape leaves no file: nothing was chosen.
-            Err(_) if status.success() || !file.exists() => return Ok(None),
+            Err(_) if status.success() || !file_access::fs::exists(&file) => return Ok(None),
             Err(error) => return Err(error.to_string()),
         };
-        let _ = tokio::fs::remove_file(&file).await;
+        let _ = file_access::fs_async::remove_file(&file).await;
         let (width, height) = png_size(&bytes).ok_or("The capture wasn't a picture.")?;
         let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
         Ok(Some(json!({

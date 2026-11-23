@@ -1,7 +1,3 @@
-//! Lists a folder of the drive for macOS (the root's are the Spaces' folders), and what changed
-//! since a sync anchor. Folders are listed a page at a time from Misty; changes are asked for on the
-//! working set, which macOS keeps for the whole domain, with an anchor Misty keeps (each Space's
-//! place in its changes).
 use std::sync::Arc;
 
 use objc2::{
@@ -21,14 +17,11 @@ use crate::{
     send,
 };
 
-/// Pages Misty made start with this, so macOS's own first-page markers are told apart.
 const PAGE_PREFIX: &str = "misty-page:";
-/// `NSFileProviderErrorSyncAnchorExpired`: macOS lists everything again.
 const ANCHOR_EXPIRED: isize = -1002;
 
 pub struct EnumeratorIvars {
     link: Arc<Link>,
-    /// `"root"`, `"trash"`, `"working_set"`, a Space's folder (`space:…`) or an item id.
     container: String,
 }
 
@@ -136,7 +129,6 @@ define_class!(
                         let anchor = NSData::with_bytes(anchor.as_bytes());
                         handler.call((Retained::as_ptr(&anchor) as *mut NSFileProviderSyncAnchor,));
                     }
-                    // No anchor yet: macOS asks again, and lists folders meanwhile.
                     Err(_) => handler.call((std::ptr::null_mut(),)),
                 }
             });
@@ -152,7 +144,6 @@ impl DriveEnumerator {
     }
 }
 
-/// Misty's page token, or `None` for macOS's first-page markers.
 fn misty_page(page: &NSFileProviderPage) -> Option<String> {
     let bytes = page.to_vec();
     let text = std::str::from_utf8(&bytes).ok()?;

@@ -1,4 +1,3 @@
-//! The key that seals workspace recovery on this computer, and sealing with it.
 use aes_gcm::{
     aead::{Aead, Payload},
     Aes256Gcm, KeyInit, Nonce,
@@ -29,7 +28,6 @@ pub(crate) fn decode_fixed<const N: usize>(s: &str) -> Result<[u8; N]> {
     bytes.as_slice().try_into().map_err(|_| Error::Invalid)
 }
 
-/// Sealed data kept on this computer.
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Envelope {
@@ -54,8 +52,6 @@ impl Envelope {
     }
 }
 
-/// Whose recovery a key seals: the deployment and account come from native configuration, never a
-/// remotely supplied event or embedded webpage, and `id` names the store.
 #[derive(Clone)]
 pub struct RecoveryScope {
     pub deployment: String,
@@ -145,7 +141,6 @@ impl RecoveryKey {
         Self(Zeroizing::new(random()))
     }
 
-    /// A second handle to the same key.
     pub fn duplicate(&self) -> Self {
         Self(Zeroizing::new(*self.0))
     }

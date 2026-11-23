@@ -14,11 +14,6 @@ import type { Conflict, Resolution } from "@/features/files";
 import { formatBytes, formatDate } from "../format";
 import { nameOf } from "../model";
 
-/**
- * A copy or move that meets names already in the folder, asked one at a time as Finder does: Replace
- * (the old one goes to the Trash), Keep both ("name 2") or Skip, with "Apply to all" while more remain.
- * Cancel stops before anything moves.
- */
 export function ConflictDialog({
   conflicts,
   op,
@@ -26,7 +21,6 @@ export function ConflictDialog({
 }: {
   conflicts: Conflict[];
   op: "copy" | "move";
-  /** The answers by source path, or null when cancelled. */
   onDone(answers: Record<string, Resolution> | null): void;
 }) {
   const [at, setAt] = useState(0);
@@ -61,7 +55,11 @@ export function ConflictDialog({
           </Text>
           {left > 0 ? (
             <div className="flex items-center gap-2">
-              <Checkbox id={allId} checked={all} onCheckedChange={(checked) => setAll(checked === true)} />
+              <Checkbox
+                id={allId}
+                checked={all}
+                onCheckedChange={(checked) => setAll(checked === true)}
+              />
               <Label htmlFor={allId}>{`Apply to all ${left + 1}`}</Label>
             </div>
           ) : null}

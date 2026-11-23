@@ -1,8 +1,3 @@
-//! Misty-window control on Linux, the counterpart of `windows.rs`: the whole Misty window is
-//! drawn from what WebKit renders for each of its views, and each action goes to the view under
-//! the point as real GDK events delivered to that view alone (browser/input/native_input/linux.rs),
-//! so no global input is posted and the person's pointer and keyboard stay theirs. Typing and keys
-//! go to the view Misty last pointed at.
 use std::sync::Mutex;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -12,17 +7,14 @@ use tauri::AppHandle;
 
 use crate::browser::input::native_input::linux::{deliver, insert_text, Synth};
 
-/// The longest edge of a window frame the agent sees, as on the other systems.
 const MAX_EDGE: f64 = 2000.0;
 
-/// The label of the webview Misty last pointed at.
 static TARGET: Mutex<Option<String>> = Mutex::new(None);
 
 fn main_window(app: &AppHandle) -> Result<tauri::Window, String> {
     crate::browser::app_windows::primary(app).ok_or_else(|| "Misty window closed".into())
 }
 
-/// Why control can't continue while another window is in front.
 pub fn focus_reason() -> String {
     let name = if crate::agents::desktop_control::linux::wayland_session() {
         None
@@ -37,7 +29,6 @@ pub fn focus_reason() -> String {
     )
 }
 
-/// Runs `work` on the GTK thread and waits for it, from a worker or async task.
 async fn on_main<T: Send + 'static>(
     app: &AppHandle,
     work: impl FnOnce(&AppHandle) -> Result<T, String> + Send + 'static,
@@ -53,7 +44,6 @@ async fn on_main<T: Send + 'static>(
         .map_err(|_| "Misty's UI thread stopped".to_string())?
 }
 
-/// One of the window's views: its WebKit widget and its place in the window, in GTK units.
 struct View {
     label: String,
     widget: webkit2gtk::WebView,
@@ -63,7 +53,6 @@ struct View {
     height: i32,
 }
 
-/// The window's mapped views, pages first: they sit above the app's own view.
 fn views(window: &tauri::Window) -> Vec<View> {
     let Ok(toplevel) = window.gtk_window() else {
         return Vec::new();
@@ -73,7 +62,6 @@ fn views(window: &tauri::Window) -> Vec<View> {
         .into_iter()
         .filter_map(|view| {
             let (send, receive) = std::sync::mpsc::channel();
-            // On the GTK thread already, so this runs at once.
             view.with_webview(move |platform| {
                 let _ = send.send(OnMain(platform.inner()));
             })
@@ -97,7 +85,6 @@ fn views(window: &tauri::Window) -> Vec<View> {
     views
 }
 
-/// The window's content size and its place on screen, in GTK units.
 fn frame_of(window: &tauri::Window) -> Result<(i32, i32, i32, i32), String> {
     let toplevel = window.gtk_window().map_err(|e| e.to_string())?;
     let (x, y) = toplevel
@@ -115,7 +102,6 @@ fn frame_of(window: &tauri::Window) -> Result<(i32, i32, i32, i32), String> {
     ))
 }
 
-/// One capture of the display under control, or of the Misty window.
 pub async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Result<Value, String> {
     if !desktop {
         return capture(app).await;
@@ -127,7 +113,6 @@ pub async fn native_capture(app: &AppHandle, desktop: bool, task: String) -> Res
     .map_err(|e| e.to_string())?
 }
 
-/// Performs an action on the desktop under control, or in the Misty window.
 pub async fn perform(app: &AppHandle, desktop: bool, input: Value) -> Result<Value, String> {
     if !desktop {
         return action(app, &input).await;
@@ -139,7 +124,6 @@ pub async fn perform(app: &AppHandle, desktop: bool, input: Value) -> Result<Val
     .map_err(|e| e.to_string())?
 }
 
-/// Captures the whole Misty window, every view drawn where it sits.
 async fn capture(app: &AppHandle) -> Result<Value, String> {
     let (frame, shots) = on_main(app, |app| {
         let window = main_window(app)?;
@@ -168,7 +152,6 @@ async fn capture(app: &AppHandle) -> Result<Value, String> {
         Ok((frame, shots))
     })
     .await?;
-    // The snapshots finish on the GTK thread; draw them there, in stacking order.
     let mut surfaces = Vec::new();
     for (x, y, width, height, receive) in shots {
         if let Ok(Some(surface)) = receive.await {
@@ -191,12 +174,10 @@ async fn capture(app: &AppHandle) -> Result<Value, String> {
     }))
 }
 
-/// A GTK object passed from a closure that already runs on the GTK thread.
 struct OnMain<T>(T);
 // SAFETY: only created and used on the GTK thread; the channel never leaves it.
 unsafe impl<T> Send for OnMain<T> {}
 
-/// A cairo surface handed between GTK-thread closures; it is only ever touched there.
 struct SendSurface(gtk::cairo::Surface);
 // SAFETY: created, drawn and dropped on the GTK thread only; the async code merely carries it.
 unsafe impl Send for SendSurface {}
@@ -223,7 +204,6 @@ fn compose(
             context.save().map_err(|e| e.to_string())?;
             context.scale(scale, scale);
             context.translate(f64::from(x), f64::from(y));
-            // WebKit draws at the device scale; fit the shot to the view's place.
             context.scale(
                 f64::from(view_width) / f64::from(shot.width().max(1)),
                 f64::from(view_height) / f64::from(shot.height().max(1)),
@@ -242,7 +222,6 @@ fn compose(
     let mut rgba = Vec::with_capacity(width * height * 4);
     for row in 0..height {
         for pixel in data[row * stride..row * stride + width * 4].chunks_exact(4) {
-            // Opaque, native-endian ARGB32.
             let word = u32::from_ne_bytes([pixel[0], pixel[1], pixel[2], pixel[3]]);
             rgba.extend_from_slice(&[(word >> 16) as u8, (word >> 8) as u8, word as u8, 255]);
         }
@@ -250,7 +229,6 @@ fn compose(
     Ok((width as u32, height as u32, rgba))
 }
 
-/// The keysym and modifier bits for a workspace key.
 fn key_of(key: &str) -> Option<(u32, u32)> {
     let control = gtk::gdk::ModifierType::CONTROL_MASK.bits();
     Some(match key {
@@ -271,7 +249,6 @@ fn key_of(key: &str) -> Option<(u32, u32)> {
     })
 }
 
-/// Performs one validated action in the Misty window.
 async fn action(app: &AppHandle, input: &Value) -> Result<Value, String> {
     let input = input.clone();
     on_main(app, move |app| {
@@ -402,7 +379,6 @@ async fn action(app: &AppHandle, input: &Value) -> Result<Value, String> {
     .await
 }
 
-/// Control of the Misty window ended or paused.
 pub fn release() {
     if let Ok(mut target) = TARGET.lock() {
         *target = None;

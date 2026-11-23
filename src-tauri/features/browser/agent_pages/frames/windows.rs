@@ -1,8 +1,3 @@
-//! Cross-origin frames on Windows (../frames.rs). The tab's DevTools session attaches
-//! to each out-of-process frame, and each of those to its own (`Target.setAutoAttach` with
-//! `flatten`). The frame trees of the tab and of those sessions say which frames are
-//! cross-origin to the top document and which session runs each, so the page layer can
-//! run in an isolated world of every one (pages/content_world.rs).
 use crate::browser::agent_pages::frames::Frame;
 use crate::browser::pages::windows::webview2::{cdp, cdp_in_session, owned_string};
 use serde_json::{json, Value};
@@ -22,25 +17,18 @@ use windows::core::{Interface, HSTRING};
 mod tree;
 use tree::cross_origin_frames;
 
-/// Frames remembered per tab; the oldest are forgotten first.
 const MAX_FRAMES: usize = 24;
-/// Out-of-process frame sessions remembered per tab.
 const MAX_SESSIONS: usize = 64;
-/// Attach to out-of-process frames without pausing them.
 const AUTO_ATTACH: &str = r#"{"autoAttach":true,"waitForDebuggerOnStart":false,"flatten":true,"filter":[{"type":"iframe"}]}"#;
 const ATTACHED: &str = "Target.attachedToTarget";
 const DETACHED: &str = "Target.detachedFromTarget";
 
-/// Where the page layer reaches one frame: the target session that runs it (None for the
-/// tab's own) and its CDP frame id.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Target {
     pub session: Option<String>,
     pub frame: String,
 }
 
-/// One frame document. A frame that loads another document counts as new, as when it
-/// announces itself again on macOS.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Found {
     target: Target,
@@ -56,9 +44,7 @@ struct Entry {
 
 #[derive(Default)]
 struct Tab {
-    /// Sessions of the tab's out-of-process frames, in the order they attached.
     sessions: Vec<String>,
-    /// The top document's loader; a new one means a new page.
     document: String,
     frames: Vec<Entry>,
 }
@@ -74,7 +60,6 @@ fn next_id() -> u64 {
 }
 
 impl Tab {
-    /// Applies one Target event; returns the session of a frame that just attached.
     fn event(&mut self, event: &str, parameters: &Value) -> Option<String> {
         let session = parameters["sessionId"].as_str()?.to_owned();
         if event == DETACHED {
@@ -93,8 +78,6 @@ impl Tab {
         Some(session)
     }
 
-    /// Keeps the ids of frame documents still showing, gives new ones the next ids, and
-    /// returns them oldest first.
     fn reconcile(&mut self, document: &str, found: Vec<Found>) -> Vec<Frame> {
         if self.document != document {
             self.document = document.to_owned();
@@ -135,7 +118,6 @@ impl Tab {
     }
 }
 
-/// Asks a session (None: the tab's own) to attach to its out-of-process frames.
 fn auto_attach(core: &ICoreWebView2, session: Option<&str>) {
     let handler = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(|_, _| Ok(())));
     let method = HSTRING::from("Target.setAutoAttach");
@@ -156,7 +138,6 @@ fn auto_attach(core: &ICoreWebView2, session: Option<&str>) {
     };
 }
 
-/// Follows the tab's frame sessions as they attach and detach, then starts attaching.
 pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
     let label = webview.label().to_owned();
     webview
@@ -182,7 +163,6 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
                             return Ok(());
                         };
                         let attached = tabs().lock().ok().and_then(|mut tabs| {
-                            // Closed tabs leave their entries behind; past this many, start afresh.
                             if tabs.len() > 256 && !tabs.contains_key(&label) {
                                 tabs.clear();
                             }
@@ -190,7 +170,6 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
                                 .or_default()
                                 .event(event, &parameters)
                         });
-                        // A frame's own out-of-process frames attach through its session.
                         if let Some(session) = attached {
                             auto_attach(&core, Some(&session));
                         }
@@ -211,7 +190,6 @@ pub(crate) fn install(webview: &tauri::Webview) -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-/// The tab's cross-origin frames, oldest first.
 pub(crate) async fn list(view: &tauri::Webview) -> Vec<Frame> {
     let Ok(top) = cdp(view, "Page.getFrameTree", &json!({})).await else {
         return Vec::new();
@@ -243,12 +221,10 @@ pub(crate) async fn list(view: &tauri::Webview) -> Vec<Frame> {
         .reconcile(&document, found)
 }
 
-/// Where one listed frame runs, to run script inside it.
 pub(crate) fn target(label: &str, id: u64) -> Option<Target> {
     tabs().lock().ok()?.get(label)?.target(id)
 }
 
-/// Forgets a frame that no longer answers, such as one its page removed.
 pub(crate) fn forget(label: &str, id: u64) {
     if let Ok(mut tabs) = tabs().lock() {
         if let Some(tab) = tabs.get_mut(label) {

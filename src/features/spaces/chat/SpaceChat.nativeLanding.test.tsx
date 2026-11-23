@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { spacesApi } from "@/features/spaces/api/api";
-import type { SpacesStore } from "../list/spacesStoreTypes";
-import { useSpacesStore } from "../list/useSpacesStore";
+import type { SpacesStore } from "../list/spaces_store_types";
+import { useSpacesStore } from "../list/use_spaces_store";
 import { SpaceChat } from "./SpaceChat";
 import type { SpaceChatThreadProps } from "./components/SpaceChatThread";
 
@@ -16,7 +16,6 @@ vi.mock("@/features/agents/runs/markdown/AiPaneHost", async (importOriginal) => 
   useAiSurfaceAdapter: vi.fn(),
 }));
 
-// Exercise the real landing branch and message scope without the message editor.
 vi.mock("./components/SpaceChatThread", () => ({
   SpaceChatThread: ({ scope, onDelete }: SpaceChatThreadProps) => (
     <section aria-label="Conversation messages">
@@ -83,7 +82,6 @@ it("shows existing Everyone messages when opening Misty without a conversation s
       <SpaceChat spaceId="space-a" spaceName="Our Space" />
     </MemoryRouter>,
   );
-  // The Space-wide channel, named in the channel header as Discord names a channel.
   expect(ui.getByRole("heading", { name: "everyone" })).toBeTruthy();
   expect(ui.getByText("Our earlier Space conversation")).toBeTruthy();
   expect(ui.queryByText("No Misty conversations yet")).toBeNull();

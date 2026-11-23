@@ -1,4 +1,3 @@
-//! The generate-content request body. Ported from `GoogleLanguageModel.getArgs`.
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Number, Value};
 
@@ -22,8 +21,6 @@ const SAFETY_CATEGORIES: [&str; 4] = [
     "HARM_CATEGORY_SEXUALLY_EXPLICIT",
 ];
 
-/// What Misty may set under `providerOptions.google`. An option that doesn't fit is refused, as the
-/// SDK's schema refuses it.
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GoogleOptions {
@@ -123,7 +120,6 @@ fn other_warning(message: String) -> Value {
     json!({ "type": "other", "message": message })
 }
 
-/// `prepareTools`, for function tools.
 fn prepare_tools(
     tools: &[ToolDefinition],
     choice: Option<&ToolChoice>,
@@ -143,15 +139,23 @@ fn prepare_tools(
     let config = |value: Value| Some(json!({ "functionCallingConfig": value }));
     let tool_config = match choice {
         None => strict.then(|| json!({ "functionCallingConfig": { "mode": "VALIDATED" } })),
-        Some(ToolChoice::Auto) => config(json!({ "mode": if strict { "VALIDATED" } else { "AUTO" } })),
+        Some(ToolChoice::Auto) => {
+            config(json!({ "mode": if strict { "VALIDATED" } else { "AUTO" } }))
+        }
         Some(ToolChoice::None) => config(json!({ "mode": "NONE" })),
         Some(ToolChoice::Required) => config(json!({ "mode": "ANY" })),
-        Some(ToolChoice::Tool { tool_name }) => config(json!({ "mode": "ANY", "allowedFunctionNames": [tool_name] })),
+        Some(ToolChoice::Tool { tool_name }) => {
+            config(json!({ "mode": "ANY", "allowedFunctionNames": [tool_name] }))
+        }
     };
-    Ok((Some([ToolList { function_declarations: declarations }]), tool_config))
+    Ok((
+        Some([ToolList {
+            function_declarations: declarations,
+        }]),
+        tool_config,
+    ))
 }
 
-/// `{ ...resolved, ...options.thinkingConfig }`.
 fn merged_thinking(resolved: Option<Value>, options: Option<&ThinkingConfig>) -> Option<Value> {
     if resolved.is_none() && options.is_none() {
         return None;
@@ -174,9 +178,16 @@ fn merged_thinking(resolved: Option<Value>, options: Option<&ThinkingConfig>) ->
     Some(Value::Object(merged))
 }
 
-/// Builds the request, and the warnings the stream starts with.
-pub(super) fn build<'a>(model: &str, options: &'a CallOptions) -> Result<(GoogleRequest<'a>, Vec<Value>), ModelError> {
-    let google: GoogleOptions = match options.provider_options.as_ref().and_then(|all| all.get("google")).filter(|value| !value.is_null()) {
+pub(super) fn build<'a>(
+    model: &str,
+    options: &'a CallOptions,
+) -> Result<(GoogleRequest<'a>, Vec<Value>), ModelError> {
+    let google: GoogleOptions = match options
+        .provider_options
+        .as_ref()
+        .and_then(|all| all.get("google"))
+        .filter(|value| !value.is_null())
+    {
         Some(value) => serde_json::from_value(value.clone())
             .map_err(|_| ModelError::Unsupported("invalid google provider options".into()))?,
         None => GoogleOptions::default(),
@@ -192,7 +203,12 @@ pub(super) fn build<'a>(model: &str, options: &'a CallOptions) -> Result<(Google
             "'sharedRequestType' and 'requestType' are Vertex AI options and are ignored with the current Google provider ({PROVIDER})."
         )));
     }
-    let converted = messages::convert(&options.prompt, is_gemma(model), uses_gemini_3_features(model), &mut warnings)?;
+    let converted = messages::convert(
+        &options.prompt,
+        is_gemma(model),
+        uses_gemini_3_features(model),
+        &mut warnings,
+    )?;
     let (tools, tool_config) = prepare_tools(&options.tools, options.tool_choice.as_ref())?;
     let resolved = thinking_config(options.reasoning.as_deref(), model, &mut warnings);
     let thinking = merged_thinking(resolved, google.thinking_config.as_ref());
@@ -200,7 +216,10 @@ pub(super) fn build<'a>(model: &str, options: &'a CallOptions) -> Result<(Google
         google.threshold.as_ref().map(|threshold| {
             SAFETY_CATEGORIES
                 .iter()
-                .map(|category| SafetySetting { category: (*category).to_owned(), threshold: threshold.clone() })
+                .map(|category| SafetySetting {
+                    category: (*category).to_owned(),
+                    threshold: threshold.clone(),
+                })
                 .collect()
         })
     });
@@ -217,8 +236,10 @@ pub(super) fn build<'a>(model: &str, options: &'a CallOptions) -> Result<(Google
     let mut response_mime_type = None;
     if let Some(ResponseFormat::Json { schema, .. }) = &options.response_format {
         response_mime_type = Some("application/json");
-        // Google doesn't take every schema feature, so this option turns schemas off.
-        if let Some(schema) = schema.as_ref().filter(|_| google.structured_outputs.unwrap_or(true)) {
+        if let Some(schema) = schema
+            .as_ref()
+            .filter(|_| google.structured_outputs.unwrap_or(true))
+        {
             response_schema = to_openapi(&Ordered::from_raw(schema))?;
         }
     }

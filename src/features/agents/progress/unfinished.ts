@@ -5,11 +5,6 @@ export interface UnfinishedItem {
 
 const marker = /\n*Still incomplete:\n/;
 
-/**
- * A run that ended partly or blocked reports its answer, then a "Still
- * incomplete:" list of "requirement: reason" lines. The answer shows as the
- * message and each line as a row of the "Not finished" table.
- */
 export function splitUnfinished(text: string): { answer: string; remaining: UnfinishedItem[] } {
   const match = marker.exec(text);
   if (!match) return { answer: text, remaining: [] };

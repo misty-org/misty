@@ -19,8 +19,6 @@ use chats::storage::{device_snapshot_sync, scoped_file_path_sync};
 use database::environment::AppEnvironmentService;
 use database::store::Store;
 
-/// A folder's canonical path as it is stored and compared: on Windows without
-/// the `\\?\` prefix canonicalizing adds, so every path here has one form.
 pub(crate) fn canonical(path: impl AsRef<Path>) -> std::io::Result<PathBuf> {
     fs::canonicalize(path).map(|path| shared_folders::plain_path(&path))
 }
@@ -38,7 +36,6 @@ pub struct ListScopedFilesRequest {
     pub relative_path: String,
 }
 
-/// Agents see at most this many entries from one folder listing.
 const SCOPED_LISTING_LIMIT: usize = 500;
 
 #[derive(Debug, Deserialize)]
@@ -59,10 +56,7 @@ impl AgentService {
         run_db(self.database_path.clone(), device_snapshot_sync).await
     }
 
-    /// Shares a folder the person chose. Agents can read it and nothing more.
     pub async fn share_folder(&self, path: PathBuf, protected: &[PathBuf]) -> ApiResult<Value> {
-        // The person just picked this in the system's dialog, but it's only granted once it has
-        // passed the checks below, so this look comes first.
         let chosen = file_access::looks::chosen_folder(&path)
             .map_err(|error| ApiError::Message(format!("Could not open that folder: {error}")))?;
         let root = shared_folders::plain_path(&chosen.real);
@@ -104,7 +98,6 @@ impl AgentService {
         Ok(shared)
     }
 
-    /// Gives the file gate the folders shared before, when Misty starts.
     pub fn restore_folder_grants(&self) {
         let folders = (|| -> rusqlite::Result<Vec<String>> {
             let connection = Store::at(&self.database_path).connect()?;
@@ -117,7 +110,6 @@ impl AgentService {
         }
     }
 
-    /// The name a shared folder goes by, for the question about it.
     pub async fn folder_name(&self, scope_id: String) -> ApiResult<String> {
         run_db(self.database_path.clone(), move |connection| {
             connection.query_row(
@@ -129,7 +121,6 @@ impl AgentService {
         .await
     }
 
-    /// Only for after the person said yes in the native dialog.
     pub async fn allow_folder_changes(&self, key: String, scope_id: String) -> ApiResult<()> {
         run_db(self.database_path.clone(), move |connection| {
             shared_folders::folder_changes::allow(connection, &key, &scope_id)
@@ -155,7 +146,6 @@ impl AgentService {
         .await
     }
 
-    /// Off when the database can't answer: a failure must never read as a yes.
     pub async fn folder_changes_allowed(&self, key: String, scope_id: String) -> bool {
         run_db(self.database_path.clone(), move |connection| {
             shared_folders::folder_changes::allowed(connection, &key, &scope_id)
@@ -164,7 +154,6 @@ impl AgentService {
         .unwrap_or(false)
     }
 
-    /// A shared folder's real path, for a job already checked against its grant.
     pub async fn folder_root(&self, scope_id: String) -> ApiResult<PathBuf> {
         run_db(self.database_path.clone(), move |connection| {
             let root: String = connection.query_row(
@@ -197,7 +186,6 @@ impl AgentService {
         Ok(())
     }
 
-    /// Lists one directory inside a granted folder. Hidden entries are skipped.
     pub async fn list_scoped_files(&self, request: ListScopedFilesRequest) -> ApiResult<Value> {
         run_db(self.database_path.clone(), move |connection| {
             let root: String = connection.query_row(
@@ -315,7 +303,6 @@ pub mod run_control;
 pub mod screen_context;
 pub mod shell;
 #[cfg(test)]
-// Tests build their fixtures directly, outside the file gate.
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;
 pub mod tutor_links;

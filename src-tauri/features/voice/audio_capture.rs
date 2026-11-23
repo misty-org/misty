@@ -1,7 +1,3 @@
-//! Voice captures the person starts: the microphone, system audio (without
-//! Misty's own sound unless asked) and specific apps or tabs, as separate
-//! channels, sent to the window that started them. Mute closes the microphone;
-//! unmute reopens it. Nothing here starts on its own.
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Deserialize;
 use serde_json::json;
@@ -16,12 +12,9 @@ use voice_capture::{AudioSource, Capture, Channel, DuplexRouter, PcmChunk};
 #[serde(rename_all = "camelCase")]
 pub struct CaptureRequest {
     pub mic: bool,
-    /// Everything the computer plays, except Misty.
     pub system: bool,
-    /// System audio with Misty in it.
     #[serde(default)]
     pub include_misty: bool,
-    /// Only these processes (an app, or a tab's web content process).
     #[serde(default)]
     pub pids: Vec<u32>,
 }
@@ -34,7 +27,6 @@ pub struct CaptureState {
 
 struct Running {
     id: u64,
-    /// The window that started this capture and receives its audio.
     owner: String,
     mic: Option<Capture>,
     other: Option<Capture>,
@@ -92,8 +84,6 @@ fn open(
     .map_err(|error| error.to_string())
 }
 
-/// Starts a capture and returns its session number. Audio arrives as
-/// `misty://capture-audio` events, one channel per stream.
 #[tauri::command]
 pub fn voice_capture_start(
     webview: Webview,
@@ -112,7 +102,6 @@ pub fn voice_capture_start(
     let session = state.session.fetch_add(1, Ordering::SeqCst) + 1;
     let owner = webview.label().to_owned();
     let has_other = request.system || !request.pids.is_empty();
-    // With both channels open, the system channel is the echo reference.
     let router = Arc::new(Mutex::new(DuplexRouter::new(request.mic && has_other)));
     let other = if has_other {
         let source = if request.pids.is_empty() {
@@ -148,7 +137,6 @@ pub fn voice_capture_start(
     Ok(session)
 }
 
-/// Mute closes the microphone; other channels keep going.
 #[tauri::command]
 pub fn voice_capture_mute(
     webview: Webview,

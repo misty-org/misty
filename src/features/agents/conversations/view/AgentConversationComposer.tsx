@@ -2,10 +2,10 @@ import { useSpeechSupport } from "@/features/voice";
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from "react";
 import { useEffect } from "react";
 import { Download, Globe, History, LogIn, Mic, RefreshCw, Square } from "lucide-react";
-import type { useAiVoiceRecorder } from "../../runs/markdown/useAiVoiceRecorder";
+import type { useAiVoiceRecorder } from "../../runs/markdown/use_ai_voice_recorder";
 import { MistyComposer } from "../composer/MistyComposer";
-import type { useGlobalMistyAttachments } from "../composer/useGlobalMistyAttachments";
-import { useMistyStore } from "../state/useMistyStore";
+import type { useGlobalMistyAttachments } from "../composer/use_global_misty_attachments";
+import { useMistyStore } from "../state/use_misty_store";
 import type { AgentProfile } from "@/shared/schemas";
 import {
   ComposerStatusRow,
@@ -15,12 +15,12 @@ import {
   type ActionBarItem,
 } from "@misty/ui";
 import { ENGINE_NAMES, type EngineId } from "@/features/engine-config/channels";
-import { blocksAgent, useEngineReadiness } from "../../engines/engineReadiness";
+import { blocksAgent, useEngineReadiness } from "../../engines/engine_readiness";
 import { EngineNextStep } from "../../engines/EngineNextStep";
-import { chooseEngineMode, type usePermissionMode } from "../../plans/permissionMode";
-import { resolveEngineMode, useEngineModes } from "../../engines/engineModes";
-import type { useCollaborationComposer } from "../../plans/useCollaborationComposer";
-import { mistyEngine } from "../../engines/enginesApi";
+import { chooseEngineMode, type usePermissionMode } from "../../plans/permission_mode";
+import { resolveEngineMode, useEngineModes } from "../../engines/engine_modes";
+import type { useCollaborationComposer } from "../../plans/use_collaboration_composer";
+import { mistyEngine } from "../../engines/engines_api";
 import {
   BrowserChip,
   captureRegionFile,
@@ -30,17 +30,17 @@ import {
   useEngineModels,
 } from "../composer/controls/ComposerControls";
 import { useComposerSuggestions } from "../composer/controls/ComposerSuggestions";
-import { handleVimKey, useComposerVim } from "../composer/controls/composerVim";
-import { useChatFolder } from "../../shared-folders/chatFolder";
+import { handleVimKey, useComposerVim } from "../composer/controls/composer_vim";
+import { useChatFolder } from "../../shared-folders/chat_folder";
 import {
   useBrowserAttached,
   useBrowserAttachment,
   useChatChoices,
   useComposerChoices,
-} from "../composer/controls/composerChoices";
+} from "../composer/controls/composer_choices";
 import { ContextMeter } from "../composer/controls/ContextMeter";
-import { useChatContextUsage, watchContextUsage } from "../composer/controls/contextUsage";
-import { usePromptHistoryNav } from "../composer/usePromptHistoryNav";
+import { useChatContextUsage, watchContextUsage } from "../composer/controls/context_usage";
+import { usePromptHistoryNav } from "../composer/use_prompt_history_nav";
 
 const engineNames: Record<string, string> = {
   claude: "Claude Code",
@@ -59,13 +59,6 @@ const engineNames: Record<string, string> = {
   pi: "Pi",
 };
 
-/**
- * The conversation's message box: the text, then one bar that never wraps (the + menu with attach
- * and screen capture, effort, the engine's mode and model, giving way in that order), with
- * the context ring, voice and send (Stop while a reply runs and nothing is typed) at its end.
- * Where the chat works (Space, folder, branch) is in the context panel. `@` mentions a file in
- * the linked folder, `/` runs a command and `$` uses a skill.
- */
 export function AgentConversationComposer({
   agent,
   accountId,
@@ -98,23 +91,16 @@ export function AgentConversationComposer({
   working: boolean;
   send: () => void;
   reportError: (message: string) => void;
-  /** The chat has no messages yet: the composer is roomier. */
   empty?: boolean;
-  /** Rows about the chat's state at the top of the box, such as queued messages. */
   status?: ReactNode;
-  /** Opens the engine's own past chats, to continue one here (as `/resume` does). */
   onOpenHistory?: () => void;
-  /** Pulls in what happened in this chat's engine session outside Misty. */
   onSync?: () => void;
 }) {
   const engine = agent?.engine && agent.engine !== mistyEngine ? agent.engine : "";
-  // The engine's own modes; the chat's saved choice read as one of them.
   const modes = useEngineModes(engine || mistyEngine);
   const mode = resolveEngineMode(modes, permission, collaboration.mode === "plan");
   const planning = mode?.kind === "plans";
   const teaching = collaboration.mode === "teach";
-  // The chat's own folder, which `@` mentions read: a project, or its scratch folder once its
-  // first run has made it.
   const { folder } = useChatFolder(conversationId);
   useEffect(() => {
     watchContextUsage();
@@ -138,8 +124,6 @@ export function AgentConversationComposer({
     getText: () => textareaRef.current?.value ?? draft,
     setText: setDraft,
   });
-  // An agent whose engine isn't installed or signed in yet stays disabled: the box takes no
-  // message, and a row at its top says what is missing with the button that sets it up.
   const readiness = useEngineReadiness(engine);
   const held = Boolean(engine) && blocksAgent(readiness.state);
   const engineName = ENGINE_NAMES[engine as EngineId] ?? engine;
@@ -176,7 +160,6 @@ export function AgentConversationComposer({
     vimItem({ on: vimOn, mode: vimMode }),
   ].filter((item): item is ActionBarItem => Boolean(item));
 
-  // One button: Send while there is something to send, Stop while a reply runs and nothing is typed.
   const stop =
     working && !draft.trim() && !attachments.attachments.length ? (
       <MessageComposerAction
@@ -192,7 +175,6 @@ export function AgentConversationComposer({
       </MessageComposerAction>
     ) : undefined;
   const listening = voice.recording;
-  // Voice input is recognized by this computer; where it can't, the microphone isn't shown.
   const speech = useSpeechSupport();
   const voiceBusy = voice.requesting || voice.transcribing;
   return (
@@ -271,12 +253,9 @@ export function AgentConversationComposer({
             e.preventDefault();
             return;
           }
-          // Vim keys, when on, take what they need before history and sending.
           if (handleVimKey(e, textareaRef, setDraft)) return;
-          // Up in an empty box brings back what was sent before.
           if (history.handleKeyDown(e)) return;
           if (e.key === "Tab" && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey) {
-            // Shift+Tab steps through the engine's own modes, as in the engines' own tools.
             e.preventDefault();
             if (modes.length > 1 && mode) {
               const next = modes[(modes.indexOf(mode) + 1) % modes.length];
@@ -286,12 +265,10 @@ export function AgentConversationComposer({
           }
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
-            // The next message starts in insert mode, as a new Vim buffer would.
             useComposerVim.getState().reset();
             if (!attachments.attachments.some((a) => a.state !== "ready")) send();
           }
         }}
-        // Who the chat is with, and nothing else: @ and / open their menus when typed.
         placeholder={`${planning ? "Plan with" : "Message"} ${agent?.name || "Misty"}`}
         disabled={disabled}
         items={items}

@@ -1,12 +1,8 @@
-//! Which display the person works on, and the windows that count as theirs.
-
 use super::{platform, Display};
 
 fn contains(d: &Display, p: (f64, f64)) -> bool {
     p.0 >= d.x && p.0 < d.x + d.width && p.1 >= d.y && p.1 < d.y + d.height
 }
-/// Misty windows a person works in: app windows. The companion, its overlays
-/// and other panels are never "in front".
 pub(super) fn person_works_in(label: &str) -> bool {
     crate::browser::app_windows::is_app_window(label)
 }
@@ -24,7 +20,6 @@ pub(super) fn native_handle(window: &tauri::WebviewWindow) -> Option<isize> {
     // SAFETY: called on the main thread with a live window.
     Some(unsafe { (*native).windowNumber() })
 }
-/// "App: title", short enough for a capture label.
 pub(super) fn window_name(window: &platform::ForegroundWindow) -> String {
     let title: String = window.title.trim().chars().take(120).collect();
     match (window.app.trim(), title.as_str()) {
@@ -34,9 +29,6 @@ pub(super) fn window_name(window: &platform::ForegroundWindow) -> String {
         (app, title) => format!("{app}: {title}"),
     }
 }
-/// The display the person is working on: the one holding the window in
-/// front, else the one under the cursor, else the first. The flag says
-/// whether the foreground window decided it.
 pub(super) fn choose_primary(
     frames: &[Display],
     foreground: Option<&platform::ForegroundWindow>,

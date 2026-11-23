@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({ probePlan: vi.fn() }));
 vi.mock("./api", () => ({ mcpApi: api }));
 
 import { McpProbeConfirmHost } from "./McpProbeConfirmHost";
-import { confirmWorkspaceProbe, forgetProbeConfirm } from "./probe-confirm";
+import { confirmWorkspaceProbe, forgetProbeConfirm } from "./probe_confirm";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -58,7 +58,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  // Confirmations live for the run: start each case unconfirmed.
   forgetProbeConfirm(ENTRY, "/ws");
   if (root) await act(async () => root!.unmount());
   root = null;

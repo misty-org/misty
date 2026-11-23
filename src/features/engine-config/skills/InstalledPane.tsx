@@ -1,16 +1,12 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
-/**
- * The installed skills' actions (sync to an engine, import, update, uninstall, restore and their
- * confirmations), shared by Explore's Skills section (`agents/marketplace/SkillsSection.tsx`).
- */
 
 import type { Dispatch, SetStateAction } from "react";
 import { skillsHubApi } from "./api";
 import { t } from "./strings";
-import type { Feedback } from "./components";
+import type { Feedback } from "./Components";
 import type { BusyTarget, ConfirmState, UpdateMap } from "./InstalledPane.parts";
-import type { InstalledSkillsStore } from "./useInstalledSkills";
+import type { InstalledSkillsStore } from "./use_installed_skills";
 import type { SkillRow, SkillTargetId } from "./types";
 import { nextTargets, summarizeTargetResults } from "./utils";
 
@@ -27,9 +23,6 @@ export interface PaneActionDeps {
   setImportOpen: (value: boolean) => void;
 }
 
-/** Every async action the pane can run, gathered in one factory so the
- *  component stays a composition of header / list / dialogs instead of one
- *  long function mixing state transitions with markup. */
 export function createInstalledPaneActions(deps: PaneActionDeps) {
   const {
     store,
@@ -59,7 +52,6 @@ export function createInstalledPaneActions(deps: PaneActionDeps) {
 
   const handleRefresh = () => {
     return store.refresh().then(async () => {
-      // Update signals ride the same refresh: one round trip for the user.
       const payload = await skillsHubApi.updates(false);
       setUpdates(payload.updates ?? {});
     });
@@ -134,9 +126,6 @@ export function createInstalledPaneActions(deps: PaneActionDeps) {
     }
   };
 
-  /** Sync one engine on/off from the row icon or the detail checkbox: the
-   *  message names the engine, because a single-target action must not read
-   *  like a bulk result. */
   const onToggleTarget = async (skill: SkillRow, targetId: SkillTargetId, enabled: boolean) => {
     setBusyTarget({ skillId: skill.id, targetId });
     try {
@@ -159,8 +148,6 @@ export function createInstalledPaneActions(deps: PaneActionDeps) {
         return;
       }
       const vars = { name: skill.name, engine: targetLabel(targetId) };
-      // The person's own source copy is never deleted: the backend keeps it and
-      // marks it kept, so the UI mustn't say "removed" while the icon stays.
       if (!enabled && entry?.kept) {
         flash({ tone: "success", text: t("feedback.keptLocal", vars) });
         return;
@@ -172,7 +159,6 @@ export function createInstalledPaneActions(deps: PaneActionDeps) {
     } catch (error) {
       flash({ tone: "error", text: error instanceof Error ? error.message : String(error) }, 0);
     } finally {
-      // Clear only this toggle's busy state: another engine's may be in flight.
       setBusyTarget((current) =>
         current && current.skillId === skill.id && current.targetId === targetId ? null : current,
       );

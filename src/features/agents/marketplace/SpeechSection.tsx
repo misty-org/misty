@@ -1,11 +1,3 @@
-/**
- * Explore › Speech: the open speech models of Misty's catalog, as two shelves. Hearing: the model in
- * use first, then the others that hear the person's languages and run well on this computer
- * (`rankHearing`), the rest of the catalog under See all. Voices: those that speak the person's
- * languages, each heard with its play button once it's here, marked where Misty or an agent uses
- * it. Something here but not in use has Remove in its ⋯, as in Settings › Voice. Downloads show
- * how far they've come in the item's line; the button just waits.
- */
 import { ExternalLink, RefreshCw, Trash2, Volume2 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useSettingsStore } from "@/features/settings";
@@ -21,8 +13,8 @@ import {
   type InstallProgress,
   type VoiceView,
 } from "@/features/voice";
-import { voiceSettings } from "@/features/voice/voiceSettings";
-import { openExternalLink } from "@/shared/platform/openExternalLink";
+import { voiceSettings } from "@/features/voice/voice_settings";
+import { openExternalLink } from "@/shared/platform/open_external_link";
 import {
   Button,
   CatalogDone,
@@ -39,14 +31,13 @@ import {
   useConfirmDelete,
 } from "@misty/ui";
 import { voiceLine } from "../personal/AgentVoicePicker";
-import { voiceProgress } from "../personal/agentVoice";
-import { usePersonalAgentsStore } from "../personal/personalAgentsStore";
+import { voiceProgress } from "../personal/agent_voice";
+import { usePersonalAgentsStore } from "../personal/personal_agents_store";
 import { MarketShelf, MarketShelvesSkeleton } from "./MarketShelf";
 import { MakerTile, pluginMaker } from "./PluginMaker";
 
 export type SpeechEntry = HearingModelView | VoiceView;
 
-/** What a voice says when it's tried, in the language it speaks. */
 const samples: Record<string, string> = {
   en: "Hi, I'm {name}. This is how I sound.",
   es: "Hola, soy {name}. Así sueno.",
@@ -67,7 +58,6 @@ const matches = (entry: SpeechEntry, words: string) =>
     .toLowerCase()
     .includes(words);
 
-/** A download as its line says it: "Downloading 40%", then "Unpacking". */
 export function progressLine(progress: InstallProgress) {
   if (progress.phase === "unpacking") return "Unpacking";
   return progress.total
@@ -75,7 +65,6 @@ export function progressLine(progress: InstallProgress) {
     : "Downloading";
 }
 
-/** The speech store's view of one entry: whether it's coming, and why it last failed. */
 function useEntryState() {
   const catalog = useSpeechModels((state) => state.catalog);
   const progress = useSpeechModels((state) => state.progress);
@@ -119,7 +108,6 @@ export function SpeechSection({ query }: { query: string }) {
   const languages = personLanguages();
   const words = query.trim().toLowerCase();
 
-  // Who speaks in each voice: Misty's own speech, then each agent that picked one.
   const speakers = new Map<string, string[]>();
   const speaks = (voice: string, who: string) => {
     if (voice) speakers.set(voice, [...(speakers.get(voice) ?? []), who]);
@@ -127,7 +115,6 @@ export function SpeechSection({ query }: { query: string }) {
   speaks(settings.voice, "Misty");
   for (const agent of agents) if (agent.voice) speaks(agent.voice, agent.name);
 
-  // What may go: on this computer, not in use, and sharing no download with something in use.
   const inUse = new Set<string>([settings.hearingModel, ...speakers.keys()]);
   const all: SpeechEntry[] = [...catalog.hearing, ...catalog.voices];
   const removable = (entry: SpeechEntry) =>
@@ -215,7 +202,6 @@ function HearingShelf({
   removable: (entry: SpeechEntry) => boolean;
   onRemove: (entry: SpeechEntry) => void;
 }) {
-  // A search that only matches the rest of the catalog shows it at once.
   const [open, setOpen] = useState(!models.length);
   const shown = open ? [...models, ...more] : models;
   return (
@@ -340,7 +326,6 @@ function VoiceItem({
   onRemove,
 }: {
   voice: VoiceView;
-  /** Who speaks in it: Misty, then agents by name. */
   speakers: string[];
   mistyVoice: boolean;
   removable: boolean;
@@ -358,7 +343,6 @@ function VoiceItem({
       .catch((reason: unknown) => notify({ message: String(reason), tone: "error" }))
       .finally(() => setPlaying(false));
   };
-  // One action: a voice on this computer is heard; who uses it is said in its line.
   const action = voice.installed ? (
     <IconButton label={`Hear ${voice.name}`} disabled={playing} onClick={hear}>
       <Volume2 />
@@ -393,14 +377,12 @@ function VoiceItem({
   );
 }
 
-/** "Misty", "Misty and Ada", "Misty, Ada and Sam". */
 function listed(names: string[]) {
   return names.length < 2
     ? (names[0] ?? "")
     : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** An entry's ⋯: its own actions, its maker's page, then Remove when it may go. */
 function EntryMenu({
   entry,
   removable,

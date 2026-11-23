@@ -9,33 +9,31 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { readInitialUser, type AuthUser } from "./sessions/authSession";
-import type { SavedAccountSession } from "./sessions/accountVault";
-import { useAccountListActions } from "./provider/useAccountListActions";
-import { useAccountOperation } from "./provider/useAccountOperation";
+import { readInitialUser, type AuthUser } from "./sessions/auth_session";
+import type { SavedAccountSession } from "./sessions/account_vault";
+import { useAccountListActions } from "./provider/use_account_list_actions";
+import { useAccountOperation } from "./provider/use_account_operation";
 import {
   useInvalidSessionHandling,
   useNativeWorkspaceRecovery,
   useSavedAccountListSync,
   useStartupSessionValidation,
   useStoredUserPersistence,
-} from "./provider/useAccountSideEffects";
-import { useAccountSwitching } from "./provider/useAccountSwitching";
-import { useAuthenticateAccount } from "./provider/useAuthenticateAccount";
-import { useDeactivateToChooser } from "./provider/useDeactivateToChooser";
-import { useLogout } from "./provider/useLogout";
-import { useRefreshUser } from "./provider/useRefreshUser";
-import { listSavedAccountSessions } from "./sessions/useAuthTokenStore";
-import { useUserStore } from "./sessions/useUserStore";
-export type { AuthContextValue, AuthUser } from "./sessions/authSession";
-import { AuthContext } from "./sessions/authState";
-// Preserve the public import path without recreating the context during provider refreshes.
-export { useAuth } from "./sessions/authState";
+} from "./provider/use_account_side_effects";
+import { useAccountSwitching } from "./provider/use_account_switching";
+import { useAuthenticateAccount } from "./provider/use_authenticate_account";
+import { useDeactivateToChooser } from "./provider/use_deactivate_to_chooser";
+import { useLogout } from "./provider/use_logout";
+import { useRefreshUser } from "./provider/use_refresh_user";
+import { listSavedAccountSessions } from "./sessions/use_auth_token_store";
+import { useUserStore } from "./sessions/use_user_store";
+export type { AuthContextValue, AuthUser } from "./sessions/auth_session";
+import { AuthContext } from "./sessions/auth_state";
+export { useAuth } from "./sessions/auth_state";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const nativeUser = useNativeSessionStore((state) => state.status?.current_user ?? null);
   const [user, setUserState] = useState<AuthUser | null>(() => {
     const initial = readInitialUser();
-    // Known before the first render, so nothing filed by account starts out under no one.
     useUserStore.getState().setAccountId(initial?.id ?? "");
     return initial;
   });
@@ -47,10 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   const [sessionExpired, setSessionExpired] = useState(false);
   const markSessionExpired = useCallback(() => setSessionExpired(true), []);
-  // Any new identity, or the same one signed in again, carries a working session.
   useEffect(() => setSessionExpired(false), [user]);
-  // Signing in from the local profile adopts it and signing out returns to it, so the window
-  // keeps its pages; only switching between two accounts starts the app over.
   const [outletKey, setOutletKey] = useState(() => accountScopeFor(activeUser?.id));
   const previousUserId = useRef(activeUser?.id);
   useEffect(() => {

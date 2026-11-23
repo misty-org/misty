@@ -1,50 +1,28 @@
-//! Codex's auto-review (its "guardian") denials, kept for `/approve`.
-//!
-//! When the auto-review turns an action down, Codex's terminal app remembers the denial and its
-//! `/approve` hands it back through `thread/approveGuardianDeniedAction`, which approves one
-//! retry of that exact action. The call wants the denial as Codex's core
-//! `GuardianAssessmentEvent` (snake_case), while the `item/autoApprovalReview/completed`
-//! notification carries the app-server's camelCase review, so the turn converts it here, the
-//! way the terminal app's `on_guardian_review_notification` does, and keeps the latest one per
-//! thread.
-//!
-//! They live in memory only. The terminal app keeps them in memory too and loses them when it
-//! quits, and an approval matters only right after the denial, while the person still sees it.
-
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 use serde_json::{json, Map, Value};
 
-/// Thread id -> the latest denial on it, as a core `GuardianAssessmentEvent`.
 static DENIED: LazyLock<Mutex<HashMap<String, Value>>> = LazyLock::new(Default::default);
 
-/// The longest action summary a notice shows; a command can run to pages.
 const SUMMARY_CHARS: usize = 160;
 
-/// Keeps `event` as the latest denial on `thread`.
 pub(in crate::engines) fn keep(thread: &str, event: Value) {
     if let Ok(mut denied) = DENIED.lock() {
         denied.insert(thread.to_string(), event);
     }
 }
 
-/// Takes the latest denial on `thread`: one approval spends it, as in the terminal app.
 pub(in crate::engines) fn take(thread: &str) -> Option<Value> {
     DENIED.lock().ok()?.remove(thread)
 }
 
-/// Puts back a denial whose approval didn't go through, so the person can try again, unless a
-/// newer denial arrived meanwhile.
 pub(in crate::engines) fn restore(thread: &str, event: Value) {
     if let Ok(mut denied) = DENIED.lock() {
         denied.entry(thread.to_string()).or_insert(event);
     }
 }
 
-/// The core `GuardianAssessmentEvent` for an `item/autoApprovalReview/completed` notification,
-/// when the review denied the action. None for any other outcome, or an action kind this
-/// version doesn't know.
 pub(in crate::engines) fn core_event(params: &Value) -> Option<Value> {
     let review = params.get("review")?;
     if review.get("status").and_then(Value::as_str) != Some("denied") {
@@ -52,7 +30,6 @@ pub(in crate::engines) fn core_event(params: &Value) -> Option<Value> {
     }
     let mut event = Map::new();
     event.insert("id".into(), json!(params.get("reviewId")?.as_str()?));
-    // The terminal app leaves `target_item_id` out of the event it approves; so does this.
     event.insert(
         "turn_id".into(),
         json!(params
@@ -71,7 +48,6 @@ pub(in crate::engines) fn core_event(params: &Value) -> Option<Value> {
         event.insert("completed_at_ms".into(), json!(completed));
     }
     event.insert("status".into(), json!("denied"));
-    // Risk and authorization levels are lowercase words in both shapes.
     copy(&mut event, review, "riskLevel", "risk_level");
     copy(
         &mut event,
@@ -87,7 +63,6 @@ pub(in crate::engines) fn core_event(params: &Value) -> Option<Value> {
     Some(Value::Object(event))
 }
 
-/// The reviewed action in core's shape: snake_case tags, fields and enum words.
 fn core_action(action: &Value) -> Option<Value> {
     let kind = action.get("type")?.as_str()?;
     let mut out = Map::new();
@@ -110,7 +85,6 @@ fn core_action(action: &Value) -> Option<Value> {
     for (from, to) in fields {
         copy(&mut out, action, from, to);
     }
-    // `unifiedExec`, `socks5Tcp` and the like are snake_case words in core.
     for key in ["source", "protocol"] {
         if let Some(word) = action.get(key).and_then(Value::as_str) {
             out.insert(key.into(), json!(snake(word)));
@@ -125,9 +99,6 @@ fn core_action(action: &Value) -> Option<Value> {
     Some(Value::Object(out))
 }
 
-/// A requested permission profile in core's shape. Core reads the file-system part as either
-/// `entries` or the older `read`/`write` lists, never both, so the lists become entries the way
-/// the app-server's own conversion does.
 fn core_permissions(permissions: &Value) -> Value {
     let mut out = Map::new();
     if let Some(network) = present(permissions, "network") {
@@ -160,8 +131,6 @@ fn core_permissions(permissions: &Value) -> Value {
     Value::Object(out)
 }
 
-/// What the denied action was, in a few words: the terminal app's `action_summary`, read from
-/// the core event.
 pub(in crate::engines) fn summary(event: &Value) -> String {
     let action = &event["action"];
     let text = |key: &str| action[key].as_str().unwrap_or_default().to_string();
@@ -202,7 +171,6 @@ pub(in crate::engines) fn summary(event: &Value) -> String {
     }
 }
 
-/// The line the chat shows when a denial arrives, so the person knows `/approve` is there.
 pub(in crate::engines) fn notice(event: &Value) -> String {
     let summary = summary(event);
     if summary.is_empty() {
@@ -224,7 +192,6 @@ fn copy(out: &mut Map<String, Value>, from: &Value, key: &str, to: &str) {
     }
 }
 
-/// `applyPatch` -> `apply_patch`, `socks5Tcp` -> `socks5_tcp`.
 fn snake(word: &str) -> String {
     let mut out = String::with_capacity(word.len() + 4);
     for character in word.chars() {

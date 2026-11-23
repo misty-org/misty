@@ -52,7 +52,6 @@ fn default_entry_leads_the_catalog() {
         .map(|m| m.id)
         .collect();
     assert_eq!(ids, vec!["b", "a"]);
-    // Absent from the catalog: prepended, not dropped.
     let absent = EngineModel {
         id: "z".to_string(),
         name: None,
@@ -65,7 +64,6 @@ fn default_entry_leads_the_catalog() {
         .map(|m| m.id)
         .collect();
     assert_eq!(ids, vec!["z", "a", "b"]);
-    // No default known: order untouched.
     let ids: Vec<String> = with_default_first(listed, None)
         .into_iter()
         .map(|m| m.id)

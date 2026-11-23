@@ -32,18 +32,14 @@ export function SelectControl(props: {
   );
 }
 
-/** One option of a settings dropdown or segmented choice. */
 interface DropdownOption {
   value: string;
   label: string;
-  /** The row's icon in a dropdown; settings rows without one draw their label alone. */
   icon?: MenuIcon;
   disabled?: boolean;
-  /** Why a disabled option can't be picked, shown in a tooltip. */
   title?: string;
 }
 
-/** Shared checkmarked dropdown for longer lists of choices. An empty value is a real choice. */
 export function DropdownControl(props: {
   value: string;
   label?: string;
@@ -58,7 +54,6 @@ export function DropdownControl(props: {
       aria-label={props.label ?? label}
       className={cn("w-50 max-w-full", props.className)}
       value={props.value}
-      // Main's settings dropdowns list words alone; an option may still bring its icon.
       options={props.options.map((option): SelectOption => ({
         value: option.value,
         label: option.label,
@@ -74,7 +69,6 @@ export function DropdownControl(props: {
 
 const emptyChoice = "__settings_empty_choice__";
 
-/** Up to four short options render as a segmented control; anything longer is a dropdown. */
 export function ChoiceControl(props: {
   value: string;
   options: DropdownOption[];
@@ -87,7 +81,6 @@ export function ChoiceControl(props: {
     return (
       <ChoiceGroup
         label={ariaLabel}
-        // Radix keeps "" for "nothing chosen", so an empty option stands in under another value.
         value={props.value || emptyChoice}
         options={props.options.map((option) => ({
           value: option.value || emptyChoice,
@@ -160,9 +153,10 @@ export function SliderControl(props: {
       />
       <Text
         bare
+        size="meta"
         tone={props.disabled ? "muted" : "default"}
         weight="medium"
-        className="w-12 shrink-0 text-right text-sm tabular-nums"
+        className="w-12 shrink-0 text-right tabular-nums"
       >
         {format(props.value)}
       </Text>
@@ -170,7 +164,5 @@ export function SliderControl(props: {
   );
 }
 
-/** Multi-line free text, committed on blur like {@link TextControl}. */
-
 export * from "./SettingsTextControls";
-export * from "./settingsValues";
+export * from "./settings_values";

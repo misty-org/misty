@@ -1,4 +1,3 @@
-//! Word documents and zip archives of documents.
 use super::*;
 
 pub(super) fn prepare_docx_sections(

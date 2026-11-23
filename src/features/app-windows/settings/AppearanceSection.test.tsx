@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as SettingsControlsModule from "../../settings/SettingsControls";
-import type { SettingsContentProps } from "../../settings/settingsTypes";
+import type { SettingsContentProps } from "../../settings/settings_types";
 import { SettingsPageScope } from "../../settings/device-preferences/SettingScope";
 import { useDevicePreferences } from "../../settings/device-preferences/store";
 import { AppearanceSection } from "./AppearanceSection";
@@ -11,7 +11,7 @@ const zoomMocks = vi.hoisted(() => ({
   setAppZoom: vi.fn(),
 }));
 
-vi.mock("@/shared/hooks/useAppZoom", () => ({
+vi.mock("@/shared/hooks/use_app_zoom", () => ({
   appZoomToStoredScale: (zoom: number) => Math.round(zoom * 110) / 100,
   appZoomMin: 0.8,
   appZoomMax: 2,
@@ -99,7 +99,6 @@ describe("AppearanceSection app zoom", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Reset App zoom to default" }));
     expect(edit).toHaveBeenCalledWith("app.zoom", undefined, { stage: true });
-    // Theme is still at its default, so it offers no Reset.
     expect(screen.queryByRole("button", { name: "Reset Theme to default" })).toBeNull();
     view.unmount();
   });

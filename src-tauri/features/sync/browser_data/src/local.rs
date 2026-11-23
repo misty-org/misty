@@ -1,9 +1,3 @@
-//! Everything a profile keeps (its open tabs and their page state) as encrypted records in
-//! one local database. Rows are sealed with a key kept for this install alone, and never leave
-//! this computer.
-//!
-//! One row per record. `version` and `dirty` are left from when records synced: a row written
-//! before then may still carry a version, and its deletion is remembered for a while.
 use std::path::Path;
 
 use aes_gcm::{
@@ -33,7 +27,6 @@ CREATE INDEX IF NOT EXISTS records_dirty ON records(dirty, edited_at);
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
 ";
 
-/// The install's key for this database. It never leaves the machine.
 pub struct LocalKey(Zeroizing<[u8; 32]>);
 
 impl LocalKey {
@@ -60,7 +53,6 @@ impl LocalKey {
 pub struct LocalStore {
     connection: Connection,
     cipher: Aes256Gcm,
-    /// The latest edit time this store has seen.
     clock: u64,
 }
 
@@ -97,7 +89,6 @@ impl LocalStore {
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         connection.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
         connection.execute_batch(SCHEMA)?;
-        // A remembered deletion goes after this long.
         connection.execute(
             "DELETE FROM records WHERE sealed IS NULL AND dirty = 0 AND edited_at < ?1",
             params![now_ms().saturating_sub(DELETES_KEPT_MS) as i64],
@@ -114,7 +105,6 @@ impl LocalStore {
         })
     }
 
-    /// An edit time that is never behind anything this store has seen, even if the clock went back.
     fn tick(&mut self) -> u64 {
         self.clock = now_ms().max(self.clock + 1);
         self.clock
@@ -163,8 +153,6 @@ impl LocalStore {
             .map_err(|_| Error::Unlock)
     }
 
-    /// A collection's live records. A row this version can't read (written by a newer one, or
-    /// damaged) is skipped here and left in place, so it is never lost or passed off as gone.
     pub fn list(&self, profile: &str, collection: &str) -> Result<Vec<ViewRecord>> {
         let mut statement = self.connection.prepare_cached(
             "SELECT id, sealed FROM records
@@ -184,7 +172,6 @@ impl LocalStore {
             .collect())
     }
 
-    /// Ids deleted in a collection and still remembered.
     pub fn deleted_ids(&self, profile: &str, collection: &str) -> Result<Vec<String>> {
         let mut statement = self.connection.prepare_cached(
             "SELECT id FROM records WHERE profile = ?1 AND collection = ?2 AND sealed IS NULL",
@@ -213,8 +200,6 @@ impl LocalStore {
         }
     }
 
-    /// Local edits. `None` deletes. Writing what is already stored changes nothing. Returns how
-    /// many rows changed.
     pub fn write(
         &mut self,
         profile: &str,
@@ -239,7 +224,6 @@ impl LocalStore {
         Ok(changed)
     }
 
-    /// A local edit of an opaque record body. Returns whether the row changed.
     pub fn write_one(
         &mut self,
         profile: &str,
@@ -264,7 +248,6 @@ impl LocalStore {
             return Ok(false);
         }
         let version = row.as_ref().map_or(0, |(_, version)| *version);
-        // A row with no version was never anywhere else: it just goes.
         if plain.is_none() && version == 0 {
             self.connection.execute(
                 "DELETE FROM records WHERE profile = ?1 AND collection = ?2 AND id = ?3",
@@ -293,8 +276,6 @@ impl LocalStore {
         Ok(true)
     }
 
-    /// Runs `work` in one transaction: a page of a thousand records is one disk sync, and a crash
-    /// halfway leaves everything as it was, cursor included.
     pub fn atomic<T>(&mut self, work: impl FnOnce(&mut Self) -> Result<T>) -> Result<T> {
         self.connection.execute_batch("BEGIN IMMEDIATE")?;
         match work(self) {

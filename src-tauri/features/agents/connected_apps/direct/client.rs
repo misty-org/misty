@@ -1,6 +1,3 @@
-//! Talking to an app's own MCP server over Streamable HTTP: `initialize`, then `tools/list` or
-//! `tools/call`, with the person's token. One short session per request keeps nothing open between
-//! calls.
 use std::time::Duration;
 
 use reqwest::{header, Client, StatusCode};
@@ -9,18 +6,15 @@ use serde_json::{json, Value};
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 const SESSION_HEADER: &str = "mcp-session-id";
 const CALL_LIMIT: Duration = Duration::from_secs(120);
-/// An answer bigger than this is cut off; the model sees far less anyway.
 const BODY_LIMIT: usize = 4 << 20;
 const MAX_TOOL_PAGES: usize = 10;
 
 #[derive(Debug)]
 pub enum CallError {
-    /// The token was refused: refresh it or sign in again.
     Unauthorized,
     Failed(String),
 }
 
-/// The JSON-RPC answer whose id is `id`, from a JSON body or an event stream.
 pub fn answer_in(body: &str, content_type: &str, id: i64) -> Option<Value> {
     if !content_type.starts_with("text/event-stream") {
         return serde_json::from_str(body).ok();
@@ -145,7 +139,6 @@ impl<'a> Session<'a> {
     }
 }
 
-/// Every tool the server offers, as it describes them.
 pub async fn tools(http: &Client, url: &str, token: &str) -> Result<Vec<Value>, CallError> {
     let mut session = Session::open(http, url, token).await?;
     let mut tools = Vec::new();
@@ -165,7 +158,6 @@ pub async fn tools(http: &Client, url: &str, token: &str) -> Result<Vec<Value>, 
     Ok(tools)
 }
 
-/// Runs one tool and returns the server's result as it gave it.
 pub async fn call(
     http: &Client,
     url: &str,

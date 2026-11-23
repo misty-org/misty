@@ -1,14 +1,19 @@
-//! Taking the one program file out of a maker's archive.
-
 use super::*;
 
-/// The one file named `name` anywhere in a zip.
 pub(super) fn from_zip(archive: &[u8], name: &str) -> Result<Vec<u8>, String> {
-    let mut zip = zip::ZipArchive::new(Cursor::new(archive)).map_err(|_| "The app's tools aren't a zip file.".to_owned())?;
+    let mut zip = zip::ZipArchive::new(Cursor::new(archive))
+        .map_err(|_| "The app's tools aren't a zip file.".to_owned())?;
     let mut found: Option<usize> = None;
     for index in 0..zip.len() {
-        let entry = zip.by_index(index).map_err(|_| "The app's tools are damaged.".to_owned())?;
-        let last = entry.name().trim_end_matches('/').rsplit('/').next().unwrap_or("");
+        let entry = zip
+            .by_index(index)
+            .map_err(|_| "The app's tools are damaged.".to_owned())?;
+        let last = entry
+            .name()
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .unwrap_or("");
         if last != name || entry.is_dir() {
             continue;
         }
@@ -20,18 +25,24 @@ pub(super) fn from_zip(archive: &[u8], name: &str) -> Result<Vec<u8>, String> {
         }
     }
     let index = found.ok_or_else(|| format!("The app's release has no {name}."))?;
-    let entry = zip.by_index(index).map_err(|_| "The app's tools are damaged.".to_owned())?;
+    let entry = zip
+        .by_index(index)
+        .map_err(|_| "The app's tools are damaged.".to_owned())?;
     read_capped(entry)
 }
 
-/// The one regular file named `name` anywhere in a gzipped tar.
 pub(super) fn from_tar_gz(archive: &[u8], name: &str) -> Result<Vec<u8>, String> {
     let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(Cursor::new(archive)));
     let mut found: Option<Vec<u8>> = None;
-    let entries = tar.entries().map_err(|_| "The app's tools are damaged.".to_owned())?;
+    let entries = tar
+        .entries()
+        .map_err(|_| "The app's tools are damaged.".to_owned())?;
     for entry in entries {
         let entry = entry.map_err(|_| "The app's tools are damaged.".to_owned())?;
-        let path = entry.path().map_err(|_| "The app's tools are damaged.".to_owned())?.into_owned();
+        let path = entry
+            .path()
+            .map_err(|_| "The app's tools are damaged.".to_owned())?
+            .into_owned();
         if path.file_name().and_then(|file| file.to_str()) != Some(name) {
             continue;
         }

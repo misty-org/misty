@@ -1,4 +1,4 @@
-import { SystemErrorNotice } from "@/shared/platform/systemErrors";
+import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,9 +11,8 @@ import {
   Input,
   Text,
 } from "@misty/ui";
-import type { SpaceLifecycleActions } from "./useSpaceLifecycleActions";
+import type { SpaceLifecycleActions } from "./use_space_lifecycle_actions";
 
-/* Confirmation dialogs for leaving and deleting a Space; both share the store error. */
 export function LeaveDeleteSpaceDialogs({
   spaceName,
   controller,
@@ -47,7 +46,7 @@ export function LeaveDeleteSpaceDialogs({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <WhatGoes />
-          <Text tone="muted" wrap className="m-0 text-sm">
+          <Text as="p" size="control" tone="muted" wrap className="m-0">
             Your public docs, drawings and files stay with the Space. Another member must invite you
             to come back.
           </Text>
@@ -84,12 +83,12 @@ export function LeaveDeleteSpaceDialogs({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <WhatGoes />
-          <Text tone="muted" wrap className="m-0 text-sm">
+          <Text as="p" size="control" tone="muted" wrap className="m-0">
             The rest of the Space is deleted permanently after 30 days. Type the Space name exactly
             to continue.
           </Text>
-          <label className="grid gap-2 text-xs font-medium">
-            <Text bare tone="muted">
+          <label className="grid gap-2">
+            <Text bare size="meta" tone="muted" weight="medium">
               Space name
             </Text>
             <Input
@@ -119,11 +118,10 @@ export function LeaveDeleteSpaceDialogs({
   );
 }
 
-/** What leaving or deleting a Space takes with it: each person's private layer there. */
 function WhatGoes() {
   return (
-    <Text bare as="div" tone="default">
-      <ul className="m-0 list-disc space-y-1 pl-5 text-sm">
+    <Text bare as="div" size="control" tone="default">
+      <ul className="m-0 list-disc space-y-1 pl-5">
         <li>Agent conversations in this Space</li>
         <li>Private notes, Lab notebooks and files</li>
         <li>The app accounts picked for this Space</li>
