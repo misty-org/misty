@@ -34,12 +34,7 @@ pub struct TestHome {
 
 #[cfg(test)]
 impl TestHome {
-    const KEYS: [&'static str; 4] = [
-        "MISTY_TEST_ENGINE_HOME",
-        "CLAUDE_CONFIG_DIR",
-        "CODEX_HOME",
-        "GEMINI_CLI_HOME",
-    ];
+    const KEYS: [&'static str; 3] = ["MISTY_TEST_ENGINE_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME"];
 
     pub fn set(home: &Path) -> Self {
         let lock = HOME_ENV_LOCK.lock();
@@ -106,60 +101,16 @@ pub fn app_home() -> PathBuf {
         .join("engine-config")
 }
 
-pub fn hermes_home() -> PathBuf {
-    if let Some(home) = std::env::var_os("HERMES_HOME").filter(|v| !v.is_empty()) {
-        return PathBuf::from(home);
-    }
-    #[cfg(windows)]
-    if let Some(local) = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) {
-        return PathBuf::from(local).join("hermes");
-    }
-    home_dir().join(".hermes")
-}
-
 pub fn engine_config_locations() -> (Vec<PathBuf>, Vec<(PathBuf, &'static str)>) {
     let home = home_dir();
     let folders = vec![
         claude_home(),
         codex_home(),
         home.join(".cache").join("codex-runtimes"),
-        engine_home(Some("GEMINI_CLI_HOME"), ".gemini"),
+        home.join(".gemini"),
         home.join(".agents"),
-        home.join(".config").join("opencode"),
-        home.join(".local").join("share").join("opencode"),
-        home.join(".qwen"),
-        home.join(".kimi"),
-        home.join(".kimi-code"),
-        home.join(".qoder-cn"),
-        home.join(".dsh"),
-        home.join(".grok"),
-        home.join(".minimax"),
-        home.join(".mcode"),
-        home.join(".qoder"),
-        home.join(".codebuddy"),
-        home.join(".omp"),
-        home.join(".pi"),
-        hermes_home(),
         home.join(".cc-switch"),
     ];
-    let mut folders = folders;
-    if let Some(config) = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
-        folders.push(PathBuf::from(config).join("opencode"));
-    }
-    let opencode_data = [dirs::data_dir(), dirs::data_local_dir()]
-        .into_iter()
-        .flatten()
-        .map(|dir| dir.join("opencode"))
-        .chain(
-            std::env::var_os("OPENCODE_HOME")
-                .filter(|v| !v.is_empty())
-                .map(PathBuf::from),
-        );
-    for folder in opencode_data {
-        if !folders.contains(&folder) {
-            folders.push(folder);
-        }
-    }
     let files = vec![
         (home.clone(), ".claude.json"),
         (home.clone(), ".mcp.json"),

@@ -3,23 +3,7 @@
 
 export type SkillSourceKind = "managed" | "local" | "builtin" | "system" | "plugin";
 
-export type SkillTargetId =
-  | "claude"
-  | "codex"
-  | "kimi"
-  | "grok"
-  | "pi"
-  | "omp"
-  | "dsh"
-  | "agy"
-  | "gemini"
-  | "opencode"
-  | "qoder"
-  | "qoder-cn"
-  | "qwen"
-  | "codebuddy"
-  | "hermes"
-  | "agents";
+export type SkillTargetId = "claude" | "codex" | "agy" | "agents";
 
 export type SkillTargetState = "off" | "synced" | "orphan";
 

@@ -20,24 +20,7 @@ pub const LOCAL_PROVIDER_ID: &str = "__local_settings_json__";
 pub(crate) const LEGACY_LOCAL_CONFIG_TOML_ID: &str = "__local_config_toml__";
 pub const DISABLED_PROVIDER_ID: &str = "__disabled__";
 
-pub const ENGINES: [&str; 16] = [
-    "claude",
-    "codex",
-    "opencode",
-    "gemini",
-    "qwen",
-    "kimi",
-    "grok",
-    "minimax",
-    "qoder",
-    "qoder-cn",
-    "omp",
-    "codebuddy",
-    "agy",
-    "pi",
-    "dsh",
-    "hermes",
-];
+pub const ENGINES: [&str; 3] = ["claude", "codex", "agy"];
 
 const STORE_KEY: &str = "channels";
 
@@ -997,10 +980,10 @@ mod tests {
     #[test]
     fn resolve_provider_env_disabled_errors() {
         let _scratch = Scratch::new();
-        seed_channel("kimi", "chan-a", Some(DISABLED_PROVIDER_ID), json!({}));
-        assert!(resolve_provider_env("kimi", Some(DISABLED_PROVIDER_ID)).is_err());
-        assert!(ensure_engine_enabled("kimi").is_err());
-        assert!(channel_env("kimi").is_empty());
+        seed_channel("agy", "chan-a", Some(DISABLED_PROVIDER_ID), json!({}));
+        assert!(resolve_provider_env("agy", Some(DISABLED_PROVIDER_ID)).is_err());
+        assert!(ensure_engine_enabled("agy").is_err());
+        assert!(channel_env("agy").is_empty());
     }
 
     #[test]

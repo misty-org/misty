@@ -73,29 +73,29 @@ describe("skills utils", () => {
   });
 
   it("shows only engines holding a copy in the row strip", () => {
-    const targets = [target("claude", true), target("grok", true), target("hermes", false)];
+    const targets = [target("claude", true), target("codex", true), target("agy", false)];
     const row = skill({
-      targetStates: { claude: "synced", grok: "off", hermes: "orphan" },
+      targetStates: { claude: "synced", codex: "off", agy: "orphan" },
     });
-    expect(copiedTargets(row, targets).map((item) => item.id)).toEqual(["claude", "hermes"]);
+    expect(copiedTargets(row, targets).map((item) => item.id)).toEqual(["claude", "agy"]);
     expect(copiedTargets(skill({ targetStates: {} }), targets)).toEqual([]);
   });
 
   it("offers installed engines plus any engine holding a copy in the detail list", () => {
-    const targets = [target("claude", true), target("grok", true), target("hermes", false)];
-    const row = skill({ targetStates: { claude: "synced", hermes: "orphan" } });
+    const targets = [target("claude", true), target("codex", true), target("agy", false)];
+    const row = skill({ targetStates: { claude: "synced", agy: "orphan" } });
     expect(relevantTargets(row, targets).map((item) => item.id)).toEqual([
       "claude",
-      "grok",
-      "hermes",
+      "codex",
+      "agy",
     ]);
-    const other = skill({ targetStates: { claude: "off", hermes: "off" } });
-    expect(relevantTargets(other, targets).map((item) => item.id)).toEqual(["claude", "grok"]);
+    const other = skill({ targetStates: { claude: "off", agy: "off" } });
+    expect(relevantTargets(other, targets).map((item) => item.id)).toEqual(["claude", "codex"]);
   });
 
   it("computes the next target list per engine", () => {
-    const row = skill({ targets: ["claude"], targetStates: { claude: "synced", grok: "off" } });
-    expect(nextTargets(row, "grok", true)).toEqual(["claude", "grok"]);
+    const row = skill({ targets: ["claude"], targetStates: { claude: "synced", codex: "off" } });
+    expect(nextTargets(row, "codex", true)).toEqual(["claude", "codex"]);
     expect(nextTargets(row, "claude", false)).toEqual([]);
     const orphan = skill({
       targets: ["claude"],

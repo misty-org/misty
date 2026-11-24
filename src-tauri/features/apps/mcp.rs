@@ -274,7 +274,9 @@ pub fn register_standby(
         standby_key(webview, app_id),
         Entry {
             app_id: app_id.to_owned(),
-            space_id: space_id.filter(|space| !space.is_empty()).map(str::to_owned),
+            space_id: space_id
+                .filter(|space| !space.is_empty())
+                .map(str::to_owned),
             source: Source::Standby {
                 webview: webview.to_owned(),
             },
@@ -340,7 +342,9 @@ pub fn route(internal: &str, space: Option<&str>) -> Result<Route, String> {
         })
         .collect();
     match space {
-        Some(space) => found.retain(|entry| entry.space_id.as_deref().is_none_or(|own| own == space)),
+        Some(space) => {
+            found.retain(|entry| entry.space_id.as_deref().is_none_or(|own| own == space))
+        }
         None => {
             let spaces: HashSet<&str> = found
                 .iter()
@@ -389,7 +393,10 @@ pub fn offered_in(space: Option<&str>) -> Vec<Value> {
     entries.sort_by(|a, b| {
         a.app_id
             .cmp(&b.app_id)
-            .then(matches!(a.source, Source::Standby { .. }).cmp(&matches!(b.source, Source::Standby { .. })))
+            .then(
+                matches!(a.source, Source::Standby { .. })
+                    .cmp(&matches!(b.source, Source::Standby { .. })),
+            )
             .then(b.order.cmp(&a.order))
     });
     let mut seen = HashSet::new();
@@ -418,7 +425,12 @@ pub fn resolve(wire_name: &str) -> Option<(String, String)> {
             .tools
             .iter()
             .find(|tool| wire(&entry.app_id, &tool.name) == wire_name)
-            .map(|tool| (internal_name(&entry.app_id, &tool.name), tool.original.clone()))
+            .map(|tool| {
+                (
+                    internal_name(&entry.app_id, &tool.name),
+                    tool.original.clone(),
+                )
+            })
     });
     found
 }
@@ -589,10 +601,16 @@ mod tests {
             br#"{"id":"mcp-closed","name":"Demo","version":"1.0.0","logo":"l.svg","entry":"i.html","permissions":["files"],"mcp":"frame"}"#,
         )
         .unwrap();
-        let gone = permissions::open(&manifest, "space-a", "closed-w", &[Permission::Files]).unwrap();
+        let gone =
+            permissions::open(&manifest, "space-a", "closed-w", &[Permission::Files]).unwrap();
         register(&gone, "closed-w", &[json!({ "name": "crop" })]).unwrap();
-        register_standby("live-w", "mcp-closed", Some("space-a"), &[json!({ "name": "crop" })])
-            .unwrap();
+        register_standby(
+            "live-w",
+            "mcp-closed",
+            Some("space-a"),
+            &[json!({ "name": "crop" })],
+        )
+        .unwrap();
         let open = |label: &str| label == "live-w";
         assert_eq!(
             route_open("app.mcp-closed.crop", Some("space-a"), open),
@@ -611,8 +629,13 @@ mod tests {
     fn closing_a_window_withdraws_everything_it_offered() {
         let session = session_for("mcp-window", "shut-w");
         register(&session, "shut-w", &[json!({ "name": "crop" })]).unwrap();
-        register_standby("shut-w", "mcp-window-standby", None, &[json!({ "name": "trim" })])
-            .unwrap();
+        register_standby(
+            "shut-w",
+            "mcp-window-standby",
+            None,
+            &[json!({ "name": "trim" })],
+        )
+        .unwrap();
         close_window("shut-w");
         assert!(!is_registered("app.mcp-window.crop"));
         assert!(!is_registered("app.mcp-window-standby.trim"));
@@ -625,7 +648,8 @@ mod tests {
             br#"{"id":"mcp-offer","name":"Demo","version":"1.0.0","logo":"l.svg","entry":"i.html","permissions":["files"],"mcp":"frame"}"#,
         )
         .unwrap();
-        let here = permissions::open(&manifest, "space-a", "offer-w", &[Permission::Files]).unwrap();
+        let here =
+            permissions::open(&manifest, "space-a", "offer-w", &[Permission::Files]).unwrap();
         register(&here, "offer-w", &[json!({ "name": "crop" })]).unwrap();
         register_program("mcp-offer-program", &[json!({ "name": "mix" })]).unwrap();
         let names = |space| -> Vec<String> {

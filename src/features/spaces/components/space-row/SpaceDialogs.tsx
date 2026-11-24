@@ -23,8 +23,19 @@ import { SpaceFoldersSection } from "../../folders/SpaceFoldersSection";
 import { LeaveDeleteSpaceDialogs } from "../LeaveDeleteSpaceDialogs";
 import { useSpaceLifecycleActions } from "../use_space_lifecycle_actions";
 import { useSpacesStore } from "../../list/use_spaces_store";
+import { RolesDialog } from "../../roles/RolesDialog";
+import { SpaceIntegrationsSection } from "../../integrations/SpaceIntegrationsSection";
 
-export type SpaceDialog = "rename" | "members" | "invite" | "folders" | "leave" | "delete" | null;
+export type SpaceDialog =
+  | "rename"
+  | "members"
+  | "invite"
+  | "roles"
+  | "integrations"
+  | "folders"
+  | "leave"
+  | "delete"
+  | null;
 
 export function SpaceDialogs({
   space,
@@ -79,6 +90,19 @@ export function SpaceDialogs({
           {open === "folders" ? <SpaceFoldersSection spaceId={space.id} /> : null}
         </DialogContent>
       </Dialog>
+      <Dialog open={open === "integrations"} onOpenChange={(next) => !next && onClose()}>
+        <DialogContent size="lg" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Integrations</DialogTitle>
+          </DialogHeader>
+          {open === "integrations" ? <SpaceIntegrationsSection spaceId={space.id} /> : null}
+        </DialogContent>
+      </Dialog>
+      <RolesDialog
+        space={space}
+        open={open === "roles"}
+        onOpenChange={(next) => !next && onClose()}
+      />
       <LeaveDeleteSpaceDialogs spaceName={space.name} controller={controller} />
     </>
   );

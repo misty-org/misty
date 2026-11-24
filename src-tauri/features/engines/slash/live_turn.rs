@@ -69,7 +69,6 @@ pub(super) async fn send(
         prompt.to_string(),
         Vec::new(),
         None,
-        None,
         Some(model.to_string()),
         effort.map(str::to_string),
         Some(permission.to_string()),

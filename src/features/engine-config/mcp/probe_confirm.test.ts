@@ -116,7 +116,7 @@ describe("confirmWorkspaceProbe", () => {
     const seen = autoAnswer(true);
     const [first, second] = await Promise.all([
       confirm.confirmWorkspaceProbe([entry()], "/ws"),
-      confirm.confirmWorkspaceProbe([entry({ id: "omp_project:other", name: "other" })], "/ws"),
+      confirm.confirmWorkspaceProbe([entry({ id: "claude_project:other", name: "other" })], "/ws"),
     ]);
     expect([first, second]).toEqual([true, true]);
     expect(seen).toHaveLength(2);

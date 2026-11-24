@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, LogOut, MoreHorizontal, ShieldCheck, UserPlus, type LucideIcon } from "lucide-react";
+import { Bot, LogOut, MoreHorizontal, UserPlus, type LucideIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/account";
 import { useSpacesStore } from "../list/use_spaces_store";
@@ -11,8 +11,6 @@ import { AddPeopleDialog, ConversationAgentsDialog } from "./sidebar/GroupDirect
 import { isGroupDirectMessage } from "./sidebar/conversation_groups";
 import { useOwnMentionableAgents } from "./own_agents";
 import { spacesApi } from "../api/api";
-import { SpaceDialogs, type SpaceDialog } from "../components/space-row/SpaceDialogs";
-import { RolesDialog } from "../roles/RolesDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +30,6 @@ import {
 import { useSpaceConversations } from "./sidebar/use_space_conversations";
 import { reloadSpaceConversations } from "./space_conversations_resource";
 import { SpaceChat } from "./SpaceChat";
-import { spaceCan } from "../roles/use_space_roles";
 
 type ChatAction = {
   id: string;
@@ -53,7 +50,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const members = useSpacesStore((s) => s.membersBySpace[spaceId]);
   const nodesLoaded = useSpacesStore((s) => Boolean(s.nodesBySpace[spaceId]));
   const loadNodes = useSpacesStore((s) => s.loadNodes);
-  const space = useSpacesStore((s) => s.spaces.find((item) => item.id === spaceId));
   const [addingPeople, setAddingPeople] = useState(false);
   const [agentsOpen, setAgentsOpen] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -63,8 +59,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const openDirect = openConversation?.kind === "dm" ? openConversation : undefined;
   const openGroup =
     openDirect && isGroupDirectMessage(openDirect, user?.id) ? openDirect : undefined;
-  const [spaceDialog, setSpaceDialog] = useState<SpaceDialog>(null);
-  const [rolesOpen, setRolesOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [searchedText, setSearchedText] = useState("");
   const closeSearch = () => {
@@ -112,20 +106,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
       setLeaveError(reason instanceof Error ? reason.message : "You couldn't leave the group.");
     }
   };
-  if (space && spaceCan(space, "space.invite") && !referenceOnly)
-    actions.push({
-      id: "invite",
-      icon: UserPlus,
-      label: "Invite people",
-      onSelect: () => setSpaceDialog("invite"),
-    });
-  if (space && spaceCan(space, "roles.manage") && !referenceOnly)
-    actions.push({
-      id: "roles",
-      icon: ShieldCheck,
-      label: "Roles",
-      onSelect: () => setRolesOpen(true),
-    });
 
   const sideActions = useChatBarActions({
     spaceId,
@@ -185,12 +165,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
 
   return (
     <>
-      {space ? (
-        <>
-          <SpaceDialogs space={space} open={spaceDialog} onClose={() => setSpaceDialog(null)} />
-          <RolesDialog space={space} open={rolesOpen} onOpenChange={setRolesOpen} />
-        </>
-      ) : null}
       <SpaceChat
         {...props}
         searchedText={searchedText}

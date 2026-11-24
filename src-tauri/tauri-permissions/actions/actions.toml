@@ -129,6 +129,7 @@ permissions = [
   "allow-auth-http-cancel",
   "allow-auth-http-read",
   "allow-auth-http-start",
+  "allow-auth-room-token",
   "allow-auth-session-capture",
   "allow-auth-session-forget",
   "allow-auth-session-restore",
@@ -426,7 +427,6 @@ permissions = [
   "allow-project-write-file",
   "allow-space-app-bundle-install",
   "allow-space-app-bundle-manifest",
-  "allow-space-app-resolve",
   "allow-space-app-snapshot",
   "allow-space-app-tools-standby",
   "allow-space-app-tools-withdraw",
@@ -526,14 +526,6 @@ permissions = [
   "allow-engine-usage-rescan",
   "allow-engine-usage-sources",
   "allow-engine-usage-update-prices",
-  "allow-dsh-host-start",
-  "allow-dsh-host-status",
-  "allow-dsh-host-stop",
-  "allow-pi-family-auth-delete-credential",
-  "allow-pi-family-auth-list",
-  "allow-pi-family-auth-set-api-key",
-  "allow-pi-family-models-config-read",
-  "allow-pi-family-models-config-write",
 ]
 
 [[set]]

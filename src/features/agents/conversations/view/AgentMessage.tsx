@@ -7,7 +7,10 @@ import type { GlobalAiMessage } from "../state/conversation_types";
 import { LinkPreviews } from "@/features/files";
 import { MistyAppRequestCard } from "../state/MistyAppRequestCard";
 import { ScreenRequestCard } from "../context/ScreenRequestCard";
-import { Button, Surface, Text } from "@misty/ui";
+import { Button, ChannelMessage, Text } from "@misty/ui";
+import type { AgentProfile } from "@/shared/schemas";
+import { AgentAvatar } from "../../personal/AgentAvatar";
+import { messageStamp, useYou, YouFace } from "./AgentChatFaces";
 import { splitLedger, type LedgerRow } from "../../checkpoints/ledger";
 import { AgentAnsweredQuestions } from "../../plans/AgentAnsweredQuestions";
 import { AgentMessageChecklist } from "../../plans/AgentChecklist";
@@ -15,7 +18,7 @@ import { AgentProgress } from "../../progress/AgentProgress";
 import { continuationEvent } from "../../progress/continuation_event";
 import { splitUnfinished } from "../../progress/unfinished";
 import { useMessageProgress } from "../../progress/use_message_progress";
-import { AgentMessageActions } from "./AgentMessageActions";
+import { AgentMessageActions, replyDetails } from "./AgentMessageActions";
 import { AgentNotebookCard } from "./AgentNotebookCard";
 import { AgentRunOutcome } from "./AgentRunOutcome";
 import { GrantCards } from "./grants/GrantCard";
@@ -33,6 +36,7 @@ import { splitReplyQuote } from "./reply_quote";
 
 type AgentMessageProps = {
   conversationId?: string;
+  agent?: AgentProfile;
   message: GlobalAiMessage;
   steps?: GlobalAiMessage[];
   retryPrompt?: string;
@@ -108,7 +112,7 @@ function AgentMessageView(props: AgentMessageProps) {
           bare
           size="caption"
           tone="muted"
-          className="flex items-center justify-center gap-1.5"
+          className="mt-4 flex items-center justify-center gap-1.5"
         >
           <Flag aria-hidden="true" />
           Continued toward the goal
@@ -116,56 +120,35 @@ function AgentMessageView(props: AgentMessageProps) {
       );
     if (continuationEvent(content, message.source)) return null;
     const reply = splitReplyQuote(content);
-    return (
-      <div
-        className="agent-message-user group/message flex flex-col items-end gap-1.5"
-        data-message
-        data-message-id={message.id}
-        data-anchor-id={message.id}
-      >
-        <Surface
-          tone="well"
-          radius="xl"
-          className="max-w-[min(85%,72ch)] px-3.5 py-2.5 text-control leading-[1.6]"
-        >
-          <Text bare as="div" tone="default">
-            <MistyMessageAttachments attachments={message.attachments} />
-            {reply.quote ? (
-              <blockquote className="m-0 mb-2 border-l-2 pl-2.5">
-                <Text
-                  as="p"
-                  size="meta"
-                  tone="muted"
-                  lines={3}
-                  className="max-h-[3lh] leading-normal whitespace-pre-wrap"
-                >
-                  {reply.quote}
-                </Text>
-              </blockquote>
-            ) : null}
-            <CollapsibleText text={reply.body} />
-          </Text>
-        </Surface>
-        <AgentMessageActions
-          conversationId={props.conversationId}
-          message={message}
-          text={content}
-          working={props.working}
-          resendable={content === message.content.trim() && !message.attachments?.length}
-          onRetry={props.onRetry}
-          onEdit={props.onEdit}
-        />
-      </div>
-    );
+    return <YouMessage {...props} content={content} reply={reply} />;
   }
+  const stamp = messageStamp(message.createdAt);
   return (
-    <article
-      className="agent-message-assistant group/message flex items-start"
-      data-message
+    <ChannelMessage
+      className="agent-message-assistant"
       data-state={message.state}
       data-message-id={message.id}
+      avatar={<AgentAvatar agent={props.agent} />}
+      name={props.agent?.name || "Misty"}
+      time={stamp.time}
+      timeFull={live ? stamp.full : replyDetails(message, stamp.full)}
+      dateTime={message.createdAt}
+      tools={
+        live ? undefined : (
+          <AgentMessageActions
+            conversationId={props.conversationId}
+            message={message}
+            text={content}
+            working={props.working}
+            retryPrompt={props.retryPrompt}
+            retryFrom={props.retryFrom}
+            onRetry={props.onRetry}
+            onReply={props.onReply}
+          />
+        )
+      }
     >
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 max-w-209">
         {props.steps?.map((step) => (
           <EarlierReply key={step.id} message={step} />
         ))}
@@ -256,17 +239,72 @@ function AgentMessageView(props: AgentMessageProps) {
             invocationId={message.invocationId}
           />
         ) : null}
+      </div>
+    </ChannelMessage>
+  );
+}
+
+function YouMessage(
+  props: AgentMessageProps & { content: string; reply: ReturnType<typeof splitReplyQuote> },
+) {
+  const { message, reply } = props;
+  const you = useYou();
+  const stamp = messageStamp(message.createdAt);
+  return (
+    <ChannelMessage
+      className="agent-message-user"
+      data-message-id={message.id}
+      data-anchor-id={message.id}
+      avatar={<YouFace you={you} />}
+      name={you.name}
+      time={stamp.time}
+      timeFull={stamp.full}
+      dateTime={message.createdAt}
+      tools={
         <AgentMessageActions
           conversationId={props.conversationId}
           message={message}
-          text={content}
+          text={props.content}
           working={props.working}
-          retryPrompt={props.retryPrompt}
-          retryFrom={props.retryFrom}
+          resendable={props.content === message.content.trim() && !message.attachments?.length}
           onRetry={props.onRetry}
-          onReply={props.onReply}
+          onEdit={props.onEdit}
         />
-      </div>
-    </article>
+      }
+    >
+      <Text bare as="div" size="body" tone="default" className="max-w-[72ch]">
+        <MistyMessageAttachments attachments={message.attachments} />
+        {reply.quote ? (
+          <blockquote className="m-0 mb-2 border-l-2 pl-2.5">
+            <Text
+              as="p"
+              size="meta"
+              tone="muted"
+              lines={3}
+              className="max-h-[3lh] leading-normal whitespace-pre-wrap"
+            >
+              {reply.quote}
+            </Text>
+          </blockquote>
+        ) : null}
+        <CollapsibleText text={reply.body} />
+      </Text>
+    </ChannelMessage>
+  );
+}
+
+export function AgentThinkingRow({ agent, since }: { agent?: AgentProfile; since?: string }) {
+  const stamp = messageStamp(since ?? new Date().toISOString());
+  return (
+    <ChannelMessage
+      className="agent-message-assistant"
+      avatar={<AgentAvatar agent={agent} />}
+      name={agent?.name || "Misty"}
+      time={stamp.time}
+      timeFull={stamp.full}
+      dateTime={since ?? ""}
+    >
+      <LiveStatus phrase="Thinking" startedAt={since} />
+    </ChannelMessage>
   );
 }

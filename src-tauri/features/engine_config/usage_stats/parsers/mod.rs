@@ -3,7 +3,6 @@
 
 pub(crate) mod claude;
 pub(crate) mod codex;
-pub(crate) mod pi;
 
 use super::types::{Engine, UsageEvent};
 use serde::{Deserialize, Deserializer};
@@ -37,7 +36,6 @@ impl ParseCtx {
 pub(crate) enum FileParser {
     Claude(claude::ClaudeParser),
     Codex(codex::CodexParser),
-    Pi(pi::PiParser),
 }
 
 impl FileParser {
@@ -45,7 +43,6 @@ impl FileParser {
         match engine {
             Engine::Claude => FileParser::Claude(claude::ClaudeParser),
             Engine::Codex => FileParser::Codex(codex::CodexParser::new(file_name, state)),
-            Engine::Pi | Engine::Omp => FileParser::Pi(pi::PiParser::new(engine, state)),
         }
     }
 
@@ -53,7 +50,6 @@ impl FileParser {
         match self {
             FileParser::Claude(p) => p.wants(line),
             FileParser::Codex(p) => p.wants(line),
-            FileParser::Pi(p) => p.wants(line),
         }
     }
 
@@ -61,7 +57,6 @@ impl FileParser {
         match self {
             FileParser::Claude(p) => p.feed(line, out),
             FileParser::Codex(p) => p.feed(line, ctx, out),
-            FileParser::Pi(p) => p.feed(line, out),
         }
     }
 
@@ -69,7 +64,6 @@ impl FileParser {
         match self {
             FileParser::Claude(_) => None,
             FileParser::Codex(p) => p.state_json(),
-            FileParser::Pi(p) => p.state_json(),
         }
     }
 }
@@ -94,13 +88,6 @@ pub(crate) fn clean(value: Option<&str>) -> Option<String> {
 pub(crate) fn de_count<'de, D: Deserializer<'de>>(deserializer: D) -> Result<i64, D::Error> {
     let value = serde_json::Value::deserialize(deserializer)?;
     Ok(count_of(&value))
-}
-
-pub(crate) fn de_opt_count<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Option<i64>, D::Error> {
-    let value = serde_json::Value::deserialize(deserializer)?;
-    Ok(value.as_f64().map(|_| count_of(&value)))
 }
 
 const MAX_TOKENS_PER_EVENT: f64 = 1e10;

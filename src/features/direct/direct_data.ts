@@ -1,11 +1,18 @@
 import { useEffect } from "react";
 import {
   peekSpaceResource,
+  provideDirectSpaceCheck,
   refreshSpaceResource,
   setSpaceResource,
   useSpaceResource,
 } from "@/features/spaces";
-import { directApi, type DirectConversation, type FriendsList } from "./api";
+import {
+  directApi,
+  type DirectConversation,
+  type FriendsList,
+  type Person,
+  type SharedSpace,
+} from "./api";
 
 const friendsPath = "/friends";
 const dmsPath = "/dms";
@@ -16,6 +23,18 @@ export function useFriends() {
 
 export function reloadFriends() {
   return refreshSpaceResource(friendsPath, directApi.friends);
+}
+
+export function useMutualFriends(userId: string) {
+  return useSpaceResource<Person[]>(`/people/${encodeURIComponent(userId)}/mutual-friends`, () =>
+    directApi.mutualFriends(userId),
+  );
+}
+
+export function useSharedSpaces(userId: string) {
+  return useSpaceResource<SharedSpace[]>(`/people/${encodeURIComponent(userId)}/shared-spaces`, () =>
+    directApi.sharedSpaces(userId),
+  );
 }
 
 export function useDms() {
@@ -37,6 +56,8 @@ export function peekDm(dmId: string): DirectConversation | undefined {
 export function isDmId(spaceId: string): boolean {
   return Boolean(peekDm(spaceId));
 }
+
+provideDirectSpaceCheck(isDmId);
 
 export function useDmListUpdates() {
   useEffect(() => {

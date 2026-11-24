@@ -105,10 +105,10 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
     }
   };
 
-  const updateApp = (app: ExploreCatalogApp, source?: unknown) =>
+  const updateApp = (app: ExploreCatalogApp) =>
     run(
       `app:${app.id}`,
-      () => apps.install(app.id, app.version, app.permissions, source),
+      () => apps.install(app.id, app.version, app.permissions),
       `${app.name} is up to date.`,
       `${app.name} couldn't be updated`,
     );
@@ -217,7 +217,7 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
         ) : undefined
       }
     >
-      {appRows.map(({ app, from, source }) => (
+      {appRows.map(({ app, from }) => (
         <ShelfItem
           key={`app:${app.id}`}
           logo={
@@ -235,7 +235,7 @@ export function UpdatesSection({ spaceId, canManage }: { spaceId: string; canMan
               variant="get"
               size="sm"
               disabled={busy.has(`app:${app.id}`)}
-              onClick={() => void updateApp(app, source)}
+              onClick={() => void updateApp(app)}
             >
               Update
             </Button>

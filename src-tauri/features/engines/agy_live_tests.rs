@@ -97,7 +97,6 @@ fn start(
         workspace: folder.to_path_buf(),
         prompt: prompt.to_string(),
         prompt_contributions: Vec::new(),
-        native_compact: false,
         images: Vec::new(),
         model: Some(MODEL.to_string()),
         effort: None,
@@ -112,7 +111,7 @@ fn start(
         .host_command(&req, &bin)
         .unwrap();
     built.command.current_dir(folder).env("HOME", &home);
-    let handle = tokio::spawn(crate::engines::grok_acp::run_acp_turn(
+    let handle = tokio::spawn(crate::engines::acp_turn::run_acp_turn(
         core, req, built, killed, pid,
     ));
     LiveTurn {
@@ -135,8 +134,7 @@ impl LiveTurn {
                 let label = question["options"][0]["label"].clone();
                 let answers = json!({ question["question"].as_str().unwrap(): label });
                 let frame =
-                    crate::engines::grok_acp::answer_frame(&input["grokAcp"], Some(&answers))
-                        .unwrap();
+                    crate::engines::acp_turn::answer_frame(&input["acp"], Some(&answers)).unwrap();
                 eprintln!("  answering {request_id}: {frame}");
                 self.registry
                     .write_line(&self.run_id, frame.to_string())

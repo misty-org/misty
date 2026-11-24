@@ -73,23 +73,6 @@ pub async fn engine_catalog(
         return Err("That engine has no adapter.".into());
     }
     let db = state.environment.store();
-    if engine == "opencode" && !folder.is_empty() {
-        let (db, account, folder) = (db.clone(), account.clone(), folder.clone());
-        tokio::spawn(async move {
-            let path = std::path::PathBuf::from(&folder);
-            let linked = tokio::task::spawn_blocking(move || {
-                path.is_absolute() && store::is_linked(&db, &account, &path).unwrap_or(false)
-            })
-            .await
-            .unwrap_or(false);
-            if !linked {
-                return;
-            }
-            if let Ok(origin) = super::opencode_server::ensure_running().await {
-                super::opencode_session::report_commands(origin, folder).await;
-            }
-        });
-    }
     blocking(move || {
         let home = dirs::home_dir().ok_or("Misty can't find your home folder.")?;
         let folder = std::path::PathBuf::from(folder);

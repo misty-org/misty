@@ -3,18 +3,20 @@ import { Text } from "@misty/ui";
 import type { GlobalAiConversation } from "../state/conversation_types";
 import type { LedgerRow } from "../../checkpoints/ledger";
 import { LessonObjectives } from "../../tutor/lessons/LessonObjectives";
-import { AgentMessage } from "./AgentMessage";
-import { LiveStatus } from "./status/LiveStatus";
+import { AgentMessage, AgentThinkingRow } from "./AgentMessage";
+import { AgentWelcome } from "./AgentWelcome";
+import type { AgentProfile } from "@/shared/schemas";
 import { SummarizedDivider } from "./AgentTranscriptParts";
 import { conversationTurns } from "./conversation_turns";
 
 const transcriptClass = [
-  "agent-transcript mx-auto w-full max-w-209 px-6 py-7",
+  "agent-transcript flex min-h-full w-full flex-col justify-end pt-4 pb-6",
   "[&_:is(p,li,a,pre)]:[overflow-wrap:anywhere] [&_pre]:max-w-full [&_pre]:overflow-x-auto",
 ].join(" ");
 
 export const AgentConversationView = memo(function AgentConversationView(props: {
   conversation?: GlobalAiConversation;
+  agent?: AgentProfile;
   working: boolean;
   onRetry: (prompt: string, fromMessageId?: string) => void;
   onResume?: (messageId: string, rows: LedgerRow[], only?: string[]) => void;
@@ -48,11 +50,20 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
 
   return (
     <div className={transcriptClass}>
-      <div className="flex flex-col gap-4.5 [&>*]:my-0!">
-        <LessonObjectives conversationId={props.conversation.id} />
+      {props.conversation.hasOlderMessages ? null : (
+        <AgentWelcome
+          agent={props.agent}
+          line={`This is the beginning of this thread with ${props.agent?.name || "Misty"}.`}
+        />
+      )}
+      <div className="flex flex-col">
+        <div className="px-4 empty:hidden">
+          <LessonObjectives conversationId={props.conversation.id} />
+        </div>
         {turns.map((turn) => {
           const handlers = {
             conversationId: props.conversation?.id,
+            agent: props.agent,
             working: props.working,
             onRetry: props.onRetry,
             onResume: props.onResume,
@@ -72,7 +83,11 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
                   {...handlers}
                 />
               )}
-              {turn.compacted && <SummarizedDivider />}
+              {turn.compacted && (
+                <div className="mt-4 px-4">
+                  <SummarizedDivider />
+                </div>
+              )}
             </Fragment>
           );
         })}
@@ -82,14 +97,10 @@ export const AgentConversationView = memo(function AgentConversationView(props: 
             message.role === "assistant" &&
             (message.state === "pending" || message.state === "streaming"),
         ) ? (
-          <div className="agent-message-assistant">
-            <LiveStatus
-              phrase="Thinking"
-              startedAt={
-                [...props.conversation.messages].reverse().find((m) => m.role === "user")?.createdAt
-              }
-            />
-          </div>
+          <AgentThinkingRow
+            agent={props.agent}
+            since={[...props.conversation.messages].reverse().find((m) => m.role === "user")?.createdAt}
+          />
         ) : null}
       </div>
     </div>

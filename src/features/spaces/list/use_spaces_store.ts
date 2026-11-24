@@ -68,6 +68,7 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   spaces: [],
   invitations: [],
   membersBySpace: {},
+  integrationsBySpace: {},
   messagesBySpace: {},
   messageLoadingBySpace: {},
   messageErrorsBySpace: {},
@@ -172,17 +173,20 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
     if (!space) {
       set((state) => {
         const membersBySpace = { ...state.membersBySpace };
+        const integrationsBySpace = { ...state.integrationsBySpace };
         const messagesBySpace = { ...state.messagesBySpace };
         const messageLoadingBySpace = { ...state.messageLoadingBySpace };
         const messageErrorsBySpace = { ...state.messageErrorsBySpace };
         const nodesBySpace = { ...state.nodesBySpace };
         delete membersBySpace[spaceId];
+        delete integrationsBySpace[spaceId];
         delete messagesBySpace[spaceId];
         delete messageLoadingBySpace[spaceId];
         delete messageErrorsBySpace[spaceId];
         delete nodesBySpace[spaceId];
         return {
           membersBySpace,
+          integrationsBySpace,
           messagesBySpace,
           messageLoadingBySpace,
           messageErrorsBySpace,
@@ -309,13 +313,20 @@ export const useSpacesStore = create<SpacesStore>((set, get) => ({
   loadMembers: async (spaceId) => {
     const generation = spacesAccountGeneration;
     try {
-      const { members } = await spacesApi.members(spaceId, (saved) => {
+      const { members, integrations } = await spacesApi.members(spaceId, (saved) => {
         if (generation !== spacesAccountGeneration || get().membersBySpace[spaceId]) return;
-        set((state) => ({ membersBySpace: { ...state.membersBySpace, [spaceId]: saved.members } }));
+        set((state) => ({
+          membersBySpace: { ...state.membersBySpace, [spaceId]: saved.members },
+          integrationsBySpace: {
+            ...state.integrationsBySpace,
+            [spaceId]: saved.integrations ?? [],
+          },
+        }));
       });
       if (generation !== spacesAccountGeneration) return;
       set((state) => ({
         membersBySpace: { ...state.membersBySpace, [spaceId]: members },
+        integrationsBySpace: { ...state.integrationsBySpace, [spaceId]: integrations ?? [] },
       }));
     } catch (error) {
       if (generation !== spacesAccountGeneration) return;
@@ -347,6 +358,7 @@ export function resetSpacesAccountState(): void {
     spaces: [],
     invitations: [],
     membersBySpace: {},
+    integrationsBySpace: {},
     messagesBySpace: {},
     messageLoadingBySpace: {},
     messageErrorsBySpace: {},
@@ -370,17 +382,20 @@ async function recoverInaccessibleSpace(
   if (!accessErrors.isInaccessibleSpaceError(error)) return false;
   useSpacesStore.setState((state) => {
     const membersBySpace = { ...state.membersBySpace };
+    const integrationsBySpace = { ...state.integrationsBySpace };
     const messagesBySpace = { ...state.messagesBySpace };
     const messageLoadingBySpace = { ...state.messageLoadingBySpace };
     const messageErrorsBySpace = { ...state.messageErrorsBySpace };
     const nodesBySpace = { ...state.nodesBySpace };
     delete membersBySpace[spaceId];
+    delete integrationsBySpace[spaceId];
     delete messagesBySpace[spaceId];
     delete messageLoadingBySpace[spaceId];
     delete messageErrorsBySpace[spaceId];
     delete nodesBySpace[spaceId];
     return {
       membersBySpace,
+      integrationsBySpace,
       messagesBySpace,
       messageLoadingBySpace,
       messageErrorsBySpace,

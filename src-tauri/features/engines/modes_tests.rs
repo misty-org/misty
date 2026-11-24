@@ -92,25 +92,11 @@ fn reads_each_cli_help_list_of_modes() {
             "plan"
         ]
     );
-    let codebuddy = "  --permission-mode <mode>   Default permission mode. Choices: acceptEdits, \
-        bypassPermissions, default, plan, dontAsk, auto. Does not write settings.\n  \
-        --permission-mode-before-plan <mode>   Mode to restore\n";
-    assert_eq!(
-        parse_help_choices(codebuddy, "--permission-mode").unwrap(),
-        [
-            "acceptEdits",
-            "bypassPermissions",
-            "default",
-            "plan",
-            "dontAsk",
-            "auto"
-        ]
-    );
-    let qoder = "  --permission-mode <mode>   Set the permission mode (choices:\n         \
+    let wrapped = "  --permission-mode <mode>   Set the permission mode (choices:\n         \
         default, accept_edits,\n         bypass_permissions, dont_ask, auto)\n  \
         --dangerously-skip-permissions   Bypass\n";
     assert_eq!(
-        parse_help_choices(qoder, "--permission-mode").unwrap(),
+        parse_help_choices(wrapped, "--permission-mode").unwrap(),
         [
             "default",
             "accept_edits",

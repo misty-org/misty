@@ -4,19 +4,13 @@ use serde::Serialize;
 
 use database::store::Store;
 
-pub mod acp;
 pub mod agy;
 pub mod claude;
-pub mod codebuddy;
 pub mod codex;
-pub mod dsh;
-pub mod files;
-pub mod gemini;
+#[cfg(all(test, unix))]
+mod every_engine;
 #[cfg(all(test, unix))]
 mod live_turn;
-pub mod opencode;
-pub mod pi;
-pub mod qoder;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -144,14 +138,7 @@ pub fn commands(engine: &str) -> &'static [Command] {
     match engine {
         "claude" => claude::COMMANDS,
         "codex" => codex::COMMANDS,
-        "opencode" => opencode::COMMANDS,
-        "gemini" | "qwen" => gemini::commands(engine),
-        "qoder" | "qoder-cn" => qoder::COMMANDS,
-        "codebuddy" => codebuddy::COMMANDS,
-        "dsh" => dsh::COMMANDS,
         "agy" => agy::COMMANDS,
-        "pi" | "omp" => pi::commands(engine),
-        "kimi" | "grok" | "minimax" | "hermes" => acp::commands(engine),
         _ => &[],
     }
 }
@@ -166,13 +153,7 @@ pub async fn run(context: Context, name: &str) -> Result<Output, String> {
     match context.engine.as_str() {
         "claude" => claude::run(context, name).await,
         "codex" => codex::run(context, name).await,
-        "opencode" => opencode::run(context, name).await,
-        "gemini" | "qwen" => gemini::run(context, name).await,
-        "qoder" | "qoder-cn" => qoder::run(context, name).await,
-        "codebuddy" => codebuddy::run(context, name).await,
-        "dsh" => dsh::run(context, name).await,
         "agy" => agy::run(context, name).await,
-        "pi" | "omp" => pi::run(context, name).await,
-        _ => acp::run(context, name).await,
+        _ => Err(format!("Misty doesn't run /{name} for this engine.")),
     }
 }

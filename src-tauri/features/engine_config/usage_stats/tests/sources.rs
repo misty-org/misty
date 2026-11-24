@@ -21,7 +21,7 @@ fn default_roots_follow_home_and_engine_env() {
 
     let specs = default_specs();
     let ids: Vec<&str> = specs.iter().map(|s| s.engine.id()).collect();
-    assert_eq!(ids, ["claude", "codex", "pi", "omp"]);
+    assert_eq!(ids, ["claude", "codex"]);
     assert_eq!(specs[0].roots, [home.join(".claude/projects")]);
     assert_eq!(
         specs[1].roots,
@@ -30,8 +30,6 @@ fn default_roots_follow_home_and_engine_env() {
             home.join(".codex/archived_sessions")
         ]
     );
-    assert_eq!(specs[2].roots, [home.join(".pi/agent/sessions")]);
-    assert_eq!(specs[3].roots, [home.join(".omp/agent/sessions")]);
 
     let missing = status_for(Engine::Claude);
     assert_eq!((missing.status.as_str(), missing.files), ("missing", 0));
@@ -56,7 +54,13 @@ fn default_roots_follow_home_and_engine_env() {
     let relocated = scratch.path("claude-elsewhere");
     write_lines(
         &relocated.join("projects/p/s.jsonl"),
-        &[pi_header("x", "/w")],
+        &[claude_line(
+            "m",
+            "r",
+            "2026-10-26T08:00:00Z",
+            "c",
+            [1, 1, 0, 0],
+        )],
     );
     std::env::set_var("CLAUDE_CONFIG_DIR", &relocated);
     let claude = status_for(Engine::Claude);
@@ -75,7 +79,7 @@ fn unreadable_root_reports_denied_and_absent_root_missing() {
     let root = scratch.path("sessions");
     std::fs::create_dir_all(root.join("w")).unwrap();
     std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o000)).unwrap();
-    let locked = spec(Engine::Pi, &root);
+    let locked = spec(Engine::Claude, &root);
     let denied = status_of(&locked, &discover(&locked), None);
     std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755)).unwrap();
     if denied.status != "ok" {
@@ -83,7 +87,7 @@ fn unreadable_root_reports_denied_and_absent_root_missing() {
         assert!(denied.error.unwrap().contains("sessions"));
     }
 
-    let absent = spec(Engine::Pi, &scratch.path("nope"));
+    let absent = spec(Engine::Claude, &scratch.path("nope"));
     let missing = status_of(&absent, &discover(&absent), None);
     assert_eq!((missing.status.as_str(), missing.error), ("missing", None));
 }

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { SpaceRequestError } from "../api/api";
 import { spaceAppsApi } from "./server_apps";
 import type { InstalledSpaceApp } from "./server_apps";
-import type { AppSource } from "./third_party_apps";
 
 interface Entry {
   apps: InstalledSpaceApp[] | null;
@@ -90,8 +89,8 @@ export function useSpaceApps(spaceId: string) {
 
   const reload = useCallback(() => void load(spaceId, true), [spaceId]);
   const install = useCallback(
-    async (appId: string, version: string, permissions: string[], source?: AppSource) => {
-      const saved = await spaceAppsApi.install(spaceId, appId, version, permissions, source);
+    async (appId: string, version: string, permissions: string[]) => {
+      const saved = await spaceAppsApi.install(spaceId, appId, version, permissions);
       const now = read(spaceId);
       writeLocally(spaceId, {
         ...now,

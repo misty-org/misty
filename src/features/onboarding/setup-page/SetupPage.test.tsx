@@ -86,14 +86,14 @@ vi.mock("@/shared/platform/native_invoke", () => ({
           installing: [],
         };
       case "engines_list":
-        return ["claude", "codex", "agy", "opencode"].map((id) => ({
+        return ["claude", "codex", "agy"].map((id) => ({
           id,
           name: id,
           installed: mocks.installed.has(id),
           version: null,
           supportsImages: true,
           supportsMcp: true,
-          supportsWebSearch: id !== "opencode" && id !== "agy",
+          supportsWebSearch: id !== "agy",
           modes: [],
         }));
       default:
@@ -146,36 +146,26 @@ it("asks for one next step per engine", () => {
     signedIn,
     detail: null,
   });
-  expect(engineSetupState("claude", { status: null, signIn: null, error: null })).toBe("checking");
-  expect(engineSetupState("claude", { status: null, signIn: null, error: "boom" })).toBe("failed");
+  expect(engineSetupState({ status: null, signIn: null, error: null })).toBe("checking");
+  expect(engineSetupState({ status: null, signIn: null, error: "boom" })).toBe("failed");
   expect(
-    engineSetupState("claude", { status: status({ installed: false }), signIn: null, error: null }),
+    engineSetupState({ status: status({ installed: false }), signIn: null, error: null }),
   ).toBe("install");
   expect(
-    engineSetupState("grok", {
+    engineSetupState({
       status: status({ installed: false, updateKind: null }),
       signIn: null,
       error: null,
     }),
   ).toBe("get");
-  expect(
-    engineSetupState("claude", { status: status({}), signIn: signIn(false), error: null }),
-  ).toBe("sign-in");
-  expect(engineSetupState("kimi", { status: status({}), signIn: signIn(null), error: null })).toBe(
+  expect(engineSetupState({ status: status({}), signIn: signIn(false), error: null })).toBe(
     "sign-in",
   );
-  expect(engineSetupState("minimax", { status: status({}), signIn: null, error: null })).toBe(
+  expect(engineSetupState({ status: status({}), signIn: signIn(null), error: null })).toBe(
     "sign-in",
   );
-  expect(engineSetupState("kimi", { status: status({}), signIn: signIn(true), error: null })).toBe(
-    "ready",
-  );
-  expect(
-    engineSetupState("opencode", { status: status({}), signIn: signIn(null), error: null }),
-  ).toBe("ready");
-  expect(engineSetupState("dsh", { status: status({}), signIn: signIn(false), error: null })).toBe(
-    "ready",
-  );
+  expect(engineSetupState({ status: status({}), signIn: null, error: null })).toBe("sign-in");
+  expect(engineSetupState({ status: status({}), signIn: signIn(true), error: null })).toBe("ready");
 });
 
 it("explains how Misty works before the engines, and comes back to it", async () => {
@@ -200,7 +190,8 @@ it("needs a ready engine that can run Misty to continue, with no way to skip", a
 });
 
 it("doesn't count a ready engine that can't run Misty's own work", async () => {
-  mocks.installed.add("opencode");
+  mocks.installed.add("agy");
+  mocks.signedIn.set("agy", true);
   renderSetup();
   expect(await screen.findByText("Can't run Misty's own work")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);

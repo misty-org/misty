@@ -32,12 +32,20 @@ import { useWorkspaceViewTitle, type WorkspaceView } from "@/features/app-window
 import { SpaceChat, useChatBarActions, useChatBarMenu, useSpacesStore } from "@/features/spaces";
 import { DmMembers } from "./DmMembers";
 import { DmFace, DmProfile, DmWelcome, profileIcon } from "./DmPeople";
-import { directApi, type DirectConversation } from "./api";
+import { directApi, type DirectConversation, type Person } from "./api";
 import { AddPeopleDialog } from "./AddPeopleDialog";
 import { dmOf, useCallStore, useCallsAvailable } from "./calls/call_store";
 import { CallStageView } from "./calls/CallView";
 import { useMissedCalls } from "./calls/missed_calls";
-import { dmName, dmOthers, friendsRoute, reloadDms, updateDms, useDms } from "./direct_data";
+import {
+  dmName,
+  dmOthers,
+  friendsRoute,
+  reloadDms,
+  reloadFriends,
+  updateDms,
+  useDms,
+} from "./direct_data";
 
 export function DmView({ tab, dmId }: { tab: WorkspaceView; dmId: string }) {
   const dms = useDms();
@@ -119,6 +127,28 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
       onConfirm: async () => {
         await directApi.deleteDm(dm.id);
         await reloadDms().catch(() => undefined);
+        navigate(friendsRoute);
+      },
+    });
+  const removeFriend = (person: Person) =>
+    void confirm({
+      title: `Remove ${person.username} as a friend?`,
+      what: `All your messages with ${person.username} will be deleted too.`,
+      confirmLabel: "Remove",
+      onConfirm: async () => {
+        await directApi.unfriend(person.user_id);
+        await Promise.all([reloadFriends(), reloadDms()]);
+        navigate(friendsRoute);
+      },
+    });
+  const blockPerson = (person: Person) =>
+    void confirm({
+      title: `Block ${person.username}?`,
+      what: `All your messages with ${person.username} will be deleted too.`,
+      confirmLabel: "Block",
+      onConfirm: async () => {
+        await directApi.block(person.user_id);
+        await Promise.all([reloadFriends(), reloadDms()]);
         navigate(friendsRoute);
       },
     });
@@ -284,7 +314,12 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
           face: other ? <DmFace dmId={dm.id} person={other} size="sm" /> : undefined,
           welcome: <DmWelcome dm={dm} name={name} other={other} />,
           members: other ? (
-            <DmProfile dm={dm} person={other} />
+            <DmProfile
+              dm={dm}
+              person={other}
+              onRemove={() => removeFriend(other)}
+              onBlock={() => blockPerson(other)}
+            />
           ) : (
             <DmMembers members={dm.members} me={myId ?? ""} />
           ),

@@ -7,7 +7,6 @@ pub(super) fn req(permission: Option<&str>) -> SendRequest {
         workspace: PathBuf::from("/tmp/ws"),
         prompt: "hi".to_string(),
         prompt_contributions: Vec::new(),
-        native_compact: false,
         images: Vec::new(),
         model: None,
         effort: None,
@@ -59,9 +58,11 @@ fn modes_match_the_installed_handshake() {
         {"id": "accept-edits", "name": "Accept edits", "description": "Approve file edits in the workspace without asking."},
         {"id": "auto", "name": "Auto", "description": "Approve edits and safe commands; ask before irreversible actions."},
         {"id": "plan", "name": "Plan", "description": "Plan carefully before executing a task."}]}});
-    let listed: Vec<String> = super::super::models::acp_modes(&session)
-        .into_iter()
-        .map(|mode| mode.id)
+    let listed: Vec<String> = session["modes"]["availableModes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|mode| mode["id"].as_str().map(str::to_string))
         .collect();
     let adapter: Vec<&str> = AgyEngine.modes().iter().map(|mode| mode.id).collect();
     assert_eq!(adapter, ["default", "accept-edits", "plan"]);

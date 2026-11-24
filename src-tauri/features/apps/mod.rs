@@ -6,6 +6,5 @@ pub mod manifest;
 pub mod mcp;
 pub mod permissions;
 pub mod program;
-pub mod resolve;
 pub mod scheme;
 pub mod site;

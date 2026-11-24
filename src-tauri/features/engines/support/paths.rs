@@ -68,11 +68,7 @@ impl InstallRoot {
 
     pub fn program_dirs(&self, engine: &str) -> Vec<PathBuf> {
         let dir = self.engine_dir(engine);
-        let mut dirs = vec![dir.join("bin"), dir.join("node_modules").join(".bin")];
-        if engine == "hermes" {
-            dirs.push(self.checkout_dir(engine).join(".hermes").join("bin"));
-        }
-        dirs
+        vec![dir.join("bin"), dir.join("node_modules").join(".bin")]
     }
 
     pub fn checkout_dir(&self, engine: &str) -> PathBuf {

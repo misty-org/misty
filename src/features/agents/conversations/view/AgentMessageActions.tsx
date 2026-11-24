@@ -1,6 +1,6 @@
 import type { GlobalAiMessage } from "../state/conversation_types";
 import { useMistyStore } from "../state/use_misty_store";
-import { MessageActions, Tooltip, useNow, type MessageAction } from "@misty/ui";
+import { MessageActions, type MessageAction } from "@misty/ui";
 import {
   Copy,
   Forward,
@@ -20,8 +20,6 @@ import { HandOffDialog } from "./HandOffDialog";
 import { formatCost } from "../../context-panel/chat_usage";
 import { formatTokens, tookText } from "./meta/format";
 
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const fullFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 export function AgentMessageActions(props: {
   conversationId?: string;
@@ -122,12 +120,7 @@ export function AgentMessageActions(props: {
     });
   return (
     <>
-      <MessageActions
-        align={user ? "end" : "start"}
-        actions={actions}
-        className={user ? undefined : "mt-1"}
-        trailing={user ? <MessageTime message={message} /> : <ReplyTime message={message} />}
-      />
+      <MessageActions align="start" alwaysVisible actions={actions} />
       {handOff && space ? (
         <HandOffDialog space={space} draft={props.text} onClose={() => setHandOff(false)} />
       ) : null}
@@ -186,44 +179,17 @@ function useReadAloud(text: string) {
   };
 }
 
-function MessageTime({ message }: { message: GlobalAiMessage }) {
-  const date = new Date(message.createdAt);
-  if (Number.isNaN(date.getTime())) return null;
-  return (
-    <Tooltip content={fullFormat.format(date)}>
-      <time dateTime={message.createdAt}>{timeFormat.format(date)}</time>
-    </Tooltip>
-  );
-}
-
-function ReplyTime({ message }: { message: GlobalAiMessage }) {
-  const now = useNow();
-  const date = new Date(message.createdAt);
-  if (Number.isNaN(date.getTime())) return null;
+export function replyDetails(message: GlobalAiMessage, when: string) {
   const usage = message.usage;
   const cost = usage?.costUsd;
-  const details = [
-    fullFormat.format(date),
+  return [
+    when,
     message.durationMs ? `worked for ${tookText(message.durationMs)}` : "",
     usage?.output ? tokenBreakdown(usage) : "",
     typeof cost === "number" && cost > 0 ? formatCost(cost) : "",
   ]
     .filter(Boolean)
     .join(", ");
-  return (
-    <Tooltip content={details}>
-      <time dateTime={message.createdAt}>{agoText(date.getTime(), now)}</time>
-    </Tooltip>
-  );
-}
-
-function agoText(time: number, now: number) {
-  const minutes = Math.floor((now - time) / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return timeFormat.format(time);
 }
 
 function tokenBreakdown(usage: NonNullable<GlobalAiMessage["usage"]>) {

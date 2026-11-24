@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import type { settingsSectionIds } from "./settings_sections";
-import { AccountSection, ServerSection } from "@/features/account";
+import { AccountSection, ServerSection, SessionsSection } from "@/features/account";
 import { RequestsSection, StatusSection } from "@/features/direct";
 import {
   AgentActivitySettings,
@@ -42,6 +42,7 @@ export const settingsSections = {
   account: AccountSection,
   status: StatusSection,
   requests: RequestsSection,
+  sessions: SessionsSection,
   notifications: NotificationsSection,
   server: ServerSection,
   drive: DriveSettingsSection,

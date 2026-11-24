@@ -174,7 +174,7 @@ describe("probe store", () => {
   });
 
   it("asks before probing a workspace server and does nothing when declined", async () => {
-    const repo = entry({ id: "omp_project:x", name: "x", workspaceFile: true });
+    const repo = entry({ id: "claude_project:x", name: "x", workspaceFile: true });
     api.probe.mockResolvedValue(connected());
 
     confirm.confirmWorkspaceProbe.mockResolvedValueOnce(false);
@@ -193,7 +193,7 @@ describe("probe store", () => {
   });
 
   it("drops a confirmation the backend rejected as stale, so the next click asks again", async () => {
-    const repo = entry({ id: "omp_project:x", name: "x", workspaceFile: true });
+    const repo = entry({ id: "claude_project:x", name: "x", workspaceFile: true });
     confirm.confirmWorkspaceProbe.mockResolvedValue(true);
     confirm.confirmedFingerprint.mockReturnValue("fp-old");
     api.probe.mockRejectedValueOnce(Object.assign(new Error("changed"), { code: "conflict" }));

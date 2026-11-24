@@ -6,8 +6,7 @@ use super::node_runtime::{self, NODE_VERSION};
 
 const FIXTURE: &[u8] = b"Misty checks every download.\n";
 const FIXTURE_SHA256: &str = "aa131f23e45aaf3ea47b871577874cce99fc1e1e30d9c86f2e6f364491fd75c9";
-const FIXTURE_SHA512: &str =
-    "0WFRsFrPm0HlGLXvC+fHLBWwQAtqCgcmfjq5Zc4hSv1JQ3LaOHNsalNrvz/FaLZIFL9Yv5tjItE/W3zbaVqD+w==";
+const FIXTURE_SHA512: &str = "d16151b05acf9b41e518b5ef0be7c72c15b0400b6a0a07267e3ab965ce214afd494372da38736c6a536bbf3fc568b64814bf58bf9b6322d13f5b7cdb695a83fb";
 
 #[test]
 fn downloads_are_kept_only_when_they_match_the_published_checksum() {
@@ -20,7 +19,7 @@ fn downloads_are_kept_only_when_they_match_the_published_checksum() {
     assert!(downloads::file_matches(&file, &sha256).unwrap());
     let upper = Checksum::sha256_hex(&FIXTURE_SHA256.to_ascii_uppercase()).unwrap();
     assert!(downloads::file_matches(&file, &upper).unwrap());
-    let sha512 = Checksum::from_npm_integrity(&format!("sha512-{FIXTURE_SHA512}")).unwrap();
+    let sha512 = Checksum::sha512_hex(FIXTURE_SHA512).unwrap();
     assert!(downloads::file_matches(&file, &sha512).unwrap());
 
     std::fs::write(&file, b"Misty checks every download!\n").unwrap();
@@ -32,7 +31,7 @@ fn downloads_are_kept_only_when_they_match_the_published_checksum() {
 
     assert_eq!(Checksum::sha256_hex("abc"), None);
     assert_eq!(Checksum::sha256_hex(&"z".repeat(64)), None);
-    assert_eq!(Checksum::from_npm_integrity("sha1-abc"), None);
+    assert_eq!(Checksum::sha512_hex("abc"), None);
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -79,35 +78,18 @@ fn node_comes_from_its_shasums_line() {
 
 #[test]
 fn makers_builds_are_picked_for_this_system() {
-    let target = |os, arch, musl, avx2| Target {
-        os,
-        arch,
-        musl,
-        avx2,
-    };
+    let target = |os, arch, musl| Target { os, arch, musl };
     assert_eq!(
-        maker_builds::claude_platform(target("macos", "aarch64", false, true)).as_deref(),
+        maker_builds::claude_platform(target("macos", "aarch64", false)).as_deref(),
         Some("darwin-arm64")
     );
     assert_eq!(
-        maker_builds::claude_platform(target("linux", "x86_64", true, true)).as_deref(),
+        maker_builds::claude_platform(target("linux", "x86_64", true)).as_deref(),
         Some("linux-x64-musl")
     );
     assert_eq!(
-        maker_builds::claude_platform(target("windows", "aarch64", false, true)).as_deref(),
+        maker_builds::claude_platform(target("windows", "aarch64", false)).as_deref(),
         Some("win32-arm64")
-    );
-    assert_eq!(
-        maker_builds::opencode_target(target("linux", "x86_64", true, false)).as_deref(),
-        Some("linux-x64-baseline-musl")
-    );
-    assert_eq!(
-        maker_builds::opencode_target(target("macos", "x86_64", false, true)).as_deref(),
-        Some("darwin-x64")
-    );
-    assert_eq!(
-        maker_builds::opencode_target(target("windows", "x86_64", false, true)),
-        None
     );
 
     let manifest = serde_json::json!({

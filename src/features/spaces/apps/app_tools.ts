@@ -1,6 +1,7 @@
 import { LocalToolRejected } from "@/features/agents";
 import type { LocalToolHandler } from "@/features/agents";
 import { invoke } from "@/native";
+import { AGENT_META, agentOfRun, noteAppAgent } from "./app_agents";
 import { createAppMcpClient, McpRemoteError, McpUnreachable } from "./app_mcp_client";
 import { registerAppTools, serveAppTools, unregisterAppTools } from "./app_tool_server";
 import type { HostChannel } from "./host_channel";
@@ -46,6 +47,12 @@ export function offerAppTools(options: {
     onToolsChanged: () => reoffer(),
   });
 
+  const callerOf = async (runId: string) => {
+    const agent = await agentOfRun(runId);
+    noteAppAgent(session, agent);
+    return agent;
+  };
+
   const offer = async () => {
     const tools = options.mcp ? await client.listTools() : [];
     if (!live) return;
@@ -53,10 +60,11 @@ export function offerAppTools(options: {
       ...(extra?.handlers((tool) => appToolName(appId, tool)) ?? {}),
     };
     for (const tool of tools) {
-      handlers[appToolName(appId, tool.name)] = async ({ input, signal }) => {
+      handlers[appToolName(appId, tool.name)] = async ({ input, signal, runId }) => {
+        const agent = await callerOf(runId);
         let result;
         try {
-          result = await client.callTool(tool.name, input, signal);
+          result = await client.callTool(tool.name, input, signal, { [AGENT_META]: agent });
         } catch (error) {
           if (error instanceof McpRemoteError || error instanceof McpUnreachable)
             throw new LocalToolRejected("app_tool_failed", messageOf(error));
@@ -79,9 +87,10 @@ export function offerAppTools(options: {
       : [];
     if (!live) return;
     for (const tool of adapted) {
-      handlers[appToolName(appId, tool.name)] = async ({ input }) => {
+      handlers[appToolName(appId, tool.name)] = async ({ input, runId }) => {
+        const agent = await callerOf(runId);
         try {
-          return await options.adapter!.command("adapter.call", { name: tool.name, args: input });
+          return await options.adapter!.command("adapter.call", { name: tool.name, args: input, agent });
         } catch (error) {
           if (error instanceof ScreenRefused)
             throw new LocalToolRejected("app_tool_failed", messageOf(error));

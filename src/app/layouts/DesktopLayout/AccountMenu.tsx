@@ -1,4 +1,5 @@
 import {
+  openDeviceApproval,
   openSignInSheet,
   openSignOutSheet,
   SavedAccountSessionUnavailableError,
@@ -34,6 +35,7 @@ import {
   CreditCard,
   LifeBuoy,
   LogOut,
+  MonitorSmartphone,
   Plus,
   Repeat2,
   Settings,
@@ -136,6 +138,11 @@ function AccountMenuItems(props: AccountMenuProps) {
     openSignOutSheet();
   };
 
+  const signInDevice = () => {
+    props.onClose();
+    window.setTimeout(() => openDeviceApproval(), 0);
+  };
+
   return (
     <>
       <ProfileCardBanner src={bannerUrl || null} onChange={props.onChangeBanner} />
@@ -145,6 +152,10 @@ function AccountMenuItems(props: AccountMenuProps) {
             <AccountAvatar size="xl" shape="circle" />
           </PresenceFace>
         }
+      />
+      <ProfileCardName
+        name={name}
+        line={email || undefined}
         status={
           <ProfileCardStatus
             emoji={status.custom_emoji}
@@ -153,7 +164,6 @@ function AccountMenuItems(props: AccountMenuProps) {
           />
         }
       />
-      <ProfileCardName name={name} line={email || undefined} />
       <ProfileCardGroup>
         <MenuItem
           icon={<UserCircle />}
@@ -226,6 +236,12 @@ function AccountMenuItems(props: AccountMenuProps) {
             }
           />
         </MenuSubmenu>
+        <MenuItem
+          icon={<MonitorSmartphone />}
+          label="Sign in a device"
+          disabled={transitioning}
+          onSelect={signInDevice}
+        />
         <MenuItem icon={<LogOut />} label="Sign out…" disabled={transitioning} onSelect={signOut} />
       </ProfileCardGroup>
     </>

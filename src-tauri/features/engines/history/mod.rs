@@ -3,9 +3,6 @@ mod agy;
 mod codex_titles;
 pub(crate) mod discovery;
 mod extract;
-mod gemini_family;
-mod hermes;
-mod opencode_v2;
 mod past_folders;
 mod past_folders_stores;
 pub mod reader;
@@ -71,27 +68,11 @@ pub struct SessionFile {
     pub file_path: PathBuf,
 }
 
-pub fn stat_signature(path: &Path) -> Option<(i64, i64)> {
-    let target = split_opencode_db_path(path).map(|(db, _)| db);
-    let shared_db = target.is_some();
-    let path = target.as_deref().unwrap_or(path);
-    let (size, mtime_ms) = file_stat(path)?;
-    if !shared_db {
-        return Some((size, mtime_ms));
-    }
-    let mut wal = path.as_os_str().to_owned();
-    wal.push("-wal");
-    Some(match file_stat(Path::new(&wal)) {
-        Some((wal_size, wal_mtime)) => (size + wal_size, mtime_ms.max(wal_mtime)),
-        None => (size, mtime_ms),
-    })
-}
-
 #[allow(
     clippy::disallowed_methods,
     reason = "stats the engine's own session file in place, wherever the engine keeps it"
 )]
-fn file_stat(path: &Path) -> Option<(i64, i64)> {
+pub fn stat_signature(path: &Path) -> Option<(i64, i64)> {
     let meta = std::fs::metadata(path).ok()?;
     let mtime_ms = meta
         .modified()
@@ -100,24 +81,6 @@ fn file_stat(path: &Path) -> Option<(i64, i64)> {
         .ok()?
         .as_millis() as i64;
     Some((meta.len() as i64, mtime_ms))
-}
-
-const OPENCODE_DB_SEP: char = '\u{1f}';
-
-pub(crate) fn opencode_db_session_path(db: &Path, session_id: &str) -> PathBuf {
-    let mut address = db.to_string_lossy().into_owned();
-    address.push(OPENCODE_DB_SEP);
-    address.push_str(session_id);
-    PathBuf::from(address)
-}
-
-pub(crate) fn split_opencode_db_path(path: &Path) -> Option<(PathBuf, String)> {
-    let text = path.to_str()?;
-    let (db, session_id) = text.split_once(OPENCODE_DB_SEP)?;
-    if db.is_empty() || session_id.is_empty() {
-        return None;
-    }
-    Some((PathBuf::from(db), session_id.to_string()))
 }
 
 pub fn parse_ts_ms_str(text: &str) -> Option<i64> {
@@ -483,7 +446,7 @@ mod tests {
 
     #[test]
     fn unwrap_keeps_literal_user_query_in_typed_body() {
-        let text = "Review the typed `<user_query>` body. Grok injects context.";
+        let text = "Review the typed `<user_query>` body. The engine injects context.";
         assert_eq!(unwrap_user_turn(text), text);
     }
 

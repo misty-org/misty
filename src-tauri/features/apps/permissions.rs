@@ -21,10 +21,12 @@ pub fn required(kind: Kind, name: &str) -> Need {
         (Kind::Call, "chat.post" | "chat.open" | "chat.notify") => Some(ChatPost),
         (Kind::Call, name) if name.starts_with("files.") => Some(Files),
         (Kind::Subscribe, "files.watch") => Some(Files),
-        (Kind::Call, "room.update" | "room.awareness" | "room.sync" | "room.serialized") => {
-            Some(Rooms)
-        }
-        (Kind::Subscribe, "room") => Some(Rooms),
+        (
+            Kind::Call,
+            "room.update" | "room.awareness" | "room.sync" | "room.serialized" | "room.option"
+            | "room.frame" | "room.read" | "room.change",
+        ) => Some(Rooms),
+        (Kind::Subscribe, "room" | "room.frames") => Some(Rooms),
         (Kind::Subscribe, FILE_ROOM) => Some(Files),
         (Kind::Call, "calls.join" | "calls.leave" | "calls.mute") => Some(Calls),
         (Kind::Subscribe, "calls.channels" | "calls.current") => Some(Calls),
@@ -77,7 +79,13 @@ pub fn open(
     webview: &str,
     approved: &[Permission],
 ) -> Result<String, String> {
-    open_since(manifest, space_id, webview, approved, window_generation(webview))
+    open_since(
+        manifest,
+        space_id,
+        webview,
+        approved,
+        window_generation(webview),
+    )
 }
 
 pub fn open_since(
@@ -121,11 +129,12 @@ pub fn check(session: &str, webview: &str, kind: Kind, name: &str) -> Result<(),
         .get(session)
         .filter(|session| session.webview == webview)
         .ok_or_else(|| "This app isn't running.".to_owned())?;
-    if kind == Kind::Subscribe
-        && name == FILE_ROOM
-        && !session.allowed.contains(&Permission::Rooms)
+    if kind == Kind::Subscribe && name == FILE_ROOM && !session.allowed.contains(&Permission::Rooms)
     {
-        return Err(format!("{} wasn't approved for live documents.", session.app_id));
+        return Err(format!(
+            "{} wasn't approved for live documents.",
+            session.app_id
+        ));
     }
     match required(kind, name) {
         Need::Nothing => Ok(()),
@@ -307,6 +316,10 @@ mod tests {
             "room.awareness",
             "room.sync",
             "room.serialized",
+            "room.option",
+            "room.frame",
+            "room.read",
+            "room.change",
             "calls.join",
             "calls.leave",
             "calls.mute",
@@ -320,6 +333,7 @@ mod tests {
             "members.presence",
             "files.watch",
             "room",
+            "room.frames",
             "calls.channels",
             "calls.current",
             "agents.control",

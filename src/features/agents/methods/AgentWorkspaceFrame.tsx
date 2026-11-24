@@ -14,25 +14,10 @@ import { useRailShown } from "../context-panel/rail_layout_store";
 import { ChatSessionCard, useAgentChatSidePanel } from "../context-panel/ChatSidePanels";
 import { CHAT_MIN_WIDTH } from "../context-panel/context_panel_store";
 import { isUnread, markConversationRead } from "./conversation_reads";
-import { Button, cn, designPx, FramedBar, FramedPage, Separator, Surface, Text } from "@misty/ui";
+import { designPx, FramedPage, Separator, Surface } from "@misty/ui";
 import { AgentMemoryPage } from "../memory/AgentMemoryPage";
 import { homeSpaceOf } from "../personal/agent_home_space";
 import { createPort } from "@/shared/lib/seams";
-
-const emptyChatClass = cn(
-  "[&_.agent-conversation[data-empty=true]]:justify-start",
-  "[&_.agent-conversation[data-empty=true]]:pt-[clamp(--spacing(10),18vh,--spacing(52.5))]",
-  "[&_.agent-conversation[data-empty=true]]:overflow-y-auto",
-  "[&_.agent-conversation[data-empty=true]]:overscroll-contain",
-  "[&_.agent-conversation[data-empty=true]_.agent-conversation-scroll]:flex-none",
-  "[&_.agent-conversation[data-empty=true]_.agent-conversation-scroll]:overflow-visible",
-  "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:mx-auto",
-  "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:my-0",
-  "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:w-168",
-  "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:max-w-[calc(100%-var(--spacing)*12)]",
-  "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:shrink-0",
-  "[&_.agent-conversation[data-empty=true]_.agent-compose-area]:p-0",
-);
 
 export const filesPage = createPort<ComponentType>("the Files page");
 
@@ -63,7 +48,6 @@ export function AgentWorkspaceFrame({
   header,
   children,
   onNewTask,
-  threads,
   theirs,
 }: {
   agent: AgentProfile;
@@ -76,7 +60,6 @@ export function AgentWorkspaceFrame({
   header?: ReactNode;
   children: ReactNode;
   onNewTask(): void;
-  threads?: ReactNode;
   theirs?: ReactNode;
 }) {
   const chatPageRef = useRef<HTMLDivElement>(null);
@@ -131,10 +114,7 @@ export function AgentWorkspaceFrame({
   const railShown = useRailShown((state) => state.value);
   return (
     <div
-      className={cn(
-        "agent-studio @container/agent-studio flex h-full min-h-0 min-w-0 flex-1 flex-row",
-        emptyChatClass,
-      )}
+      className="agent-studio @container/agent-studio flex h-full min-h-0 min-w-0 flex-1 flex-row"
       data-page={page}
     >
       <div ref={frameRef} className="flex min-h-0 min-w-0 flex-1">
@@ -142,30 +122,6 @@ export function AgentWorkspaceFrame({
           autoSaveId="agent-chat"
           workMinWidth={CHAT_MIN_WIDTH}
           header={page === "task" ? header : undefined}
-          start={
-            threads
-              ? {
-                  id: "threads",
-                  label: "Threads",
-                  width: 288,
-                  minWidth: 216,
-                  header: (
-                    <FramedBar
-                      start={
-                        <Text size="control" weight="medium" tone="bright">
-                          Threads
-                        </Text>
-                      }
-                    >
-                      <Button variant="primary" onClick={onNewTask}>
-                        New thread
-                      </Button>
-                    </FramedBar>
-                  ),
-                  content: threads,
-                }
-              : null
-          }
           end={theirs ? null : sidePanel}
         >
           <div className="relative isolate min-h-0 min-w-0 flex-1 overflow-hidden">

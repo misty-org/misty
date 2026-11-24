@@ -23,10 +23,11 @@ pub(crate) use crate::account::http::{
     __tauri_command_name_auth_http_start, auth_http_cancel, auth_http_read, auth_http_start,
 };
 pub(crate) use crate::account::session::{
-    __cmd__auth_session_capture, __cmd__auth_session_forget, __cmd__auth_session_restore,
+    __cmd__auth_room_token, __cmd__auth_session_capture, __cmd__auth_session_forget,
+    __cmd__auth_session_restore, __tauri_command_name_auth_room_token,
     __tauri_command_name_auth_session_capture, __tauri_command_name_auth_session_forget,
-    __tauri_command_name_auth_session_restore, auth_session_capture, auth_session_forget,
-    auth_session_restore,
+    __tauri_command_name_auth_session_restore, auth_room_token, auth_session_capture,
+    auth_session_forget, auth_session_restore,
 };
 pub(crate) use crate::account::signed_in_user::{
     __cmd__check_system, __cmd__save_authenticated_user, __cmd__sign_out_misty,

@@ -317,7 +317,6 @@ fn command(folder: &Path, session: Option<&str>, fork: bool) -> Result<BuiltComm
             workspace: folder.to_path_buf(),
             prompt: String::new(),
             prompt_contributions: Vec::new(),
-            native_compact: false,
             images: Vec::new(),
             model,
             effort: None,

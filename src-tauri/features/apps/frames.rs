@@ -195,8 +195,8 @@ pub fn document_left(app: &AppHandle, mount: &str) {
         entry.posting.clear();
         entry.doc.take()
     })
-        .flatten()
-        .is_some()
+    .flatten()
+    .is_some()
     {
         emit_page(app, mount, "opened", None);
     }

@@ -5,6 +5,7 @@ import { activateTab, emptyTab, layoutTabs } from "../panes/layout_tabs";
 import type { WorkspaceLayout, WorkspaceTab } from "./workspace_views";
 import {
   encodedFields,
+  fieldsGroup,
   tabFields,
   tabFromFields,
   tabStaysHere,
@@ -30,7 +31,15 @@ function ownTabs(): { tab: WorkspaceTab; fields: TabFields }[] {
   return sides.flatMap(([held, heldSide]) =>
     layoutTabs(held)
       .filter((tab) => !tabStaysHere(tab))
-      .map((tab, order) => ({ tab, fields: tabFields(tab, order, heldSide) })),
+      .map((tab, order) => ({
+        tab,
+        fields: tabFields(
+          tab,
+          order,
+          heldSide,
+          held.groups?.find((group) => group.id === tab.group),
+        ),
+      })),
   );
 }
 
@@ -50,6 +59,14 @@ function mergeTabs(
   let tabs = held.filter((tab) => !removed.has(tab.id));
   tabs.forEach((tab, index) => order.set(tab.id, index));
   const arrived: string[] = [];
+  const groups = [...(layout.groups ?? [])];
+  for (const { fields } of incoming) {
+    const group = fieldsGroup(fields);
+    if (!group) continue;
+    const at = groups.findIndex((known) => known.id === group.id);
+    if (at < 0) groups.push(group);
+    else groups[at] = { ...groups[at], title: group.title, color: group.color };
+  }
   for (const { id, fields } of incoming) {
     order.set(id, fields.order);
     const previous = tabs.find((tab) => tab.id === id);
@@ -73,7 +90,9 @@ function mergeTabs(
   const kept = tabs.find((tab) => tab.id === layout.activeTabId);
   const first = untouched ? tabs.find((tab) => arrived.includes(tab.id)) : undefined;
   const active = kept ?? first ?? tabs[0];
-  return normalizeWorkspaceLayout(activateTab({ ...layout, tabs }, active.id));
+  return normalizeWorkspaceLayout(
+    activateTab({ ...layout, tabs, groups: groups.length ? groups : undefined }, active.id),
+  );
 }
 
 export function startProfileTabs(): () => void {

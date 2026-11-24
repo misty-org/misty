@@ -63,7 +63,7 @@ import { SidebarRow as Row } from "./SidebarRow";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { chatSectionClass, markSlotClass } from "./styles";
 import { useSearchDialog } from "./search/search_store";
-import { agentChatRoute, openWorkspaceRoute } from "./space_navigation";
+import { agentChatRoute, agentSharedThreadRoute, openWorkspaceRoute } from "./space_navigation";
 
 const ExploreIcon = spaceIcons.explore;
 
@@ -284,6 +284,14 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const params = new URLSearchParams(query);
   const view = path === "/agents" ? params.get("view") : null;
   const openAgent = path === "/agents" && !view ? params.get("agent") : null;
+  const shownConversation = useMistyStore((state) => state.activeConversationId);
+  const agentPlace = {
+    agent: openAgent,
+    conversation: !openAgent || params.get("new")
+      ? null
+      : (params.get("conversation") ?? (shownConversation || null)),
+    thread: openAgent ? params.get("thread") : null,
+  };
   const spaceAgents = useMemo(
     () => (space ? agents.filter((agent) => homeSpaceOf(accountId, agent) === space.id) : []),
     [agents, accountId, space],
@@ -403,8 +411,13 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
             agents={spaceAgents}
             chats={chats}
             statuses={statuses}
-            openAgent={openAgent}
+            here={agentPlace}
+            spaceId={space.id}
+            accountId={accountId}
             onOpen={(agent) => open(agentChatRoute(agent.id))}
+            onNewThread={(agent) => open(agentChatRoute(agent.id, undefined, true))}
+            onOpenThread={(agent, conversationId) => open(agentChatRoute(agent.id, conversationId))}
+            onOpenShared={(agent, threadId) => open(agentSharedThreadRoute(agent.id, threadId))}
           >
             {conversationsError && !conversations.length ? (
               <ErrorState

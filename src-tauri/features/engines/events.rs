@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/events.rs.
 //! Engine event types and tool-call/todo payload parsing shared by every
-//! engine adapter (claude, kimi, codex, omp, ...).
+//! engine adapter (claude, codex, agy).
 
 use super::plan_review::PlanReview;
 use serde::Serialize;

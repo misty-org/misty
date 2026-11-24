@@ -129,14 +129,6 @@ pub(crate) fn parse_iso_ms(text: &str) -> Option<i64> {
     Some(secs * 1000 + millis)
 }
 
-pub(crate) fn epoch_ms_from_number(value: f64) -> Option<i64> {
-    if !value.is_finite() || value <= 0.0 {
-        return None;
-    }
-    let ms = if value < 1e12 { value * 1000.0 } else { value };
-    Some(ms.floor() as i64)
-}
-
 pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

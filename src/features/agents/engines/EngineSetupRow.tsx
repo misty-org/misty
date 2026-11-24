@@ -10,7 +10,6 @@ import type { EngineSetupState } from "./engine_readiness";
 
 const ACCOUNT_HINTS: Partial<Record<EngineId, string>> = {
   agy: "Free with a Google account",
-  opencode: "Free, no account",
   codex: "With a ChatGPT account",
   claude: "With a Claude plan",
 };

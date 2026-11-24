@@ -1,4 +1,4 @@
-import { ChatStart, ChatStartIdeas } from "./ChatStart";
+import { ChatStart } from "./ChatStart";
 import { needsDefaultEngine, openEngineSettings } from "../engines/engine_needed";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import { AgentWorkspaceConversation } from "../conversations/view/AgentWorkspaceConversation";
@@ -80,7 +80,6 @@ export function AgentsTaskContent({ state, actions }: AgentsTaskContentProps) {
             onVoiceStateChange={setVoiceState}
             onDraftStateChange={guard.setConversationStatus}
             emptyContent={profile ? <ChatStart agent={profile} /> : undefined}
-            emptyFooter={profile ? <ChatStartIdeas agent={profile} /> : undefined}
             onCreate={create}
             onNewChat={() => profile && actions.select(profile.id, true)}
           />

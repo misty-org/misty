@@ -295,18 +295,6 @@ export const PRESETS: Partial<Record<EngineId, ProviderPreset[]>> = {
       },
     },
   ],
-  kimi: [
-    {
-      name: "Kimi Coding",
-      mark: "kimi",
-      baseUrl: "https://api.kimi.com/coding/v1",
-      model: "kimi-for-coding",
-    },
-    { name: "Moonshot", mark: "moonshot", baseUrl: "https://api.moonshot.cn/v1", model: "" },
-  ],
-  grok: [
-    { name: "xAI Official", mark: "xai", baseUrl: "https://api.x.ai/v1", model: "grok-build" },
-  ],
   codex: [
     {
       name: "API Route",

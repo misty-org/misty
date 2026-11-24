@@ -168,9 +168,6 @@ fn build_windows_extra_search_paths(
         paths.push(user_profile.join(".local\\bin"));
         paths.push(user_profile.join(".codex-cli\\bin"));
         paths.push(user_profile.join(".local\\share\\mise\\shims"));
-        paths.push(user_profile.join(".hermes\\node"));
-        paths.push(user_profile.join(".hermes\\node\\bin"));
-        paths.push(user_profile.join(".omp\\bin"));
         paths.push(user_profile.join(".cargo\\bin"));
         paths.push(user_profile.join(".bun\\bin"));
         let codemoss_sdk_root =
@@ -217,10 +214,6 @@ fn build_windows_extra_search_paths(
         }
     }
     if let Some(local_app_data) = local_app_data {
-        paths.push(local_app_data.join("omp"));
-        paths.push(local_app_data.join("hermes\\node"));
-        paths.push(local_app_data.join("hermes\\node\\bin"));
-        paths.push(local_app_data.join("hermes\\bin"));
         paths.push(local_app_data.join("Volta\\bin"));
         paths.push(local_app_data.join("pnpm"));
         paths.push(local_app_data.join("mise\\shims"));
@@ -283,9 +276,7 @@ fn build_unix_extra_search_paths() -> Vec<PathBuf> {
         paths.push(home.join(".cargo/bin"));
         paths.push(home.join(".bun/bin"));
         paths.push(home.join(".volta/bin"));
-        paths.push(home.join(".omp/bin"));
         paths.push(home.join(".claude/local"));
-        paths.push(home.join(".opencode/bin"));
         paths.push(home.join(".npm-global/bin"));
         let nvm_root = home.join(".nvm/versions/node");
         if let Ok(entries) = std::fs::read_dir(nvm_root) {

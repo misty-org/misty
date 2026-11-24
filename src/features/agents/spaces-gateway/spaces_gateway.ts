@@ -4,17 +4,6 @@ import type { Awareness } from "y-protocols/awareness";
 import type * as Y from "yjs";
 import { createPort } from "@/shared/lib/seams";
 
-export interface LiveDoc {
-  doc: Y.Doc;
-  awareness: Awareness;
-  role: "creator" | "editor" | "viewer";
-  synced: Promise<void>;
-  lost(): "deleted" | "revoked" | null;
-  onLost(listener: () => void): () => void;
-  followRewrites(apply: (markdown: string) => void): () => void;
-  close(): void;
-}
-
 export interface LiveNoteEditorProps {
   fragment: Y.XmlFragment;
   awareness: Awareness;
@@ -86,7 +75,6 @@ interface SpacesGateway {
   readDoc(spaceId: string, docId: string): Promise<string>;
 
   me(): { userId: string; name: string } | undefined;
-  openLiveDoc(spaceId: string, docId: string): Promise<LiveDoc>;
   driveFile(spaceId: string, itemId: string): Promise<File>;
   createNotebookDoc(spaceId: string, title: string, markdown: string): Promise<{ id: string }>;
   deleteNotebookDoc(spaceId: string, docId: string): Promise<void>;

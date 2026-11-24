@@ -9,11 +9,10 @@
 // `engine_cli_sign_in_code` types it, then Return, into the terminal; the code goes only to the
 // pty, never into a log, an error or anything kept.
 //
-// Where the login is only a slash command inside the CLI's own screen (CodeBuddy's `/login`,
-// Qwen Code's `/auth`), the program starts first and the command is typed once its screen is up,
-// the way desktop-cc-gui drives its built-in terminal for Pi, Oh My Pi and CodeBuddy
-// (terminalLogin.ts, piFamilyLogin.ts, codebuddyLogin.ts), and the person answers under Show
-// details.
+// Where the command is only a slash command inside the CLI's own screen (Antigravity's
+// `/logout`), the program starts first and the command is typed once its screen is up, the way
+// desktop-cc-gui drives its built-in terminal (terminalLogin.ts), and the person answers under
+// Show details.
 //
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong). See NOTICE.
 
@@ -41,10 +40,7 @@ const SCREEN_DEADLINE: Duration = Duration::from_secs(20);
 mod plans;
 pub(crate) use plans::remembered_sign_in;
 pub use plans::Asks;
-use plans::{
-    google_sign_in_choice, needs_version, pasted_code, remembers_sign_in, shown_command,
-    sign_in_plan, Found, GoogleChoice, Plan,
-};
+use plans::{pasted_code, remembers_sign_in, shown_command, sign_in_plan, Plan};
 
 const CODE_PAUSE: Duration = Duration::from_millis(120);
 
@@ -222,13 +218,11 @@ pub struct SignInStarted {
 }
 
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
 pub async fn engine_cli_sign_in(
     app: tauri::AppHandle,
     webview: tauri::Webview,
     engine: String,
     id: String,
-    provider: Option<String>,
     sign_out: Option<bool>,
     cols: u16,
     rows: u16,
@@ -239,20 +233,7 @@ pub async fn engine_cli_sign_in(
     }
     let sign_out = sign_out.unwrap_or(false);
     let program = super::engine_bin(&engine);
-    let mut found = Found::default();
-    if needs_version(&engine) {
-        found.version = super::probe_local_version(&program)
-            .await
-            .version
-            .as_deref()
-            .and_then(super::parse_version);
-    }
-    if engine == "gemini" && !sign_out {
-        found.google_chosen = tokio::task::spawn_blocking(choose_google_sign_in)
-            .await
-            .unwrap_or(false);
-    }
-    let plan = sign_in_plan(&engine, provider.as_deref(), sign_out, &found)?;
+    let plan = sign_in_plan(&engine, sign_out)?;
     let remember = remembers_sign_in(&engine).then(|| (engine.clone(), !sign_out));
     spawn_session(
         &app, &webview, &id, &engine, &program, &plan, remember, cols, rows,
@@ -265,24 +246,6 @@ pub async fn engine_cli_sign_in(
         command: shown_command(&name, &plan),
         asks: plan.asks,
     })
-}
-
-fn choose_google_sign_in() -> bool {
-    let home = std::env::var_os("GEMINI_CLI_HOME")
-        .filter(|home| !home.is_empty())
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(support::home_dir);
-    let path = home.join(".gemini").join("settings.json");
-    let text = match file_access::fs::read_to_string(&path) {
-        Ok(text) => Some(text),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-        Err(_) => return false,
-    };
-    match google_sign_in_choice(text.as_deref()) {
-        GoogleChoice::Chosen => true,
-        GoogleChoice::Write(written) => support::atomic_write(&path, &written).is_ok(),
-        GoogleChoice::Leave => false,
-    }
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -86,15 +86,7 @@ impl Sandbox {
             ("MISTY_SKILLS_HUB_HOME", store.path()),
             ("CLAUDE_CONFIG_DIR", &PathBuf::new()),
             ("CODEX_HOME", &PathBuf::new()),
-            ("KIMI_CODE_HOME", &PathBuf::new()),
-            ("GROK_HOME", &PathBuf::new()),
-            ("PI_CODING_AGENT_DIR", &PathBuf::new()),
-            ("OMP_CODING_AGENT_DIR", &PathBuf::new()),
-            ("DSH_HOME", &PathBuf::new()),
             ("ANTIGRAVITY_HOME", &PathBuf::new()),
-            ("GEMINI_DIR", &PathBuf::new()),
-            ("XDG_CONFIG_HOME", &PathBuf::new()),
-            ("HERMES_HOME", &PathBuf::new()),
         ]);
         Self {
             home,
@@ -553,31 +545,12 @@ fn target_list_covers_every_cli_and_reports_availability() {
         .iter()
         .map(|t| t.get("id").and_then(Value::as_str).unwrap())
         .collect();
-    assert_eq!(
-        ids,
-        vec![
-            "claude",
-            "codex",
-            "kimi",
-            "grok",
-            "pi",
-            "omp",
-            "dsh",
-            "agy",
-            "gemini",
-            "opencode",
-            "qoder",
-            "qoder-cn",
-            "qwen",
-            "codebuddy",
-            "hermes",
-        ]
-    );
+    assert_eq!(ids, vec!["claude", "codex", "agy"]);
     assert!(!ids.contains(&"agents"));
     assert!(list
         .iter()
         .all(|t| t.get("available") == Some(&json!(false))));
-    for dir in [".claude", ".grok", ".gemini/antigravity", ".qoder-cn"] {
+    for dir in [".claude", ".gemini/antigravity"] {
         fs::create_dir_all(home.join(dir)).unwrap();
     }
     let available = |id: &str| {
@@ -589,11 +562,8 @@ fn target_list_covers_every_cli_and_reports_availability() {
             .unwrap()
     };
     assert!(available("claude"), "claude home exists");
-    assert!(available("grok"), "grok home exists");
-    assert!(available("qoder-cn"), "qoder-cn home exists");
     assert!(available("agy"), "antigravity app home exists");
     assert!(!available("codex"), "no codex home");
-    assert!(!available("hermes"), "no hermes home");
 }
 
 #[test]

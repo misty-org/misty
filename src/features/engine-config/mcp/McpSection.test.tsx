@@ -165,21 +165,20 @@ function payload(overrides: Partial<McpInventory> = {}): McpInventory {
           entries: [],
         },
       }),
-      engine("kimi", {
+      engine("agy", {
         sources: [
           {
-            source: "kimi_user",
-            path: "/home/u/.kimi-code/mcp.json",
+            source: "agy_user",
+            path: "/home/u/.antigravity/mcp_config.json",
             exists: false,
           },
           {
-            source: "kimi_local",
-            path: "/ws/.kimi-code/mcp.json",
+            source: "agy_project",
+            path: "/ws/.agents/mcp_config.json",
             exists: false,
           },
         ],
       }),
-      engine("pi", { available: false, support: "none" }),
     ],
     collectedAt: 1,
     ...overrides,
@@ -367,14 +366,16 @@ describe("McpSection", () => {
     api.inventory.mockResolvedValue(payload({ engines: [payload().engines[2]] }));
     await renderSection();
     expect(document.body.textContent).toContain("Files read");
-    expect(document.body.textContent).toContain("/home/u/.kimi-code/mcp.json");
+    expect(document.body.textContent).toContain("/home/u/.antigravity/mcp_config.json");
     expect(document.body.textContent).toContain("Not created yet");
   });
 
   it("explains an engine without MCP instead of an empty list", async () => {
-    api.inventory.mockResolvedValue(payload({ engines: [payload().engines[3]] }));
+    api.inventory.mockResolvedValue(
+      payload({ engines: [engine("agy", { available: false, support: "none" })] }),
+    );
     await renderSection();
-    expect(document.body.textContent).toContain("Pi has no MCP of its own");
+    expect(document.body.textContent).toContain("Antigravity has no MCP of its own");
     expect(document.body.textContent).not.toContain("Added");
   });
 });

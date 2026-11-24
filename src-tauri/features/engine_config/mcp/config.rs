@@ -116,7 +116,7 @@ pub(super) fn probe_target(
                 .and_then(|servers| servers.get(name))
                 .and_then(Value::as_object)
                 .ok_or_else(missing)?;
-            Ok(probe_target_from_json(object, false, CLAUDE_FIELDS))
+            Ok(probe_target_from_json(object, CLAUDE_FIELDS))
         }
         SOURCE_CLAUDE_PROJECT => {
             let workspace = require_workspace(workspace)?;
@@ -129,7 +129,7 @@ pub(super) fn probe_target(
                 .and_then(|servers| servers.get(name))
                 .and_then(Value::as_object)
                 .ok_or_else(missing)?;
-            Ok(probe_target_from_json(object, false, CLAUDE_FIELDS))
+            Ok(probe_target_from_json(object, CLAUDE_FIELDS))
         }
         SOURCE_CODEX_USER | SOURCE_CODEX_PROJECT => {
             let path = if source == SOURCE_CODEX_USER {
@@ -1309,37 +1309,11 @@ mod tests {
 
     #[test]
     fn write_enabled_rejects_readonly_and_unknown_sources() {
-        let error = write_enabled("kimi_user:alpha", true, "", None).unwrap_err();
+        let error = write_enabled("agy_user:alpha", true, "", None).unwrap_err();
         assert_eq!(error.code, "readonly");
         let error = write_enabled("bogus:alpha", true, "", None).unwrap_err();
         assert_eq!(error.code, "invalid_input");
         let error = write_enabled("codex_project:alpha", true, "", None).unwrap_err();
         assert_eq!(error.code, "invalid_input");
-    }
-
-    #[test]
-    fn new_engine_toggle_through_the_command_path_does_not_deadlock() {
-        let _guard = crate::engine_config::support::HOME_ENV_LOCK.lock();
-        let dir = TempDir::new("omp-toggle-command-path");
-        let path = dir.path().join("mcp.json");
-        let original = "{\n  \"mcpServers\": {\n    \"alpha\": { \"command\": \"npx\" }\n  }\n}\n";
-        std::fs::write(&path, original).unwrap();
-        std::env::set_var("OMP_CODING_AGENT_DIR", dir.path());
-        let version = file_hash(original.as_bytes());
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = tx.send(write_enabled("omp_user:alpha", false, &version, None));
-        });
-        let result = rx
-            .recv_timeout(std::time::Duration::from_secs(10))
-            .expect("toggle deadlocked on WRITE_LOCK");
-        std::env::remove_var("OMP_CODING_AGENT_DIR");
-        assert!(!result.unwrap().enabled);
-        let written: Value =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(
-            written["mcpServers"]["alpha"]["enabled"],
-            serde_json::json!(false)
-        );
     }
 }

@@ -255,7 +255,10 @@ pub async fn space_app_page_open(
         Kind::Bundle => None,
     };
     let token = frames::register(&mount, &app_id, &version, &owner, world, gate)?;
-    frames::set_space(&mount, space_id.filter(|space| !space.is_empty() && space.len() <= 200));
+    frames::set_space(
+        &mount,
+        space_id.filter(|space| !space.is_empty() && space.len() <= 200),
+    );
     let shortcuts =
         serde_json::to_string(&crate::browser::input::shortcuts::current_shortcut_bindings(&state))
             .unwrap_or_else(|_| "[]".to_owned());

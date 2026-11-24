@@ -1,22 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // See NOTICE.
 
-export type McpEngineId =
-  | "claude"
-  | "gemini"
-  | "qwen"
-  | "minimax"
-  | "codex"
-  | "kimi"
-  | "grok"
-  | "omp"
-  | "opencode"
-  | "agy"
-  | "qoder"
-  | "qoder-cn"
-  | "dsh"
-  | "codebuddy"
-  | "pi";
+export type McpEngineId = "claude" | "codex" | "agy";
 
 export type McpConfigSource =
   | "claude_user"
@@ -24,27 +9,8 @@ export type McpConfigSource =
   | "claude_project"
   | "codex_user"
   | "codex_project"
-  | "kimi_user"
-  | "kimi_local"
-  | "kimi_project"
-  | "grok_user"
-  | "grok_project"
-  | "omp_user"
-  | "omp_project"
-  | "opencode_user"
-  | "opencode_project"
   | "agy_user"
-  | "agy_project"
-  | "qoder_user"
-  | "qoder_local"
-  | "qoder_project"
-  | "qoder_cn_user"
-  | "qoder_cn_local"
-  | "qoder_cn_project"
-  | "codebuddy_user"
-  | "codebuddy_local"
-  | "codebuddy_project"
-  | "dsh_profile";
+  | "agy_project";
 
 export type McpEngineSupport = "native" | "plugin" | "none";
 

@@ -5,21 +5,19 @@ import { describe, expect, it } from "vitest";
 import { providerEntries, stripConventionEnv } from "./providers";
 
 describe("stripConventionEnv", () => {
-  it("keeps CODEBUDDY_INTERNET_ENVIRONMENT when editing an env-configured channel", () => {
-    const stripped = stripConventionEnv("codebuddy", {
-      env: { CODEBUDDY_INTERNET_ENVIRONMENT: "cloudhosted" },
+  it("keeps an engine's other env keys when editing an env-configured channel", () => {
+    const stripped = stripConventionEnv("claude", {
+      env: { NO_PROXY: "localhost" },
       settingsConfig: {
         env: {
-          CODEBUDDY_BASE_URL: "https://company.copilot.qq.com",
-          CODEBUDDY_API_KEY: "sk-x",
-          CODEBUDDY_INTERNET_ENVIRONMENT: "cloudhosted",
+          ANTHROPIC_BASE_URL: "https://relay.example",
+          ANTHROPIC_AUTH_TOKEN: "sk-x",
+          NO_PROXY: "localhost",
         },
       },
     });
-    expect(stripped.env).toEqual({ CODEBUDDY_INTERNET_ENVIRONMENT: "cloudhosted" });
-    expect(stripped.settingsConfig).toEqual({
-      env: { CODEBUDDY_INTERNET_ENVIRONMENT: "cloudhosted" },
-    });
+    expect(stripped.env).toEqual({ NO_PROXY: "localhost" });
+    expect(stripped.settingsConfig).toEqual({ env: { NO_PROXY: "localhost" } });
   });
 });
 

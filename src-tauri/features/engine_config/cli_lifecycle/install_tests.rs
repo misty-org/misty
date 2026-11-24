@@ -42,41 +42,29 @@ fn engines_and_node_install_into_mistys_folder() {
     let home = Scratch::new();
     let root = &home.root;
     let misty = home.dir.join(".misty");
-    assert_eq!(root.engine_dir("gemini"), misty.join("engines/gemini"));
+    assert_eq!(root.engine_dir("codex"), misty.join("engines/codex"));
     assert_eq!(
-        root.program_dirs("gemini"),
+        root.program_dirs("codex"),
         vec![
-            misty.join("engines/gemini/bin"),
-            misty.join("engines/gemini/node_modules/.bin")
+            misty.join("engines/codex/bin"),
+            misty.join("engines/codex/node_modules/.bin")
         ]
-    );
-    assert_eq!(
-        root.program_dirs("hermes")[2],
-        misty.join("engines/hermes/hermes-agent/.hermes/bin")
-    );
-    assert_eq!(
-        routes::script_target(root, "hermes"),
-        misty.join("engines/hermes/hermes-agent")
-    );
-    assert_eq!(
-        routes::script_target(root, "codex"),
-        misty.join("engines/codex/bin")
     );
     assert_eq!(root.node_dir(), misty.join("runtime/node"));
     if !cfg!(windows) {
         assert_eq!(root.node_bin_dir(), misty.join("runtime/node/bin"));
     }
-    let args = routes::npm_prefix_args(&root.engine_dir("gemini"), "@google/gemini-cli");
+    let args = routes::npm_prefix_args(&root.engine_dir("codex"), "@openai/codex");
     assert_eq!(
         &args[..3],
         [
             "install",
             "--prefix",
-            &*misty.join("engines/gemini").to_string_lossy()
+            &*misty.join("engines/codex").to_string_lossy()
         ]
     );
     assert!(!args.iter().any(|arg| arg == "-g" || arg == "--global"));
-    assert_eq!(args.last().unwrap(), "@google/gemini-cli@latest");
+    assert_eq!(args.last().unwrap(), "@openai/codex@latest");
     let claude = if cfg!(windows) {
         "claude.exe"
     } else {
@@ -93,7 +81,7 @@ fn engines_and_node_install_into_mistys_folder() {
 
 #[test]
 fn makers_scripts_update_a_copy_they_put_on_the_computer_where_it_is() {
-    let (program, args, env) = routes::script_argv("codex", None, false);
+    let (program, args, env) = routes::script_argv("codex", false);
     assert!(program.ends_with("bash"), "{program}");
     assert_eq!(args[0], "-c");
     assert_eq!(
@@ -103,7 +91,7 @@ fn makers_scripts_update_a_copy_they_put_on_the_computer_where_it_is() {
     assert!(!env
         .iter()
         .any(|(k, _)| k == "CODEX_INSTALL_DIR" || k == "HOME"));
-    let (program, args, _) = routes::script_argv("agy", None, true);
+    let (program, args, _) = routes::script_argv("agy", true);
     assert!(program.ends_with("\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"));
     assert!(!args.iter().any(|arg| arg.contains("Bypass")));
     assert_eq!(
@@ -114,33 +102,23 @@ fn makers_scripts_update_a_copy_they_put_on_the_computer_where_it_is() {
 
 #[test]
 fn a_missing_engine_always_goes_into_mistys_folder() {
-    let fresh = |engine: &str, windows: bool| routes::route(engine, engine, false, windows);
-    assert_eq!(fresh("claude", false), Some(Route::MistyDownload));
-    assert_eq!(fresh("claude", true), Some(Route::MistyDownload));
-    assert_eq!(fresh("opencode", false), Some(Route::MistyDownload));
-    assert_eq!(fresh("opencode", true), Some(Route::MistyNpm));
-    assert_eq!(fresh("codex", false), Some(Route::MistyDownload));
-    assert_eq!(fresh("codex", true), Some(Route::MistyDownload));
-    assert_eq!(fresh("agy", false), Some(Route::MistyDownload));
-    assert_eq!(fresh("agy", true), Some(Route::MistyDownload));
-    for engine in ["gemini", "qwen", "kimi", "pi", "omp", "dsh"] {
-        assert_eq!(fresh(engine, false), Some(Route::MistyNpm), "{engine}");
+    let fresh = |engine: &str| routes::route(engine, engine, false);
+    for engine in ["claude", "codex", "agy"] {
+        assert_eq!(fresh(engine), Some(Route::MistyDownload), "{engine}");
     }
-    assert_eq!(fresh("hermes", false), Some(Route::MistyScript));
-    assert_eq!(fresh("hermes", true), Some(Route::MistyScript));
-    assert_eq!(fresh("grok", false), None);
+    assert_eq!(fresh("misty"), None);
 }
 
 #[test]
 fn mistys_own_copy_updates_and_removes_the_way_misty_installed_it() {
     let home = Scratch::new();
     let root = &home.root;
-    let npm_bin = root.program_dirs("gemini")[1].join("gemini");
+    let npm_bin = root.program_dirs("codex")[1].join("codex");
     write_program(&npm_bin);
     let npm_bin = npm_bin.to_string_lossy().into_owned();
-    assert!(routes::installed_by_misty_in(root, "gemini", &npm_bin));
+    assert!(routes::installed_by_misty_in(root, "codex", &npm_bin));
     assert_eq!(
-        routes::route_in(root, "gemini", &npm_bin, true, false),
+        routes::route_in(root, "codex", &npm_bin, true),
         Some(Route::MistyNpm)
     );
 
@@ -148,20 +126,20 @@ fn mistys_own_copy_updates_and_removes_the_way_misty_installed_it() {
     write_program(&claude);
     let claude = claude.to_string_lossy().into_owned();
     assert_eq!(
-        routes::route_in(root, "claude", &claude, true, false),
+        routes::route_in(root, "claude", &claude, true),
         Some(Route::MistyDownload)
     );
     assert!(!routes::installed_by_misty_in(root, "codex", &claude));
 
-    let elsewhere = home.dir.join(".local/bin/gemini");
+    let elsewhere = home.dir.join(".local/bin/codex");
     write_program(&elsewhere);
     let elsewhere = elsewhere.to_string_lossy().into_owned();
-    assert!(!routes::installed_by_misty_in(root, "gemini", &elsewhere));
-    assert!(routes::remove_in(root, &[], "gemini", &elsewhere).is_err());
+    assert!(!routes::installed_by_misty_in(root, "codex", &elsewhere));
+    assert!(routes::remove_in(root, "codex", &elsewhere).is_err());
     assert!(Path::new(&elsewhere).exists());
 
-    routes::remove_in(root, &[], "gemini", &npm_bin).unwrap();
-    assert!(!root.engine_dir("gemini").exists());
+    routes::remove_in(root, "codex", &npm_bin).unwrap();
+    assert!(!root.engine_dir("codex").exists());
     assert!(root.engine_dir("claude").exists());
 }
 
@@ -169,7 +147,7 @@ fn mistys_own_copy_updates_and_removes_the_way_misty_installed_it() {
 fn engines_are_found_in_settings_then_the_computer_then_mistys_folder() {
     let home = Scratch::new();
     let name = format!("misty-find-{}", uuid::Uuid::new_v4().simple());
-    let misty_dir = home.root.program_dirs("kimi")[0].clone();
+    let misty_dir = home.root.program_dirs("codex")[0].clone();
     let mistys = misty_dir.join(&name);
     write_program(&mistys);
     let search = crate::engines::resolve::search_path_with(None, std::slice::from_ref(&misty_dir));
@@ -205,102 +183,10 @@ fn engines_are_found_in_settings_then_the_computer_then_mistys_folder() {
     }
 }
 
-#[test]
-fn hermes_installs_its_checkout_into_mistys_folder_without_questions() {
-    let into = Path::new("/home/me/.misty/shared/engines/hermes/hermes-agent");
-    let (_, args, env) = routes::script_argv("hermes", Some(into), false);
-    assert_eq!(
-        args[1],
-        "set -o pipefail; curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
-         | bash -s -- --non-interactive --dir \"$MISTY_ENGINE_DIR\""
-    );
-    let get = |env: &[(String, String)], key: &str| {
-        env.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone())
-    };
-    assert_eq!(
-        get(&env, "MISTY_ENGINE_DIR").as_deref(),
-        Some("/home/me/.misty/shared/engines/hermes/hermes-agent")
-    );
-    assert_eq!(
-        get(&env, "HOME").as_deref(),
-        Some("/home/me/.misty/shared/engines/hermes/home")
-    );
-    let data = get(&env, "HERMES_HOME").unwrap();
-    assert!(!data.contains(".misty"), "{data}");
-    let (_, args, env) = routes::script_argv("hermes", Some(into), true);
-    assert!(get(&env, "HOME").is_none());
-    assert_eq!(
-        args.last().unwrap(),
-        "& ([scriptblock]::Create((irm https://hermes-agent.nousresearch.com/install.ps1))) \
-         -NonInteractive -InstallDir $env:MISTY_ENGINE_DIR"
-    );
-    let (_, args, env) = routes::script_argv("hermes", None, false);
-    assert!(get(&env, "HOME").is_none());
-    assert!(
-        args[1].ends_with("| bash -s -- --non-interactive"),
-        "{}",
-        args[1]
-    );
-    assert_eq!(
-        routes::route("hermes", "/usr/bin/hermes", true, false),
-        Some(Route::VendorScript)
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn hermes_wrappers_for_mistys_checkout_are_mistys_and_go_with_remove() {
-    let home = Scratch::new();
-    let root = &home.root;
-    let checkout = root.checkout_dir("hermes");
-    write_program(&checkout.join(".hermes/bin/hermes"));
-    let local_bin = home.dir.join(".local/bin");
-    let wrapper = local_bin.join("hermes");
-    write_program(&wrapper);
-    std::fs::write(
-        &wrapper,
-        format!(
-            "#!/bin/sh\nexec {}/.hermes/bin/hermes \"$@\"\n",
-            checkout.display()
-        ),
-    )
-    .unwrap();
-    let theirs = local_bin.join("hermes-agent");
-    std::fs::write(
-        &theirs,
-        "#!/bin/sh\nexec /home/me/.hermes/hermes-agent/.hermes/bin/hermes\n",
-    )
-    .unwrap();
-    let wrapper_bin = wrapper.to_string_lossy().into_owned();
-    assert!(routes::installed_by_misty_in(root, "hermes", &wrapper_bin));
-    assert_eq!(
-        routes::route_in(root, "hermes", &wrapper_bin, true, false),
-        Some(Route::MistyScript)
-    );
-    assert!(!routes::installed_by_misty_in(
-        root,
-        "hermes",
-        &theirs.to_string_lossy()
-    ));
-    assert!(!routes::installed_by_misty_in(root, "codex", &wrapper_bin));
-
-    routes::remove_in(
-        root,
-        std::slice::from_ref(&local_bin),
-        "hermes",
-        &wrapper_bin,
-    )
-    .unwrap();
-    assert!(!wrapper.exists());
-    assert!(theirs.exists());
-    assert!(!root.engine_dir("hermes").exists());
-}
-
 fn homes(home: &Scratch) -> super::uninstall::Homes {
     super::uninstall::Homes {
         home: home.dir.clone(),
         codex_home: home.dir.join(".codex"),
-        hermes_home: home.dir.join(".hermes"),
     }
 }
 
@@ -314,35 +200,35 @@ fn uninstall_follows_how_each_copy_was_installed_and_leaves_settings() {
     let removal =
         |engine: &str, bin: &Path| removal_in(root, &homes, engine, &bin.to_string_lossy(), false);
 
-    let misty = root.program_dirs("gemini")[1].join("gemini");
+    let misty = root.program_dirs("codex")[1].join("codex");
     write_program(&misty);
-    assert_eq!(removal("gemini", &misty), Some(Removal::Misty));
+    assert_eq!(removal("codex", &misty), Some(Removal::Misty));
 
     let prefix = home.dir.join(".nvm/versions/node/v22");
-    let package = prefix.join("lib/node_modules/@google/gemini-cli");
-    write_program(&package.join("bundle/gemini.js"));
-    let npm_bin = prefix.join("bin/gemini");
+    let package = prefix.join("lib/node_modules/@openai/codex");
+    write_program(&package.join("bin/codex.js"));
+    let npm_bin = prefix.join("bin/codex");
     std::fs::create_dir_all(npm_bin.parent().unwrap()).unwrap();
-    symlink(package.join("bundle/gemini.js"), &npm_bin).unwrap();
+    symlink(package.join("bin/codex.js"), &npm_bin).unwrap();
     assert_eq!(
-        removal("gemini", &npm_bin),
+        removal("codex", &npm_bin),
         Some(Removal::Npm {
             prefix: prefix.clone(),
-            package: "@google/gemini-cli"
+            package: "@openai/codex"
         })
     );
 
     let brew_prefix = home.dir.join("homebrew");
     write_program(&brew_prefix.join("bin/brew"));
-    let cellar = brew_prefix.join("Cellar/gemini-cli/1.0.0/libexec/lib/node_modules/x/gemini");
+    let cellar = brew_prefix.join("Cellar/codex/1.0.0/libexec/lib/node_modules/x/codex");
     write_program(&cellar);
-    let brew_bin = brew_prefix.join("bin/gemini");
+    let brew_bin = brew_prefix.join("bin/codex");
     symlink(&cellar, &brew_bin).unwrap();
     assert_eq!(
-        removal("gemini", &brew_bin),
+        removal("codex", &brew_bin),
         Some(Removal::Brew {
             brew: brew_prefix.join("bin/brew"),
-            name: "gemini-cli".into(),
+            name: "codex".into(),
             cask: false
         })
     );
@@ -373,8 +259,8 @@ fn uninstall_follows_how_each_copy_was_installed_and_leaves_settings() {
         Some(Removal::Files(vec![codex.clone(), host, standalone]))
     );
 
-    let stray = home.dir.join("tools/gemini");
+    let stray = home.dir.join("tools/codex");
     write_program(&stray);
-    assert_eq!(removal("gemini", &stray), None);
-    assert_eq!(removal("gemini", Path::new("gemini")), None);
+    assert_eq!(removal("codex", &stray), None);
+    assert_eq!(removal("codex", Path::new("codex")), None);
 }

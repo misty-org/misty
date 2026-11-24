@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::{hermes_launchers, node_runtime, npm_package, routes, support, ProcOutput};
+use super::{node_runtime, npm_package, routes, support, ProcOutput};
 use crate::engines::support::paths::InstallRoot;
 
 const UNINSTALL_TIMEOUT: Duration = Duration::from_secs(180);
@@ -35,7 +35,6 @@ impl Removal {
 pub(super) struct Homes {
     pub(super) home: PathBuf,
     pub(super) codex_home: PathBuf,
-    pub(super) hermes_home: PathBuf,
 }
 
 impl Homes {
@@ -45,11 +44,7 @@ impl Homes {
             .filter(|value| !value.is_empty())
             .map(PathBuf::from)
             .unwrap_or_else(|| home.join(".codex"));
-        Self {
-            codex_home,
-            hermes_home: support::hermes_home(),
-            home,
-        }
+        Self { codex_home, home }
     }
 }
 
@@ -146,18 +141,7 @@ fn maker_files(engine: &str, path: &Path, real: &Path, homes: &Homes) -> Option<
             files.push(standalone);
             Some(files)
         }
-        "opencode" => {
-            let dir = homes.home.join(".opencode").join("bin");
-            (path.parent() == Some(dir.as_path())).then(|| vec![path.to_path_buf()])
-        }
         "agy" => in_local_bin.then(|| vec![path.to_path_buf()]),
-        "hermes" => {
-            let checkout = homes.hermes_home.join("hermes-agent");
-            let ours = hermes_launchers::wrapper_names(path, &checkout)
-                || hermes_launchers::starts_checkout(path, &checkout)
-                || real.starts_with(self::real(&checkout));
-            ours.then(|| vec![path.to_path_buf(), checkout])
-        }
         _ => None,
     }
 }
@@ -191,12 +175,9 @@ pub(super) async fn run(engine: &str, bin: &str, removal: Removal) -> Result<(),
             let env = [("HOMEBREW_NO_AUTO_UPDATE", "1"), ("NONINTERACTIVE", "1")];
             run_program("Homebrew", &brew.to_string_lossy(), &args, &env).await
         }
-        Removal::Files(files) => {
-            let engine = engine.to_string();
-            tokio::task::spawn_blocking(move || delete_files(&engine, &files))
-                .await
-                .map_err(|error| error.to_string())?
-        }
+        Removal::Files(files) => tokio::task::spawn_blocking(move || delete_files(&files))
+            .await
+            .map_err(|error| error.to_string())?,
     }
 }
 
@@ -241,12 +222,7 @@ fn finished(name: &str, output: &ProcOutput) -> Result<(), String> {
 }
 
 #[allow(clippy::disallowed_methods)]
-fn delete_files(engine: &str, files: &[PathBuf]) -> Result<(), String> {
-    if engine == "hermes" {
-        if let Some(checkout) = files.last() {
-            hermes_launchers::remove_owned(&hermes_launchers::dirs(), checkout, checkout);
-        }
-    }
+fn delete_files(files: &[PathBuf]) -> Result<(), String> {
     for file in files {
         let Ok(meta) = std::fs::symlink_metadata(file) else {
             continue;

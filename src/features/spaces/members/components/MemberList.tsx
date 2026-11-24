@@ -27,7 +27,7 @@ function roleLine(member: SpaceMember, me: boolean) {
 }
 
 function MemberFace({ member, me }: { member: SpaceMember; me: boolean }) {
-  const picture = useMemberPicture(member.space_id, member.user_id, member.avatar_version);
+  const picture = useMemberPicture(member.user_id, member.avatar_version);
   const account = useAccountPresence((state) => state.byUser[member.user_id]);
   return (
     <PresenceFace presence={account ?? (me ? "online" : "offline")}>

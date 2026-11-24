@@ -14,6 +14,8 @@ export { DrivePickerPanel } from "./drive/DrivePickerPanel";
 export { handoffGateway } from "./handoffs/handoff_gateway";
 export { liveGateway } from "./handoffs/live_gateway";
 export { spaceRequest } from "./api/api";
+export { fetchProtectedBlob } from "./api/protected_download";
+export { provideDirectSpaceCheck } from "./api/attachment_paths";
 export {
   peekSpaceResource,
   refreshSpaceResource,
@@ -31,13 +33,12 @@ export {
 } from "./list/member_agents";
 export { SpaceChat } from "./chat/SpaceChat";
 export { useChatBarActions, useChatBarMenu } from "./chat/components/ChatBarButtons";
-export { createYjsProvider } from "./journal/notes/create_yjs_provider";
 export { pageMisty } from "./apps/page_misty";
 export { appCallsHost, voiceChannelPage } from "./apps/app_calls";
 export { SpaceWorkspaceSurface } from "./overview/SpaceWorkspaceSurface";
 export { SpaceWindowBridge } from "./SpaceWindowBridge";
 export { useWindowSpace } from "./components/space-row/use_window_space";
-export { spaceTone } from "./components/SpaceAvatar";
+export { SpaceAvatar, spaceTone } from "./components/SpaceAvatar";
 export { SpaceBarMenu, SpacePresence } from "./components/space-row/SpaceBarItems";
 export { useSpaceGallery } from "./home/use_space_gallery";
 export { kindIcon } from "./home/GalleryPreview";

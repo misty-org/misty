@@ -179,19 +179,25 @@ fn full_rescan_rereads_logs_and_keeps_history_of_deleted_ones() {
     let gone = root.join("--w--/b.jsonl");
     write_lines(
         &keep,
-        &[
-            pi_header("a", "/w"),
-            pi_assistant("e1", 1_792_903_848_255, None, "m", [1, 1, 0, 0]),
-        ],
+        &[claude_line(
+            "e1",
+            "r1",
+            "2026-10-26T08:00:00Z",
+            "m",
+            [1, 1, 0, 0],
+        )],
     );
     write_lines(
         &gone,
-        &[
-            pi_header("b", "/w"),
-            pi_assistant("e2", 1_792_903_848_999, None, "m", [1, 1, 0, 0]),
-        ],
+        &[claude_line(
+            "e2",
+            "r2",
+            "2026-10-26T08:00:01Z",
+            "m",
+            [1, 1, 0, 0],
+        )],
     );
-    let specs = [spec(Engine::Omp, &root)];
+    let specs = [spec(Engine::Claude, &root)];
     let mut conn = scratch.db();
     run(&mut conn, &specs, ScanMode::Incremental);
     std::fs::remove_file(&gone).unwrap();
@@ -200,7 +206,7 @@ fn full_rescan_rereads_logs_and_keeps_history_of_deleted_ones() {
     assert_eq!(incremental.events_added, 0);
     assert_eq!(store::event_count(&conn), 2, "usage outlives deleted logs");
     assert_eq!(
-        store::cursors_for(&conn, "omp").unwrap().len(),
+        store::cursors_for(&conn, "claude").unwrap().len(),
         1,
         "stale cursor pruned"
     );
@@ -226,7 +232,7 @@ fn full_rescan_rereads_logs_and_keeps_history_of_deleted_ones() {
 fn scan_reports_progress_per_engine() {
     let scratch = Scratch::new("scan-progress");
     let claude_root = scratch.path("claude");
-    let pi_root = scratch.path("pi");
+    let codex_root = scratch.path("codex");
     write_lines(
         &claude_root.join("p/a.jsonl"),
         &[claude_line(
@@ -237,11 +243,17 @@ fn scan_reports_progress_per_engine() {
             [1, 1, 0, 0],
         )],
     );
-    write_lines(&pi_root.join("w/a.jsonl"), &[pi_header("s", "/w")]);
-    write_lines(&pi_root.join("w/b.jsonl"), &[pi_header("t", "/w")]);
+    write_lines(
+        &codex_root.join("w/rollout-a.jsonl"),
+        &[codex_meta("s", "/w", None)],
+    );
+    write_lines(
+        &codex_root.join("w/rollout-b.jsonl"),
+        &[codex_meta("t", "/w", None)],
+    );
     let specs = [
         spec(Engine::Claude, &claude_root),
-        spec(Engine::Pi, &pi_root),
+        spec(Engine::Codex, &codex_root),
     ];
     let mut conn = scratch.db();
     let (_, progress) = run(&mut conn, &specs, ScanMode::Incremental);
@@ -254,9 +266,9 @@ fn scan_reports_progress_per_engine() {
         [
             ("claude", 0),
             ("claude", 1),
-            ("pi", 2),
-            ("pi", 3),
-            ("pi", 3)
+            ("codex", 2),
+            ("codex", 3),
+            ("codex", 3)
         ]
     );
     assert!(progress.iter().all(|p| p.total == 3));

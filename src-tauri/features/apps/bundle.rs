@@ -323,6 +323,9 @@ fn single_top_folder(
             .map_err(|_| "The app's zip is damaged.".to_owned())?;
         let name = entry.name().trim_end_matches('/').to_owned();
         let first = name.split('/').next().unwrap_or("").to_owned();
+        if first == "__MACOSX" {
+            continue;
+        }
         let in_folder = name.contains('/') || entry.is_dir();
         if first.is_empty() || !in_folder || top.as_ref().is_some_and(|known| *known != first) {
             return Err("The release's files aren't all in one folder.".into());

@@ -11,9 +11,6 @@ pub(super) fn warning_for(source: &str) -> String {
         "project instructions" => "Couldn't read the project's instruction files.".into(),
         "Codex memory" => "Couldn't read Codex's memory.".into(),
         "Claude Code memory" => "Couldn't read Claude Code's memory.".into(),
-        "Hermes memory" => "Couldn't read Hermes's memory.".into(),
-        "Grok memory" => "Couldn't read Grok's memory.".into(),
-        "Gemini CLI memory" => "Couldn't read Gemini CLI's memory.".into(),
         _ => format!("Couldn't read {source}."),
     }
 }
@@ -240,21 +237,6 @@ pub(super) fn codex_notes(notes: &mut MemoryNotes) {
     }
 }
 
-pub(super) fn grok_slug(folder: &Path) -> Option<String> {
-    let name = folder.file_name()?.to_string_lossy();
-    Some(
-        name.chars()
-            .map(|character| {
-                if character.is_ascii_alphanumeric() {
-                    character.to_ascii_lowercase()
-                } else {
-                    '-'
-                }
-            })
-            .collect(),
-    )
-}
-
 #[allow(
     clippy::disallowed_methods,
     reason = "reads the engine's own memory in place, wherever the engine keeps it"
@@ -284,98 +266,6 @@ pub(crate) fn memory_notes(engine: &str, folder: Option<&Path>) -> MemoryNotes {
                 add_file_note(
                     &home.join(".codex/AGENTS.md"),
                     "Codex memory",
-                    &mut notes,
-                    &mut seen,
-                );
-            }
-        }
-        "hermes" => {
-            if let Some(home) = &home {
-                let root = home.join(".hermes");
-                add_file_note(
-                    &root.join("SOUL.md"),
-                    "Hermes memory",
-                    &mut notes,
-                    &mut seen,
-                );
-                add_markdown_tree(
-                    &root.join("memories"),
-                    "Hermes memory",
-                    &mut notes,
-                    &mut seen,
-                );
-            }
-        }
-        "grok" => {
-            if let Some(home) = &home {
-                let root = home.join(".grok/memory-v2");
-                add_markdown_tree(
-                    &root.join("global/topics"),
-                    "Grok memory",
-                    &mut notes,
-                    &mut seen,
-                );
-                if let Some(slug) = folder.and_then(grok_slug) {
-                    let workspaces = root.join("workspaces");
-                    let entries = match std::fs::read_dir(workspaces) {
-                        Ok(entries) => Some(entries),
-                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-                        Err(_) => {
-                            notes.errors.push(warning_for("Grok memory"));
-                            None
-                        }
-                    };
-                    if let Some(entries) = entries {
-                        for entry in entries {
-                            let entry = match entry {
-                                Ok(entry) => entry,
-                                Err(_) => {
-                                    notes.errors.push(warning_for("Grok memory"));
-                                    continue;
-                                }
-                            };
-                            let path = entry.path();
-                            let name = entry.file_name().to_string_lossy().to_lowercase();
-                            let metadata = match std::fs::symlink_metadata(&path) {
-                                Ok(metadata) => metadata,
-                                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                                    continue;
-                                }
-                                Err(_) => {
-                                    notes.errors.push(warning_for("Grok memory"));
-                                    continue;
-                                }
-                            };
-                            let is_real_dir =
-                                !metadata.file_type().is_symlink() && metadata.is_dir();
-                            if is_real_dir
-                                && (name == slug || name.starts_with(&format!("{slug}-")))
-                            {
-                                add_markdown_tree(
-                                    &path.join("topics"),
-                                    "Grok memory",
-                                    &mut notes,
-                                    &mut seen,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        "gemini" => {
-            if let Some(home) = &home {
-                add_file_note(
-                    &home.join(".gemini/GEMINI.md"),
-                    "Gemini CLI memory",
-                    &mut notes,
-                    &mut seen,
-                );
-            }
-            if let Some(folder) = folder {
-                add_file_note(
-                    &folder.join("GEMINI.md"),
-                    "Gemini CLI memory",
                     &mut notes,
                     &mut seen,
                 );

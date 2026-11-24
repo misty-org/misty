@@ -1,6 +1,5 @@
 import { spaceRequest } from "../../../api/api";
 import type { ItemVisibility } from "../../../api/visibility";
-import { requestCollaborationTicket } from "../create_yjs_provider";
 
 const part = encodeURIComponent;
 
@@ -20,16 +19,6 @@ export interface ServerSpaceNote {
   updated_at?: string;
   backlink_count?: number;
   visibility?: ItemVisibility;
-}
-
-type NoteCollaborationRole = "creator" | "editor" | "viewer";
-
-export interface NoteCollaborationTicket {
-  ticket: string;
-  room: string;
-  url: string;
-  role: NoteCollaborationRole;
-  expires_at: string;
 }
 
 export const notesApi = {
@@ -69,10 +58,6 @@ export const notesApi = {
       method: "PATCH",
       body: JSON.stringify({ archived }),
     }),
-  collaborationTicket: (spaceId: string, noteId: string) =>
-    requestCollaborationTicket<NoteCollaborationTicket>(
-      `/spaces/${part(spaceId)}/notes/${part(noteId)}/collaboration-ticket`,
-    ),
   backlinks: (spaceId: string, noteId: string) =>
     spaceRequest<{ backlinks: Array<{ id: string; title: string; updated_at: string }> }>(
       `/spaces/${part(spaceId)}/notes/${part(noteId)}/backlinks`,

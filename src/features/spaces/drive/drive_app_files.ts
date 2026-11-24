@@ -9,6 +9,7 @@ import {
   drivePath,
   onDriveChanged,
   type DriveEntry,
+  type DriveInUse,
 } from "./drive_native";
 
 type Call = (params: Record<string, unknown>) => Promise<unknown>;
@@ -18,7 +19,11 @@ const MAX_PAGE = 200;
 export type AppFileChange =
   { kind: "added" | "changed"; file: AppFileRef } | { kind: "removed"; id: string };
 
-export function driveFileRef(entry: DriveEntry): AppFileRef {
+type RefEntry = Pick<DriveEntry, "id" | "name" | "size" | "path" | "mtime_ms"> & {
+  in_use?: readonly Pick<DriveInUse, "user_id" | "name" | "editing" | "you">[];
+};
+
+export function driveFileRef(entry: RefEntry): AppFileRef {
   return {
     id: entry.id,
     name: entry.name,
@@ -108,7 +113,7 @@ async function bytesOf(value: unknown): Promise<Uint8Array> {
 export interface DriveFileCalls {
   calls: Record<string, Call>;
   watch(params: unknown, emit: (change: AppFileChange) => void): () => void;
-  hold(entry: DriveEntry): Promise<() => void>;
+  hold(entry: Pick<DriveEntry, "id" | "path">): Promise<() => void>;
   dispose(): void;
 }
 
@@ -126,7 +131,7 @@ export function createDriveFileCalls(
   const held = new Map<string, { id: string; path: string; editing: boolean }>();
   let disposed = false;
   const holdKey = (id: string, reason: HoldReason) => `${reason}:${id}`;
-  const holdFor = async (entry: DriveEntry, reason: HoldReason) => {
+  const holdFor = async (entry: Pick<DriveEntry, "id" | "path">, reason: HoldReason) => {
     const key = holdKey(entry.id, reason);
     if (held.has(key)) return;
     const hold = { id: entry.id, path: entry.path, editing: reason === "room" };

@@ -21,6 +21,7 @@ export const settingsSections = [
   "account",
   "status",
   "requests",
+  "sessions",
   "notifications",
   "general",
   "appearance",

@@ -1,5 +1,4 @@
 import { spaceRequest } from "../api/api";
-import type { AppSource } from "./third_party_apps";
 
 export interface InstalledSpaceApp {
   space_id: string;
@@ -8,7 +7,6 @@ export interface InstalledSpaceApp {
   permissions: string[];
   installed_by: string;
   installed_at: string;
-  source?: AppSource | null;
 }
 
 const appsPath = (spaceId: string, appId = "") =>
@@ -22,11 +20,10 @@ export const spaceAppsApi = {
     appId: string,
     version: string,
     permissions: string[],
-    source?: AppSource,
   ) =>
     spaceRequest<InstalledSpaceApp>(appsPath(spaceId, appId), {
       method: "PUT",
-      body: JSON.stringify(source ? { version, permissions, source } : { version, permissions }),
+      body: JSON.stringify({ version, permissions }),
     }),
   remove: (spaceId: string, appId: string) =>
     spaceRequest(appsPath(spaceId, appId), { method: "DELETE" }),

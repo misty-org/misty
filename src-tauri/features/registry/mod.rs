@@ -11,6 +11,8 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::app::runtime::MistyRuntime;
 
+pub mod local;
+
 const BUNDLED: &str = include_str!("../../../src/shared/registry/registry.json");
 const FEED: &str = "https://registry.mistysys.com/registry.jws.json";
 const SCOPE: &str = "registry:feed";
@@ -29,7 +31,12 @@ pub struct Registry {
 
 impl Registry {
     fn section(&self, key: &str) -> Value {
-        self.document.get(key).cloned().unwrap_or(Value::Null)
+        let value = self.document.get(key).cloned().unwrap_or(Value::Null);
+        if key == "apps" {
+            local::with_local_apps(value)
+        } else {
+            value
+        }
     }
 
     fn published_at(&self) -> &str {

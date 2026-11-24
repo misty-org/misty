@@ -20,11 +20,6 @@ function channelEnv(raw: unknown): Record<string, unknown> {
 
 const ENV_MODEL_KEY: Partial<Record<EngineId, string>> = {
   claude: "ANTHROPIC_MODEL",
-  kimi: "KIMI_MODEL_NAME",
-  grok: "GROK_MODEL",
-  codebuddy: "CODEBUDDY_MODEL",
-  gemini: "GEMINI_MODEL",
-  qwen: "OPENAI_MODEL",
 };
 
 function providerModel(engine: EngineId, raw: unknown): string {
@@ -38,12 +33,7 @@ function providerModel(engine: EngineId, raw: unknown): string {
 
 const ENV_CONVENTION_KEYS: Partial<Record<EngineId, string[]>> = {
   claude: ["ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL"],
-  kimi: ["KIMI_BASE_URL", "KIMI_API_KEY", "KIMI_MODEL_NAME"],
-  grok: ["GROK_BASE_URL", "GROK_API_KEY", "GROK_MODEL"],
   codex: ["OPENAI_BASE_URL", "OPENAI_API_KEY"],
-  codebuddy: ["CODEBUDDY_BASE_URL", "CODEBUDDY_API_KEY", "CODEBUDDY_MODEL"],
-  gemini: ["GOOGLE_GEMINI_BASE_URL", "GEMINI_API_KEY", "GEMINI_MODEL"],
-  qwen: ["OPENAI_BASE_URL", "OPENAI_API_KEY", "OPENAI_MODEL"],
 };
 
 export function stripConventionEnv(engine: EngineId, raw: unknown): Record<string, unknown> {

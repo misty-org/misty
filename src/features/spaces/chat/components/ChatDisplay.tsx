@@ -188,7 +188,7 @@ export function useMemberAvatarUrls(
     void Promise.all(
       missingRequests.map(async (request) => {
         try {
-          const blob = await spacesApi.memberAvatar(spaceId, request.memberId);
+          const blob = await spacesApi.personAvatar(request.memberId);
           const url = URL.createObjectURL(blob);
           return { ...request, spaceId, url };
         } catch {

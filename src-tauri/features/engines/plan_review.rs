@@ -506,7 +506,7 @@ mod tests {
     fn review(plan_id: &str, session: &str) -> PlanReview {
         PlanReview {
             plan_id: plan_id.into(),
-            engine: "dsh".into(),
+            engine: "agy".into(),
             session_id: session.into(),
             workspace_path: "/tmp/ws".into(),
             run_id: Some("run-1".into()),
@@ -651,7 +651,7 @@ mod tests {
         record_review(&db, &review("p2", "s2")).unwrap();
         {
             let conn = db.0.lock();
-            delete_reviews_for_session(&conn, "dsh", "s1").unwrap();
+            delete_reviews_for_session(&conn, "agy", "s1").unwrap();
         }
         assert!(get_review(&db, "p1", 1).unwrap().is_none());
         assert!(get_review(&db, "p2", 1).unwrap().is_some());

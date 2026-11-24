@@ -8,7 +8,7 @@ use tokio::io::{AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::time::{timeout_at, Instant};
 
-use super::qoder_session::{
+use super::acp_session::{
     encode_ndjson, jsonrpc_error_response, jsonrpc_id_key, jsonrpc_request,
     JSONRPC_METHOD_NOT_FOUND,
 };
@@ -59,7 +59,6 @@ pub(crate) async fn chat_command(folder: Option<&Path>) -> Result<Command, RpcEr
         None,
         String::new(),
         Vec::new(),
-        None,
         None,
         None,
         None,

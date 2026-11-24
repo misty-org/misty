@@ -65,15 +65,7 @@ fn default_roots(engine: Engine) -> Vec<PathBuf> {
                 .flat_map(|home| [home.join("sessions"), home.join("archived_sessions")])
                 .collect()
         }
-        Engine::Pi => vec![pi_family_root(".pi")],
-        Engine::Omp => vec![pi_family_root(".omp")],
     }
-}
-
-fn pi_family_root(home_dir_name: &str) -> PathBuf {
-    crate::engine_config::support::engine_home(None, home_dir_name)
-        .join("agent")
-        .join("sessions")
 }
 
 pub(crate) fn discover(spec: &SourceSpec) -> Discovery {

@@ -15,28 +15,8 @@ pub(super) struct Plan {
 #[serde(rename_all = "kebab-case")]
 pub enum Asks {
     Code,
-    DeviceCode,
     Menu,
     Nothing,
-}
-
-#[derive(Debug, Default)]
-pub(super) struct Found {
-    pub(super) version: Option<(u64, u64, u64)>,
-    pub(super) google_chosen: bool,
-}
-
-const PI_AUTH_COMMANDS: (u64, u64, u64) = (1, 5, 1);
-const OMP_LOGIN: (u64, u64, u64) = (18, 3, 0);
-const KIMI_LOGIN: (u64, u64, u64) = (0, 38, 0);
-const QODER_LOGIN: (u64, u64, u64) = (0, 2, 14);
-
-pub(super) fn needs_version(engine: &str) -> bool {
-    matches!(engine, "pi" | "omp" | "kimi" | "qoder" | "qoder-cn")
-}
-
-fn at_least(found: &Found, least: (u64, u64, u64)) -> bool {
-    found.version.is_some_and(|version| version >= least)
 }
 
 const LONGEST_CODE: usize = 2048;
@@ -71,127 +51,24 @@ fn types(line: impl Into<String>) -> Plan {
     }
 }
 
-pub(super) fn provider_id(provider: Option<&str>) -> Result<Option<&str>, String> {
-    match provider.map(str::trim).filter(|id| !id.is_empty()) {
-        None => Ok(None),
-        Some(id)
-            if id.len() <= 64
-                && id
-                    .chars()
-                    .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') =>
-        {
-            Ok(Some(id))
-        }
-        Some(_) => Err("That isn't a provider.".into()),
-    }
-}
-
-fn provider_sign_in(args: &[&str], id: &str) -> Plan {
-    let mut plan = runs(args, Asks::Nothing);
-    plan.args.push(id.to_string());
-    if id == "github-copilot" {
-        plan.then_type = Some(String::new());
-    }
-    if matches!(id, "github-copilot" | "xai" | "xai-oauth") {
-        plan.asks = Asks::DeviceCode;
-    }
-    plan
-}
-
-const GEMINI_QUESTION: &str = "Reply with just: Signed in";
-
-pub(super) fn sign_in_plan(
-    engine: &str,
-    provider: Option<&str>,
-    sign_out: bool,
-    found: &Found,
-) -> Result<Plan, String> {
-    let provider = provider_id(provider)?;
+pub(super) fn sign_in_plan(engine: &str, sign_out: bool) -> Result<Plan, String> {
     Ok(match (engine, sign_out) {
         ("claude", false) => runs(&["auth", "login"], Asks::Code),
         ("claude", true) => runs(&["auth", "logout"], Asks::Nothing),
         ("codex", false) => runs(&["login"], Asks::Nothing),
         ("codex", true) => runs(&["logout"], Asks::Nothing),
-        ("opencode", false) => runs(&["auth", "login"], Asks::Menu),
-        ("opencode", true) => runs(&["auth", "logout"], Asks::Nothing),
-        ("gemini", false) if found.google_chosen => Plan {
-            args: vec!["--prompt".into(), GEMINI_QUESTION.into()],
-            then_type: Some("y".into()),
-            asks: Asks::Nothing,
-        },
-        ("gemini" | "qwen", _) => types("/auth"),
-        ("pi", false) => {
-            let id = provider.ok_or("Choose a provider to sign in with.")?;
-            if at_least(found, PI_AUTH_COMMANDS) {
-                provider_sign_in(&["auth", "login"], id)
-            } else {
-                types(format!("/login {id}"))
-            }
-        }
-        ("pi", true) => match provider {
-            Some(id) if at_least(found, PI_AUTH_COMMANDS) => {
-                runs(&["auth", "logout", id], Asks::Nothing)
-            }
-            _ => types("/logout"),
-        },
-        ("omp", false) => {
-            let id = provider.ok_or("Choose a provider to sign in with.")?;
-            if !at_least(found, OMP_LOGIN) {
-                runs(&["auth-broker", "login", id], Asks::Menu)
-            } else if id == "google-antigravity" {
-                runs(&["login", id], Asks::Menu)
-            } else {
-                provider_sign_in(&["login"], id)
-            }
-        }
-        ("omp", true) => match provider {
-            Some(id) => runs(&["auth-broker", "logout", id], Asks::Nothing),
-            None => return Err("Choose the provider to sign out of.".into()),
-        },
-        ("kimi", false) if at_least(found, KIMI_LOGIN) => match provider {
-            Some("global") => runs(&["login", "--region", "global"], Asks::Nothing),
-            Some("cn") => runs(&["login", "--region", "mainland-cn"], Asks::Nothing),
-            None => runs(&["login"], Asks::Nothing),
-            Some(_) => return Err("Choose Global or China.".into()),
-        },
-        ("qoder" | "qoder-cn", false) if at_least(found, QODER_LOGIN) => {
-            runs(&["login"], Asks::Nothing)
-        }
-        ("codebuddy" | "kimi" | "qoder" | "qoder-cn", false) => types("/login"),
-        ("codebuddy" | "kimi" | "qoder" | "qoder-cn", true) => types("/logout"),
-        ("grok", false) => runs(&["login"], Asks::Nothing),
-        ("grok", true) => runs(&["logout"], Asks::Nothing),
-        ("minimax", false) => match provider {
-            Some("global") => runs(&["login", "--region", "global"], Asks::Nothing),
-            Some("cn") | None => runs(&["login"], Asks::Nothing),
-            Some(_) => return Err("Choose Global or China.".into()),
-        },
-        ("minimax", true) => runs(&["logout"], Asks::Nothing),
         ("agy", false) => runs(&["--print", "Reply with just: Signed in"], Asks::Code),
         ("agy", true) => types("/logout"),
-        ("hermes", false) => runs(&["model"], Asks::Menu),
-        ("hermes", true) => runs(&["auth", "logout"], Asks::Nothing),
-        ("dsh", _) => {
-            return Err("DeepSeek Harness keeps its providers in its own web page.".into())
-        }
         (_, true) => return Err("Sign out from the CLI itself.".into()),
         _ => return Err("Misty can't sign in to that engine.".into()),
     })
 }
 
 pub(super) fn remembers_sign_in(engine: &str) -> bool {
-    matches!(engine, "agy" | "hermes" | "kimi" | "codebuddy" | "minimax")
+    engine == "agy"
 }
 
 pub(crate) fn remembered_sign_in(engine: &str) -> Option<(Option<bool>, Option<String>)> {
-    if matches!(engine, "pi" | "omp") {
-        let stored =
-            crate::engines::pi_family_auth::pi_family_auth_list(engine.to_string()).map(|list| {
-                !list.oauth_providers.is_empty()
-                    || list.providers.iter().any(|item| item.state == "configured")
-            });
-        return Some((stored.ok(), None));
-    }
     remembers_sign_in(engine).then(|| {
         let here = crate::engines::support::settings::signed_in_here(engine);
         (Some(here), None)
@@ -212,53 +89,4 @@ pub(super) fn shown_command(program: &str, plan: &Plan) -> String {
         line.push_str(typed);
     }
     line
-}
-
-const GOOGLE_SIGN_IN: &str = "oauth-personal";
-
-#[derive(Debug, PartialEq)]
-pub(super) enum GoogleChoice {
-    Chosen,
-    Write(String),
-    Leave,
-}
-
-pub(super) fn google_sign_in_choice(settings: Option<&str>) -> GoogleChoice {
-    let text = settings.unwrap_or("").trim();
-    let fresh = "{\n  \"security\": {\n    \"auth\": {\n      \"selectedType\": \"oauth-personal\"\n    }\n  }\n}\n";
-    if text.is_empty() {
-        return GoogleChoice::Write(fresh.to_string());
-    }
-    let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(text) else {
-        return GoogleChoice::Leave;
-    };
-    let value = serde_json::Value::Object(map);
-    let selected = value
-        .pointer("/security/auth/selectedType")
-        .or_else(|| value.get("selectedAuthType"));
-    match selected {
-        Some(serde_json::Value::String(kind)) if kind == GOOGLE_SIGN_IN => {
-            return GoogleChoice::Chosen
-        }
-        Some(serde_json::Value::String(kind)) if !kind.is_empty() => return GoogleChoice::Leave,
-        _ => {}
-    }
-    if value.get("security").is_some() {
-        return GoogleChoice::Leave;
-    }
-    let empty = value.as_object().is_some_and(serde_json::Map::is_empty);
-    let open = text.find('{').unwrap_or(0) + 1;
-    let entry = format!(
-        "\n  \"security\": {{ \"auth\": {{ \"selectedType\": \"{GOOGLE_SIGN_IN}\" }} }}{}",
-        if empty { "\n" } else { "," }
-    );
-    let written = format!("{}{entry}{}\n", &text[..open], &text[open..]);
-    let checks = serde_json::from_str::<serde_json::Value>(&written).is_ok_and(|parsed| {
-        parsed.pointer("/security/auth/selectedType") == Some(&GOOGLE_SIGN_IN.into())
-    });
-    if checks {
-        GoogleChoice::Write(written)
-    } else {
-        GoogleChoice::Leave
-    }
 }

@@ -98,14 +98,13 @@ function CliRow({ engine }: { engine: EngineId }) {
   const checking = status === null && !error;
   const canAct =
     status !== null && status.updateKind !== null && (!status.installed || status.updateAvailable);
-  const [signingIn, setSigningIn] = useState<{ provider?: string } | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
   const [removing, setRemoving] = useState<{ open: boolean; kind: CliRemoveKind }>({
     open: false,
     kind: "misty",
   });
   const removeKind = updating ? null : (status?.removeKind ?? null);
-  const canSignIn =
-    status?.installed === true && signIn !== null && signIn.signedIn !== true && engine !== "dsh";
+  const canSignIn = status?.installed === true && signIn !== null && signIn.signedIn !== true;
   const installing = canAct && !status.installed;
   const updateInMenu = canAct && status.installed && canSignIn && !updating;
   const updateLabel = `Update to ${status?.latestVersion ? versionText(status.latestVersion) : "latest"}`;
@@ -121,7 +120,7 @@ function CliRow({ engine }: { engine: EngineId }) {
       </Button>
     );
   else if (canSignIn)
-    action = <SignInButton engine={engine} disabled={updating} onSignIn={setSigningIn} />;
+    action = <SignInButton disabled={updating} onSignIn={() => setSigningIn(true)} />;
   return (
     <>
       <DesktopSettingsRow
@@ -200,9 +199,9 @@ function CliRow({ engine }: { engine: EngineId }) {
       />
       <CliUpdateDialog engine={engine} flow={flow} />
       <SignInDialog
-        request={signingIn ? { engine, ...signingIn } : null}
+        request={signingIn ? { engine } : null}
         onClose={() => {
-          setSigningIn(null);
+          setSigningIn(false);
           refresh();
         }}
       />

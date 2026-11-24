@@ -13,13 +13,11 @@ import { directApi, type Person } from "./api";
 import { dmPath, reloadDms } from "./direct_data";
 import { useCustomStatus, usePresence } from "./status_store";
 
-function DmMember({ person, self }: { person: Person; self: boolean }) {
+export function useOpenDm() {
   const navigate = useNavigate();
-  const presence = usePresence(person.user_id);
-  const custom = useCustomStatus(person.user_id);
-  const open = async () => {
+  return async (userId: string) => {
     try {
-      const dm = await directApi.openDm(person.user_id);
+      const dm = await directApi.openDm(userId);
       await reloadDms().catch(() => undefined);
       navigate(dmPath(dm.id));
     } catch (reason) {
@@ -29,6 +27,12 @@ function DmMember({ person, self }: { person: Person; self: boolean }) {
       });
     }
   };
+}
+
+function DmMember({ person, self }: { person: Person; self: boolean }) {
+  const openDm = useOpenDm();
+  const presence = usePresence(person.user_id);
+  const custom = useCustomStatus(person.user_id);
   return (
     <MemberRow
       avatar={
@@ -39,7 +43,7 @@ function DmMember({ person, self }: { person: Person; self: boolean }) {
       name={self ? `${person.username} (you)` : person.username}
       presence={presence}
       line={custom || undefined}
-      onOpen={self ? undefined : () => void open()}
+      onOpen={self ? undefined : () => void openDm(person.user_id)}
     />
   );
 }

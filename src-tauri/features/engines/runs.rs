@@ -355,7 +355,6 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
         None => prompt,
     };
     let prompt = with_attached_files(prompt, &save_files(&body["attachments"], &run_id));
-    let native_compact = prompt.trim() == "/compact";
     let prompt = with_teammates(prompt, &body["engine"]["teammates"]);
     let prompt = match &session {
         Some(_) => prompt,
@@ -380,7 +379,7 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
         },
     );
     if !warming {
-        bridge::open(&run_id, matches!(engine.as_str(), "claude" | "codebuddy"));
+        bridge::open(&run_id, engine == "claude");
     }
     let mut mcp_servers = super::mcp::servers_for(app, &run_id).await;
     if !agent_servers.is_empty() {
@@ -420,7 +419,6 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
         session,
         prompt,
         Vec::new(),
-        Some(native_compact),
         Some(
             images
                 .iter()

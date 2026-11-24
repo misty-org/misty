@@ -388,31 +388,6 @@ fn declarative_targets_map_engine_specific_fields() {
     let _ = std::fs::remove_dir_all(&scratch);
     std::fs::create_dir_all(&scratch).unwrap();
 
-    let opencode = scratch.join("opencode.json");
-    std::fs::write(
-        &opencode,
-        r#"{"mcp":{"local":{"type":"local","command":["npx","-y","pkg"],"environment":{"TOKEN":"${MISTY_PROBE_MAP_TOKEN:-x}"}}}}"#,
-    )
-    .unwrap();
-    let json = std::fs::read_to_string(&opencode).unwrap();
-    let root: Value = serde_json::from_str(&json).unwrap();
-    let object = root["mcp"]["local"].as_object().unwrap();
-    let target = super::super::sources::probe_target_from_json(
-        object,
-        true,
-        super::super::sources::OPENCODE_FIELDS,
-    );
-    assert_eq!(target.command.as_deref(), Some("npx"));
-    assert_eq!(target.args, vec!["-y", "pkg"]);
-    assert_eq!(
-        target.env,
-        vec![(
-            "TOKEN".to_string(),
-            "${MISTY_PROBE_MAP_TOKEN:-x}".to_string()
-        )]
-    );
-    assert_eq!(target.kind(), "stdio");
-
     let agy = scratch.join("mcp_config.json");
     std::fs::write(
         &agy,
@@ -422,11 +397,8 @@ fn declarative_targets_map_engine_specific_fields() {
     let json = std::fs::read_to_string(&agy).unwrap();
     let root: Value = serde_json::from_str(&json).unwrap();
     let object = root["mcpServers"]["remote"].as_object().unwrap();
-    let target = super::super::sources::probe_target_from_json(
-        object,
-        false,
-        super::super::sources::AGY_FIELDS,
-    );
+    let target =
+        super::super::sources::probe_target_from_json(object, super::super::sources::AGY_FIELDS);
     assert_eq!(target.url.as_deref(), Some("https://x/mcp"));
     assert_eq!(target.kind(), "http");
     assert_eq!(

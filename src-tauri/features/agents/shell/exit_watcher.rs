@@ -23,8 +23,4 @@ impl ExitWatcher {
     pub(crate) async fn stop(mut self) {
         let _ = self.0.kill().await;
     }
-
-    pub(crate) fn stop_now(mut self) {
-        let _ = self.0.start_kill();
-    }
 }

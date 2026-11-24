@@ -200,10 +200,9 @@ pub(crate) fn claim(run_id: &str) -> Option<u64> {
 }
 
 pub(crate) struct WarmAcp {
-    pub(crate) spawned: super::qoder_session::SpawnedAcp,
+    pub(crate) spawned: super::acp_session::SpawnedAcp,
     pub(crate) session_id: String,
     pub(crate) effort: Option<String>,
-    pub(crate) known: super::qoder_session::AcpSessionState,
 }
 
 impl WarmAcp {
@@ -215,7 +214,7 @@ impl WarmAcp {
 impl Retire for WarmAcp {
     fn retire(mut self, cleanup: Vec<PathBuf>) {
         tokio::spawn(async move {
-            super::qoder_session::teardown(&mut self.spawned.child).await;
+            super::acp_session::teardown(&mut self.spawned.child).await;
             super::cleanup_staged_files(&cleanup);
         });
     }

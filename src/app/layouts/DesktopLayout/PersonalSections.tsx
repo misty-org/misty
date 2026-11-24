@@ -40,7 +40,7 @@ function RowCount({ count, label }: { count: number; label: string }) {
 function DmFace({ dm, myUserId }: { dm: DirectConversation; myUserId: string | undefined }) {
   const other = dmOthers(dm, myUserId)[0];
   const presence = usePresence(dm.kind === "direct" ? other?.user_id : undefined);
-  const picture = useMemberPicture(dm.id, other?.user_id ?? "", other?.avatar_version ?? 0);
+  const picture = useMemberPicture(other?.user_id ?? "", other?.avatar_version ?? 0);
   if (!other) return null;
   const face = (
     <ChatAvatar id={other.user_id} name={other.username} src={picture ?? undefined} size="sm" />

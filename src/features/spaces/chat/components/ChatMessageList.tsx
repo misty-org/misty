@@ -36,6 +36,8 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
     return new Set(latest.values());
   }, [props.messages]);
   const atStart = !props.hasOlderMessages || !props.messages.length;
+  const quiet =
+    !props.messages.length && !props.loading && Boolean(props.welcome || props.directRecipient);
   const stream: ReactNode[] = [];
   for (const { message, compact, dateLabel } of rows) {
     const unread = message.id === props.firstUnreadId;
@@ -75,7 +77,11 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
       onScroll={props.onScroll}
       className="misty-scrollbar-flush flex min-h-0 flex-1 flex-col overflow-y-auto [overflow-anchor:none]"
     >
-      <div role="log" aria-label="Messages" className="mt-auto flex min-w-0 flex-col pt-4 pb-6">
+      <div
+        role="log"
+        aria-label="Messages"
+        className={`${quiet ? "my-auto" : "mt-auto"} flex min-w-0 flex-col pt-4 pb-6`}
+      >
         {props.error ? (
           <div className="px-4 pb-2">
             <SystemErrorNotice

@@ -9,6 +9,7 @@ import {
 import { isDeepLinkRouteAllowed, resolveAuthDeepLinkRoute } from "@/app/routing/navigation";
 import { useSignInSheetStore } from "@/features/account/sign-in-sheet/sign_in_sheet_store";
 import { takeSetupLink, useSetupLinkStore } from "@/features/account/setup/setup_link_store";
+import { useDeviceApprovalStore } from "@/features/account/devices/device_approval_store";
 
 describe("Misty deep links", () => {
   it("preserves query state for open-form Space links", () => {
@@ -66,6 +67,18 @@ describe("Misty deep links", () => {
     expect(route(`misty://setup?server=http://api.mistysys.com&key=${key}`)).toBeNull();
     expect(useSignInSheetStore.getState().reason).toBeNull();
     expect(useSetupLinkStore.getState().link).toBeNull();
+  });
+
+  it("opens the device approval from a device sign-in link", () => {
+    expect(
+      routeForMistyDeepLink(
+        "misty://device?code=wdjb-mjht",
+        isDeepLinkRouteAllowed,
+        resolveAuthDeepLinkRoute,
+      ),
+    ).toBeNull();
+    expect(useDeviceApprovalStore.getState()).toMatchObject({ open: true, code: "WDJB-MJHT" });
+    useDeviceApprovalStore.setState({ open: false });
   });
 
   it("does not route retired device pairing links", () => {

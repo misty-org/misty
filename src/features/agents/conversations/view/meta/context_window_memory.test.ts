@@ -84,6 +84,6 @@ describe("context window memory", () => {
       }),
     ).toBe(200_000);
 
-    expect(resolveContextMax({ usage: undefined, engine: "pi", model: "x" })).toBeUndefined();
+    expect(resolveContextMax({ usage: undefined, engine: "agy", model: "x" })).toBeUndefined();
   });
 });

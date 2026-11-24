@@ -23,7 +23,6 @@ pub struct ClaudeEngine {
     stopped_task_result_pending: Mutex<bool>,
     streamed_text: Mutex<bool>,
     local_text: Mutex<String>,
-    reports_as: &'static str,
 }
 
 struct PendingTool {
@@ -35,10 +34,6 @@ struct PendingTool {
 
 impl ClaudeEngine {
     pub fn new() -> Self {
-        Self::reporting_as("claude")
-    }
-
-    pub fn reporting_as(engine: &'static str) -> Self {
         Self {
             pending_tool_json: Mutex::new(HashMap::new()),
             tool_names: Mutex::new(HashMap::new()),
@@ -47,7 +42,6 @@ impl ClaudeEngine {
             stopped_task_result_pending: Mutex::new(false),
             streamed_text: Mutex::new(false),
             local_text: Mutex::new(String::new()),
-            reports_as: engine,
         }
     }
 }
@@ -219,7 +213,7 @@ impl Engine for ClaudeEngine {
             let config = serde_json::json!({ "mcpServers": mcp_servers });
             cmd.arg("--mcp-config");
             if mcp_servers.keys().any(|name| name != "misty") {
-                let path = super::codebuddy::stage_private_json(
+                let path = stage_private_json(
                     &crate::engines::support::paths::app_home().join("claude-staging"),
                     "mcp",
                     &config,
@@ -334,7 +328,7 @@ impl ClaudeEngine {
                         message: format_api_retry(&value),
                     });
                 } else if subtype == Some("init") {
-                    super::reported::claude_init(self.reports_as, &value);
+                    super::reported::claude_init("claude", &value);
                     let servers = value
                         .get("mcp_servers")
                         .or_else(|| value.get("mcpServers"))
@@ -587,11 +581,24 @@ impl ClaudeEngine {
                     .unwrap_or(false);
                 let subtype = value.get("subtype").and_then(Value::as_str).unwrap_or("");
                 if is_error || subtype.starts_with("error") {
+                    let listed = value
+                        .get("errors")
+                        .and_then(Value::as_array)
+                        .map(|errors| {
+                            errors
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        })
+                        .filter(|text| !text.is_empty());
                     let message = value
                         .get("result")
                         .and_then(Value::as_str)
-                        .unwrap_or("claude turn failed")
-                        .to_string();
+                        .filter(|text| !text.is_empty())
+                        .map(str::to_string)
+                        .or(listed)
+                        .unwrap_or_else(|| "The turn failed".to_string());
                     out.push(EngineEvent::Error(message));
                 } else {
                     if let Some(text) = local_command_reply(streamed, local_text, &value) {
@@ -851,6 +858,45 @@ fn parse_content_block_stop(
         Some(&args),
         tool.tool_call_id.as_deref(),
     ));
+}
+
+fn stage_private_json(
+    directory: &std::path::Path,
+    prefix: &str,
+    value: &serde_json::Value,
+) -> Result<std::path::PathBuf, String> {
+    stage_private_json_with_writer(directory, prefix, value, |file, content| {
+        use std::io::Write;
+        file.write_all(content)
+    })
+}
+
+fn stage_private_json_with_writer(
+    directory: &std::path::Path,
+    prefix: &str,
+    value: &serde_json::Value,
+    write: impl FnOnce(&mut file_access::fs::File, &[u8]) -> std::io::Result<()>,
+) -> Result<std::path::PathBuf, String> {
+    let content = serde_json::to_vec(value)
+        .map_err(|_| format!("Cannot serialize Claude Code {prefix} settings"))?;
+    file_access::fs::create_dir_all(directory)
+        .map_err(|e| format!("create Claude Code staging directory: {e}"))?;
+    let path = directory.join(format!("{prefix}-{}.json", uuid::Uuid::new_v4()));
+    let mut options = file_access::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        options.mode(0o600);
+    }
+    let mut file = options
+        .open(&path)
+        .map_err(|e| format!("create private Claude Code settings: {e}"))?;
+    if let Err(error) = write(&mut file, &content) {
+        drop(file);
+        let _ = file_access::fs::remove_file(&path);
+        return Err(format!("write private Claude Code settings: {error}"));
+    }
+    Ok(path)
 }
 
 #[cfg(test)]
@@ -1773,7 +1819,6 @@ mod tests {
             session_id: None,
             prompt: "hi".into(),
             prompt_contributions: vec![],
-            native_compact: false,
             images: vec![],
             workspace: std::path::PathBuf::from("/tmp"),
             model: None,
@@ -1822,7 +1867,6 @@ mod tests {
             session_id: None,
             prompt: "hi".into(),
             prompt_contributions: Vec::new(),
-            native_compact: false,
             images: vec![],
             workspace: std::path::PathBuf::from("/tmp"),
             model: None,
@@ -1856,5 +1900,29 @@ mod tests {
         assert!(!args
             .windows(2)
             .any(|w| w == ["--permission-mode", "acceptEdits"]));
+    }
+
+    #[test]
+    fn failed_private_json_write_removes_the_partial_file() {
+        let dir = std::env::temp_dir().join(format!(
+            "ccgui-claude-write-failure-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let result = stage_private_json_with_writer(
+            &dir,
+            "mcp",
+            &serde_json::json!({"mcpServers":{"other":{"headers":{"Authorization":"Bearer t"}}}}),
+            |file, content| {
+                use std::io::Write;
+                file.write_all(&content[..content.len() / 2])?;
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::WriteZero,
+                    "injected write failure",
+                ))
+            },
+        );
+        assert!(result.unwrap_err().contains("injected write failure"));
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0);
+        std::fs::remove_dir(dir).unwrap();
     }
 }

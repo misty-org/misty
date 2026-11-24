@@ -22,7 +22,7 @@ import {
 
 export type { CommandScope, CommandSend } from "./misty_commands";
 
-function confirmation(name: string, args: string, engine: string): string | undefined {
+function confirmation(name: string, args: string): string | undefined {
   const first = args.split(/\s+/)[0]?.toLowerCase() ?? "";
   if (name === "delete") return "Delete this chat's engine session for good? This can't be undone.";
   if (name === "share") return "Share this session publicly? Anyone with the link can read it.";
@@ -40,13 +40,9 @@ function confirmation(name: string, args: string, engine: string): string | unde
   if (name === "topup") return "Open a top-up for the engine's account?";
   if (name === "debug" && first === "upload")
     return "Upload the engine's debug logs and share links to them?";
-  if (name === "rename" && engine === "grok")
-    return "Rename this session? Grok may sync the title to xAI.";
   if (name === "archive") return "Archive this chat's engine session?";
   if (name === "memories" && first === "reset") return "Forget everything the engine remembered?";
   if (name === "move") return "Move the engine's session out of this chat's folder?";
-  if (name === "restore" && first === "enable")
-    return "Turn on checkpointing in your Gemini CLI settings?";
   const removes = /^(delete|remove|rm|drop|clear|reset|uninstall|unauth)$/.test(first);
   if (
     removes &&
@@ -165,7 +161,7 @@ export async function runComposerCommand(
     const catalog = await catalogFor(scope.engine, scope.folder);
     const item = catalog.commands.find((command) => command.name.toLowerCase() === name);
     if (item?.runs === "misty") {
-      const ask = confirmation(name, args, scope.engine);
+      const ask = confirmation(name, args);
       if (ask && !(await confirmAction(ask))) return null;
       const output = await invoke<CommandOutput>("engine_command_run", {
         account: agentAccountId(),
@@ -178,7 +174,7 @@ export async function runComposerCommand(
       return follow(output, scope);
     }
     if (item) {
-      const ask = confirmation(name, args, scope.engine);
+      const ask = confirmation(name, args);
       if (ask && !(await confirmAction(ask))) return null;
       return undefined;
     }

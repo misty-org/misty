@@ -309,14 +309,14 @@ function SearchBody({
                     <ShortcutText commandId={hit.shortcutId} className="flex-none text-caption" />
                   </Text>
                 ) : hit.detail || hit.updatedAt ? (
-                  <span className="flex flex-none items-center gap-2">
+                  <span className="flex max-w-2/5 min-w-0 items-center gap-2">
                     {hit.detail ? (
-                      <Text bare tone="muted" className="text-caption">
+                      <Text size="caption" tone="muted" className="min-w-0">
                         {hit.detail}
                       </Text>
                     ) : null}
                     {hit.updatedAt ? (
-                      <Text bare tone="muted" className="text-caption">
+                      <Text size="caption" tone="muted" className="flex-none">
                         {shortAgo(hit.updatedAt, now)}
                       </Text>
                     ) : null}

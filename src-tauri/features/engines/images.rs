@@ -159,49 +159,6 @@ pub fn claude_stdin_message(
     serde_json::to_string(&message).map_err(|e| e.to_string())
 }
 
-pub const KIMI_IMAGE_MARKER: &str = "\n\n<!-- ccgui:kimi-image-attachments -->\n";
-
-#[cfg(test)]
-pub fn kimi_prompt_with_images(prompt: &str, images: &[String], workspace: &Path) -> String {
-    let paths: Vec<PathBuf> = images
-        .iter()
-        .filter_map(|raw| absolutize_image_path(raw, workspace))
-        .collect();
-    if paths.is_empty() {
-        return prompt.to_string();
-    }
-    let mut out = prompt.trim_end().to_string();
-    out.push_str(KIMI_IMAGE_MARKER);
-    out.push_str("The user attached the following image file(s). ");
-    out.push_str("You MUST call ReadMediaFile on each path below before answering any question about visual content.\n");
-    for (index, path) in paths.iter().enumerate() {
-        out.push_str(&format!("{}. {}\n", index + 1, path.display()));
-        out.push_str(&format!("<image path=\"{}\"></image>\n", path.display()));
-    }
-    out
-}
-
-pub const MINIMAX_IMAGE_MARKER: &str = "\n\n<!-- ccgui:minimax-image-attachments -->\n";
-
-pub fn minimax_prompt_with_images(prompt: &str, images: &[String], workspace: &Path) -> String {
-    let paths: Vec<PathBuf> = images
-        .iter()
-        .filter_map(|raw| absolutize_image_path(raw, workspace))
-        .collect();
-    if paths.is_empty() {
-        return prompt.to_string();
-    }
-    let mut out = prompt.trim_end().to_string();
-    out.push_str(MINIMAX_IMAGE_MARKER);
-    out.push_str("The user attached the following image file(s). ");
-    out.push_str("Read each path below with your file tools before answering any question about visual content.\n");
-    for (index, path) in paths.iter().enumerate() {
-        out.push_str(&format!("{}. {}\n", index + 1, path.display()));
-        out.push_str(&format!("<image path=\"{}\"></image>\n", path.display()));
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

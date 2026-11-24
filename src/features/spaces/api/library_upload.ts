@@ -4,6 +4,7 @@ import { assertUploadLimit } from "./upload_limits";
 import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
 import { assertStableSpaceAccount, spaceRequest, SpaceRequestError } from "./api";
+import { attachmentUploadsPath } from "./attachment_paths";
 export async function uploadLibraryPath(
   spaceId: string,
   path: string,
@@ -47,10 +48,9 @@ export async function uploadLibraryBlob(
 }
 
 export function discardUnsentAttachment(spaceId: string, uploadId: string): Promise<void> {
-  return spaceRequest(
-    `/spaces/${encodeURIComponent(spaceId)}/library/uploads/${encodeURIComponent(uploadId)}/abort`,
-    { method: "POST" },
-  );
+  return spaceRequest(`${attachmentUploadsPath(spaceId)}/${encodeURIComponent(uploadId)}/abort`, {
+    method: "POST",
+  });
 }
 
 export function fileNameFromPath(path: string): string {
@@ -81,7 +81,7 @@ async function uploadLibraryFile(
     upload: { id: string };
     transfer: { url: string; method?: string; headers: Record<string, string> };
     finalize?: { headers?: Record<string, string> };
-  }>(`/spaces/${encodeURIComponent(spaceId)}/library/uploads`, {
+  }>(attachmentUploadsPath(spaceId), {
     method: "POST",
     body: JSON.stringify({
       filename: file.name,
@@ -97,7 +97,7 @@ async function uploadLibraryFile(
       initiated.transfer.headers["X-Misty-Library-Upload-Token"] ??
       initiated.transfer.headers["x-misty-library-upload-token"],
   };
-  const uploadPath = `/spaces/${encodeURIComponent(spaceId)}/library/uploads/${encodeURIComponent(initiated.upload.id)}`;
+  const uploadPath = `${attachmentUploadsPath(spaceId)}/${encodeURIComponent(initiated.upload.id)}`;
   try {
     options?.onStage?.("uploading");
     await transferLibraryObject(initiated.transfer, file, accountGeneration, options);

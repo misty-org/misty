@@ -36,8 +36,6 @@ fn build_state(
         db: Arc::clone(&db),
         sink: crate::engines::support::event_sink::EventSink::new(Arc::new(Quiet)),
         processes: Arc::new(registry::ProcessRegistry::default()),
-        dsh_host: Arc::new(crate::engines::support::dsh_host::DshHostState::default()),
-        opencode_server: Arc::new(opencode_server::OpencodeServerState::default()),
     });
     (app, db)
 }
@@ -45,7 +43,7 @@ fn build_state(
 fn review(plan_id: &str, session_id: &str) -> PlanReview {
     PlanReview {
         plan_id: plan_id.into(),
-        engine: "dsh".into(),
+        engine: "agy".into(),
         session_id: session_id.into(),
         workspace_path: "/tmp/ccgui-plan-respond-ws".into(),
         run_id: None,

@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 // src-tauri/src/settings.rs: the engine settings the launch path reads (default model and effort
-// per engine, Codex Fast, Codex home, program overrides, the DeepSeek Harness host). They belong
-// to this device: one JSON document in misty.db (`cli_settings`), never synced.
+// per engine, Codex Fast, Codex home, program overrides). They belong to this device: one JSON
+// document in misty.db (`cli_settings`), never synced.
 
 use std::collections::HashMap;
 
@@ -14,13 +14,9 @@ pub struct AppSettings {
     pub default_models: HashMap<String, String>,
     pub default_efforts: HashMap<String, String>,
     pub custom_models: HashMap<String, Vec<String>>,
-    pub omp_openai_service_tier: Option<String>,
     pub codex_service_tier: Option<String>,
     pub claude_fast_mode: Option<bool>,
     pub codex_home: Option<String>,
-    pub dsh_host: Option<String>,
-    pub dsh_port: Option<u16>,
-    pub dsh_auto_start: Option<bool>,
     pub bin_overrides: HashMap<String, Value>,
 }
 
@@ -151,72 +147,6 @@ pub fn write_settings(settings: &AppSettings) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
     Ok(())
-}
-
-pub(crate) fn atomic_write(path: &std::path::Path, content: &str) -> Result<(), String> {
-    let target = write_target(path)?;
-    let dir = target
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-        .unwrap_or(std::path::Path::new("."));
-    let name = target
-        .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let tmp = dir.join(format!(".{name}.{}.tmp", uuid::Uuid::new_v4().simple()));
-    let result = write_staged(&tmp, &target, content).and_then(|()| {
-        file_access::fs::rename(&tmp, &target)
-            .map_err(|e| format!("rename {}: {e}", target.display()))
-    });
-    if result.is_err() {
-        let _ = file_access::fs::remove_file(&tmp);
-    }
-    result
-}
-
-fn write_target(path: &std::path::Path) -> Result<std::path::PathBuf, String> {
-    let is_link = file_access::fs::symlink_metadata(path)
-        .map(|meta| meta.file_type().is_symlink())
-        .unwrap_or(false);
-    if !is_link {
-        return Ok(path.to_path_buf());
-    }
-    if let Ok(resolved) = file_access::fs::canonicalize(path) {
-        return Ok(resolved);
-    }
-    let link = file_access::fs::read_link(path)
-        .map_err(|e| format!("read link {}: {e}", path.display()))?;
-    Ok(match path.parent() {
-        Some(parent) if link.is_relative() => parent.join(link),
-        _ => link,
-    })
-}
-
-fn write_staged(
-    tmp: &std::path::Path,
-    target: &std::path::Path,
-    content: &str,
-) -> Result<(), String> {
-    use std::io::Write;
-    let mut file = file_access::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(tmp)
-        .map_err(|e| format!("write {}: {e}", tmp.display()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let owner_exec = file_access::fs::metadata(target)
-            .map(|meta| meta.permissions().mode() & 0o100)
-            .unwrap_or(0);
-        let mode = 0o600 | owner_exec;
-        file.set_permissions(std::fs::Permissions::from_mode(mode))
-            .map_err(|e| format!("chmod {}: {e}", tmp.display()))?;
-    }
-    #[cfg(not(unix))]
-    let _ = target;
-    file.write_all(content.as_bytes())
-        .map_err(|e| format!("write {}: {e}", tmp.display()))
 }
 
 pub fn signed_in_here(engine: &str) -> bool {

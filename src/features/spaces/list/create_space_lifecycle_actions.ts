@@ -117,7 +117,9 @@ export function createSpaceLifecycleActions(
           delete nodesBySpace[spaceId];
           const membersBySpace = { ...state.membersBySpace };
           delete membersBySpace[spaceId];
-          return { spaces, messagesBySpace, nodesBySpace, membersBySpace };
+          const integrationsBySpace = { ...state.integrationsBySpace };
+          delete integrationsBySpace[spaceId];
+          return { spaces, messagesBySpace, nodesBySpace, membersBySpace, integrationsBySpace };
         });
         await get().load({ force: true });
       } catch (error) {

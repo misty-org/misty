@@ -126,7 +126,7 @@ export const mistyCommands: readonly MistyCommand[] = [
     description: "Switch to Plan and send what follows",
     hint: "[task]",
     on: "all",
-    wins: (args, engine) => engine !== "hermes" && args.trim().toLowerCase() !== "open",
+    wins: (args) => args.trim().toLowerCase() !== "open",
     run: async (args, scope) => {
       const rest = await scope.plan(`/plan ${args}`.trim());
       return rest ? { send: rest } : null;
@@ -175,7 +175,7 @@ export const mistyCommands: readonly MistyCommand[] = [
     name: "fast",
     description: "Turn the engine's fast mode on or off",
     on: "outside",
-    wins: (_args, engine) => engine !== "hermes",
+    wins: "always",
     run: () => openControl("model"),
   },
   {

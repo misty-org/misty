@@ -20,6 +20,9 @@ export { useNativeSessionStore } from "./native-session";
 
 export { AccountSection } from "./settings/AccountSection";
 export { ServerSection } from "./settings/ServerSection";
+export { SessionsSection } from "./settings/SessionsSection";
+export { DeviceApprovalDialog } from "./devices/DeviceApprovalDialog";
+export { openDeviceApproval } from "./devices/device_approval_store";
 export { DevicePreferencesBridge } from "./DevicePreferencesBridge";
 export { accountResets, deviceDataErasers } from "./account_seams";
 

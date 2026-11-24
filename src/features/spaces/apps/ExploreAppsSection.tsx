@@ -17,7 +17,6 @@ import {
   StoreDetailSection,
   Text,
 } from "@misty/ui";
-import { AddFromGitHubDialog } from "./AddFromGitHubDialog";
 import { permissionLines } from "./app_permissions";
 import { RemoveAppDialog } from "./RemoveAppDialog";
 import { appRoute } from "./app_routes";
@@ -59,7 +58,6 @@ export function ExploreAppsSection({
   const [picked, setPicked] = useState<CatalogApp | null>(null);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState("");
-  const [adding, setAdding] = useState(false);
   const installed = new Set((apps ?? []).map((app) => app.app_id));
 
   const get = async (app: CatalogApp) => {
@@ -84,10 +82,6 @@ export function ExploreAppsSection({
   const seeAll = onSeeAll ? (
     <Button variant="quiet" size="sm" onClick={onSeeAll}>
       See all
-    </Button>
-  ) : canManage ? (
-    <Button variant="quiet" size="sm" onClick={() => setAdding(true)}>
-      Add from GitHub
     </Button>
   ) : undefined;
 
@@ -227,14 +221,6 @@ export function ExploreAppsSection({
             </StoreDetailSection>
           ) : null}
         </StoreDetail>
-      ) : null}
-      {adding ? (
-        <AddFromGitHubDialog
-          onAdd={(source) =>
-            install(source.entry.id, source.entry.version, source.entry.permissions, source)
-          }
-          onClose={() => setAdding(false)}
-        />
       ) : null}
       {removing ? (
         <RemoveAppDialog

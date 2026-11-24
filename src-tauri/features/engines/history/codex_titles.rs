@@ -82,7 +82,7 @@ mod tests {
         let index = dir.join("session_index.jsonl");
         {
             let conn = db.0.lock();
-            for (engine, id) in [("codex", "a"), ("codex", "b"), ("omp", "a")] {
+            for (engine, id) in [("codex", "a"), ("codex", "b"), ("claude", "a")] {
                 conn.execute(
                     "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms, title, custom_title, updated_at) VALUES(?1, ?2, '/ws', ?3, 10, 20, 'first message', 'local name', 30)",
                     rusqlite::params![engine, id, format!("{engine}-{id}")],

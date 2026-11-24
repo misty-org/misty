@@ -292,9 +292,7 @@ async fn serve(
             if let (true, Some(adapter)) = (adapts, manifest.adapter.as_deref()) {
                 let up = "../".repeat(manifest.entry.matches('/').count());
                 body = with_tag(&body, &format!(r#"<script src="{up}{adapter}"></script>"#));
-                if manifest.collab == Some(super::manifest::CollabKind::Adapter) {
-                    body = with_tag(&body, SDK_TAG);
-                }
+                body = with_tag(&body, SDK_TAG);
             }
             body = with_tag(&body, SCREEN_TAG);
         }

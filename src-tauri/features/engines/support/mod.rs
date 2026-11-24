@@ -1,11 +1,10 @@
 //! What desktop-cc-gui's engine layer needs from the app around it, reduced to what Misty keeps:
-//! its tables in misty.db, its event sink, its few settings, the DeepSeek Harness host, and the
-//! paths it stages files in. Adapted from desktop-cc-gui (MIT, Copyright (c) 2026
-//! zhukunpenglinyutong); each file names its source.
+//! its tables in misty.db, its event sink, its few settings, and the paths it stages files in.
+//! Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong); each file names its
+//! source.
 
 pub mod config;
 pub mod db;
-pub mod dsh_host;
 pub mod event_sink;
 pub mod files;
 pub mod mcp;
@@ -21,8 +20,6 @@ pub struct EngineState {
     pub db: Arc<db::Db>,
     pub sink: Arc<event_sink::EventSink>,
     pub processes: Arc<crate::engines::ProcessRegistry>,
-    pub dsh_host: Arc<dsh_host::DshHostState>,
-    pub opencode_server: Arc<crate::engines::opencode_server::OpencodeServerState>,
 }
 
 static STATE: OnceLock<EngineState> = OnceLock::new();
@@ -45,10 +42,6 @@ impl EngineState {
             db,
             sink: event_sink::EventSink::new(emit),
             processes: Arc::new(crate::engines::ProcessRegistry::default()),
-            dsh_host: Arc::new(dsh_host::DshHostState::default()),
-            opencode_server: Arc::new(
-                crate::engines::opencode_server::OpencodeServerState::default(),
-            ),
         };
         let _ = STATE.set(state.clone());
         Ok(state)

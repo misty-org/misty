@@ -4,13 +4,13 @@ import { spacesApi } from "../api/api";
 
 const pictures = new Map<string, Promise<string | null>>();
 
-export function memberPicture(spaceId: string, userId: string, version: number) {
+export function memberPicture(userId: string, version: number) {
   if (!version) return Promise.resolve(null);
-  const key = `${spaceId}:${userId}:${version}`;
+  const key = `${userId}:${version}`;
   let picture = pictures.get(key);
   if (!picture) {
     picture = spacesApi
-      .memberAvatar(spaceId, userId)
+      .personAvatar(userId)
       .then((blob) => (blob.size ? URL.createObjectURL(blob) : null))
       .catch(() => null);
     pictures.set(key, picture);
@@ -31,16 +31,16 @@ export function myPicture(version: number) {
   return picture;
 }
 
-export function useMemberPicture(spaceId: string, userId: string, version = 0) {
+export function useMemberPicture(userId: string, version = 0) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     setUrl(null);
     if (!version) return;
     let live = true;
-    void memberPicture(spaceId, userId, version).then((found) => live && setUrl(found));
+    void memberPicture(userId, version).then((found) => live && setUrl(found));
     return () => {
       live = false;
     };
-  }, [spaceId, userId, version]);
+  }, [userId, version]);
   return url;
 }

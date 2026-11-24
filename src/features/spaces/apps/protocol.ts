@@ -1,6 +1,5 @@
 // The wire protocol of the SDK channel, as the host speaks it. misty-sdk (MIT) owns the other end in
-// `packages/sdk/src/protocol.ts`; keep the two in step. The host's end never imports the SDK's code; only Misty's
-// own pages do, as the SDK's clients (`page_misty.ts`).
+// `packages/sdk/src/protocol.ts`; keep the two in step.
 
 export const PROTOCOL_VERSION = 1;
 export const PROTOCOL_VERSIONS: readonly number[] = [1];
@@ -14,7 +13,30 @@ export type ErrorCode =
   | "unsupported"
   | "cancelled"
   | "closed"
-  | "internal";
+  | "internal"
+  | "too_large"
+  | "too_large_warning"
+  | "stalled"
+  | "read_only"
+  | "save_failed"
+  | "reloaded";
+
+const ERROR_CODES: ReadonlySet<string> = new Set<ErrorCode>([
+  "permission_denied",
+  "not_found",
+  "conflict",
+  "invalid",
+  "unsupported",
+  "cancelled",
+  "closed",
+  "internal",
+  "too_large",
+  "too_large_warning",
+  "stalled",
+  "read_only",
+  "save_failed",
+  "reloaded",
+]);
 
 export interface WireError {
   code: ErrorCode;
@@ -40,10 +62,13 @@ export class HostError extends Error {
   }
 }
 
-export const toWireError = (error: unknown): WireError =>
-  error instanceof HostError
-    ? { code: error.code, message: error.message }
-    : {
-        code: "internal",
-        message: error instanceof Error ? error.message : "Something went wrong.",
-      };
+const codeOf = (error: unknown): ErrorCode | null => {
+  if (error instanceof HostError) return error.code;
+  const code = error instanceof Error ? (error as { code?: unknown }).code : undefined;
+  return typeof code === "string" && ERROR_CODES.has(code) ? (code as ErrorCode) : null;
+};
+
+export const toWireError = (error: unknown): WireError => ({
+  code: codeOf(error) ?? "internal",
+  message: error instanceof Error ? error.message : "Something went wrong.",
+});

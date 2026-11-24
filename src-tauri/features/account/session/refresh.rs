@@ -24,8 +24,7 @@ impl RefreshAnswer {
     }
 }
 
-#[cfg(test)]
-fn refresh_endpoint(base: &url::Url) -> url::Url {
+pub(super) fn refresh_endpoint(base: &url::Url) -> url::Url {
     let mut endpoint = base.clone();
     endpoint.set_path(&format!(
         "{}/auth/refresh",

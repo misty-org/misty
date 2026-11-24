@@ -116,7 +116,9 @@ async fn logo(dir: &Path, remote: &str) -> Option<(Vec<u8>, &'static str)> {
 
 fn revalidate_later(dir: PathBuf, remote: String, meta: Kept) {
     {
-        let mut running = REVALIDATING.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut running = REVALIDATING
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         if !running.insert(remote.clone()) {
             return;
         }
@@ -181,7 +183,9 @@ fn write_whole(path: &Path, bytes: &[u8]) -> bool {
 
 fn fresh_for(headers: &HeaderMap) -> Option<u64> {
     let text = |name: header::HeaderName| headers.get(name).and_then(|value| value.to_str().ok());
-    let date = |name: header::HeaderName| text(name).and_then(|value| httpdate::parse_http_date(value).ok());
+    let date = |name: header::HeaderName| {
+        text(name).and_then(|value| httpdate::parse_http_date(value).ok())
+    };
     let age = text(header::AGE)
         .and_then(|value| value.trim().parse::<u64>().ok())
         .unwrap_or(0);
@@ -201,11 +205,19 @@ fn fresh_for(headers: &HeaderMap) -> Option<u64> {
     let lifetime = max_age
         .or_else(|| {
             let expires = date(header::EXPIRES)?;
-            Some(expires.duration_since(served).map_or(0, |left| left.as_secs()))
+            Some(
+                expires
+                    .duration_since(served)
+                    .map_or(0, |left| left.as_secs()),
+            )
         })
         .or_else(|| {
             let modified = date(header::LAST_MODIFIED)?;
-            Some(served.duration_since(modified).map_or(0, |since| since.as_secs() / 10))
+            Some(
+                served
+                    .duration_since(modified)
+                    .map_or(0, |since| since.as_secs() / 10),
+            )
         })
         .unwrap_or(0);
     Some(lifetime.saturating_sub(age))

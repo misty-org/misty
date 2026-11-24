@@ -1,6 +1,6 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/agy.rs.
-//! Antigravity CLI (`agy`) over the Agent Client Protocol: `agy acp`, on the same ACP driver as
-//! Gemini CLI, Kimi, Grok and Hermes (`grok_acp.rs`). Print mode (`agy -p`) can't ask anyone
+//! Antigravity CLI (`agy`) over the Agent Client Protocol: `agy acp`, on the ACP driver in
+//! `acp_turn.rs`. Print mode (`agy -p`) can't ask anyone
 //! anything: it refuses every tool that needs approval and its model is told nobody will answer a
 //! question. Over ACP each permission ask comes back as `session/request_permission`, which
 //! Misty's gate answers, and the `ask_question` tool comes back as an `elicitation/create` form,

@@ -10,6 +10,7 @@ import { accountLimitMessages } from "@/api/client/account_limits";
 import { isSpaceReferenceOnly, isSpaceWriteRequest, setSpaceReferenceOnly } from "./connectivity";
 import { createSpaceConversationsApi } from "./conversations";
 import { createSpacePinsApi } from "./pins";
+import { createSpaceIntegrationsApi } from "./integrations";
 import type {
   CreateSpaceRequest,
   CreateSpaceResult,
@@ -201,6 +202,7 @@ export const spacesApi = {
   ...createSpaceRolesApi(spaceRequest),
   ...createSpaceConversationsApi(spaceRequest),
   ...createSpacePinsApi(spaceRequest),
+  ...createSpaceIntegrationsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
   nodes: (spaceId: string, onCached?: (value: { nodes: SpaceNode[] }) => void) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`, {

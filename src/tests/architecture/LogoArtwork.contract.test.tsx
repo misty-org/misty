@@ -5,10 +5,6 @@ import type { ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ENGINE_IDS } from "@/features/engine-config/channels/engines";
 import { PRESETS } from "@/features/engine-config/channels/provider_presets";
-import {
-  PI_FAMILY_APIKEY_PROVIDERS,
-  PI_FAMILY_OAUTH_PROVIDERS,
-} from "@/features/engine-config/engine-setup/pi_family_auth_catalog";
 import { Mark, hasMark, markFor, marks, type MarkRender } from "@misty/ui";
 import { repositoryRoot } from "./repository_policy";
 
@@ -133,16 +129,9 @@ describe("logo artwork", () => {
     expect(missing).toEqual([]);
   });
 
-  it("names every sign-in provider with its brand's mark, except ones with no public mark", () => {
-    const providers = [
-      ...PI_FAMILY_APIKEY_PROVIDERS,
-      ...PI_FAMILY_OAUTH_PROVIDERS.pi,
-      ...PI_FAMILY_OAUTH_PROVIDERS.omp,
-    ];
-    const withoutMark = new Set(providers.filter((item) => !item.mark).map((item) => item.id));
-    expect([...withoutMark]).toEqual(["radius"]);
+  it("names every provider preset with a mark Misty has", () => {
     const presets = Object.values(PRESETS).flatMap((list) => list ?? []);
-    const unknown = [...providers, ...presets]
+    const unknown = presets
       .map((item) => item.mark)
       .filter((mark): mark is string => Boolean(mark) && !markFor(mark));
     expect(unknown).toEqual([]);

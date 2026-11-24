@@ -135,15 +135,6 @@ pub(super) fn is_dir(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn coding_agent_home(env_keys: &[&str], home_dir_name: &str) -> PathBuf {
-    for key in env_keys {
-        if let Some(dir) = std::env::var_os(key).filter(|value| !value.is_empty()) {
-            return PathBuf::from(dir);
-        }
-    }
-    crate::engine_config::support::engine_home(None, home_dir_name).join("agent")
-}
-
 fn antigravity_homes() -> Vec<PathBuf> {
     let mut homes = vec![crate::engine_config::support::engine_home(
         Some("ANTIGRAVITY_HOME"),
@@ -158,19 +149,7 @@ fn antigravity_homes() -> Vec<PathBuf> {
 pub(super) enum TargetKind {
     Claude,
     Codex,
-    Kimi,
-    Grok,
-    Pi,
-    Omp,
-    Dsh,
     Agy,
-    Gemini,
-    Opencode,
-    Qoder,
-    QoderCn,
-    Qwen,
-    Codebuddy,
-    Hermes,
     Agents,
 }
 
@@ -181,7 +160,7 @@ pub(super) struct Target {
     pub(super) kind: TargetKind,
 }
 
-pub(super) static TARGETS: [Target; 16] = [
+pub(super) static TARGETS: [Target; 4] = [
     Target {
         id: "claude",
         label: "Claude",
@@ -195,82 +174,10 @@ pub(super) static TARGETS: [Target; 16] = [
         kind: TargetKind::Codex,
     },
     Target {
-        id: "kimi",
-        label: "Kimi",
-        visible: true,
-        kind: TargetKind::Kimi,
-    },
-    Target {
-        id: "grok",
-        label: "Grok",
-        visible: true,
-        kind: TargetKind::Grok,
-    },
-    Target {
-        id: "pi",
-        label: "PI",
-        visible: true,
-        kind: TargetKind::Pi,
-    },
-    Target {
-        id: "omp",
-        label: "OMP",
-        visible: true,
-        kind: TargetKind::Omp,
-    },
-    Target {
-        id: "dsh",
-        label: "DeepSeek",
-        visible: true,
-        kind: TargetKind::Dsh,
-    },
-    Target {
         id: "agy",
         label: "Antigravity",
         visible: true,
         kind: TargetKind::Agy,
-    },
-    Target {
-        id: "gemini",
-        label: "Gemini",
-        visible: true,
-        kind: TargetKind::Gemini,
-    },
-    Target {
-        id: "opencode",
-        label: "OpenCode",
-        visible: true,
-        kind: TargetKind::Opencode,
-    },
-    Target {
-        id: "qoder",
-        label: "Qoder",
-        visible: true,
-        kind: TargetKind::Qoder,
-    },
-    Target {
-        id: "qoder-cn",
-        label: "Qoder CN",
-        visible: true,
-        kind: TargetKind::QoderCn,
-    },
-    Target {
-        id: "qwen",
-        label: "Qwen Code",
-        visible: true,
-        kind: TargetKind::Qwen,
-    },
-    Target {
-        id: "codebuddy",
-        label: "CodeBuddy",
-        visible: true,
-        kind: TargetKind::Codebuddy,
-    },
-    Target {
-        id: "hermes",
-        label: "Hermes",
-        visible: true,
-        kind: TargetKind::Hermes,
     },
     Target {
         id: "agents",
@@ -284,10 +191,6 @@ pub(super) fn target_by_id(id: &str) -> Option<&'static Target> {
     TARGETS.iter().find(|target| target.id == id)
 }
 
-fn skills_dirs_for_id(id: &str) -> Vec<PathBuf> {
-    target_by_id(id).map(target_dirs).unwrap_or_default()
-}
-
 pub(super) fn target_home_dirs(target: &Target) -> Vec<PathBuf> {
     match target.kind {
         TargetKind::Claude => vec![crate::engine_config::support::engine_home(
@@ -295,48 +198,7 @@ pub(super) fn target_home_dirs(target: &Target) -> Vec<PathBuf> {
             ".claude",
         )],
         TargetKind::Codex => vec![crate::engine_config::support::codex_home()],
-        TargetKind::Kimi => vec![crate::engine_config::support::engine_home(
-            Some("KIMI_CODE_HOME"),
-            ".kimi-code",
-        )],
-        TargetKind::Grok => vec![crate::engine_config::support::engine_home(
-            Some("GROK_HOME"),
-            ".grok",
-        )],
-        TargetKind::Pi => vec![coding_agent_home(&["PI_CODING_AGENT_DIR"], ".pi")],
-        TargetKind::Omp => vec![coding_agent_home(
-            &["OMP_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"],
-            ".omp",
-        )],
-        TargetKind::Dsh => vec![crate::engine_config::support::engine_home(
-            Some("DSH_HOME"),
-            ".dsh",
-        )],
         TargetKind::Agy => antigravity_homes(),
-        TargetKind::Gemini => vec![crate::engine_config::support::engine_home(
-            Some("GEMINI_DIR"),
-            ".gemini",
-        )],
-        TargetKind::Opencode => {
-            vec![
-                crate::engine_config::support::engine_home(Some("XDG_CONFIG_HOME"), ".config")
-                    .join("opencode"),
-            ]
-        }
-        TargetKind::Qoder => vec![crate::engine_config::support::engine_home(None, ".qoder")],
-        TargetKind::QoderCn => vec![crate::engine_config::support::engine_home(
-            None,
-            ".qoder-cn",
-        )],
-        TargetKind::Qwen => vec![crate::engine_config::support::engine_home(None, ".qwen")],
-        TargetKind::Codebuddy => vec![crate::engine_config::support::engine_home(
-            None,
-            ".codebuddy",
-        )],
-        TargetKind::Hermes => vec![crate::engine_config::support::engine_home(
-            Some("HERMES_HOME"),
-            ".hermes",
-        )],
         TargetKind::Agents => vec![crate::engine_config::support::engine_home(None, ".agents")],
     }
 }
@@ -412,9 +274,6 @@ pub(super) fn readonly_sources() -> Vec<ReadonlySource> {
     };
     let codex_home = crate::engine_config::support::codex_home();
     push_system(codex_home.join("skills").join(".system"));
-    for dir in skills_dirs_for_id("dsh") {
-        push_system(dir.join(".system"));
-    }
     for (dir, _) in crate::engines::catalog::codex_plugin_skills_dirs(&codex_home) {
         out.push(ReadonlySource {
             kind: ReadonlyKind::Plugin,

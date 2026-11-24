@@ -63,7 +63,6 @@ pub(crate) fn launch_for(
 }
 
 const CLAUDE_READ_ONLY: &[&str] = &["Read", "Glob", "Grep", "WebFetch", "WebSearch"];
-const PI_READ_ONLY: &[&str] = &["read", "grep", "find", "ls"];
 
 fn allows_shell(tools: &[String]) -> bool {
     tools.iter().any(|tool| {
@@ -85,8 +84,7 @@ pub(crate) fn engine_tools(
         return Ok(None);
     }
     let names: &[&str] = match engine.id() {
-        "claude" | "codebuddy" => CLAUDE_READ_ONLY,
-        "pi" => PI_READ_ONLY,
+        "claude" => CLAUDE_READ_ONLY,
         _ => &[],
     };
     if names.is_empty() || !engine.supports_tool_constraints() {

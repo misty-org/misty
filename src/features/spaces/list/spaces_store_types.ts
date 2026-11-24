@@ -2,6 +2,7 @@ import type {
   CreateSpaceRequest,
   CreateSpaceResult,
   Space,
+  SpaceIntegrationMember,
   SpaceInvitation,
   SpaceMember,
   SpaceMessage,
@@ -14,6 +15,7 @@ export interface SpacesStore {
   spaces: Space[];
   invitations: SpaceInvitation[];
   membersBySpace: Record<string, SpaceMember[]>;
+  integrationsBySpace: Record<string, SpaceIntegrationMember[]>;
   messagesBySpace: Record<string, SpaceMessage[]>;
   messageLoadingBySpace: Record<string, boolean>;
   messageErrorsBySpace: Record<string, string>;

@@ -151,23 +151,23 @@ describe("useCliVersionStatus session store", () => {
   });
 
   it("an update runs the installer and then probes again", async () => {
-    mocks.status.mockResolvedValue(versionStatus("kimi"));
+    mocks.status.mockResolvedValue(versionStatus("codex"));
     mocks.update.mockResolvedValue({ ok: true, version: "2.1.267" });
-    await render("kimi");
+    await render("codex");
     const probesBefore = mocks.status.mock.calls.length;
     await act(async () => {
       await latest.update("run-1");
     });
-    expect(mocks.update).toHaveBeenCalledWith("kimi", "run-1");
+    expect(mocks.update).toHaveBeenCalledWith("codex", "run-1");
     expect(mocks.status.mock.calls.length).toBe(probesBefore + 1);
     expect(latest.updating).toBe(false);
     expect(latest.error).toBeNull();
   });
 
   it("a failed update says why, rejects, and doesn't probe again", async () => {
-    mocks.status.mockResolvedValue(versionStatus("pi"));
+    mocks.status.mockResolvedValue(versionStatus("agy"));
     mocks.update.mockRejectedValue(new Error("npm boom"));
-    await render("pi");
+    await render("agy");
     const probesBefore = mocks.status.mock.calls.length;
     await act(async () => {
       await expect(latest.update("run-2")).rejects.toThrow("npm boom");
@@ -208,14 +208,14 @@ describe("useCliVersionStatus session store", () => {
   });
 
   it("an install that needs Node.js starts on the helper step", async () => {
-    mocks.status.mockResolvedValue(versionStatus("gemini", { installed: false }));
+    mocks.status.mockResolvedValue(versionStatus("codex", { installed: false }));
     const run = deferred<{ ok: boolean; version: string | null }>();
     mocks.update.mockReturnValue(run.promise);
     mocks.updatePlan.mockResolvedValue({
-      engine: "gemini",
+      engine: "codex",
       action: "install",
       kind: "npm",
-      steps: ["Download Node.js", "npm install --prefix ~/.misty/shared/engines/gemini"],
+      steps: ["Download Node.js", "npm install --prefix ~/.misty/shared/engines/codex"],
       needsHelper: true,
       canRun: true,
       blockers: [],
@@ -225,7 +225,7 @@ describe("useCliVersionStatus session store", () => {
     const flowRoot = createRoot(container);
     root = flowRoot;
     await act(async () => {
-      flowRoot.render(<FlowProbe engine="gemini" capture={(value) => (flow = value)} />);
+      flowRoot.render(<FlowProbe engine="codex" capture={(value) => (flow = value)} />);
     });
     await act(async () => flow.begin());
     let confirmed!: Promise<void>;

@@ -37,17 +37,12 @@ fn sign_in_comes_from_the_cli_answer() {
         (Some(false), Some("Account: Not logged in".into()))
     );
     assert_eq!(
-        parse_sign_in(&output(
-            "You are not authenticated.\n\nDefault model: grok-4.6",
-            0
-        ))
-        .0,
+        parse_sign_in(&output("You are not authenticated.", 0)).0,
         Some(false)
     );
     assert!(sign_in_status_args("claude").is_some());
-    assert!(sign_in_status_args("qoder").is_some());
-    assert!(sign_in_status_args("grok").is_some());
-    assert!(sign_in_status_args("gemini").is_none());
+    assert!(sign_in_status_args("codex").is_some());
+    assert!(sign_in_status_args("agy").is_none());
 }
 
 #[cfg(unix)]
@@ -64,21 +59,16 @@ fn exit_status(code: i32) -> std::process::ExitStatus {
 
 #[test]
 fn engines_start_as_their_own_program() {
-    assert_eq!(cli_binary_name("qoder"), "qodercli");
-    assert_eq!(cli_binary_name("qoder-cn"), "qoderclicn");
-    assert_eq!(cli_binary_name("minimax"), "mcode");
     assert_eq!(cli_binary_name("claude"), "claude");
+    assert_eq!(cli_binary_name("agy"), "agy");
 }
 
 #[test]
 fn npm_package_covers_every_npm_engine() {
-    for engine in ["claude", "kimi", "codex", "pi", "omp", "dsh", "opencode"] {
+    for engine in ["claude", "codex"] {
         assert!(npm_package(engine).is_some(), "{engine} missing package");
     }
-    assert_eq!(npm_package("grok"), None);
     assert_eq!(npm_package("agy"), None);
-    assert_eq!(npm_package("qoder"), None);
-    assert_eq!(npm_package("qoder-cn"), None);
 }
 
 #[cfg(unix)]
@@ -106,7 +96,7 @@ async fn run_streaming_emits_scoped_lines_then_finished() {
     let reporter = ProgressReporter::with_sink(
         collector.clone(),
         "run-test".to_string(),
-        "kimi".to_string(),
+        "codex".to_string(),
     );
     let mut command = Command::new("bash");
     command.args(["-c", "printf 'out1\\nout2\\n'; printf 'err1\\n' >&2"]);
@@ -155,7 +145,7 @@ fn npm_global_shims_are_the_npm_channel() {
     std::fs::write(standalone.join("claude.exe"), "").unwrap();
 
     let shim = |name: &str| prefix.join(name).to_string_lossy().into_owned();
-    let found = |engine: &str, bin: &str| routes::route(engine, bin, true, false);
+    let found = |engine: &str, bin: &str| routes::route(engine, bin, true);
     assert_eq!(found("claude", &shim("claude.cmd")), Some(Route::NpmGlobal));
     assert_eq!(found("codex", &shim("codex.cmd")), Some(Route::NpmGlobal));
     let exe = standalone.join("claude.exe").to_string_lossy().into_owned();
@@ -177,9 +167,8 @@ fn npm_shim_detection_ignores_relative_paths() {
 
 #[test]
 fn a_copy_already_on_the_computer_updates_the_way_it_was_installed() {
-    let found = |engine: &str, bin: &str| routes::route(engine, bin, true, false);
-    assert_eq!(found("dsh", "/usr/local/bin/dsh"), Some(Route::NpmGlobal));
-    assert_eq!(found("grok", "/usr/local/bin/grok"), None);
+    let found = |engine: &str, bin: &str| routes::route(engine, bin, true);
+    assert_eq!(found("misty", "/usr/local/bin/misty"), None);
     assert_eq!(
         found("agy", "/usr/local/bin/agy"),
         Some(Route::VendorScript)

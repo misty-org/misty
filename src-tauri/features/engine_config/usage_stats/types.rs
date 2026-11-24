@@ -106,19 +106,15 @@ pub(crate) struct UsageEvent {
 pub(crate) enum Engine {
     Claude,
     Codex,
-    Pi,
-    Omp,
 }
 
 impl Engine {
-    pub const ALL: [Engine; 4] = [Engine::Claude, Engine::Codex, Engine::Pi, Engine::Omp];
+    pub const ALL: [Engine; 2] = [Engine::Claude, Engine::Codex];
 
     pub fn id(self) -> &'static str {
         match self {
             Engine::Claude => "claude",
             Engine::Codex => "codex",
-            Engine::Pi => "pi",
-            Engine::Omp => "omp",
         }
     }
 
@@ -126,8 +122,6 @@ impl Engine {
         match self {
             Engine::Claude => "Claude Code",
             Engine::Codex => "Codex",
-            Engine::Pi => "Pi",
-            Engine::Omp => "oh-my-pi",
         }
     }
 
@@ -135,14 +129,13 @@ impl Engine {
         match self {
             Engine::Claude => Some("CLAUDE_CONFIG_DIR"),
             Engine::Codex => Some("CODEX_HOME"),
-            Engine::Pi | Engine::Omp => None,
         }
     }
 
     pub fn accepts_file(self, name: &str) -> bool {
         match self {
             Engine::Codex => name.starts_with("rollout-") && name.ends_with(".jsonl"),
-            Engine::Claude | Engine::Pi | Engine::Omp => name.ends_with(".jsonl"),
+            Engine::Claude => name.ends_with(".jsonl"),
         }
     }
 }

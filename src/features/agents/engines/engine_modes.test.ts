@@ -7,7 +7,7 @@ const claude: EngineModeOption[] = [
   { id: "plan", label: "Plan", kind: "plans" },
   { id: "bypassPermissions", label: "Bypass permissions", kind: "no_asking" },
 ];
-const kimi: EngineModeOption[] = [
+const askOrPlan: EngineModeOption[] = [
   { id: "default", label: "Default", kind: "asks" },
   { id: "plan", label: "Plan", kind: "plans" },
 ];
@@ -25,10 +25,10 @@ it("maps an older Ask, Auto, Plan or Bypass to the engine's own mode", () => {
   expect(resolveEngineMode(claude, "ask")?.id).toBe("default");
   expect(resolveEngineMode(claude, "auto")?.id).toBe("acceptEdits");
   expect(resolveEngineMode(claude, "bypass")?.id).toBe("bypassPermissions");
-  expect(resolveEngineMode(kimi, "auto")?.id).toBe("default");
-  expect(resolveEngineMode(kimi, "bypass")?.id).toBe("default");
+  expect(resolveEngineMode(askOrPlan, "auto")?.id).toBe("default");
+  expect(resolveEngineMode(askOrPlan, "bypass")?.id).toBe("default");
   expect(resolveEngineMode(agy, "ask")?.id).toBe("accept-edits");
-  expect(resolveEngineMode(kimi, "acceptEdits")?.id).toBe("default");
+  expect(resolveEngineMode(askOrPlan, "acceptEdits")?.id).toBe("default");
   expect(resolveEngineMode(claude, undefined)?.id).toBe("default");
 });
 

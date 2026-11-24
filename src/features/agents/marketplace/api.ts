@@ -1,50 +1,20 @@
 import type { SkillTargetId } from "@/features/engine-config/skills";
 import { invoke } from "@/native/invoke";
 
-export type MarketEngine =
-  "claude" | "codex" | "omp" | "qoder" | "codebuddy" | "minimax" | "gemini" | "qwen";
+export type MarketEngine = "claude" | "codex";
 
-const pluginEngines: ReadonlySet<string> = new Set<MarketEngine>([
-  "claude",
-  "codex",
-  "omp",
-  "qoder",
-  "codebuddy",
-  "minimax",
-  "gemini",
-  "qwen",
-]);
+const pluginEngines: ReadonlySet<string> = new Set<MarketEngine>(["claude", "codex"]);
 
 export const hasPlugins = (engine: string): engine is MarketEngine => pluginEngines.has(engine);
 
-const sourceEngines: ReadonlySet<MarketEngine> = new Set<MarketEngine>([
-  "claude",
-  "codex",
-  "omp",
-  "qoder",
-  "codebuddy",
-]);
+const sourceEngines: ReadonlySet<MarketEngine> = new Set<MarketEngine>(["claude", "codex"]);
 
 export const takesSources = (engine: MarketEngine) => sourceEngines.has(engine);
-
-export const pluginNoun = (engine: string) =>
-  engine === "gemini" || engine === "qwen" ? "extension" : "plugin";
 
 const skillTargets: Partial<Record<string, SkillTargetId>> = {
   claude: "claude",
   codex: "codex",
-  opencode: "opencode",
-  gemini: "gemini",
-  kimi: "kimi",
-  grok: "grok",
-  qoder: "qoder",
-  "qoder-cn": "qoder-cn",
-  omp: "omp",
   agy: "agy",
-  pi: "pi",
-  dsh: "dsh",
-  qwen: "qwen",
-  codebuddy: "codebuddy",
 };
 
 export const skillTargetOf = (engine: string) => skillTargets[engine];
@@ -55,11 +25,6 @@ interface SuggestedMarketplace {
   line: string;
 }
 
-const officialClaude: SuggestedMarketplace = {
-  source: "anthropics/claude-plugins-official",
-  name: "Claude plugins",
-  line: "Anthropic's official plugin directory",
-};
 const anthropicSkills: SuggestedMarketplace = {
   source: "anthropics/skills",
   name: "Anthropic skills",
@@ -84,12 +49,6 @@ const hashicorp: SuggestedMarketplace = {
 const suggestedMarketplaces: Record<MarketEngine, SuggestedMarketplace[]> = {
   claude: [anthropicSkills, workflows, superpowers, hashicorp],
   codex: [workflows, hashicorp],
-  omp: [officialClaude, anthropicSkills, workflows, superpowers, hashicorp],
-  codebuddy: [officialClaude, anthropicSkills, workflows, superpowers, hashicorp],
-  qoder: [],
-  minimax: [],
-  gemini: [],
-  qwen: [],
 };
 
 export function unaddedSuggestions(engine: MarketEngine, sources: MarketSource[]) {

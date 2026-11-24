@@ -2,7 +2,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use base64::Engine as _;
 use sha2::{Digest as _, Sha256, Sha512};
 
 use super::ProgressReporter;
@@ -14,19 +13,10 @@ const METADATA_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Checksum {
     Sha256(String),
-    Sha512(String),
     Sha512Hex(String),
 }
 
 impl Checksum {
-    pub(super) fn from_npm_integrity(integrity: &str) -> Option<Self> {
-        integrity
-            .split_whitespace()
-            .find_map(|part| part.strip_prefix("sha512-"))
-            .filter(|digest| !digest.is_empty())
-            .map(|digest| Checksum::Sha512(digest.to_string()))
-    }
-
     pub(super) fn sha256_hex(hex: &str) -> Option<Self> {
         let hex = hex.trim().to_ascii_lowercase();
         (hex.len() == 64 && hex.bytes().all(|b| b.is_ascii_hexdigit()))
@@ -49,7 +39,7 @@ impl Hasher {
     pub(super) fn for_checksum(checksum: &Checksum) -> Self {
         match checksum {
             Checksum::Sha256(_) => Hasher::Sha256(Sha256::new()),
-            Checksum::Sha512(_) | Checksum::Sha512Hex(_) => Hasher::Sha512(Sha512::new()),
+            Checksum::Sha512Hex(_) => Hasher::Sha512(Sha512::new()),
         }
     }
 
@@ -64,9 +54,6 @@ impl Hasher {
         match (self, checksum) {
             (Hasher::Sha256(hasher), Checksum::Sha256(hex)) => {
                 hex::encode(hasher.finalize()) == hex.to_ascii_lowercase()
-            }
-            (Hasher::Sha512(hasher), Checksum::Sha512(digest)) => {
-                base64::engine::general_purpose::STANDARD.encode(hasher.finalize()) == *digest
             }
             (Hasher::Sha512(hasher), Checksum::Sha512Hex(hex)) => {
                 hex::encode(hasher.finalize()) == hex.to_ascii_lowercase()

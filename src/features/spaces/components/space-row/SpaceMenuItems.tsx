@@ -5,9 +5,11 @@ import {
   LogOut,
   Pencil,
   Plus,
+  ShieldCheck,
   Trash2,
   UserPlus,
   UsersRound,
+  Webhook,
 } from "lucide-react";
 import type { Space } from "../../api/dto/entities";
 import { switchSpaceWindow } from "@/features/app-windows";
@@ -21,6 +23,7 @@ import {
 } from "../../routes/default_space";
 import { useSpacesStore } from "../../list/use_spaces_store";
 import { SpaceAvatar } from "../SpaceAvatar";
+import { spaceCan } from "../../roles/use_space_roles";
 import type { SpaceDialog } from "./SpaceDialogs";
 
 export function SpaceMenuItems(props: {
@@ -74,16 +77,6 @@ export function SpaceMenuItems(props: {
     <>
       {spaceList}
       <MenuItem icon={<Plus />} label="New Space" onSelect={later(props.onCreate)} />
-      {space.role === "owner" && !space.is_default && (
-        <>
-          <DropdownMenuSeparator />
-          <MenuItem
-            icon={<UserPlus />}
-            label="Invite people"
-            onSelect={later(() => onDialog("invite"))}
-          />
-        </>
-      )}
       <DropdownMenuSeparator />
       <SpaceSettingsItems space={space} onDialog={onDialog} />
     </>
@@ -100,7 +93,24 @@ export function SpaceSettingsItems(props: {
   const later = (run: () => void) => () => window.setTimeout(run, 0);
   return (
     <>
+      {!space.is_default && spaceCan(space, "space.invite") && (
+        <MenuItem
+          icon={<UserPlus />}
+          label="Invite people"
+          onSelect={later(() => onDialog("invite"))}
+        />
+      )}
       <MenuItem icon={<UsersRound />} label="People" onSelect={later(() => onDialog("members"))} />
+      {!space.is_default && spaceCan(space, "roles.manage") && (
+        <MenuItem icon={<ShieldCheck />} label="Roles" onSelect={later(() => onDialog("roles"))} />
+      )}
+      {!space.is_default && spaceCan(space, "integrations.manage") && (
+        <MenuItem
+          icon={<Webhook />}
+          label="Integrations"
+          onSelect={later(() => onDialog("integrations"))}
+        />
+      )}
       <MenuItem
         icon={<FolderOpen />}
         label="Shared folders"

@@ -28,7 +28,7 @@ export function AgentConversationTranscript({
       <>
         <AgentConversationView {...view} />
         {plan && (
-          <div className="mx-auto max-w-209 px-6 pb-5">
+          <div className="px-4 pb-5">
             <AgentPlanCard
               plan={plan}
               history={planHistory}

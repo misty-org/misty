@@ -1,6 +1,7 @@
 import { useUserStore } from "@/features/account/core";
 import { invoke } from "@/native";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { forgetAppAgents } from "./app_agents";
 import {
   createScreenChannel,
   noteRunningApp,
@@ -252,6 +253,7 @@ export function useRunningApp(options: {
     return () => {
       alive = false;
       leave();
+      if (session) forgetAppAgents(session);
       if (session) void invoke("space_app_session_close", { session }).catch(() => {});
     };
   }, [spaceId, appId, version, approvedKey, url, sha256, wrapKey, siteKey, attempt]);

@@ -65,8 +65,6 @@ export function windowName(window: LimitWindow): string {
 const engineNames: Record<string, string> = {
   claude: "Claude Code",
   codex: "Codex",
-  pi: "Pi",
-  omp: "Oh My Pi",
 };
 
 export const engineName = (engine: string) => engineNames[engine] ?? engine;

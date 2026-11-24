@@ -322,7 +322,7 @@ export function EngineProgramSection({ engine }: { engine: EngineId }) {
     <Section title="Program">
       {settings ? (
         <>
-          {engine !== "codex" && engine !== "dsh" ? (
+          {engine !== "codex" ? (
             <ProgramPathRow engine={engine} settings={settings} save={save} />
           ) : null}
           {engine === "codex" ? <CodexHomeRow settings={settings} save={save} /> : null}
@@ -338,7 +338,7 @@ export function EngineProgramSection({ engine }: { engine: EngineId }) {
       ) : (
         <DesktopSettingsRowSkeleton
           label="Reading the engine's settings"
-          rows={engine === "dsh" ? 1 : 2}
+          rows={2}
           control="button"
         />
       )}

@@ -5,6 +5,7 @@ import { type AppTab } from "@/app/shell";
 import {
   AccountClosingNotice,
   AccountSuspendedNotice,
+  DeviceApprovalDialog,
   ServerAlertsNotice,
   openSignInSheet,
   SignInSheet,
@@ -236,6 +237,7 @@ export function DesktopLayout(props: { getRouteId: (pathname: string) => AppTab 
       <FramePacingOverlay enabled={!isAuthRoute && framePacingOverlayEnabled} />
       <SignInSheet />
       {!isAuthRoute && user ? <SignOutSheet /> : null}
+      {!isAuthRoute && user ? <DeviceApprovalDialog /> : null}
       <AccountSuspendedNotice />
       <AccountClosingNotice />
       {!isAuthRoute && user ? <ServerAlertsNotice /> : null}

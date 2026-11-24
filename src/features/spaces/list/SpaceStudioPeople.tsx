@@ -58,7 +58,7 @@ function StudioPeople({ spaceId }: { spaceId: string }) {
     for (const person of people) {
       if (person.userId in faces) continue;
       const version = members.find((member) => member.user_id === person.userId)?.avatar_version;
-      void memberPicture(spaceId, person.userId, version ?? 0).then((url) => {
+      void memberPicture(person.userId, version ?? 0).then((url) => {
         if (live) setFaces((known) => ({ ...known, [person.userId]: url }));
       });
     }

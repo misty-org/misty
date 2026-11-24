@@ -1,5 +1,10 @@
-import type { SpaceInvitation, SpaceMember } from "./dto/entities";
+import type { SpaceIntegrationMember, SpaceInvitation, SpaceMember } from "./dto/entities";
 import type { SpaceRequest } from "./space_request_types";
+
+export interface SpaceMembersList {
+  members: SpaceMember[];
+  integrations?: SpaceIntegrationMember[];
+}
 
 type ProtectedBlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
 
@@ -11,12 +16,12 @@ export function createSpaceMembersApi(
     `/spaces/${encodeURIComponent(spaceId)}/members/${encodeURIComponent(userId)}`;
 
   return {
-    members: (spaceId: string, onCached?: (value: { members: SpaceMember[] }) => void) =>
-      request<{ members: SpaceMember[] }>(`/spaces/${encodeURIComponent(spaceId)}/members`, {
+    members: (spaceId: string, onCached?: (value: SpaceMembersList) => void) =>
+      request<SpaceMembersList>(`/spaces/${encodeURIComponent(spaceId)}/members`, {
         onCached,
       }),
-    memberAvatar: (spaceId: string, userId: string) =>
-      fetchProtectedBlob(`${memberPath(spaceId, userId)}/avatar`),
+    personAvatar: (userId: string) =>
+      fetchProtectedBlob(`/people/${encodeURIComponent(userId)}/avatar`),
     invite: (spaceId: string, email: string) =>
       request<SpaceInvitation>(`/spaces/${encodeURIComponent(spaceId)}/invitations`, {
         method: "POST",

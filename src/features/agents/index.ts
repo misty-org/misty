@@ -164,9 +164,10 @@ export {
 export { provideExploreApps } from "./marketplace/explore_apps";
 
 export { filesPage } from "./methods/AgentWorkspaceFrame";
-export { tryEveryEngine } from "./threads/engine_test";
 export { threadClashes, type ThreadClashes } from "./threads/thread_work";
 export { openAgentThread } from "./tutor/cursor/tutor_handoff";
 export { SharedThreadsSync } from "./threads/SharedThreadsSync";
 export { useThreadWork, watchThreadWork } from "./threads/thread_work";
+export { useOthersThreads } from "./threads/agent_threads";
+export type { SharedThread } from "./threads/shared_threads";
 export { homeSpaceOf } from "./personal/agent_home_space";

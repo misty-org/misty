@@ -1,0 +1,443 @@
+// Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/grok_acp.rs.
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+use serde_json::{json, Map, Value};
+use tokio::process::Command;
+
+use super::acp_session::{
+    session_update_from_notification, spawn_piped_acp, teardown, AcpLine, AcpProcess, AcpUpdate,
+    KILL_POLL, PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT,
+};
+use super::{BuiltCommand, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
+
+#[derive(Default)]
+struct TurnView {
+    last_usage: Option<Value>,
+    tool_names: HashMap<String, String>,
+    subagents: Option<super::agy::Subagents>,
+}
+
+fn follow_subagents(
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    now: bool,
+) -> bool {
+    let events = view
+        .subagents
+        .as_mut()
+        .map(|subagents| subagents.poll(now))
+        .unwrap_or_default();
+    let moved = !events.is_empty();
+    for event in events {
+        core.dispatch_event(state, event);
+    }
+    moved
+}
+
+pub(super) async fn run_acp_turn(
+    core: TurnCore,
+    req: SendRequest,
+    built: BuiltCommand,
+    killed: Arc<AtomicBool>,
+    virtual_pid: u32,
+) {
+    let BuiltCommand {
+        mut command,
+        cleanup_files,
+        ..
+    } = built;
+    let mut state = TurnState::new(req.session_id.clone());
+    let mut view = TurnView::default();
+    let preassigned_session_id = req.session_id.clone();
+    let _registry_guard =
+        VirtualRunGuard::new(Arc::clone(&core.registry), core.run_id.clone(), virtual_pid);
+    let mut cleanup_files = cleanup_files;
+    let result = turn_inner(
+        &core,
+        &mut state,
+        &mut view,
+        &req,
+        &mut command,
+        &killed,
+        &mut cleanup_files,
+    )
+    .await;
+    let parked_keys = [
+        state.native_session_id.clone(),
+        Some(core.run_id.clone()),
+        preassigned_session_id.clone(),
+    ];
+    settle_parked(&core, &mut state, parked_keys);
+    if let Err(error) = result {
+        if !killed.load(Ordering::SeqCst) {
+            core.dispatch_event(&mut state, EngineEvent::Error(error));
+        }
+    }
+    if !state.saw_done && !state.saw_error {
+        let usage = if killed.load(Ordering::SeqCst) {
+            None
+        } else {
+            view.last_usage.clone()
+        };
+        let session_id = state.native_session_id.clone();
+        core.dispatch_event(&mut state, EngineEvent::Done { session_id, usage });
+    }
+    core.registry.remove_if_pid(&core.run_id, virtual_pid);
+    if let Some(session_id) = state.native_session_id.clone() {
+        core.registry.remove_if_pid(&session_id, virtual_pid);
+    }
+    if let Some(session_id) = preassigned_session_id {
+        core.registry.remove_if_pid(&session_id, virtual_pid);
+    }
+    core.sink.flush();
+    super::cleanup_staged_files(&cleanup_files);
+}
+
+fn settle_parked(core: &TurnCore, state: &mut TurnState, keys: [Option<String>; 3]) {
+    for key in keys.into_iter().flatten() {
+        for request_id in core.registry.take_questions(&key) {
+            core.dispatch_event(state, EngineEvent::QuestionSettled { request_id });
+        }
+        super::reader::expire_parked_plans(core, state, &key);
+    }
+}
+
+async fn turn_inner(
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    req: &SendRequest,
+    command: &mut Command,
+    killed: &Arc<AtomicBool>,
+    cleanup_files: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    let fingerprint = super::warm::claim(&core.run_id);
+    let mut warm = match super::warm::take_acp(core, req, fingerprint) {
+        Some(warm) => warm,
+        None => {
+            let mut spawned = spawn_piped_acp(command, &core.engine_id, &req.workspace)?;
+            spawned.acp.reports_as = Some(core.engine_id.clone());
+            core.registry
+                .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
+            let (session_id, effort) = match handshake(&mut spawned.acp, req, killed).await {
+                Ok(opened) => opened,
+                Err(error) => {
+                    teardown(&mut spawned.child).await;
+                    return Err(terminal_message(error, &spawned.stderr_buf));
+                }
+            };
+            super::warm::Warm {
+                item: super::warm::WarmAcp {
+                    spawned,
+                    session_id,
+                    effort,
+                },
+                token: None,
+                cleanup: std::mem::take(cleanup_files),
+            }
+        }
+    };
+    let session_id = warm.item.session_id.clone();
+    let effort = warm.item.effort.clone();
+    let result = prompt(
+        &mut warm.item.spawned.acp,
+        core,
+        state,
+        view,
+        req,
+        killed,
+        &session_id,
+        effort,
+    )
+    .await
+    .map_err(|error| terminal_message(error, &warm.item.spawned.stderr_buf));
+    let clean = result.is_ok() && !killed.load(Ordering::SeqCst);
+    super::warm::park_acp(core, req, fingerprint, clean, warm);
+    result
+}
+
+async fn handshake(
+    acp: &mut AcpProcess,
+    req: &SendRequest,
+    killed: &AtomicBool,
+) -> Result<(String, Option<String>), String> {
+    let agent = acp
+        .routed(
+            "initialize",
+            super::agy::initialization(),
+            RPC_HANDSHAKE_TIMEOUT,
+            killed,
+            None,
+            &mut |_| None,
+        )
+        .await?;
+    let agent = super::agy::mcp_capable(&agent);
+    let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
+    super::agy::attach_session(acp, req, servers, killed).await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn prompt(
+    acp: &mut AcpProcess,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    req: &SendRequest,
+    killed: &AtomicBool,
+    session_id: &str,
+    effort: Option<String>,
+) -> Result<(), String> {
+    let gate = crate::engines::gate::AcpGate::of(core, req);
+    if let Some(effort) = effort {
+        core.dispatch_event(state, EngineEvent::Effort(effort));
+    }
+    core.dispatch_event(state, EngineEvent::SessionId(session_id.to_string()));
+    view.subagents = Some(super::agy::Subagents::of(session_id));
+    let blocks = prompt_blocks(&req.prompt, &req.images, &req.workspace)?;
+    let workspace = req.workspace.clone();
+    let result = {
+        let mut router = |line: &AcpLine| route(core, state, view, &gate, &workspace, line);
+        acp.routed(
+            "session/prompt",
+            json!({ "sessionId": session_id, "prompt": blocks }),
+            PROMPT_TIMEOUT,
+            killed,
+            Some(session_id),
+            &mut router,
+        )
+        .await?
+    };
+    follow_on(acp, core, state, view, &gate, &workspace, killed).await;
+    if let Some(usage) = prompt_usage(&result) {
+        view.last_usage = Some(usage.clone());
+        core.dispatch_event(state, EngineEvent::Usage(usage));
+    }
+    Ok(())
+}
+
+fn route(
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    gate: &crate::engines::gate::AcpGate,
+    workspace: &Path,
+    line: &AcpLine,
+) -> Option<Value> {
+    follow_subagents(core, state, view, false);
+    match line {
+        AcpLine::Notification { method, params } if method == "session/update" => {
+            let followed = view
+                .subagents
+                .as_mut()
+                .and_then(|subagents| subagents.update(params));
+            let params = followed.as_ref().unwrap_or(params);
+            if let Some(usage) = usage_update(params) {
+                view.last_usage = Some(usage.clone());
+                core.dispatch_event(state, EngineEvent::Usage(usage));
+            }
+            super::agy::report_session_state(core, state, params);
+            handle_session_update(core, state, view, params);
+            None
+        }
+        AcpLine::AgentRequest { id, method, params } if method == "elicitation/create" => {
+            super::agy::park_question(core, state, id, params)
+        }
+        AcpLine::AgentRequest { id, method, params } => {
+            crate::engines::gate::acp_agent_request(Some(gate), workspace, id, method, params)
+        }
+        _ => None,
+    }
+}
+
+async fn follow_on(
+    acp: &mut AcpProcess,
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    gate: &crate::engines::gate::AcpGate,
+    workspace: &Path,
+    killed: &AtomicBool,
+) {
+    let mut heard = Instant::now();
+    loop {
+        if follow_subagents(core, state, view, false) {
+            heard = Instant::now();
+        }
+        let Some(subagents) = view.subagents.as_ref().filter(|s| s.started_any()) else {
+            return;
+        };
+        if killed.load(Ordering::SeqCst) || heard.elapsed() >= subagents.quiet_after() {
+            return;
+        }
+        let mut router = |line: &AcpLine| route(core, state, view, gate, workspace, line);
+        match acp.listen(KILL_POLL, &mut router).await {
+            Ok(true) => heard = Instant::now(),
+            Ok(false) => {}
+            Err(_) => return,
+        }
+    }
+}
+
+fn usage_update(params: &Value) -> Option<Value> {
+    let update = &params["update"];
+    if update["sessionUpdate"] != "usage_update" {
+        return None;
+    }
+    let used = update["used"].as_u64()?;
+    let mut usage = json!({ "input_tokens": used });
+    if used > 0 {
+        usage["used"] = json!(used);
+    }
+    if let Some(size) = update["size"].as_u64() {
+        usage["model_context_window"] = json!(size);
+    }
+    Some(usage)
+}
+
+fn prompt_blocks(text: &str, images: &[String], workspace: &Path) -> Result<Vec<Value>, String> {
+    let mut blocks = vec![json!({ "type": "text", "text": text })];
+    for raw in images {
+        let (mime, base64) = super::images::load_image(raw, workspace)?;
+        blocks.push(json!({
+            "type": "image",
+            "data": base64,
+            "mimeType": mime,
+        }));
+    }
+    Ok(blocks)
+}
+
+fn handle_session_update(
+    core: &TurnCore,
+    state: &mut TurnState,
+    view: &mut TurnView,
+    params: &Value,
+) {
+    match session_update_from_notification(params) {
+        AcpUpdate::AgentMessageChunk { text } => {
+            core.dispatch_event(state, EngineEvent::Delta(text));
+        }
+        AcpUpdate::AgentThoughtChunk { text } => {
+            core.dispatch_event(state, EngineEvent::Thinking(text));
+        }
+        AcpUpdate::ToolStarted {
+            tool_id,
+            tool_name,
+            input,
+        } => {
+            let id = view.subagents.is_some().then_some(tool_id.as_str());
+            let event = super::tool_call_message_with_id(tool_name.clone(), input.as_ref(), id);
+            view.tool_names.insert(tool_id, tool_name);
+            core.dispatch_event(state, event);
+        }
+        AcpUpdate::ToolCompleted {
+            tool_id,
+            tool_name,
+            output,
+            error,
+        } => {
+            let name = tool_name
+                .or_else(|| view.tool_names.get(&tool_id).cloned())
+                .unwrap_or_else(|| "tool".to_string());
+            let result = match (output, error) {
+                (Some(output), _) => output,
+                (None, Some(error)) => json!({ "text": error, "isError": true }),
+                (None, None) => Value::Null,
+            };
+            let id = view.subagents.is_some().then_some(tool_id.as_str());
+            core.dispatch_event(
+                state,
+                super::tool_result_patch_with_id(name, Some(&result), id),
+            );
+        }
+        AcpUpdate::Ignore => {}
+    }
+}
+
+pub(super) fn answer_frame(parked: &Value, answers: Option<&Value>) -> Result<Value, String> {
+    let id = parked
+        .get("rpcId")
+        .filter(|id| !id.is_null())
+        .ok_or_else(|| "the question's answer context is missing the request id".to_string())?;
+    let fields = parked
+        .get("agyForm")
+        .ok_or_else(|| "the question's answer context is missing its form".to_string())?;
+    super::agy::answer_frame(id, fields, answers)
+}
+
+fn prompt_usage(result: &Value) -> Option<Value> {
+    if let Some(usage) = turn_usage(result) {
+        return Some(usage);
+    }
+    let meta = result.get("_meta").filter(|meta| meta.is_object())?;
+    let input = meta.get("inputTokens").and_then(Value::as_u64);
+    let output = meta.get("outputTokens").and_then(Value::as_u64);
+    let total = match meta.get("totalTokens").and_then(Value::as_u64) {
+        Some(total) => total,
+        None => input? + output?,
+    };
+    let mut usage = Map::new();
+    usage.insert("totalTokens".to_string(), json!(total));
+    if let Some(input) = input {
+        usage.insert("inputTokens".to_string(), json!(input));
+    }
+    if let Some(output) = output {
+        usage.insert("outputTokens".to_string(), json!(output));
+    }
+    if let Some(cached) = meta.get("cachedReadTokens").and_then(Value::as_u64) {
+        usage.insert("cacheRead".to_string(), json!(cached));
+    }
+    Some(Value::Object(usage))
+}
+
+fn turn_usage(result: &Value) -> Option<Value> {
+    let usage = result.get("usage").filter(|usage| usage.is_object())?;
+    let number = |name: &str| usage.get(name).and_then(Value::as_u64);
+    let cached = number("cachedReadTokens");
+    let mut out = Map::new();
+    if let Some(input) = number("inputTokens") {
+        out.insert(
+            "inputTokens".to_string(),
+            json!(input.saturating_sub(cached.unwrap_or(0))),
+        );
+    }
+    if let Some(cached) = cached {
+        out.insert("cacheRead".to_string(), json!(cached));
+    }
+    if let Some(output) = number("outputTokens") {
+        out.insert("outputTokens".to_string(), json!(output));
+    }
+    if let Some(thought) = number("thoughtTokens") {
+        out.insert("thoughtTokens".to_string(), json!(thought));
+    }
+    (!out.is_empty()).then_some(Value::Object(out))
+}
+
+fn terminal_message(raw: String, stderr_buf: &Arc<Mutex<String>>) -> String {
+    let bare = raw
+        .strip_prefix("rpc:")
+        .and_then(|rest| rest.split_once(':'))
+        .map(|(_, message)| message.trim())
+        .filter(|message| !message.is_empty());
+    if let Some(message) = bare {
+        return message.to_string();
+    }
+    let stderr_tail = stderr_buf
+        .lock()
+        .map(|tail| tail.trim().to_string())
+        .unwrap_or_default();
+    if !stderr_tail.is_empty() {
+        return stderr_tail;
+    }
+    raw
+}
+
+#[cfg(test)]
+#[path = "acp_turn_tests.rs"]
+mod tests;

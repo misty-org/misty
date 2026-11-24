@@ -55,6 +55,10 @@ export function agentChatRoute(agentId: string, conversationId?: string, fresh =
   return `/agents?${params}`;
 }
 
+export function agentSharedThreadRoute(agentId: string, threadId: string) {
+  return `/agents?${new URLSearchParams({ agent: agentId, thread: threadId })}`;
+}
+
 export function newChatRoute() {
   const { agents, selected } = usePersonalAgentsStore.getState();
   const agent =

@@ -142,6 +142,15 @@ impl AccountClient {
         let access = tokens.as_ref()?.access.as_ref()?;
         Some(format!("Bearer {}", access.as_str()))
     }
+    pub(super) fn access_token(&self, url: &url::Url, lasting: Duration) -> Option<String> {
+        let tokens = self.tokens.lock().ok()?;
+        let tokens = tokens
+            .as_ref()
+            .filter(|tokens| tokens.origin == url.origin().ascii_serialization())?;
+        let access = tokens.access.as_ref()?;
+        let (_, expiry) = identity(access, "access").ok()?;
+        (expiry > now().saturating_add(lasting.as_secs())).then(|| access.to_string())
+    }
     pub(super) fn refresh_header(&self, url: &url::Url) -> Option<String> {
         let tokens = self.tokens.lock().ok()?;
         let tokens = tokens

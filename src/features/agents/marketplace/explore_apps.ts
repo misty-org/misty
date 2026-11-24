@@ -13,7 +13,6 @@ export interface ExploreCatalogApp {
 export interface ExploreAppUpdate {
   app: ExploreCatalogApp;
   from: string;
-  source?: unknown;
 }
 
 export interface ExploreAppUpdates {
@@ -25,7 +24,6 @@ export interface ExploreAppUpdates {
     appId: string,
     version: string,
     permissions: string[],
-    source?: unknown,
   ): Promise<unknown>;
 }
 

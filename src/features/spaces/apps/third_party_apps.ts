@@ -68,23 +68,8 @@ export function catalogSource(app: CatalogApp) {
   };
 }
 
-export type ManifestFrom = "reviewed" | "maker" | "basic";
-
-export interface AppSource {
-  repo: string;
-  listed: boolean;
-  manifest_from: ManifestFrom;
-  entry: CatalogApp;
-}
-
-export type ResolvedLink =
-  ({ result: "app" } & AppSource) | { result: "incompatible"; repo: string; reason: string };
-
-export function appEntry(app: {
-  app_id: string;
-  source?: AppSource | null;
-}): CatalogApp | undefined {
-  return registryApps().find((entry) => entry.id === app.app_id) ?? app.source?.entry ?? undefined;
+export function appEntry(app: { app_id: string }): CatalogApp | undefined {
+  return registryApps().find((entry) => entry.id === app.app_id);
 }
 
 export const isSiteApp = (entry: CatalogApp): boolean => entry.kind === "site";
@@ -118,20 +103,4 @@ export function siteHost(entry: CatalogApp): string {
   } catch {
     return "";
   }
-}
-
-export function appHosts(entry: CatalogApp): { host: string; paid: boolean }[] {
-  const network = entry.manifest.network;
-  return Array.isArray(network)
-    ? network.flatMap((item) =>
-        item && typeof item === "object" && typeof (item as { host?: unknown }).host === "string"
-          ? [
-              {
-                host: (item as { host: string }).host,
-                paid: (item as { paid?: unknown }).paid === true,
-              },
-            ]
-          : [],
-      )
-    : [];
 }

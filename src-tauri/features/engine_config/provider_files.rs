@@ -9,9 +9,6 @@
 //
 // desktop-cc-gui also carries a one-time migration that restores files its older versions wrote
 // for a channel. Misty never wrote them, so that migration is not ported.
-//
-// OpenCode and Qoder keep their native configuration and sign-in; these engines declare no
-// official files here.
 
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -30,13 +27,6 @@ pub(crate) fn targets(engine: &str) -> Vec<Target> {
     match engine {
         "claude" => vec![target(support::claude_home().join("settings.json"))],
         "codex" => vec![target(support::codex_home().join("config.toml"))],
-        "kimi" => vec![target(
-            home(Some("KIMI_CODE_HOME"), ".kimi-code").join("config.toml"),
-        )],
-        "grok" => vec![target(home(Some("GROK_HOME"), ".grok").join("config.toml"))],
-        "codebuddy" => vec![target(
-            home(Some("CODEBUDDY_CONFIG_DIR"), ".codebuddy").join("settings.json"),
-        )],
         "agy" => vec![target(
             home(Some("ANTIGRAVITY_HOME"), ".gemini/antigravity-cli").join("settings.json"),
         )],
@@ -226,35 +216,10 @@ pub(crate) fn env_mapping(engine: &str) -> [(&'static str, &'static str); 3] {
             ("apiKey", "ANTHROPIC_AUTH_TOKEN"),
             ("model", "ANTHROPIC_MODEL"),
         ],
-        "kimi" => [
-            ("baseUrl", "KIMI_BASE_URL"),
-            ("apiKey", "KIMI_API_KEY"),
-            ("model", "KIMI_MODEL_NAME"),
-        ],
-        "grok" => [
-            ("baseUrl", "GROK_BASE_URL"),
-            ("apiKey", "GROK_API_KEY"),
-            ("model", "GROK_MODEL"),
-        ],
         "codex" => [
             ("baseUrl", "OPENAI_BASE_URL"),
             ("apiKey", "OPENAI_API_KEY"),
             ("model", ""),
-        ],
-        "codebuddy" => [
-            ("baseUrl", "CODEBUDDY_BASE_URL"),
-            ("apiKey", "CODEBUDDY_API_KEY"),
-            ("model", "CODEBUDDY_MODEL"),
-        ],
-        "gemini" => [
-            ("baseUrl", "GOOGLE_GEMINI_BASE_URL"),
-            ("apiKey", "GEMINI_API_KEY"),
-            ("model", "GEMINI_MODEL"),
-        ],
-        "qwen" => [
-            ("baseUrl", "OPENAI_BASE_URL"),
-            ("apiKey", "OPENAI_API_KEY"),
-            ("model", "OPENAI_MODEL"),
         ],
         _ => [("baseUrl", ""), ("apiKey", ""), ("model", "")],
     }
@@ -338,58 +303,7 @@ pub(crate) fn channel_env(
             out.insert("OPENAI_API_KEY".to_string(), key);
         }
     }
-    if engine == "grok" {
-        if let Some(base) = out.remove("GROK_BASE_URL") {
-            let base = base.trim_end_matches('/');
-            for key in [
-                "GROK_MODELS_BASE_URL",
-                "GROK_XAI_API_BASE_URL",
-                "GROK_CLI_CHAT_PROXY_BASE_URL",
-            ] {
-                out.entry(key.into()).or_insert_with(|| base.to_string());
-            }
-            out.entry("GROK_MODELS_LIST_URL".into())
-                .or_insert_with(|| format!("{base}/models"));
-        }
-        if let Some(key) = out.remove("GROK_API_KEY") {
-            out.entry("XAI_API_KEY".into()).or_insert(key);
-        }
-    }
-    if engine == "codebuddy" && !seen.contains("CODEBUDDY_INTERNET_ENVIRONMENT") {
-        if let Some(edition) = out
-            .get("CODEBUDDY_BASE_URL")
-            .and_then(|base| codebuddy_edition_for(base))
-        {
-            out.insert(
-                "CODEBUDDY_INTERNET_ENVIRONMENT".to_string(),
-                edition.to_string(),
-            );
-        }
-    }
     Ok(out)
-}
-
-fn codebuddy_edition_for(base_url: &str) -> Option<&'static str> {
-    let rest = base_url
-        .split_once("://")
-        .map_or(base_url, |(scheme, rest)| {
-            if scheme.is_empty() || scheme.contains(['/', '?', '#']) {
-                base_url
-            } else {
-                rest
-            }
-        });
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or(rest);
-    let host_port = authority.rsplit('@').next().unwrap_or(authority);
-    let host = host_port
-        .split_once(':')
-        .map(|(host, _)| host)
-        .unwrap_or(host_port);
-    match host.to_ascii_lowercase().as_str() {
-        "tencent.sso.copilot.tencent.com" => Some("ioa"),
-        "copilot.tencent.com" => Some("internal"),
-        _ => None,
-    }
 }
 
 pub(crate) fn codex_api_key(provider: &Value) -> Option<String> {
@@ -436,35 +350,6 @@ pub(crate) fn safe_provider_probe_config(
 mod tests {
     #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
     use super::*;
-
-    #[test]
-    fn grok_channel_injects_native_endpoint_and_auth_names() {
-        let p = serde_json::json!({"env": {
-            "GROK_BASE_URL": "https://relay.example/v1/",
-            "GROK_API_KEY": "dummy-key"
-        }});
-        let env = channel_env("grok", &p).unwrap();
-        for key in [
-            "GROK_MODELS_BASE_URL",
-            "GROK_XAI_API_BASE_URL",
-            "GROK_CLI_CHAT_PROXY_BASE_URL",
-        ] {
-            assert_eq!(
-                env.get(key).map(String::as_str),
-                Some("https://relay.example/v1")
-            );
-        }
-        assert_eq!(
-            env.get("GROK_MODELS_LIST_URL").map(String::as_str),
-            Some("https://relay.example/v1/models")
-        );
-        assert_eq!(
-            env.get("XAI_API_KEY").map(String::as_str),
-            Some("dummy-key")
-        );
-        assert!(!env.contains_key("GROK_API_KEY"));
-        assert!(!env.contains_key("GROK_BASE_URL"));
-    }
 
     #[test]
     fn channel_env_raw_wins_convention_and_refuses_blocked_keys() {
@@ -527,49 +412,6 @@ mod tests {
     }
 
     #[test]
-    fn channel_env_codebuddy_derives_internet_environment() {
-        let edition = |base: &str, extra: Option<&str>| {
-            let mut p = serde_json::json!({ "baseUrl": base, "apiKey": "sk" });
-            if let Some(value) = extra {
-                p["env"] = serde_json::json!({ "CODEBUDDY_INTERNET_ENVIRONMENT": value });
-            }
-            channel_env("codebuddy", &p)
-                .unwrap()
-                .get("CODEBUDDY_INTERNET_ENVIRONMENT")
-                .cloned()
-        };
-        assert_eq!(
-            edition("https://copilot.tencent.com/v1", None).as_deref(),
-            Some("internal")
-        );
-        assert_eq!(
-            edition("https://tencent.sso.copilot.tencent.com/v1", None).as_deref(),
-            Some("ioa")
-        );
-        assert_eq!(
-            edition("https://copilot.tencent.com/v1", Some("cloudhosted")).as_deref(),
-            Some("cloudhosted")
-        );
-        assert_eq!(edition("https://selfhosted.example.com", None), None);
-        for base in [
-            "https://copilot.tencent.com.example.org/v1",
-            "copilot.tencent.com.example.org/v1",
-            "https://gateway.corp/https://copilot.tencent.com/v1",
-            "gateway.corp/https://copilot.tencent.com/v1",
-        ] {
-            assert_eq!(edition(base, None), None, "{base}");
-        }
-        assert_eq!(
-            edition("https://copilot.tencent.com:8443/v1", None).as_deref(),
-            Some("internal")
-        );
-        assert_eq!(
-            edition("copilot.tencent.com/v1", None).as_deref(),
-            Some("internal")
-        );
-    }
-
-    #[test]
     fn validate_official_rejects_malformed_content() {
         let json_target = Target {
             path: PathBuf::from("/tmp/settings.json"),
@@ -592,21 +434,24 @@ mod tests {
         let paths = provider_file_paths("codex");
         assert_eq!(paths.len(), 1);
         assert!(paths[0].ends_with("config.toml"));
-        assert!(provider_file_paths("opencode").is_empty());
+        assert!(provider_file_paths("misty").is_empty());
         let _ = std::fs::remove_dir_all(&scratch);
     }
 
     #[test]
-    fn codebuddy_native_settings_are_editable_and_backed_up() {
+    fn agy_native_settings_are_editable_and_backed_up() {
         let scratch = std::env::temp_dir().join(format!("misty-pf-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&scratch).unwrap();
         let _home = support::TestHome::set(&scratch);
-        let path = scratch.join(".codebuddy").join("settings.json");
+        let path = scratch
+            .join(".gemini")
+            .join("antigravity-cli")
+            .join("settings.json");
         assert_eq!(
-            provider_file_paths("codebuddy"),
+            provider_file_paths("agy"),
             vec![path.to_string_lossy().into_owned()]
         );
-        let missing = official_config_read("codebuddy").unwrap();
+        let missing = official_config_read("agy").unwrap();
         assert_eq!(missing.len(), 1);
         assert_eq!(missing[0].format, "json");
         assert!(!missing[0].exists);
@@ -617,25 +462,25 @@ mod tests {
             path: path.to_string_lossy().into_owned(),
             content: content.into(),
         };
-        official_config_write("codebuddy", vec![draft(first)]).unwrap();
+        official_config_write("agy", vec![draft(first)]).unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), first);
-        official_config_write("codebuddy", vec![draft(r#"{"model":"next"}"#)]).unwrap();
+        official_config_write("agy", vec![draft(r#"{"model":"next"}"#)]).unwrap();
         let backups: Vec<_> =
-            std::fs::read_dir(scratch.join(".misty/engine-config/provider-backups/codebuddy"))
+            std::fs::read_dir(scratch.join(".misty/engine-config/provider-backups/agy"))
                 .unwrap()
                 .flatten()
                 .map(|entry| std::fs::read_to_string(entry.path()).unwrap())
                 .collect();
         assert_eq!(backups, vec![first.to_string()]);
         assert!(official_config_write(
-            "codebuddy",
+            "agy",
             vec![OfficialConfigDraft {
                 path: scratch.join("other.json").to_string_lossy().into_owned(),
                 content: "{}".into(),
             }]
         )
         .is_err());
-        assert!(official_config_write("codebuddy", vec![draft("[]")]).is_err());
+        assert!(official_config_write("agy", vec![draft("[]")]).is_err());
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
             r#"{"model":"next"}"#

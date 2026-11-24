@@ -21,7 +21,7 @@ export function EngineNextStep({
   state: EngineSetupState;
 }) {
   const flow = useCliUpdateFlow(engine);
-  const [signingIn, setSigningIn] = useState<{ provider?: string } | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
   const name = ENGINE_NAMES[engine] ?? engine;
   return (
     <>
@@ -47,13 +47,13 @@ export function EngineNextStep({
           Get it
         </Button>
       ) : state === "sign-in" ? (
-        <SignInButton engine={engine} label={`Sign in to ${name}`} onSignIn={setSigningIn} />
+        <SignInButton label={`Sign in to ${name}`} onSignIn={() => setSigningIn(true)} />
       ) : null}
       <CliUpdateDialog engine={engine} flow={flow} plain />
       <SignInDialog
-        request={signingIn ? { engine, ...signingIn } : null}
+        request={signingIn ? { engine } : null}
         onClose={() => {
-          setSigningIn(null);
+          setSigningIn(false);
           view.refresh();
         }}
       />

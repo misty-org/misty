@@ -3,9 +3,8 @@
 
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
-use super::read::{read_dsh_profile, read_json_source, read_toml_source};
-use super::write::{set_json_enabled, write_enabled};
-use crate::engine_config::mcp::config::file_hash;
+use super::read::read_json_source;
+use super::write::write_enabled;
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -52,22 +51,20 @@ fn every_declared_source_is_registered_and_consistent() {
             assert!(!entry.readonly_reason_code.is_empty());
         }
     }
-    assert!(source("grok_user").writable);
-    assert!(!source("grok_project").writable);
 }
 
 #[test]
-fn kimi_json_entries_read_transport_state_and_redact_url() {
-    let scratch = Scratch::new("kimi");
-    let path = scratch.path().join("mcp.json");
+fn json_entries_read_transport_state_and_redact_url() {
+    let scratch = Scratch::new("agy-user");
+    let path = scratch.path().join("mcp_config.json");
     std::fs::write(
         &path,
         r#"{"mcpServers":{"alpha":{"command":"npx","args":["-y","pkg"],"env":{"API_KEY":"secret"}},
             "remote":{"url":"https://example.com/mcp?token=abc&x=1","headers":{"Authorization":"Bearer x"}},
-            "off":{"command":"uvx","enabled":false}}}"#,
+            "off":{"command":"uvx","disabled":true}}}"#,
     )
     .unwrap();
-    let entries = read_json_source(source("kimi_user"), &path).unwrap();
+    let entries = read_json_source(source("agy_user"), &path).unwrap();
     assert_eq!(entries.len(), 3);
     let alpha = entries.iter().find(|entry| entry.name == "alpha").unwrap();
     assert!(alpha.enabled);
@@ -89,7 +86,7 @@ fn kimi_json_entries_read_transport_state_and_redact_url() {
 }
 
 #[test]
-fn agy_and_qoder_use_inverted_disabled_flag() {
+fn agy_uses_inverted_disabled_flag() {
     let scratch = Scratch::new("agy");
     let path = scratch.path().join("mcp_config.json");
     std::fs::write(
@@ -117,235 +114,33 @@ fn agy_and_qoder_use_inverted_disabled_flag() {
 }
 
 #[test]
-fn opencode_command_array_becomes_command_plus_args() {
-    let scratch = Scratch::new("opencode");
-    let path = scratch.path().join("opencode.json");
-    std::fs::write(
-        &path,
-        r#"{"mcp":{"web":{"type":"remote","url":"https://mcp.exa.ai/mcp","enabled":false},
-            "local":{"type":"local","command":["npx","-y","pkg"],"environment":{"TOKEN":"x"}}}}"#,
-    )
-    .unwrap();
-    let entries = read_json_source(source("opencode_project"), &path).unwrap();
-    let local = entries.iter().find(|entry| entry.name == "local").unwrap();
-    assert_eq!(local.command.as_deref(), Some("npx"));
-    assert_eq!(local.args_count, 2);
-    assert_eq!(local.env_keys, vec!["TOKEN"]);
-    let web = entries.iter().find(|entry| entry.name == "web").unwrap();
-    assert!(!web.enabled);
-    assert_eq!(web.transport.as_deref(), Some("remote"));
-}
-
-#[test]
-fn opencode_toggle_writes_enabled_and_round_trips() {
-    let scratch = Scratch::new("opencode-write");
-    let path = scratch.path().join("opencode.json");
-    let original = "{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"mcp\": {\n    \"local\": {\n      \"type\": \"local\",\n      \"command\": [\"npx\"]\n    }\n  }\n}\n";
-    std::fs::write(&path, original).unwrap();
-    let version = file_hash(original.as_bytes());
-    set_json_enabled(source("opencode_project"), &path, "local", false, &version).unwrap();
-    let raw = std::fs::read_to_string(&path).unwrap();
-    assert!(raw.contains("\"$schema\""));
-    let entries = read_json_source(source("opencode_project"), &path).unwrap();
-    assert!(!entries[0].enabled);
-
-    let version = file_hash(raw.as_bytes());
-    set_json_enabled(source("opencode_project"), &path, "local", true, &version).unwrap();
-    assert!(read_json_source(source("opencode_project"), &path).unwrap()[0].enabled);
-
-    let error =
-        set_json_enabled(source("opencode_project"), &path, "local", false, "stale").unwrap_err();
-    assert_eq!(error.code, "conflict");
-    let raw = std::fs::read_to_string(&path).unwrap();
-    let version = file_hash(raw.as_bytes());
-    let error =
-        set_json_enabled(source("opencode_project"), &path, "ghost", false, &version).unwrap_err();
-    assert_eq!(error.code, "not_found");
-}
-
-#[test]
-fn omp_toggle_writes_the_enabled_field_and_round_trips() {
-    let scratch = Scratch::new("omp-write");
-    let path = scratch.path().join("mcp.json");
-    let original = "{\n  \"mcpServers\": {\n    \"rea\": {\n      \"command\": \"cmd.exe\",\n      \"args\": [\"/c\", \"rea\"]\n    }\n  }\n}\n";
-    std::fs::write(&path, original).unwrap();
-    assert!(source("omp_user").writable);
-    assert!(source("omp_project").writable);
-    set_json_enabled(
-        source("omp_user"),
-        &path,
-        "rea",
-        false,
-        &file_hash(original.as_bytes()),
-    )
-    .unwrap();
-    let raw = std::fs::read_to_string(&path).unwrap();
-    let entries = read_json_source(source("omp_user"), &path).unwrap();
-    assert!(!entries[0].enabled);
-    let written: serde_json::Value = serde_json::from_str(&raw).unwrap();
-    assert_eq!(
-        written["mcpServers"]["rea"]["enabled"],
-        serde_json::json!(false)
-    );
-    assert_eq!(written["mcpServers"]["rea"]["command"], "cmd.exe");
-    set_json_enabled(
-        source("omp_user"),
-        &path,
-        "rea",
-        true,
-        &file_hash(raw.as_bytes()),
-    )
-    .unwrap();
-    let entries = read_json_source(source("omp_user"), &path).unwrap();
-    assert!(entries[0].enabled);
-}
-
-#[test]
-fn grok_disabled_list_and_enabled_field_combine_for_both_scopes() {
-    let scratch = Scratch::new("grok");
-    let home = scratch.path().join("home");
-    std::fs::create_dir_all(home.join(".grok")).unwrap();
-    let _home = HomeGuard::new(&home);
-    let user_path = home.join(".grok").join("config.toml");
-    std::fs::write(
-        &user_path,
-        "disabled_mcp_servers = [\"beta\"]\n\n[mcp_servers.alpha]\ncommand = \"npx\"\n\n[mcp_servers.beta]\ncommand = \"uvx\"\nenabled = false\n",
-    )
-    .unwrap();
-    let entries = read_toml_source(source("grok_user"), &user_path).unwrap();
-    assert!(
-        entries
-            .iter()
-            .find(|entry| entry.name == "alpha")
-            .unwrap()
-            .enabled
-    );
-    assert!(
-        !entries
-            .iter()
-            .find(|entry| entry.name == "beta")
-            .unwrap()
-            .enabled
-    );
-    assert_eq!(entries[0].format, "toml");
-
-    let workspace = scratch.path().join("ws");
-    std::fs::create_dir_all(workspace.join(".grok")).unwrap();
-    let project_path = workspace.join(".grok").join("config.toml");
-    std::fs::write(
-        &project_path,
-        "[mcp_servers.beta]\nurl = \"https://x/mcp\"\n",
-    )
-    .unwrap();
-    let project = read_toml_source(source("grok_project"), &project_path).unwrap();
-    assert!(!project[0].enabled);
-    assert!(!source("grok_project").writable);
-}
-
-#[test]
-fn grok_toggle_updates_field_and_keeps_comments() {
-    let scratch = Scratch::new("grok-write");
-    let home = scratch.path().join("home");
-    std::fs::create_dir_all(home.join(".grok")).unwrap();
-    let _home = HomeGuard::new(&home);
-    let path = home.join(".grok").join("config.toml");
-    let original = "# keep\n[mcp_servers.alpha]\ncommand = \"npx\"\n\n[other]\nvalue = 1\n";
-    std::fs::write(&path, original).unwrap();
-    let version = file_hash(original.as_bytes());
-    let entry = write_enabled("grok_user", "alpha", false, &version, None).unwrap();
-    assert!(!entry.enabled);
-    let raw = std::fs::read_to_string(&path).unwrap();
-    assert!(raw.contains("# keep"));
-    assert!(raw.contains("[other]"));
-    assert!(raw.contains("disabled_mcp_servers"));
-    assert!(raw.contains("enabled = false"));
-
-    let version = file_hash(raw.as_bytes());
-    let entry = write_enabled("grok_user", "alpha", true, &version, None).unwrap();
-    assert!(entry.enabled);
-    let raw = std::fs::read_to_string(&path).unwrap();
-    assert!(!raw.contains("disabled_mcp_servers"));
-    assert!(raw.contains("enabled = true"));
-}
-
-#[test]
 fn readonly_sources_refuse_writes() {
-    let error = write_enabled("kimi_user", "alpha", false, "", None).unwrap_err();
+    let error = write_enabled("agy_user", "alpha", false, "", None).unwrap_err();
     assert_eq!(error.code, "readonly");
-    let error = write_enabled("dsh_profile", "alpha", false, "", None).unwrap_err();
+    let error = write_enabled("agy_project", "alpha", false, "", None).unwrap_err();
     assert_eq!(error.code, "readonly");
-}
-
-#[test]
-fn dsh_profile_entries_come_from_plugin_instances() {
-    let scratch = Scratch::new("dsh");
-    let path = scratch.path().join("cordis.patch.yml");
-    std::fs::write(
-        &path,
-        "\
-- id: mcp-github
-  name: '@deepseek-ai/dsh-mcp-client'
-  config:
-    serverName: github
-    transport: stdio
-    command: npx
-    args: ['-y', '@modelcontextprotocol/server-github']
-    env:
-      GITHUB_TOKEN: x
-- id: other
-  name: 'something-else'
-- id: group
-  insert:
-    - id: mcp-web
-      name: '@deepseek-ai/dsh-mcp-client'
-      disabled: true
-      config:
-        serverName: web
-        transport: streamable-http
-        url: https://mcp.example.com/mcp
-        headers:
-          Authorization: Bearer x
-",
-    )
-    .unwrap();
-    let entries = read_dsh_profile(&path).unwrap();
-    assert_eq!(entries.len(), 2);
-    let github = entries.iter().find(|entry| entry.name == "github").unwrap();
-    assert!(github.enabled);
-    assert_eq!(github.command.as_deref(), Some("npx"));
-    assert_eq!(github.args_count, 2);
-    assert_eq!(github.env_keys, vec!["GITHUB_TOKEN"]);
-    assert_eq!(
-        github.readonly_reason_code.as_deref(),
-        Some(REASON_DSH_PLUGIN)
-    );
-    let web = entries.iter().find(|entry| entry.name == "web").unwrap();
-    assert!(!web.enabled);
-    assert_eq!(web.transport.as_deref(), Some("streamable-http"));
-    assert_eq!(web.header_keys, vec!["Authorization"]);
 }
 
 #[test]
 fn jsonc_sources_parse_comments_and_stay_readonly() {
     let scratch = Scratch::new("jsonc");
-    let path = scratch.path().join("opencode.jsonc");
+    let path = scratch.path().join("mcp.jsonc");
     std::fs::write(
         &path,
         r#"{
   // global config
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
+  "mcpServers": {
     "local": {
       /* local server */
-      "type": "local",
-      "command": ["npx", "-y", "pkg"],
+      "command": "npx",
+      "args": ["-y", "pkg"],
     },
   },
 }
 "#,
     )
     .unwrap();
-    let entries = read_json_source(source("opencode_user"), &path).unwrap();
+    let entries = read_json_source(source("agy_user"), &path).unwrap();
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].command.as_deref(), Some("npx"));
     assert_eq!(entries[0].args_count, 2);
@@ -354,96 +149,34 @@ fn jsonc_sources_parse_comments_and_stay_readonly() {
         entries[0].readonly_reason_code.as_deref(),
         Some(REASON_JSONC_READONLY)
     );
-    assert!(source("opencode_user").writable);
-    let error = set_json_enabled(source("opencode_user"), &path, "local", false, "").unwrap_err();
-    assert_eq!(error.code, "readonly");
-    assert!(std::fs::read_to_string(&path)
-        .unwrap()
-        .contains("global config"));
 }
 
 #[test]
 fn malformed_files_surface_a_source_error_not_a_panic() {
     let scratch = Scratch::new("broken");
-    let json_path = scratch.path().join("dsh.json");
+    let json_path = scratch.path().join("mcp.json");
     std::fs::write(&json_path, "{not json").unwrap();
-    assert!(read_json_source(source("kimi_user"), &json_path).is_err());
-    let yaml_path = scratch.path().join("cordis.yml");
-    std::fs::write(&yaml_path, "a: [unclosed").unwrap();
-    assert!(read_dsh_profile(&yaml_path).is_err());
+    assert!(read_json_source(source("agy_user"), &json_path).is_err());
 }
 
 #[test]
 fn candidate_paths_follow_cli_homes() {
     let scratch = Scratch::new("paths");
     let _home = HomeGuard::new(scratch.path());
-    std::env::set_var("KIMI_CODE_HOME", scratch.path().join("kimi"));
-    std::env::set_var("OMP_CODING_AGENT_DIR", scratch.path().join("omp"));
-    let kimi = candidate_paths("kimi_user", None);
-    assert_eq!(kimi[0], scratch.path().join("kimi").join("mcp.json"));
-    let omp = candidate_paths("omp_user", None);
-    assert_eq!(omp[0], scratch.path().join("omp").join("mcp.json"));
-    std::env::remove_var("KIMI_CODE_HOME");
-    std::env::remove_var("OMP_CODING_AGENT_DIR");
-    let project = candidate_paths("kimi_local", Some("/ws"));
-    assert_eq!(project[0], Path::new("/ws/.kimi-code/mcp.json"));
-    assert!(candidate_paths("kimi_local", None).is_empty());
-}
-
-#[test]
-fn omp_server_lists_decide_the_state_and_make_the_entry_readonly() {
-    let scratch = Scratch::new("omp-lists");
-    let path = scratch.path().join("mcp.json");
-    let text = r#"{
-      "mcpServers": {
-        "listed_off": { "command": "a" },
-        "listed_on": { "command": "b", "enabled": false },
-        "plain": { "command": "c", "enabled": false }
-      },
-      "disabledServers": ["listed_off"],
-      "enabledServers": ["listed_on"]
-    }"#;
-    std::fs::write(&path, text).unwrap();
-    let mut entries = read_json_source(source("omp_user"), &path).unwrap();
-    entries.push(McpConfigEntry {
-        engine: "kimi".to_string(),
-        name: "listed_off".to_string(),
-        ..entries[0].clone()
-    });
-    apply_omp_server_lists(&mut entries, &path);
-    let find = |name: &str, engine: &str| {
-        entries
-            .iter()
-            .find(|e| e.name == name && e.engine == engine)
-            .unwrap()
-            .clone()
-    };
-    let off = find("listed_off", "omp");
-    assert!(!off.enabled && !off.writable);
+    std::env::set_var("ANTIGRAVITY_HOME", scratch.path().join("agy"));
+    let user = candidate_paths("agy_user", None);
     assert_eq!(
-        off.readonly_reason_code.as_deref(),
-        Some(REASON_OMP_SERVER_LIST)
+        user[1],
+        scratch
+            .path()
+            .join("agy")
+            .join("config")
+            .join("mcp_config.json")
     );
-    let on = find("listed_on", "omp");
-    assert!(on.enabled && !on.writable);
-    let plain = find("plain", "omp");
-    assert!(
-        !plain.enabled && plain.writable,
-        "unlisted entries keep the enabled field"
-    );
-    assert!(
-        find("listed_off", "kimi").writable,
-        "only OMP follows OMP's lists"
-    );
-
-    let _guard = crate::engine_config::support::HOME_ENV_LOCK.lock();
-    std::env::set_var("OMP_CODING_AGENT_DIR", scratch.path());
-    let version = file_hash(text.as_bytes());
-    let refused = write_enabled("omp_user", "listed_off", true, &version, None).unwrap_err();
-    let plain_written = write_enabled("omp_user", "plain", true, &version, None);
-    std::env::remove_var("OMP_CODING_AGENT_DIR");
-    assert_eq!(refused.code, "readonly");
-    assert!(plain_written.unwrap().enabled);
+    std::env::remove_var("ANTIGRAVITY_HOME");
+    let project = candidate_paths("agy_project", Some("/ws"));
+    assert_eq!(project[0], Path::new("/ws/.agents/mcp_config.json"));
+    assert!(candidate_paths("agy_project", None).is_empty());
 }
 
 #[test]

@@ -4,13 +4,13 @@ import { avatarTone } from "@/shared/lib/avatar_palette";
 import { requestOpenRoute } from "@/shared/lib/open_route";
 import { SpaceRequestError, spacesApi } from "../api/api";
 import type { MessageSpan } from "../api/dto/common";
+import { appAgents, onAppAgents } from "./app_agents";
 import type { HostHandlers } from "./host_channel";
 import { HostError, PROTOCOL_VERSIONS } from "./protocol";
 import type { ErrorCode } from "./protocol";
 import { createDriveFileCalls } from "../drive/drive_app_files";
 import type { FileHost } from "./space_app_files";
-import { createAppRooms, ROOM_FEATURES, type RoomSource } from "./app_rooms";
-import { fileRoomOpener } from "./app_file_rooms";
+import { createSpaceRooms, ROOM_TOPICS } from "./space_rooms";
 import { createAppCalls } from "./app_calls";
 import { appRoute } from "./app_routes";
 import { watchAgentControl } from "./app_screen";
@@ -34,7 +34,6 @@ export interface AppHostContext {
   route: Source<{ path: string; params: Record<string, string> }>;
   navigate(route: { path: string; params: Record<string, string> }, replace: boolean): void;
   files: Pick<FileHost, "pickFiles" | "saved">;
-  rooms?: RoomSource;
 }
 
 export const HOST_TOPICS = [
@@ -161,11 +160,13 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
     name: context.me.name,
     tone: context.me.user_id ? avatarTone(context.me.user_id) : null,
   };
-  const rooms = createAppRooms(spaceId, appId, {
+  const instance = context.instance ?? "";
+  const rooms = createSpaceRooms(spaceId, appId, {
     identity,
-    source: context.rooms,
-    files: context.rooms ? undefined : fileRoomOpener(spaceId, appId, driveFiles),
+    holds: driveFiles,
+    agents: () => (instance ? appAgents(instance) : []),
   });
+  const stopAgents = instance ? onAppAgents(instance, () => rooms.agentsChanged()) : () => {};
   const appCalls = createAppCalls(spaceId);
 
   const members = async () => (await spacesApi.members(spaceId)).members;
@@ -266,7 +267,10 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
         permissions: context.permissions,
         protocol: typeof protocol === "number" ? protocol : PROTOCOL_VERSIONS[0],
         versions: [...PROTOCOL_VERSIONS],
-        offers: { calls: Object.keys(calls), topics: [...HOST_TOPICS, ...ROOM_FEATURES] },
+        offers: {
+          calls: Object.keys(calls),
+          topics: [...new Set([...HOST_TOPICS, ...ROOM_TOPICS])],
+        },
       };
     },
     "route.navigate": async ({ route, replace }) => {
@@ -364,12 +368,14 @@ export function createSpaceAppHandlers(context: AppHostContext): HostHandlers {
         case "agents.control":
           return watchAgentControl(context.instance ?? "", context.me.user_id, emit);
         case "room":
-          return rooms.subscribe(record(params), emit, end);
+        case "room.frames":
+          return rooms.subscribe(topic, record(params), emit, end);
         default:
           throw unsupported(topic);
       }
     },
     dispose() {
+      stopAgents();
       driveFiles.dispose();
     },
   };

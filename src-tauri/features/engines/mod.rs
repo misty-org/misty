@@ -1,9 +1,8 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/mod.rs.
-//! Outside agent engines: Claude Code, Codex, OpenCode, Kimi, Grok, MiniMax, Qoder, CodeBuddy,
-//! Antigravity, Pi, Oh My Pi, DeepSeek Harness, and Gemini CLI and Qwen Code over the Agent Client
-//! Protocol. Each is a program the person installed and signed in to; Misty starts it in a linked
-//! folder and turns what it reports into the same run events Misty's own agent produces, so one
-//! chat shows them all. Misty holds none of their keys and never reads or reuses their sign-in.
+//! Outside agent engines: Claude Code, Codex, and Antigravity over the Agent Client Protocol.
+//! Each is a program the person installed and signed in to; Misty starts it in a linked folder
+//! and turns what it reports into the same run events Misty's own agent produces, so one chat
+//! shows them all. Misty holds none of their keys and never reads or reuses their sign-in.
 //!
 //! The engine layer and the session history are desktop-cc-gui's (MIT, Copyright (c) 2026
 //! zhukunpenglinyutong), src-tauri/src/engine and src-tauri/src/history, adapted to Misty: its
@@ -11,6 +10,8 @@
 //! may do is decided by the run's mode in native code (`agents/run_control/engine_modes.rs`), with
 //! every permission ask answered by Misty's own gate (`gate.rs`). See NOTICE.
 
+mod acp_session;
+mod acp_turn;
 pub(crate) mod agent_memory;
 pub mod agy;
 mod bridge;
@@ -22,7 +23,6 @@ pub mod claude;
 mod claude_channel;
 pub mod reported;
 
-pub mod codebuddy;
 pub mod codex;
 mod codex_app;
 mod codex_provider_env;
@@ -31,39 +31,20 @@ pub(crate) mod codex_rpc;
 mod codex_usage;
 pub mod commands;
 mod companion;
-pub mod dsh;
-mod dsh_images;
-mod dsh_session;
 mod events;
 pub mod folder_grant;
 pub(crate) mod gate;
-pub mod gemini;
-pub mod grok;
-mod grok_acp;
-pub mod hermes;
 pub mod history;
 pub mod history_commands;
 pub mod images;
 #[cfg(windows)]
 pub(crate) mod job;
-pub mod kimi;
-mod kimi_acp;
 pub(crate) mod mcp;
-pub mod minimax;
-mod minimax_acp;
 pub mod models;
 pub mod modes;
 pub mod multirun;
 pub mod open_in_code;
-pub mod opencode;
-pub mod opencode_server;
-mod opencode_session;
-pub mod pi_family;
-pub mod pi_family_auth;
-mod pi_family_env;
 pub mod plan_review;
-pub mod qoder;
-mod qoder_session;
 mod reader;
 pub(crate) mod recall;
 mod registry;
@@ -159,7 +140,6 @@ pub struct SendRequest {
     pub workspace: PathBuf,
     pub prompt: String,
     pub prompt_contributions: Vec<PromptContribution>,
-    pub native_compact: bool,
     pub images: Vec<String>,
     pub model: Option<String>,
     pub effort: Option<String>,
@@ -195,7 +175,6 @@ pub trait Engine: Send + Sync {
         })
     }
     fn parse_line(&self, _line: &str, _out: &mut Vec<EngineEvent>) {}
-    fn set_served_models_file(&self, _path: &std::path::Path) {}
     fn reports_served(&self) -> bool {
         false
     }
@@ -242,25 +221,8 @@ pub trait Engine: Send + Sync {
 pub fn engine_by_id(id: &str) -> Option<Box<dyn Engine>> {
     match id {
         "claude" => Some(Box::new(claude::ClaudeEngine::new())),
-        "kimi" => Some(Box::new(kimi::KimiEngine)),
-        "hermes" => Some(Box::new(hermes::HermesEngine)),
-        "minimax" => Some(Box::new(minimax::MiniMaxEngine)),
-        "codebuddy" => Some(Box::new(codebuddy::CodeBuddyEngine::new())),
-        "grok" => Some(Box::new(grok::GrokEngine)),
         "codex" => Some(Box::new(codex::CodexEngine)),
-        "pi" => Some(Box::new(pi_family::pi())),
-        "omp" => Some(Box::new(pi_family::omp())),
-        "dsh" => Some(Box::new(dsh::DshEngine)),
         "agy" => Some(Box::new(agy::AgyEngine)),
-        "opencode" => Some(Box::new(opencode::OpenCodeEngine)),
-        "qoder" => Some(Box::new(qoder::QoderEngine::new(
-            qoder::QoderDistribution::Global,
-        ))),
-        "qoder-cn" => Some(Box::new(qoder::QoderEngine::new(
-            qoder::QoderDistribution::Cn,
-        ))),
-        "gemini" => Some(Box::new(gemini::gemini())),
-        "qwen" => Some(Box::new(gemini::qwen())),
         _ => None,
     }
 }
@@ -346,12 +308,7 @@ fn codex_bin_from_home(
         .then(|| resolve::resolve_launchable_cli_binary(&candidate.to_string_lossy()))
 }
 pub(crate) fn cli_binary_name(engine_id: &str) -> &str {
-    match engine_id {
-        "qoder" => qoder::QoderDistribution::Global.cli_name(),
-        "qoder-cn" => qoder::QoderDistribution::Cn.cli_name(),
-        "minimax" => "mcode",
-        _ => engine_id,
-    }
+    engine_id
 }
 #[allow(
     clippy::disallowed_methods,
@@ -437,20 +394,7 @@ pub fn engine_name(id: &str) -> &'static str {
     match id {
         "claude" => "Claude Code",
         "codex" => "Codex",
-        "opencode" => "OpenCode",
-        "gemini" => "Gemini CLI",
-        "qwen" => "Qwen Code",
-        "kimi" => "Kimi CLI",
-        "grok" => "Grok CLI",
-        "minimax" => "MiniMax Code",
-        "qoder" => "Qoder CLI",
-        "qoder-cn" => "Qoder CLI (China)",
-        "omp" => "Oh My Pi",
-        "codebuddy" => "CodeBuddy",
         "agy" => "Antigravity",
-        "pi" => "Pi",
-        "dsh" => "DeepSeek Harness",
-        "hermes" => "Hermes Agent",
         _ => "Engine",
     }
 }
@@ -551,16 +495,6 @@ pub fn start(app: &tauri::App) {
                 folder_linked(&folder.to_string_lossy());
             }
             history::scanner::spawn_scan(Arc::clone(&state.db), Arc::clone(&state.sink));
-            tauri::async_runtime::spawn(async move {
-                let settings = support::settings::read_settings().unwrap_or_default();
-                if support::dsh_host::autostart_allowed(&settings) {
-                    if let Err(error) =
-                        support::dsh_host::ensure_host(&state.dsh_host, &settings).await
-                    {
-                        eprintln!("[dsh] autostart failed: {error}");
-                    }
-                }
-            });
         });
     });
 }
@@ -582,8 +516,6 @@ pub async fn shutdown() {
     if let Some(state) = support::state() {
         state.processes.kill_all();
         warm::shutdown();
-        state.opencode_server.kill_spawned();
-        state.dsh_host.kill_spawned();
     }
 }
 
@@ -618,7 +550,6 @@ fn prepare_launch(
     session_id: Option<String>,
     prompt: String,
     prompt_contributions: Vec<PromptContribution>,
-    native_compact: Option<bool>,
     image_paths: Option<Vec<String>>,
     model: Option<String>,
     effort: Option<String>,
@@ -691,12 +622,10 @@ fn prepare_launch(
         workspace: PathBuf::from(workspace_path),
         prompt: effective_prompt(&prompt, prompt_contributions),
         prompt_contributions: Vec::new(),
-        native_compact: native_compact.unwrap_or(false) && engine == "omp",
         images: image_paths.unwrap_or_default(),
         model,
         effort,
         service_tier: match engine {
-            "omp" => settings.omp_openai_service_tier.clone(),
             "codex" => settings.codex_service_tier.clone(),
             "claude" => (settings.claude_fast_mode == Some(true)).then(|| "fast".to_string()),
             _ => None,
@@ -738,17 +667,9 @@ fn prepare_launch(
         ("claude", Some(provider)) => {
             claude_channel::apply(&mut built, provider, &channel_env, &req)
         }
-        ("codebuddy", Some(_)) => codebuddy::apply_channel(
-            &mut built,
-            &channel_env,
-            req.model.as_deref(),
-            &crate::engines::support::paths::app_home().join("codebuddy-staging"),
-        ),
-        ("kimi", Some(_)) => kimi::apply_channel(&mut built.command, &channel_env, &req),
         ("codex", Some(provider)) => {
             codex::apply_channel(&mut built.command, provider, &channel_env, &req)
         }
-        ("grok", Some(provider)) => grok::isolate_channel(&mut built, provider, &req),
         _ => Ok(()),
     };
     if let Err(error) = configured {
@@ -810,7 +731,6 @@ pub async fn send_message_inner(
     session_id: Option<String>,
     prompt: String,
     prompt_contributions: Vec<PromptContribution>,
-    native_compact: Option<bool>,
     image_paths: Option<Vec<String>>,
     model: Option<String>,
     effort: Option<String>,
@@ -829,7 +749,6 @@ pub async fn send_message_inner(
         session_id,
         prompt,
         prompt_contributions,
-        native_compact,
         image_paths,
         model,
         effort,
@@ -859,7 +778,6 @@ async fn send_message_inner_with_sink(
     session_id: Option<String>,
     prompt: String,
     prompt_contributions: Vec<PromptContribution>,
-    native_compact: Option<bool>,
     image_paths: Option<Vec<String>>,
     model: Option<String>,
     effort: Option<String>,
@@ -875,18 +793,17 @@ async fn send_message_inner_with_sink(
         None if provider_id.is_none() => models::usable::model_for_run(&engine).await,
         None => None,
     };
-    let followup = (matches!(engine.as_str(), "claude" | "codebuddy")
-        && Arc::ptr_eq(&sink, &state.sink))
-    .then(|| registry::FollowupPrefs {
-        model: model.clone(),
-        effort: effort.clone(),
-        permission: permission.clone(),
-        provider_id: provider_id.clone(),
-        allowed_tools: allowed_tools.clone(),
-        launch: extras.key.clone(),
-        dirs: launch_dirs(state, run_id.as_deref()),
-        warm: extras.warm,
-    });
+    let followup =
+        (engine == "claude" && Arc::ptr_eq(&sink, &state.sink)).then(|| registry::FollowupPrefs {
+            model: model.clone(),
+            effort: effort.clone(),
+            permission: permission.clone(),
+            provider_id: provider_id.clone(),
+            allowed_tools: allowed_tools.clone(),
+            launch: extras.key.clone(),
+            dirs: launch_dirs(state, run_id.as_deref()),
+            warm: extras.warm,
+        });
     if let Some(prefs) = followup.as_ref() {
         let workspace = PathBuf::from(&workspace_path);
         let images = image_paths.clone().unwrap_or_default();
@@ -952,7 +869,6 @@ async fn send_message_inner_with_sink(
         session_id,
         prompt,
         prompt_contributions,
-        native_compact,
         image_paths,
         model,
         effort,
@@ -1048,7 +964,6 @@ async fn send_reserved(
     session_id: Option<String>,
     prompt: String,
     prompt_contributions: Vec<PromptContribution>,
-    native_compact: Option<bool>,
     image_paths: Option<Vec<String>>,
     model: Option<String>,
     effort: Option<String>,
@@ -1069,7 +984,6 @@ async fn send_reserved(
         session_id,
         prompt,
         prompt_contributions,
-        native_compact,
         image_paths,
         model,
         effort,
@@ -1080,21 +994,7 @@ async fn send_reserved(
         allowed_tools,
         extra_args,
     )?;
-    if matches!(engine.as_str(), "pi" | "omp") {
-        pi_family_env::apply(&mut launch.built.command, &engine).await;
-    }
-    if pi_family::loads_served_model_bridge(&engine, &launch.req) {
-        if let Some(path) = pi_family::prepare_served_models_file(&run_id) {
-            launch.engine_impl.set_served_models_file(&path);
-            launch
-                .built
-                .command
-                .env("CCGUI_SERVED_MODEL_FILE", path.as_os_str());
-        }
-    }
-    if launch.engine_impl.drives_own_transport()
-        || (engine == "omp" && pi_family::acp_plan_requested(&launch.req))
-    {
+    if launch.engine_impl.drives_own_transport() {
         if engine == "codex" && !codex_read_only::requested(&launch.req) {
             codex_provider_env::apply(&mut launch.built.command).await;
         }
@@ -1246,9 +1146,7 @@ async fn send_host_stream(
     reader_abort: Arc<std::sync::OnceLock<tokio::task::AbortHandle>>,
     warm: Option<Vec<String>>,
 ) -> Result<SendResult, String> {
-    if let Some(launch_key) =
-        warm.filter(|_| !matches!(engine.as_str(), "dsh" | "opencode" | "omp"))
-    {
+    if let Some(launch_key) = warm {
         warm::intend(
             &run_id,
             warm::fingerprint(
@@ -1286,28 +1184,7 @@ async fn send_host_stream(
     };
     let resume_session_id = launch.req.session_id.clone();
     let task = match engine.as_str() {
-        "dsh" => tokio::spawn(dsh_session::run_host_turn(
-            core,
-            launch.req,
-            state.dsh_host.clone(),
-            killed,
-            pid,
-        )),
-        "opencode" => tokio::spawn(opencode_session::run_server_turn(
-            core,
-            launch.req,
-            launch.bin,
-            state.opencode_server.clone(),
-            killed,
-            pid,
-        )),
-        "qoder" | "qoder-cn" => tokio::spawn(qoder_session::run_acp_turn(
-            core, launch.req, launch.bin, killed, pid,
-        )),
-        "grok" | "kimi" | "gemini" | "qwen" | "hermes" | "agy" => tokio::spawn(
-            grok_acp::run_acp_turn(core, launch.req, launch.built, killed, pid),
-        ),
-        "minimax" => tokio::spawn(minimax_acp::run_acp_turn(
+        "agy" => tokio::spawn(acp_turn::run_acp_turn(
             core,
             launch.req,
             launch.built,
@@ -1315,13 +1192,6 @@ async fn send_host_stream(
             pid,
         )),
         "codex" => tokio::spawn(codex_app::run_app_server_turn(
-            core,
-            launch.req,
-            launch.built,
-            killed,
-            pid,
-        )),
-        "omp" => tokio::spawn(pi_family::omp_acp::run_acp_turn(
             core,
             launch.req,
             launch.built,
@@ -1354,19 +1224,8 @@ pub async fn answer_question(
         .get(&request_id)
         .cloned()
         .ok_or_else(|| "question is no longer pending".to_string())?;
-    if let Some(context) = input.get("kimiAcp") {
-        let frame = kimi_acp::answer_frame(context, answers.as_ref())?;
-        state
-            .processes
-            .write_line(&session_id, frame.to_string())
-            .await?;
-        if let Ok(mut questions) = entry.questions.lock() {
-            questions.remove(&request_id);
-        }
-        return Ok(());
-    }
-    if let Some(acp) = input.get("grokAcp") {
-        let frame = grok_acp::answer_frame(acp, answers.as_ref())?;
+    if let Some(acp) = input.get("acp") {
+        let frame = acp_turn::answer_frame(acp, answers.as_ref())?;
         state
             .processes
             .write_line(&session_id, frame.to_string())
@@ -1414,66 +1273,6 @@ pub async fn answer_question(
     }
     if let Some(app) = input.get("codexApp") {
         let frame = codex_app::answer_frame(app, answers.as_ref())?;
-        state
-            .processes
-            .write_line(&session_id, frame.to_string())
-            .await?;
-        if let Ok(mut questions) = entry.questions.lock() {
-            questions.remove(&request_id);
-        }
-        return Ok(());
-    }
-    if let Some(extui) = input.get("extui") {
-        let method = extui.get("method").and_then(Value::as_str).unwrap_or("");
-        let frame = pi_family::extension_ui_answer_frame(method, &request_id, answers.as_ref());
-        state
-            .processes
-            .write_line(&session_id, frame.to_string())
-            .await?;
-        if let Ok(mut questions) = entry.questions.lock() {
-            questions.remove(&request_id);
-        }
-        return Ok(());
-    }
-    if let Some(opencode) = input.get("opencode") {
-        opencode_session::answer_question(opencode, answers.as_ref()).await?;
-        if let Ok(mut questions) = entry.questions.lock() {
-            questions.remove(&request_id);
-        }
-        return Ok(());
-    }
-    if let Some(dsh) = input.get("dsh") {
-        let origin = dsh
-            .get("origin")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "question answer context is missing the host origin".to_string())?;
-        let client_id = dsh
-            .get("clientId")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "question answer context is missing the events client id".to_string())?;
-        let event_id = dsh
-            .get("eventId")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "question answer context is missing the event id".to_string())?;
-        let request = dsh.get("request").cloned().unwrap_or(Value::Null);
-        let outcome = dsh_session::question_outcome(&request, answers.as_ref());
-        crate::engines::support::dsh_host::host_call(
-            origin,
-            "$events/result",
-            serde_json::json!({
-                "clientId": client_id,
-                "eventId": event_id,
-                "outcome": outcome,
-            }),
-        )
-        .await?;
-        if let Ok(mut questions) = entry.questions.lock() {
-            questions.remove(&request_id);
-        }
-        return Ok(());
-    }
-    if let Some(context) = input.get("codebuddyQuestion") {
-        let frame = codebuddy::question_response(&request_id, context, answers)?;
         state
             .processes
             .write_line(&session_id, frame.to_string())
@@ -1636,17 +1435,6 @@ pub async fn respond_plan_review(
                 .write_line(&session_key, frame_to_line(&frame))
                 .await
         }
-        Some("http") => {
-            let origin = parked.get("origin").and_then(Value::as_str).unwrap_or("");
-            let path = parked.get("path").and_then(Value::as_str).unwrap_or("");
-            if origin.is_empty() || path.is_empty() {
-                Err("the parked native context is missing its http origin/path".to_string())
-            } else {
-                crate::engines::support::dsh_host::host_call(origin, path, frame)
-                    .await
-                    .map(|_| ())
-            }
-        }
         _ => Err("the parked native context does not declare a reply route".to_string()),
     };
     if let Err(message) = written {
@@ -1743,8 +1531,7 @@ mod permission_tests {
     #[test]
     fn tool_constraint_support_is_explicit() {
         assert!(engine_by_id("claude").unwrap().supports_tool_constraints());
-        assert!(engine_by_id("pi").unwrap().supports_tool_constraints());
-        for id in ["codex", "omp", "grok", "kimi"] {
+        for id in ["codex", "agy"] {
             assert!(
                 !engine_by_id(id).unwrap().supports_tool_constraints(),
                 "{id}"
@@ -1758,7 +1545,6 @@ mod permission_tests {
             workspace: PathBuf::from("/tmp"),
             prompt: "hi".to_string(),
             prompt_contributions: Vec::new(),
-            native_compact: false,
             images: Vec::new(),
             model: None,
             effort: None,
@@ -1769,65 +1555,6 @@ mod permission_tests {
             mcp_servers: None,
             allowed_tools: None,
         }
-    }
-
-    #[test]
-    fn pi_read_only_launch_disables_all_extensions_on_start_and_resume() {
-        for session_id in [None, Some("existing-session".to_string())] {
-            let mut request = req(None);
-            request.session_id = session_id;
-            request.allowed_tools = Some(vec![
-                "read".into(),
-                "grep".into(),
-                "find".into(),
-                "ls".into(),
-            ]);
-            let args = argv(&pi_family::pi(), &request);
-            assert!(args
-                .windows(2)
-                .any(|args| args == ["--tools", "read,grep,find,ls"]));
-            assert!(args.contains(&"--no-extensions".to_string()));
-            assert!(!args.contains(&"--extension".to_string()));
-            assert!(!args.contains(&"--auto-approve".to_string()));
-        }
-    }
-
-    #[test]
-    fn pi_read_only_rejects_empty_writable_and_custom_tools() {
-        for tools in [
-            vec![],
-            vec![""],
-            vec!["read", "bash"],
-            vec!["write"],
-            vec!["edit"],
-            vec!["custom"],
-            vec!["read,bash"],
-        ] {
-            let mut request = req(None);
-            request.allowed_tools = Some(tools.into_iter().map(str::to_string).collect());
-            assert!(pi_family::pi().build_command(&request, "pi").is_err());
-        }
-    }
-
-    #[test]
-    fn pi_read_only_rejects_session_file_destinations() {
-        for session in ["/tmp/plan.jsonl", "relative.jsonl", "../plan", "C:\\plan"] {
-            let mut request = req(None);
-            request.allowed_tools = Some(vec!["read".into()]);
-            request.session_id = Some(session.into());
-            assert!(
-                pi_family::pi().build_command(&request, "pi").is_err(),
-                "{session}"
-            );
-        }
-    }
-
-    #[test]
-    fn pi_unrestricted_launch_keeps_the_ask_extension() {
-        let args = argv(&pi_family::pi(), &req(None));
-        assert!(args.contains(&"--extension".to_string()));
-        assert!(!args.contains(&"--no-extensions".to_string()));
-        assert!(!args.contains(&"--tools".to_string()));
     }
 
     fn build(engine: &dyn Engine, req: &SendRequest) -> Result<BuiltCommand, String> {
@@ -1846,148 +1573,12 @@ mod permission_tests {
     }
 
     #[test]
-    fn pi_prompt_rides_the_rpc_prompt_command() {
-        let mut request = req(None);
-        request.prompt = "first line\nsecond line\n%PATH%".to_string();
-        let built = build(&pi_family::pi(), &request).unwrap();
-        let args: Vec<String> = built
-            .command
-            .as_std()
-            .get_args()
-            .map(|a| a.to_string_lossy().to_string())
-            .collect();
-        assert!(args.windows(2).any(|w| w == ["--mode", "rpc"]), "{args:?}");
-        let at = args
-            .iter()
-            .position(|a| a == "--extension")
-            .expect("{args:?}");
-        assert!(args[at + 1].ends_with("ccgui-ask-bridge.ts"), "{args:?}");
-        assert!(!args.iter().any(|a| a.contains("first line")), "{args:?}");
-        let payload = built.stdin_payload.expect("rpc prompt must ride stdin");
-        let mut lines = payload.lines();
-        let state: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
-        assert_eq!(state["type"], "get_state");
-        let commands: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
-        assert_eq!(commands["type"], "get_commands");
-        let prompt: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
-        assert_eq!(prompt["type"], "prompt");
-        assert_eq!(prompt["message"], request.prompt);
-        assert!(
-            lines.next().is_none(),
-            "unexpected extra command: {payload}"
-        );
-        assert!(
-            !payload.ends_with('\n'),
-            "writer appends the terminator: {payload:?}"
-        );
-        assert!(built.keep_stdin_open);
-    }
-
-    #[test]
-    fn omp_prompt_rides_the_rpc_prompt_command() {
-        let mut request = req(None);
-        request.prompt = "first line\nsecond line".to_string();
-        let built = build(&pi_family::omp(), &request).unwrap();
-        let args: Vec<String> = built
-            .command
-            .as_std()
-            .get_args()
-            .map(|a| a.to_string_lossy().to_string())
-            .collect();
-        assert!(
-            args.windows(2).any(|w| w == ["--mode", "rpc-ui"]),
-            "{args:?}"
-        );
-        assert!(!args.contains(&"--print".to_string()), "{args:?}");
-        assert!(!args.iter().any(|a| a.contains("first line")), "{args:?}");
-        let payload = built.stdin_payload.expect("rpc prompt must ride stdin");
-        let mut lines = payload.lines();
-        assert!(lines.next().unwrap().contains("negotiate_protocol"));
-        assert!(lines.next().unwrap().contains("get_state"));
-        let prompt: Value = serde_json::from_str(lines.next().unwrap()).unwrap();
-        assert_eq!(prompt["type"], "prompt");
-        assert_eq!(prompt["message"], "first line\nsecond line");
-        assert!(
-            lines.next().is_none(),
-            "unexpected extra command: {payload}"
-        );
-        assert!(built.keep_stdin_open);
-    }
-
-    #[test]
-    fn omp_fast_tier_is_explicit_and_independent_of_effort() {
-        let mut request = req(None);
-        request.model = Some("openai-codex/gpt-5.4".into());
-        request.effort = Some("high".into());
-        for tier in [None, Some("priority"), Some("default")] {
-            request.service_tier = tier.map(str::to_string);
-            let args = argv(&pi_family::omp(), &request);
-            let actual = args
-                .iter()
-                .position(|a| a == "--service-tier")
-                .map(|i| args[i + 1].as_str());
-            assert_eq!(actual, tier);
-            assert!(args.windows(2).any(|a| a == ["--thinking", "high"]));
-        }
-    }
-
-    #[test]
-    fn omp_fast_tier_does_not_leak_to_other_models_or_pi() {
-        let mut request = req(None);
-        request.service_tier = Some("priority".into());
-        for model in [
-            None,
-            Some("anthropic/claude"),
-            Some("google/gemini"),
-            Some("gpt-5.4"),
-            Some("openai/"),
-            Some("openai/gpt-5.4"),
-            Some("openai-codex/"),
-            Some("custom/gpt-5.4"),
-        ] {
-            request.model = model.map(str::to_string);
-            assert!(!argv(&pi_family::omp(), &request)
-                .iter()
-                .any(|a| a == "--service-tier"));
-        }
-        request.model = Some("openai-codex/gpt-5.4".into());
-        assert!(!argv(&pi_family::pi(), &request)
-            .iter()
-            .any(|a| a == "--service-tier"));
-        assert!(argv(&pi_family::omp(), &request)
-            .iter()
-            .any(|a| a == "--service-tier"));
-        request.service_tier = Some("invalid".into());
-        assert!(build(&pi_family::omp(), &request).is_err());
-    }
-
-    #[test]
-    fn omp_tier_settings_are_backward_compatible_and_roundtrip() {
-        let mut settings: crate::engines::support::settings::AppSettings =
-            serde_json::from_str("{}").unwrap();
-        assert_eq!(settings.omp_openai_service_tier, None);
-        for tier in [Some("priority"), Some("default"), None] {
-            settings.omp_openai_service_tier = tier.map(str::to_string);
-            let encoded = serde_json::to_string(&settings).unwrap();
-            let decoded: crate::engines::support::settings::AppSettings =
-                serde_json::from_str(&encoded).unwrap();
-            assert_eq!(decoded.omp_openai_service_tier.as_deref(), tier);
-        }
-    }
-
-    #[test]
     fn unsupported_mode_falls_back_to_first_supported() {
         let codex = codex::CodexEngine;
         assert_eq!(codex.resolve_permission(Some("plan")), "plan");
         assert_eq!(codex.resolve_permission(Some("read-only")), "read-only");
         assert_eq!(codex.resolve_permission(Some("manual")), "read-only");
         assert_eq!(codex.resolve_permission(None), "read-only");
-        assert_eq!(pi_family::omp().resolve_permission(Some("plan")), "plan");
-        assert_eq!(dsh::DshEngine.resolve_permission(Some("plan")), "plan");
-        assert_eq!(pi_family::pi().resolve_permission(Some("plan")), "auto");
-        let grok = grok::GrokEngine;
-        assert_eq!(grok.resolve_permission(Some("auto")), "manual");
-        assert_eq!(grok.resolve_permission(Some("plan")), "manual");
     }
 
     #[test]
@@ -2020,20 +1611,10 @@ mod permission_tests {
 
     #[test]
     fn plan_capability_matrix_matches_the_adapter_evidence() {
-        let typed: Vec<(Box<dyn Engine>, plan_review::PlanReviewKind)> = vec![
-            (
-                Box::new(pi_family::omp()),
-                plan_review::PlanReviewKind::NativeRequest,
-            ),
-            (
-                Box::new(codex::CodexEngine),
-                plan_review::PlanReviewKind::NextTurn,
-            ),
-            (
-                Box::new(dsh::DshEngine),
-                plan_review::PlanReviewKind::NativeRequest,
-            ),
-        ];
+        let typed: Vec<(Box<dyn Engine>, plan_review::PlanReviewKind)> = vec![(
+            Box::new(codex::CodexEngine),
+            plan_review::PlanReviewKind::NextTurn,
+        )];
         for (engine, kind) in typed {
             let id = engine.id().to_string();
             match engine.plan_approval() {
@@ -2049,60 +1630,6 @@ mod permission_tests {
                 "{id} plan request must pass the gate"
             );
             assert!(ensure_plan_approval(&id, engine.as_ref(), Some("auto")).is_ok());
-        }
-
-        let unavailable: Vec<Box<dyn Engine>> = vec![
-            Box::new(pi_family::pi()),
-            Box::new(grok::GrokEngine),
-            Box::new(qoder::QoderEngine::new(qoder::QoderDistribution::Global)),
-            Box::new(qoder::QoderEngine::new(qoder::QoderDistribution::Cn)),
-        ];
-        for engine in unavailable {
-            let id = engine.id().to_string();
-            assert!(
-                matches!(engine.plan_approval(), PlanApproval::Unavailable { .. }),
-                "{id} must stay fail-closed until its adapter is proven"
-            );
-            assert!(
-                !engine.supported_permissions().contains(&"plan"),
-                "{id} picker must not offer plan"
-            );
-            let refusal = ensure_plan_approval(&id, engine.as_ref(), Some("plan"));
-            let Err(message) = refusal else {
-                panic!("{id} plan request must be refused before spawn");
-            };
-            assert!(
-                message.contains("cannot run a human-approved plan"),
-                "{message}"
-            );
-            assert!(ensure_plan_approval(&id, engine.as_ref(), Some("auto")).is_ok());
-        }
-
-        let mut plan_req = req(Some("plan"));
-        plan_req.model = Some("openai-codex/gpt-5.4".into());
-        let plan = argv(&pi_family::omp(), &plan_req);
-        assert!(plan.contains(&"--mode".to_string()));
-        assert!(!plan.contains(&"--plan-yolo".to_string()));
-        assert!(!plan.contains(&"--plan-yolo-into".to_string()));
-        assert!(!plan.contains(&"--auto-approve".to_string()));
-
-        let mut auto_req = req(Some("auto"));
-        auto_req.model = Some("openai-codex/gpt-5.4".into());
-        let auto = argv(&pi_family::omp(), &auto_req);
-        let pin = auto
-            .iter()
-            .position(|a| a == "--model")
-            .expect("model flag");
-        assert_eq!(auto[pin + 1], "openai-codex/gpt-5.4");
-        assert!(!auto.contains(&"--auto-approve".to_string()));
-        let bypass = argv(&pi_family::omp(), &req(Some("bypass")));
-        assert!(!bypass.contains(&"--auto-approve".to_string()));
-        assert!(!bypass.contains(&"--plan-yolo".to_string()));
-
-        for mode in [Some("plan"), Some("bypass"), Some("manual")] {
-            let args = argv(&pi_family::pi(), &req(mode));
-            assert!(!args.contains(&"--plan-yolo".to_string()), "{args:?}");
-            assert!(!args.contains(&"--auto-approve".to_string()), "{args:?}");
         }
     }
 
@@ -2216,7 +1743,7 @@ mod retry_lifecycle_tests {
         let core = TurnCore {
             sink: event_sink::EventSink::new(emitter.clone()),
             registry: Arc::new(ProcessRegistry::default()),
-            engine_id: "omp".to_string(),
+            engine_id: "claude".to_string(),
             run_id: "settled-run".to_string(),
             db: None,
             followup: None,
@@ -2250,10 +1777,6 @@ mod retry_lifecycle_tests {
             .map(|event| event["kind"].as_str().unwrap())
             .collect();
         assert_eq!(kinds, ["error"], "a settled run must not send live events");
-    }
-
-    async fn replay_cli_output(lines: &[Value]) -> Vec<Value> {
-        replay_engine_output("omp", Box::new(pi_family::omp()), lines).await
     }
 
     async fn replay_engine_output(
@@ -2594,56 +2117,10 @@ mod retry_lifecycle_tests {
         assert_eq!(kinds, ["delta", "done"], "{events:?}");
     }
 
-    #[tokio::test]
-    async fn legacy_agent_end_can_retry_and_recover_before_eof() {
-        let events = replay_cli_output(&[
-            serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"error","errorMessage":"socket closed"}}),
-            serde_json::json!({"type":"agent_end","messages":[{"role":"assistant","stopReason":"error","errorMessage":"socket closed"}]}),
-            serde_json::json!({"type":"auto_retry_start","attempt":1,"maxAttempts":50}),
-            serde_json::json!({"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"recovered"}}),
-            serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"stop"}}),
-            serde_json::json!({"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop"}]}),
-        ]).await;
-        let kinds: Vec<_> = events
-            .iter()
-            .filter(|event| {
-                !matches!(
-                    event["kind"].as_str(),
-                    Some("background_tasks" | "process_closed")
-                )
-            })
-            .map(|event| event["kind"].as_str().unwrap())
-            .collect();
-        assert_eq!(kinds, ["retry", "delta", "done"]);
-        assert_eq!(events[1]["data"], "recovered");
-    }
-
-    #[tokio::test]
-    async fn clean_eof_preserves_a_final_model_failure() {
-        for failure in [
-            serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"error","errorMessage":"401 Invalid token"}}),
-            serde_json::json!({"type":"auto_retry_end","success":false,"finalError":"socket closed"}),
-        ] {
-            let events = replay_cli_output(&[failure]).await;
-            let last = events.last().unwrap();
-            assert_eq!(
-                last["kind"], "error",
-                "clean process exit must not turn a failed request into success"
-            );
-            assert!(matches!(
-                last["data"].as_str(),
-                Some("401 Invalid token" | "socket closed")
-            ));
-            assert!(!events.iter().any(|event| event["kind"] == "done"));
-        }
-    }
     #[cfg(unix)]
     #[tokio::test]
     async fn child_exit_settles_run_despite_pipe_holding_grandchild() {
-        let done_lines = [
-            serde_json::json!({"type":"turn_end","message":{"role":"assistant","stopReason":"stop"}}),
-            serde_json::json!({"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop"}]}),
-        ];
+        let done_lines = [claude_result()];
         let script = format!(
             "printf '%s\\n' {}; sleep 600 & exit 0",
             done_lines
@@ -2686,12 +2163,12 @@ mod retry_lifecycle_tests {
             core: TurnCore {
                 sink: event_sink::EventSink::new(emitter.clone()),
                 registry: Arc::clone(&registry),
-                engine_id: "omp".to_string(),
+                engine_id: "claude".to_string(),
                 run_id: "pipe-held-run".to_string(),
                 db: None,
                 followup: None,
             },
-            engine_impl: Box::new(pi_family::omp()),
+            engine_impl: Box::new(claude::ClaudeEngine::new()),
             pid,
             preassigned_session_id: Some("session-held".to_string()),
             initial_model: None,

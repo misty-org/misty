@@ -21,11 +21,11 @@ fn reads_the_engine_layers_usage_shapes() {
 
 #[test]
 fn acp_turn_totals_size_the_context() {
-    let grok = json!({ "totalTokens": 12345, "inputTokens": 12000, "outputTokens": 345 });
-    assert_eq!(context_usage(&grok), (Some(12345), None));
-    let omp = json!({ "totalTokens": 40300, "inputTokens": 300, "outputTokens": 200,
-                      "cacheRead": 39800, "model_context_window": 128000 });
-    assert_eq!(context_usage(&omp), (Some(40300), Some(128000)));
+    let totals = json!({ "totalTokens": 12345, "inputTokens": 12000, "outputTokens": 345 });
+    assert_eq!(context_usage(&totals), (Some(12345), None));
+    let windowed = json!({ "totalTokens": 40300, "inputTokens": 300, "outputTokens": 200,
+                           "cacheRead": 39800, "model_context_window": 128000 });
+    assert_eq!(context_usage(&windowed), (Some(40300), Some(128000)));
     let buckets = json!({ "inputTokens": 100, "cacheRead": 900, "cachedReadTokens": 900,
                           "outputTokens": 5 });
     assert_eq!(context_usage(&buckets), (Some(1005), None));

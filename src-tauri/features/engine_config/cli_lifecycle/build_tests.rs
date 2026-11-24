@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use base64::Engine as _;
 
 use super::downloads::{Checksum, Hasher};
-use super::hermes_launchers;
 use super::maker_builds::{self, antigravity, codex, Target};
 use super::routes::{self, Route};
 use crate::engines::support::paths::{own_copy_env_in, InstallRoot};
@@ -16,12 +15,7 @@ const FIXTURE_SHA512: &str =
     "0WFRsFrPm0HlGLXvC+fHLBWwQAtqCgcmfjq5Zc4hSv1JQ3LaOHNsalNrvz/FaLZIFL9Yv5tjItE/W3zbaVqD+w==";
 
 fn target(os: &'static str, arch: &'static str, musl: bool) -> Target<'static> {
-    Target {
-        os,
-        arch,
-        musl,
-        avx2: true,
-    }
+    Target { os, arch, musl }
 }
 
 struct Scratch {
@@ -150,95 +144,11 @@ fn codex_and_antigravity_install_as_builds_on_every_system() {
     std::fs::create_dir_all(program.parent().unwrap()).unwrap();
     std::fs::write(&program, "").unwrap();
     assert_eq!(
-        routes::route_in(root, "codex", &program.to_string_lossy(), true, true),
+        routes::route_in(root, "codex", &program.to_string_lossy(), true),
         Some(Route::MistyDownload)
     );
     let steps = routes::plan_steps("codex", Route::MistyDownload, "codex", false);
     assert!(steps[0].contains("releases.openai.com"), "{steps:?}");
-}
-
-fn exe_launcher(checkout: &str) -> Vec<u8> {
-    let mut bytes = b"MZ\x90\x00stub\x00\x00#!\"C:\\py\\python.exe\" -I\r\nPK\x03\x04".to_vec();
-    bytes.extend(format!("import os, re, sys\nsys.path.insert(0, {checkout})\n").as_bytes());
-    bytes
-}
-
-fn cmd_launcher(checkout: &str) -> String {
-    let script = format!("import os, re, sys\nsys.path.insert(0, {checkout})\nimport x\n");
-    let encoded = base64::engine::general_purpose::STANDARD.encode(script);
-    format!(
-        "@echo off\r\n\"C:\\py\\python.exe\" -I -c \"import base64; \
-         exec(base64.b64decode('{encoded}'))\" %*\r\n"
-    )
-}
-
-#[test]
-fn a_hermes_launcher_says_which_checkout_it_starts() {
-    let windows_path = r"'C:\\Users\\me\\.misty\\engines\\hermes\\hermes-agent'";
-    let expected = r"C:\Users\me\.misty\engines\hermes\hermes-agent";
-    assert_eq!(
-        hermes_launchers::launcher_checkout(&exe_launcher(windows_path)).as_deref(),
-        Some(expected)
-    );
-    assert_eq!(
-        hermes_launchers::launcher_checkout(cmd_launcher(windows_path).as_bytes()).as_deref(),
-        Some(expected)
-    );
-    assert_eq!(
-        hermes_launchers::launcher_checkout(&exe_launcher(r#""C:\\O'Neil\\hermes-agent""#))
-            .as_deref(),
-        Some(r"C:\O'Neil\hermes-agent")
-    );
-    assert_eq!(
-        hermes_launchers::launcher_checkout(b"MZ\x00not a launcher"),
-        None
-    );
-}
-
-#[test]
-fn remove_takes_the_windows_launchers_of_mistys_checkout_and_no_others() {
-    let home = Scratch::new();
-    let root = &home.root;
-    let checkout = root.checkout_dir("hermes");
-    std::fs::create_dir_all(checkout.join(".hermes/bin")).unwrap();
-    let bin = home.dir.join("AppData/Local/hermes/bin");
-    std::fs::create_dir_all(&bin).unwrap();
-    let dirs = vec![bin.clone()];
-    let ours = format!("{:?}", checkout.to_string_lossy());
-    let absent = hermes_launchers::absent(&dirs);
-    std::fs::write(bin.join("hermes.exe"), exe_launcher(&ours)).unwrap();
-    std::fs::write(bin.join("hermes-acp.exe"), b"MZ unreadable").unwrap();
-    hermes_launchers::record_created(&root.engine_dir("hermes"), &absent).unwrap();
-    std::fs::write(
-        bin.join("hermes-acp.cmd"),
-        cmd_launcher(r"'C:\\Users\\me\\hermes-agent'"),
-    )
-    .unwrap();
-    std::fs::write(bin.join("hermes-agent.exe"), b"MZ someone else's").unwrap();
-
-    let launcher = bin.join("hermes.exe").to_string_lossy().into_owned();
-    assert!(routes::installed_by_misty_in(root, "hermes", &launcher));
-    assert_eq!(
-        routes::route_in(root, "hermes", &launcher, true, true),
-        Some(Route::MistyScript)
-    );
-    routes::remove_in(root, &dirs, "hermes", &launcher).unwrap();
-    assert!(!bin.join("hermes.exe").exists());
-    assert!(!bin.join("hermes-acp.exe").exists(), "recorded at install");
-    assert!(bin.join("hermes-acp.cmd").exists(), "another checkout");
-    assert!(bin.join("hermes-agent.exe").exists(), "not Misty's");
-    assert!(!root.engine_dir("hermes").exists());
-}
-
-#[test]
-fn hermes_script_gets_a_home_inside_mistys_folder_on_macos_and_linux() {
-    let into = std::path::Path::new("/home/me/.misty/shared/engines/hermes/hermes-agent");
-    assert_eq!(
-        routes::installer_home("hermes", into, false),
-        Some(PathBuf::from("/home/me/.misty/shared/engines/hermes/home"))
-    );
-    assert_eq!(routes::installer_home("hermes", into, true), None);
-    assert_eq!(routes::installer_home("codex", into, false), None);
 }
 
 #[test]

@@ -3,7 +3,46 @@ use super::{
     server, set_account, AccountClient,
 };
 use crate::browser::profiles;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
+use tauri::Manager;
+
+const ROOM_TOKEN_LASTING: Duration = Duration::from_secs(60);
+const SIGNED_OUT: &str = "signed_out";
+
+#[tauri::command]
+pub async fn auth_room_token(
+    webview: tauri::Webview,
+    api_base: String,
+    fresh: Option<bool>,
+) -> Result<String, String> {
+    if !crate::browser::app_windows::is_person_window(webview.label()) {
+        return Err("Only the trusted Misty shell can open a live room.".into());
+    }
+    let url = server(&api_base)?;
+    let client = current(&url)?;
+    if !fresh.unwrap_or(false) {
+        if let Some(token) = client.access_token(&url, ROOM_TOKEN_LASTING) {
+            return Ok(token);
+        }
+    }
+    let used = client.access_header();
+    let answer = client
+        .rotate(super::refresh::refresh_endpoint(&url), used)
+        .await?;
+    if answer.ended {
+        crate::account::http::session_ended(webview.app_handle(), &url).await?;
+        return Err(SIGNED_OUT.into());
+    }
+    if !(200..300).contains(&answer.status) {
+        return Err("Could not refresh the Misty session".into());
+    }
+    client
+        .access_token(&url, Duration::ZERO)
+        .ok_or_else(|| SIGNED_OUT.into())
+}
 
 #[tauri::command]
 pub async fn auth_session_capture(

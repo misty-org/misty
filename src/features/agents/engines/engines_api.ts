@@ -78,7 +78,7 @@ export function engineModels(engine: string): Promise<EngineModel[]> {
   return pending;
 }
 
-const ACCOUNT_LISTED = new Set(["codex", "omp", "pi"]);
+const ACCOUNT_LISTED = new Set(["codex"]);
 
 export function usablePick(
   engine: string,

@@ -8,7 +8,12 @@ import {
 } from "@misty/ui";
 import { useMistyStore, useStudioAgents } from "@/features/agents";
 import { useNow } from "@/shared/hooks/use_now";
-import type { Space, SpaceMember, SpaceRoleDef } from "../../api/dto/entities";
+import type {
+  Space,
+  SpaceIntegrationMember,
+  SpaceMember,
+  SpaceRoleDef,
+} from "../../api/dto/entities";
 import { MemberRolesMenu } from "../../roles/MemberRolesMenu";
 import { loadSpaceMembers } from "../load_space_members";
 import { useSpacesStore } from "../../list/use_spaces_store";
@@ -22,6 +27,7 @@ import { useSpaceConversations } from "../sidebar/use_space_conversations";
 import { useSpaceApps } from "../../apps/use_space_apps";
 import { appEntry } from "../../apps/third_party_apps";
 import { ChatAvatar } from "./ChatAvatar";
+import { accessLine } from "../../integrations/integration_access";
 
 interface Row {
   member: SpaceMember;
@@ -57,6 +63,7 @@ export function ChatMemberList(props: {
   const { spaceId } = props;
   const now = useNow();
   const people = useSpacesStore((state) => state.membersBySpace[spaceId]);
+  const integrations = useSpacesStore((state) => state.integrationsBySpace[spaceId]);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -166,6 +173,14 @@ export function ChatMemberList(props: {
     apps,
   ]);
 
+  const shownIntegrations = useMemo(
+    () =>
+      props.visibleTo
+        ? []
+        : [...(integrations ?? [])].sort((left, right) => left.name.localeCompare(right.name)),
+    [integrations, props.visibleTo],
+  );
+
   if (!people && failed)
     return (
       <MemberList label="Members">
@@ -199,7 +214,25 @@ export function ChatMemberList(props: {
           ))}
         </Fragment>
       ))}
+      {shownIntegrations.length ? (
+        <>
+          <MemberGroupHeading title="Integrations" count={shownIntegrations.length} />
+          {shownIntegrations.map((integration) => (
+            <IntegrationItem key={integration.id} integration={integration} />
+          ))}
+        </>
+      ) : null}
     </MemberList>
+  );
+}
+
+function IntegrationItem({ integration }: { integration: SpaceIntegrationMember }) {
+  return (
+    <MemberRow
+      avatar={<ChatAvatar id={integration.id} name={integration.name} size="default" />}
+      name={integration.name}
+      line={accessLine(integration.access, integration.key_prefix) || undefined}
+    />
   );
 }
 
@@ -213,7 +246,6 @@ function MemberItem(props: {
   isMe: boolean;
 }) {
   const picture = useMemberPicture(
-    props.space.id,
     props.member.user_id,
     props.member.avatar_version,
   );

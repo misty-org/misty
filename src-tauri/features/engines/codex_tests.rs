@@ -19,7 +19,6 @@ fn base_req() -> SendRequest {
         workspace: std::path::PathBuf::from("/tmp"),
         prompt: "hi".into(),
         prompt_contributions: Vec::new(),
-        native_compact: false,
         images: Vec::new(),
         model: Some("gpt-6-astra".into()),
         effort: None,

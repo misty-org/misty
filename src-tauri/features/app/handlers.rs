@@ -22,6 +22,7 @@ pub fn invoke_handler() -> impl Fn(Invoke<Wry>) -> bool + Send + Sync + 'static 
             crate::account::commands::auth_http_start,
             crate::account::commands::auth_http_read,
             crate::account::commands::auth_http_cancel,
+            crate::account::commands::auth_room_token,
             crate::agents::commands::misty_workspace_focused,
             crate::agents::commands::misty_screen_status,
             crate::agents::commands::misty_screen_capture,

@@ -1,69 +1,13 @@
 import { UserRound, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, FramedBar, IconButton, Skeleton, Text, windowToolbarClass } from "@misty/ui";
+import { ChannelHeader, cn, FramedBar, windowToolbarClass } from "@misty/ui";
 import { useTitlePending } from "../conversations/state/conversation_titles";
 import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
 import { AgentAvatar } from "../personal/AgentAvatar";
 import { AgentIdentity } from "../personal/AgentIdentity";
 import { useContextPanel } from "../context-panel/context_panel_store";
 import { useRailShown } from "../context-panel/rail_layout_store";
-
-export function ChatTitle({
-  conversation,
-  agent,
-}: {
-  conversation?: { id: string; title?: string };
-  agent?: AgentProfile;
-}) {
-  const titlePending = useTitlePending(conversation);
-  if (titlePending)
-    return (
-      <span className="min-w-0 flex-1" aria-busy>
-        <Skeleton className="inline-block h-[0.75em] w-[min(--spacing(36),70%)] rounded-full align-middle" />
-        <span className="sr-only">Naming this conversation</span>
-      </span>
-    );
-  return (
-    <Text as="h1" size="control" weight="semibold" className="min-w-0 flex-1">
-      {agent?.name ? `${agent.name} ` : null}
-      {agent?.name ? (
-        <Text bare tone="muted" weight="regular">
-          {conversation ? conversation.title || "Untitled conversation" : "New chat"}
-        </Text>
-      ) : conversation ? (
-        conversation.title || "Untitled conversation"
-      ) : (
-        "New chat"
-      )}
-    </Text>
-  );
-}
-
-export function ChatHeaderButtons() {
-  const profileOpen = useContextPanel((state) => state.tab === "profile");
-  const railShown = useRailShown((state) => state.value);
-  return (
-    <div role="toolbar" aria-label="Chat actions" className="flex shrink-0 items-center gap-1">
-      <IconButton
-        label="Profile"
-        variant="quiet"
-        aria-pressed={profileOpen}
-        onClick={() => useContextPanel.getState().toggle("profile")}
-      >
-        <UserRound />
-      </IconButton>
-      <IconButton
-        label="Tools"
-        variant="quiet"
-        aria-pressed={railShown}
-        onClick={() => useRailShown.getState().set(!railShown)}
-      >
-        <Wrench />
-      </IconButton>
-    </div>
-  );
-}
 
 export function AgentStudioBar({
   conversation,
@@ -72,14 +16,38 @@ export function AgentStudioBar({
   conversation?: { id: string; title?: string };
   agent?: AgentProfile;
 }) {
+  const titlePending = useTitlePending(conversation);
+  const profileOpen = useContextPanel((state) => state.tab === "profile");
+  const railShown = useRailShown((state) => state.value);
+  const topic = titlePending
+    ? undefined
+    : conversation
+      ? conversation.title || "Untitled thread"
+      : "New thread";
   return (
-    <FramedBar
-      className={cn("agent-studio-bar", windowToolbarClass)}
-      data-window-toolbar=""
-      start={<ChatTitle conversation={conversation} agent={agent} />}
-    >
-      <ChatHeaderButtons />
-    </FramedBar>
+    <ChannelHeader
+      leading={<AgentAvatar agent={agent} face />}
+      name={agent?.name ?? "Agent"}
+      topic={topic}
+      actions={[
+        {
+          id: "profile",
+          icon: UserRound,
+          label: "Profile",
+          priority: 2,
+          pressed: profileOpen,
+          onSelect: () => useContextPanel.getState().toggle("profile"),
+        },
+        {
+          id: "tools",
+          icon: Wrench,
+          label: "Tools",
+          priority: 1,
+          pressed: railShown,
+          onSelect: () => useRailShown.getState().set(!railShown),
+        },
+      ]}
+    />
   );
 }
 

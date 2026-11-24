@@ -28,6 +28,7 @@ export interface AppMcpClient {
     name: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
+    meta?: Record<string, unknown>,
   ): Promise<McpCallResult>;
   dispose(): void;
 }
@@ -169,12 +170,17 @@ export function createAppMcpClient(
       }
       return tools;
     },
-    async callTool(name, args, signal) {
+    async callTool(name, args, signal, meta) {
       await started().catch((error: unknown) => {
         throw new McpUnreachable(error instanceof Error ? error.message : String(error));
       });
       return record(
-        await request("tools/call", { name, arguments: args }, callTimeoutMs, signal),
+        await request(
+          "tools/call",
+          { name, arguments: args, ...(meta ? { _meta: meta } : {}) },
+          callTimeoutMs,
+          signal,
+        ),
       ) as McpCallResult;
     },
     dispose() {

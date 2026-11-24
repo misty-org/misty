@@ -1,12 +1,6 @@
 import { useUserStore } from "@/features/account/core";
 import { spacesApi } from "../api/api";
 import { notesApi } from "../journal/notes/api/api";
-import { followPendingMarkdown } from "../journal/notes/components/note_editor_content";
-import { pageMisty } from "../apps/page_misty";
-import {
-  acquireNoteCollaborationSession,
-  releaseNoteCollaborationSession,
-} from "../journal/notes/note_collaboration";
 import { leaveViewingPlace, setViewingPlace } from "../list/create_spaces_realtime_actions";
 import { useSpacesStore } from "../list/use_spaces_store";
 import { memberPicture, myPicture } from "../members/member_pictures";
@@ -25,44 +19,6 @@ export const liveGateway = {
   me(): { userId: string; name: string } | undefined {
     const me = useUserStore.getState().me;
     return me ? { userId: me.id, name: me.username || me.email } : undefined;
-  },
-
-  async openLiveDoc(spaceId: string, docId: string) {
-    const session = await acquireNoteCollaborationSession(spaceId, docId);
-    const room = pageMisty(spaceId, "lab").room(docId);
-    let closed = false;
-    const lost = (): "deleted" | "revoked" | null =>
-      room.lost?.code === "not_found"
-        ? "deleted"
-        : room.lost?.code === "permission_denied"
-          ? "revoked"
-          : session.access.lost;
-    return {
-      doc: room.doc,
-      awareness: room.awareness,
-      role: session.ticket.role,
-      synced: room.synced,
-      lost,
-      onLost(listener: () => void) {
-        const stopRoom = room.onLost(() => listener());
-        const stopSession = session.access.subscribe(listener);
-        return () => {
-          stopRoom();
-          stopSession();
-        };
-      },
-      followRewrites: (apply: (markdown: string) => void) =>
-        followPendingMarkdown(
-          { role: session.ticket.role, metadata: session.metadata, provider: session.provider },
-          { gone: () => closed, apply },
-        ),
-      close() {
-        if (closed) return;
-        closed = true;
-        room.destroy();
-        releaseNoteCollaborationSession(spaceId, docId);
-      },
-    };
   },
 
   driveFile: (spaceId: string, itemId: string) => driveFileById(spaceId, itemId),
@@ -119,7 +75,7 @@ export const liveGateway = {
     const member = useSpacesStore
       .getState()
       .membersBySpace[spaceId]?.find((candidate) => candidate.user_id === userId);
-    return memberPicture(spaceId, userId, member?.avatar_version ?? 0);
+    return memberPicture(userId, member?.avatar_version ?? 0);
   },
 
   async discussion(spaceId: string, title: string, known?: string) {

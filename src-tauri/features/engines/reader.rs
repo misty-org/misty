@@ -2,10 +2,10 @@
 //! Stdout reader and per-turn streaming state: the capped line reader,
 //! event dispatch core, and settle/cleanup path for engine process runs.
 
+#[cfg(test)]
+use super::codex;
 use super::codex_usage;
 use super::events::EngineEvent;
-#[cfg(test)]
-use super::grok;
 #[cfg(windows)]
 use super::job;
 use super::plan_review;
@@ -172,7 +172,7 @@ impl TurnState {
     ) {
         if !self.exit_confirmed
             && run_id.starts_with("pa-")
-            && matches!(engine_id, "pi" | "codex")
+            && engine_id == "codex"
             && matches!(kind, "done" | "error")
         {
             self.pending_terminal = Some((kind.to_string(), data));
@@ -455,14 +455,7 @@ impl TurnCore {
                 state.gen_end();
                 if let Some(entry) = self.registry.get(&self.run_id) {
                     if let Ok(mut questions) = entry.questions.lock() {
-                        let parked_input = if self.engine_id == "codebuddy" {
-                            serde_json::json!({
-                                "codebuddyQuestion": { "input": input, "toolUseId": tool_use_id },
-                            })
-                        } else {
-                            input.clone()
-                        };
-                        questions.insert(request_id.clone(), parked_input);
+                        questions.insert(request_id.clone(), input.clone());
                     }
                 }
                 state.push(
@@ -850,12 +843,7 @@ impl Drop for VirtualRunGuard {
 
 pub fn sweep_staging_dirs() {
     let home = crate::engines::support::paths::app_home();
-    for name in [
-        "claude-staging",
-        "grok-staging",
-        "codex-plan-staging",
-        "codebuddy-staging",
-    ] {
+    for name in ["claude-staging", "grok-staging", "codex-plan-staging"] {
         let dir = home.join(name);
         if file_access::fs::exists(&dir) {
             if let Err(error) = file_access::fs::remove_dir_all(&dir) {
@@ -1060,9 +1048,6 @@ pub(crate) async fn run_reader(stdout: ChildStdout, ctx: RunContext) {
             Value::Null,
         );
     }
-    let _ = file_access::fs::remove_file(crate::engines::pi_family::served_models_path(
-        &ctx.core.run_id,
-    ));
     for key in [
         state.native_session_id.clone(),
         Some(ctx.core.run_id.clone()),
@@ -1257,12 +1242,12 @@ mod staging_tests {
                 core: TurnCore {
                     sink: event_sink::EventSink::new(Arc::new(Noop)),
                     registry: Arc::new(ProcessRegistry::default()),
-                    engine_id: "grok".into(),
+                    engine_id: "codex".into(),
                     run_id: "test".into(),
                     db: None,
                     followup: None,
                 },
-                engine_impl: Box::new(grok::GrokEngine),
+                engine_impl: Box::new(codex::CodexEngine),
                 pid: 0,
                 preassigned_session_id: None,
                 initial_model: None,
@@ -1318,12 +1303,12 @@ mod staging_tests {
             core: TurnCore {
                 sink: event_sink::EventSink::new(Arc::new(Noop)),
                 registry: Arc::clone(&registry),
-                engine_id: "grok".into(),
+                engine_id: "codex".into(),
                 run_id: "run-abort".into(),
                 db: None,
                 followup: None,
             },
-            engine_impl: Box::new(grok::GrokEngine),
+            engine_impl: Box::new(codex::CodexEngine),
             pid: 4242,
             preassigned_session_id: None,
             initial_model: None,
@@ -1412,8 +1397,8 @@ mod terminal_event_tests {
     }
 
     #[tokio::test]
-    async fn plugin_pi_and_codex_terminals_wait_for_confirmed_exit() {
-        for engine in ["pi", "codex"] {
+    async fn plugin_codex_terminals_wait_for_confirmed_exit() {
+        for engine in ["codex"] {
             for fail in [false, true] {
                 let collector = Arc::new(Collector::default());
                 let core = TurnCore {
@@ -1457,7 +1442,7 @@ mod terminal_event_tests {
         let core = TurnCore {
             sink: event_sink::EventSink::new(collector.clone()),
             registry: Arc::new(ProcessRegistry::default()),
-            engine_id: "pi".into(),
+            engine_id: "codex".into(),
             run_id: "gen-ms-test".into(),
             db: None,
             followup: None,
@@ -1565,108 +1550,6 @@ mod terminal_event_tests {
                 ["delta", "usage", if fail { "error" } else { "done" }]
             );
             assert_eq!(events[0]["data"], "完成中文与 emoji 🐎");
-        }
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn plugin_pi_interrupt_emits_terminal_only_after_child_exit() {
-        for early_done in [false, true] {
-            let mut command = Command::new("sh");
-            let delta = r#"{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"ready"}}"#;
-            let done = if early_done {
-                r#"printf '%s\n' '{"type":"agent_end","messages":[{"role":"assistant","stopReason":"stop"}]}';"#
-            } else {
-                ""
-            };
-            command.args([
-                "-c",
-                &format!("printf '%s\\n' '{delta}'; {done} exec sleep 30"),
-            ]);
-            command
-                .stdout(std::process::Stdio::piped())
-                .process_group(0)
-                .kill_on_drop(true);
-            let mut child = command.spawn().unwrap();
-            let pid = child.id().unwrap();
-            let stdout = child.stdout.take().unwrap();
-            let child = Arc::new(TokioMutex::new(child));
-            let collector = Arc::new(Collector::default());
-            let sink =
-                event_sink::EventSink::with_name(collector.clone(), event_sink::ENGINE_EVENT_NAME);
-            let registry = Arc::new(ProcessRegistry::default());
-            let killed = Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let run_id = "pa-relay-interrupt";
-            registry.insert(
-                run_id.into(),
-                crate::engines::ChildEntry {
-                    child: Some(child.clone()),
-                    pid,
-                    run_id: run_id.into(),
-                    killed: killed.clone(),
-                    reader_abort: Arc::new(std::sync::OnceLock::new()),
-                    stdin: None,
-                    questions: Arc::new(Mutex::new(std::collections::HashMap::new())),
-                    plans: Arc::new(Mutex::new(std::collections::HashMap::new())),
-                },
-            );
-            let context = RunContext {
-                core: TurnCore {
-                    sink: sink.clone(),
-                    registry: registry.clone(),
-                    engine_id: "pi".into(),
-                    run_id: run_id.into(),
-                    db: None,
-                    followup: None,
-                },
-                engine_impl: Box::new(crate::engines::pi_family::pi()),
-                pid,
-                preassigned_session_id: None,
-                initial_model: None,
-                comparison_model: None,
-                initial_effort: None,
-                child: child.clone(),
-                killed,
-                cleanup_files: vec![],
-                stderr_buf: Arc::new(Mutex::new(String::new())),
-                stdout_plain_buf: Arc::new(Mutex::new(String::new())),
-            };
-            let reader = tokio::spawn(run_reader(stdout, context));
-            tokio::time::timeout(std::time::Duration::from_secs(3), async {
-                loop {
-                    sink.flush();
-                    if !collector.0.lock().unwrap().is_empty() {
-                        break;
-                    }
-                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                }
-            })
-            .await
-            .unwrap();
-            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
-            sink.flush();
-            assert!(!collector
-                .0
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|event| matches!(event["kind"].as_str(), Some("done" | "error"))));
-            assert!(registry.kill(run_id));
-            tokio::time::timeout(std::time::Duration::from_secs(3), reader)
-                .await
-                .unwrap()
-                .unwrap();
-            assert!(child.lock().await.try_wait().unwrap().is_some());
-            assert_eq!(registry.active_run_count(), 0);
-            let events = collector.0.lock().unwrap();
-            assert_eq!(
-                events
-                    .iter()
-                    .filter(|event| matches!(event["kind"].as_str(), Some("done" | "error")))
-                    .count(),
-                1
-            );
-            assert_eq!(events.last().unwrap()["kind"], "done");
         }
     }
 }

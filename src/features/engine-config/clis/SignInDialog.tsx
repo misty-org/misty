@@ -30,7 +30,6 @@ import {
   DialogFooter,
 } from "@misty/ui";
 import { engineName } from "../channels/engines";
-import { signInChoiceLabel } from "./SignInButton";
 import { listenSignIn, signInApi, type SignInRequest, type SignInStarted } from "./sign_in_api";
 import { uiPx } from "@misty/ui";
 
@@ -46,41 +45,15 @@ export function SignInDialog({
   if (!request) return null;
   return (
     <SignInTerminal
-      key={`${request.engine}:${request.provider ?? ""}:${request.signOut ? "out" : "in"}`}
+      key={`${request.engine}:${request.signOut ? "out" : "in"}`}
       request={request}
       onClose={onClose}
     />
   );
 }
 
-const DEVICE_PAGES: Record<string, string> = {
-  "github-copilot": "A GitHub page",
-  xai: "An xAI page",
-  "xai-oauth": "An xAI page",
-};
-
-const ENGINE_PAGES: Record<string, string> = {
-  gemini: "A Google page opens in your browser. Sign in there with your Google account",
-  kimi: "A Kimi page opens in your browser. Sign in there and allow access",
-  qoder: "A Qoder page opens in your browser. Sign in there with your Qoder account",
-  "qoder-cn": "A Qoder page opens in your browser. Sign in there with your Qoder account",
-  grok: "An xAI page opens in your browser. Sign in there with your X or xAI account",
-};
-
-export function signInSteps(
-  started: SignInStarted,
-  engine: string,
-  signOut: boolean,
-  provider?: string,
-): string {
+export function signInSteps(started: SignInStarted, engine: string, signOut: boolean): string {
   const name = engineName(engine);
-  if (started.asks === "device-code") {
-    const page = DEVICE_PAGES[provider ?? ""] ?? "A sign-in page";
-    return (
-      `${page} opens in your browser and asks for a code. Open Show details to see the code, ` +
-      "enter it on that page, then come back here."
-    );
-  }
   if (started.asks === "menu") {
     return signOut
       ? `${name} signs out in its own screen. Open Show details, and if it asks which account, ` +
@@ -105,12 +78,6 @@ export function signInSteps(
   }
   if (started.asks === "code") {
     return "A sign-in page opens in your browser. Sign in there, then copy the code it shows and paste it here.";
-  }
-  const page = ENGINE_PAGES[engine];
-  if (page) return `${page}, then come back here.`;
-  const chosen = signInChoiceLabel(engine, provider);
-  if (chosen && (engine === "pi" || engine === "omp")) {
-    return `A sign-in page for ${chosen} opens in your browser. Sign in there, then come back here.`;
   }
   return "A sign-in page opens in your browser. Finish there, then come back here.";
 }
@@ -157,7 +124,7 @@ function SignInTerminal({ request, onClose }: { request: SignInRequest; onClose:
   else if (!started) line = null;
   else if (codeSent)
     line = `Signing you in to ${name}. If nothing happens, Show details has what it says.`;
-  else line = signInSteps(started, request.engine, signOut, request.provider);
+  else line = signInSteps(started, request.engine, signOut);
 
   const retry = () => {
     setStarted(null);

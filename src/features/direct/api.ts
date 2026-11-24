@@ -1,10 +1,17 @@
-import { spaceRequest } from "@/features/spaces";
+import { fetchProtectedBlob, spaceRequest } from "@/features/spaces";
 
 export interface Person {
   user_id: string;
   username: string;
   avatar_version: number;
+  banner_version?: number;
   since: string;
+}
+
+export interface SharedSpace {
+  id: string;
+  name: string;
+  avatar_version: number;
 }
 
 export interface FriendsList {
@@ -74,6 +81,15 @@ export const directApi = {
   unfriend: (userId: string) => spaceRequest(`/friends/${id(userId)}`, { method: "DELETE" }),
   block: (userId: string) => spaceRequest(`/blocks/${id(userId)}`, { method: "PUT" }),
   unblock: (userId: string) => spaceRequest(`/blocks/${id(userId)}`, { method: "DELETE" }),
+  personBanner: (userId: string) => fetchProtectedBlob(`/people/${id(userId)}/banner`),
+  mutualFriends: (userId: string) =>
+    spaceRequest<{ friends: Person[] }>(`/people/${id(userId)}/mutual-friends`).then(
+      (result) => result.friends,
+    ),
+  sharedSpaces: (userId: string) =>
+    spaceRequest<{ spaces: SharedSpace[] }>(`/people/${id(userId)}/shared-spaces`).then(
+      (result) => result.spaces,
+    ),
   privacy: () => spaceRequest<FriendPrivacy>("/me/privacy"),
   setPrivacy: (privacy: FriendPrivacy) =>
     spaceRequest<FriendPrivacy>("/me/privacy", { method: "PUT", ...json(privacy) }),

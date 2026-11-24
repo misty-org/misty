@@ -257,8 +257,8 @@ fn npm_prefix_resolution_ignores_empty_values() {
 fn prefer_windows_executable_variant_prefers_cmd_over_posix_shim() {
     let root = std::env::temp_dir().join(format!("ccgui-posix-shim-{}", std::process::id()));
     std::fs::create_dir_all(&root).expect("create temp dir");
-    let posix_shim = root.join("dsh");
-    let cmd_path = root.join("dsh.cmd");
+    let posix_shim = root.join("agy");
+    let cmd_path = root.join("agy.cmd");
     std::fs::write(&posix_shim, "#!/bin/sh\n").expect("write shim");
     std::fs::write(&cmd_path, "@echo off\n").expect("write cmd");
 
@@ -270,7 +270,7 @@ fn prefer_windows_executable_variant_prefers_cmd_over_posix_shim() {
         prefer_windows_executable_variant(cmd_path.clone()),
         cmd_path
     );
-    let missing = PathBuf::from(r"C:\definitely\missing\dsh");
+    let missing = PathBuf::from(r"C:\definitely\missing\agy");
     assert_eq!(prefer_windows_executable_variant(missing.clone()), missing);
 
     let _ = std::fs::remove_dir_all(root);

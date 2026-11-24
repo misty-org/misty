@@ -23,6 +23,7 @@ export async function referenceSpaceSnapshotState(
     spaces: [],
     invitations: [],
     membersBySpace: {},
+    integrationsBySpace: {},
     messagesBySpace: {},
     nodesBySpace: {},
     snapshotReady: false,

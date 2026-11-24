@@ -273,7 +273,7 @@ fn other_engines_read_the_shared_layouts() {
         "# Deploy\n",
     )
     .unwrap();
-    let catalog = catalog_for("pi", &home, Some(&project));
+    let catalog = catalog_for("agy", &home, Some(&project));
     let skills: Vec<&str> = catalog.skills.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(
         skills,

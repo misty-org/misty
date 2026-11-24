@@ -52,13 +52,13 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{timeout, Instant};
 
-use super::codex_read_only;
-use super::images;
-use super::plan_review::{self, PlanDecision, PlanReview, PlanReviewKind};
-use super::qoder_session::{
+use super::acp_session::{
     encode_ndjson, jsonrpc_id_key, jsonrpc_request, jsonrpc_result_response, teardown, KILL_POLL,
     PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT,
 };
+use super::codex_read_only;
+use super::images;
+use super::plan_review::{self, PlanDecision, PlanReview, PlanReviewKind};
 use super::{
     assistant_message, read_line_capped, spawn_stderr_capture, tool_call_message,
     tool_call_message_with_id, tool_result_patch, tool_result_patch_with_id, BuiltCommand,
@@ -1605,7 +1605,6 @@ pub(crate) async fn run_plan_decision(
         workspace: PathBuf::from(&review.workspace_path),
         prompt: spec.prompt,
         prompt_contributions: Vec::new(),
-        native_compact: false,
         images: Vec::new(),
         model: None,
         effort: None,
@@ -1919,7 +1918,6 @@ mod tests {
             workspace: workspace.clone(),
             prompt: "not sent".into(),
             prompt_contributions: Vec::new(),
-            native_compact: false,
             images: vec![],
             model: Some("probe".into()),
             effort: None,
@@ -2000,7 +1998,6 @@ mod tests {
             workspace: directory.clone(),
             prompt: "hi".into(),
             prompt_contributions: Vec::new(),
-            native_compact: false,
             images: vec![],
             model: None,
             effort: None,
@@ -2315,7 +2312,6 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
                 workspace: std::env::temp_dir(),
                 prompt: "Continue the conversation".into(),
                 prompt_contributions: Vec::new(),
-                native_compact: false,
                 images: Vec::new(),
                 model: None,
                 effort: None,

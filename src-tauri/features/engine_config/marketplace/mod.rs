@@ -1,7 +1,6 @@
 pub mod details;
 mod listings;
 mod parse;
-mod parse_more;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -13,31 +12,10 @@ use std::path::Path;
 use std::time::Duration;
 
 use super::cli_lifecycle::{command_for_binary, engine_bin, run_capture_capped, ProcOutput};
-use listings::{list_gallery, list_loose, list_omp};
 use parse::*;
 pub use parse::{Connector, MarketItem, MarketSource, ShownCommand};
-use parse_more::*;
 
-const ENGINES: &[&str] = &[
-    "claude",
-    "codex",
-    "omp",
-    "qoder",
-    "codebuddy",
-    "minimax",
-    "gemini",
-    "qwen",
-];
-
-const GALLERY_ENGINES: &[&str] = &["gemini", "qwen"];
-
-fn plugin_word(engine: &str) -> &'static str {
-    if engine == "qoder" {
-        "plugins"
-    } else {
-        "plugin"
-    }
-}
+const ENGINES: &[&str] = &["claude", "codex"];
 
 const LIST_LIMIT: Duration = Duration::from_secs(60);
 const CHANGE_LIMIT: Duration = Duration::from_secs(300);
@@ -116,12 +94,6 @@ fn engine_label(engine: &str) -> &'static str {
     match engine {
         "claude" => "Claude Code",
         "codex" => "Codex",
-        "omp" => "Oh My Pi",
-        "qoder" => "Qoder",
-        "codebuddy" => "CodeBuddy",
-        "minimax" => "MiniMax Code",
-        "gemini" => "Gemini CLI",
-        "qwen" => "Qwen Code",
         _ => "The engine",
     }
 }
@@ -178,12 +150,6 @@ fn read_manifest(folder: &Path) -> Option<Value> {
 }
 
 async fn list_engine(engine: &'static str) -> Result<(Vec<MarketItem>, Vec<MarketSource>), String> {
-    match engine {
-        "omp" => return list_omp().await,
-        "qoder" | "codebuddy" | "minimax" => return list_loose(engine).await,
-        "gemini" | "qwen" => return list_gallery(engine).await,
-        _ => {}
-    }
     let (plugins, sources) = tokio::join!(
         run_ok(
             engine,
@@ -264,12 +230,7 @@ async fn install(
     accept: Option<String>,
 ) -> Result<InstallOutcome, String> {
     let id = id.to_string();
-    let valid = if GALLERY_ENGINES.contains(&engine) {
-        valid_gallery_url(&id)
-    } else {
-        valid_id(&id)
-    };
-    if !valid {
+    if !valid_id(&id) {
         return Err("That isn't a plugin Misty can install.".into());
     }
     match engine {
@@ -295,17 +256,6 @@ async fn install(
                 Err(failure_text(engine, &output))
             }
         }
-        "omp" | "qoder" | "codebuddy" | "minimax" | "gemini" | "qwen" => {
-            let word = plugin_word(engine);
-            let args: &[&str] = match engine {
-                "minimax" => &[word, "add", &id],
-                "gemini" => &["extensions", "install", &id, "--consent"],
-                "qwen" => &["extensions", "install", &id, "--consent"],
-                _ => &[word, "install", &id],
-            };
-            run_ok(engine, args, CHANGE_LIMIT).await?;
-            Ok(InstallOutcome::Installed)
-        }
         _ => {
             run_ok(
                 engine,
@@ -330,20 +280,11 @@ pub async fn engine_market_remove(
 
 async fn remove(engine: &'static str, id: &str) -> Result<(), String> {
     let id = id.to_string();
-    let valid = if GALLERY_ENGINES.contains(&engine) {
-        valid_name(&id)
-    } else {
-        valid_id(&id)
-    };
-    if !valid {
+    if !valid_id(&id) {
         return Err("That isn't a plugin Misty can remove.".into());
     }
-    let word = plugin_word(engine);
     let args: &[&str] = match engine {
         "claude" => &["plugin", "uninstall", "--json", "--", &id],
-        "omp" | "qoder" | "codebuddy" => &[word, "uninstall", &id],
-        "minimax" => &[word, "remove", &id],
-        "gemini" | "qwen" => &["extensions", "uninstall", &id],
         _ => &["plugin", "remove", "--", &id],
     };
     run_ok(engine, args, CHANGE_LIMIT).await.map(drop)
@@ -364,10 +305,8 @@ async fn add_source(engine: &'static str, source: &str) -> Result<(), String> {
     if !valid_source(&source) {
         return Err("Use a GitHub owner/repo, an https:// address or a folder.".into());
     }
-    let word = plugin_word(engine);
     let args: &[&str] = match engine {
         "claude" => &["plugin", "marketplace", "add", "--json", "--", &source],
-        "omp" | "qoder" | "codebuddy" => &[word, "marketplace", "add", &source],
         "codex" => &["plugin", "marketplace", "add", "--", &source],
         _ => return Err(no_sources(engine)),
     };
@@ -389,10 +328,8 @@ async fn remove_source(engine: &'static str, name: &str) -> Result<(), String> {
     if !valid_name(&name) {
         return Err("That isn't a marketplace Misty can remove.".into());
     }
-    let word = plugin_word(engine);
     let args: &[&str] = match engine {
         "claude" => &["plugin", "marketplace", "remove", "--json", "--", &name],
-        "omp" | "qoder" | "codebuddy" => &[word, "marketplace", "remove", &name],
         "codex" => &["plugin", "marketplace", "remove", "--", &name],
         _ => return Err(no_sources(engine)),
     };

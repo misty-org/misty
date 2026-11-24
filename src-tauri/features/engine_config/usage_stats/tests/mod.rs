@@ -150,30 +150,3 @@ pub(super) fn codex_record(ts: &str, response_id: &str, usage: [i64; 4]) -> Stri
            "payload": {"response_id": response_id, "usage": codex_usage(usage)}})
     .to_string()
 }
-
-pub(super) fn pi_header(id: &str, cwd: &str) -> String {
-    json!({"type": "session", "version": 3, "id": id, "timestamp": "2026-10-25T04:54:29.653Z", "cwd": cwd}).to_string()
-}
-
-pub(super) fn pi_assistant(
-    entry_id: &str,
-    ts_ms: i64,
-    response_id: Option<&str>,
-    model: &str,
-    usage: [i64; 4],
-) -> String {
-    let mut message = json!({
-        "role": "assistant", "provider": "deepseek", "model": model,
-        "content": [{"type": "text", "text": "hello"}],
-        "usage": {"input": usage[0], "output": usage[1], "cacheRead": usage[2], "cacheWrite": usage[3],
-                  "reasoningTokens": 7, "totalTokens": usage.iter().sum::<i64>(),
-                  "cost": {"total": 0.001}},
-        "timestamp": ts_ms,
-    });
-    if let Some(id) = response_id {
-        message["responseId"] = json!(id);
-    }
-    json!({"type": "message", "id": entry_id, "parentId": null,
-           "timestamp": "2026-10-25T04:50:49.544Z", "message": message})
-    .to_string()
-}

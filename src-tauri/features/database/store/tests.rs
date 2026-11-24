@@ -136,7 +136,7 @@ fn migration_20_removes_only_the_coding_preferences() {
                  '{"agent":{"mode":"plan","coding_default_tool":"claude","coding_usage_cap":"50"},"general":{"coding_usage_cap":"kept"}}');
              INSERT INTO settings_state (scope, revision, document) VALUES
                  ('["hosted"]', 4, '{"version":3,"values":{"agents.mode":"plan","agents.coding_default_tool":"codex","agents.coding_fallback_tool":"none","agents.coding_usage_cap":"50"}}'),
-                 ('settings-baseline:hosted', 2, '{"agent":{"mode":"act","coding_fallback_tool":"pi"}}'),
+                 ('settings-baseline:hosted', 2, '{"agent":{"mode":"act","coding_fallback_tool":"codex"}}'),
                  ('clean', 7, '{ "version": 3, "values": {"agents.mode": "act"} }'),
                  ('device:id', 1, '"device_old"'),
                  ('profile-collections:a', 1, 'true'),

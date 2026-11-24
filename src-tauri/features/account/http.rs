@@ -87,7 +87,7 @@ fn renderer_may_set(name: &str) -> bool {
     )
 }
 
-async fn session_ended(app: &tauri::AppHandle, url: &url::Url) -> Result<(), String> {
+pub(crate) async fn session_ended(app: &tauri::AppHandle, url: &url::Url) -> Result<(), String> {
     crate::browser::profiles::change_account(Some(app), || {
         session::set_account(url, None);
         Ok(())

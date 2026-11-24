@@ -45,18 +45,7 @@ import { usePromptHistoryNav } from "../composer/use_prompt_history_nav";
 const engineNames: Record<string, string> = {
   claude: "Claude Code",
   codex: "Codex",
-  opencode: "OpenCode",
-  gemini: "Gemini CLI",
-  qwen: "Qwen Code",
-  kimi: "Kimi CLI",
-  grok: "Grok CLI",
-  minimax: "MiniMax Code",
-  qoder: "Qoder CLI",
-  "qoder-cn": "Qoder CLI (China)",
-  omp: "Oh My Pi",
-  codebuddy: "CodeBuddy",
   agy: "Antigravity",
-  pi: "Pi",
 };
 
 export function AgentConversationComposer({
@@ -73,7 +62,6 @@ export function AgentConversationComposer({
   working,
   send,
   reportError,
-  empty = false,
   status,
   onOpenHistory,
   onSync,
@@ -91,7 +79,6 @@ export function AgentConversationComposer({
   working: boolean;
   send: () => void;
   reportError: (message: string) => void;
-  empty?: boolean;
   status?: ReactNode;
   onOpenHistory?: () => void;
   onSync?: () => void;
@@ -181,7 +168,6 @@ export function AgentConversationComposer({
     <>
       <MistyComposer
         className="agent-toolbar-composer"
-        roomy={empty}
         status={
           held ? (
             <>

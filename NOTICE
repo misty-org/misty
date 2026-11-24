@@ -20,10 +20,10 @@ a header, and the notices below are preserved as their licenses require.
 
 desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   Adapted in src-tauri/features/engines and src-tauri/features/project: the agent engine adapters
-  (Claude Code, Codex, OpenCode, the Agent Client Protocol engines Kimi, Grok, MiniMax, Qoder and
-  Oh My Pi, CodeBuddy, Antigravity and Pi), program discovery, and the files, Git, Git-ignore,
-  worktree, terminal, open-in-app, HTML preview and clipboard backends (src-tauri/features/project)
-  and window state (src-tauri/features/browser/app_windows). The panels beside a chat follow its
+  (Claude Code, Codex, and Antigravity with the Agent Client Protocol driver it runs on), program
+  discovery, and the files, Git, Git-ignore, worktree, terminal, open-in-app, HTML preview and
+  clipboard backends (src-tauri/features/project) and window state
+  (src-tauri/features/browser/app_windows). The panels beside a chat follow its
   file tree, editor, find and replace, Markdown and HTML preview, changes panel, terminal,
   worktree, open-in and launch-script features and its workspace grouping
   (src/features/agents/context-panel, src/features/agents/engines/enginesApi.ts). The chat composer's `@` file, `/` command, `$` skill and `!` prompt menus and its
@@ -37,9 +37,8 @@ desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   src-tauri/features/engines/folder_grant.rs). Engine management is adapted in
   src-tauri/features/engine_config and src/features/engine-config: the engines' own MCP servers,
   the skills hub, the prompt library, usage statistics and plan limits, CLI install and update,
-  provider channels and CC Switch import, the network proxy, fonts and the performance panel,
-  and Pi's per-provider editor (piFamilyModelsBlocks.ts). The notes shown after an update follow
-  its upgrade announcement (src/features/updater).
+  provider channels and CC Switch import, the network proxy, fonts and the performance panel.
+  The notes shown after an update follow its upgrade announcement (src/features/updater).
   The safety scan on what an engine wrote into Misty's memory, since removed, followed its memory
   scan.
   Also adapted: bot bundles and the bot prompt (src-tauri/features/bots, src/features/agents/bots),
@@ -77,18 +76,6 @@ lobe-icons (https://github.com/lobehub/lobe-icons)
   MIT License
 
   Copyright (c) 2023 LobeHub
-
-Oh My Pi (https://github.com/can1357/oh-my-pi)
-  Oh My Pi's mark in @misty/ui's marks registry (src/icons/marks/omp.svg in the misty-ui
-  repository, credited in its own NOTICE) is the gradient π of its
-  packages/collab-web/public/favicon.svg, without the favicon's dark tile. The mark belongs to its
-  owners and only names their product.
-
-  MIT License
-
-  Copyright (c) 2025 Mario Zechner
-  Copyright (c) 2025-2026 Can Bölük
-  Copyright (c) 2026 Stencil Labs, Inc.
 
 LiteLLM (https://github.com/BerriAI/litellm)
   Its model price table (model_prices_and_context_window.json) is bundled as

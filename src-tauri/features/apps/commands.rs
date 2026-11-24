@@ -52,18 +52,6 @@ pub async fn space_app_snapshot(
 }
 
 #[tauri::command]
-pub async fn space_app_resolve(
-    webview: Webview,
-    link: String,
-) -> Result<super::resolve::Resolved, String> {
-    person_window(&webview)?;
-    if link.len() > 512 {
-        return Err("That link is too long.".into());
-    }
-    super::resolve::resolve(&link).await
-}
-
-#[tauri::command]
 pub async fn space_app_bundle_install(
     webview: Webview,
     app_id: String,
@@ -87,6 +75,10 @@ pub async fn space_app_bundle_install(
 
 async fn download(url: &str, max: u64) -> Result<Vec<u8>, String> {
     let parsed = url::Url::parse(url).map_err(|_| "That isn't an address.".to_owned())?;
+    #[cfg(debug_assertions)]
+    if parsed.scheme() == "file" {
+        return crate::registry::local::read_build(&parsed, max);
+    }
     if parsed.scheme() != "https" {
         return Err("Apps download only over https.".into());
     }

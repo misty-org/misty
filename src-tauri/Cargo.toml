@@ -184,7 +184,7 @@ libloading = "0.8"
 [target.'cfg(windows)'.dependencies]
 # The engine layer reads the live User/Machine PATH from the registry (MIT).
 winreg = "0.55"
-# Plain paths, not \\?\ ones, for the Grok sessions junction.
+# Plain paths, not \\?\ ones, when comparing folders.
 dunce = "1"
 # Confined helpers and agent commands (AppContainer and Job objects).
 webview2-com = "0.38.2"

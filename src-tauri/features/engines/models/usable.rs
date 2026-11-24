@@ -15,13 +15,6 @@ static LISTED: LazyLock<Mutex<Listed>> = LazyLock::new(|| Mutex::new(HashMap::ne
     reason = "reads each engine's own config in place, under homes the person or an env override may move outside the engine folders the gate grants"
 )]
 pub(super) fn configured_default(engine: &str) -> Option<String> {
-    let text = |value: Option<&serde_json::Value>| {
-        value
-            .and_then(serde_json::Value::as_str)
-            .map(str::trim)
-            .filter(|text| !text.is_empty())
-            .map(str::to_string)
-    };
     match engine {
         "codex" => {
             let home = crate::engines::codex_home();
@@ -36,22 +29,6 @@ pub(super) fn configured_default(engine: &str) -> Option<String> {
                 .map(str::trim)
                 .filter(|model| !model.is_empty())
                 .map(str::to_string)
-        }
-        "omp" => {
-            let dir = crate::engines::pi_family_auth::agent_dir("omp").ok()?;
-            let content = std::fs::read_to_string(dir.join("config.yml")).ok()?;
-            let value: serde_json::Value = serde_yaml::from_str(&content).ok()?;
-            text(value.pointer("/modelRoles/default"))
-        }
-        "pi" => {
-            let dir = crate::engines::pi_family_auth::agent_dir("pi").ok()?;
-            let content = std::fs::read_to_string(dir.join("settings.json")).ok()?;
-            let value: serde_json::Value = serde_json::from_str(&content).ok()?;
-            let model = text(value.get("defaultModel"))?;
-            if model.contains('/') {
-                return Some(model);
-            }
-            Some(format!("{}/{model}", text(value.get("defaultProvider"))?))
         }
         _ => None,
     }
@@ -94,7 +71,7 @@ pub(super) fn settle(engine: &str, mut catalog: EngineCatalog) -> EngineCatalog 
 }
 
 pub(crate) async fn model_for_run(engine: &str) -> Option<String> {
-    if !matches!(engine, "codex" | "omp" | "pi") {
+    if engine != "codex" {
         return None;
     }
     let configured = configured_default(engine)?;

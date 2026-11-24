@@ -6,6 +6,7 @@ export const settingsSectionIds = [
   "account",
   "status",
   "requests",
+  "sessions",
   "notifications",
   "server",
   "drive",

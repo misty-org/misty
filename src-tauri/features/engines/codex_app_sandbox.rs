@@ -51,7 +51,6 @@ mod tests {
             workspace: PathBuf::from("/work/space"),
             prompt: "hi".into(),
             prompt_contributions: Vec::new(),
-            native_compact: false,
             images: Vec::new(),
             model: None,
             effort: None,

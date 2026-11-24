@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde_json::{json, Map, Value};
 
 use super::AgyEngine;
-use crate::engines::qoder_session::{
+use crate::engines::acp_session::{
     initialize_params, jsonrpc_id_key, jsonrpc_result_response, session_state_update, AcpLine,
     AcpProcess, AcpSessionState, RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT,
     SESSION_RESUME_TIMEOUT,
@@ -287,7 +287,7 @@ pub(crate) fn park_question(
             tool_use_id: params["toolCallId"].as_str().map(str::to_string),
             input: json!({
                 "questions": questions,
-                "grokAcp": { "rpcId": id, "agyForm": fields },
+                "acp": { "rpcId": id, "agyForm": fields },
             }),
         },
     );

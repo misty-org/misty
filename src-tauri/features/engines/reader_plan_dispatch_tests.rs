@@ -41,7 +41,7 @@ fn ready_core(
     let core = TurnCore {
         sink: event_sink::EventSink::new(collector.clone()),
         registry: Arc::new(ProcessRegistry::default()),
-        engine_id: "dsh".into(),
+        engine_id: "agy".into(),
         run_id: "run-plan".into(),
         db: Some(Arc::clone(&db)),
         followup: None,
@@ -65,7 +65,7 @@ fn ready_core(
 fn review(plan_id: &str) -> plan_review::PlanReview {
     plan_review::PlanReview {
         plan_id: plan_id.into(),
-        engine: "dsh".into(),
+        engine: "agy".into(),
         session_id: "sess-plan".into(),
         workspace_path: "/tmp/ccgui-plan-dispatch-ws".into(),
         run_id: Some("run-plan".into()),

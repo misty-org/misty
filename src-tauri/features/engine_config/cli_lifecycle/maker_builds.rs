@@ -10,15 +10,12 @@ pub(super) mod antigravity;
 pub(super) mod codex;
 
 const CLAUDE_RELEASES: &str = "https://downloads.claude.ai/claude-code-releases";
-const OPENCODE_LATEST: &str = "https://opencode.ai/update/api/latest/cli/npm";
-const NPM_REGISTRY: &str = "https://registry.npmjs.org";
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Target<'a> {
     pub(super) os: &'a str,
     pub(super) arch: &'a str,
     pub(super) musl: bool,
-    pub(super) avx2: bool,
 }
 
 impl Target<'static> {
@@ -27,7 +24,6 @@ impl Target<'static> {
             os: std::env::consts::OS,
             arch: std::env::consts::ARCH,
             musl: is_musl(),
-            avx2: has_avx2(),
         }
     }
 }
@@ -38,17 +34,6 @@ fn is_musl() -> bool {
         && (Path::new("/lib/libc.musl-x86_64.so.1").exists()
             || Path::new("/lib/libc.musl-aarch64.so.1").exists()
             || Path::new("/etc/alpine-release").exists())
-}
-
-fn has_avx2() -> bool {
-    #[cfg(target_arch = "x86_64")]
-    {
-        std::arch::is_x86_feature_detected!("avx2")
-    }
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        true
-    }
 }
 
 pub(super) fn claude_platform(target: Target) -> Option<String> {
@@ -73,27 +58,6 @@ pub(super) fn claude_checksum(manifest: &serde_json::Value, platform: &str) -> O
         .get("checksum")?
         .as_str()
         .and_then(Checksum::sha256_hex)
-}
-
-pub(super) fn opencode_target(target: Target) -> Option<String> {
-    let os = match target.os {
-        "macos" => "darwin",
-        "linux" => "linux",
-        _ => return None,
-    };
-    let arch = match target.arch {
-        "aarch64" => "arm64",
-        "x86_64" => "x64",
-        _ => return None,
-    };
-    let mut name = format!("{os}-{arch}");
-    if arch == "x64" && !target.avx2 {
-        name.push_str("-baseline");
-    }
-    if os == "linux" && target.musl {
-        name.push_str("-musl");
-    }
-    Some(name)
 }
 
 fn program_name(base: &str) -> String {
@@ -125,13 +89,9 @@ pub(super) fn plan_step(engine: &str) -> String {
              release lists, and put it in {}",
             super::shown_path(&engine_install_dir(engine))
         ),
-        "agy" => format!(
+        _ => format!(
             "Download Antigravity's build from the release server its installer uses, check it \
              against the SHA-512 in its manifest, and put it in {into}"
-        ),
-        _ => format!(
-            "Download OpenCode's build from the npm registry, check it against the registry's \
-             SHA-512, and put it in {into}"
         ),
     }
 }
@@ -139,7 +99,6 @@ pub(super) fn plan_step(engine: &str) -> String {
 pub(super) fn available(engine: &str, target: Target) -> bool {
     match engine {
         "claude" => claude_platform(target).is_some(),
-        "opencode" => opencode_target(target).is_some(),
         "codex" => codex::codex_target(target).is_some(),
         "agy" => antigravity::agy_platform(target).is_some(),
         _ => false,
@@ -150,7 +109,6 @@ pub(super) async fn install(engine: &str, reporter: &ProgressReporter) -> Result
     let target = Target::this_computer();
     match engine {
         "claude" => install_claude(target, reporter).await,
-        "opencode" => install_opencode(target, reporter).await,
         "codex" => codex::install(target, reporter).await,
         "agy" => antigravity::install(target, reporter).await,
         _ => Err(format!("Misty doesn't download {engine}'s build itself.")),
@@ -184,61 +142,6 @@ async fn install_claude(target: Target<'_>, reporter: &ProgressReporter) -> Resu
     let dest = program_path("claude");
     downloads::download_verified(&url, &dest, &checksum, reporter).await?;
     downloads::make_executable(&dest)
-}
-
-async fn install_opencode(target: Target<'_>, reporter: &ProgressReporter) -> Result<(), String> {
-    let build = opencode_target(target).ok_or("OpenCode isn't built for this system.")?;
-    let latest = downloads::fetch_json(OPENCODE_LATEST).await?;
-    let version = latest
-        .get("version")
-        .and_then(serde_json::Value::as_str)
-        .filter(|version| super::parse_version(version).is_some())
-        .ok_or("opencode.ai didn't give a version.")?;
-    let package = latest
-        .pointer("/metadata/package")
-        .or_else(|| latest.get("package"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("@opencode/cli");
-    let scope = package
-        .strip_suffix("/cli")
-        .filter(|scope| scope.starts_with('@') && !scope.contains(['/', '%', '?', '#']))
-        .ok_or("opencode.ai named a package Misty doesn't know.")?;
-    let name = format!("{scope}/cli-{build}");
-    let info = downloads::fetch_json(&format!(
-        "{NPM_REGISTRY}/{}/{version}",
-        name.replace('/', "%2f")
-    ))
-    .await?;
-    let tarball = info
-        .pointer("/dist/tarball")
-        .and_then(serde_json::Value::as_str)
-        .filter(|url| url.starts_with(&format!("{NPM_REGISTRY}/")))
-        .ok_or("The npm registry gave no download for OpenCode's build.")?;
-    let checksum = info
-        .pointer("/dist/integrity")
-        .and_then(serde_json::Value::as_str)
-        .and_then(Checksum::from_npm_integrity)
-        .ok_or("The npm registry gave no SHA-512 for OpenCode's build.")?;
-    reporter.emit(
-        "stdout",
-        Some(format!("OpenCode {version} for {build}")),
-        None,
-    );
-    let folder = engine_install_dir("opencode");
-    let download = folder.join(format!("cli-{build}-{version}.tgz"));
-    downloads::download_verified(tarball, &download, &checksum, reporter).await?;
-    let staging = folder.join(format!("unpack-{}", uuid::Uuid::new_v4().simple()));
-    let unpacked = downloads::unpack(&download, &staging, 0).await;
-    let _ = file_access::fs::remove_file(&download);
-    let placed = match unpacked {
-        Ok(()) => place(
-            &staging.join("package").join("bin").join("opencode"),
-            &program_path("opencode"),
-        ),
-        Err(error) => Err(error),
-    };
-    let _ = file_access::fs::remove_dir_all(&staging);
-    placed
 }
 
 fn place(unpacked: &Path, dest: &Path) -> Result<(), String> {

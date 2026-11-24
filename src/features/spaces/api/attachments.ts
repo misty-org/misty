@@ -1,9 +1,7 @@
 import * as uploads from "./library_upload";
 import type { LibraryUploadOptions } from "./library_upload";
+import { attachmentDownloadPath } from "./attachment_paths";
 import { downloadProtectedFile, fetchProtectedBlob } from "./protected_download";
-
-const attachmentPath = (spaceId: string, attachmentId: string) =>
-  `/spaces/${encodeURIComponent(spaceId)}/attachments/${encodeURIComponent(attachmentId)}/download`;
 
 export const spaceAttachmentsApi = {
   uploadLibraryPath: (
@@ -22,7 +20,7 @@ export const spaceAttachmentsApi = {
   discardUnsentAttachment: (spaceId: string, uploadId: string) =>
     uploads.discardUnsentAttachment(spaceId, uploadId),
   attachmentContent: (spaceId: string, attachmentId: string) =>
-    fetchProtectedBlob(attachmentPath(spaceId, attachmentId)),
+    fetchProtectedBlob(attachmentDownloadPath(spaceId, attachmentId)),
   downloadAttachment: (spaceId: string, attachmentId: string, filename: string) =>
-    downloadProtectedFile(attachmentPath(spaceId, attachmentId), filename),
+    downloadProtectedFile(attachmentDownloadPath(spaceId, attachmentId), filename),
 };

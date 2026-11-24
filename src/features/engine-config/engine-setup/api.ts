@@ -9,9 +9,6 @@ export interface EngineSettings {
   binOverrides?: Record<string, unknown>;
   codexHome?: string | null;
   customModels?: Record<string, string[]>;
-  dshHost?: string | null;
-  dshPort?: number | null;
-  dshAutoStart?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -55,66 +52,3 @@ export function useEngineSettings() {
   const retry = useCallback(() => void reload(), [reload]);
   return { settings: resource.data ?? null, loadError, retry, save };
 }
-
-export interface PiFamilyAuthProviderSnapshot {
-  id: string;
-  envVar: string | null;
-  state: "configured" | "none";
-  maskedKey?: string | null;
-  keySource?: string | null;
-}
-
-export interface PiFamilyAuthListResult {
-  store: { path: string; kind: string; exists: boolean };
-  providers: PiFamilyAuthProviderSnapshot[];
-  oauthProviders: string[];
-}
-
-export interface PiFamilyCustomProviderSummary {
-  id: string;
-  name: string | null;
-  baseUrl: string | null;
-  api: string | null;
-  modelCount: number;
-  hasApiKey: boolean;
-}
-
-export interface PiFamilyModelsConfigReadResult {
-  file: { path: string; format: "json" | "yaml"; exists: boolean };
-  text: string | null;
-  template: string;
-  providers: PiFamilyCustomProviderSummary[];
-  parseError: string | null;
-}
-
-export const piFamilyApi = {
-  list: (engine: "pi" | "omp") => invoke<PiFamilyAuthListResult>("pi_family_auth_list", { engine }),
-  setApiKey: (engine: "pi" | "omp", providerId: string, key: string) =>
-    invoke<void>("pi_family_auth_set_api_key", { engine, providerId, key }),
-  deleteCredential: (engine: "pi" | "omp", providerId: string) =>
-    invoke<void>("pi_family_auth_delete_credential", { engine, providerId }),
-  readModels: (engine: "pi" | "omp") =>
-    invoke<PiFamilyModelsConfigReadResult>("pi_family_models_config_read", { engine }),
-  writeModels: (engine: "pi" | "omp", text: string) =>
-    invoke<void>("pi_family_models_config_write", { engine, text }),
-};
-
-export interface DshHostStatus {
-  installed: boolean;
-  version: string | null;
-  host: string;
-  port: number;
-  origin: string;
-  autoStart: boolean;
-  running: boolean;
-  ownership: "spawned" | "adopted" | null;
-  describe: Record<string, unknown> | null;
-  webUrl: string | null;
-  error: string | null;
-}
-
-export const dshHostApi = {
-  status: () => invoke<DshHostStatus>("dsh_host_status"),
-  start: () => invoke<DshHostStatus>("dsh_host_start"),
-  stop: () => invoke<{ ok: boolean }>("dsh_host_stop"),
-};

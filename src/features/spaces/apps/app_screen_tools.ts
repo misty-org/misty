@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { LocalToolRejected, loadRunEntry, usePersonalAgentsStore } from "@/features/agents";
+import { LocalToolRejected } from "@/features/agents";
 import type { LocalToolHandler } from "@/features/agents";
+import { agentOfRun, noteAppAgent } from "./app_agents";
 import type { ScreenChannel } from "./app_screen";
 import { ScreenRefused, useAppControl } from "./app_screen";
 
@@ -106,12 +107,9 @@ export function createScreenTools(options: {
   ];
 
   const agentOf = async (runId: string) => {
-    const entry = await loadRunEntry(runId).catch(() => null);
-    const agentId = entry?.agentId ?? runId;
-    const agent = usePersonalAgentsStore
-      .getState()
-      .agents.find((candidate) => candidate.id === agentId);
-    return { agentId, name: agent?.name || "Agent" };
+    const agent = await agentOfRun(runId);
+    noteAppAgent(instance, agent);
+    return { agentId: agent.id, name: agent.name };
   };
   const inControl = () => {
     if (useAppControl.getState().held[instance])

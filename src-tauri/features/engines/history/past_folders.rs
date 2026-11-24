@@ -116,20 +116,6 @@ fn find_all() -> Found {
     let claude = crate::engines::engine_home(Some("CLAUDE_CONFIG_DIR"), ".claude");
     find_claude(&claude.join("projects"), &mut found);
     find_codex(&crate::engines::codex_home(), &mut found);
-    for home in [".pi", ".omp"] {
-        let sessions = crate::engines::engine_home(None, home)
-            .join("agent")
-            .join("sessions");
-        find_pi_family(&sessions, &mut found);
-    }
-    for root in super::discovery::dir_session_anchor_roots("dsh") {
-        find_dsh(&root, &mut found);
-    }
-    let gemini = crate::engines::engine_home(Some("GEMINI_CLI_HOME"), ".gemini");
-    let qwen = crate::engines::engine_home(None, ".qwen");
-    for home in [gemini, qwen] {
-        find_gemini_family(&home.join("tmp"), &mut found);
-    }
     super::past_folders_stores::find_stores(&mut found);
     found
 }
@@ -170,18 +156,9 @@ fn newest_files(dir: &Path, ending: &str) -> Vec<(PathBuf, i64)> {
         .collect()
 }
 
-pub(super) fn from_head(
-    path: &Path,
-    zstd_compressed: bool,
-    pick: impl Fn(&str) -> Option<String>,
-) -> Option<String> {
+pub(super) fn from_head(path: &Path, pick: impl Fn(&str) -> Option<String>) -> Option<String> {
     use std::io::Read;
-    let file = file_access::fs::File::open(path).ok()?;
-    let mut reader: Box<dyn Read> = if zstd_compressed {
-        Box::new(zstd::stream::read::Decoder::new(std::io::BufReader::new(file)).ok()?)
-    } else {
-        Box::new(file)
-    };
+    let mut reader = file_access::fs::File::open(path).ok()?;
     let mut head = Vec::new();
     let mut chunk = vec![0u8; CHUNK_BYTES];
     while head.len() < HEAD_BYTES {
@@ -246,7 +223,7 @@ pub(super) fn find_claude(projects: &Path, found: &mut Found) {
         };
         let cwd = known(&dir).or_else(|| {
             files.iter().take(MAX_FILES_PER_DIR).find_map(|(file, _)| {
-                from_head(file, false, |head| {
+                from_head(file, |head| {
                     json_paths(head, "cwd").into_iter().find(|cwd| matches(cwd))
                 })
             })
@@ -268,7 +245,7 @@ pub(super) fn find_codex(home: &Path, found: &mut Found) {
             continue;
         };
         let cwd = known(&file).or_else(|| {
-            from_head(&file, false, |head| {
+            from_head(&file, |head| {
                 head.contains("\"session_meta\"")
                     .then(|| json_path(head, "cwd"))
                     .flatten()
@@ -308,86 +285,6 @@ fn newest_rollouts(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) {
             out.push(path);
         }
     }
-}
-
-pub(super) fn find_pi_family(sessions: &Path, found: &mut Found) {
-    for (dir, _) in newest_entries(sessions, true).into_iter().take(MAX_DIRS) {
-        let files = newest_files(&dir, ".jsonl");
-        let Some(&(_, last)) = files.first() else {
-            continue;
-        };
-        let cwd = known(&dir).or_else(|| {
-            files
-                .iter()
-                .take(MAX_FILES_PER_DIR)
-                .find_map(|(file, _)| from_head(file, false, |head| json_path(head, "cwd")))
-        });
-        if let Some(cwd) = cwd {
-            remember(&dir, &cwd);
-            found.add(&cwd, last);
-        }
-    }
-}
-
-pub(super) fn find_dsh(sessions: &Path, found: &mut Found) {
-    for (dir, _) in newest_entries(sessions, true).into_iter().take(MAX_DIRS) {
-        let chats = newest_entries(&dir, true);
-        let Some(&(_, last)) = chats.first() else {
-            continue;
-        };
-        let cwd = known(&dir).or_else(|| {
-            chats.iter().take(MAX_FILES_PER_DIR).find_map(|(chat, _)| {
-                newest_files(chat, ".jsonl.zstd")
-                    .into_iter()
-                    .filter(|(file, _)| {
-                        file.file_name()
-                            .and_then(|name| name.to_str())
-                            .and_then(super::discovery::dsh_log_generation)
-                            .is_some()
-                    })
-                    .find_map(|(file, _)| from_head(&file, true, |head| json_path(head, "cwd")))
-            })
-        });
-        if let Some(cwd) = cwd {
-            remember(&dir, &cwd);
-            found.add(&cwd, last);
-        }
-    }
-}
-
-pub(super) fn find_gemini_family(tmp: &Path, found: &mut Found) {
-    for (project, _) in newest_entries(tmp, true).into_iter().take(MAX_DIRS) {
-        let files = newest_files(&project.join("chats"), ".jsonl");
-        let Some(&(_, last)) = files.first() else {
-            continue;
-        };
-        let cwd = known(&project).or_else(|| {
-            files
-                .iter()
-                .take(MAX_FILES_PER_DIR)
-                .find_map(|(file, _)| from_head(file, false, gemini_folder))
-        });
-        if let Some(cwd) = cwd {
-            remember(&project, &cwd);
-            found.add(&cwd, last);
-        }
-    }
-}
-
-fn gemini_folder(head: &str) -> Option<String> {
-    let complete = head.rsplit_once('\n').map_or("", |(lines, _)| lines);
-    complete.lines().find_map(|line| {
-        let value: serde_json::Value = serde_json::from_str(line.trim()).ok()?;
-        let cwd = value.get("cwd").and_then(serde_json::Value::as_str);
-        let first_dir = value
-            .get("directories")
-            .and_then(serde_json::Value::as_array)
-            .and_then(|dirs| dirs.first())
-            .and_then(serde_json::Value::as_str);
-        cwd.or(first_dir)
-            .filter(|path| Path::new(path).is_absolute())
-            .map(str::to_string)
-    })
 }
 
 #[cfg(test)]

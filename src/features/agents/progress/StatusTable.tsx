@@ -1,6 +1,6 @@
 import { Check, Circle, CircleAlert, CircleMinus, CircleX, LoaderCircle } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn, Surface, Text, type TextTone } from "@misty/ui";
+import { cn, Spinner, Surface, Text, type TextTone } from "@misty/ui";
 import { remCss } from "@misty/ui";
 
 export type StatusState =
@@ -99,7 +99,7 @@ export function StatusRow({
           tone={iconTone[state] ?? "muted"}
           className="flex h-lh shrink-0 items-center self-start"
         >
-          <Icon aria-hidden="true" className={running ? "animate-spin" : undefined} />
+          {running ? <Spinner label={false} /> : <Icon aria-hidden="true" />}
         </Text>
       ) : null}
       {verb ? (

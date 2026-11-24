@@ -10,7 +10,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { routes } from "@/app/shell";
 import type { AgentProfile } from "@/shared/schemas/native_agents";
-import { EmptyState, StarterPrompts, Text, type StarterPrompt } from "@misty/ui";
+import { EmptyState, StarterPrompts, type StarterPrompt } from "@misty/ui";
+import { AgentWelcome } from "../conversations/view/AgentWelcome";
 import { useMistyStore } from "../conversations/state/use_misty_store";
 import { useDefaultEngine } from "../engines/default_engine";
 import { useNow } from "@/shared/hooks/use_now";
@@ -54,30 +55,15 @@ export function ChatStart({ agent }: { agent: AgentProfile }) {
     );
   }
   return (
-    <div className="mx-auto mb-5 px-5 text-center">
-      <Text
-        as="h1"
-        wrap
-        size="display"
-        tone="bright"
-        weight="regular"
-        className="m-0 leading-[1.3] tracking-[-0.01em]"
-      >
-        {greetingFor(new Date(now))}. What's on your mind?
-      </Text>
+    <div className="flex min-h-full flex-col justify-end pt-4 pb-6">
+      <AgentWelcome agent={agent} line={`${greetingFor(new Date(now))}. What's on your mind?`}>
+        <StarterPrompts
+          label="Ideas to start with"
+          align="start"
+          prompts={ideas}
+          onPick={(picked) => useMistyStore.getState().setQuery(picked.prompt)}
+        />
+      </AgentWelcome>
     </div>
-  );
-}
-
-export function ChatStartIdeas({ agent }: { agent: AgentProfile }) {
-  if (useNeedsSetup(agent)) return null;
-  return (
-    <StarterPrompts
-      variant="chips"
-      label="Ideas to start with"
-      prompts={ideas}
-      onPick={(picked) => useMistyStore.getState().setQuery(picked.prompt)}
-      className="mt-3"
-    />
   );
 }

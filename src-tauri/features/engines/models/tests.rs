@@ -2,27 +2,6 @@
 use super::*;
 
 #[test]
-fn top_level_model_stops_at_first_table() {
-    let toml = "\
-model_provider = \"OpenAI\"
-model = \"gpt-5.6-sol\"   # active
-review_model = 'gpt-5.6-mini'
-
-[model_providers.OpenAI]
-model = \"must-not-leak\"
-";
-    assert_eq!(
-        parse_top_level_toml_string(toml, "model"),
-        Some("gpt-5.6-sol".to_string())
-    );
-    assert_eq!(
-        parse_top_level_toml_string("[features]\nmodel = \"x\"", "model"),
-        None
-    );
-    assert_eq!(parse_top_level_toml_string("model = ''", "model"), None);
-}
-
-#[test]
 fn default_entry_leads_the_catalog() {
     let listed = vec![
         EngineModel {

@@ -1,6 +1,12 @@
 import { dockTreeViews } from "../panes/dock_tree";
 import { isEmptyTab } from "../panes/layout_tabs";
-import type { WorkspaceDockNode, WorkspaceTab, WorkspaceView } from "./workspace_views";
+import { isTabGroupColor } from "@misty/ui";
+import type {
+  WorkspaceDockNode,
+  WorkspaceTab,
+  WorkspaceTabGroup,
+  WorkspaceView,
+} from "./workspace_views";
 import type { WorkspaceSide } from "./workspace_sides";
 
 interface StoredView {
@@ -30,7 +36,18 @@ export interface TabFields {
   order: number;
   side?: WorkspaceSide;
   title?: string;
+  group?: { id: string; title: string; color: WorkspaceTabGroup["color"] };
   tree: StoredNode;
+}
+
+export function fieldsGroup(fields: TabFields): WorkspaceTabGroup | undefined {
+  const group = fields.group;
+  if (!group || typeof group.id !== "string" || !isTabGroupColor(group.color)) return undefined;
+  return {
+    id: group.id,
+    title: typeof group.title === "string" ? group.title : "",
+    color: group.color,
+  };
 }
 
 export function tabStaysHere(tab: WorkspaceTab): boolean {
@@ -71,11 +88,17 @@ function storedNode(node: WorkspaceDockNode): StoredNode {
   };
 }
 
-export function tabFields(tab: WorkspaceTab, order: number, side?: WorkspaceSide): TabFields {
+export function tabFields(
+  tab: WorkspaceTab,
+  order: number,
+  side?: WorkspaceSide,
+  group?: WorkspaceTabGroup,
+): TabFields {
   return {
     order,
     ...(side ? { side } : {}),
     ...(tab.title ? { title: tab.title } : {}),
+    ...(group ? { group: { id: group.id, title: group.title, color: group.color } } : {}),
     tree: storedNode(tab.root),
   };
 }
@@ -154,7 +177,7 @@ export function tabFromFields(
         ? previous.focusedPaneId
         : firstLeafId(fields.tree),
     ...(fields.title ? { title: fields.title } : {}),
-    ...(previous?.group ? { group: previous.group } : {}),
+    ...(fieldsGroup(fields) ? { group: fieldsGroup(fields)!.id } : {}),
   };
 }
 

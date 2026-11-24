@@ -19,6 +19,7 @@ export function DirectMessageIntro({
   const avatarUrl = useMemberAvatarUrl(spaceId, recipient.userId);
   return (
     <ChannelWelcome
+      align="center"
       mark={
         <ChatAvatar
           id={recipient.userId}
@@ -41,7 +42,7 @@ function useMemberAvatarUrl(spaceId: string, userId: string): string {
     let objectUrl = "";
     setUrl("");
     void spacesApi
-      .memberAvatar(spaceId, userId)
+      .personAvatar(userId)
       .then((blob) => {
         if (canceled) return;
         objectUrl = URL.createObjectURL(blob);

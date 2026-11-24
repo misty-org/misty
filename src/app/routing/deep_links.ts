@@ -1,5 +1,5 @@
 import { deliverGoogleSignInCode } from "@/features/account";
-import { openSetupDeepLink } from "@/features/account";
+import { openDeviceApproval, openSetupDeepLink } from "@/features/account";
 import { isLinkTargetWindow } from "@/features/app-windows";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -83,6 +83,10 @@ export function routeForMistyDeepLink(
   }
   if (first === "setup") {
     openSetupDeepLink(rawUrl);
+    return null;
+  }
+  if (first === "device" && !rest.length) {
+    openDeviceApproval(url.searchParams.get("code") ?? "");
     return null;
   }
   return normalizeDeepLinkRoute(parts, url.search, isRouteAllowed);

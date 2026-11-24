@@ -129,7 +129,7 @@ pub(crate) fn acp_agent_request(
     params: &Value,
 ) -> Option<Value> {
     let Some(gate) = gate.filter(|gate| !gate.bypass) else {
-        return Some(super::qoder_session::answer_agent_request(
+        return Some(super::acp_session::answer_agent_request(
             workspace, id, method, params,
         ));
     };
@@ -149,7 +149,7 @@ pub(crate) fn acp_agent_request(
             tokio::spawn(async move {
                 let input = json!({ "path": params["path"], "content": params["content"] });
                 let frame = match ask(&run_id, "Write", input).await {
-                    Decision::Allow => super::qoder_session::answer_agent_request(
+                    Decision::Allow => super::acp_session::answer_agent_request(
                         &workspace,
                         &id,
                         "fs/write_text_file",
@@ -165,7 +165,7 @@ pub(crate) fn acp_agent_request(
             });
             None
         }
-        _ => Some(super::qoder_session::answer_agent_request(
+        _ => Some(super::acp_session::answer_agent_request(
             workspace, id, method, params,
         )),
     }

@@ -132,7 +132,8 @@
   function adapterCall(args) {
     var adapter = window.mistyAdapter;
     if (!adapter || typeof adapter.call !== "function") throw new Error("This app has no adapter.");
-    return adapter.call(String(args.name || ""), args.args || {});
+    var agent = args.agent && typeof args.agent.id === "string" ? { id: args.agent.id, name: String(args.agent.name || "Agent") } : null;
+    return adapter.call(String(args.name || ""), args.args || {}, { agent: agent });
   }
 
   var commands = {

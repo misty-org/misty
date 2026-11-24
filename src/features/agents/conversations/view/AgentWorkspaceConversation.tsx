@@ -58,7 +58,6 @@ export function AgentWorkspaceConversation({
   agent,
   conversationId,
   emptyContent,
-  emptyFooter,
   initialDraft = "",
   spaceId: _legacySpaceId,
   accountId,
@@ -71,7 +70,6 @@ export function AgentWorkspaceConversation({
   agent?: AgentProfile;
   conversationId?: string;
   emptyContent?: ReactNode;
-  emptyFooter?: ReactNode;
   initialDraft?: string;
   spaceId: string;
   accountId: string;
@@ -366,6 +364,7 @@ export function AgentWorkspaceConversation({
         <AgentConversationTranscript
           view={{
             conversation,
+            agent,
             working: shownWorking,
             onRetry: retryPrompt,
             onResume: resumeLedger,
@@ -388,7 +387,7 @@ export function AgentWorkspaceConversation({
         messages={conversation?.messages}
         scrollRef={scrollRef}
       />
-      <div className="agent-compose-area mx-auto w-full max-w-209 shrink-0 px-6 pt-3 pb-4">
+      <div className="agent-compose-area w-full shrink-0 px-4 pb-4">
         <AgentComposeError
           error={state.error}
           reconnect={state.working && Boolean(state.invocationId)}
@@ -476,9 +475,7 @@ export function AgentWorkspaceConversation({
               />
             </>
           }
-          empty={!conversation?.messages.length}
         />
-        {conversation?.messages.length ? null : emptyFooter}
       </div>
     </section>
   );

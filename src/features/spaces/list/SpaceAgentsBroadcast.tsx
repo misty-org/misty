@@ -79,7 +79,7 @@ export function SpaceAgentsBroadcast() {
     for (const userId of owners) {
       if (userId in faces) continue;
       const version = members?.find((member) => member.user_id === userId)?.avatar_version ?? 0;
-      void memberPicture(spaceId, userId, version).then((url) => {
+      void memberPicture(userId, version).then((url) => {
         if (live) setFaces((known) => (userId in known ? known : { ...known, [userId]: url }));
       });
     }
