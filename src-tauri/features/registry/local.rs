@@ -14,8 +14,8 @@ mod overlay {
             .filter(|path| path.is_file())
     }
 
-    fn builds_folder() -> Option<PathBuf> {
-        pins_file()?.parent()?.join("builds").canonicalize().ok()
+    fn work_folder(name: &str) -> Option<PathBuf> {
+        pins_file()?.parent()?.join(name).canonicalize().ok()
     }
 
     pub fn with_local_apps(mut apps: Value) -> Value {
@@ -46,15 +46,16 @@ mod overlay {
 
     pub fn read_build(url: &url::Url, max: u64) -> Result<Vec<u8>, String> {
         let refused = || "Only the registry's local builds open from this computer.".to_owned();
-        let folder = builds_folder().ok_or_else(refused)?;
         let path = url
             .to_file_path()
             .map_err(|()| refused())?
             .canonicalize()
             .map_err(|_| refused())?;
-        if !path.starts_with(&folder)
-            || path.extension().and_then(|ext| ext.to_str()) != Some("zip")
-        {
+        let within = |name: &str, extension: &str| {
+            work_folder(name).is_some_and(|folder| path.starts_with(folder))
+                && path.extension().and_then(|ext| ext.to_str()) == Some(extension)
+        };
+        if !within("builds", "zip") && !within("files", "js") {
             return Err(refused());
         }
         let size = std::fs::metadata(&path).map_err(|_| refused())?.len();

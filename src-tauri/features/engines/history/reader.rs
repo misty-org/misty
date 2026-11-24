@@ -232,16 +232,16 @@ mod tests {
         {
             let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
             assert_eq!(
-                rename_session_in(&db, "codex", "missing", "title"),
+                rename_session_in(&db, "qoder", "missing", "title"),
                 Err("CCGUI_SESSION_NOT_FOUND".to_string())
             );
             db.0.lock().execute(
                     "INSERT INTO cli_sessions(engine, session_id, workspace_path, file_path, file_size, file_mtime_ms)
-                     VALUES('codex', 'sid', '/ws', '/ws/sid.jsonl', 1, 1)", [],
+                     VALUES('qoder', 'sid', '/ws', '/ws/sid.jsonl', 1, 1)", [],
                 ).unwrap();
             assert!(rename_session_in(&db, "claude", "sid", "wrong engine").is_err());
-            rename_session_in(&db, "codex", "sid", "  新标题  ").unwrap();
-            rename_session_in(&db, "codex", "sid", "新标题").unwrap();
+            rename_session_in(&db, "qoder", "sid", "  新标题  ").unwrap();
+            rename_session_in(&db, "qoder", "sid", "新标题").unwrap();
             assert_eq!(
                 list_sessions_from(&db).unwrap()[0].custom_title.as_deref(),
                 Some("新标题")
@@ -253,7 +253,7 @@ mod tests {
                 list_sessions_from(&db).unwrap()[0].custom_title.as_deref(),
                 Some("新标题")
             );
-            rename_session_in(&db, "codex", "sid", "   ").unwrap();
+            rename_session_in(&db, "qoder", "sid", "   ").unwrap();
             assert_eq!(list_sessions_from(&db).unwrap()[0].custom_title, None);
         }
         std::fs::remove_dir_all(&home).unwrap();

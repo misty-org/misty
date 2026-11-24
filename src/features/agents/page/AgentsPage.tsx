@@ -93,11 +93,6 @@ function AgentsWorkspacePage() {
   const agentSpace = profile ? homeSpaceOf(user?.id ?? "", profile) : "";
   const others = useOthersThreads(agentSpace, profile?.id ?? "", user?.id ?? "");
   const pickedThread = others.others?.find((thread) => thread.id === openThread);
-  const openTheirs = (threadId: string) => {
-    const next = new URLSearchParams(state.params);
-    next.set("thread", threadId);
-    setParams(next);
-  };
   const theirs =
     !openThread || !profile ? undefined : pickedThread ? (
       <SharedThreadView

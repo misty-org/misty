@@ -1,8 +1,10 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/history/scanner.rs.
 use super::discovery::{
-    codex_candidates, discover_agy, discover_claude, identify_head, is_codex_subagent_file,
-    path_is_under,
+    codex_candidates, discover_agy, discover_claude, discover_grok, discover_kimi,
+    discover_minimax, discover_qoder, identify_head, is_codex_subagent_file, path_is_under,
+    qoder_transcript_conflicts_with_workspace,
 };
+use super::gemini_family::discover_gemini_family;
 use super::{same_or_child, scan_summary_file, stat_signature, ScanSummary};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -76,7 +78,21 @@ fn gather_candidates(workspaces: &[String]) -> Vec<Candidate> {
         let workspace = PathBuf::from(workspace_path);
         for file in discover_claude(&workspace)
             .into_iter()
+            .chain(discover_kimi(&workspace))
+            .chain(discover_grok(&workspace))
             .chain(discover_agy(&workspace))
+            .chain(discover_minimax(&workspace))
+            .chain(discover_qoder(
+                &workspace,
+                crate::engines::qoder::QoderDistribution::Global,
+            ))
+            .chain(discover_qoder(
+                &workspace,
+                crate::engines::qoder::QoderDistribution::Cn,
+            ))
+            .chain(discover_gemini_family("gemini", &workspace))
+            .chain(discover_gemini_family("qwen", &workspace))
+            .chain(super::hermes::discover_hermes(&workspace))
         {
             if seen_paths.insert(file.file_path.clone()) {
                 candidates.push(Candidate {
@@ -441,11 +457,11 @@ fn prune_missing_file_sessions(
     candidates: &[Candidate],
 ) -> Result<bool, String> {
     let live: HashSet<PathBuf> = candidates.iter().map(|c| c.path.clone()).collect();
-    let rows: Vec<(String, String, String)> = {
+    let rows: Vec<(String, String, String, String)> = {
         let conn = db.0.lock();
         let mut stmt = conn
             .prepare(
-                "SELECT engine, session_id, file_path
+                "SELECT engine, session_id, file_path, workspace_path
                  FROM cli_sessions WHERE file_path <> ''",
             )
             .map_err(|e| e.to_string())?;
@@ -455,6 +471,7 @@ fn prune_missing_file_sessions(
                     r.get::<_, String>(0)?,
                     r.get::<_, String>(1)?,
                     r.get::<_, String>(2)?,
+                    r.get::<_, String>(3)?,
                 ))
             })
             .map_err(|e| e.to_string())?;
@@ -469,9 +486,18 @@ fn prune_missing_file_sessions(
     };
     let mut attached: HashMap<PathBuf, bool> = HashMap::new();
     let mut dead: Vec<(String, String)> = Vec::new();
-    for (engine, session_id, file_path) in rows {
+    for (engine, session_id, file_path, workspace_path) in rows {
         let path = PathBuf::from(&file_path);
-        if live.contains(&path) || is_remote_path(&file_path) {
+        if live.contains(&path)
+            || is_remote_path(&file_path)
+            || super::split_opencode_db_path(&path).is_some()
+        {
+            continue;
+        }
+        if matches!(engine.as_str(), "qoder" | "qoder-cn")
+            && qoder_transcript_conflicts_with_workspace(&path, Path::new(&workspace_path))
+        {
+            dead.push((engine, session_id));
             continue;
         }
         if definitely_missing(&path, &mut attached) {
@@ -683,7 +709,12 @@ pub(super) mod tests {
 
     pub(crate) use crate::engines::support::paths::HOME_ENV_LOCK as HOME_LOCK;
 
-    const ENGINE_HOME_KEYS: [&str; 2] = ["CLAUDE_CONFIG_DIR", "CODEX_HOME"];
+    const ENGINE_HOME_KEYS: [&str; 4] = [
+        "CLAUDE_CONFIG_DIR",
+        "CODEX_HOME",
+        "KIMI_HOME",
+        "MINIMAX_DATA_DIR",
+    ];
 
     pub struct HomeGuard {
         _lock: parking_lot::MutexGuard<'static, ()>,
@@ -1194,7 +1225,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn file_gc_skips_remote_paths() -> Result<(), String> {
+    fn file_gc_skips_remote_and_synthetic_paths() -> Result<(), String> {
         let home = scratch_dir(&format!("gc-shapes-{}", uuid::Uuid::new_v4()));
         let _guard = HomeGuard::set(&home);
         let workspace = home.join("ws");
@@ -1204,6 +1235,7 @@ pub(super) mod tests {
         let live_file = home.join("live.jsonl");
         std::fs::write(&live_file, "{}\n").map_err(|e| e.to_string())?;
         let ghost_file = home.join("ghost.jsonl");
+        let synthetic = super::super::opencode_db_session_path(&home.join("opencode.db"), "abc123");
         {
             let conn = db.0.lock();
             for (engine, id, path) in [
@@ -1223,6 +1255,11 @@ pub(super) mod tests {
                     "claude",
                     "extended-local",
                     format!("\\\\?\\{}", ghost_file.to_string_lossy()),
+                ),
+                (
+                    "opencode",
+                    "synthetic",
+                    synthetic.to_string_lossy().into_owned(),
                 ),
             ] {
                 conn.execute(
@@ -1244,6 +1281,7 @@ pub(super) mod tests {
         assert_eq!(session_count(&db, "claude", "unc"), 1);
         assert_eq!(session_count(&db, "claude", "extended"), 1);
         assert_eq!(session_count(&db, "claude", "extended-local"), 0);
+        assert_eq!(session_count(&db, "opencode", "synthetic"), 1);
         assert!(!prune_missing_file_sessions(&db, &candidates)?);
         drop(db);
         std::fs::remove_dir_all(&home).ok();
@@ -1433,6 +1471,329 @@ pub(super) mod tests {
                 assert!(!storage_attached(&sessions, &mut verdicts));
             }
         }
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn scan_grok_titles_from_user_query_and_uses_mtime() -> Result<(), String> {
+        let home = scratch_dir("scan-grok-home");
+        let workspace = home.join("ws");
+        std::fs::create_dir_all(&workspace).map_err(|e| e.to_string())?;
+        let encoded: String = workspace
+            .to_string_lossy()
+            .bytes()
+            .map(|b| {
+                if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+                    (b as char).to_string()
+                } else {
+                    format!("%{b:02X}")
+                }
+            })
+            .collect();
+        let session_dir = home
+            .join(".grok")
+            .join("sessions")
+            .join(&encoded)
+            .join("sid-grok");
+        std::fs::create_dir_all(&session_dir).map_err(|e| e.to_string())?;
+        std::fs::write(
+            session_dir.join("chat_history.jsonl"),
+            concat!(
+                "{\"type\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"<user_info>\\nOS Version: macos\\n</user_info>\"}]}\n",
+                "{\"type\":\"user\",\"synthetic_reason\":\"system_reminder\",\"content\":[{\"type\":\"text\",\"text\":\"<system-reminder>x</system-reminder>\"}]}\n",
+                "{\"type\":\"user\",\"prompt_index\":0,\"content\":[{\"type\":\"text\",\"text\":\"<user_query>这个鼠标移动上去</user_query>\"}]}\n",
+                "{\"type\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}\n",
+            ),
+        )
+        .map_err(|e| e.to_string())?;
+
+        let _guard = HomeGuard::set(&home);
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db"))
+            .map_err(|e| e.to_string())?;
+        {
+            let conn = db.0.lock();
+            conn.execute(
+                "INSERT INTO cli_workspaces(id, path, name) VALUES('w1', ?1, 'ws')",
+                [workspace.to_string_lossy().to_string()],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        let report = scan_with(&db, || {})?;
+        assert_eq!(report.reparsed, 1);
+        let (title, updated_at): (String, Option<i64>) = {
+            let conn = db.0.lock();
+            conn.query_row(
+                "SELECT title, updated_at FROM cli_sessions WHERE engine='grok' AND session_id='sid-grok'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .map_err(|e| e.to_string())?
+        };
+        assert_eq!(title, "这个鼠标移动上去");
+        assert!(
+            updated_at.is_some() && updated_at.unwrap() > 0,
+            "expected mtime fallback, got {updated_at:?}"
+        );
+        drop(db);
+        std::fs::remove_dir_all(&home).ok();
+        Ok(())
+    }
+
+    fn write_qoder_session(bucket: &Path, session_id: &str, cwd: &Path) {
+        std::fs::create_dir_all(bucket).unwrap();
+        std::fs::write(
+            bucket.join(format!("{session_id}.jsonl")),
+            format!("{}\n", qoder_user_line(session_id, cwd, "第一轮")),
+        )
+        .unwrap();
+    }
+
+    fn qoder_user_line(session_id: &str, cwd: &Path, text: &str) -> serde_json::Value {
+        serde_json::json!({
+            "type": "user",
+            "sessionId": session_id,
+            "cwd": cwd.to_string_lossy(),
+            "uuid": format!("{session_id}-{text}"),
+            "timestamp": "2026-11-01T00:00:00.000Z",
+            "message": { "role": "user", "content": text },
+        })
+    }
+
+    fn register_workspace(db: &crate::engines::support::db::Db, id: &str, path: &Path) {
+        db.0.lock()
+            .execute(
+                "INSERT INTO cli_workspaces(id, path, name) VALUES(?1, ?2, ?1)",
+                rusqlite::params![id, path.to_string_lossy()],
+            )
+            .unwrap();
+    }
+
+    fn qoder_session_workspace(
+        db: &crate::engines::support::db::Db,
+        session_id: &str,
+    ) -> Option<String> {
+        db.0.lock()
+            .query_row(
+                "SELECT workspace_path FROM cli_sessions WHERE engine='qoder' AND session_id=?1",
+                [session_id],
+                |row| row.get(0),
+            )
+            .ok()
+    }
+
+    fn seed_qoder_row(
+        db: &crate::engines::support::db::Db,
+        session_id: &str,
+        workspace: &Path,
+        transcript: &Path,
+        custom_title: &str,
+    ) {
+        let (size, mtime_ms) = stat_signature(transcript).unwrap();
+        db.0.lock()
+            .execute(
+                "INSERT INTO cli_sessions(
+                    engine, session_id, workspace_path, file_path, file_size,
+                    file_mtime_ms, custom_title
+                 ) VALUES('qoder', ?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![
+                    session_id,
+                    workspace.to_string_lossy(),
+                    transcript.to_string_lossy(),
+                    size,
+                    mtime_ms,
+                    custom_title,
+                ],
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn qoder_colliding_workspaces_keep_their_own_sessions() {
+        let home = scratch_dir("qoder-collision-both");
+        let _guard = HomeGuard::set(&home);
+        let frontend = home.join("项目").join("前端");
+        let backend = home.join("项目").join("后端");
+        std::fs::create_dir_all(&frontend).unwrap();
+        std::fs::create_dir_all(&backend).unwrap();
+        let slug = super::super::claude_encode_project_path(&frontend.to_string_lossy());
+        assert_eq!(
+            slug,
+            super::super::claude_encode_project_path(&backend.to_string_lossy())
+        );
+        let bucket = home.join(".qoder").join("projects").join(&slug);
+        write_qoder_session(&bucket, "frontend-session", &frontend);
+        write_qoder_session(&bucket, "backend-session", &backend);
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        register_workspace(&db, "w1", &frontend);
+        register_workspace(&db, "w2", &backend);
+
+        scan_with(&db, || {}).unwrap();
+
+        assert_eq!(
+            qoder_session_workspace(&db, "frontend-session").as_deref(),
+            Some(&*frontend.to_string_lossy())
+        );
+        assert_eq!(
+            qoder_session_workspace(&db, "backend-session").as_deref(),
+            Some(&*backend.to_string_lossy())
+        );
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn qoder_unregistered_neighbor_stays_out_of_workspace() {
+        let home = scratch_dir("qoder-collision-neighbor");
+        let _guard = HomeGuard::set(&home);
+        let frontend = home.join("项目").join("前端");
+        let backend = home.join("项目").join("后端");
+        std::fs::create_dir_all(&frontend).unwrap();
+        let slug = super::super::claude_encode_project_path(&frontend.to_string_lossy());
+        let bucket = home.join(".qoder").join("projects").join(&slug);
+        write_qoder_session(&bucket, "backend-session", &backend);
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        register_workspace(&db, "w1", &frontend);
+
+        scan_with(&db, || {}).unwrap();
+
+        assert_eq!(qoder_session_workspace(&db, "backend-session"), None);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn qoder_new_turn_stays_in_its_workspace_after_colliding_add() {
+        let home = scratch_dir("qoder-collision-turn");
+        let _guard = HomeGuard::set(&home);
+        let dashed = home.join("my-app");
+        let spaced = home.join("my app");
+        std::fs::create_dir_all(&dashed).unwrap();
+        std::fs::create_dir_all(&spaced).unwrap();
+        let slug = super::super::claude_encode_project_path(&dashed.to_string_lossy());
+        let bucket = home.join(".qoder").join("projects").join(&slug);
+        write_qoder_session(&bucket, "dashed-session", &dashed);
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        register_workspace(&db, "w1", &dashed);
+        scan_with(&db, || {}).unwrap();
+
+        register_workspace(&db, "w2", &spaced);
+        let transcript = bucket.join("dashed-session.jsonl");
+        let mut text = std::fs::read_to_string(&transcript).unwrap();
+        text.push_str(&format!(
+            "{}\n",
+            qoder_user_line("dashed-session", &dashed, "第二轮")
+        ));
+        std::fs::write(&transcript, text).unwrap();
+        scan_with(&db, || {}).unwrap();
+
+        assert_eq!(
+            qoder_session_workspace(&db, "dashed-session").as_deref(),
+            Some(&*dashed.to_string_lossy())
+        );
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn qoder_unknown_cwd_is_not_guessed_from_cli_bucket() {
+        let home = scratch_dir("qoder-collision-unknown-cwd");
+        let _guard = HomeGuard::set(&home);
+        let frontend = home.join("项目").join("前端");
+        let backend = home.join("项目").join("后端");
+        std::fs::create_dir_all(&frontend).unwrap();
+        std::fs::create_dir_all(&backend).unwrap();
+        let slug = super::super::claude_encode_project_path(&frontend.to_string_lossy());
+        let bucket = home.join(".qoder").join("projects").join(&slug);
+        std::fs::create_dir_all(&bucket).unwrap();
+        std::fs::write(bucket.join("unknown.jsonl"), "{}\n").unwrap();
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        register_workspace(&db, "w1", &frontend);
+        register_workspace(&db, "w2", &backend);
+
+        scan_with(&db, || {}).unwrap();
+
+        assert_eq!(qoder_session_workspace(&db, "unknown"), None);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn qoder_unchanged_file_repairs_previous_workspace_attribution() {
+        let home = scratch_dir("qoder-repair-unchanged");
+        let _guard = HomeGuard::set(&home);
+        let frontend = home.join("项目").join("前端");
+        let backend = home.join("项目").join("后端");
+        std::fs::create_dir_all(&frontend).unwrap();
+        std::fs::create_dir_all(&backend).unwrap();
+        let slug = super::super::claude_encode_project_path(&frontend.to_string_lossy());
+        let bucket = home.join(".qoder").join("projects").join(&slug);
+        write_qoder_session(&bucket, "frontend-session", &frontend);
+        let transcript = bucket.join("frontend-session.jsonl");
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        register_workspace(&db, "w1", &frontend);
+        register_workspace(&db, "w2", &backend);
+        seed_qoder_row(&db, "frontend-session", &backend, &transcript, "保留标题");
+
+        scan_with(&db, || {}).unwrap();
+
+        assert_eq!(
+            qoder_session_workspace(&db, "frontend-session").as_deref(),
+            Some(&*frontend.to_string_lossy())
+        );
+        let title: String = db
+            .0
+            .lock()
+            .query_row(
+                "SELECT custom_title FROM cli_sessions WHERE engine='qoder' AND session_id='frontend-session'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(title, "保留标题");
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn qoder_confirmed_old_misattribution_is_pruned() {
+        let home = scratch_dir("qoder-prune-misattributed");
+        let _guard = HomeGuard::set(&home);
+        let frontend = home.join("项目").join("前端");
+        let backend = home.join("项目").join("后端");
+        std::fs::create_dir_all(&frontend).unwrap();
+        let slug = super::super::claude_encode_project_path(&frontend.to_string_lossy());
+        let bucket = home.join(".qoder").join("projects").join(&slug);
+        write_qoder_session(&bucket, "backend-session", &backend);
+        let transcript = bucket.join("backend-session.jsonl");
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        register_workspace(&db, "w1", &frontend);
+        seed_qoder_row(&db, "backend-session", &frontend, &transcript, "旧标题");
+
+        scan_with(&db, || {}).unwrap();
+
+        assert_eq!(qoder_session_workspace(&db, "backend-session"), None);
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn qoder_detached_workspace_alias_keeps_indexed_metadata() {
+        let home = scratch_dir("qoder-detached-alias");
+        let _guard = HomeGuard::set(&home);
+        let target = home.join("detached-target");
+        let workspace = home.join("workspace-link");
+        std::fs::create_dir_all(&target).unwrap();
+        std::os::unix::fs::symlink(&target, &workspace).unwrap();
+        let slug = super::super::claude_encode_project_path(&target.to_string_lossy());
+        let bucket = home.join(".qoder").join("projects").join(&slug);
+        write_qoder_session(&bucket, "detached-session", &target);
+        let transcript = bucket.join("detached-session.jsonl");
+        let db = crate::engines::support::db::Db::open_at(&home.join("app.db")).unwrap();
+        register_workspace(&db, "w1", &workspace);
+        seed_qoder_row(&db, "detached-session", &workspace, &transcript, "保留标题");
+        std::fs::remove_dir_all(&target).unwrap();
+
+        scan_with(&db, || {}).unwrap();
+
+        assert_eq!(
+            qoder_session_workspace(&db, "detached-session").as_deref(),
+            Some(&*workspace.to_string_lossy())
+        );
         std::fs::remove_dir_all(&home).ok();
     }
 }

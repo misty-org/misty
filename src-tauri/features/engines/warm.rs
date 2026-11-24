@@ -203,6 +203,7 @@ pub(crate) struct WarmAcp {
     pub(crate) spawned: super::acp_session::SpawnedAcp,
     pub(crate) session_id: String,
     pub(crate) effort: Option<String>,
+    pub(crate) known: super::acp_session::AcpSessionState,
 }
 
 impl WarmAcp {

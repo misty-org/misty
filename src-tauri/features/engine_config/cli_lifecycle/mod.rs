@@ -3,8 +3,9 @@
 //
 // The engine CLIs' lifecycle in Settings › Engines and first run: the local version
 // (`<cli> --version`), the latest one on npm, installing and updating, and whether the person is
-// signed in, asked of the CLI itself (Misty never opens a CLI's credential files), and signing in
-// through the CLI's own login in a terminal (`sign_in.rs`).
+// signed in, asked of the CLI itself or, for Gemini CLI and Qwen Code, read from the sign-in way
+// their settings name (Misty never opens a CLI's credential files), and signing in through the
+// CLI's own login in a terminal (`sign_in.rs`).
 //
 // Every install runs inside the app with its output streamed to the dialog, never typed into a
 // terminal (`routes.rs`). An engine already on the computer is used as it is; a missing one goes
@@ -27,7 +28,9 @@ use tokio::time::timeout;
 use super::support;
 use crate::engines::support::paths::own_copy_env;
 
+mod developer_tools;
 mod downloads;
+mod hermes_launchers;
 #[cfg(windows)]
 pub(crate) mod job;
 mod maker_builds;
@@ -37,6 +40,7 @@ mod routes;
 pub mod sign_in;
 mod uninstall;
 pub(crate) mod upkeep;
+mod user_path;
 
 pub use plan::CliUpdatePlan;
 
@@ -55,6 +59,9 @@ const CAPTURE_CAP_BYTES: usize = 1024 * 1024;
 fn npm_package(engine: &str) -> Option<&'static str> {
     match engine {
         "claude" => Some("@anthropic-ai/claude-code"),
+        "gemini" => Some("@google/gemini-cli"),
+        "qwen" => Some("@qwen-code/qwen-code"),
+        "kimi" => Some("@moonshot-ai/kimi-code"),
         "codex" => Some("@openai/codex"),
         _ => None,
     }
@@ -73,7 +80,12 @@ pub struct CliVersionStatus {
 }
 
 fn cli_binary_name(engine: &str) -> &str {
-    engine
+    match engine {
+        "minimax" => "mcode",
+        "qoder" => "qodercli",
+        "qoder-cn" => "qoderclicn",
+        _ => engine,
+    }
 }
 
 pub(crate) fn engine_bin(engine: &str) -> String {
@@ -291,6 +303,13 @@ pub async fn engine_cli_update(engine: String, run_id: String) -> Result<UpdateR
     let installed = probe_local_version(&bin).await.installed;
     let route = route_for(&engine, &bin, installed)
         .ok_or_else(|| format!("Misty can't install or update {engine} for you."))?;
+    if developer_tools::needed(&engine, route).await {
+        developer_tools::open_installer(&reporter).await?;
+        return Ok(UpdateResult {
+            ok: true,
+            version: None,
+        });
+    }
     routes::run(&engine, route, &bin, &reporter).await?;
     let probe = probe_local_version(&engine_bin(&engine)).await;
     if !probe.installed {
@@ -549,6 +568,8 @@ fn sign_in_status_args(engine: &str) -> Option<&'static [&'static str]> {
     match engine {
         "claude" => Some(&["auth", "status"]),
         "codex" => Some(&["login", "status"]),
+        "qoder" | "qoder-cn" => Some(&["status"]),
+        "grok" => Some(&["models"]),
         _ => None,
     }
 }
@@ -594,6 +615,45 @@ fn parse_sign_in(output: &ProcOutput) -> (Option<bool>, Option<String>) {
     }
 }
 
+fn settings_sign_in(engine: &str) -> Option<(Option<bool>, Option<String>)> {
+    let folder = match engine {
+        "gemini" => std::env::var_os("GEMINI_CLI_HOME")
+            .filter(|home| !home.is_empty())
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(support::home_dir)
+            .join(".gemini"),
+        "qwen" => support::home_dir().join(".qwen"),
+        _ => return None,
+    };
+    let settings = file_access::fs::read_to_string(folder.join("settings.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok());
+    let selected = settings.as_ref().and_then(|value| {
+        value
+            .pointer("/security/auth/selectedType")
+            .or_else(|| value.get("selectedAuthType"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string)
+    });
+    Some(sign_in_from_selection(
+        selected.as_deref(),
+        file_access::fs::is_file(folder.join("oauth_creds.json")),
+    ))
+}
+
+fn sign_in_from_selection(
+    selected: Option<&str>,
+    creds_exist: bool,
+) -> (Option<bool>, Option<String>) {
+    match selected {
+        None | Some("") => (Some(false), None),
+        Some(kind @ ("oauth-personal" | "qwen-oauth" | "login-with-google")) => {
+            (Some(creds_exist), Some(kind.to_string()))
+        }
+        Some(kind) => (Some(true), Some(kind.to_string())),
+    }
+}
+
 fn agy_sign_in() -> (Option<bool>, Option<String>) {
     let token = crate::engines::agy::agy_home().join("antigravity-oauth-token");
     let signed_in = (cfg!(target_os = "linux") && is_file_outside_gate(&token))
@@ -607,7 +667,7 @@ pub async fn engine_cli_signed_in(engine: String) -> Result<CliSignInStatus, Str
     let bin = engine_bin(&engine);
     let known = match engine.as_str() {
         "agy" => Some(agy_sign_in()),
-        _ => sign_in::remembered_sign_in(&engine),
+        _ => sign_in::remembered_sign_in(&engine).or_else(|| settings_sign_in(&engine)),
     };
     if let Some((signed_in, detail)) = known {
         let installed = probe_local_version(&bin).await.installed;
@@ -680,3 +740,7 @@ mod download_tests;
 #[cfg(test)]
 #[path = "build_tests.rs"]
 mod build_tests;
+
+#[cfg(test)]
+#[path = "user_path_tests.rs"]
+mod user_path_tests;

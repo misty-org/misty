@@ -18,10 +18,9 @@ const nameField = () => screen.getByLabelText("Name") as HTMLInputElement;
 it("opens straight into the agent's New task conversation without a directory", () => {
   renderAgentsPage();
   expect(screen.queryByRole("heading", { name: "Agents" })).toBeNull();
-  expect(screen.getByRole("heading", { name: /What's on your mind\?$/ })).toBeTruthy();
+  expect(screen.getByText(/What's on your mind\?$/)).toBeTruthy();
   expect(screen.queryByRole("navigation", { name: "Agent workspace pages" })).toBeNull();
-  expect(screen.getByRole("heading", { name: /^Communications New chat$/ })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: /^Communications/ })).toBeTruthy();
+  expect(screen.getAllByRole("heading", { name: "Communications" }).length).toBeGreaterThan(0);
   expect(screen.queryByRole("button", { name: /^Switch agent/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Back to agents" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Agent settings" })).toBeNull();
@@ -96,7 +95,7 @@ it("opens Files from links, with no title bar", () => {
   expect(document.querySelector(".agent-studio-bar")).toBeNull();
   openChat();
   expect(page()).toBe("task");
-  expect(document.querySelector(".agent-studio-bar")).toBeTruthy();
+  expect(document.querySelector(".agent-studio-bar")).toBeNull();
   expect(composer()).toBeTruthy();
 });
 

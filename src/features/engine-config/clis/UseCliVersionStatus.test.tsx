@@ -151,14 +151,14 @@ describe("useCliVersionStatus session store", () => {
   });
 
   it("an update runs the installer and then probes again", async () => {
-    mocks.status.mockResolvedValue(versionStatus("codex"));
+    mocks.status.mockResolvedValue(versionStatus("kimi"));
     mocks.update.mockResolvedValue({ ok: true, version: "2.1.267" });
-    await render("codex");
+    await render("kimi");
     const probesBefore = mocks.status.mock.calls.length;
     await act(async () => {
       await latest.update("run-1");
     });
-    expect(mocks.update).toHaveBeenCalledWith("codex", "run-1");
+    expect(mocks.update).toHaveBeenCalledWith("kimi", "run-1");
     expect(mocks.status.mock.calls.length).toBe(probesBefore + 1);
     expect(latest.updating).toBe(false);
     expect(latest.error).toBeNull();
@@ -208,14 +208,14 @@ describe("useCliVersionStatus session store", () => {
   });
 
   it("an install that needs Node.js starts on the helper step", async () => {
-    mocks.status.mockResolvedValue(versionStatus("codex", { installed: false }));
+    mocks.status.mockResolvedValue(versionStatus("gemini", { installed: false }));
     const run = deferred<{ ok: boolean; version: string | null }>();
     mocks.update.mockReturnValue(run.promise);
     mocks.updatePlan.mockResolvedValue({
-      engine: "codex",
+      engine: "gemini",
       action: "install",
       kind: "npm",
-      steps: ["Download Node.js", "npm install --prefix ~/.misty/shared/engines/codex"],
+      steps: ["Download Node.js", "npm install --prefix ~/.misty/shared/engines/gemini"],
       needsHelper: true,
       canRun: true,
       blockers: [],
@@ -225,7 +225,7 @@ describe("useCliVersionStatus session store", () => {
     const flowRoot = createRoot(container);
     root = flowRoot;
     await act(async () => {
-      flowRoot.render(<FlowProbe engine="codex" capture={(value) => (flow = value)} />);
+      flowRoot.render(<FlowProbe engine="gemini" capture={(value) => (flow = value)} />);
     });
     await act(async () => flow.begin());
     let confirmed!: Promise<void>;

@@ -5,7 +5,19 @@
 
 use serde_json::Value;
 
-pub const ENGINES: [&str; 3] = ["claude", "codex", "agy"];
+pub const ENGINES: [&str; 11] = [
+    "claude",
+    "kimi",
+    "grok",
+    "codex",
+    "agy",
+    "qoder",
+    "qoder-cn",
+    "minimax",
+    "gemini",
+    "qwen",
+    "hermes",
+];
 
 pub fn ensure_engine_enabled(engine: &str) -> Result<(), String> {
     if ENGINES.contains(&engine) {

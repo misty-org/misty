@@ -116,6 +116,13 @@ fn maps_session_update_kinds() {
 }
 
 #[test]
+fn error_prefixed_chunks_are_detected() {
+    assert!(is_error_prefixed_text("[Error] Network attempt failed"));
+    assert!(is_error_prefixed_text("  [Error] boom"));
+    assert!(!is_error_prefixed_text("hello [Error] later"));
+}
+
+#[test]
 fn permission_auto_answer_selects_first_allow_kind() {
     let params = json!({
         "options": [

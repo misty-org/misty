@@ -255,7 +255,7 @@ export function ChatThreadColumn({
           <TypingLine label={typingLabel || undefined} />
           <form ref={form} onSubmit={submit}>
             <MessageComposer
-              variant="channel"
+              variant="card"
               inputRef={textarea}
               inputProps={{
                 "aria-label": "Reply",

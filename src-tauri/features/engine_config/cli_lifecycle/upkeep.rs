@@ -3,14 +3,20 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Map, Value};
 
-use super::{engine_bin, parse_version, probe_local_version, route_for, routes, ProgressReporter};
-use crate::engines::support::paths::app_home;
+use super::{
+    engine_bin, hermes_launchers, parse_version, probe_local_version, route_for, routes,
+    ProgressReporter,
+};
+use crate::engines::support::paths::{app_home, InstallRoot};
 
 const MINIMUMS: &[(&str, &str)] = &[];
 
 const LOCK_STALE: Duration = Duration::from_secs(15 * 60);
 
 pub(crate) async fn ensure_minimum(engine: &str) -> Result<(), String> {
+    if engine == "hermes" {
+        repair_moved_hermes().await?;
+    }
     let Some(needed) = MINIMUMS
         .iter()
         .find(|(name, _)| *name == engine)
@@ -36,6 +42,39 @@ pub(crate) async fn ensure_minimum(engine: &str) -> Result<(), String> {
     let reporter = ProgressReporter::new(format!("upkeep-{engine}"), engine.to_owned());
     routes::run(engine, route, &bin, &reporter).await?;
     forget(engine);
+    Ok(())
+}
+
+async fn repair_moved_hermes() -> Result<(), String> {
+    let Some(before) = file_access::paths::misty_root_dir()
+        .map(|misty| misty.join("engines").join("hermes").join("hermes-agent"))
+    else {
+        return Ok(());
+    };
+    let checkout = InstallRoot::here().checkout_dir("hermes");
+    let launcher = checkout.join(".hermes").join("bin").join("hermes");
+    let moved = |launcher: &Path| {
+        file_access::fs::is_file(launcher) && hermes_launchers::wrapper_names(launcher, &before)
+    };
+    if before == checkout || !moved(&launcher) {
+        return Ok(());
+    }
+    let Some(_lock) = UpdateLock::take("hermes") else {
+        return Ok(());
+    };
+    if !moved(&launcher) {
+        return Ok(());
+    }
+    let bin = launcher.to_string_lossy().into_owned();
+    let route = route_for("hermes", &bin, true)
+        .ok_or_else(|| "Misty can't repair Hermes Agent for you.".to_string())?;
+    let reporter = ProgressReporter::new("upkeep-hermes".to_owned(), "hermes".to_owned());
+    routes::run("hermes", route, &bin, &reporter).await?;
+    forget("hermes");
+    hermes_launchers::remove_wrappers(&hermes_launchers::dirs(), &before);
+    if moved(&launcher) {
+        return Err("Hermes Agent still starts from the folder it was moved out of. Reinstall it in Settings › Engines.".into());
+    }
     Ok(())
 }
 

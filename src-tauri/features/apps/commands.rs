@@ -61,6 +61,14 @@ pub async fn space_app_bundle_install(
     wrap: Option<bundle::Wrap>,
 ) -> Result<AppManifest, String> {
     person_window(&webview)?;
+    let mut wrap = wrap;
+    if let Some(wrap) = wrap.as_mut() {
+        for file in &mut wrap.add_files {
+            if let Some(source) = &file.source {
+                file.content = crate::registry::files::script(source).await?;
+            }
+        }
+    }
     let bytes = download(&url, MAX_DOWNLOAD_BYTES).await?;
     tauri::async_runtime::spawn_blocking(move || {
         let root = bundle::cache_root()?;
@@ -73,7 +81,7 @@ pub async fn space_app_bundle_install(
     .map_err(|error| error.to_string())?
 }
 
-async fn download(url: &str, max: u64) -> Result<Vec<u8>, String> {
+pub(crate) async fn download(url: &str, max: u64) -> Result<Vec<u8>, String> {
     let parsed = url::Url::parse(url).map_err(|_| "That isn't an address.".to_owned())?;
     #[cfg(debug_assertions)]
     if parsed.scheme() == "file" {

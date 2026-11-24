@@ -238,6 +238,13 @@ pub async fn space_app_page_open(
         }
         close(&existing, &mount)?;
     }
+    let adapter = match &kind {
+        Kind::Site(site) => match &site.adapter {
+            Some(file) => Some(crate::registry::files::script(file).await?),
+            None => None,
+        },
+        Kind::Bundle => None,
+    };
     let _lifecycle = crate::browser::profiles::browser_lifecycle().read().await;
     remember_main_macos_webview(&app, &owner)?;
     let label = frames::label_of(&mount)?;
@@ -250,7 +257,7 @@ pub async fn space_app_page_open(
                 .as_ref()
                 .and_then(frames::FrameOrigin::of)
                 .ok_or("That website app has no address Misty can open.")?,
-            adapter: site.adapter_source.clone(),
+            adapter,
         }),
         Kind::Bundle => None,
     };

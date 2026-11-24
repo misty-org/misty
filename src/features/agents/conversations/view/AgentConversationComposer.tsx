@@ -45,6 +45,13 @@ import { usePromptHistoryNav } from "../composer/use_prompt_history_nav";
 const engineNames: Record<string, string> = {
   claude: "Claude Code",
   codex: "Codex",
+  gemini: "Gemini CLI",
+  qwen: "Qwen Code",
+  kimi: "Kimi CLI",
+  grok: "Grok CLI",
+  minimax: "MiniMax Code",
+  qoder: "Qoder CLI",
+  "qoder-cn": "Qoder CLI (China)",
   agy: "Antigravity",
 };
 

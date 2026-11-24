@@ -1,4 +1,5 @@
 use super::parse::*;
+use super::parse_more::*;
 use serde_json::json;
 use std::path::Path;
 
@@ -132,6 +133,85 @@ fn claude_connectors_keep_names_and_states_but_never_addresses() {
     );
     let serialized = serde_json::to_string(&connectors).unwrap();
     assert!(!serialized.contains("https://") && !serialized.contains("token"));
+}
+
+#[test]
+fn loose_listings_read_arrays_and_claude_style_objects() {
+    let object = loose_items(
+        "qoder",
+        &json!({
+            "installed": [{ "id": "review@official", "enabled": true }],
+            "available": [
+                { "pluginId": "review@official", "description": "Reviews code." },
+                { "name": "docs", "marketplace": "official", "installCount": 12 },
+                { "name": "no-marketplace" }
+            ]
+        }),
+    );
+    assert_eq!(
+        object.len(),
+        2,
+        "an entry without a marketplace can't install"
+    );
+    assert!(object[0].installed && object[0].enabled);
+    assert_eq!(object[1].id, "docs@official");
+    assert_eq!(object[1].installs, Some(12));
+
+    let array = loose_items(
+        "minimax",
+        &json!([{ "id": "lint@official", "installed": true, "description": "Lints." }]),
+    );
+    assert_eq!(array[0].engine, "minimax");
+    assert!(array[0].installed);
+
+    let sources = loose_sources(&json!({ "marketplaces": [
+        { "name": "official", "source": { "source": "github", "repo": "qoder/plugins" } }
+    ]}));
+    assert_eq!(sources[0].location, "qoder/plugins");
+}
+
+#[test]
+fn the_gallery_marks_installed_extensions_and_keeps_the_rest() {
+    let gallery = json!([
+        { "url": "https://github.com/obra/superpowers", "fullName": "obra/superpowers",
+          "extensionName": "superpowers", "extensionDescription": "Core skills library",
+          "stars": 299294 },
+        { "url": "https://github.com/a/b", "fullName": "a/b", "extensionName": "b-tools",
+          "repoDescription": "Tools" },
+        { "url": "http://insecure.example/x", "extensionName": "x" }
+    ]);
+    let installed = vec![
+        InstalledExtension {
+            name: "b-tools".into(),
+            description: String::new(),
+            source: None,
+        },
+        InstalledExtension {
+            name: "local-thing".into(),
+            description: "Mine".into(),
+            source: Some("/Users/me/thing".into()),
+        },
+    ];
+    let items = gallery_items("gemini", &gallery, &installed);
+    assert_eq!(items.len(), 3, "an address that isn't GitHub stays out");
+    assert_eq!(items[0].id, "https://github.com/obra/superpowers");
+    assert_eq!(items[0].stars, Some(299294));
+    assert!(!items[0].installed);
+    assert_eq!(
+        items[1].id, "b-tools",
+        "an installed extension removes by name"
+    );
+    assert!(items[1].installed);
+    assert_eq!(items[2].id, "local-thing");
+    assert_eq!(items[2].link, None);
+
+    assert!(valid_gallery_url("https://github.com/obra/superpowers"));
+    assert!(!valid_gallery_url("https://github.com/obra"));
+    assert!(!valid_gallery_url(
+        "https://github.com/obra/superpowers/tree/main"
+    ));
+    assert!(!valid_gallery_url("https://example.com/obra/superpowers"));
+    assert!(!valid_gallery_url("https://github.com/-x/y"));
 }
 
 #[test]
@@ -288,7 +368,7 @@ fn a_bare_auth_code_reads_as_signing_in_first() {
         timed_out: false,
     };
     assert_eq!(
-        super::failure_text("claude", &output),
-        "Sign in to Claude Code first."
+        super::failure_text("minimax", &output),
+        "Sign in to MiniMax Code first."
     );
 }

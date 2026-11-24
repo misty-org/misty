@@ -6,6 +6,13 @@ import type { McpConfigEntry, McpConfigSource, McpRuntimeStatus } from "./types"
 const engineNames: Record<string, string> = {
   claude: "Claude Code",
   codex: "Codex",
+  gemini: "Gemini CLI",
+  qwen: "Qwen Code",
+  kimi: "Kimi CLI",
+  grok: "Grok CLI",
+  minimax: "MiniMax Code",
+  qoder: "Qoder CLI",
+  "qoder-cn": "Qoder CLI (China)",
   agy: "Antigravity",
 };
 
@@ -19,8 +26,19 @@ const sourceLabels: Record<McpConfigSource, string> = {
   claude_project: "Project .mcp.json",
   codex_user: "User config",
   codex_project: "Project config",
+  kimi_user: "User mcp.json",
+  kimi_local: "Workspace .kimi-code/mcp.json",
+  kimi_project: "Project .mcp.json (shared)",
+  grok_user: "User config.toml",
+  grok_project: "Project .grok/config.toml",
   agy_user: "User mcp_config.json",
   agy_project: "Workspace .agents/mcp_config.json",
+  qoder_user: "User settings.json",
+  qoder_local: "Workspace settings.local.json",
+  qoder_project: "Project .mcp.json (shared)",
+  qoder_cn_user: "User settings.json",
+  qoder_cn_local: "Workspace settings.local.json",
+  qoder_cn_project: "Project .mcp.json (shared)",
 };
 
 export function sourceLabel(source: string): string {
@@ -37,6 +55,8 @@ const readonlyReasons: Record<string, string> = {
     "This source's switch hasn't been checked against the real CLI, so it's read-only here. Edit the config file to change it.",
   shared_project_file:
     "A shared project .mcp.json: each CLI applies its own rules, so it's read-only here.",
+  grok_project_toggle:
+    "Grok's project switch also rewrites the user-level disabled_mcp_servers list, so it's read-only here rather than half written.",
   jsonc_readonly:
     "This file is JSONC and has comments a write would drop, so it's read-only here. Edit it in your editor.",
   needs_workspace:

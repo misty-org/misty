@@ -165,16 +165,16 @@ function payload(overrides: Partial<McpInventory> = {}): McpInventory {
           entries: [],
         },
       }),
-      engine("agy", {
+      engine("kimi", {
         sources: [
           {
-            source: "agy_user",
-            path: "/home/u/.antigravity/mcp_config.json",
+            source: "kimi_user",
+            path: "/home/u/.kimi-code/mcp.json",
             exists: false,
           },
           {
-            source: "agy_project",
-            path: "/ws/.agents/mcp_config.json",
+            source: "kimi_local",
+            path: "/ws/.kimi-code/mcp.json",
             exists: false,
           },
         ],
@@ -366,7 +366,7 @@ describe("McpSection", () => {
     api.inventory.mockResolvedValue(payload({ engines: [payload().engines[2]] }));
     await renderSection();
     expect(document.body.textContent).toContain("Files read");
-    expect(document.body.textContent).toContain("/home/u/.antigravity/mcp_config.json");
+    expect(document.body.textContent).toContain("/home/u/.kimi-code/mcp.json");
     expect(document.body.textContent).toContain("Not created yet");
   });
 

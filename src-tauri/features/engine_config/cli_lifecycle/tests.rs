@@ -37,11 +37,18 @@ fn sign_in_comes_from_the_cli_answer() {
         (Some(false), Some("Account: Not logged in".into()))
     );
     assert_eq!(
-        parse_sign_in(&output("You are not authenticated.", 0)).0,
+        parse_sign_in(&output(
+            "You are not authenticated.\n\nDefault model: grok-4.6",
+            0
+        ))
+        .0,
         Some(false)
     );
     assert!(sign_in_status_args("claude").is_some());
     assert!(sign_in_status_args("codex").is_some());
+    assert!(sign_in_status_args("qoder").is_some());
+    assert!(sign_in_status_args("grok").is_some());
+    assert!(sign_in_status_args("gemini").is_none());
     assert!(sign_in_status_args("agy").is_none());
 }
 
@@ -59,16 +66,22 @@ fn exit_status(code: i32) -> std::process::ExitStatus {
 
 #[test]
 fn engines_start_as_their_own_program() {
+    assert_eq!(cli_binary_name("qoder"), "qodercli");
+    assert_eq!(cli_binary_name("qoder-cn"), "qoderclicn");
+    assert_eq!(cli_binary_name("minimax"), "mcode");
     assert_eq!(cli_binary_name("claude"), "claude");
     assert_eq!(cli_binary_name("agy"), "agy");
 }
 
 #[test]
 fn npm_package_covers_every_npm_engine() {
-    for engine in ["claude", "codex"] {
+    for engine in ["claude", "gemini", "qwen", "kimi", "codex"] {
         assert!(npm_package(engine).is_some(), "{engine} missing package");
     }
+    assert_eq!(npm_package("grok"), None);
     assert_eq!(npm_package("agy"), None);
+    assert_eq!(npm_package("qoder"), None);
+    assert_eq!(npm_package("qoder-cn"), None);
 }
 
 #[cfg(unix)]
@@ -169,6 +182,8 @@ fn npm_shim_detection_ignores_relative_paths() {
 fn a_copy_already_on_the_computer_updates_the_way_it_was_installed() {
     let found = |engine: &str, bin: &str| routes::route(engine, bin, true);
     assert_eq!(found("misty", "/usr/local/bin/misty"), None);
+    assert_eq!(found("grok", "/usr/local/bin/grok"), None);
+    assert_eq!(found("kimi", "/usr/local/bin/kimi"), Some(Route::NpmGlobal));
     assert_eq!(
         found("agy", "/usr/local/bin/agy"),
         Some(Route::VendorScript)

@@ -43,7 +43,7 @@ export interface BundleSource {
     add_copies: { from: string; to: string }[];
     strip_top: boolean;
     auto_top?: boolean;
-    add_files?: { path: string; content: string }[];
+    add_files?: { path: string; url: string; sha256: string; size: number }[];
   };
 }
 

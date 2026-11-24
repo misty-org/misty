@@ -540,6 +540,51 @@ pub fn catalog_for(engine: &str, home: &Path, project: Option<&Path>) -> Catalog
             catalog.commands.extend(items(commands_from(commands), "/"));
             catalog.skills.extend(items(skills_from(skills), "$"));
         }
+        "gemini" => {
+            catalog.commands = builtin(
+                &[("init", "Write a GEMINI.md that describes this project")],
+                "/",
+            );
+            let user_dir = env_home("GEMINI_CLI_HOME", &[]).join(".gemini");
+            let custom = super::gemini::custom_commands_from(Some(&user_dir), project)
+                .into_iter()
+                .map(|command| Found {
+                    name: command.name,
+                    description: clip(&command.description),
+                    argument_hint: None,
+                    source: if command.scope == "Project" {
+                        "project"
+                    } else {
+                        "user"
+                    },
+                })
+                .collect();
+            catalog.commands.extend(items(custom, "/"));
+        }
+        "qwen" | "qoder" | "qoder-cn" => {
+            let own = match engine {
+                "qwen" => ".qwen",
+                "qoder" => ".qoder",
+                _ => ".qoder-cn",
+            };
+            let user_dir = if engine == "qwen" {
+                env_home("QWEN_HOME", &[own])
+            } else {
+                home.join(own)
+            };
+            let mut commands = Folders::new();
+            let mut skills = Folders::new();
+            if let Some(project) = project {
+                commands.add(join(project, &[own, "commands"]), "project");
+                skills.add(join(project, &[own, "skills"]), "project");
+                skills.add(join(project, &[".agents", "skills"]), "project");
+            }
+            commands.add(user_dir.join("commands"), "user");
+            skills.add(user_dir.join("skills"), "user");
+            skills.add(join(home, &[".agents", "skills"]), "user");
+            catalog.commands.extend(items(commands_from(commands), "/"));
+            catalog.skills.extend(items(skills_from(skills), "/"));
+        }
         _ => {
             let mut commands = Folders::new();
             let mut skills = Folders::new();

@@ -39,11 +39,11 @@ vi.mock("@/shared/lib/terminal/xterm_loader", () => ({
 
 import { SignInDialog } from "./SignInDialog";
 
-async function open(engine: string, started: SignInStarted, signOut = false) {
+async function open(engine: string, started: SignInStarted, signOut = false, provider?: string) {
   api.start.mockResolvedValue(started);
   const onClose = vi.fn();
   await act(async () => {
-    render(<SignInDialog request={{ engine, signOut }} onClose={onClose} />);
+    render(<SignInDialog request={{ engine, signOut, provider }} onClose={onClose} />);
   });
   return onClose;
 }
@@ -101,11 +101,11 @@ describe("SignInDialog", () => {
   });
 
   it("points a menu sign-in at the folded terminal, with no code field", async () => {
-    const onClose = await open("codex", { command: "codex, then /login", asks: "menu" });
+    const onClose = await open("gemini", { command: "gemini, then /auth", asks: "menu" });
     expect(screen.getByText(/asks how you'd like to sign in. Open Show details/)).toBeTruthy();
     expect(screen.queryByLabelText("Code")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show details" }));
-    expect(screen.getByText("codex, then /login").closest('[data-state="closed"]')).toBeNull();
+    expect(screen.getByText("gemini, then /auth").closest('[data-state="closed"]')).toBeNull();
     expect(screen.getByRole("button", { name: "Hide details" })).toBeTruthy();
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Done" }));
@@ -116,8 +116,8 @@ describe("SignInDialog", () => {
   });
 
   it("says what to do on the page for a direct sign-in, with no code field", async () => {
-    const onClose = await open("codex", { command: "codex login", asks: "nothing" });
-    expect(screen.getByText(/A ChatGPT page opens in your browser/)).toBeTruthy();
+    const onClose = await open("gemini", { command: "gemini --prompt", asks: "nothing" });
+    expect(screen.getByText(/A Google page opens in your browser/)).toBeTruthy();
     expect(screen.queryByLabelText("Code")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalled();

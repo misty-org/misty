@@ -9,7 +9,7 @@ export const canBeDefault = (engine: EngineInfo) =>
   Boolean(engine.supportsMcp) &&
   Boolean(engine.supportsWebSearch);
 
-const preferred = ["claude", "codex"];
+const preferred = ["claude", "codex", "gemini"];
 
 export function defaultChoices(engines: readonly EngineInfo[]): EngineInfo[] {
   const rank = (id: string) => {

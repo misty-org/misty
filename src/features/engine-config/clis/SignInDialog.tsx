@@ -45,12 +45,20 @@ export function SignInDialog({
   if (!request) return null;
   return (
     <SignInTerminal
-      key={`${request.engine}:${request.signOut ? "out" : "in"}`}
+      key={`${request.engine}:${request.provider ?? ""}:${request.signOut ? "out" : "in"}`}
       request={request}
       onClose={onClose}
     />
   );
 }
+
+const ENGINE_PAGES: Record<string, string> = {
+  gemini: "A Google page opens in your browser. Sign in there with your Google account",
+  kimi: "A Kimi page opens in your browser. Sign in there and allow access",
+  qoder: "A Qoder page opens in your browser. Sign in there with your Qoder account",
+  "qoder-cn": "A Qoder page opens in your browser. Sign in there with your Qoder account",
+  grok: "An xAI page opens in your browser. Sign in there with your X or xAI account",
+};
 
 export function signInSteps(started: SignInStarted, engine: string, signOut: boolean): string {
   const name = engineName(engine);
@@ -79,6 +87,8 @@ export function signInSteps(started: SignInStarted, engine: string, signOut: boo
   if (started.asks === "code") {
     return "A sign-in page opens in your browser. Sign in there, then copy the code it shows and paste it here.";
   }
+  const page = ENGINE_PAGES[engine];
+  if (page) return `${page}, then come back here.`;
   return "A sign-in page opens in your browser. Finish there, then come back here.";
 }
 

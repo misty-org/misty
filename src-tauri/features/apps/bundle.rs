@@ -111,7 +111,10 @@ pub struct Wrap {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct AddFile {
     pub path: String,
+    #[serde(default)]
     pub content: String,
+    #[serde(flatten)]
+    pub source: Option<crate::registry::files::RegistryFile>,
 }
 
 const MAX_ADDED_BYTES: usize = 256 << 10;
@@ -222,6 +225,9 @@ fn add_wrapper(staging: &Path, id: &str, version: &str, wrap: &Wrap) -> Result<(
         return Err("The files Misty adds to the app are too large.".into());
     }
     for file in &wrap.add_files {
+        if file.content.is_empty() {
+            return Err("A file Misty adds to an app came without its content.".into());
+        }
         if !safe_relative(&file.path)
             || !file.path.starts_with("misty/")
             || !file.path.ends_with(".js")

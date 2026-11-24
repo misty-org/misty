@@ -59,13 +59,10 @@ fn the_engines_own_mode_decides_by_its_kind_and_a_page_cant_name_another() {
     assert!(edits.auto && !edits.bypass);
     assert!(on("claude", "plan").planning);
     assert!(on("codex", "plan").planning);
-    let sandboxed = crate::engines::engine_by_id("claude")
-        .unwrap()
-        .folder_sandbox();
-    let bypass = on("claude", "bypassPermissions");
-    assert_eq!(bypass.bypass, sandboxed);
-    assert_eq!(bypass.auto, sandboxed);
-    let unknown = on("codex", "yolo");
+    let yolo = on("gemini", "yolo");
+    assert_eq!(yolo.bypass, cfg!(target_os = "macos"));
+    assert_eq!(yolo.auto, cfg!(target_os = "macos"));
+    let unknown = on("kimi", "yolo");
     assert!(!unknown.auto && !unknown.bypass && unknown.mode_id.is_empty());
     let taint = Taint::default();
     assert_eq!(

@@ -37,14 +37,17 @@ export function CliUpdateDialog({
 }) {
   const { state, confirm } = flow;
   const running = state.status === "running";
-  const autoStart = plain && state.status === "ready" && Boolean(state.plan?.canRun);
+  const developerTools = Boolean(state.plan?.needsDeveloperTools);
+  const autoStart =
+    plain && state.status === "ready" && Boolean(state.plan?.canRun) && !developerTools;
   useEffect(() => {
     if (autoStart) void confirm();
   }, [autoStart, confirm]);
   if (state.status === "idle") return null;
   const name = engineName(engine);
   const title = state.plan?.action === "update" ? `Update ${name}` : `Install ${name}`;
-  const confirming = !plain && (state.status === "ready" || state.status === "planning");
+  const confirming =
+    !plain && !developerTools && (state.status === "ready" || state.status === "planning");
   return (
     <Dialog open onOpenChange={(open) => (open || running ? undefined : flow.close())}>
       <DialogContent
@@ -89,10 +92,17 @@ function RunStatus({
     return () => window.clearTimeout(timer);
   }, [running, state.step]);
   const updating = state.plan?.action === "update";
+  const developerTools = Boolean(state.plan?.needsDeveloperTools);
 
   let line: ReactNode;
   if (state.status === "planning") {
     line = updating ? `Getting ready to update ${name}.` : `Getting ready to install ${name}.`;
+  } else if (developerTools && state.status === "done") {
+    line = `Apple's installer is open. When it finishes, continue to install ${name}.`;
+  } else if (developerTools && running) {
+    line = "Opening Apple's installer.";
+  } else if (developerTools && state.status === "ready" && state.plan?.canRun) {
+    line = "This needs Apple's developer tools first.";
   } else if (state.status === "done") {
     line = updating ? `${name} is up to date.` : `${name} is installed.`;
   } else if (state.status === "error") {
@@ -206,6 +216,21 @@ function UpdateFooter({ flow, plain }: { flow: CliUpdateFlow; plain: boolean }) 
   const { state } = flow;
   if (state.status === "running") return null;
   const plan = state.plan;
+  if (plan?.needsDeveloperTools && plan.canRun && state.status !== "error") {
+    const done = state.status === "done";
+    return (
+      <DialogFooter>
+        <Button
+          variant="primary"
+          autoFocus
+          disabled={!done && state.status !== "ready"}
+          onClick={() => void (done ? flow.begin() : flow.confirm())}
+        >
+          {done ? "Continue" : "Install developer tools"}
+        </Button>
+      </DialogFooter>
+    );
+  }
   if (state.status === "done") {
     return (
       <DialogFooter>

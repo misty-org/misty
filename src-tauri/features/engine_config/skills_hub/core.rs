@@ -149,7 +149,14 @@ fn antigravity_homes() -> Vec<PathBuf> {
 pub(super) enum TargetKind {
     Claude,
     Codex,
+    Kimi,
+    Grok,
     Agy,
+    Gemini,
+    Qoder,
+    QoderCn,
+    Qwen,
+    Hermes,
     Agents,
 }
 
@@ -160,7 +167,7 @@ pub(super) struct Target {
     pub(super) kind: TargetKind,
 }
 
-pub(super) static TARGETS: [Target; 4] = [
+pub(super) static TARGETS: [Target; 11] = [
     Target {
         id: "claude",
         label: "Claude",
@@ -174,10 +181,52 @@ pub(super) static TARGETS: [Target; 4] = [
         kind: TargetKind::Codex,
     },
     Target {
+        id: "kimi",
+        label: "Kimi",
+        visible: true,
+        kind: TargetKind::Kimi,
+    },
+    Target {
+        id: "grok",
+        label: "Grok",
+        visible: true,
+        kind: TargetKind::Grok,
+    },
+    Target {
         id: "agy",
         label: "Antigravity",
         visible: true,
         kind: TargetKind::Agy,
+    },
+    Target {
+        id: "gemini",
+        label: "Gemini",
+        visible: true,
+        kind: TargetKind::Gemini,
+    },
+    Target {
+        id: "qoder",
+        label: "Qoder",
+        visible: true,
+        kind: TargetKind::Qoder,
+    },
+    Target {
+        id: "qoder-cn",
+        label: "Qoder CN",
+        visible: true,
+        kind: TargetKind::QoderCn,
+    },
+    Target {
+        id: "qwen",
+        label: "Qwen Code",
+        visible: true,
+        kind: TargetKind::Qwen,
+    },
+    Target {
+        id: "hermes",
+        label: "Hermes",
+        visible: true,
+        kind: TargetKind::Hermes,
     },
     Target {
         id: "agents",
@@ -198,7 +247,29 @@ pub(super) fn target_home_dirs(target: &Target) -> Vec<PathBuf> {
             ".claude",
         )],
         TargetKind::Codex => vec![crate::engine_config::support::codex_home()],
+        TargetKind::Kimi => vec![crate::engine_config::support::engine_home(
+            Some("KIMI_CODE_HOME"),
+            ".kimi-code",
+        )],
+        TargetKind::Grok => vec![crate::engine_config::support::engine_home(
+            Some("GROK_HOME"),
+            ".grok",
+        )],
         TargetKind::Agy => antigravity_homes(),
+        TargetKind::Gemini => vec![crate::engine_config::support::engine_home(
+            Some("GEMINI_DIR"),
+            ".gemini",
+        )],
+        TargetKind::Qoder => vec![crate::engine_config::support::engine_home(None, ".qoder")],
+        TargetKind::QoderCn => vec![crate::engine_config::support::engine_home(
+            None,
+            ".qoder-cn",
+        )],
+        TargetKind::Qwen => vec![crate::engine_config::support::engine_home(None, ".qwen")],
+        TargetKind::Hermes => vec![crate::engine_config::support::engine_home(
+            Some("HERMES_HOME"),
+            ".hermes",
+        )],
         TargetKind::Agents => vec![crate::engine_config::support::engine_home(None, ".agents")],
     }
 }

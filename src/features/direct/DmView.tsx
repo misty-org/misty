@@ -311,11 +311,10 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
           name,
           group,
           readOnly: dm.read_only,
-          face: other ? <DmFace dmId={dm.id} person={other} size="sm" /> : undefined,
+          face: other ? <DmFace person={other} size="sm" /> : undefined,
           welcome: <DmWelcome dm={dm} name={name} other={other} />,
           members: other ? (
             <DmProfile
-              dm={dm}
               person={other}
               onRemove={() => removeFriend(other)}
               onBlock={() => blockPerson(other)}

@@ -168,6 +168,8 @@ fn build_windows_extra_search_paths(
         paths.push(user_profile.join(".local\\bin"));
         paths.push(user_profile.join(".codex-cli\\bin"));
         paths.push(user_profile.join(".local\\share\\mise\\shims"));
+        paths.push(user_profile.join(".hermes\\node"));
+        paths.push(user_profile.join(".hermes\\node\\bin"));
         paths.push(user_profile.join(".cargo\\bin"));
         paths.push(user_profile.join(".bun\\bin"));
         let codemoss_sdk_root =
@@ -214,6 +216,9 @@ fn build_windows_extra_search_paths(
         }
     }
     if let Some(local_app_data) = local_app_data {
+        paths.push(local_app_data.join("hermes\\node"));
+        paths.push(local_app_data.join("hermes\\node\\bin"));
+        paths.push(local_app_data.join("hermes\\bin"));
         paths.push(local_app_data.join("Volta\\bin"));
         paths.push(local_app_data.join("pnpm"));
         paths.push(local_app_data.join("mise\\shims"));

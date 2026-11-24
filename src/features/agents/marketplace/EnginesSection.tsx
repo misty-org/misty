@@ -67,7 +67,7 @@ export function EngineTile({ engine }: { engine: CatalogEngine }) {
 function EngineItem({ engine }: { engine: CatalogEngine }) {
   const { status, signIn, loading, updating, refresh } = useCliVersionStatus(engine.id);
   const flow = useCliUpdateFlow(engine.id, { onSuccess: () => void listEngines() });
-  const [signingIn, setSigningIn] = useState(false);
+  const [signingIn, setSigningIn] = useState<{ provider?: string } | null>(null);
   const [open, setOpen] = useState(false);
   const installed = status?.installed === true;
   const busy =
@@ -106,10 +106,11 @@ function EngineItem({ engine }: { engine: CatalogEngine }) {
     if (canSignIn)
       return (
         <SignInButton
+          engine={engine.id}
           size={filled ? undefined : "sm"}
           label={`Sign in to ${engine.name}`}
           disabled={updating}
-          onSignIn={() => setSigningIn(true)}
+          onSignIn={setSigningIn}
         />
       );
     return installed ? <CatalogDone /> : null;
@@ -172,9 +173,9 @@ function EngineItem({ engine }: { engine: CatalogEngine }) {
       />
       <CliUpdateDialog engine={engine.id} flow={flow} />
       <SignInDialog
-        request={signingIn ? { engine: engine.id } : null}
+        request={signingIn ? { engine: engine.id, ...signingIn } : null}
         onClose={() => {
-          setSigningIn(false);
+          setSigningIn(null);
           refresh();
         }}
       />

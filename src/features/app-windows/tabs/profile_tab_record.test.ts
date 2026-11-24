@@ -39,15 +39,16 @@ describe("a tab as the profile keeps it", () => {
     expect(encodedFields(tabFields(decoded, 3))).toBe(encodedFields(fields));
   });
 
-  it("reads a record an older version pinned or grouped as a plain tab", () => {
+  it("reads a record an older version pinned as a plain tab, keeping its group", () => {
     const fields = {
       ...tabFields(tab([view("v", "one")]), 0),
       pinned_url: "https://example.test/",
-      group: { id: "g", name: "Work", color: "purple" },
+      group: { id: "g", title: "Work", color: "purple" as const },
     };
     expect(usableFields(fields)).toBe(true);
     const decoded = tabFromFields("layout:one", fields);
-    expect(Object.keys(decoded).sort()).toEqual(["focusedPaneId", "id", "root"]);
+    expect(Object.keys(decoded).sort()).toEqual(["focusedPaneId", "group", "id", "root"]);
+    expect(decoded.group).toBe("g");
   });
 
   it("doesn't change when only focus does", () => {

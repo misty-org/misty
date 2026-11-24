@@ -92,10 +92,155 @@ async fn parked_form_answers_through_the_registry_context() {
     );
 }
 
+fn ask_params() -> Value {
+    json!({
+        "sessionId": "s-1",
+        "toolCallId": "call-1",
+        "questions": [{
+            "question": "Which drink?",
+            "options": [
+                { "label": "Coffee", "description": "Espresso" },
+                { "label": "Tea", "description": "Green tea" },
+            ],
+            "multiSelect": null,
+        }],
+        "mode": "default",
+    })
+}
+
 #[test]
-fn answer_frame_needs_the_request_id_and_its_form() {
+fn normalizes_questions_onto_the_card_contract() {
+    let questions = normalize_questions(&ask_params());
+    assert_eq!(
+        questions,
+        vec![json!({
+            "question": "Which drink?",
+            "header": "Q1",
+            "multiSelect": false,
+            "options": [
+                { "label": "Coffee", "description": "Espresso" },
+                { "label": "Tea", "description": "Green tea" },
+            ],
+        })]
+    );
+    let questions = normalize_questions(&json!({
+        "questions": [
+            { "question": "a", "header": " Scope ", "multiSelect": true, "options": [] },
+            { "question": "b" },
+        ]
+    }));
+    assert_eq!(questions[0]["header"], json!("Scope"));
+    assert_eq!(questions[0]["multiSelect"], json!(true));
+    assert_eq!(questions[1]["header"], json!("Q2"));
+    assert_eq!(questions[1]["options"], json!([]));
+    assert!(normalize_questions(&json!({})).is_empty());
+}
+
+#[test]
+fn answer_frame_round_trips_the_request_id() {
+    let parked = json!({ "rpcId": 7 });
+    let answers = json!({ "Which drink?": "Coffee" });
+    assert_eq!(
+        answer_frame(&parked, Some(&answers)).unwrap(),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": { "outcome": "accepted", "answers": { "Which drink?": "Coffee" } },
+        })
+    );
+    let parked = json!({ "rpcId": "req-9" });
+    let answers = json!({ "Which drinks?": ["Coffee", "Tea"] });
+    let frame = answer_frame(&parked, Some(&answers)).unwrap();
+    assert_eq!(frame["id"], json!("req-9"));
+    assert_eq!(
+        frame["result"]["answers"]["Which drinks?"],
+        json!(["Coffee", "Tea"])
+    );
+    let frame = answer_frame(&json!({ "rpcId": 1 }), Some(&json!({}))).unwrap();
+    assert_eq!(
+        frame["result"],
+        json!({ "outcome": "accepted", "answers": {} })
+    );
+}
+
+#[test]
+fn answer_frame_dismisses_and_rejects_malformed_answers() {
+    let parked = json!({ "rpcId": 3 });
+    assert_eq!(
+        answer_frame(&parked, None).unwrap(),
+        json!({ "jsonrpc": "2.0", "id": 3, "result": { "outcome": "cancelled" } })
+    );
     assert!(answer_frame(&json!({}), None).is_err());
-    assert!(answer_frame(&json!({ "rpcId": 3 }), None).is_err());
+    assert!(answer_frame(&json!({ "rpcId": 3 }), Some(&json!(["Coffee"]))).is_err());
+    assert!(answer_frame(&parked, Some(&json!({ "Which drink?": 2 }))).is_err());
+    assert!(answer_frame(&parked, Some(&json!({ "Which drink?": [1] }))).is_err());
+}
+
+#[tokio::test]
+async fn grok_question_answers_through_the_registry_context() {
+    let (mut core, registry, emitter) = test_core();
+    core.engine_id = "grok".into();
+    let mut state = TurnState::new(None);
+    assert!(park_question(&core, &mut state, &json!(7), &ask_params()).is_none());
+    let parked = registry
+        .get("test-run")
+        .unwrap()
+        .questions
+        .lock()
+        .unwrap()
+        .get("7")
+        .cloned()
+        .expect("the ask stays parked until the user answers");
+    assert_eq!(
+        parked["questions"],
+        json!(normalize_questions(&ask_params()))
+    );
+    core.sink.flush();
+    let emitted = emitter.0.lock().unwrap().join(" ");
+    assert!(emitted.contains("\"question\"") && emitted.contains("\"acp\""));
+    let frame = answer_frame(&parked["acp"], Some(&json!({ "Which drink?": "Tea" }))).unwrap();
+    assert_eq!(frame["id"], json!(7));
+    assert_eq!(frame["result"]["answers"]["Which drink?"], json!("Tea"));
+    assert!(park_question(&core, &mut state, &json!(8), &json!({ "questions": [] })).is_some());
+}
+
+#[tokio::test]
+async fn kimi_form_parks_all_questions_with_reply_context() {
+    let (mut core, registry, emitter) = test_core();
+    core.engine_id = "kimi".into();
+    let mut state = TurnState::new(None);
+    let params = json!({"mode": "form", "toolCallId": "ask-1", "message": "选哪种？", "requestedSchema": {
+        "required": ["q0"], "properties": {"q0": {
+            "type": "string", "title": "选择", "oneOf": [{"const": "A"}, {"const": "B"}]
+        }}
+    }});
+    assert!(super::super::kimi_acp::park_question(&core, &mut state, &json!(8), &params).is_none());
+    let entry = registry.get("test-run").unwrap();
+    let parked = entry.questions.lock().unwrap()["8"].clone();
+    assert_eq!(parked["questions"][0]["allowOther"], false);
+    let frame =
+        super::super::kimi_acp::answer_frame(&parked["kimiAcp"], Some(&json!({"选哪种？": "B"})))
+            .unwrap();
+    assert_eq!(frame["result"]["content"], json!({"q0": "B"}));
+    core.sink.flush();
+    assert!(emitter.0.lock().unwrap().join(" ").contains("kimiAcp"));
+    let decline =
+        super::super::kimi_acp::park_question(&core, &mut state, &json!(9), &json!({})).unwrap();
+    assert_eq!(decline["result"]["action"], "decline");
+    assert_eq!(entry.questions.lock().unwrap().len(), 1);
+}
+
+#[test]
+fn session_id_comes_from_the_handshake_shape_grok_returns() {
+    assert_eq!(
+        extract_session_id(&json!({ "sessionId": "s-new", "models": {} })),
+        Some("s-new".to_string())
+    );
+    assert_eq!(
+        extract_session_id(&json!({ "_meta": { "sessionId": "s-loaded" } })),
+        Some("s-loaded".to_string())
+    );
+    assert_eq!(extract_session_id(&json!({ "session_id": " " })), None);
 }
 
 #[test]

@@ -53,7 +53,7 @@ describe("Agents conversation page", () => {
     );
 
     const headings = [...container.querySelectorAll("h1")].map((h) => h.textContent);
-    expect(headings.some((h) => h?.endsWith("What's on your mind?"))).toBe(true);
+    expect(container.textContent).toContain("What's on your mind?");
     expect(headings).not.toContain("Agents");
     expect(container.querySelector('[aria-label="Search all"]')).toBeNull();
     expect(container.querySelector('[aria-label="Agent workspace pages"]')).toBeNull();

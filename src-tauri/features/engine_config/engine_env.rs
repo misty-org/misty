@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn engines_are_plain_ids() {
-        assert_eq!(checked_engine("agy").unwrap(), "agy");
+        assert_eq!(checked_engine("qoder-cn").unwrap(), "qoder-cn");
         assert!(checked_engine("../claude").is_err());
         assert!(checked_engine("Claude").is_err());
     }

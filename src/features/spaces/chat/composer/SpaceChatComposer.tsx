@@ -206,7 +206,7 @@ export function SpaceChatComposer(props: {
         }}
       >
         <MessageComposer
-          variant="channel"
+          variant="card"
           data-tour="space-chat-composer"
           inputRef={textarea}
           inputProps={{

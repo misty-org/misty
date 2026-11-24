@@ -78,7 +78,8 @@ mod questions;
 mod sandbox;
 use native::{native_command, started_turn_id, NativeCommand};
 use plan::{
-    check_plan_item, decision_collaboration, decision_spec, plan_collaboration, plan_id_for,
+    check_plan_item, collaboration_mode, decision_collaboration, decision_spec, plan_collaboration,
+    plan_id_for,
     plan_title, PLAN_STALE_PREFIX,
 };
 use sandbox::{sandbox_for, writable_roots};
@@ -1472,6 +1473,18 @@ async fn start_on_thread(
             thread_model.as_deref(),
             req.effort.as_deref(),
         )?;
+    } else if let Some(model) = req
+        .session_id
+        .as_ref()
+        .filter(|_| !codex_read_only::requested(req))
+        .and(req.model.as_deref().or(thread_model.as_deref()))
+        .filter(|m| !m.trim().is_empty())
+    {
+        turn_params["collaborationMode"] = collaboration_mode(
+            "default",
+            model,
+            req.effort.as_deref().or(reported_effort.as_deref()),
+        );
     } else {
         if let Some(effort) = req.effort.as_deref() {
             turn_params["effort"] = json!(effort);
@@ -2285,10 +2298,12 @@ require('node:readline').createInterface({input: process.stdin}).on('line', line
     assert.equal(params.threadId, 'thread-123');
     assert.equal(params.input[0].text, 'Continue the conversation');
     assert.equal(params.history, undefined);
-    if (mode === 'decision') {
+    if (resumed) {
       assert.equal(params.collaborationMode.mode, 'default');
       assert.equal(params.collaborationMode.settings.model, 'test-model');
       assert.equal(params.collaborationMode.settings.reasoning_effort, 'high');
+    } else {
+      assert.equal(params.collaborationMode, undefined);
     }
     result = {turn: {id: 'next-turn'}};
   }

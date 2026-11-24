@@ -1,7 +1,7 @@
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
 use super::*;
-use crate::engines::history::past_folders_stores::find_agy;
+use crate::engines::history::past_folders_stores::{find_agy, find_grok, find_hermes, find_kimi};
 
 fn scratch(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("misty-past-{tag}-{}", uuid::Uuid::new_v4()));
@@ -92,6 +92,53 @@ fn codex_folders_come_from_session_meta() {
     find_codex(&home, &mut found);
     assert_eq!(folders(found), vec!["/Users/me/one", "/Users/me/two"]);
     let _ = std::fs::remove_dir_all(&home);
+}
+
+#[test]
+fn gemini_and_qwen_folders_come_from_directories_or_cwd() {
+    let tmp = scratch("gemini");
+    write(
+        &tmp.join("hash-a/chats/session-1.jsonl"),
+        "{\"sessionId\":\"1\",\"projectHash\":\"hash-a\",\"directories\":[\"/Users/me/gem\",\"/Users/me/extra\"]}\n",
+    );
+    write(
+        &tmp.join("hash-b/chats/session-2.jsonl"),
+        "{\"sessionId\":\"2\",\"cwd\":\"/Users/me/qwen\",\"type\":\"user\"}\n",
+    );
+    let mut found = Found::default();
+    find_gemini_family(&tmp, &mut found);
+    assert_eq!(folders(found), vec!["/Users/me/gem", "/Users/me/qwen"]);
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn hermes_kimi_and_grok_folders_come_from_their_records() {
+    let root = scratch("stores");
+    let db = root.join("state.db");
+    let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE sessions(id TEXT, cwd TEXT, parent_session_id TEXT, hidden INTEGER,
+                               started_at REAL, last_activity_at REAL);
+         INSERT INTO sessions VALUES('a', '/Users/me/hermes', NULL, 0, 1700000000.5, NULL);
+         INSERT INTO sessions VALUES('b', '/Users/me/branch', 'a', 0, 1700000001, NULL);
+         INSERT INTO sessions VALUES('c', '/Users/me/hidden', NULL, 1, 1700000002, NULL);",
+    )
+    .unwrap();
+    drop(conn);
+    write(
+        &root.join("kimi").join("session_index.jsonl"),
+        "{\"sessionId\":\"k\",\"workDir\":\"/Users/me/kimi\"}\nnot json\n",
+    );
+    std::fs::create_dir_all(root.join("grok").join("%2FUsers%2Fme%2Fgrok%20app")).unwrap();
+    let mut found = Found::default();
+    find_hermes(&db, &mut found);
+    find_kimi(&root.join("kimi").join("session_index.jsonl"), &mut found);
+    find_grok(&root.join("grok"), &mut found);
+    assert_eq!(
+        folders(found),
+        vec!["/Users/me/grok app", "/Users/me/hermes", "/Users/me/kimi"]
+    );
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]

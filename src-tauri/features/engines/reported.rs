@@ -127,6 +127,9 @@ pub fn acp_update(engine: &str, params: &Value) {
                 let Some(name) = clean_name(first) else {
                     continue;
                 };
+                if super::slash::acp::withheld(engine).contains(&name.as_str()) {
+                    continue;
+                }
                 match second.and_then(clean_name) {
                     Some(sub) => add_subcommand(&mut commands, name, sub),
                     None => match commands.iter_mut().find(|command| command.name == name) {

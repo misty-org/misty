@@ -11,6 +11,7 @@ const SIGN_IN_CLOSED_EVENT = "engine-cli://sign-in-closed";
 
 export interface SignInRequest {
   engine: string;
+  provider?: string;
   signOut?: boolean;
 }
 
@@ -25,6 +26,7 @@ export const signInApi = {
   start: (request: SignInRequest, id: string, cols: number, rows: number) =>
     invoke<SignInStarted>("engine_cli_sign_in", {
       engine: request.engine,
+      provider: request.provider ?? null,
       signOut: request.signOut ?? false,
       id,
       cols,

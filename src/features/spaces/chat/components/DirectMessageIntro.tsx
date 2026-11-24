@@ -19,7 +19,6 @@ export function DirectMessageIntro({
   const avatarUrl = useMemberAvatarUrl(spaceId, recipient.userId);
   return (
     <ChannelWelcome
-      align="center"
       mark={
         <ChatAvatar
           id={recipient.userId}

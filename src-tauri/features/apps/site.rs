@@ -24,7 +24,7 @@ pub struct SiteEntry {
     #[serde(default)]
     pub media: std::collections::HashMap<Platform, MediaCheck>,
     #[serde(default)]
-    pub adapter_source: Option<String>,
+    pub adapter: Option<crate::registry::files::RegistryFile>,
 }
 
 impl SiteEntry {
@@ -47,7 +47,7 @@ impl SiteEntry {
     }
 
     pub fn has_space_features(&self) -> bool {
-        cfg!(target_os = "macos") && self.adapter_source.is_some()
+        cfg!(target_os = "macos") && self.adapter.is_some()
     }
 
     pub fn manifest(&self) -> Result<AppManifest, String> {
@@ -58,7 +58,7 @@ impl SiteEntry {
             "logo": "",
             "entry": "",
             "permissions": self.permissions,
-            "mcp": self.adapter_source.as_ref().map(|_| McpKind::Adapter),
+            "mcp": self.adapter.as_ref().map(|_| McpKind::Adapter),
             "platforms": self.platforms,
         }))
         .map_err(|error| error.to_string())
@@ -142,7 +142,7 @@ mod tests {
     fn a_site_entry_is_read_from_the_registry() {
         let apps = r#"{"apps":[{"id":"draw","url":"x"},{"kind":"site","id":"tunes","name":"Tunes","version":"1.0.0",
             "address":"https://tunes.example.com/","origins":["https://tunes.example.com"],"platforms":["macos"],
-            "media":{"macos":{"drm":false}},"permissions":["rooms"],"adapter_source":"1"}]}"#;
+            "media":{"macos":{"drm":false}},"permissions":["rooms"],"adapter":{"url":"https://registry.mistysys.com/files/a.js","sha256":"a","size":1}}]}"#;
         let site = entry_in(apps, "tunes").unwrap();
         assert_eq!(
             site.address().unwrap().as_str(),

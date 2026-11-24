@@ -13,7 +13,8 @@ async fn live_every_engine_lists_its_marketplace() {
     crate::engine_config::support::allow_engine_config_locations();
     let mut broken = Vec::new();
     for engine in super::ENGINES {
-        if !on_path(engine) {
+        let gallery = super::GALLERY_ENGINES.contains(engine);
+        if !gallery && !on_path(engine) {
             println!("absent  {engine}");
             continue;
         }
@@ -112,9 +113,18 @@ async fn live_install_and_remove_in_every_engine() {
     }
     crate::engine_config::support::allow_engine_config_locations();
     const CLAUDE_MD: &str = "claude-md-management@claude-plugins-official";
+    const GALLERY_PICK: &str = "https://github.com/gemini-cli-extensions/web-accessibility";
     let throwaway: &[Throwaway] = &[
         ("claude", CLAUDE_MD, None),
         ("codex", "build-web-data-visualization@openai-curated", None),
+        ("minimax", "image-generation@official", None),
+        (
+            "qoder",
+            "claude-api@anthropic-agent-skills",
+            Some(("anthropics/skills", "anthropic-agent-skills")),
+        ),
+        ("gemini", GALLERY_PICK, None),
+        ("qwen", GALLERY_PICK, None),
     ];
     let mut broken = Vec::new();
     for &(engine, id, source) in throwaway {

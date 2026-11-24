@@ -1,8 +1,9 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong), src-tauri/src/engine/mod.rs.
-//! Outside agent engines: Claude Code, Codex, and Antigravity over the Agent Client Protocol.
-//! Each is a program the person installed and signed in to; Misty starts it in a linked folder
-//! and turns what it reports into the same run events Misty's own agent produces, so one chat
-//! shows them all. Misty holds none of their keys and never reads or reuses their sign-in.
+//! Outside agent engines: Claude Code, Codex, and Antigravity, Kimi, Grok, MiniMax, Qoder,
+//! Hermes, Gemini CLI and Qwen Code over the Agent Client Protocol. Each is a program the person
+//! installed and signed in to; Misty starts it in a linked folder and turns what it reports into
+//! the same run events Misty's own agent produces, so one chat shows them all. Misty holds none of
+//! their keys and never reads or reuses their sign-in.
 //!
 //! The engine layer and the session history are desktop-cc-gui's (MIT, Copyright (c) 2026
 //! zhukunpenglinyutong), src-tauri/src/engine and src-tauri/src/history, adapted to Misty: its
@@ -33,18 +34,27 @@ pub mod commands;
 mod companion;
 mod events;
 pub mod folder_grant;
+pub mod gemini;
+pub mod grok;
+pub mod hermes;
 pub(crate) mod gate;
 pub mod history;
 pub mod history_commands;
 pub mod images;
+pub mod kimi;
+mod kimi_acp;
 #[cfg(windows)]
 pub(crate) mod job;
 pub(crate) mod mcp;
+pub mod minimax;
+mod minimax_acp;
 pub mod models;
 pub mod modes;
 pub mod multirun;
 pub mod open_in_code;
 pub mod plan_review;
+pub mod qoder;
+mod qoder_session;
 mod reader;
 pub(crate) mod recall;
 mod registry;
@@ -223,6 +233,18 @@ pub fn engine_by_id(id: &str) -> Option<Box<dyn Engine>> {
         "claude" => Some(Box::new(claude::ClaudeEngine::new())),
         "codex" => Some(Box::new(codex::CodexEngine)),
         "agy" => Some(Box::new(agy::AgyEngine)),
+        "kimi" => Some(Box::new(kimi::KimiEngine)),
+        "hermes" => Some(Box::new(hermes::HermesEngine)),
+        "minimax" => Some(Box::new(minimax::MiniMaxEngine)),
+        "grok" => Some(Box::new(grok::GrokEngine)),
+        "qoder" => Some(Box::new(qoder::QoderEngine::new(
+            qoder::QoderDistribution::Global,
+        ))),
+        "qoder-cn" => Some(Box::new(qoder::QoderEngine::new(
+            qoder::QoderDistribution::Cn,
+        ))),
+        "gemini" => Some(Box::new(gemini::gemini())),
+        "qwen" => Some(Box::new(gemini::qwen())),
         _ => None,
     }
 }
@@ -308,7 +330,12 @@ fn codex_bin_from_home(
         .then(|| resolve::resolve_launchable_cli_binary(&candidate.to_string_lossy()))
 }
 pub(crate) fn cli_binary_name(engine_id: &str) -> &str {
-    engine_id
+    match engine_id {
+        "qoder" => qoder::QoderDistribution::Global.cli_name(),
+        "qoder-cn" => qoder::QoderDistribution::Cn.cli_name(),
+        "minimax" => "mcode",
+        _ => engine_id,
+    }
 }
 #[allow(
     clippy::disallowed_methods,
@@ -395,6 +422,14 @@ pub fn engine_name(id: &str) -> &'static str {
         "claude" => "Claude Code",
         "codex" => "Codex",
         "agy" => "Antigravity",
+        "gemini" => "Gemini CLI",
+        "qwen" => "Qwen Code",
+        "kimi" => "Kimi CLI",
+        "grok" => "Grok CLI",
+        "minimax" => "MiniMax Code",
+        "qoder" => "Qoder CLI",
+        "qoder-cn" => "Qoder CLI (China)",
+        "hermes" => "Hermes Agent",
         _ => "Engine",
     }
 }
@@ -670,6 +705,8 @@ fn prepare_launch(
         ("codex", Some(provider)) => {
             codex::apply_channel(&mut built.command, provider, &channel_env, &req)
         }
+        ("kimi", Some(_)) => kimi::apply_channel(&mut built.command, &channel_env, &req),
+        ("grok", Some(provider)) => grok::isolate_channel(&mut built, provider, &req),
         _ => Ok(()),
     };
     if let Err(error) = configured {
@@ -1184,7 +1221,13 @@ async fn send_host_stream(
     };
     let resume_session_id = launch.req.session_id.clone();
     let task = match engine.as_str() {
-        "agy" => tokio::spawn(acp_turn::run_acp_turn(
+        "qoder" | "qoder-cn" => tokio::spawn(qoder_session::run_acp_turn(
+            core, launch.req, launch.bin, killed, pid,
+        )),
+        "grok" | "kimi" | "gemini" | "qwen" | "hermes" | "agy" => tokio::spawn(
+            acp_turn::run_acp_turn(core, launch.req, launch.built, killed, pid),
+        ),
+        "minimax" => tokio::spawn(minimax_acp::run_acp_turn(
             core,
             launch.req,
             launch.built,
@@ -1224,6 +1267,17 @@ pub async fn answer_question(
         .get(&request_id)
         .cloned()
         .ok_or_else(|| "question is no longer pending".to_string())?;
+    if let Some(context) = input.get("kimiAcp") {
+        let frame = kimi_acp::answer_frame(context, answers.as_ref())?;
+        state
+            .processes
+            .write_line(&session_id, frame.to_string())
+            .await?;
+        if let Ok(mut questions) = entry.questions.lock() {
+            questions.remove(&request_id);
+        }
+        return Ok(());
+    }
     if let Some(acp) = input.get("acp") {
         let frame = acp_turn::answer_frame(acp, answers.as_ref())?;
         state
@@ -1531,7 +1585,7 @@ mod permission_tests {
     #[test]
     fn tool_constraint_support_is_explicit() {
         assert!(engine_by_id("claude").unwrap().supports_tool_constraints());
-        for id in ["codex", "agy"] {
+        for id in ["codex", "agy", "grok", "kimi"] {
             assert!(
                 !engine_by_id(id).unwrap().supports_tool_constraints(),
                 "{id}"
@@ -1579,6 +1633,9 @@ mod permission_tests {
         assert_eq!(codex.resolve_permission(Some("read-only")), "read-only");
         assert_eq!(codex.resolve_permission(Some("manual")), "read-only");
         assert_eq!(codex.resolve_permission(None), "read-only");
+        let grok = grok::GrokEngine;
+        assert_eq!(grok.resolve_permission(Some("auto")), "manual");
+        assert_eq!(grok.resolve_permission(Some("plan")), "manual");
     }
 
     #[test]
@@ -1628,6 +1685,32 @@ mod permission_tests {
             assert!(
                 ensure_plan_approval(&id, engine.as_ref(), Some("plan")).is_ok(),
                 "{id} plan request must pass the gate"
+            );
+            assert!(ensure_plan_approval(&id, engine.as_ref(), Some("auto")).is_ok());
+        }
+
+        let unavailable: Vec<Box<dyn Engine>> = vec![
+            Box::new(grok::GrokEngine),
+            Box::new(qoder::QoderEngine::new(qoder::QoderDistribution::Global)),
+            Box::new(qoder::QoderEngine::new(qoder::QoderDistribution::Cn)),
+        ];
+        for engine in unavailable {
+            let id = engine.id().to_string();
+            assert!(
+                matches!(engine.plan_approval(), PlanApproval::Unavailable { .. }),
+                "{id} must stay fail-closed until its adapter is proven"
+            );
+            assert!(
+                !engine.supported_permissions().contains(&"plan"),
+                "{id} picker must not offer plan"
+            );
+            let refusal = ensure_plan_approval(&id, engine.as_ref(), Some("plan"));
+            let Err(message) = refusal else {
+                panic!("{id} plan request must be refused before spawn");
+            };
+            assert!(
+                message.contains("cannot run a human-approved plan"),
+                "{message}"
             );
             assert!(ensure_plan_approval(&id, engine.as_ref(), Some("auto")).is_ok());
         }

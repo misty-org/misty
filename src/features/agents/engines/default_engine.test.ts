@@ -47,20 +47,21 @@ describe("the default engine", () => {
     expect(canBeDefault(engine("agy", { supportsWebSearch: false }))).toBe(false);
   });
 
-  it("offers Claude, then Codex, then the rest", () => {
+  it("offers Claude, then Codex, then Gemini, then the rest", () => {
     const choices = defaultChoices([
       engine("other"),
+      engine("gemini"),
       engine("agy", { supportsWebSearch: false }),
       engine("codex"),
       engine("claude"),
     ]);
-    expect(choices.map((item) => item.id)).toEqual(["claude", "codex", "other"]);
+    expect(choices.map((item) => item.id)).toEqual(["claude", "codex", "gemini", "other"]);
   });
 
   it("keeps the saved engine while it can still be the default", () => {
     const engines = [engine("claude"), engine("codex")];
     expect(resolveDefaultEngine(engines, "codex").engine?.id).toBe("codex");
-    expect(resolveDefaultEngine(engines, "agy").engine?.id).toBe("claude");
+    expect(resolveDefaultEngine(engines, "gemini").engine?.id).toBe("claude");
     expect(
       resolveDefaultEngine([engine("claude"), engine("codex", { installed: false })], "codex")
         .engine?.id,

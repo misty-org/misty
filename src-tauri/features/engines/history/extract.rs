@@ -13,7 +13,10 @@ pub fn parse_session_file(engine: &str, path: &Path) -> Result<ParsedSession, St
     if engine == "agy" {
         return Ok(super::agy::parse_agy_session(path));
     }
-    let reader = open_line_reader(path)?;
+    if engine == "hermes" {
+        return Ok(super::hermes::parse_hermes_session(path));
+    }
+    let reader = open_line_reader(engine, path)?;
     Ok(collect_session(
         reader,
         &extractor_for(engine, ImageMode::Collect),
@@ -32,7 +35,10 @@ pub fn scan_summary_file(engine: &str, path: &Path) -> Result<ScanSummary, Strin
     if engine == "agy" {
         return Ok(super::agy::scan_agy_summary(path));
     }
-    let reader = open_line_reader(path)?;
+    if engine == "hermes" {
+        return Ok(super::hermes::scan_hermes_summary(path));
+    }
+    let reader = open_line_reader(engine, path)?;
     let mut acc = ScanAcc::default();
     walk_lines(
         reader,
@@ -48,7 +54,11 @@ pub fn scan_summary_file(engine: &str, path: &Path) -> Result<ScanSummary, Strin
     clippy::disallowed_types,
     reason = "reads the engine's own session file in place, wherever the engine keeps it"
 )]
-fn open_line_reader(path: &Path) -> Result<Box<dyn BufRead>, String> {
+fn open_line_reader(engine: &str, path: &Path) -> Result<Box<dyn BufRead>, String> {
+    if engine == "gemini" {
+        let replayed = super::gemini_family::replayed_gemini_chat(path)?;
+        return Ok(Box::new(std::io::Cursor::new(replayed.into_bytes())));
+    }
     let file = std::fs::File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
     Ok(Box::new(std::io::BufReader::new(file)))
 }
@@ -313,6 +323,23 @@ fn user_row_is_visible(text: &str, has_images: bool) -> bool {
     !text.trim().is_empty() || has_images
 }
 
+fn kimi_image_paths(block: &str) -> Vec<String> {
+    const TAG: &str = "<image path=\"";
+    let mut out = Vec::new();
+    let mut rest = block;
+    while let Some(start) = rest.find(TAG) {
+        rest = &rest[start + TAG.len()..];
+        match rest.find('"') {
+            Some(end) => {
+                out.push(rest[..end].to_string());
+                rest = &rest[end..];
+            }
+            None => break,
+        }
+    }
+    out
+}
+
 fn claude_image_data_url(block: &Value) -> Option<String> {
     let source = block.get("source")?;
     let data = source.get("data").and_then(Value::as_str)?;
@@ -439,9 +466,216 @@ fn normalize_extracted_row(mut row: LineRow) -> Option<LineRow> {
 fn extract_line_messages(engine: &str, value: &Value, images: ImageMode) -> LineRows {
     match engine {
         "claude" => extract_claude_line(value, images),
+        "kimi" => extract_kimi_line(value),
+        "grok" => extract_grok_line(value),
         "codex" => extract_codex_line(value, images),
+        "qoder" | "qoder-cn" => extract_qoder_line(value, images),
+        "minimax" => extract_minimax_line(value),
+        "gemini" => extract_gemini_line(value),
+        "qwen" => extract_qwen_line(value),
         _ => Vec::new(),
     }
+}
+
+fn extract_gemini_line(value: &Value) -> LineRows {
+    let ts = ts_string(value, &["timestamp"]);
+    let text = super::content_text(value.get("content"));
+    if text.trim().is_empty() {
+        return Vec::new();
+    }
+    match type_str(value) {
+        "user" => vec![LineRow::new("user", text, ts)],
+        "gemini" => vec![LineRow {
+            model: value
+                .get("model")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            ..LineRow::new("assistant", text, ts)
+        }],
+        _ => Vec::new(),
+    }
+}
+
+fn extract_qwen_line(value: &Value) -> LineRows {
+    let ts = ts_string(value, &["timestamp"]);
+    let parts = value
+        .get("message")
+        .and_then(|message| message.get("parts"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let joined = |thought: bool| {
+        parts
+            .iter()
+            .filter(|part| {
+                part.get("thought")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+                    == thought
+            })
+            .filter_map(|part| part.get("text").and_then(Value::as_str))
+            .collect::<Vec<_>>()
+            .join("")
+    };
+    match type_str(value) {
+        "user" => {
+            let text = joined(false);
+            if text.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![LineRow::new("user", text, ts)]
+            }
+        }
+        "assistant" => {
+            let mut out = Vec::new();
+            let thinking = joined(true);
+            if !thinking.trim().is_empty() {
+                out.push(LineRow::new("thinking", thinking, ts.clone()));
+            }
+            let text = joined(false);
+            if !text.trim().is_empty() {
+                out.push(LineRow {
+                    model: value
+                        .get("model")
+                        .and_then(Value::as_str)
+                        .map(str::to_string),
+                    ..LineRow::new("assistant", text, ts)
+                });
+            }
+            out
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn extract_minimax_line(value: &Value) -> LineRows {
+    let Some(message) = value.get("message") else {
+        return Vec::new();
+    };
+    let role = message.get("role").and_then(Value::as_str).unwrap_or("");
+    let ts = message
+        .get("timestamp")
+        .and_then(Value::as_i64)
+        .map(|ms| ms.to_string());
+    match role {
+        "user" => {
+            let text = minimax_text_of_content(message.get("content"));
+            let (display, images) = match text.find(crate::engines::images::MINIMAX_IMAGE_MARKER) {
+                Some(idx) => (
+                    text[..idx].trim_end().to_string(),
+                    kimi_image_paths(&text[idx..]),
+                ),
+                None => (text, Vec::new()),
+            };
+            if display.trim().is_empty() && images.is_empty() {
+                Vec::new()
+            } else {
+                vec![LineRow {
+                    images,
+                    ..LineRow::new("user", display, ts)
+                }]
+            }
+        }
+        "assistant" => {
+            let mut out = Vec::new();
+            let mut text = String::new();
+            for part in message
+                .get("content")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                match part.get("type").and_then(Value::as_str) {
+                    Some("text") => {
+                        if let Some(t) = part.get("text").and_then(Value::as_str) {
+                            text.push_str(t);
+                        }
+                    }
+                    Some("thinking") => {
+                        pi_flush_text(&mut out, &mut text, &ts, "assistant");
+                        if let Some(t) = part.get("thinking").and_then(Value::as_str) {
+                            out.push(LineRow::new("thinking", t.to_string(), ts.clone()));
+                        }
+                    }
+                    Some("toolCall") => {
+                        pi_flush_text(&mut out, &mut text, &ts, "assistant");
+                        let name = part.get("name").and_then(Value::as_str).unwrap_or("tool");
+                        let arguments = part.get("arguments");
+                        out.push(LineRow {
+                            path: arguments.and_then(crate::engines::tool_path_arg),
+                            args: arguments.and_then(crate::engines::parse_tool_args_value),
+                            tool_call_id: part
+                                .get("id")
+                                .and_then(Value::as_str)
+                                .map(str::to_string),
+                            todos: arguments.and_then(crate::engines::parse_todo_args),
+                            ..LineRow::new("tool", name.to_string(), ts.clone())
+                        });
+                    }
+                    _ => {}
+                }
+            }
+            pi_flush_text(&mut out, &mut text, &ts, "assistant");
+            if let Some(row) = out.iter_mut().rev().find(|row| row.role == "assistant") {
+                row.model = message
+                    .get("model")
+                    .and_then(Value::as_str)
+                    .map(str::to_string);
+            }
+            if let Some(usage) = minimax_usage(message.get("usage")) {
+                out.push(LineRow {
+                    usage: Some(usage),
+                    ..LineRow::new("__usage__", String::new(), ts)
+                });
+            }
+            out
+        }
+        "toolResult" => {
+            let text = minimax_text_of_content(message.get("content"));
+            let mut result = serde_json::Map::new();
+            result.insert("text".to_string(), serde_json::Value::String(text));
+            if message.get("isError").and_then(Value::as_bool) == Some(true) {
+                result.insert("isError".to_string(), serde_json::Value::Bool(true));
+            }
+            vec![LineRow {
+                tool_call_id: message
+                    .get("toolCallId")
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                result: Some(serde_json::Value::Object(result)),
+                ..LineRow::new("__tool_result__", String::new(), ts)
+            }]
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn minimax_text_of_content(content: Option<&Value>) -> String {
+    content
+        .and_then(Value::as_array)
+        .map(|parts| {
+            parts
+                .iter()
+                .filter(|part| type_str(part) == "text")
+                .filter_map(|part| part.get("text").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("")
+        })
+        .unwrap_or_default()
+}
+
+fn minimax_usage(usage: Option<&Value>) -> Option<Value> {
+    let usage = usage?.as_object()?;
+    let get = |key: &str| usage.get(key).and_then(Value::as_u64);
+    let input = get("input")?;
+    let output = get("output")?;
+    let total = usage.get("totalTokens").and_then(Value::as_u64)?;
+    Some(serde_json::json!({
+        "input_tokens": input,
+        "output_tokens": output,
+        "total_tokens": total,
+        "cache_read": get("cacheRead"),
+    }))
 }
 
 fn extract_codex_line(value: &Value, images: ImageMode) -> LineRows {
@@ -509,6 +743,12 @@ fn extract_codex_line(value: &Value, images: ImageMode) -> LineRows {
             Vec::new()
         }
         _ => Vec::new(),
+    }
+}
+
+fn pi_flush_text(out: &mut LineRows, text: &mut String, ts: &Option<String>, role: &str) {
+    if !text.trim().is_empty() {
+        out.push(LineRow::new(role, std::mem::take(text), ts.clone()));
     }
 }
 
@@ -689,6 +929,219 @@ fn extract_claude_line(value: &Value, images: ImageMode) -> LineRows {
         }
     }
     out
+}
+
+fn extract_kimi_line(value: &Value) -> LineRows {
+    let line_type = type_str(value);
+    let ts = value
+        .get("time")
+        .and_then(Value::as_i64)
+        .map(|ms| ms.to_string());
+    match line_type {
+        "turn.prompt" => {
+            let text = content_text(value.get("input"));
+            let (display, images) = match text.find(crate::engines::images::KIMI_IMAGE_MARKER) {
+                Some(idx) => (
+                    text[..idx].trim_end().to_string(),
+                    kimi_image_paths(&text[idx..]),
+                ),
+                None => (text, Vec::new()),
+            };
+            if display.trim().is_empty() && images.is_empty() {
+                Vec::new()
+            } else {
+                vec![LineRow {
+                    images,
+                    ..LineRow::new("user", display, ts)
+                }]
+            }
+        }
+        "context.append_loop_event" => {
+            let Some(event) = value.get("event") else {
+                return Vec::new();
+            };
+            if event.get("type").and_then(Value::as_str) != Some("content.part") {
+                return Vec::new();
+            }
+            let Some(part) = event.get("part") else {
+                return Vec::new();
+            };
+            match part.get("type").and_then(Value::as_str) {
+                Some("text") => {
+                    let text = part
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    if text.trim().is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![LineRow::new("assistant", text, ts)]
+                    }
+                }
+                Some("tool_call") => {
+                    let name = part
+                        .get("name")
+                        .or_else(|| part.get("tool_name"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("tool")
+                        .to_string();
+                    let args = part
+                        .get("arguments")
+                        .or_else(|| part.get("input"))
+                        .or_else(|| part.get("args"));
+                    vec![LineRow {
+                        path: args.and_then(crate::engines::tool_path_arg),
+                        args: args.and_then(crate::engines::parse_tool_args_value),
+                        todos: args.and_then(crate::engines::parse_todo_args),
+                        ..LineRow::new("tool", name, ts)
+                    }]
+                }
+                _ => Vec::new(),
+            }
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn extract_grok_line(value: &Value) -> LineRows {
+    let line_type = type_str(value);
+    let ts = ts_string(value, &["timestamp", "created_at", "createdAt"]);
+    match line_type {
+        "user" => {
+            if value.get("synthetic_reason").is_some() {
+                return Vec::new();
+            }
+            let text = content_text(value.get("content"));
+            if text.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![LineRow::new("user", text, ts)]
+            }
+        }
+        "reasoning" => {
+            let text = match value.get("summary") {
+                Some(Value::Array(parts)) => text_of_parts(parts, "\n"),
+                Some(Value::String(s)) => s.clone(),
+                _ => String::new(),
+            };
+            if text.trim().is_empty() {
+                Vec::new()
+            } else {
+                vec![LineRow::new("thinking", text, ts)]
+            }
+        }
+        "assistant" => {
+            let mut out = Vec::new();
+            let text = content_text(value.get("content"));
+            if !text.trim().is_empty() {
+                let usage = value.get("usage").cloned();
+                out.push(LineRow {
+                    usage,
+                    ..LineRow::new("assistant", text, ts.clone())
+                });
+            }
+            if let Some(calls) = value.get("tool_calls").and_then(Value::as_array) {
+                for call in calls {
+                    let function = call.get("function");
+                    let name = function
+                        .and_then(|f| f.get("name"))
+                        .or_else(|| call.get("name"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("tool")
+                        .to_string();
+                    let args = function
+                        .and_then(|f| f.get("arguments"))
+                        .or_else(|| call.get("arguments"))
+                        .or_else(|| call.get("input"));
+                    out.push(LineRow {
+                        path: args.and_then(crate::engines::tool_path_arg),
+                        args: args.and_then(crate::engines::parse_tool_args_value),
+                        todos: args.and_then(crate::engines::parse_todo_args),
+                        ..LineRow::new("tool", name, ts.clone())
+                    });
+                }
+            }
+            out
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn qoder_is_sidechain(value: &Value) -> bool {
+    match value.get("isSidechain") {
+        Some(Value::Bool(true)) => true,
+        Some(Value::String(s)) => s.eq_ignore_ascii_case("true"),
+        _ => false,
+    }
+}
+
+fn qoder_tool_result_rows(value: &Value, ts: &Option<String>) -> LineRows {
+    let mut out = Vec::new();
+    let Some(blocks) = value
+        .get("message")
+        .and_then(|m| m.get("content"))
+        .and_then(Value::as_array)
+    else {
+        return out;
+    };
+    for block in blocks {
+        if block.get("type").and_then(Value::as_str) != Some("tool_result") {
+            continue;
+        }
+        out.push(LineRow {
+            tool_call_id: block
+                .get("tool_use_id")
+                .or_else(|| block.get("toolUseId"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            result: block.get("content").cloned(),
+            ..LineRow::new("__tool_result__", String::new(), ts.clone())
+        });
+    }
+    out
+}
+
+fn extract_qoder_line(value: &Value, images: ImageMode) -> LineRows {
+    if qoder_is_sidechain(value) {
+        return Vec::new();
+    }
+    let line_type = type_str(value);
+    if line_type != "user" && line_type != "assistant" {
+        return Vec::new();
+    }
+    let ts = ts_string(value, &["timestamp"]);
+    if line_type == "user" && value.get("toolUseResult").is_some() {
+        return qoder_tool_result_rows(value, &ts);
+    }
+    let mut rows = extract_claude_line(value, images);
+    if line_type == "assistant" {
+        let mut call_ids = value
+            .get("message")
+            .and_then(|m| m.get("content"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"))
+            .filter_map(|b| b.get("id").and_then(Value::as_str));
+        for row in rows.iter_mut() {
+            if row.role == "tool" {
+                row.tool_call_id = call_ids.next().map(str::to_string);
+            }
+        }
+    }
+    if !rows.is_empty() || line_type != "user" {
+        return rows;
+    }
+    match value
+        .get("humanInput")
+        .and_then(|input| input.get("text"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+    {
+        Some(text) if !text.is_empty() => vec![LineRow::new("user", text.to_string(), ts)],
+        _ => Vec::new(),
+    }
 }
 
 #[cfg(test)]
@@ -1187,5 +1640,262 @@ mod tests {
             usage.get("total_tokens").and_then(Value::as_i64),
             Some(8038)
         );
+    }
+
+    #[test]
+    fn gemini_and_qwen_lines_become_turns() {
+        let roles = |engine: &str, line: &str| {
+            let value: Value = serde_json::from_str(line).unwrap();
+            extract_line_messages(engine, &value, ImageMode::SkipDataUrls)
+                .into_iter()
+                .map(|row| (row.role, row.text))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            roles("gemini", r#"{"type":"user","content":[{"text":"hi"}]}"#),
+            [("user".to_string(), "hi".to_string())]
+        );
+        assert_eq!(
+            roles(
+                "gemini",
+                r#"{"type":"gemini","content":"hello","model":"gemini-2.5-pro"}"#
+            ),
+            [("assistant".to_string(), "hello".to_string())]
+        );
+        assert!(roles("gemini", r#"{"$set":{"summary":"x"}}"#).is_empty());
+        assert!(roles("gemini", r#"{"sessionId":"g1","projectHash":"abc"}"#).is_empty());
+        assert_eq!(
+            roles(
+                "qwen",
+                r#"{"type":"assistant","message":{"role":"model","parts":[{"text":"plan","thought":true},{"text":"done"}]}}"#
+            ),
+            [
+                ("thinking".to_string(), "plan".to_string()),
+                ("assistant".to_string(), "done".to_string())
+            ]
+        );
+        assert!(roles("qwen", r#"{"type":"tool_result","message":{"parts":[]}}"#).is_empty());
+    }
+
+    #[test]
+    fn kimi_prompt_row_recovers_image_paths() {
+        let prompt = crate::engines::images::kimi_prompt_with_images(
+            "what is this",
+            &["/tmp/a.png".to_string(), "b.jpg".to_string()],
+            Path::new("/tmp"),
+        );
+        let line: Value = serde_json::json!({
+            "type": "turn.prompt",
+            "time": 1757493136000i64,
+            "input": prompt,
+        });
+        let rows = extract_kimi_line(&line);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].role, "user");
+        assert_eq!(rows[0].text, "what is this");
+        let got: Vec<std::path::PathBuf> = rows[0]
+            .images
+            .iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                std::path::PathBuf::from("/tmp/a.png"),
+                std::path::Path::new("/tmp").join("b.jpg"),
+            ]
+        );
+    }
+
+    #[test]
+    fn grok_skips_synthetic_reason_and_leaves_envelope_to_normalize() {
+        let reminder: Value = serde_json::json!({
+            "type": "user",
+            "synthetic_reason": "system_reminder",
+            "content": [{"type": "text", "text": "<system-reminder>skills</system-reminder>"}]
+        });
+        assert!(extract_grok_line(&reminder).is_empty());
+
+        let context: Value = serde_json::json!({
+            "type": "user",
+            "content": [{"type": "text", "text": "<user_info>\nOS Version: macos\n</user_info>"}]
+        });
+        let context_rows = extract_grok_line(&context);
+        assert_eq!(context_rows.len(), 1);
+        assert!(normalize_extracted_row(context_rows.into_iter().next().unwrap()).is_none());
+
+        let query: Value = serde_json::json!({
+            "type": "user",
+            "prompt_index": 0,
+            "content": [{
+                "type": "text",
+                "text": "<image_files>\n1. /tmp/a.png\n</image_files>\n\n<user_query>Grok CLI 的历史记录怎么没出现？</user_query>"
+            }]
+        });
+        let rows = extract_grok_line(&query);
+        assert_eq!(rows.len(), 1);
+        let normalized = normalize_extracted_row(rows.into_iter().next().unwrap()).unwrap();
+        assert_eq!(normalized.role, "user");
+        assert_eq!(normalized.text, "Grok CLI 的历史记录怎么没出现？");
+
+        let mentioned = LineRow::new(
+            "user",
+            "please look at <user_info> in grok logs, not the typed <user_query>".into(),
+            None,
+        );
+        let kept = normalize_extracted_row(mentioned).unwrap();
+        assert_eq!(
+            kept.text,
+            "please look at <user_info> in grok logs, not the typed <user_query>"
+        );
+    }
+
+    #[test]
+    fn grok_reasoning_summary_becomes_thinking() {
+        let line: Value = serde_json::json!({
+            "type": "reasoning",
+            "summary": [
+                {"type": "summary_text", "text": "first thought"},
+                {"type": "summary_text", "text": "second thought"}
+            ]
+        });
+        let rows = extract_grok_line(&line);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].role, "thinking");
+        assert_eq!(rows[0].text, "first thought\nsecond thought");
+    }
+
+    #[test]
+    fn qoder_line_skips_sidechains_and_reads_user_prompt() {
+        let sidechain = serde_json::json!({
+            "type": "user", "uuid": "hidden", "isSidechain": true,
+            "humanInput": {"text": "hidden prompt"},
+            "message": {"content": "hidden prompt"}
+        });
+        assert!(extract_qoder_line(&sidechain, ImageMode::Collect).is_empty());
+        let sidechain_str = serde_json::json!({
+            "type": "assistant", "isSidechain": "true",
+            "message": {"content": "hidden answer"}
+        });
+        assert!(extract_qoder_line(&sidechain_str, ImageMode::Collect).is_empty());
+
+        let user = serde_json::json!({
+            "type": "user", "uuid": "user-1", "timestamp": "2026-08-22T00:00:00Z",
+            "humanInput": {"text": "first prompt"},
+            "message": {"content": "first prompt"}
+        });
+        let rows = extract_qoder_line(&user, ImageMode::Collect);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].role, "user");
+        assert_eq!(rows[0].text, "first prompt");
+    }
+
+    #[test]
+    fn qoder_human_input_is_user_text_fallback() {
+        let line = serde_json::json!({
+            "type": "user", "uuid": "u1", "timestamp": "2026-08-22T00:00:00Z",
+            "humanInput": {"text": "typed body"}
+        });
+        let rows = extract_qoder_line(&line, ImageMode::Collect);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].role, "user");
+        assert_eq!(rows[0].text, "typed body");
+    }
+
+    #[test]
+    fn qoder_tool_result_pairs_with_call_id() {
+        let call = |id: &str| {
+            serde_json::json!({
+                "type": "assistant", "uuid": id, "timestamp": "2026-08-22T00:00:01Z",
+                "message": {"content": [
+                    {"type": "tool_use", "id": id, "name": "Read", "input": {"path": "README.md"}}
+                ]}
+            })
+        };
+        let result = |id: &str, body: &str| {
+            serde_json::json!({
+                "type": "user", "timestamp": "2026-08-22T00:00:02Z",
+                "toolUseResult": {"ok": true},
+                "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": id, "content": body}
+                ]}
+            })
+        };
+        let lines = [
+            call("tool-a"),
+            call("tool-b"),
+            result("tool-b", "body b"),
+            result("tool-a", "body a"),
+        ];
+        let input = lines
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        let extractor: LineExtractor<'_> =
+            Box::new(|value: &Value| extract_qoder_line(value, ImageMode::Collect));
+        let parsed = collect_session(std::io::Cursor::new(input), &extractor);
+        assert_eq!(parsed.messages.len(), 2);
+        assert_eq!(parsed.messages[0].result, Some(serde_json::json!("body a")));
+        assert_eq!(parsed.messages[1].result, Some(serde_json::json!("body b")));
+    }
+
+    #[test]
+    fn minimax_lines_project_roles_parts_usage_and_images() {
+        let rows = extract_line_messages(
+            "minimax",
+            &serde_json::json!({
+                "message_id": "m1", "turn_id": "t1",
+                "message": {"role": "user", "content": [
+                    {"type": "text", "text": "看这张图"},
+                    {"type": "text", "text": "\n\n<!-- ccgui:minimax-image-attachments -->\n附件如下\n1. /tmp/pic.png\n<image path=\"/tmp/pic.png\"></image>\n"}
+                ], "timestamp": 1_700_000_000_000i64}
+            }),
+            ImageMode::SkipDataUrls,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].role, "user");
+        assert_eq!(rows[0].text, "看这张图");
+        assert_eq!(rows[0].images, vec!["/tmp/pic.png".to_string()]);
+
+        let rows = extract_line_messages(
+            "minimax",
+            &serde_json::json!({
+                "message_id": "m2", "turn_id": "t1",
+                "message": {"role": "assistant", "content": [
+                    {"type": "thinking", "thinking": "想一下"},
+                    {"type": "text", "text": "答案是 "},
+                    {"type": "text", "text": "42"},
+                    {"type": "toolCall", "id": "call-9", "name": "read_file", "arguments": {"path": "/tmp/a"}}
+                ], "timestamp": 1_700_000_001_000i64,
+                "model": "minimax/MiniMax-M2.7",
+                "usage": {"input": 10, "output": 5, "totalTokens": 15, "cacheRead": 2}}
+            }),
+            ImageMode::SkipDataUrls,
+        );
+        assert_eq!(
+            rows.iter().map(|r| r.role.as_str()).collect::<Vec<_>>(),
+            ["thinking", "assistant", "tool", "__usage__"]
+        );
+        assert_eq!(rows[1].text, "答案是 42");
+        assert_eq!(rows[1].model.as_deref(), Some("minimax/MiniMax-M2.7"));
+        assert_eq!(rows[2].text, "read_file");
+        assert_eq!(rows[2].tool_call_id.as_deref(), Some("call-9"));
+        assert_eq!(rows[3].usage.as_ref().unwrap()["total_tokens"], 15);
+
+        let rows = extract_line_messages(
+            "minimax",
+            &serde_json::json!({
+                "message_id": "m3", "turn_id": "t1",
+                "message": {"role": "toolResult", "toolCallId": "call-9",
+                    "content": [{"type": "text", "text": "文件内容"}],
+                    "timestamp": 1_700_000_002_000i64}
+            }),
+            ImageMode::SkipDataUrls,
+        );
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].role, "__tool_result__");
+        assert_eq!(rows[0].tool_call_id.as_deref(), Some("call-9"));
+        assert_eq!(rows[0].result.as_ref().unwrap()["text"], "文件内容");
     }
 }

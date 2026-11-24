@@ -42,6 +42,7 @@ import {
   marketApi,
   matchItems,
   orderItems,
+  pluginNoun,
   takesSources,
   unaddedSuggestions,
   type EngineMarket,
@@ -158,6 +159,7 @@ function EnginePluginShelves({
     return [...groups];
   }, [shown]);
 
+  const noun = pluginNoun(engine);
   const canAdd = takesSources(engine);
   const suggestions = market?.ready && canAdd ? unaddedSuggestions(engine, market.sources) : [];
   const filtered = Boolean(query.trim()) || category !== null;
@@ -221,7 +223,7 @@ function EnginePluginShelves({
     try {
       await marketApi.addSource(engine, source);
       await load();
-      notify({ message: `${label} is added. Its plugins are on the shelves.` });
+      notify({ message: `${label} is added. Its ${noun}s are on the shelves.` });
     } catch (reason) {
       notify({ message: failureText(reason, `${label} couldn't be added.`), tone: "error" });
     } finally {
@@ -308,7 +310,7 @@ function EnginePluginShelves({
             utilities={
               <>
                 <CollectionSortMenu value={sort} options={sortOptions} onChange={setMarketSort} />
-                <IconButton label="Refresh plugins" onClick={() => void load()}>
+                <IconButton label={`Refresh ${noun}s`} onClick={() => void load()}>
                   <RefreshCw />
                 </IconButton>
                 {canAdd ? (
@@ -327,25 +329,25 @@ function EnginePluginShelves({
       </div>
 
       {!market ? (
-        <MarketShelvesSkeleton label={`${name} plugins`} />
+        <MarketShelvesSkeleton label={`${name} ${noun}s`} />
       ) : !market.ready ? (
         <ErrorState
           inline
-          title={`${name} didn't list its plugins`}
+          title={`${name} didn't list its ${noun}s`}
           line={market.error ?? `Check that ${name} is installed and signed in.`}
           action={{ label: "Try again", icon: RefreshCw, onClick: () => void load() }}
         />
       ) : shown.length === 0 ? (
         <EmptyState
           inline
-          title={filtered ? "No plugins found" : `${name} offers no plugins yet`}
+          title={filtered ? `No ${noun}s found` : `${name} offers no ${noun}s yet`}
           line={
             filtered
               ? canAdd
                 ? "Try other words, or add a marketplace."
                 : "Try other words."
               : canAdd
-                ? "Add a marketplace to see its plugins here."
+                ? `Add a marketplace to see its ${noun}s here.`
                 : `${name} lists none right now.`
           }
           action={

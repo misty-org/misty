@@ -40,11 +40,9 @@ const longDate = new Intl.DateTimeFormat(undefined, {
 });
 
 export function DmFace({
-  dmId,
   person,
   size,
 }: {
-  dmId: string;
   person: Person;
   size?: AvatarSize;
 }) {
@@ -74,7 +72,6 @@ export function DmWelcome({
   if (dm.kind === "group" || !other)
     return (
       <ChannelWelcome
-        align="center"
         icon={Users}
         title={name}
         line={`This is the beginning of the ${name} group.`}
@@ -82,8 +79,7 @@ export function DmWelcome({
     );
   return (
     <ChannelWelcome
-      align="center"
-      mark={<DmFace dmId={dm.id} person={other} size="xl" />}
+      mark={<DmFace person={other} size="xl" />}
       title={other.username}
       line={`This is the beginning of your direct message history with ${other.username}.`}
       actions={dm.read_only ? undefined : <WaveButton dmId={dm.id} name={other.username} />}
@@ -183,12 +179,10 @@ function MutualFriend({ person, onOpen }: { person: Person; onOpen: (userId: str
 }
 
 export function DmProfile({
-  dm,
   person,
   onRemove,
   onBlock,
 }: {
-  dm: DirectConversation;
   person: Person;
   onRemove: () => void;
   onBlock: () => void;
@@ -208,7 +202,7 @@ export function DmProfile({
     <PersonProfile
       label="Profile"
       banner={banner}
-      face={<DmFace dmId={dm.id} person={person} size="xl" />}
+      face={<DmFace person={person} size="xl" />}
       name={person.username}
       line={custom || undefined}
       menu={

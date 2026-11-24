@@ -80,7 +80,7 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
       <div
         role="log"
         aria-label="Messages"
-        className={`${quiet ? "my-auto" : "mt-auto"} flex min-w-0 flex-col pt-4 pb-6`}
+        className={`${quiet ? "my-auto" : "mt-auto"} flex min-w-0 flex-col pt-4 pb-2`}
       >
         {props.error ? (
           <div className="px-4 pb-2">

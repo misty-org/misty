@@ -34,7 +34,12 @@ pub struct TestHome {
 
 #[cfg(test)]
 impl TestHome {
-    const KEYS: [&'static str; 3] = ["MISTY_TEST_ENGINE_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME"];
+    const KEYS: [&'static str; 4] = [
+        "MISTY_TEST_ENGINE_HOME",
+        "CLAUDE_CONFIG_DIR",
+        "CODEX_HOME",
+        "GEMINI_CLI_HOME",
+    ];
 
     pub fn set(home: &Path) -> Self {
         let lock = HOME_ENV_LOCK.lock();
@@ -101,14 +106,34 @@ pub fn app_home() -> PathBuf {
         .join("engine-config")
 }
 
+pub fn hermes_home() -> PathBuf {
+    if let Some(home) = std::env::var_os("HERMES_HOME").filter(|v| !v.is_empty()) {
+        return PathBuf::from(home);
+    }
+    #[cfg(windows)]
+    if let Some(local) = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) {
+        return PathBuf::from(local).join("hermes");
+    }
+    home_dir().join(".hermes")
+}
+
 pub fn engine_config_locations() -> (Vec<PathBuf>, Vec<(PathBuf, &'static str)>) {
     let home = home_dir();
     let folders = vec![
         claude_home(),
         codex_home(),
         home.join(".cache").join("codex-runtimes"),
-        home.join(".gemini"),
+        engine_home(Some("GEMINI_CLI_HOME"), ".gemini"),
         home.join(".agents"),
+        home.join(".qwen"),
+        home.join(".kimi"),
+        home.join(".kimi-code"),
+        home.join(".qoder-cn"),
+        home.join(".grok"),
+        home.join(".minimax"),
+        home.join(".mcode"),
+        home.join(".qoder"),
+        hermes_home(),
         home.join(".cc-switch"),
     ];
     let files = vec![

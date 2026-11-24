@@ -151,6 +151,7 @@ fn an_adapter_is_added_under_misty_and_never_over_the_release() {
         add_files: vec![AddFile {
             path: path.into(),
             content: "window.mistyAdapter = {};".into(),
+            source: None,
         }],
         ..wrap(false, &[])
     };

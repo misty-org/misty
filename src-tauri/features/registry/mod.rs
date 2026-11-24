@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::app::runtime::MistyRuntime;
 
+pub mod files;
 pub mod local;
 
 const BUNDLED: &str = include_str!("../../../src/shared/registry/registry.json");

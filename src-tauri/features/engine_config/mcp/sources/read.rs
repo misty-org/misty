@@ -2,13 +2,15 @@
 // See NOTICE.
 
 use super::{
-    candidate_paths, first_existing, source_spec, Fields, Source, Toggle, REASON_JSONC_READONLY,
+    candidate_paths, first_existing, grok_home, source_spec, Fields, Source, Toggle,
+    REASON_JSONC_READONLY,
 };
 use crate::engine_config::mcp::config::{file_hash, object_keys, read_text, redact_url};
 use crate::engine_config::mcp::probe::ProbeTarget;
 use crate::engine_config::mcp::{parse_json, McpConfigEntry, McpError};
 use serde_json::{Map, Value};
 use std::path::Path;
+use toml_edit::DocumentMut;
 
 pub(super) fn parse_jsonc(text: &str, path: &str) -> Result<Value, McpError> {
     let stripped = strip_jsonc(text)
@@ -159,7 +161,7 @@ pub(super) fn build_entry(
         scope: source.scope.to_string(),
         workspace_file: crate::engine_config::mcp::source_in_workspace(source.id),
         path: path.to_string_lossy().into_owned(),
-        format: "json".to_string(),
+        format: source.format.to_string(),
         enabled: entry_enabled(source, spec_object),
         transport,
         command,
@@ -219,8 +221,128 @@ fn bool_field(object: &Map<String, Value>, key: &str) -> Option<bool> {
 
 fn entry_enabled(source: &Source, spec_object: &Map<String, Value>) -> bool {
     match source.toggle {
+        Some(Toggle::Enabled) => bool_field(spec_object, "enabled").unwrap_or(true),
         Some(Toggle::Disabled) => !bool_field(spec_object, "disabled").unwrap_or(false),
         None => true,
+    }
+}
+
+pub(super) fn read_toml_source(
+    source: &Source,
+    path: &Path,
+) -> Result<Vec<McpConfigEntry>, McpError> {
+    let raw = read_text(path)?;
+    let version = file_hash(raw.as_bytes());
+    let document = raw
+        .parse::<DocumentMut>()
+        .map_err(|error| McpError::format(format!("{}: invalid TOML: {error}", path.display())))?;
+    let mut disabled = string_array(&document, "disabled_mcp_servers")?;
+    if source.id == "grok_project" {
+        let user_path = grok_home().join("config.toml");
+        if file_access::fs::is_file(&user_path) {
+            if let Ok(user_raw) = read_text(&user_path) {
+                if let Ok(user_document) = user_raw.parse::<DocumentMut>() {
+                    if let Ok(names) = string_array(&user_document, "disabled_mcp_servers") {
+                        disabled.extend(names);
+                    }
+                }
+            }
+        }
+    }
+    let mut entries = Vec::new();
+    let Some(servers) = document
+        .get("mcp_servers")
+        .and_then(|item| item.as_table_like())
+    else {
+        return Ok(entries);
+    };
+    for (name, item) in servers.iter() {
+        let name = name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        let Some(table) = item.as_table_like() else {
+            continue;
+        };
+        let spec = source_spec(source.id).expect("registered source");
+        let enabled = table
+            .get("enabled")
+            .and_then(|item| item.as_bool())
+            .unwrap_or(true)
+            && !disabled.iter().any(|item| item == name);
+        let command = table
+            .get("command")
+            .and_then(|item| item.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let url = table
+            .get("url")
+            .and_then(|item| item.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(redact_url);
+        let transport = table
+            .get("type")
+            .and_then(|item| item.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+        let args_count = table
+            .get("args")
+            .and_then(|item| item.as_array())
+            .map(|items| items.len())
+            .unwrap_or(0);
+        let mut env_keys: Vec<String> = table
+            .get("env")
+            .and_then(|item| item.as_table_like())
+            .map(|table| table.iter().map(|(key, _)| key.to_string()).collect())
+            .unwrap_or_default();
+        env_keys.sort();
+        let mut header_keys: Vec<String> = table
+            .get("headers")
+            .and_then(|item| item.as_table_like())
+            .map(|table| table.iter().map(|(key, _)| key.to_string()).collect())
+            .unwrap_or_default();
+        header_keys.sort();
+        entries.push(McpConfigEntry {
+            id: format!("{}:{name}", source.id),
+            engine: source.engine.to_string(),
+            name: name.to_string(),
+            source: source.id.to_string(),
+            scope: source.scope.to_string(),
+            workspace_file: crate::engine_config::mcp::source_in_workspace(source.id),
+            path: path.to_string_lossy().into_owned(),
+            format: "toml".to_string(),
+            enabled,
+            transport,
+            command,
+            args_count,
+            url,
+            env_keys,
+            header_keys,
+            writable: spec.writable,
+            readonly_reason: spec.readonly_reason.map(str::to_string),
+            readonly_reason_code: spec.readonly_reason_code.map(str::to_string),
+            version: version.clone(),
+        });
+    }
+    Ok(entries)
+}
+
+pub(super) fn string_array(document: &DocumentMut, key: &str) -> Result<Vec<String>, McpError> {
+    match document.get(key) {
+        None => Ok(Vec::new()),
+        Some(item) => item
+            .as_array()
+            .map(|array| {
+                array
+                    .iter()
+                    .filter_map(|item| item.as_str())
+                    .map(str::to_string)
+                    .collect()
+            })
+            .ok_or_else(|| McpError::format(format!("{key} isn't a list; the field was skipped"))),
     }
 }
 
@@ -340,17 +462,34 @@ pub(crate) fn probe_target_for_source(
         McpError::not_found("The config file doesn't exist, so there's nothing to connect to")
     })?;
     let missing = || McpError::not_found(format!("The config has no MCP server named “{name}”"));
-    let raw = read_text(&path)?;
-    let root = if is_jsonc(&path) {
-        parse_jsonc(&raw, &path.to_string_lossy())?
-    } else {
-        parse_json(&raw, &path.to_string_lossy())?
-    };
-    let object = root
-        .get(source.servers_key)
-        .and_then(Value::as_object)
-        .and_then(|servers| servers.get(name))
-        .and_then(Value::as_object)
-        .ok_or_else(missing)?;
-    Ok(probe_target_from_json(object, source.fields))
+    match source.format {
+        "toml" => {
+            let raw = read_text(&path)?;
+            let document = raw.parse::<DocumentMut>().map_err(|error| {
+                McpError::format(format!("{}: invalid TOML: {error}", path.display()))
+            })?;
+            let table = document
+                .get(source.servers_key)
+                .and_then(|item| item.as_table_like())
+                .and_then(|servers| servers.get(name))
+                .and_then(|item| item.as_table_like())
+                .ok_or_else(missing)?;
+            Ok(probe_target_from_toml(table, source.fields))
+        }
+        _ => {
+            let raw = read_text(&path)?;
+            let root = if is_jsonc(&path) {
+                parse_jsonc(&raw, &path.to_string_lossy())?
+            } else {
+                parse_json(&raw, &path.to_string_lossy())?
+            };
+            let object = root
+                .get(source.servers_key)
+                .and_then(Value::as_object)
+                .and_then(|servers| servers.get(name))
+                .and_then(Value::as_object)
+                .ok_or_else(missing)?;
+            Ok(probe_target_from_json(object, source.fields))
+        }
+    }
 }

@@ -25,11 +25,12 @@ fn ccs_app_key(engine: &str) -> Option<&'static str> {
     match engine {
         "claude" => Some("claude"),
         "codex" => Some("codex"),
+        "grok" => Some("grokbuild"),
         _ => None,
     }
 }
 
-const IMPORT_ENGINES: [&str; 2] = ["claude", "codex"];
+const IMPORT_ENGINES: [&str; 3] = ["claude", "codex", "grok"];
 
 fn ccs_dir() -> PathBuf {
     support::home_dir().join(".cc-switch")
@@ -293,13 +294,17 @@ fn convert_provider(engine: &str, id: &str, p: &Value) -> Value {
 
     let sc = &p["settingsConfig"];
     match engine {
-        "claude" => {
+        "claude" | "grok" => {
             let env = &sc["env"];
-            let (base, key, model) = (
-                "ANTHROPIC_BASE_URL",
-                "ANTHROPIC_AUTH_TOKEN",
-                "ANTHROPIC_MODEL",
-            );
+            let (base, key, model) = if engine == "claude" {
+                (
+                    "ANTHROPIC_BASE_URL",
+                    "ANTHROPIC_AUTH_TOKEN",
+                    "ANTHROPIC_MODEL",
+                )
+            } else {
+                ("GROK_BASE_URL", "GROK_API_KEY", "GROK_MODEL")
+            };
             if let Some(v) = env_str(env, base) {
                 out.insert("baseUrl".into(), Value::String(v));
             }
@@ -512,7 +517,7 @@ mod tests {
         }"#;
         std::fs::write(&path, json).unwrap();
 
-        let loaded = load_from_json(&path, &["claude", "codex", "agy"]).unwrap();
+        let loaded = load_from_json(&path, &["claude", "codex", "grok"]).unwrap();
         assert_eq!(loaded.len(), 3);
         let claude = loaded[0].1.as_ref().unwrap();
         assert_eq!(claude.len(), 1);
@@ -565,7 +570,7 @@ mod tests {
         assert_eq!(converted["baseUrl"], "https://c.example");
         assert_eq!(converted["apiKey"], "sk-y");
         assert!(claude[1].1["settingsConfig"].is_object());
-        let loaded = load_from_db(&path, &["agy"]).unwrap();
+        let loaded = load_from_db(&path, &["kimi"]).unwrap();
         assert!(loaded[0].1.is_none());
     }
 

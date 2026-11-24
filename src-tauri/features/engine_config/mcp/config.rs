@@ -1309,7 +1309,7 @@ mod tests {
 
     #[test]
     fn write_enabled_rejects_readonly_and_unknown_sources() {
-        let error = write_enabled("agy_user:alpha", true, "", None).unwrap_err();
+        let error = write_enabled("kimi_user:alpha", true, "", None).unwrap_err();
         assert_eq!(error.code, "readonly");
         let error = write_enabled("bogus:alpha", true, "", None).unwrap_err();
         assert_eq!(error.code, "invalid_input");

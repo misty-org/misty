@@ -27,6 +27,10 @@ pub(crate) fn targets(engine: &str) -> Vec<Target> {
     match engine {
         "claude" => vec![target(support::claude_home().join("settings.json"))],
         "codex" => vec![target(support::codex_home().join("config.toml"))],
+        "kimi" => vec![target(
+            home(Some("KIMI_CODE_HOME"), ".kimi-code").join("config.toml"),
+        )],
+        "grok" => vec![target(home(Some("GROK_HOME"), ".grok").join("config.toml"))],
         "agy" => vec![target(
             home(Some("ANTIGRAVITY_HOME"), ".gemini/antigravity-cli").join("settings.json"),
         )],
@@ -216,10 +220,30 @@ pub(crate) fn env_mapping(engine: &str) -> [(&'static str, &'static str); 3] {
             ("apiKey", "ANTHROPIC_AUTH_TOKEN"),
             ("model", "ANTHROPIC_MODEL"),
         ],
+        "kimi" => [
+            ("baseUrl", "KIMI_BASE_URL"),
+            ("apiKey", "KIMI_API_KEY"),
+            ("model", "KIMI_MODEL_NAME"),
+        ],
+        "grok" => [
+            ("baseUrl", "GROK_BASE_URL"),
+            ("apiKey", "GROK_API_KEY"),
+            ("model", "GROK_MODEL"),
+        ],
         "codex" => [
             ("baseUrl", "OPENAI_BASE_URL"),
             ("apiKey", "OPENAI_API_KEY"),
             ("model", ""),
+        ],
+        "gemini" => [
+            ("baseUrl", "GOOGLE_GEMINI_BASE_URL"),
+            ("apiKey", "GEMINI_API_KEY"),
+            ("model", "GEMINI_MODEL"),
+        ],
+        "qwen" => [
+            ("baseUrl", "OPENAI_BASE_URL"),
+            ("apiKey", "OPENAI_API_KEY"),
+            ("model", "OPENAI_MODEL"),
         ],
         _ => [("baseUrl", ""), ("apiKey", ""), ("model", "")],
     }
@@ -303,6 +327,23 @@ pub(crate) fn channel_env(
             out.insert("OPENAI_API_KEY".to_string(), key);
         }
     }
+    if engine == "grok" {
+        if let Some(base) = out.remove("GROK_BASE_URL") {
+            let base = base.trim_end_matches('/');
+            for key in [
+                "GROK_MODELS_BASE_URL",
+                "GROK_XAI_API_BASE_URL",
+                "GROK_CLI_CHAT_PROXY_BASE_URL",
+            ] {
+                out.entry(key.into()).or_insert_with(|| base.to_string());
+            }
+            out.entry("GROK_MODELS_LIST_URL".into())
+                .or_insert_with(|| format!("{base}/models"));
+        }
+        if let Some(key) = out.remove("GROK_API_KEY") {
+            out.entry("XAI_API_KEY".into()).or_insert(key);
+        }
+    }
     Ok(out)
 }
 
@@ -350,6 +391,35 @@ pub(crate) fn safe_provider_probe_config(
 mod tests {
     #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
     use super::*;
+
+    #[test]
+    fn grok_channel_injects_native_endpoint_and_auth_names() {
+        let p = serde_json::json!({"env": {
+            "GROK_BASE_URL": "https://relay.example/v1/",
+            "GROK_API_KEY": "dummy-key"
+        }});
+        let env = channel_env("grok", &p).unwrap();
+        for key in [
+            "GROK_MODELS_BASE_URL",
+            "GROK_XAI_API_BASE_URL",
+            "GROK_CLI_CHAT_PROXY_BASE_URL",
+        ] {
+            assert_eq!(
+                env.get(key).map(String::as_str),
+                Some("https://relay.example/v1")
+            );
+        }
+        assert_eq!(
+            env.get("GROK_MODELS_LIST_URL").map(String::as_str),
+            Some("https://relay.example/v1/models")
+        );
+        assert_eq!(
+            env.get("XAI_API_KEY").map(String::as_str),
+            Some("dummy-key")
+        );
+        assert!(!env.contains_key("GROK_API_KEY"));
+        assert!(!env.contains_key("GROK_BASE_URL"));
+    }
 
     #[test]
     fn channel_env_raw_wins_convention_and_refuses_blocked_keys() {

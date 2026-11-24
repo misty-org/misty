@@ -1,6 +1,13 @@
 use serde_json::{json, Value};
 
-const AGENT_SERVER_SOURCES: &[&str] = &["claude_local", "claude_user", "codex_user", "agy_user"];
+const AGENT_SERVER_SOURCES: &[&str] = &[
+    "claude_local",
+    "claude_user",
+    "codex_user",
+    "kimi_user",
+    "grok_user",
+    "agy_user",
+];
 
 fn plain_server_name(name: &str) -> bool {
     !name.is_empty()
@@ -21,7 +28,10 @@ pub(crate) fn agent_servers(
         if !plain_server_name(name) || name == crate::engine_config::mcp::MISTY_SERVER_NAME {
             continue;
         }
-        let own = |source: &str| source.starts_with(&format!("{engine}_"));
+        let own = |source: &str| {
+            source.starts_with(&format!("{engine}_"))
+                || (matches!(engine, "gemini" | "qwen") && source.starts_with("agy_"))
+        };
         let mut found = None;
         let ordered = AGENT_SERVER_SOURCES
             .iter()

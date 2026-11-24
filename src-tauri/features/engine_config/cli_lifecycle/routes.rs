@@ -1,12 +1,13 @@
 use std::path::Path;
 
-use super::{maker_builds, node_runtime, npm_package, support, ProgressReporter};
+use super::{hermes_launchers, maker_builds, node_runtime, npm_package, support, ProgressReporter};
 use crate::engines::support::paths::{engine_install_dir, InstallRoot};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Route {
     MistyNpm,
     MistyDownload,
+    MistyScript,
     NpmGlobal,
     VendorScript,
     SelfUpdate,
@@ -33,11 +34,25 @@ pub(super) fn installed_by_misty_in(root: &InstallRoot, engine: &str, bin: &str)
     let Some(parent) = path.parent() else {
         return false;
     };
-    real(parent).starts_with(real(&root.engine_dir(engine)))
+    if real(parent).starts_with(real(&root.engine_dir(engine))) {
+        return true;
+    }
+    let checkout = root.checkout_dir(engine);
+    engine == "hermes"
+        && (hermes_launchers::wrapper_names(path, &checkout)
+            || hermes_launchers::starts_checkout(path, &checkout))
 }
 
 fn real(path: &Path) -> std::path::PathBuf {
     super::resolve_link(&path.to_string_lossy()).unwrap_or_else(|_| path.to_path_buf())
+}
+
+pub(super) fn script_target(root: &InstallRoot, engine: &str) -> std::path::PathBuf {
+    if engine == "hermes" {
+        root.checkout_dir(engine)
+    } else {
+        root.engine_dir(engine).join("bin")
+    }
 }
 
 pub(super) fn route(engine: &str, bin: &str, installed: bool) -> Option<Route> {
@@ -54,6 +69,7 @@ pub(super) fn route_in(
     if !installed {
         return match engine {
             "claude" | "codex" | "agy" => Some(Route::MistyDownload),
+            "hermes" => Some(Route::MistyScript),
             _ if has_npm => Some(Route::MistyNpm),
             _ => None,
         };
@@ -63,6 +79,7 @@ pub(super) fn route_in(
         return match engine {
             _ if npm && has_npm => Some(Route::MistyNpm),
             "claude" | "codex" | "agy" => Some(Route::MistyDownload),
+            "hermes" => Some(Route::MistyScript),
             _ if has_npm => Some(Route::MistyNpm),
             _ => None,
         };
@@ -71,7 +88,7 @@ pub(super) fn route_in(
     match engine {
         _ if npm_copy && has_npm => Some(Route::NpmGlobal),
         "claude" => Some(Route::SelfUpdate),
-        "codex" | "agy" => Some(Route::VendorScript),
+        "codex" | "agy" | "hermes" => Some(Route::VendorScript),
         _ if has_npm => Some(Route::NpmGlobal),
         _ => None,
     }
@@ -114,6 +131,8 @@ fn script_url(engine: &str, windows: bool) -> &'static str {
     match (engine, windows) {
         ("agy", false) => "https://antigravity.google/cli/install.sh",
         ("agy", true) => "https://antigravity.google/cli/install.ps1",
+        ("hermes", false) => "https://hermes-agent.nousresearch.com/install.sh",
+        ("hermes", true) => "https://hermes-agent.nousresearch.com/install.ps1",
         (_, false) => "https://chatgpt.com/codex/install.sh",
         (_, true) => "https://chatgpt.com/codex/install.ps1",
     }
@@ -121,20 +140,60 @@ fn script_url(engine: &str, windows: bool) -> &'static str {
 
 pub(super) fn script_argv(
     engine: &str,
+    into: Option<&Path>,
     windows: bool,
 ) -> (String, Vec<String>, Vec<(String, String)>) {
     let url = script_url(engine, windows);
-    let env = vec![("CODEX_NON_INTERACTIVE".to_string(), "1".to_string())];
+    let mut env = vec![("CODEX_NON_INTERACTIVE".to_string(), "1".to_string())];
+    if let Some(into) = into {
+        env.push((
+            "MISTY_ENGINE_DIR".into(),
+            into.to_string_lossy().into_owned(),
+        ));
+        if let Some(home) = installer_home(engine, into, windows) {
+            let data = support::hermes_home().to_string_lossy().into_owned();
+            env.push(("HERMES_HOME".into(), data));
+            env.push(("HOME".into(), home.to_string_lossy().into_owned()));
+        }
+    }
+    let quiet = match (engine, windows) {
+        ("hermes", false) => Some("--non-interactive"),
+        ("hermes", true) => Some("-NonInteractive"),
+        _ => None,
+    };
+    let folder_flag = into.and(match (engine, windows) {
+        ("hermes", false) => Some("--dir"),
+        ("hermes", true) => Some("-InstallDir"),
+        _ => None,
+    });
     if windows {
+        let mut flags: Vec<String> = quiet.into_iter().map(str::to_string).collect();
+        if let Some(flag) = folder_flag {
+            flags.push(format!("{flag} $env:MISTY_ENGINE_DIR"));
+        }
+        let script = if flags.is_empty() {
+            format!("irm {url} | iex")
+        } else {
+            format!("& ([scriptblock]::Create((irm {url}))) {}", flags.join(" "))
+        };
         let args = vec![
             "-NoProfile".into(),
             "-NonInteractive".into(),
             "-Command".into(),
-            format!("irm {url} | iex"),
+            script,
         ];
         (windows_powershell_path(), args, env)
     } else {
-        let line = format!("set -o pipefail; curl -fsSL {url} | bash");
+        let mut flags: Vec<String> = quiet.into_iter().map(str::to_string).collect();
+        if let Some(flag) = folder_flag {
+            flags.push(format!("{flag} \"$MISTY_ENGINE_DIR\""));
+        }
+        let rest = if flags.is_empty() {
+            String::new()
+        } else {
+            format!(" -s -- {}", flags.join(" "))
+        };
+        let line = format!("set -o pipefail; curl -fsSL {url} | bash{rest}");
         let bash = if super::is_file_outside_gate(Path::new("/bin/bash")) {
             "/bin/bash"
         } else {
@@ -142,6 +201,16 @@ pub(super) fn script_argv(
         };
         (bash.into(), vec!["-c".into(), line], env)
     }
+}
+
+pub(super) fn installer_home(
+    engine: &str,
+    into: &Path,
+    windows: bool,
+) -> Option<std::path::PathBuf> {
+    (engine == "hermes" && !windows)
+        .then(|| into.parent().map(|folder| folder.join("home")))
+        .flatten()
 }
 
 fn windows_powershell_path() -> String {
@@ -172,13 +241,19 @@ pub(super) fn plan_steps(engine: &str, route: Route, bin: &str, helper: bool) ->
         }
         Route::NpmGlobal => vec![format!("npm {}", npm_global_args(package).join(" "))],
         Route::MistyDownload => vec![maker_builds::plan_step(engine)],
-        Route::VendorScript => {
-            let (_, args, env) = script_argv(engine, windows);
+        Route::MistyScript | Route::VendorScript => {
+            let into =
+                (route == Route::MistyScript).then(|| script_target(&InstallRoot::here(), engine));
+            let (_, args, env) = script_argv(engine, into.as_deref(), windows);
             let mut steps: Vec<String> = env
                 .iter()
+                .filter(|(key, _)| key != "MISTY_ENGINE_DIR")
                 .map(|(key, value)| format!("{key}={}", super::shown_path(Path::new(value))))
                 .collect();
             steps.push(args.last().cloned().unwrap_or_default());
+            if let Some(into) = into {
+                steps.push(format!("Into {}", super::shown_path(&into)));
+            }
             steps
         }
         Route::SelfUpdate => vec![format!("{bin} update")],
@@ -229,10 +304,36 @@ pub(super) async fn run(
             reporter.emit("step", Some("engine".into()), None);
             maker_builds::install(engine, reporter).await
         }
-        Route::VendorScript => {
+        Route::MistyScript | Route::VendorScript => {
             reporter.emit("step", Some("engine".into()), None);
-            let (program, args, env) = script_argv(engine, windows);
-            run_program("The installer", &program, &args, &env, false, reporter).await
+            let into =
+                (route == Route::MistyScript).then(|| script_target(&InstallRoot::here(), engine));
+            if let Some(into) = &into {
+                let folder = into.parent().unwrap_or(into);
+                file_access::fs::create_dir_all(folder).map_err(|error| error.to_string())?;
+                if let Some(home) = installer_home(engine, into, windows) {
+                    file_access::fs::create_dir_all(home).map_err(|error| error.to_string())?;
+                }
+            }
+            let launchers = (engine == "hermes" && windows && into.is_some())
+                .then(|| hermes_launchers::absent(&hermes_launchers::dirs()));
+            #[cfg(windows)]
+            let path_guard = launchers
+                .is_some()
+                .then(|| super::user_path::Guard::take(&support::hermes_home().join("bin")));
+            let (program, args, env) = script_argv(engine, into.as_deref(), windows);
+            let ran = run_program("The installer", &program, &args, &env, false, reporter).await;
+            #[cfg(windows)]
+            if let Some(guard) = path_guard {
+                guard.restore(reporter);
+            }
+            ran?;
+            match launchers {
+                Some(absent) => {
+                    hermes_launchers::record_created(&engine_install_dir(engine), &absent)
+                }
+                None => Ok(()),
+            }
         }
         Route::SelfUpdate => {
             reporter.emit("step", Some("engine".into()), None);
@@ -283,14 +384,23 @@ async fn run_program(
 }
 
 pub(super) fn remove(engine: &str, bin: &str) -> Result<(), String> {
-    remove_in(&InstallRoot::here(), engine, bin)
+    remove_in(&InstallRoot::here(), &hermes_launchers::dirs(), engine, bin)
 }
 
-pub(super) fn remove_in(root: &InstallRoot, engine: &str, bin: &str) -> Result<(), String> {
+pub(super) fn remove_in(
+    root: &InstallRoot,
+    wrapper_dirs: &[std::path::PathBuf],
+    engine: &str,
+    bin: &str,
+) -> Result<(), String> {
     if !installed_by_misty_in(root, engine, bin) {
         return Err("Misty didn't install this copy, so it leaves it alone.".into());
     }
     let folder = root.engine_dir(engine);
+    if engine == "hermes" {
+        let checkout = root.checkout_dir(engine);
+        hermes_launchers::remove_owned(wrapper_dirs, &checkout, &folder);
+    }
     if file_access::fs::exists(&folder) {
         file_access::fs::remove_dir_all(&folder)
             .map_err(|error| format!("Couldn't remove it: {error}"))?;

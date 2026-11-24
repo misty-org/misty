@@ -98,13 +98,12 @@ it("previews and saves a cloud avatar while preserving unrelated avatar metadata
   );
 });
 
-it("names the chat, not its agent, with nothing to switch", () => {
+it("names the agent it chats with, with nothing to switch", () => {
   fixture.includeSecond = true;
   renderAgentsPage();
-  expect(screen.getByRole("heading", { name: /^Communications New chat$/ })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: /^Communications/ })).toBeTruthy();
+  expect(screen.getAllByRole("heading", { name: "Communications" }).length).toBeGreaterThan(0);
   openChat("research");
-  expect(screen.getByRole("heading", { name: /^Research/ })).toBeTruthy();
+  expect(screen.getAllByRole("heading", { name: /^Research/ }).length).toBeGreaterThan(0);
   expect(screen.queryByRole("button", { name: /^Switch agent/ })).toBeNull();
   expect(useMistyStore.getState().selectedAgentId).toBe("research");
 });

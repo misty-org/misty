@@ -116,6 +116,11 @@ fn find_all() -> Found {
     let claude = crate::engines::engine_home(Some("CLAUDE_CONFIG_DIR"), ".claude");
     find_claude(&claude.join("projects"), &mut found);
     find_codex(&crate::engines::codex_home(), &mut found);
+    let gemini = crate::engines::engine_home(Some("GEMINI_CLI_HOME"), ".gemini");
+    let qwen = crate::engines::engine_home(None, ".qwen");
+    for home in [gemini, qwen] {
+        find_gemini_family(&home.join("tmp"), &mut found);
+    }
     super::past_folders_stores::find_stores(&mut found);
     found
 }
@@ -285,6 +290,41 @@ fn newest_rollouts(dir: &Path, out: &mut Vec<PathBuf>, depth: usize) {
             out.push(path);
         }
     }
+}
+
+pub(super) fn find_gemini_family(tmp: &Path, found: &mut Found) {
+    for (project, _) in newest_entries(tmp, true).into_iter().take(MAX_DIRS) {
+        let files = newest_files(&project.join("chats"), ".jsonl");
+        let Some(&(_, last)) = files.first() else {
+            continue;
+        };
+        let cwd = known(&project).or_else(|| {
+            files
+                .iter()
+                .take(MAX_FILES_PER_DIR)
+                .find_map(|(file, _)| from_head(file, gemini_folder))
+        });
+        if let Some(cwd) = cwd {
+            remember(&project, &cwd);
+            found.add(&cwd, last);
+        }
+    }
+}
+
+fn gemini_folder(head: &str) -> Option<String> {
+    let complete = head.rsplit_once('\n').map_or("", |(lines, _)| lines);
+    complete.lines().find_map(|line| {
+        let value: serde_json::Value = serde_json::from_str(line.trim()).ok()?;
+        let cwd = value.get("cwd").and_then(serde_json::Value::as_str);
+        let first_dir = value
+            .get("directories")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|dirs| dirs.first())
+            .and_then(serde_json::Value::as_str);
+        cwd.or(first_dir)
+            .filter(|path| Path::new(path).is_absolute())
+            .map(str::to_string)
+    })
 }
 
 #[cfg(test)]

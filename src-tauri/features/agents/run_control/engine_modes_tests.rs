@@ -82,7 +82,7 @@ fn only_a_no_asking_mode_passes_an_engines_skip_permissions_flag() {
     }
 }
 
-const FOLDER_SANDBOXED: &[&str] = &["claude"];
+const FOLDER_SANDBOXED: &[&str] = &["claude", "gemini", "qwen"];
 
 #[test]
 fn only_an_engine_with_a_folder_sandbox_lists_a_no_asking_mode() {
@@ -106,15 +106,23 @@ fn only_an_engine_with_a_folder_sandbox_lists_a_no_asking_mode() {
                 && which::which("bwrap").is_ok()
                 && which::which("socat").is_ok())
     );
+    for id in ["gemini", "qwen"] {
+        let engine = engine_by_id(id).unwrap();
+        assert_eq!(engine.folder_sandbox(), cfg!(target_os = "macos"), "{id}");
+    }
 }
 
 #[test]
 fn a_no_asking_mode_skips_asks_only_inside_the_engines_sandbox() {
-    for (id, mode, flags) in [(
-        "claude",
-        "bypassPermissions",
-        &["--dangerously-skip-permissions", "--settings"][..],
-    )] {
+    for (id, mode, flags) in [
+        (
+            "claude",
+            "bypassPermissions",
+            &["--dangerously-skip-permissions", "--settings"][..],
+        ),
+        ("gemini", "yolo", &["--yolo", "--sandbox"][..]),
+        ("qwen", "yolo", &["--yolo", "--sandbox"][..]),
+    ] {
         let engine = engine_by_id(id).unwrap();
         let Ok(level) = launch(engine.as_ref(), mode) else {
             assert!(!engine.folder_sandbox(), "{id}");
@@ -132,9 +140,9 @@ fn a_mode_the_engine_does_not_list_is_refused() {
     let claude = engine_by_id("claude").unwrap();
     assert!(launch(claude.as_ref(), "yolo").is_err());
     assert!(launch(claude.as_ref(), "auto").is_err());
-    let codex = engine_by_id("codex").unwrap();
-    assert!(launch(codex.as_ref(), "yolo").is_err());
-    assert_eq!(launch(codex.as_ref(), "plan"), Ok("plan"));
+    let kimi = engine_by_id("kimi").unwrap();
+    assert!(launch(kimi.as_ref(), "yolo").is_err());
+    assert_eq!(launch(kimi.as_ref(), "plan"), Ok("plan"));
 }
 
 #[test]
@@ -158,9 +166,9 @@ fn an_old_request_maps_to_the_engines_closest_mode() {
             "auto"
         })
     );
-    let codex = engine_by_id("codex").unwrap();
+    let kimi = engine_by_id("kimi").unwrap();
     assert_eq!(
-        launch_for(codex.as_ref(), &json!({ "permission_mode": "auto" })),
+        launch_for(kimi.as_ref(), &json!({ "permission_mode": "auto" })),
         Ok("auto")
     );
     let agy = engine_by_id("agy").unwrap();

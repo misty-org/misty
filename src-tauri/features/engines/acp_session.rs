@@ -12,13 +12,13 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::Mutex as TokioMutex;
 use tokio::time::{timeout, Instant};
 
-use super::EngineEvent;
+use super::{EngineEvent, TurnCore, TurnState};
 
 #[path = "acp_framing.rs"]
 mod framing;
 pub(crate) use framing::{
     encode_ndjson, jsonrpc_error_response, jsonrpc_id_key, jsonrpc_notification, jsonrpc_request,
-    jsonrpc_result_response, parse_acp_line, AcpLine, LineRouter,
+    jsonrpc_result_response, parse_acp_line, AcpLine, AcpRpcError, LineRouter,
 };
 
 const ACP_PROTOCOL_VERSION: u32 = 1;
@@ -35,7 +35,7 @@ const POST_TERMINAL_DRAIN: Duration = Duration::from_millis(250);
 pub(crate) const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;
 pub(crate) const JSONRPC_INVALID_PARAMS: i64 = -32602;
 pub(crate) const JSONRPC_INTERNAL_ERROR: i64 = -32603;
-const CANCELLED: &str = "ACP turn cancelled";
+pub(crate) const CANCELLED: &str = "ACP turn cancelled";
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum AcpUpdate {
@@ -59,7 +59,7 @@ pub(crate) enum AcpUpdate {
     Ignore,
 }
 
-fn extract_content_text(content: Option<&Value>) -> String {
+pub(crate) fn extract_content_text(content: Option<&Value>) -> String {
     let Some(content) = content else {
         return String::new();
     };
@@ -112,8 +112,11 @@ fn extract_tool_call_id(update: &Value) -> Option<String> {
 
 fn extract_tool_name(update: &Value) -> Option<String> {
     update
-        .get("title")
+        .get("_meta")
+        .and_then(|meta| meta.get("qoder"))
+        .and_then(|qoder| qoder.get("toolName"))
         .and_then(Value::as_str)
+        .or_else(|| update.get("title").and_then(Value::as_str))
         .or_else(|| update.get("kind").and_then(Value::as_str))
         .or_else(|| update.get("name").and_then(Value::as_str))
         .map(str::trim)
@@ -131,6 +134,10 @@ fn extract_tool_content_text(update: &Value) -> String {
         return from_raw;
     }
     extract_content_text(update.get("output"))
+}
+
+pub(crate) fn is_error_prefixed_text(text: &str) -> bool {
+    text.trim_start().starts_with("[Error]")
 }
 
 pub(crate) fn map_session_update(update: &Value) -> AcpUpdate {
@@ -233,7 +240,7 @@ pub(crate) struct AcpSessionState {
     pub effort: Option<String>,
 }
 
-fn non_empty(value: Option<&Value>) -> Option<String> {
+pub(crate) fn non_empty(value: Option<&Value>) -> Option<String> {
     value
         .and_then(Value::as_str)
         .map(str::trim)
@@ -257,7 +264,7 @@ pub(crate) fn session_state_update(params: &Value) -> Option<AcpSessionState> {
     }
 }
 
-fn config_options_state(options: &Value) -> AcpSessionState {
+pub(crate) fn config_options_state(options: &Value) -> AcpSessionState {
     let mut state = AcpSessionState::default();
     for option in options.as_array().into_iter().flatten() {
         let Some(value) = non_empty(option.get("currentValue")) else {
@@ -301,6 +308,14 @@ impl AcpSessionState {
             events.push(EngineEvent::SessionChoice { model, effort });
         }
         events
+    }
+}
+
+pub(crate) fn report_session_state(core: &TurnCore, state: &mut TurnState, params: &Value) {
+    if let Some(update) = session_state_update(params) {
+        for event in AcpSessionState::default().follow(update) {
+            core.dispatch_event(state, event);
+        }
     }
 }
 
@@ -472,16 +487,24 @@ pub(crate) struct AcpProcess {
     reader: BufReader<ChildStdout>,
     line_buf: Vec<u8>,
     next_id: u64,
+    workspace_root: PathBuf,
+    pub(crate) gate: Option<crate::engines::gate::AcpGate>,
     pub(crate) reports_as: Option<String>,
 }
 
 impl AcpProcess {
-    pub(crate) fn new(stdin: Arc<TokioMutex<Option<ChildStdin>>>, stdout: ChildStdout) -> Self {
+    pub(crate) fn new(
+        stdin: Arc<TokioMutex<Option<ChildStdin>>>,
+        stdout: ChildStdout,
+        workspace_root: PathBuf,
+    ) -> Self {
         Self {
             stdin,
             reader: BufReader::new(stdout),
             line_buf: Vec::new(),
             next_id: 1,
+            workspace_root,
+            gate: None,
             reports_as: None,
         }
     }
@@ -501,6 +524,44 @@ impl AcpProcess {
             .await
             .map_err(|error| format!("failed to flush ACP request: {error}"))?;
         Ok(())
+    }
+
+    pub(crate) async fn request(
+        &mut self,
+        method: &str,
+        params: Value,
+        timeout_dur: impl Into<Option<Duration>>,
+        killed: &AtomicBool,
+        cancel_session_id: Option<&str>,
+        on_update: &mut (dyn FnMut(&Value) + Send),
+    ) -> Result<Value, String> {
+        let workspace = self.workspace_root.clone();
+        let gate = self.gate.clone();
+        let mut router = |line: &AcpLine| match line {
+            AcpLine::Notification { method, params } if method == "session/update" => {
+                on_update(params);
+                None
+            }
+            AcpLine::AgentRequest { id, method, params } => {
+                crate::engines::gate::acp_agent_request(
+                    gate.as_ref(),
+                    &workspace,
+                    id,
+                    method,
+                    params,
+                )
+            }
+            _ => None,
+        };
+        self.routed(
+            method,
+            params,
+            timeout_dur,
+            killed,
+            cancel_session_id,
+            &mut router,
+        )
+        .await
     }
 
     pub(crate) async fn routed(
@@ -716,7 +777,11 @@ pub(crate) fn spawn_piped_acp(
         };
     Ok(SpawnedAcp {
         child,
-        acp: AcpProcess::new(Arc::new(TokioMutex::new(Some(stdin))), stdout),
+        acp: AcpProcess::new(
+            Arc::new(TokioMutex::new(Some(stdin))),
+            stdout,
+            workspace.to_path_buf(),
+        ),
         stderr_buf: super::spawn_stderr_capture(stderr),
         #[cfg(windows)]
         _tree_guard: tree_guard,

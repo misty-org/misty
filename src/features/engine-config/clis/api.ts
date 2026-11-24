@@ -23,6 +23,7 @@ export interface CliUpdatePlan {
   kind: "npm" | "native" | "none";
   steps: string[];
   needsHelper: boolean;
+  needsDeveloperTools: boolean;
   canRun: boolean;
   blockers: string[];
   platform: string;

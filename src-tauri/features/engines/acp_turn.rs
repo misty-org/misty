@@ -10,10 +10,15 @@ use serde_json::{json, Map, Value};
 use tokio::process::Command;
 
 use super::acp_session::{
-    session_update_from_notification, spawn_piped_acp, teardown, AcpLine, AcpProcess, AcpUpdate,
-    KILL_POLL, PROMPT_TIMEOUT, RPC_HANDSHAKE_TIMEOUT,
+    initialize_params, jsonrpc_id_key, jsonrpc_result_response, session_update_from_notification,
+    spawn_piped_acp, teardown, AcpLine, AcpProcess, AcpUpdate, KILL_POLL, PROMPT_TIMEOUT,
+    RPC_HANDSHAKE_TIMEOUT, SESSION_NEW_TIMEOUT, SESSION_RESUME_TIMEOUT,
 };
 use super::{BuiltCommand, EngineEvent, SendRequest, TurnCore, TurnState, VirtualRunGuard};
+
+const ASK_METHOD: &str = "_x.ai/ask_user_question";
+const ACCEPTED_OUTCOME: &str = "accepted";
+const DISMISS_OUTCOME: &str = "cancelled";
 
 #[derive(Default)]
 struct TurnView {
@@ -42,7 +47,7 @@ fn follow_subagents(
 
 pub(super) async fn run_acp_turn(
     core: TurnCore,
-    req: SendRequest,
+    mut req: SendRequest,
     built: BuiltCommand,
     killed: Arc<AtomicBool>,
     virtual_pid: u32,
@@ -52,6 +57,9 @@ pub(super) async fn run_acp_turn(
         cleanup_files,
         ..
     } = built;
+    if core.engine_id == "kimi" {
+        req.model = super::kimi_acp::selected_model(req.model.as_deref(), &command);
+    }
     let mut state = TurnState::new(req.session_id.clone());
     let mut view = TurnView::default();
     let preassigned_session_id = req.session_id.clone();
@@ -125,7 +133,7 @@ async fn turn_inner(
             spawned.acp.reports_as = Some(core.engine_id.clone());
             core.registry
                 .set_stdin(&core.run_id, Arc::clone(&spawned.acp.stdin));
-            let (session_id, effort) = match handshake(&mut spawned.acp, req, killed).await {
+            let (session_id, effort) = match handshake(&mut spawned.acp, core, req, killed).await {
                 Ok(opened) => opened,
                 Err(error) => {
                     teardown(&mut spawned.child).await;
@@ -137,6 +145,7 @@ async fn turn_inner(
                     spawned,
                     session_id,
                     effort,
+                    known: Default::default(),
                 },
                 token: None,
                 cleanup: std::mem::take(cleanup_files),
@@ -164,22 +173,41 @@ async fn turn_inner(
 
 async fn handshake(
     acp: &mut AcpProcess,
+    core: &TurnCore,
     req: &SendRequest,
     killed: &AtomicBool,
 ) -> Result<(String, Option<String>), String> {
     let agent = acp
         .routed(
             "initialize",
-            super::agy::initialization(),
+            match core.engine_id.as_str() {
+                "kimi" => super::kimi_acp::initialization(),
+                "agy" => super::agy::initialization(),
+                _ => initialize_params(),
+            },
             RPC_HANDSHAKE_TIMEOUT,
             killed,
             None,
             &mut |_| None,
         )
         .await?;
-    let agent = super::agy::mcp_capable(&agent);
+    let agent = match core.engine_id.as_str() {
+        "agy" => super::agy::mcp_capable(&agent),
+        _ => agent,
+    };
     let servers = crate::engines::gate::acp_mcp_servers(req, &agent);
-    super::agy::attach_session(acp, req, servers, killed).await
+    let (session_id, effort) = match core.engine_id.as_str() {
+        "kimi" => super::kimi_acp::attach_session(acp, req, servers, killed).await?,
+        "agy" => super::agy::attach_session(acp, req, servers, killed).await?,
+        _ => (attach_session(acp, req, servers, killed).await?, None),
+    };
+    if let Some(model) = req.model.as_deref().filter(|_| core.engine_id == "hermes") {
+        super::hermes::set_model(acp, &session_id, model, killed).await?;
+    }
+    if core.engine_id == "hermes" {
+        super::hermes::set_mode(acp, &session_id, req.permission.as_deref(), killed).await?;
+    }
+    Ok((session_id, effort))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -198,14 +226,29 @@ async fn prompt(
         core.dispatch_event(state, EngineEvent::Effort(effort));
     }
     core.dispatch_event(state, EngineEvent::SessionId(session_id.to_string()));
-    view.subagents = Some(super::agy::Subagents::of(session_id));
-    let blocks = prompt_blocks(&req.prompt, &req.images, &req.workspace)?;
+    if core.engine_id == "agy" {
+        view.subagents = Some(super::agy::Subagents::of(session_id));
+    }
+    let expanded = (core.engine_id == "gemini")
+        .then(|| super::gemini::expand_custom_command(&req.prompt, &req.workspace))
+        .flatten();
+    let blocks = prompt_blocks(
+        expanded.as_deref().unwrap_or(&req.prompt),
+        &req.images,
+        &req.workspace,
+    )?;
     let workspace = req.workspace.clone();
     let result = {
         let mut router = |line: &AcpLine| route(core, state, view, &gate, &workspace, line);
+        let mut prompt = json!({ "sessionId": session_id, "prompt": blocks });
+        if let Some(mode) =
+            super::grok::prompt_mode(req.permission.as_deref()).filter(|_| core.engine_id == "grok")
+        {
+            prompt["_meta"] = json!({ "mode": mode });
+        }
         acp.routed(
             "session/prompt",
-            json!({ "sessionId": session_id, "prompt": blocks }),
+            prompt,
             PROMPT_TIMEOUT,
             killed,
             Some(session_id),
@@ -241,12 +284,26 @@ fn route(
                 view.last_usage = Some(usage.clone());
                 core.dispatch_event(state, EngineEvent::Usage(usage));
             }
-            super::agy::report_session_state(core, state, params);
+            if core.engine_id == "agy" {
+                super::agy::report_session_state(core, state, params);
+            } else {
+                super::acp_session::report_session_state(core, state, params);
+            }
             handle_session_update(core, state, view, params);
             None
         }
-        AcpLine::AgentRequest { id, method, params } if method == "elicitation/create" => {
+        AcpLine::AgentRequest { id, method, params }
+            if core.engine_id == "kimi" && method == "elicitation/create" =>
+        {
+            super::kimi_acp::park_question(core, state, id, params)
+        }
+        AcpLine::AgentRequest { id, method, params }
+            if core.engine_id == "agy" && method == "elicitation/create" =>
+        {
             super::agy::park_question(core, state, id, params)
+        }
+        AcpLine::AgentRequest { id, method, params } if method == ASK_METHOD => {
+            park_question(core, state, id, params)
         }
         AcpLine::AgentRequest { id, method, params } => {
             crate::engines::gate::acp_agent_request(Some(gate), workspace, id, method, params)
@@ -298,6 +355,65 @@ fn usage_update(params: &Value) -> Option<Value> {
         usage["model_context_window"] = json!(size);
     }
     Some(usage)
+}
+
+async fn attach_session(
+    acp: &mut AcpProcess,
+    req: &SendRequest,
+    servers: Value,
+    killed: &AtomicBool,
+) -> Result<String, String> {
+    let cwd = req.workspace.to_string_lossy().to_string();
+    let mut loaded = None;
+    if let Some(session_id) = req.session_id.as_deref() {
+        let load = acp
+            .routed(
+                "session/load",
+                json!({ "cwd": cwd, "mcpServers": servers.clone(), "sessionId": session_id }),
+                SESSION_RESUME_TIMEOUT,
+                killed,
+                None,
+                &mut |_| None,
+            )
+            .await;
+        match load {
+            Ok(result) => loaded = Some(result),
+            Err(error) => {
+                if killed.load(Ordering::SeqCst) {
+                    return Err(error);
+                }
+            }
+        }
+    }
+    let session_result = match loaded {
+        Some(result) => result,
+        None => {
+            acp.routed(
+                "session/new",
+                json!({ "cwd": cwd, "mcpServers": servers }),
+                SESSION_NEW_TIMEOUT,
+                killed,
+                None,
+                &mut |_| None,
+            )
+            .await?
+        }
+    };
+    extract_session_id(&session_result)
+        .or_else(|| req.session_id.clone())
+        .ok_or_else(|| "the ACP session handshake returned no sessionId".to_string())
+}
+
+fn extract_session_id(value: &Value) -> Option<String> {
+    value
+        .get("sessionId")
+        .or_else(|| value.get("session_id"))
+        .or_else(|| value.get("id"))
+        .or_else(|| value.get("_meta").and_then(|meta| meta.get("sessionId")))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn prompt_blocks(text: &str, images: &[String], workspace: &Path) -> Result<Vec<Value>, String> {
@@ -360,15 +476,104 @@ fn handle_session_update(
     }
 }
 
+fn park_question(
+    core: &TurnCore,
+    state: &mut TurnState,
+    rpc_id: &Value,
+    params: &Value,
+) -> Option<Value> {
+    let questions = normalize_questions(params);
+    if questions.is_empty() {
+        return Some(jsonrpc_result_response(
+            rpc_id,
+            json!({ "outcome": DISMISS_OUTCOME }),
+        ));
+    }
+    let request_id = jsonrpc_id_key(rpc_id).unwrap_or_else(|| rpc_id.to_string());
+    core.dispatch_event(
+        state,
+        EngineEvent::Question {
+            request_id,
+            tool_use_id: params
+                .get("toolCallId")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            input: json!({
+                "questions": questions,
+                "acp": { "rpcId": rpc_id },
+            }),
+        },
+    );
+    None
+}
+
 pub(super) fn answer_frame(parked: &Value, answers: Option<&Value>) -> Result<Value, String> {
     let id = parked
         .get("rpcId")
         .filter(|id| !id.is_null())
         .ok_or_else(|| "the question's answer context is missing the request id".to_string())?;
-    let fields = parked
-        .get("agyForm")
-        .ok_or_else(|| "the question's answer context is missing its form".to_string())?;
-    super::agy::answer_frame(id, fields, answers)
+    if let Some(fields) = parked.get("agyForm") {
+        return super::agy::answer_frame(id, fields, answers);
+    }
+    Ok(jsonrpc_result_response(id, answer_outcome(answers)?))
+}
+
+fn answer_outcome(answers: Option<&Value>) -> Result<Value, String> {
+    let Some(answers) = answers else {
+        return Ok(json!({ "outcome": DISMISS_OUTCOME }));
+    };
+    let map = answers.as_object().ok_or_else(|| {
+        "the answers must be an object keyed by the question text".to_string()
+    })?;
+    for (question, choice) in map {
+        let is_label = matches!(choice, Value::String(_));
+        let is_labels =
+            matches!(choice, Value::Array(labels) if labels.iter().all(Value::is_string));
+        if !is_label && !is_labels {
+            return Err(format!(
+                "the answer for question `{question}` must be a label or an array of labels"
+            ));
+        }
+    }
+    Ok(json!({ "outcome": ACCEPTED_OUTCOME, "answers": Value::Object(map.clone()) }))
+}
+
+fn normalize_questions(params: &Value) -> Vec<Value> {
+    params
+        .get("questions")
+        .and_then(Value::as_array)
+        .map(|questions| {
+            questions
+                .iter()
+                .enumerate()
+                .map(|(index, question)| {
+                    let header = question
+                        .get("header")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|header| !header.is_empty())
+                        .map(str::to_string)
+                        .unwrap_or_else(|| format!("Q{}", index + 1));
+                    json!({
+                        "question": question
+                            .get("question")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default(),
+                        "header": header,
+                        "multiSelect": question
+                            .get("multiSelect")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                        "options": question
+                            .get("options")
+                            .filter(|options| options.is_array())
+                            .cloned()
+                            .unwrap_or_else(|| json!([])),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn prompt_usage(result: &Value) -> Option<Value> {

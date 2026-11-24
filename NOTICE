@@ -20,10 +20,10 @@ a header, and the notices below are preserved as their licenses require.
 
 desktop-cc-gui (https://github.com/zhukunpenglinyutong/desktop-cc-gui)
   Adapted in src-tauri/features/engines and src-tauri/features/project: the agent engine adapters
-  (Claude Code, Codex, and Antigravity with the Agent Client Protocol driver it runs on), program
-  discovery, and the files, Git, Git-ignore, worktree, terminal, open-in-app, HTML preview and
-  clipboard backends (src-tauri/features/project) and window state
-  (src-tauri/features/browser/app_windows). The panels beside a chat follow its
+  (Claude Code, Codex, and the Agent Client Protocol engines Antigravity, Kimi, Grok, MiniMax and
+  Qoder, with the drivers they run on), program discovery, and the files, Git, Git-ignore,
+  worktree, terminal, open-in-app, HTML preview and clipboard backends (src-tauri/features/project)
+  and window state (src-tauri/features/browser/app_windows). The panels beside a chat follow its
   file tree, editor, find and replace, Markdown and HTML preview, changes panel, terminal,
   worktree, open-in and launch-script features and its workspace grouping
   (src/features/agents/context-panel, src/features/agents/engines/enginesApi.ts). The chat composer's `@` file, `/` command, `$` skill and `!` prompt menus and its
