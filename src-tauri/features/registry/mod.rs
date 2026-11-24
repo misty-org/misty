@@ -21,7 +21,7 @@ const MAX_FEED_BYTES: usize = 8 << 20;
 const SCHEMA: u64 = 1;
 
 pub const REGISTRY_KEYS: &[(&str, &str)] =
-    &[("registry-1", "k3yfVLHUoX3HqhtSRGvUDvmpZ98TnzTEBWxQD0E/BGI=")];
+    &[("misty-registry", "Nbnp8dQWU7ibTphBreL9xu1zOaBIBQqT2yY6rIcmqkU=")];
 
 pub const CHANGED_EVENT: &str = "misty://registry-changed";
 
