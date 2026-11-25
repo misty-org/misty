@@ -10,7 +10,7 @@ pub(super) async fn decide(app: &AppHandle, run_id: &str, tool: &str, input: &Va
         return Decision::Deny("This run has ended.".into());
     };
     let facts = RunFacts::of_request(run_id, &body);
-    let misty = crate::engines::mcp::names_misty_tool(tool, input);
+    let misty = crate::engines::mcp::names_misty_tool(tool);
     if misty && !facts.planning {
         return Decision::Allow;
     }

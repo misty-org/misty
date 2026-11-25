@@ -652,6 +652,11 @@ fn prepare_launch(
         .filter(|e| !e.trim().is_empty())
         .or_else(|| settings.default_efforts.get(engine).cloned())
         .filter(|e| !e.trim().is_empty());
+    for choice in [model.as_deref(), effort.as_deref()].into_iter().flatten() {
+        if !plain_choice(choice) {
+            return Err(format!("\"{choice}\" isn't a model or level this engine can take."));
+        }
+    }
     let req = SendRequest {
         session_id: session_id.filter(|s| !s.trim().is_empty()),
         workspace: PathBuf::from(workspace_path),
@@ -2329,3 +2334,26 @@ mod codex_home_bin_tests {
 #[cfg(test)]
 #[path = "plan_respond_tests.rs"]
 mod plan_respond_tests;
+
+pub(crate) fn plain_choice(name: &str) -> bool {
+    name.len() <= 200
+        && name.chars().next().is_some_and(|first| first.is_ascii_alphanumeric())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._:/@+-[]~".contains(c))
+}
+
+#[cfg(test)]
+mod plain_choice_tests {
+    use super::plain_choice;
+
+    #[test]
+    fn a_model_from_the_space_is_a_plain_name_never_an_option() {
+        for name in ["gemini-2.5-pro", "claude-opus-4[1m]", "qwen3-coder:30b", "openai/gpt-5", "high"] {
+            assert!(plain_choice(name), "{name}");
+        }
+        for name in ["--yolo", "-y", "x --yolo", "x\n--yolo", "", "x;rm", "$(id)"] {
+            assert!(!plain_choice(name), "{name}");
+        }
+    }
+}

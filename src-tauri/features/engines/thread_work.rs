@@ -22,6 +22,60 @@ const META: &str = ".meta";
 const AGENTS: &str = "Agents";
 const PULL_MOST: u64 = 512 * 1024 * 1024;
 const NAME_MOST: usize = 80;
+const ENGINE_CONFIG: [&str; 13] = [
+    ".claude",
+    ".mcp.json",
+    ".codex",
+    ".gemini",
+    ".qwen",
+    ".qoder",
+    ".kimi",
+    ".grok",
+    ".hermes",
+    ".agy",
+    ".minimax",
+    ".cursor",
+    ".envrc",
+];
+
+pub(crate) fn is_engine_config(drive_path: &str) -> bool {
+    drive_path.split('/').any(|part| {
+        ENGINE_CONFIG
+            .iter()
+            .any(|name| part.eq_ignore_ascii_case(name))
+    })
+}
+
+fn hold_engine_config(db: &Store, conversation: &str, root: &Path) -> Result<(), String> {
+    let held = meta(db, conversation, ".held")?;
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        let Ok(entries) = file_access::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(info) = file_access::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if ENGINE_CONFIG
+                .iter()
+                .any(|config| name.eq_ignore_ascii_case(config))
+            {
+                let to = held.join(format!("{}-{name}", now()));
+                file_access::fs::create_dir_all(&held).map_err(text)?;
+                file_access::fs::rename(&path, &to).map_err(text)?;
+            } else if info.is_dir()
+                && !info.file_type().is_symlink()
+                && !space_drive::ignore::HEAVY_FOLDERS.contains(&name.as_str())
+            {
+                pending.push(path);
+            }
+        }
+    }
+    Ok(())
+}
 pub(crate) const EVENT: &str = "thread-work-changed";
 
 #[derive(Clone, Debug)]
@@ -168,6 +222,9 @@ pub(crate) fn walk(root: &Path) -> BTreeMap<String, String> {
             let Some(drive_path) = drive_path_of(root, &path) else {
                 continue;
             };
+            if is_engine_config(&drive_path) {
+                continue;
+            }
             if info.is_dir() {
                 if !rules.ignores(&drive_path, true) {
                     pending.push(path);
@@ -435,7 +492,9 @@ async fn pull(
         .file_shas(space)
         .map_err(crate::spaces_drive::error_text)?
         .into_iter()
-        .filter(|(path, _)| names::is_within(path, folder) && path != folder)
+        .filter(|(path, _)| {
+            names::is_within(path, folder) && path != folder && !is_engine_config(path)
+        })
         .collect();
     let mut agreed = BTreeMap::new();
     for (path, sha) in &files {
@@ -549,6 +608,7 @@ async fn begin(
 ) -> Result<(), String> {
     let lock = space_lock(&row.space);
     let _turn = lock.lock().await;
+    hold_engine_config(db, conversation, root)?;
     if !row.started {
         let space = SpaceId(row.space.clone());
         let known = read_known(db, conversation);
@@ -796,4 +856,29 @@ pub async fn thread_clashes(
         rows.collect::<Result<Vec<_>, _>>().map_err(text)
     })
     .await
+}
+
+#[cfg(test)]
+mod engine_config_tests {
+    use super::is_engine_config;
+
+    #[test]
+    fn engine_settings_never_come_from_the_space() {
+        for path in [
+            "Agents/Ana/plan/.claude/settings.json",
+            "Agents/Ana/plan/.CLAUDE/settings.local.json",
+            "Agents/Ana/plan/.mcp.json",
+            "Agents/Ana/plan/sub/.gemini/settings.json",
+            "Agents/Ana/plan/.codex/config.toml",
+        ] {
+            assert!(is_engine_config(path), "{path}");
+        }
+        for path in [
+            "Agents/Ana/plan/notes.md",
+            "Agents/Ana/plan/claude.md",
+            "Agents/Ana/plan/my.claude.txt",
+        ] {
+            assert!(!is_engine_config(path), "{path}");
+        }
+    }
 }

@@ -155,6 +155,9 @@ pub fn plan_down(trees: &Trees) -> Vec<Down> {
     ids.sort_by_key(|id| (trees.server_depth(id), (*id).clone()));
     for id in ids {
         let item = &trees.server[id];
+        if crate::ignore::never_synced_name(&item.name) {
+            continue;
+        }
         let live = trees.server_live(id);
         match trees.local.get(id) {
             None => {
@@ -327,6 +330,22 @@ mod tests {
             plan_down(&trees),
             vec![Down::Add(ItemId("a".into())), Down::Add(ItemId("b".into()))]
         );
+    }
+
+    #[test]
+    fn a_member_s_git_folder_never_comes_down() {
+        let mut trees = Trees::default();
+        trees
+            .server
+            .insert(ItemId("g".into()), item("g", None, ".git", 1, None));
+        trees.server.insert(
+            ItemId("c".into()),
+            item("c", Some("g"), "config", 1, Some("x")),
+        );
+        trees
+            .server
+            .insert(ItemId("u".into()), item("u", None, ".GIT", 1, None));
+        assert!(plan_down(&trees).is_empty());
     }
 
     #[test]

@@ -69,24 +69,19 @@ fn maps_a_call_back_to_misty_s_own_tool() {
 }
 
 #[test]
-fn knows_its_own_tools_however_an_engine_spells_them() {
-    for spelled in [
-        "mcp__misty__screen_open",
-        "misty_browser_snapshot",
-        "Misty: file_read",
-    ] {
-        assert!(names_misty_tool(spelled, &Value::Null), "{spelled}");
-    }
-    let call =
-        json!({ "title": "Open a tab", "rawInput": { "server": "misty", "tool": "screen_open" } });
-    assert!(names_misty_tool("Open a tab", &call));
+fn knows_its_own_tools_only_by_the_exact_name_an_engine_gives() {
+    assert!(names_misty_tool("mcp__misty__screen_open"));
     for other in [
         "shell",
         "edit",
         "mcp__github__create_issue",
         "misty",
         "screen_open",
+        "misty_browser_snapshot",
+        "Misty: file_read",
+        "mcp__misty__screen_open_and_more",
+        "rm -rf ~ # mcp__misty__screen_open",
     ] {
-        assert!(!names_misty_tool(other, &Value::Null), "{other}");
+        assert!(!names_misty_tool(other), "{other}");
     }
 }

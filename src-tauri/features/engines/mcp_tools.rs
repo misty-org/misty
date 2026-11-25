@@ -238,20 +238,18 @@ pick the place and confirm, then the chat's files move there. Don't move or copy
     &TOOLS
 }
 
-pub(crate) fn names_misty_tool(tool: &str, call: &Value) -> bool {
-    let named = |text: &str| {
-        let text = text.to_ascii_lowercase();
-        text.contains("misty")
-            && (space_tools()
-                .iter()
-                .filter_map(|offered| offered["name"].as_str())
-                .any(|name| text.contains(name))
-                || crate::engines::agent_memory::WIRE_NAMES
-                    .iter()
-                    .any(|name| text.contains(name))
-                || text.contains(&format!("misty__{}", crate::engines::recall::RECALL)))
-    };
-    named(tool) || named(&call.to_string())
+pub(crate) fn is_misty_wire_name(name: &str) -> bool {
+    space_tools()
+        .iter()
+        .filter_map(|offered| offered["name"].as_str())
+        .any(|offered| offered == name)
+        || crate::engines::agent_memory::WIRE_NAMES.contains(&name)
+        || name == crate::engines::recall::RECALL
+}
+
+pub(crate) fn names_misty_tool(tool: &str) -> bool {
+    let prefix = format!("mcp__{}__", crate::engine_config::mcp::MISTY_SERVER_NAME);
+    tool.strip_prefix(&prefix).is_some_and(is_misty_wire_name)
 }
 
 pub(super) fn misty_call(name: &str, arguments: Value) -> Option<(String, Value)> {
