@@ -1,4 +1,5 @@
 import { noteAccountResponse } from "./account_limits";
+import { noteAppVersionResponse, withAppVersion } from "./app_version";
 import { nativeAccountFetch } from "./native_account_fetch";
 import { invoke } from "@tauri-apps/api/core";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -216,7 +217,8 @@ async function accountFetch(input: RequestInfo | URL, init: RequestInit): Promis
     init.credentials !== "omit" && !new Headers(init.headers).has("Authorization");
   const response = await (hasTauriInternals() && usesAccountCookies
     ? nativeAccountFetch(input, init)
-    : fetch(input, init));
+    : fetch(input, withAppVersion(input, init)));
   noteAccountResponse(input, response);
+  noteAppVersionResponse(response);
   return response;
 }

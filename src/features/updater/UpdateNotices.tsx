@@ -7,6 +7,8 @@ import { settingsBoolean, useSettingsStore } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { ReleaseNotesDialog } from "./ReleaseNotesDialog";
 import { UpdatePromptDialog } from "./UpdatePromptDialog";
+import { UpdateRequiredDialog } from "./UpdateRequiredDialog";
+import { useAppUpdateRequired } from "@/api/client/app_version";
 import { requestUpdateCheck } from "./update_check_request";
 
 const minCheckIntervalMs = 6 * 60 * 60_000;
@@ -32,6 +34,7 @@ export function UpdateNotices({ accountScope }: { accountScope: string }) {
   const [prompt, setPrompt] = useState<Update | null>(null);
   const [notice, setNotice] = useState("");
   const [dismissed, setDismissed] = useState("");
+  const required = useAppUpdateRequired((state) => state.minimum);
   const enabled = useSettingsStore((s) =>
     settingsBoolean(s.settings?.document ?? {}, "general", "auto_update_enabled", true),
   );
@@ -106,7 +109,11 @@ export function UpdateNotices({ accountScope }: { accountScope: string }) {
   return (
     <>
       <ReleaseNotesDialog />
-      {prompt ? <UpdatePromptDialog update={prompt} onLater={later} /> : null}
+      {required !== null ? (
+        <UpdateRequiredDialog minimum={required} />
+      ) : prompt ? (
+        <UpdatePromptDialog update={prompt} onLater={later} />
+      ) : null}
     </>
   );
 }

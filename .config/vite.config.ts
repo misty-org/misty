@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { recoverDeadPages } from "../tasks/dead_page_watchdog.ts";
@@ -88,6 +89,9 @@ export default defineConfig(({ command, mode }) => {
     command === "serve" || mode.includes("dev") || process.env.NODE_ENV !== "production";
   const defaultPublicUrl = isDev ? "http://localhost:5174" : "";
   const publicUrl = (env.MISTY_PUBLIC_URL ?? env.VITE_MISTY_PUBLIC_URL)?.trim() || defaultPublicUrl;
+  const appVersion = (
+    JSON.parse(readFileSync(resolve(process.cwd(), "package.json"), "utf8")) as { version: string }
+  ).version;
 
   return {
     root: resolve(process.cwd(), "src/app"),
@@ -108,6 +112,7 @@ export default defineConfig(({ command, mode }) => {
       ...publicAppEnv(env),
       "import.meta.env.VITE_MISTY_PUBLIC_API_URL": JSON.stringify(publicApiUrl ?? ""),
       "import.meta.env.VITE_MISTY_PUBLIC_URL": JSON.stringify(publicUrl ?? ""),
+      "import.meta.env.MISTY_APP_VERSION": JSON.stringify(appVersion),
     },
     clearScreen: false,
     cacheDir: resolve(

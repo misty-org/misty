@@ -118,7 +118,8 @@ impl Http for AccountHttp {
                 }
                 builder = builder
                     .header(session::TOKEN_TRANSPORT.0, session::TOKEN_TRANSPORT.1)
-                    .header("X-Misty-CSRF", "1");
+                    .header("X-Misty-CSRF", "1")
+                    .header("X-Misty-App-Version", env!("CARGO_PKG_VERSION"));
                 if let Some(body) = &request.body {
                     builder = builder.body(body.clone());
                 }

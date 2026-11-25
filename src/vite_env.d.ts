@@ -6,4 +6,5 @@ interface ImportMetaEnv {
   readonly VITE_DISTRIBUTION_CHANNEL?: string;
   readonly VITE_MISTY_PUBLIC_API_URL?: string;
   readonly VITE_MISTY_PUBLIC_URL?: string;
+  readonly MISTY_APP_VERSION?: string;
 }

@@ -186,14 +186,8 @@ function AccountMenuItems(props: AccountMenuProps) {
       {cloud ? (
         <ProfileCardGroup>
           <MenuSubmenu icon={<CreditCard />} label="Plan and billing">
-            <MenuItem
-              label="Get Misty+ monthly"
-              onSelect={() => openWebsite("/pricing?checkout=plus")}
-            />
-            <MenuItem
-              label="Get Misty+ yearly"
-              onSelect={() => openWebsite("/pricing?checkout=plus_yearly")}
-            />
+            <MenuItem label="Get Pro" onSelect={() => openWebsite("/pricing?checkout=pro")} />
+            <MenuItem label="Get Max" onSelect={() => openWebsite("/pricing?checkout=max")} />
             <DropdownMenuSeparator />
             <MenuItem label="Manage plan" onSelect={() => openWebsite("/settings/subscription")} />
           </MenuSubmenu>

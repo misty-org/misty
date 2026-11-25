@@ -13,13 +13,13 @@ export const accountLimitMessages: Record<string, string> = {
   storage_limit_reached: storageFull,
   owner_storage_quota_exceeded: storageFull,
   space_people_limit_reached:
-    "This Space is full for its level. Boost it on Misty Cloud to raise its level, or remove someone first.",
+    "This Space has as many people as its server allows. Remove someone first, or ask whoever runs your Misty server.",
   space_agent_limit_reached:
-    "This Space has as many agents as its level allows. Boost it to raise its level, or take an agent out first.",
+    "This Space has as many agents as its server allows. Take an agent out first, or ask whoever runs your Misty server.",
   space_upload_limit_reached:
-    "This file is larger than this Space's level allows. Boost the Space, or get Misty+ for larger files.",
+    "This file is larger than this Space's server allows. Ask whoever runs your Misty server.",
   space_storage_quota_exceeded:
-    "This Space's storage is full. Boost it for more, or free some space in it. Nothing already stored is lost.",
+    "This Space's storage is full. Free some space in it, or ask whoever runs your Misty server. Nothing already stored is lost.",
   spaces_limit_reached:
     "You're in as many Spaces as your plan allows, your own and joined ones together. Leave one, or on Misty Cloud choose a larger plan in Plan and billing.",
   account_suspended:

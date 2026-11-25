@@ -84,6 +84,7 @@ fn renderer_may_set(name: &str) -> bool {
             | "x-misty-refresh-token"
             | "x-misty-session-ended"
             | "x-misty-models"
+            | "x-misty-app-version"
     )
 }
 
@@ -158,7 +159,8 @@ pub async fn auth_http_start(
     }
     builder = builder
         .header(session::TOKEN_TRANSPORT.0, session::TOKEN_TRANSPORT.1)
-        .header("X-Misty-CSRF", "1");
+        .header("X-Misty-CSRF", "1")
+        .header("X-Misty-App-Version", env!("CARGO_PKG_VERSION"));
     if has_body {
         let total = body.len() as u64;
         let mut sent = 0;

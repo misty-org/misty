@@ -15,7 +15,6 @@ import { DeleteSpaceDialog } from "../components/SpaceLifecycleDialogs";
 import { useSpaceLifecycleActions } from "../components/use_space_lifecycle_actions";
 import { useSpacePictureEditor } from "../components/UseSpacePictureEditor";
 import { useSpacesStore } from "../list/use_spaces_store";
-import { SpaceBoosts } from "./SpaceBoosts";
 import { SpaceSettingsFrame, type SpaceSettingsNav } from "./SpaceSettingsFrame";
 import { canDeleteSpace, canEditSpace } from "./space_settings_pages";
 
@@ -31,7 +30,6 @@ export function OverviewPage({ nav }: { nav: SpaceSettingsNav }) {
             <NameRow space={space} />
           </SettingsSection>
         ) : null}
-        {space.is_default ? null : <SpaceBoosts spaceId={space.id} />}
         {canDeleteSpace(space) ? (
           <SettingsSection title="Delete">
             <SettingsRow
