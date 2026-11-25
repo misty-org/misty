@@ -140,5 +140,6 @@ fn misty_mounts_its_server_over_http() {
     assert_eq!(servers[0]["headers"][0]["name"], "Authorization");
 }
 
+#[cfg(unix)]
 #[path = "agy_live_tests.rs"]
 mod live;

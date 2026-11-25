@@ -92,6 +92,7 @@ pub(super) fn stage(
         return Err("Codex planning staging root must not be a symlink".into());
     }
     let directory = staging_root.join(uuid::Uuid::new_v4().simple().to_string());
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut builder = file_access::fs::DirBuilder::new();
     #[cfg(unix)]
     {

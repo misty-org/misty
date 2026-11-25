@@ -1,5 +1,6 @@
 #![allow(clippy::disallowed_methods, clippy::disallowed_types)]
 
+#[cfg(unix)]
 use std::collections::HashSet;
 use std::path::Path;
 

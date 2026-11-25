@@ -100,6 +100,7 @@ mod tests {
     use super::*;
     #[cfg(unix)]
     use crate::engines::codex_app::tests::{recorded, test_core};
+    #[cfg(unix)]
     use crate::engines::codex_app::*;
 
     #[test]

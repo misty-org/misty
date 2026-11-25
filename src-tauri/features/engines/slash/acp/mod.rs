@@ -319,6 +319,6 @@ fn unwrapped(value: &Value) -> &Value {
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 #[path = "live_tests.rs"]
 mod live;

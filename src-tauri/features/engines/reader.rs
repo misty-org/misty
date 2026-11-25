@@ -9,7 +9,9 @@ use super::events::EngineEvent;
 #[cfg(windows)]
 use super::job;
 use super::plan_review;
-use super::registry::{kill_process_group, FollowupPrefs, ProcessRegistry};
+#[cfg(unix)]
+use super::registry::kill_process_group;
+use super::registry::{FollowupPrefs, ProcessRegistry};
 use super::Engine;
 use crate::engines::support::event_sink;
 use serde_json::Value;

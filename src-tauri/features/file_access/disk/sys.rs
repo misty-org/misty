@@ -574,10 +574,6 @@ mod imp {
             Ok(None)
         }
 
-        pub(crate) fn stat(&self) -> io::Result<Stat> {
-            fs::symlink_metadata(&self.path).map(|meta| stat_from(&meta))
-        }
-
         pub(crate) fn stat_at(&self, name: &OsStr) -> io::Result<Stat> {
             fs::symlink_metadata(self.path.join(name)).map(|meta| stat_from(&meta))
         }

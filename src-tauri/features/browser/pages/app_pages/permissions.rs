@@ -364,6 +364,17 @@ mod platform {
     );
     unsafe impl Send for OnUiThread {}
 
+    impl OnUiThread {
+        fn into_parts(
+            self,
+        ) -> (
+            ICoreWebView2PermissionRequestedEventArgs,
+            ICoreWebView2Deferral,
+        ) {
+            (self.0, self.1)
+        }
+    }
+
     pub(super) fn install(app: &AppHandle, page: &Webview, mount: &str) -> Result<(), String> {
         let app = app.clone();
         let mount = mount.to_owned();
@@ -395,7 +406,7 @@ mod platform {
                     kinds,
                     Box::new(move |allow| {
                         let _ = main.run_on_main_thread(move || {
-                            let OnUiThread(args, deferral) = held;
+                            let (args, deferral) = held.into_parts();
                             let state = if allow {
                                 COREWEBVIEW2_PERMISSION_STATE_ALLOW
                             } else {

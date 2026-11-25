@@ -52,6 +52,8 @@ impl HostChannel for Channel {
                     crate::browser::pages::macos::pointer_guard::set_caret_rect(&webview, rect);
                 }
             }
+            #[cfg(not(target_os = "macos"))]
+            let _ = caret;
             return;
         }
         if let Some(fullscreen) = fullscreen_message(raw) {

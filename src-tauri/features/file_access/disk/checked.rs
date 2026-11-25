@@ -64,6 +64,7 @@ const NO_DISK: &str = "Files hasn't been given access to this computer.";
 const AGENT_SECRET: &str = "Agents can't open secrets or keys.";
 const MOVED: &str = "That folder moved while Misty was opening it.";
 const LINKED: &str = "Links aren't followed here.";
+#[cfg(unix)]
 const NOT_YOURS: &str = "That folder belongs to another user of this computer.";
 
 pub(crate) fn policy_allows(real: &Path, access: Access) -> bool {

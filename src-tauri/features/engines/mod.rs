@@ -2307,6 +2307,7 @@ mod codex_home_bin_tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&candidate, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
+        #[cfg_attr(not(unix), allow(unused_mut))]
         let mut settings = crate::engines::support::settings::AppSettings {
             codex_home: Some(dir.to_string_lossy().into_owned()),
             ..Default::default()
