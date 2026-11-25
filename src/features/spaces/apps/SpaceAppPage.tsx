@@ -12,7 +12,7 @@ import { SpaceAppFrame } from "./SpaceAppFrame";
 import type { AppFileRef } from "./space_app_files";
 import { createSpaceAppHandlers, type Source } from "./space_app_handlers";
 import { themeSource } from "./theme_source";
-import { appEntry, catalogSource, isSiteApp, runsHere, siteManifest } from "./third_party_apps";
+import { appEntry, catalogSource, runsHere } from "./third_party_apps";
 import { useInstalledApps } from "./use_installed_apps";
 import { spaceCan } from "../roles/use_space_roles";
 
@@ -100,8 +100,7 @@ export function SpaceAppPage({
         appName={name}
         version={installed.version}
         approved={installed.permissions ?? []}
-        source={catalog && !isSiteApp(catalog) ? catalogSource(catalog) : undefined}
-        site={catalog && isSiteApp(catalog) ? siteManifest(catalog) : undefined}
+        source={catalog ? catalogSource(catalog) : undefined}
         makeHandlers={(manifest) =>
           createSpaceAppHandlers({
             appId,

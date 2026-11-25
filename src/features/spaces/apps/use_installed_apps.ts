@@ -32,6 +32,15 @@ let loading: Promise<void> | null = null;
 let again = false;
 let watching = false;
 let downloads: Record<string, AppServerProgress> = {};
+const installing = new Set<string>();
+
+const setDownload = (appId: string, progress: AppServerProgress | null) => {
+  const next = { ...downloads };
+  if (progress) next[appId] = progress;
+  else delete next[appId];
+  downloads = next;
+  for (const listener of [...listeners]) listener();
+};
 
 const write = (next: Entry) => {
   entry = next;
@@ -78,11 +87,13 @@ function watch() {
   void listen<{ appId: string; received: number; total: number }>(
     "misty://app-server-install",
     ({ payload }) => {
-      const next = { ...downloads };
-      if (payload.received >= payload.total) delete next[payload.appId];
-      else next[payload.appId] = { received: payload.received, total: payload.total };
-      downloads = next;
-      for (const listener of [...listeners]) listener();
+      const done = payload.received >= payload.total;
+      if (!done) setDownload(payload.appId, { received: payload.received, total: payload.total });
+      else
+        setDownload(
+          payload.appId,
+          installing.has(payload.appId) ? { received: payload.total, total: payload.total } : null,
+        );
     },
   ).catch(() => undefined);
 }
@@ -92,12 +103,20 @@ const downloadSnapshot = () => downloads;
 export const installedApps = {
   reload: () => void load(),
   async install(appId: string, version: string, permissions: string[], source?: AppBundleSource) {
-    const saved = await invoke<InstalledApp>("apps_install", {
-      appId,
-      version,
-      permissions,
-      source: source ?? null,
-    });
+    installing.add(appId);
+    if (!downloads[appId]) setDownload(appId, { received: 0, total: 0 });
+    let saved: InstalledApp;
+    try {
+      saved = await invoke<InstalledApp>("apps_install", {
+        appId,
+        version,
+        permissions,
+        source: source ?? null,
+      });
+    } finally {
+      installing.delete(appId);
+      setDownload(appId, null);
+    }
     write({
       apps: [...(entry.apps ?? []).filter((app) => app.app_id !== appId), saved],
       error: "",

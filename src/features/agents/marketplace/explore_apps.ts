@@ -2,7 +2,6 @@ import type { MarkRender } from "@misty/ui";
 
 export interface ExploreCatalogApp {
   id: string;
-  kind?: "site";
   name: string;
   description?: string;
   maker: string;
@@ -29,8 +28,6 @@ export interface ExploreInstalledApps {
   remove(appId: string): Promise<unknown>;
   open(appId: string): void;
   permissionLine(permission: string): string;
-  isSite(app: ExploreCatalogApp): boolean;
-  siteHost(app: ExploreCatalogApp): string;
 }
 
 export interface ExploreAppsParts {

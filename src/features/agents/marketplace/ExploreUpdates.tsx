@@ -13,6 +13,7 @@ import {
   AppLogoImage,
   Button,
   EmptyState,
+  ProgressPill,
   ErrorState,
   notify,
   Shelf,
@@ -21,7 +22,7 @@ import {
 } from "@misty/ui";
 import { useRegistryEngineIds, useRegistryEngines, type CatalogEngine } from "./engine_catalog";
 import { EngineTile } from "./ExploreEngines";
-import { progressLine } from "./ExploreSpeechParts";
+import { pillProgress, useSpeech } from "./ExploreSpeechParts";
 import { exploreApps, type ExploreCatalogApp } from "./explore_apps";
 import { failureText } from "./explore_index";
 import {
@@ -30,7 +31,7 @@ import {
   useInstallRecords,
   useReadyEngines,
 } from "./explore_installs";
-import { askToRun, ListingLogo } from "./ListingRows";
+import { ActionButton, askToRun, ListingLogo } from "./ListingRows";
 import {
   registryShards,
   useRegistry,
@@ -112,6 +113,21 @@ function useSpeechUpdates(): SpeechEntry[] | null {
   return catalog.hearing.filter((entry) => entry.outdated);
 }
 
+const appProgress = (download: { received: number; total: number } | undefined) =>
+  download ? { value: download.total ? download.received / download.total : 0 } : undefined;
+
+function useDownloads(spaceId: string) {
+  const apps = exploreApps().useExploreInstalledApps(spaceId);
+  const { catalog, stateOf } = useSpeech();
+  const packages = new Set<string>();
+  const speech = (catalog?.hearing ?? []).filter((entry) => {
+    if (!stateOf(entry).downloading || packages.has(entry.packageKey)) return false;
+    packages.add(entry.packageKey);
+    return true;
+  });
+  return { apps: apps.listed.filter((app) => apps.downloadOf(app.id)), speech, stateOf };
+}
+
 function useAppUpdates(spaceId: string) {
   const apps = exploreApps().useExploreInstalledApps(spaceId);
   const rows = apps.listed.flatMap((app) => {
@@ -151,13 +167,16 @@ function usePluginUpdates() {
   return { rows, reload: () => void records.reload() };
 }
 
-export function useUpdateCount(spaceId: string) {
+export function useMyAppsCount(spaceId: string) {
+  const downloads = useDownloads(spaceId);
   const apps = useAppUpdates(spaceId).rows.length;
   const skills = useSkillUpdates().rows?.length ?? 0;
   const engines = useEngineUpdates({ probe: false }).rows.length;
   const speech = useSpeechUpdates()?.length ?? 0;
   const plugins = usePluginUpdates().rows.length;
-  return apps + skills + engines + speech + plugins;
+  return (
+    downloads.apps.length + downloads.speech.length + apps + skills + engines + speech + plugins
+  );
 }
 
 function engineLine(status: CliVersionStatus) {
@@ -166,9 +185,10 @@ function engineLine(status: CliVersionStatus) {
   return `From ${from} to ${to}`;
 }
 
-export function UpdatesPage({ spaceId }: { spaceId: string }) {
+export function MyAppsPage({ spaceId }: { spaceId: string }) {
   const nav = useExploreNav();
   const { apps, rows: appRows } = useAppUpdates(spaceId);
+  const downloads = useDownloads(spaceId);
   const skills = useSkillUpdates();
   const plugins = usePluginUpdates();
   const readyEngines = useReadyEngines();
@@ -308,7 +328,7 @@ export function UpdatesPage({ spaceId }: { spaceId: string }) {
     return (
       <ErrorState
         inline
-        title="Updates couldn't load"
+        title="My apps couldn't load"
         line={apps.error}
         action={{
           label: "Try again",
@@ -321,38 +341,112 @@ export function UpdatesPage({ spaceId }: { spaceId: string }) {
         }}
       />
     );
-  if (loading && !apps.error && !skills.error) return <ShelfSkeleton label="Updates" items={3} />;
-  if (!count)
-    return <EmptyState inline title="Everything is up to date" line="New versions show up here." />;
-  const updateButton = (key: string, onClick: () => void, disabled = false) => (
-    <Button variant="get" size="sm" disabled={busy.has(key) || disabled} onClick={onClick}>
-      Update
-    </Button>
+  if (loading && !apps.error && !skills.error) return <ShelfSkeleton label="My apps" items={3} />;
+  const downloading = new Set(downloads.apps.map((app) => app.id));
+  const updating = new Set(appRows.map(({ app }) => app.id));
+  const here = apps.listed.filter(
+    (app) =>
+      apps.versionOf(app.id) !== undefined && !downloading.has(app.id) && !updating.has(app.id),
   );
+  if (!count && !downloads.apps.length && !downloads.speech.length && !here.length)
+    return <EmptyState inline title="No apps yet" line="What you get in Explore shows up here." />;
+  const appLogo = (app: ExploreCatalogApp) => (
+    <AppLogoImage
+      src={exploreApps().catalogLogoUrl(app)}
+      name={app.name}
+      size="tile"
+      render={app.icon_render}
+    />
+  );
+  const updateButton = (
+    key: string,
+    onClick: () => void,
+    progress?: { value?: number },
+    name?: string,
+  ) =>
+    progress ? (
+      <ProgressPill
+        value={progress.value}
+        label={name ? `Downloading ${name}` : "Downloading"}
+        size="sm"
+        widthOf={["Update"]}
+      />
+    ) : (
+      <Button variant="get" size="sm" widthOf={["Update"]} disabled={busy.has(key)} onClick={onClick}>
+        Update
+      </Button>
+    );
   return (
     <>
+      {downloads.apps.length || downloads.speech.length ? (
+        <Shelf title="Downloading">
+          {downloads.apps.map((app) => (
+            <ShelfItem
+              key={`app:${app.id}`}
+              logo={appLogo(app)}
+              title={app.name}
+              line={apps.versionOf(app.id) === undefined ? app.description : `To ${app.version}`}
+              action={
+                <ActionButton
+                  action={{
+                    label: "Get",
+                    variant: "get",
+                    progress: appProgress(apps.downloadOf(app.id)),
+                    onClick: () => undefined,
+                  }}
+                  label={app.name}
+                />
+              }
+              onOpen={() => nav.open({ kind: "apps", id: app.id })}
+            />
+          ))}
+          {downloads.speech.map((entry) => (
+            <ShelfItem
+              key={`speech:${entry.id}`}
+              logo={
+                <MakerTile
+                  maker={pluginMaker({ author: entry.maker, link: entry.source })}
+                  name={entry.name}
+                />
+              }
+              title={entry.name}
+              line={entry.description}
+              action={
+                <ActionButton
+                  action={{
+                    label: "Get",
+                    variant: "get",
+                    progress: pillProgress(downloads.stateOf(entry).coming, true),
+                    onClick: () => undefined,
+                  }}
+                  label={entry.name}
+                />
+              }
+              onOpen={() => nav.open({ kind: "hearing", id: entry.id })}
+            />
+          ))}
+        </Shelf>
+      ) : null}
       {appRows.length ? (
-        <Shelf title="Apps">
+        <Shelf title="App updates">
           {appRows.map(({ app, from }) => (
             <ShelfItem
               key={app.id}
-              logo={
-                <AppLogoImage
-                  src={exploreApps().catalogLogoUrl(app)}
-                  name={app.name}
-                  size="tile"
-                  render={app.icon_render}
-                />
-              }
+              logo={appLogo(app)}
               title={app.name}
               line={`From ${from} to ${app.version}`}
-              action={updateButton(`app:${app.id}`, () => void updateApp(app))}
+              action={updateButton(
+                `app:${app.id}`,
+                () => void updateApp(app),
+                appProgress(apps.downloadOf(app.id)),
+                app.name,
+              )}
             />
           ))}
         </Shelf>
       ) : null}
       {skillRows.length ? (
-        <Shelf title="Skills">
+        <Shelf title="Skill updates">
           {skillRows.map((skill) => (
             <ShelfItem
               key={skill.id}
@@ -379,7 +473,7 @@ export function UpdatesPage({ spaceId }: { spaceId: string }) {
         </Shelf>
       ) : null}
       {engineRows.length ? (
-        <Shelf title="Engines">
+        <Shelf title="Engine updates">
           {engineRows.map(({ engine, status }) => (
             <ShelfItem
               key={engine.id}
@@ -392,7 +486,7 @@ export function UpdatesPage({ spaceId }: { spaceId: string }) {
         </Shelf>
       ) : null}
       {pluginRows.length ? (
-        <Shelf title="Plugins">
+        <Shelf title="Plugin updates">
           {pluginRows.map((entry) => (
             <ShelfItem
               key={entry.id}
@@ -405,7 +499,7 @@ export function UpdatesPage({ spaceId }: { spaceId: string }) {
         </Shelf>
       ) : null}
       {speechRows.length ? (
-        <Shelf title="Speech">
+        <Shelf title="Speech updates">
           {speechRows.map((entry) => {
             const coming = speechProgress[entry.id] ?? speechProgress[entry.packageKey];
             return (
@@ -418,15 +512,35 @@ export function UpdatesPage({ spaceId }: { spaceId: string }) {
                   />
                 }
                 title={entry.name}
-                line={coming ? progressLine(coming) : "A newer version"}
+                line="A newer version"
                 action={updateButton(
                   `speech:${entry.id}`,
                   () => void updateSpeech(entry),
-                  Boolean(coming),
+                  pillProgress(coming, false),
+                  entry.name,
                 )}
               />
             );
           })}
+        </Shelf>
+      ) : null}
+      {here.length ? (
+        <Shelf title="On this computer">
+          {here.map((app) => (
+            <ShelfItem
+              key={app.id}
+              logo={appLogo(app)}
+              title={app.name}
+              line={app.description ?? `By ${app.maker}`}
+              action={
+                <ActionButton
+                  action={{ label: "Open", variant: "secondary", onClick: () => apps.open(app.id) }}
+                  label={app.name}
+                />
+              }
+              onOpen={() => nav.open({ kind: "apps", id: app.id })}
+            />
+          ))}
         </Shelf>
       ) : null}
     </>

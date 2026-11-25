@@ -1,11 +1,6 @@
 use super::*;
 
-#[cfg(target_os = "macos")]
-const MAX_WORLD_POSTS: usize = 256;
-#[cfg(target_os = "macos")]
-const WORLD_POST_BOUND: std::time::Duration = std::time::Duration::from_secs(10);
-
-pub fn relay_script(token: &str, shortcuts: &str, sender: &str, world: bool) -> String {
+pub fn relay_script(token: &str, shortcuts: &str, sender: &str) -> String {
     RELAY
         .replace(
             "__MISTY_APP_TOKEN__",
@@ -20,16 +15,7 @@ pub fn relay_script(token: &str, shortcuts: &str, sender: &str, world: bool) -> 
             "__MISTY_APP_TOKEN_HEADER__",
             &serde_json::to_string(TOKEN_HEADER).unwrap_or_default(),
         )
-        .replace(
-            "__MISTY_APP_LIMIT__",
-            &(if world {
-                MAX_WORLD_BYTES
-            } else {
-                MAX_FRAME_BYTES
-            })
-            .to_string(),
-        )
-        .replace("__MISTY_APP_WORLD__", if world { "true" } else { "false" })
+        .replace("__MISTY_APP_LIMIT__", &MAX_FRAME_BYTES.to_string())
         .replace("__KIRI_HOST_SENDER__", sender)
 }
 
@@ -58,15 +44,6 @@ pub async fn space_app_page_post(
     if doc.as_deref().is_some_and(|doc| !on_doc(&mount, doc)) {
         return Err("The app moved on to a new page.".into());
     }
-    if is_site(&mount) {
-        let here = page.url().ok().as_ref().and_then(FrameOrigin::of);
-        if here.is_none() || here != site_address(&mount) {
-            return Err("The app isn't on its own page.".into());
-        }
-    }
-    if is_world(&mount) {
-        return post_to_world(page, &mount, body).await;
-    }
     let argument = if body.len() > MAX_FRAME_BYTES {
         let reference = new_reference();
         put_bytes(&mount, None, &reference, body.into_bytes())?;
@@ -78,36 +55,6 @@ pub async fn space_app_page_post(
         "window.__mistyAppRelay&&window.__mistyAppRelay({argument});"
     ))
     .map_err(|error| error.to_string())
-}
-
-#[cfg(target_os = "macos")]
-async fn post_to_world(page: Webview, mount: &str, body: String) -> Result<(), String> {
-    let Some(post) = begin_post(mount, MAX_WORLD_POSTS, WORLD_POST_BOUND) else {
-        return Err("The website app isn't keeping up, so this didn't reach it.".into());
-    };
-    let settled = mount.to_owned();
-    crate::browser::pages::content_world::post_in_content_world(
-        &page,
-        ADAPTER_WORLD,
-        format!("window.__mistyAppRelay&&window.__mistyAppRelay({body});return \"\";"),
-        Box::new(move || end_post(&settled, post)),
-    )
-}
-
-#[cfg(windows)]
-async fn post_to_world(page: Webview, _mount: &str, body: String) -> Result<(), String> {
-    crate::browser::pages::content_world::evaluate_in_content_world(
-        page,
-        ADAPTER_WORLD,
-        format!("window.__mistyAppRelay&&window.__mistyAppRelay({body});return \"\";"),
-    )
-    .await
-    .map(|_| ())
-}
-
-#[cfg(not(any(target_os = "macos", windows)))]
-async fn post_to_world(_page: Webview, _mount: &str, _body: String) -> Result<(), String> {
-    Err("Website apps get no Space features here.".into())
 }
 
 #[tauri::command]

@@ -25,13 +25,7 @@ impl HostChannel for Channel {
     fn receive(&self, message: HostMessage<'_>) {
         let app = &self.app;
         if crate::apps::frames::is_app_page(message.webview) {
-            let _ = crate::apps::frames::receive(
-                app,
-                message.webview,
-                message.main_frame,
-                None,
-                message.body,
-            );
+            crate::apps::frames::receive(app, message.webview, message.main_frame, message.body);
             return;
         }
         let Some(id) = message.webview.strip_prefix("misty-browser-") else {

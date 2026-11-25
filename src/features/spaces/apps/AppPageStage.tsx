@@ -83,7 +83,6 @@ export function AppPageStage({
   appId,
   version,
   appName,
-  site = false,
   instance,
   start,
   leave,
@@ -94,7 +93,6 @@ export function AppPageStage({
   appId: string;
   version: string;
   appName: string;
-  site?: boolean;
   instance: string;
   start: (frame: FrameTarget, element: HTMLElement, page: AppPageView) => void;
   leave: () => void;
@@ -125,7 +123,7 @@ export function AppPageStage({
   usePresentedPageHost(`app-page:${mount}`, presented);
 
   useEffect(() => {
-    const link = createAppPageLink(mount, { world: site });
+    const link = createAppPageLink(mount);
     const page: AppPageView = {
       snapshot: () =>
         invoke<{ dataUrl: string; width: number; height: number }>("space_app_page_snapshot", {
@@ -190,7 +188,7 @@ export function AppPageStage({
       setQuestions([]);
       void invoke("space_app_page_close", { request: { mount } }).catch(() => undefined);
     };
-  }, [mount, site]);
+  }, [mount]);
 
   useEffect(() => {
     if (!opened) return;

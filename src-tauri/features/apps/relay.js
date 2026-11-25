@@ -6,8 +6,7 @@
   const tokenHeader = __MISTY_APP_TOKEN_HEADER__;
   const limit = __MISTY_APP_LIMIT__;
   const bind = __KIRI_HOST_SENDER__;
-  const world = __MISTY_APP_WORLD__;
-  const inline = world ? Infinity : 16384;
+  const inline = 16384;
   const mark = "$mistyBytes";
   const sdkLane = "misty:init";
   const own = {
@@ -123,21 +122,16 @@
     return result;
   };
   const load = (ref) =>
-    world
-      ? Promise.reject(new Error("A website app takes no bytes from Misty this way."))
-      : own.fetch(bytesPath + ref, { headers: { [tokenHeader]: token }, cache: "no-store" }).then((response) => {
-          if (!response.ok) throw new Error("The bytes from Misty didn't arrive.");
-          return response.arrayBuffer().then((buffer) => new Uint8Array(buffer));
-        });
+    own.fetch(bytesPath + ref, { headers: { [tokenHeader]: token }, cache: "no-store" }).then((response) => {
+      if (!response.ok) throw new Error("The bytes from Misty didn't arrive.");
+      return response.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+    });
   const upload = (ref, bytes) =>
-    world
-      ? Promise.reject(new Error("That's too big to send to Misty from a website app."))
-      : own.fetch(bytesPath + ref, { method: "POST", headers: { [tokenHeader]: token }, body: bytes, cache: "no-store" })
-          .then((response) => {
-            if (!response.ok) throw new Error("Misty couldn't take the app's bytes.");
-          });
+    own.fetch(bytesPath + ref, { method: "POST", headers: { [tokenHeader]: token }, body: bytes, cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Misty couldn't take the app's bytes.");
+      });
   const free = (refs) => {
-    if (world) return;
     refs.forEach((ref) =>
       own.fetch(bytesPath + ref, { method: "DELETE", headers: { [tokenHeader]: token }, cache: "no-store" }).catch(() => undefined),
     );
@@ -307,7 +301,6 @@
     try {
       let text = own.stringify({ token: token, doc: doc, frames: ready.map((entry) => entry.wire) });
       if (utf8Length(text) > limit) {
-        if (world) throw new Error("That's too big to send to Misty from a website app.");
         const ref = newId();
         await upload(ref, new own.Encoder().encode(own.stringify({ frames: ready.map((entry) => entry.wire) })));
         sent.push(ref);
@@ -339,45 +332,6 @@
     schedule();
   };
 
-  const waiting = new Map();
-  const handed = new Map();
-  const handOver = (lane, port, message) => {
-    handed.set(lane, { port: port, message: message });
-    const waiters = waiting.get(lane) || [];
-    waiting.delete(lane);
-    waiters.forEach((resolve) => resolve(handed.get(lane)));
-    if (lane === "misty:screen" && typeof window.__mistyScreenAttach === "function") window.__mistyScreenAttach(port);
-  };
-  const portFor = (lane) =>
-    new Promise((resolve) => {
-      const ready = handed.get(lane);
-      if (ready) {
-        handed.delete(lane);
-        return resolve(ready);
-      }
-      waiting.set(lane, (waiting.get(lane) || []).concat([(found) => {
-        handed.delete(lane);
-        resolve(found);
-      }]));
-    });
-  if (world)
-    own.define(window, "mistyAdapterHost", {
-      value: Object.freeze({
-        connect: () =>
-          portFor(sdkLane).then((found) => {
-            const SDK = window.MistySDK;
-            if (!SDK || typeof SDK.createMisty !== "function" || typeof SDK.Connection !== "function")
-              throw new Error("Misty's SDK isn't loaded in this adapter.");
-            const protocol = typeof found.message.version === "number" ? found.message.version : 1;
-            return new SDK.Connection(found.port)
-              .call("hello", { sdk: "adapter", protocol: protocol })
-              .then((hello) => SDK.createMisty(found.port, hello));
-          }),
-      }),
-      writable: false,
-      configurable: false,
-      enumerable: false,
-    });
   const started = new Map();
   const closePort = (port) => {
     port.onmessage = null;
@@ -417,12 +371,11 @@
     ports.set(lane, channel.port1);
     started.set(lane, message);
     listenOn(lane, channel.port1);
-    if (world) return handOver(lane, channel.port2, message);
     own.post(Object.assign({}, message, { type: lane }), "*", [channel.port2]);
   };
   const offerAgain = () => {
     const message = started.get(sdkLane);
-    if (world || !message || heard.has(sdkLane) || !ports.has(sdkLane)) return;
+    if (!message || heard.has(sdkLane) || !ports.has(sdkLane)) return;
     const channel = new own.Channel();
     spares.set(sdkLane, (spares.get(sdkLane) || []).concat([channel.port1]));
     listenOn(sdkLane, channel.port1);
@@ -524,12 +477,7 @@
 
   send({ open: true });
   const announce = () => send({ ready: true });
-  if (world) {
-    if (document.readyState === "complete") own.timeout(announce, 0);
-    else window.addEventListener("load", announce, { once: true });
-  } else {
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", announce, { once: true });
-    else own.timeout(announce, 0);
-    if (document.readyState !== "complete") window.addEventListener("load", offerAgain, { once: true });
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", announce, { once: true });
+  else own.timeout(announce, 0);
+  if (document.readyState !== "complete") window.addEventListener("load", offerAgain, { once: true });
 })();

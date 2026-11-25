@@ -33,6 +33,9 @@ const PROFILE: &str = r#"
 pub const MAX_SERVER_ARCHIVE_BYTES: u64 = 1 << 30;
 const MAX_SERVER_PROGRAM_BYTES: u64 = 3 << 29;
 const START_LIMIT: Duration = Duration::from_secs(180);
+const DOWNLOAD_STALL: Duration = Duration::from_secs(60);
+const DOWNLOAD_RESUMES: u32 = 5;
+const PROGRESS_STEP: Duration = Duration::from_millis(250);
 const LOG_LINES: usize = 40;
 pub const INSTALL_EVENT: &str = "misty://app-server-install";
 
@@ -288,18 +291,11 @@ async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::limited(5))
         .connect_timeout(Duration::from_secs(30))
+        .read_timeout(DOWNLOAD_STALL)
         .build()
         .map_err(|error| error.to_string())?;
     let failed = || "Couldn't download the app's server. Check your connection and try again.".to_owned();
-    let mut response = client
-        .get(parsed)
-        .send()
-        .await
-        .and_then(|response| response.error_for_status())
-        .map_err(|_| failed())?;
-    if response.url().scheme() != "https" {
-        return Err("Apps download only over https.".into());
-    }
+    let mut response = request_from(&client, &parsed, 0).await.ok_or_else(failed)?;
     let total = pinned.build.size;
     if response.content_length().is_some_and(|length| length > MAX_SERVER_ARCHIVE_BYTES) {
         return Err("The app's server is larger than Misty downloads.".into());
@@ -308,8 +304,19 @@ async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<
         .map_err(|error| format!("Couldn't save the app's server: {error}"))?;
     let mut hasher = Sha256::new();
     let mut received: u64 = 0;
-    let mut told: u64 = 0;
-    while let Some(chunk) = response.chunk().await.map_err(|_| failed())? {
+    let mut told = std::time::Instant::now();
+    let mut resumed = 0;
+    loop {
+        let chunk = match response.chunk().await {
+            Ok(Some(chunk)) => chunk,
+            Ok(None) if total == 0 || received >= total => break,
+            Ok(None) | Err(_) if resumed < DOWNLOAD_RESUMES && received > 0 => {
+                resumed += 1;
+                response = request_from(&client, &parsed, received).await.ok_or_else(failed)?;
+                continue;
+            }
+            Ok(None) | Err(_) => return Err(failed()),
+        };
         received += chunk.len() as u64;
         if received > MAX_SERVER_ARCHIVE_BYTES {
             return Err("The app's server is larger than Misty downloads.".into());
@@ -317,8 +324,8 @@ async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<
         hasher.update(&chunk);
         file.write_all(&chunk)
             .map_err(|error| format!("Couldn't save the app's server: {error}"))?;
-        if received - told >= 4 << 20 || received == total {
-            told = received;
+        if told.elapsed() >= PROGRESS_STEP || received == total {
+            told = std::time::Instant::now();
             let _ = app.emit(
                 INSTALL_EVENT,
                 Progress {
@@ -339,6 +346,26 @@ async fn download_to(app: &AppHandle, pinned: &Pinned, target: &Path) -> Result<
         return Err("The downloaded server doesn't match the catalog's checksum, so it wasn't installed.".into());
     }
     Ok(())
+}
+
+async fn request_from(client: &reqwest::Client, url: &url::Url, from: u64) -> Option<reqwest::Response> {
+    let mut request = client.get(url.clone());
+    if from > 0 {
+        request = request.header(reqwest::header::RANGE, format!("bytes={from}-"));
+    }
+    let response = request.send().await.ok()?.error_for_status().ok()?;
+    if response.url().scheme() != "https" {
+        return None;
+    }
+    let starts_here = response
+        .headers()
+        .get(reqwest::header::CONTENT_RANGE)
+        .and_then(|range| range.to_str().ok())
+        .is_some_and(|range| range.starts_with(&format!("bytes {from}-")));
+    if from > 0 && (response.status() != reqwest::StatusCode::PARTIAL_CONTENT || !starts_here) {
+        return None;
+    }
+    Some(response)
 }
 
 fn extract(archive: &Path, target: &Path, name: &str, tar: bool) -> Result<(), String> {

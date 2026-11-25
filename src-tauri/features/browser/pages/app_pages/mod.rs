@@ -1,13 +1,11 @@
-use crate::apps::{bundle, frames, manifest, site::SiteEntry};
+use crate::apps::{bundle, frames, manifest};
 use crate::browser::*;
 use sha2::{Digest, Sha256};
 
-#[cfg(target_os = "macos")]
-mod adapter_world;
 mod downloads;
 mod navigation;
 mod permissions;
-use navigation::{refuse_outside, stays_in_app, stays_on_site};
+use navigation::{refuse_outside, stays_in_app};
 pub use permissions::{
     __cmd__space_app_page_permission_answer, __cmd__space_apps_forget_permissions,
     __tauri_command_name_space_app_page_permission_answer,
@@ -66,11 +64,6 @@ pub struct AppPageLowerRequest {
 #[serde(rename_all = "camelCase")]
 pub struct AppPageOpened {
     pub channel: bool,
-}
-
-enum Kind {
-    Bundle,
-    Site(Box<SiteEntry>),
 }
 
 fn apps_store() -> Option<String> {
@@ -152,8 +145,6 @@ fn park(page: &Webview) -> Result<(), String> {
 
 fn close(page: &Webview, mount: &str) -> Result<(), String> {
     permissions::forget_mount(mount);
-    #[cfg(target_os = "macos")]
-    adapter_world::forget(page.label());
     frames::forget(mount);
     kiri::channel::forget_host_channel(page.label());
     silence_page(page);
@@ -162,19 +153,11 @@ fn close(page: &Webview, mount: &str) -> Result<(), String> {
 }
 
 pub(crate) fn send_shortcuts(page: &Webview, payload: &str) -> Result<(), String> {
-    let Some(mount) = frames::mount_of(page.label()) else {
+    if frames::mount_of(page.label()).is_none() {
         return Ok(());
-    };
-    if !frames::is_site(mount) {
-        return page
-            .eval(format!("window.__MISTY_SET_SHORTCUTS__?.({payload});"))
-            .map_err(|error| error.to_string());
     }
-    #[cfg(target_os = "macos")]
-    if frames::is_world(mount) {
-        return adapter_world::send_shortcuts(page, payload);
-    }
-    Ok(())
+    page.eval(format!("window.__MISTY_SET_SHORTCUTS__?.({payload});"))
+        .map_err(|error| error.to_string())
 }
 
 pub(crate) fn close_if_app_page(page: &Webview) -> Option<Result<(), String>> {
@@ -191,21 +174,14 @@ pub(crate) fn close_app_pages(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-async fn kind_of(app_id: &str, version: &str) -> Result<Kind, String> {
-    if let Some(site) = crate::apps::site::site_entry(app_id).filter(|site| site.version == version)
-    {
-        if !site.runs_here() {
-            return Err(format!("{} doesn't play on this computer.", site.name));
-        }
-        return Ok(Kind::Site(Box::new(site)));
-    }
+async fn installed_here(app_id: &str, version: &str) -> Result<(), String> {
     let (id, release) = (app_id.to_owned(), version.to_owned());
     let installed =
         tauri::async_runtime::spawn_blocking(move || bundle::installed_manifest(&id, &release))
             .await
             .map_err(|error| error.to_string())??;
     match installed {
-        Some(_) => Ok(Kind::Bundle),
+        Some(_) => Ok(()),
         None => Err("This app isn't on this computer yet.".into()),
     }
 }
@@ -229,55 +205,30 @@ pub async fn space_app_page_open(
     }
     frames::remember_app(&app);
     let owner = caller.window().label().to_owned();
-    let kind = kind_of(&app_id, &version).await?;
-    if matches!(kind, Kind::Bundle) {
-        let (id, release) = (app_id.clone(), version.clone());
-        let serves = tauri::async_runtime::spawn_blocking(move || {
-            crate::apps::app_server::declared(&id, &release)
-        })
-        .await
-        .unwrap_or(false);
-        if serves {
-            crate::apps::app_server::url(&app, &app_id).await?;
-        }
+    installed_here(&app_id, &version).await?;
+    let (id, release) = (app_id.clone(), version.clone());
+    let serves = tauri::async_runtime::spawn_blocking(move || {
+        crate::apps::app_server::declared(&id, &release)
+    })
+    .await
+    .unwrap_or(false);
+    if serves {
+        crate::apps::app_server::url(&app, &app_id).await?;
     }
-    let channel = match &kind {
-        Kind::Bundle => true,
-        Kind::Site(site) => site.has_space_features(),
-    };
     if let Some(existing) = owned(&caller, &mount)? {
         if frames::runs(&mount, &app_id, &version)
             && frames::owner_of(&mount).as_deref() == Some(owner.as_str())
         {
             place(&app, &existing, &bounds)?;
-            return Ok(AppPageOpened { channel });
+            return Ok(AppPageOpened { channel: true });
         }
         close(&existing, &mount)?;
     }
-    let adapter = match &kind {
-        Kind::Site(site) => match &site.adapter {
-            Some(file) => Some(crate::registry::files::script(file).await?),
-            None => None,
-        },
-        Kind::Bundle => None,
-    };
     let _lifecycle = crate::browser::profiles::browser_lifecycle().read().await;
     remember_main_macos_webview(&app, &owner)?;
     let label = frames::label_of(&mount)?;
     let store = apps_store();
-    let world = matches!(&kind, Kind::Site(_)) && channel;
-    let gate = match &kind {
-        Kind::Site(site) => Some(frames::SiteGate {
-            address: site
-                .address()
-                .as_ref()
-                .and_then(frames::FrameOrigin::of)
-                .ok_or("That website app has no address Misty can open.")?,
-            adapter,
-        }),
-        Kind::Bundle => None,
-    };
-    let token = frames::register(&mount, &app_id, &version, &owner, world, gate)?;
+    let token = frames::register(&mount, &app_id, &version, &owner)?;
     frames::set_space(
         &mount,
         space_id.filter(|space| !space.is_empty() && space.len() <= 200),
@@ -285,38 +236,16 @@ pub async fn space_app_page_open(
     let shortcuts =
         serde_json::to_string(&crate::browser::input::shortcuts::current_shortcut_bindings(&state))
             .unwrap_or_else(|_| "[]".to_owned());
-    let (first_url, site_address) = match &kind {
-        Kind::Bundle => (bundle_url(&app_id, &version)?, None),
-        Kind::Site(site) => {
-            let address = site
-                .address()
-                .ok_or("That website app has no address Misty can open.")?;
-            if cfg!(target_os = "macos") {
-                (
-                    Url::parse("about:blank").map_err(|error| error.to_string())?,
-                    Some(address),
-                )
-            } else {
-                (address, None)
-            }
-        }
-    };
+    let first_url = bundle_url(&app_id, &version)?;
     let window_app = app.clone();
     let download_app = app.clone();
     let download_mount = mount.clone();
-    let site_rules = match &kind {
-        Kind::Site(site) => Some(site.as_ref().clone()),
-        Kind::Bundle => None,
-    };
-    let window_rules = site_rules.clone();
-    let window_label = label.clone();
     let navigation_id = app_id.clone();
     let window_id = app_id.clone();
     let navigation_app = app.clone();
     let navigation_mount = mount.clone();
     let window_mount = mount.clone();
     let load_mount = mount.clone();
-    let reapplies_shortcuts = matches!(kind, Kind::Bundle);
     let builder = with_store_data(
         WebviewBuilder::new(&label, WebviewUrl::CustomProtocol(first_url))
             .background_throttling(BackgroundThrottlingPolicy::Disabled),
@@ -327,11 +256,7 @@ pub async fn space_app_page_open(
     .focused(false)
     .accept_first_mouse(true)
     .on_navigation(move |url| {
-        let stays = match &site_rules {
-            Some(site) => stays_on_site(url, site),
-            None => stays_in_app(url, &navigation_id),
-        };
-        if stays {
+        if stays_in_app(url, &navigation_id) {
             return true;
         }
         #[cfg(target_os = "macos")]
@@ -344,14 +269,6 @@ pub async fn space_app_page_open(
         false
     })
     .on_new_window(move |url, _features| {
-        if let Some(site) = &window_rules {
-            if stays_on_site(&url, site) {
-                if let Some(page) = window_app.get_webview(&window_label) {
-                    let _ = page.navigate(url);
-                    return NewWindowResponse::Deny;
-                }
-            }
-        }
         refuse_outside(&window_app, &window_mount, &window_id, &url);
         NewWindowResponse::Deny
     })
@@ -360,29 +277,17 @@ pub async fn space_app_page_open(
         tauri::webview::PageLoadEvent::Started => {
             frames::document_left(webview.app_handle(), &load_mount)
         }
-        tauri::webview::PageLoadEvent::Finished if reapplies_shortcuts => {
+        tauri::webview::PageLoadEvent::Finished => {
             if let Some(state) = webview.app_handle().try_state::<BrowserSessionState>() {
                 let _ = crate::browser::input::shortcuts::apply(&webview, &state);
             }
         }
-        tauri::webview::PageLoadEvent::Finished => {}
-    });
-    let builder = match &kind {
-        Kind::Bundle => builder.initialization_script(frames::relay_script(
-            &token,
-            &shortcuts,
-            kiri::channel::sender_script(),
-            false,
-        )),
-        Kind::Site(_) => builder,
-    };
-    let builder = match &kind {
-        Kind::Site(_) => match native_macos_safari_user_agent() {
-            Some(agent) => builder.user_agent(&agent),
-            None => builder,
-        },
-        Kind::Bundle => builder,
-    };
+    })
+    .initialization_script(frames::relay_script(
+        &token,
+        &shortcuts,
+        kiri::channel::sender_script(),
+    ));
     #[cfg(windows)]
     let builder = builder.general_autofill_enabled(false);
     let (position, size) = logical_bounds(bounds.x, bounds.y, bounds.width, bounds.height);
@@ -397,9 +302,7 @@ pub async fn space_app_page_open(
             return Err(error.to_string());
         }
     };
-    if matches!(kind, Kind::Bundle) {
-        crate::browser::kiri_link::host_messages::install(&page)?;
-    }
+    crate::browser::kiri_link::host_messages::install(&page)?;
     permissions::install(&app, &page, &mount)?;
     crate::browser::page_media::install(&page)?;
     #[cfg(target_os = "macos")]
@@ -410,20 +313,8 @@ pub async fn space_app_page_open(
     crate::browser::app_windows::windows::focus::watch(&page);
     configure_browser_frame_rate(&page)?;
     apply_macos_webview_theme(&page)?;
-    #[cfg(target_os = "macos")]
-    if let (Kind::Site(_), Some(address)) = (&kind, site_address) {
-        if world {
-            adapter_world::install(
-                &page,
-                &frames::relay_script(&token, &shortcuts, adapter_world::SENDER, true),
-            )?;
-        }
-        page.navigate(address).map_err(|error| error.to_string())?;
-    }
-    #[cfg(not(target_os = "macos"))]
-    let _ = site_address;
     place(&app, &page, &bounds)?;
-    Ok(AppPageOpened { channel })
+    Ok(AppPageOpened { channel: true })
 }
 
 #[tauri::command]

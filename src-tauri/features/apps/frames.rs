@@ -1,10 +1,6 @@
 use std::{
     collections::HashMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Mutex, OnceLock,
-    },
-    time::{Duration, Instant},
+    sync::{Mutex, OnceLock},
 };
 
 use serde::{Deserialize, Serialize};
@@ -23,10 +19,8 @@ pub const LABEL_PREFIX: &str = "misty-app-";
 pub const BYTES_PATH: &str = "/__misty/bytes/";
 pub const TOKEN_HEADER: &str = "x-misty-token";
 pub const PAGE_EVENT: &str = "misty://app-page";
-pub const ADAPTER_WORLD: &str = "misty-adapter";
-pub const ADAPTER_HANDLER: &str = "mistyAdapter";
 const MAX_FRAME_BYTES: usize = 300_000;
-const MAX_WORLD_BYTES: usize = 64 << 20;
+const MAX_MESSAGE_BYTES: usize = 64 << 20;
 const MAX_HELD_BYTES: usize = 1 << 30;
 const RELAY: &str = include_str!("relay.js");
 pub const SDK_SCRIPT: &str = include_str!("../../../node_modules/@misty/sdk/dist/misty-sdk.js");
@@ -39,39 +33,8 @@ struct Mount {
     doc: Option<String>,
     bytes: HashMap<String, Vec<u8>>,
     held: usize,
-    world: bool,
     lowered: bool,
-    site: Option<SiteGate>,
-    posting: HashMap<u64, Instant>,
     space: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FrameOrigin {
-    pub scheme: String,
-    pub host: String,
-    pub port: Option<u16>,
-}
-
-impl FrameOrigin {
-    pub fn of(url: &url::Url) -> Option<Self> {
-        Some(Self {
-            scheme: url.scheme().to_owned(),
-            host: url.host_str()?.to_owned(),
-            port: url.port(),
-        })
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct SiteGate {
-    pub address: FrameOrigin,
-    pub adapter: Option<String>,
-}
-
-pub enum Heard {
-    Nothing,
-    Ready(Option<String>),
 }
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
@@ -121,14 +84,7 @@ fn new_reference() -> String {
     uuid::Uuid::new_v4().simple().to_string()
 }
 
-pub fn register(
-    mount: &str,
-    app_id: &str,
-    version: &str,
-    owner: &str,
-    world: bool,
-    site: Option<SiteGate>,
-) -> Result<String, String> {
+pub fn register(mount: &str, app_id: &str, version: &str, owner: &str) -> Result<String, String> {
     let token = new_reference();
     mounts()
         .lock()
@@ -143,10 +99,7 @@ pub fn register(
                 doc: None,
                 bytes: HashMap::new(),
                 held: 0,
-                world,
                 lowered: false,
-                site,
-                posting: HashMap::new(),
                 space: None,
             },
         );
@@ -179,25 +132,8 @@ pub fn app_of(mount: &str) -> Option<String> {
     with_mount(mount, |entry| entry.app_id.clone())
 }
 
-pub fn is_site(mount: &str) -> bool {
-    with_mount(mount, |entry| entry.site.is_some()).unwrap_or(false)
-}
-
-pub fn site_address(mount: &str) -> Option<FrameOrigin> {
-    with_mount(mount, |entry| {
-        entry.site.as_ref().map(|site| site.address.clone())
-    })
-    .flatten()
-}
-
 pub fn document_left(app: &AppHandle, mount: &str) {
-    if with_mount(mount, |entry| {
-        entry.posting.clear();
-        entry.doc.take()
-    })
-    .flatten()
-    .is_some()
-    {
+    if with_mount(mount, |entry| entry.doc.take()).flatten().is_some() {
         emit_page(app, mount, "opened", None);
     }
 }
@@ -210,38 +146,8 @@ pub fn space_of(mount: &str) -> Option<String> {
     with_mount(mount, |entry| entry.space.clone()).flatten()
 }
 
-pub fn current_doc(mount: &str) -> Option<String> {
-    with_mount(mount, |entry| entry.doc.clone()).flatten()
-}
-
 pub fn on_doc(mount: &str, doc: &str) -> bool {
     with_mount(mount, |entry| entry.doc.as_deref() == Some(doc)).unwrap_or(false)
-}
-
-static POSTS: AtomicU64 = AtomicU64::new(0);
-
-pub fn begin_post(mount: &str, most: usize, bound: Duration) -> Option<u64> {
-    let now = Instant::now();
-    with_mount(mount, |entry| {
-        entry
-            .posting
-            .retain(|_, began| now.duration_since(*began) < bound);
-        if entry.posting.len() >= most {
-            return None;
-        }
-        let post = POSTS.fetch_add(1, Ordering::Relaxed);
-        entry.posting.insert(post, now);
-        Some(post)
-    })
-    .flatten()
-}
-
-pub fn end_post(mount: &str, post: u64) {
-    with_mount(mount, |entry| entry.posting.remove(&post));
-}
-
-pub fn is_world(mount: &str) -> bool {
-    with_mount(mount, |entry| entry.world).unwrap_or(false)
 }
 
 pub fn lowered(label: &str) -> bool {
@@ -406,22 +312,12 @@ enum Accepted {
     Current,
 }
 
-fn accept(
-    mount: &str,
-    origin: Option<&FrameOrigin>,
-    message: &PageMessage,
-) -> Option<(Accepted, String, Option<String>)> {
+fn accept(mount: &str, message: &PageMessage) -> Option<(Accepted, String)> {
     let mut mounts = mounts().lock().ok()?;
     let entry = mounts.get_mut(mount)?;
     if !token_matches(entry, &message.token) || !valid_name(&message.doc, 64) {
         return None;
     }
-    if let Some(site) = &entry.site {
-        if origin != Some(&site.address) {
-            return None;
-        }
-    }
-    let adapter = entry.site.as_ref().and_then(|site| site.adapter.clone());
     let owner = entry.owner.clone();
     let fresh = entry.doc.as_deref() != Some(message.doc.as_str());
     if message.open || message.ready {
@@ -433,30 +329,23 @@ fn accept(
                 Accepted::Opened
             },
             owner,
-            adapter,
         ));
     }
-    (!fresh).then_some((Accepted::Current, owner, None))
+    (!fresh).then_some((Accepted::Current, owner))
 }
 
-pub fn receive(
-    app: &AppHandle,
-    label: &str,
-    main_frame: bool,
-    origin: Option<&FrameOrigin>,
-    body: &str,
-) -> Heard {
+pub fn receive(app: &AppHandle, label: &str, main_frame: bool, body: &str) {
     let Some(mount) = mount_of(label) else {
-        return Heard::Nothing;
+        return;
     };
-    if !main_frame || body.len() > MAX_WORLD_BYTES {
-        return Heard::Nothing;
+    if !main_frame || body.len() > MAX_MESSAGE_BYTES {
+        return;
     }
     let Ok(message) = serde_json::from_str::<PageMessage>(body) else {
-        return Heard::Nothing;
+        return;
     };
-    let Some((accepted, owner, adapter)) = accept(mount, origin, &message) else {
-        return Heard::Nothing;
+    let Some((accepted, owner)) = accept(mount, &message) else {
+        return;
     };
     let emit = |kind: &'static str, body: Option<String>| {
         let _ = app.emit_to(
@@ -472,12 +361,11 @@ pub fn receive(
     match accepted {
         Accepted::Opened => {
             emit("opened", None);
-            return Heard::Nothing;
+            return;
         }
-        Accepted::Ready if is_world(mount) => return Heard::Ready(adapter),
         Accepted::Ready => {
             emit("ready", Some(message.doc.clone()));
-            return Heard::Nothing;
+            return;
         }
         Accepted::Current => {}
     }
@@ -529,5 +417,4 @@ pub fn receive(
             None => emit("lost", None),
         }
     }
-    Heard::Nothing
 }

@@ -219,9 +219,7 @@ export interface AppPageLink {
 type Outgoing = { start: { lane: string; message: unknown } } | { frame: Entry };
 type Queued = Outgoing & { lap: number };
 
-export function createAppPageLink(mount: string, options: { world?: boolean } = {}): AppPageLink {
-  const inline = options.world ? Number.POSITIVE_INFINITY : INLINE_BYTES;
-  const postLimit = options.world ? Number.POSITIVE_INFINITY : MAX_POST_CHARS;
+export function createAppPageLink(mount: string): AppPageLink {
   const ports = new Map<string, MessagePort>();
   const readyListeners = new Set<() => void>();
   const leftListeners = new Set<() => void>();
@@ -305,7 +303,7 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
     for (const entry of coalesceAwareness(entries)) {
       const uploads: Upload[] = [];
       try {
-        encoded.push({ entry, wire: [entry[0], encode(entry[1], uploads, inline)], uploads });
+        encoded.push({ entry, wire: [entry[0], encode(entry[1], uploads, INLINE_BYTES)], uploads });
       } catch (error) {
         undeliverable(entry, error, true, at);
       }
@@ -344,7 +342,7 @@ export function createAppPageLink(mount: string, options: { world?: boolean } = 
     };
     for (const item of ready) {
       const length = JSON.stringify(item.wire).length;
-      if (size + length > postLimit) await flushChunk();
+      if (size + length > MAX_POST_CHARS) await flushChunk();
       chunk.push(item);
       size += length;
     }

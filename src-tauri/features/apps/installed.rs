@@ -134,15 +134,10 @@ pub async fn apps_install(
     if !valid_id(&app_id) || !valid_version(&version) {
         return Err("That isn't an app id and version.".into());
     }
-    let manifest = match super::site::site_entry(&app_id).filter(|site| site.version == version) {
-        Some(site) => site.manifest()?,
-        None => {
-            let source =
-                source.ok_or_else(|| "Misty's registry doesn't say where to get this app.".to_owned())?;
-            install_bundle(app_id.clone(), version.clone(), source.url, source.sha256, source.wrap)
-                .await?
-        }
-    };
+    let source =
+        source.ok_or_else(|| "Misty's registry doesn't say where to get this app.".to_owned())?;
+    let manifest =
+        install_bundle(app_id.clone(), version.clone(), source.url, source.sha256, source.wrap).await?;
     let asked: HashSet<Permission> = manifest.permissions.iter().copied().collect();
     if permissions.iter().any(|permission| !asked.contains(permission)) {
         return Err("That's more than the app asks for.".into());

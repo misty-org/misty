@@ -17,7 +17,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   appIcons,
   BackButton,
-  Button,
   CollectionFilterMenu,
   CollectionSortMenu,
   CollectionViewToggle,
@@ -42,8 +41,9 @@ import { ExploreProduct } from "./ExploreProducts";
 import { AppsPage } from "./ExploreApps";
 import { EnginesPage } from "./ExploreEngines";
 import { SpeechPage } from "./ExploreSpeech";
-import { UpdatesPage, useUpdateCount } from "./ExploreUpdates";
+import { MyAppsPage, useMyAppsCount } from "./ExploreUpdates";
 import { ListingList } from "./ListingList";
+import { ActionButton } from "./ListingRows";
 import { kindNames, useCategories, useListing, type ExploreSort } from "./explore_index";
 import {
   ExploreNavContext,
@@ -148,7 +148,7 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
   const [managing, setManaging] = useState<ExploreItem | null>(null);
   const scroller = useRef<HTMLElement>(null);
   const restore = useRef<number | null>(null);
-  const updates = useUpdateCount(spaceId);
+  const mine = useMyAppsCount(spaceId);
 
   const goTab = useCallback(
     (next: Page) => {
@@ -234,12 +234,12 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
       </NavList>
       <Separator />
       <NavList>
-        <NavRow current={!searching && page === "updates"} onClick={() => goTab("updates")}>
+        <NavRow current={!searching && page === "mine"} onClick={() => goTab("mine")}>
           <CircleArrowDown />
-          <OverflowFadeText>Updates</OverflowFadeText>
-          {updates ? (
+          <OverflowFadeText>My apps</OverflowFadeText>
+          {mine ? (
             <Text size="caption" tone="muted" className="ml-auto tabular-nums">
-              {updates}
+              {mine}
             </Text>
           ) : null}
         </NavRow>
@@ -248,9 +248,7 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
   );
 
   const barButton = bar ? (
-    <Button variant={bar.variant} disabled={bar.disabled} onClick={bar.run}>
-      {bar.label}
-    </Button>
+    <ActionButton action={{ ...bar, onClick: bar.run }} size="md" label={barTitle} />
   ) : null;
 
   const header = (
@@ -301,8 +299,8 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
     body = <AppsPage spaceId={spaceId} />;
   else if (view.page === "engines") body = <EnginesPage />;
   else if (view.page === "speech") body = <SpeechPage />;
-  else if (view.page === "updates")
-    body = <UpdatesPage spaceId={spaceId} />;
+  else if (view.page === "mine")
+    body = <MyAppsPage spaceId={spaceId} />;
   else body = <KindPage kind={view.page} sort={sort} category={category} facet={facet} />;
 
   const flush = view.at === "list" && layout === "list";

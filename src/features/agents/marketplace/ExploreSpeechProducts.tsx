@@ -59,9 +59,13 @@ function HearingProduct({ model }: { model: HearingModelView }) {
   const nav = useExploreNav();
   const { settings, stateOf } = useSpeech();
   const current = settings.hearingModel === model.id;
-  const { downloading } = stateOf(model);
-  const action = hearingAction(model, settings.hearingModel, downloading, () =>
-    nav.manage({ kind: "hearing", id: model.id }),
+  const { coming, downloading } = stateOf(model);
+  const action = hearingAction(
+    model,
+    settings.hearingModel,
+    downloading,
+    () => nav.manage({ kind: "hearing", id: model.id }),
+    coming,
   );
   useBarAction(action, model.name);
   return (
@@ -77,7 +81,7 @@ function HearingProduct({ model }: { model: HearingModelView }) {
       line={model.description}
       maker={model.maker}
       onMaker={() => void openExternalLink(model.source)}
-      action={<ActionButton action={action} size="md" />}
+      action={<ActionButton action={action} size="md" label={model.name} />}
       menu={
         <MenuItem
           icon={ExternalLink}

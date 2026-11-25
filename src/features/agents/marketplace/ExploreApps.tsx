@@ -29,15 +29,15 @@ import {
 } from "@misty/ui";
 import { exploreApps, type ExploreCatalogApp, type ExploreInstalledApps } from "./explore_apps";
 import { failureText, wordsMatch } from "./explore_index";
-import { progressLine } from "./ExploreSpeechParts";
 import { useBarAction, useExploreNav, type BarAction } from "./explore_view";
 import { ActionButton, SeeAll } from "./ListingRows";
 
 const megabytes = (bytes: number) => `${Math.max(1, Math.round(bytes / 1_000_000))} MB`;
 
-const downloadLine = (apps: ExploreInstalledApps, app: ExploreCatalogApp) => {
+const downloadProgress = (apps: ExploreInstalledApps, app: ExploreCatalogApp) => {
   const download = apps.downloadOf(app.id);
-  return download ? progressLine({ ...download, phase: "downloading" }) : undefined;
+  if (!download) return undefined;
+  return { value: download.total ? download.received / download.total : 0 };
 };
 
 function AppLogo({ app, size = "tile" }: { app: ExploreCatalogApp; size?: "tile" | "hero" }) {
@@ -118,6 +118,7 @@ function useAppAction(
   const here = apps.versionOf(app.id);
   const approved = apps.approvedOf(app.id);
   const label = here === undefined ? "added" : "updated";
+  const progress = downloadProgress(apps, app);
   const install = async () => {
     setBusy(true);
     try {
@@ -144,6 +145,11 @@ function useAppAction(
       onAllow={() => void install()}
     />
   );
+  if (progress)
+    return {
+      action: { label: here === undefined ? "Get" : "Update", variant: "get", progress, onClick: get },
+      dialog,
+    };
   if (here !== undefined && here !== app.version)
     return { action: { label: "Update", variant: "get", disabled: busy, onClick: get }, dialog };
   if (here !== undefined)
@@ -167,8 +173,8 @@ function AppItem({ apps, app }: { apps: ExploreInstalledApps; app: ExploreCatalo
       <ShelfItem
         logo={<AppLogo app={app} />}
         title={app.name}
-        line={downloadLine(apps, app) ?? app.description ?? `By ${app.maker}`}
-        action={<ActionButton action={action} />}
+        line={app.description ?? `By ${app.maker}`}
+        action={<ActionButton action={action} label={app.name} />}
         onOpen={() => nav.open({ kind: "apps", id: app.id })}
       />
       {dialog}
@@ -270,15 +276,14 @@ function AppProductPage({ apps, app }: { apps: ExploreInstalledApps; app: Explor
   const nav = useExploreNav();
   const { action, dialog } = useAppAction(apps, app, true);
   useBarAction(action, app.name);
-  const site = apps.isSite(app);
   const here = apps.versionOf(app.id);
   return (
     <ProductPage
       logo={<AppLogo app={app} size="hero" />}
       title={app.name}
-      line={downloadLine(apps, app) ?? app.description}
+      line={app.description}
       maker={app.maker}
-      action={<ActionButton action={action} size="md" />}
+      action={<ActionButton action={action} size="md" label={app.name} />}
       menu={
         here !== undefined ? (
           <MenuItem
@@ -291,13 +296,8 @@ function AppProductPage({ apps, app }: { apps: ExploreInstalledApps; app: Explor
       onHeroOut={nav.setPinned}
       facts={[
         { label: "Made by", value: app.maker },
-        { label: "Kind", value: site ? "Website" : "Web app" },
-        ...(site
-          ? [{ label: "Website", value: apps.siteHost(app) }]
-          : [
-              { label: "Version", value: app.version },
-              { label: "Size", value: megabytes(app.size) },
-            ]),
+        { label: "Version", value: app.version },
+        { label: "Size", value: megabytes(app.size) },
         ...(app.permissions.includes("files")
           ? [{ label: "Works with", value: "Files", detail: "In the Space you open it in" }]
           : []),
@@ -322,9 +322,9 @@ function AppProductPage({ apps, app }: { apps: ExploreInstalledApps; app: Explor
         <ProductInfo
           items={[
             { label: "Made by", value: app.maker },
-            ...(site ? [] : [{ label: "Source", value: app.upstream }]),
+            { label: "Source", value: app.upstream },
             ...(app.license ? [{ label: "License", value: app.license }] : []),
-            ...(site ? [] : [{ label: "Version", value: app.version }]),
+            { label: "Version", value: app.version },
           ]}
         />
       </ProductSection>

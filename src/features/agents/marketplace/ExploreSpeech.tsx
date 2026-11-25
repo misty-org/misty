@@ -20,7 +20,6 @@ import {
   hearingAction,
   languageName,
   languagesLine,
-  progressLine,
   SpeechFailed,
   useSpeech,
 } from "./ExploreSpeechParts";
@@ -41,12 +40,15 @@ function HearingItem({ model, current }: { model: HearingModelView; current: str
       }
       title={model.name}
       line={
-        coming
-          ? progressLine(coming)
-          : (failure ??
-            `${languagesLine(model)}, ${accuracyWords[model.accuracy].toLowerCase()} accuracy, ${gigabytes(model.disk_mb)}`)
+        failure ??
+        `${languagesLine(model)}, ${accuracyWords[model.accuracy].toLowerCase()} accuracy, ${gigabytes(model.disk_mb)}`
       }
-      action={<ActionButton action={hearingAction(model, current, downloading, manage)} />}
+      action={
+        <ActionButton
+          action={hearingAction(model, current, downloading, manage, coming)}
+          label={model.name}
+        />
+      }
       onOpen={() => open()}
     />
   );

@@ -167,51 +167,6 @@ async fn evaluate_in(
         .map_err(|_| "Page state was canceled.".to_owned())?
 }
 
-#[cfg(target_os = "macos")]
-pub(crate) fn post_in_content_world(
-    webview: &Webview,
-    world_name: &'static str,
-    function_body: String,
-    settled: Box<dyn FnOnce() + Send>,
-) -> Result<(), String> {
-    use block2::RcBlock;
-    use objc2::{runtime::AnyObject, MainThreadMarker};
-    use objc2_foundation::{NSError, NSString};
-    use objc2_web_kit::{WKContentWorld, WKWebView};
-    use std::sync::{Arc, Mutex};
-
-    let settled = Arc::new(Mutex::new(Some(settled)));
-    let settle = |slot: &Mutex<Option<Box<dyn FnOnce() + Send>>>| {
-        if let Some(done) = slot.lock().ok().and_then(|mut slot| slot.take()) {
-            done();
-        }
-    };
-    let inside = settled.clone();
-    let result = webview.with_webview(move |platform_webview| unsafe {
-        let Some(mtm) = MainThreadMarker::new() else {
-            settle(&*inside);
-            return;
-        };
-        let view: &WKWebView = &*platform_webview.inner().cast();
-        let world = WKContentWorld::worldWithName(&NSString::from_str(world_name), mtm);
-        let done = inside.clone();
-        let handler = RcBlock::new(move |_value: *mut AnyObject, _error: *mut NSError| {
-            settle(&*done);
-        });
-        view.callAsyncJavaScript_arguments_inFrame_inContentWorld_completionHandler(
-            &NSString::from_str(&function_body),
-            None,
-            None,
-            &world,
-            Some(&*handler),
-        );
-    });
-    if result.is_err() {
-        settle(&*settled);
-    }
-    result.map_err(|error| error.to_string())
-}
-
 #[cfg(windows)]
 pub(crate) async fn evaluate_in_content_world(
     webview: Webview,

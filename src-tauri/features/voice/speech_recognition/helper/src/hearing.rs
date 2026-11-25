@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 
@@ -9,16 +9,27 @@ use voice_speech::{reason, HearingEvent, VadSpec, SAMPLE_RATE};
 use crate::recognizer::Recognizer;
 
 pub(crate) const WINDOW: usize = 512;
+pub(crate) const LEAD: usize = SAMPLE_RATE as usize / 2;
+const KEPT: usize = SAMPLE_RATE as usize * 2;
+
+pub(crate) fn lead_in(from: i64, kept: &[f32], start: i64) -> &[f32] {
+    let first = (start - LEAD as i64).max(from);
+    let last = start.min(from + kept.len() as i64);
+    if last <= first {
+        return &[];
+    }
+    &kept[(first - from) as usize..(last - from) as usize]
+}
 
 pub(crate) fn detector(vad: &VadSpec) -> Option<VoiceActivityDetector> {
     let config = VadModelConfig {
         silero_vad: SileroVadModelConfig {
             model: Some(vad.model.to_string_lossy().into_owned()),
             threshold: 0.5,
-            min_silence_duration: 0.4,
-            min_speech_duration: 0.2,
+            min_silence_duration: 0.55,
+            min_speech_duration: 0.05,
             window_size: WINDOW as i32,
-            max_speech_duration: 20.0,
+            max_speech_duration: 60.0,
         },
         sample_rate: SAMPLE_RATE,
         num_threads: 1,
@@ -26,7 +37,7 @@ pub(crate) fn detector(vad: &VadSpec) -> Option<VoiceActivityDetector> {
         debug: false,
         ..VadModelConfig::default()
     };
-    VoiceActivityDetector::create(&config, 60.0)
+    VoiceActivityDetector::create(&config, 90.0)
 }
 
 struct Input {
@@ -34,6 +45,27 @@ struct Input {
     pending: Vec<f32>,
     speaking: bool,
     generation: u64,
+    fed: i64,
+    recent: VecDeque<f32>,
+    lead: Vec<f32>,
+    lead_from: i64,
+}
+
+impl Input {
+    fn accept(&mut self, window: &[f32]) {
+        self.detector.accept_waveform(window);
+        self.fed += window.len() as i64;
+        self.recent.extend(window.iter().copied());
+        let over = self.recent.len().saturating_sub(KEPT);
+        self.recent.drain(..over);
+    }
+
+    fn forget(&mut self) {
+        self.fed = 0;
+        self.recent.clear();
+        self.lead.clear();
+        self.lead_from = 0;
+    }
 }
 
 struct Job {
@@ -118,6 +150,10 @@ impl Hearing {
                         pending: Vec::new(),
                         speaking: false,
                         generation,
+                        fed: 0,
+                        recent: VecDeque::new(),
+                        lead: Vec::new(),
+                        lead_from: 0,
                     },
                 );
                 if let Ok(mut map) = self.generations.lock() {
@@ -131,7 +167,7 @@ impl Hearing {
             let whole = state.pending.len() / WINDOW * WINDOW;
             let ready: Vec<f32> = state.pending.drain(..whole).collect();
             for window in ready.chunks(WINDOW) {
-                state.detector.accept_waveform(window);
+                state.accept(window);
                 self.step(input, state, &mut told);
             }
         }
@@ -151,12 +187,13 @@ impl Hearing {
                 if !state.pending.is_empty() {
                     let mut last = std::mem::take(&mut state.pending);
                     last.resize(WINDOW, 0.0);
-                    state.detector.accept_waveform(&last);
+                    state.accept(&last);
                 }
                 state.detector.flush();
                 self.step(input, state, &mut told);
                 if state.speaking {
                     state.speaking = false;
+                    state.lead.clear();
                     told.push(HearingEvent::Stopped {
                         input: input.to_string(),
                     });
@@ -174,6 +211,7 @@ impl Hearing {
         };
         if let Some(state) = inputs.get_mut(input) {
             state.detector.reset();
+            state.forget();
             state.pending.clear();
             state.speaking = false;
             state.generation = self.generation();
@@ -215,17 +253,24 @@ impl Hearing {
         let detected = state.detector.detected();
         if detected && !state.speaking {
             state.speaking = true;
+            state.lead = state.recent.iter().copied().collect();
+            state.lead_from = state.fed - state.lead.len() as i64;
             told.push(HearingEvent::Started {
                 input: input.to_string(),
             });
         }
         let mut finished = false;
         while let Some(segment) = state.detector.front() {
+            let start = segment.start() as i64;
+            let lead = lead_in(state.lead_from, &state.lead, start);
+            let mut samples = Vec::with_capacity(lead.len() + segment.samples().len());
+            samples.extend_from_slice(lead);
+            samples.extend_from_slice(segment.samples());
             let job = Job {
                 input: input.to_string(),
                 generation: state.generation,
-                samples: segment.samples().to_vec(),
-                offset: segment.start() as f64 / SAMPLE_RATE as f64,
+                samples,
+                offset: (start - lead.len() as i64) as f64 / SAMPLE_RATE as f64,
             };
             drop(segment);
             state.detector.pop();
@@ -238,6 +283,7 @@ impl Hearing {
         }
         if finished && !detected && state.speaking {
             state.speaking = false;
+            state.lead.clear();
             told.push(HearingEvent::Stopped {
                 input: input.to_string(),
             });

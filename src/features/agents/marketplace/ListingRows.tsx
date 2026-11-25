@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { openExternalLink } from "@/shared/platform/open_external_link";
-import { Button, MenuItem, notify, Shelf, ShelfItem } from "@misty/ui";
+import { Button, MenuItem, notify, ProgressPill, Shelf, ShelfItem } from "@misty/ui";
 import { confirmAction } from "@/shared/lib/confirm_action";
 import type { EntryOf, ListingEntry, ListingKind, McpEntry, PluginEntry } from "@/native/registry";
 import {
@@ -191,20 +191,33 @@ export const askToRun = (engine: string, command: string) =>
     `Let ${engine} run this?`,
   );
 
+const actionLabels = ["Get", "Manage", "Update", "Open"];
+
 export function ActionButton({
   action,
   size = "sm",
+  label,
 }: {
   action: BarAction | null;
   size?: "sm" | "md";
+  label?: string;
 }) {
   if (!action) return null;
+  if (action.progress)
+    return (
+      <ProgressPill
+        value={action.progress.value}
+        label={label ? `Downloading ${label}` : "Downloading"}
+        size={size}
+        widthOf={actionLabels}
+      />
+    );
   return (
     <Button
       variant={action.variant}
       size={size}
       disabled={action.disabled}
-      widthOf={["Get", "Manage", "Update", "Open"]}
+      widthOf={actionLabels}
       onClick={(event) => {
         event.stopPropagation();
         action.onClick();

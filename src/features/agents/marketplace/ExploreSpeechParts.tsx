@@ -26,11 +26,10 @@ export const gigabytes = (megabytes: number) =>
   megabytes >= 1000 ? `${(megabytes / 1000).toFixed(1)} GB` : `${megabytes} MB`;
 export const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
-export function progressLine(progress: InstallProgress) {
-  if (progress.phase === "unpacking") return "Unpacking";
-  return progress.total
-    ? `Downloading ${Math.round((progress.received / progress.total) * 100)}%`
-    : "Downloading";
+export function pillProgress(progress: InstallProgress | undefined, downloading: boolean) {
+  if (!progress) return downloading ? { value: 0 } : undefined;
+  if (progress.phase === "unpacking") return { value: 1 };
+  return { value: progress.total ? progress.received / progress.total : 0 };
 }
 
 export function useSpeech() {
@@ -74,6 +73,7 @@ export function hearingAction(
   current: string,
   downloading: boolean,
   manage: () => void,
+  coming?: InstallProgress,
 ): BarAction {
   if (model.installed && model.id === current)
     return { label: "Manage", variant: "secondary", onClick: manage };
@@ -82,7 +82,7 @@ export function hearingAction(
   return {
     label: "Get",
     variant: "get",
-    disabled: downloading,
+    progress: pillProgress(coming, downloading),
     onClick: () => void useSpeechModels.getState().install(model.id),
   };
 }

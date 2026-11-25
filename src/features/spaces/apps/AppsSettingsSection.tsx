@@ -43,7 +43,7 @@ export function AppsSettingsSection() {
     <>
       <DesktopSettingsRow
         label="Sign out of all apps"
-        description="Every app and website app in your Spaces, on this computer."
+        description="Every app in your Spaces, on this computer."
       >
         <Button variant="secondary" onClick={() => setAsking(true)}>
           Sign out

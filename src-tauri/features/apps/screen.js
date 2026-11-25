@@ -171,7 +171,6 @@
     };
   }
 
-  Object.defineProperty(window, "__mistyScreenAttach", { value: attach, writable: false, configurable: false });
   window.addEventListener("message", function (event) {
     var data = event.data;
     if (event.source !== window.parent || !data || data.type !== "misty:screen" || !event.ports[0]) return;

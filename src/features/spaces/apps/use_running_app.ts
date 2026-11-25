@@ -116,11 +116,9 @@ export function useRunningApp(options: {
   version: string;
   approved: string[];
   source?: BundleSource;
-  site?: AppManifest;
   makeHandlers: (manifest: AppManifest) => HostHandlers;
 }): { app: RunningApp; retry: () => void; connected: boolean } {
   const { spaceId, appId, version, source } = options;
-  const siteKey = options.site ? JSON.stringify(options.site) : "";
   const approvedKey = JSON.stringify(options.approved);
   const handlersRef = useRef(options.makeHandlers);
   handlersRef.current = options.makeHandlers;
@@ -156,9 +154,10 @@ export function useRunningApp(options: {
     setConnected(false);
 
     (async () => {
-      let manifest = siteKey
-        ? (JSON.parse(siteKey) as AppManifest)
-        : await invoke<AppManifest | null>("space_app_bundle_manifest", { appId, version });
+      let manifest = await invoke<AppManifest | null>("space_app_bundle_manifest", {
+        appId,
+        version,
+      });
       if (!manifest) {
         if (!url || !sha256) throw new Error("This app isn't on this computer yet.");
         manifest = await invoke<AppManifest>("space_app_bundle_install", {
@@ -255,7 +254,7 @@ export function useRunningApp(options: {
       if (session) forgetAppAgents(session);
       if (session) void invoke("space_app_session_close", { session }).catch(() => {});
     };
-  }, [spaceId, appId, version, approvedKey, url, sha256, wrapKey, siteKey, attempt]);
+  }, [spaceId, appId, version, approvedKey, url, sha256, wrapKey, attempt]);
 
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
   return { app, retry, connected };

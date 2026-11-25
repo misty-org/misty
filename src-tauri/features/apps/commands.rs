@@ -183,12 +183,7 @@ pub async fn space_app_session_open(
     let label = webview.label().to_owned();
     let generation = permissions::window_generation(&label);
     tauri::async_runtime::spawn_blocking(move || {
-        let manifest = match super::site::site_entry(&app_id).filter(|site| site.version == version)
-        {
-            Some(site) if site.runs_here() => site.manifest()?,
-            Some(site) => return Err(format!("{} isn't made for this computer.", site.name)),
-            None => bundle::read_manifest(&app_id, &version)?,
-        };
+        let manifest = bundle::read_manifest(&app_id, &version)?;
         if !manifest.runs_here() {
             return Err(format!("{} isn't made for this computer.", manifest.name));
         }

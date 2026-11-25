@@ -11,15 +11,7 @@ export interface AppWrap {
   add_files?: { path: string; url: string; sha256: string; size: number }[];
 }
 
-export interface SiteMediaCheck {
-  drm: boolean;
-}
-
 export interface CatalogApp extends AppWrap {
-  kind?: "site";
-  address?: string;
-  origins?: string[];
-  media?: Partial<Record<"macos" | "windows" | "linux", SiteMediaCheck>>;
   id: string;
   name: string;
   description?: string;
@@ -72,35 +64,7 @@ export function appEntry(app: { app_id: string }): CatalogApp | undefined {
   return registryApps().find((entry) => entry.id === app.app_id);
 }
 
-export const isSiteApp = (entry: CatalogApp): boolean => entry.kind === "site";
-
 export function runsHere(entry: CatalogApp): boolean {
   const platforms = entry.manifest.platforms;
-  const listed = !Array.isArray(platforms) || !platforms.length || platforms.includes(desktopOs());
-  if (!isSiteApp(entry)) return listed;
-  const os = desktopOs() as "macos" | "windows" | "linux";
-  return listed && entry.media?.[os]?.drm === false;
-}
-
-export function siteManifest(entry: CatalogApp) {
-  return {
-    id: entry.id,
-    name: entry.name,
-    version: entry.version,
-    logo: entry.logo,
-    entry: "",
-    opens: [],
-    permissions: entry.permissions,
-    mcp: entry.manifest.mcp === "adapter" ? ("adapter" as const) : undefined,
-    webview: false,
-    platforms: entry.manifest.platforms as ("macos" | "windows" | "linux")[] | undefined,
-  };
-}
-
-export function siteHost(entry: CatalogApp): string {
-  try {
-    return new URL(entry.address ?? "").host;
-  } catch {
-    return "";
-  }
+  return !Array.isArray(platforms) || !platforms.length || platforms.includes(desktopOs());
 }

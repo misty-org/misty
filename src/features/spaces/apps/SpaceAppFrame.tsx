@@ -15,7 +15,6 @@ export function SpaceAppFrame({
   version,
   approved,
   source,
-  site,
   makeHandlers,
   active = true,
 }: {
@@ -25,7 +24,6 @@ export function SpaceAppFrame({
   version: string;
   approved: string[];
   source?: BundleSource;
-  site?: AppManifest;
   makeHandlers: (manifest: AppManifest) => HostHandlers;
   active?: boolean;
 }) {
@@ -35,7 +33,6 @@ export function SpaceAppFrame({
     version,
     approved,
     source,
-    site,
     makeHandlers,
   });
   const [channel, setChannel] = useState(true);
@@ -48,13 +45,12 @@ export function SpaceAppFrame({
   });
   const [silent, setSilent] = useState(false);
   const ready = app.status === "ready";
-  const waitsForApp = !site && channel;
   useEffect(() => {
     setSilent(false);
-    if (!ready || connected || !active || !waitsForApp) return;
+    if (!ready || connected || !active || !channel) return;
     const timer = window.setTimeout(() => setSilent(true), START_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [ready, connected, active, appId, waitsForApp]);
+  }, [ready, connected, active, appId, channel]);
 
   if (!active) return null;
   if (app.status === "failed")
@@ -80,7 +76,6 @@ export function SpaceAppFrame({
       appId={appId}
       version={version}
       appName={appName}
-      site={Boolean(site)}
       instance={app.instance}
       start={app.start}
       leave={app.leave}

@@ -37,6 +37,8 @@ export interface CallAgentView {
 }
 
 const FOLLOW_UP_MS = 8_000;
+const END_OF_TURN_MS = 500;
+const INTERRUPTION_MS = 500;
 
 const voiceOf = (profile: AgentProfile) => profile.voice || undefined;
 
@@ -56,6 +58,13 @@ interface Own {
   };
 }
 
+interface Speech {
+  speaking: boolean;
+  said: string[];
+  end?: ReturnType<typeof setTimeout>;
+  interrupt?: ReturnType<typeof setTimeout>;
+}
+
 interface Remote {
   name: string;
   owner: string;
@@ -73,6 +82,7 @@ export class CallAgents {
     string,
     { track: MediaStreamTrack; stop: Promise<(() => void) | undefined> }
   >();
+  private speech = new Map<string, Speech>();
   private lastSpoke?: { id: string; asker: string; until: number };
   private cipher: Promise<CryptoKey>;
   private listeners = new Set<() => void>();
@@ -179,8 +189,9 @@ export class CallAgents {
   private hearing(): Promise<HearingSession | undefined> {
     this.session ??= hear((event) => {
       if (this.disposed) return;
-      if (event.kind === "started") this.interrupted(event.input);
-      else if (event.kind === "heard" && event.text.trim()) this.said(event.text, event.input);
+      if (event.kind === "started") this.started(event.input);
+      else if (event.kind === "stopped") this.stopped(event.input);
+      else if (event.kind === "heard") this.heard(event.text, event.input);
       else if (event.kind === "failed" && !this.deafNotice) {
         this.deafNotice = true;
         notify({
@@ -244,7 +255,54 @@ export class CallAgents {
     this.taps.set(identity, { track, stop });
   }
 
+  private speechOf(identity: string) {
+    let speech = this.speech.get(identity);
+    if (!speech) {
+      speech = { speaking: false, said: [] };
+      this.speech.set(identity, speech);
+    }
+    return speech;
+  }
+
+  private started(identity: string) {
+    const speech = this.speechOf(identity);
+    speech.speaking = true;
+    clearTimeout(speech.end);
+    clearTimeout(speech.interrupt);
+    speech.interrupt = setTimeout(() => {
+      if (!this.disposed && speech.speaking) this.interrupted(identity);
+    }, INTERRUPTION_MS);
+  }
+
+  private stopped(identity: string) {
+    const speech = this.speechOf(identity);
+    speech.speaking = false;
+    clearTimeout(speech.interrupt);
+  }
+
+  private heard(text: string, identity: string) {
+    const speech = this.speechOf(identity);
+    if (text.trim()) speech.said.push(text.trim());
+    if (speech.speaking || !speech.said.length) return;
+    clearTimeout(speech.end);
+    speech.end = setTimeout(() => {
+      if (this.disposed || speech.speaking) return;
+      const said = speech.said.join(" ");
+      speech.said = [];
+      this.said(said, identity);
+    }, END_OF_TURN_MS);
+  }
+
+  private forgetSpeech(identity: string) {
+    const speech = this.speech.get(identity);
+    if (!speech) return;
+    clearTimeout(speech.end);
+    clearTimeout(speech.interrupt);
+    this.speech.delete(identity);
+  }
+
   private stopHearing(identity: string) {
+    this.forgetSpeech(identity);
     const current = this.taps.get(identity);
     this.taps.delete(identity);
     void current?.stop.then((stop) => stop?.());
@@ -253,6 +311,7 @@ export class CallAgents {
 
   private deafenAll() {
     for (const identity of [...this.taps.keys()]) this.stopHearing(identity);
+    for (const identity of [...this.speech.keys()]) this.forgetSpeech(identity);
     const session = this.session;
     this.session = undefined;
     void session?.then((open) => open?.stop()).catch(() => undefined);

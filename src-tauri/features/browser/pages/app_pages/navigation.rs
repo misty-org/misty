@@ -15,16 +15,6 @@ pub(super) fn stays_in_app(url: &Url, app_id: &str) -> bool {
     }
 }
 
-pub(super) fn stays_on_site(url: &Url, site: &SiteEntry) -> bool {
-    match url.scheme() {
-        "https" => site.allows(url),
-        "blob" => Url::parse(url.path()).is_ok_and(|inner| stays_on_site(&inner, site)),
-        "about" => url.as_str() == "about:blank" || url.as_str() == "about:srcdoc",
-        "data" => false,
-        _ => false,
-    }
-}
-
 pub(super) fn offered_outside(url: &Url) -> bool {
     match url.scheme() {
         "http" | "https" => url.host_str().is_some_and(|host| !host.is_empty()),

@@ -10,7 +10,7 @@ export const explorePages = [
   "mcps",
   "engines",
   "speech",
-  "updates",
+  "mine",
 ] as const;
 export type ExplorePage = (typeof explorePages)[number];
 
@@ -19,6 +19,7 @@ const aliases: Record<string, ExplorePage> = {
   personas: "templates",
   mcp: "mcps",
   connections: "mcps",
+  updates: "mine",
 };
 
 export function pageOf(tab: string | null): ExplorePage {
@@ -45,6 +46,7 @@ export interface BarAction {
   label: string;
   variant: "get" | "secondary";
   disabled?: boolean;
+  progress?: { value?: number };
   onClick: () => void;
 }
 
@@ -77,13 +79,17 @@ export function useBarAction(action: BarAction | null, title?: string) {
   const label = action?.label;
   const variant = action?.variant;
   const disabled = action?.disabled ?? false;
+  const downloading = Boolean(action?.progress);
+  const value = action?.progress?.value;
   useEffect(() => {
     setBarAction(
-      label && variant ? { label, variant, disabled } : null,
+      label && variant
+        ? { label, variant, disabled, progress: downloading ? { value } : undefined }
+        : null,
       () => handler.current?.(),
       title,
     );
-  }, [label, variant, disabled, title, setBarAction]);
+  }, [label, variant, disabled, downloading, value, title, setBarAction]);
   useEffect(() => () => setBarAction(null), [setBarAction]);
 }
 

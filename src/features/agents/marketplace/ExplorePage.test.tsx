@@ -122,8 +122,6 @@ beforeAll(() => {
       remove: async () => undefined,
       open: () => undefined,
       permissionLine: (permission: string) => permission,
-      isSite: (app) => app.kind === "site",
-      siteHost: () => "example.com",
     }),
   });
 });

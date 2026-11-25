@@ -3,7 +3,7 @@ use std::path::Path;
 use voice_speech::{reason, Phrase, VadSpec, SAMPLE_RATE};
 
 use crate::decode::decode_file;
-use crate::hearing::{detector, WINDOW};
+use crate::hearing::{detector, lead_in, WINDOW};
 use crate::recognizer::Recognizer;
 
 pub fn recognize_file(
@@ -24,8 +24,13 @@ pub fn recognize_samples(
     let mut phrases = Vec::new();
     let mut take = |detector: &sherpa_onnx::VoiceActivityDetector| {
         while let Some(segment) = detector.front() {
-            let offset = segment.start() as f64 / SAMPLE_RATE as f64;
-            let phrase = recognizer.recognize(segment.samples(), offset);
+            let start = segment.start() as i64;
+            let lead = lead_in(0, samples, start);
+            let mut heard = Vec::with_capacity(lead.len() + segment.samples().len());
+            heard.extend_from_slice(lead);
+            heard.extend_from_slice(segment.samples());
+            let offset = (start - lead.len() as i64) as f64 / SAMPLE_RATE as f64;
+            let phrase = recognizer.recognize(&heard, offset);
             drop(segment);
             detector.pop();
             if !phrase.text.is_empty() {

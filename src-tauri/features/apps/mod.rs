@@ -9,4 +9,3 @@ pub mod mcp;
 pub mod permissions;
 pub mod program;
 pub mod scheme;
-pub mod site;
