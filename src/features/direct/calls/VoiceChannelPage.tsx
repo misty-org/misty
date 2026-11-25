@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Video, VideoOff, Volume2 } from "lucide-react";
 import type { LocalVideoTrack } from "livekit-client";
 import {
-  Avatar,
-  AvatarFallback,
   Button,
   CallControl,
   CallLobby,
@@ -15,10 +13,8 @@ import {
 import { useWorkspaceViewTitle } from "@/features/app-windows";
 import { useUserStore } from "@/features/account";
 import { useSpaceConversations, useVoicePresence, watchVoicePresence } from "@/features/spaces";
-import { personTone } from "@/shared/lib/person_tone";
-import { personInitials } from "@/shared/lib/person_initials";
-import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { useDirectUserId } from "../direct_account";
+import { OwnCallFace } from "./OwnCallFace";
 import { useCallStore } from "./call_store";
 import { CallStageView } from "./CallView";
 import { joinVoiceChannel } from "./voice_channels";
@@ -74,7 +70,6 @@ function Lobby({
 }) {
   const userId = useDirectUserId();
   const username = useUserStore((state) => state.me?.username ?? "");
-  const outline = useUserStore((state) => avatarOutline(state.me?.avatar_decoration));
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -94,14 +89,10 @@ function Lobby({
     <CallLobby
       preview={
         <CallTile
-          name="You"
+          name={username}
           muted={!micOn}
           picture={cameraOn ? <CameraPreview deviceId={camera} /> : undefined}
-          face={
-            <Avatar size="lg" tone={personTone(userId ?? username)} outline={outline}>
-              <AvatarFallback>{personInitials(username || "You")}</AvatarFallback>
-            </Avatar>
-          }
+          face={<OwnCallFace id={userId ?? ""} />}
         />
       }
       controls={

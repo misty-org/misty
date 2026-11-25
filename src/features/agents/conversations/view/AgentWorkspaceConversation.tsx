@@ -386,7 +386,7 @@ export function AgentWorkspaceConversation({
         messages={conversation?.messages}
         scrollRef={scrollRef}
       />
-      <div className="agent-compose-area w-full shrink-0 px-4 pb-4">
+      <div className="agent-compose-area w-full shrink-0 px-4 pb-1">
         <AgentComposeError
           error={state.error}
           reconnect={state.working && Boolean(state.invocationId)}

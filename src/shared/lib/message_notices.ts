@@ -1,3 +1,4 @@
+import { notify } from "@misty/ui";
 import { createDeviceSetting } from "@/shared/lib/device_setting";
 
 export interface MessageNoticePrefs {
@@ -34,6 +35,15 @@ export function setMuted(spaceId: string, muted: boolean): void {
   }));
 }
 
+export function muteWithNotice(muteId: string, message: string): void {
+  setMuted(muteId, true);
+  notify({
+    id: `mute-${muteId}`,
+    message,
+    action: { label: "Undo", onSelect: () => setMuted(muteId, false) },
+  });
+}
+
 export function chatMuteId(spaceId: string, conversationId = ""): string {
   return `${spaceId}/${conversationId || "everyone"}`;
 }
@@ -47,9 +57,13 @@ export function noticesMuted(
   return conversationId !== undefined && prefs.muted.includes(chatMuteId(spaceId, conversationId));
 }
 
-export function useMuted(spaceId: string, muteId: string) {
+export function useMuted(spaceId: string, muteId: string, notice: string) {
   const space = useMessageNotices((state) => state.value.muted.includes(spaceId));
   const own = useMessageNotices((state) => state.value.muted.includes(muteId));
   const bySpace = space && muteId !== spaceId;
-  return { muted: space || own, bySpace, toggle: () => setMuted(muteId, !own) };
+  return {
+    muted: space || own,
+    bySpace,
+    toggle: () => (own ? setMuted(muteId, false) : muteWithNotice(muteId, notice)),
+  };
 }

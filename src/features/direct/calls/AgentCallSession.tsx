@@ -45,7 +45,7 @@ export function AgentCallSession({ call }: { call: LocalAgentCall }) {
 
   const self: CallPerson = {
     id: selfId,
-    name: "You",
+    name: me?.username ?? "",
     self: true,
     speaking: view.hearing,
     micOn: view.micOn,
@@ -136,7 +136,7 @@ export function AgentCallSession({ call }: { call: LocalAgentCall }) {
       },
       controls,
       agent,
-      nameOf: (userId) => (userId === selfId ? (me?.username ?? "You") : name),
+      nameOf: (userId) => (userId === selfId ? (me?.username ?? "") : name),
       faceOf: (userId) => (me && me.id === userId ? me : undefined),
     });
   });

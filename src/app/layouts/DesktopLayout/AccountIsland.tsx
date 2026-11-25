@@ -126,10 +126,11 @@ export function AccountIsland(props: {
       <BannerDialog file={bannerFile} onClose={() => setBannerFile(null)} />
       {picture.dialog}
       <CustomStatusDialog open={statusOpen} onOpenChange={setStatusOpen} />
-      <div className="ml-auto flex flex-none items-center gap-1.5">
+      <div className="ml-auto flex flex-none items-center gap-2">
         {expired ? null : <CallAudioControls onVoiceSettings={() => openSettings("voice")} />}
         <IconButton
           label="Settings"
+          variant="secondary"
           aria-pressed={props.settingsOpen}
           onPointerEnter={() => void preloadSettingsWorkspace().catch(() => undefined)}
           onFocus={() => void preloadSettingsWorkspace().catch(() => undefined)}

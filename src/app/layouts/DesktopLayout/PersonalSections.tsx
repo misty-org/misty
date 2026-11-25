@@ -44,7 +44,7 @@ function RowCount({ count, label }: { count: number; label: string }) {
 }
 
 function DmRowMenu({ dmId, children }: { dmId: string; children: ReactNode }) {
-  const mute = useMuted(dmId, dmId);
+  const mute = useMuted(dmId, dmId, "Notifications off for this conversation");
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>

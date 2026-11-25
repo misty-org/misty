@@ -200,7 +200,7 @@ export function SpaceChatComposer(props: {
     </SuggestionList>
   ) : null;
   return (
-    <section aria-label="Message composer" className="shrink-0 px-4 pb-4">
+    <section aria-label="Message composer" className="shrink-0 px-4 pb-1">
       <TypingLine label={props.typing.label || undefined} />
       <form
         ref={form}

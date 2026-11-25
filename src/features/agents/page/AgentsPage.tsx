@@ -212,7 +212,7 @@ function AgentsPageSkeleton({ chat }: { chat: boolean }) {
               </div>
             )}
           </div>
-          <div className="w-full px-4 pb-4">{composer}</div>
+          <div className="w-full px-4 pb-1">{composer}</div>
         </FramedPage>
       </div>
       <Separator orientation="vertical" />

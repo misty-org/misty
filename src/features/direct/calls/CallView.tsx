@@ -43,6 +43,7 @@ import { useMemberPicture, useSpaceCan } from "@/features/spaces";
 import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { personTone } from "@/shared/lib/person_tone";
 import { personInitials } from "@/shared/lib/person_initials";
+import { OwnCallFace, useOwnCallName } from "./OwnCallFace";
 import { useCallSession } from "./call_session_store";
 import type { CallAgentView } from "./call_agents";
 import type { CallPerson, CallVideo } from "./use_live_kit_call";
@@ -74,11 +75,7 @@ function Face({ person, name }: { person: CallPerson; name: string }) {
   const face = useCallSession((state) => state.faceOf(person.id));
   const picture = useMemberPicture(person.id, face?.avatar_version ?? 0);
   return (
-    <Avatar
-      size="lg"
-      tone={personTone(person.id)}
-      outline={avatarOutline(face?.avatar_decoration)}
-    >
+    <Avatar size="xl" tone={personTone(person.id)} outline={avatarOutline(face?.avatar_decoration)}>
       {picture ? <AvatarImage src={picture} alt="" /> : null}
       <AvatarFallback>{personInitials(name)}</AvatarFallback>
     </Avatar>
@@ -109,7 +106,7 @@ function AgentTile({
         agent.profile ? (
           <AgentAvatar agent={agent.profile} large />
         ) : (
-          <Avatar size="lg" tone={personTone(agent.key)}>
+          <Avatar size="xl" tone={personTone(agent.key)}>
             <AvatarFallback>{personInitials(agent.name)}</AvatarFallback>
           </Avatar>
         )
@@ -136,6 +133,7 @@ export function CallStageView() {
   const fullscreen = useCallSession((state) => state.fullscreen);
   const devicesOpen = useCallSession((state) => state.devicesOpen);
   const screenZoom = useCallSession((state) => state.screenZoom);
+  const ownName = useOwnCallName();
   const live = Boolean(where?.live);
   const withPeople = where?.kind !== "agent";
   const canShow = where?.canShow ?? true;
@@ -148,7 +146,8 @@ export function CallStageView() {
   if (!controls) return null;
   const people = ordered;
   const { pin, setFullscreen, setDevicesOpen, setScreenZoom } = useCallSession.getState();
-  const label = (person: CallPerson) => (person.self ? "You" : nameOf(person.id));
+  const label = (person: CallPerson) =>
+    person.self ? ownName || nameOf(person.id) : nameOf(person.id);
   const voiceSettings = () => {
     setFullscreen(false);
     openSettings("voice");
@@ -167,7 +166,9 @@ export function CallStageView() {
       reaction={person.reaction}
       picture={person.camera ? <TrackVideo track={person.camera} self={person.self} /> : undefined}
       mirror={person.self}
-      face={<Face person={person} name={label(person)} />}
+      face={
+        person.self ? <OwnCallFace id={person.id} /> : <Face person={person} name={label(person)} />
+      }
       actions={
         people.length > 1 ? (
           <CallPersonMenu
@@ -268,7 +269,7 @@ export function CallStageView() {
             key: line.key,
             name:
               line.person === people.find((person) => person.self)?.id
-                ? "You"
+                ? ownName || nameOf(line.person)
                 : nameOf(line.person),
             text: line.text,
           }))}

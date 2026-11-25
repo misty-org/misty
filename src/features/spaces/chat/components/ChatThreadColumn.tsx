@@ -258,7 +258,7 @@ export function ChatThreadColumn({
         ) : null}
       </div>
       {canWrite && root ? (
-        <section aria-label="Reply composer" className="shrink-0 px-4 pb-4">
+        <section aria-label="Reply composer" className="shrink-0 px-4 pb-1">
           <TypingLine label={typingLabel || undefined} />
           <form ref={form} onSubmit={submit}>
             <MessageComposer
