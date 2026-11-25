@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { Bell, BellOff, MessagesSquare, Pin, Users, type LucideIcon } from "lucide-react";
-import { IconButton, IndicatorDot, SearchField, type ActionBarItem } from "@misty/ui";
+import { IconButton, IndicatorDot, SearchField, notify, type ActionBarItem } from "@misty/ui";
 import { chatCallItems, chatMoreItem, type ChatBarCalls } from "@/shared/hooks/ChatBarItems";
-import { useMuted } from "@/shared/lib/message_notices";
+import { setMuted, useMuted } from "@/shared/lib/message_notices";
 import { useChatSidePanel } from "../chat_side_panel_store";
 import { useThreadsUnread } from "../hooks/use_threads_unread";
 import { useChatSidebarPreferences } from "../sidebar/chat_sidebar_preferences";
@@ -86,7 +86,16 @@ export function useChatBar(props: {
       priority: 2,
       pressed: mute.muted,
       disabled: mute.bySpace,
-      onSelect: mute.toggle,
+      onSelect: () => {
+        if (!mute.muted) {
+          notify({
+            id: `mute-${muteId}`,
+            message: "Notifications off for this chat",
+            action: { label: "Undo", onSelect: () => setMuted(muteId, false) },
+          });
+        }
+        mute.toggle();
+      },
     },
     {
       id: "pinned",
