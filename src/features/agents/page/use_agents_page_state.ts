@@ -169,7 +169,9 @@ export function useAgentsPageState() {
   );
   useViewTitle(
     viewConversation.viewId,
-    workspacePage === "task" ? chatTitle?.trim() || "New chat" : workspacePageTitles[workspacePage],
+    workspacePage === "task"
+      ? profile?.name?.trim() || chatTitle?.trim() || "New chat"
+      : workspacePageTitles[workspacePage],
   );
   const activity = useAgentActivity(accountId, profile?.id);
   return {

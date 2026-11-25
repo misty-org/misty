@@ -1,4 +1,5 @@
 import { openSettings, type SettingsSection } from "@/features/settings";
+import { openExploreEvent, requestOpenExplore } from "@/shared/lib/open_explore";
 
 export type AgentsHubPage =
   | "agents"
@@ -10,7 +11,6 @@ export type AgentsHubPage =
   | "plugins"
   | "mcp"
   | "skills"
-  | "prompts"
   | "apps"
   | "connections";
 
@@ -23,19 +23,18 @@ export const agentsHubSections: Partial<Record<AgentsHubPage, SettingsSection>> 
 };
 
 export const agentsHubTabs: Partial<Record<AgentsHubPage, string>> = {
-  personas: "agents",
+  personas: "templates",
   plugins: "plugins",
-  mcp: "mcp",
+  mcp: "mcps",
   skills: "skills",
-  prompts: "prompts",
   apps: "apps",
-  connections: "connections",
+  connections: "mcps",
 };
 
-export const openAgentsPageEvent = "misty:open-agents-page";
+export const openAgentsPageEvent = openExploreEvent;
 
 export function openAgentsPage(tab = "agents") {
-  window.dispatchEvent(new CustomEvent<{ tab: string }>(openAgentsPageEvent, { detail: { tab } }));
+  requestOpenExplore(tab);
 }
 
 export function openAgentsHub(page: AgentsHubPage = "agents") {

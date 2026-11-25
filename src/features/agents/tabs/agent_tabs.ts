@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { browserHomeUrl } from "@/features/app-windows";
 import { setBrowserRuntimeKeepLive } from "@/features/app-windows";
+import { prewarmTurn, shownPageBox, whenPageHostShown } from "@/features/browser";
 import {
   addBrowserTab,
   browserTabActed,
@@ -121,37 +122,50 @@ export function sleepAgentTab(scopeId: string, force = false): Promise<void> {
   });
 }
 
-export function wakeAgentTab(scopeId: string): Promise<boolean> {
-  return serial(scopeId, async () => {
-    const tab = tabs.get(scopeId);
-    if (!tab) return false;
-    if (tab.viewId) return true;
-    await makeRoom(scopeId);
-    const id = `agent-${crypto.randomUUID()}`;
-    const finished = viewOfTab(scopeId)?.view.status === "done";
-    try {
-      await invoke("browser_webview_create", {
-        request: {
-          id,
-          scopeId,
-          url: tab.url || browserHomeUrl(),
-          originSpaceId: "",
-          agentRunId: finished ? undefined : tab.runId,
-          ...agentPageBounds(),
-        },
-      });
-      if (!finished) await invoke("agent_workspace_bind_scope", { taskId: tab.taskId, scopeId });
-      await invoke("browser_webview_hide", { request: { id, keepLive: true } });
-    } catch {
-      await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
-      return false;
+export async function wakeAgentTab(scopeId: string, host?: HTMLElement | null): Promise<boolean> {
+  const turn = host && !shownPageBox(host) && !tabs.get(scopeId)?.viewId ? prewarmTurn() : null;
+  try {
+    if (turn && host) {
+      const shown = whenPageHostShown(host);
+      await Promise.race([turn.ready, shown.shown]);
+      shown.stop();
     }
-    tab.viewId = id;
-    tab.lastUsed = Date.now();
-    setBrowserRuntimeKeepLive(id, true);
-    updateBrowserTab(scopeId, { viewId: id });
-    return true;
-  });
+    return await serial(scopeId, () => openAgentTab(scopeId, host));
+  } finally {
+    turn?.release();
+  }
+}
+
+async function openAgentTab(scopeId: string, host?: HTMLElement | null): Promise<boolean> {
+  const tab = tabs.get(scopeId);
+  if (!tab) return false;
+  if (tab.viewId) return true;
+  await makeRoom(scopeId);
+  const id = `agent-${crypto.randomUUID()}`;
+  const finished = viewOfTab(scopeId)?.view.status === "done";
+  const shown = shownPageBox(host);
+  try {
+    await invoke("browser_webview_create", {
+      request: {
+        id,
+        scopeId,
+        url: tab.url || browserHomeUrl(),
+        originSpaceId: "",
+        agentRunId: finished ? undefined : tab.runId,
+        ...(shown ?? agentPageBounds()),
+      },
+    });
+    if (!finished) await invoke("agent_workspace_bind_scope", { taskId: tab.taskId, scopeId });
+    if (!shown) await invoke("browser_webview_hide", { request: { id, keepLive: true } });
+  } catch {
+    await invoke("browser_webview_close", { request: { id } }).catch(() => undefined);
+    return false;
+  }
+  tab.viewId = id;
+  tab.lastUsed = Date.now();
+  setBrowserRuntimeKeepLive(id, true);
+  updateBrowserTab(scopeId, { viewId: id });
+  return true;
 }
 
 async function makeRoom(waking: string) {

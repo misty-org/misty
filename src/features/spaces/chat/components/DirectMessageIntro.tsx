@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { spacesApi } from "../../api/api";
+import { useSpacesStore } from "../../list/use_spaces_store";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { ChannelWelcome } from "@misty/ui";
 import { ChatAvatar } from "./ChatAvatar";
 
@@ -17,14 +19,22 @@ export function DirectMessageIntro({
   recipient: DirectRecipient;
 }) {
   const avatarUrl = useMemberAvatarUrl(spaceId, recipient.userId);
+  const outline = useSpacesStore((state) =>
+    avatarOutline(
+      state.membersBySpace[spaceId]?.find((member) => member.user_id === recipient.userId)
+        ?.avatar_decoration,
+    ),
+  );
   return (
     <ChannelWelcome
+      align="center"
       mark={
         <ChatAvatar
           id={recipient.userId}
           name={recipient.name}
           src={avatarUrl || undefined}
           size="xl"
+          outline={outline}
         />
       }
       title={recipient.name}

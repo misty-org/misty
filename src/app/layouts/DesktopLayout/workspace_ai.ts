@@ -10,6 +10,7 @@ const surfaceLabels: Record<WorkspaceSurfaceId, string> = {
   space: "Space",
   agents: "Agents",
   direct: "Direct messages",
+  browser: "Browser",
 };
 
 export function workspaceAiAdapter(tab: WorkspaceView | undefined): AiSurfaceAdapter | null {

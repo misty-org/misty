@@ -1,7 +1,7 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
 import { Plus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { IconButton, Input, Pressable, SidePanelHeader } from "@misty/ui";
+import { IconButton, Input, OverflowFadeText, Pressable, SidePanelHeader } from "@misty/ui";
 import { terminalTabTitle, useTerminalStore, type TerminalTab } from "./terminal_store";
 import { TerminalView } from "./TerminalView";
 import "./terminal.css";
@@ -14,7 +14,7 @@ function TabTitle(props: { tab: TerminalTab; index: number; onRename(title: stri
   const [draft, setDraft] = useState(title);
   if (!editing)
     return (
-      <span
+      <OverflowFadeText
         className="terminal-tab-title"
         onDoubleClick={() => {
           setDraft(title);
@@ -22,7 +22,7 @@ function TabTitle(props: { tab: TerminalTab; index: number; onRename(title: stri
         }}
       >
         {title}
-      </span>
+      </OverflowFadeText>
     );
   const finish = (save: boolean) => {
     if (save) props.onRename(draft);

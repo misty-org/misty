@@ -31,7 +31,7 @@ mod overlay {
         let Some(extra) = local.get("apps").and_then(Value::as_array) else {
             return apps;
         };
-        let Some(list) = apps.get_mut("apps").and_then(Value::as_array_mut) else {
+        let Some(list) = apps.as_array_mut() else {
             return apps;
         };
         for entry in extra {

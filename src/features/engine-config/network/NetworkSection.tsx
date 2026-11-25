@@ -3,11 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCachedResource } from "@/api/cache/cached_resource";
-import {
-  DesktopSettingsNotice,
-  DesktopSettingsRow,
-  DesktopSettingsSection as Section,
-} from "@/features/settings";
+import { DesktopSettingsNotice, DesktopSettingsRow } from "@/features/settings";
 import { Button, ErrorState, Input, Skeleton, Switch } from "@misty/ui";
 import { proxyApi, type ProxySettings } from "./api";
 
@@ -112,61 +108,55 @@ export function NetworkSection() {
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
       {notice ? <DesktopSettingsNotice>{notice}</DesktopSettingsNotice> : null}
-      <Section title="Proxy">
-        {loadError ? (
-          <ErrorState
-            inline
-            title="Couldn't read the proxy"
-            line={loadError}
-            action={{ label: "Try again", onClick: () => void proxy.reload() }}
-          />
-        ) : (
-          <>
+      {loadError ? (
+        <ErrorState
+          inline
+          title="Couldn't read the proxy"
+          line={loadError}
+          action={{ label: "Try again", onClick: () => void proxy.reload() }}
+        />
+      ) : (
+        <>
+          <DesktopSettingsRow
+            label="Use a proxy"
+            description="For the engines Misty starts and its downloads of skills, versions and prices."
+          >
+            {settings ? (
+              <Switch
+                aria-label="Use a proxy"
+                checked={enabledDraft}
+                disabled={saving}
+                onCheckedChange={onToggle}
+              />
+            ) : (
+              <Skeleton className="h-5 w-9 rounded-full" />
+            )}
+          </DesktopSettingsRow>
+          {enabledDraft ? (
             <DesktopSettingsRow
-              label="Use a proxy"
-              description="For the engines Misty starts and its downloads of skills, versions and prices."
+              label="Proxy address"
+              description="http, https or socks5. SOCKS reaches the engines only."
             >
-              {settings ? (
-                <Switch
-                  aria-label="Use a proxy"
-                  checked={enabledDraft}
-                  disabled={saving}
-                  onCheckedChange={onToggle}
+              <div className="flex items-center gap-2">
+                <Input
+                  aria-label="Proxy address"
+                  className="w-64"
+                  value={urlDraft}
+                  placeholder={DEFAULT_PROXY_URL}
+                  disabled={!settings}
+                  onChange={(event) => {
+                    setUrlDraft(event.target.value);
+                    setError(null);
+                  }}
                 />
-              ) : (
-                <Skeleton className="h-5 w-9 rounded-full" />
-              )}
+                <Button variant="primary" disabled={!settings || saving || !dirty} onClick={onSave}>
+                  Save
+                </Button>
+              </div>
             </DesktopSettingsRow>
-            {enabledDraft ? (
-              <DesktopSettingsRow
-                label="Proxy address"
-                description="http, https or socks5. SOCKS reaches the engines only."
-              >
-                <div className="flex items-center gap-2">
-                  <Input
-                    aria-label="Proxy address"
-                    className="w-64"
-                    value={urlDraft}
-                    placeholder={DEFAULT_PROXY_URL}
-                    disabled={!settings}
-                    onChange={(event) => {
-                      setUrlDraft(event.target.value);
-                      setError(null);
-                    }}
-                  />
-                  <Button
-                    variant="primary"
-                    disabled={!settings || saving || !dirty}
-                    onClick={onSave}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </DesktopSettingsRow>
-            ) : null}
-          </>
-        )}
-      </Section>
+          ) : null}
+        </>
+      )}
     </>
   );
 }

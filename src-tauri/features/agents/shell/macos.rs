@@ -15,7 +15,36 @@ use super::{
     ShellRequest,
 };
 
-const BASE_PROFILE: &str = include_str!("../../../tauri-permissions/permissions/agent-shell.sb");
+const BASE_PROFILE: &str = r#"
+(version 1)
+(deny default)
+(allow process-fork)
+(allow process-exec (literal (param "TOOL")))
+(allow signal (target same-sandbox))
+(allow sysctl-read)
+(allow file-read-metadata)
+(allow file-read*
+  (literal (param "TOOL")) (subpath (param "TOOLS"))
+  (subpath "/System/Library") (subpath "/usr/lib")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
+  (subpath "/private/var/db/timezone") (literal "/private/etc/localtime")
+  (literal "/") (literal "/etc") (literal "/var") (literal "/tmp") (literal "/private")
+  (literal "/private/var") (literal "/dev") (literal "/dev/null") (literal "/dev/zero")
+  (literal "/dev/urandom") (literal "/dev/random") (literal "/dev/tty") (subpath "/dev/fd"))
+(allow file-write-data (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (subpath "/dev/fd"))
+(allow file-ioctl (literal "/dev/null") (literal "/dev/tty"))
+(allow mach-lookup
+  (global-name "com.apple.system.opendirectoryd.libinfo")
+  (global-name "com.apple.system.logger")
+  (global-name "com.apple.logd")
+  (global-name "com.apple.diagnosticd")
+  (global-name "com.apple.system.notification_center"))
+(allow ipc-posix-shm-read-data (ipc-posix-name "apple.shm.notification_center"))
+(allow ipc-posix-shm-read-metadata)
+(allow file-read* file-write* (subpath (param "WORKSPACE")))
+(deny network*)
+"#;
 
 const SECRET_FILES: &str = r#"
 (deny file-read* file-write*

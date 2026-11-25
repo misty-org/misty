@@ -18,7 +18,7 @@ pub(crate) fn admit_path(path: &Path, access: Access) -> Result<PathBuf, String>
         .components()
         .any(|part| part.as_os_str() == ".misty-agent-trash")
     {
-        return Err("Agent trash is the person's to look over. Nothing was done.".into());
+        return Err("Misty's old agent trash is the person's to look over. Nothing was done.".into());
     }
     file_access::disk::check_agent(path, access).map_err(|error| super::failed(path, error))?;
     Ok(path.to_path_buf())

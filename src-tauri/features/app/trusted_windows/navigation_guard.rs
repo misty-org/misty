@@ -2,7 +2,9 @@ use tauri::{plugin::TauriPlugin, Manager, Runtime};
 use url::Url;
 
 pub(crate) fn hosts_websites(label: &str) -> bool {
-    label.starts_with("misty-browser-") || label == "render-control"
+    label.starts_with("misty-browser-")
+        || label == "render-control"
+        || crate::apps::frames::is_app_page(label)
 }
 
 pub fn allows(label: &str, url: &Url, dev_origin: Option<&str>) -> bool {
@@ -160,6 +162,7 @@ mod tests {
             "misty-browser-storage-1",
             "misty-browser-capture-1",
             "render-control",
+            "misty-app-youtube-music-0d3c9a1b2e4f5a6b7c8d9e0f",
         ] {
             assert!(allows(label, &url("https://example.com/"), None));
         }

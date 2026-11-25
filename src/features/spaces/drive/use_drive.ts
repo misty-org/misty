@@ -4,13 +4,11 @@ import {
   driveNative,
   driveParent,
   drivePath,
-  onDriveChanged,
   onDriveStatus,
   subscribeDriveChanged,
   type DriveChanged,
   type DriveEntry,
   type DriveSpaceStatus,
-  type DriveTrashEntry,
 } from "./drive_native";
 
 const PAGE = 200;
@@ -189,64 +187,3 @@ export function useDriveList(spaceId: string | undefined, path: string) {
   return { ...state, retry };
 }
 
-export type DriveTrashState =
-  | { status: "loading" }
-  | { status: "failed"; message: string }
-  | { status: "ready"; entries: DriveTrashEntry[] };
-
-export function useDriveTrash(spaceId: string | undefined) {
-  const [state, setState] = useState<DriveTrashState>({ status: "loading" });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    if (!spaceId) return void setState({ status: "ready", entries: [] });
-    let live = true;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    setState({ status: "loading" });
-    const read = () =>
-      driveNative.trashList(spaceId).then(
-        (entries) => live && setState({ status: "ready", entries }),
-        (cause) =>
-          live &&
-          setState((current) =>
-            current.status === "ready" ? current : { status: "failed", message: messageOf(cause) },
-          ),
-      );
-    const stop = onDriveChanged((changed) => {
-      if (!live || changed.space_id !== spaceId) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void read(), 300);
-    });
-    void read();
-    return () => {
-      live = false;
-      if (timer) clearTimeout(timer);
-      stop();
-    };
-  }, [spaceId, attempt]);
-
-  const retry = useCallback(() => setAttempt((count) => count + 1), []);
-  const drop = (itemId: string) =>
-    setState((current) =>
-      current.status === "ready"
-        ? { ...current, entries: current.entries.filter((entry) => entry.id !== itemId) }
-        : current,
-    );
-  const restore = useCallback(
-    async (itemId: string) => {
-      if (!spaceId) return;
-      await driveNative.restore(spaceId, itemId);
-      drop(itemId);
-    },
-    [spaceId],
-  );
-  const purge = useCallback(
-    async (itemId: string) => {
-      if (!spaceId) return;
-      await driveNative.purge(spaceId, itemId);
-      drop(itemId);
-    },
-    [spaceId],
-  );
-  return { ...state, retry, restore, purge };
-}

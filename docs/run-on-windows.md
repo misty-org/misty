@@ -106,8 +106,9 @@ LiveKit, so it can't carry calls. Use a server set up as in misty-docs'
 [Set up a server](https://github.com/misty-org/misty-docs/blob/main/content/self-hosting/set-up-a-server.md), on a
 computer that stays on: a VPS, or your Mac.
 
-1. Follow that guide, with `MISTY_ENVIRONMENT=production` and `MISTY_CALLS=1` in
-   `~/.misty/.env/server/misty.env`.
+1. Follow that guide, with `MISTY_ENVIRONMENT=production` and `MISTY_CALLS=1` in `misty.env`, in the server's
+   own root: `~/.misty/rel/<version>/.env/server/`, with `MISTY_ENV_DIR` naming that folder. On your Mac, keep it
+   apart from `~/.misty/dev/default/.env/server/`, which is the dev stack's.
 2. Start it with calls: `docker compose --profile calls up -d`.
 3. Open these to the internet on that computer (on a home network, forward them on the router to it): UDP `3478`,
    UDP `50000-50100` and TCP `7881`. Sound and video go straight there, not through Cloudflare.

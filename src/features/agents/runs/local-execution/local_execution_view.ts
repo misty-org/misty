@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { browserHomeUrl } from "@/features/app-windows";
+import { agentPageBounds } from "../../tabs/agent_tab_records";
 import { browserTabAgentFileCapabilities } from "../../tabs/browser_tab_capabilities";
 import type { Execution } from "./local_execution_state";
 import { agentsDeviceSnapshot } from "../../personal/use_agents_store";
@@ -24,10 +25,7 @@ export async function createWorkspaceView(
       scopeId,
       url: execution.desktopControl ? "about:blank" : browserHomeUrl(),
       originSpaceId: execution.spaceId,
-      x: 0,
-      y: 64,
-      width: Math.max(200, window.innerWidth - 440),
-      height: Math.max(300, window.innerHeight - 128),
+      ...agentPageBounds(),
     },
   });
   try {

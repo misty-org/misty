@@ -1,3 +1,4 @@
+import type { AvatarDecoration } from "@/shared/lib/avatar_decoration";
 import type { ChannelOverwrite, SpacePermission } from "./role_types";
 interface SpaceParticipant {
   kind: "person" | "agent";
@@ -16,6 +17,7 @@ export interface SpaceMessageSender {
   agent_id?: string;
   display_name: string;
   avatar_version?: number;
+  avatar_decoration?: AvatarDecoration;
 }
 
 export interface SpaceConversation {
@@ -29,6 +31,17 @@ export interface SpaceConversation {
   unread_count?: number;
   overwrites?: ChannelOverwrite[];
   permissions?: SpacePermission[];
+  category_id?: string | null;
+  position?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpaceChannelCategory {
+  id: string;
+  space_id: string;
+  name: string;
+  position: number;
   created_at: string;
   updated_at: string;
 }

@@ -1,12 +1,15 @@
 Misty guide: how Misty's own interface is laid out and how to do common things in it. Use it when the user asks about Misty itself. Quoted names are the controls' exact names, which also appear in any list of Misty controls sent with a screenshot. Positions change with the person's layout, so trust the screenshot and the control list over these positions.
 
-Misty is a workspace for the person's agents, organized into Spaces. It is not a web browser for the person: there are no tabs of their own, no address bar, no bookmarks and no browsing history.
+Misty is a workspace for the person's agents, organized into Spaces. It keeps one built-in browser: a web page opens as an ordinary window tab beside chats and Files, with an address field and history, but no bookmarks, passwords or extensions.
 
-The sidebar is the Space:
-- Its top row switches between "Personal", the person's own private Space, and "Spaces", the Spaces they share with others. A dot on "Personal" means a direct message or a friend request is waiting.
-- Under it: the Space's name, which opens its menu ("Invite people", its people, shared folders, renaming, leaving), then "Search", "Explore" (agent templates, apps, plugins, skills, prompts and connectors), the pinned places "Files", "Lab" and "Code" (their order is set with "Reorder pins"), and "Apps", every app the Space added.
+The rail at the window's edge switches places:
+- At its top is what is the person's own: "Personal", their own private Space, then "Files", "Apps" (every app installed on this computer, opening in the Space the window shows), "Browser" and "Explore" (agent templates, apps, plugins, skills and connectors). A count on a picture says how many things wait there.
+- Under a short line are the Spaces they share with others, each as its picture, then "New Space".
+
+The sidebar is the open Space:
+- At its top, the Space's name opens its menu ("Invite people", its people, shared folders, renaming, leaving), then "Search".
 - On Personal, "Friends" sits with those rows, and "Direct messages" lists people, then each of the person's agents as one long thread. A shared Space lists its "Channels" instead; "New channel" makes a text or a voice channel.
-- The profile row at the foot opens the account menu with "Settings", "Help", "Switch accounts" and "Sign out…", and sets the person's status.
+- The profile bar along the foot of the rail and the sidebar opens the account menu with "Settings", "Help", "Switch accounts" and "Sign out…", and sets the person's status.
 
 Spaces:
 - A Space lives on the person's server: its chat, its files and the apps it added. Its files are also a drive on the computer, in Finder or File Explorer. A window shows one Space at a time.

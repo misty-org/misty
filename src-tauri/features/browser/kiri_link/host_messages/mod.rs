@@ -71,6 +71,8 @@ impl HostChannel for Channel {
             #[cfg(any(target_os = "macos", windows))]
             if let Some(webview) = app.get_webview(message.webview) {
                 set_under_page_background(&webview, background.background.clone());
+                #[cfg(target_os = "macos")]
+                crate::browser::pages::first_paint::note_page_background(&webview, background.bare);
             }
             if let Ok(mut values) = page_backgrounds().lock() {
                 values.insert(id.to_owned(), background.background.clone());

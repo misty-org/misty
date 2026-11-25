@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Avatar,
-  AvatarFallback,
   Button,
   Checkbox,
   Dialog,
@@ -16,46 +14,86 @@ import {
   FieldError,
   ListRow,
   ListRowSkeleton,
+  SearchField,
 } from "@misty/ui";
-import { personTone } from "@/shared/lib/person_tone";
-import { personInitials } from "@/shared/lib/person_initials";
 import { directApi, type DirectConversation, type Person } from "./api";
 import { dmPath, reloadDms, reloadFriends, useFriends } from "./direct_data";
+import { Face } from "./FriendsActivity";
+import { statusWords, useCustomStatus, usePresence, useStatusStore } from "./status_store";
 
 const mostPeople = 10;
 
-function Face({ person }: { person: Person }) {
+function PickRow({
+  person,
+  checked,
+  full,
+  onToggle,
+}: {
+  person: Person;
+  checked: boolean;
+  full: boolean;
+  onToggle: (on: boolean) => void;
+}) {
+  const presence = usePresence(person.user_id);
+  const custom = useCustomStatus(person.user_id);
+  const line = presence === "offline" ? statusWords.offline : custom || statusWords[presence];
   return (
-    <Avatar size="sm" tone={personTone(person.user_id)}>
-      <AvatarFallback>{personInitials(person.username)}</AvatarFallback>
-    </Avatar>
+    <ListRow
+      label={person.username}
+      description={line}
+      leading={<Face userId={person.user_id} name={person.username} person={person} size="sm" />}
+      disabled={full}
+      onOpen={() => onToggle(!checked)}
+      trailing={
+        <Checkbox
+          checked={checked}
+          disabled={full}
+          aria-label={`Add ${person.username}`}
+          onCheckedChange={(next) => onToggle(next === true)}
+        />
+      }
+    />
   );
 }
 
 export function AddPeopleDialog({
   dm,
+  startWith,
   open,
   onOpenChange,
 }: {
-  dm: DirectConversation;
+  dm?: DirectConversation;
+  startWith?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const navigate = useNavigate();
   const friends = useFriends();
+  const statuses = useStatusStore((state) => state.byUser);
   const [picked, setPicked] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    if (!open) {
+    if (open) setPicked(startWith ? [startWith] : []);
+    else {
       setPicked([]);
+      setQuery("");
       setError("");
     }
-  }, [open]);
+  }, [open, startWith]);
 
-  const inDm = new Set(dm.members.map((member) => member.user_id));
-  const candidates = (friends.data?.friends ?? []).filter((person) => !inDm.has(person.user_id));
-  const room = mostPeople - dm.members.length;
+  const inDm = new Set((dm?.members ?? []).map((member) => member.user_id));
+  const online = (person: Person) =>
+    (statuses[person.user_id]?.status ?? "offline") !== "offline";
+  const candidates = (friends.data?.friends ?? [])
+    .filter((person) => !inDm.has(person.user_id))
+    .sort((a, b) => Number(online(b)) - Number(online(a)) || a.username.localeCompare(b.username));
+  const needle = query.trim().toLowerCase();
+  const shown = needle
+    ? candidates.filter((person) => person.username.toLowerCase().includes(needle))
+    : candidates;
+  const room = mostPeople - (dm ? dm.members.length : 1);
   const toggle = (userId: string, on: boolean) =>
     setPicked((current) =>
       on
@@ -70,12 +108,15 @@ export function AddPeopleDialog({
     setAdding(true);
     setError("");
     try {
-      const result = await directApi.addDmMembers(dm.id, picked);
+      const result = dm
+        ? await directApi.addDmMembers(dm.id, picked)
+        : await directApi.createGroupDm(picked);
       await reloadDms().catch(() => undefined);
       onOpenChange(false);
-      if (result.id !== dm.id) navigate(dmPath(result.id));
+      if (result.id !== dm?.id) navigate(dmPath(result.id));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "They couldn't be added.");
+      const fallback = dm ? "They couldn't be added." : "The group couldn't be started.";
+      setError(reason instanceof Error ? reason.message : fallback);
     } finally {
       setAdding(false);
     }
@@ -83,7 +124,9 @@ export function AddPeopleDialog({
 
   const list = () => {
     if (!friends.data && friends.loading)
-      return <ListRowSkeleton label="Loading friends" rows={4} leading trailing="text" />;
+      return (
+        <ListRowSkeleton label="Loading friends" rows={6} leading lines={2} trailing="icon" />
+      );
     if (!friends.data)
       return (
         <ErrorState
@@ -96,27 +139,24 @@ export function AddPeopleDialog({
         />
       );
     if (!candidates.length)
-      return (
+      return dm ? (
         <EmptyState inline title="No one to add" line="Friends who aren't here yet show here." />
+      ) : (
+        <EmptyState inline title="No friends yet" line="Add friends to start a group with them." />
       );
-    return candidates.map((person) => {
-      const checked = picked.includes(person.user_id);
-      const full = !checked && picked.length >= room;
+    if (!shown.length)
       return (
-        <ListRow
+        <EmptyState inline title="No friends match" line={`Nobody called “${query.trim()}”.`} />
+      );
+    return shown.map((person) => {
+      const checked = picked.includes(person.user_id);
+      return (
+        <PickRow
           key={person.user_id}
-          label={person.username}
-          leading={<Face person={person} />}
-          disabled={full}
-          onOpen={() => toggle(person.user_id, !checked)}
-          trailing={
-            <Checkbox
-              checked={checked}
-              disabled={full}
-              aria-label={`Add ${person.username}`}
-              onCheckedChange={(next) => toggle(person.user_id, next === true)}
-            />
-          }
+          person={person}
+          checked={checked}
+          full={!checked && picked.length >= room}
+          onToggle={(on) => toggle(person.user_id, on)}
         />
       );
     });
@@ -124,10 +164,21 @@ export function AddPeopleDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => !adding && onOpenChange(next)}>
-      <DialogContent size="sm" layout="scroll">
+      <DialogContent size="md" layout="scroll">
         <DialogHeader>
-          <DialogTitle>Add people</DialogTitle>
+          <DialogTitle>{dm ? "Add people" : "New group"}</DialogTitle>
         </DialogHeader>
+        {candidates.length ? (
+          <div className="shrink-0">
+            <SearchField
+              autoFocus
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search friends"
+              aria-label="Search friends"
+            />
+          </div>
+        ) : null}
         <DialogBody>
           <div className="flex flex-col">{list()}</div>
           <FieldError message={error || undefined} />
@@ -142,7 +193,7 @@ export function AddPeopleDialog({
             disabled={!picked.length || adding}
             onClick={() => void add()}
           >
-            Add
+            {dm ? "Add" : "Start"}
           </Button>
         </DialogFooter>
       </DialogContent>

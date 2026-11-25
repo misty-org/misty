@@ -19,7 +19,6 @@ pub(crate) mod native_views;
 pub mod process_ended;
 #[cfg(windows)]
 pub(crate) mod stacked_pages;
-pub(crate) mod theme;
 pub(crate) mod title_probe;
 #[cfg(target_os = "macos")]
 pub(crate) mod url_observer;

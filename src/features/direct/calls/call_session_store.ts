@@ -5,18 +5,34 @@ import type { ActiveCall } from "./call_store";
 import type { CallControls } from "./use_live_kit_call";
 import type { CallAgentPart } from "./UseCallAgent";
 
+export type CallFace = { avatar_version?: number; avatar_decoration?: unknown };
+
+export interface CallWhere {
+  kind: "people" | "agent";
+  title: string;
+  live: boolean;
+  canShow: boolean;
+  voiceSpaceId?: string;
+  open(): void;
+  isHome(at: { pathname: string; search: string }): boolean;
+}
+
 interface CallSessionState {
+  where: CallWhere | null;
   controls: CallControls | null;
   agent: CallAgentPart | null;
   nameOf: (userId: string) => string;
+  faceOf: (userId: string) => CallFace | undefined;
   fullscreen: boolean;
   pinned: string | null;
   pipCorner: PipCorner;
-  devicesOpen: "audio" | "camera" | null;
+  devicesOpen: "audio" | "sound" | "camera" | null;
   screenZoom: number;
   setScreenZoom(zoom: number): void;
-  setDevicesOpen(which: "audio" | "camera" | null): void;
-  publish(session: Pick<CallSessionState, "controls" | "agent" | "nameOf">): void;
+  setDevicesOpen(which: "audio" | "sound" | "camera" | null): void;
+  publish(
+    session: Pick<CallSessionState, "where" | "controls" | "agent" | "nameOf" | "faceOf">,
+  ): void;
   clear(): void;
   setFullscreen(on: boolean): void;
   pin(personId: string | null): void;
@@ -24,9 +40,11 @@ interface CallSessionState {
 }
 
 export const useCallSession = create<CallSessionState>((set) => ({
+  where: null,
   controls: null,
   agent: null,
   nameOf: (userId) => userId,
+  faceOf: () => undefined,
   fullscreen: false,
   pinned: null,
   pipCorner: "bottom-right",
@@ -37,6 +55,7 @@ export const useCallSession = create<CallSessionState>((set) => ({
   publish: (session) => set(session),
   clear: () =>
     set({
+      where: null,
       controls: null,
       agent: null,
       fullscreen: false,

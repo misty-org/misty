@@ -39,8 +39,12 @@ test("native background reporting coalesces changes and sends only changed color
     },
     document: {
       body: {},
+      documentElement: {},
       createElement: () => ({ getContext: () => context }),
       elementsFromPoint: () => [{ closest: () => null }],
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener() {},
     },
     getComputedStyle: () => ({ backgroundColor: "rgb(32, 33, 36)" }),
     MutationObserver: class {
@@ -66,7 +70,11 @@ test("native background reporting coalesces changes and sends only changed color
   assert.equal(timers.size, 1);
   assert.equal(reports.length, 0);
   flush();
-  assert.deepEqual(JSON.parse(reports[0]), { token: "test-token", background: "#202124" });
+  assert.deepEqual(JSON.parse(reports[0]), {
+    token: "test-token",
+    background: "#202124",
+    bare: false,
+  });
   assert.deepEqual(painted, ["#ffffff", "rgb(32, 33, 36)"]);
   mutate();
   flush();

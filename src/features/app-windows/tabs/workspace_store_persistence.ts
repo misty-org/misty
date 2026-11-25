@@ -43,8 +43,21 @@ function knownClosedItems(value: unknown): ClosedWorkspaceItem[] {
   });
 }
 
-function knownSide(value: unknown): WorkspaceStore["side"] {
-  return value === "personal" || value === "spaces" ? value : undefined;
+const knownSideKey = (value: unknown): value is string =>
+  typeof value === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(value);
+
+function knownAsides(value: unknown): Record<string, AsideWorkspace> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const asides = Object.entries(value as Record<string, unknown>).flatMap(([key, aside]) => {
+    const known = knownSideKey(key) ? knownAside(aside) : undefined;
+    return known ? [[key, known] as const] : [];
+  });
+  return asides.length ? Object.fromEntries(asides) : undefined;
+}
+
+function legacyAsides(state: { side?: unknown; aside?: unknown }) {
+  const aside = state.side === "spaces" ? knownAside(state.aside) : undefined;
+  return aside ? { personal: aside } : undefined;
 }
 
 function knownAside(value: unknown): AsideWorkspace | undefined {
@@ -75,8 +88,10 @@ export function migrateWorkspaceStore(persisted: unknown, version: number): Work
     layout: knownLayout(state.layout ?? initialWorkspaceLayout()),
     activeWindowId: currentWindowId(),
     closedItems: knownClosedItems(state.closedItems),
-    side: knownSide(state.side),
-    aside: knownSide(state.side) ? knownAside(state.aside) : undefined,
+    side: state.side === "spaces" ? undefined : knownSideKey(state.side) ? state.side : undefined,
+    asides: knownSideKey(state.side)
+      ? (knownAsides(state.asides) ?? legacyAsides(state as { side?: unknown; aside?: unknown }))
+      : undefined,
   } as WorkspaceStore;
 }
 
@@ -88,6 +103,6 @@ export function partialWorkspaceStore(state: WorkspaceStore): Partial<WorkspaceS
     lastUsedViewByGroup: state.lastUsedViewByGroup,
     closedItems: state.closedItems,
     side: state.side,
-    aside: state.aside,
+    asides: state.asides,
   };
 }

@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useEffect, useId, type KeyboardEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
+import { DesktopSettingsRow as Row } from "@/features/settings";
 import { usePointerReorder } from "@misty/ui";
 import { Button, cn, IconButton, Pressable, Surface, Text, Tooltip } from "@misty/ui";
 import { bottomBarItems } from "./BottomBarItems";
@@ -39,11 +39,12 @@ export function BottomBarSettings() {
   const show = (id: BottomBarItemId) => move(id, bottomBarItems[id].side);
 
   return (
-    <Section
-      title="Bottom bar"
-      description="What the bar along the bottom of the window shows. Drag items between its ends, or down to hide them."
-    >
-      <Row label="Bar" description="Left for the whole window, right for the page in view." stacked>
+    <>
+      <Row
+        label="Bar"
+        description="Drag items between its ends: left for the whole window, right for the page in view."
+        stacked
+      >
         <Surface
           tone="well"
           edge="hairline"
@@ -67,14 +68,14 @@ export function BottomBarSettings() {
       {isDefault ? null : (
         <Row
           label="Default layout"
-          description="Agent activity and the server on the left; the Code page's status, zoom, shortcuts and page info on the right."
+          description="Agent activity and the server on the left; the branch, zoom, shortcuts and page info on the right."
         >
           <Button variant="secondary" onClick={() => useBottomBar.getState().reset()}>
             Reset
           </Button>
         </Row>
       )}
-    </Section>
+    </>
   );
 }
 

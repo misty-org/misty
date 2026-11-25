@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::{HearingEvent, HearingSpec, Phrase, VadSpec, VoiceSpec};
+use crate::{HearingEvent, HearingSpec, Phrase, VadSpec};
 
 pub const MOST_FRAME_BYTES: usize = 1 << 30;
 
@@ -32,15 +32,6 @@ pub enum Request {
     },
     Resample {
         rate: i32,
-    },
-    OpenVoice {
-        spec: VoiceSpec,
-    },
-    Speak {
-        voice: u64,
-        text: String,
-        speaker: i32,
-        speed: f32,
     },
     OpenHearing {
         recognizer: u64,
@@ -84,7 +75,6 @@ pub enum Answer {
     Phrase { phrase: Phrase },
     Phrases { phrases: Vec<Phrase> },
     Samples,
-    Speech { rate: u32 },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]

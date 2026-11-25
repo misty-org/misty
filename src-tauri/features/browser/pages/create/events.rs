@@ -64,6 +64,8 @@ pub(super) fn page_load(
         }
         #[cfg(target_os = "macos")]
         crate::browser::kiri_link::host_messages::forget_page_background(page_id);
+        #[cfg(target_os = "macos")]
+        crate::browser::pages::first_paint::clear_canvas_until_drawn(&webview);
     }
     let phase = match payload.event() {
         tauri::webview::PageLoadEvent::Started => "started",
@@ -87,6 +89,8 @@ pub(super) fn page_load(
     );
     if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
         crate::browser::finish_first_paint_load(page_app, page_id);
+        #[cfg(target_os = "macos")]
+        crate::browser::pages::first_paint::note_page_finished(&webview);
         if let Some(state) = page_app.try_state::<BrowserSessionState>() {
             let _ = apply_shortcuts(&webview, &state);
         }

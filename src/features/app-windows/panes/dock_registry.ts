@@ -10,6 +10,7 @@ const defaults: Record<WorkspaceSurfaceId, DockWidgetDescriptor> = {
   space: descriptor("space", "per-space", "suspend", 360, 240, 360),
   agents: descriptor("agents", "singleton", "suspend", 360, 240, 720),
   direct: descriptor("direct", "singleton", "suspend", 360, 240, 360),
+  browser: descriptor("browser", "multiple", "suspend", 360, 240, 720),
 };
 
 function descriptor(

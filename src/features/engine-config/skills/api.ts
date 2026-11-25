@@ -93,6 +93,19 @@ export const skillsHubApi = {
       },
       targets,
     }),
+  installFromRegistry: (
+    skill: {
+      name: string;
+      description: string;
+      directory: string;
+      repoOwner: string;
+      repoName: string;
+      repoBranch: string;
+      bundle?: { url: string; sha256: string; size: number };
+      registry: { id: string; category: string };
+    },
+    targets: SkillTargetId[],
+  ) => mutate({ action: "install", force: false, skill, targets }),
   uninstall: (id: string) => mutate({ action: "uninstall", id }),
   restore: (id: string) => mutate({ action: "restore", id }),
   setTargets: (id: string, targets: SkillTargetId[]) =>

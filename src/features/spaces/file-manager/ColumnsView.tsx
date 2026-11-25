@@ -1,5 +1,6 @@
 import { type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { ColumnBrowser, type ColumnBrowserColumn, type ColumnBrowserRow } from "@misty/ui";
+import { carryFiles, draggedItems } from "./file_drag";
 import { columnRow } from "./FileItems";
 import { foldersBetween, placeInside, placeKey, type FileItem, type FilesPlace } from "./model";
 import { arrange } from "./store/arrange";
@@ -67,6 +68,7 @@ export function ColumnsView({
   onOpen,
   menu,
   onDrop,
+  onDwell,
 }: {
   root: FilesPlace;
   place: FilesPlace;
@@ -79,6 +81,7 @@ export function ColumnsView({
   onOpen(item: FileItem): void;
   menu(item: FileItem, folder: FilesPlace): ReactNode;
   onDrop(folder: FilesPlace, items: FileItem[], copy: boolean): void;
+  onDwell(folder: FilesPlace, item: FileItem): void;
 }) {
   const ancestors = chain(root, place);
   const listings = useListings(ancestors, hidden);
@@ -112,6 +115,8 @@ export function ColumnsView({
     };
   });
 
+  const itemsById = new Map([...byId].map(([id, row]) => [id, row.item]));
+
   const folderOf = (id: string): FilesPlace | undefined => {
     const column = places.find((folder) => placeKey(folder) === id);
     if (column) return column;
@@ -141,9 +146,15 @@ export function ColumnsView({
         canDrop: (target) => folderOf(target) !== undefined,
         onDrop: (target, ids, copy) => {
           const folder = target === null ? places[places.length - 1] : folderOf(target);
-          const items = ids.flatMap((id) => byId.get(id)?.item ?? []);
+          const items = draggedItems(ids, itemsById);
           if (folder && items.length) onDrop(folder, items, copy);
         },
+        where: placeKey(place),
+        onDwell: (target) => {
+          const row = byId.get(target);
+          if (row?.item.folder) onDwell(row.folder, row.item);
+        },
+        carries: (ids) => carryFiles(ids.flatMap((id) => byId.get(id)?.item ?? [])),
       }}
     />
   );

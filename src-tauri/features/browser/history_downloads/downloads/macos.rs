@@ -50,8 +50,9 @@ extern "C" fn load_failed(
     _selector: objc::runtime::Sel,
     webview: *mut objc::runtime::Object,
     navigation: *mut objc::runtime::Object,
-    _error: *mut objc::runtime::Object,
+    error: *mut objc::runtime::Object,
 ) {
+    crate::browser::web_tabs::page_failed(webview, error);
     unsafe {
         let loading: objc::runtime::BOOL = msg_send![webview, isLoading];
         if loading != objc::runtime::NO {

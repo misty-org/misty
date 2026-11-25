@@ -4,6 +4,7 @@ import { useSpacesStore } from "../list/use_spaces_store";
 import { createHostChannel, type FrameTarget } from "./host_channel";
 import { createSpaceAppHandlers, HOST_TOPICS } from "./space_app_handlers";
 import { ROOM_CALLS, ROOM_TOPICS } from "./space_rooms";
+import { spaceCan } from "../roles/use_space_roles";
 import { themeSource } from "./theme_source";
 
 export type MistyPage = "code" | "lab";
@@ -24,7 +25,7 @@ export function pageMisty(spaceId: string, page: MistyPage): Misty {
 
   const space = useSpacesStore.getState().spaces.find((candidate) => candidate.id === spaceId);
   const me = useUserStore.getState().me;
-  const isMod = Boolean(space?.permissions?.includes("apps.manage"));
+  const isMod = spaceCan(space, "administrator");
   const route: HelloResult["route"] = { path: "/", params: {} };
   const context: HelloResult = {
     app_id: page,

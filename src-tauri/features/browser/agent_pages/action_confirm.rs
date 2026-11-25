@@ -69,7 +69,7 @@ pub(in crate::browser) fn page_origin(view: &Webview) -> String {
     view.url().map(|url| origin_of(&url)).unwrap_or_default()
 }
 
-fn origin_of(url: &url::Url) -> String {
+pub(in crate::browser) fn origin_of(url: &url::Url) -> String {
     match url.origin() {
         url::Origin::Tuple(..) => url.origin().ascii_serialization(),
         url::Origin::Opaque(_) => String::new(),
@@ -182,6 +182,33 @@ async fn wait_for_answer(app: &AppHandle, account: &str, question: Question<'_>)
         Ok(Ok(false)) => Answer::Refused,
         _ => Answer::Unanswered,
     }
+}
+
+pub(in crate::browser) async fn ask_account(
+    app: &AppHandle,
+    account: &str,
+    request: &BrowserAgentExecuteRequest,
+    url: &url::Url,
+) -> Answer {
+    let id = uuid::Uuid::new_v4().to_string();
+    let site = url.host_str().unwrap_or("").to_owned();
+    let origin = origin_of(url);
+    wait_for_answer(
+        app,
+        account,
+        Question {
+            id: &id,
+            kind: "account",
+            control: "",
+            reason: "",
+            site: &site,
+            origin: &origin,
+            rememberable: origin.starts_with("https://"),
+            agent_id: &request.agent_id,
+            task_id: request.input["__mistyTaskId"].as_str().unwrap_or(""),
+        },
+    )
+    .await
 }
 
 pub(crate) struct ToolAsk<'a> {

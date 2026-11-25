@@ -30,6 +30,10 @@ const sounds = {
     { hz: 1046.5, at: 0.68, length: 0.16 },
   ],
   ringback: [{ hz: 440, at: 0, length: 0.9, volume: 0.35 }],
+  message: [
+    { hz: 987.77, at: 0, length: 0.14, volume: 0.6 },
+    { hz: 1318.51, at: 0.08, length: 0.4, volume: 0.6 },
+  ],
 } satisfies Record<string, Note[]>;
 
 export type CallSound = keyof typeof sounds;

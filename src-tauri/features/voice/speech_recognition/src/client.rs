@@ -7,7 +7,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 use crate::protocol::{self, bytes_to_samples, samples_to_bytes, Answer, Call, Message, Request};
-use crate::{reason, HearingEvent, HearingSpec, Phrase, Speech, VadSpec, VoiceSpec, SAMPLE_RATE};
+use crate::{reason, HearingEvent, HearingSpec, Phrase, VadSpec, SAMPLE_RATE};
 
 pub type Launch = fn() -> Result<Command, String>;
 
@@ -252,48 +252,6 @@ impl Recognizer {
                 ..Phrase::default()
             },
         }
-    }
-}
-
-pub struct Voice {
-    spec: VoiceSpec,
-    held: Held,
-}
-
-impl Voice {
-    pub fn open(spec: &VoiceSpec) -> Result<Self, String> {
-        let voice = Self {
-            spec: spec.clone(),
-            held: Held::new(),
-        };
-        voice.handle()?;
-        Ok(voice)
-    }
-
-    fn handle(&self) -> Result<(Arc<Connection>, u64), String> {
-        self.held.get(|| Request::OpenVoice {
-            spec: self.spec.clone(),
-        })
-    }
-
-    pub fn speak(&self, text: &str, speaker: i32, speed: f32) -> Result<Speech, String> {
-        let (connection, voice) = self.handle()?;
-        let (answer, bytes) = connection.call(
-            Request::Speak {
-                voice,
-                text: text.to_string(),
-                speaker,
-                speed,
-            },
-            &[],
-        )?;
-        let Answer::Speech { rate } = answer else {
-            return Err(reason("voice"));
-        };
-        Ok(Speech {
-            samples: bytes_to_samples(&bytes),
-            rate,
-        })
     }
 }
 

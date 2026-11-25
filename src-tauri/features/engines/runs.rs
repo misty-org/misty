@@ -11,7 +11,8 @@ use crate::app::runtime::MistyRuntime;
 
 use super::bridge;
 use super::run_prompt::{
-    save_files, save_images, with_attached_files, with_browser_hint, with_history, with_teammates,
+    save_files, save_images, with_agent, with_attached_files, with_browser_hint, with_history,
+    with_teammates,
 };
 use super::{store, support};
 
@@ -360,6 +361,7 @@ async fn launch(app: &AppHandle, run_id: String, body: Value, warming: bool) -> 
         Some(_) => prompt,
         None => with_history(prompt, &body["history_turns"]),
     };
+    let prompt = with_agent(prompt, &body["agent"], session.is_some());
     let prompt = match (&session, &opened) {
         (None, Some(opened)) => format!("{prompt}\n\n{}", opened.note),
         _ => prompt,

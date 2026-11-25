@@ -8,6 +8,7 @@ import {
   notify,
 } from "@misty/ui";
 import { personInitials } from "@/shared/lib/person_initials";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { personTone } from "@/shared/lib/person_tone";
 import { directApi, type Person } from "./api";
 import { dmPath, reloadDms } from "./direct_data";
@@ -36,7 +37,11 @@ function DmMember({ person, self }: { person: Person; self: boolean }) {
   return (
     <MemberRow
       avatar={
-        <Avatar size="sm" tone={personTone(person.user_id)}>
+        <Avatar
+          size="sm"
+          tone={personTone(person.user_id)}
+          outline={avatarOutline(person.avatar_decoration)}
+        >
           <AvatarFallback>{personInitials(person.username)}</AvatarFallback>
         </Avatar>
       }

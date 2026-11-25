@@ -51,6 +51,8 @@ pub(super) fn navigate_message(raw: &str) -> Option<Url> {
 pub(super) struct BackgroundMessage {
     pub(super) token: String,
     pub(super) background: String,
+    #[serde(default)]
+    pub(super) bare: bool,
 }
 
 #[derive(serde::Deserialize)]

@@ -15,11 +15,9 @@ mod file;
 mod hearing;
 mod model;
 mod recognizer;
-mod voice;
 
 use hearing::Hearing;
 use recognizer::Recognizer;
-use voice::Voice;
 
 type Reply = (Result<Answer, String>, Vec<u8>);
 
@@ -31,7 +29,6 @@ struct Helper {
     output: Mutex<Box<dyn Write + Send>>,
     next: AtomicU64,
     recognizers: Mutex<HashMap<u64, Arc<Recognizer>>>,
-    voices: Mutex<HashMap<u64, Arc<Voice>>>,
     hearings: Mutex<HashMap<u64, Arc<Hearing>>>,
 }
 
@@ -151,7 +148,6 @@ impl Helper {
             }
             Request::Forget { handle } => {
                 lock(&self.recognizers).remove(&handle);
-                lock(&self.voices).remove(&handle);
                 done()
             }
             _ => failed(reason("failed")),
@@ -202,30 +198,6 @@ impl Helper {
                 let samples = decode::resample(&bytes_to_samples(&payload), rate);
                 (Ok(Answer::Samples), samples_to_bytes(&samples))
             }
-            Request::OpenVoice { spec } => match Voice::open(&spec) {
-                Ok(voice) => {
-                    let handle = self.handle();
-                    lock(&self.voices).insert(handle, Arc::new(voice));
-                    (Ok(Answer::Opened { handle }), Vec::new())
-                }
-                Err(error) => failed(error),
-            },
-            Request::Speak {
-                voice,
-                text,
-                speaker,
-                speed,
-            } => {
-                let open = lock(&self.voices).get(&voice).cloned();
-                match open.map(|open| open.speak(&text, speaker, speed)) {
-                    Some(Ok(speech)) => (
-                        Ok(Answer::Speech { rate: speech.rate }),
-                        samples_to_bytes(&speech.samples),
-                    ),
-                    Some(Err(error)) => failed(error),
-                    None => failed(reason("voice")),
-                }
-            }
             _ => failed(reason("failed")),
         }
     }
@@ -251,7 +223,6 @@ fn main() {
         output: Mutex::new(answers()),
         next: AtomicU64::new(0),
         recognizers: Mutex::default(),
-        voices: Mutex::default(),
         hearings: Mutex::default(),
     });
     let mut input = BufReader::new(io::stdin().lock());

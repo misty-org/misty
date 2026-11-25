@@ -71,6 +71,7 @@ export interface MistyState {
       collaborationMode?: "teach" | "act";
       spaceId?: string;
       openScreen?: boolean;
+      shown?: string;
     },
   ) => Promise<void>;
 }

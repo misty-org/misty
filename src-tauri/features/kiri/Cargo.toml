@@ -35,7 +35,7 @@ serde_json = "1"
 # Kiri's native code must use the same webview2-com / windows / webkit2gtk
 # versions as the wry that Tauri resolves to, so these move together with
 # Misty's Tauri (src-tauri/Cargo.toml). Bump them as one.
-tauri = { version = ">=2.11.3, <2.12", optional = true }
+tauri = { version = ">=2.12.7, <2.13", optional = true }
 tokio = { version = "1", features = ["sync", "time"], optional = true }
 url = "2"
 
@@ -45,8 +45,8 @@ objc = { version = "0.2.7", optional = true }
 objc2-foundation = { version = "0.3.2", optional = true, default-features = false, features = ["std", "NSProcessInfo"] }
 
 [target.'cfg(windows)'.dependencies]
-webview2-com = { version = "0.38.2", optional = true }
-windows = { version = "0.61", optional = true }
+webview2-com = { version = "0.39", optional = true }
+windows = { version = "0.62", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", optional = true }

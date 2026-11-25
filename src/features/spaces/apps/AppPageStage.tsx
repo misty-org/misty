@@ -221,7 +221,10 @@ export function AppPageStage({
         const result = await invoke<{ channel: boolean }>("space_app_page_open", {
           request: { mount, appId, version, spaceId, ...bounds },
         });
-        if (disposed) return;
+        if (disposed) {
+          await invoke("space_app_page_close", { request: { mount } }).catch(() => undefined);
+          return;
+        }
         channelRef.current?.(result.channel);
         setOpened(true);
       } else {

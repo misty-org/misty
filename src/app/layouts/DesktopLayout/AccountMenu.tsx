@@ -68,6 +68,7 @@ interface AccountMenuProps {
   onOpenAccountSettings: () => void;
   onOpenSettings?: () => void;
   onChangeBanner: () => void;
+  onChangePicture: () => void;
   onCustomStatus: () => void;
 }
 
@@ -147,6 +148,8 @@ function AccountMenuItems(props: AccountMenuProps) {
     <>
       <ProfileCardBanner src={bannerUrl || null} onChange={props.onChangeBanner} />
       <ProfileCardHeader
+        onFaceEdit={props.onChangePicture}
+        faceEditLabel="Edit picture"
         face={
           <PresenceFace presence={presence} face="xl">
             <AccountAvatar size="xl" shape="circle" />

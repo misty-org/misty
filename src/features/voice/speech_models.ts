@@ -37,13 +37,6 @@ export interface HearingModelView extends CatalogEntryView {
   words: boolean;
 }
 
-export interface VoiceView extends CatalogEntryView {
-  accent?: string;
-  gender: "female" | "male";
-  family: string;
-  speaker: number;
-}
-
 export interface Machine {
   memoryMb: number;
   cores: number;
@@ -53,7 +46,6 @@ export interface Machine {
 
 interface CatalogView {
   hearing: HearingModelView[];
-  voices: VoiceView[];
   supportInstalled: boolean;
   machine: Machine;
   installing: string[];
@@ -134,13 +126,6 @@ export function rankHearing(
       b.speed - a.speed ||
       a.disk_mb - b.disk_mb,
   );
-}
-
-export function voicesFor(voices: readonly VoiceView[], languages: readonly string[]) {
-  const speaking = voices.filter((voice) =>
-    voice.languages.some((code) => languages.includes(code)),
-  );
-  return speaking.length ? speaking : [...voices];
 }
 
 interface SpeechModelsState {
@@ -268,8 +253,6 @@ export function ensureSpeech(): Promise<void> {
         await useSpeechModels.getState().install(hearing.id);
         hearingId = (await checkSpeed(hearing.id, languages)) ?? hearingId;
       }
-      const voice = catalog.voices.find((entry) => entry.id === settings.voice);
-      if (voice && !voice.installed) await useSpeechModels.getState().install(voice.id);
       await apply(hearingId);
     } finally {
       picking = null;

@@ -34,14 +34,19 @@ import { applyNoiseReduction } from "./noise_reduction";
 import { captionVoice } from "./call_captions";
 import { moderatesVoice, prepareVoiceModerators } from "./call_moderators";
 
+export interface CallVideo {
+  attach(element: HTMLMediaElement): unknown;
+  detach(element: HTMLMediaElement): unknown;
+}
+
 export interface CallPerson {
   id: string;
   name: string;
   self: boolean;
   speaking: boolean;
   micOn: boolean;
-  camera?: Track;
-  screen?: Track;
+  camera?: CallVideo;
+  screen?: CallVideo;
   sharing: boolean;
   watching: boolean;
   weak: boolean;
@@ -65,6 +70,7 @@ export interface CallControls {
   handUp: boolean;
   noiseReduction: boolean;
   silentMic: boolean;
+  systemMic?: boolean;
   captionsOn: boolean;
   captions: readonly CallCaption[];
   offerLowerHand: boolean;
@@ -228,11 +234,9 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
   const [silentMic, setSilentMic] = useState(false);
   const [offerLowerHand, setOfferLowerHand] = useState(false);
   const noiseReduction = savedNoiseReduction((state) => state.value);
-  const micBeforeDeafen = useRef(false);
   const micWanted = useRef<boolean | null>(null);
   const micSettling = useRef(false);
   const deafWanted = useRef(false);
-  const deafRef = useRef(false);
   const signalsRef = useRef<CallSignals | null>(null);
   const carried = useRef<{ room: Room; hand: boolean; captions: boolean } | null>(null);
   const [, setVersion] = useState(0);
@@ -520,10 +524,10 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         const remembered = savedCallAudio.getState().value;
         const quiet = startMuted || remembered.muted;
         if (remembered.deafened) {
-          micBeforeDeafen.current = !quiet;
           deafWanted.current = true;
           signalsRef.current?.setDeaf(true);
-        } else if (!quiet) {
+        }
+        if (!quiet) {
           micWanted.current = true;
           await settleMic(room, false).catch(() => {
             if (!cancelled)
@@ -613,7 +617,6 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
   const view = signals?.current() ?? noSignals;
   const self = room?.localParticipant.identity ?? "";
   const deafened = view.deaf.has(self);
-  deafRef.current = deafened;
   const places = handPlaces(view.hands);
   const handUp = view.hands.has(self);
   const selfSpeaking = Boolean(room?.localParticipant.isSpeaking);
@@ -680,7 +683,6 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       mic: {
         on: micOn,
         set: (on) => {
-          if (on && deafRef.current) return;
           micWanted.current = on;
           savedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
           void settleMic(room).catch(() =>
@@ -708,22 +710,10 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
     toggleDeafen: () => {
       if (!room) return;
       const on = !deafened;
-      if (on) {
-        micBeforeDeafen.current = micSettling.current
-          ? Boolean(micWanted.current)
-          : room.localParticipant.isMicrophoneEnabled;
-        micWanted.current = false;
-      } else if (micBeforeDeafen.current) {
-        micWanted.current = true;
-      }
       deafWanted.current = on;
-      deafRef.current = on;
       signals?.setDeaf(on);
       savedCallAudio.getState().set((current) => ({ ...current, deafened: on }));
       playCallSound(on ? "mute" : "unmute");
-      void settleMic(room, false).catch(() =>
-        notify({ message: "Deafening didn’t work.", tone: "error" }),
-      );
     },
     toggleHand: () => signals?.setHand(!handUp),
     toggleCaptions: () => signals?.setCaptions(!view.captionsWanted.has(self)),
@@ -772,7 +762,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
         if (!canPickSpeaker()) return;
       } else savedCallDevice[kind].getState().set(deviceId);
       run(
-        (room) => room.switchActiveDevice(kind, deviceId),
+        (room) => room.switchActiveDevice(kind, deviceId || "default", Boolean(deviceId)),
         kind === "videoinput"
           ? "That camera couldn’t be used."
           : kind === "audioinput"
@@ -785,14 +775,7 @@ export function useLiveKitCall(call: ActiveCall, maxPeople: number): CallControl
       const on = micSettling.current
         ? !micWanted.current
         : !room.localParticipant.isMicrophoneEnabled;
-      if (on && deafened) {
-        deafWanted.current = false;
-        deafRef.current = false;
-        signals?.setDeaf(false);
-      }
-      savedCallAudio
-        .getState()
-        .set((current) => ({ muted: !on, deafened: on ? false : current.deafened }));
+      savedCallAudio.getState().set((current) => ({ ...current, muted: !on }));
       micWanted.current = on;
       void settleMic(room).catch(() =>
         notify({ message: "The microphone couldn’t be turned on.", tone: "error" }),

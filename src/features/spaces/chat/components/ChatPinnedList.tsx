@@ -16,6 +16,9 @@ import type { SpaceMessage } from "../../api/dto/entities";
 import { useSpaceCan } from "../../roles/use_space_roles";
 import { useChatSidePanel } from "../chat_side_panel_store";
 import { ChatAvatar } from "./ChatAvatar";
+import { memberOutlineFor, useMemberAvatarUrls, useMemberOutlines } from "./ChatDisplay";
+
+const noMessages: SpaceMessage[] = [];
 import { spansToText } from "./message_text";
 import { pinnedChatKey, useCanPin, usePinnedStore } from "./pinned_store";
 
@@ -87,6 +90,9 @@ export function ChatPinnedList({
   conversationId: string;
 }) {
   const list = usePinnedStore((state) => state.byChat[pinnedChatKey(spaceId, conversationId)]);
+  const pinned = list?.status === "done" ? list.messages : noMessages;
+  const avatars = useMemberAvatarUrls(spaceId, pinned);
+  const outlines = useMemberOutlines(spaceId, pinned);
   const canManageMessages = useSpaceCan(spaceId, "messages.manage");
   const canPin = useCanPin(spaceId, canManageMessages);
   const navigate = useNavigate();
@@ -141,6 +147,10 @@ export function ChatPinnedList({
               id={message.sender_user_id || message.sender_name}
               name={message.sender_name}
               size="lg"
+              src={
+                message.origin?.author_avatar_url || avatars.get(message.sender_user_id) || undefined
+              }
+              outline={memberOutlineFor(outlines, message)}
             />
           }
           time={stampFormat.format(new Date(message.created_at))}

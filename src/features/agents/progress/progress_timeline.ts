@@ -19,7 +19,19 @@ export function withToolEvent(
       item.type === "tool" && item.id === event.toolCallId ? { ...item, ...patch } : item,
     ),
   });
-  if (event.type === "tool.detail") return update({ activity: event.activity });
+  if (event.type === "tool.detail") {
+    const tool = progress.find(
+      (item): item is ProgressTool => item.type === "tool" && item.id === event.toolCallId,
+    );
+    const input = event.activity.input;
+    const args = isEmptyArgs(input) ? undefined : input;
+    const path = tool?.path || (args ? pathOf(args) : undefined);
+    return update({
+      activity: { ...tool?.activity, ...event.activity },
+      ...(args !== undefined ? { args } : {}),
+      ...(path ? { path } : {}),
+    });
+  }
   if (event.type !== "tool.started")
     return update({
       state: event.type === "tool.failed" ? "failed" : "completed",
@@ -28,6 +40,7 @@ export function withToolEvent(
       ...(event.args !== undefined ? { args: event.args } : {}),
       ...(event.result !== undefined ? { result: event.result } : {}),
       ...(event.path ? { path: event.path } : {}),
+      ...(event.pictures?.length ? { pictures: event.pictures } : {}),
     });
   const note = message.content.trim();
   if (note) progress.push({ type: "note", text: note });
@@ -41,6 +54,21 @@ export function withToolEvent(
       ...(event.path ? { path: event.path } : {}),
     });
   return { content: "", progress };
+}
+
+function isEmptyArgs(value: unknown) {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "object" && !Array.isArray(value) && !Object.keys(value).length)
+  );
+}
+
+function pathOf(args: unknown): string | undefined {
+  if (!args || typeof args !== "object") return undefined;
+  const fields = args as Record<string, unknown>;
+  const path = fields.file_path ?? fields.path ?? fields.notebook_path;
+  return typeof path === "string" && path ? path : undefined;
 }
 
 export function withAnswer(
@@ -285,48 +313,6 @@ const kindWords: Array<[ToolKind, RegExp]> = [
 export function toolKind(name: string): ToolKind {
   const plain = name.replace(/^misty[._]/, "").toLowerCase();
   return kindWords.find(([, pattern]) => pattern.test(plain))?.[0] ?? "other";
-}
-
-const kindCounts: Partial<Record<ToolKind, [one: string, many: string]>> = {
-  edit: ["made 1 edit", "made # edits"],
-  delete: ["deleted 1 thing", "deleted # things"],
-  command: ["ran 1 command", "ran # commands"],
-  agent: ["ran 1 sub-agent", "ran # sub-agents"],
-  send: ["sent 1 message", "sent # messages"],
-  browser: ["used the browser", "used the browser # times"],
-  web: ["looked at the web", "looked at the web # times"],
-  read: ["read 1 file", "read # files"],
-  search: ["searched", "searched # times"],
-};
-const kindWeight = Object.keys(kindCounts) as ToolKind[];
-
-export function turnSummary(tools: ProgressTool[]): string {
-  const counts = new Map<ToolKind, number>();
-  let other = 0;
-  for (const tool of tools) {
-    const kind = toolKind(tool.name);
-    if (kind === "finish" || kind === "tasks") continue;
-    if (!kindCounts[kind]) {
-      other += 1;
-      continue;
-    }
-    counts.set(kind, (counts.get(kind) ?? 0) + 1);
-  }
-  const parts = [...counts]
-    .sort(([a], [b]) => kindWeight.indexOf(a) - kindWeight.indexOf(b))
-    .map(([kind, count]) => {
-      const [one, many] = kindCounts[kind]!;
-      return count === 1 ? one : many.replace("#", String(count));
-    });
-  if (other) parts.push(other === 1 ? "1 more step" : `${other} more steps`);
-  if (!parts.length)
-    return tools.length === 1 ? "Worked through 1 step" : `Worked through ${tools.length} steps`;
-  const words = [
-    lowerFirst(parts[0]).replace(/^./, (first) => first.toUpperCase()),
-    ...parts.slice(1),
-  ];
-  if (words.length === 1) return words[0]!;
-  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 }
 
 export function stepDuration(ms: number | undefined): string {

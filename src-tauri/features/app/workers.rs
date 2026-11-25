@@ -44,7 +44,16 @@ pub(crate) fn program(service: &str) -> Result<PathBuf, String> {
                 .and_then(|_| folder.parent())
                 .and_then(|parent| beside(parent, service))
         })
+        .or_else(|| development_build(&folder).and_then(|build| beside(&build, service)))
         .ok_or_else(missing)
+}
+
+fn development_build(folder: &Path) -> Option<PathBuf> {
+    if !cfg!(debug_assertions) {
+        return None;
+    }
+    let apps = folder.ancestors().nth(3)?;
+    (apps.file_name()? == "misty-dev-apps").then(|| apps.parent().map(Path::to_path_buf))?
 }
 
 #[cfg(test)]
@@ -67,6 +76,20 @@ mod tests {
                 .is_some_and(|name| name.starts_with(&format!("misty-{service}"))));
         }
         assert!(program("nothing-like-it").is_err());
+    }
+
+    #[test]
+    fn the_development_bundle_finds_its_helpers_in_the_build_folder() {
+        assert_eq!(
+            development_build(Path::new(
+                "/work/target/debug/misty-dev-apps/Misty.app/Contents/MacOS"
+            )),
+            Some(PathBuf::from("/work/target/debug"))
+        );
+        assert_eq!(
+            development_build(Path::new("/Applications/Misty.app/Contents/MacOS")),
+            None
+        );
     }
 
     #[cfg(windows)]

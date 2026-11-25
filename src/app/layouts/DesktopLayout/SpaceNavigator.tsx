@@ -1,5 +1,5 @@
-import { Hash, LayoutGrid, Search, Volume2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/features/account";
 import {
   homeSpaceOf,
@@ -19,6 +19,8 @@ import {
   voicePath,
 } from "@/features/direct";
 import { personInitials } from "@/shared/lib/person_initials";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
+import { noticesMuted, useMessageNotices } from "@/shared/lib/message_notices";
 import type { Space } from "@/features/spaces";
 import {
   ChannelRowMenu,
@@ -27,11 +29,11 @@ import {
   GlobalCreateSpaceDialog,
   spaceChatPath,
   useSpaceEveryoneUnread,
-  groupConversations,
-  NewChannelButton,
-  SpaceAppsLauncher,
+  channelLayout,
+  ChannelCategoryList,
+  ChannelHeadingTools,
+  ChannelList,
   SpaceSelector,
-  useAppLauncher,
   useSpacesStore,
   useSpaceConversations,
   useVoicePresence,
@@ -41,6 +43,7 @@ import {
 import {
   Avatar,
   AvatarFallback,
+  CountMark,
   EmptyState,
   ErrorState,
   NavGroupHeading,
@@ -48,7 +51,6 @@ import {
   NavRowLabel,
   Skeleton,
   spaceIcons,
-  Text,
   VoicePerson,
 } from "@misty/ui";
 import { toggleSection, useCollapsedSections } from "./collapsed_sections";
@@ -57,19 +59,16 @@ import { usePlace, useSharedSpaces } from "./place_store";
 import { JoinWithLink } from "./JoinWithLink";
 import { SidebarAgentThreads } from "./SidebarAgentThreads";
 import { SpaceInvitations } from "./SpaceInvitations";
-import { SidebarMore, SidebarPinnedPlaces, type SidebarPlace } from "./SidebarPins";
-import { useSidebarPins, type SidebarPlaceId } from "./sidebar_pins_store";
 import { SidebarRow as Row } from "./SidebarRow";
 import { useShortcutHandler } from "@/features/shortcuts";
 import { chatSectionClass, markSlotClass } from "./styles";
 import { useSearchDialog } from "./search/search_store";
 import { agentChatRoute, agentSharedThreadRoute, openWorkspaceRoute } from "./space_navigation";
 
-const ExploreIcon = spaceIcons.explore;
+const ChannelIcon = spaceIcons.channel;
+const VoiceIcon = spaceIcons.voice;
 
-const placeLabels: Record<SidebarPlaceId, string> = { files: "Files" };
-
-function useFocusedRoute(): string {
+export function useFocusedRoute(): string {
   return useWorkspaceStore((state) => {
     const pane = dockLeaves(state.layout.root).find(
       (leaf) => leaf.id === state.layout.focusedPaneId,
@@ -95,24 +94,33 @@ function SpaceSections({
   space,
   route,
   onOpen,
+  agents,
 }: {
   space: Space;
   route: string;
   onOpen(view: WorkspaceView): void;
+  agents?: ReactNode;
 }) {
   const { user } = useAuth();
-  const { conversations, error, retry } = useSpaceConversations(space.id);
+  const { conversations, categories, error, retry } = useSpaceConversations(space.id);
   const collapsed = useCollapsedSections((state) => state.value);
   const channelsOpen = !collapsed.includes("channels");
-  const channels = useMemo(
-    () => groupConversations(conversations)[0]?.conversations ?? [],
-    [conversations],
+  const layout = useMemo(
+    () => channelLayout(conversations, categories),
+    [conversations, categories],
+  );
+  const orderedCategories = useMemo(
+    () => layout.categories.map((group) => group.category),
+    [layout],
   );
   const [path, query = ""] = route.split("?");
   const inChat = path.includes("/social/misty");
   const openConversation = inChat ? new URLSearchParams(query).get("conversation") : null;
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
-  const everyoneUnread = useSpaceEveryoneUnread(space.id);
+  const notices = useMessageNotices((state) => state.value);
+  const everyoneMuted = noticesMuted(notices, space.id, "");
+  const everyoneCount = useSpaceEveryoneUnread(space.id);
+  const everyoneUnread = everyoneMuted ? 0 : everyoneCount;
   const everyoneOpen = inChat && !openConversation;
   useEffect(() => watchVoicePresence(space.id), [space.id]);
   const inVoice = useVoicePresence((state) => state.bySpace[space.id]);
@@ -134,9 +142,13 @@ function SpaceSections({
     return (
       <div key={conversation.id}>
         <ChannelRowMenu spaceId={space.id} conversation={conversation} onDeleted={() => undefined}>
-          <NavRow current={here} onClick={join}>
+          <NavRow
+            current={here}
+            muted={noticesMuted(notices, space.id, conversation.id)}
+            onClick={join}
+          >
             <span className={markSlotClass}>
-              <Volume2 aria-hidden="true" />
+              <VoiceIcon aria-hidden="true" />
             </span>
             <NavRowLabel bright={here} className="flex-1">
               {conversation.title}
@@ -144,14 +156,15 @@ function SpaceSections({
           </NavRow>
         </ChannelRowMenu>
         {people.map((userId) => {
-          const name = members?.find((member) => member.user_id === userId)?.name ?? "Someone";
+          const member = members?.find((candidate) => candidate.user_id === userId);
+          const name = member?.name ?? "Someone";
           return (
             <VoicePerson
               key={userId}
               name={name}
               speaking={here && speaking.includes(userId)}
               avatar={
-                <Avatar size="xs">
+                <Avatar size="xs" outline={avatarOutline(member?.avatar_decoration)}>
                   <AvatarFallback>{personInitials(name)}</AvatarFallback>
                 </Avatar>
               }
@@ -164,25 +177,23 @@ function SpaceSections({
 
   const conversationRow = (conversation: (typeof conversations)[number]) => {
     if (conversation.voice) return voiceRow(conversation);
-    const unread = conversation.unread_count ?? 0;
+    const muted = noticesMuted(notices, space.id, conversation.id);
+    const unread = muted ? 0 : (conversation.unread_count ?? 0);
     const here = openConversation === conversation.id;
     const row = (
       <NavRow
         key={conversation.id}
         current={here}
+        muted={muted}
         onClick={() => open(conversationPath(space.id, conversation))}
       >
         <span className={markSlotClass}>
-          <Hash aria-hidden="true" />
+          <ChannelIcon aria-hidden="true" />
         </span>
         <NavRowLabel bright={unread > 0} className="flex-1">
           {conversationName(conversation, user?.id)}
         </NavRowLabel>
-        {unread > 0 ? (
-          <Text size="caption" tone="chrome" aria-label={`${unread} unread`}>
-            {unread}
-          </Text>
-        ) : null}
+        <CountMark count={unread} label={`${unread} unread`} />
       </NavRow>
     );
     return (
@@ -205,8 +216,9 @@ function SpaceSections({
           collapsible={{ open: channelsOpen, onToggle: () => toggleSection("channels") }}
           className="group/row"
         >
-          <NewChannelButton
+          <ChannelHeadingTools
             spaceId={space.id}
+            categories={orderedCategories}
             onCreated={(created) => open(conversationPath(space.id, created))}
           />
         </NavGroupHeading>
@@ -220,24 +232,43 @@ function SpaceSections({
         ) : (
           <>
             <ChannelRowMenu spaceId={space.id}>
-              <NavRow current={everyoneOpen} onClick={() => open(spaceChatPath(space.id))}>
+              <NavRow
+                current={everyoneOpen}
+                muted={everyoneMuted}
+                onClick={() => open(spaceChatPath(space.id))}
+              >
                 <span className={markSlotClass}>
-                  <Hash aria-hidden="true" />
+                  <ChannelIcon aria-hidden="true" />
                 </span>
                 <NavRowLabel bright={everyoneUnread > 0} className="flex-1">
                   everyone
                 </NavRowLabel>
-                {everyoneUnread > 0 ? (
-                  <Text size="caption" tone="chrome" aria-label={`${everyoneUnread} unread`}>
-                    {everyoneUnread}
-                  </Text>
-                ) : null}
+                <CountMark count={everyoneUnread} label={`${everyoneUnread} unread`} />
               </NavRow>
             </ChannelRowMenu>
-            {channels.map(conversationRow)}
+            <ChannelList
+              spaceId={space.id}
+              categoryId={null}
+              channels={layout.loose}
+              className={chatSectionClass}
+              row={conversationRow}
+            />
           </>
         )}
+        {channelsOpen ? agents : null}
       </section>
+      <ChannelCategoryList
+        spaceId={space.id}
+        layout={layout}
+        keepShown={[
+          openConversation,
+          activeVoice?.spaceId === space.id ? activeVoice.channelId : null,
+        ]}
+        className="flex flex-none flex-col gap-4"
+        sectionClassName={chatSectionClass}
+        row={conversationRow}
+        onCreated={(created) => open(conversationPath(space.id, created))}
+      />
     </>
   );
 }
@@ -287,41 +318,48 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
   const shownConversation = useMistyStore((state) => state.activeConversationId);
   const agentPlace = {
     agent: openAgent,
-    conversation: !openAgent || params.get("new")
-      ? null
-      : (params.get("conversation") ?? (shownConversation || null)),
+    conversation:
+      !openAgent || params.get("new")
+        ? null
+        : (params.get("conversation") ?? (shownConversation || null)),
     thread: openAgent ? params.get("thread") : null,
   };
   const spaceAgents = useMemo(
     () => (space ? agents.filter((agent) => homeSpaceOf(accountId, agent) === space.id) : []),
     [agents, accountId, space],
   );
-  const base = space ? `/spaces/${encodeURIComponent(space.id)}` : "";
   const open = (target: string) => openWorkspaceRoute(target, onOpen);
-  useEffect(() => void useSidebarPins.getState().load(), []);
-  const placeRoutes: Record<SidebarPlaceId, string> = {
-    files: "/agents?view=files",
-  };
-  const places = Object.fromEntries(
-    (Object.keys(placeLabels) as SidebarPlaceId[]).map((id) => [
-      id,
-      {
-        label: placeLabels[id],
-        command: `app.open_${id}`,
-        icon: spaceIcons[id],
-        current: view === id,
-        open: () => open(placeRoutes[id]),
-      } satisfies SidebarPlace,
-    ]),
-  ) as Record<SidebarPlaceId, SidebarPlace>;
-  useShortcutHandler("app.open_explore", () => open(`${base}/explore`), Boolean(space));
-  useShortcutHandler("app.open_files", () => open(placeRoutes.files), Boolean(space));
-  useShortcutHandler(
-    "app.open_apps",
-    () => useAppLauncher.getState().setOpen(true),
-    Boolean(space),
-  );
   useShortcutHandler("app.open_friends", () => open(friendsRoute), Boolean(space));
+
+  const agentRows = space ? (
+    <SidebarAgentThreads
+      agents={spaceAgents}
+      chats={chats}
+      statuses={statuses}
+      here={agentPlace}
+      spaceId={space.id}
+      accountId={accountId}
+      onOpen={(agent) => open(agentChatRoute(agent.id))}
+      onNewThread={(agent) => open(agentChatRoute(agent.id, undefined, true))}
+      onOpenThread={(agent, conversationId) => open(agentChatRoute(agent.id, conversationId))}
+      onOpenShared={(agent, threadId) => open(agentSharedThreadRoute(agent.id, threadId))}
+    >
+      {conversationsError && !conversations.length ? (
+        <ErrorState
+          inline
+          title="Agent chats couldn't load"
+          line={conversationsError}
+          action={{
+            label: "Try again",
+            variant: "secondary",
+            onClick: () => void useMistyStore.getState().loadConversations(),
+          }}
+        />
+      ) : chatsPending ? (
+        <RowSkeletons count={3} />
+      ) : undefined}
+    </SidebarAgentThreads>
+  ) : null;
 
   if (place === "spaces" && allSpaces.length > 0 && !sharedSpaces.length)
     return (
@@ -365,33 +403,7 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
           onOpen={() => useSearchDialog.getState().setOpen(true)}
           data-tour="sidebar-search"
         />
-        <Row
-          label="Explore"
-          icon={<ExploreIcon aria-hidden="true" />}
-          current={Boolean(space) && path === `${base}/explore`}
-          command="app.open_explore"
-          onOpen={() => open(`${base}/explore`)}
-          data-tour="sidebar-explore"
-        />
-        {space ? <SidebarPinnedPlaces places={places} /> : null}
-        <Row
-          label="Apps"
-          icon={<LayoutGrid aria-hidden="true" />}
-          command="app.open_apps"
-          onOpen={() => useAppLauncher.getState().setOpen(true)}
-          data-tour="sidebar-apps"
-        />
-        {space ? (
-          <>
-            <SpaceAppsLauncher
-              spaceId={space.id}
-              isMod={Boolean(space.permissions?.includes("apps.manage"))}
-              onOpen={open}
-            />
-            {place === "personal" ? <FriendsRow route={route} onOpen={onOpen} /> : null}
-            <SidebarMore places={places} />
-          </>
-        ) : null}
+        {space && place === "personal" ? <FriendsRow route={route} onOpen={onOpen} /> : null}
       </nav>
       <nav
         className="mt-4 flex min-h-0 flex-1 flex-col gap-4 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -399,42 +411,13 @@ export function SpaceNavigator({ onOpen }: { onOpen(view: WorkspaceView): void }
         data-misty-window-drag-block="true"
       >
         {!space ? null : place === "personal" ? (
-          <PersonalSections route={route} onOpen={onOpen} />
+          <PersonalSections route={route} onOpen={onOpen} agents={agentRows} />
         ) : (
           <>
             <SpaceInvitations />
-            <SpaceSections space={space} route={route} onOpen={onOpen} />
+            <SpaceSections space={space} route={route} onOpen={onOpen} agents={agentRows} />
           </>
         )}
-        {space ? (
-          <SidebarAgentThreads
-            agents={spaceAgents}
-            chats={chats}
-            statuses={statuses}
-            here={agentPlace}
-            spaceId={space.id}
-            accountId={accountId}
-            onOpen={(agent) => open(agentChatRoute(agent.id))}
-            onNewThread={(agent) => open(agentChatRoute(agent.id, undefined, true))}
-            onOpenThread={(agent, conversationId) => open(agentChatRoute(agent.id, conversationId))}
-            onOpenShared={(agent, threadId) => open(agentSharedThreadRoute(agent.id, threadId))}
-          >
-            {conversationsError && !conversations.length ? (
-              <ErrorState
-                inline
-                title="Agent chats couldn't load"
-                line={conversationsError}
-                action={{
-                  label: "Try again",
-                  variant: "secondary",
-                  onClick: () => void useMistyStore.getState().loadConversations(),
-                }}
-              />
-            ) : chatsPending ? (
-              <RowSkeletons count={3} />
-            ) : undefined}
-          </SidebarAgentThreads>
-        ) : null}
         {!space && spacesPending ? <RowSkeletons count={6} /> : null}
       </nav>
     </>

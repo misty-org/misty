@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use voice_speech::{
-    decode_file, recognize_file, recognize_samples, resample, use_helper, Hearing, HearingEvent,
-    HearingFamily, HearingSpec, Recognizer, VadSpec, Voice, VoiceSpec,
+    decode_file, recognize_file, use_helper, Hearing, HearingEvent,
+    HearingFamily, HearingSpec, Recognizer, VadSpec,
 };
 
 fn helper() -> Result<std::process::Command, String> {
@@ -39,24 +39,6 @@ fn parakeet() -> HearingSpec {
 fn vad() -> VadSpec {
     VadSpec {
         model: models().join("silero_vad.onnx"),
-    }
-}
-
-fn kokoro(speaker: i32) -> VoiceSpec {
-    let files: HashMap<String, String> = [
-        ("model", "model.int8.onnx"),
-        ("voices", "voices.bin"),
-        ("tokens", "tokens.txt"),
-        ("lexicon", "lexicon-us-en.txt,lexicon-zh.txt"),
-        ("dict", "dict"),
-    ]
-    .into_iter()
-    .map(|(role, name)| (role.to_string(), name.to_string()))
-    .collect();
-    VoiceSpec {
-        dir: models().join("kokoro-int8-multi-lang-v1_0"),
-        files,
-        speaker,
     }
 }
 
@@ -113,27 +95,3 @@ fn hears_live_audio_and_tells_what_was_said_once_closed() {
     assert!(!heard.trim().is_empty(), "nothing was heard");
 }
 
-#[test]
-#[ignore = "needs the real models; see the top of this file"]
-fn speaks_in_a_voice_and_is_heard_back() {
-    let voice = Voice::open(&kokoro(3)).expect("Kokoro opens");
-    let speech = voice
-        .speak("Hello from Misty. This is how I sound.", 3, 1.0)
-        .expect("spoken");
-    assert_eq!(speech.rate, 24_000);
-    assert!(
-        speech.samples.len() > 24_000,
-        "less than a second of speech"
-    );
-    let recognizer = Recognizer::open(&parakeet(), None).expect("Parakeet opens");
-    let samples = resample(&speech.samples, speech.rate as i32);
-    let phrases = recognize_samples(&recognizer, &vad(), &samples).expect("recognized");
-    let heard = phrases
-        .iter()
-        .map(|phrase| phrase.text.to_lowercase())
-        .collect::<Vec<_>>()
-        .join(" ");
-    println!("said and heard back: {heard}");
-    assert!(heard.contains("hello"), "heard {heard:?}");
-    assert!(heard.contains("misty"), "heard {heard:?}");
-}

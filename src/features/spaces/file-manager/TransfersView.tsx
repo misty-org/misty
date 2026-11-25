@@ -1,5 +1,5 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import { CircleSlash, Eraser, Pause, Play, RotateCcw } from "lucide-react";
+import { CircleSlash, Eraser, Pause, Play, RotateCcw, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   CollectionFilterMenu,
@@ -8,6 +8,7 @@ import {
   CollectionPage,
   CollectionSearch,
   EmptyState,
+  IconButton,
   MenuItem,
   Progress,
   StateMark,
@@ -74,7 +75,7 @@ function transferMenu(transfer: Transfer) {
   return undefined;
 }
 
-export function TransfersView() {
+export function TransfersView({ onClose }: { onClose(): void }) {
   const byOpId = useTransfers((store) => store.byId);
   const order = useTransfers((store) => store.order);
   const list = useMemo(() => order.flatMap((id) => byOpId[id] ?? []), [order, byOpId]);
@@ -149,6 +150,7 @@ export function TransfersView() {
   return (
     <CollectionPage>
       <CollectionHeading
+        title="Transfers"
         actionsLabel="Transfers"
         actions={[
           ...(paused || waiting
@@ -197,18 +199,19 @@ export function TransfersView() {
               onChange={(event) => setQuery(event.target.value)}
               onClear={() => setQuery("")}
             />
+            <IconButton label="Close" onClick={onClose}>
+              <X />
+            </IconButton>
           </>
         }
       />
       {items.length ? (
-        <div className="px-4 pb-4">
-          <CollectionItems
-            view="list"
-            columns={columns}
-            columnSetId="files-transfers"
-            items={items}
-          />
-        </div>
+        <CollectionItems
+          view="list"
+          columns={columns}
+          columnSetId="files-transfers"
+          items={items}
+        />
       ) : (
         <EmptyState
           title={list.length ? "No transfers match" : "No transfers yet"}

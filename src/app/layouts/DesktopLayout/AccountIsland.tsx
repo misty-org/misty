@@ -4,13 +4,14 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
+  FaceEdit,
   FileInput,
   IconButton,
   Text,
   Tooltip,
   useNotice,
 } from "@misty/ui";
-import { BannerDialog } from "@/features/account";
+import { BannerDialog, useAccountPictureEditor } from "@/features/account";
 import { CallAudioControls } from "@/features/direct";
 import { openSettings, preloadSettingsWorkspace } from "@/features/settings";
 import { PICTURE_TYPES } from "@/shared/lib/square_png";
@@ -38,6 +39,7 @@ export function AccountIsland(props: {
   const expired = Boolean(props.sessionExpired);
   useStatusMirror();
   const presence = useMyShownPresence();
+  const picture = useAccountPictureEditor();
   const customStatus = useMyCustomStatus();
   const bannerInput = useRef<HTMLInputElement>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -59,7 +61,7 @@ export function AccountIsland(props: {
   });
   return (
     <div
-      className="mt-1 flex min-h-8 shrink-0 items-center gap-1.5 pt-1 pr-0.5"
+      className="flex h-8 shrink-0 items-center gap-1.5"
       data-browser-toolbar
       data-sidebar
       data-misty-window-drag-block="true"
@@ -78,23 +80,32 @@ export function AccountIsland(props: {
         </Button>
       ) : (
         <DropdownMenu open={props.open} onOpenChange={props.onOpenChange} modal={false}>
-          <Tooltip content="Account">
-            <DropdownMenuTrigger asChild>
-              <AccountNavButton
-                open={props.open}
-                showAccountName
-                presence={presence}
-                line={customStatus || undefined}
-                className={rowButtonClass}
-              />
-            </DropdownMenuTrigger>
-          </Tooltip>
+          <span className="relative flex min-w-0 shrink">
+            <Tooltip content="Account">
+              <DropdownMenuTrigger asChild>
+                <AccountNavButton
+                  open={props.open}
+                  showAccountName
+                  presence={presence}
+                  line={customStatus || undefined}
+                  className={rowButtonClass}
+                />
+              </DropdownMenuTrigger>
+            </Tooltip>
+            <span className="absolute inset-y-0 left-1 my-auto size-7">
+              <FaceEdit onEdit={picture.open} label="Edit picture" />
+            </span>
+          </span>
           <AccountMenu
             onClose={() => props.onOpenChange(false)}
             onOpenAccountSettings={props.onOpenAccountSettings}
             onChangeBanner={() => {
               props.onOpenChange(false);
               bannerInput.current?.click();
+            }}
+            onChangePicture={() => {
+              props.onOpenChange(false);
+              picture.open();
             }}
             onCustomStatus={() => {
               props.onOpenChange(false);
@@ -113,22 +124,20 @@ export function AccountIsland(props: {
         }}
       />
       <BannerDialog file={bannerFile} onClose={() => setBannerFile(null)} />
+      {picture.dialog}
       <CustomStatusDialog open={statusOpen} onOpenChange={setStatusOpen} />
-      {expired ? null : (
-        <div className="ml-auto flex flex-none items-center gap-0.5">
-          <CallAudioControls onVoiceSettings={() => openSettings("voice")} />
-        </div>
-      )}
-      <IconButton
-        label="Settings"
-        className={expired ? "ml-auto" : undefined}
-        aria-pressed={props.settingsOpen}
-        onPointerEnter={() => void preloadSettingsWorkspace().catch(() => undefined)}
-        onFocus={() => void preloadSettingsWorkspace().catch(() => undefined)}
-        onClick={props.onSettingsClick}
-      >
-        <Settings />
-      </IconButton>
+      <div className="ml-auto flex flex-none items-center gap-1.5">
+        {expired ? null : <CallAudioControls onVoiceSettings={() => openSettings("voice")} />}
+        <IconButton
+          label="Settings"
+          aria-pressed={props.settingsOpen}
+          onPointerEnter={() => void preloadSettingsWorkspace().catch(() => undefined)}
+          onFocus={() => void preloadSettingsWorkspace().catch(() => undefined)}
+          onClick={props.onSettingsClick}
+        >
+          <Settings />
+        </IconButton>
+      </div>
     </div>
   );
 }

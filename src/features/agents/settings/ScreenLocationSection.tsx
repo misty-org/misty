@@ -2,7 +2,7 @@ import { useNotice } from "@misty/ui";
 import { useEffect, useState } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { type ScreenLocation } from "../runs/invocations/ai_settings_types";
-import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
+import { DesktopSettingsRow } from "@/features/settings";
 import { ChoiceControl, SwitchControl } from "../../settings/SettingsControls";
 import { setKeepAwakeForAgents } from "../runs/jobs/keep_awake";
 
@@ -60,7 +60,7 @@ export function ScreenLocationSection() {
   };
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
-    <DesktopSettingsSection title="Screens">
+    <>
       <DesktopSettingsRow
         label="Where Misty opens new screens"
         description="Saying where in your request always wins."
@@ -82,6 +82,6 @@ export function ScreenLocationSection() {
           onChange={(value) => void changeKeepAwake(value)}
         />
       </DesktopSettingsRow>
-    </DesktopSettingsSection>
+    </>
   );
 }

@@ -6,6 +6,7 @@ import {
   type StoredDockingLayout,
 } from "@/app/shell/docking_layout";
 import { configureStartupPreference } from "@/app/shell";
+import { configureWebSearch } from "@/features/browser";
 import { configureLinkPreviews } from "@/features/files";
 import {
   onSettingsApplied,
@@ -36,6 +37,9 @@ function applyFeatureSettings(
       });
   } catch {}
   configureLinkPreviews(settingsBoolean(document, "general", "browser_link_previews", true));
+  configureWebSearch({
+    suggestions: settingsBoolean(document, "general", "browser_search_suggestions", true),
+  });
   configureStartupPreference({
     reopenLastSession: settingsBoolean(document, "general", "reopen_last_session", true),
     startupViewIndex: settingsNumber(document, "general", "startup_view_index", 0),

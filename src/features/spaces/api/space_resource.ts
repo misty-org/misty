@@ -25,8 +25,12 @@ export function useSpaceResource<T>(
   return useCachedResource(path ? spaceResourceKey(path) : null, loader, { persist: "account" });
 }
 
-export function refreshSpaceResource<T>(path: string, loader: () => Promise<T>): Promise<T> {
-  return refreshCachedResource(spaceResourceKey(path), loader, "account");
+export function refreshSpaceResource<T>(
+  path: string,
+  loader: () => Promise<T>,
+  options: { join?: boolean } = {},
+): Promise<T> {
+  return refreshCachedResource(spaceResourceKey(path), loader, "account", options);
 }
 
 export function setSpaceResource<T>(path: string, next: T | ((previous: T | undefined) => T)) {

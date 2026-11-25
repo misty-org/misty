@@ -47,6 +47,7 @@ fn build_window<R: Runtime>(
     #[cfg(target_os = "macos")]
     if let Some(view) = app.get_webview(label) {
         let _ = view.with_webview(|view| unsafe {
+            crate::browser::pages::macos::webkit_hooks::install();
             crate::app::macos_window_effects::mac_traffic_lights::hold_traffic_lights_of(
                 view.ns_window(),
             );

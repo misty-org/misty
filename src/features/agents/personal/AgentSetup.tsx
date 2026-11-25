@@ -74,7 +74,7 @@ export function AgentSetup(props: {
   }, [step]);
   const desktop = hasTauriInternals() && /Mac|Win/.test(navigator.platform);
   const finish = async () => {
-    if (busy || !draft.name.trim() || !draft.voice) return;
+    if (busy || !draft.name.trim()) return;
     setBusy(true);
     setError("");
     try {
@@ -95,7 +95,7 @@ export function AgentSetup(props: {
       className="grid gap-6"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!draft.name.trim() || !draft.voice) return;
+        if (!draft.name.trim()) return;
         if (step < 2) setStep(step + 1);
         else void finish();
       }}
@@ -123,12 +123,8 @@ export function AgentSetup(props: {
         options={["Identity", "Context", "Start"].map((label, index) => ({
           value: String(index),
           label,
-          disabled: busy || (index > 0 && (!draft.name.trim() || !draft.voice)),
-          reason: busy
-            ? undefined
-            : !draft.name.trim()
-              ? "Name your agent first"
-              : "Pick its voice first",
+          disabled: busy || (index > 0 && !draft.name.trim()),
+          reason: busy ? undefined : "Name your agent first",
         }))}
       />
       <fieldset disabled={busy} className="grid min-w-0 gap-4">
@@ -244,7 +240,7 @@ export function AgentSetup(props: {
           type="submit"
           variant="primary"
           size="lg"
-          disabled={!draft.name.trim() || !draft.voice || busy}
+          disabled={!draft.name.trim() || busy}
         >
           {step === 2 ? "Create agent" : "Continue"}
         </Button>

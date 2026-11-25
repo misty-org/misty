@@ -17,7 +17,21 @@ const STAGING_TIMEOUT: Duration = Duration::from_secs(60);
 const PROCESSING_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[cfg(target_os = "macos")]
-const PROFILE: &str = include_str!("../../tauri-permissions/permissions/document-worker.sb");
+const PROFILE: &str = r#"
+(version 1)
+(deny default)
+(allow process-exec (literal (param "TOOL")))
+(allow file-read* (literal (param "TOOL")) (subpath (param "WORK"))
+  (subpath "/System/Library") (subpath "/usr/lib")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
+  (literal "/") (literal "/dev/null") (literal "/dev/urandom")
+  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*[.]dylib$")
+  (regex #"^/(opt/homebrew|usr/local)/(Cellar|opt)/.*/lib$"))
+(allow file-write* (subpath (param "WORK")))
+(allow sysctl-read)
+(allow file-read-metadata)
+"#;
 
 #[cfg(target_os = "macos")]
 type Keep = ();

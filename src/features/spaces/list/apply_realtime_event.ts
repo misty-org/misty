@@ -3,6 +3,8 @@ import * as accessErrors from "../api/access_errors";
 import type { SpaceEvent } from "../api/dto/entities";
 import { beginRealtimeEvent, finishRealtimeEvent } from "../api/realtime_cursor";
 import { errorText } from "@/shared/lib/format";
+import { readAvatarDecoration } from "@/shared/lib/avatar_decoration";
+import { useUserStore } from "@/features/account/core";
 import {
   mergeSpaceMessages,
   messageFromSpaceEvent,
@@ -41,12 +43,55 @@ const itemEventPages: Record<string, string> = {
   note: "misty:space-note-event",
 };
 
-const appEventTypes = new Set(["app.installed", "app.updated", "app.removed", "apps.changed"]);
-
 const agentEventTypes = new Set(["agent.added", "agent.updated", "agent.removed"]);
 
 const spaceAgentsChanged = (spaceId: string) =>
   window.dispatchEvent(new CustomEvent("misty:space-agents-changed", { detail: { spaceId } }));
+
+const avatarDecorationEvent = "misty:avatar-decoration";
+
+function announceSpaceProfile(event: SpaceEvent) {
+  if (event.type !== "space.updated") return;
+  const detail: Record<string, unknown> = { spaceId: event.space_id };
+  if (typeof event.payload.avatar_version === "number")
+    detail.avatar_version = event.payload.avatar_version;
+  if ("avatar_decoration" in event.payload)
+    detail.avatar_decoration = readAvatarDecoration(event.payload.avatar_decoration);
+  if (Object.keys(detail).length > 1)
+    window.dispatchEvent(new CustomEvent("misty:space-profile", { detail }));
+}
+
+function applyAvatarDecoration(event: SpaceEvent, accountId: string, set: SpacesSet) {
+  announceSpaceProfile(event);
+  if (!("avatar_decoration" in event.payload)) return;
+  const avatar_decoration = readAvatarDecoration(event.payload.avatar_decoration);
+  if (event.type === "space.updated") {
+    set((state) => ({
+      spaces: state.spaces.map((space) =>
+        space.id === event.space_id ? { ...space, avatar_decoration } : space,
+      ),
+    }));
+    return;
+  }
+  const userId = event.payload.user_id;
+  if (event.type !== "member.updated" || typeof userId !== "string" || !userId) return;
+  set((state) => ({
+    membersBySpace: Object.fromEntries(
+      Object.entries(state.membersBySpace).map(([spaceId, members]) => [
+        spaceId,
+        members.some((member) => member.user_id === userId)
+          ? members.map((member) =>
+              member.user_id === userId ? { ...member, avatar_decoration } : member,
+            )
+          : members,
+      ]),
+    ),
+  }));
+  if (userId === accountId) useUserStore.getState().patchMe({ avatar_decoration });
+  window.dispatchEvent(
+    new CustomEvent(avatarDecorationEvent, { detail: { userId, avatar_decoration } }),
+  );
+}
 
 async function reloadSpacesSnapshot(get: () => SpacesStore) {
   const askedAt = Date.now();
@@ -68,14 +113,6 @@ async function applyRealtimeEvent(
   if (event.type.startsWith("drive.")) return forwardDriveRealtimeEvent(event);
   if (event.type.startsWith("agent_thread.")) {
     window.dispatchEvent(new CustomEvent("misty:agent-thread-event", { detail: event }));
-    return;
-  }
-  if (appEventTypes.has(event.type)) {
-    window.dispatchEvent(
-      new CustomEvent("misty:space-apps-changed", {
-        detail: { accountId, spaceId: event.space_id },
-      }),
-    );
     return;
   }
   if (agentEventTypes.has(event.type)) {
@@ -174,7 +211,7 @@ async function applyRealtimeEvent(
           get().loadMessages(event.space_id),
         );
     }
-  } else if (event.type.startsWith("conversation."))
+  } else if (event.type.startsWith("conversation.") || event.type.startsWith("channel_category."))
     window.dispatchEvent(new CustomEvent("misty:space-conversation-event", { detail: event }));
   else if (event.type.startsWith("direct."))
     window.dispatchEvent(new CustomEvent("misty:direct-event", { detail: event }));
@@ -193,6 +230,7 @@ async function applyRealtimeEvent(
     event.type.startsWith("owner.") ||
     event.type.startsWith("space.")
   ) {
+    applyAvatarDecoration(event, accountId, set);
     await reloadSpacesSnapshot(get);
     if (accountId !== scope.currentAccountId() || generation !== scope.accountGeneration()) return;
     if (!get().spaces.some((space) => space.id === event.space_id)) return;

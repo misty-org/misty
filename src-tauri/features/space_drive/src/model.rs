@@ -104,13 +104,9 @@ pub struct Item {
     #[serde(default)]
     pub modified_at: String,
     #[serde(default)]
-    pub trashed: bool,
-    #[serde(default)]
     pub trashed_at: Option<String>,
     #[serde(default)]
     pub trashed_by: Option<String>,
-    #[serde(default)]
-    pub trash_hold: bool,
     #[serde(default)]
     pub deleted: bool,
     #[serde(default)]
@@ -121,7 +117,7 @@ pub struct Item {
 
 impl Item {
     pub fn is_live(&self) -> bool {
-        !self.trashed && !self.deleted
+        !self.deleted
     }
 }
 
@@ -263,46 +259,10 @@ pub struct EntryPage {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TrashEntry {
-    #[serde(flatten)]
-    pub entry: DriveEntry,
-    pub trashed_at: Option<String>,
-    pub trashed_by_name: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChangedEntry {
     #[serde(flatten)]
     pub entry: DriveEntry,
     pub removed: bool,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TrashPage {
-    pub items: Vec<Item>,
-    pub next_after: Option<String>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TrashBy {
-    Person,
-    Agent { agent_id: String, chat_id: String },
-}
-
-impl TrashBy {
-    pub fn held(&self) -> bool {
-        matches!(self, Self::Agent { .. })
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentTrash {
-    pub space_id: SpaceId,
-    pub item_id: ItemId,
-    pub path: String,
-    pub agent_id: String,
-    pub chat_id: String,
-    pub at_ms: i64,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

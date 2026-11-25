@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use database::store::Store;
 use space_drive::rules::{is_text, merge_text, MAX_TEXT};
-use space_drive::{names, Drive, ItemId, Kind, Node, SpaceId, TrashBy, Version};
+use space_drive::{names, Drive, ItemId, Kind, Node, SpaceId, Version};
 use tauri::AppHandle;
 
 use super::{
@@ -125,8 +125,6 @@ fn write_one(
 fn apply(
     drive: &Drive,
     space: &SpaceId,
-    agent_id: &str,
-    conversation: &str,
     ops: &[Op],
 ) -> Result<(), String> {
     for op in ops {
@@ -141,16 +139,11 @@ fn apply(
                 bytes,
                 replace,
             } => write_one(drive, space, path, Some(bytes), None, replace.clone())?,
-            Op::Trash { id, .. } => drive
-                .trash(
-                    space,
-                    id,
-                    TrashBy::Agent {
-                        agent_id: agent_id.to_string(),
-                        chat_id: conversation.to_string(),
-                    },
-                )
-                .map_err(error_text)?,
+            Op::Trash { id, .. } => {
+                if !drive.in_trash(space, id).map_err(error_text)? {
+                    drive.trash(space, id).map_err(error_text)?;
+                }
+            }
         }
     }
     Ok(())
@@ -342,14 +335,9 @@ pub(crate) async fn land(
     }
 
     let applied = {
-        let (drive, space, agent_id, conversation) = (
-            drive.clone(),
-            space.clone(),
-            row.agent_id.clone(),
-            conversation.to_string(),
-        );
+        let (drive, space) = (drive.clone(), space.clone());
         tokio::task::spawn_blocking(move || {
-            let result = apply(&drive, &space, &agent_id, &conversation, &ops);
+            let result = apply(&drive, &space, &ops);
             (ops, result)
         })
         .await

@@ -2,10 +2,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use serde_json::{json, Value};
-use space_drive::{names, Drive, Kind, NewNode, Node, SpaceId, TrashBy, Version};
+use space_drive::{names, Drive, Kind, NewNode, Node, SpaceId, Version};
 use tauri::AppHandle;
 
-use crate::agents::run_control::tool_policy::{chat_of, RunFacts};
+use crate::agents::run_control::tool_policy::RunFacts;
 
 pub(crate) mod index;
 pub(crate) mod topics;
@@ -176,7 +176,7 @@ pub(crate) fn offered(run_id: &str) -> Vec<Value> {
         }));
         tools.push(json!({
             "name": MEMORY_FORGET,
-            "description": "Forget a topic: its file leaves this agent's memory (to the Space's agent trash, where the person can bring it back) and its line leaves MEMORY.md.",
+            "description": "Forget a topic: its file leaves this agent's memory (to the Space's .trash, where the person can bring it back) and its line leaves MEMORY.md.",
             "inputSchema": {
                 "type": "object",
                 "additionalProperties": false,
@@ -321,16 +321,11 @@ pub(crate) async fn call(
         "memory.write" => write(&drive, &space, &place, &input).await,
         "memory.edit" => edit(&drive, &space, &place, &input).await,
         "memory.forget" => {
-            let by = TrashBy::Agent {
-                agent_id: place.agent.clone(),
-                chat_id: chat_of(facts),
-            };
             forget(
                 &drive,
                 &space,
                 &place,
                 text_arg(&input, "topic").unwrap_or(""),
-                by,
             )
             .await
         }
@@ -513,7 +508,6 @@ async fn forget(
     space: &SpaceId,
     place: &Place,
     topic: &str,
-    by: TrashBy,
 ) -> Result<Value, String> {
     let (index_text, index_node) = read_index(drive, space, place).await?;
     let file = topics::topic_file(topic, &index_text)?;
@@ -524,7 +518,7 @@ async fn forget(
     }
     if let Some(found) = found {
         let (drive, space) = (drive.clone(), space.clone());
-        tokio::task::spawn_blocking(move || drive.trash(&space, &found.id, by).map_err(drive_text))
+        tokio::task::spawn_blocking(move || drive.trash(&space, &found.id).map_err(drive_text))
             .await
             .map_err(|error| error.to_string())??;
     }
@@ -570,7 +564,6 @@ pub(crate) async fn forget_from_view(
         &SpaceId(space.to_string()),
         &place,
         file,
-        TrashBy::Person,
     )
     .await?;
     index::refresh(store, space, agent).await

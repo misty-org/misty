@@ -10,7 +10,6 @@ import { accountLimitMessages } from "@/api/client/account_limits";
 import { isSpaceReferenceOnly, isSpaceWriteRequest, setSpaceReferenceOnly } from "./connectivity";
 import { createSpaceConversationsApi } from "./conversations";
 import { createSpacePinsApi } from "./pins";
-import { createSpaceIntegrationsApi } from "./integrations";
 import type {
   CreateSpaceRequest,
   CreateSpaceResult,
@@ -26,6 +25,7 @@ import { createSpaceChatApi } from "./chat";
 import { spaceAttachmentsApi } from "./attachments";
 import { fetchProtectedBlob } from "./protected_download";
 import type { SpaceRequestInit } from "./space_request_types";
+import { readAvatarDecoration, type AvatarDecoration } from "@/shared/lib/avatar_decoration";
 
 export class SpaceRequestError extends ApiRequestError {
   constructor(message: string, status: number, code?: string, responseText = "") {
@@ -198,11 +198,24 @@ export const spacesApi = {
     spaceRequest<{ avatar_version: number }>(`/spaces/${encodeURIComponent(spaceId)}/avatar`, {
       method: "DELETE",
     }),
+  setSpaceAvatarDecoration: async (spaceId: string, decoration: AvatarDecoration) => {
+    const result = await spaceRequest<{ avatar_decoration?: AvatarDecoration }>(
+      `/spaces/${encodeURIComponent(spaceId)}/avatar/decoration`,
+      { method: "PUT", body: JSON.stringify(decoration) },
+    );
+    const avatar_decoration = readAvatarDecoration(result?.avatar_decoration);
+    const { useSpacesStore } = await import("../list/use_spaces_store");
+    useSpacesStore.setState((state) => ({
+      spaces: state.spaces.map((space) =>
+        space.id === spaceId ? { ...space, avatar_decoration } : space,
+      ),
+    }));
+    return avatar_decoration;
+  },
   ...createSpaceMembersApi(spaceRequest, fetchProtectedBlob),
   ...createSpaceRolesApi(spaceRequest),
   ...createSpaceConversationsApi(spaceRequest),
   ...createSpacePinsApi(spaceRequest),
-  ...createSpaceIntegrationsApi(spaceRequest),
   ...createSpaceChatApi(spaceRequest),
   nodes: (spaceId: string, onCached?: (value: { nodes: SpaceNode[] }) => void) =>
     spaceRequest<{ nodes: SpaceNode[] }>(`/spaces/${encodeURIComponent(spaceId)}/nodes`, {

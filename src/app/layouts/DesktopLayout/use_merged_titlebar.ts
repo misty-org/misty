@@ -24,6 +24,7 @@ export function useMergedTitlebar(
   enabled: boolean,
   chromeLeft: number,
   chromeRight: number,
+  lightsInDrawer = false,
 ) {
   useLayoutEffect(() => {
     const shell = ref.current;
@@ -79,6 +80,7 @@ export function useMergedTitlebar(
           chromeRight,
         );
         if (!insets.touchesTitlebar) return;
+        if (lightsInDrawer && element.dataset.windowToolbar === "beside-drawer") insets.left = 0;
         retained.add(element);
         if (!modified.has(element)) {
           modified.set(element, {
@@ -159,5 +161,5 @@ export function useMergedTitlebar(
       window.removeEventListener("resize", schedule);
       for (const element of modified.keys()) clear(element);
     };
-  }, [ref, layoutKey, enabled, chromeLeft, chromeRight]);
+  }, [ref, layoutKey, enabled, chromeLeft, chromeRight, lightsInDrawer]);
 }

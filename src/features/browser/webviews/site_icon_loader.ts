@@ -88,7 +88,7 @@ export function loadSiteIcon(url: string): Promise<SiteIconImage | null> {
   const load = invoke<string>("browser_site_icon", { url })
     .then(prepared)
     .catch((error: unknown): SiteIconImage | null =>
-      String(error).includes("private_address") ? { src: url, tone: "mixed" } : null,
+      String(error).includes("private_address") ? { src: privateIcon(url), tone: "mixed" } : null,
     )
     .then((image) => {
       remember(url, image);
@@ -97,4 +97,38 @@ export function loadSiteIcon(url: string): Promise<SiteIconImage | null> {
     });
   loading.set(url, load);
   return load;
+}
+
+function privateIcon(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname === "/" && !parsed.search ? `${parsed.origin}/favicon.ico` : url;
+  } catch {
+    return url;
+  }
+}
+
+function pageSource(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? `${parsed.origin}/` : url;
+  } catch {
+    return url;
+  }
+}
+
+export function knownPageIcon(url: string, reported?: string): SiteIconImage | null | undefined {
+  if (reported) {
+    const found = knownSiteIcon(reported);
+    if (found !== null) return found;
+  }
+  return knownSiteIcon(pageSource(url));
+}
+
+export async function loadPageIcon(url: string, reported?: string): Promise<SiteIconImage | null> {
+  if (reported) {
+    const found = await loadSiteIcon(reported);
+    if (found) return found;
+  }
+  return loadSiteIcon(pageSource(url));
 }

@@ -17,6 +17,8 @@ pub struct BrowserWebviewCreateRequest {
     pub native_live_resize: bool,
     #[serde(default)]
     pub agent_run_id: Option<String>,
+    #[serde(default)]
+    pub parked: bool,
 }
 
 #[derive(Debug, Deserialize)]

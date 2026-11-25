@@ -44,7 +44,6 @@ import { mistyEngine } from "../../engines/engines_api";
 import { useChatFolder } from "../../shared-folders/chat_folder";
 import { runComposerCommand } from "../composer/commands/engine_commands";
 import { CommandReportDialog } from "../composer/commands/CommandReportDialog";
-import { EngineTodoLane } from "./engine/EngineTodos";
 import { EngineQueueChips } from "./engine/EngineQueueChips";
 import { EngineHistoryDialog } from "./engine/EngineHistoryDialog";
 import { useEngineQueue } from "./engine/engine_queue";
@@ -455,13 +454,6 @@ export function AgentWorkspaceConversation({
           }}
           status={
             <>
-              <EngineTodoLane
-                runId={
-                  state.working && state.invocationConversationId === conversation?.id
-                    ? state.invocationId
-                    : undefined
-                }
-              />
               <EngineQueueChips
                 conversationId={conversation?.id}
                 working={state.working}

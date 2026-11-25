@@ -2,6 +2,7 @@ import { listen as listenEvent, type UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import { useSettingsStore } from "@/features/settings";
 import { invoke } from "@/native/invoke";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { voiceSettings } from "./voice_settings";
 
 export interface SpeechSupport {
@@ -22,9 +23,15 @@ export function useSpeechSupport(): SpeechSupport | null {
     const ask = () => void speechSupport().then((found) => live && setSupport(found));
     ask();
     window.addEventListener(SPEECH_CHANGED, ask);
+    const unlisten = hasTauriInternals()
+      ? ["misty://apps-changed", "misty://app-server-install"].map((name) =>
+          listenEvent(name, ask).catch(() => null),
+        )
+      : [];
     return () => {
       live = false;
       window.removeEventListener(SPEECH_CHANGED, ask);
+      for (const pending of unlisten) void pending.then((stop) => stop?.());
     };
   }, []);
   return support;
@@ -161,6 +168,7 @@ export async function hear(onEvent: (event: HearingEvent) => void): Promise<Hear
   for (const payload of early) if (payload.session === session) handle(payload);
   let stopping: Promise<void> | null = null;
   let pushing: Promise<unknown> = Promise.resolve();
+  let pushFailed = false;
   const stop = () => {
     stopping ??= (async () => {
       window.removeEventListener("pagehide", stop);
@@ -181,7 +189,11 @@ export async function hear(onEvent: (event: HearingEvent) => void): Promise<Hear
       if (stopping) return;
       pushing = pushing
         .then(() => invoke("speech_hear_push", { session, input, pcm }))
-        .catch(() => undefined);
+        .catch((error: unknown) => {
+          if (pushFailed || stopping) return;
+          pushFailed = true;
+          onEvent({ kind: "failed", error: typeof error === "string" ? error : "" });
+        });
     },
     reset: (input) => void invoke("speech_hear_reset", { session, input }).catch(() => undefined),
     remove: (input) => void invoke("speech_hear_remove", { session, input }).catch(() => undefined),

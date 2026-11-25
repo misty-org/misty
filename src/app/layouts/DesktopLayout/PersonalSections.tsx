@@ -1,4 +1,5 @@
-import { Plus, Users } from "lucide-react";
+import { BellOff, Plus } from "lucide-react";
+import type { ReactNode } from "react";
 import { useAuth } from "@/features/account";
 import type { WorkspaceView } from "@/features/app-windows";
 import {
@@ -14,27 +15,50 @@ import {
 } from "@/features/direct";
 import { ChatAvatar, useMemberPicture } from "@/features/spaces";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+  CountMark,
   ErrorState,
   IconButton,
+  MenuCheckItem,
   NavGroupHeading,
   NavRow,
   NavRowLabel,
   PresenceFace,
   RowTools,
   Skeleton,
-  Text,
+  spaceIcons,
 } from "@misty/ui";
+import { noticesMuted, useMessageNotices, useMuted } from "@/shared/lib/message_notices";
 import { toggleSection, useCollapsedSections } from "./collapsed_sections";
 import { openWorkspaceRoute } from "./space_navigation";
 import { SidebarShortcut } from "./SidebarRow";
 import { chatSectionClass, faceSlotClass, markSlotClass } from "./styles";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
+
+const FriendsIcon = spaceIcons.friends;
 
 function RowCount({ count, label }: { count: number; label: string }) {
-  return count > 0 ? (
-    <Text size="caption" tone="chrome" aria-label={`${count} ${label}`}>
-      {count}
-    </Text>
-  ) : null;
+  return <CountMark count={count} label={`${count} ${label}`} />;
+}
+
+function DmRowMenu({ dmId, children }: { dmId: string; children: ReactNode }) {
+  const mute = useMuted(dmId, dmId);
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <MenuCheckItem
+          icon={BellOff}
+          label="Mute conversation"
+          checked={mute.muted}
+          closeOnSelect
+          onCheckedChange={mute.toggle}
+        />
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 }
 
 function DmFace({ dm, myUserId }: { dm: DirectConversation; myUserId: string | undefined }) {
@@ -43,7 +67,13 @@ function DmFace({ dm, myUserId }: { dm: DirectConversation; myUserId: string | u
   const picture = useMemberPicture(other?.user_id ?? "", other?.avatar_version ?? 0);
   if (!other) return null;
   const face = (
-    <ChatAvatar id={other.user_id} name={other.username} src={picture ?? undefined} size="sm" />
+    <ChatAvatar
+      id={other.user_id}
+      name={other.username}
+      src={picture ?? undefined}
+      size="sm"
+      outline={avatarOutline(other.avatar_decoration)}
+    />
   );
   return dm.kind === "direct" ? (
     <PresenceFace presence={presence} face="sm">
@@ -59,7 +89,7 @@ function DmRowSkeletons() {
     <>
       {Array.from({ length: 3 }, (_, index) => (
         <NavRow key={index} still aria-hidden="true">
-          <Skeleton className="size-6 rounded-full" />
+          <Skeleton className="size-7 rounded-full" />
           <Skeleton className="h-3 w-28" />
         </NavRow>
       ))}
@@ -82,7 +112,7 @@ export function FriendsRow({
       onClick={() => openWorkspaceRoute(friendsRoute, onOpen)}
     >
       <span className={markSlotClass}>
-        <Users aria-hidden="true" />
+        <FriendsIcon aria-hidden="true" />
       </span>
       <NavRowLabel bright={incoming > 0} className="flex-1">
         Friends
@@ -99,13 +129,16 @@ export function FriendsRow({
 export function PersonalSections({
   route,
   onOpen,
+  agents,
 }: {
   route: string;
   onOpen(view: WorkspaceView): void;
+  agents?: ReactNode;
 }) {
   useDmListUpdates();
   const { user } = useAuth();
   const dms = useDms();
+  const notices = useMessageNotices((state) => state.value);
   const collapsed = useCollapsedSections((state) => state.value);
   const dmsOpen = !collapsed.includes("dms");
   const path = route.split("?")[0];
@@ -113,9 +146,9 @@ export function PersonalSections({
 
   return (
     <>
-      <section className={chatSectionClass} aria-label="Direct messages" data-tour="sidebar-dms">
+      <section className={chatSectionClass} aria-label="Direct Messages" data-tour="sidebar-dms">
         <NavGroupHeading
-          name="Direct messages"
+          name="Direct Messages"
           collapsible={{ open: dmsOpen, onToggle: () => toggleSection("dms") }}
           className="group/row"
         >
@@ -142,21 +175,25 @@ export function PersonalSections({
               <DmRowSkeletons />
             ) : (
               (dms.data ?? []).map((dm) => {
-                const unread = dm.unread_count;
+                const muted = noticesMuted(notices, dm.id);
+                const unread = muted ? 0 : dm.unread_count;
                 const target = dmPath(dm.id);
                 return (
-                  <NavRow key={dm.id} current={path === target} onClick={() => open(target)}>
-                    <span className={faceSlotClass}>
-                      <DmFace dm={dm} myUserId={user?.id} />
-                    </span>
-                    <NavRowLabel bright={unread > 0} className="flex-1">
-                      {dmName(dm, user?.id)}
-                    </NavRowLabel>
-                    <RowCount count={unread} label="unread" />
-                  </NavRow>
+                  <DmRowMenu key={dm.id} dmId={dm.id}>
+                    <NavRow current={path === target} muted={muted} onClick={() => open(target)}>
+                      <span className={faceSlotClass}>
+                        <DmFace dm={dm} myUserId={user?.id} />
+                      </span>
+                      <NavRowLabel bright={unread > 0} className="flex-1">
+                        {dmName(dm, user?.id)}
+                      </NavRowLabel>
+                      <RowCount count={unread} label="unread" />
+                    </NavRow>
+                  </DmRowMenu>
                 );
               })
             )}
+            {agents}
           </>
         ) : null}
       </section>

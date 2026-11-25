@@ -5,7 +5,6 @@ import {
   DesktopSettingsNotice,
   DesktopSettingsRow,
   DesktopSettingsRowSkeleton,
-  DesktopSettingsSection,
 } from "@/features/settings";
 import { useCachedResource } from "@/api/cache/cached_resource";
 import {
@@ -72,14 +71,40 @@ function rangeDates(days: number) {
 const SOURCES_KEY = "engine-config/usage-sources";
 const usageKey = (range: Range) => `engine-config/usage:${range}`;
 
-export function UsageSection() {
+function useBlockError() {
   const [error, setError] = useState<string | null>(null);
+  return {
+    notice: error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null,
+    onError: setError,
+  };
+}
+
+export function UsageSection() {
+  const { notice, onError } = useBlockError();
   return (
     <>
-      {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
-      <LimitsBlock onError={setError} />
-      <UsageBlock onError={setError} />
-      <SourcesBlock onError={setError} />
+      {notice}
+      <UsageBlock onError={onError} />
+    </>
+  );
+}
+
+export function UsageLimitsSection() {
+  const { notice, onError } = useBlockError();
+  return (
+    <>
+      {notice}
+      <LimitsBlock onError={onError} />
+    </>
+  );
+}
+
+export function UsageLogsSection() {
+  const { notice, onError } = useBlockError();
+  return (
+    <>
+      {notice}
+      <SourcesBlock onError={onError} />
     </>
   );
 }
@@ -113,117 +138,121 @@ function UsageBlock(props: { onError: (error: string | null) => void }) {
   );
   const peak = Math.max(1, ...days.map((day) => day.tokens));
   return (
-    <DesktopSettingsSection title="Usage">
-      <div className="flex min-w-0 items-center justify-between gap-3 py-3">
+    <>
+      <DesktopSettingsRow label="Range">
         <ChoiceGroup label="Range" value={range} options={ranges} onChange={setRange} />
+      </DesktopSettingsRow>
+      <DesktopSettingsRow label="Group by">
         <ChoiceGroup label="Group by" value={group} options={groups} onChange={setGroup} />
-      </div>
+      </DesktopSettingsRow>
       {result === null ? (
         usage.loading ? (
           <UsageSkeleton />
         ) : null
       ) : (
-        <div className="grid gap-4 py-3">
-          <div className="flex min-w-0 gap-8">
-            <Figure label="Tokens" value={formatTokens(sum.tokens)} />
-            <Figure label="Estimated cost" value={formatCost(sum.cost, sum.unpriced)} />
-            <Figure label="Requests" value={sum.requests.toLocaleString("en-US")} />
-          </div>
-          <div
-            role="img"
-            aria-label={`Tokens per day, ${dates.from} to ${dates.to}`}
-            className="flex h-28 items-end gap-px"
-          >
-            {days.map((day) => (
-              <Tooltip
-                key={day.day}
-                content={`${day.day}: ${formatTokens(day.tokens)} tokens, ${formatCost(day.cost)}`}
-              >
-                <div className="flex h-full min-w-0 flex-1 items-end">
-                  <Text
-                    bare
-                    as="div"
-                    tone="muted"
-                    className="w-full rounded-sm bg-current/50"
-                    style={{
-                      height: `${Math.max(day.tokens ? 2 : 0, (day.tokens / peak) * 100)}%`,
-                    }}
-                  />
-                </div>
-              </Tooltip>
-            ))}
-          </div>
-          {grouped.length === 0 ? (
-            <Text size="meta" as="p" tone="muted">
-              No usage in this range
-            </Text>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{groups.find((g) => g.value === group)?.label}</TableHead>
-                  <TableHead className="text-right">Requests</TableHead>
-                  <TableHead className="text-right">Input</TableHead>
-                  <TableHead className="text-right">Output</TableHead>
-                  <TableHead className="text-right">Cache</TableHead>
-                  <TableHead className="text-right">Cost</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {grouped.map((entry) => (
-                  <TableRow key={entry.key}>
-                    <TableCell className="max-w-60 overflow-hidden">
-                      <Tooltip content={entry.key}>
-                        <span className="flex min-w-0 items-center gap-2">
-                          {group === "engine" ? (
-                            <Mark
-                              of={`engine:${entry.key}`}
-                              size={12}
-                              label={engineName(entry.key)}
-                              aria-hidden
-                            />
-                          ) : null}
-                          <OverflowFadeText>
-                            {group === "engine"
-                              ? engineName(entry.key)
-                              : group === "project"
-                                ? folderLabel(entry.key)
-                                : entry.key}
-                          </OverflowFadeText>
-                        </span>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {entry.requests.toLocaleString("en-US")}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatTokens(entry.input)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatTokens(entry.output)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatTokens(entry.cache)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {entry.unpriced && entry.cost === 0
-                        ? "No price"
-                        : formatCost(entry.cost, entry.unpriced)}
-                    </TableCell>
+        <DesktopSettingsRow label={`Last ${range} days`} stacked>
+          <div className="grid w-full gap-4">
+            <div className="flex min-w-0 gap-8">
+              <Figure label="Tokens" value={formatTokens(sum.tokens)} />
+              <Figure label="Estimated cost" value={formatCost(sum.cost, sum.unpriced)} />
+              <Figure label="Requests" value={sum.requests.toLocaleString("en-US")} />
+            </div>
+            <div
+              role="img"
+              aria-label={`Tokens per day, ${dates.from} to ${dates.to}`}
+              className="flex h-28 items-end gap-px"
+            >
+              {days.map((day) => (
+                <Tooltip
+                  key={day.day}
+                  content={`${day.day}: ${formatTokens(day.tokens)} tokens, ${formatCost(day.cost)}`}
+                >
+                  <div className="flex h-full min-w-0 flex-1 items-end">
+                    <Text
+                      bare
+                      as="div"
+                      tone="muted"
+                      className="w-full rounded-sm bg-current/50"
+                      style={{
+                        height: `${Math.max(day.tokens ? 2 : 0, (day.tokens / peak) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </Tooltip>
+              ))}
+            </div>
+            {grouped.length === 0 ? (
+              <Text size="meta" as="p" tone="muted">
+                No usage in this range
+              </Text>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{groups.find((g) => g.value === group)?.label}</TableHead>
+                    <TableHead className="text-right">Requests</TableHead>
+                    <TableHead className="text-right">Input</TableHead>
+                    <TableHead className="text-right">Output</TableHead>
+                    <TableHead className="text-right">Cache</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
+                </TableHeader>
+                <TableBody>
+                  {grouped.map((entry) => (
+                    <TableRow key={entry.key}>
+                      <TableCell className="max-w-60 overflow-hidden">
+                        <Tooltip content={entry.key}>
+                          <span className="flex min-w-0 items-center gap-2">
+                            {group === "engine" ? (
+                              <Mark
+                                of={`engine:${entry.key}`}
+                                size={12}
+                                label={engineName(entry.key)}
+                                aria-hidden
+                              />
+                            ) : null}
+                            <OverflowFadeText>
+                              {group === "engine"
+                                ? engineName(entry.key)
+                                : group === "project"
+                                  ? folderLabel(entry.key)
+                                  : entry.key}
+                            </OverflowFadeText>
+                          </span>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {entry.requests.toLocaleString("en-US")}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatTokens(entry.input)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatTokens(entry.output)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatTokens(entry.cache)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {entry.unpriced && entry.cost === 0
+                          ? "No price"
+                          : formatCost(entry.cost, entry.unpriced)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DesktopSettingsRow>
       )}
-    </DesktopSettingsSection>
+    </>
   );
 }
 
 function UsageSkeleton() {
   return (
-    <div role="status" aria-label="Usage" aria-busy="true" className="grid gap-4 py-3">
+    <div role="status" aria-label="Usage" aria-busy="true" className="grid gap-4 px-3 py-3">
       <span className="sr-only">Usage</span>
       <div className="flex min-w-0 gap-8">
         {[0, 1, 2].map((figure) => (
@@ -305,7 +334,7 @@ function SourcesBlock(props: { onError: (error: string | null) => void }) {
     }
   };
   return (
-    <DesktopSettingsSection title="Logs and prices">
+    <>
       {sources === null ? (
         logs.loading ? (
           <DesktopSettingsRowSkeleton label="Logs" rows={4} description control="text" />
@@ -343,6 +372,6 @@ function SourcesBlock(props: { onError: (error: string | null) => void }) {
           Update prices
         </Button>
       </DesktopSettingsRow>
-    </DesktopSettingsSection>
+    </>
   );
 }

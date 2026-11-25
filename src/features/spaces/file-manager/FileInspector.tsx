@@ -1,5 +1,5 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
-import { FileSearch, Files } from "lucide-react";
+import { FileSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -157,13 +157,11 @@ function otherRows(item: FileItem): PropertyListItem[] {
       { label: "Where", value: parentOf(source.path) },
       { label: "Modified", value: formatDate(item.modifiedMs) },
     );
-  } else if (source.kind === "trash" || source.kind === "agent-trash") {
+  } else if (source.kind === "trash") {
     rows.push(
       { label: "From", value: parentOf(source.item.originalPath) },
       { label: "Moved", value: formatDate(item.modifiedMs) },
     );
-  } else if (source.kind === "drive-trash" && source.entry.trashed_by_name) {
-    rows.push({ label: "Trashed by", value: source.entry.trashed_by_name });
   }
   return rows;
 }
@@ -217,11 +215,13 @@ function ItemDetails({
   item,
   from,
   hidden,
+  selection,
   onOpen,
 }: {
   item: FileItem;
   from: FilesPlace;
   hidden: boolean;
+  selection?: PropertyListItem;
   onOpen(item: FileItem): void;
 }) {
   const settled = useSettled();
@@ -230,6 +230,7 @@ function ItemDetails({
   const source = sourceOf(item);
   const previewed = !item.folder && !source.inTrash;
   const folderPreview = item.folder && placeInside(item, from) !== undefined;
+  const withSelection = (rows: PropertyListItem[]) => (selection ? [selection, ...rows] : rows);
   return (
     <div className="flex flex-col">
       {previewed || folderPreview ? (
@@ -244,13 +245,17 @@ function ItemDetails({
       <Separator className="mt-3" />
       <div className="px-3 pt-3">
         {!disked ? (
-          <PropertyList layout="info" label="Details" items={otherRows(item)} />
+          <PropertyList layout="info" label="Details" items={withSelection(otherRows(item))} />
         ) : state.status === "loading" ? (
           <PaneLoading inline label="Reading its details" />
         ) : state.status === "failed" ? (
           <ErrorState inline title="Its details couldn't be read" line={state.message} />
         ) : (
-          <PropertyList layout="info" label="Details" items={diskRows(item, state.info, size)} />
+          <PropertyList
+            layout="info"
+            label="Details"
+            items={withSelection(diskRows(item, state.info, size))}
+          />
         )}
       </div>
     </div>
@@ -259,33 +264,35 @@ function ItemDetails({
 
 export function FileInspector({
   items,
+  lead,
   from,
   hidden,
   onOpen,
 }: {
   items: FileItem[];
+  lead?: string;
   from: FilesPlace;
   hidden: boolean;
   onOpen(item: FileItem): void;
 }) {
-  let body;
-  if (items.length === 0)
-    body = (
-      <EmptyState icon={FileSearch} line="Select a file to preview it and view its details." />
-    );
-  else if (items.length > 1) {
-    const bytes = items.reduce((sum, item) => sum + (item.folder ? 0 : item.size), 0);
-    body = (
-      <EmptyState
-        icon={Files}
-        title="Multiple items"
-        line={`${countText(items.length)} selected, ${formatBytes(bytes)}`}
-      />
-    );
-  } else
-    body = (
-      <ItemDetails key={items[0].id} item={items[0]} from={from} hidden={hidden} onOpen={onOpen} />
-    );
+  const shown = items.find((item) => item.id === lead) ?? items[items.length - 1];
+  const bytes = items.reduce((sum, item) => sum + (item.folder ? 0 : item.size), 0);
+  const body = shown ? (
+    <ItemDetails
+      key={shown.id}
+      item={shown}
+      from={from}
+      hidden={hidden}
+      selection={
+        items.length > 1
+          ? { label: "Selected", value: `${countText(items.length)}, ${formatBytes(bytes)}` }
+          : undefined
+      }
+      onOpen={onOpen}
+    />
+  ) : (
+    <EmptyState icon={FileSearch} line="Select a file to preview it and view its details." />
+  );
   return (
     <aside aria-label="Preview" className="flex size-full min-h-0 flex-col overflow-y-auto p-3">
       {body}

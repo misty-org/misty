@@ -1,14 +1,5 @@
 import { Headphones, HeadphoneOff, Mic, MicOff, Settings2 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  IconButton,
-  MenuCheckItem,
-  MenuItem,
-  MenuSeparator,
-  MenuTrigger,
-  SplitButton,
-} from "@misty/ui";
+import { CallControl, MenuCheckItem, MenuItem, MenuSeparator } from "@misty/ui";
 import { DeviceChoices } from "./DeviceChoices";
 import {
   rememberSpeaker,
@@ -16,9 +7,14 @@ import {
   savedCallDevice,
   savedNoiseReduction,
 } from "./call_devices";
-import { useCallStore } from "./call_store";
+import { useCallStore, type LiveCallAudio } from "./call_store";
 
-function useCallAudio() {
+type AudioDevices = Pick<
+  LiveCallAudio,
+  "noiseReduction" | "setNoiseReduction" | "activeDevice" | "pickDevice"
+>;
+
+export function useCallAudio(): LiveCallAudio {
   const live = useCallStore((state) => state.audio);
   const saved = savedCallAudio((state) => state.value);
   const noiseReduction = savedNoiseReduction((state) => state.value);
@@ -26,17 +22,11 @@ function useCallAudio() {
   const speaker = savedCallDevice.audiooutput((state) => state.value);
   if (live) return live;
   return {
-    micOn: !saved.muted && !saved.deafened,
+    micOn: !saved.muted,
     deafened: saved.deafened,
     noiseReduction,
     toggleMic: () =>
-      savedCallAudio
-        .getState()
-        .set((current) =>
-          current.deafened
-            ? { muted: false, deafened: false }
-            : { ...current, muted: !current.muted },
-        ),
+      savedCallAudio.getState().set((current) => ({ ...current, muted: !current.muted })),
     toggleDeafen: () =>
       savedCallAudio.getState().set((current) => ({ ...current, deafened: !current.deafened })),
     setNoiseReduction: (on: boolean) => savedNoiseReduction.getState().set(on),
@@ -49,59 +39,81 @@ function useCallAudio() {
   };
 }
 
+export function MicrophoneMenu({
+  audio,
+  onVoiceSettings,
+}: {
+  audio: AudioDevices;
+  onVoiceSettings?: () => void;
+}) {
+  return (
+    <>
+      <DeviceChoices
+        kind="audioinput"
+        title="Microphone"
+        value={audio.activeDevice("audioinput")}
+        onPick={(deviceId) => audio.pickDevice("audioinput", deviceId)}
+      />
+      <MenuSeparator />
+      <MenuCheckItem
+        label="Noise reduction"
+        checked={audio.noiseReduction}
+        onCheckedChange={audio.setNoiseReduction}
+      />
+      {onVoiceSettings ? (
+        <MenuItem icon={Settings2} label="Voice settings" onSelect={onVoiceSettings} />
+      ) : null}
+    </>
+  );
+}
+
+export function SpeakerMenu({
+  audio,
+  onVoiceSettings,
+}: {
+  audio: AudioDevices;
+  onVoiceSettings?: () => void;
+}) {
+  return (
+    <>
+      <DeviceChoices
+        kind="audiooutput"
+        title="Speaker"
+        value={audio.activeDevice("audiooutput")}
+        onPick={(deviceId) => audio.pickDevice("audiooutput", deviceId)}
+      />
+      {onVoiceSettings ? (
+        <>
+          <MenuSeparator />
+          <MenuItem icon={Settings2} label="Voice settings" onSelect={onVoiceSettings} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
 export function CallAudioControls({ onVoiceSettings }: { onVoiceSettings(): void }) {
   const audio = useCallAudio();
   return (
     <>
-      <SplitButton label="Microphone">
-        <IconButton
-          label={audio.micOn ? "Mute" : "Unmute"}
-          aria-pressed={!audio.micOn}
-          onClick={audio.toggleMic}
-        >
-          {audio.micOn ? <Mic /> : <MicOff />}
-        </IconButton>
-        <DropdownMenu modal={false}>
-          <MenuTrigger iconOnly chevron label="Microphone settings" />
-          <DropdownMenuContent side="top" align="start">
-            <DeviceChoices
-              kind="audioinput"
-              title="Microphone"
-              value={audio.activeDevice("audioinput")}
-              onPick={(deviceId) => audio.pickDevice("audioinput", deviceId)}
-            />
-            <MenuSeparator />
-            <MenuCheckItem
-              label="Noise reduction"
-              checked={audio.noiseReduction}
-              onCheckedChange={audio.setNoiseReduction}
-            />
-            <MenuItem icon={Settings2} label="Voice settings" onSelect={onVoiceSettings} />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SplitButton>
-      <SplitButton label="Sound">
-        <IconButton
-          label={audio.deafened ? "Undeafen" : "Deafen"}
-          aria-pressed={audio.deafened}
-          onClick={audio.toggleDeafen}
-        >
-          {audio.deafened ? <HeadphoneOff /> : <Headphones />}
-        </IconButton>
-        <DropdownMenu modal={false}>
-          <MenuTrigger iconOnly chevron label="Sound settings" />
-          <DropdownMenuContent side="top" align="start">
-            <DeviceChoices
-              kind="audiooutput"
-              title="Speaker"
-              value={audio.activeDevice("audiooutput")}
-              onPick={(deviceId) => audio.pickDevice("audiooutput", deviceId)}
-            />
-            <MenuSeparator />
-            <MenuItem icon={Settings2} label="Voice settings" onSelect={onVoiceSettings} />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SplitButton>
+      <CallControl
+        label={audio.micOn ? "Mute" : "Unmute"}
+        off={!audio.micOn}
+        onClick={audio.toggleMic}
+        menuLabel="Microphone settings"
+        menu={<MicrophoneMenu audio={audio} onVoiceSettings={onVoiceSettings} />}
+      >
+        {audio.micOn ? <Mic /> : <MicOff />}
+      </CallControl>
+      <CallControl
+        label={audio.deafened ? "Undeafen" : "Deafen"}
+        off={audio.deafened}
+        onClick={audio.toggleDeafen}
+        menuLabel="Sound settings"
+        menu={<SpeakerMenu audio={audio} onVoiceSettings={onVoiceSettings} />}
+      >
+        {audio.deafened ? <HeadphoneOff /> : <Headphones />}
+      </CallControl>
     </>
   );
 }

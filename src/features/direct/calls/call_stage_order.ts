@@ -1,21 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { Track } from "livekit-client";
-import type { ActiveCall } from "./call_store";
-import { useCallSession } from "./call_session_store";
-import type { CallPerson } from "./use_live_kit_call";
+import type { CallPerson, CallVideo } from "./use_live_kit_call";
 
 export const STRIP_SEEN = 3;
 
-export function useCallTitle(call: ActiveCall | null): string {
-  const people = useCallSession((state) => state.controls?.people);
-  const nameOf = useCallSession((state) => state.nameOf);
-  if (!call) return "";
-  if (call.place.kind === "voice") return call.place.name;
-  const others = (people ?? []).filter((person) => !person.self);
-  return others.length ? others.map((person) => nameOf(person.id)).join(", ") : "Call";
-}
-
-export function featured(people: CallPerson[], pinned: string | null): Track | undefined {
+export function featured(people: CallPerson[], pinned: string | null): CallVideo | undefined {
   const pick = people.find((person) => person.id === pinned);
   const screen = people.find((person) => !person.self && person.screen);
   return (

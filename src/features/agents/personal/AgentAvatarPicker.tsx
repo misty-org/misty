@@ -34,7 +34,7 @@ export function AgentAvatarPicker({
         <Pressable
           aria-label="Edit agent avatar"
           onClick={() => setAvatarEditing(!avatarEditing)}
-          className="group relative size-16 shrink-0 overflow-hidden rounded-md"
+          className="group relative size-16 shrink-0 overflow-hidden rounded-full"
         >
           <AgentAvatar
             agent={
@@ -50,7 +50,7 @@ export function AgentAvatarPicker({
             bare
             as="div"
             tone="bright"
-            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl"
+            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full"
           >
             <Pencil />
           </Text>

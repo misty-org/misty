@@ -1,35 +1,16 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { spacesApi } from "../api/api";
 import type { Space } from "../api/dto/entities";
 import { Avatar, AvatarFallback, AvatarImage, cn } from "@misty/ui";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
+import { seedPicture, useVersionedPicture } from "@/shared/lib/versioned_picture";
 
-const pictures = new Map<string, Promise<string | null>>();
-
-function spacePicture(spaceId: string, version: number) {
-  const key = `${spaceId}:${version}`;
-  let picture = pictures.get(key);
-  if (!picture) {
-    picture = spacesApi
-      .spacePicture(spaceId)
-      .then((blob) => (blob.size ? URL.createObjectURL(blob) : null))
-      .catch(() => null);
-    pictures.set(key, picture);
-  }
-  return picture;
+export function seedSpacePicture(spaceId: string, version: number, url: string) {
+  seedPicture(`space:${spaceId}`, version, url);
 }
 
-function useSpacePicture(spaceId: string, version: number) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    setUrl(null);
-    if (!version) return;
-    let live = true;
-    void spacePicture(spaceId, version).then((found) => live && setUrl(found));
-    return () => {
-      live = false;
-    };
-  }, [spaceId, version]);
-  return url;
+export function useSpacePicture(spaceId: string, version: number) {
+  return useVersionedPicture(`space:${spaceId}`, version, () => spacesApi.spacePicture(spaceId));
 }
 
 const tones = ["blue", "teal", "violet", "orange", "pink", "green", "amber", "red"] as const;
@@ -45,7 +26,7 @@ export function SpaceAvatar({
   className,
   fallbackClassName,
 }: {
-  space: Pick<Space, "id" | "name"> & Partial<Pick<Space, "avatar_version">>;
+  space: Pick<Space, "id" | "name"> & Partial<Pick<Space, "avatar_version" | "avatar_decoration">>;
   className?: string;
   fallbackClassName?: string;
 }) {
@@ -55,7 +36,13 @@ export function SpaceAvatar({
     background: `linear-gradient(140deg, color-mix(in srgb, ${tone} 88%, white), color-mix(in srgb, ${tone} 62%, black))`,
   };
   return (
-    <Avatar shape="tile" className={cn("shrink-0", className)} aria-label={`${space.name} picture`}>
+    <Avatar
+      shape="tile"
+      edge
+      outline={avatarOutline(space.avatar_decoration)}
+      className={cn("shrink-0", className)}
+      aria-label={`${space.name} picture`}
+    >
       {picture ? <AvatarImage src={picture} alt="" /> : null}
       <AvatarFallback
         className={cn("font-semibold tracking-tight text-white", fallbackClassName)}

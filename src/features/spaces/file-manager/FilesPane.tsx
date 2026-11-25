@@ -9,17 +9,18 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Portal, PropertyList, Surface, Text, type CollectionItem } from "@misty/ui";
+import { Portal, Surface, type CollectionItem } from "@misty/ui";
 import { disk } from "@/features/files";
 import { mimeFromName } from "../drive";
+import { useSpacesStore } from "../list/use_spaces_store";
 import { acceptsFile } from "../apps/space_app_files";
 import { keyCommands } from "./browser_parts";
-import { ColumnsView } from "./ColumnsView";
+import { ColumnsArea } from "./FilesColumnsArea";
 import type { FilesDialogs } from "./dialogs/UseFilesDialogs";
 import { FilesDialogsHost } from "./dialogs/UseFilesDialogs";
 import { canCreateIn, canPasteIn, createFileActions, fail } from "./file_actions";
+import { canDropIn, carryFiles, draggedItems, takesDrop } from "./file_drag";
 import { collectionItem } from "./FileItems";
-import { FilePreview } from "./FilePreview";
 import { useFilesChoices, type FilesPick, type FilesSort } from "./files_choices";
 import { handleFilesKey } from "./files_keys";
 import { useFilesReveal } from "./files_reveal";
@@ -32,15 +33,16 @@ import {
   PaneSidebar,
   PaneToolbar,
 } from "./FilesPaneParts";
-import { formatBytes, formatDate, kindOf } from "./format";
 import { ItemMenuFor } from "./ItemMenu";
 import { finderOrdered } from "./list_folder";
 import {
   browsable,
+  isSpaceTrashFolder,
   localPath,
+  mayEmptySpaceTrash,
   parentOf,
   placeInside,
-  samePlace,
+  placeKey,
   type FileItem,
   type FilesPlace,
 } from "./model";
@@ -64,65 +66,6 @@ export interface PaneSlots {
 
 const NO_ITEMS: FileItem[] = [];
 
-function ColumnPreview({ item }: { item: FileItem }) {
-  return (
-    <div className="flex w-60 shrink-0 flex-col gap-3 p-3">
-      <div className="relative h-48 min-h-0 overflow-hidden">
-        <FilePreview key={item.id} item={item} compact />
-      </div>
-      <Text weight="semibold" tone="bright" full>
-        {item.name}
-      </Text>
-      <PropertyList
-        label="Info"
-        layout="stacked"
-        items={[
-          { label: "Kind", value: kindOf(item) },
-          { label: "Size", value: formatBytes(item.size) },
-          { label: "Modified", value: formatDate(item.modifiedMs) },
-        ]}
-      />
-    </div>
-  );
-}
-
-const ColumnsArea = memo(function ColumnsArea({
-  shown,
-  hidden,
-  sort,
-}: {
-  shown: Map<string, FileItem>;
-  hidden: boolean;
-  sort: FilesSort | undefined;
-}) {
-  const { store, actions } = usePane();
-  const place = useBrowser((state) => state.place);
-  const root = useBrowser((state) => state.columnRoot);
-  const selected = useBrowser((state) => state.selected);
-  const cut = useBrowser((state) => state.cut);
-  const ids = useMemo(() => [...selected], [selected]);
-  const one = ids.length === 1 ? shown.get(ids[0]) : undefined;
-  return (
-    <ColumnsView
-      root={root}
-      place={place}
-      hidden={hidden}
-      sort={sort}
-      selected={ids}
-      cut={cut}
-      preview={one && !one.folder ? <ColumnPreview item={one} /> : undefined}
-      onPick={(at, id, event, columnOrder) => {
-        const state = store.getState();
-        if (samePlace(at, state.place)) state.pick(id, columnOrder, event);
-        else state.go(at, { replace: true, select: [id] });
-      }}
-      onOpen={actions.open}
-      menu={(item) => <ItemMenuFor item={item} />}
-      onDrop={actions.dropInto}
-    />
-  );
-});
-
 const MainArea = memo(function MainArea({
   listing,
   items,
@@ -130,6 +73,7 @@ const MainArea = memo(function MainArea({
   columns,
   background,
   drag,
+  dropHere,
 }: {
   listing: MainListing;
   items: CollectionItem[];
@@ -137,6 +81,7 @@ const MainArea = memo(function MainArea({
   columns?: ReactNode;
   background: BackgroundMenu;
   drag: Parameters<typeof FilesMain>[0]["drag"];
+  dropHere: Parameters<typeof FilesMain>[0]["dropHere"];
 }) {
   const pane = usePane();
   const { store } = pane;
@@ -182,6 +127,7 @@ const MainArea = memo(function MainArea({
         store.getState().pick(id, orderIds(), event);
       }}
       drag={drag}
+      dropHere={dropHere}
       background={background}
       columns={columns}
       scrollRef={scrollRef}
@@ -249,9 +195,7 @@ function PaneBody({
     pane.shown.current = shown;
   }, [pane, shown]);
 
-  const driveSpace =
-    place.kind === "space-drive" || place.kind === "space-drive-trash" ? place.spaceId : undefined;
-  const drives = useDriveOpenWith(driveSpace);
+  const drives = useDriveOpenWith();
   useLayoutEffect(() => {
     driveOpen.current = (item) => {
       if (item.source.kind !== "drive") return;
@@ -297,11 +241,31 @@ function PaneBody({
               );
             },
             onDrop: (target: string | null, ids: string[], copy: boolean) => {
-              const dropped = ids.flatMap((id) => shown.get(id) ?? []);
+              const dropped = draggedItems(ids, shown);
               const into = target ? shown.get(target) : undefined;
               const destination = into ? placeInside(into, place) : place;
               if (destination) actions.dropInto(destination, dropped, copy);
             },
+            where: placeKey(place),
+            onDwell: (target: string) => {
+              const into = shown.get(target);
+              const inside = into ? placeInside(into, place) : undefined;
+              if (inside) store.getState().go(inside);
+            },
+            carries: (ids: ReadonlyArray<string>) =>
+              carryFiles(ids.flatMap((id) => shown.get(id) ?? [])),
+          },
+    [picking, place, shown, actions, store],
+  );
+  const dropHere = useMemo(
+    () =>
+      picking || !takesDrop(place)
+        ? undefined
+        : {
+            canDrop: (ids: ReadonlyArray<string>, copy: boolean) =>
+              canDropIn(place, draggedItems(ids, shown), copy),
+            onDrop: (ids: ReadonlyArray<string>, copy: boolean) =>
+              actions.dropInto(place, draggedItems(ids, shown), copy),
           },
     [picking, place, shown, actions],
   );
@@ -309,6 +273,13 @@ function PaneBody({
   const hiddenToggle = browsable(place)
     ? { shown: hidden, toggle: choices.toggleHidden }
     : undefined;
+  const trashSpace = place.kind === "space-drive" && isSpaceTrashFolder(place) ? place.spaceId : "";
+  const mayEmptyTrash = useSpacesStore(
+    (state) =>
+      trashSpace !== "" &&
+      mayEmptySpaceTrash(state.spaces.find((space) => space.id === trashSpace)?.permissions),
+  );
+  const hasItems = items.length > 0;
   const background = useMemo(
     (): BackgroundMenu =>
       picking
@@ -318,13 +289,24 @@ function PaneBody({
             paste: canPasteIn(place, granted) ? () => void actions.paste() : undefined,
             duplicates:
               granted && place.kind === "disk" ? () => actions.duplicates(place.path) : undefined,
-            emptyAgentTrash:
-              place.kind === "agent-trash" && items.length ? actions.emptyAgentTrash : undefined,
+            emptyTrash:
+              mayEmptyTrash && hasItems ? () => actions.emptyTrash(trashSpace) : undefined,
             goToFolder: granted ? () => store.getState().editPath() : undefined,
             hidden: hiddenToggle,
           },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [picking, place, granted, actions, store, items.length > 0, hidden, choices.toggleHidden],
+    [
+      picking,
+      place,
+      granted,
+      actions,
+      store,
+      hasItems,
+      hidden,
+      choices.toggleHidden,
+      mayEmptyTrash,
+      trashSpace,
+    ],
   );
 
   const searching = Boolean(query.trim());
@@ -358,6 +340,7 @@ function PaneBody({
           }
           background={background}
           drag={drag}
+          dropHere={dropHere}
         />
         <PaneFooter shown={shown} count={mainListing.status === "ready" ? items.length : null} />
       </Surface>
@@ -373,7 +356,7 @@ function PaneBody({
       ) : null}
       {slots.sidebar ? (
         <Portal container={slots.sidebar}>
-          <PaneSidebar />
+          <PaneSidebar shown={shown} />
         </Portal>
       ) : null}
       {slots.inspector ? (

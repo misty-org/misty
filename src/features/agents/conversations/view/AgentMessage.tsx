@@ -14,7 +14,7 @@ import { messageStamp, useYou, YouFace } from "./AgentChatFaces";
 import { splitLedger, type LedgerRow } from "../../checkpoints/ledger";
 import { AgentAnsweredQuestions } from "../../plans/AgentAnsweredQuestions";
 import { AgentMessageChecklist } from "../../plans/AgentChecklist";
-import { AgentProgress } from "../../progress/AgentProgress";
+import { AgentProgress, runningOutput } from "../../progress/AgentProgress";
 import { continuationEvent } from "../../progress/continuation_event";
 import { splitUnfinished } from "../../progress/unfinished";
 import { useMessageProgress } from "../../progress/use_message_progress";
@@ -26,6 +26,7 @@ import { AgentSubagents } from "./AgentSubagents";
 import { EngineThinking } from "./engine/EngineThinking";
 import { EngineAsks, useEngineTurn } from "./engine/EngineTurnParts";
 import { EngineSubagents } from "./engine/EngineSubagents";
+import { EngineTasks } from "./engine/EngineTodos";
 import { AgentTurnChanges } from "./AgentTurnChanges";
 import { turnPhrase } from "../../progress/turn_model";
 import { LiveStatus } from "./status/LiveStatus";
@@ -152,12 +153,6 @@ function AgentMessageView(props: AgentMessageProps) {
         {props.steps?.map((step) => (
           <EarlierReply key={step.id} message={step} />
         ))}
-        <AgentMessageChecklist
-          conversationId={props.conversationId}
-          invocationId={message.invocationId}
-          running={live}
-          hold={message.appRequest?.state === "pending" ? "waiting_for_you" : undefined}
-        />
         {thinking ? <EngineThinking text={thinking} answering={answering} /> : null}
         {progress?.length ? <AgentProgress items={progress} live={live} /> : null}
         {engineTurn?.subagents.length ? (
@@ -198,12 +193,20 @@ function AgentMessageView(props: AgentMessageProps) {
             <LinkPreviews text={content} enabled={!live} />
           </Text>
         ) : null}
+        <AgentMessageChecklist
+          conversationId={props.conversationId}
+          invocationId={message.invocationId}
+          running={live}
+          hold={message.appRequest?.state === "pending" ? "waiting_for_you" : undefined}
+        />
+        {engineTurn?.todos.length ? <EngineTasks todos={engineTurn.todos} live={live} /> : null}
         {live ? (
           <LiveStatus
             phrase={status.phrase}
             waiting={status.waiting}
             startedAt={message.createdAt}
             tokens={message.usage?.output}
+            output={runningOutput(progress)}
           />
         ) : null}
         {ended ? (
@@ -254,7 +257,6 @@ function YouMessage(
     <ChannelMessage
       className="agent-message-user"
       data-message-id={message.id}
-      data-anchor-id={message.id}
       avatar={<YouFace you={you} />}
       name={you.name}
       time={stamp.time}

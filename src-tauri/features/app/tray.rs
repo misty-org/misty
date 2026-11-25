@@ -41,6 +41,9 @@ const CHECK_UPDATES_EVENT: &str = "misty://tray-check-updates";
 const SHORTCUT_EVENT: &str = "misty://shortcut-command";
 const OPEN_SETTINGS_COMMAND: &str = "app.open_settings";
 
+#[cfg(not(target_os = "macos"))]
+const TRAY_ICON: &[u8] = include_bytes!("../../icons/32x32.png");
+
 const MOST_CHATS: usize = 6;
 const MOST_TITLE: usize = 200;
 
@@ -100,7 +103,7 @@ pub fn setup(app: &tauri::App<Wry>) -> Result<(), String> {
         .icon_as_template(true);
     #[cfg(not(target_os = "macos"))]
     let builder = builder.icon(
-        tauri::image::Image::from_bytes(include_bytes!("../../icons/32x32.png"))
+        tauri::image::Image::from_bytes(TRAY_ICON)
             .map_err(|error| format!("Could not load Misty tray icon: {error}"))?,
     );
     let tray_icon = builder
@@ -263,6 +266,28 @@ pub(crate) fn refresh(app: &AppHandle<Wry>) {
         let _ = tray.set_menu(Some(built.menu));
     }
     set_glyphs(app, built.glyphs);
+}
+
+pub(crate) fn show_count(app: &AppHandle<Wry>, text: Option<&str>) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    let tooltip = match text {
+        Some(text) => format!("Misty, {text} new"),
+        None => "Misty".to_string(),
+    };
+    let _ = tray.set_tooltip(Some(tooltip));
+    #[cfg(target_os = "macos")]
+    let _ = tray.set_title(text);
+    #[cfg(not(target_os = "macos"))]
+    if let Ok(base) = tauri::image::Image::from_bytes(TRAY_ICON) {
+        let (width, height) = (base.width(), base.height());
+        let mut pixels = base.rgba().to_vec();
+        if let Some(text) = text {
+            super::badge::draw_bubble(&mut pixels, width, text, width * 9 / 16);
+        }
+        let _ = tray.set_icon(Some(tauri::image::Image::new_owned(pixels, width, height)));
+    }
 }
 
 pub(crate) fn changed() {

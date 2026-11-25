@@ -1,19 +1,28 @@
 import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { useCachedResource } from "@/api/cache/cached_resource";
-import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
+import {
+  DesktopSettingsRow,
+  DesktopSettingsRowSkeleton,
+  useSettingsSectionAction,
+} from "@/features/settings";
 import {
   Button,
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  Field,
   FieldError,
   IconButton,
   Input,
   MenuItem,
   SecretField,
-  Skeleton,
-  SkeletonControl,
   useConfirmDelete,
 } from "@misty/ui";
 import { EnginePicker } from "../channels/ChannelsSection";
@@ -71,7 +80,7 @@ function VariableRow({
   const { confirm, dialog } = useConfirmDelete();
   const remove = async () => onChange(await engineEnvApi.remove(engine, variable.name));
   return (
-    <DesktopSettingsRow label={variable.name} density="compact">
+    <DesktopSettingsRow label={variable.name}>
       {variable.secret ? (
         <SecretField
           className="w-72"
@@ -114,99 +123,95 @@ function VariableRow({
   );
 }
 
-function AddVariable({
+function AddVariableDialog({
   engine,
   onChange,
+  onClose,
 }: {
   engine: EngineId;
   onChange: (vars: EngineEnvVar[]) => void;
+  onClose: () => void;
 }) {
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const add = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || saving) return;
     setSaving(true);
     try {
       onChange(await engineEnvApi.set(engine, name.trim(), value));
-      setName("");
-      setValue("");
-      setError("");
+      onClose();
     } catch (failure) {
       setError(message(failure));
     } finally {
       setSaving(false);
     }
   };
+  const submit = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") void add();
+  };
   return (
-    <div className="grid gap-1 py-3" data-tour="agents-env-add">
-      <div className="flex items-center gap-2">
-        <Input
-          aria-label="Variable name"
-          placeholder="NAME"
-          className="w-56"
-          value={name}
-          onChange={(event) => setName(event.target.value.toUpperCase().replace(/\s/g, "_"))}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void add();
-          }}
-        />
-        <Input
-          aria-label="Variable value"
-          placeholder="Value"
-          className="min-w-0 flex-1"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void add();
-          }}
-        />
-        <Button variant="secondary" disabled={!name.trim() || saving} onClick={() => void add()}>
-          <Plus />
+    <DialogContent size="sm">
+      <DialogHeader>
+        <DialogTitle>Add a variable</DialogTitle>
+      </DialogHeader>
+      <DialogBody className="grid gap-4">
+        <Field label="Name">
+          <Input
+            placeholder="NAME"
+            value={name}
+            onChange={(event) => setName(event.target.value.toUpperCase().replace(/\s/g, "_"))}
+            onKeyDown={submit}
+          />
+        </Field>
+        <Field label="Value" error={error}>
+          <Input
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={submit}
+          />
+        </Field>
+      </DialogBody>
+      <DialogFooter>
+        <Button size="lg" variant="quiet" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          size="lg"
+          variant="primary"
+          disabled={!name.trim() || saving}
+          onClick={() => void add()}
+        >
           Add
         </Button>
-      </div>
-      <FieldError message={error} />
-    </div>
-  );
-}
-
-function VariableRowSkeleton() {
-  return (
-    <div
-      data-setting-label=""
-      role="status"
-      aria-label="Variables"
-      aria-busy="true"
-      className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 py-3"
-    >
-      <div className="flex h-6 items-center">
-        <Skeleton className="h-4 w-32" />
-      </div>
-      <div className="flex items-center gap-2">
-        <SkeletonControl kind="field" className="w-72" />
-        <SkeletonControl kind="icon" />
-      </div>
-    </div>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
 export function EnvironmentSection({ initialEngine = "claude" }: { initialEngine?: EngineId }) {
   const [engine, setEngine] = useState<EngineId>(initialEngine);
+  const [adding, setAdding] = useState(false);
   const variables = useCachedResource(`engine-config/env:${engine}`, () =>
     engineEnvApi.list(engine),
   );
   const vars = variables.data;
   const setVars = variables.set;
   const error = variables.error && !vars ? message(variables.error) : "";
+  useSettingsSectionAction({
+    label: "Add variable",
+    icon: Plus,
+    showLabel: true,
+    onSelect: () => setAdding(true),
+  });
   return (
-    <Section title="Environment variables">
-      <DesktopSettingsRow label="Engine" density="compact">
+    <>
+      <DesktopSettingsRow label="Engine">
         <EnginePicker engine={engine} onChange={setEngine} />
       </DesktopSettingsRow>
       {variables.loading ? (
-        <VariableRowSkeleton />
+        <DesktopSettingsRowSkeleton label="Variables" control={["field", "icon"]} />
       ) : (
         (vars ?? []).map((variable) => (
           <VariableRow
@@ -217,8 +222,21 @@ export function EnvironmentSection({ initialEngine = "claude" }: { initialEngine
           />
         ))
       )}
-      <FieldError message={error} />
-      <AddVariable key={engine} engine={engine} onChange={setVars} />
-    </Section>
+      {error ? (
+        <DesktopSettingsRow label="Variables" description={error}>
+          {null}
+        </DesktopSettingsRow>
+      ) : null}
+      <Dialog open={adding} onOpenChange={setAdding}>
+        {adding ? (
+          <AddVariableDialog
+            key={engine}
+            engine={engine}
+            onChange={setVars}
+            onClose={() => setAdding(false)}
+          />
+        ) : null}
+      </Dialog>
+    </>
   );
 }

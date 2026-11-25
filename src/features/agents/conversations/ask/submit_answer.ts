@@ -31,6 +31,7 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
         );
     };
     const normalized = prompt.trim();
+    const shown = companion?.shown?.trim() || normalized;
     if (!normalized && !attachments.length) return;
     if (get().working) {
       if (attachments.length) {
@@ -47,7 +48,7 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
     const epoch = advanceSubmissionEpoch();
     const executionMode = companion?.executionMode ?? "user";
     const echo = echoPrompt(set, get, {
-      prompt: normalized,
+      prompt: shown,
       attachments,
       echoed: !(companion?.idempotencyKey?.startsWith("voice-") || companion?.continuation),
       conversationId: origin?.conversationId,
@@ -148,10 +149,10 @@ export function createSubmitAnswer(set: MistySet, get: MistyGet): MistyState["su
     const collaborationMode = companion?.collaborationMode ?? modes.collaborationMode;
     echo.settle(conversationId);
     if (startsConversation && !companion?.continuation)
-      awaitConversationTitle(conversationId, normalized, normalized.slice(0, 56));
+      awaitConversationTitle(conversationId, shown, shown.slice(0, 56));
     updateConversation(set, get, conversationId, (conversation) =>
       openTurn(conversation, {
-        prompt: normalized,
+        prompt: shown,
         userMessage,
         assistantMessage,
         isEcho,

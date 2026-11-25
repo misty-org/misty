@@ -1,11 +1,5 @@
-import { MenuItem, MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@misty/ui";
+import { MenuLabel, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@misty/ui";
 import { useCallDevices, type CallDeviceKind } from "./call_devices";
-
-const noDevices: Record<CallDeviceKind, string> = {
-  audioinput: "No microphones found",
-  audiooutput: "No speakers found",
-  videoinput: "No cameras found",
-};
 
 export function DeviceChoices({
   kind,
@@ -19,18 +13,16 @@ export function DeviceChoices({
   onPick: (deviceId: string) => void;
 }) {
   const devices = useCallDevices(kind);
+  const picked = devices.some((device) => device.deviceId === value) ? value : "";
   return (
     <>
       <MenuLabel>{title}</MenuLabel>
-      {devices.length ? (
-        <MenuRadioGroup value={value} onValueChange={onPick}>
-          {devices.map((device) => (
-            <MenuRadioItem key={device.deviceId} value={device.deviceId} label={device.label} />
-          ))}
-        </MenuRadioGroup>
-      ) : (
-        <MenuItem label={noDevices[kind]} disabled />
-      )}
+      <MenuRadioGroup value={picked} onValueChange={onPick}>
+        <MenuRadioItem value="" label="System default" />
+        {devices.map((device) => (
+          <MenuRadioItem key={device.deviceId} value={device.deviceId} label={device.label} />
+        ))}
+      </MenuRadioGroup>
     </>
   );
 }

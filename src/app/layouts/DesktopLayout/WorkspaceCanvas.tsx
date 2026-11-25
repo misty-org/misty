@@ -16,6 +16,7 @@ import { WorkspaceDockTree } from "./WorkspaceDockTree";
 import { SidebarDrawer } from "./SidebarDrawer";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { useClearTabsShortcut } from "./UseClearTabsShortcut";
+import { AppBadgeSync } from "./attention";
 import { WorkspaceTabPanels } from "./WorkspaceTabPanels";
 import { TopEdge } from "./TopEdge";
 import { WorkspaceTabBar } from "./WorkspaceTabBar";
@@ -29,6 +30,9 @@ import { useWorkspaceCanvasShortcuts } from "./use_workspace_canvas_shortcuts";
 import { useWorkspaceTabShortcuts } from "./use_workspace_tab_shortcuts";
 import { disposeWorkspaceTab, workspaceTabsById } from "./workspace_view_lifecycle";
 import { Surface } from "@misty/ui";
+import { SidebarAccountBar } from "./SidebarAccountBar";
+import { SidebarNowPlaying } from "./SidebarNowPlaying";
+import { SpaceRailNav } from "./SpaceRailNav";
 
 export function WorkspaceCanvas(props: {
   tabPosition?: TabSide;
@@ -106,13 +110,15 @@ export function WorkspaceCanvas(props: {
   );
 
   const windowSpace = useWindowSpace();
-  useAppPrograms(windowSpace?.id);
+  useAppPrograms();
   useAppStandby(windowSpace?.id);
   useEffect(() => {
     if (!windowSpace) return;
     const open = (event: Event) => {
-      const tab = (event as CustomEvent<{ tab?: string }>).detail?.tab ?? "agents";
-      const route = `/spaces/${encodeURIComponent(windowSpace.id)}/explore?tab=${encodeURIComponent(tab)}`;
+      const detail = (event as CustomEvent<{ tab?: string; app?: string }>).detail;
+      const params = new URLSearchParams({ tab: detail?.tab ?? "agents" });
+      if (detail?.app) params.set("app", detail.app);
+      const route = `/spaces/${encodeURIComponent(windowSpace.id)}/explore?${params}`;
       openWorkspaceRoute(route, openTab);
     };
     window.addEventListener(openAgentsPageEvent, open);
@@ -160,6 +166,7 @@ export function WorkspaceCanvas(props: {
 
   const side = props.tabPosition ?? "left";
   const contentColumn = side === "right" ? 1 : 2;
+  const sidebarColumn = side === "right" ? 2 : 1;
 
   return (
     <>
@@ -170,8 +177,19 @@ export function WorkspaceCanvas(props: {
         }`}
         data-workspace-panes={leaves.length}
       >
-        <SidebarDrawer side={side}>
-          <WorkspaceSidebar position={side} onOpen={openTab} account={props.stripAccount} />
+        <SidebarDrawer
+          side={side}
+          gridColumn={sidebarColumn}
+          rail={<SpaceRailNav onOpen={openTab} side={side} />}
+          footer={
+            props.stripAccount ? (
+              <SidebarAccountBar side={side} above={<SidebarNowPlaying onOpen={openTab} />}>
+                {props.stripAccount}
+              </SidebarAccountBar>
+            ) : null
+          }
+        >
+          <WorkspaceSidebar position={side} onOpen={openTab} />
         </SidebarDrawer>
         <TopEdge gridColumn={contentColumn} side={side} />
         <WorkspaceTabBar
@@ -183,6 +201,7 @@ export function WorkspaceCanvas(props: {
         <WorkspaceTabPanels gridColumn={contentColumn} layout={layout} renderTree={dockTree} />
         <PaneSwapMode />
         <WorkspaceSearch onOpen={openTab} path={location.pathname} />
+        <AppBadgeSync />
         <TrayAgentsSync
           onOpenChat={(agentId, chatId) =>
             openWorkspaceRoute(openChatRoute(agentId, chatId), openTab)

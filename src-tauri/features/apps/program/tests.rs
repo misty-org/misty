@@ -97,7 +97,7 @@ fn the_pin_comes_from_the_catalog_and_must_be_the_makers_own() {
     let Some(platform) = platform() else { return };
     let catalog = |url: &str, extra: &str| -> String {
         format!(
-            r#"{{"apps":[{{"id":"demo","upstream":"maker/demo","version":"1.0.0","mcp_program":{{"program":"demo-cli","args":["mcp"],"read_root_flag":"--read-root","write_root_flag":"--write-root"{extra},"builds":{{"{platform}":{{"url":"{url}","sha256":"{}","size":10}}}}}}}}]}}"#,
+            r#"[{{"kind":"site","id":"tunes","name":"Tunes"}},{{"id":"demo","upstream":"maker/demo","version":"1.0.0","mcp_program":{{"program":"demo-cli","args":["mcp"],"read_root_flag":"--read-root","write_root_flag":"--write-root"{extra},"builds":{{"{platform}":{{"url":"{url}","sha256":"{}","size":10}}}}}}}}]"#,
             "a".repeat(64)
         )
     };

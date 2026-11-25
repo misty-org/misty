@@ -1,22 +1,22 @@
 # Permissions: who may use an action and how far. Misty's defaults, and the person can add on
-# Processes are held to theirs by the OS, in the .sb profile beside
-# this file or in the code named below. Nothing here allows a command by itself.
+# Processes are held to theirs by the OS, in the sandbox profile kept
+# in the code named below. Nothing here allows a command by itself.
 
 [[permission]]
 identifier = "permission-agent-shell"
-description = "The chat's workspace and system tools, with no network. See agent-shell.sb."
+description = "The chat's workspace and system tools, with no network. See agents/shell/macos.rs."
 
 [[permission]]
 identifier = "permission-document-worker"
-description = "The one file it's handed, with no network. See document-worker.sb."
+description = "The one file it's handed, with no network. See documents/unix.rs."
 
 [[permission]]
 identifier = "permission-page-reader"
-description = "The page it's handed, with no network or files. See page-reader.sb."
+description = "The page it's handed, with no network or files. See browser/page_text/host/unix.rs."
 
 [[permission]]
 identifier = "permission-speech-helper"
-description = "Speech models and recordings on this computer, with no network or other programs. See speech-helper.sb."
+description = "Speech models and recordings on this computer, with no network or other programs. See voice/speech.rs."
 
 [[permission]]
 identifier = "permission-screen-capture"

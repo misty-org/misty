@@ -134,6 +134,7 @@ export type AiInvocationEvent =
       args?: unknown;
       result?: unknown;
       path?: string;
+      pictures?: string[];
       parentToolCallId?: string;
     }
   | {
@@ -266,4 +267,5 @@ export type AiProgressItem =
       args?: unknown;
       result?: unknown;
       path?: string;
+      pictures?: string[];
     };

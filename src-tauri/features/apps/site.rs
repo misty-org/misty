@@ -88,7 +88,6 @@ pub fn origin_allows(origin: &str, url: &Url) -> bool {
 fn entry_in(apps: &str, id: &str) -> Option<SiteEntry> {
     let document: Value = serde_json::from_str(apps).ok()?;
     document
-        .get("apps")?
         .as_array()?
         .iter()
         .find(|app| {
@@ -140,9 +139,9 @@ mod tests {
 
     #[test]
     fn a_site_entry_is_read_from_the_registry() {
-        let apps = r#"{"apps":[{"id":"draw","url":"x"},{"kind":"site","id":"tunes","name":"Tunes","version":"1.0.0",
+        let apps = r#"[{"id":"draw","url":"x"},{"kind":"site","id":"tunes","name":"Tunes","version":"1.0.0",
             "address":"https://tunes.example.com/","origins":["https://tunes.example.com"],"platforms":["macos"],
-            "media":{"macos":{"drm":false}},"permissions":["rooms"],"adapter":{"url":"https://registry.mistysys.com/files/a.js","sha256":"a","size":1}}]}"#;
+            "media":{"macos":{"drm":false}},"permissions":["rooms"],"adapter":{"url":"https://registry.mistysys.com/files/a.js","sha256":"a","size":1}}]"#;
         let site = entry_in(apps, "tunes").unwrap();
         assert_eq!(
             site.address().unwrap().as_str(),

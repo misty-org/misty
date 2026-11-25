@@ -1,17 +1,25 @@
-import { ListChecks } from "lucide-react";
-import { ComposerStatusRow } from "@misty/ui";
-import { useEngineTurnStore } from "./engine_turn_store";
+import { TurnTasks, type TurnTaskState } from "@misty/ui";
+import type { EngineTodo } from "../../../runs/invocations/invocation_types";
 
-export function EngineTodoLane({ runId }: { runId?: string }) {
-  const todos = useEngineTurnStore((state) => (runId ? state.byRun[runId]?.todos : undefined));
-  if (!todos?.length) return null;
-  const done = todos.filter((todo) => todo.status === "complete").length;
-  const current =
-    todos.find((todo) => todo.status === "active") ??
-    todos.find((todo) => todo.status !== "complete" && todo.status !== "dropped");
+const taskStates: Record<NonNullable<EngineTodo["status"]>, TurnTaskState> = {
+  pending: "pending",
+  active: "working",
+  complete: "done",
+  blocked: "failed",
+  dropped: "skipped",
+};
+
+export function EngineTasks({ todos, live }: { todos: EngineTodo[]; live: boolean }) {
+  const unfinished = todos.some((todo) => todo.status !== "complete" && todo.status !== "dropped");
+  if (!todos.length || (!live && !unfinished)) return null;
   return (
-    <ComposerStatusRow icon={ListChecks} label={`Tasks ${done} of ${todos.length}`}>
-      {current?.content ?? "All done"}
-    </ComposerStatusRow>
+    <TurnTasks
+      label="Tasks"
+      tasks={todos.map((todo, index) => ({
+        id: todo.id ?? `${index}:${todo.content}`,
+        title: todo.content,
+        state: taskStates[todo.status ?? "pending"],
+      }))}
+    />
   );
 }

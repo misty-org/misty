@@ -1,3 +1,4 @@
+import { settleProgress } from "../../progress/progress_timeline";
 import { readRunState } from "../../runs/invocations/invocation_subscription";
 import type { GlobalAiConversation } from "./conversation_types";
 import { isStoredChat, localChats } from "./local_chats";
@@ -31,6 +32,7 @@ async function settleOrphanedReplies(
             state: "failed" as const,
             retryable: true,
             content: message.content || "This run stopped before it finished.",
+            progress: settleProgress(message.progress),
           }
         : message,
     ),

@@ -8,12 +8,8 @@ import {
 } from "@misty/ui";
 import { useMistyStore, useStudioAgents } from "@/features/agents";
 import { useNow } from "@/shared/hooks/use_now";
-import type {
-  Space,
-  SpaceIntegrationMember,
-  SpaceMember,
-  SpaceRoleDef,
-} from "../../api/dto/entities";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
+import type { Space, SpaceMember, SpaceRoleDef } from "../../api/dto/entities";
 import { MemberRolesMenu } from "../../roles/MemberRolesMenu";
 import { loadSpaceMembers } from "../load_space_members";
 import { useSpacesStore } from "../../list/use_spaces_store";
@@ -24,10 +20,8 @@ import { useMemberPicture } from "../../members/member_pictures";
 import { useAccountPresence } from "@/shared/lib/account_presence";
 import { useVoicePresence } from "../../list/voice_presence";
 import { useSpaceConversations } from "../sidebar/use_space_conversations";
-import { useSpaceApps } from "../../apps/use_space_apps";
 import { appEntry } from "../../apps/third_party_apps";
 import { ChatAvatar } from "./ChatAvatar";
-import { accessLine } from "../../integrations/integration_access";
 
 interface Row {
   member: SpaceMember;
@@ -63,7 +57,6 @@ export function ChatMemberList(props: {
   const { spaceId } = props;
   const now = useNow();
   const people = useSpacesStore((state) => state.membersBySpace[spaceId]);
-  const integrations = useSpacesStore((state) => state.integrationsBySpace[spaceId]);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -82,7 +75,6 @@ export function ChatMemberList(props: {
   const voice = useVoicePresence((state) => state.bySpace[spaceId]);
   const inVoice = Object.values(voice ?? {}).some((people) => people.length > 0);
   const { conversations } = useSpaceConversations(inVoice ? spaceId : "");
-  const { apps } = useSpaceApps(spaceId);
   const heard = useMemberAgents((state) => state.bySpace[spaceId]);
   const roles = useSpaceRoles(spaceId);
   const { agents } = useStudioAgents();
@@ -102,9 +94,8 @@ export function ChatMemberList(props: {
     for (const viewer of viewers ?? []) {
       if (activity.has(viewer.user_id)) continue;
       if (viewer.place === "app" && viewer.item_id) {
-        const app = apps?.find((candidate) => candidate.app_id === viewer.item_id);
-        const name = (app && appEntry(app)?.name) ?? app?.app_id;
-        if (name) activity.set(viewer.user_id, `In ${name}`);
+        const name = appEntry({ app_id: viewer.item_id })?.name ?? viewer.item_id;
+        activity.set(viewer.user_id, `In ${name}`);
       } else if (viewer.place === "lab") activity.set(viewer.user_id, "In the Lab");
     }
     const working = new Map<string, { state: string; line: string }>();
@@ -170,16 +161,7 @@ export function ChatMemberList(props: {
     accounts,
     voice,
     conversations,
-    apps,
   ]);
-
-  const shownIntegrations = useMemo(
-    () =>
-      props.visibleTo
-        ? []
-        : [...(integrations ?? [])].sort((left, right) => left.name.localeCompare(right.name)),
-    [integrations, props.visibleTo],
-  );
 
   if (!people && failed)
     return (
@@ -214,25 +196,7 @@ export function ChatMemberList(props: {
           ))}
         </Fragment>
       ))}
-      {shownIntegrations.length ? (
-        <>
-          <MemberGroupHeading title="Integrations" count={shownIntegrations.length} />
-          {shownIntegrations.map((integration) => (
-            <IntegrationItem key={integration.id} integration={integration} />
-          ))}
-        </>
-      ) : null}
     </MemberList>
-  );
-}
-
-function IntegrationItem({ integration }: { integration: SpaceIntegrationMember }) {
-  return (
-    <MemberRow
-      avatar={<ChatAvatar id={integration.id} name={integration.name} size="default" />}
-      name={integration.name}
-      line={accessLine(integration.access, integration.key_prefix) || undefined}
-    />
   );
 }
 
@@ -245,10 +209,7 @@ function MemberItem(props: {
   owner: boolean;
   isMe: boolean;
 }) {
-  const picture = useMemberPicture(
-    props.member.user_id,
-    props.member.avatar_version,
-  );
+  const picture = useMemberPicture(props.member.user_id, props.member.avatar_version);
   return (
     <MemberRolesMenu space={props.space} member={props.member}>
       <MemberRow
@@ -258,6 +219,7 @@ function MemberItem(props: {
             name={props.member.name}
             src={picture ?? undefined}
             size="default"
+            outline={avatarOutline(props.member.avatar_decoration)}
           />
         }
         name={props.member.name}

@@ -59,16 +59,28 @@ it("lists the person's own Space first in the switcher", () => {
   ]);
 });
 
-it("never offers to delete, leave or transfer the person's own Space", () => {
+it("never offers to delete or leave the person's own Space", () => {
   spaces.splice(0, spaces.length, own, team);
   open(<SpaceSettingsItems space={own} onDialog={vi.fn()} />);
   expect(screen.queryByRole("menuitem", { name: /Delete/ })).toBeNull();
   expect(screen.queryByRole("menuitem", { name: /Leave/ })).toBeNull();
-  expect(screen.getByRole("menuitem", { name: "Edit name and picture" })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Space settings" })).toBeTruthy();
 });
 
-it("offers Delete for another Space its owner made", () => {
+it("keeps Delete out of the menu: its owner finds it in Space settings", () => {
   spaces.splice(0, spaces.length, own, team);
   open(<SpaceSettingsItems space={team} onDialog={vi.fn()} />);
-  expect(screen.getByRole("menuitem", { name: /Delete/ })).toBeTruthy();
+  expect(screen.queryByRole("menuitem", { name: /Delete/ })).toBeNull();
+  expect(screen.getByRole("menuitem", { name: "Space settings" })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Invite people" })).toBeTruthy();
+});
+
+it("offers People and Leave to a member who manages nothing", () => {
+  spaces.splice(0, spaces.length, own, theirs);
+  open(
+    <SpaceSettingsItems space={{ ...theirs, permissions: ["messages.read"] }} onDialog={vi.fn()} />,
+  );
+  expect(screen.queryByRole("menuitem", { name: "Space settings" })).toBeNull();
+  expect(screen.getByRole("menuitem", { name: "People" })).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Leave Space" })).toBeTruthy();
 });

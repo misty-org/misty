@@ -61,26 +61,6 @@ vi.mock("@/shared/platform/native_invoke", () => ({
       case "speech_catalog":
         return {
           hearing: [],
-          voices: [
-            {
-              id: "amy",
-              name: "Amy",
-              maker: "",
-              source: "",
-              license: "MIT",
-              languages: ["en"],
-              package: { url: "", sha256: "", size: 0 },
-              disk_mb: 60,
-              memory_mb: 100,
-              installed: false,
-              outdated: false,
-              packageKey: "amy",
-              accent: "British English",
-              gender: "female",
-              family: "piper",
-              speaker: 0,
-            },
-          ],
           supportInstalled: false,
           machine: { memoryMb: 16_000, cores: 8, appleSilicon: true, diskFreeMb: null },
           installing: [],
@@ -249,13 +229,9 @@ it("offers only the direct sign-ins, which need no key, then ends the welcome", 
     expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
   );
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  expect(await screen.findByRole("heading", { name: "Pick Misty's voice" })).toBeTruthy();
-  const amy = await screen.findByRole("button", { name: "Amy (British English)" });
-  expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
-  fireEvent.click(amy);
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false),
-  );
+  expect(
+    await screen.findByRole("heading", { name: "Which language do you speak?" }),
+  ).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
   expect(await screen.findByRole("button", { name: "Connect Notion" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Connect Asana" })).toBeNull();

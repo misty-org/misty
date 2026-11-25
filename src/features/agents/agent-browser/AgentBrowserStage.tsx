@@ -39,7 +39,7 @@ export function AgentBrowserStage({
     setClosed(false);
     setShownAgentTab(scopeId);
     if (!blank)
-      void wakeAgentTab(scopeId).then(
+      void wakeAgentTab(scopeId, ref.current).then(
         (open) => {
           if (current) setClosed(!open);
         },

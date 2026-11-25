@@ -1,33 +1,35 @@
 import {
   Keyboard,
-  LayoutGrid,
+  Lock,
+  MousePointer2,
   Palette,
-  Search,
   Server,
+  ShieldCheck,
   SlidersHorizontal,
   UserCircle,
-  Users,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { lazy, type ComponentType } from "react";
-import { spaceIcons } from "@misty/ui";
+import { appIcons, spaceIcons } from "@misty/ui";
 import type { SettingOwnership } from "./device-preferences/registry";
 import type { SettingsContentProps, SettingsSection } from "./settings_types";
 
 export { preferenceSection, preferencesWithoutRows } from "./settings_routing";
 
 type SettingsArea =
-  | "account"
-  | "general"
+  | "profile"
+  | "privacy"
   | "server"
-  | "appearance"
-  | "input"
+  | "general"
+  | "interface"
+  | "voice"
+  | "shortcuts"
   | "advanced"
-  | "search"
-  | "files"
-  | "apps"
-  | "agents";
+  | "agents"
+  | "permissions"
+  | "tutor"
+  | "engines";
 
 interface SettingsAreaInfo {
   label: string;
@@ -35,83 +37,104 @@ interface SettingsAreaInfo {
 }
 
 export const settingsAreas: Record<SettingsArea, SettingsAreaInfo> = {
-  account: { label: "Profile", icon: UserCircle },
-  general: { label: "General", icon: SlidersHorizontal },
+  profile: { label: "Profile", icon: UserCircle },
+  privacy: { label: "Privacy", icon: Lock },
   server: { label: "Server", icon: Server },
-  appearance: { label: "Interface", icon: Palette },
-  input: { label: "Input", icon: Keyboard },
+  general: { label: "General", icon: SlidersHorizontal },
+  interface: { label: "Interface", icon: Palette },
+  voice: { label: "Voice", icon: appIcons.speech },
+  shortcuts: { label: "Shortcuts", icon: Keyboard },
   advanced: { label: "Advanced", icon: Wrench },
-  search: { label: "Search", icon: Search },
-  files: { label: "Files", icon: spaceIcons.files },
-  apps: { label: "Apps", icon: LayoutGrid },
-  agents: { label: "Agents", icon: Users },
+  agents: { label: "Agents", icon: spaceIcons.agents },
+  permissions: { label: "Permissions", icon: ShieldCheck },
+  tutor: { label: "Tutor", icon: MousePointer2 },
+  engines: { label: "Engines", icon: appIcons.engines },
 };
 
 export const settingsGroups: readonly { label: string; areas: readonly SettingsArea[] }[] = [
-  { label: "Account", areas: ["account", "server"] },
-  {
-    label: "App",
-    areas: ["general", "appearance", "input", "advanced"],
-  },
-  { label: "Pages", areas: ["search", "files", "apps", "agents"] },
+  { label: "Account", areas: ["profile", "privacy", "server"] },
+  { label: "App", areas: ["general", "interface", "voice", "shortcuts", "advanced"] },
+  { label: "AI", areas: ["agents", "permissions", "tutor", "engines"] },
 ];
 
 interface SettingsBlock {
   id: SettingsSection;
-  label: string;
   area: SettingsArea;
+  title?: string;
   owner: SettingOwnership;
+  also: readonly SettingsSection[];
+  tour?: string;
 }
 
 interface SettingsRegistryEntry extends SettingsBlock {
   Component: ComponentType<SettingsContentProps>;
 }
 
-const block = (
+const section = (
   area: SettingsArea,
   id: SettingsSection,
-  label: string,
-  owner: SettingOwnership = "device",
-): SettingsBlock => ({ area, id, label, owner });
+  title: string | undefined,
+  options: { owner?: SettingOwnership; also?: readonly SettingsSection[]; tour?: string } = {},
+): SettingsBlock => ({
+  area,
+  id,
+  title,
+  owner: options.owner ?? "device",
+  also: options.also ?? [],
+  tour: options.tour,
+});
+
+const resource = { owner: "resource" } as const;
 
 const settingsBlocks: readonly SettingsBlock[] = [
-  block("general", "general", "Startup"),
-  block("general", "updates", "Updates"),
-  block("account", "account", "Profile", "resource"),
-  block("account", "status", "Status", "resource"),
-  block("account", "requests", "Requests", "resource"),
-  block("account", "notifications", "Notifications"),
-  block("account", "sessions", "Sessions", "resource"),
-  block("server", "server", "Server"),
-  block("server", "drive", "Drive"),
-  block("server", "menu-bar", "Menu bar"),
-  block("server", "privacy", "Data"),
-  block("appearance", "appearance", "Appearance"),
-  block("appearance", "fonts", "Fonts"),
-  block("appearance", "pets", "Pet"),
-  block("appearance", "bottom-bar", "Bottom bar"),
-  block("appearance", "accessibility", "Accessibility"),
-  block("input", "shortcuts", "Shortcuts"),
-  block("input", "voice", "Voice"),
-  block("input", "devices", "Devices"),
-  block("advanced", "advanced", "Advanced"),
-  block("advanced", "network", "Network"),
-  block("advanced", "performance", "Performance"),
-  block("advanced", "diagnostics", "Diagnostics"),
-  block("search", "search", "Sources"),
-  block("files", "thumbnails", "Thumbnails"),
-  block("apps", "apps-data", "Data"),
-  block("agents", "agents-list", "Team", "resource"),
-  block("agents", "agents-defaults", "Conversations"),
-  block("agents", "agents-companion", "Tutor"),
-  block("agents", "agents-permissions", "Access", "resource"),
-  block("agents", "agents-computer-use", "Computer use"),
-  block("agents", "agent-activity", "Activity"),
-  block("agents", "models", "Engine"),
-  block("agents", "engines-clis", "Setup", "resource"),
-  block("agents", "engines-channels", "Channels", "resource"),
-  block("agents", "engines-environment", "Environment", "resource"),
-  block("agents", "engines-usage", "Usage", "resource"),
+  section("profile", "account", "Details", resource),
+  section("profile", "status", "Status", resource),
+  section("profile", "sessions", "Sessions", resource),
+  section("profile", "account-removal", "Account removal", resource),
+  section("privacy", "requests", "Friends", resource),
+  section("privacy", "privacy", "This computer", { also: ["apps-data"] }),
+  section("server", "server", "Connection"),
+  section("server", "drive", "Drive", { also: ["thumbnails"] }),
+  section("general", "general", "Startup", { also: ["menu-bar"] }),
+  section("general", "notifications", "Notifications"),
+  section("general", "search", "Search"),
+  section("general", "browser", "Browser"),
+  section("general", "updates", "Updates"),
+  section("interface", "appearance", "Theme"),
+  section("interface", "display", "Display", { also: ["accessibility"] }),
+  section("interface", "fonts", "Fonts"),
+  section("interface", "bottom-bar", "Bottom bar"),
+  section("interface", "pets", "Pet"),
+  section("voice", "voice", "Dictation"),
+  section("voice", "speech", "Speech"),
+  section("voice", "speaking", "Speaking"),
+  section("voice", "listening", "Listening", { also: ["devices"] }),
+  section("voice", "voice-models", "On this computer"),
+  section("shortcuts", "shortcuts", undefined),
+  section("advanced", "network", "Network", { also: ["advanced"] }),
+  section("advanced", "performance", "Performance"),
+  section("advanced", "diagnostics", "Diagnostics"),
+  section("agents", "agents-list", "Your agents", { ...resource, tour: "agents-list" }),
+  section("agents", "agents-defaults", "Chats"),
+  section("agents", "agents-screens", "Screens"),
+  section("agents", "agent-activity", "Activity"),
+  section("permissions", "agents-permissions", "Limits", resource),
+  section("permissions", "agents-approvals", "Approvals", resource),
+  section("permissions", "agents-folders", "Shared folders", resource),
+  section("permissions", "agents-sandbox", "Sandbox"),
+  section("permissions", "agents-disk", "Disk"),
+  section("permissions", "agents-computer-use", "Computer use"),
+  section("tutor", "agents-companion", "Companion"),
+  section("tutor", "tutor-behavior", "Behavior"),
+  section("tutor", "tutor-talking", "Talking"),
+  section("tutor", "tutor-tour", "Tour"),
+  section("engines", "models", "Default"),
+  section("engines", "engines-clis", "Installed", resource),
+  section("engines", "engines-channels", undefined, resource),
+  section("engines", "engines-environment", "Environment", resource),
+  section("engines", "engines-usage", "Usage", resource),
+  section("engines", "engines-limits", "Plan limits", resource),
+  section("engines", "engines-logs", "Logs", resource),
 ];
 
 export const settingsRegistry: SettingsRegistryEntry[] = [];
@@ -149,8 +172,8 @@ export function registerSettingsSections(
   }
 }
 
-export function settingsPage(section: SettingsSection): SettingsRegistryEntry | undefined {
-  return settingsRegistry.find((entry) => entry.id === section);
+export function settingsPage(id: SettingsSection): SettingsRegistryEntry | undefined {
+  return settingsRegistry.find((entry) => entry.id === id || entry.also.includes(id));
 }
 
 export function settingsPageTitle(entry: SettingsRegistryEntry): string {

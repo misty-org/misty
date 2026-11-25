@@ -44,6 +44,9 @@ export interface SkillRow {
   targets: SkillTargetId[];
   targetStates: Record<string, SkillTargetState>;
   targetPaths?: Record<string, string>;
+  bundleSha256?: string;
+  registryId?: string;
+  registryCategory?: string;
 }
 
 export interface SkillsInstalledResult {

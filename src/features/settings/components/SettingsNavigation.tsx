@@ -1,4 +1,4 @@
-import { NavGroupHeading, NavList, NavRow, OverflowFadeText } from "@misty/ui";
+import { NavBranch, NavGroupHeading, NavList, NavRow, OverflowFadeText } from "@misty/ui";
 import type { LucideIcon } from "lucide-react";
 import { Fragment } from "react";
 export interface DesktopSettingsNavEntry<Id extends string = string> {
@@ -24,10 +24,7 @@ export function SettingsNavigation<Id extends string>(props: {
   onSection?: (id: string) => void;
 }) {
   return (
-    <nav
-      aria-label={props.label}
-      className="misty-scrollbar min-h-0 flex-1 overflow-y-auto px-3"
-    >
+    <nav aria-label={props.label} className="misty-scrollbar min-h-0 flex-1 overflow-y-auto px-3">
       {props.groups.map((group) => (
         <div key={group.label} role="group" aria-label={group.label} className="pb-3">
           <NavGroupHeading tone="page" name={group.label} className="mt-2 mb-1" />
@@ -48,8 +45,9 @@ export function SettingsNavigation<Id extends string>(props: {
                     {Icon ? <Icon aria-hidden /> : null}
                     <OverflowFadeText>{entry.label}</OverflowFadeText>
                   </NavRow>
-                  {open
-                    ? props.sections?.map((section) => (
+                  {open && props.sections?.length ? (
+                    <NavBranch>
+                      {props.sections.map((section) => (
                         <NavRow
                           key={section.id}
                           tone="page"
@@ -60,8 +58,9 @@ export function SettingsNavigation<Id extends string>(props: {
                         >
                           <OverflowFadeText>{section.label}</OverflowFadeText>
                         </NavRow>
-                      ))
-                    : null}
+                      ))}
+                    </NavBranch>
+                  ) : null}
                 </Fragment>
               );
             })}

@@ -1,5 +1,13 @@
 import { Check, SendHorizontal } from "lucide-react";
-import { Button, ColorChip, Separator, Surface, Text, Tooltip } from "@misty/ui";
+import {
+  Button,
+  ColorChip,
+  OverflowFadeText,
+  Separator,
+  Surface,
+  Text,
+  Tooltip,
+} from "@misty/ui";
 import { sizeLabel, styleNames } from "./picked_element";
 import type { PagePick } from "./pick_api";
 
@@ -34,7 +42,9 @@ export function PickedElementCard({
           ) : null}
           <div className="min-w-0 flex-1">
             <Tooltip content={element.selector}>
-              <code className="preview-card-selector">{element.selector}</code>
+              <OverflowFadeText as="code" className="preview-card-selector">
+                {element.selector}
+              </OverflowFadeText>
             </Tooltip>
             <Text
               bare
@@ -61,12 +71,12 @@ export function PickedElementCard({
                   {name}
                 </Text>
                 <Tooltip content={element.styles[name]}>
-                  <dd>
+                  <OverflowFadeText as="dd">
                     {name === "color" || name === "background" ? (
                       <ColorChip color={element.styles[name]} />
                     ) : null}
                     {element.styles[name]}
-                  </dd>
+                  </OverflowFadeText>
                 </Tooltip>
               </div>
             ) : null,

@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { callEncryptionSupported } from "./call_support";
-import { Phone, PhoneOff, Video } from "lucide-react";
-import { Button, SideCard, Text, ViewportLayer, notify } from "@misty/ui";
+import { Phone, Video } from "lucide-react";
+import { Button, HangUpGlyph, SideCard, Text, ViewportLayer, notify } from "@misty/ui";
 import { useDirectUserId } from "../direct_account";
 import { onRealtimeMessage } from "@/features/spaces";
 import { dmPath, peekDm, useDms, useFriends } from "../direct_data";
@@ -10,6 +10,8 @@ import { isDoNotDisturb } from "../status_store";
 import { deviceCallKey } from "./call_keys";
 import { loopCallSound } from "./call_sounds";
 import { CallFullscreen, CallMiniPlayer } from "./CallView";
+import { AgentCallSession } from "./AgentCallSession";
+import { useAgentCall } from "./agent_call_store";
 import { watchSpeakerForSpeech } from "./call_devices";
 import { dmOf, useCallStore } from "./call_store";
 import { useMissedCalls } from "./missed_calls";
@@ -34,6 +36,7 @@ export function IncomingCallHost() {
   const myId = useDirectUserId();
   const incoming = useCallStore((state) => state.incoming);
   const active = useCallStore((state) => state.active);
+  const agentCall = useAgentCall((state) => state.call);
   const maxPeople = useCallStore((state) => state.config?.max_people ?? 8);
   const dms = useDms().data;
   const friends = useFriends().data;
@@ -134,9 +137,10 @@ export function IncomingCallHost() {
       "Someone")
     : "";
 
-  if (!incoming && !active) return null;
+  if (!incoming && !active && !agentCall) return null;
   return (
     <>
+      {agentCall && !active ? <AgentCallSession call={agentCall} /> : null}
       {active ? (
         <Suspense fallback={null}>
           <CallSession key={active.room} call={active} maxPeople={maxPeople} />
@@ -154,8 +158,8 @@ export function IncomingCallHost() {
                 </Text>
                 <div className="flex items-center justify-end gap-2">
                   <Button
-                    variant="quiet"
-                    icon={PhoneOff}
+                    variant="hang-up"
+                    icon={HangUpGlyph}
                     onClick={() => useCallStore.getState().decline()}
                   >
                     Decline

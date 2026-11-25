@@ -1,6 +1,8 @@
 import type { GlobalAiMessage } from "../state/conversation_types";
 import { useMistyStore } from "../state/use_misty_store";
-import { MessageActions, type MessageAction } from "@misty/ui";
+import { MessageActions, notify, type MessageAction } from "@misty/ui";
+import { say, stopSaying, useSpeechSupport } from "@/features/voice";
+import { usePersonalAgentsStore } from "../../personal/personal_agents_store";
 import {
   Copy,
   Forward,
@@ -39,7 +41,7 @@ export function AgentMessageActions(props: {
   const [handOff, setHandOff] = useState(false);
   useSpaceWindowStore((store) => store.identity.key);
   const space = !user ? spacesGateway.maybe()?.sharedWindowSpace() : undefined;
-  const speech = useReadAloud(props.text);
+  const speech = useReadAloud(props.text, props.conversationId);
   if (state === "pending" || state === "streaming") return null;
   const canRetry = state === "failed" && message.retryable && props.retryPrompt;
   const actions: MessageAction[] = [];
@@ -151,30 +153,36 @@ function selectedText(button: HTMLElement) {
   return message.contains(range.commonAncestorContainer) ? selection.toString().trim() : "";
 }
 
-function useReadAloud(text: string) {
+function useReadAloud(text: string, conversationId?: string) {
+  const support = useSpeechSupport();
+  const voice = useMistyStore((state) => {
+    const agentId = state.conversations.find((chat) => chat.id === conversationId)?.agentId;
+    return usePersonalAgentsStore.getState().agents.find((agent) => agent.id === agentId)?.voice;
+  });
   const [speaking, setSpeaking] = useState(false);
-  const utterance = useRef<SpeechSynthesisUtterance>(undefined);
-  const speech = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+  const reading = useRef(false);
   useEffect(
     () => () => {
-      if (utterance.current) speech?.cancel();
+      if (reading.current) void stopSaying();
     },
-    [speech],
+    [],
   );
-  if (!speech) return null;
+  if (!support?.speaking) return null;
   return {
     speaking,
     toggle: () => {
-      speech.cancel();
-      if (speaking) return setSpeaking(false);
-      const next = new SpeechSynthesisUtterance(plainText(text));
-      next.onend = next.onerror = () => {
-        if (utterance.current === next) utterance.current = undefined;
-        setSpeaking(false);
-      };
-      utterance.current = next;
-      speech.speak(next);
+      if (speaking) {
+        void stopSaying();
+        return;
+      }
+      reading.current = true;
       setSpeaking(true);
+      void say(plainText(text), voice || undefined)
+        .catch((reason: unknown) => notify({ message: String(reason), tone: "error" }))
+        .finally(() => {
+          reading.current = false;
+          setSpeaking(false);
+        });
     },
   };
 }

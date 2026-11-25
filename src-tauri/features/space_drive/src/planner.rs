@@ -275,10 +275,8 @@ mod tests {
             modified_by: String::new(),
             modified_by_name: "Ana".into(),
             modified_at: String::new(),
-            trashed: false,
             trashed_at: None,
             trashed_by: None,
-            trash_hold: false,
             deleted: false,
             replaced_of: None,
             content_version: None,
@@ -302,9 +300,6 @@ mod tests {
             dirty_content: false,
             dirty_place: false,
             trash_pending: false,
-            trash_held: false,
-            trash_agent: None,
-            trash_chat: None,
             not_synced: false,
             downloaded: false,
             content_base: None,
@@ -364,7 +359,7 @@ mod tests {
         let mut trees = Trees::default();
         agreed(&mut trees, item("d", None, "D", 1, None), "/D");
         let mut gone = item("d", None, "D", 2, None);
-        gone.trashed = true;
+        gone.deleted = true;
         trees.server.insert(ItemId("d".into()), gone);
         let mut fresh = node_of(&item("n", Some("d"), "new.txt", 0, Some("y")), "/D/new.txt");
         fresh.created = true;
@@ -383,7 +378,7 @@ mod tests {
             "/D/f.txt",
         );
         let mut gone = item("d", None, "D", 2, None);
-        gone.trashed = true;
+        gone.deleted = true;
         trees.server.insert(ItemId("d".into()), gone);
         assert_eq!(plan_down(&trees), vec![Down::Remove(ItemId("d".into()))]);
     }

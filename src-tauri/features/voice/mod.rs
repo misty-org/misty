@@ -12,6 +12,7 @@ mod share_audio;
 pub mod speech;
 pub mod speech_models;
 pub mod speech_words;
+pub mod voicebox;
 
 #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
 pub use audio_capture::*;

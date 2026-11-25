@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { IconButton, IndicatorDot, spaceIcons } from "@misty/ui";
+import { noticesMuted, useMessageNotices } from "@/shared/lib/message_notices";
 import { preloadSpaceSection } from "../overview/SpaceSectionView";
 import { spaceChatPath } from "./chat_route";
 import { useSpaceConversationList, useSpaceEveryoneUnread } from "./space_conversations_resource";
@@ -8,7 +9,13 @@ export function SpaceChatButton({ spaceId }: { spaceId: string }) {
   const navigate = useNavigate();
   const everyone = useSpaceEveryoneUnread(spaceId);
   const conversations = useSpaceConversationList(spaceId).data ?? [];
-  const unread = everyone + conversations.reduce((sum, item) => sum + (item.unread_count ?? 0), 0);
+  const notices = useMessageNotices((state) => state.value);
+  const unread =
+    (noticesMuted(notices, spaceId, "") ? 0 : everyone) +
+    conversations.reduce(
+      (sum, item) => sum + (noticesMuted(notices, spaceId, item.id) ? 0 : (item.unread_count ?? 0)),
+      0,
+    );
   const Icon = spaceIcons.chat;
   return (
     <span className="relative inline-flex" data-tour="space-chat-button">

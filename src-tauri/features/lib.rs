@@ -63,6 +63,16 @@ pub fn run() {
     }
     let _ = rustls::crypto::ring::default_provider().install_default();
     app::plugins::register(tauri::Builder::default())
+        .on_page_load(|webview, payload| {
+            use tauri::Manager;
+            let window = webview.window();
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started)
+                && webview.label() == window.label()
+                && !webview.label().starts_with("misty-browser-")
+            {
+                browser::close_window_pages(webview.app_handle(), window.label());
+            }
+        })
         .setup(app::setup::setup)
         .invoke_handler(app::handlers::invoke_handler())
         .build(context)

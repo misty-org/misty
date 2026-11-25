@@ -1,53 +1,103 @@
-import { UserRound, Wrench } from "lucide-react";
+import { MessagesSquare, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { ChannelHeader, cn, FramedBar, windowToolbarClass } from "@misty/ui";
-import { useTitlePending } from "../conversations/state/conversation_titles";
+import { useSpeechSupport } from "@/features/voice";
+import { ChannelHeader, cn, FramedBar, profileIcons, windowToolbarClass } from "@misty/ui";
+import { chatCallItems, chatMoreItem } from "@/shared/hooks/ChatBarItems";
+import { agentCallsHost } from "../calls/agent_calls_host";
+import { startAgentCall } from "../calls/start_agent_call";
+import { useEnginesList } from "../engines/engines_api";
+import { mistyEngine } from "../engines/misty_engine";
 import { AgentConversationActions } from "../conversations/view/AgentConversationActions";
+import { useConversationActions } from "../conversations/view/UseConversationActions";
 import { AgentAvatar } from "../personal/AgentAvatar";
 import { AgentIdentity } from "../personal/AgentIdentity";
 import { useContextPanel } from "../context-panel/context_panel_store";
 import { useRailShown } from "../context-panel/rail_layout_store";
 
+const notBusy = () => false;
+const noTranscript = () => ({ inCall: false, shown: false, toggle: () => undefined });
+
+function useAgentSees(agent?: AgentProfile): boolean {
+  const engines = useEnginesList().data;
+  if (!agent) return false;
+  if (!agent.engine || agent.engine === mistyEngine) return true;
+  return Boolean(engines?.find((engine) => engine.id === agent.engine)?.supportsImages);
+}
+
 export function AgentStudioBar({
-  conversation,
   agent,
+  conversation,
+  disabled = false,
+  callable = false,
 }: {
-  conversation?: { id: string; title?: string };
   agent?: AgentProfile;
+  conversation?: { id: string; title?: string };
+  disabled?: boolean;
+  callable?: boolean;
 }) {
-  const titlePending = useTitlePending(conversation);
   const profileOpen = useContextPanel((state) => state.tab === "profile");
   const railShown = useRailShown((state) => state.value);
-  const topic = titlePending
-    ? undefined
-    : conversation
-      ? conversation.title || "Untitled thread"
-      : "New thread";
+  const useBusy = agentCallsHost.maybe()?.useBusy ?? notBusy;
+  const busy = useBusy();
+  const useTranscript = agentCallsHost.maybe()?.useTranscript ?? noTranscript;
+  const transcript = useTranscript(conversation?.id);
+  const sees = useAgentSees(agent);
+  const speech = useSpeechSupport();
+  const talks = Boolean(speech?.speaking && speech.recognition);
+  const conversationActions = useConversationActions({
+    conversation: conversation ?? { id: "" },
+    disabled,
+  });
+  const calls =
+    callable && talks && agent && agentCallsHost.maybe()
+      ? {
+          disabled: busy,
+          videoDisabled: !sees,
+          start: (video: boolean) =>
+            startAgentCall({ agent, conversationId: conversation?.id, video, sees }),
+        }
+      : undefined;
   return (
-    <ChannelHeader
-      leading={<AgentAvatar agent={agent} face />}
-      name={agent?.name ?? "Agent"}
-      topic={topic}
-      actions={[
-        {
-          id: "profile",
-          icon: UserRound,
-          label: "Profile",
-          priority: 2,
-          pressed: profileOpen,
-          onSelect: () => useContextPanel.getState().toggle("profile"),
-        },
-        {
-          id: "tools",
-          icon: Wrench,
-          label: "Tools",
-          priority: 1,
-          pressed: railShown,
-          onSelect: () => useRailShown.getState().set(!railShown),
-        },
-      ]}
-    />
+    <>
+      <ChannelHeader
+        leading={<AgentAvatar agent={agent} face />}
+        name={agent?.name ?? "Agent"}
+        actions={[
+          ...chatCallItems(calls),
+          ...(transcript.inCall
+            ? [
+                {
+                  id: "threads",
+                  icon: MessagesSquare,
+                  label: "Thread",
+                  priority: 9,
+                  pressed: transcript.shown,
+                  onSelect: transcript.toggle,
+                },
+              ]
+            : []),
+          {
+            id: "tools",
+            icon: Wrench,
+            label: "Tools",
+            priority: 3,
+            pressed: railShown,
+            onSelect: () => useRailShown.getState().set(!railShown),
+          },
+          {
+            id: "profile",
+            icon: profileIcons.agent,
+            label: "Profile",
+            priority: 5,
+            pressed: profileOpen,
+            onSelect: () => useContextPanel.getState().toggle("profile"),
+          },
+          ...chatMoreItem(conversation ? conversationActions.rows : undefined),
+        ]}
+      />
+      {conversation ? conversationActions.dialogs : null}
+    </>
   );
 }
 

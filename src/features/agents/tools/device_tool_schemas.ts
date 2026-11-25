@@ -179,6 +179,8 @@ export const deviceToolSchemas: Record<string, Schema> = {
   ),
   "screen.look": object({ reason: text(3, 300) }, ["reason"]),
   "screen.close": object({ scopeId }, ["scopeId"]),
+  "browser.tab.list": object({}),
+  "browser.tab.use": object({ scopeId, reason: text(3, 300) }, ["scopeId", "reason"]),
 };
 
 function isType(value: unknown, type: NonNullable<Schema["type"]>): boolean {

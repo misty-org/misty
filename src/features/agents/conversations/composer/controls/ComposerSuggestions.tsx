@@ -3,7 +3,6 @@ import {
   FileText,
   Folder,
   Globe,
-  Plus,
   ScrollText,
   UserRound,
   type LucideIcon,
@@ -15,7 +14,6 @@ import { commandIcon } from "../commands/command_icons";
 import { catalogFor, mistyCommandsFor } from "../commands/engine_commands";
 import { matchMentionEntries, mentionIndex, prefetchMentionIndex } from "./mention_files";
 import { matchPrompts, promptsFor } from "@/features/engine-config/prompts";
-import { openAgentsHub } from "../../../hub/agents_hub_store";
 import { applyTrigger, filterItems, mentionOf, triggerAt, type Trigger } from "./composer_triggers";
 import { PersonaMakeAgent, personaSuggestions } from "../../../personas/PersonaSuggestions";
 
@@ -24,11 +22,11 @@ interface Suggestion {
   name: string;
   description: string;
   insert: string;
-  icon: "file" | "folder" | "command" | "skill" | "browser" | "prompt" | "new" | "persona";
+  icon: "file" | "folder" | "command" | "skill" | "browser" | "prompt" | "persona";
   hint?: string;
   origin?: "builtin" | "user" | "project";
   persona?: string;
-  action?: "browser" | "new-prompt";
+  action?: "browser";
   source?: string;
 }
 
@@ -53,15 +51,6 @@ const computerCommand: Suggestion = {
 
 const sourceLabel = { builtin: "", user: "Yours", project: "Project" } as const;
 
-const newPrompt: Suggestion = {
-  key: "prompt:new",
-  name: "New prompt",
-  description: "",
-  insert: "",
-  icon: "new",
-  action: "new-prompt",
-};
-
 async function suggestionsFor(
   trigger: Trigger,
   engine: string,
@@ -78,7 +67,6 @@ async function suggestionsFor(
         icon: "prompt" as const,
         source: entry.scope === "workspace" ? "Project" : "Yours",
       })),
-      newPrompt,
     ];
   }
   const outside = Boolean(engine && engine !== mistyEngine);
@@ -156,7 +144,6 @@ const icons = {
   skill: ScrollText,
   browser: Globe,
   prompt: FileText,
-  new: Plus,
   persona: UserRound,
 };
 
@@ -223,11 +210,6 @@ export function useComposerSuggestions(input: {
 
   const choose = (item: Suggestion) => {
     if (!trigger) return;
-    if (item.action === "new-prompt") {
-      setTrigger(undefined);
-      openAgentsHub("prompts");
-      return;
-    }
     if (item.action) input.onAction?.(item.action);
     const next = applyTrigger(text, trigger, item.insert);
     input.setText(next.text);
@@ -295,7 +277,7 @@ export function useComposerSuggestions(input: {
             icon={iconOf(item)}
             label={
               <>
-                {item.action === "new-prompt" ? item.name : `${prefixes[trigger.kind]}${item.name}`}
+                {`${prefixes[trigger.kind]}${item.name}`}
                 {item.hint ? (
                   <Text as="span" tone="muted" className="ml-1 inline">
                     {item.hint}

@@ -382,5 +382,22 @@ pub fn remove_all_versions(root: &Path, id: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn remove_other_versions(root: &Path, id: &str, keep: &str) -> Result<(), String> {
+    if !valid_id(id) || !valid_version(keep) {
+        return Err("That isn't an app id and version.".into());
+    }
+    let Ok(entries) = fs::read_dir(root.join(id)) else {
+        return Ok(());
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let path = entry.path();
+        if path.file_name().and_then(|name| name.to_str()) != Some(keep) && fs::is_dir(&path) {
+            fs::remove_dir_all(&path)
+                .map_err(|error| format!("Couldn't remove the app's old version: {error}"))?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests;

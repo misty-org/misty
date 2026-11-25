@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow as Row,
-  DesktopSettingsSection as Section,
+  DesktopSettingsRowSkeleton,
 } from "@/features/settings";
-import { Button, cn, Input, OverflowFadeText, Skeleton, SkeletonControl } from "@misty/ui";
+import { Button, Input, OverflowFadeText } from "@misty/ui";
 import { DropdownControl } from "../../settings/SettingsControls";
 import {
   applyFontPreferences,
@@ -227,49 +227,28 @@ export function FontsSection() {
   return (
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
-      <Section title="Fonts">
-        {settings ? (
-          <>
-            <FontFamilyRow
-              label="Interface font"
-              value={settings.fontFamily}
-              filePath={settings.fontFile}
-              busy={busy !== null}
-              onModeChange={(mode) => onModeChange("fontFamily", mode)}
-              onPickFile={() => onPickFile("fontFamily")}
-            />
-            <FontFamilyRow
-              label="Code font"
-              value={settings.codeFontFamily}
-              filePath={settings.codeFontFile}
-              busy={busy !== null}
-              onModeChange={(mode) => onModeChange("codeFontFamily", mode)}
-              onPickFile={() => onPickFile("codeFontFamily")}
-            />
-          </>
-        ) : (
-          ["w-32", "w-28"].map((width, index) => (
-            <div
-              key={width}
-              data-setting-label=""
-              role={index === 0 ? "status" : undefined}
-              aria-label={index === 0 ? "Fonts" : undefined}
-              aria-busy={index === 0 || undefined}
-              className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-8 py-3"
-            >
-              <div className="grid min-w-0 gap-1">
-                <div className="flex h-6 items-center">
-                  <Skeleton className={cn("h-4", width)} />
-                </div>
-                <div className="flex h-6 items-center">
-                  <Skeleton className="h-3.5 w-2/3" />
-                </div>
-              </div>
-              <SkeletonControl kind="select" className="w-50" />
-            </div>
-          ))
-        )}
-      </Section>
+      {settings ? (
+        <>
+          <FontFamilyRow
+            label="Interface font"
+            value={settings.fontFamily}
+            filePath={settings.fontFile}
+            busy={busy !== null}
+            onModeChange={(mode) => onModeChange("fontFamily", mode)}
+            onPickFile={() => onPickFile("fontFamily")}
+          />
+          <FontFamilyRow
+            label="Code font"
+            value={settings.codeFontFamily}
+            filePath={settings.codeFontFile}
+            busy={busy !== null}
+            onModeChange={(mode) => onModeChange("codeFontFamily", mode)}
+            onPickFile={() => onPickFile("codeFontFamily")}
+          />
+        </>
+      ) : (
+        <DesktopSettingsRowSkeleton label="Fonts" rows={2} control="select" />
+      )}
     </>
   );
 }

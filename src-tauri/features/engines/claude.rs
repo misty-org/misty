@@ -30,6 +30,7 @@ struct PendingTool {
     id: Option<String>,
     json: String,
     tool_call_id: Option<String>,
+    path_shown: bool,
 }
 
 impl ClaudeEngine {
@@ -763,14 +764,58 @@ fn parse_content_block_delta(
             let Some(index) = event.get("index").and_then(Value::as_u64) else {
                 return;
             };
+            let mut early = None;
             if let Ok(mut map) = pending.lock() {
                 if let Some(tool) = map.get_mut(&(agent.to_string(), index)) {
                     tool.json.push_str(partial);
+                    if !tool.path_shown {
+                        if tool.json.len() > 4096 {
+                            tool.path_shown = true;
+                        } else if let Some(path) = streamed_path(&tool.json) {
+                            tool.path_shown = true;
+                            if serde_json::from_str::<Value>(tool.json.trim()).is_err() {
+                                early = Some((tool.name.clone(), path, tool.tool_call_id.clone()));
+                            }
+                        }
+                    }
                 }
+            }
+            if let Some((name, path, tool_call_id)) = early {
+                out.push(tool_call_patch_with_id(
+                    name,
+                    Some(&serde_json::json!({ "file_path": path })),
+                    tool_call_id.as_deref(),
+                ));
             }
         }
         _ => {}
     }
+}
+
+fn streamed_path(json: &str) -> Option<String> {
+    ["file_path", "notebook_path", "path"].iter().find_map(|key| {
+        let at = json.find(&format!("\"{key}\""))? + key.len() + 2;
+        let rest = json[at..]
+            .trim_start()
+            .strip_prefix(':')?
+            .trim_start()
+            .strip_prefix('"')?;
+        let mut escaped = false;
+        let (end, _) = rest.char_indices().find(|&(_, c)| {
+            if escaped {
+                escaped = false;
+                false
+            } else if c == '\\' {
+                escaped = true;
+                false
+            } else {
+                c == '"'
+            }
+        })?;
+        let path: String = serde_json::from_str(&format!("\"{}\"", &rest[..end])).ok()?;
+        let path = path.trim();
+        (!path.is_empty()).then(|| path.to_string())
+    })
 }
 
 fn parse_content_block_start(
@@ -813,6 +858,7 @@ fn parse_content_block_start(
                     id: block.get("id").and_then(Value::as_str).map(str::to_string),
                     json: String::new(),
                     tool_call_id: tool_call_id.clone(),
+                    path_shown: false,
                 },
             );
         }
@@ -1307,6 +1353,51 @@ mod tests {
             }
             _ => panic!("expected patched tool message"),
         }
+    }
+
+    #[test]
+    fn a_streaming_write_shows_its_path_before_its_content_ends() {
+        let engine = ClaudeEngine::new();
+        let line = |event: serde_json::Value| {
+            serde_json::json!({ "type": "stream_event", "event": event }).to_string()
+        };
+        let delta = |partial: &str| {
+            line(serde_json::json!({
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": { "type": "input_json_delta", "partial_json": partial }
+            }))
+        };
+        let mut out = Vec::new();
+        engine.parse_line(
+            &line(serde_json::json!({
+                "type": "content_block_start",
+                "index": 1,
+                "content_block": { "type": "tool_use", "id": "toolu_w", "name": "Write", "input": {} }
+            })),
+            &mut out,
+        );
+        engine.parse_line(&delta("{\"file_pa"), &mut out);
+        assert_eq!(out.len(), 1);
+        engine.parse_line(&delta("th\":\"src/a b.ts\",\"content\":\"hel"), &mut out);
+        assert_eq!(out.len(), 2);
+        match &out[1] {
+            EngineEvent::Message {
+                path, args, patch, ..
+            } => {
+                assert_eq!(path.as_deref(), Some("src/a b.ts"));
+                assert_eq!(args, &Some(serde_json::json!({ "file_path": "src/a b.ts" })));
+                assert!(*patch);
+            }
+            _ => panic!("expected the path patch"),
+        }
+        engine.parse_line(&delta("lo \\\"path\\\" there\"}"), &mut out);
+        assert_eq!(out.len(), 2);
+        engine.parse_line(
+            &line(serde_json::json!({ "type": "content_block_stop", "index": 1 })),
+            &mut out,
+        );
+        assert_eq!(out.len(), 3);
     }
 
     #[test]

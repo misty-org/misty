@@ -1,4 +1,4 @@
-import type { VoiceView } from "../speech_models";
+import type { VoiceboxVoice } from "../voicebox";
 
 export const speechLanguages = [
   { value: "auto", label: "System language" },
@@ -26,8 +26,6 @@ function languageName(code: string) {
   }
 }
 
-export function voiceLabel(voice: VoiceView) {
-  const language = voice.languages.find((code) => code !== "*");
-  const where = voice.accent ?? (language ? languageName(language) : undefined);
-  return where ? `${voice.name} (${where})` : voice.name;
+export function voiceLabel(voice: VoiceboxVoice) {
+  return voice.language ? `${voice.name} (${languageName(voice.language)})` : voice.name;
 }

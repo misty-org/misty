@@ -1,6 +1,5 @@
-import { Trash2 } from "lucide-react";
 import { NavList, NavRow, OverflowFadeText, SectionHeading, Skeleton, StateMark } from "@misty/ui";
-import type { SpaceDrivePlace, SpaceDriveTrashPlace } from "../apps/file-picker/picker_places";
+import type { SpaceDrivePlace } from "../apps/file-picker/picker_places";
 import { SpaceAvatar } from "../components/SpaceAvatar";
 import { useSpacesStore } from "../list/use_spaces_store";
 import { preferredDefaultSpace, spaceNavigationName } from "../routes/default_space";
@@ -19,35 +18,16 @@ function DriveStatusMark({ status }: { status?: DriveSpaceStatus }) {
   return null;
 }
 
-export function SpaceDriveTrashRow({
-  spaceId,
-  current,
-  onGo,
-}: {
-  spaceId: string;
-  current?: boolean;
-  onGo: (place: SpaceDriveTrashPlace) => void;
-}) {
-  return (
-    <NavRow current={current} onClick={() => onGo({ kind: "space-drive-trash", spaceId })}>
-      <Trash2 aria-hidden="true" />
-      <OverflowFadeText>Trash</OverflowFadeText>
-    </NavRow>
-  );
-}
-
 export function SpaceDriveSection({
   current,
   onGo,
-  onGoTrash,
   open,
   onOpenChange,
 }: {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  current?: SpaceDrivePlace | SpaceDriveTrashPlace;
+  current?: SpaceDrivePlace;
   onGo: (place: SpaceDrivePlace) => void;
-  onGoTrash?: (place: SpaceDriveTrashPlace) => void;
 }) {
   const drive = useDriveStatus();
   const spaces = useSpacesStore((state) => state.spaces);
@@ -78,29 +58,26 @@ export function SpaceDriveSection({
             const here = current?.spaceId === space.id;
             const name = spaceNavigationName(space);
             return (
-              <div key={space.id} className="contents">
-                <NavRow
-                  current={here && current?.kind === "space-drive"}
-                  onClick={() => onGo({ kind: "space-drive", spaceId: space.id, path: "/" })}
-                >
-                  <SpaceAvatar
-                    space={space}
-                    className="size-4 shrink-0 rounded-sm"
-                    fallbackClassName="text-micro font-semibold"
-                  />
-                  <OverflowFadeText full className="min-w-0 flex-1">
-                    {name}
-                  </OverflowFadeText>
-                  <DriveStatusMark status={drive.bySpace[space.id]} />
-                </NavRow>
-                {here && onGoTrash ? (
-                  <SpaceDriveTrashRow
-                    spaceId={space.id}
-                    current={current?.kind === "space-drive-trash"}
-                    onGo={onGoTrash}
-                  />
-                ) : null}
-              </div>
+              <NavRow
+                key={space.id}
+                current={here}
+                onClick={() => onGo({ kind: "space-drive", spaceId: space.id, path: "/" })}
+                data-collection-place={JSON.stringify({
+                  kind: "space-drive",
+                  spaceId: space.id,
+                  path: "/",
+                })}
+              >
+                <SpaceAvatar
+                  space={space}
+                  className="size-4 shrink-0 rounded-sm"
+                  fallbackClassName="text-micro font-semibold"
+                />
+                <OverflowFadeText full className="min-w-0 flex-1">
+                  {name}
+                </OverflowFadeText>
+                <DriveStatusMark status={drive.bySpace[space.id]} />
+              </NavRow>
             );
           })}
         </NavList>

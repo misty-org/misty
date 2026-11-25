@@ -78,6 +78,54 @@ macro_rules! with_more_commands {
             #[cfg(desktop)]
             crate::browser::commands::browser_clear_website_data,
             #[cfg(desktop)]
+            crate::browser::commands::browser_webview_find,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_webview_nav_state,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_webview_set_zoom,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_history_record,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_history_set_title,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_history_suggest,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_history_recent,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_history_clear,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_search_suggest,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_webview_print,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_webview_save_page,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_webview_inspect,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_webview_picture_in_picture,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_webview_page_text,
+            #[cfg(desktop)]
+            crate::browser::commands::page_media_act,
+            #[cfg(desktop)]
+            crate::browser::commands::page_media_set_muted,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_site_permission_answer,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_site_permissions,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_site_permission_set,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_history_forget,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_history_list,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_downloads_list,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_download_open,
+            #[cfg(desktop)]
+            crate::browser::commands::browser_downloads_clear,
+            #[cfg(desktop)]
             crate::browser::commands::profile_window_info,
             crate::browser::commands::profile_window_new,
             crate::browser::commands::profile_window_close,
@@ -217,6 +265,7 @@ macro_rules! with_more_commands {
             crate::engine_config::mcp::engine_mcp_inventory,
             crate::engine_config::mcp::engine_mcp_set_enabled,
             crate::engine_config::mcp::add::engine_mcp_add,
+            crate::engine_config::mcp::add::engine_mcp_remove,
             crate::engine_config::mcp::engine_mcp_reveal,
             crate::engine_config::mcp::probe::engine_mcp_probe,
             crate::engine_config::mcp::probe::engine_mcp_probe_plan,
@@ -273,6 +322,17 @@ macro_rules! with_more_commands {
             crate::project::git::project_git_tree_status,
             crate::project::terminal::project_terminal_host_info,
             crate::registry::registry_get,
+            crate::registry::registry_top,
+            crate::registry::registry_category,
+            crate::registry::registry_source_file,
+            crate::registry::registry_search,
+            crate::registry::registry_find,
+            crate::registry::installs::registry_installs,
+            crate::registry::installs::registry_plugin_install,
+            crate::registry::installs::registry_plugin_remove,
+            crate::registry::installs::registry_bundle_text,
+            crate::registry::installs::registry_sample,
+            crate::registry::installs::registry_mcp_keys,
             crate::engines::chat_folder::chat_folder,
             crate::engines::chat_folder::chat_folder_choose,
             crate::engines::chat_folder::chat_folder_use,
@@ -351,11 +411,6 @@ macro_rules! with_more_commands {
             crate::files::power::files_rename_many,
             crate::files::power::files_duplicates,
             crate::files::power::files_compare,
-            crate::files::agent_trash::files_agent_trash_list,
-            crate::files::agent_trash::files_agent_trash_usage,
-            crate::files::agent_trash::files_agent_trash_put_back,
-            crate::files::agent_trash::files_agent_trash_delete,
-            crate::files::agent_trash::files_agent_trash_empty,
             crate::files::agent_delete::files_agent_delete_status,
             crate::files::agent_delete::files_agent_delete_allow,
             crate::files::agent_delete::files_agent_delete_stop,
@@ -372,7 +427,6 @@ macro_rules! with_more_commands {
             crate::spaces_drive::commands::drive_keep_downloaded,
             crate::spaces_drive::commands::drive_remove_download,
             crate::spaces_drive::commands::drive_trash,
-            crate::spaces_drive::commands::drive_trash_list,
             crate::spaces_drive::commands::drive_trash_many,
             crate::spaces_drive::commands::drive_restore_many,
             crate::spaces_drive::commands::drive_purge_many,
@@ -398,6 +452,12 @@ macro_rules! with_more_commands {
             crate::apps::commands::space_app_mcp_unregister,
             crate::apps::commands::space_app_program_offer,
             crate::apps::commands::space_app_program_withdraw,
+            crate::apps::app_server::app_server_url,
+            crate::apps::app_server::app_server_install,
+            crate::apps::app_server::app_server_state,
+            crate::apps::installed::apps_installed,
+            crate::apps::installed::apps_install,
+            crate::apps::installed::apps_remove,
             crate::apps::commands::space_app_session_open,
             crate::apps::commands::space_app_session_check,
             crate::apps::commands::space_app_session_close,

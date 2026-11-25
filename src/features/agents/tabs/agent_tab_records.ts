@@ -36,7 +36,8 @@ export function restoredAgentTabs(): Map<string, AgentTab> {
 
 export const agentPageBounds = () => ({
   x: 0,
-  y: 64,
+  y: 0,
   width: Math.max(200, window.innerWidth - 440),
   height: Math.max(300, window.innerHeight - 128),
+  parked: true,
 });

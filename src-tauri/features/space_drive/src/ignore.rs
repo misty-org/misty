@@ -10,6 +10,7 @@ use sha2::{Digest as _, Sha256};
 use crate::names::{self, relative_text};
 
 pub const IGNORE_FILE: &str = ".mistyignore";
+pub const TRASH_FOLDER: &str = ".trash";
 pub const GIT_IGNORE_FILE: &str = ".gitignore";
 
 pub const HEAVY_FOLDERS: &[&str] = &[

@@ -5,10 +5,6 @@ import { useSpacesStore } from "@/features/spaces";
 import { IconButton, ListRow, NavGroupHeading, notify } from "@misty/ui";
 import { chatSectionClass } from "./styles";
 
-export function useSpaceInvitationWaiting(): boolean {
-  return useSpacesStore((state) => state.invitations.length > 0);
-}
-
 export function SpaceInvitations() {
   const invitations = useSpacesStore((state) => state.invitations);
   const respondInvite = useSpacesStore((state) => state.respondInvite);

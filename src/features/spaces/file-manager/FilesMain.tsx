@@ -7,7 +7,15 @@ import {
   FolderPlus,
   Trash2,
 } from "lucide-react";
-import type { KeyboardEvent, MouseEvent, ReactNode, RefObject } from "react";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   CollectionItems,
   CollectionSkeleton,
@@ -19,6 +27,7 @@ import {
   MenuCheckItem,
   MenuItem,
   MenuSeparator,
+  useCollectionDropPlaces,
   type CollectionDrag,
   type CollectionItem,
   type CollectionZoom,
@@ -26,7 +35,7 @@ import {
 import type { FilesView } from "./FilesToolbar";
 import { fileColumns } from "./FileItems";
 import { keys } from "./key_labels";
-import type { FilesPlace } from "./model";
+import { isSpaceTrashFolder, type FilesPlace } from "./model";
 
 export interface MainListing {
   status: "loading" | "failed" | "ready";
@@ -44,12 +53,11 @@ function emptyCopy(place: FilesPlace, searching: boolean): { line: string } {
     case "tag":
       return { line: `Nothing is tagged ${place.name}.` };
     case "trash":
-    case "space-drive-trash":
       return { line: "The Trash is empty." };
-    case "agent-trash":
-      return { line: "What agents clean up waits here for you to look over." };
     default:
-      return { line: "This folder is empty." };
+      return isSpaceTrashFolder(place)
+        ? { line: "What anyone deletes in this Space waits here for 30 days." }
+        : { line: "This folder is empty." };
   }
 }
 
@@ -57,13 +65,13 @@ export interface BackgroundMenu {
   create?: (kind: "folder" | "file") => void;
   paste?: () => void;
   duplicates?: () => void;
-  emptyAgentTrash?: () => void;
+  emptyTrash?: () => void;
   goToFolder?: () => void;
   hidden?: { shown: boolean; toggle(): void };
 }
 
 function BackgroundRows({ menu }: { menu: BackgroundMenu }) {
-  const { create, paste, duplicates, emptyAgentTrash, goToFolder, hidden } = menu;
+  const { create, paste, duplicates, emptyTrash, goToFolder, hidden } = menu;
   return (
     <>
       {goToFolder ? (
@@ -97,8 +105,8 @@ function BackgroundRows({ menu }: { menu: BackgroundMenu }) {
           <MenuItem icon={Files} label="Find duplicates" onSelect={duplicates} />
         </>
       ) : null}
-      {emptyAgentTrash ? (
-        <MenuItem icon={Trash2} label="Empty agent trash" danger onSelect={emptyAgentTrash} />
+      {emptyTrash ? (
+        <MenuItem icon={Trash2} label="Empty trash" danger onSelect={emptyTrash} />
       ) : null}
       {hidden ? (
         <>
@@ -129,6 +137,7 @@ export function FilesMain({
   onShownOrder,
   onSelect,
   drag,
+  dropHere,
   background,
   columns,
   scrollRef,
@@ -147,11 +156,28 @@ export function FilesMain({
   onShownOrder(ids: string[], perRow: number): void;
   onSelect(event: MouseEvent, id: string, onOpen: () => void): void;
   drag?: CollectionDrag;
+  dropHere?: {
+    canDrop(ids: ReadonlyArray<string>, copy: boolean): boolean;
+    onDrop(ids: ReadonlyArray<string>, copy: boolean): void;
+  };
   background: BackgroundMenu;
   columns?: ReactNode;
   scrollRef: RefObject<HTMLDivElement | null>;
   onKeyDown(event: KeyboardEvent<HTMLElement>): void;
 }) {
+  const [regionNode, setRegionNode] = useState<HTMLDivElement | null>(null);
+  const regionRef = useMemo(() => ({ current: regionNode }), [regionNode]);
+  const regionCallback = useCallback(
+    (node: HTMLDivElement | null) => {
+      scrollRef.current = node;
+      setRegionNode(node);
+    },
+    [scrollRef],
+  );
+  useCollectionDropPlaces(regionRef, {
+    canDrop: (_place, ids, copy) => Boolean(dropHere?.canDrop(ids, copy)),
+    onDrop: (_place, ids, copy) => dropHere?.onDrop(ids, copy),
+  });
   let body: ReactNode;
   if (listing.status === "loading")
     body = (
@@ -191,13 +217,14 @@ export function FilesMain({
     );
 
   const hasMenu = Boolean(
-    background.create || background.paste || background.duplicates || background.emptyAgentTrash,
+    background.create || background.paste || background.duplicates || background.emptyTrash,
   );
   const region = (
     <div
-      ref={scrollRef}
+      ref={regionCallback}
       role="region"
       aria-label="Items"
+      data-collection-place={dropHere ? "here" : undefined}
       tabIndex={0}
       onKeyDown={onKeyDown}
       className={

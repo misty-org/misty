@@ -22,7 +22,7 @@ export function SpaceBarMenu() {
   const personal = preferredDefaultSpace(spaces);
   const ordered = personal ? [personal, ...spaces.filter((item) => item !== personal)] : spaces;
   const avatar = (item: typeof space) => (
-    <SpaceAvatar space={item} className="size-4 rounded-sm" fallbackClassName="text-micro" />
+    <SpaceAvatar space={item} className="size-5 rounded-sm" fallbackClassName="text-micro" />
   );
   return (
     <DropdownMenu>

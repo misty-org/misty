@@ -588,5 +588,17 @@
     "owner": "device",
     "type": "boolean",
     "platforms": ["desktop"]
+  },
+  {
+    "id": "browser.searchSuggestions",
+    "label": "Search suggestions",
+    "keywords": ["google", "address", "autocomplete", "browser"],
+    "page": "browser",
+    "section": "general",
+    "key": "browser_search_suggestions",
+    "default": true,
+    "owner": "device",
+    "type": "boolean",
+    "platforms": ["desktop"]
   }
 ]

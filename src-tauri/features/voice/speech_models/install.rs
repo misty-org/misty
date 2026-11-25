@@ -115,7 +115,7 @@ async fn install_package(
             );
         }
     };
-    let matched = download_to(&package.url, &download, package.size, &progress).await;
+    let matched = download_to(package.download_url(), &download, package.size, &progress).await;
     let matched = match matched {
         Ok(hash) => hash.eq_ignore_ascii_case(&package.sha256),
         Err(error) => {

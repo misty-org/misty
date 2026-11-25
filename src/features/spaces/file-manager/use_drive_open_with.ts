@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { appRoute } from "../apps/app_routes";
 import { acceptsFile } from "../apps/space_app_files";
 import { appEntry, catalogLogoUrl, runsHere } from "../apps/third_party_apps";
-import { useSpaceApps } from "../apps/use_space_apps";
+import { useInstalledApps } from "../apps/use_installed_apps";
 import { mimeFromName, type DriveEntry } from "../drive";
 
 export interface DriveOpenApp {
@@ -13,9 +13,9 @@ export interface DriveOpenApp {
   render?: MarkRender;
 }
 
-export function useDriveOpenWith(spaceId: string | undefined) {
+export function useDriveOpenWith() {
   const navigate = useNavigate();
-  const { apps } = useSpaceApps(spaceId ?? "");
+  const { apps } = useInstalledApps();
 
   const appsFor = (entry: DriveEntry): DriveOpenApp[] => {
     const mime = mimeFromName(entry.name);

@@ -1,12 +1,9 @@
-import {
-  DesktopSettingsRow as SettingsRow,
-  DesktopSettingsSection as SettingsSectionBlock,
-} from "@/features/settings";
+import { DesktopSettingsRow as SettingsRow } from "@/features/settings";
 import { DropdownControl } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settings_types";
 import { savedInputDevice, useInputDevices } from "../input_device";
 
-export function DevicesSection(props: SettingsContentProps) {
+export function MicrophoneRow(props: SettingsContentProps) {
   const chosen = savedInputDevice((state) => state.value);
   const { devices } = useInputDevices();
   const options = [
@@ -14,15 +11,13 @@ export function DevicesSection(props: SettingsContentProps) {
     ...devices.map((device) => ({ value: device.deviceId, label: device.label })),
   ];
   return (
-    <SettingsSectionBlock title="Devices">
-      <SettingsRow label="Microphone">
-        <DropdownControl
-          value={options.some((item) => item.value === chosen) ? chosen : ""}
-          options={options}
-          disabled={props.working}
-          onValueChange={(value) => savedInputDevice.getState().set(value)}
-        />
-      </SettingsRow>
-    </SettingsSectionBlock>
+    <SettingsRow label="Microphone">
+      <DropdownControl
+        value={options.some((item) => item.value === chosen) ? chosen : ""}
+        options={options}
+        disabled={props.working}
+        onValueChange={(value) => savedInputDevice.getState().set(value)}
+      />
+    </SettingsRow>
   );
 }

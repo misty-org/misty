@@ -24,7 +24,7 @@ export function WorkspaceTabPanels(props: {
           active || kept
             ? cn(
                 "flex min-h-0 min-w-0",
-                active ? "z-[1]" : "z-0",
+                active ? "z-[1]" : "invisible z-0",
                 mistySide === "left" && "flex-row-reverse",
                 "has-[>[data-misty-panel-dock=right]]:[&_[data-workspace-pane]]:rounded-r-xl",
                 "has-[>[data-misty-panel-dock=left]]:[&_[data-workspace-pane]]:rounded-l-xl",

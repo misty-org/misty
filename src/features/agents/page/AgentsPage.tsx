@@ -119,10 +119,7 @@ function AgentsWorkspacePage() {
   const taskContent = <AgentsTaskContent state={state} actions={actions} />;
   const taskHeader =
     pickedThread && view.showWorkspace ? (
-      <AgentStudioBar
-        agent={profile}
-        conversation={{ id: pickedThread.id, title: pickedThread.title }}
-      />
+      <AgentStudioBar agent={profile} />
     ) : (
       <AgentsTaskHeader state={state} view={view} />
     );

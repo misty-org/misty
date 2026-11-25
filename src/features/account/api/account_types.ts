@@ -1,3 +1,5 @@
+import type { AvatarDecoration } from "@/shared/lib/avatar_decoration";
+
 export interface AccountAuthUser {
   provider?: "misty" | "google";
   id: string;
@@ -11,6 +13,7 @@ export interface AccountMeResponse {
   username: string;
   email: string;
   avatar_version?: number;
+  avatar_decoration?: AvatarDecoration;
   banner_version?: number;
   created_at: string;
   delete_at?: string | null;

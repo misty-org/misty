@@ -31,7 +31,7 @@ export interface WorkspaceStore extends WorkspaceWindowsState {
   lastUsedViewByGroup: Partial<Record<WorkspaceGroupKey, string>>;
   closedItems: ClosedWorkspaceItem[];
   side?: WorkspaceSide;
-  aside?: AsideWorkspace;
+  asides?: Record<WorkspaceSide, AsideWorkspace>;
   newTab: (route?: string) => WorkspaceView;
   navigatePane: (delta: number, paneId?: string) => WorkspaceView | null;
   detachPaneToTab: (viewId: string) => boolean;
@@ -102,7 +102,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           closedItems: [],
           dockingLayout: undefined,
           side: undefined,
-          aside: undefined,
+          asides: undefined,
         });
       },
     }),

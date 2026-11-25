@@ -33,14 +33,12 @@ export function PaymentsAskSection() {
   };
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
-    <>
-      <DesktopSettingsRow label="Ask before paying" description="Even while a chat is in Auto.">
-        <SwitchControl
-          checked={paymentsAsk ?? true}
-          disabled={paymentsAsk === null || working}
-          onChange={(value) => void change(value)}
-        />
-      </DesktopSettingsRow>
-    </>
+    <DesktopSettingsRow label="Ask before paying" description="Even while a chat is in Auto.">
+      <SwitchControl
+        checked={paymentsAsk ?? true}
+        disabled={paymentsAsk === null || working}
+        onChange={(value) => void change(value)}
+      />
+    </DesktopSettingsRow>
   );
 }

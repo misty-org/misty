@@ -8,6 +8,7 @@ import {
 } from "@/features/app-windows";
 import { RenderErrorBoundary } from "../RenderErrorBoundary";
 import { QuietPane } from "@misty/ui";
+import { WebTabSurface } from "./WebTabSurface";
 
 export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
   if (tab.placeholder) return <EmptyWorkspacePane />;
@@ -25,6 +26,8 @@ export function WorkspaceSurface({ tab }: { tab: WorkspaceView }) {
             <AgentsPage />
           ) : tab.surfaceId === "direct" ? (
             <DirectSurface tab={tab} />
+          ) : tab.surfaceId === "browser" ? (
+            <WebTabSurface tab={tab} />
           ) : (
             <EmptyWorkspacePane />
           )}

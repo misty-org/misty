@@ -70,6 +70,32 @@ export const driveSource: FileSourceAdapter = {
       );
     return failed;
   },
+  restore: async (items) => {
+    const failed: Failure[] = [];
+    for (const [spaceId, entries] of bySpace(items))
+      failed.push(
+        ...failuresOf(
+          await driveNative.restoreMany(
+            spaceId,
+            entries.map((entry) => entry.id),
+          ),
+        ),
+      );
+    return failed;
+  },
+  purge: async (items) => {
+    const failed: Failure[] = [];
+    for (const [spaceId, entries] of bySpace(items))
+      failed.push(
+        ...failuresOf(
+          await driveNative.purgeMany(
+            spaceId,
+            entries.map((entry) => entry.id),
+          ),
+        ),
+      );
+    return failed;
+  },
   reveal: async (item) => {
     const entry = entryOf(item);
     if (entry) await driveNative.reveal(entry.space_id, entry.path);

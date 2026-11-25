@@ -27,13 +27,13 @@ describe("settings registry", () => {
   });
 
   it("names groups by feature and never echoes a group in its pages", () => {
-    expect(settingsGroups.map((group) => group.label)).toEqual(["Account", "App", "Pages"]);
+    expect(settingsGroups.map((group) => group.label)).toEqual(["Account", "App", "AI"]);
     for (const group of settingsGroups)
       for (const area of group.areas)
         expect(settingsAreas[area].label.toLowerCase()).not.toContain(group.label.toLowerCase());
     for (const entry of settingsRegistry) {
-      expect(entry.label).not.toContain("&");
-      expect(entry.label).not.toMatch(/\band\b/);
+      expect(entry.title ?? "").not.toContain("&");
+      expect(entry.title ?? "").not.toMatch(/\band\b/);
     }
   });
 
@@ -51,12 +51,17 @@ describe("settings registry", () => {
 
 describe("settings routing", () => {
   it("resolves every section id to a block that exists", () => {
-    for (const section of settingsSections) expect(blockIds.has(section), section).toBe(true);
+    for (const section of settingsSections) expect(settingsPage(section), section).toBeDefined();
   });
 
   it("lands every “manage it in Settings” link on the page that holds it", () => {
     const links: Record<string, [SettingsSection, string]> = {
       "update notice": ["updates", "general"],
+      "menu bar": ["menu-bar", "general"],
+      microphone: ["devices", "voice"],
+      thumbnails: ["thumbnails", "server"],
+      "reduce motion": ["accessibility", "interface"],
+      "website data": ["apps-data", "privacy"],
     };
     for (const [link, [section, area]] of Object.entries(links))
       expect(settingsPage(section)?.area, link).toBe(area);
@@ -66,9 +71,9 @@ describe("settings routing", () => {
     for (const definition of settingDefinitions) {
       if (preferencesWithoutRows.has(definition.id)) continue;
       const section = preferenceSection(definition.id, definition.page);
-      expect(blockIds.has(section), `${definition.id} → ${section}`).toBe(true);
+      expect(settingsPage(section), `${definition.id} → ${section}`).toBeDefined();
     }
-    expect(preferenceSection("app.appearance.compact_mode_enabled", "appearance")).toBe("advanced");
+    expect(preferenceSection("app.appearance.compact_mode_enabled", "appearance")).toBe("display");
   });
 });
 
@@ -91,6 +96,8 @@ describe("settings titles", () => {
     };
     for (const group of settingsGroups) claim(group.label, "a sidebar group");
     for (const area of Object.values(settingsAreas)) claim(area.label, "a settings page");
+    for (const entry of settingsRegistry)
+      if (entry.title) claim(entry.title, `section ${entry.id}`);
     for (const [file, source] of Object.entries(files)) {
       if (file.includes(".test.")) continue;
       const titles = source.matchAll(

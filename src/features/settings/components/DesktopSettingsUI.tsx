@@ -1,5 +1,4 @@
 import {
-  RowGroupLabel,
   SettingsRow,
   SettingsSection,
   BottomBar,
@@ -8,16 +7,29 @@ import {
   FramedPage,
   IconButton,
   InlineLink,
+  Portal,
   Skeleton,
   SkeletonControl,
   Text,
   trailingControls,
   type NoticeAction,
+  type SectionHeadingAction,
   type SkeletonTrailing,
   useNotice,
 } from "@misty/ui";
 import { X } from "lucide-react";
-import { Children, createContext, isValidElement, useContext, type ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  isValidElement,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import { useSettingReset } from "../device-preferences/SettingScope";
 import {
   type DesktopSettingsNavGroup,
@@ -25,9 +37,11 @@ import {
   SettingsNavigation,
 } from "./SettingsNavigation";
 export const SettingsControlLabelContext = createContext<string | undefined>(undefined);
-const SettingsPageTitleContext = createContext("");
+const SettingsBarSlotContext = createContext<HTMLElement | null | undefined>(undefined);
+const SectionActionContext = createContext<((action?: SectionHeadingAction) => void) | null>(null);
 export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFrameProps<Id>) {
   const overlay = props.presentation === "overlay";
+  const [barSlot, setBarSlot] = useState<HTMLElement | null>(null);
   const navigation = Boolean(
     props.groups.length ||
     props.navigationHeader ||
@@ -40,7 +54,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
       as="div"
       tone="muted"
       data-tour={props.navigationTour}
-      className="flex min-h-0 flex-1 flex-col py-3"
+      className="flex min-h-0 flex-1 flex-col pt-1.5 pb-3"
     >
       {props.navigationOverride ?? (
         <SettingsNavigation
@@ -68,12 +82,23 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
           <FramedBar
             start={
               props.title ? (
-                <Text as="h1" size="title" weight="semibold" tone="bright" className="min-w-0 pl-3.5">
-                  {props.title}
-                </Text>
+                <div className="flex min-w-0 items-center gap-1">
+                  {props.back}
+                  <Text
+                    as="h1"
+                    size="title"
+                    weight="semibold"
+                    tone="bright"
+                    className={cn("min-w-0", !props.back && "pl-3.5")}
+                  >
+                    {props.title}
+                  </Text>
+                </div>
               ) : undefined
             }
           >
+            <div ref={setBarSlot} className="flex min-w-0 items-center gap-2 empty:hidden" />
+            {props.actions}
             <IconButton label={`Close ${props.ariaLabel.toLowerCase()}`} onClick={props.onClose}>
               <X />
             </IconButton>
@@ -90,6 +115,7 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
               minWidth: 200,
               maxWidth: 320,
               keep: true,
+              headerLine: false,
               header: props.navigationHeader ? (
                 <FramedBar
                   start={
@@ -106,13 +132,11 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
           data-settings-scroller
           className="misty-scrollbar misty-scrollbar-floating mb-3 min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
         >
-          <div className={cn("w-full max-w-180 px-6 pb-12", overlay ? "pt-4" : "pt-6")}>
+          <div className={cn("w-full px-6 pb-12", overlay ? "pt-4" : "pt-6")}>
             {props.contentHeader}
-            <SettingsPageTitleContext.Provider
-              value={typeof props.title === "string" && overlay ? props.title : ""}
-            >
+            <SettingsBarSlotContext.Provider value={overlay ? barSlot : undefined}>
               {props.children}
-            </SettingsPageTitleContext.Provider>
+            </SettingsBarSlotContext.Provider>
           </div>
         </div>
         {props.saveBar}
@@ -121,35 +145,89 @@ export function DesktopSettingsFrame<Id extends string>(props: DesktopSettingsFr
     </FramedPage>
   );
 }
-export function DesktopSettingsSection(props: {
-  title: string;
-  description?: ReactNode;
-  children: ReactNode;
-  density?: "normal" | "compact";
-}) {
-  const repeatsPage = useContext(SettingsPageTitleContext) === props.title;
-  if (props.density === "compact")
-    return (
-      <section aria-label={props.title} className="mb-5 grid min-w-0 gap-1.5 last:mb-0">
-        {repeatsPage ? null : <RowGroupLabel title={props.title} />}
-        {props.description ? (
-          <Text as="p" size="meta" tone="muted" wrap className="px-0.5">
-            {props.description}
-          </Text>
-        ) : null}
-        <div className="min-w-0">{props.children}</div>
-      </section>
-    );
+
+/**
+ * Controls that belong to the open settings page as a whole (Shortcuts' search and Restore all),
+ * drawn in the page's top bar beside its close button.
+ */
+export function SettingsPageBar(props: { children: ReactNode }) {
+  const slot = useContext(SettingsBarSlotContext);
+  if (slot) return <Portal container={slot}>{props.children}</Portal>;
+  if (slot === null) return null;
+  return <div className="flex min-w-0 items-center justify-end gap-2">{props.children}</div>;
+}
+
+const sectionSlug = (title: string) =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+export function DesktopSettingsSection(
+  props: Omit<HTMLAttributes<HTMLElement>, "title" | "children"> & {
+    title: string;
+    description?: ReactNode;
+    action?: SectionHeadingAction;
+    children: ReactNode;
+    section?: string;
+  },
+) {
+  const { title, description, action, children, section, ...rest } = props;
   return (
     <SettingsSection
-      title={repeatsPage ? undefined : props.title}
-      description={props.description}
-      className="mb-5 last:mb-0"
+      {...rest}
+      title={title}
+      description={description}
+      action={action}
+      data-settings-section={section ?? sectionSlug(title)}
+      data-settings-title={title}
+      className="scroll-mt-4"
     >
-      {props.children}
+      {children}
     </SettingsSection>
   );
 }
+
+/**
+ * A section of a settings page whose heading the page draws from its registry entry, holding
+ * rows only. A row component sets the heading's one action with `useSettingsSectionAction`.
+ */
+export function TitledSettingsSection(
+  props: Omit<HTMLAttributes<HTMLElement>, "title" | "children"> & {
+    title: string;
+    section: string;
+    children: ReactNode;
+  },
+) {
+  const [action, setAction] = useState<SectionHeadingAction>();
+  return (
+    <SectionActionContext.Provider value={setAction}>
+      <DesktopSettingsSection {...props} action={action} />
+    </SectionActionContext.Provider>
+  );
+}
+
+export function useSettingsSectionAction(action: SectionHeadingAction | undefined) {
+  const set = useContext(SectionActionContext);
+  const latest = useRef(action);
+  useLayoutEffect(() => {
+    latest.current = action;
+  });
+  const shown = action ? `${action.label}\n${action.disabled ? "off" : "on"}` : "";
+  useEffect(() => {
+    const current = latest.current;
+    if (!set || !shown || !current) return;
+    set({
+      label: current.label,
+      icon: current.icon,
+      showLabel: current.showLabel,
+      disabled: current.disabled,
+      onSelect: () => latest.current?.onSelect?.(),
+    });
+    return () => set(undefined);
+  }, [set, shown]);
+}
+
 export function DesktopSettingsRow(props: {
   label: string;
   description?: ReactNode;
@@ -157,7 +235,6 @@ export function DesktopSettingsRow(props: {
   muted?: boolean;
   indent?: boolean;
   stacked?: boolean;
-  density?: "normal" | "compact";
   leading?: ReactNode;
 }) {
   const reset = useSettingReset(props.label);
@@ -204,7 +281,6 @@ export function DesktopSettingsRowSkeleton(props: {
   rows?: number;
   description?: boolean;
   control?: SkeletonTrailing;
-  density?: "normal" | "compact";
 }) {
   const ends = trailingControls(props.control);
   return (
@@ -282,6 +358,8 @@ interface DesktopSettingsFrameProps<Id extends string> {
   onSection?: (id: string) => void;
   presentation?: "page" | "overlay";
   title: ReactNode;
+  back?: ReactNode;
+  actions?: ReactNode;
   navigationHeader?: ReactNode;
   navigationOverride?: ReactNode;
   navigationFooter?: ReactNode;

@@ -152,26 +152,6 @@ export interface IndexStatus {
   files: number;
 }
 
-export interface AgentTrashItem {
-  id: number;
-  name: string;
-  originalPath: string;
-  holdingPath?: string;
-  agentId: string;
-  chatId?: string;
-  trashedAt: number;
-  size: number;
-  kind: FileKind;
-  spaceId?: string;
-  driveItemId?: string;
-}
-
-export interface AgentTrashUsage {
-  bytes: number;
-  items: number;
-  oldestMs?: number;
-}
-
 export const disk = {
   granted: () => invoke<boolean>("files_grant_status"),
   grant: () => invoke<boolean>("files_grant"),
@@ -255,13 +235,6 @@ export const disk = {
     invoke<DuplicateGroup[]>("files_duplicates", { dir, opId }),
   compare: (left: string, right: string, opId: string) =>
     invoke<CompareRow[]>("files_compare", { left, right, opId }),
-
-  agentTrash: () => invoke<AgentTrashItem[]>("files_agent_trash_list"),
-  agentTrashUsage: () => invoke<AgentTrashUsage>("files_agent_trash_usage"),
-  agentTrashPutBack: (ids: number[], resolution: Resolution) =>
-    invoke<TransferResult>("files_agent_trash_put_back", { ids, resolution }),
-  agentTrashDelete: (ids: number[]) => invoke<Failure[]>("files_agent_trash_delete", { ids }),
-  agentTrashEmpty: () => invoke<Failure[]>("files_agent_trash_empty"),
 
   agentDeleteOn: () => invoke<boolean>("files_agent_delete_status"),
   allowAgentDelete: () => invoke<boolean>("files_agent_delete_allow"),

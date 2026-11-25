@@ -20,6 +20,7 @@ import { personTone } from "@/shared/lib/person_tone";
 import { personInitials } from "@/shared/lib/person_initials";
 import { MistyMarkdown } from "../runs/markdown/MistyMarkdown";
 import { continueThread } from "./continuation";
+import { memberFace } from "./member_face";
 import { reactionPicker } from "@/shared/lib/reaction_picker";
 import {
   AGENT_THREAD_EVENT,
@@ -60,6 +61,16 @@ function outputRows(body: string) {
         <ToolRow name="Made" target={<ToolPath path={path} />} state="done" />
       </li>
     ));
+}
+
+function OwnerFace({ spaceId, userId, name }: { spaceId: string; userId: string; name: string }) {
+  const Face = memberFace.maybe();
+  if (Face) return <Face spaceId={spaceId} userId={userId} name={name} />;
+  return (
+    <Avatar size="lg" tone={personTone(userId)}>
+      <AvatarFallback>{personInitials(name)}</AvatarFallback>
+    </Avatar>
+  );
 }
 
 export function SharedThreadView(props: {
@@ -152,9 +163,7 @@ export function SharedThreadView(props: {
                 fromAgent ? (
                   props.agentAvatar
                 ) : (
-                  <Avatar size="lg" tone={personTone(thread.owner_user_id)}>
-                    <AvatarFallback>{personInitials(name)}</AvatarFallback>
-                  </Avatar>
+                  <OwnerFace spaceId={spaceId} userId={thread.owner_user_id} name={name} />
                 )
               }
               time={when.time}

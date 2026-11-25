@@ -11,9 +11,9 @@ mod player;
 #[cfg(feature = "client")]
 pub use client::{
     decode_file, recognize_file, recognize_samples, resample, use_helper, Hearing, Launch,
-    Recognizer, Voice,
+    Recognizer,
 };
-pub use model::{HearingFamily, HearingSpec, VadSpec, VoiceSpec};
+pub use model::{HearingFamily, HearingSpec, VadSpec};
 #[cfg(feature = "client")]
 pub use player::{play, Playback};
 
@@ -57,7 +57,6 @@ pub fn reason(code: &str) -> String {
         "model" => {
             "The speech model couldn't be opened. Set it up again in Settings › Voice.".into()
         }
-        "voice" => "The voice couldn't be opened. Set it up again in Settings › Voice.".into(),
         "file" => "That recording couldn't be read.".into(),
         "output" => "Misty couldn't play sound on this computer.".into(),
         _ => "Speech stopped before it finished.".into(),

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { webTabOfScope } from "@/features/browser";
 import { watchAllRunEvents } from "../local-run/local_run_events";
 import { agentAccountId } from "../../personal/agent_account";
 import { holdAwake, releaseAwake } from "../jobs/keep_awake";
@@ -109,6 +110,7 @@ export async function startHostedSession(
     newTab?: unknown;
     closeScope?: unknown;
     appCommand?: unknown;
+    useScope?: unknown;
   };
   if (input.appCommand) throw new DeviceOperationNotAttempted(new Error("app_window_unavailable"));
   const agentId = typeof config.agentId === "string" ? config.agentId : "";
@@ -186,6 +188,19 @@ export async function startHostedSession(
     void holdAwake(`hosted:${taskId}`);
   } else {
     touchHostedSession(session.scopeId, job.runId);
+  }
+  if (typeof input.useScope === "string") {
+    const person = webTabOfScope(input.useScope);
+    if (!person?.viewId) throw new DeviceOperationNotAttempted(new Error("unknown_tab"));
+    try {
+      await invoke("agent_workspace_bind_scope", {
+        taskId: session.taskId,
+        scopeId: input.useScope,
+      });
+      return await signedSessionTab(job, input.useScope, session.taskId);
+    } catch (error) {
+      throw new DeviceOperationNotAttempted(error);
+    }
   }
   let tabScope = session.scopeId;
   if (input.newTab === true && typeof input.url === "string") {

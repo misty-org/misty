@@ -4,6 +4,7 @@ export { AccountSuspendedNotice } from "./notices/AccountSuspendedNotice";
 export { ServerAlertsNotice } from "./notices/ServerAlertsNotice";
 export * from "./hooks/use_account_avatar_url";
 export * from "./hooks/use_account_banner_url";
+export * from "./hooks/UseAccountPictureEditor";
 export { BannerDialog } from "./profile/BannerDialog";
 export { default as RegisterPage } from "./pages/RegisterPage";
 export { SavedAccountSessionUnavailableError } from "./sessions/session_errors";
@@ -18,7 +19,7 @@ export { openSignInSheet, useSignInSheetStore } from "./sign-in-sheet/sign_in_sh
 
 export { useNativeSessionStore } from "./native-session";
 
-export { AccountSection } from "./settings/AccountSection";
+export { AccountRemovalSection, AccountSection } from "./settings/AccountSection";
 export { ServerSection } from "./settings/ServerSection";
 export { SessionsSection } from "./settings/SessionsSection";
 export { DeviceApprovalDialog } from "./devices/DeviceApprovalDialog";

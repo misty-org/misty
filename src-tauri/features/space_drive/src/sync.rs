@@ -10,7 +10,7 @@ use serde_json::Value;
 use crate::api::{Change, NewItem};
 use crate::cache::BlobPin;
 use crate::copy_source::{CopyFlow, CopyFolder, CopyKind, CopySource};
-use crate::ignore::{never_synced_name, DriveRules, GIT_IGNORE_FILE, IGNORE_FILE};
+use crate::ignore::{never_synced_name, DriveRules, GIT_IGNORE_FILE, IGNORE_FILE, TRASH_FOLDER};
 use crate::in_use::{self, ANSWER_HOLD, STALE_CHECK, USED_LATELY};
 use crate::model::*;
 use crate::names;
@@ -88,6 +88,29 @@ fn retry_error(message: &str) -> DriveError {
 
 pub(crate) fn is_root_ignore(node: &NodeRow) -> bool {
     node.parent.is_none() && node.kind == Kind::File && node.name.eq_ignore_ascii_case(IGNORE_FILE)
+}
+
+pub(crate) fn is_root_trash(node: &NodeRow) -> bool {
+    node.parent.is_none()
+        && node.kind == Kind::Folder
+        && names::fold(&node.name) == names::fold(TRASH_FOLDER)
+}
+
+pub(crate) fn in_trash(inner: &Inner, space: &SpaceId, node: &NodeRow) -> Result<bool, DriveError> {
+    let mut current = node.parent.clone();
+    for _ in 0..4096 {
+        let Some(id) = current else {
+            return Ok(false);
+        };
+        let Some(above) = inner.store.node(space, &id)? else {
+            return Ok(false);
+        };
+        if is_root_trash(&above) {
+            return Ok(true);
+        }
+        current = above.parent.clone();
+    }
+    Ok(false)
 }
 
 fn waits_large(inner: &Inner, space: &SpaceId, id: &ItemId) -> bool {
@@ -503,7 +526,7 @@ async fn create_up(
 }
 
 fn trashed_since(node: &NodeRow, item: &Item) -> bool {
-    (item.trashed || item.deleted) && !(node.kind == Kind::File && node.sha256 != item.sha256)
+    item.deleted && !(node.kind == Kind::File && node.sha256 != item.sha256)
 }
 
 fn gone_since(
@@ -1279,23 +1302,29 @@ async fn trash_up(
             }
             continue;
         }
-        let answer = inner.api.trash(space, &id, node.trash_held).await;
+        if in_trash(inner, space, &node)? {
+            let outcome = purge_up(inner, space, &node, touched).await?;
+            results.insert(id.clone(), outcome);
+            continue;
+        }
+        let answer = inner.api.trash(space, &id).await;
         match rules::after_trash(answer) {
-            TrashOutcome::Accepted(item) => {
-                if let Some(item) = &item {
-                    inner.store.put_item(item)?;
-                    touched.server.push(item.clone());
+            TrashOutcome::Accepted(Some(item)) => {
+                inner.store.put_item(&item)?;
+                touched.server.push(item.clone());
+                if let Some(parent) = &item.parent_id {
+                    if inner.store.node(space, parent)?.is_none() {
+                        if let Ok(folder) = inner.api.item(space, parent).await {
+                            inner.store.put_item(&folder)?;
+                            touched.server.push(folder.clone());
+                            add_down(inner, space, parent, touched)?;
+                        }
+                    }
                 }
-                if let (Some(agent_id), Some(chat_id)) = (&node.trash_agent, &node.trash_chat) {
-                    inner.events.agent_trashed(&AgentTrash {
-                        space_id: space.clone(),
-                        item_id: id.clone(),
-                        path: node.path.clone(),
-                        agent_id: agent_id.clone(),
-                        chat_id: chat_id.clone(),
-                        at_ms: now_ms(),
-                    });
-                }
+                land_in_trash(inner, space, &node, &item, touched)?;
+                results.insert(id.clone(), Ok(()));
+            }
+            TrashOutcome::Accepted(None) => {
                 for gone in inner.store.remove_subtree(space, &id)? {
                     inner.bases.remove(&gone.id);
                     touched.removed.insert(gone.id.clone(), inner.entry(&gone));
@@ -1335,6 +1364,74 @@ async fn trash_up(
     Ok(results)
 }
 
+async fn purge_up(
+    inner: &Inner,
+    space: &SpaceId,
+    node: &NodeRow,
+    touched: &mut Touched,
+) -> Result<Result<(), DriveError>, DriveError> {
+    match inner.api.purge(space, &node.id).await {
+        Ok(()) | Err(ApiError::NotFound) => {
+            for gone in inner.store.remove_subtree(space, &node.id)? {
+                inner.bases.remove(&gone.id);
+                touched.removed.insert(gone.id.clone(), inner.entry(&gone));
+            }
+            Ok(Ok(()))
+        }
+        Err(error) if error.is_transient() || matches!(error, ApiError::SignedOut) => {
+            Err(retry_error(&error.to_string()))
+        }
+        Err(ApiError::Forbidden) => {
+            bring_back(inner, space, node, touched)?;
+            let message =
+                "Only the Space's owner and moderators can delete from .trash for good.".to_owned();
+            touched.problem = Some(message.clone());
+            Ok(Err(DriveError::Fixed(message)))
+        }
+        Err(error) => {
+            bring_back(inner, space, node, touched)?;
+            let message = error.to_string();
+            touched.problem = Some(message.clone());
+            Ok(Err(DriveError::Invalid(message)))
+        }
+    }
+}
+
+fn land_in_trash(
+    inner: &Inner,
+    space: &SpaceId,
+    node: &NodeRow,
+    item: &Item,
+    touched: &mut Touched,
+) -> Result<(), DriveError> {
+    let trash_here = match &item.parent_id {
+        Some(parent) => match inner.store.node(space, parent)? {
+            Some(folder) => is_root_trash(&folder) || in_trash(inner, space, &folder)?,
+            None => false,
+        },
+        None => false,
+    };
+    if !trash_here {
+        for gone in inner.store.remove_subtree(space, &node.id)? {
+            inner.bases.remove(&gone.id);
+            touched.removed.insert(gone.id.clone(), inner.entry(&gone));
+        }
+        return Ok(());
+    }
+    for mut row in inner.store.descendants(space, &node.id)? {
+        if row.trash_pending {
+            row.trash_pending = false;
+            inner.store.update_node(&row)?;
+        }
+    }
+    let Some(now) = inner.store.node(space, &node.id)? else {
+        return Ok(());
+    };
+    take_server(inner, space, &now, item, false, true, touched)?;
+    inner.store.put_base(space, &Base::of(item))?;
+    Ok(())
+}
+
 fn bring_back(
     inner: &Inner,
     space: &SpaceId,
@@ -1344,9 +1441,6 @@ fn bring_back(
     for mut row in inner.store.descendants(space, &node.id)? {
         if row.trash_pending {
             row.trash_pending = false;
-            row.trash_held = false;
-            row.trash_agent = None;
-            row.trash_chat = None;
             inner.store.update_node(&row)?;
         }
         touched.changed.insert(row.id.clone());
@@ -1474,9 +1568,6 @@ fn add_down(
         dirty_content: false,
         dirty_place: false,
         trash_pending: false,
-        trash_held: false,
-        trash_agent: None,
-        trash_chat: None,
         not_synced: false,
         downloaded,
         content_base: None,
@@ -1891,6 +1982,11 @@ fn create_node(
     rules: Option<&DriveRules>,
 ) -> Result<NodeRow, DriveError> {
     let name = check_name(name)?;
+    if parent.is_none() && kind == Kind::File && names::fold(&name) == names::fold(TRASH_FOLDER) {
+        return Err(DriveError::Fixed(
+            "The Space's .trash stays a folder at its top.".to_owned(),
+        ));
+    }
     let mut parent_synced = true;
     if let Some(parent) = &parent {
         let folder = inner
@@ -1922,16 +2018,10 @@ fn create_node(
                     }
                     let mut gone = child;
                     gone.trash_pending = true;
-                    gone.trash_held = revived.trash_held;
-                    gone.trash_agent = revived.trash_agent.clone();
-                    gone.trash_chat = revived.trash_chat.clone();
                     inner.store.update_node(&gone)?;
                 }
             }
             revived.trash_pending = false;
-            revived.trash_held = false;
-            revived.trash_agent = None;
-            revived.trash_chat = None;
             if let Some((sha256, size)) = content {
                 set_content(
                     inner,
@@ -2003,9 +2093,6 @@ fn create_node(
         dirty_content: false,
         dirty_place: false,
         trash_pending: false,
-        trash_held: false,
-        trash_agent: None,
-        trash_chat: None,
         not_synced,
         downloaded: true,
         content_base: None,
@@ -2117,6 +2204,14 @@ pub(crate) fn rename_local(
             "The Space's .mistyignore stays at its top.".to_owned(),
         ));
     }
+    let becomes_trash = folder.is_none() && names::fold(&name) == names::fold(TRASH_FOLDER);
+    if (is_root_trash(&node) && !node.created && !node.not_synced && !becomes_trash)
+        || (becomes_trash && !is_root_trash(&node))
+    {
+        return Err(DriveError::Fixed(
+            "The Space's .trash stays at its top.".to_owned(),
+        ));
+    }
     if let Some(folder) = folder {
         let target = inner
             .store
@@ -2151,7 +2246,7 @@ pub(crate) fn rename_local(
             if node.created || node.not_synced {
                 inner.store.remove_subtree(space, &node.id)?;
             } else {
-                trash_local(inner, space, &node.id, &TrashBy::Person)?;
+                trash_local(inner, space, &node.id)?;
             }
             return inner
                 .store
@@ -2171,12 +2266,7 @@ pub(crate) fn rename_local(
     Ok(moved)
 }
 
-pub(crate) fn trash_local(
-    inner: &Inner,
-    space: &SpaceId,
-    id: &ItemId,
-    by: &TrashBy,
-) -> Result<(), DriveError> {
+pub(crate) fn trash_local(inner: &Inner, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
     let mut node = inner
         .store
         .node(space, id)?
@@ -2202,12 +2292,12 @@ pub(crate) fn trash_local(
             "The Space's .mistyignore can't be deleted. Change its lines instead.".to_owned(),
         ));
     }
-    node.trash_pending = true;
-    node.trash_held = by.held();
-    if let TrashBy::Agent { agent_id, chat_id } = by {
-        node.trash_agent = Some(agent_id.clone());
-        node.trash_chat = Some(chat_id.clone());
+    if is_root_trash(&node) {
+        return Err(DriveError::Fixed(
+            "The Space's .trash can't be deleted. Empty it instead.".to_owned(),
+        ));
     }
+    node.trash_pending = true;
     inner.store.update_node(&node)?;
     Ok(())
 }
@@ -2824,68 +2914,4 @@ pub(crate) fn remove_download(
         }
     }
     Ok(())
-}
-
-fn server_path(inner: &Inner, space: &SpaceId, item: &Item) -> String {
-    let mut parts = vec![item.name.clone()];
-    let mut current = item.parent_id.clone();
-    for _ in 0..256 {
-        let Some(id) = current else {
-            break;
-        };
-        match inner.store.node(space, &id).ok().flatten() {
-            Some(node) => {
-                return names::join(
-                    &node.path,
-                    &parts.into_iter().rev().collect::<Vec<_>>().join("/"),
-                );
-            }
-            None => match inner.store.item(space, &id).ok().flatten() {
-                Some(parent) => {
-                    parts.push(parent.name.clone());
-                    current = parent.parent_id.clone();
-                }
-                None => break,
-            },
-        }
-    }
-    format!("/{}", parts.into_iter().rev().collect::<Vec<_>>().join("/"))
-}
-
-pub(crate) async fn trash_list(
-    inner: &Arc<Inner>,
-    space: &SpaceId,
-    after: Option<&str>,
-    limit: u32,
-) -> Result<(Vec<TrashEntry>, Option<String>), DriveError> {
-    let page = inner.api.trash_list(space, after, limit).await?;
-    let entries = page
-        .items
-        .into_iter()
-        .map(|item| {
-            inner.store.put_item(&item).ok();
-            TrashEntry {
-                entry: DriveEntry {
-                    id: item.id.clone(),
-                    space_id: space.clone(),
-                    path: server_path(inner, space, &item),
-                    name: item.name.clone(),
-                    kind: item.kind,
-                    size: item.size,
-                    mtime_ms: item.mtime_ms,
-                    modified_by_name: item.modified_by_name.clone(),
-                    state: LocalState::Online,
-                    keep_downloaded: false,
-                    in_use: Vec::new(),
-                    version: Some(item.version),
-                    content_version: item.content_version,
-                    sha: item.sha256.clone(),
-                    waits_large: false,
-                },
-                trashed_at: item.trashed_at.clone(),
-                trashed_by_name: Some(item.modified_by_name.clone()),
-            }
-        })
-        .collect();
-    Ok((entries, page.next_after))
 }

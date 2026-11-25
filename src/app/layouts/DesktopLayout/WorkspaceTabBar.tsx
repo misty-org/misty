@@ -1,7 +1,8 @@
-import { Blocks, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import {
   activeLayoutView,
+  dockTreeViews,
   isEmptyTab,
   layoutTabs,
   tabLabel,
@@ -17,9 +18,11 @@ import {
   type TabStripGroup,
   type TabStripTab,
 } from "@misty/ui";
+import { setPageMuted, usePageMedia, type PlayingPage } from "@/features/browser";
+import { usePlayingSources } from "./page_media_views";
 import { GroupMenu, TabMenu } from "./WorkspaceTabMenus";
 import { openNewTab } from "./space_navigation";
-import { ViewIcon } from "./WorkspaceViewGroupButton";
+import { WorkspaceTabIcon } from "./WorkspaceTabIcon";
 import { windowsCaptionSlotId } from "./WindowsTitlebarControls";
 
 export function WorkspaceTabBar(props: {
@@ -36,13 +39,27 @@ export function WorkspaceTabBar(props: {
   const close = (id: string) => {
     if (store().closeTab(id)) props.onClosed();
   };
+  const sources = usePlayingSources();
+  const mutedPages = usePageMedia((state) => state.muted);
+  const playingIn = new Map<string, PlayingPage[]>();
+  for (const source of sources)
+    if (source.view && source.page.media.playing)
+      playingIn.set(source.view.id, [...(playingIn.get(source.view.id) ?? []), source.page]);
   const items: TabStripTab[] = tabs.map((tab) => {
     const view = activeLayoutView(tab);
     const label = tabLabel(tab);
+    const playing = dockTreeViews(tab.root).flatMap((pane) => playingIn.get(pane.id) ?? []);
+    const muted = playing.length > 0 && playing.every((page) => mutedPages[page.key]);
     return {
       id: tab.id,
+      sound: playing.length
+        ? {
+            muted,
+            onToggle: () => playing.forEach((page) => setPageMuted(page, !muted)),
+          }
+        : undefined,
       label,
-      icon: <ViewIcon tab={view?.placeholder ? undefined : (view ?? undefined)} icon={Blocks} />,
+      icon: <WorkspaceTabIcon view={view ?? undefined} />,
       closeLabel: `Close ${label}`,
       group: tab.group,
       menu: (
@@ -78,7 +95,7 @@ export function WorkspaceTabBar(props: {
     <div
       className={`min-w-0 ${windowToolbarClass}`}
       style={{ gridColumn: props.gridColumn, gridRow: 2 }}
-      data-window-toolbar
+      data-window-toolbar="beside-drawer"
       data-misty-window-titlebar-region="true"
     >
       <TabStrip

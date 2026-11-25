@@ -256,8 +256,8 @@ fn change_value(drive: &Drive, space: &SpaceId, item: &Item) -> Value {
             "state": "online",
         }),
     };
-    let gone = item.trashed || item.deleted || node.is_none();
-    with_gone(value, item.trashed || (gone && !item.deleted), item.deleted)
+    let gone = item.deleted || node.is_none();
+    with_gone(value, gone && !item.deleted, item.deleted)
 }
 
 enum Place {
@@ -580,7 +580,10 @@ async fn answer(drive: &Drive, staging: &Path, request: &Value) -> Result<Value,
         "trash" => {
             let (space, id) = item_of(drive, request)?;
             drive.trash_from_os_now(&space, &id).await?;
-            Ok(Value::Object(Map::new()))
+            Ok(match drive.node(&space, &id).ok().flatten() {
+                Some(node) => json!({ "item": node_value(drive, &space, &node) }),
+                None => Value::Object(Map::new()),
+            })
         }
         "changes_since" => {
             let limit = request

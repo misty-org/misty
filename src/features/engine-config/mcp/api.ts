@@ -50,6 +50,8 @@ export interface McpAddRequest {
 
 export const mcpApi = {
   add: (request: McpAddRequest): Promise<void> => call<void>("engine_mcp_add", { request }),
+  remove: (engine: string, name: string): Promise<void> =>
+    call<void>("engine_mcp_remove", { engine, name }),
   inventory: (workspace: string | null): Promise<McpInventory> =>
     call<McpInventory>("engine_mcp_inventory", { workspace }),
   setEnabled: (

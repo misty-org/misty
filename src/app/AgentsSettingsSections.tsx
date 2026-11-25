@@ -3,7 +3,7 @@ import { HubAgentsPage } from "@/features/agents";
 import { ChannelsSection } from "@/features/engine-config/channels";
 import { ClisSection } from "@/features/engine-config/clis";
 import { EnvironmentSection } from "@/features/engine-config/environment";
-import { UsageSection } from "@/features/engine-config/usage";
+import { UsageLimitsSection, UsageLogsSection, UsageSection } from "@/features/engine-config/usage";
 import { startTour, useTours } from "@/features/onboarding";
 import type { SettingsContentProps, SettingsSection } from "@/features/settings";
 
@@ -21,4 +21,6 @@ export const agentsSettingsSections = {
   "engines-channels": () => <ChannelsSection />,
   "engines-environment": () => <EnvironmentSection />,
   "engines-usage": () => <UsageSection />,
+  "engines-limits": () => <UsageLimitsSection />,
+  "engines-logs": () => <UsageLogsSection />,
 } satisfies Partial<Record<SettingsSection, ComponentType<SettingsContentProps>>>;

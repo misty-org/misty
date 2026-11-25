@@ -1,7 +1,7 @@
 import { useMistyStore } from "../../conversations/state/use_misty_store";
 import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, IconButton, Kbd, Switch, Slider, Text, useNotice } from "@misty/ui";
+import { Button, IconButton, Kbd, RowGroupStack, Switch, Slider, Text, useNotice } from "@misty/ui";
 import { RotateCcw, Square, VolumeX } from "lucide-react";
 import { useState } from "react";
 import { setCompanionOn, useCompanionOn } from "./companion_on";
@@ -67,68 +67,70 @@ export function AgentCompanionPanel() {
           {desktop ? "Starting" : "Available in Misty for macOS and Windows."}
         </Text>
       )}
-      <DesktopSettingsSection title="Behavior">
-        {desktop && (
-          <DesktopSettingsRow label="Tutor">
+      <RowGroupStack>
+        <DesktopSettingsSection title="Behavior">
+          {desktop && (
+            <DesktopSettingsRow label="Tutor">
+              <Switch
+                aria-label="Tutor"
+                checked={on === true}
+                disabled={on === undefined}
+                onCheckedChange={(next) =>
+                  void setCompanionOn(next).catch((reason: unknown) => setError(String(reason)))
+                }
+              />
+            </DesktopSettingsRow>
+          )}
+          <DesktopSettingsRow label="Teach mode" description={teachLine}>
             <Switch
-              aria-label="Tutor"
-              checked={on === true}
-              disabled={on === undefined}
-              onCheckedChange={(next) =>
-                void setCompanionOn(next).catch((reason: unknown) => setError(String(reason)))
-              }
+              aria-label="Teach mode"
+              checked={state.teach === true}
+              disabled={!control}
+              onCheckedChange={(teach) => act({ kind: "teach", teach })}
             />
           </DesktopSettingsRow>
-        )}
-        <DesktopSettingsRow label="Teach mode" description={teachLine}>
-          <Switch
-            aria-label="Teach mode"
-            checked={state.teach === true}
-            disabled={!control}
-            onCheckedChange={(teach) => act({ kind: "teach", teach })}
-          />
-        </DesktopSettingsRow>
-        <DesktopSettingsRow label="Ask before taking control">
-          <Switch
-            aria-label="Ask before taking control"
-            checked={state.ask === true}
-            disabled={!control}
-            onCheckedChange={(ask) => act({ kind: "ask", ask })}
-          />
-        </DesktopSettingsRow>
-        <div>
-          <div className="mb-4 flex items-center gap-2.5">
-            <span className="mr-auto">Companion size</span>
-            <Text bare tone="muted" className="tabular-nums">
-              {size}%
-            </Text>
-            <IconButton
-              label="Reset size"
-              disabled={!control || size === companionSizeDefault}
-              onClick={() => act({ kind: "size", size: companionSizeDefault })}
-            >
-              <RotateCcw />
-            </IconButton>
-          </div>
-          <Slider
-            aria-label="Companion size"
-            aria-valuetext={`${size}%`}
-            min={companionSizeMin}
-            max={companionSizeMax}
-            step={companionSizeStep}
-            value={[size]}
-            disabled={!control}
-            onValueChange={([next]) => act({ kind: "size", size: next })}
-          />
-        </div>
-      </DesktopSettingsSection>
-      <DesktopSettingsSection title="Voice">
-        {desktop && (
-          <DesktopSettingsRow label="Talk shortcut">
-            <Kbd>{/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt"}</Kbd>
+          <DesktopSettingsRow label="Ask before taking control">
+            <Switch
+              aria-label="Ask before taking control"
+              checked={state.ask === true}
+              disabled={!control}
+              onCheckedChange={(ask) => act({ kind: "ask", ask })}
+            />
           </DesktopSettingsRow>
-        )}
-      </DesktopSettingsSection>
+          <div>
+            <div className="mb-4 flex items-center gap-2.5">
+              <span className="mr-auto">Companion size</span>
+              <Text bare tone="muted" className="tabular-nums">
+                {size}%
+              </Text>
+              <IconButton
+                label="Reset size"
+                disabled={!control || size === companionSizeDefault}
+                onClick={() => act({ kind: "size", size: companionSizeDefault })}
+              >
+                <RotateCcw />
+              </IconButton>
+            </div>
+            <Slider
+              aria-label="Companion size"
+              aria-valuetext={`${size}%`}
+              min={companionSizeMin}
+              max={companionSizeMax}
+              step={companionSizeStep}
+              value={[size]}
+              disabled={!control}
+              onValueChange={([next]) => act({ kind: "size", size: next })}
+            />
+          </div>
+        </DesktopSettingsSection>
+        <DesktopSettingsSection title="Voice">
+          {desktop && (
+            <DesktopSettingsRow label="Talk shortcut">
+              <Kbd>{/Mac/.test(navigator.platform) ? "⌃ ⌥" : "Ctrl + Alt"}</Kbd>
+            </DesktopSettingsRow>
+          )}
+        </DesktopSettingsSection>
+      </RowGroupStack>
     </Text>
   );
 }

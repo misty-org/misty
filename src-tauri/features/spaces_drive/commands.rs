@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use space_drive::{
-    DriveEntry, DriveStatus, EntryPage, ItemId, SpaceId, TrashBy, TrashEntry, Version,
+    DriveEntry, DriveStatus, EntryPage, ItemId, SpaceId, Version,
 };
 use tauri::{AppHandle, Webview};
 
@@ -355,10 +355,11 @@ pub async fn drive_trash(webview: Webview, space_id: String, path: String) -> Re
     person_window(&webview)?;
     let space = space_of(&space_id)?;
     let id = node_id(&space, &path)?;
-    drive()?
-        .trash_now(&space, &id, TrashBy::Person)
-        .await
-        .map_err(error_text)
+    let drive = drive()?;
+    if drive.in_trash(&space, &id).map_err(error_text)? {
+        return Err("That's already in the Space's .trash, which only a person empties.".into());
+    }
+    drive.trash_now(&space, &id).await.map_err(error_text)
 }
 
 #[tauri::command]
@@ -377,7 +378,7 @@ pub async fn drive_trash_many(
     for path in paths {
         let result = match node_id(&space, &path) {
             Ok(id) => drive
-                .trash_now(&space, &id, TrashBy::Person)
+                .trash_now(&space, &id)
                 .await
                 .map_err(error_text),
             Err(error) => Err(error),
@@ -391,7 +392,6 @@ pub async fn drive_trash_many(
 
 #[tauri::command]
 pub async fn drive_restore_many(
-    app: AppHandle,
     webview: Webview,
     space_id: String,
     item_ids: Vec<String>,
@@ -412,12 +412,11 @@ pub async fn drive_restore_many(
                 .map_err(error_text),
             Err(error) => Err(error),
         };
-        match result {
-            Ok(()) => super::forget_agent_trash(&app, &space_id, &item_id),
-            Err(error) => failures.push(Failure {
+        if let Err(error) = result {
+            failures.push(Failure {
                 path: item_id,
                 error,
-            }),
+            });
         }
     }
     Ok(failures)
@@ -425,7 +424,6 @@ pub async fn drive_restore_many(
 
 #[tauri::command]
 pub async fn drive_purge_many(
-    app: AppHandle,
     webview: Webview,
     space_id: String,
     item_ids: Vec<String>,
@@ -442,39 +440,14 @@ pub async fn drive_purge_many(
             Ok(id) => drive.purge(&space, &id).await.map_err(error_text),
             Err(error) => Err(error),
         };
-        match result {
-            Ok(()) => super::forget_agent_trash(&app, &space_id, &item_id),
-            Err(error) => failures.push(Failure {
+        if let Err(error) = result {
+            failures.push(Failure {
                 path: item_id,
                 error,
-            }),
+            });
         }
     }
     Ok(failures)
-}
-
-#[tauri::command]
-pub async fn drive_trash_list(
-    webview: Webview,
-    space_id: String,
-) -> Result<Vec<TrashEntry>, String> {
-    person_window(&webview)?;
-    let space = space_of(&space_id)?;
-    let drive = drive()?;
-    let mut out = Vec::new();
-    let mut after: Option<String> = None;
-    for _ in 0..20 {
-        let (entries, next) = drive
-            .trash_list(&space, after.as_deref(), 200)
-            .await
-            .map_err(error_text)?;
-        out.extend(entries);
-        match next {
-            Some(next) => after = Some(next),
-            None => break,
-        }
-    }
-    Ok(out)
 }
 
 #[derive(Debug, Serialize)]
@@ -499,7 +472,6 @@ pub async fn drive_restore_burst(
 
 #[tauri::command]
 pub async fn drive_restore(
-    app: AppHandle,
     webview: Webview,
     space_id: String,
     item_id: String,
@@ -508,7 +480,6 @@ pub async fn drive_restore(
     let space = space_of(&space_id)?;
     let id = item_of(&item_id)?;
     let item = drive()?.restore(&space, &id).await.map_err(error_text)?;
-    super::forget_agent_trash(&app, &space_id, &item_id);
     Ok(Restored {
         item_id: item.id,
         name: item.name,
@@ -517,7 +488,6 @@ pub async fn drive_restore(
 
 #[tauri::command]
 pub async fn drive_purge(
-    app: AppHandle,
     webview: Webview,
     space_id: String,
     item_id: String,
@@ -525,9 +495,8 @@ pub async fn drive_purge(
     person_window(&webview)?;
     let space = space_of(&space_id)?;
     let id = item_of(&item_id)?;
-    drive()?.purge(&space, &id).await.map_err(error_text)?;
-    super::forget_agent_trash(&app, &space_id, &item_id);
-    Ok(())
+    drive()?.purge(&space, &id).await.map_err(error_text)
+
 }
 
 #[tauri::command]

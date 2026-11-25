@@ -48,6 +48,7 @@ export function useDesktopTitlebarGeometry(options: {
     !isAuthRoute,
     titlebarNavigationGeometry.left,
     captionRight,
+    docking.tabs === "left",
   );
 
   return {

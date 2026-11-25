@@ -85,9 +85,9 @@ export {
 export { useWorkspaceStore } from "./tabs/use_workspace_store";
 export { startWorkspaceSides } from "./tabs/workspace_sides";
 
-export { AdvancedSection } from "./settings/AdvancedSection";
+export { FramePacingRow, LinkPreviewsRow, PaneDisplayRows } from "./settings/AdvancedSection";
 export { AccessibilitySection } from "./settings/AccessibilitySection";
-export { AppearanceSection } from "./settings/AppearanceSection";
+export { AppearanceSection, WindowSection } from "./settings/AppearanceSection";
 
 export {
   browserBlockingOverlayOpen,

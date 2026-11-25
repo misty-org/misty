@@ -1,3 +1,4 @@
+import type { AvatarDecoration } from "@/shared/lib/avatar_decoration";
 import type { SpaceRole } from "./common";
 
 export type AgentAvatar =
@@ -13,5 +14,6 @@ export interface SpaceMember {
   joined_at: string;
   read_message_seq: number;
   avatar_version?: number;
+  avatar_decoration?: AvatarDecoration;
   role_ids?: string[];
 }

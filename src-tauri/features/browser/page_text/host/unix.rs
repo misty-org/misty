@@ -14,7 +14,17 @@ use tokio::{
 use file_access::fs;
 
 #[cfg(target_os = "macos")]
-const PROFILE: &str = include_str!("../../../../tauri-permissions/permissions/page-reader.sb");
+const PROFILE: &str = r#"
+(version 1)
+(deny default)
+(allow process-exec (literal (param "TOOL")))
+(allow file-read* (literal (param "TOOL")) (subpath (param "WORK"))
+  (subpath "/System/Library") (subpath "/usr/lib")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
+  (literal "/"))
+(allow sysctl-read)
+"#;
 
 #[cfg(target_os = "macos")]
 type Keep = ();

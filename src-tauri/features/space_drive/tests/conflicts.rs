@@ -5,7 +5,7 @@ mod common;
 use std::{sync::atomic::Ordering, time::Duration};
 
 use common::*;
-use space_drive::{Kind, NoticeKind, TrashBy};
+use space_drive::{Kind, NoticeKind};
 
 fn lines(first: &str, last: &str) -> Vec<u8> {
     format!("{first}\n--\nmiddle\n--\n{last}\n").into_bytes()
@@ -54,17 +54,14 @@ fn non_overlapping_text_edits_from_two_computers_both_survive() {
             "the merge is written back on the computer that made it"
         );
         assert!(
-            server
-                .trashed_items()
-                .iter()
-                .all(|item| item.replaced_of.is_none()),
+            server.replaced_copies().is_empty(),
             "a merge replaces nothing"
         );
     });
 }
 
 #[test]
-fn of_two_saves_of_a_binary_file_the_last_wins_and_the_first_waits_in_the_trash() {
+fn of_two_saves_of_a_binary_file_the_last_wins_and_the_first_stays_beside_it() {
     let runtime = runtime();
     runtime.block_on(async {
         let server = FakeServer::new();
@@ -88,13 +85,24 @@ fn of_two_saves_of_a_binary_file_the_last_wins_and_the_first_waits_in_the_trash(
             Some(sha(b"ben's\0"))
         );
         let kept: Vec<_> = server
-            .trashed_items()
+            .replaced_copies()
             .into_iter()
             .filter(|item| item.replaced_of.as_ref() == Some(&id))
             .collect();
-        assert_eq!(kept.len(), 1, "Ana's save waits in the trash");
+        assert_eq!(kept.len(), 1, "Ana's save is kept as a conflicted copy");
         assert_eq!(kept[0].sha256, Some(sha(b"ana's\0")));
-        assert!(kept[0].name.contains("(replaced "), "{}", kept[0].name);
+        assert!(
+            kept[0].name.contains(space_drive::CONFLICTED_MARK),
+            "{}",
+            kept[0].name
+        );
+        assert_eq!(
+            tree.get(&format!("/{}", kept[0].name))
+                .and_then(|(_, sha)| sha.clone()),
+            Some(sha(b"ana's\0")),
+            "the copy sits beside the file"
+        );
+        assert!(server.trashed_items().is_empty());
         let notices = ana.notices.lock().unwrap().clone();
         let notice = notices
             .iter()
@@ -113,7 +121,7 @@ fn of_two_saves_of_a_binary_file_the_last_wins_and_the_first_waits_in_the_trash(
 }
 
 #[test]
-fn an_edit_after_a_delete_brings_the_file_back() {
+fn an_edit_after_a_delete_keeps_the_file_in_the_trash_with_the_edit() {
     let runtime = runtime();
     runtime.block_on(async {
         let server = FakeServer::new();
@@ -127,27 +135,36 @@ fn an_edit_after_a_delete_brings_the_file_back() {
 
         ben.offline.store(true, Ordering::SeqCst);
         save(&b, "/Report.pdf", b"ben's edit\0");
-        a.trash(&space(), &id, TrashBy::Person).unwrap();
+        a.trash(&space(), &id).unwrap();
         a.sync_now(&space()).await.unwrap();
         assert!(!server.live_tree().contains_key("/Report.pdf"));
 
         ben.offline.store(false, Ordering::SeqCst);
         settle(&server, &[b.clone(), a.clone()]).await;
 
-        let tree = server.live_tree();
-        assert_eq!(
-            tree.get("/Report.pdf").and_then(|(_, sha)| sha.clone()),
-            Some(sha(b"ben's edit\0")),
-            "the later write wins"
-        );
-        assert!(server.revived_by_write() >= 1);
-        assert!(
-            local_tree(&a).contains_key("/Report.pdf"),
-            "Ana sees it come back"
-        );
-        assert!(ana.notices.lock().unwrap().iter().any(|notice| notice.kind
-            == NoticeKind::Revived
-            && notice.by.as_deref() == Some("Ben")));
+        assert!(!server.live_tree().contains_key("/Report.pdf"));
+        let report = server
+            .trashed_items()
+            .into_iter()
+            .find(|item| item.id == id)
+            .expect("still in the trash");
+        assert_eq!(report.sha256, Some(sha(b"ben's edit\0")), "with Ben's edit");
+        assert_eq!(report.parent_id.map(|parent| parent.0), server.trash_id());
+        for drive in [&a, &b] {
+            assert!(!local_tree(drive).contains_key("/Report.pdf"));
+            assert_eq!(
+                local_tree(drive)
+                    .get("/.trash/Report.pdf")
+                    .and_then(|(_, sha, _)| sha.clone()),
+                Some(sha(b"ben's edit\0"))
+            );
+        }
+        assert!(!ana
+            .notices
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|notice| notice.kind == NoticeKind::Revived));
     });
 }
 
@@ -167,7 +184,7 @@ fn a_delete_after_an_edit_trashes_the_edited_file() {
         save(&a, "/Report.pdf", b"v2");
         a.sync_now(&space()).await.unwrap();
         ana.offline.store(true, Ordering::SeqCst);
-        b.trash_now(&space(), &id, TrashBy::Person).await.unwrap();
+        b.trash_now(&space(), &id).await.unwrap();
         ana.offline.store(false, Ordering::SeqCst);
         settle(&server, &[a.clone(), b.clone()]).await;
 
@@ -179,11 +196,15 @@ fn a_delete_after_an_edit_trashes_the_edited_file() {
             .expect("in the trash");
         assert_eq!(report.sha256, Some(sha(b"v2")), "restorable as Ana left it");
         assert!(!local_tree(&a).contains_key("/Report.pdf"));
+        assert!(
+            local_tree(&a).contains_key("/.trash/Report.pdf"),
+            "Ana sees it in the Space's trash"
+        );
     });
 }
 
 #[test]
-fn a_new_file_in_a_deleted_folder_brings_the_folder_back() {
+fn a_new_file_in_a_deleted_folder_lands_in_the_trash_with_it() {
     let runtime = runtime();
     runtime.block_on(async {
         let server = FakeServer::new();
@@ -198,31 +219,36 @@ fn a_new_file_in_a_deleted_folder_brings_the_folder_back() {
         ben.offline.store(true, Ordering::SeqCst);
         save(&b, "/Docs/new.txt", b"new");
         let docs = a.node_at(&space(), "/Docs").unwrap().unwrap();
-        a.trash(&space(), &docs.id, TrashBy::Person).unwrap();
+        a.trash(&space(), &docs.id).unwrap();
         a.sync_now(&space()).await.unwrap();
 
         ben.offline.store(false, Ordering::SeqCst);
         settle(&server, &[b.clone(), a.clone()]).await;
 
         let tree = server.live_tree();
-        assert!(matches!(tree.get("/Docs"), Some((Kind::Folder, _))));
+        assert!(!tree.contains_key("/Docs"), "{tree:?}");
+        let whole = server.whole_tree();
+        assert!(matches!(whole.get("/.trash/Docs"), Some((Kind::Folder, _))));
         assert_eq!(
-            tree.get("/Docs/new.txt").and_then(|(_, sha)| sha.clone()),
+            whole
+                .get("/.trash/Docs/new.txt")
+                .and_then(|(_, sha)| sha.clone()),
             Some(sha(b"new"))
         );
-        assert!(
-            tree.contains_key("/Docs/old.txt"),
-            "the folder comes back whole"
-        );
-        assert!(
-            local_tree(&a).contains_key("/Docs/new.txt"),
-            "the deleter sees it"
-        );
+        assert!(whole.contains_key("/.trash/Docs/old.txt"));
+        for drive in [&a, &b] {
+            let local = local_tree(drive);
+            assert!(!local.contains_key("/Docs"));
+            assert!(
+                local.contains_key("/.trash/Docs/new.txt"),
+                "everyone sees it in the trash"
+            );
+        }
     });
 }
 
 #[test]
-fn two_new_files_by_one_name_are_one_file_and_the_first_waits_in_the_trash() {
+fn two_new_files_by_one_name_are_one_file_and_the_first_stays_beside_it() {
     let runtime = runtime();
     runtime.block_on(async {
         let server = FakeServer::new();
@@ -236,15 +262,17 @@ fn two_new_files_by_one_name_are_one_file_and_the_first_waits_in_the_trash() {
         a.sync_now(&space()).await.unwrap();
         settle(&server, &[b.clone(), a.clone()]).await;
         let tree = server.live_tree();
-        assert_eq!(tree.len(), 1, "{tree:?}");
+        assert_eq!(tree.len(), 2, "{tree:?}");
         assert_eq!(
             tree.get("/Notes.md").and_then(|(_, sha)| sha.clone()),
             Some(sha(b"ben"))
         );
-        assert!(server
-            .trashed_items()
-            .iter()
-            .any(|item| item.replaced_of.is_some() && item.sha256 == Some(sha(b"ana"))));
+        let copy = server
+            .replaced_copies()
+            .into_iter()
+            .find(|item| item.sha256 == Some(sha(b"ana")))
+            .expect("Ana's file is kept as a conflicted copy");
+        assert!(tree.contains_key(&format!("/{}", copy.name)), "{tree:?}");
         let content = |tree: std::collections::HashMap<
             String,
             (Kind, Option<String>, space_drive::LocalState),
@@ -420,7 +448,7 @@ fn a_file_someone_has_open_is_not_deleted() {
         let id = save(&a, "/Report.pdf", b"v1");
         settle(&server, &[a.clone(), b.clone()]).await;
         b.open(&space(), &id, false).await.unwrap();
-        let refused = a.trash_now(&space(), &id, TrashBy::Person).await;
+        let refused = a.trash_now(&space(), &id).await;
         assert!(
             matches!(refused, Err(space_drive::DriveError::InUse(_))),
             "{refused:?}"
@@ -434,7 +462,7 @@ fn a_file_someone_has_open_is_not_deleted() {
             .iter()
             .any(|notice| notice.kind == NoticeKind::DeleteRefusedInUse));
         b.close(&space(), &id, false).await;
-        a.trash_now(&space(), &id, TrashBy::Person).await.unwrap();
+        a.trash_now(&space(), &id).await.unwrap();
         assert!(
             !server.live_tree().contains_key("/Report.pdf"),
             "closed, it goes"
@@ -471,7 +499,7 @@ fn one_person_edits_on_two_computers_like_anyone() {
 }
 
 #[test]
-fn an_agents_trash_is_held_and_recorded_on_this_computer_only() {
+fn a_delete_moves_the_item_into_the_spaces_trash_where_it_can_be_put_back_or_purged() {
     let runtime = runtime();
     runtime.block_on(async {
         let server = FakeServer::new();
@@ -480,22 +508,35 @@ fn an_agents_trash_is_held_and_recorded_on_this_computer_only() {
         let a = server.open_drive(&ana, dir.path().to_path_buf(), runtime.handle().clone());
         let id = save(&a, "/draft.md", b"draft");
         settle(&server, &[a.clone()]).await;
-        a.trash(
-            &space(),
-            &id,
-            TrashBy::Agent {
-                agent_id: "agent-1".into(),
-                chat_id: "chat-1".into(),
-            },
-        )
-        .unwrap();
+        a.trash(&space(), &id).unwrap();
         a.sync_now(&space()).await.unwrap();
         let item = server.item_named("draft.md").unwrap();
-        assert!(item.trashed && item.trash_hold);
-        let records = ana.agent_trash.lock().unwrap().clone();
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].agent_id, "agent-1");
-        assert_eq!(records[0].path, "/draft.md");
+        assert_eq!(item.id, id);
+        assert_eq!(item.parent_id.map(|parent| parent.0), server.trash_id());
+        assert!(item.trashed_at.is_some());
+        assert_eq!(item.trashed_by.as_deref(), Some("ana"));
+        assert!(server.trashed_ids().contains(id.as_str()));
+        assert!(a.in_trash(&space(), &id).unwrap());
+        assert!(local_tree(&a).contains_key("/.trash/draft.md"));
+        assert!(!local_tree(&a).contains_key("/draft.md"));
+
+        a.restore(&space(), &id).await.unwrap();
+        settle(&server, &[a.clone()]).await;
+        let item = server.item_named("draft.md").unwrap();
+        assert!(item.parent_id.is_none() && item.trashed_at.is_none());
+        assert!(server.live_tree().contains_key("/draft.md"));
+        assert!(!a.in_trash(&space(), &id).unwrap());
+        assert!(local_tree(&a).contains_key("/draft.md"));
+
+        a.trash_now(&space(), &id).await.unwrap();
+        assert!(a.in_trash(&space(), &id).unwrap());
+        a.trash_now(&space(), &id).await.unwrap();
+        assert!(
+            server.item_named("draft.md").is_some_and(|item| item.deleted),
+            "a delete inside the trash is for good"
+        );
+        assert!(a.node(&space(), &id).unwrap().is_none());
+        assert!(server.trash_id().is_some(), "the trash folder stays");
     });
 }
 
@@ -522,7 +563,7 @@ fn a_lost_reply_never_makes_a_copy_of_ones_own_change() {
             Some(sha(b"two"))
         );
         assert!(
-            server.trashed_items().is_empty(),
+            server.replaced_copies().is_empty() && server.trashed_items().is_empty(),
             "nothing of one's own is replaced"
         );
     });

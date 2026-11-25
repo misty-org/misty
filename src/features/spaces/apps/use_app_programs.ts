@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { invoke } from "@/native";
 import { useRegistryApps } from "./third_party_apps";
-import { useSpaceApps } from "./use_space_apps";
+import { useInstalledApps } from "./use_installed_apps";
 
-export function useAppPrograms(spaceId: string | undefined) {
-  const { apps } = useSpaceApps(spaceId ?? "");
+export function useAppPrograms() {
+  const { apps } = useInstalledApps();
   const listedApps = useRegistryApps();
   const key = (apps ?? [])
     .filter((app) => listedApps.some((entry) => entry.id === app.app_id && entry.mcp_program))

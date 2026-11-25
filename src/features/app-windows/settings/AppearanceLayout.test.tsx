@@ -4,7 +4,7 @@ import { defaultDockingLayout, useDockingLayoutStore } from "@/app/shell/docking
 import { useWorkspaceStore } from "@/features/app-windows";
 import { useWindowDockingLayout } from "@/features/app-windows/panes/use_window_docking_layout";
 import type { SettingsContentProps } from "../../settings/settings_types";
-import { AppearanceSection } from "./AppearanceSection";
+import { WindowSection } from "./AppearanceSection";
 
 const props: SettingsContentProps = {
   document: {},
@@ -30,8 +30,8 @@ const chooseTabs = (side: "Left" | "Right") =>
     within(screen.getByRole("radiogroup", { name: "Tabs" })).getByRole("radio", { name: side }),
   );
 
-it("moves this window's tab sidebar between the left and the right from Appearance", () => {
-  render(<AppearanceSection {...props} />);
+it("moves this window's tab sidebar between the left and the right from Interface", () => {
+  render(<WindowSection {...props} />);
   const { result } = renderHook(useWindowDockingLayout);
   chooseTabs("Right");
   expect(result.current).toEqual({ tabs: "right", navigation: "left" });

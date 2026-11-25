@@ -1,6 +1,5 @@
 import { Globe, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { browserFaviconUrl } from "@/features/app-windows";
 import {
   cn,
   IconButton,
@@ -33,9 +32,9 @@ const agentTabLabel = (tab: AgentBrowserTab | undefined) => {
 };
 
 function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; active: boolean }) {
-  const icon = tab?.faviconUrl ?? (tab?.url ? browserFaviconUrl(tab.url) : null);
+  const page = tab?.url && /^https?:\/\//i.test(tab.url) ? tab.url : null;
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [icon]);
+  useEffect(() => setFailed(false), [page, tab?.faviconUrl]);
   if (tab?.loading)
     return (
       <Text bare tone={active ? "bright" : "muted"} className="flex shrink-0">
@@ -45,11 +44,12 @@ function AgentTabIcon({ tab, active }: { tab: AgentBrowserTab | undefined; activ
         />
       </Text>
     );
-  if (icon && !failed)
+  if (page && !failed)
     return (
       <SiteIcon
         className="size-4 shrink-0 select-none rounded-sm object-contain"
-        url={icon}
+        url={page}
+        icon={tab?.faviconUrl}
         onFailed={() => setFailed(true)}
       />
     );

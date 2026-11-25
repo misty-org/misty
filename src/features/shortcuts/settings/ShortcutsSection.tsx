@@ -1,31 +1,13 @@
 import type { UpdateShortcutRequest } from "@/native/ipc";
-import {
-  Button,
-  cn,
-  MistyMark,
-  notify,
-  SearchField,
-  Skeleton,
-  SkeletonControl,
-  spaceIcons,
-  Text,
-  type MenuIcon,
-} from "@misty/ui";
-
-import {
-  AppWindow,
-  AppWindowMac,
-  ArrowLeftRight,
-  CodeXml,
-  Keyboard,
-  LayoutPanelLeft,
-} from "lucide-react";
+import { Button, EmptyState, notify, SearchField } from "@misty/ui";
 import { useEffect, useMemo, useState } from "react";
 import {
   DesktopSettingsRow as SettingsRow,
-  DesktopSettingsSection as SettingsSectionBlock,
+  DesktopSettingsRowSkeleton,
+  DesktopSettingsSection,
+  SettingsPageBar,
 } from "@/features/settings";
-import { booleanSetting, DropdownControl, SwitchControl } from "../../settings/SettingsControls";
+import { booleanSetting, SwitchControl } from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settings_types";
 import { ShortcutCommandRow, type ShortcutConflict } from "./ShortcutCommandRow";
 import { findShortcutConflict, groupShortcutsByCategory } from "./shortcut_settings_model";
@@ -45,54 +27,21 @@ function holdAppShortcuts(recording: boolean) {
   else delete document.documentElement.dataset.shortcutCapture;
 }
 
-const skeletonWidths = ["w-32", "w-40", "w-28", "w-36"];
-
-function ShortcutRowsSkeleton() {
+export function ShortcutHintsRow(props: SettingsContentProps) {
   return (
-    <>
-      {Array.from({ length: 8 }, (_, index) => (
-        <div
-          key={index}
-          data-setting-label=""
-          role={index === 0 ? "status" : undefined}
-          aria-label={index === 0 ? "Shortcuts" : undefined}
-          aria-busy={index === 0 || undefined}
-          className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-8 py-3"
-        >
-          <div className="grid min-w-0 gap-1">
-            <div className="flex h-6 items-center">
-              <Skeleton className={cn("h-4", skeletonWidths[index % skeletonWidths.length])} />
-            </div>
-            <div className="flex h-6 items-center">
-              <Skeleton className="h-3.5 w-2/3" />
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            <SkeletonControl kind="field" className="w-48" />
-            <SkeletonControl kind="icon" />
-          </div>
-        </div>
-      ))}
-    </>
+    <SettingsRow label="Show shortcut hints" description="In menus, tooltips and buttons.">
+      <SwitchControl
+        checked={booleanSetting(props.document, "shortcuts", "shortcut_hints_enabled", true)}
+        disabled={props.working}
+        onChange={(value) => props.onSettingChange("shortcuts", "shortcut_hints_enabled", value)}
+      />
+    </SettingsRow>
   );
 }
-
-const categoryIcons: Record<string, MenuIcon> = {
-  Misty: <MistyMark size={16} />,
-  View: LayoutPanelLeft,
-  Tabs: AppWindow,
-  Windows: AppWindowMac,
-  Navigation: ArrowLeftRight,
-  Spaces: spaceIcons.space,
-  Files: spaceIcons.files,
-  Chat: spaceIcons.chat,
-  Code: CodeXml,
-};
 
 export function ShortcutsSection(props: SettingsContentProps) {
   const snapshot = props.shortcuts;
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
   const [conflict, setConflict] = useState<PendingConflict | null>(null);
   const offerUndo = (requests: UpdateShortcutRequest[]) =>
     notify({
@@ -192,92 +141,69 @@ export function ShortcutsSection(props: SettingsContentProps) {
       ? { message: conflict.message, onReassign: () => reassign(conflict) }
       : null;
 
-  const categories = useMemo(
-    () => groupShortcutsByCategory(definitions).map(([name]) => name),
-    [definitions],
-  );
-  const shownCategory = categories.includes(category) ? category : (categories[0] ?? "");
-  const shown = query.trim()
-    ? filtered
-    : filtered.filter((definition) => definition.category === shownCategory);
+  const groups = useMemo(() => groupShortcutsByCategory(filtered), [filtered]);
+  const row = (definition: (typeof definitions)[number]) => {
+    const binding = bindingsById.get(definition.id);
+    if (!binding || !snapshot) return null;
+    return (
+      <ShortcutCommandRow
+        key={definition.id}
+        definition={definition}
+        binding={binding}
+        platform={snapshot.detectedPlatform}
+        conflict={conflictFor(definition.id)}
+        disabled={props.working}
+        onRecordingChange={(recording) => {
+          holdAppShortcuts(recording);
+          if (recording) setConflict(null);
+        }}
+        onChange={(value) => record(definition.id, value)}
+        onRestore={() => void props.onResetShortcuts({ commandId: definition.id })}
+      />
+    );
+  };
 
   return (
     <>
-      <SettingsSectionBlock title={query.trim() ? "Matches" : "Commands"}>
-        <SettingsRow label="Show shortcut hints" description="In menus, tooltips and buttons.">
-          <SwitchControl
-            checked={booleanSetting(props.document, "shortcuts", "shortcut_hints_enabled", true)}
-            disabled={props.working}
-            onChange={(value) =>
-              props.onSettingChange("shortcuts", "shortcut_hints_enabled", value)
-            }
-          />
-        </SettingsRow>
-        <div className="flex min-w-0 items-center gap-2 pb-3">
-          <SearchField
-            containerClassName="min-w-50 flex-1"
-            aria-label="Search shortcuts"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search commands, tools, or shortcuts"
-          />
-          <DropdownControl
-            label="Shortcut category"
-            value={shownCategory}
-            disabled={!snapshot || Boolean(query.trim())}
-            options={categories.map((name) => ({
-              value: name,
-              label: name,
-              icon: categoryIcons[name] ?? Keyboard,
-            }))}
-            onValueChange={setCategory}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            className={settingsDisabledControlClass}
-            disabled={props.working || !snapshot?.overrides?.length}
-            onClick={() =>
-              void confirmAction(
-                "Every shortcut you changed goes back to its default.",
-                "Restore all shortcuts?",
-              ).then((yes) => {
-                if (yes) void props.onResetShortcuts();
-              })
-            }
-          >
-            Restore all
-          </Button>
-        </div>
-        {!snapshot ? (
-          <ShortcutRowsSkeleton />
-        ) : shown.length === 0 ? (
-          <Text as="p" size="control" tone="muted" className="py-2">
-            No matching commands.
-          </Text>
-        ) : (
-          shown.map((definition) => {
-            const binding = bindingsById.get(definition.id);
-            if (!binding) return null;
-            return (
-              <ShortcutCommandRow
-                key={definition.id}
-                definition={definition}
-                binding={binding}
-                platform={snapshot.detectedPlatform}
-                conflict={conflictFor(definition.id)}
-                disabled={props.working}
-                onRecordingChange={(recording) => {
-                  holdAppShortcuts(recording);
-                  if (recording) setConflict(null);
-                }}
-                onChange={(value) => record(definition.id, value)}
-                onRestore={() => void props.onResetShortcuts({ commandId: definition.id })}
-              />
-            );
-          })
-        )}
-      </SettingsSectionBlock>
+      <SettingsPageBar>
+        <SearchField
+          containerClassName="w-60"
+          aria-label="Search shortcuts"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onClear={() => setQuery("")}
+          placeholder="Search shortcuts"
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          className={settingsDisabledControlClass}
+          disabled={props.working || !snapshot?.overrides?.length}
+          onClick={() =>
+            void confirmAction(
+              "Every shortcut you changed goes back to its default.",
+              "Restore all shortcuts?",
+            ).then((yes) => {
+              if (yes) void props.onResetShortcuts();
+            })
+          }
+        >
+          Restore all
+        </Button>
+      </SettingsPageBar>
+      {!snapshot ? (
+        <DesktopSettingsSection title="Commands" section="commands">
+          <DesktopSettingsRowSkeleton label="Shortcuts" rows={8} control={["field", "icon"]} />
+        </DesktopSettingsSection>
+      ) : groups.length === 0 ? (
+        <EmptyState inline title="No matching commands" line="Try another word or shortcut." />
+      ) : (
+        groups.map(([category, commands]) => (
+          <DesktopSettingsSection key={category} title={category}>
+            {commands.map(row)}
+          </DesktopSettingsSection>
+        ))
+      )}
     </>
   );
 }

@@ -15,6 +15,7 @@ import type { SpaceMessage } from "../../api/dto/entities";
 import { searchSpaceMessages } from "../../search/space_search";
 import { spansToText } from "./message_text";
 import { ChatAvatar } from "./ChatAvatar";
+import { memberOutlineFor, useMemberAvatarUrls, useMemberOutlines } from "./ChatDisplay";
 
 type Found =
   { status: "loading" } | { status: "done"; messages: SpaceMessage[] } | { status: "failed" };
@@ -85,6 +86,8 @@ export function useChatSearchResults(props: {
     () => parsed.words.toLowerCase().split(/\s+/).filter(Boolean),
     [parsed.words],
   );
+  const avatars = useMemberAvatarUrls(props.spaceId, messages);
+  const outlines = useMemberOutlines(props.spaceId, messages);
   const header = (
     <FramedBar
       start={
@@ -180,6 +183,12 @@ export function useChatSearchResults(props: {
                       id={message.sender_user_id || message.sender_name}
                       name={message.sender_name}
                       size="lg"
+                      src={
+                        message.origin?.author_avatar_url ||
+                        avatars.get(message.sender_user_id) ||
+                        undefined
+                      }
+                      outline={memberOutlineFor(outlines, message)}
                     />
                   }
                   time={stampFormat.format(new Date(message.created_at))}

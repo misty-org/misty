@@ -7,7 +7,6 @@ import {
   DesktopSettingsNotice,
   DesktopSettingsRow as Row,
   DesktopSettingsRowSkeleton,
-  DesktopSettingsSection as Section,
 } from "@/features/settings";
 
 export function AgentGrantsSection() {
@@ -59,48 +58,46 @@ export function AgentGrantsSection() {
   return (
     <>
       {error ? <DesktopSettingsNotice>{error}</DesktopSettingsNotice> : null}
-      <Section title="Approvals">
-        {listing.loading ? (
-          <DesktopSettingsRowSkeleton label="Approvals" rows={3} description control="button" />
-        ) : null}
-        {grants !== null && !groups.length ? (
+      {listing.loading ? (
+        <DesktopSettingsRowSkeleton label="Approvals" rows={3} description control="button" />
+      ) : null}
+      {grants !== null && !groups.length ? (
+        <Row
+          label="No remembered approvals"
+          description="When you choose Accept and remember on an agent's request, it shows here."
+        >
+          {null}
+        </Row>
+      ) : null}
+      {groups.flatMap((group) =>
+        group.grants.map((grant) => (
           <Row
-            label="No remembered approvals"
-            description="When you choose Accept and remember on an agent's request, it shows here."
+            key={grant.id}
+            label={grant.label}
+            description={`For ${group.agentName}, ${lastUsedText(grant).toLowerCase()}`}
           >
-            {null}
-          </Row>
-        ) : null}
-        {groups.flatMap((group) =>
-          group.grants.map((grant) => (
-            <Row
-              key={grant.id}
-              label={grant.label}
-              description={`For ${group.agentName}, ${lastUsedText(grant).toLowerCase()}`}
+            <Button
+              disabled={Boolean(working)}
+              onClick={() =>
+                void run(
+                  grant.id,
+                  () => grantsApi.revoke(grant.id),
+                  "Misty couldn’t revoke that approval.",
+                )
+              }
             >
-              <Button
-                disabled={Boolean(working)}
-                onClick={() =>
-                  void run(
-                    grant.id,
-                    () => grantsApi.revoke(grant.id),
-                    "Misty couldn’t revoke that approval.",
-                  )
-                }
-              >
-                Revoke
-              </Button>
-            </Row>
-          )),
-        )}
-        {(grants?.length ?? 0) > 1 ? (
-          <Row label="Revoke all">
-            <Button disabled={Boolean(working)} onClick={() => void revokeAll()}>
-              Revoke all
+              Revoke
             </Button>
           </Row>
-        ) : null}
-      </Section>
+        )),
+      )}
+      {(grants?.length ?? 0) > 1 ? (
+        <Row label="Revoke all">
+          <Button disabled={Boolean(working)} onClick={() => void revokeAll()}>
+            Revoke all
+          </Button>
+        </Row>
+      ) : null}
     </>
   );
 }

@@ -61,8 +61,10 @@ export interface RowProps {
   message: SpaceMessage;
   grouped: boolean;
   avatarUrl: string;
+  avatarOutline?: string;
   replied: SpaceMessage | undefined;
   repliedAvatarUrl: string;
+  repliedAvatarOutline?: string;
   replyCount: number;
   props: SpaceChatMessagesProps;
 }
@@ -86,8 +88,10 @@ export const MessageRow = memo(MessageRowView, (previous, next) => {
     previous.message !== next.message ||
     previous.grouped !== next.grouped ||
     previous.avatarUrl !== next.avatarUrl ||
+    previous.avatarOutline !== next.avatarOutline ||
     previous.replied !== next.replied ||
     previous.repliedAvatarUrl !== next.repliedAvatarUrl ||
+    previous.repliedAvatarOutline !== next.repliedAvatarOutline ||
     previous.replyCount !== next.replyCount ||
     rowFields.some((field) => previous.props[field] !== next.props[field])
   )
@@ -107,8 +111,10 @@ function MessageRowView({
   message,
   grouped,
   avatarUrl,
+  avatarOutline,
   replied,
   repliedAvatarUrl,
+  repliedAvatarOutline,
   replyCount,
   props,
 }: RowProps) {
@@ -296,6 +302,7 @@ function MessageRowView({
             name={message.sender_name}
             src={avatarUrl || undefined}
             size="lg"
+            outline={avatarOutline}
           />
         )
       }
@@ -321,6 +328,7 @@ function MessageRowView({
           <ReplyLine
             replied={replied}
             avatarUrl={repliedAvatarUrl}
+            avatarOutline={repliedAvatarOutline}
             color={replied ? props.memberColors?.get(replied.sender_user_id) : undefined}
             earlier={!replied && Boolean(props.hasOlderMessages)}
             onOpen={() => {

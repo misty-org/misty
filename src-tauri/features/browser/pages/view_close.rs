@@ -95,6 +95,27 @@ pub fn close_browser_webview(
     close_page(&webview)
 }
 
+pub fn close_window_pages(app: &AppHandle, window: &str) {
+    let pages: Vec<Webview> = app
+        .webviews()
+        .into_values()
+        .filter(|page| page.label() != window && page.window().label() == window)
+        .collect();
+    for page in pages {
+        if let Some(id) = page.label().strip_prefix("misty-browser-") {
+            let _ = close_browser_webview(
+                app.clone(),
+                app.state::<BrowserSessionState>(),
+                BrowserWebviewIdRequest { id: id.to_owned() },
+            );
+        } else if crate::browser::pages::app_pages::close_if_app_page(&page).is_none() {
+            silence_page(&page);
+            let _ = page.close();
+        }
+    }
+    forget_closed_pages(app);
+}
+
 pub(crate) fn forget_closed_pages(app: &AppHandle) {
     crate::apps::mcp::forget_closed(|label| app.get_webview(label).is_some());
     if let Some(state) = app.try_state::<BrowserSessionState>() {
@@ -108,6 +129,9 @@ pub(crate) fn forget_closed_pages(app: &AppHandle) {
 }
 
 pub(in crate::browser) fn silence_page(webview: &Webview) {
+    crate::browser::page_media::forget(webview);
+    #[cfg(target_os = "macos")]
+    crate::browser::pages::first_paint::forget_unpainted_page(webview.label());
     #[cfg(target_os = "macos")]
     let _ = webview.with_webview(|platform_webview| unsafe {
         let view: &objc2::runtime::AnyObject = &*platform_webview.inner().cast();

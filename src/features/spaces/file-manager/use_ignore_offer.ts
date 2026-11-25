@@ -79,7 +79,7 @@ export function useIgnoreOffer(
   items: readonly FileItem[] | null | undefined,
   on: boolean,
 ) {
-  const templates = useRegistry((state) => state.ignore?.templates);
+  const templates = useRegistry((state) => state.ignore);
   const spaceId = place.kind === "space-drive" ? place.spaceId : undefined;
   const folder = place.kind === "space-drive" ? drivePath(place.path) : undefined;
   const mayEditRoot = useSpacesStore((store) => {

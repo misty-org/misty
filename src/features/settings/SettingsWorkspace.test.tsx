@@ -127,15 +127,19 @@ describe("SettingsWorkspace", () => {
 
   it("lists pages under feature groups, without disclosures or an Account footer", async () => {
     await render();
-    const groups = [...container.querySelectorAll('nav [role="group"]')];
+    const groups = [...container.querySelectorAll('nav > [role="group"]')];
     expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual([
       "Account",
       "App",
-      "Pages",
+      "AI",
     ]);
     const entries = [...container.querySelectorAll("[data-settings-nav-entry]")];
     expect(entries.map((entry) => entry.getAttribute("data-settings-nav-entry"))).toEqual(PAGES);
-    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe("General");
+    expect(
+      container.querySelector(
+        '[data-settings-nav-entry="general"] + [data-slot="nav-branch"] [aria-current="page"]',
+      ),
+    ).not.toBeNull();
     expect(container.querySelector('[aria-label^="Account settings"]')).toBeNull();
     expect(container.querySelector('[aria-expanded]:not([role="combobox"])')).toBeNull();
   });
@@ -157,16 +161,17 @@ describe("SettingsWorkspace", () => {
 
   it("opens a deep-linked block on its page", async () => {
     await render("updates");
-    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe("General");
+    expect(container.querySelector('[data-settings-nav-entry="general"]')).not.toBeNull();
+    expect(container.querySelector('[aria-current="page"]')?.textContent).toBe("Updates");
     expect(container.querySelector('[data-settings-page="updates"]')).not.toBeNull();
   });
 
   it("selects a page from the sidebar", async () => {
     await render();
     await act(async () =>
-      (container.querySelector('[data-settings-nav-entry="advanced"]') as HTMLElement).click(),
+      (container.querySelector('[data-settings-nav-entry="network"]') as HTMLElement).click(),
     );
-    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("advanced", undefined);
+    expect(mocks.settingsState.setActiveSection).toHaveBeenCalledWith("network", undefined);
   });
 
   it("searches preferences and opens the page that shows the row", async () => {

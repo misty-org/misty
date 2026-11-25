@@ -4,7 +4,7 @@ import type * as SettingsControlsModule from "../../settings/SettingsControls";
 import type { SettingsContentProps } from "../../settings/settings_types";
 import { SettingsPageScope } from "../../settings/device-preferences/SettingScope";
 import { useDevicePreferences } from "../../settings/device-preferences/store";
-import { AppearanceSection } from "./AppearanceSection";
+import { AppearanceSection, WindowSection } from "./AppearanceSection";
 
 const zoomMocks = vi.hoisted(() => ({
   current: 1,
@@ -72,7 +72,7 @@ describe("AppearanceSection app zoom", () => {
   });
 
   it("previews the percentage without moving the slider, then applies on commit", async () => {
-    render(<AppearanceSection {...props} />);
+    render(<WindowSection {...props} />);
     expect(screen.getByText("100%")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Preview zoom" }));
@@ -93,8 +93,9 @@ describe("AppearanceSection app zoom", () => {
       state: { version: 3, values: { "app.zoom": 2 } },
     });
     const view = render(
-      <SettingsPageScope.Provider value={{ page: "appearance", owner: "device" }}>
+      <SettingsPageScope.Provider value={{ page: "display", owner: "device" }}>
         <AppearanceSection {...props} />
+        <WindowSection {...props} />
       </SettingsPageScope.Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Reset App zoom to default" }));

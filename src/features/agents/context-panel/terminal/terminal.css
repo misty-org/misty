@@ -44,8 +44,6 @@
 .terminal-tab-title {
   max-width: calc(var(--spacing) * 40);
   overflow: hidden;
-  -webkit-mask-image: var(--mask-fade-end);
-  mask-image: var(--mask-fade-end);
 }
 .terminal-tab-input {
   width: calc(var(--spacing) * 30);

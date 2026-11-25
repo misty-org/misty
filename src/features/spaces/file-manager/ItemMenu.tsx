@@ -40,7 +40,14 @@ import type { FileActions } from "./file_actions";
 import { useFilesChoices } from "./files_choices";
 import { isArchive } from "./format";
 import { isMac, keys } from "./key_labels";
-import { localPath, type FileItem } from "./model";
+import {
+  directlyInSpaceTrash,
+  inSpaceTrash,
+  isSpaceTrash,
+  localPath,
+  mayEmptySpaceTrash,
+  type FileItem,
+} from "./model";
 import { DiskOpenWithItems, DriveOpenWithItems } from "./OpenWithItems";
 import { targetsOf, usePane } from "./pane_context";
 import { sourceOf } from "./sources";
@@ -81,10 +88,7 @@ function TagRows({ items, ctx }: { items: FileItem[]; ctx: MenuContext }) {
 }
 
 function TrashRows({ items, ctx }: { items: FileItem[]; ctx: MenuContext }) {
-  const first = items[0].source;
-  const deletable =
-    sourceOf(items[0]).purge !== undefined &&
-    (first.kind !== "drive-trash" || ctx.canPurge(first.entry.space_id));
+  const deletable = sourceOf(items[0]).purge !== undefined;
   return (
     <>
       <MenuItem icon={Undo2} label="Put back" onSelect={() => ctx.actions.putBack(items)} />
@@ -160,7 +164,7 @@ export function ItemMenu({ items, ctx }: { items: FileItem[]; ctx: MenuContext }
       ) : null}
       {ctx.picking ? null : (
         <>
-          {drive && one ? (
+          {drive && one && !isSpaceTrash(item) ? (
             <>
               <MenuSeparator />
               {drive.waits_large ? (
@@ -290,12 +294,37 @@ export function ItemMenu({ items, ctx }: { items: FileItem[]; ctx: MenuContext }
             </>
           ) : null}
           <MenuSeparator />
-          <MenuItem
-            icon={Trash2}
-            label="Move to Trash"
-            shortcut={keys.trash}
-            onSelect={() => void actions.trash(items)}
-          />
+          {drive && one && isSpaceTrash(item) ? (
+            ctx.canPurge(drive.space_id) ? (
+              <MenuItem
+                icon={Trash2}
+                label="Empty trash"
+                danger
+                onSelect={() => actions.emptyTrash(drive.space_id)}
+              />
+            ) : null
+          ) : drive && items.every(inSpaceTrash) ? (
+            <>
+              {items.every(directlyInSpaceTrash) ? (
+                <MenuItem icon={Undo2} label="Put back" onSelect={() => actions.putBack(items)} />
+              ) : null}
+              {ctx.canPurge(drive.space_id) ? (
+                <MenuItem
+                  icon={Eraser}
+                  label="Delete immediately"
+                  danger
+                  onSelect={() => actions.deleteFromTrash(items)}
+                />
+              ) : null}
+            </>
+          ) : (
+            <MenuItem
+              icon={Trash2}
+              label="Move to Trash"
+              shortcut={keys.trash}
+              onSelect={() => void actions.trash(items)}
+            />
+          )}
           {onDisk ? (
             <MenuItem
               icon={Eraser}
@@ -319,8 +348,7 @@ export function ItemMenuFor({ item }: { item: FileItem }) {
   const tags = usePlacesStore((store) => store.tags);
   const spaces = useSpacesStore((store) => store.spaces);
   const { setInfo } = useFilesChoices(picking);
-  const drive = item.source.kind === "drive" ? item.source.entry : undefined;
-  const driveOpen = useDriveOpenWith(drive?.space_id);
+  const driveOpen = useDriveOpenWith();
   const ctx: MenuContext = {
     granted: pane.granted,
     picking,
@@ -335,11 +363,8 @@ export function ItemMenuFor({ item }: { item: FileItem }) {
     },
     driveApps: driveOpen.appsFor,
     openDriveIn: driveOpen.openIn,
-    canPurge: (spaceId) => {
-      const held: readonly string[] =
-        spaces.find((space) => space.id === spaceId)?.permissions ?? [];
-      return held.includes("drive.purge") || held.includes("administrator");
-    },
+    canPurge: (spaceId) =>
+      mayEmptySpaceTrash(spaces.find((space) => space.id === spaceId)?.permissions),
   };
   return <ItemMenu items={items} ctx={ctx} />;
 }

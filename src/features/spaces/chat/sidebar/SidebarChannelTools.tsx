@@ -1,15 +1,17 @@
-import { Settings, Trash2, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowUp, BellOff, Settings, Trash2, UserPlus } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
   ConfirmDeleteDialog,
   ContextMenu,
   ContextMenuContent,
   ContextMenuTrigger,
+  MenuCheckItem,
   MenuItem,
   MenuSeparator,
   notify,
 } from "@misty/ui";
 import { useAuth } from "@/features/account";
+import { chatMuteId, useMuted } from "@/shared/lib/message_notices";
 import { spacesApi } from "../../api/api";
 import type { SpaceConversation } from "../../api/dto/entities";
 import { SpaceDialogs, type SpaceDialog } from "../../components/space-row/SpaceDialogs";
@@ -17,6 +19,7 @@ import { useSpacesStore } from "../../list/use_spaces_store";
 import { spaceCan } from "../../roles/use_space_roles";
 import { CreateEditConversationDialog } from "./CreateEditConversationDialog";
 import { conversationName } from "./conversation_groups";
+import { channelLayout, moveTargets } from "./channel_layout";
 import { useSpaceConversations } from "./use_space_conversations";
 
 function useChannelRights(spaceId: string) {
@@ -39,13 +42,39 @@ export function ChannelRowMenu(props: {
 }) {
   const { user } = useAuth();
   const rights = useChannelRights(props.spaceId);
-  const { upsert, remove } = useSpaceConversations(props.spaceId);
+  const { conversations, categories, upsert, remove, reload } = useSpaceConversations(
+    props.spaceId,
+  );
   const [dialog, setDialog] = useState<SpaceDialog>(null);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const conversation = props.conversation;
   const canEdit = Boolean(conversation) && rights.manage;
-  if (!rights.invite && !canEdit) return <>{props.children}</>;
+  const text = !conversation?.voice;
+  const mute = useMuted(props.spaceId, chatMuteId(props.spaceId, conversation?.id ?? ""));
+  const layout = channelLayout(conversations, categories);
+  const group = conversation
+    ? ([layout.loose, ...layout.categories.map((item) => item.channels)].find((channels) =>
+        channels.some((item) => item.id === conversation.id),
+      ) ?? [])
+    : [];
+  const moves = conversation && canEdit ? moveTargets(group, conversation.id) : null;
+  const move = (afterId: string | null) => {
+    if (!conversation) return;
+    void spacesApi
+      .placeConversation(
+        props.spaceId,
+        conversation.id,
+        group === layout.loose ? null : (conversation.category_id ?? null),
+        afterId,
+      )
+      .then((saved) => {
+        upsert(saved);
+        return reload();
+      })
+      .catch(() => notify({ message: "The channel couldn't be moved. Try again.", tone: "error" }));
+  };
+  if (!rights.invite && !canEdit && !text) return <>{props.children}</>;
   return (
     <>
       <ContextMenu>
@@ -54,9 +83,27 @@ export function ChannelRowMenu(props: {
           {rights.invite ? (
             <MenuItem icon={UserPlus} label="Invite people" onSelect={() => setDialog("invite")} />
           ) : null}
+          {text ? (
+            <MenuCheckItem
+              icon={BellOff}
+              label="Mute channel"
+              checked={mute.muted}
+              disabled={mute.bySpace}
+              reason="The whole Space is muted"
+              closeOnSelect
+              onCheckedChange={mute.toggle}
+            />
+          ) : null}
           {canEdit ? (
             <>
+              <MenuSeparator />
               <MenuItem icon={Settings} label="Edit channel" onSelect={() => setEditing(true)} />
+              {moves?.up !== undefined ? (
+                <MenuItem icon={ArrowUp} label="Move up" onSelect={() => move(moves.up!)} />
+              ) : null}
+              {moves?.down !== undefined ? (
+                <MenuItem icon={ArrowDown} label="Move down" onSelect={() => move(moves.down!)} />
+              ) : null}
               <MenuSeparator />
               <MenuItem
                 icon={Trash2}
@@ -69,7 +116,12 @@ export function ChannelRowMenu(props: {
         </ContextMenuContent>
       </ContextMenu>
       {rights.space ? (
-        <SpaceDialogs space={rights.space} open={dialog} onClose={() => setDialog(null)} />
+        <SpaceDialogs
+          space={rights.space}
+          open={dialog}
+          onOpen={setDialog}
+          onClose={() => setDialog(null)}
+        />
       ) : null}
       {conversation && canEdit ? (
         <>

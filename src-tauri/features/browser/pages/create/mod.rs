@@ -35,6 +35,11 @@ pub async fn browser_webview_create(
     remember_main_macos_webview(&app, caller.window().label())?;
     let label = webview_label(&request.id)?;
     let (position, size) = logical_bounds(request.x, request.y, request.width, request.height);
+    let position = if request.parked {
+        PARKED_POSITION
+    } else {
+        position
+    };
     let window = caller.window();
     if app.get_webview(&label).is_some() {
         let sessions = state
@@ -71,11 +76,11 @@ pub async fn browser_webview_create(
         &app,
         store_id.as_deref(),
     )?;
-    #[cfg(not(windows))]
-    let builder = builder.background_color(browser_background());
     #[cfg(windows)]
     let builder = builder.general_autofill_enabled(false);
-    let builder = builder.data_store_identifier(store_identifier);
+    let builder = builder
+        .data_store_identifier(store_identifier)
+        .incognito(is_agent_page(&request.id));
     let builder = if let Some(user_agent) = native_macos_safari_user_agent() {
         builder.user_agent(&user_agent)
     } else {
@@ -130,8 +135,11 @@ pub async fn browser_webview_create(
             return Err(error.to_string());
         }
     };
+    #[cfg(target_os = "macos")]
+    crate::browser::pages::first_paint::clear_canvas_until_drawn(&webview);
     crate::browser::kiri_link::host_messages::install(&webview)?;
     crate::browser::agent_pages::frames::install(&webview)?;
+    crate::browser::page_media::install(&webview)?;
     #[cfg(target_os = "macos")]
     crate::browser::pages::url_observer::install(&app, &webview, &request.id)?;
     #[cfg(windows)]
@@ -147,6 +155,7 @@ pub async fn browser_webview_create(
     configure_browser_frame_rate(&webview)?;
     apply_macos_webview_theme(&webview)?;
     configure_browser_webview(&webview, request.native_live_resize)?;
+    crate::browser::web_tabs::install(&app, &webview, &request.id, &request.scope_id)?;
     apply_shortcuts(&webview, &state)?;
     set_webview_bounds_if_changed(&app, &webview, position, size)?;
     trace_create("created and presented");

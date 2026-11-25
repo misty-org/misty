@@ -7,10 +7,7 @@ import {
   useAppZoomValue,
 } from "@/shared/hooks/use_app_zoom";
 import { useState } from "react";
-import {
-  DesktopSettingsRow as SettingsRow,
-  DesktopSettingsSection as SettingsSectionBlock,
-} from "@/features/settings";
+import { DesktopSettingsRow as SettingsRow } from "@/features/settings";
 import {
   ChoiceControl,
   numberSetting,
@@ -25,94 +22,92 @@ import { useWindowDockingLayout } from "../panes/use_window_docking_layout";
 import { useWorkspaceStore } from "../tabs/use_workspace_store";
 
 export function AppearanceSection(props: SettingsContentProps) {
-  const appZoom = useAppZoomValue();
-  const [appZoomDraft, setAppZoomDraft] = useState<number | null>(null);
-  const displayedAppZoom = appZoomDraft ?? appZoom;
   const nightLight = stringSetting(props.document, "appearance", "night_light_mode", "off");
 
   return (
     <>
-      <SettingsSectionBlock title="Theme">
-        <SettingsRow label="Theme" description="System follows your computer.">
-          <ChoiceControl
-            value={stringSetting(props.document, "appearance", "theme_mode", "dark")}
-            disabled={props.working}
-            options={[
-              { value: "system", label: "System" },
-              { value: "dark", label: "Dark" },
-              { value: "light", label: "Light" },
-            ]}
-            onValueChange={(value) => props.onSettingChange("appearance", "theme_mode", value)}
-          />
-        </SettingsRow>
-        <SettingsRow label="Night light" description="Warms the window and every page.">
-          <ChoiceControl
-            value={nightLight}
-            disabled={props.working}
-            options={[
-              { value: "off", label: "Off" },
-              { value: "on", label: "On" },
-              { value: "scheduled", label: "Scheduled" },
-            ]}
-            onValueChange={(value) =>
-              props.onSettingChange("appearance", "night_light_mode", value)
-            }
-          />
-        </SettingsRow>
-        {nightLight === "scheduled" ? (
-          <>
-            <SettingsRow label="Turns on" indent>
-              <ClockTimeControl
-                value={stringSetting(props.document, "appearance", "night_light_start", "21:00")}
-                disabled={props.working}
-                onChange={(value) =>
-                  props.onSettingChange("appearance", "night_light_start", value)
-                }
-              />
-            </SettingsRow>
-            <SettingsRow label="Turns off" indent>
-              <ClockTimeControl
-                value={stringSetting(props.document, "appearance", "night_light_end", "07:00")}
-                disabled={props.working}
-                onChange={(value) => props.onSettingChange("appearance", "night_light_end", value)}
-              />
-            </SettingsRow>
-          </>
-        ) : null}
-        {nightLight !== "off" ? (
-          <SettingsRow label="Warmth" indent>
-            <SliderControl
-              value={numberSetting(props.document, "appearance", "night_light_warmth", 0.5)}
-              min={0.1}
-              max={1}
-              step={0.05}
+      <SettingsRow label="Theme" description="System follows your computer.">
+        <ChoiceControl
+          value={stringSetting(props.document, "appearance", "theme_mode", "dark")}
+          disabled={props.working}
+          options={[
+            { value: "system", label: "System" },
+            { value: "dark", label: "Dark" },
+            { value: "light", label: "Light" },
+          ]}
+          onValueChange={(value) => props.onSettingChange("appearance", "theme_mode", value)}
+        />
+      </SettingsRow>
+      <SettingsRow label="Night light" description="Warms the window and every page.">
+        <ChoiceControl
+          value={nightLight}
+          disabled={props.working}
+          options={[
+            { value: "off", label: "Off" },
+            { value: "on", label: "On" },
+            { value: "scheduled", label: "Scheduled" },
+          ]}
+          onValueChange={(value) => props.onSettingChange("appearance", "night_light_mode", value)}
+        />
+      </SettingsRow>
+      {nightLight === "scheduled" ? (
+        <>
+          <SettingsRow label="Turns on" indent>
+            <ClockTimeControl
+              value={stringSetting(props.document, "appearance", "night_light_start", "21:00")}
               disabled={props.working}
-              format={(value) => `${Math.round(value * 100)}%`}
-              onCommit={(value) => props.onSettingChange("appearance", "night_light_warmth", value)}
+              onChange={(value) => props.onSettingChange("appearance", "night_light_start", value)}
             />
           </SettingsRow>
-        ) : null}
-      </SettingsSectionBlock>
-
-      <SettingsSectionBlock title="Window">
-        <WindowTabsRow />
-        <SettingsRow label="App zoom" description="Also Cmd or Ctrl with +, − and 0.">
+          <SettingsRow label="Turns off" indent>
+            <ClockTimeControl
+              value={stringSetting(props.document, "appearance", "night_light_end", "07:00")}
+              disabled={props.working}
+              onChange={(value) => props.onSettingChange("appearance", "night_light_end", value)}
+            />
+          </SettingsRow>
+        </>
+      ) : null}
+      {nightLight !== "off" ? (
+        <SettingsRow label="Warmth" indent>
           <SliderControl
-            value={displayedAppZoom}
-            min={appZoomMin}
-            max={appZoomMax}
-            step={appZoomStep}
+            value={numberSetting(props.document, "appearance", "night_light_warmth", 0.5)}
+            min={0.1}
+            max={1}
+            step={0.05}
             disabled={props.working}
             format={(value) => `${Math.round(value * 100)}%`}
-            onChange={setAppZoomDraft}
-            onCommit={(value) => {
-              setAppZoom(value);
-              setAppZoomDraft(null);
-              props.onSettingChange("appearance", "app_zoom", appZoomToStoredScale(value));
-            }}
+            onCommit={(value) => props.onSettingChange("appearance", "night_light_warmth", value)}
           />
         </SettingsRow>
-      </SettingsSectionBlock>
+      ) : null}
+    </>
+  );
+}
+
+export function WindowSection(props: SettingsContentProps) {
+  const appZoom = useAppZoomValue();
+  const [appZoomDraft, setAppZoomDraft] = useState<number | null>(null);
+  const displayedAppZoom = appZoomDraft ?? appZoom;
+  return (
+    <>
+      <WindowTabsRow />
+      <SettingsRow label="App zoom" description="Also Cmd or Ctrl with +, − and 0.">
+        <SliderControl
+          value={displayedAppZoom}
+          min={appZoomMin}
+          max={appZoomMax}
+          step={appZoomStep}
+          disabled={props.working}
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={setAppZoomDraft}
+          onCommit={(value) => {
+            setAppZoom(value);
+            setAppZoomDraft(null);
+            props.onSettingChange("appearance", "app_zoom", appZoomToStoredScale(value));
+          }}
+        />
+      </SettingsRow>
     </>
   );
 }

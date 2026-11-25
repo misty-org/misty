@@ -51,6 +51,7 @@ function ChatRoleMention(props: { roleId: string; label: string }) {
 export function ReplyLine(props: {
   replied: SpaceMessage | undefined;
   avatarUrl: string;
+  avatarOutline?: string;
   color?: string;
   earlier: boolean;
   onOpen(): void;
@@ -66,6 +67,7 @@ export function ReplyLine(props: {
           name={replied.sender_name}
           src={props.avatarUrl || undefined}
           size="xs"
+          outline={props.avatarOutline}
         />
       }
       name={replied.sender_name}

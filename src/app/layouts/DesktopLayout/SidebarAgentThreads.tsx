@@ -10,9 +10,10 @@ import {
 } from "@/features/agents";
 import type { AgentProfile } from "@/shared/schemas";
 import {
+  CountMark,
   DisclosureButton,
   IconButton,
-  NavGroupHeading,
+  NavBranch,
   NavRow,
   NavRowLabel,
   RowTools,
@@ -20,8 +21,8 @@ import {
   Text,
   Tooltip,
 } from "@misty/ui";
-import { toggleSection, useCollapsedSections } from "./collapsed_sections";
-import { chatSectionClass, faceSlotClass } from "./styles";
+import { attentionByAgent, attentionLabel } from "./attention";
+import { faceSlotClass } from "./styles";
 import type { SidebarChat } from "./sidebar_types";
 
 const rank: Record<string, number> = { working: 3, "needs-you": 2, failed: 1 };
@@ -106,78 +107,81 @@ export function SidebarAgentThreads({
   onOpenShared(agent: AgentProfile, threadId: string): void;
   children?: ReactNode;
 }) {
-  const collapsed = useCollapsedSections((state) => state.value);
-  const open = !collapsed.includes("agents");
   const rows = useMemo(() => {
-    const byAgent = new Map<string, { status?: ChatStatus; unread: boolean }>();
+    const byAgent = new Map<string, ChatStatus>();
     for (const chat of chats) {
       if (!chat.agentId || chat.archivedAt) continue;
-      const known = byAgent.get(chat.agentId) ?? { unread: false };
       const status = statuses[chat.id];
-      if (status && (rank[status] ?? 0) > (rank[known.status ?? ""] ?? 0)) known.status = status;
-      known.unread ||= isChatUnread(chat);
-      byAgent.set(chat.agentId, known);
+      const known = byAgent.get(chat.agentId);
+      if (status && (rank[status] ?? 0) > (rank[known ?? ""] ?? 0))
+        byAgent.set(chat.agentId, status);
     }
+    const attention = attentionByAgent(chats, statuses);
     return agents
       .filter((agent) => agent.enabled && !agent.system_managed)
-      .map((agent) => ({ agent, ...(byAgent.get(agent.id) ?? { unread: false }) }));
+      .map((agent) => ({
+        agent,
+        status: byAgent.get(agent.id),
+        attention: attention.get(agent.id) ?? { count: 0, waiting: false },
+      }));
   }, [agents, chats, statuses]);
-  if (!rows.length && !children) return null;
+  if (children) return <>{children}</>;
   return (
-    <section className={chatSectionClass} aria-label="Agents">
-      <NavGroupHeading
-        name="Agents"
-        collapsible={{ open, onToggle: () => toggleSection("agents") }}
-      />
-      {open
-        ? (children ??
-          rows.map(({ agent, status, unread }) => {
-            const expanded = here.agent === agent.id;
-            const onThread = expanded && Boolean(here.conversation || here.thread);
-            return (
-              <div key={agent.id} className="flex flex-col gap-1.5">
-                <div className="group/row relative">
-                  <NavRow
-                    current={expanded && !onThread}
-                    aria-expanded={expanded}
-                    aria-busy={status === "working" || undefined}
-                    onClick={() => onOpen(agent)}
-                  >
-                    <span className={faceSlotClass}>
-                      <AgentAvatar agent={agent} face />
-                    </span>
-                    <NavRowLabel
-                      bright={expanded || status === "working" || unread}
-                      className="min-w-0"
-                    >
-                      {agent.name}
-                    </NavRowLabel>
-                    <span className="flex-1" />
-                    {expanded ? null : <StateMark status={status} unread={unread} />}
-                  </NavRow>
-                  <RowTools reveal="cover">
-                    <IconButton label="New thread" onClick={() => onNewThread(agent)}>
-                      <SquarePen />
-                    </IconButton>
-                  </RowTools>
-                </div>
-                {expanded ? (
-                  <AgentThreadRows
-                    agent={agent}
-                    chats={chats}
-                    statuses={statuses}
-                    here={here}
-                    spaceId={spaceId}
-                    accountId={accountId}
-                    onOpenThread={onOpenThread}
-                    onOpenShared={onOpenShared}
+    <>
+      {rows.map(({ agent, status, attention }) => {
+        const expanded = here.agent === agent.id;
+        const onThread = expanded && Boolean(here.conversation || here.thread);
+        return (
+          <div key={agent.id} className="flex flex-col gap-1.5">
+            <div className="group/row relative">
+              <NavRow
+                current={expanded && !onThread}
+                aria-expanded={expanded}
+                aria-busy={status === "working" || undefined}
+                onClick={() => onOpen(agent)}
+              >
+                <span className={faceSlotClass}>
+                  <AgentAvatar agent={agent} face />
+                </span>
+                <NavRowLabel
+                  bright={expanded || status === "working" || attention.count > 0}
+                  className="min-w-0"
+                >
+                  {agent.name}
+                </NavRowLabel>
+                <span className="flex-1" />
+                {expanded ? null : attention.count ? (
+                  <CountMark
+                    count={attention.count}
+                    waiting={attention.waiting}
+                    label={attentionLabel(attention)}
                   />
-                ) : null}
-              </div>
-            );
-          }))
-        : null}
-    </section>
+                ) : (
+                  <StateMark status={status} />
+                )}
+              </NavRow>
+              <RowTools reveal="cover">
+                <IconButton label="New thread" onClick={() => onNewThread(agent)}>
+                  <SquarePen />
+                </IconButton>
+              </RowTools>
+            </div>
+            {expanded ? (
+              <AgentThreadRows
+                agent={agent}
+                chats={chats}
+                statuses={statuses}
+                here={here}
+                spaceId={spaceId}
+                accountId={accountId}
+                onOpenThread={onOpenThread}
+                onOpenShared={onOpenShared}
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -213,7 +217,7 @@ function AgentThreadRows({
   const shownMine = cut ? mine.slice(0, firstThreads) : mine;
   const shownTheirs = cut ? theirs.slice(0, Math.max(0, firstThreads - mine.length)) : theirs;
   return (
-    <>
+    <NavBranch under="face">
       {shownMine.map((chat) => {
         const picked = !here.thread && here.conversation === chat.id;
         const status: ChatStatus | undefined =
@@ -222,7 +226,7 @@ function AgentThreadRows({
         return (
           <NavRow
             key={chat.id}
-            nested
+            nested="face"
             hover="fill"
             current={picked}
             onClick={() => onOpenThread(agent, chat.id)}
@@ -239,7 +243,7 @@ function AgentThreadRows({
         return (
           <Tooltip key={thread.id} content={`${thread.owner_name}'s thread`}>
             <NavRow
-              nested
+              nested="face"
               hover="fill"
               current={picked}
               onClick={() => onOpenShared(agent, thread.id)}
@@ -253,12 +257,12 @@ function AgentThreadRows({
         );
       })}
       {count > firstThreads ? (
-        <div className="pl-8">
+        <div key="more" className="pl-10">
           <DisclosureButton open={all} onClick={() => setAll((value) => !value)}>
             {all ? "Show fewer" : "Show all"}
           </DisclosureButton>
         </div>
       ) : null}
-    </>
+    </NavBranch>
   );
 }

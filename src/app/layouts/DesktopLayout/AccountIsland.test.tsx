@@ -10,6 +10,7 @@ vi.mock("@/features/agents", () => ({
 vi.mock("@/features/account", () => ({
   openSignInSheet: agents.openSignInSheet,
   BannerDialog: () => null,
+  useAccountPictureEditor: () => ({ open: vi.fn(), dialog: null }),
 }));
 vi.mock("@/features/settings", () => ({
   openSettings: vi.fn(),

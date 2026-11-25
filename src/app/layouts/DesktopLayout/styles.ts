@@ -6,10 +6,10 @@ export const navigatorMotionClass =
 
 export const markSlotClass = [
   "grid size-4 flex-none place-items-center",
-  "[&>.agent-avatar]:!size-4 [&>.agent-avatar]:!bg-transparent [&>.agent-avatar]:!text-caption",
+  "[&>.agent-avatar]:!size-4 [&>.agent-avatar]:!text-caption",
 ].join(" ");
 
-export const faceSlotClass = "grid size-6 flex-none place-items-center";
+export const faceSlotClass = "grid size-7 flex-none place-items-center";
 
 export const chatSectionClass = "flex flex-none flex-col gap-1.5";
 

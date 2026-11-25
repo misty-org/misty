@@ -15,6 +15,8 @@ export function knownWorkspaceView(view: WorkspaceView | null | undefined): Work
   if (view.surfaceId === "agents") return /^\/agents(?:[/?#]|$)/.test(view.route) ? view : null;
   if (view.surfaceId === "direct")
     return /^\/(?:dms\/[^/?#]+|friends)(?:[?#]|$)/.test(view.route) ? view : null;
+  if (view.surfaceId === "browser")
+    return /^\/browser\/web-[\w-]{8,64}$/.test(view.route) ? view : null;
   return null;
 }
 

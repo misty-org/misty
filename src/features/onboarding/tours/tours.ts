@@ -2,13 +2,7 @@ import type { TourStep } from "@misty/ui";
 import { utilityTours } from "./utility_tours";
 
 export type TourId =
-  | "welcome"
-  | "agents"
-  | "space"
-  | "space-chat"
-  | "search"
-  | "add-sources"
-  | "agent-settings";
+  "welcome" | "agents" | "space" | "space-chat" | "search" | "add-sources" | "agent-settings";
 
 export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }> = {
   welcome: {
@@ -21,7 +15,7 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "sidebar-dms",
         title: "Start a chat",
-        body: "Your agents are under Direct messages. Pick one to talk to it the way you'd text a friend; only you see these chats.",
+        body: "Your agents are under Direct Messages. Pick one to talk to it the way you'd text a friend; only you see these chats.",
       },
       {
         target: "composer",
@@ -71,17 +65,12 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       {
         target: "agents-list",
         title: "Your agents",
-        body: "Each one is an AI you can chat with. Pick one to start a new chat; new chats keep using it.",
-      },
-      {
-        target: "agents-new",
-        title: "Add an agent",
-        body: "Choose the engine it runs on and give it a name. You can have a few on the same engine.",
+        body: "Each one is an AI you can chat with. New agent adds one on the engine you choose; you can have a few on the same engine.",
       },
       {
         target: "settings-nav",
         title: "Set up their engines",
-        body: "Engines and Tools, in the list on the left, install and update each engine, sign you in, and add plugins and more.",
+        body: "Engines, in the list on the left, installs and updates each engine and signs you in.",
       },
     ],
   },
@@ -96,9 +85,9 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
           "switch spaces, start one, see its people and its shared folders.",
       },
       {
-        target: "sidebar-apps",
+        target: "rail-apps",
         title: "Apps",
-        body: "Open-source apps this Space added open from here. A mod can add more from Explore.",
+        body: "The open-source apps on this computer open from here, in the Space you're in. Get more from Explore.",
       },
       {
         target: "sidebar-space",
@@ -119,7 +108,7 @@ export const tours: Record<TourId, { label: string; steps: readonly TourStep[] }
       },
       {
         target: "sidebar-dms",
-        title: "Direct messages",
+        title: "Direct Messages",
         body: "Talk one to one with someone in this space.",
       },
       {

@@ -296,18 +296,41 @@ pub(crate) fn agent_settings(store: &Store) -> AgentSettings {
     }
 }
 
-fn site_grants(store: &Store, facts: &RunFacts) -> Vec<confirm::SiteGrant> {
+fn agent_documents(store: &Store, account: &str) -> Vec<Value> {
     let read = || -> rusqlite::Result<Vec<Value>> {
         let connection = store.connect()?;
         let mut statement = connection
             .prepare("SELECT document FROM agent_chats WHERE account = ?1 AND kind = 'agent'")?;
-        let rows = statement.query_map([&facts.account], |row| row.get::<_, String>(0))?;
+        let rows = statement.query_map([account], |row| row.get::<_, String>(0))?;
         Ok(rows
             .flatten()
             .filter_map(|text| serde_json::from_str(&text).ok())
             .collect())
     };
-    let documents = read().unwrap_or_default();
+    read().unwrap_or_default()
+}
+
+pub(crate) fn account_site_granted(store: &Store, account: &str, agent: &str, origin: &str) -> bool {
+    !account.is_empty()
+        && !agent.is_empty()
+        && origin.starts_with("https://")
+        && account_granted(&agent_documents(store, account), agent, origin)
+}
+
+fn account_granted(documents: &[Value], agent: &str, origin: &str) -> bool {
+    documents.iter().any(|row| {
+        row["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("sitegrant_"))
+            && row["agent_id"] == agent
+            && row["action"] == "browser.account"
+            && row["scope_kind"] == "origin"
+            && row["scope_id"] == origin
+    })
+}
+
+fn site_grants(store: &Store, facts: &RunFacts) -> Vec<confirm::SiteGrant> {
+    let documents = agent_documents(store, &facts.account);
     let builtin = || {
         documents
             .iter()
@@ -416,6 +439,19 @@ mod tests {
         assert!(!blocks.sensitive);
         assert_eq!(blocks.sites, ["a.example"]);
         assert!(read.confirm_kinds.is_none());
+    }
+
+    #[test]
+    fn account_access_counts_only_for_this_agent_on_this_origin() {
+        let documents = [
+            json!({ "id": "sitegrant_a:account:https://mail.example", "agent_id": "a", "action": "browser.account", "scope_kind": "origin", "scope_id": "https://mail.example" }),
+            json!({ "id": "sitegrant_b:account:https://bank.example", "agent_id": "b", "action": "browser.account", "scope_kind": "origin", "scope_id": "https://bank.example" }),
+            json!({ "id": "sitegrant_a:send:https://shop.example", "agent_id": "a", "action": "browser.send", "scope_kind": "origin", "scope_id": "https://shop.example" }),
+        ];
+        assert!(account_granted(&documents, "a", "https://mail.example"));
+        assert!(!account_granted(&documents, "a", "https://bank.example"));
+        assert!(!account_granted(&documents, "a", "https://shop.example"));
+        assert!(!account_granted(&documents, "b", "https://mail.example"));
     }
 
     #[test]

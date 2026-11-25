@@ -53,17 +53,25 @@ export function pluginMaker(item: { author?: string | null; link: string | null 
   };
 }
 
-export function MakerTile({ maker, name }: { maker: PluginMaker; name: string }) {
+export function MakerTile({
+  maker,
+  name,
+  size = "tile",
+}: {
+  maker: PluginMaker;
+  name: string;
+  size?: "tile" | "hero";
+}) {
   if (maker.brand) {
     return (
-      <LogoTile size="tile">
-        <Mark of={maker.brand} label={maker.name ?? name} size={40} />
+      <LogoTile size={size}>
+        <Mark of={maker.brand} label={maker.name ?? name} size={size === "hero" ? 81 : 40} />
       </LogoTile>
     );
   }
   return (
-    <LogoTile size="tile" cover={Boolean(maker.avatar)}>
-      <AppLogoImage src={maker.avatar} name={maker.name ?? name} size="tile" />
+    <LogoTile size={size} cover={Boolean(maker.avatar)}>
+      <AppLogoImage src={maker.avatar} name={maker.name ?? name} size={size} />
     </LogoTile>
   );
 }

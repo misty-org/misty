@@ -1,14 +1,13 @@
-import { useEffect, useMemo } from "react";
 import { Volume2 } from "lucide-react";
-import { IconButton, ListRow, ListRowSkeleton, notify, SetupState, Text } from "@misty/ui";
+import { Button, IconButton, ListRow, ListRowSkeleton, notify, Text } from "@misty/ui";
 import {
-  personLanguages,
   previewVoice,
-  useSpeechModels,
-  voicesFor,
-  type VoiceView,
+  useVoicebox,
+  useVoiceboxVoices,
+  VOICEBOX_APP_ID,
+  type VoiceboxVoice,
 } from "@/features/voice";
-import { voiceProgress, voiceSetupLine } from "./agent_voice";
+import { requestOpenExplore } from "@/shared/lib/open_explore";
 
 const languageNames = (() => {
   try {
@@ -18,11 +17,11 @@ const languageNames = (() => {
   }
 })();
 
-export function voiceLine(voice: VoiceView) {
-  const languages = voice.languages
-    .filter((code) => code !== "*")
-    .map((code) => languageNames?.of(code) ?? code);
-  return [...languages, ...(voice.accent ? [voice.accent] : [])].join(", ");
+const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
+
+export function voiceLine(voice: VoiceboxVoice) {
+  const language = voice.language ? (languageNames?.of(voice.language) ?? voice.language) : "";
+  return [voice.gender ? capital(voice.gender) : "", language].filter(Boolean).join(", ");
 }
 
 export function AgentVoicePicker({
@@ -38,80 +37,53 @@ export function AgentVoicePicker({
   disabled?: boolean;
   onChange(voice: string): void;
 }) {
-  const catalog = useSpeechModels((state) => state.catalog);
-  const loadError = useSpeechModels((state) => state.error);
-  const progress = useSpeechModels((state) => state.progress);
-  const failures = useSpeechModels((state) => state.failures);
-  useEffect(() => {
-    if (!useSpeechModels.getState().catalog) void useSpeechModels.getState().load();
-  }, []);
-  const voices = useMemo(
-    () => (catalog ? voicesFor(catalog.voices, personLanguages()) : []),
-    [catalog],
-  );
-  const picked = catalog?.voices.find((item) => item.id === voice);
-  const downloading = (item: VoiceView) =>
-    Boolean(voiceProgress(progress, item)) ||
-    Boolean(catalog?.installing.some((id) => id === item.id || id === item.packageKey));
-  const pick = (item: VoiceView) => {
-    onChange(item.id);
-    if (!item.installed && !downloading(item)) void useSpeechModels.getState().install(item.id);
-  };
+  const voicebox = useVoicebox();
+  const ready = Boolean(voicebox?.installed);
+  const { voices, error, retry } = useVoiceboxVoices(ready);
   const sample = `Hi, I'm ${name.trim() || "your agent"}. This is how I sound.`;
-  const hear = (item: VoiceView) =>
-    void previewVoice(item.id, sample).catch((reason: unknown) =>
+  const hear = (item: VoiceboxVoice) =>
+    void previewVoice(item.key, sample).catch((reason: unknown) =>
       notify({ message: String(reason), tone: "error" }),
     );
-  const failure = picked ? failures[picked.id] : undefined;
-  const coming = picked && !picked.installed ? voiceProgress(progress, picked) : undefined;
 
-  if (!catalog && loadError)
+  if (!voicebox) return <ListRowSkeleton label="Voices" rows={4} lines={2} />;
+  if (!voicebox.runsHere) return null;
+  if (!ready)
     return (
-      <Text size="meta" tone="danger" wrap>
-        {loadError}
-      </Text>
-    );
-  if (!catalog) return <ListRowSkeleton label="Voices" rows={4} lines={2} />;
-  return (
-    <div className="grid gap-2">
-      <div id={id} role="group" aria-label="Voice" className="grid max-h-64 overflow-y-auto">
-        {voices.map((item) => (
-          <ListRow
-            key={item.id}
-            label={item.name}
-            description={voiceLine(item)}
-            checked={item.id === voice}
-            disabled={disabled}
-            state={!item.installed && downloading(item) ? { kind: "downloading" } : undefined}
-            onOpen={() => pick(item)}
-            trailing={
-              item.installed ? (
-                <IconButton
-                  label={`Hear ${item.name}`}
-                  disabled={disabled}
-                  onClick={() => hear(item)}
-                >
-                  <Volume2 />
-                </IconButton>
-              ) : null
-            }
-          />
-        ))}
+      <div className="grid justify-items-start gap-2">
+        <Text size="meta" tone="muted" wrap>
+          Agents speak through Voicebox.
+        </Text>
+        <Button onClick={() => requestOpenExplore("apps", VOICEBOX_APP_ID)}>Get Voicebox</Button>
       </div>
-      {picked && !picked.installed ? (
-        <SetupState
-          tool="voice"
-          label={
-            coming?.total
-              ? `${voiceSetupLine(name)}, ${Math.round((coming.received / coming.total) * 100)}%`
-              : voiceSetupLine(name)
+    );
+  if (error)
+    return (
+      <div className="grid justify-items-start gap-2">
+        <Text size="meta" tone="danger" wrap>
+          {error}
+        </Text>
+        <Button onClick={retry}>Try again</Button>
+      </div>
+    );
+  if (!voices) return <ListRowSkeleton label="Voices" rows={4} lines={2} />;
+  return (
+    <div id={id} role="group" aria-label="Voice" className="grid max-h-64 overflow-y-auto">
+      {voices.map((item) => (
+        <ListRow
+          key={item.key}
+          label={item.name}
+          description={voiceLine(item)}
+          checked={item.key === voice}
+          disabled={disabled}
+          onOpen={() => onChange(item.key)}
+          trailing={
+            <IconButton label={`Hear ${item.name}`} disabled={disabled} onClick={() => hear(item)}>
+              <Volume2 />
+            </IconButton>
           }
-          size="row"
-          stallAfterMs={false}
-          error={failure}
-          onRetry={() => void useSpeechModels.getState().install(picked.id)}
         />
-      ) : null}
+      ))}
     </div>
   );
 }

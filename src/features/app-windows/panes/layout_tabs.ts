@@ -143,11 +143,11 @@ export function recoverPaneHistoryViews(layout: WorkspaceLayout): WorkspaceLayou
 
 export function workspaceTabsById(state: {
   layout: WorkspaceLayout;
-  aside?: { layout: WorkspaceLayout };
+  asides?: Record<string, { layout: WorkspaceLayout }>;
 }): Map<string, WorkspaceView> {
   const views = [
     ...allLayoutViews(state.layout),
-    ...(state.aside ? allLayoutViews(state.aside.layout) : []),
+    ...Object.values(state.asides ?? {}).flatMap((aside) => allLayoutViews(aside.layout)),
   ];
   return new Map(views.map((tab) => [tab.id, tab]));
 }

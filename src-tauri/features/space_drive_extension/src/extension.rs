@@ -444,7 +444,7 @@ define_class!(
                     }
                 }
                 match link.trash(&id) {
-                    Ok(()) => handler.call((std::ptr::null_mut(),)),
+                    Ok(_) => handler.call((std::ptr::null_mut(),)),
                     Err(failure) if failure.code() == "not_found" => {
                         handler.call((std::ptr::null_mut(),))
                     }
@@ -510,7 +510,11 @@ fn refused_trash(failure: &LinkError) -> bool {
 
 fn move_to_trash(link: &Link, id: &str, trashed: ItemInfo) -> Result<Changed, LinkError> {
     match link.trash(id) {
-        Ok(()) => Ok(Changed {
+        Ok(Some(item)) => Ok(Changed {
+            item,
+            refetch: false,
+        }),
+        Ok(None) => Ok(Changed {
             item: trashed,
             refetch: false,
         }),

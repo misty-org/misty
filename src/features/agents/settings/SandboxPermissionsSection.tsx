@@ -3,17 +3,17 @@ import { useCachedResource } from "@/api/cache/cached_resource";
 import { downloadsGrantId, sandboxPermissionSet, sandboxPermissionsList } from "@/native/sandbox";
 import { confirmAction } from "@/shared/lib/confirm_action";
 import { Button, ErrorState, useNotice } from "@misty/ui";
-import {
-  DesktopSettingsRow as Row,
-  DesktopSettingsRowSkeleton,
-  DesktopSettingsSection as Section,
-} from "@/features/settings";
+import { DesktopSettingsRow as Row, DesktopSettingsRowSkeleton } from "@/features/settings";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { SwitchControl } from "../../settings/SettingsControls";
 
 export function SandboxPermissionsSection() {
-  const listing = useCachedResource("agents/sandbox-permissions", sandboxPermissionsList, {
-    persist: "device",
-  });
+  const native = hasTauriInternals();
+  const listing = useCachedResource(
+    native ? "agents/sandbox-permissions" : null,
+    sandboxPermissionsList,
+    { persist: "device" },
+  );
   const rows = listing.data ?? null;
   const loadFailed = !listing.data && !listing.loading && Boolean(listing.error);
   const [working, setWorking] = useState("");
@@ -41,25 +41,20 @@ export function SandboxPermissionsSection() {
       await change(downloadsGrantId, false);
   };
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
+  if (!native) return null;
   if (loadFailed)
     return (
-      <Section title="This computer">
-        <ErrorState
-          inline
-          title="Couldn't read these permissions"
-          line="Something went wrong on this computer. Try again in a moment."
-          action={{ label: "Try again", onClick: () => void refresh() }}
-        />
-      </Section>
+      <ErrorState
+        inline
+        title="Couldn't read these permissions"
+        line="Something went wrong on this computer. Try again in a moment."
+        action={{ label: "Try again", onClick: () => void refresh() }}
+      />
     );
   if (rows === null)
-    return (
-      <Section title="This computer">
-        <DesktopSettingsRowSkeleton label="This computer" rows={3} control="switch" />
-      </Section>
-    );
+    return <DesktopSettingsRowSkeleton label="Sandbox" rows={3} control="switch" />;
   return (
-    <Section title="This computer">
+    <>
       {rows
         .filter((row) => row.id !== downloadsGrantId || row.on)
         .map((row) =>
@@ -79,6 +74,6 @@ export function SandboxPermissionsSection() {
             </Row>
           ),
         )}
-    </Section>
+    </>
   );
 }

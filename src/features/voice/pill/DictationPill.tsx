@@ -2,7 +2,7 @@ import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Lock, Mic, MicOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { IconButton, Spinner, Surface } from "@misty/ui";
+import { IconButton, OverflowFadeText, Spinner, Surface } from "@misty/ui";
 import type { PillState } from "../dictation_engine";
 import { remCss } from "@misty/ui";
 
@@ -53,7 +53,7 @@ export function DictationPill() {
           ))}
         </span>
       )}
-      <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:var(--mask-fade-end)]">
+      <OverflowFadeText className="flex-1">
         {pill.note ? (
           <span className="opacity-55">{pill.note}</span>
         ) : words ? (
@@ -64,7 +64,7 @@ export function DictationPill() {
         ) : (
           <span className="opacity-55">Listening</span>
         )}
-      </span>
+      </OverflowFadeText>
       {pill.locked && listening && (
         <Surface
           as="span"

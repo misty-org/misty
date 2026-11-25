@@ -102,6 +102,7 @@ const ASK_MODE_STOPS: &[&str] = &[
 ];
 
 const PLAN_REFUSES: &[&str] = &[
+    "browser.tab.use",
     "browser.act",
     "browser.fill_form",
     "browser.navigate",
@@ -152,8 +153,9 @@ fn delete_decision(facts: &RunFacts, name: &str) -> Decision {
         return Decision::Refuse {
             code: "delete_off",
             message:
-                "Agents don't delete files. Move what should go into Agent trash with the files \
-trash tool: the person looks it over there and deletes it themselves. Nothing was deleted."
+                "Agents don't delete files. Move what should go with the files trash tool: a Space's \
+files go to its .trash and other files to the system Trash, where the person looks them over and \
+deletes them themselves. Nothing was deleted."
                     .to_owned(),
         };
     }

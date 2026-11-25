@@ -103,7 +103,7 @@ pub fn open_since(
         .iter()
         .any(|permission| !asked.contains(permission))
     {
-        return Err("A mod approved more than the app asks for.".into());
+        return Err("More was approved than the app asks for.".into());
     }
     let id = uuid::Uuid::new_v4().to_string();
     let mut sessions = sessions();

@@ -1,16 +1,4 @@
-import {
-  BellOff,
-  FolderOpen,
-  HardDrive,
-  LogOut,
-  Pencil,
-  Plus,
-  ShieldCheck,
-  Trash2,
-  UserPlus,
-  UsersRound,
-  Webhook,
-} from "lucide-react";
+import { BellOff, HardDrive, LogOut, Plus, Settings, UserPlus, UsersRound } from "lucide-react";
 import type { Space } from "../../api/dto/entities";
 import { switchSpaceWindow } from "@/features/app-windows";
 import { DropdownMenuSeparator, MenuCheckItem, MenuItem, notify } from "@misty/ui";
@@ -21,6 +9,7 @@ import {
   preferredDefaultSpace,
   spaceNavigationName,
 } from "../../routes/default_space";
+import { spaceSettingsPages } from "../../settings/space_settings_pages";
 import { useSpacesStore } from "../../list/use_spaces_store";
 import { SpaceAvatar } from "../SpaceAvatar";
 import { spaceCan } from "../../roles/use_space_roles";
@@ -63,7 +52,7 @@ export function SpaceMenuItems(props: {
             icon={
               <SpaceAvatar
                 space={item}
-                className="size-5 rounded-md"
+                className="size-6 rounded-md"
                 fallbackClassName="text-micro font-semibold"
               />
             }
@@ -88,37 +77,35 @@ export function SpaceSettingsItems(props: {
   onDialog: (dialog: SpaceDialog) => void;
 }) {
   const { space, onDialog } = props;
-  const isOwner = space.role === "owner";
   const muted = useMessageNotices((state) => state.value.muted.includes(space.id));
   const later = (run: () => void) => () => window.setTimeout(run, 0);
+  const pages = spaceSettingsPages(space);
+  const canInvite = !space.is_default && spaceCan(space, "space.invite");
+  const canLeave =
+    !space.is_default && space.role !== "owner" && canManageSpaceLifecycle(space, "leave");
+  const settings = pages.some((page) => page !== "people");
   return (
     <>
-      {!space.is_default && spaceCan(space, "space.invite") && (
+      {canInvite ? (
         <MenuItem
           icon={<UserPlus />}
           label="Invite people"
           onSelect={later(() => onDialog("invite"))}
         />
-      )}
-      <MenuItem icon={<UsersRound />} label="People" onSelect={later(() => onDialog("members"))} />
-      {!space.is_default && spaceCan(space, "roles.manage") && (
-        <MenuItem icon={<ShieldCheck />} label="Roles" onSelect={later(() => onDialog("roles"))} />
-      )}
-      {!space.is_default && spaceCan(space, "integrations.manage") && (
+      ) : null}
+      {settings ? (
         <MenuItem
-          icon={<Webhook />}
-          label="Integrations"
-          onSelect={later(() => onDialog("integrations"))}
+          icon={<Settings />}
+          label="Space settings"
+          onSelect={later(() => onDialog(pages[0]!))}
         />
-      )}
-      <MenuItem
-        icon={<FolderOpen />}
-        label="Shared folders"
-        onSelect={later(() => onDialog("folders"))}
-      />
+      ) : pages.includes("people") ? (
+        <MenuItem icon={<UsersRound />} label="People" onSelect={later(() => onDialog("people"))} />
+      ) : null}
+      {canInvite || pages.length ? <DropdownMenuSeparator /> : null}
       <MenuItem
         icon={<HardDrive />}
-        label="Show drive"
+        label="Show in Finder"
         onSelect={() =>
           void driveNative
             .reveal(space.id)
@@ -133,23 +120,7 @@ export function SpaceSettingsItems(props: {
         checked={muted}
         onSelect={() => setMuted(space.id, !muted)}
       />
-      {isOwner && canManageSpaceLifecycle(space, "rename") && (
-        <MenuItem
-          icon={<Pencil />}
-          label="Edit name and picture"
-          onSelect={later(() => onDialog("rename"))}
-        />
-      )}
-      {isOwner && canManageSpaceLifecycle(space, "delete") ? (
-        <>
-          <DropdownMenuSeparator />
-          <MenuItem
-            icon={<Trash2 />}
-            label="Delete Space"
-            onSelect={later(() => onDialog("delete"))}
-          />
-        </>
-      ) : !isOwner && canManageSpaceLifecycle(space, "leave") ? (
+      {canLeave ? (
         <>
           <DropdownMenuSeparator />
           <MenuItem

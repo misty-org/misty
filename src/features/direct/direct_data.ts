@@ -1,10 +1,13 @@
 import { useEffect } from "react";
+import { useUserStore } from "@/features/account";
 import {
+  onRealtimeMessage,
   peekSpaceResource,
   provideDirectSpaceCheck,
   refreshSpaceResource,
   setSpaceResource,
   useSpaceResource,
+  useSpacesStore,
 } from "@/features/spaces";
 import {
   directApi,
@@ -13,6 +16,7 @@ import {
   type Person,
   type SharedSpace,
 } from "./api";
+import { readAvatarDecoration, type AvatarDecoration } from "@/shared/lib/avatar_decoration";
 
 const friendsPath = "/friends";
 const dmsPath = "/dms";
@@ -25,14 +29,21 @@ export function reloadFriends() {
   return refreshSpaceResource(friendsPath, directApi.friends);
 }
 
+const peopleSeen = new Set<string>();
+
+const mutualFriendsPath = (userId: string) => `/people/${encodeURIComponent(userId)}/mutual-friends`;
+const sharedSpacesPath = (userId: string) => `/people/${encodeURIComponent(userId)}/shared-spaces`;
+
 export function useMutualFriends(userId: string) {
-  return useSpaceResource<Person[]>(`/people/${encodeURIComponent(userId)}/mutual-friends`, () =>
+  peopleSeen.add(userId);
+  return useSpaceResource<Person[]>(mutualFriendsPath(userId), () =>
     directApi.mutualFriends(userId),
   );
 }
 
 export function useSharedSpaces(userId: string) {
-  return useSpaceResource<SharedSpace[]>(`/people/${encodeURIComponent(userId)}/shared-spaces`, () =>
+  peopleSeen.add(userId);
+  return useSpaceResource<SharedSpace[]>(sharedSpacesPath(userId), () =>
     directApi.sharedSpaces(userId),
   );
 }
@@ -58,6 +69,107 @@ export function isDmId(spaceId: string): boolean {
 }
 
 provideDirectSpaceCheck(isDmId);
+
+type ProfilePatch = { avatar_version?: number; avatar_decoration?: AvatarDecoration };
+
+function profilePatch(source: Record<string, unknown> | undefined): ProfilePatch | null {
+  if (!source) return null;
+  const patch: ProfilePatch = {};
+  if (typeof source.avatar_version === "number") patch.avatar_version = source.avatar_version;
+  if ("avatar_decoration" in source)
+    patch.avatar_decoration = readAvatarDecoration(source.avatar_decoration);
+  return Object.keys(patch).length ? patch : null;
+}
+
+function withProfile<T extends { user_id: string }>(
+  people: T[],
+  userId: string,
+  patch: ProfilePatch,
+): T[] {
+  if (!people.some((person) => person.user_id === userId)) return people;
+  return people.map((person) => (person.user_id === userId ? { ...person, ...patch } : person));
+}
+
+function applyPersonProfile(userId: string, patch: ProfilePatch) {
+  const dms = peekSpaceResource<DirectConversation[]>(dmsPath);
+  if (dms?.some((dm) => dm.members.some((member) => member.user_id === userId)))
+    updateDms((current) =>
+      current.map((dm) => {
+        const members = withProfile(dm.members, userId, patch);
+        return members === dm.members ? dm : { ...dm, members };
+      }),
+    );
+  const friends = peekSpaceResource<FriendsList>(friendsPath);
+  if (friends)
+    setSpaceResource<FriendsList>(friendsPath, (previous = friends) => ({
+      friends: withProfile(previous.friends, userId, patch),
+      incoming: withProfile(previous.incoming, userId, patch),
+      outgoing: withProfile(previous.outgoing, userId, patch),
+      blocked: withProfile(previous.blocked, userId, patch),
+    }));
+  for (const person of peopleSeen) {
+    const mutual = peekSpaceResource<Person[]>(mutualFriendsPath(person));
+    if (mutual?.some((friend) => friend.user_id === userId))
+      setSpaceResource<Person[]>(mutualFriendsPath(person), (previous = mutual) =>
+        withProfile(previous, userId, patch),
+      );
+  }
+  useSpacesStore.setState((state) => {
+    let changed = false;
+    const membersBySpace = Object.fromEntries(
+      Object.entries(state.membersBySpace).map(([spaceId, members]) => {
+        const next = withProfile(members, userId, patch);
+        if (next !== members) changed = true;
+        return [spaceId, next];
+      }),
+    );
+    return changed ? { membersBySpace } : state;
+  });
+  if (useUserStore.getState().me?.id === userId) useUserStore.getState().patchMe(patch);
+}
+
+function applySpaceProfile(spaceId: string, patch: ProfilePatch) {
+  for (const person of peopleSeen) {
+    const shared = peekSpaceResource<SharedSpace[]>(sharedSpacesPath(person));
+    if (shared?.some((space) => space.id === spaceId))
+      setSpaceResource<SharedSpace[]>(sharedSpacesPath(person), (previous = shared) =>
+        previous.map((space) => (space.id === spaceId ? { ...space, ...patch } : space)),
+      );
+  }
+}
+
+export function useProfileUpdates(accountId: string | undefined) {
+  useEffect(() => {
+    if (!accountId) return;
+    const stopProfile = onRealtimeMessage("profile", (message) => {
+      const profile = message.profile as Record<string, unknown> | undefined;
+      const userId = profile?.user_id;
+      const patch = profilePatch(profile);
+      if (typeof userId === "string" && userId && patch) applyPersonProfile(userId, patch);
+    });
+    const onPerson = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string; avatar_decoration?: unknown }>)
+        .detail;
+      if (!detail?.userId) return;
+      applyPersonProfile(detail.userId, {
+        avatar_decoration: readAvatarDecoration(detail.avatar_decoration),
+      });
+    };
+    const onSpace = (event: Event) => {
+      const detail = (event as CustomEvent<{ spaceId?: string } & Record<string, unknown>>)
+        .detail;
+      const patch = profilePatch(detail);
+      if (detail?.spaceId && patch) applySpaceProfile(detail.spaceId, patch);
+    };
+    window.addEventListener("misty:avatar-decoration", onPerson);
+    window.addEventListener("misty:space-profile", onSpace);
+    return () => {
+      stopProfile();
+      window.removeEventListener("misty:avatar-decoration", onPerson);
+      window.removeEventListener("misty:space-profile", onSpace);
+    };
+  }, [accountId]);
+}
 
 export function useDmListUpdates() {
   useEffect(() => {

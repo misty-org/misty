@@ -93,6 +93,22 @@ fn string_array_param(payload: &Value, key: &str) -> Option<Vec<String>> {
     })
 }
 
+pub(crate) async fn install_from_folder(
+    folder: std::path::PathBuf,
+    skill: Value,
+    targets: Vec<String>,
+) -> Result<Value, String> {
+    install_skill_from(&skill, &targets, true, Some(folder))
+        .await
+        .map_err(|error| HubError::from(error).message)
+}
+
+pub(crate) fn uninstall(id: &str) -> Result<(), String> {
+    uninstall_skill(id)
+        .map(drop)
+        .map_err(|error| HubError::from(error).message)
+}
+
 #[tauri::command]
 pub async fn engine_skills_query(mode: String, params: Value) -> Result<Value, HubError> {
     let mode = if mode.is_empty() {

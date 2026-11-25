@@ -16,7 +16,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use space_drive::{
-    AgentTrash, ChangedEntry, Drive, DriveConfig, DriveError, DriveStatus, Events, Notice, OsFace,
+    ChangedEntry, Drive, DriveConfig, DriveError, DriveStatus, Events, Notice, OsFace,
     SpaceId, SpaceMount, StatusKind,
 };
 use tauri::{AppHandle, Emitter, Manager};
@@ -188,42 +188,6 @@ impl Events for AppEvents {
     fn notice(&self, notice: &Notice) {
         to_people(&self.app, NOTICE_EVENT, notice.clone());
     }
-
-    fn agent_trashed(&self, record: &AgentTrash) {
-        let original = mounts()
-            .get(record.space_id.as_str())
-            .map(|mount| space_drive::names::local_path(mount, &record.path))
-            .unwrap_or_else(|| PathBuf::from(&record.path));
-        let store = self.app.state::<MistyRuntime>().environment.store();
-        let saved = store.connect().and_then(|connection| {
-            connection.execute(
-                "INSERT INTO files_agent_trash (original_path, holding_path, agent_id, chat_id,
-                    trashed_at, space_id, drive_item_id)
-                 VALUES (?1, NULL, ?2, ?3, ?4, ?5, ?6)",
-                rusqlite::params![
-                    original.to_string_lossy().into_owned(),
-                    record.agent_id,
-                    record.chat_id,
-                    record.at_ms,
-                    record.space_id.as_str(),
-                    record.item_id.as_str(),
-                ],
-            )
-        });
-        if saved.is_err() {
-            eprintln!("[drive] couldn't record an agent's trash");
-        }
-    }
-}
-
-pub(crate) fn forget_agent_trash(app: &AppHandle, space: &str, item: &str) {
-    let store = app.state::<MistyRuntime>().environment.store();
-    if let Ok(connection) = store.connect() {
-        let _ = connection.execute(
-            "DELETE FROM files_agent_trash WHERE space_id = ?1 AND drive_item_id = ?2",
-            rusqlite::params![space, item],
-        );
-    }
 }
 
 fn retire_shared_folder_copies(misty_dir: &std::path::Path) {
@@ -251,6 +215,8 @@ fn open_host(
         .join(account_folder);
     let runtime = app.state::<MistyRuntime>();
     retire_shared_folder_copies(&runtime.environment.misty_dir());
+    let retiring = app.clone();
+    std::thread::spawn(move || crate::files::agent_trash::retire(&retiring));
     let store = runtime.environment.store();
     let device = space_drive::Device {
         id: device::device_id(&store)?,

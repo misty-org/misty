@@ -9,6 +9,8 @@ import {
 import { resolveApiBase } from "@/api/deployment/api";
 import { desktopOs } from "@/shared/platform/desktop_os";
 import { addRequestCorrelation } from "@/shared/platform/request_correlation";
+import { readAvatarDecoration, type AvatarDecoration } from "@/shared/lib/avatar_decoration";
+import { useUserStore } from "../sessions/use_user_store";
 import type {
   AccountMeResponse,
   LoginResponse,
@@ -100,6 +102,16 @@ export const accountApi = {
   removeAvatar: async () => {
     const response = await accountAvatarRequest("DELETE");
     return (await response.json()) as { avatar_version: number };
+  },
+  setAvatarDecoration: async (decoration: AvatarDecoration) => {
+    const result = await requestJson<{ avatar_decoration?: AvatarDecoration }>(
+      "PUT",
+      "/me/avatar/decoration",
+      decoration,
+    );
+    const avatar_decoration = readAvatarDecoration(result?.avatar_decoration);
+    useUserStore.getState().patchMe({ avatar_decoration });
+    return avatar_decoration;
   },
   banner: async () => {
     const response = await accountAvatarRequest("GET", undefined, "/me/banner");

@@ -1,9 +1,11 @@
 import { fetchProtectedBlob, spaceRequest } from "@/features/spaces";
+import type { AvatarDecoration } from "@/shared/lib/avatar_decoration";
 
 export interface Person {
   user_id: string;
   username: string;
   avatar_version: number;
+  avatar_decoration?: AvatarDecoration;
   banner_version?: number;
   since: string;
 }
@@ -12,6 +14,7 @@ export interface SharedSpace {
   id: string;
   name: string;
   avatar_version: number;
+  avatar_decoration?: AvatarDecoration;
 }
 
 export interface FriendsList {

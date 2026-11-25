@@ -4,7 +4,12 @@ import { ChannelDivider, ChannelWelcome } from "@misty/ui";
 import { SystemErrorNotice } from "@/shared/platform/system_errors";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { SpaceChatMessagesProps } from "./ChatMessages";
-import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
+import {
+  buildChatDisplayRows,
+  memberOutlineFor,
+  useMemberAvatarUrls,
+  useMemberOutlines,
+} from "./ChatDisplay";
 import { DirectMessageIntro } from "./DirectMessageIntro";
 import { ChatStarters } from "./ChatStarters";
 import { ChatMessagesLoading } from "./ChatMessagesLoading";
@@ -21,6 +26,7 @@ const longDate = new Intl.DateTimeFormat(undefined, {
 export function ChatMessageList(props: SpaceChatMessagesProps) {
   const rows = useMemo(() => buildChatDisplayRows(props.messages), [props.messages]);
   const avatars = useMemberAvatarUrls(props.spaceId, props.messages);
+  const outlines = useMemberOutlines(props.spaceId, props.messages);
   const byId = useMemo(
     () => new Map(props.messages.map((message) => [message.id, message])),
     [props.messages],
@@ -28,6 +34,7 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
   const rowProps = useStableRowProps(props);
   const avatarFor = (message: SpaceMessage) =>
     message.origin?.author_avatar_url || avatars.get(message.sender_user_id) || "";
+  const outlineFor = (message: SpaceMessage) => memberOutlineFor(outlines, message);
   const latestByAgent = useMemo(() => {
     const latest = new Map<string, string>();
     for (const message of props.messages)
@@ -55,8 +62,10 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
         message={message}
         grouped={compact && !unread}
         avatarUrl={avatarFor(message)}
+        avatarOutline={outlineFor(message)}
         replied={replied}
         repliedAvatarUrl={replied ? avatarFor(replied) : ""}
+        repliedAvatarOutline={replied ? outlineFor(replied) : undefined}
         replyCount={message.reply_count ?? 0}
         props={rowProps}
       />,
@@ -80,7 +89,7 @@ export function ChatMessageList(props: SpaceChatMessagesProps) {
       <div
         role="log"
         aria-label="Messages"
-        className={`${quiet ? "my-auto" : "mt-auto"} flex min-w-0 flex-col pt-4 pb-2`}
+        className={`${quiet ? "my-auto" : "mt-auto"} flex min-w-0 flex-col pt-4`}
       >
         {props.error ? (
           <div className="px-4 pb-2">

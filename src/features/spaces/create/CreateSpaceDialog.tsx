@@ -32,7 +32,7 @@ export function CreateSpaceDialog({ dialog }: { dialog: ReturnType<typeof useCre
 
           <DialogBody className="grid gap-5">
             <div className="flex items-end gap-3">
-              <Avatar shape="tile" className="size-10 shrink-0" aria-hidden="true">
+              <Avatar shape="tile" className="size-12 shrink-0" aria-hidden="true">
                 <AvatarFallback
                   className={cn(avatarColorClass(dialog.name || "new-space"), avatarInkClass)}
                 >

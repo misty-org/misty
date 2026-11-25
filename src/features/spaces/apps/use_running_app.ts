@@ -176,7 +176,6 @@ export function useRunningApp(options: {
         spaceId,
         appId,
         version,
-        approved: approvedNow,
       });
       if (!alive) {
         void invoke("space_app_session_close", { session: opened }).catch(() => {});

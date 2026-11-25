@@ -25,6 +25,7 @@ import {
   IconButton,
   Input,
   MenuItem,
+  MenuSeparator,
 } from "@misty/ui";
 
 export function useConversationActions({
@@ -120,6 +121,13 @@ export function useConversationActions({
       </DropdownMenuContent>
     </DropdownMenu>
   );
+  const rows = (
+    <>
+      <MenuItem icon={Pencil} label="Rename" disabled={disabled || busy} onSelect={startRename} />
+      <MenuSeparator />
+      <MenuItem icon={Trash2} label="Delete" disabled={disabled || busy} onSelect={startDelete} />
+    </>
+  );
   const contextMenu = (
     <ContextMenuContent onCloseAutoFocus={keepDialogFocus}>
       {onOpen && <MenuItem icon={ExternalLink} label="Open" onSelect={onOpen} />}
@@ -195,5 +203,5 @@ export function useConversationActions({
       </AlertDialog>
     </>
   );
-  return { dropdown, contextMenu, dialogs };
+  return { dropdown, contextMenu, rows, dialogs };
 }

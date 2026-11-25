@@ -1,6 +1,7 @@
 import { useAccountAvatarUrl, useAuth, useUserStore } from "@/features/account";
 import { useNativeSessionStore } from "@/features/account";
 import { avatarColorClass, avatarInkClass } from "@/shared/lib/avatar_palette";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import {
   Avatar,
   AvatarFallback,
@@ -27,6 +28,7 @@ function useAccountFace() {
       email: state.me?.email,
       username: state.me?.username,
       avatarVersion: state.me?.avatar_version ?? 0,
+      outline: avatarOutline(state.me?.avatar_decoration),
     })),
   );
   const account = user ?? currentUser;
@@ -36,7 +38,15 @@ function useAccountFace() {
   const initials = initialsForProfile(displayName, email);
   const avatarVersion = accountMe?.avatarVersion ?? user?.avatarVersion ?? 0;
   const avatarUrl = useAccountAvatarUrl(account?.id, avatarVersion);
-  return { accountId: account?.id, signedIn: Boolean(account), displayName, initials, avatarUrl };
+  const outline = accountMe ? accountMe.outline : user?.avatarDecoration?.outline;
+  return {
+    accountId: account?.id,
+    signedIn: Boolean(account),
+    displayName,
+    initials,
+    avatarUrl,
+    outline,
+  };
 }
 
 export function AccountAvatar(props: {
@@ -49,6 +59,7 @@ export function AccountAvatar(props: {
     <Avatar
       shape={props.shape ?? "tile"}
       size={props.size}
+      outline={face.outline}
       className={cn("shrink-0", props.className)}
     >
       {face.avatarUrl ? (

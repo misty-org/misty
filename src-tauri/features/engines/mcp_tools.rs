@@ -161,6 +161,31 @@ pub(super) fn space_tools() -> &'static Vec<Value> {
             .map(offered_tool)
             .collect();
         tools.push(json!({
+            "name": wire_name("browser.tab.list"),
+            "description": TAB_LIST,
+            "inputSchema": { "type": "object", "additionalProperties": false, "properties": {} },
+            "annotations": { "readOnlyHint": true },
+        }));
+        tools.push(json!({
+            "name": wire_name("browser.tab.use"),
+            "description": TAB_USE,
+            "inputSchema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["scopeId", "reason"],
+                "properties": {
+                    "scopeId": { "type": "string", "minLength": 8, "maxLength": 256 },
+                    "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 300,
+                        "description": "What you'll do in the tab, in a few words the person sees.",
+                    },
+                },
+            },
+            "annotations": { "readOnlyHint": false },
+        }));
+        tools.push(json!({
             "name": ASK_MISTY,
             "description": "Hand a task to Misty's own agent, which works on its own in the \
 background. State the finished result fully: it does not see this conversation. Waits up to about four minutes, then returns what is still \
@@ -245,6 +270,11 @@ pub(super) fn misty_call(name: &str, arguments: Value) -> Option<(String, Value)
     }
     if name == MISTY_WAIT {
         return Some(("agent.wait".into(), json!({})));
+    }
+    for known in ["browser.tab.list", "browser.tab.use"] {
+        if wire_name(known) == name {
+            return Some((known.to_string(), arguments));
+        }
     }
     let catalog: Vec<Value> = serde_json::from_str(CATALOG).unwrap_or_default();
     catalog.iter().find_map(|tool| {

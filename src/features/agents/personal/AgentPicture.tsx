@@ -1,7 +1,7 @@
 import { Cloud } from "lucide-react";
-import type { ReactNode } from "react";
 import type { AgentProfile } from "@/shared/schemas";
-import { cn, hasMark, Mark, PersonaLogo, personaTone, Surface, Text } from "@misty/ui";
+import { personTone } from "@/shared/lib/person_tone";
+import { AgentFace, cn, hasMark, personaTone, type AvatarSize } from "@misty/ui";
 import { mistyEngine } from "../engines/misty_engine";
 import { agentCloudAvatar, type agentCloudVariants } from "./agent_cloud_avatars";
 import { personaGlyph } from "../personas/persona_glyph";
@@ -11,79 +11,64 @@ export function AgentAvatar({
   large = false,
   compact = false,
   face = false,
+  glyph = false,
   className,
 }: {
   agent?: AgentProfile;
   large?: boolean;
   compact?: boolean;
   face?: boolean;
+  glyph?: boolean;
   className?: string;
 }) {
-  const glyph = large ? 34 : compact && !face ? 16 : 22;
-  const frame = (bare: boolean, disc: boolean, children: ReactNode) => (
-    <Surface
-      as="span"
-      tone={disc ? "active" : "none"}
-      radius={bare ? "none" : "full"}
-      data-bare={bare || undefined}
-      aria-hidden="true"
-      className={cn(
-        "agent-avatar inline-flex shrink-0 items-center justify-center",
-        bare ? "overflow-visible" : "overflow-hidden",
-        large
-          ? "size-16 text-display"
-          : face
-            ? bare
-              ? "size-6 text-control"
-              : "size-6 text-caption"
-            : compact
-              ? bare
-                ? "size-4.5 text-meta"
-                : "size-7 text-caption"
-              : "size-10 text-title",
-        className,
-      )}
-    >
-      <Text
-        bare
-        tone={bare ? "default" : "bright"}
-        weight={bare ? "semibold" : "medium"}
-        className="contents"
-      >
-        {children}
-      </Text>
-    </Surface>
-  );
+  const size: AvatarSize = large
+    ? "xl"
+    : glyph
+      ? "glyph"
+      : face
+        ? "sm"
+        : compact
+          ? "xs"
+          : "lg";
+  const faceClass = cn("agent-avatar", className);
+  const tone = agent ? personTone(agent.id) : undefined;
   const avatar = agent?.avatar as
     { kind?: unknown; persona?: unknown; division?: unknown } | undefined;
   if (avatar?.kind === "persona" && typeof avatar.persona === "string") {
     const persona = { id: avatar.persona, divisionId: String(avatar.division ?? "") };
     return (
-      <span aria-hidden="true" className={cn("agent-avatar inline-flex shrink-0", className)}>
-        <PersonaLogo
-          icon={personaGlyph(persona)}
-          color={personaTone(persona.id)}
-          size={large ? "tile" : compact || face ? "row" : "avatar"}
-        />
-      </span>
+      <AgentFace
+        size={size}
+        icon={personaGlyph(persona)}
+        color={personaTone(persona.id)}
+        className={faceClass}
+      />
     );
   }
   if (agent?.engine && agent.engine !== mistyEngine) {
-    return frame(
-      true,
-      false,
-      hasMark(`engine:${agent.engine}`) ? (
-        <Mark of={`engine:${agent.engine}`} size={glyph} />
-      ) : (
-        (agent.name.trim()[0] ?? "?").toUpperCase()
-      ),
+    const mark = `engine:${agent.engine}`;
+    return hasMark(mark) ? (
+      <AgentFace size={size} mark={mark} tone={tone} className={faceClass} />
+    ) : (
+      <AgentFace size={size} tone={tone} className={faceClass}>
+        {(agent.name.trim()[0] ?? "?").toUpperCase()}
+      </AgentFace>
     );
   }
   if (typeof agent?.avatar?.emoji === "string" && agent.avatar.emoji) {
-    return frame(false, true, agent.avatar.emoji);
+    return (
+      <AgentFace size={size} tone={tone} className={faceClass}>
+        {agent.avatar.emoji}
+      </AgentFace>
+    );
   }
-  if (compact || face) return frame(true, false, <Cloud />);
-  return frame(false, false, <AgentCloudImage variant={agentCloudAvatar(agent)} fill />);
+  if (compact || face || glyph)
+    return <AgentFace size={size} icon={Cloud} tone={tone} className={faceClass} />;
+  return (
+    <AgentFace size={size} picture className={faceClass}>
+      <AgentCloudImage variant={agentCloudAvatar(agent)} fill />
+    </AgentFace>
+  );
 }
 
 export function AgentCloudImage({

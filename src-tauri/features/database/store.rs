@@ -916,6 +916,43 @@ const MIGRATIONS: &[&str] = &[
          text, title UNINDEXED, space_id UNINDEXED, agent_id UNINDEXED,
          file UNINDEXED, stamp UNINDEXED, tokenize = 'trigram'
      );",
+    "CREATE TABLE registry_shards (
+         sha256 TEXT PRIMARY KEY,
+         body TEXT NOT NULL
+     ) WITHOUT ROWID;",
+    "CREATE TABLE registry_installs (
+         kind TEXT NOT NULL,
+         id TEXT NOT NULL,
+         digest TEXT NOT NULL,
+         placed TEXT NOT NULL,
+         installed_at INTEGER NOT NULL,
+         PRIMARY KEY (kind, id)
+     ) WITHOUT ROWID;",
+    "CREATE TABLE browser_history (
+         url TEXT PRIMARY KEY,
+         title TEXT NOT NULL DEFAULT '',
+         visits INTEGER NOT NULL DEFAULT 0,
+         typed INTEGER NOT NULL DEFAULT 0,
+         last_visit INTEGER NOT NULL
+     ) WITHOUT ROWID;
+     CREATE INDEX browser_history_recent ON browser_history(last_visit);
+     CREATE TABLE browser_downloads (
+         id TEXT PRIMARY KEY,
+         url TEXT NOT NULL,
+         path TEXT NOT NULL,
+         space_id TEXT NOT NULL DEFAULT '',
+         state TEXT NOT NULL,
+         error TEXT,
+         started_at INTEGER NOT NULL,
+         finished_at INTEGER
+     ) WITHOUT ROWID;
+     CREATE INDEX browser_downloads_started ON browser_downloads(started_at);",
+    "CREATE TABLE installed_apps (
+         app_id TEXT PRIMARY KEY,
+         version TEXT NOT NULL,
+         permissions TEXT NOT NULL DEFAULT '[]',
+         installed_at INTEGER NOT NULL
+     ) WITHOUT ROWID;",
 ];
 
 #[derive(Debug, Clone)]

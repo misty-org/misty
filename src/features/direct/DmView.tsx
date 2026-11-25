@@ -1,39 +1,25 @@
 import { useEffect, useState } from "react";
-import {
-  LogOut,
-  MessagesSquare,
-  MoreHorizontal,
-  Phone,
-  Trash2,
-  UserPlus,
-  Video,
-} from "lucide-react";
+import { LogOut, Trash2, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
   ErrorState,
   FramedPage,
-  IconButton,
-  IndicatorDot,
   MenuItem,
   MenuSeparator,
   PaneLoading,
-  SearchField,
   Text,
   notify,
   useConfirmDelete,
-  type ActionBarItem,
 } from "@misty/ui";
 import { useDirectUserId } from "./direct_account";
 import { useWorkspaceViewTitle, type WorkspaceView } from "@/features/app-windows";
-import { SpaceChat, useChatBarActions, useChatBarMenu, useSpacesStore } from "@/features/spaces";
+import { SpaceChat, useChatBar, useSpacesStore } from "@/features/spaces";
 import { DmMembers } from "./DmMembers";
 import { DmFace, DmProfile, DmWelcome, profileIcon } from "./DmPeople";
 import { directApi, type DirectConversation, type Person } from "./api";
 import { AddPeopleDialog } from "./AddPeopleDialog";
+import { useAnyCall } from "./calls/agent_call_store";
 import { dmOf, useCallStore, useCallsAvailable } from "./calls/call_store";
 import { CallStageView } from "./calls/CallView";
 import { useMissedCalls } from "./calls/missed_calls";
@@ -100,12 +86,10 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
   const [addingPeople, setAddingPeople] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const { confirm, dialog } = useConfirmDelete();
-  const [searchText, setSearchText] = useState("");
-  const [searchedText, setSearchedText] = useState("");
   useWorkspaceViewTitle(tab.id, name);
   const missed = useMissedCalls((state) => state.byDm[dm.id]);
   const inCall = useCallStore((state) => dmOf(state.active) === dm.id);
-  const anyCall = useCallStore((state) => Boolean(state.active));
+  const anyCall = useAnyCall();
   useEffect(() => useCallStore.getState().loadConfig(), []);
 
   useEffect(() => {
@@ -180,28 +164,14 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
     }
   };
 
-  const closeSearch = () => {
-    setSearchText("");
-    setSearchedText("");
-  };
-  const menu = useChatBarMenu({ spaceId: dm.id, muteId: dm.id, onPanel: closeSearch });
-  const sideActions = useChatBarActions({
-    spaceId: dm.id,
-    muteId: dm.id,
-    searching: Boolean(searchedText),
-    folded: true,
-    sideLabel: group ? undefined : "Profile",
-    SideIcon: group ? undefined : profileIcon,
-    onPanel: closeSearch,
-  });
   const moreRows = (
     <>
-      <MenuItem icon={MessagesSquare} label={menu.threadsLabel} onSelect={menu.toggleThreads} />
-      <MenuItem icon={menu.MuteIcon} label={menu.muteLabel} onSelect={menu.toggleMute} />
       {dm.read_only ? null : (
-        <MenuItem icon={UserPlus} label="Add people" onSelect={() => setAddingPeople(true)} />
+        <>
+          <MenuItem icon={UserPlus} label="Add people" onSelect={() => setAddingPeople(true)} />
+          <MenuSeparator />
+        </>
       )}
-      <MenuSeparator />
       {group ? (
         <MenuItem icon={LogOut} label="Leave group" danger onSelect={leaveGroup} />
       ) : (
@@ -209,71 +179,18 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
       )}
     </>
   );
-  const startCall = (video: boolean) => void useCallStore.getState().start(dm.id, video);
-  const actions: ActionBarItem[] = [
-    ...(callsAvailable
-      ? [
-          {
-            id: "voice-call",
-            icon: Phone,
-            label: "Voice call",
-            priority: 6,
-            disabled: anyCall,
-            onSelect: () => startCall(false),
-          },
-          {
-            id: "video-call",
-            icon: Video,
-            label: "Video call",
-            priority: 6,
-            disabled: anyCall,
-            onSelect: () => startCall(true),
-          },
-        ]
-      : []),
-    ...sideActions,
-    {
-      id: "more",
-      icon: MoreHorizontal,
-      label: "More",
-      priority: 9,
-      menu: moreRows,
-      render: () => (
-        <DropdownMenu>
-          <span className="relative inline-flex">
-            <DropdownMenuTrigger asChild>
-              <IconButton label="More" variant="quiet">
-                <MoreHorizontal />
-              </IconButton>
-            </DropdownMenuTrigger>
-            {menu.threadsUnread > 0 ? <IndicatorDot /> : null}
-          </span>
-          <DropdownMenuContent align="end" aria-label="Conversation actions">
-            {moreRows}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
-  const search = (
-    <SearchField
-      containerClassName="w-40"
-      aria-label="Search messages"
-      placeholder="Search"
-      value={searchText}
-      onChange={(event) => {
-        setSearchText(event.target.value);
-        if (!event.target.value) setSearchedText("");
-      }}
-      onClear={closeSearch}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          setSearchedText(searchText.trim());
+  const bar = useChatBar({
+    spaceId: dm.id,
+    muteId: dm.id,
+    calls: callsAvailable
+      ? {
+          disabled: anyCall,
+          start: (video) => void useCallStore.getState().start(dm.id, video),
         }
-      }}
-    />
-  );
+      : undefined,
+    side: group ? undefined : { label: "Profile", icon: profileIcon },
+    more: moreRows,
+  });
   const notice = missed ? (
     <div className="flex shrink-0 items-center gap-2 px-4 pt-2">
       <Text tone="muted" size="meta" className="min-w-0 flex-1">
@@ -303,10 +220,10 @@ function DmChat({ tab, dm }: { tab: WorkspaceView; dm: DirectConversation }) {
         spaceId={dm.id}
         spaceName={name}
         workspaceTabId={tab.id}
-        searchedText={searchedText}
-        onCloseSearch={closeSearch}
-        actions={actions}
-        search={search}
+        searchedText={bar.searchedText}
+        onCloseSearch={bar.closeSearch}
+        actions={bar.actions}
+        search={bar.search}
         dm={{
           name,
           group,

@@ -59,8 +59,16 @@ const shellCommands: ShortcutCommandDefinition[] = [
     windows: "Ctrl+Shift+D",
     allowInEditable: true,
   }),
+  command("app.open_browser", "Open Browser", {
+    description: "Open a new browser tab.",
+    category: "Misty",
+    aliases: ["web", "internet", "new web tab"],
+    mac: "Cmd+Shift+B",
+    windows: "Ctrl+Shift+B",
+    allowInEditable: true,
+  }),
   command("app.open_apps", "Open Apps", {
-    description: "Open the Space's apps.",
+    description: "Open the apps on this computer.",
     category: "Misty",
     aliases: ["launcher", "applications"],
     mac: "Cmd+Shift+A",

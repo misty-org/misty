@@ -55,11 +55,11 @@ export function WaitingForYouCard({
       error={error}
       actions={
         <>
-          <Button variant="quiet" disabled={busy} onClick={() => void decide(false)}>
-            Stop
-          </Button>
           <Button variant="primary" disabled={busy} onClick={() => void decide(true)}>
             Done, continue
+          </Button>
+          <Button variant="quiet" disabled={busy} onClick={() => void decide(false)}>
+            Stop
           </Button>
         </>
       }

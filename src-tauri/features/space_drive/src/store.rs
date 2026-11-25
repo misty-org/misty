@@ -129,17 +129,24 @@ const MIGRATIONS: &[&str] = &[
      );",
     "ALTER TABLE items ADD COLUMN content_version INTEGER;
      ALTER TABLE base ADD COLUMN content_version INTEGER;",
+    "ALTER TABLE items DROP COLUMN trashed;
+     ALTER TABLE items DROP COLUMN trash_hold;
+     ALTER TABLE nodes DROP COLUMN trash_held;
+     ALTER TABLE nodes DROP COLUMN trash_agent;
+     ALTER TABLE nodes DROP COLUMN trash_chat;
+     DELETE FROM items;
+     UPDATE cursor SET seq = 0;",
 ];
 
 const KEPT_ANCHORS: i64 = 64;
 const BATCH: usize = 1024;
 
 const NODE_COLUMNS: &str = "ino, space, id, parent, name, server_name, kind, sha256, size, \
-     mtime_ms, path, created, dirty_content, dirty_place, trash_pending, trash_held, trash_agent, \
-     trash_chat, not_synced, downloaded, content_base, last_used_ms";
+     mtime_ms, path, created, dirty_content, dirty_place, trash_pending, not_synced, \
+     downloaded, content_base, last_used_ms";
 
 const ITEM_COLUMNS: &str = "space, id, parent, name, kind, sha256, size, mtime_ms, version, seq, \
-     modified_by, modified_by_name, modified_at, trashed, trashed_at, trashed_by, trash_hold, \
+     modified_by, modified_by_name, modified_at, trashed_at, trashed_by, \
      deleted, replaced_of, content_version";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -159,9 +166,6 @@ pub struct NodeRow {
     pub dirty_content: bool,
     pub dirty_place: bool,
     pub trash_pending: bool,
-    pub trash_held: bool,
-    pub trash_agent: Option<String>,
-    pub trash_chat: Option<String>,
     pub not_synced: bool,
     pub downloaded: bool,
     pub content_base: Option<Version>,
@@ -499,13 +503,10 @@ fn node_from(row: &Row<'_>) -> rusqlite::Result<NodeRow> {
         dirty_content: row.get(12)?,
         dirty_place: row.get(13)?,
         trash_pending: row.get(14)?,
-        trash_held: row.get(15)?,
-        trash_agent: row.get(16)?,
-        trash_chat: row.get(17)?,
-        not_synced: row.get(18)?,
-        downloaded: row.get(19)?,
-        content_base: row.get::<_, Option<i64>>(20)?.map(Version),
-        last_used_ms: row.get(21)?,
+        not_synced: row.get(15)?,
+        downloaded: row.get(16)?,
+        content_base: row.get::<_, Option<i64>>(17)?.map(Version),
+        last_used_ms: row.get(18)?,
     })
 }
 
@@ -524,13 +525,11 @@ fn item_from(row: &Row<'_>) -> rusqlite::Result<Item> {
         modified_by: row.get(10)?,
         modified_by_name: row.get(11)?,
         modified_at: row.get(12)?,
-        trashed: row.get(13)?,
-        trashed_at: row.get(14)?,
-        trashed_by: row.get(15)?,
-        trash_hold: row.get(16)?,
-        deleted: row.get(17)?,
-        replaced_of: row.get::<_, Option<String>>(18)?.map(ItemId),
-        content_version: row.get::<_, Option<i64>>(19)?.map(Version),
+        trashed_at: row.get(13)?,
+        trashed_by: row.get(14)?,
+        deleted: row.get(15)?,
+        replaced_of: row.get::<_, Option<String>>(16)?.map(ItemId),
+        content_version: row.get::<_, Option<i64>>(17)?.map(Version),
     })
 }
 
@@ -749,17 +748,16 @@ fn write_loop(connection: Connection, receive: mpsc::Receiver<Message>) {
 fn save_node(connection: &Connection, node: &NodeRow, local_seq: i64) -> rusqlite::Result<()> {
     let mut statement = connection.prepare_cached(
         "INSERT INTO nodes (ino, space, id, parent, name, server_name, kind, sha256, size, mtime_ms,
-            path, created, dirty_content, dirty_place, trash_pending, trash_held, trash_agent,
-            trash_chat, not_synced, downloaded, content_base, last_used_ms, local_seq)
+            path, created, dirty_content, dirty_place, trash_pending, not_synced, downloaded,
+            content_base, last_used_ms, local_seq)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
-            ?19, ?20, ?21, ?22, ?23)
+            ?19, ?20)
          ON CONFLICT(ino) DO UPDATE SET space = excluded.space, id = excluded.id,
             parent = excluded.parent, name = excluded.name, server_name = excluded.server_name,
             kind = excluded.kind, sha256 = excluded.sha256, size = excluded.size,
             mtime_ms = excluded.mtime_ms, path = excluded.path, created = excluded.created,
             dirty_content = excluded.dirty_content, dirty_place = excluded.dirty_place,
-            trash_pending = excluded.trash_pending, trash_held = excluded.trash_held,
-            trash_agent = excluded.trash_agent, trash_chat = excluded.trash_chat,
+            trash_pending = excluded.trash_pending,
             not_synced = excluded.not_synced, downloaded = excluded.downloaded,
             content_base = excluded.content_base, last_used_ms = excluded.last_used_ms,
             local_seq = excluded.local_seq",
@@ -780,9 +778,6 @@ fn save_node(connection: &Connection, node: &NodeRow, local_seq: i64) -> rusqlit
         node.dirty_content,
         node.dirty_place,
         node.trash_pending,
-        node.trash_held,
-        node.trash_agent,
-        node.trash_chat,
         node.not_synced,
         node.downloaded,
         node.content_base.map(|version| version.0),
@@ -795,7 +790,7 @@ fn save_node(connection: &Connection, node: &NodeRow, local_seq: i64) -> rusqlit
 fn save_item(connection: &Connection, item: &Item) -> rusqlite::Result<()> {
     let mut statement = connection.prepare_cached(&format!(
         "INSERT OR REPLACE INTO items ({ITEM_COLUMNS})
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)"
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)"
     ))?;
     statement.execute(params![
         item.space_id.as_str(),
@@ -811,10 +806,8 @@ fn save_item(connection: &Connection, item: &Item) -> rusqlite::Result<()> {
         item.modified_by,
         item.modified_by_name,
         item.modified_at,
-        item.trashed,
         item.trashed_at,
         item.trashed_by,
-        item.trash_hold,
         item.deleted,
         item.replaced_of.as_ref().map(ItemId::as_str),
         item.content_version.map(|version| version.0),
@@ -1355,9 +1348,6 @@ impl Store {
         current.dirty_content = node.dirty_content;
         current.dirty_place = node.dirty_place;
         current.trash_pending = node.trash_pending;
-        current.trash_held = node.trash_held;
-        current.trash_agent = node.trash_agent.clone();
-        current.trash_chat = node.trash_chat.clone();
         current.not_synced = node.not_synced;
         current.downloaded = node.downloaded;
         current.content_base = node.content_base;
@@ -1966,9 +1956,6 @@ mod tests {
             dirty_content: false,
             dirty_place: false,
             trash_pending: false,
-            trash_held: false,
-            trash_agent: None,
-            trash_chat: None,
             not_synced: false,
             downloaded: false,
             content_base: None,

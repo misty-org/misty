@@ -26,7 +26,22 @@ use confine::confined;
 use server::{Server, Trouble};
 
 #[cfg(target_os = "macos")]
-const PROFILE: &str = include_str!("../../tauri-permissions/permissions/app-mcp-program.sb");
+const PROFILE: &str = r#"
+(version 1)
+(deny default)
+(allow process-exec (literal (param "TOOL")))
+(allow file-read* (literal (param "TOOL")) (subpath (param "PROGRAM_DIR")) (subpath (param "WORK"))
+  (subpath "/System/Library") (subpath "/usr/lib") (subpath "/usr/share")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library")
+  (subpath "/System/Volumes/Preboot/Cryptexes/OS/usr/lib")
+  (subpath "/private/var/db/timezone") (literal "/private/etc/localtime")
+  (literal "/") (literal "/dev/null") (literal "/dev/random") (literal "/dev/urandom"))
+(allow file-write* (subpath (param "WORK")) (literal "/dev/null"))
+(allow file-ioctl (literal "/dev/null"))
+(allow sysctl-read)
+(allow file-read-metadata)
+(allow mach-lookup (global-name "com.apple.system.logger"))
+"#;
 
 pub const MAX_ARCHIVE_BYTES: u64 = 256 << 20;
 const MAX_PROGRAM_BYTES: u64 = 256 << 20;
@@ -58,16 +73,10 @@ pub struct McpProgram {
 
 #[derive(Deserialize)]
 struct CatalogApp {
-    id: String,
     upstream: String,
     version: String,
     #[serde(default)]
     mcp_program: Option<McpProgram>,
-}
-
-#[derive(Deserialize)]
-struct Catalog {
-    apps: Vec<CatalogApp>,
 }
 
 pub fn platform() -> Option<&'static str> {
@@ -165,15 +174,16 @@ pub fn pinned(app_id: &str, version: &str) -> Result<(McpProgram, Build), String
 }
 
 fn pinned_in(catalog: &str, app_id: &str, version: &str) -> Result<(McpProgram, Build), String> {
-    let catalog: Catalog = serde_json::from_str(catalog)
+    let apps: Vec<serde_json::Value> = serde_json::from_str(catalog)
         .map_err(|error| format!("Misty's app registry isn't valid: {error}"))?;
-    let app = catalog
-        .apps
+    let entry = apps
         .into_iter()
-        .find(|app| app.id == app_id)
+        .find(|app| app.get("id").and_then(serde_json::Value::as_str) == Some(app_id))
         .ok_or_else(|| "That app isn't in Misty's catalog.".to_owned())?;
+    let app: CatalogApp = serde_json::from_value(entry)
+        .map_err(|error| format!("Misty's catalog entry for this app isn't valid: {error}"))?;
     if app.version != version {
-        return Err("This Space has another version of the app than Misty's catalog. Update the app to use its tools.".into());
+        return Err("This computer has another version of the app than Misty's catalog. Update the app to use its tools.".into());
     }
     let upstream_ok = app.upstream.split('/').count() == 2
         && app.upstream.split('/').all(|part| {
@@ -229,6 +239,17 @@ pub fn installed(
     let dir = program_dir_in(&programs_root()?, app_id, version)?;
     let path = program_path(&dir, program);
     Ok(fs::is_file(&path).then_some(path))
+}
+
+pub fn remove_all(app_id: &str) -> Result<(), String> {
+    if !valid_id(app_id) {
+        return Err("That isn't an app id.".into());
+    }
+    let dir = programs_root()?.join(app_id);
+    if fs::exists(&dir) {
+        fs::remove_dir_all(&dir).map_err(|error| format!("Couldn't remove the app: {error}"))?;
+    }
+    Ok(())
 }
 
 pub fn install(

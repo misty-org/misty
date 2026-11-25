@@ -130,7 +130,7 @@ describe("ShortcutsSection", () => {
     await render();
     expect(container.textContent).toContain("⌘");
     const search = container.querySelector<HTMLInputElement>(
-      'input[placeholder="Search commands, tools, or shortcuts"]',
+      'input[placeholder="Search shortcuts"]',
     );
     await act(async () => {
       if (!search) return;

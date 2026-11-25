@@ -361,8 +361,12 @@ impl Link {
         })
     }
 
-    pub fn trash(&self, item: &str) -> Result<(), LinkError> {
-        self.call("trash", json!({ "item_id": item }), true).map(|_| ())
+    pub fn trash(&self, item: &str) -> Result<Option<ItemInfo>, LinkError> {
+        let mut reply = self.call("trash", json!({ "item_id": item }), true)?;
+        if !reply.contains_key("item") {
+            return Ok(None);
+        }
+        Self::item_of(&mut reply).map(Some)
     }
 
     pub fn used(&self, item: &str, at_ms: i64) -> Result<(), LinkError> {

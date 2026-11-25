@@ -10,7 +10,7 @@ import {
   notify,
 } from "@misty/ui";
 import { useState } from "react";
-import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
+import { DesktopSettingsRow } from "@/features/settings";
 import { invoke } from "@/native";
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -40,7 +40,7 @@ export function AppsSettingsSection() {
     );
 
   return (
-    <DesktopSettingsSection title="Apps">
+    <>
       <DesktopSettingsRow
         label="Sign out of all apps"
         description="Every app and website app in your Spaces, on this computer."
@@ -76,6 +76,6 @@ export function AppsSettingsSection() {
           Reset
         </Button>
       </DesktopSettingsRow>
-    </DesktopSettingsSection>
+    </>
   );
 }

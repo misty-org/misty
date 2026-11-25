@@ -29,7 +29,7 @@ export function driveNoticeOptions(notice: DriveNotice): Parameters<typeof notif
         message: `${by} saved ${name} after you, so yours is kept beside it as a conflicted copy`,
       };
     case "revived":
-      return { message: `${by}'s edit brought ${name} back` };
+      return { message: `${by} put ${name} back from .trash` };
     case "deletes_held": {
       const burst = notice.burst;
       const count = notice.count ?? 0;

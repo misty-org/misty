@@ -19,7 +19,12 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "macos")]
     crate::app::macos_window_effects::mac_traffic_lights::install();
     #[cfg(target_os = "macos")]
-    wry::set_trusted_media_origins(own_page_origins(app.handle()));
+    {
+        crate::browser::pages::macos::webkit_hooks::set_trusted_media_origins(own_page_origins(
+            app.handle(),
+        ));
+        crate::browser::pages::macos::webkit_hooks::install();
+    }
     #[cfg(all(desktop, debug_assertions))]
     crate::browser::agent_pages::eval_bridge::start_if_requested(app.handle());
     if let Err(error) = database::misty_home::ensure_misty_home() {

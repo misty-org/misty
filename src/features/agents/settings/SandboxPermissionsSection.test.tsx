@@ -14,6 +14,7 @@ vi.mock("@/native/sandbox", () => ({
   sandboxPermissionSet: mocks.set,
 }));
 vi.mock("@/shared/lib/confirm_action", () => ({ confirmAction: mocks.confirm }));
+vi.mock("@/shared/platform/tauri", () => ({ hasTauriInternals: () => true }));
 
 import { SandboxPermissionsSection } from "./SandboxPermissionsSection";
 

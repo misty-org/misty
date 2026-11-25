@@ -32,3 +32,5 @@ pub fn browser_webview_stop(
 
 mod clear_data;
 pub use clear_data::*;
+mod find_zoom;
+pub use find_zoom::*;

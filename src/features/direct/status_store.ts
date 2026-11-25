@@ -4,6 +4,13 @@ import { onRealtimeMessage, onRealtimeOpen, sendRealtimeMessage } from "@/featur
 import { useDoNotDisturb } from "@/shared/lib/do_not_disturb";
 import { directApi, type AccountStatus, type ChosenStatus, type PresenceStatus } from "./api";
 
+export const statusWords: Record<PresenceStatus, string> = {
+  online: "Online",
+  idle: "Idle",
+  dnd: "Do not disturb",
+  offline: "Offline",
+};
+
 function mirrorDoNotDisturb(status: ChosenStatus) {
   const dnd = status.chosen === "dnd";
   if (useDoNotDisturb.getState().value !== dnd) useDoNotDisturb.getState().set(dnd);

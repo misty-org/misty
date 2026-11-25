@@ -175,7 +175,6 @@ pub trait Events: Send + Sync {
     fn status(&self, status: &DriveStatus);
     fn changed(&self, space: &SpaceId, entries: &[ChangedEntry]);
     fn notice(&self, notice: &Notice);
-    fn agent_trashed(&self, record: &AgentTrash);
 }
 
 #[derive(Clone, Debug)]
@@ -833,7 +832,7 @@ impl Drive {
                         .lookup(space, folder.as_ref(), &wanted)?
                         .filter(|holder| &holder.id != id)
                     {
-                        self.trash(space, &holder.id, TrashBy::Person)?;
+                        self.trash(space, &holder.id)?;
                     }
                     self.rename_checked(space, id, folder.as_ref(), &wanted, true)?;
                 }
@@ -916,43 +915,43 @@ impl Drive {
         Ok(self.inner.node_view(&node))
     }
 
-    pub fn trash(&self, space: &SpaceId, id: &ItemId, by: TrashBy) -> Result<(), DriveError> {
+    pub fn trash(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
         let before = self
             .inner
             .store
             .node(space, id)?
             .map(|node| self.inner.entry(&node));
-        sync::trash_local(&self.inner, space, id, &by)?;
+        sync::trash_local(&self.inner, space, id)?;
         self.emit_now(space, &[], before.into_iter().collect());
         self.kick(space);
         Ok(())
     }
 
     pub fn trash_from_os(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
-        if self.restore_root_ignore(space, id)? {
+        if self.restore_fixed_place(space, id)? {
             return Ok(());
         }
         let files = self.guard_delete(space, id)?;
-        self.trash(space, id, TrashBy::Person)?;
+        self.trash(space, id)?;
         self.inner.guard.record(space, id, files);
         Ok(())
     }
 
     pub async fn trash_from_os_now(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
-        if self.restore_root_ignore(space, id)? {
+        if self.restore_fixed_place(space, id)? {
             return Ok(());
         }
         let files = self.guard_delete(space, id)?;
-        self.trash_now(space, id, TrashBy::Person).await?;
+        self.trash_now(space, id).await?;
         self.inner.guard.record(space, id, files);
         Ok(())
     }
 
-    fn restore_root_ignore(&self, space: &SpaceId, id: &ItemId) -> Result<bool, DriveError> {
+    fn restore_fixed_place(&self, space: &SpaceId, id: &ItemId) -> Result<bool, DriveError> {
         let Some(node) = self.inner.store.node(space, id)? else {
             return Ok(false);
         };
-        if !sync::is_root_ignore(&node)
+        if !(sync::is_root_ignore(&node) || sync::is_root_trash(&node))
             || node.created
             || node.not_synced
             || node.trash_pending
@@ -1019,18 +1018,13 @@ impl Drive {
         Ok(restored)
     }
 
-    pub async fn trash_now(
-        &self,
-        space: &SpaceId,
-        id: &ItemId,
-        by: TrashBy,
-    ) -> Result<(), DriveError> {
+    pub async fn trash_now(&self, space: &SpaceId, id: &ItemId) -> Result<(), DriveError> {
         let before = self
             .inner
             .store
             .node(space, id)?
             .map(|node| self.inner.entry(&node));
-        sync::trash_local(&self.inner, space, id, &by)?;
+        sync::trash_local(&self.inner, space, id)?;
         self.emit_now(space, &[], before.into_iter().collect());
         if self.inner.store.node(space, id)?.is_none() {
             return Ok(());
@@ -1044,11 +1038,10 @@ impl Drive {
         &self,
         space: &SpaceId,
         ids: &[ItemId],
-        by: TrashBy,
     ) -> Vec<(ItemId, Result<(), DriveError>)> {
         let mut out = Vec::with_capacity(ids.len());
         for id in ids {
-            out.push((id.clone(), self.trash_now(space, id, by.clone()).await));
+            out.push((id.clone(), self.trash_now(space, id).await));
         }
         out
     }
@@ -1341,15 +1334,6 @@ impl Drive {
         sync::remove_download(&self.inner, space, path)
     }
 
-    pub async fn trash_list(
-        &self,
-        space: &SpaceId,
-        after: Option<&str>,
-        limit: u32,
-    ) -> Result<(Vec<TrashEntry>, Option<String>), DriveError> {
-        sync::trash_list(&self.inner, space, after, limit).await
-    }
-
     pub async fn restore_many(
         &self,
         space: &SpaceId,
@@ -1372,6 +1356,13 @@ impl Drive {
             out.push((id.clone(), self.purge(space, id).await));
         }
         out
+    }
+
+    pub fn in_trash(&self, space: &SpaceId, id: &ItemId) -> Result<bool, DriveError> {
+        match self.inner.store.node(space, id)? {
+            Some(node) => sync::in_trash(&self.inner, space, &node),
+            None => Ok(false),
+        }
     }
 
     pub async fn restore(&self, space: &SpaceId, id: &ItemId) -> Result<Item, DriveError> {

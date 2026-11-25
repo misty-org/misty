@@ -94,6 +94,8 @@ pub struct AppManifest {
     pub collab: Option<CollabKind>,
     #[serde(default)]
     pub adapter: Option<String>,
+    #[serde(default)]
+    pub server: bool,
 }
 
 const MAX_MANIFEST_NAME: usize = 64;

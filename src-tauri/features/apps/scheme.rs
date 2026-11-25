@@ -17,16 +17,34 @@ const OWN_SOURCES: &str = if cfg!(windows) {
 };
 
 fn policy(frame_parent: &str, inline_scripts: bool, hosts: &[String]) -> String {
+    server_policy(frame_parent, inline_scripts, hosts, None)
+}
+
+fn local_server(url: &str) -> bool {
+    url.strip_prefix("http://127.0.0.1:")
+        .and_then(|port| port.parse::<u16>().ok())
+        .is_some_and(|port| port > 0)
+}
+
+fn server_policy(
+    frame_parent: &str,
+    inline_scripts: bool,
+    hosts: &[String],
+    server: Option<&str>,
+) -> String {
     let inline = if inline_scripts {
         " 'unsafe-inline'"
     } else {
         ""
     };
-    let network: String = hosts
+    let mut network: String = hosts
         .iter()
         .filter(|host| super::manifest::valid_host(host))
         .map(|host| format!(" https://{host} wss://{host}"))
         .collect();
+    if let Some(url) = server.filter(|url| local_server(url)) {
+        network.push_str(&format!(" {url}"));
+    }
     format!(
         "default-src 'none'; script-src {own} 'wasm-unsafe-eval'{inline}; style-src {own} 'unsafe-inline'; \
          img-src {own} data: blob:{network}; font-src {own} data:; media-src {own} blob: data:{network}; \
@@ -44,6 +62,7 @@ const SCREEN: &str = include_str!("screen.js");
 const SDK_PATH: &str = "/__misty/sdk.js";
 const SDK_TAG: &str = r#"<script src="/__misty/sdk.js"></script>"#;
 const SCREEN_PATH: &str = "/__misty/screen.js";
+const SERVER_FILE: &str = "__misty/server.js";
 const SCREEN_TAG: &str = r#"<script src="/__misty/screen.js"></script>"#;
 
 pub(crate) fn with_shim(html: &[u8]) -> Vec<u8> {
@@ -264,12 +283,31 @@ async fn serve(
         Target::Bytes(_) => return Err(StatusCode::FORBIDDEN),
         Target::App { id, version, file } => (id, version, file),
     };
-    let (mime, body, inline_scripts, hosts) = tokio::task::spawn_blocking(move || {
+    let (mime, body, inline_scripts, hosts, server) = tokio::task::spawn_blocking(move || {
         let dir = bundle::locate(&id, &version).map_err(|_| StatusCode::NOT_FOUND)?;
         let manifest = bundle::manifest_in(&dir, &id, &version)
             .ok()
             .flatten()
             .ok_or(StatusCode::NOT_FOUND)?;
+        let server = if manifest.server {
+            super::app_server::current_url(&id).filter(|url| local_server(url))
+        } else {
+            None
+        };
+        if manifest.server && requested_file == SERVER_FILE {
+            let script = format!(
+                "window.__MISTY_APP_SERVER__ = {};\n",
+                serde_json::to_string(&server.clone().unwrap_or_default())
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            );
+            return Ok::<_, StatusCode>((
+                "text/javascript; charset=utf-8",
+                script.into_bytes(),
+                false,
+                Vec::new(),
+                server,
+            ));
+        }
         let file = if requested_file.is_empty() {
             manifest.entry.clone()
         } else {
@@ -295,17 +333,25 @@ async fn serve(
                 body = with_tag(&body, SDK_TAG);
             }
             body = with_tag(&body, SCREEN_TAG);
+            if manifest.server {
+                let up = "../".repeat(manifest.entry.matches('/').count());
+                body = with_tag(&body, &format!(r#"<script src="{up}{SERVER_FILE}"></script>"#));
+            }
         }
         let hosts: Vec<String> = manifest
             .network
             .iter()
             .map(|entry| entry.host.clone())
             .collect();
-        Ok::<_, StatusCode>((mime_of(&file), body, manifest.inline_scripts, hosts))
+        Ok::<_, StatusCode>((mime_of(&file), body, manifest.inline_scripts, hosts, server))
     })
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)??;
-    reply(body, mime, policy(frame_parent, inline_scripts, &hosts))
+    reply(
+        body,
+        mime,
+        server_policy(frame_parent, inline_scripts, &hosts, server.as_deref()),
+    )
 }
 
 fn reply(

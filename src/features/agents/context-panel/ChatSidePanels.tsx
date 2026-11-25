@@ -7,7 +7,6 @@ import {
   Pin,
   ScrollText,
   SquareTerminal,
-  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -17,6 +16,7 @@ import {
   SideCard,
   SidePanel,
   lazyTool,
+  profileIcons,
   ToolSuspense,
   type FramedPageColumn,
 } from "@misty/ui";
@@ -54,7 +54,7 @@ const surfaces: Record<ContextPanelSurface | "browser", [name: string, icon: Luc
   changes: ["Changes", GitCompareArrows],
   files: ["Files", FolderTree],
   terminal: ["Terminal", SquareTerminal],
-  profile: ["Profile", UserRound],
+  profile: ["Profile", profileIcons.agent],
 };
 
 function useOnePanel(

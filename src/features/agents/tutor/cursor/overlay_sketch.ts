@@ -59,14 +59,15 @@ export function createSketchPainter(layer: HTMLDivElement) {
         frame.style.transform = `translate(${card.x}px, ${card.y}px)`;
         frame.style.width = `${card.width}px`;
         frame.style.height = `${card.height}px`;
-        if (sketch.title) {
-          const title = document.createElement("div");
-          title.className =
-            "mb-1 overflow-hidden whitespace-nowrap text-caption font-medium [mask-image:var(--mask-fade-end)]";
-          title.textContent = sketch.title;
+        const title = sketch.title ? document.createElement("div") : null;
+        if (title) {
+          title.className = "mb-1 overflow-hidden whitespace-nowrap text-caption font-medium";
+          title.textContent = sketch.title ?? "";
           frame.append(title);
         }
         layer.replaceChildren(frame);
+        if (title && title.scrollWidth > title.clientWidth + 1)
+          title.classList.add("[mask-image:var(--mask-fade-end)]");
       }
       const board = frame;
       if (sketch.surface === "model") {

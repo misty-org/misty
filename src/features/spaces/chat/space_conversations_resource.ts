@@ -1,7 +1,7 @@
 import { readApiAccountId } from "@/api/client/session";
 import { create } from "zustand";
 import { spacesApi } from "../api/api";
-import type { SpaceConversation } from "../api/dto/entities";
+import type { SpaceChannelCategory, SpaceConversation } from "../api/dto/entities";
 import {
   peekSpaceResource,
   refreshSpaceResource,
@@ -11,6 +11,7 @@ import {
 import { coalescedReload, coalescedReloadPending } from "../list/coalesced_reload";
 
 const path = (spaceId: string) => `/spaces/${encodeURIComponent(spaceId)}/conversations`;
+const categoriesPath = (spaceId: string) => `/spaces/${encodeURIComponent(spaceId)}/categories`;
 
 const useEveryoneUnread = create<{ counts: Record<string, number> }>(() => ({ counts: {} }));
 const everyoneKey = (spaceId: string) => `${readApiAccountId()}:${spaceId}`;
@@ -24,8 +25,29 @@ const setEveryoneUnread = (spaceId: string, count: number) =>
 const load = (spaceId: string) =>
   spacesApi.conversations(spaceId).then((result) => {
     setEveryoneUnread(spaceId, result.everyone_unread_count ?? 0);
+    setSpaceResource<SpaceChannelCategory[]>(categoriesPath(spaceId), result.categories ?? []);
     return result.conversations;
   });
+
+const joinLoad = (spaceId: string) =>
+  refreshSpaceResource(path(spaceId), () => load(spaceId), { join: true }).then(
+    () => peekSpaceResource<SpaceChannelCategory[]>(categoriesPath(spaceId)) ?? [],
+  );
+
+export function useSpaceChannelCategoryList(spaceId: string) {
+  return useSpaceResource<SpaceChannelCategory[]>(spaceId ? categoriesPath(spaceId) : null, () =>
+    joinLoad(spaceId),
+  );
+}
+
+export function updateSpaceChannelCategories(
+  spaceId: string,
+  update: (current: SpaceChannelCategory[]) => SpaceChannelCategory[],
+) {
+  setSpaceResource<SpaceChannelCategory[]>(categoriesPath(spaceId), (current) =>
+    update(current ?? []),
+  );
+}
 
 export function useSpaceEveryoneUnread(spaceId: string): number {
   return useEveryoneUnread((state) => state.counts[everyoneKey(spaceId)] ?? 0);

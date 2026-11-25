@@ -7,8 +7,6 @@
 .preview-card-selector {
   display: block;
   overflow: hidden;
-  -webkit-mask-image: var(--mask-fade-end);
-  mask-image: var(--mask-fade-end);
   white-space: nowrap;
   font-family: var(--font-mono, ui-monospace, Menlo, monospace);
   font-size: var(--text-caption);
@@ -21,8 +19,6 @@
   gap: calc(var(--spacing) * 1.25);
   margin: 0;
   overflow: hidden;
-  -webkit-mask-image: var(--mask-fade-end);
-  mask-image: var(--mask-fade-end);
   white-space: nowrap;
   font-family: var(--font-mono, ui-monospace, Menlo, monospace);
   font-size: var(--text-micro);

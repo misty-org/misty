@@ -32,7 +32,7 @@ export {
   type MemberAgentStatus,
 } from "./list/member_agents";
 export { SpaceChat } from "./chat/SpaceChat";
-export { useChatBarActions, useChatBarMenu } from "./chat/components/ChatBarButtons";
+export { useChatBar } from "./chat/components/ChatBarButtons";
 export { pageMisty } from "./apps/page_misty";
 export { appCallsHost, voiceChannelPage } from "./apps/app_calls";
 export { SpaceWorkspaceSurface } from "./overview/SpaceWorkspaceSurface";
@@ -46,20 +46,26 @@ export { searchSpaceText, type SpaceSearchHit } from "./search/space_search";
 
 export { SpaceSelector } from "./components/space-row/SpaceSelector";
 export { GlobalCreateSpaceDialog } from "./create/GlobalCreateSpaceDialog";
-export { useSpaceApps } from "./apps/use_space_apps";
+export { useInstalledApps } from "./apps/use_installed_apps";
 export { useAppPrograms } from "./apps/use_app_programs";
 export { useAppStandby } from "./apps/use_app_standby";
 export { appRoute } from "./apps/app_routes";
-export { SpaceAppsLauncher, useAppLauncher } from "./apps/SpaceAppsLauncher";
+export { AppsLauncher, useAppLauncher } from "./apps/AppsLauncher";
 export { registryApps, useRegistryApps, catalogLogoUrl } from "./apps/third_party_apps";
-export { useAppUpdates } from "./apps/app_updates";
-export { ExploreAppsSection } from "./apps/ExploreAppsSection";
+export { useExploreInstalledApps } from "./apps/explore_installed_apps";
 export { useSpaceConversations } from "./chat/sidebar/use_space_conversations";
 export { NewChannelButton } from "./chat/sidebar/NewChannelButton";
+export {
+  ChannelCategoryList,
+  ChannelHeadingTools,
+  ChannelList,
+} from "./chat/sidebar/ChannelCategories";
+export { channelLayout } from "./chat/sidebar/channel_layout";
 export { ChannelRowMenu } from "./chat/sidebar/SidebarChannelTools";
 export { useSpaceEveryoneUnread } from "./chat/space_conversations_resource";
 export { ChatAvatar } from "./chat/components/ChatAvatar";
 export { useMemberPicture } from "./members/member_pictures";
+export { MemberFace } from "./members/MemberFace";
 export {
   conversationName,
   groupConversations,
@@ -72,3 +78,4 @@ export { LazyFilesPage as FilesPage } from "./file-manager/LazyFilesPage";
 export { startFilesReveal } from "./file-manager/files_reveal";
 
 provideReactionPicker(ChatEmojiPicker);
+export { isChatOnScreen } from "./chat/hooks/window_viewing";

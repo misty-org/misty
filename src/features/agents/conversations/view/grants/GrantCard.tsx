@@ -75,16 +75,16 @@ function GrantCard({
       actions={
         grant.status === "pending" ? (
           <>
-            <Button variant="quiet" disabled={busy} onClick={() => patch({ status: "declined" })}>
-              <X aria-hidden="true" />
-              {grant.path ? "Decline" : "Dismiss"}
-            </Button>
             {grant.path ? (
               <Button variant="primary" disabled={busy} onClick={() => void allow()}>
                 <Check aria-hidden="true" />
                 Allow folder
               </Button>
             ) : null}
+            <Button variant="quiet" disabled={busy} onClick={() => patch({ status: "declined" })}>
+              <X aria-hidden="true" />
+              {grant.path ? "Decline" : "Dismiss"}
+            </Button>
           </>
         ) : grant.status === "granted" ? (
           <>

@@ -15,16 +15,26 @@ import { dockLeaves, spacesDirectory, useWorkspaceStore } from "@/features/app-w
 import { shortcutScope } from "@/features/shortcuts";
 import type { ShortcutScope } from "@/shared/shortcuts/shortcut_types";
 import {
+  agentCallsHost,
   agentsDeviceSnapshot,
   ensureAgentDevice,
   findVocative,
+  memberFace,
   openMisty,
   routeToAgent,
   spacesGateway,
   tourCorner,
 } from "@/features/agents";
 import { browserLibrary } from "@/features/browser";
-import { callsForApps, endCallsForAccountReset, VoiceChannelPage } from "@/features/direct";
+import {
+  AgentCallSplit,
+  callsForApps,
+  endCallsForAccountReset,
+  useAgentCall,
+  useAgentCallTranscript,
+  useAnyCall,
+  VoiceChannelPage,
+} from "@/features/direct";
 import { noteAsk, vocativeRouting, voiceCleanup, voiceDevice, voiceEngine } from "@/features/voice";
 import {
   SetupStepBody,
@@ -37,17 +47,17 @@ import {
   catalogLogoUrl,
   DrivePickerPanel,
   driveGateway,
-  ExploreAppsSection,
   FilesPage,
   handoffGateway,
   liveGateway,
+  MemberFace,
   appCallsHost,
   voiceChannelPage,
   pageMisty,
   resetSpacesAccountState,
   spaceRequest,
   startFilesReveal,
-  useAppUpdates,
+  useExploreInstalledApps,
   useSpacesStore,
 } from "@/features/spaces";
 
@@ -62,6 +72,13 @@ deviceDataErasers.listen(async () => {
 });
 
 tourCorner.provide(TourInfoButton);
+memberFace.provide(MemberFace);
+agentCallsHost.provide({
+  start: (input) => useAgentCall.getState().start(input),
+  useBusy: useAnyCall,
+  useTranscript: useAgentCallTranscript,
+  Split: AgentCallSplit,
+});
 
 setupFlow.provide({
   stepCopy: setupStepCopy,
@@ -123,4 +140,4 @@ drivePicker.provide(DrivePickerPanel);
 
 noteAsk.provide((input) => openMisty(input));
 
-provideExploreApps({ useAppUpdates, ExploreAppsSection, catalogLogoUrl });
+provideExploreApps({ useExploreInstalledApps, catalogLogoUrl });

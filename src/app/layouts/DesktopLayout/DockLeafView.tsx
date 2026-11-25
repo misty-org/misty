@@ -268,7 +268,7 @@ export function DockLeafView(props: WorkspaceDockTreeProps & { pane: WorkspacePa
                 key={mountedTab.id}
                 className={cn(
                   "relative col-start-1 row-start-1 h-full min-h-0 w-full",
-                  isActive ? "z-[1] block" : kept ? "z-0 block" : "hidden",
+                  isActive ? "z-[1] block" : kept ? "invisible z-0 block" : "hidden",
                 )}
                 style={{ minWidth: dockWidgetRegistry.get(mountedTab.surfaceId).contentWidth }}
                 aria-hidden={!isActive}

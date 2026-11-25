@@ -58,11 +58,23 @@ pub fn run_event(app: &AppHandle, event: RunEvent) {
     }
 }
 
+fn last_open_window(window: &Window) -> bool {
+    !crate::browser::app_windows::person_windows(window.app_handle())
+        .iter()
+        .any(|other| other.label() != window.label() && other.is_visible().unwrap_or(false))
+}
+
 pub fn window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
-        if crate::browser::app_windows::is_person_window(window.label()) && must_ask() {
+        if !crate::browser::app_windows::is_person_window(window.label()) {
+            return;
+        }
+        if must_ask() {
             api.prevent_close();
             ask(window.app_handle(), Some(window.label()));
+        } else if !crate::app::tray::hidden() && last_open_window(window) {
+            api.prevent_close();
+            let _ = window.hide();
         }
     }
 }
@@ -85,8 +97,13 @@ pub fn app_quit_confirmed(
         return Err("Only the main workspace can confirm quitting".into());
     }
     if closing {
-        return webview
-            .window()
+        let window = webview.window();
+        if !crate::app::tray::hidden() && last_open_window(&window) {
+            return window
+                .hide()
+                .map_err(|_| "Could not close the window".into());
+        }
+        return window
             .destroy()
             .map_err(|_| "Could not close the window".into());
     }

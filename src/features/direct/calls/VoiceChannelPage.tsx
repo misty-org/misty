@@ -17,6 +17,7 @@ import { useUserStore } from "@/features/account";
 import { useSpaceConversations, useVoicePresence, watchVoicePresence } from "@/features/spaces";
 import { personTone } from "@/shared/lib/person_tone";
 import { personInitials } from "@/shared/lib/person_initials";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { useDirectUserId } from "../direct_account";
 import { useCallStore } from "./call_store";
 import { CallStageView } from "./CallView";
@@ -73,6 +74,7 @@ function Lobby({
 }) {
   const userId = useDirectUserId();
   const username = useUserStore((state) => state.me?.username ?? "");
+  const outline = useUserStore((state) => avatarOutline(state.me?.avatar_decoration));
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -96,7 +98,7 @@ function Lobby({
           muted={!micOn}
           picture={cameraOn ? <CameraPreview deviceId={camera} /> : undefined}
           face={
-            <Avatar size="lg" tone={personTone(userId ?? username)}>
+            <Avatar size="lg" tone={personTone(userId ?? username)} outline={outline}>
               <AvatarFallback>{personInitials(username || "You")}</AvatarFallback>
             </Avatar>
           }

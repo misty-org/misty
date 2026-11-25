@@ -21,6 +21,17 @@ pub struct Package {
     pub kind: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub folder: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mirror: Option<String>,
+}
+
+impl Package {
+    pub fn download_url(&self) -> &str {
+        self.mirror
+            .as_deref()
+            .filter(|mirror| *mirror == format!("https://registry.mistysys.com/blobs/{}", self.sha256))
+            .unwrap_or(&self.url)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -46,25 +57,6 @@ pub struct HearingEntry {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct VoiceEntry {
-    pub id: String,
-    pub name: String,
-    pub maker: String,
-    pub source: String,
-    pub license: String,
-    pub languages: Vec<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub accent: Option<String>,
-    pub gender: String,
-    pub family: String,
-    pub package: Package,
-    pub files: HashMap<String, String>,
-    pub speaker: i32,
-    pub disk_mb: u64,
-    pub memory_mb: u64,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SupportEntry {
     pub id: String,
     pub name: String,
@@ -81,8 +73,6 @@ struct Catalog {
     #[serde(default)]
     hearing: Vec<HearingEntry>,
     #[serde(default)]
-    voices: Vec<VoiceEntry>,
-    #[serde(default)]
     support: Vec<SupportEntry>,
 }
 
@@ -92,18 +82,6 @@ static CATALOG: LazyLock<Catalog> = LazyLock::new(|| {
 
 pub fn hearing(id: &str) -> Option<&'static HearingEntry> {
     CATALOG.hearing.iter().find(|entry| entry.id == id)
-}
-
-pub fn voice(id: &str) -> Option<&'static VoiceEntry> {
-    CATALOG.voices.iter().find(|entry| entry.id == id)
-}
-
-pub fn installed_voices() -> Vec<&'static VoiceEntry> {
-    CATALOG
-        .voices
-        .iter()
-        .filter(|entry| installed(&entry.package))
-        .collect()
 }
 
 fn vad_entry() -> Option<&'static SupportEntry> {
@@ -190,27 +168,6 @@ pub fn hearing_spec(id: &str) -> Option<voice_speech::HearingSpec> {
     })
 }
 
-pub fn voice_spec_any(id: &str) -> Option<voice_speech::VoiceSpec> {
-    let entry = voice(id)?;
-    Some(voice_speech::VoiceSpec {
-        dir: files_dir(&entry.package)?,
-        files: entry.files.clone(),
-        speaker: entry.speaker,
-    })
-}
-
-pub fn voice_spec(id: &str) -> Option<voice_speech::VoiceSpec> {
-    let entry = voice(id)?;
-    if !installed(&entry.package) {
-        return None;
-    }
-    Some(voice_speech::VoiceSpec {
-        dir: files_dir(&entry.package)?,
-        files: entry.files.clone(),
-        speaker: entry.speaker,
-    })
-}
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Machine {
@@ -257,7 +214,6 @@ struct Listed<T: Serialize> {
 #[serde(rename_all = "camelCase")]
 pub struct SpeechCatalog {
     hearing: Vec<Listed<HearingEntry>>,
-    voices: Vec<Listed<VoiceEntry>>,
     support_installed: bool,
     machine: Machine,
     installing: Vec<String>,
@@ -293,16 +249,6 @@ pub async fn speech_catalog(
                 entry: entry.clone(),
             })
             .collect(),
-        voices: CATALOG
-            .voices
-            .iter()
-            .map(|entry| Listed {
-                installed: installed(&entry.package),
-                outdated: outdated(&entry.id, &entry.package, &pins),
-                package_key: package_key(&entry.package),
-                entry: entry.clone(),
-            })
-            .collect(),
         support_installed: vad_entry().is_some_and(|entry| installed(&entry.package)),
         machine,
         installing,
@@ -321,20 +267,11 @@ fn entries_sharing(package: &Package) -> Vec<String> {
         .iter()
         .filter(|entry| package_key(&entry.package) == key)
         .map(|entry| entry.id.clone())
-        .chain(
-            CATALOG
-                .voices
-                .iter()
-                .filter(|entry| package_key(&entry.package) == key)
-                .map(|entry| entry.id.clone()),
-        )
         .collect()
 }
 
 fn package_of(id: &str) -> Option<Package> {
-    hearing(id)
-        .map(|entry| entry.package.clone())
-        .or_else(|| voice(id).map(|entry| entry.package.clone()))
+    hearing(id).map(|entry| entry.package.clone())
 }
 
 #[tauri::command]
@@ -414,3 +351,30 @@ fn sample_recording(dir: &Path) -> Option<PathBuf> {
 
 mod install;
 pub use install::*;
+
+#[cfg(test)]
+mod tests {
+    use super::Package;
+
+    fn package(mirror: Option<&str>) -> Package {
+        Package {
+            url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx".into(),
+            sha256: "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6".into(),
+            size: 643854,
+            kind: "file".into(),
+            folder: None,
+            mirror: mirror.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn a_model_downloads_from_its_registry_blob_only_when_that_is_its_own() {
+        let own = "https://registry.mistysys.com/blobs/9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6";
+        assert_eq!(package(Some(own)).download_url(), own);
+        assert_eq!(package(None).download_url(), package(None).url);
+        assert_eq!(
+            package(Some("https://example.com/silero_vad.onnx")).download_url(),
+            package(None).url
+        );
+    }
+}

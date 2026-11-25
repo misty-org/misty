@@ -26,7 +26,6 @@ const listNames: Partial<Record<FilesPlace["kind"], string>> = {
   recent: "Recent",
   starred: "Starred",
   trash: "Trash",
-  "agent-trash": "Agent trash",
 };
 
 function folderLabel(path: string, places: Places | null): string {
@@ -56,8 +55,7 @@ export function pathSegments(
         label: nameOf(path),
         onSelect: () => go({ kind: "project", root: place.root, path }),
       }));
-    case "space-drive":
-    case "space-drive-trash": {
+    case "space-drive": {
       const space = spaces.find((each) => each.id === place.spaceId);
       const name = space ? spaceNavigationName(space) : "Space";
       const root = {
@@ -65,7 +63,6 @@ export function pathSegments(
         label: name,
         onSelect: () => go({ kind: "space-drive", spaceId: place.spaceId, path: "/" }),
       };
-      if (place.kind === "space-drive-trash") return [root, { id: "trash", label: "Trash" }];
       const parts = place.path.split("/").filter(Boolean);
       return [
         root,
@@ -161,8 +158,6 @@ export function enclosing(place: FilesPlace): FilesPlace | undefined {
     return place.path === "/"
       ? undefined
       : { kind: "space-drive", spaceId: place.spaceId, path: driveParent(place.path) };
-  if (place.kind === "space-drive-trash")
-    return { kind: "space-drive", spaceId: place.spaceId, path: "/" };
   return undefined;
 }
 

@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Bot, LogOut, MoreHorizontal, UserPlus, type LucideIcon } from "lucide-react";
+import { Bot, LogOut, UserPlus, type LucideIcon } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/account";
 import { useSpacesStore } from "../list/use_spaces_store";
-import { useChatBarActions } from "./components/ChatBarButtons";
+import { useChatBar } from "./components/ChatBarButtons";
 import { chatMuteId } from "@/shared/lib/message_notices";
 import { spaceChatPath } from "./chat_route";
 import { loadSpaceMembers } from "./load_space_members";
@@ -19,13 +19,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-  IconButton,
   MenuItem,
-  SearchField,
-  type ActionBarItem,
 } from "@misty/ui";
 import { useSpaceConversations } from "./sidebar/use_space_conversations";
 import { reloadSpaceConversations } from "./space_conversations_resource";
@@ -59,12 +53,6 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
   const openDirect = openConversation?.kind === "dm" ? openConversation : undefined;
   const openGroup =
     openDirect && isGroupDirectMessage(openDirect, user?.id) ? openDirect : undefined;
-  const [searchText, setSearchText] = useState("");
-  const [searchedText, setSearchedText] = useState("");
-  const closeSearch = () => {
-    setSearchText("");
-    setSearchedText("");
-  };
   useEffect(() => {
     if (!members) void loadSpaceMembers(spaceId).catch(() => {});
   }, [members, spaceId]);
@@ -107,70 +95,31 @@ export function SpaceChatEntry(props: React.ComponentProps<typeof SpaceChat>) {
     }
   };
 
-  const sideActions = useChatBarActions({
+  const moreRows = actions.length
+    ? actions.map((action) => (
+        <MenuItem
+          key={action.id}
+          icon={action.icon}
+          label={action.label}
+          onSelect={action.onSelect}
+        />
+      ))
+    : undefined;
+  const bar = useChatBar({
     spaceId,
     conversationId,
     muteId: chatMuteId(spaceId, conversationId),
-    searching: Boolean(searchedText),
-    onPanel: closeSearch,
+    more: moreRows,
   });
-  const moreRows = actions.map((action) => (
-    <MenuItem key={action.id} icon={action.icon} label={action.label} onSelect={action.onSelect} />
-  ));
-  const barActions: ActionBarItem[] = [
-    ...sideActions,
-    ...(actions.length
-      ? [
-          {
-            id: "more",
-            icon: MoreHorizontal,
-            label: "More",
-            priority: 1,
-            menu: moreRows,
-            render: () => (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton label="More" variant="quiet">
-                    <MoreHorizontal />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" aria-label="Chat actions">
-                  {moreRows}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ),
-          },
-        ]
-      : []),
-  ];
-  const search = (
-    <SearchField
-      containerClassName="w-56"
-      aria-label="Search messages"
-      placeholder="Search messages"
-      value={searchText}
-      onChange={(event) => {
-        setSearchText(event.target.value);
-        if (!event.target.value) setSearchedText("");
-      }}
-      onClear={closeSearch}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          setSearchedText(searchText.trim());
-        }
-      }}
-    />
-  );
 
   return (
     <>
       <SpaceChat
         {...props}
-        searchedText={searchedText}
-        onCloseSearch={closeSearch}
-        actions={barActions}
-        search={search}
+        searchedText={bar.searchedText}
+        onCloseSearch={bar.closeSearch}
+        actions={bar.actions}
+        search={bar.search}
       />
       {openGroup ? (
         <AddPeopleDialog

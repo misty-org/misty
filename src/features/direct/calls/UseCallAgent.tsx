@@ -11,6 +11,7 @@ import {
   MenuCheckItem,
 } from "@misty/ui";
 import { callAgents } from "@/features/agents";
+import { useSpeechSupport } from "@/features/voice";
 import { CallAgents, type CallAgentView } from "./call_agents";
 import type { ActiveCall } from "./call_store";
 
@@ -18,7 +19,7 @@ export interface CallAgentPart {
   rows: ReactNode;
   trigger: ReactNode;
   agents: CallAgentView[];
-  remove(id: string): void;
+  remove?(id: string): void;
 }
 
 const none: CallAgentView[] = [];
@@ -69,7 +70,8 @@ export function useCallAgent({
     session?.agents ?? (() => none),
   );
 
-  const profiles = callAgents();
+  const speech = useSpeechSupport();
+  const profiles = speech?.speaking && speech.recognition ? callAgents() : [];
   const AgentsIcon = appIcons.agents;
   const busy = agents.filter(
     (agent) => agent.mine && (agent.state === "thinking" || agent.state === "working"),

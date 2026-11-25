@@ -23,20 +23,21 @@ import {
   ToolBody,
   ToolLines,
   ToolList,
-  ToolNote,
   ToolPath,
   ToolRow,
-  TurnFold,
+  TurnPictures,
+  type TurnPicture,
 } from "@misty/ui";
 import { Fold } from "./WorkGroup";
 import {
   groupProgress,
+  settleProgress,
   stepMeta,
   stepsOf,
   stepTarget,
   toolKind,
   toolParts,
-  turnSummary,
+  toolLabel,
   type ProgressStep,
   type ProgressTool,
   type ToolKind,
@@ -44,6 +45,7 @@ import {
 import { usageLimitNotice, usageLimitNotices } from "./usage_limits";
 import { countEditLines } from "./payload/edit_line_stats";
 import { hasToolPayload, ToolPayloadViewer } from "./payload/ToolPayloadViewer";
+import { safeTauriAssetUrl } from "@/shared/platform/tauri";
 
 export const kindIcons: Record<ToolKind, LucideIcon> = {
   command: SquareTerminal,
@@ -60,126 +62,51 @@ export const kindIcons: Record<ToolKind, LucideIcon> = {
   other: Wrench,
 };
 
-const LIVE_ROWS = 6;
-
 type Entry =
   { type: "note"; key: string; text: string } | { type: "step"; key: string; step: ProgressStep };
 
 export function AgentProgress({ items, live = true }: { items: AiProgressItem[]; live?: boolean }) {
   if (!items.length) return null;
-  const groups = groupProgress(items);
-  const toolGroups = groups.filter((group) => group.type === "tools");
-  const plan = groups[0]?.type === "note" ? groups[0] : undefined;
-  const note = (group: { key: string; text: string }) => (
-    <Text key={group.key} as="div" bare tone="default" className="w-full">
-      <MistyMarkdown size="body">{group.text}</MistyMarkdown>
-    </Text>
+  const steps = live ? items : (settleProgress(items) ?? items);
+  const entries: Entry[] = groupProgress(steps).flatMap((group): Entry[] =>
+    group.type === "note"
+      ? [{ type: "note", key: group.key, text: group.text }]
+      : stepsOf(group.tools).map((step, index) => ({
+          type: "step",
+          key: step.id || `${group.key}:${index}`,
+          step,
+        })),
   );
+  const shown = live
+    ? entries.filter((entry) => entry.type === "note" || entry.step.state !== "running")
+    : entries;
   const limits = usageLimitNotices(items).map((text) => (
     <Text key={text} as="p" bare size="control" tone="default" className="w-full leading-[1.6]">
       {text}
     </Text>
   ));
-  if (!toolGroups.length)
-    return (
-      <div className="mb-3 grid gap-1">
-        {groups.map((group) => (group.type === "note" ? note(group) : null))}
-        {limits}
-      </div>
-    );
-  const entries: Entry[] = groups
-    .filter((group) => group !== plan)
-    .flatMap((group): Entry[] =>
-      group.type === "note"
-        ? [{ type: "note", key: group.key, text: group.text }]
-        : stepsOf(group.tools).map((step, index) => ({
-            type: "step",
-            key: step.id || `${group.key}:${index}`,
-            step,
-          })),
-    );
-  const tools = toolGroups.flatMap((group) => (group.type === "tools" ? group.tools : []));
   return (
-    <div className="mb-3 grid gap-1">
-      {plan && note(plan)}
-      <Turn entries={entries} tools={tools} live={live} />
+    <div className="mb-3 grid gap-2">
+      {runsOf(shown).map((run) =>
+        run.type === "note" ? (
+          <Text key={run.key} as="div" bare tone="default" className="w-full">
+            <MistyMarkdown size="body">{run.text}</MistyMarkdown>
+          </Text>
+        ) : (
+          <Run key={run.key} steps={run.steps} />
+        ),
+      )}
       {limits}
     </div>
   );
 }
 
-function Turn({
-  entries,
-  tools,
-  live,
-}: {
-  entries: Entry[];
-  tools: ProgressTool[];
-  live: boolean;
-}) {
-  const [chosen, setChosen] = useState<boolean>();
-  const [all, setAll] = useState(false);
-  const listId = useId();
-  const open = chosen ?? false;
-  const hidden = live && !all ? Math.max(0, entries.length - LIVE_ROWS) : 0;
-  const shown = hidden ? entries.slice(-LIVE_ROWS) : entries;
-  const rows = (
-    <div id={live ? listId : undefined}>
-      {runsOf(shown).map((run) =>
-        run.type === "note" ? (
-          <ToolNote key={run.key}>
-            <MistyMarkdown>{run.text}</MistyMarkdown>
-          </ToolNote>
-        ) : (
-          <ToolList key={run.key} label="Steps">
-            {exploreGroups(run.steps).map((item) =>
-              item.type === "explore" ? (
-                <Explore key={item.key} steps={item.steps} />
-              ) : (
-                <Step key={item.key} step={item.step} />
-              ),
-            )}
-          </ToolList>
-        ),
-      )}
-    </div>
-  );
-  if (live)
-    return (
-      <div className="agent-turn">
-        {hidden ? (
-          <TurnFold
-            summary="Earlier steps"
-            open={false}
-            more={hidden}
-            controls={listId}
-            onToggle={() => setAll(true)}
-          />
-        ) : null}
-        {rows}
-      </div>
-    );
-  return (
-    <div className="agent-turn">
-      <TurnFold
-        summary={turnSummary(tools)}
-        open={open}
-        controls={listId}
-        onToggle={() => setChosen(!open)}
-      />
-      <Fold id={listId} open={open} onReveal={() => setChosen(true)}>
-        {rows}
-      </Fold>
-    </div>
-  );
-}
-
-type Run =
+type RunPart =
   | { type: "note"; key: string; text: string }
   | { type: "steps"; key: string; steps: Extract<Entry, { type: "step" }>[] };
 
-function runsOf(entries: Entry[]): Run[] {
-  const runs: Run[] = [];
+function runsOf(entries: Entry[]): RunPart[] {
+  const runs: RunPart[] = [];
   for (const entry of entries) {
     if (entry.type === "note") {
       runs.push(entry);
@@ -192,13 +119,46 @@ function runsOf(entries: Entry[]): Run[] {
   return runs;
 }
 
+const MOST_PICTURES = 4;
+
+function picturesOf(steps: ProgressTool[]): TurnPicture[] {
+  return steps
+    .flatMap((step) =>
+      (step.pictures ?? []).map((path) => ({
+        src: safeTauriAssetUrl(path),
+        label: toolLabel(step.name, false),
+      })),
+    )
+    .slice(-MOST_PICTURES);
+}
+
+export function runningOutput(items: AiProgressItem[] | undefined): ReactNode {
+  const running = [...(items ?? [])]
+    .reverse()
+    .find((item) => item.type === "tool" && item.state === "running");
+  return running?.type === "tool" ? stepOutput({ ...running, attempts: 1 }) : null;
+}
+
+function Run({ steps }: { steps: Extract<Entry, { type: "step" }>[] }) {
+  const pictures = picturesOf(steps.map((entry) => entry.step));
+  return (
+    <div className="grid gap-1">
+      <ToolList label="Steps">
+        {exploreGroups(steps).map((item) =>
+          item.type === "explore" ? (
+            <Explore key={item.key} steps={item.steps} />
+          ) : (
+            <Step key={item.key} step={item.step} />
+          ),
+        )}
+      </ToolList>
+      {pictures.length ? <TurnPictures pictures={pictures} /> : null}
+    </div>
+  );
+}
+
 type StepEntry = Extract<Entry, { type: "step" }>;
 type RunItem = StepEntry | { type: "explore"; key: string; steps: ProgressStep[] };
-
-const exploring = (step: ProgressStep) => {
-  const kind = toolKind(step.name);
-  return (kind === "read" || kind === "search") && step.state !== "failed";
-};
 
 function exploreGroups(steps: StepEntry[]): RunItem[] {
   const items: RunItem[] = [];
@@ -234,35 +194,35 @@ function exploreSummary(steps: ProgressStep[]) {
 function Explore({ steps }: { steps: ProgressStep[] }) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();
-  const running = steps.some((step) => step.state === "running");
   return (
     <li>
       <ToolRow
-        name={running ? "Exploring" : "Explored"}
+        name="Explored"
         target={exploreSummary(steps)}
-        state={running ? "running" : "done"}
         open={open}
         onToggle={() => setOpen(!open)}
         controls={bodyId}
       />
       <Fold id={bodyId} open={open} onReveal={() => setOpen(true)}>
         <ToolBody>
-          {steps.map((step, index) => {
-            const target = stepTarget(step);
-            return (
-              <Text key={step.id || index} size="meta" tone="muted">
-                {toolParts(step.name, step.state === "running").verb}{" "}
-                <Text as="span" bare size="meta" tone="default">
-                  {target}
-                </Text>
+          {steps.map((step, index) => (
+            <Text key={step.id || index} size="meta" tone="muted">
+              {toolParts(step.name, false).verb}{" "}
+              <Text as="span" bare size="meta" tone="default">
+                {stepTarget(step)}
               </Text>
-            );
-          })}
+            </Text>
+          ))}
         </ToolBody>
       </Fold>
     </li>
   );
 }
+
+const exploring = (step: ProgressStep) => {
+  const kind = toolKind(step.name);
+  return (kind === "read" || kind === "search") && step.state !== "failed";
+};
 
 function failureLine(step: ProgressStep): string {
   const notice = usageLimitNotice(step.error);

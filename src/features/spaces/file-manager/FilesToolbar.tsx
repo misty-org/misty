@@ -1,10 +1,10 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 import {
   ArrowRightLeft,
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
   SquareTerminal,
-  ChevronLeft,
-  ChevronRight,
   ClipboardCopy,
   ClipboardPaste,
   Copy,
@@ -17,8 +17,8 @@ import {
   Pencil,
   Plus,
   Redo2,
-  RefreshCcw,
   RotateCcw,
+  RotateCw,
   Scissors,
   Trash2,
   Undo2,
@@ -86,7 +86,7 @@ export function FilesNavBar(props: FilesNavBarProps) {
               disabled={!props.canBack}
               onClick={props.back}
             >
-              <ChevronLeft />
+              <ArrowLeft />
             </IconButton>
             <IconButton
               label="Forward"
@@ -94,7 +94,7 @@ export function FilesNavBar(props: FilesNavBarProps) {
               disabled={!props.canForward}
               onClick={props.forward}
             >
-              <ChevronRight />
+              <ArrowRight />
             </IconButton>
             <IconButton
               label="Enclosing folder"
@@ -105,7 +105,7 @@ export function FilesNavBar(props: FilesNavBarProps) {
               <ArrowUp />
             </IconButton>
             <IconButton label="Refresh" onClick={props.refresh}>
-              <RefreshCcw />
+              <RotateCw />
             </IconButton>
           </div>
           <PathField
@@ -295,7 +295,7 @@ export interface FilesMoreMenu {
   copyFolderPath?: () => void;
   copySelectedPath?: () => void;
   duplicates?: () => void;
-  emptyAgentTrash?: () => void;
+  emptyTrash?: () => void;
 }
 
 const sortRows: { key: FilesSort["key"]; label: string }[] = [
@@ -355,15 +355,15 @@ export function MoreRows({ menu }: { menu: FilesMoreMenu }) {
         </>
       ) : null}
       <MenuLabel>Location</MenuLabel>
-      <MenuItem icon={RefreshCcw} label="Refresh" onSelect={menu.refresh} />
+      <MenuItem icon={RotateCw} label="Refresh" onSelect={menu.refresh} />
       {menu.copyFolderPath ? (
         <MenuItem icon={ClipboardCopy} label="Copy current path" onSelect={menu.copyFolderPath} />
       ) : null}
       {menu.duplicates ? (
         <MenuItem icon={Files} label="Find duplicates" onSelect={menu.duplicates} />
       ) : null}
-      {menu.emptyAgentTrash ? (
-        <MenuItem icon={Trash2} label="Empty agent trash" danger onSelect={menu.emptyAgentTrash} />
+      {menu.emptyTrash ? (
+        <MenuItem icon={Trash2} label="Empty trash" danger onSelect={menu.emptyTrash} />
       ) : null}
       {menu.copySelectedPath ? (
         <>

@@ -3,11 +3,7 @@
 
 import { Check, Copy, Download, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import {
-  DesktopSettingsNotice,
-  DesktopSettingsRow as Row,
-  DesktopSettingsSection as Section,
-} from "@/features/settings";
+import { DesktopSettingsNotice, DesktopSettingsRow as Row } from "@/features/settings";
 import { Button, CodeBlock, Skeleton } from "@misty/ui";
 import { SwitchControl } from "../../settings/SettingsControls";
 import { exportPerformanceReport } from "./export";
@@ -106,60 +102,55 @@ export function PerformanceSection() {
   return (
     <>
       {notice ? <DesktopSettingsNotice>{notice}</DesktopSettingsNotice> : null}
-      <Section
-        title="Performance"
-        description="Numbers and process roles stay on this computer and clear when Misty quits. No chats, code, paths or keys are recorded."
+      <Row
+        label="Record performance"
+        description="Keeps the last five minutes, on this computer only, and clears when Misty quits. No chats, code, paths or keys are recorded."
       >
+        <SwitchControl
+          checked={enabled === true}
+          disabled={enabled === null || saving || exporting}
+          onChange={(next) => void toggle(next)}
+        />
+      </Row>
+      {enabled === false ? null : (
         <Row
-          label="Record performance"
-          description="Keeps the last five minutes. Turning it off stops recording and clears what was kept."
+          label="Report"
+          description={
+            partial
+              ? "Misty's own process figures aren't available, so this has the window's figures only."
+              : (status ??
+                "Process CPU counts one core as 100%; system CPU counts the whole computer as 100%.")
+          }
+          stacked
         >
-          <SwitchControl
-            checked={enabled === true}
-            disabled={enabled === null || saving || exporting}
-            onChange={(next) => void toggle(next)}
-          />
-        </Row>
-        {enabled === false ? null : (
-          <Row
-            label="Report"
-            description={
-              partial
-                ? "Misty's own process figures aren't available, so this has the window's figures only."
-                : (status ??
-                  "Process CPU counts one core as 100%; system CPU counts the whole computer as 100%.")
-            }
-            stacked
-          >
-            <div className="grid w-full gap-3">
-              {report === null ? (
-                <Skeleton className="h-52 w-full" aria-label="Report" />
-              ) : (
-                <CodeBlock
-                  aria-label="Performance summary"
-                  code={text}
-                  copy={false}
-                  className="max-h-52 overflow-y-auto"
-                />
-              )}
-              <div className="flex min-w-0 justify-end gap-2">
-                <Button disabled={collecting} onClick={collect}>
-                  <RefreshCw />
-                  Refresh
-                </Button>
-                <Button disabled={!text} onClick={copy}>
-                  {copied ? <Check /> : <Copy />}
-                  Copy summary
-                </Button>
-                <Button disabled={!report || exporting || saving} onClick={() => void exportFile()}>
-                  <Download />
-                  Save full report
-                </Button>
-              </div>
+          <div className="grid w-full gap-3">
+            {report === null ? (
+              <Skeleton className="h-52 w-full" aria-label="Report" />
+            ) : (
+              <CodeBlock
+                aria-label="Performance summary"
+                code={text}
+                copy={false}
+                className="max-h-52 overflow-y-auto"
+              />
+            )}
+            <div className="flex min-w-0 justify-end gap-2">
+              <Button disabled={collecting} onClick={collect}>
+                <RefreshCw />
+                Refresh
+              </Button>
+              <Button disabled={!text} onClick={copy}>
+                {copied ? <Check /> : <Copy />}
+                Copy summary
+              </Button>
+              <Button disabled={!report || exporting || saving} onClick={() => void exportFile()}>
+                <Download />
+                Save full report
+              </Button>
             </div>
-          </Row>
-        )}
-      </Section>
+          </div>
+        </Row>
+      )}
     </>
   );
 }

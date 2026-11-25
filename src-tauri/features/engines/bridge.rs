@@ -15,6 +15,9 @@ mod values;
 #[path = "bridge_tools.rs"]
 mod tools;
 
+#[path = "bridge_pictures.rs"]
+mod pictures;
+
 pub(crate) use tools::note_mcp_call;
 use tools::{close_tool, detail, find_tool, start_tool, OpenTool};
 pub(crate) use values::context_usage;
@@ -141,6 +144,7 @@ impl Bridge {
         listener: impl Fn(&str, RunNote) + Send + Sync + 'static,
     ) -> Arc<Self> {
         let _ = APP.set(app.clone());
+        pictures::allow_pictures(app);
         let _ = LISTENER.set(Arc::new(listener));
         Arc::new(Self)
     }

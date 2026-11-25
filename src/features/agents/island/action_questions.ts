@@ -8,7 +8,7 @@ import { startTellingNativeTheAccount } from "../personal/agent_account";
 
 export interface ActionQuestion {
   id: string;
-  kind: "payment" | "send" | "delete" | "publish" | "action";
+  kind: "payment" | "send" | "delete" | "publish" | "account" | "action";
   control: string;
   reason: string;
   site: string;
@@ -85,8 +85,14 @@ export function actionQuestionVerb(question: Pick<ActionQuestion, "kind">) {
     send: "send messages",
     delete: "delete things",
     publish: "post or publish",
+    account: "use your account",
     action: "take this step",
   }[question.kind];
+}
+
+export function actionQuestionRemembers(question: Pick<ActionQuestion, "kind" | "origin">) {
+  if (question.kind === "account") return `Always allow using your account on ${question.origin}`;
+  return `Always allow ${actionQuestionVerb(question)} on ${question.origin} while the chat is in Auto`;
 }
 
 export function actionQuestionHasDetails(question: Pick<ActionQuestion, "control">) {
@@ -99,9 +105,11 @@ export function actionQuestionText(question: ActionQuestion, agentName: string) 
     send: "send a message",
     delete: "delete something",
     publish: "post or publish",
+    account: "use your account",
     action: "take this step",
   }[question.kind];
   const where = question.site ? ` on ${question.site}` : "";
+  if (!question.control) return `${agentName} wants to ${verb}${where}.`;
   if (actionQuestionHasDetails(question)) return `${agentName} wants to ${verb}${where}:`;
   return `${agentName} wants to ${verb}${where}: ${question.control}.`;
 }

@@ -6,7 +6,7 @@ import type { HostHandlers } from "./host_channel";
 import { useRunningApp } from "./use_running_app";
 import type { AppManifest, BundleSource } from "./use_running_app";
 
-const START_TIMEOUT_MS = 8_000;
+const START_TIMEOUT_MS = 30_000;
 
 export function SpaceAppFrame({
   spaceId,
@@ -58,11 +58,12 @@ export function SpaceAppFrame({
 
   if (!active) return null;
   if (app.status === "failed")
-    return <SetupState tool={appName} error={app.error} onRetry={retry} />;
+    return <SetupState tool={appName} named error={app.error} onRetry={retry} />;
   if (silent && !connected)
     return (
       <SetupState
         tool={appName}
+        named
         error={`${appName} started but never connected to Misty.`}
         onRetry={() => {
           setSilent(false);
@@ -71,7 +72,7 @@ export function SpaceAppFrame({
       />
     );
   if (app.status === "setup")
-    return <SetupState tool={appName} label={`Setting up ${appName}`} stallAfterMs={false} />;
+    return <SetupState tool={appName} named stallAfterMs={false} />;
   return (
     <AppPageStage
       key={`${appId}@${version}`}

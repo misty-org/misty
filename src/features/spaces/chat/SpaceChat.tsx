@@ -42,7 +42,6 @@ import { useJumpToMessage } from "./hooks/use_jump_to_message";
 import { useChatSidePanel } from "./chat_side_panel_store";
 export function SpaceChat({
   spaceId,
-  spaceName,
   workspaceTabId,
   conversationId: openConversationId,
   panel = false,
@@ -140,7 +139,7 @@ export function SpaceChat({
     : spaceCan(space, "messages.manage");
   useWorkspaceViewTitle(
     dm ? undefined : workspaceTabId,
-    isDirect ? `@${channelName} in ${spaceName}` : `#${channelName} in ${spaceName}`,
+    isDirect ? `@${channelName}` : `#${channelName}`,
   );
   const unreadAtOpen = useRef<{ key: string; count: number } | null>(null);
   const openKey = `${spaceId}:${conversationId}`;

@@ -113,10 +113,7 @@ export function SpaceSectionView(props: {
         {section === "files" ? (
           <LazyFilesPage />
         ) : section === "explore" ? (
-          <Explore
-            spaceId={spaceId}
-            canManageApps={Boolean(space.permissions?.includes("apps.manage"))}
-          />
+          <Explore spaceId={spaceId} />
         ) : section === "app" ? (
           <App space={space} appId={itemId} workspaceTabId={props.workspaceTabId} />
         ) : section === "voice" ? (

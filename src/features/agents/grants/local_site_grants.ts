@@ -9,6 +9,7 @@ const actions: Record<string, string> = {
   send: "browser.send",
   delete: "browser.delete",
   publish: "browser.publish",
+  account: "browser.account",
 };
 
 const agentName = (id: string, names: Map<string, string>) => names.get(id) ?? "";
@@ -38,7 +39,10 @@ export async function rememberSiteGrant(input: { agentId: string; kind: string; 
     action,
     scope_kind: "origin",
     scope_id: input.origin,
-    label: `${input.kind[0]!.toUpperCase()}${input.kind.slice(1)} on ${input.origin}`,
+    label:
+      input.kind === "account"
+        ? `Use your account on ${input.origin}`
+        : `${input.kind[0]!.toUpperCase()}${input.kind.slice(1)} on ${input.origin}`,
     created_at: new Date().toISOString(),
     use_count: 0,
   };

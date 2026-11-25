@@ -4,7 +4,7 @@ use file_access::{self, fs};
 #[cfg(target_os = "macos")]
 pub(crate) mod macos;
 mod settings;
-use settings::browser_download_directory;
+pub(in crate::browser) use settings::browser_download_directory;
 
 pub(in crate::browser) fn handle_download_event(
     app: &AppHandle,
@@ -27,7 +27,19 @@ pub(in crate::browser) fn handle_download_event(
                         .map(|pending| pending.expires_at > Utc::now())
                 })
                 .unwrap_or(false);
-            let Some(download_dir) = browser_download_directory(app, agent_download) else {
+            let space_id = state
+                .sessions
+                .lock()
+                .ok()
+                .and_then(|sessions| {
+                    sessions
+                        .get(tab_id)
+                        .and_then(|session| session.origin_space_id.clone())
+                })
+                .unwrap_or_default();
+            let Some((download_dir, own_folder)) =
+                browser_download_directory(app, agent_download, &space_id)
+            else {
                 emit_download_failure(
                     app,
                     &state,
@@ -37,7 +49,7 @@ pub(in crate::browser) fn handle_download_event(
                 );
                 return false;
             };
-            if !agent_download && !permissions::ensure_downloads_folder(app) {
+            if !own_folder && !permissions::ensure_downloads_folder(app) {
                 emit_download_failure(app, &state, tab_id, &url, DOWNLOADS_NOT_ALLOWED);
                 return false;
             }
@@ -58,6 +70,14 @@ pub(in crate::browser) fn handle_download_event(
             file_access::allow_recorded_download(&path);
             *destination = path.clone();
             let record = requested_download(&state, tab_id, &url, &path);
+            if record.initiator == "human" {
+                let saved_in = if crate::spaces_drive::run_folder(&space_id).is_some() {
+                    space_id.as_str()
+                } else {
+                    ""
+                };
+                super::library::download_started(&record.download_id, &record.url, &path, saved_in);
+            }
             let _ = app.emit_to(
                 browser_owner_label(app, tab_id),
                 "misty://browser-download",
@@ -67,6 +87,14 @@ pub(in crate::browser) fn handle_download_event(
         }
         DownloadEvent::Finished { url, path, success } => {
             let record = finish_download(&state, tab_id, &url, path.as_deref(), success);
+            if record.initiator == "human" {
+                super::library::download_finished(
+                    &record.download_id,
+                    &record.path,
+                    record.success,
+                    record.error.as_deref(),
+                );
+            }
             if record.success {
                 let _ = app.asset_protocol_scope().allow_file(&record.path);
             }

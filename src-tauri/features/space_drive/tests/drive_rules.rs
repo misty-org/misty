@@ -200,7 +200,7 @@ fn the_root_mistyignore_comes_back_when_deleted_on_the_computer() {
         let a = server.open_drive(&ana, dir.path().to_path_buf(), runtime.handle().clone());
         let id = save(&a, "/.mistyignore", b"*.log\n");
         settle(&server, &[a.clone()]).await;
-        let refused = a.trash(&space(), &id, space_drive::TrashBy::Person);
+        let refused = a.trash(&space(), &id);
         assert!(matches!(refused, Err(DriveError::Fixed(_))), "{refused:?}");
         a.trash_from_os(&space(), &id).unwrap();
         settle(&server, &[a.clone()]).await;

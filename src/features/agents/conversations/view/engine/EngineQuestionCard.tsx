@@ -124,15 +124,15 @@ export function EngineQuestionCard({ runId, ask }: { runId: string; ask: EngineA
           </Text>
         ) : (
           <>
-            <Button variant="quiet" disabled={sending} onClick={() => void send(true)}>
-              Skip
-            </Button>
             <Button
               variant="primary"
               disabled={!answered || sending}
               onClick={() => void send(false)}
             >
               Answer
+            </Button>
+            <Button variant="quiet" disabled={sending} onClick={() => void send(true)}>
+              Skip
             </Button>
           </>
         )

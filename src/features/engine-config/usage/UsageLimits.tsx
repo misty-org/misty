@@ -1,5 +1,5 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
+import { DesktopSettingsRow } from "@/features/settings";
 import { refreshCachedResource, useCachedResource } from "@/api/cache/cached_resource";
 import { Button, cn, Mark, Progress, Skeleton, SkeletonControl, Text } from "@misty/ui";
 import { useCallback, useState } from "react";
@@ -25,7 +25,7 @@ export function LimitsBlock(props: { onError: (error: string | null) => void }) 
     }
   }, [onError]);
   return (
-    <DesktopSettingsSection title="Plan limits">
+    <>
       {providers === undefined ? (
         saved.loading ? (
           <ProviderRowsSkeleton />
@@ -41,7 +41,7 @@ export function LimitsBlock(props: { onError: (error: string | null) => void }) 
           />
         ))
       )}
-    </DesktopSettingsSection>
+    </>
   );
 }
 

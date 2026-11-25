@@ -1,14 +1,11 @@
 import { DesktopUpdaterSettings } from "./DesktopUpdaterSettings";
-import {
-  DesktopSettingsRow as SettingsRow,
-  DesktopSettingsSection as SettingsSectionBlock,
-} from "@/features/settings";
+import { DesktopSettingsRow as SettingsRow } from "@/features/settings";
 import { booleanSetting, SwitchControl } from "../settings/SettingsControls";
 import type { SettingsContentProps } from "../settings/settings_types";
 
 export function UpdatesSection(props: SettingsContentProps) {
   return (
-    <SettingsSectionBlock title="Updates">
+    <>
       <DesktopUpdaterSettings />
       <SettingsRow label="Check for updates automatically" description="Checks on launch.">
         <SwitchControl
@@ -17,6 +14,6 @@ export function UpdatesSection(props: SettingsContentProps) {
           onChange={(value) => props.onSettingChange("general", "auto_update_enabled", value)}
         />
       </SettingsRow>
-    </SettingsSectionBlock>
+    </>
   );
 }

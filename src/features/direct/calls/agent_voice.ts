@@ -31,13 +31,15 @@ export class AgentVoice {
   private context?: AudioContext;
   private speaker?: SpeakerSink;
   private node?: AudioWorkletNode;
+  private heard?: GainNode;
   private track?: MediaStreamTrack;
   private publication?: LocalTrackPublication;
   private opened?: Promise<void>;
   private closed = false;
+  private deaf = false;
 
   constructor(
-    private readonly room: Room,
+    private readonly room: Room | null,
     private readonly agentId: string,
     private readonly onIdle: () => void,
   ) {}
@@ -60,11 +62,15 @@ export class AgentVoice {
       node.connect(destination);
       const speaker = speakerSink(context);
       this.speaker = speaker;
-      node.connect(speaker.destination);
+      const heard = context.createGain();
+      heard.gain.value = this.deaf ? 0 : 1;
+      node.connect(heard);
+      heard.connect(speaker.destination);
+      this.heard = heard;
       await context.resume();
       const [track] = destination.stream.getAudioTracks();
       this.track = track;
-      if (this.closed) return;
+      if (this.closed || !this.room) return;
       this.publication = await this.room.localParticipant.publishTrack(track, {
         name: `${AGENT_VOICE_PREFIX}${this.agentId}`,
         source: Track.Source.Unknown,
@@ -88,10 +94,15 @@ export class AgentVoice {
     this.node?.port.postMessage({ clear: true });
   }
 
+  deafen(on: boolean) {
+    this.deaf = on;
+    if (this.heard) this.heard.gain.value = on ? 0 : 1;
+  }
+
   private async unpublish() {
     const publication = this.publication;
     this.publication = undefined;
-    if (publication?.track)
+    if (publication?.track && this.room)
       await this.room.localParticipant.unpublishTrack(publication.track).catch(() => undefined);
   }
 
@@ -102,6 +113,7 @@ export class AgentVoice {
     await this.unpublish();
     this.track?.stop();
     this.node?.disconnect();
+    this.heard?.disconnect();
     this.speaker?.close();
     await this.context?.close().catch(() => undefined);
   }

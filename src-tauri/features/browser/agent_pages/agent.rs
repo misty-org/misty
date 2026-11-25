@@ -44,6 +44,26 @@ pub(crate) async fn execute_agent_request(
     if request.operation.starts_with("browser.workspace.") {
         return crate::agents::window_control::execute(&app, &request).await;
     }
+    if request.operation != "browser.downloads.list" {
+        let current = app
+            .get_webview(&webview_label(&id)?)
+            .ok_or("Browser tab is not running.")?
+            .url()
+            .map_err(|error| error.to_string())?;
+        let reaching = match request.operation.as_str() {
+            "browser.navigate" => request
+                .input
+                .get("url")
+                .and_then(Value::as_str)
+                .and_then(|url| external_url(url).ok())
+                .unwrap_or(current),
+            _ => current,
+        };
+        crate::browser::agent_pages::account_sites::gate_person_tab(
+            &app, &id, &request, &reaching,
+        )
+        .await?;
+    }
     if matches!(
         request.operation.as_str(),
         "browser.click"
@@ -139,6 +159,16 @@ pub(crate) async fn execute_agent_request(
                     }
                     landed["snapshot"] = snapshot;
                 }
+            }
+            if let Some(arrived) = landed["url"]
+                .as_str()
+                .and_then(|url| Url::parse(url).ok())
+                .filter(|arrived| arrived.origin() != target.origin())
+            {
+                crate::browser::agent_pages::account_sites::gate_person_tab(
+                    &app, &id, &request, &arrived,
+                )
+                .await?;
             }
             Ok(landed)
         }

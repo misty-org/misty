@@ -3,8 +3,6 @@ import { diskItem, type FileItem, type FilesPlace } from "./model";
 import {
   diskFolder,
   driveFolder,
-  listAgentTrash,
-  listDriveTrash,
   listTrash,
   projectFolder,
 } from "./sources";
@@ -20,8 +18,6 @@ export async function listPlace(place: FilesPlace, hidden: boolean): Promise<Fil
       return shown(await projectFolder.list(place.path), hidden);
     case "space-drive":
       return shown(await driveFolder.list(place.spaceId, place.path), hidden);
-    case "space-drive-trash":
-      return listDriveTrash(place.spaceId);
     case "recent":
       return (await disk.recent()).map(diskItem);
     case "starred":
@@ -30,8 +26,6 @@ export async function listPlace(place: FilesPlace, hidden: boolean): Promise<Fil
       return (await disk.tagged(place.name)).map(diskItem);
     case "trash":
       return listTrash();
-    case "agent-trash":
-      return listAgentTrash();
   }
 }
 

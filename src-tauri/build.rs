@@ -40,6 +40,7 @@ fn main() {
 }
 
 fn sandbox_attributes() -> tauri_build::Attributes {
+    println!("cargo:rerun-if-changed=tauri-permissions");
     const APP_COMMANDS: &[&str] = include!("tauri-permissions/app_commands.in");
     tauri_build::Attributes::new()
         .capabilities_path_pattern("./tauri-permissions/capabilities/*.json")

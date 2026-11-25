@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { AgentMessageChecklist } from "./AgentChecklist";
 import { useCollaborationStore } from "./store";
@@ -39,18 +39,27 @@ it("shows nothing, not a placeholder or loading text, until it knows whether a c
   expect(container.childElementCount).toBe(0);
 });
 
-it("summarizes, then lists steps with their status in words", async () => {
+it("lists every step with its status in words, on the same card as an engine's tasks", () => {
   useCollaborationStore.setState({ byConversation: { c1: state([checklist]) } });
   render(<AgentMessageChecklist conversationId="c1" invocationId="inv_1" running />);
-  const summary = screen.getByRole("button", { name: /Edit tests, 1 of 3 done/ });
-  expect(summary.getAttribute("aria-expanded")).toBe("true");
-  const table = screen.getByRole("region", { name: "Checklist" });
-  expect(within(table).getByText("In progress")).toBeTruthy();
-  expect(within(table).getByText("Edit tests")).toBeTruthy();
-  expect(within(table).getByText("Done")).toBeTruthy();
-  expect(within(table).getByText("Read the code")).toBeTruthy();
-  await act(async () => fireEvent.click(summary));
-  expect(summary.getAttribute("aria-expanded")).toBe("false");
+  const list = screen.getByRole("list", { name: "Checklist" });
+  expect(within(list).getByText("In progress")).toBeTruthy();
+  expect(within(list).getByText("Edit tests")).toBeTruthy();
+  expect(within(list).getByText("Done")).toBeTruthy();
+  expect(within(list).getByText("Read the code")).toBeTruthy();
+  expect(within(list).getByText("Not started")).toBeTruthy();
+});
+
+it("leaves a finished checklist out once the run ends", () => {
+  const finished = {
+    ...checklist,
+    items: checklist.items.map((item) => ({ ...item, status: "done" as const })),
+  };
+  useCollaborationStore.setState({ byConversation: { c1: state([finished]) } });
+  const { container } = render(
+    <AgentMessageChecklist conversationId="c1" invocationId="inv_1" running={false} />,
+  );
+  expect(container.childElementCount).toBe(0);
 });
 
 it("says Stopped for the active step of a run that ended, and Waiting for you on a card", () => {
@@ -58,7 +67,7 @@ it("says Stopped for the active step of a run that ended, and Waiting for you on
   const { rerender } = render(
     <AgentMessageChecklist conversationId="c1" invocationId="inv_1" running={false} />,
   );
-  expect(screen.getByRole("button", { name: /Edit tests, 1 of 3 done/ })).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Checklist" })).toBeTruthy();
   expect(screen.getByText("Stopped")).toBeTruthy();
   rerender(
     <AgentMessageChecklist

@@ -153,29 +153,23 @@ pub(super) fn close_tool(
         held(&MCP_CALLS).remove(wire);
     }
     let took = tool.started.elapsed().as_millis() as u64;
-    match failed {
-        Some(error) => send_to(
-            run_id,
-            json!({
-                "type": "tool.failed",
-                "toolCallId": tool.id,
-                "toolName": tool.name,
-                "durationMs": took,
-                "error": error,
-                "result": result.map(clip_value),
-            }),
-        ),
-        None => send_to(
-            run_id,
-            json!({
-                "type": "tool.completed",
-                "toolCallId": tool.id,
-                "toolName": tool.name,
-                "durationMs": took,
-                "result": result.map(clip_value),
-            }),
-        ),
+    let mut event = json!({
+        "type": if failed.is_some() { "tool.failed" } else { "tool.completed" },
+        "toolCallId": tool.id,
+        "toolName": tool.name,
+        "durationMs": took,
+        "result": result.map(clip_value),
+    });
+    if let Some(error) = failed {
+        event["error"] = json!(error);
     }
+    let pictures = result
+        .map(|result| super::pictures::step_pictures(run_id, &tool.id, result))
+        .unwrap_or_default();
+    if !pictures.is_empty() {
+        event["pictures"] = json!(pictures);
+    }
+    send_to(run_id, event);
     if let Some(result) = result {
         let text = output_text(result);
         if !text.is_empty() {

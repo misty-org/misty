@@ -133,17 +133,17 @@ export function EmbeddedUniversalPreviewView(props: {
     );
   if (isVideo && props.url)
     return (
-      <video
-        ref={props.videoRef}
-        className="block max-h-full max-w-full object-contain transition-[filter,transform]"
-        style={props.mediaStyle}
-        src={props.url}
-        controls
+      <PreviewVideo
+        key={props.url}
+        url={props.url}
+        placeholder={props.placeholder}
+        videoRef={props.videoRef}
+        mediaStyle={props.mediaStyle}
         autoPlay={props.autoPlay}
         loop={props.loop}
         onEnded={props.onVideoEnded}
-        onLoadedMetadata={props.onVideoMetadata}
-        onTimeUpdate={props.onVideoTime}
+        onMetadata={props.onVideoMetadata}
+        onTime={props.onVideoTime}
       />
     );
   if (isAudio && props.url)
@@ -227,6 +227,55 @@ export function EmbeddedUniversalPreviewView(props: {
       detail="Misty can inspect this file and make the original available to you."
       action={props.fallbackAction}
     />
+  );
+}
+
+function PreviewVideo(props: {
+  url: string;
+  placeholder?: string;
+  videoRef?: React.RefObject<HTMLVideoElement | null>;
+  mediaStyle?: React.CSSProperties;
+  autoPlay?: boolean;
+  loop?: boolean;
+  onEnded?: () => void;
+  onMetadata?: () => void;
+  onTime?: () => void;
+}) {
+  const [ready, setReady] = useState(false);
+  const [placeholderShown, setPlaceholderShown] = useState(Boolean(props.placeholder));
+  return (
+    <div className="grid h-full w-full place-items-center">
+      {!ready && placeholderShown ? (
+        <img
+          aria-hidden="true"
+          alt=""
+          src={props.placeholder}
+          className="col-start-1 row-start-1 block h-full w-full object-contain"
+          onError={() => setPlaceholderShown(false)}
+        />
+      ) : null}
+      <video
+        ref={props.videoRef}
+        className={cn(
+          "col-start-1 row-start-1 block max-h-full max-w-full object-contain transition-[filter,transform]",
+          !ready && "invisible",
+        )}
+        style={props.mediaStyle}
+        src={props.url}
+        poster={props.placeholder}
+        controls
+        preload="metadata"
+        autoPlay={props.autoPlay}
+        loop={props.loop}
+        onEnded={props.onEnded}
+        onLoadedMetadata={() => {
+          setReady(true);
+          props.onMetadata?.();
+        }}
+        onError={() => setReady(true)}
+        onTimeUpdate={props.onTime}
+      />
+    </div>
   );
 }
 

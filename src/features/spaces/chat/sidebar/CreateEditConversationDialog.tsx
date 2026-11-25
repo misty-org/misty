@@ -11,6 +11,7 @@ import {
   DialogTitle,
   ChoiceList,
   Input,
+  OptionSelect,
   Switch,
   Text,
 } from "@misty/ui";
@@ -18,6 +19,8 @@ import { Hash, Lock, Volume2 } from "lucide-react";
 import { useSpaceRoles } from "../../roles/use_space_roles";
 import { allowedRoleIds, withPrivacy } from "../../roles/channel_privacy";
 import { isPrivateChannel } from "./conversation_groups";
+import { channelLayout, channelsIn } from "./channel_layout";
+import { useSpaceConversations } from "./use_space_conversations";
 import { useEffect, useState, type FormEvent } from "react";
 
 export function CreateEditConversationDialog({
@@ -25,12 +28,14 @@ export function CreateEditConversationDialog({
   open,
   onOpenChange,
   conversation,
+  categoryId: startCategory = null,
   onSaved,
 }: {
   spaceId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   conversation?: SpaceConversation | null;
+  categoryId?: string | null;
   onSaved: (conversation: SpaceConversation) => void;
 }) {
   const [title, setTitle] = useState("");
@@ -42,6 +47,8 @@ export function CreateEditConversationDialog({
   const pickable = (roles ?? []).filter((role) => !role.is_default);
   const [isPrivate, setPrivate] = useState(false);
   const [allowed, setAllowed] = useState<string[]>([]);
+  const { conversations, categories } = useSpaceConversations(spaceId);
+  const [category, setCategory] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -50,7 +57,8 @@ export function CreateEditConversationDialog({
     setKind("text");
     setPrivate(Boolean(conversation && isPrivateChannel(conversation, defaultRoleId)));
     setAllowed(allowedRoleIds(conversation));
-  }, [open, conversation, defaultRoleId]);
+    setCategory((conversation ? conversation.category_id : startCategory) ?? "");
+  }, [open, conversation, defaultRoleId, startCategory]);
 
   const canSave = Boolean(title.trim()) && !saving;
 
@@ -66,9 +74,24 @@ export function CreateEditConversationDialog({
     setError("");
     try {
       const name = title.trim().slice(0, 80);
+      const known = categories.some((item) => item.id === category) ? category : "";
       let saved = conversation
         ? await spacesApi.updateConversation(spaceId, conversation.id, name)
-        : await spacesApi.createConversation(spaceId, name, { voice: kind === "voice" });
+        : await spacesApi.createConversation(spaceId, name, {
+            voice: kind === "voice",
+            categoryId: known || null,
+          });
+      if (conversation && known !== (conversation.category_id ?? "")) {
+        const target = channelsIn(channelLayout(conversations, categories), known).filter(
+          (item) => item.id !== conversation.id,
+        );
+        saved = await spacesApi.placeConversation(
+          spaceId,
+          conversation.id,
+          known || null,
+          target.at(-1)?.id ?? null,
+        );
+      }
       const wasPrivate = Boolean(conversation && isPrivateChannel(conversation, defaultRoleId));
       const before = allowedRoleIds(conversation).sort().join();
       if (
@@ -124,6 +147,26 @@ export function CreateEditConversationDialog({
               onChange={(event) => setTitle(event.target.value)}
             />
           </Text>
+          {categories.length ? (
+            <Text
+              bare
+              as="label"
+              size="meta"
+              tone="muted"
+              weight="medium"
+              className="mt-5 grid gap-2"
+            >
+              Category
+              <OptionSelect
+                value={categories.some((item) => item.id === category) ? category : ""}
+                onValueChange={setCategory}
+                options={[
+                  { value: "", label: "No category" },
+                  ...categories.map((item) => ({ value: item.id, label: item.name })),
+                ]}
+              />
+            </Text>
+          ) : null}
           {defaultRoleId ? (
             <Text
               bare

@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { Button, Text } from "@misty/ui";
+import { Button, Text, TurnTasks, type TurnTask } from "@misty/ui";
 import { useMistyStore } from "../../conversations/state/use_misty_store";
 import { useCollaborationStore } from "../../plans/store";
-import { StatusRow, StatusTable, type StatusState } from "../../progress/StatusTable";
 import { lessonProgress } from "./lesson_router";
 import { nextCourseLesson, useLessonStore } from "./lesson_store";
 import type { LessonObjective } from "./lesson_types";
 
-const rowState = (objective: LessonObjective, current: boolean): [StatusState, string] => {
-  if (objective.status === "done") return ["done", "Done"];
-  if (objective.status === "skipped") return ["skipped", "Skipped"];
-  if (current || objective.status === "in_progress") return ["waiting", "Your turn"];
-  return ["next", "Next"];
-};
+function taskOf(objective: LessonObjective, current: boolean, finished: boolean): TurnTask {
+  const task = { id: objective.id, title: objective.title };
+  if (objective.status === "done") return { ...task, state: "done" };
+  if (objective.status === "skipped") return { ...task, state: "skipped" };
+  if (current || objective.status === "in_progress")
+    return finished
+      ? { ...task, state: "pending", note: "Not reached" }
+      : { ...task, state: "waiting", note: "Your turn" };
+  return { ...task, state: "pending" };
+}
 
 async function startNextLesson(courseId: string, index: number, title: string, goal?: string) {
   const misty = useMistyStore.getState();
@@ -53,45 +56,37 @@ export function LessonObjectives({ conversationId }: { conversationId: string })
     }
   };
   return (
-    <StatusTable
+    <TurnTasks
       label={`Lesson: ${lesson.title}`}
       head={
         finished
           ? `Lesson finished with ${progress} goals`
           : `${lesson.goal || lesson.title}, ${progress} goals${lesson.status === "paused" ? ", paused" : ""}`
       }
-      actions={
-        next ? (
+      tasks={lesson.objectives.map((objective) =>
+        taskOf(objective, !finished && lesson.current === objective.id, finished),
+      )}
+      foot={
+        (finished && lesson.summary) || next ? (
           <>
-            <Button disabled={starting} onClick={() => void start()}>
-              Next lesson: {next.part.title}
-            </Button>
-            {notice && (
+            {finished && lesson.summary ? (
+              <Text as="p" bare size="meta" tone="muted" wrap>
+                {lesson.summary}
+              </Text>
+            ) : null}
+            {next ? (
+              <Button disabled={starting} onClick={() => void start()}>
+                Next lesson: {next.part.title}
+              </Button>
+            ) : null}
+            {notice ? (
               <Text size="meta" bare tone="muted" role="status">
                 {notice}
               </Text>
-            )}
+            ) : null}
           </>
         ) : undefined
       }
-    >
-      {lesson.objectives.map((objective) => {
-        const [state, verb] = rowState(objective, !finished && lesson.current === objective.id);
-        return (
-          <StatusRow
-            key={objective.id}
-            state={finished && state === "waiting" ? "stopped" : state}
-            verb={finished && state === "waiting" ? "Not reached" : verb}
-          >
-            {objective.title}
-          </StatusRow>
-        );
-      })}
-      {finished && lesson.summary ? (
-        <StatusRow state="plain" sub={lesson.summary}>
-          What you achieved
-        </StatusRow>
-      ) : null}
-    </StatusTable>
+    />
   );
 }

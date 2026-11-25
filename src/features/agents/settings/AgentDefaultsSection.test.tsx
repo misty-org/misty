@@ -34,7 +34,6 @@ describe("AgentDefaultsSection Misty panel controls", () => {
   it("renders the Misty panel side control", () => {
     render(<AgentDefaultsSection />);
 
-    expect(screen.getByText("Defaults")).toBeTruthy();
     expect(screen.getByText("Misty panel side")).toBeTruthy();
 
     const leftRadio = screen.getByRole("radio", { name: "Left" });

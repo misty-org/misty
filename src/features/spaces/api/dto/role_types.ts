@@ -30,10 +30,7 @@ export type SpacePermission =
   | "messages.write"
   | "attachments.upload"
   | "storage.view_own_usage"
-  | "studio.view"
   | "ask.run"
-  | "integrations.manage"
-  | "apps.manage"
   | "space.leave"
   | "space.transfer"
   | "space.delete";

@@ -1,3 +1,4 @@
+import type { AvatarDecoration } from "@/shared/lib/avatar_decoration";
 import type { MessageSpan, SpaceRole } from "./common";
 import type { SpacePermission } from "./role_types";
 import type { MessageAttachment, StorageQuotaDimension } from "./library";
@@ -16,6 +17,7 @@ export interface Space {
   pending_count: number;
   is_shared: boolean;
   avatar_version?: number;
+  avatar_decoration?: AvatarDecoration;
   permissions?: SpacePermission[];
   created_at: string;
   updated_at: string;
@@ -28,6 +30,7 @@ export interface SpaceInvitation {
   invited_user_id?: string;
   invited_user_name?: string;
   invited_email: string;
+  by_account?: boolean;
   invited_by_user_id: string;
   inviter_name?: string;
   link?: string;
@@ -66,6 +69,7 @@ export interface SpaceMessage {
   sender_user_id: string;
   sender_name: string;
   sender_avatar_version?: number;
+  sender_avatar_decoration?: AvatarDecoration;
   sender_kind: "person" | "agent" | "system";
   sender_agent_id?: string;
   sender?: SpaceMessageSender;

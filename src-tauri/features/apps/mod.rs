@@ -1,6 +1,8 @@
+pub mod app_server;
 pub mod bundle;
 pub mod commands;
 pub mod frames;
+pub mod installed;
 pub mod logo_cache;
 pub mod manifest;
 pub mod mcp;

@@ -9,7 +9,7 @@
 .wrangler/
 
 # No env file is ever committed, not even an example: the docs list every
-# value. A server's files live in ~/.misty/.env/server/, outside the repository.
+# value. A server's files live in <misty.root>/.env/server/, outside the repository.
 
 **/.venv
 

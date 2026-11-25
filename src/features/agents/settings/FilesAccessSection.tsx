@@ -3,11 +3,8 @@ import { useCachedResource } from "@/api/cache/cached_resource";
 import { disk } from "@/features/files";
 import { invoke } from "@/shared/platform/native_invoke";
 import { ErrorState, useNotice } from "@misty/ui";
-import {
-  DesktopSettingsRow as Row,
-  DesktopSettingsRowSkeleton,
-  DesktopSettingsSection as Section,
-} from "@/features/settings";
+import { DesktopSettingsRow as Row, DesktopSettingsRowSkeleton } from "@/features/settings";
+import { hasTauriInternals } from "@/shared/platform/tauri";
 import { SwitchControl } from "../../settings/SettingsControls";
 
 interface FilesAccess {
@@ -24,13 +21,16 @@ const diskLine =
   "Files shows and changes what your user can reach, never Misty's data or your keychains. " +
   "Agents reach it too and ask before changing anything.";
 const deleteLine =
-  "Off, agents move what they clean up to Agent trash for you to look over. " +
+  "Off, agents move what they clean up to the trash for you to look over. " +
   "On, they may delete for good, and still ask every time.";
 
 const revokeDiskGrant = () => invoke<void>("files_grant_revoke");
 
 export function FilesAccessSection() {
-  const listing = useCachedResource("agents/files-access", readAccess, { persist: "device" });
+  const native = hasTauriInternals();
+  const listing = useCachedResource(native ? "agents/files-access" : null, readAccess, {
+    persist: "device",
+  });
   const access = listing.data ?? null;
   const loadFailed = !listing.data && !listing.loading && Boolean(listing.error);
   const [working, setWorking] = useState(false);
@@ -48,25 +48,20 @@ export function FilesAccessSection() {
       setWorking(false);
     }
   };
+  if (!native) return null;
   if (loadFailed)
     return (
-      <Section title="Disk">
-        <ErrorState
-          inline
-          title="Couldn't read these permissions"
-          line="Something went wrong on this computer. Try again in a moment."
-          action={{ label: "Try again", onClick: () => void listing.reload() }}
-        />
-      </Section>
+      <ErrorState
+        inline
+        title="Couldn't read these permissions"
+        line="Something went wrong on this computer. Try again in a moment."
+        action={{ label: "Try again", onClick: () => void listing.reload() }}
+      />
     );
   if (access === null)
-    return (
-      <Section title="Disk">
-        <DesktopSettingsRowSkeleton label="Disk" rows={2} description control="switch" />
-      </Section>
-    );
+    return <DesktopSettingsRowSkeleton label="Disk" rows={2} description control="switch" />;
   return (
-    <Section title="Disk">
+    <>
       <Row label="Files can open this computer" description={diskLine}>
         <SwitchControl
           checked={access.disk}
@@ -83,6 +78,6 @@ export function FilesAccessSection() {
           />
         </Row>
       ) : null}
-    </Section>
+    </>
   );
 }

@@ -41,6 +41,7 @@ function renderMenu() {
           onClose={vi.fn()}
           onOpenAccountSettings={vi.fn()}
           onChangeBanner={vi.fn()}
+          onChangePicture={vi.fn()}
           onCustomStatus={vi.fn()}
         />
       </DropdownMenu>
@@ -78,6 +79,7 @@ describe("AccountMenu", () => {
             onClose={onClose}
             onOpenAccountSettings={vi.fn()}
             onChangeBanner={vi.fn()}
+            onChangePicture={vi.fn()}
             onCustomStatus={vi.fn()}
           />
         </DropdownMenu>

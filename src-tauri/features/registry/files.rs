@@ -12,6 +12,8 @@ pub struct RegistryFile {
     pub size: u64,
 }
 
+const BLOBS: &str = "https://registry.mistysys.com/blobs/";
+
 fn cache_dir() -> Result<PathBuf, String> {
     file_access::paths::misty_home_dir()
         .map(|home| home.join("registry-files"))
@@ -31,7 +33,7 @@ pub async fn script(file: &RegistryFile) -> Result<String, String> {
         return Err("The registry names a script Misty won't take.".into());
     }
     let cached = cache_dir()?.join(format!("{}.js", file.sha256));
-    if let Ok(bytes) = std::fs::read(&cached) {
+    if let Ok(bytes) = file_access::fs::read(&cached) {
         if let Ok(text) = checked(file, bytes) {
             return Ok(text);
         }
@@ -39,9 +41,39 @@ pub async fn script(file: &RegistryFile) -> Result<String, String> {
     let bytes = crate::apps::commands::download(&file.url, MAX_SCRIPT_BYTES).await?;
     let text = checked(file, bytes)?;
     if let Some(folder) = cached.parent() {
-        if std::fs::create_dir_all(folder).is_ok() {
-            let _ = std::fs::write(&cached, text.as_bytes());
+        if file_access::fs::create_dir_all(folder).is_ok() {
+            let _ = file_access::fs::write(&cached, text.as_bytes());
         }
     }
     Ok(text)
+}
+
+fn named(file: &RegistryFile) -> bool {
+    file.sha256.len() == 64 && file.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn matches_blob(file: &RegistryFile, bytes: &[u8]) -> bool {
+    bytes.len() as u64 == file.size && hex::encode(Sha256::digest(bytes)) == file.sha256
+}
+
+pub async fn blob(file: &RegistryFile, max: u64) -> Result<Vec<u8>, String> {
+    if !named(file) || file.size > max || file.url != format!("{BLOBS}{}", file.sha256) {
+        return Err("The registry names a file Misty won't take.".into());
+    }
+    let cached = cache_dir()?.join(&file.sha256);
+    if let Ok(bytes) = file_access::fs::read(&cached) {
+        if matches_blob(file, &bytes) {
+            return Ok(bytes);
+        }
+    }
+    let bytes = crate::apps::commands::download(&file.url, max).await?;
+    if !matches_blob(file, &bytes) {
+        return Err("A file from the registry doesn't match its checksum.".into());
+    }
+    if let Some(folder) = cached.parent() {
+        if file_access::fs::create_dir_all(folder).is_ok() {
+            let _ = file_access::fs::write(&cached, &bytes);
+        }
+    }
+    Ok(bytes)
 }

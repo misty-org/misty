@@ -3,7 +3,7 @@ import type { DockingLayout } from "@/app/shell/docking_layout";
 
 export { browserHomeUrl } from "../addresses/browser_home";
 
-export type WorkspaceSurfaceId = "space" | "agents" | "direct";
+export type WorkspaceSurfaceId = "space" | "agents" | "direct" | "browser";
 
 export type WorkspaceGroupKey = `space:${string}` | `tool:${WorkspaceSurfaceId}` | `app:${string}`;
 type WorkspaceInstancePolicy = "multiple" | "single";

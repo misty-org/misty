@@ -2,11 +2,7 @@ import { useState } from "react";
 import { Button, ErrorState, notify } from "@misty/ui";
 import { useCachedResource } from "@/api/cache/cached_resource";
 import { useNow } from "@/shared/hooks/use_now";
-import {
-  DesktopSettingsRow as Row,
-  DesktopSettingsRowSkeleton,
-  DesktopSettingsSection as Section,
-} from "@/features/settings";
+import { DesktopSettingsRow as Row, DesktopSettingsRowSkeleton } from "@/features/settings";
 import { useAuth } from "../sessions/auth_state";
 import { openSignOutSheet } from "../sign-in-sheet/SignOutSheet";
 import { deviceSignInApi, sessionsKey, type AccountSession } from "../devices/device_sign_in_api";
@@ -14,11 +10,9 @@ import { sessionLine, sessionName, sortSessions } from "../devices/session_lines
 
 export function SessionsSection() {
   const { user } = useAuth();
-  const listing = useCachedResource(
-    user ? sessionsKey(user.id) : null,
-    deviceSignInApi.sessions,
-    { persist: "account" },
-  );
+  const listing = useCachedResource(user ? sessionsKey(user.id) : null, deviceSignInApi.sessions, {
+    persist: "account",
+  });
   const now = useNow();
   const [signingOut, setSigningOut] = useState("");
   if (!user) return null;
@@ -42,22 +36,16 @@ export function SessionsSection() {
 
   if (!sessions && !listing.loading && listing.error)
     return (
-      <Section title="Sessions">
-        <ErrorState
-          inline
-          title="Sessions couldn't load"
-          action={{ label: "Try again", onClick: () => void listing.reload() }}
-        />
-      </Section>
+      <ErrorState
+        inline
+        title="Sessions couldn't load"
+        action={{ label: "Try again", onClick: () => void listing.reload() }}
+      />
     );
   if (!sessions)
-    return (
-      <Section title="Sessions">
-        <DesktopSettingsRowSkeleton label="Sessions" rows={2} description control="button" />
-      </Section>
-    );
+    return <DesktopSettingsRowSkeleton label="Sessions" rows={2} description control="button" />;
   return (
-    <Section title="Sessions">
+    <>
       {sortSessions(sessions).map((session) => (
         <Row
           key={session.id}
@@ -73,6 +61,6 @@ export function SessionsSection() {
           </Button>
         </Row>
       ))}
-    </Section>
+    </>
   );
 }

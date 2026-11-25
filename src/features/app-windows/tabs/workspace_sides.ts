@@ -4,7 +4,7 @@ import { spaceWindow, useSpaceWindowStore, type SpaceWindowIdentity } from "./sp
 import { useWorkspaceStore } from "./use_workspace_store";
 import type { WorkspaceGroupKey, WorkspaceLayout } from "./workspace_views";
 
-export type WorkspaceSide = "personal" | "spaces";
+export type WorkspaceSide = string;
 
 export interface AsideWorkspace {
   layout: WorkspaceLayout;
@@ -12,11 +12,7 @@ export interface AsideWorkspace {
   closedItems: ClosedWorkspaceItem[];
 }
 
-export const sideOf = (identity: SpaceWindowIdentity): WorkspaceSide =>
-  identity.personal ? "personal" : "spaces";
-
-export const otherSide = (side: WorkspaceSide): WorkspaceSide =>
-  side === "personal" ? "spaces" : "personal";
+export const sideOf = (identity: SpaceWindowIdentity): WorkspaceSide => identity.key;
 
 export function emptyAsideWorkspace(): AsideWorkspace {
   return {
@@ -33,17 +29,20 @@ export function showWorkspaceSide(side: WorkspaceSide) {
     useWorkspaceStore.setState({ side });
     return;
   }
-  const shown = state.aside ?? emptyAsideWorkspace();
+  const asides = { ...state.asides };
+  const shown = asides[side] ?? emptyAsideWorkspace();
+  delete asides[side];
+  asides[state.side] = {
+    layout: state.layout,
+    lastUsedViewByGroup: state.lastUsedViewByGroup,
+    closedItems: state.closedItems,
+  };
   useWorkspaceStore.setState({
     side,
     layout: shown.layout,
     lastUsedViewByGroup: shown.lastUsedViewByGroup,
     closedItems: shown.closedItems,
-    aside: {
-      layout: state.layout,
-      lastUsedViewByGroup: state.lastUsedViewByGroup,
-      closedItems: state.closedItems,
-    },
+    asides,
   });
   window.dispatchEvent(new Event("misty:workspace-projection-applied"));
 }

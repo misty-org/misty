@@ -4,7 +4,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { ArrowUp, BookOpen, Download, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
-import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
+import { DesktopSettingsRow } from "@/features/settings";
 import {
   Button,
   ConfirmDeleteDialog,
@@ -211,10 +211,10 @@ function CliRow({ engine }: { engine: EngineId }) {
 
 export function ClisSection() {
   return (
-    <Section title="CLIs">
+    <>
       {ENGINE_IDS.map((engine) => (
         <CliRow key={engine} engine={engine} />
       ))}
-    </Section>
+    </>
   );
 }

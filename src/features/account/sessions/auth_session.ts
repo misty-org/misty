@@ -4,6 +4,7 @@ import { useAppRouteMemoryStore } from "@/app/shell";
 import { accountResets } from "../account_seams";
 import { resetWorkspaceAccountState } from "@/features/app-windows";
 import type { AccountMeResponse } from "../api/account_types";
+import { readAvatarDecoration, type AvatarDecoration } from "@/shared/lib/avatar_decoration";
 import type { SavedAccountSession } from "./account_vault";
 import { notifyAccountScopeReset, notifyAccountScopeWillReset } from "./account_events";
 import { isAccountUnauthorizedError } from "./use_account_store";
@@ -29,6 +30,7 @@ export function authUserFromMe(me: AccountMeResponse, fallback: SavedAccountSess
     username: me.username || fallback.username,
     email: me.email || fallback.email,
     avatarVersion: me.avatar_version,
+    avatarDecoration: readAvatarDecoration(me.avatar_decoration),
     accountCreatedAt: me.created_at || fallback.accountCreatedAt,
   };
 }
@@ -87,6 +89,7 @@ export interface AuthUser {
   username: string;
   email: string;
   avatarVersion?: number;
+  avatarDecoration?: AvatarDecoration;
   accountCreatedAt?: string;
 }
 export interface AuthContextValue {

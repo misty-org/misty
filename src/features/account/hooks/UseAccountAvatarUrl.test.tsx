@@ -54,7 +54,7 @@ describe("useAccountAvatarUrl", () => {
     vi.restoreAllMocks();
   });
 
-  it("refetches and replaces the object URL when account avatar data changes", async () => {
+  it("loads each version once and frees the one it replaces", async () => {
     await act(async () => {
       root.render(<AvatarUrlProbe accountId="account-1" avatarVersion={1} />);
     });
@@ -75,8 +75,15 @@ describe("useAccountAvatarUrl", () => {
     });
 
     expect(mocks.accountFetchAvatar).toHaveBeenCalledTimes(3);
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:avatar-2");
+    expect(revokeObjectURL).not.toHaveBeenCalledWith("blob:avatar-2");
     expect(container.querySelector("output")?.dataset.avatarUrl).toBe("blob:avatar-3");
+
+    await act(async () => {
+      root.render(<AvatarUrlProbe accountId="account-1" avatarVersion={2} />);
+    });
+
+    expect(mocks.accountFetchAvatar).toHaveBeenCalledTimes(3);
+    expect(container.querySelector("output")?.dataset.avatarUrl).toBe("blob:avatar-2");
   });
 
   it("uses the fallback path when the account has no uploaded avatar", async () => {

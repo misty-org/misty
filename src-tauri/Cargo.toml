@@ -17,12 +17,6 @@ name = "misty-desktop"
 path = "features/main.rs"
 
 [[test]]
-name = "webview_url"
-path = "features/browser/pages/tests/webview_url.rs"
-# AppKit and WKWebView must be exercised on the process's main thread.
-harness = false
-
-[[test]]
 name = "browser_native_input"
 path = "features/browser/input/tests/browser_native_input.rs"
 # Real WKWebView events need the main thread and a window server.
@@ -135,9 +129,6 @@ tauri-plugin-notification = "2.3.3"
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# The vendored copy (see [patch.crates-io]) Tauri already runs: Misty names its own page's origins to
-# it, so that page uses the microphone and camera with no WebKit panel (app/setup.rs).
-wry = { version = "=0.55.1", default-features = false }
 # System notices that open their chat when clicked (agents/run_control/run_notices.rs).
 mac-notification-sys = "0.6.15"
 block2 = "0.6.2"
@@ -187,8 +178,8 @@ winreg = "0.55"
 # Plain paths, not \\?\ ones, when comparing folders.
 dunce = "1"
 # Confined helpers and agent commands (AppContainer and Job objects).
-webview2-com = "0.38.2"
-windows = { version = "0.61", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Foundation", "Graphics", "Graphics_Capture", "Graphics_DirectX", "Graphics_DirectX_Direct3D11", "Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Security", "Win32_Security_Cryptography", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_JobObjects", "Win32_System_Ole", "Win32_System_Threading", "Win32_System_Variant", "Win32_System_WinRT", "Win32_System_WinRT_Direct3D11", "Win32_System_WinRT_Graphics_Capture", "Win32_UI_Accessibility", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 windows-sys = { version = "0.59", features = ["Wdk_Storage_FileSystem", "Win32_Devices_DeviceAndDriverInstallation", "Win32_Foundation", "Win32_Graphics_Dwm", "Win32_Graphics_Gdi", "Win32_NetworkManagement_WNet", "Win32_Security", "Win32_Security_Isolation", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_IO", "Win32_System_Ioctl", "Win32_System_JobObjects", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Power", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Accessibility", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 
 [features]
@@ -328,24 +319,9 @@ file_access = { path = "features/file_access", features = ["test-fixtures"] }
 # Build fixtures/reference decoders without shipping these codecs in the macOS host.
 image = { version = "0.25.10", default-features = false, features = ["bmp", "gif", "jpeg", "tga", "webp"] }
 
-[target.'cfg(target_os = "macos")'.dev-dependencies]
-# The vendored copy (see [patch.crates-io]); the webview URL test compiles its URL reader.
-wry = { version = "=0.55.1", default-features = false }
-
 [patch.crates-io]
 # Preserve the clipboard API while using AppKit instead of a bundled TIFF decoder on macOS.
 arboard = { path = "vendor/arboard" }
-# Hands out the menu the menu bar icon opens, so its items can show SF Symbols (app/tray.rs).
-tray-icon = { path = "vendor/tray-icon" }
-
-# Honor focused(false) for background WebKit views on macOS, and let pages
-# declare their own global `ipc` (see vendor/wry/MISTY-PATCH.md).
-wry = { path = "vendor/wry" }
-
-# Hold runtime messages that arrive while a webview is being created, so a
-# nested create or close can't wait on its own thread on Windows (see
-# vendor/tauri-runtime-wry/MISTY-PATCH.md).
-tauri-runtime-wry = { path = "vendor/tauri-runtime-wry" }
 
 # Backport the upstream VariantStrIter soundness fix to Tauri's GTK3-compatible GLib.
 glib = { path = "vendor/glib" }

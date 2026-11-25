@@ -63,7 +63,6 @@ export class CursorCompanionVoice {
     const turn = s.turn;
     this.narrated.add(invocationId);
     const voice = taskVoice(s, invocationId);
-    if (voice === null) return;
     const reading = openReading(voice);
     const sentences = new SpokenSentences((sentence) => reading.add(sentence));
     let stop = () => {};
@@ -105,8 +104,7 @@ export class CursorCompanionVoice {
     try {
       if (!s.pointPending) s.change({ phase: "processing" });
       if (!(await onCall())) {
-        const voice = taskVoice(s, id);
-        if (voice !== null) await this.start().readResult(id, voice);
+        await this.start().readResult(id, taskVoice(s, id));
       }
       if (!s.active(generation)) return;
       s.voicePending = false;

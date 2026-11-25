@@ -6,9 +6,9 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::Serialize;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State, Webview};
-use voice_speech::{Speech, Voice};
+use voice_speech::Speech;
 
-use super::super::speech_models;
+use super::super::voicebox::Speaker;
 use super::*;
 
 fn play_and_wait(
@@ -47,7 +47,7 @@ pub async fn speech_say(
 ) -> Result<(), String> {
     require_person(&webview)?;
     let text: String = text.chars().take(20_000).collect();
-    if text.trim().is_empty() {
+    if text.trim().is_empty() || !super::super::voicebox::usable() {
         return Ok(());
     }
     stop_speaking(&state);
@@ -58,14 +58,14 @@ pub async fn speech_say(
     tokio::task::spawn_blocking(move || {
         let state = app.state::<SpeechState>();
         let speed = self::rate(&state, rate);
-        let opened = self::voice(&state, voice.as_deref());
+        let opened = self::speaker(&app, &state, voice.as_deref());
         let mut result = Ok(());
         for sentence in sentences(&text) {
             if stopped.load(Ordering::SeqCst) {
                 break;
             }
             let spoken = match opened.as_ref() {
-                Ok((model, speaker)) => model.speak(&sentence, *speaker, speed),
+                Ok(speaker) => speaker.speak(&sentence, speed),
                 Err(error) => Err(error.clone()),
             };
             match spoken {
@@ -137,16 +137,16 @@ pub fn speech_reading_start(
     std::thread::spawn(move || {
         let state = maker_app.state::<SpeechState>();
         let speed = self::rate(&state, rate);
-        let opened = self::voice(&state, voice.as_deref());
+        let opened = self::speaker(&maker_app, &state, voice.as_deref());
         for (index, sentence) in queue.into_iter().enumerate() {
             let Some(sentence) = sentence else { break };
             if maker_stopped.load(Ordering::SeqCst) {
                 break;
             }
-            let Ok((model, speaker)) = opened.as_ref() else {
+            let Ok(speaker) = opened.as_ref() else {
                 break;
             };
-            if let Ok(speech) = model.speak(&sentence, *speaker, speed) {
+            if let Ok(speech) = speaker.speak(&sentence, speed) {
                 if made.send(Some((index, speech))).is_err() {
                     break;
                 }
@@ -283,8 +283,7 @@ pub async fn speech_render(
     tokio::task::spawn_blocking(move || {
         let state = app.state::<SpeechState>();
         let speed = self::rate(&state, rate);
-        let (model, speaker) = self::voice(&state, voice.as_deref())?;
-        let speech = model.speak(&text, speaker, speed)?;
+        let speech = self::speaker(&app, &state, voice.as_deref())?.speak(&text, speed)?;
         let bytes: Vec<u8> = speech
             .samples
             .iter()
@@ -299,45 +298,20 @@ pub async fn speech_render(
     .map_err(|_| voice_speech::reason("failed"))?
 }
 
-pub fn dialogue_voices(
-    app: &AppHandle,
-    first: Option<&str>,
-) -> Result<Vec<(Arc<Voice>, i32)>, String> {
+pub fn dialogue_voices(app: &AppHandle, first: Option<&str>) -> Result<Vec<Speaker>, String> {
     let state = app.state::<SpeechState>();
-    let first_id = match first.filter(|id| !id.trim().is_empty()) {
-        Some(id) => id.to_string(),
-        None => state
-            .chosen
-            .lock()
-            .ok()
-            .and_then(|chosen| chosen.voice.clone())
-            .ok_or_else(|| voice_speech::reason("voice"))?,
+    let opened = speaker(app, &state, first)?;
+    let second = if opened.voice() == Some(SECOND_VOICE) {
+        FIRST_VOICE
+    } else {
+        SECOND_VOICE
     };
-    let opened = voice(&state, Some(first_id.as_str()))?;
-    let mut voices = vec![opened];
-    if let Some(entry) = speech_models::voice(&first_id) {
-        let others: Vec<_> = speech_models::installed_voices()
-            .into_iter()
-            .filter(|other| other.id != entry.id)
-            .filter(|other| {
-                other
-                    .languages
-                    .iter()
-                    .any(|code| entry.languages.contains(code))
-            })
-            .collect();
-        let second = others
-            .iter()
-            .find(|other| other.gender != entry.gender)
-            .or_else(|| others.first());
-        if let Some(second) = second {
-            if let Ok(other) = voice(&state, Some(second.id.as_str())) {
-                voices.push(other);
-            }
-        }
-    }
-    Ok(voices)
+    let other = speaker(app, &state, Some(second))?;
+    Ok(vec![opened, other])
 }
+
+const FIRST_VOICE: &str = "qwen-ryan";
+const SECOND_VOICE: &str = "qwen-serena";
 
 #[tauri::command]
 pub async fn speech_preview(

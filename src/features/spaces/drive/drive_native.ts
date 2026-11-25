@@ -32,11 +32,6 @@ export interface DriveEntry {
   waits_large?: boolean;
 }
 
-export type DriveTrashEntry = DriveEntry & {
-  trashed_at?: string | null;
-  trashed_by_name?: string | null;
-};
-
 export type DriveSyncStatus = "idle" | "syncing" | "offline" | "failed";
 
 export interface DriveSpaceStatus {
@@ -155,7 +150,6 @@ export const driveNative = {
     invoke<DriveFailure[]>("drive_restore_many", { spaceId, itemIds }),
   purgeMany: (spaceId: string, itemIds: string[]) =>
     invoke<DriveFailure[]>("drive_purge_many", { spaceId, itemIds }),
-  trashList: (spaceId: string) => invoke<DriveTrashEntry[]>("drive_trash_list", { spaceId }),
   restore: (spaceId: string, itemId: string) => invoke<void>("drive_restore", { spaceId, itemId }),
   restoreBurst: (spaceId: string, burst: string) =>
     invoke<number>("drive_restore_burst", { spaceId, burst }),

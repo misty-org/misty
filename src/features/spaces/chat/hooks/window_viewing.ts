@@ -16,6 +16,26 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+const shownChats = new Map<string, number>();
+
+function chatKey(spaceId: string, conversationId: string): string {
+  return `${spaceId}/${conversationId || "everyone"}`;
+}
+
+export function showChat(spaceId: string, conversationId: string): () => void {
+  const key = chatKey(spaceId, conversationId);
+  shownChats.set(key, (shownChats.get(key) ?? 0) + 1);
+  return () => {
+    const left = (shownChats.get(key) ?? 1) - 1;
+    if (left > 0) shownChats.set(key, left);
+    else shownChats.delete(key);
+  };
+}
+
+export function isChatOnScreen(spaceId: string, conversationId: string): boolean {
+  return isWindowViewing() && shownChats.has(chatKey(spaceId, conversationId));
+}
+
 export function useWindowViewing(): boolean {
   return useSyncExternalStore(subscribe, isWindowViewing, () => true);
 }

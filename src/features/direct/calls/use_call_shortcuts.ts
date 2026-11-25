@@ -3,8 +3,7 @@ import { useShortcutHandler } from "@/features/shortcuts";
 import { useCallStore } from "./call_store";
 import type { CallControls } from "./use_live_kit_call";
 
-export function useCallShortcuts(controls: CallControls) {
-  const live = useCallStore((state) => state.active?.state === "live");
+export function useCallShortcuts(controls: CallControls, live: boolean) {
   const current = useRef(controls);
   current.current = controls;
   const holding = useRef<(() => void) | null>(null);

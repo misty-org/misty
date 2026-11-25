@@ -8,6 +8,8 @@ import type { AgentsPageState } from "./use_agents_page_state";
 import { AgentBrowserPip } from "../agent-browser/AgentBrowserPip";
 import { setBrowserExpanded } from "../agent-browser/agent_browser_store";
 import { chatKey } from "../conversations/state/draft_chat";
+import { agentCallsHost } from "../calls/agent_calls_host";
+import { conversationClass } from "../conversations/view/conversation_class";
 
 const chatColumnClass =
   "agents-chat relative flex min-h-0 min-w-90 flex-1 flex-col overflow-hidden " +
@@ -28,7 +30,14 @@ export function AgentsTaskHeader({
         disabled={view.disabled}
       />
     );
-  return <AgentStudioBar conversation={state.conversation} agent={state.profile} />;
+  return (
+    <AgentStudioBar
+      agent={state.profile}
+      conversation={state.conversation}
+      disabled={view.disabled}
+      callable
+    />
+  );
 }
 
 type AgentsTaskContentProps = {
@@ -51,6 +60,25 @@ export function AgentsTaskContent({ state, actions }: AgentsTaskContentProps) {
     guard,
   } = state;
   const { create } = actions;
+  const CallSplit = agentCallsHost.maybe()?.Split;
+  const conversation = (
+    <AgentWorkspaceConversation
+      key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
+      agent={profile}
+      conversationId={activeConversationId}
+      spaceId={conversationSpaceId}
+      accountId={user.id}
+      initialDraft={
+        !activeConversationId && draftSeed.agentId === profile?.id ? draftSeed.text : ""
+      }
+      voiceControlRef={voiceRef}
+      onVoiceStateChange={setVoiceState}
+      onDraftStateChange={guard.setConversationStatus}
+      emptyContent={profile ? <ChatStart agent={profile} /> : undefined}
+      onCreate={create}
+      onNewChat={() => profile && actions.select(profile.id, true)}
+    />
+  );
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col in-data-[settings-open=true]:mr-105">
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden [container:agents-body/size]">
@@ -67,22 +95,13 @@ export function AgentsTaskContent({ state, actions }: AgentsTaskContentProps) {
             conversationId={chatKey(activeConversationId)}
             onDock={() => setBrowserExpanded(chatKey(activeConversationId), true)}
           />
-          <AgentWorkspaceConversation
-            key={`${user?.id}:${profile?.id}:${conversationSpaceId}:${chatRevision}`}
-            agent={profile}
-            conversationId={activeConversationId}
-            spaceId={conversationSpaceId}
-            accountId={user.id}
-            initialDraft={
-              !activeConversationId && draftSeed.agentId === profile?.id ? draftSeed.text : ""
-            }
-            voiceControlRef={voiceRef}
-            onVoiceStateChange={setVoiceState}
-            onDraftStateChange={guard.setConversationStatus}
-            emptyContent={profile ? <ChatStart agent={profile} /> : undefined}
-            onCreate={create}
-            onNewChat={() => profile && actions.select(profile.id, true)}
-          />
+          {CallSplit ? (
+            <div className={conversationClass}>
+              <CallSplit conversationId={activeConversationId}>{conversation}</CallSplit>
+            </div>
+          ) : (
+            conversation
+          )}
         </div>
       </div>
     </div>

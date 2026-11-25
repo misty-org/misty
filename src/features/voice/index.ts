@@ -2,8 +2,13 @@ export { DictationController } from "./DictationController";
 export { DictationPill } from "./pill/DictationPill";
 export { CaptureBarStatus, CaptureMenu, CapturePanel, transcribeAudioFile } from "./capture";
 
-export { VoiceSection } from "./settings/VoiceSection";
-export { DevicesSection } from "./settings/DevicesSection";
+export {
+  ListeningSection,
+  SpeakingSection,
+  SpeechSection,
+  VoiceModelsSection,
+  VoiceSection,
+} from "./settings/VoiceSection";
 export { speechLanguages, voiceLabel, voiceSample } from "./settings/speech_choices";
 export { voiceSettings } from "./voice_settings";
 export { savedInputDevice } from "./input_device";
@@ -46,12 +51,21 @@ export {
   personLanguages,
   rankHearing,
   useSpeechModels,
-  voicesFor,
   type HearingModelView,
   type InstallProgress,
   type Machine,
-  type VoiceView,
 } from "./speech_models";
+export {
+  useVoicebox,
+  useVoiceboxProgress,
+  useVoiceboxVoices,
+  voiceboxState,
+  voiceboxVoices,
+  warmVoicebox,
+  VOICEBOX_APP_ID,
+  type VoiceboxState,
+  type VoiceboxVoice,
+} from "./voicebox";
 export { vocativeRouting } from "./vocative_route";
 export { matchVocative, type Vocative } from "./vocative";
 export { noteAsk } from "./capture/open_note";

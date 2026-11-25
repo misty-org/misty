@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Ban, CircleUserRound, Hand, Trash2, Users } from "lucide-react";
+import { Ban, Hand, Trash2, Users } from "lucide-react";
 import {
   Button,
   ChannelWelcome,
@@ -13,11 +13,13 @@ import {
   PersonProfile,
   PersonProfileSection,
   PresenceFace,
+  profileIcons,
   SkeletonList,
   Text,
   type AvatarSize,
 } from "@misty/ui";
 import type { CachedResource } from "@/api/cache/cached_resource";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import {
   ChatAvatar,
   SpaceAvatar,
@@ -31,7 +33,7 @@ import { useOpenDm } from "./DmMembers";
 import { usePersonBanner } from "./person_banner";
 import { useCustomStatus, usePresence } from "./status_store";
 
-export const profileIcon = CircleUserRound;
+export const profileIcon = profileIcons.person;
 
 const longDate = new Intl.DateTimeFormat(undefined, {
   month: "long",
@@ -44,7 +46,7 @@ export function DmFace({
   size,
 }: {
   person: Person;
-  size?: AvatarSize;
+  size?: Exclude<AvatarSize, "glyph">;
 }) {
   const presence = usePresence(person.user_id);
   const picture = useMemberPicture(person.user_id, person.avatar_version);
@@ -55,6 +57,7 @@ export function DmFace({
         name={person.username}
         src={picture ?? undefined}
         size={size}
+        outline={avatarOutline(person.avatar_decoration)}
       />
     </PresenceFace>
   );
@@ -73,12 +76,14 @@ export function DmWelcome({
     return (
       <ChannelWelcome
         icon={Users}
+        align="center"
         title={name}
         line={`This is the beginning of the ${name} group.`}
       />
     );
   return (
     <ChannelWelcome
+      align="center"
       mark={<DmFace person={other} size="xl" />}
       title={other.username}
       line={`This is the beginning of your direct message history with ${other.username}.`}
@@ -148,7 +153,7 @@ function SharedSpaceRow({ space }: { space: SharedSpace }) {
     <NavRow onClick={() => navigate(spaceChatPath(space.id))}>
       <SpaceAvatar
         space={space}
-        className="size-5 rounded-md"
+        className="size-6 rounded-md"
         fallbackClassName="text-micro font-semibold"
       />
       <OverflowFadeText className="flex-1">{space.name}</OverflowFadeText>
@@ -168,6 +173,7 @@ function MutualFriend({ person, onOpen }: { person: Person; onOpen: (userId: str
           name={person.username}
           src={picture ?? undefined}
           size="sm"
+          outline={avatarOutline(person.avatar_decoration)}
         />
       }
       name={person.username}
@@ -180,10 +186,14 @@ function MutualFriend({ person, onOpen }: { person: Person; onOpen: (userId: str
 
 export function DmProfile({
   person,
+  now,
+  actions,
   onRemove,
   onBlock,
 }: {
   person: Person;
+  now?: ReactNode;
+  actions?: ReactNode;
   onRemove: () => void;
   onBlock: () => void;
 }) {
@@ -205,6 +215,7 @@ export function DmProfile({
       face={<DmFace person={person} size="xl" />}
       name={person.username}
       line={custom || undefined}
+      actions={actions}
       menu={
         friend ? (
           <>
@@ -214,6 +225,7 @@ export function DmProfile({
         ) : undefined
       }
     >
+      {now ? <PersonProfileSection title="Now">{now}</PersonProfileSection> : null}
       {since && !Number.isNaN(since.getTime()) ? (
         <PersonProfileSection title="Friends since">
           <Text size="control">{longDate.format(since)}</Text>

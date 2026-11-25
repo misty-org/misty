@@ -1,8 +1,9 @@
 use std::time::Duration;
 
-use tauri::Webview;
+use tauri::{AppHandle, Webview};
 
 use super::bundle;
+use super::installed;
 use super::manifest::{AppManifest, Permission};
 use super::mcp;
 use super::permissions::{self, Kind};
@@ -61,6 +62,16 @@ pub async fn space_app_bundle_install(
     wrap: Option<bundle::Wrap>,
 ) -> Result<AppManifest, String> {
     person_window(&webview)?;
+    install_bundle(app_id, version, url, sha256, wrap).await
+}
+
+pub(crate) async fn install_bundle(
+    app_id: String,
+    version: String,
+    url: String,
+    sha256: String,
+    wrap: Option<bundle::Wrap>,
+) -> Result<AppManifest, String> {
     let mut wrap = wrap;
     if let Some(wrap) = wrap.as_mut() {
         for file in &mut wrap.add_files {
@@ -157,12 +168,18 @@ pub fn space_app_program_withdraw(webview: Webview, app_id: String) -> Result<()
 #[tauri::command]
 pub async fn space_app_session_open(
     webview: Webview,
+    app: AppHandle,
     space_id: String,
     app_id: String,
     version: String,
-    approved: Vec<Permission>,
 ) -> Result<String, String> {
     person_window(&webview)?;
+    let installed = installed::find(&app, &app_id)?
+        .ok_or_else(|| "That app isn't on this computer.".to_owned())?;
+    if installed.version != version {
+        return Err("This computer has another version of the app. Open it again.".into());
+    }
+    let approved: Vec<Permission> = installed.permissions;
     let label = webview.label().to_owned();
     let generation = permissions::window_generation(&label);
     tauri::async_runtime::spawn_blocking(move || {

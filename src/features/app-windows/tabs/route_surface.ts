@@ -4,6 +4,7 @@ export function isRetiredWebRoute(pathname: string): boolean {
   const path = pathname.split(/[?#]/)[0];
   return (
     ["/", "/new", "/browser", "/discover"].includes(path) ||
+    (path.startsWith("/browser/") && !webTabId(path)) ||
     (path.startsWith("/apps") && path !== "/apps/agents")
   );
 }
@@ -64,6 +65,8 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       "single",
     );
   }
+  const webTab = webTabId(path);
+  if (webTab) return request("browser", "tool:browser", "New tab", path, webTab, "multiple");
   if (path === "/friends")
     return request("direct", "tool:direct", "Friends", pathname, "direct", "single");
   if (path.startsWith("/dms/") && path.split("/").filter(Boolean).length === 2)
@@ -78,6 +81,11 @@ export function workspaceSurfaceFromRoute(pathname: string): OpenWorkspaceSurfac
       "single",
     );
   return null;
+}
+
+function webTabId(path: string): string {
+  const match = /^\/browser\/(web-[\w-]{8,64})$/.exec(path);
+  return match ? match[1] : "";
 }
 
 type SpaceWorkspaceTool = "explore" | "social" | "files" | "space";

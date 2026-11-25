@@ -54,7 +54,7 @@ export function FilePreview({ item, compact = false }: { item: FileItem; compact
     kind === "pdf" ||
     (kind === "document" && item.size <= DOCUMENT_MAX_BYTES);
   const url = streamed ? (sourceOf(item).previewUrl(item) ?? "") : "";
-  const placeholder = kind === "image" ? thumbnailFor(item) : undefined;
+  const placeholder = kind === "image" || kind === "video" ? thumbnailFor(item) : undefined;
   if (head.status === "loading") return <PaneLoading label={`Opening ${item.name}`} />;
   if (head.status === "failed")
     return <ErrorState inline title="This file couldn't be previewed" line={head.message} />;

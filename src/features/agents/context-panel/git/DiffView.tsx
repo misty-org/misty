@@ -6,6 +6,7 @@ import {
   ChoiceGroup,
   cn,
   IconButton,
+  OverflowFadeText,
   Pressable,
   PaneLoading,
   Separator,
@@ -154,9 +155,7 @@ export function DiffView(props: {
           <ArrowLeft />
         </IconButton>
         <Tooltip content={target.file}>
-          <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:var(--mask-fade-end)]">
-            {target.file}
-          </span>
+          <OverflowFadeText className="flex-1">{target.file}</OverflowFadeText>
         </Tooltip>
         <span>{target.staged ? "Staged" : "Unstaged"}</span>
         {!isImage && steps && steps.length > 1 ? (

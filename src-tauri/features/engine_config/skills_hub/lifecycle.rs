@@ -19,6 +19,15 @@ pub(super) async fn install_skill(
     target_ids: &[String],
     force: bool,
 ) -> SkillResult<Value> {
+    install_skill_from(skill_input, target_ids, force, None).await
+}
+
+pub(super) async fn install_skill_from(
+    skill_input: &Value,
+    target_ids: &[String],
+    force: bool,
+    local: Option<PathBuf>,
+) -> SkillResult<Value> {
     let skill_name_input = js_string(skill_input.get("name"));
     let skill_description_input = js_string(skill_input.get("description"));
     let directory_input = js_string(skill_input.get("directory"));
@@ -78,13 +87,41 @@ pub(super) async fn install_skill(
         ));
     }
 
-    let client = http_client()?;
-    let (branch, tree) = get_repo_tree(&client, &repo_owner, &repo_name, &repo_branch).await?;
-    let Some(source_dir) = resolve_existing_skill_dir(&tree, &source_dir) else {
-        return Err(SkillError::coded(
-            "invalid_input",
-            "SKILL.md not found in selected directory",
-        ));
+    let bundle: Option<crate::registry::files::RegistryFile> = skill_input
+        .get("bundle")
+        .cloned()
+        .and_then(|value| serde_json::from_value(value).ok());
+    let (branch, tree, source_dir, unpacked) = match (&local, &bundle) {
+        (Some(folder), _) => {
+            if !file_access::fs::is_file(folder.join("SKILL.md")) {
+                return Err(SkillError::coded("invalid_input", "The folder holds no SKILL.md"));
+            }
+            (repo_branch.clone(), Vec::new(), source_dir, Some(folder.clone()))
+        }
+        (None, Some(bundle)) => {
+            let folder = crate::registry::bundles::unpacked(bundle)
+                .await
+                .map_err(SkillError::other)?;
+            if !file_access::fs::is_file(folder.join("SKILL.md")) {
+                return Err(SkillError::coded(
+                    "invalid_input",
+                    "The registry's bundle holds no SKILL.md",
+                ));
+            }
+            (repo_branch.clone(), Vec::new(), source_dir, Some(folder))
+        }
+        (None, None) => {
+            let client = http_client()?;
+            let (branch, tree) =
+                get_repo_tree(&client, &repo_owner, &repo_name, &repo_branch).await?;
+            let Some(source_dir) = resolve_existing_skill_dir(&tree, &source_dir) else {
+                return Err(SkillError::coded(
+                    "invalid_input",
+                    "SKILL.md not found in selected directory",
+                ));
+            };
+            (branch, tree, source_dir, None)
+        }
     };
     let files = skill_dir_files(&tree, &source_dir);
 
@@ -111,7 +148,14 @@ pub(super) async fn install_skill(
     remove_path(&temp);
     ensure_dir(&temp)?;
     let download = async {
+        if let Some(folder) = &unpacked {
+            copy_dir(folder, &temp)?;
+        }
+        let client = if files.is_empty() { None } else { Some(http_client()?) };
         for entry in &files {
+            let Some(client) = client.as_ref() else {
+                break;
+            };
             let path = entry.get("path").and_then(Value::as_str).unwrap_or("");
             let relative = if path == source_dir {
                 Path::new(path)
@@ -129,7 +173,7 @@ pub(super) async fn install_skill(
                 ensure_dir(parent)?;
             }
             let text = fetch_text(
-                &client,
+                client,
                 &github_raw_url(&repo_owner, &repo_name, &branch, path),
             )
             .await?;
@@ -189,6 +233,18 @@ pub(super) async fn install_skill(
         installed.insert("sourceSignature".to_string(), json!(signature));
     }
     installed.insert("targets".to_string(), json!(&selected_targets));
+    if let Some(bundle) = &bundle {
+        installed.insert("bundleSha256".to_string(), json!(bundle.sha256));
+    }
+    for (from, to) in [("id", "registryId"), ("category", "registryCategory")] {
+        if let Some(value) = skill_input
+            .pointer(&format!("/registry/{from}"))
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty() && value.len() <= 200)
+        {
+            installed.insert(to.to_string(), json!(value));
+        }
+    }
 
     registry.skills.retain(|entry| {
         entry.get("id").and_then(Value::as_str) != Some(id.as_str())

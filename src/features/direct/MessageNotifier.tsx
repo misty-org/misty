@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect } from "react";
-import { useSpacesStore } from "@/features/spaces";
-import { chatMuteId, useMessageNotices } from "@/shared/lib/message_notices";
+import { conversationPath, isChatOnScreen, spaceChatPath, useSpacesStore } from "@/features/spaces";
+import { noticesMuted, useMessageNotices } from "@/shared/lib/message_notices";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { dmName, dmPath, peekDm } from "./direct_data";
+import { playCallSound } from "./calls/call_sounds";
 import { isDoNotDisturb } from "./status_store";
 
 interface MessageLike {
@@ -42,9 +43,8 @@ function mentions(content: unknown, userId: string, roleIds: readonly string[]):
 
 function myRoleIds(spaceId: string, userId: string): string[] {
   return (
-    useSpacesStore
-      .getState()
-      .membersBySpace[spaceId]?.find((member) => member.user_id === userId)?.role_ids ?? []
+    useSpacesStore.getState().membersBySpace[spaceId]?.find((member) => member.user_id === userId)
+      ?.role_ids ?? []
   );
 }
 
@@ -83,24 +83,29 @@ export function MessageNotifier({ accountId }: { accountId: string }) {
       if (type === "message.updated" && !mentioned) return;
       if (isDoNotDisturb()) return;
       const prefs = useMessageNotices.getState().value;
-      if (prefs.muted.includes(spaceId)) return;
-      if (prefs.muted.includes(chatMuteId(spaceId, detail.conversationId))) return;
+      const conversationId = detail.conversationId ?? "";
       const dm = peekDm(spaceId);
       const sender = String(message.sender_name ?? "").trim() || "Someone";
       let title: string;
       let route: string;
       if (dm) {
-        if (!prefs.direct) return;
+        if (!prefs.direct || noticesMuted(prefs, spaceId)) return;
         title = dm.kind === "group" ? `${sender} in ${dmName(dm, accountId)}` : sender;
         route = dmPath(spaceId);
       } else {
         if (prefs.spaces === "off") return;
         if (prefs.spaces === "mentions" && !mentioned) return;
+        if (!mentioned && noticesMuted(prefs, spaceId, conversationId)) return;
         const space = useSpacesStore.getState().spaces.find((item) => item.id === spaceId);
         title = space ? `${sender} in ${space.name}` : sender;
-        route = `/spaces/${encodeURIComponent(spaceId)}/chat`;
+        route = conversationId
+          ? conversationPath(spaceId, { id: conversationId })
+          : spaceChatPath(spaceId);
       }
+      if (isChatOnScreen(spaceId, conversationId)) return;
       remember(messageId);
+      if (prefs.sound) playCallSound("message");
+      if (document.hasFocus()) return;
       void invoke("chat_message_notify", {
         messageId,
         title,

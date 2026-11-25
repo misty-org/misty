@@ -1,14 +1,14 @@
 // Adapted from desktop-cc-gui (MIT, Copyright (c) 2026 zhukunpenglinyutong).
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useCachedResource } from "@/api/cache/cached_resource";
 import {
   DesktopSettingsRow as Row,
-  DesktopSettingsSection as Section,
+  DesktopSettingsRowSkeleton,
   type SettingsContentProps,
 } from "@/features/settings";
 import { confirmAction } from "@/shared/lib/confirm_action";
 import { hasTauriInternals } from "@/shared/platform/tauri";
-import { Button, cn, ErrorState, Skeleton, SkeletonControl, useNotice } from "@misty/ui";
+import { Button, ErrorState, useNotice } from "@misty/ui";
 import { DropdownControl, SwitchControl } from "../settings/SettingsControls";
 import type { PetSummary } from "./pet_atlas";
 import { normalizePetScale, PET_SCALE_OPTIONS } from "./pet_scale";
@@ -61,61 +61,20 @@ function usePets() {
   };
 }
 
-function SkeletonRow(props: { width: string; status?: boolean; children: ReactNode }) {
-  return (
-    <div
-      data-setting-label=""
-      role={props.status ? "status" : undefined}
-      aria-label={props.status ? "Pet" : undefined}
-      aria-busy={props.status || undefined}
-      className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-8 py-3"
-    >
-      <div className="flex h-6 items-center">
-        <Skeleton className={cn("h-4", props.width)} />
-      </div>
-      <div className="flex items-center justify-end gap-2">{props.children}</div>
-    </div>
-  );
-}
-
-function PetsSkeleton() {
-  return (
-    <>
-      <SkeletonRow width="w-20" status>
-        <SkeletonControl kind="switch" />
-      </SkeletonRow>
-      <SkeletonRow width="w-10">
-        <SkeletonControl kind="select" className="w-50" />
-        <SkeletonControl kind="button" />
-      </SkeletonRow>
-      <SkeletonRow width="w-10">
-        <SkeletonControl kind="select" className="w-50" />
-      </SkeletonRow>
-    </>
-  );
-}
-
 export function PetsSection(_props: SettingsContentProps) {
   const { pets, settings, busy, act, loadError, retry } = usePets();
   if (!hasTauriInternals()) return null;
   if (loadError)
     return (
-      <Section title="Pet">
-        <ErrorState
-          inline
-          title="Couldn't read your pets"
-          line={loadError}
-          action={{ label: "Try again", onClick: retry }}
-        />
-      </Section>
+      <ErrorState
+        inline
+        title="Couldn't read your pets"
+        line={loadError}
+        action={{ label: "Try again", onClick: retry }}
+      />
     );
-  if (!pets || !settings) {
-    return (
-      <Section title="Pet">
-        <PetsSkeleton />
-      </Section>
-    );
-  }
+  if (!pets || !settings)
+    return <DesktopSettingsRowSkeleton label="Pet" rows={3} control={["select", "button"]} />;
   const selected = pets.find((pet) => pet.id === settings.petId);
   const importPet = () =>
     act(async () => {
@@ -128,7 +87,7 @@ export function PetsSection(_props: SettingsContentProps) {
     await act(() => petsApi.remove(pet.id));
   };
   return (
-    <Section title="Pet">
+    <>
       <Row label="Show pet">
         <SwitchControl
           checked={settings.enabled && Boolean(selected)}
@@ -169,6 +128,6 @@ export function PetsSection(_props: SettingsContentProps) {
           onValueChange={(value) => void act(() => petsApi.setScale(Number(value)))}
         />
       </Row>
-    </Section>
+    </>
   );
 }

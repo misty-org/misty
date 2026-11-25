@@ -42,10 +42,10 @@ export interface CatalogApp extends AppWrap {
 }
 
 export const registryApps = (): readonly CatalogApp[] =>
-  useRegistry.getState().apps.apps as readonly CatalogApp[];
+  useRegistry.getState().apps as readonly CatalogApp[];
 
 export const useRegistryApps = (): readonly CatalogApp[] =>
-  useRegistry((state) => state.apps.apps) as readonly CatalogApp[];
+  useRegistry((state) => state.apps) as readonly CatalogApp[];
 
 export function catalogLogoUrl(app: Pick<CatalogApp, "logo">): string {
   if (!app.logo.startsWith("https://")) return app.logo;

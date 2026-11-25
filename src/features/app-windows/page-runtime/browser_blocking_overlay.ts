@@ -11,8 +11,10 @@ const browserBlockingOverlaySelector = [
   '[role="menu"][data-state="open"]',
   '[role="dialog"][data-state="open"]',
   '[role="listbox"][data-state="open"]',
+  '[data-slot="sheet-content"][data-state="open"]',
   '[data-slot="workspace-overlay"]',
   '[data-slot="suggestion-list"]',
+  '[data-slot="tour"]',
   '[data-slot="viewport-layer"][role="dialog"]',
 ].join(",");
 const overlaps = (a: DOMRect, b: DOMRect) =>

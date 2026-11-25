@@ -3,7 +3,12 @@ import type { WorkspaceDockNode, WorkspaceView } from "@/features/app-windows";
 
 export function keepsLayoutWhileHidden(view: WorkspaceView): boolean {
   if (view.placeholder) return false;
-  return view.surfaceId === "space" || view.surfaceId === "agents" || view.surfaceId === "direct";
+  return (
+    view.surfaceId === "space" ||
+    view.surfaceId === "agents" ||
+    view.surfaceId === "direct" ||
+    view.surfaceId === "browser"
+  );
 }
 
 export function treeKeepsLayoutWhileHidden(root: WorkspaceDockNode): boolean {

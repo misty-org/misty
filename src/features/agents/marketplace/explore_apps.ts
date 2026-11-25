@@ -1,44 +1,40 @@
 import type { MarkRender } from "@misty/ui";
-import type { ComponentType } from "react";
 
 export interface ExploreCatalogApp {
   id: string;
+  kind?: "site";
   name: string;
+  description?: string;
+  maker: string;
+  upstream: string;
+  license: string;
   version: string;
+  size: number;
   permissions: string[];
   logo: string;
   icon_render?: MarkRender;
+  banner?: string;
+  screenshots?: string[];
 }
 
-export interface ExploreAppUpdate {
-  app: ExploreCatalogApp;
-  from: string;
-}
-
-export interface ExploreAppUpdates {
-  updates: ExploreAppUpdate[];
+export interface ExploreInstalledApps {
+  listed: readonly ExploreCatalogApp[];
   loaded: boolean;
   error: string;
   reload(): void;
-  install(
-    appId: string,
-    version: string,
-    permissions: string[],
-  ): Promise<unknown>;
-}
-
-export interface ExploreAppsSectionProps {
-  spaceId: string;
-  canManage: boolean;
-  query?: string;
-  limit?: number;
-  onSeeAll?: () => void;
-  featured?: boolean;
+  versionOf(appId: string): string | undefined;
+  approvedOf(appId: string): string[];
+  downloadOf(appId: string): { received: number; total: number } | undefined;
+  install(appId: string, version: string, permissions: string[]): Promise<unknown>;
+  remove(appId: string): Promise<unknown>;
+  open(appId: string): void;
+  permissionLine(permission: string): string;
+  isSite(app: ExploreCatalogApp): boolean;
+  siteHost(app: ExploreCatalogApp): string;
 }
 
 export interface ExploreAppsParts {
-  useAppUpdates(spaceId: string): ExploreAppUpdates;
-  ExploreAppsSection: ComponentType<ExploreAppsSectionProps>;
+  useExploreInstalledApps(spaceId: string): ExploreInstalledApps;
   catalogLogoUrl(app: Pick<ExploreCatalogApp, "logo">): string;
 }
 

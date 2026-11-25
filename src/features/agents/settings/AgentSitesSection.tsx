@@ -2,7 +2,7 @@ import { useNotice } from "@misty/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { aiSurfaceApi } from "../runs/invocations/api";
 import { type AiUserSettings } from "../runs/invocations/ai_settings_types";
-import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
+import { DesktopSettingsRow } from "@/features/settings";
 import { SwitchControl, TextAreaControl } from "../../settings/SettingsControls";
 
 export function AgentSitesSection(props: { children?: ReactNode }) {
@@ -34,11 +34,11 @@ export function AgentSitesSection(props: { children?: ReactNode }) {
   const sites = settings?.agent_blocked_sites ?? [];
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
   return (
-    <DesktopSettingsSection title="Limits">
+    <>
       {props.children}
       <DesktopSettingsRow
         label="Banking, crypto and adult sites"
-        description="Agents read these sites but never act on them."
+        description="Agents never act on these sites, and never open them in your own tabs."
       >
         <SwitchControl
           checked={settings?.agent_block_sensitive ?? true}
@@ -62,6 +62,6 @@ export function AgentSitesSection(props: { children?: ReactNode }) {
           }
         />
       </DesktopSettingsRow>
-    </DesktopSettingsSection>
+    </>
   );
 }

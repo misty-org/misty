@@ -1,7 +1,5 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import type { Track } from "livekit-client";
+import { useLocation } from "react-router-dom";
 import {
   Captions,
   CaptionsOff,
@@ -16,7 +14,6 @@ import {
   MicOff,
   Minimize,
   MonitorUp,
-  PhoneOff,
   PictureInPicture2,
   Video,
   VideoOff,
@@ -24,42 +21,41 @@ import {
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Button,
   CallBar,
   CallCaptions,
   CallControl,
+  CallLeave,
   CallReactions,
   CallStage,
   CallTile,
   FloatingPip,
   IconButton,
-  MenuCheckItem,
   MenuItem,
-  MenuSeparator,
-  Surface,
   Text,
   ToolbarDivider,
-  ViewHeader,
-  ViewportLayer,
   ZoomControl,
 } from "@misty/ui";
-import { AgentAvatar } from "@/features/agents";
-import { useSpaceCan } from "@/features/spaces";
+import { AgentAvatar, useAgentScreen } from "@/features/agents";
+import { openSettings } from "@/features/settings";
+import { useMemberPicture, useSpaceCan } from "@/features/spaces";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { personTone } from "@/shared/lib/person_tone";
 import { personInitials } from "@/shared/lib/person_initials";
-import { hasTauriInternals } from "@/shared/platform/tauri";
-import { useCallStore } from "./call_store";
-import { callPath, useCallSession } from "./call_session_store";
+import { useCallSession } from "./call_session_store";
 import type { CallAgentView } from "./call_agents";
-import type { CallPerson } from "./use_live_kit_call";
-import { DeviceChoices, SpeakerChoices } from "./DeviceChoices";
+import type { CallPerson, CallVideo } from "./use_live_kit_call";
+import { CallFullscreenFrame } from "./CallFullscreenFrame";
+import { DeviceChoices } from "./DeviceChoices";
+import { MicrophoneMenu, SpeakerMenu } from "./CallAudioControls";
 import { callReactions } from "./call_reactions";
 import { CallPersonMenu } from "./CallPersonMenu";
-import { featured, useCallTitle, useStableOrder } from "./call_stage_order";
+import { featured, useStableOrder } from "./call_stage_order";
 
-const playing = new Map<Track, HTMLVideoElement>();
+const playing = new Map<CallVideo, HTMLVideoElement>();
 
-function TrackVideo({ track, self }: { track: Track; self: boolean }) {
+function TrackVideo({ track, self }: { track: CallVideo; self: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const element = ref.current;
@@ -75,16 +71,64 @@ function TrackVideo({ track, self }: { track: Track; self: boolean }) {
 }
 
 function Face({ person, name }: { person: CallPerson; name: string }) {
+  const face = useCallSession((state) => state.faceOf(person.id));
+  const picture = useMemberPicture(person.id, face?.avatar_version ?? 0);
   return (
-    <Avatar size="lg" tone={personTone(person.id)}>
+    <Avatar
+      size="lg"
+      tone={personTone(person.id)}
+      outline={avatarOutline(face?.avatar_decoration)}
+    >
+      {picture ? <AvatarImage src={picture} alt="" /> : null}
       <AvatarFallback>{personInitials(name)}</AvatarFallback>
     </Avatar>
+  );
+}
+
+function AgentTile({
+  agent,
+  name,
+  onRemove,
+}: {
+  agent: CallAgentView;
+  name: string;
+  onRemove?: () => void;
+}) {
+  const page = useAgentScreen(agent.conversationId);
+  const busy = agent.state === "thinking" || agent.state === "working";
+  const shown = busy && page ? page : undefined;
+  return (
+    <CallTile
+      name={shown ? `${name}’s screen` : name}
+      speaking={agent.state === "speaking"}
+      muted={agent.state === "working"}
+      deafened={agent.state === "working"}
+      fit="contain"
+      picture={shown ? <img src={shown} alt="" draggable={false} /> : undefined}
+      face={
+        agent.profile ? (
+          <AgentAvatar agent={agent.profile} large />
+        ) : (
+          <Avatar size="lg" tone={personTone(agent.key)}>
+            <AvatarFallback>{personInitials(agent.name)}</AvatarFallback>
+          </Avatar>
+        )
+      }
+      actions={
+        onRemove ? (
+          <IconButton label={`Send ${agent.name} away`} onClick={onRemove}>
+            <LogOut />
+          </IconButton>
+        ) : undefined
+      }
+    />
   );
 }
 
 const zoomLevels = [1, 1.5, 2, 3];
 
 export function CallStageView() {
+  const where = useCallSession((state) => state.where);
   const controls = useCallSession((state) => state.controls);
   const agent = useCallSession((state) => state.agent);
   const nameOf = useCallSession((state) => state.nameOf);
@@ -92,9 +136,11 @@ export function CallStageView() {
   const fullscreen = useCallSession((state) => state.fullscreen);
   const devicesOpen = useCallSession((state) => state.devicesOpen);
   const screenZoom = useCallSession((state) => state.screenZoom);
-  const live = useCallStore((state) => state.active?.state === "live");
-  const place = useCallStore((state) => state.active?.place);
-  const moderator = useSpaceCan(place?.kind === "voice" ? place.spaceId : "", "members.remove");
+  const live = Boolean(where?.live);
+  const withPeople = where?.kind !== "agent";
+  const canShow = where?.canShow ?? true;
+  const voiceSpaceId = where?.voiceSpaceId;
+  const moderator = useSpaceCan(voiceSpaceId ?? "", "members.remove");
   const everyone = controls?.people ?? [];
   const pickedNow = everyone.find((person) => person.id === pinned);
   const sharingNow = everyone.some((person) => !person.self && person.sharing);
@@ -103,6 +149,10 @@ export function CallStageView() {
   const people = ordered;
   const { pin, setFullscreen, setDevicesOpen, setScreenZoom } = useCallSession.getState();
   const label = (person: CallPerson) => (person.self ? "You" : nameOf(person.id));
+  const voiceSettings = () => {
+    setFullscreen(false);
+    openSettings("voice");
+  };
 
   const tile = (person: CallPerson, focused: boolean) => (
     <CallTile
@@ -116,6 +166,7 @@ export function CallStageView() {
       handPlace={person.handPlace}
       reaction={person.reaction}
       picture={person.camera ? <TrackVideo track={person.camera} self={person.self} /> : undefined}
+      mirror={person.self}
       face={<Face person={person} name={label(person)} />}
       actions={
         people.length > 1 ? (
@@ -124,7 +175,7 @@ export function CallStageView() {
             controls={controls}
             focused={focused}
             onFocus={() => pin(focused ? null : person.id)}
-            moderator={moderator && place?.kind === "voice"}
+            moderator={moderator && Boolean(voiceSpaceId)}
           />
         ) : undefined
       }
@@ -133,33 +184,13 @@ export function CallStageView() {
 
   const remove = agent?.remove;
   const agentTile = (agent: CallAgentView) => {
-    const name = agent.mine ? agent.name : `${agent.name}, ${nameOf(agent.owner)}’s agent`;
+    const profile = agent.profile;
     return (
-      <CallTile
+      <AgentTile
         key={agent.key}
-        name={name}
-        speaking={agent.state === "speaking"}
-        muted={agent.state === "working"}
-        deafened={agent.state === "working"}
-        face={
-          agent.profile ? (
-            <AgentAvatar agent={agent.profile} large />
-          ) : (
-            <Avatar size="lg" tone={personTone(agent.key)}>
-              <AvatarFallback>{personInitials(agent.name)}</AvatarFallback>
-            </Avatar>
-          )
-        }
-        actions={
-          agent.profile ? (
-            <IconButton
-              label={`Send ${agent.name} away`}
-              onClick={() => agent.profile && remove?.(agent.profile.id)}
-            >
-              <LogOut />
-            </IconButton>
-          ) : undefined
-        }
+        agent={agent}
+        name={agent.mine ? agent.name : `${agent.name}, ${nameOf(agent.owner)}’s agent`}
+        onRemove={profile && remove ? () => remove(profile.id) : undefined}
       />
     );
   };
@@ -226,7 +257,7 @@ export function CallStageView() {
       : undefined;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">
+    <div className="flex min-h-0 flex-1 flex-col p-3">
       <CallStage focus={focus} dimmed={controls.reconnecting}>
         {rest.map((person) => tile(person, false))}
         {(agent?.agents ?? []).map(agentTile)}
@@ -250,88 +281,84 @@ export function CallStageView() {
           off={!controls.micOn}
           disabled={!live}
           onClick={controls.toggleMic}
-          menuLabel="Audio devices"
-          menuOpen={devicesOpen === "audio"}
-          onMenuOpenChange={(open) => setDevicesOpen(open ? "audio" : null)}
-          menu={
-            <>
-              <DeviceChoices
-                kind="audioinput"
-                title="Microphone"
-                value={controls.activeDevice("audioinput")}
-                onPick={(deviceId) => controls.pickDevice("audioinput", deviceId)}
-              />
-              <SpeakerChoices
-                value={controls.activeDevice("audiooutput")}
-                onPick={(deviceId) => controls.pickDevice("audiooutput", deviceId)}
-              />
-              <MenuSeparator />
-              <MenuCheckItem
-                label="Noise reduction"
-                checked={controls.noiseReduction}
-                onCheckedChange={controls.setNoiseReduction}
-              />
-            </>
-          }
+          {...(controls.systemMic
+            ? {}
+            : {
+                menuLabel: "Microphone settings",
+                menuOpen: devicesOpen === "audio",
+                onMenuOpenChange: (open: boolean) => setDevicesOpen(open ? "audio" : null),
+                menu: <MicrophoneMenu audio={controls} onVoiceSettings={voiceSettings} />,
+              })}
         >
           {controls.micOn ? <Mic /> : <MicOff />}
         </CallControl>
         <CallControl
-          label={controls.cameraOn ? "Turn camera off" : "Turn camera on"}
-          off={!controls.cameraOn}
-          disabled={!live}
-          onClick={controls.toggleCamera}
-          menuLabel="Cameras"
-          menuOpen={devicesOpen === "camera"}
-          onMenuOpenChange={(open) => setDevicesOpen(open ? "camera" : null)}
-          menu={
-            <DeviceChoices
-              kind="videoinput"
-              title="Camera"
-              value={controls.activeDevice("videoinput")}
-              onPick={(deviceId) => controls.pickDevice("videoinput", deviceId)}
-            />
-          }
-        >
-          {controls.cameraOn ? <Video /> : <VideoOff />}
-        </CallControl>
-        <IconButton
-          label={controls.screenOn ? "Stop sharing" : "Share screen"}
-          variant="secondary"
-          aria-pressed={controls.screenOn}
-          disabled={!live}
-          onClick={controls.toggleScreen}
-        >
-          <MonitorUp />
-        </IconButton>
-        <IconButton
-          label={controls.handUp ? "Lower hand" : "Raise hand"}
-          variant="secondary"
-          aria-pressed={controls.handUp}
-          disabled={!live}
-          onClick={controls.toggleHand}
-        >
-          <Hand />
-        </IconButton>
-        <CallReactions reactions={callReactions} onPick={controls.react} disabled={!live} />
-        <IconButton
-          label={controls.captionsOn ? "Turn captions off" : "Turn captions on"}
-          variant="secondary"
-          aria-pressed={controls.captionsOn}
-          disabled={!live}
-          onClick={controls.toggleCaptions}
-        >
-          {controls.captionsOn ? <Captions /> : <CaptionsOff />}
-        </IconButton>
-        <IconButton
           label={controls.deafened ? "Undeafen" : "Deafen"}
-          variant="secondary"
-          aria-pressed={controls.deafened}
+          off={controls.deafened}
           disabled={!live}
           onClick={controls.toggleDeafen}
+          menuLabel="Sound settings"
+          menuOpen={devicesOpen === "sound"}
+          onMenuOpenChange={(open) => setDevicesOpen(open ? "sound" : null)}
+          menu={<SpeakerMenu audio={controls} onVoiceSettings={voiceSettings} />}
         >
           {controls.deafened ? <HeadphoneOff /> : <Headphones />}
-        </IconButton>
+        </CallControl>
+        {canShow ? (
+          <>
+            <CallControl
+              label={controls.cameraOn ? "Turn camera off" : "Turn camera on"}
+              off={!controls.cameraOn}
+              disabled={!live}
+              onClick={controls.toggleCamera}
+              menuLabel="Cameras"
+              menuOpen={devicesOpen === "camera"}
+              onMenuOpenChange={(open) => setDevicesOpen(open ? "camera" : null)}
+              menu={
+                <DeviceChoices
+                  kind="videoinput"
+                  title="Camera"
+                  value={controls.activeDevice("videoinput")}
+                  onPick={(deviceId) => controls.pickDevice("videoinput", deviceId)}
+                />
+              }
+            >
+              {controls.cameraOn ? <Video /> : <VideoOff />}
+            </CallControl>
+            <IconButton
+              label={controls.screenOn ? "Stop sharing" : "Share screen"}
+              variant="secondary"
+              aria-pressed={controls.screenOn}
+              disabled={!live}
+              onClick={controls.toggleScreen}
+            >
+              <MonitorUp />
+            </IconButton>
+          </>
+        ) : null}
+        {withPeople ? (
+          <>
+            <IconButton
+              label={controls.handUp ? "Lower hand" : "Raise hand"}
+              variant="secondary"
+              aria-pressed={controls.handUp}
+              disabled={!live}
+              onClick={controls.toggleHand}
+            >
+              <Hand />
+            </IconButton>
+            <CallReactions reactions={callReactions} onPick={controls.react} disabled={!live} />
+            <IconButton
+              label={controls.captionsOn ? "Turn captions off" : "Turn captions on"}
+              variant="secondary"
+              aria-pressed={controls.captionsOn}
+              disabled={!live}
+              onClick={controls.toggleCaptions}
+            >
+              {controls.captionsOn ? <Captions /> : <CaptionsOff />}
+            </IconButton>
+          </>
+        ) : null}
         {agent?.trigger}
         <ToolbarDivider />
         {pictureInPicture ? (
@@ -346,80 +373,49 @@ export function CallStageView() {
           {fullscreen ? <Minimize /> : <Maximize />}
         </IconButton>
         <ToolbarDivider />
-        <IconButton label="Leave" variant="danger" onClick={controls.leave}>
-          <PhoneOff />
-        </IconButton>
+        <CallLeave onClick={controls.leave} />
       </CallBar>
     </div>
   );
 }
 
-function setWindowFullscreen(on: boolean) {
-  if (!hasTauriInternals()) return;
-  void getCurrentWindow()
-    .setFullscreen(on)
-    .catch(() => undefined);
-}
+const exitFullscreen = () => useCallSession.getState().setFullscreen(false);
 
 export function CallFullscreen() {
   const fullscreen = useCallSession((state) => state.fullscreen);
-  const active = useCallStore((state) => state.active);
-  const title = useCallTitle(active);
-  const windowFull = useRef(false);
-  useEffect(() => {
-    if (fullscreen === windowFull.current) return;
-    windowFull.current = fullscreen;
-    setWindowFullscreen(fullscreen);
-  }, [fullscreen]);
-  useEffect(
-    () => () => {
-      if (windowFull.current) setWindowFullscreen(false);
-    },
-    [],
-  );
-  useEffect(() => {
-    if (!fullscreen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") useCallSession.getState().setFullscreen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [fullscreen]);
-  if (!fullscreen || !active) return null;
+  const where = useCallSession((state) => state.where);
+  if (!fullscreen || !where) return null;
   return (
-    <ViewportLayer layer="workspace-overlay">
-      <Surface tone="page" className="flex size-full flex-col">
-        <ViewHeader title={title} />
-        <CallStageView />
-      </Surface>
-    </ViewportLayer>
+    <CallFullscreenFrame title={where.title} onExit={exitFullscreen}>
+      <CallStageView />
+    </CallFullscreenFrame>
   );
 }
 
 export function CallMiniPlayer() {
-  const active = useCallStore((state) => state.active);
+  const where = useCallSession((state) => state.where);
   const controls = useCallSession((state) => state.controls);
+  const agent = useCallSession((state) => state.agent);
   const pinned = useCallSession((state) => state.pinned);
   const fullscreen = useCallSession((state) => state.fullscreen);
   const corner = useCallSession((state) => state.pipCorner);
-  const title = useCallTitle(active);
   const location = useLocation();
-  const navigate = useNavigate();
-  if (!active || !controls || fullscreen) return null;
-  const home = callPath(active);
-  if (location.pathname === home || location.pathname.startsWith(`${home}/`)) return null;
+  if (!where || !controls || fullscreen || where.isHome(location)) return null;
   const video = featured(controls.people, pinned);
-  const speaker =
+  const other =
     controls.people.find((person) => !person.self && person.speaking) ??
-    controls.people.find((person) => !person.self) ??
-    controls.people[0];
+    controls.people.find((person) => !person.self);
+  const agentShown = agent?.agents.find((each) => each.profile);
+  const self = controls.people.find((person) => person.self);
+  let face: ReactNode = null;
+  if (other) face = <Face person={other} name={other.name} />;
+  else if (agentShown?.profile) face = <AgentAvatar agent={agentShown.profile} />;
+  else if (self) face = <Face person={self} name={self.name} />;
   const picture = video ? (
     <TrackVideo track={video} self={false} />
-  ) : speaker ? (
+  ) : face ? (
     <span>
-      <span className="grid size-full place-items-center">
-        <Face person={speaker} name={speaker.name} />
-      </span>
+      <span className="grid size-full place-items-center">{face}</span>
     </span>
   ) : (
     <span />
@@ -429,10 +425,10 @@ export function CallMiniPlayer() {
       <FloatingPip
         label="Call"
         picture={picture}
-        caption={title}
+        caption={where.title}
         corner={corner}
         onCornerChange={useCallSession.getState().setPipCorner}
-        onOpen={() => navigate(home)}
+        onOpen={where.open}
         openLabel="Go back to the call"
         actions={
           <>
@@ -443,9 +439,7 @@ export function CallMiniPlayer() {
             >
               {controls.micOn ? <Mic /> : <MicOff />}
             </IconButton>
-            <IconButton label="Leave" onClick={controls.leave}>
-              <PhoneOff />
-            </IconButton>
+            <CallLeave onClick={controls.leave} />
           </>
         }
       />

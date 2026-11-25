@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { notify } from "@misty/ui";
-import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
+import { DesktopSettingsRow as Row } from "@/features/settings";
 import { DropdownControl } from "@/features/settings/SettingsControls";
 import { TextControl } from "@/features/settings/SettingsTextControls";
 import type { ChosenStatus } from "../api";
@@ -42,7 +42,7 @@ export function StatusSection() {
         notify({ message: "Your status couldn't be changed. Try again.", tone: "error" }),
       );
   return (
-    <Section title="Status">
+    <>
       <Row label="Show as">
         <DropdownControl
           value={mine.chosen}
@@ -74,6 +74,6 @@ export function StatusSection() {
           }}
         />
       </Row>
-    </Section>
+    </>
   );
 }

@@ -31,7 +31,15 @@ export { useLessonStore } from "./tutor/lessons/lesson_store";
 export { BrowserContextMenuBridge } from "./conversations/context/BrowserContextMenuBridge";
 export { MistyContextBridgeHost } from "./conversations/context/MistyContextBridgeHost";
 export { useMistyStore } from "./conversations/state/use_misty_store";
-export { agentCallTurn, callAgents, type CallTurn } from "./calls/agent_call_turn";
+export {
+  agentCallGreeting,
+  agentCallTurn,
+  callAgents,
+  type CallFrame,
+  type CallTurn,
+} from "./calls/agent_call_turn";
+export { useAgentScreen } from "./calls/agent_screen";
+export { agentCallsHost, type AgentCallsHost } from "./calls/agent_calls_host";
 export { AgentExecutionSurface } from "./island/AgentExecutionSurface";
 export { agentAccountId } from "./personal/agent_account";
 export { desktopDeviceGrants } from "./personal/device_grants";
@@ -59,9 +67,19 @@ export { MistyMarkdown } from "./runs/markdown/MistyMarkdown";
 
 export {
   AgentDefaultsSection,
+  AgentFoldersSection,
   AgentPermissionsSection,
-  CompanionSection,
 } from "./settings/FeatureSections";
+export { AgentGrantsSection } from "./settings/AgentGrantsSection";
+export { FilesAccessSection } from "./settings/FilesAccessSection";
+export { SandboxPermissionsSection } from "./settings/SandboxPermissionsSection";
+export { ScreenLocationSection } from "./settings/ScreenLocationSection";
+export {
+  TutorBehaviorSection,
+  TutorSettings,
+  TutorTalkingSection,
+  TutorTourSection,
+} from "./tutor/cursor/TutorSettings";
 
 export { spaceAgentsApi, type SpaceAgent } from "./api/space_agents";
 export { copyAgent, removeAgent } from "./personal/save_agent";
@@ -100,7 +118,6 @@ export {
 export { filesApi, imageFileUrl, type DirEntry } from "./context-panel/files/files_api";
 export { useProjectsHome, useProjectsHomePath } from "./shared-folders/projects_home";
 export { RunNotifier } from "./runs/notices/RunNotifier";
-export { PersonaCatalogSection } from "./personas";
 export { projectApi, type GitStatus } from "./context-panel/project_api";
 export { useContextPanel } from "./context-panel/context_panel_store";
 export { endNewChatTerminals } from "./page/use_view_conversation";
@@ -120,6 +137,7 @@ export {
 export { PickUpDialog } from "./pickup/PickUpDialog";
 export { pickUpRequest, pickUpTopic } from "./pickup/pick_up";
 export { runOnEngine } from "./engines/engine_run";
+export { attachFileToChat } from "./conversations/composer/attach_to_chat";
 export { cleanupOnEngine } from "./engines/misty_calls";
 export { EngineSection } from "./engines/EngineSection";
 export {
@@ -140,6 +158,7 @@ export { defaultEngineAgent } from "./engines/default_engine";
 export { directAppsApi } from "./connected-apps/direct_api";
 export { openFolderFile, searchFolderFiles } from "./context-panel/files/folder_file_search";
 export { tourCorner, type AgentSurfaceTour } from "./TourCorner";
+export { memberFace } from "./threads/member_face";
 export {
   AgentBrowsingStatus,
   ApprovalsStatus,
@@ -171,3 +190,4 @@ export { useThreadWork, watchThreadWork } from "./threads/thread_work";
 export { useOthersThreads } from "./threads/agent_threads";
 export type { SharedThread } from "./threads/shared_threads";
 export { homeSpaceOf } from "./personal/agent_home_space";
+export { useAgentBrowser } from "./agent-browser/agent_browser_store";

@@ -149,6 +149,18 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       ),
     [spaceId, upload],
   );
+  const attachFiles = useCallback(
+    (files: File[]) =>
+      upload(
+        files.map(
+          (file) => (conversation?: string) =>
+            spacesApi.uploadLibraryBlob(spaceId, file, file.name, "attachment", {
+              conversationId: conversation,
+            }),
+        ),
+      ),
+    [spaceId, upload],
+  );
   return useMemo(
     () => ({
       text,
@@ -166,6 +178,7 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       reset,
       uploadAttachments,
       attachDriveFiles,
+      attachFiles,
     }),
     [
       setText,
@@ -182,6 +195,7 @@ export function useSpaceChatDraft(spaceId: string, conversationId = "") {
       text,
       uploadAttachments,
       attachDriveFiles,
+      attachFiles,
     ],
   );
 }

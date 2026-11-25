@@ -1,15 +1,15 @@
 import { useCachedResource } from "@/api/cache/cached_resource";
 import { agentsDeviceSnapshot, forgetFolder, shareFolder } from "../personal/use_agents_store";
 import { shareFolderWarning } from "../plans/AgentFolderMenu";
-import { TutorSettings } from "../tutor/cursor/TutorSettings";
 import { confirmAction } from "@/shared/lib/confirm_action";
 import { hasTauriInternals } from "@/shared/platform/tauri";
 import { Button, useNotice } from "@misty/ui";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import {
   DesktopSettingsRow as Row,
   DesktopSettingsRowSkeleton,
-  DesktopSettingsSection as Section,
+  useSettingsSectionAction,
 } from "@/features/settings";
 import { definitionById, fromLegacy } from "@/features/settings";
 import { useDevicePreferences } from "@/features/settings";
@@ -18,25 +18,18 @@ import { useRailShown } from "../context-panel/rail_layout_store";
 import { useShowHiddenSteps } from "../activity/RunSteps";
 import { useComposerVim } from "../conversations/composer/controls/composer_vim";
 import { useSettingsStore } from "@/features/settings";
-import { AgentGrantsSection } from "./AgentGrantsSection";
 import { AgentSitesSection } from "./AgentSitesSection";
 import { PaymentsAskSection } from "./PaymentsAskSection";
-import { FilesAccessSection } from "./FilesAccessSection";
-import { SandboxPermissionsSection } from "./SandboxPermissionsSection";
-import { ScreenLocationSection } from "./ScreenLocationSection";
 import { PreferenceRow } from "@/features/settings";
 export function AgentDefaultsSection() {
   return (
     <>
-      <Section title="Defaults">
-        <CollaborationModeRow />
-        <PreferenceRow id="agents.plan_deep_thinking" />
-        <PanelSideRow />
-        <ToolsPanelRow />
-        <ComposerVimRow />
-        <HiddenStepsRow />
-      </Section>
-      <ScreenLocationSection />
+      <CollaborationModeRow />
+      <PreferenceRow id="agents.plan_deep_thinking" />
+      <PanelSideRow />
+      <ToolsPanelRow />
+      <ComposerVimRow />
+      <HiddenStepsRow />
     </>
   );
 }
@@ -112,38 +105,26 @@ function CollaborationModeRow() {
     </Row>
   );
 }
-export function CompanionSection() {
-  return <TutorSettings />;
-}
 export function AgentPermissionsSection() {
   return (
-    <>
-      <AgentSitesSection>
-        <PaymentsAskSection />
-      </AgentSitesSection>
-      <AgentGrantsSection />
-      {hasTauriInternals() ? <AgentScopeList /> : null}
-      {hasTauriInternals() ? <SandboxPermissionsSection /> : null}
-      {hasTauriInternals() ? <FilesAccessSection /> : null}
-    </>
+    <AgentSitesSection>
+      <PaymentsAskSection />
+    </AgentSitesSection>
   );
 }
-function AgentScopeList() {
-  const snapshot = useCachedResource("agents/device-snapshot", agentsDeviceSnapshot, {
-    persist: "device",
-  });
+export function AgentFoldersSection() {
+  const native = hasTauriInternals();
+  const snapshot = useCachedResource(
+    native ? "agents/device-snapshot" : null,
+    agentsDeviceSnapshot,
+    { persist: "device" },
+  );
   const scopes = snapshot.data?.scopes ?? [];
   const [actionError, setError] = useState("");
   const loadFailed = Boolean(snapshot.error) && !snapshot.refreshing;
   const error = actionError || (loadFailed ? "Shared folders could not be loaded. Try again." : "");
   const refresh = snapshot.reload;
   useNotice(Boolean(error), { message: error, tone: "error", onDismiss: () => setError("") });
-  if (snapshot.loading)
-    return (
-      <Section title="Shared folders">
-        <DesktopSettingsRowSkeleton label="Shared folders" rows={2} control="button" />
-      </Section>
-    );
   const share = async () => {
     if (!(await confirmAction(shareFolderWarning, "Share a folder"))) return;
     try {
@@ -154,8 +135,17 @@ function AgentScopeList() {
       setError(text && !text.includes("_") ? text : "That folder couldn’t be shared.");
     }
   };
+  useSettingsSectionAction(
+    native
+      ? { label: "Share a folder", icon: Plus, showLabel: true, onSelect: () => void share() }
+      : undefined,
+  );
+  if (!native) return null;
+  if (snapshot.loading)
+    return <DesktopSettingsRowSkeleton label="Shared folders" rows={2} control="button" />;
   return (
-    <Section title="Shared folders">
+    <>
+      {scopes.length ? null : <Row label="No shared folders">{null}</Row>}
       {scopes.map((s) => (
         <Row key={s.id} label={s.displayName}>
           <Button
@@ -181,9 +171,6 @@ function AgentScopeList() {
           </Button>
         </Row>
       ))}
-      <Row label="Add a folder">
-        <Button onClick={() => void share()}>Share a folder</Button>
-      </Row>
-    </Section>
+    </>
   );
 }

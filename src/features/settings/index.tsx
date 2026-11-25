@@ -46,7 +46,7 @@ export { definitionById, fromLegacy } from "./device-preferences/registry";
 export { validClockTime } from "./preferences/night_light";
 export { applyCachedAppTheme } from "./preferences/app_theme";
 export { useSettingsStore } from "./preferences/use_settings_store";
-export { GeneralSection } from "./sections/GeneralSection";
+export { LaunchOnLoginRow, ReopenSessionRows } from "./sections/GeneralSection";
 export { NotificationsSection } from "./sections/NotificationsSection";
 export { preloadSettingsSections, registerSettingsSections } from "./SettingsRegistry";
 export type { SettingsContentProps } from "./settings_types";

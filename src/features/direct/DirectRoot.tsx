@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { notify } from "@misty/ui";
 import { directApi } from "./api";
 import { useStatusUpdates } from "./status_store";
+import { useProfileUpdates } from "./direct_data";
 import { useDirectAccount } from "./direct_account";
 import { IncomingCallHost } from "./calls/IncomingCallHost";
 import { MessageNotifier } from "./MessageNotifier";
@@ -11,6 +12,7 @@ export function DirectRoot({ accountId }: { accountId: string | undefined }) {
     useDirectAccount.setState({ userId: accountId });
   }, [accountId]);
   useStatusUpdates(accountId);
+  useProfileUpdates(accountId);
   useEffect(() => {
     if (!accountId) return;
     let cancelled = false;

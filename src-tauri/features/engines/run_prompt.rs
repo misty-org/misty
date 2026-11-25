@@ -38,6 +38,22 @@ pub(super) fn with_history(prompt: String, history: &Value) -> String {
     )
 }
 
+pub(super) fn with_agent(prompt: String, agent: &Value, resumed: bool) -> String {
+    let name = agent["name"].as_str().unwrap_or("").trim();
+    if name.is_empty() {
+        return prompt;
+    }
+    let who = format!(
+        "(You are {name}, an agent this person made in Misty. Always speak and sign as {name}: \
+never call yourself Misty, the app, or the engine you run on."
+    );
+    let instructions = agent["instructions"].as_str().unwrap_or("").trim();
+    if resumed || instructions.is_empty() {
+        return format!("{who})\n\n{prompt}");
+    }
+    format!("{who} Your instructions:)\n\n{instructions}\n\n---\n\n{prompt}")
+}
+
 const BROWSER_HINT: &str = "\n\n(Use Misty's browser for this, through the misty MCP server: open a tab with \
 screen_open, read it with browser_snapshot and act with browser_steps, or do several page steps in one \
 browser_run program. Save what a program collects with its saveAs option rather than copying it into \

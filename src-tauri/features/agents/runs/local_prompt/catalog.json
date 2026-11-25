@@ -2932,12 +2932,12 @@
   "annotations": {
    "readOnlyHint": false
   },
-  "description": "Clean up: move items on this computer into Agent trash, where the person looks them over, puts back what they want and deletes the rest themselves. Use this, never a delete. The person may see an approval card first.",
+  "description": "Clean up: move items to the trash. A Space's files go to its .trash folder and other files on this computer to the system Trash, where the person looks them over, puts back what they want and deletes the rest themselves. Use this, never a delete. The person may see an approval card first.",
   "inputSchema": {
    "additionalProperties": false,
    "properties": {
     "paths": {
-     "description": "Full paths of the items to move to Agent trash.",
+     "description": "Full paths of the items to move to the trash.",
      "items": {
       "maxLength": 4096,
       "minLength": 1,

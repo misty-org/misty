@@ -5,6 +5,7 @@ import { Button, CodeText, OverflowFadeText, QuestionPanel, Text, Tooltip } from
 import { useWorkspaceViewShown } from "@/features/app-windows";
 import { ErrorNotice } from "../ErrorNotice";
 import {
+  actionQuestionRemembers,
   actionQuestionVerb,
   answerActionQuestion,
   dockQuestionsFor,
@@ -106,14 +107,14 @@ export function PermissionDock({ agentId }: { agentId?: string }) {
       error={error}
       actions={
         <>
-          <Tooltip content="Deny" shortcut="⌥⌫">
-            <Button variant="quiet" icon={X} disabled={closed} onClick={() => answer(false)}>
-              Deny
+          <Tooltip content="Allow once" shortcut="⌥↵">
+            <Button variant="primary" icon={Check} disabled={closed} onClick={() => answer(true)}>
+              Allow once
             </Button>
           </Tooltip>
           {rememberable ? (
             <Tooltip
-              content={`Always allow ${actionQuestionVerb(question)} on ${question.origin} while the chat is in Auto`}
+              content={actionQuestionRemembers(question)}
               shortcut="⌥⇧↵"
             >
               <Button
@@ -126,9 +127,9 @@ export function PermissionDock({ agentId }: { agentId?: string }) {
               </Button>
             </Tooltip>
           ) : null}
-          <Tooltip content="Allow once" shortcut="⌥↵">
-            <Button variant="primary" icon={Check} disabled={closed} onClick={() => answer(true)}>
-              Allow once
+          <Tooltip content="Deny" shortcut="⌥⌫">
+            <Button variant="quiet" icon={X} disabled={closed} onClick={() => answer(false)}>
+              Deny
             </Button>
           </Tooltip>
         </>

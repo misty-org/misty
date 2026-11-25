@@ -3,8 +3,8 @@ import { Button } from "@misty/ui";
 import { ErrorNotice } from "../conversations/ErrorNotice";
 import {
   actionQuestionHasDetails,
+  actionQuestionRemembers,
   actionQuestionText,
-  actionQuestionVerb,
   answerActionQuestion,
   useIslandQuestions,
 } from "./action_questions";
@@ -66,8 +66,7 @@ export function AgentActionQuestions() {
                 [
                   question.reason,
                   question.rememberable && question.origin
-                    ? `Remember: ${actionQuestionVerb(question)} on ${question.origin}. ` +
-                      "Applies when the chat is in Auto."
+                    ? `${actionQuestionRemembers(question)}.`
                     : "",
                 ]
                   .filter(Boolean)

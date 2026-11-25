@@ -38,9 +38,3 @@ pub struct VadSpec {
     pub model: PathBuf,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct VoiceSpec {
-    pub dir: PathBuf,
-    pub files: HashMap<String, String>,
-    pub speaker: i32,
-}

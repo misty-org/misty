@@ -84,12 +84,31 @@ const fallbackName: Record<CallDeviceKind, string> = {
 export const canPickSpeaker = () =>
   typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
 
+let audioAccess: Promise<void> | undefined;
+
+function askForAudioAccess(): Promise<void> {
+  audioAccess ??= (async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    for (const track of stream.getTracks()) track.stop();
+  })().catch(() => undefined);
+  return audioAccess;
+}
+
+const hiddenUntilAllowed = (devices: MediaDeviceInfo[], kind: CallDeviceKind) =>
+  kind !== "videoinput" &&
+  devices.some((device) => device.kind === kind && (!device.deviceId || !device.label));
+
 export function useCallDevices(kind: CallDeviceKind): CallDevice[] {
   const [devices, setDevices] = useState<CallDevice[]>([]);
   const refresh = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
-      const found = (await navigator.mediaDevices.enumerateDevices()).filter(
+      let all = await navigator.mediaDevices.enumerateDevices();
+      if (hiddenUntilAllowed(all, kind) && "getUserMedia" in navigator.mediaDevices) {
+        await askForAudioAccess();
+        all = await navigator.mediaDevices.enumerateDevices();
+      }
+      const found = all.filter(
         (device) => device.kind === kind && device.deviceId && device.deviceId !== "default",
       );
       setDevices(

@@ -58,6 +58,10 @@ pub async fn engine_mcp_add(
     request: McpAddRequest,
 ) -> Result<(), McpError> {
     person_window(&webview)?;
+    add_server(request).await
+}
+
+pub(crate) async fn add_server(request: McpAddRequest) -> Result<(), McpError> {
     let engine = ENGINES
         .iter()
         .copied()
@@ -167,6 +171,39 @@ pub async fn engine_mcp_add(
 
     let refs: Vec<&str> = args.iter().map(String::as_str).collect();
     run_ok(engine, &refs, ADD_LIMIT)
+        .await
+        .map(|_| ())
+        .map_err(|message| McpError::new("engine", message))
+}
+
+#[tauri::command]
+pub async fn engine_mcp_remove(
+    webview: tauri::Webview,
+    engine: String,
+    name: String,
+) -> Result<(), McpError> {
+    person_window(&webview)?;
+    remove_server(&engine, &name).await
+}
+
+pub(crate) async fn remove_server(engine: &str, name: &str) -> Result<(), McpError> {
+    let engine = ENGINES
+        .iter()
+        .copied()
+        .find(|known| *known == engine.trim())
+        .ok_or_else(|| McpError::invalid("This agent can't remove servers from Misty."))?;
+    let name = name.trim();
+    if !valid_name(name) {
+        return Err(McpError::invalid("That isn't a server Misty added."));
+    }
+    if name == MISTY_SERVER_NAME {
+        return Err(McpError::invalid("Misty's own server is managed by Misty."));
+    }
+    let args: Vec<&str> = match engine {
+        "claude" => vec!["mcp", "remove", "--scope", "user", name],
+        _ => vec!["mcp", "remove", name],
+    };
+    run_ok(engine, &args, ADD_LIMIT)
         .await
         .map(|_| ())
         .map_err(|message| McpError::new("engine", message))

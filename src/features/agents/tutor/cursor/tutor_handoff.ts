@@ -12,6 +12,7 @@ import { homeSpaceOf, ownSpaceOf } from "../../personal/agent_home_space";
 import { usePersonalAgentsStore } from "../../personal/personal_agents_store";
 import { useLocalExecution } from "../../runs/local-execution/local_execution_state";
 import { useLessonStore } from "../lessons/lesson_store";
+import type { MistyImageAttachment } from "../../conversations/state/conversation_types";
 import type { DisplayCapture } from "./protocol";
 
 export function handoffAgents(): AgentProfile[] {
@@ -112,13 +113,16 @@ export class NoAgentError extends Error {
 export async function handOff(input: {
   agent: AgentProfile;
   instruction: string;
+  shown?: string;
   key: string;
   turn: number;
   interactionMode: "team" | "auto";
   screens: DisplayCapture[];
   permissionMode?: "ask";
+  conversationId?: string;
+  attachments?: MistyImageAttachment[];
 }): Promise<{ invocationId: string; conversationId: string }> {
-  let conversationId = agentThreadId(input.agent.id);
+  let conversationId = input.conversationId ?? agentThreadId(input.agent.id);
   if (!conversationId) {
     const thread = newLocalConversation("New conversation", undefined, input.agent.id);
     useMistyStore.setState((state) => ({
@@ -132,7 +136,7 @@ export async function handOff(input: {
   try {
     await useMistyStore.getState().submitAnswer(
       input.instruction,
-      [],
+      input.attachments ?? [],
       undefined,
       [],
       { conversationId, context: [] },
@@ -142,6 +146,7 @@ export async function handOff(input: {
         interactionMode: input.interactionMode,
         ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
         idempotencyKey: input.key,
+        ...(input.shown ? { shown: input.shown } : {}),
         ...(input.screens.length ? { displayCaptures: input.screens } : {}),
       },
     );

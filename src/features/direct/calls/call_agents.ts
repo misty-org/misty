@@ -10,8 +10,14 @@ import {
   type Room,
 } from "livekit-client";
 import { notify } from "@misty/ui";
-import { agentCallTurn, type CallTurn } from "@/features/agents";
-import { hear, matchVocative, renderSpeech, type HearingSession } from "@/features/voice";
+import { agentCallGreeting, agentCallTurn, type CallTurn } from "@/features/agents";
+import {
+  hear,
+  matchVocative,
+  renderSpeech,
+  warmVoicebox,
+  type HearingSession,
+} from "@/features/voice";
 import type { AgentProfile } from "@/shared/schemas";
 import { tapVoice } from "./agent_hearing";
 import { AgentVoice } from "./agent_voice";
@@ -27,6 +33,7 @@ export interface CallAgentView {
   mine: boolean;
   state: CallAgentState;
   profile?: AgentProfile;
+  conversationId?: string;
 }
 
 const FOLLOW_UP_MS = 8_000;
@@ -37,10 +44,12 @@ interface Own {
   profile: AgentProfile;
   state: CallAgentState;
   voice: AgentVoice;
+  ready: Promise<void>;
   turn?: {
     id: string;
     call: CallTurn;
     asker: string;
+    greeting: boolean;
     done: boolean;
     making: number;
     chain: Promise<void>;
@@ -69,6 +78,7 @@ export class CallAgents {
   private listeners = new Set<() => void>();
   private snapshot: CallAgentView[] = [];
   private disposed = false;
+  private deafNotice = false;
   private watchedMic?: Track;
   others = 0;
   nameOf: (identity: string) => string = (identity) => identity;
@@ -100,16 +110,20 @@ export class CallAgents {
 
   bring(profile: AgentProfile) {
     if (this.disposed || this.own.has(profile.id)) return;
+    void warmVoicebox().catch(() => undefined);
     const id = profile.id;
     const voice = new AgentVoice(this.room, id, () => this.played(id));
-    this.own.set(id, { profile, state: "listening", voice });
-    void voice.open().catch(() => {
+    const ready = voice.open();
+    ready.catch(() => {
       notify({ message: `${profile.name}’s voice couldn’t join the call.`, tone: "error" });
     });
+    const own: Own = { profile, state: "listening", voice, ready };
+    this.own.set(id, own);
     playCallSound("join");
     this.announce(id);
     this.hearEveryone();
     this.changed();
+    this.greet(own);
   }
 
   remove(id: string) {
@@ -167,6 +181,13 @@ export class CallAgents {
       if (this.disposed) return;
       if (event.kind === "started") this.interrupted(event.input);
       else if (event.kind === "heard" && event.text.trim()) this.said(event.text, event.input);
+      else if (event.kind === "failed" && !this.deafNotice) {
+        this.deafNotice = true;
+        notify({
+          message: event.error.trim() || "Your agent can’t hear this call.",
+          tone: "error",
+        });
+      }
     }).catch((error: unknown) => {
       notify({
         message:
@@ -268,7 +289,7 @@ export class CallAgents {
 
   private said(text: string, speaker: string) {
     const me = this.room.localParticipant.identity;
-    const free = [...this.own.values()].filter((own) => own.state === "listening");
+    const free = [...this.own.values()].filter(this.free);
     const profiles = free.map((own) => own.profile);
     const named = matchVocative(text, profiles) ?? matchVocative(`hey ${text}`, profiles);
     if (named) {
@@ -277,22 +298,50 @@ export class CallAgents {
       return;
     }
     const last = this.lastSpoke && this.own.get(this.lastSpoke.id);
-    if (!last || last.state !== "listening") return;
+    if (!last || !this.free(last)) return;
     const followUp = this.lastSpoke?.asker === speaker && Date.now() < (this.lastSpoke?.until ?? 0);
     const alone = this.others === 0 && speaker === me;
     if (followUp || alone) this.answer(last, text, speaker);
   }
 
+  private free = (own: Own) =>
+    own.state === "listening" || (own.state === "thinking" && Boolean(own.turn?.greeting));
+
+  private greet(own: Own) {
+    const turnId = crypto.randomUUID();
+    this.setState(own.profile.id, "thinking");
+    const call = agentCallGreeting(own.profile, "group", {
+      onSentence: (sentence) => this.speak(own, turnId, sentence),
+    });
+    this.follow(own, turnId, call, this.room.localParticipant.identity, true);
+  }
+
   private answer(own: Own, said: string, asker: string) {
-    const id = own.profile.id;
+    if (own.turn?.greeting) {
+      own.turn.call.stop();
+      own.turn = undefined;
+    }
     const me = this.room.localParticipant.identity;
     const turnId = crypto.randomUUID();
-    this.setState(id, "thinking");
+    this.setState(own.profile.id, "thinking");
     const call = agentCallTurn(own.profile, said, {
       asker: asker === me ? undefined : this.nameOf(asker),
       onSentence: (sentence) => this.speak(own, turnId, sentence),
     });
-    own.turn = { id: turnId, call, asker, done: false, making: 0, chain: Promise.resolve() };
+    this.follow(own, turnId, call, asker, false);
+  }
+
+  private follow(own: Own, turnId: string, call: CallTurn, asker: string, greeting: boolean) {
+    const id = own.profile.id;
+    own.turn = {
+      id: turnId,
+      call,
+      asker,
+      greeting,
+      done: false,
+      making: 0,
+      chain: Promise.resolve(),
+    };
     call.finished
       .catch((reason: unknown) => {
         if (own.turn?.id !== turnId) return;
@@ -320,6 +369,7 @@ export class CallAgents {
     turn.chain = turn.chain
       .then(async () => {
         const speech = await made;
+        await own.ready;
         if (own.turn?.id !== turnId) return;
         await own.voice.speak(speech.pcm, speech.rate);
         this.setState(own.profile.id, "speaking");

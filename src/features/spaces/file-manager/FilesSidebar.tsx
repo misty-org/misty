@@ -1,6 +1,5 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 import {
-  Bot,
   Clock,
   Download,
   FileText,
@@ -12,7 +11,7 @@ import {
   Usb,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ListRowSkeleton,
   Meter,
@@ -23,11 +22,11 @@ import {
   TagDot,
   Text,
   tagToneName,
+  useCollectionDropPlaces,
 } from "@misty/ui";
 import { folderName, useProjectFolders } from "@/features/agents";
 import {
   disk,
-  type AgentTrashUsage,
   type Drive,
   type FinderTag,
   type FreeSpace,
@@ -60,6 +59,7 @@ function PlaceRow({
     <NavRow
       current={here ?? (current !== null && samePlace(place, current))}
       onClick={() => onGo(place)}
+      data-collection-place={JSON.stringify(place)}
     >
       {Icon ? <Icon aria-hidden="true" /> : mark}
       <OverflowFadeText full className="min-w-0 flex-1">
@@ -134,7 +134,12 @@ function DeviceRow({
     current?.kind === "disk" &&
     (current.path === drive.path || current.path.startsWith(`${drive.path.replace(/\/$/, "")}/`));
   return (
-    <NavRow tall current={here} onClick={() => onGo({ kind: "disk", path: drive.path })}>
+    <NavRow
+      tall
+      current={here}
+      onClick={() => onGo({ kind: "disk", path: drive.path })}
+      data-collection-place={JSON.stringify({ kind: "disk", path: drive.path })}
+    >
       <Icon aria-hidden="true" />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <OverflowFadeText full>{drive.name}</OverflowFadeText>
@@ -182,23 +187,36 @@ export function FilesSidebar({
   picking,
   places,
   tags,
-  agentTrash,
   macos,
   folded,
   onFold,
   onGo,
+  drop,
 }: {
   current: FilesPlace | null;
   granted: boolean;
   picking: boolean;
   places: Places | null;
   tags: FinderTag[];
-  agentTrash: AgentTrashUsage | null;
   macos: boolean;
   folded: readonly string[];
   onFold(section: string, fold: boolean): void;
   onGo(place: FilesPlace): void;
+  drop?: {
+    canDrop(place: FilesPlace, ids: ReadonlyArray<string>, copy: boolean): boolean;
+    onDrop(place: FilesPlace, ids: ReadonlyArray<string>, copy: boolean): void;
+  };
 }) {
+  const navRef = useRef<HTMLElement>(null);
+  const placeOf = (key: string) => JSON.parse(key) as FilesPlace;
+  useCollectionDropPlaces(navRef, {
+    canDrop: (key, ids, copy) => Boolean(drop?.canDrop(placeOf(key), ids, copy)),
+    onDrop: (key, ids, copy) => drop?.onDrop(placeOf(key), ids, copy),
+    onDwell: (key) => {
+      const place = placeOf(key);
+      if (drop && !(current && samePlace(place, current))) onGo(place);
+    },
+  });
   const fixed: [string | undefined, string, LucideIcon][] = places
     ? [
         [places.home, "Home", House],
@@ -207,21 +225,19 @@ export function FilesSidebar({
         [places.downloads, "Downloads", Download],
       ]
     : [];
-  const drivePlace =
-    current?.kind === "space-drive" || current?.kind === "space-drive-trash" ? current : undefined;
+  const drivePlace = current?.kind === "space-drive" ? current : undefined;
   const sectionProps = { folded, onFold };
 
   return (
-    <nav aria-label="Places" className="grid content-start gap-3">
+    <nav ref={navRef} aria-label="Places" className="grid content-start gap-3">
       <SpaceDriveSection
         current={drivePlace}
         onGo={onGo}
-        onGoTrash={picking ? undefined : onGo}
         open={!folded.includes("spaces")}
         onOpenChange={(next) => onFold("spaces", !next)}
       />
       {granted ? (
-        <Section id="quick" title="Quick access" {...sectionProps}>
+        <Section id="quick" title="Quick Access" {...sectionProps}>
           <NavList>
             {fixed.map(([path, label, icon]) =>
               path ? (
@@ -250,25 +266,13 @@ export function FilesSidebar({
               onGo={onGo}
             />
             {!picking ? (
-              <>
-                <PlaceRow
-                  place={{ kind: "trash" }}
-                  current={current}
-                  icon={Trash2}
-                  label="Trash"
-                  onGo={onGo}
-                />
-                <PlaceRow
-                  place={{ kind: "agent-trash" }}
-                  current={current}
-                  icon={Bot}
-                  label="Agent trash"
-                  end={
-                    agentTrash && agentTrash.items > 0 ? formatBytes(agentTrash.bytes) : undefined
-                  }
-                  onGo={onGo}
-                />
-              </>
+              <PlaceRow
+                place={{ kind: "trash" }}
+                current={current}
+                icon={Trash2}
+                label="Trash"
+                onGo={onGo}
+              />
             ) : null}
           </NavList>
         </Section>

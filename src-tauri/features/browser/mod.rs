@@ -83,8 +83,6 @@ use crate::browser::pages::macos::{
     configure_browser_frame_rate, configure_browser_webview, native_macos_safari_user_agent,
     refresh_browser_cursor_ownership, reload_browser_webview, unregister_browser_cursor_ownership,
 };
-#[cfg(not(windows))]
-use crate::browser::pages::theme::browser_background;
 
 const MAX_SNAPSHOT_CHARS: usize = 256 * 1024;
 const MAX_INTERACTIVE_ELEMENTS: usize = 500;
@@ -187,6 +185,7 @@ pub mod input;
 pub mod kiri_link;
 pub mod link_previews;
 pub mod menus;
+pub mod page_media;
 pub mod page_pick;
 pub mod page_text;
 pub mod pages;
@@ -194,6 +193,8 @@ pub mod pages;
 pub mod profiles;
 pub mod site_data;
 pub mod site_icons;
+#[cfg(desktop)]
+pub mod web_tabs;
 #[cfg(test)]
 #[allow(clippy::disallowed_methods, clippy::disallowed_types)]
 mod tests;

@@ -2,8 +2,6 @@ import { folderName } from "@/features/agents";
 
 export type SpaceDrivePlace = { kind: "space-drive"; spaceId: string; path: string };
 
-export type SpaceDriveTrashPlace = { kind: "space-drive-trash"; spaceId: string };
-
 export type PickerPlace =
   SpaceDrivePlace | { kind: "computer" } | { kind: "folder"; root: string; path: string };
 

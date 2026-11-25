@@ -1,7 +1,4 @@
-import {
-  DesktopSettingsRow as SettingsRow,
-  DesktopSettingsSection as SettingsSectionBlock,
-} from "@/features/settings";
+import { DesktopSettingsRow as SettingsRow } from "@/features/settings";
 import { notify } from "@misty/ui";
 import { createDeviceSetting } from "@/shared/lib/device_setting";
 import { useEffect, useState } from "react";
@@ -53,7 +50,7 @@ export function DriveSettingsSection(props: SettingsContentProps) {
       .catch(() => setPaused(null));
   }, []);
   return (
-    <SettingsSectionBlock title="Drive">
+    <>
       <SettingsRow
         label="Pause syncing"
         description="Changes wait on this computer until you turn it back on or restart Misty."
@@ -115,6 +112,6 @@ export function DriveSettingsSection(props: SettingsContentProps) {
           }}
         />
       </SettingsRow>
-    </SettingsSectionBlock>
+    </>
   );
 }

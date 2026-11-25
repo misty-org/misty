@@ -12,7 +12,7 @@ export interface CatalogEngine {
 }
 
 export const useRegistryEngines = (): readonly CatalogEngine[] =>
-  useRegistry((state) => state.engines.engines) as readonly CatalogEngine[];
+  useRegistry((state) => state.engines) as readonly CatalogEngine[];
 
 export function useRegistryEngineIds(): readonly string[] {
   const engines = useRegistryEngines();

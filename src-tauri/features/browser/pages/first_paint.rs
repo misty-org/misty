@@ -86,3 +86,85 @@ pub(in crate::browser) fn release_first_paint(app: &AppHandle, id: &str) {
         );
     }
 }
+
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+struct UnpaintedPage {
+    background_reported: bool,
+    bare: bool,
+    page_finished: bool,
+}
+
+#[cfg(target_os = "macos")]
+fn unpainted_pages() -> &'static Mutex<HashMap<String, UnpaintedPage>> {
+    static UNPAINTED: OnceLock<Mutex<HashMap<String, UnpaintedPage>>> = OnceLock::new();
+    UNPAINTED.get_or_init(Default::default)
+}
+
+#[cfg(target_os = "macos")]
+pub(in crate::browser) fn clear_canvas_until_drawn(webview: &Webview) {
+    if let Ok(mut pages) = unpainted_pages().lock() {
+        pages.insert(webview.label().to_owned(), UnpaintedPage::default());
+    }
+    draw_page_canvas(webview, false);
+}
+
+#[cfg(target_os = "macos")]
+pub(in crate::browser) fn note_page_background(webview: &Webview, bare: bool) {
+    settle_unpainted_page(webview, |page| {
+        page.background_reported = true;
+        page.bare = bare;
+    });
+}
+
+#[cfg(target_os = "macos")]
+pub(in crate::browser) fn note_page_finished(webview: &Webview) {
+    settle_unpainted_page(webview, |page| page.page_finished = true);
+}
+
+#[cfg(target_os = "macos")]
+pub(in crate::browser) fn forget_unpainted_page(label: &str) {
+    if let Ok(mut pages) = unpainted_pages().lock() {
+        pages.remove(label);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn settle_unpainted_page(webview: &Webview, mark: impl FnOnce(&mut UnpaintedPage)) {
+    let canvas = unpainted_pages().lock().is_ok_and(|mut pages| {
+        let label = webview.label();
+        let Some(page) = pages.get_mut(label) else {
+            return false;
+        };
+        mark(page);
+        if !(page.background_reported && page.page_finished) {
+            return false;
+        }
+        let bare = page.bare;
+        pages.remove(label);
+        bare
+    });
+    if canvas {
+        draw_page_canvas(webview, true);
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn draw_page_canvas(webview: &Webview, draws: bool) {
+    use objc2::runtime::Bool;
+    use objc2_app_kit::NSView;
+    let _ = webview.with_webview(move |platform_webview| unsafe {
+        let Some(view) = platform_webview.inner().cast::<NSView>().as_ref() else {
+            return;
+        };
+        let settable: bool =
+            objc2::msg_send![view, respondsToSelector: objc2::sel!(_setDrawsBackground:)];
+        if settable {
+            let _: () = objc2::msg_send![view, _setDrawsBackground: Bool::new(draws)];
+        } else {
+            let value = objc2_foundation::NSNumber::numberWithBool(draws);
+            let key = objc2_foundation::NSString::from_str("drawsBackground");
+            let _: () = objc2::msg_send![view, setValue: &*value, forKey: &*key];
+        }
+    });
+}

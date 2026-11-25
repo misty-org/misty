@@ -5,6 +5,8 @@ pub(crate) mod frame_rate;
 #[cfg(target_os = "macos")]
 pub(crate) mod pointer_guard;
 #[cfg(target_os = "macos")]
+pub(crate) mod webkit_hooks;
+#[cfg(target_os = "macos")]
 mod website_data;
 mod webview;
 

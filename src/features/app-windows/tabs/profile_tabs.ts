@@ -13,7 +13,7 @@ import {
   type TabFields,
 } from "./profile_tab_record";
 import { useWorkspaceStore, type WorkspaceStore } from "./use_workspace_store";
-import { emptyAsideWorkspace, otherSide, type WorkspaceSide } from "./workspace_sides";
+import { emptyAsideWorkspace, type AsideWorkspace, type WorkspaceSide } from "./workspace_sides";
 import { normalizeWorkspaceLayout } from "../profiles/windows";
 import { knownWorkspaceTab } from "../recovery/known_workspace_views";
 
@@ -25,9 +25,10 @@ interface TabsForWindow {
 }
 
 function ownTabs(): { tab: WorkspaceTab; fields: TabFields }[] {
-  const { layout, side, aside } = useWorkspaceStore.getState();
+  const { layout, side, asides } = useWorkspaceStore.getState();
   const sides: [WorkspaceLayout, WorkspaceSide | undefined][] = [[layout, side]];
-  if (aside && side) sides.push([aside.layout, otherSide(side)]);
+  if (side)
+    for (const [key, aside] of Object.entries(asides ?? {})) sides.push([aside.layout, key]);
   return sides.flatMap(([held, heldSide]) =>
     layoutTabs(held)
       .filter((tab) => !tabStaysHere(tab))
@@ -44,8 +45,11 @@ function ownTabs(): { tab: WorkspaceTab; fields: TabFields }[] {
 }
 
 function localTabIds(): string[] {
-  const { layout, aside } = useWorkspaceStore.getState();
-  return [...layoutTabs(layout), ...(aside ? layoutTabs(aside.layout) : [])].map((tab) => tab.id);
+  const { layout, asides } = useWorkspaceStore.getState();
+  return [
+    ...layoutTabs(layout),
+    ...Object.values(asides ?? {}).flatMap((aside) => layoutTabs(aside.layout)),
+  ].map((tab) => tab.id);
 }
 
 function mergeTabs(
@@ -132,20 +136,32 @@ export function startProfileTabs(): () => void {
     if (!incoming.length && !removed.size) return;
     for (const { id, fields } of incoming) baseline.set(id, encodedFields(fields));
     const state = useWorkspaceStore.getState();
-    const here = incoming.filter(
-      ({ fields }) => !state.side || !fields.side || fields.side === state.side,
-    );
-    const away = incoming.filter((tab) => !here.includes(tab));
-    const leaving = (moved: typeof incoming) =>
-      new Set([...removed, ...moved.map(({ id }) => id)]);
+    const sideOfTab = ({ fields }: (typeof incoming)[number]) =>
+      !state.side || !fields.side ? state.side : fields.side;
+    const here = incoming.filter((tab) => sideOfTab(tab) === state.side);
+    const leaving = (kept: typeof incoming) =>
+      new Set([
+        ...removed,
+        ...incoming.filter((tab) => !kept.includes(tab)).map(({ id }) => id),
+      ]);
     const update: Partial<WorkspaceStore> = {
-      layout: mergeTabs(state.layout, here, leaving(away)),
+      layout: mergeTabs(state.layout, here, leaving(here)),
     };
-    if (state.aside || away.length) {
-      const aside = state.aside ?? emptyAsideWorkspace();
-      const layout = mergeTabs(aside.layout, away, leaving(here));
-      if (layout !== aside.layout) update.aside = { ...aside, layout };
+    const asides: Record<string, AsideWorkspace> = { ...state.asides };
+    let asidesChanged = false;
+    const keys = new Set([
+      ...Object.keys(asides),
+      ...incoming.map(sideOfTab).filter((key): key is string => Boolean(key) && key !== state.side),
+    ]);
+    for (const key of keys) {
+      const mine = incoming.filter((tab) => sideOfTab(tab) === key);
+      const aside = asides[key] ?? emptyAsideWorkspace();
+      const layout = mergeTabs(aside.layout, mine, leaving(mine));
+      if (layout === aside.layout && asides[key]) continue;
+      asides[key] = { ...aside, layout };
+      asidesChanged = true;
     }
+    if (asidesChanged) update.asides = asides;
     useWorkspaceStore.setState(update);
   };
 
@@ -162,7 +178,7 @@ export function startProfileTabs(): () => void {
     });
 
   const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
-    if (state.layout === previous.layout && state.aside === previous.aside) return;
+    if (state.layout === previous.layout && state.asides === previous.asides) return;
     clearTimeout(timer);
     timer = setTimeout(() => void inOrder(publish), publishDelayMs);
   });

@@ -104,13 +104,7 @@ export function createAppCalls(spaceId: string) {
       "calls.mute": async (params: Record<string, unknown>) => {
         const call = host().current();
         if (call?.spaceId !== spaceId) return;
-        const muted = params.muted === true;
-        if (!muted && call.deafened)
-          throw new HostError(
-            "permission_denied",
-            "The person has deafened themselves, so their microphone stays off.",
-          );
-        host().setMuted(muted);
+        host().setMuted(params.muted === true);
       },
     },
     watchChannels(emit: (data: unknown) => void): () => void {

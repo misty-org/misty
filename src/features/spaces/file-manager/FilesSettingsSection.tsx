@@ -4,7 +4,6 @@ import { disk, type ThumbnailCacheStatus } from "@/features/files";
 import {
   DesktopSettingsRow as SettingsRow,
   DesktopSettingsRowSkeleton,
-  DesktopSettingsSection as SettingsSectionBlock,
   type SettingsContentProps,
 } from "@/features/settings";
 import { DropdownControl } from "@/features/settings/SettingsControls";
@@ -49,8 +48,8 @@ export function FilesSettingsSection(props: SettingsContentProps) {
       : [...choices, { value: String(cache.limit), label: formatBytes(cache.limit) }];
     row = (
       <SettingsRow
-        label="Keep up to"
-        description={`${formatBytes(cache.used)} of thumbnails on this computer now.`}
+        label="Thumbnail cache"
+        description={`${formatBytes(cache.used)} on this computer now.`}
       >
         <DropdownControl
           value={String(cache.limit)}
@@ -70,5 +69,5 @@ export function FilesSettingsSection(props: SettingsContentProps) {
       </SettingsRow>
     );
   }
-  return <SettingsSectionBlock title="Thumbnails">{row}</SettingsSectionBlock>;
+  return row;
 }

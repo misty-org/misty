@@ -3,6 +3,7 @@ import { useAccountAvatarUrl } from "@/features/account";
 import { useUserStore } from "@/features/account/core";
 import { personTone } from "@/shared/lib/person_tone";
 import { personInitials } from "@/shared/lib/person_initials";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 
 const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const day = new Intl.DateTimeFormat(undefined, { dateStyle: "short" });
@@ -13,12 +14,13 @@ export function useYou() {
   const name = useUserStore((state) => state.me?.username || state.me?.email?.split("@")[0] || "");
   const version = useUserStore((state) => state.me?.avatar_version ?? 0);
   const picture = useAccountAvatarUrl(id, version);
-  return { id, name: name || "You", picture };
+  const outline = useUserStore((state) => avatarOutline(state.me?.avatar_decoration));
+  return { id, name: name || "You", picture, outline };
 }
 
 export function YouFace({ you }: { you: ReturnType<typeof useYou> }) {
   return (
-    <Avatar size="lg" tone={personTone(you.id || you.name)}>
+    <Avatar size="lg" tone={personTone(you.id || you.name)} outline={you.outline}>
       {you.picture ? <AvatarImage src={you.picture} alt="" /> : null}
       <AvatarFallback>{personInitials(you.name)}</AvatarFallback>
     </Avatar>

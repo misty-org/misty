@@ -177,6 +177,11 @@ pub(crate) fn send_shortcuts(page: &Webview, payload: &str) -> Result<(), String
     Ok(())
 }
 
+pub(crate) fn close_if_app_page(page: &Webview) -> Option<Result<(), String>> {
+    let label = page.label().to_owned();
+    frames::mount_of(&label).map(|mount| close(page, mount))
+}
+
 pub(crate) fn close_app_pages(app: &AppHandle) -> Result<(), String> {
     for (label, page) in app.webviews() {
         if let Some(mount) = frames::mount_of(&label) {
@@ -225,6 +230,17 @@ pub async fn space_app_page_open(
     frames::remember_app(&app);
     let owner = caller.window().label().to_owned();
     let kind = kind_of(&app_id, &version).await?;
+    if matches!(kind, Kind::Bundle) {
+        let (id, release) = (app_id.clone(), version.clone());
+        let serves = tauri::async_runtime::spawn_blocking(move || {
+            crate::apps::app_server::declared(&id, &release)
+        })
+        .await
+        .unwrap_or(false);
+        if serves {
+            crate::apps::app_server::url(&app, &app_id).await?;
+        }
+    }
     let channel = match &kind {
         Kind::Bundle => true,
         Kind::Site(site) => site.has_space_features(),
@@ -318,7 +334,13 @@ pub async fn space_app_page_open(
         if stays {
             return true;
         }
-        refuse_outside(&navigation_app, &navigation_mount, &navigation_id, url);
+        #[cfg(target_os = "macos")]
+        let page_itself = crate::browser::pages::macos::webkit_hooks::navigation_is_main_frame();
+        #[cfg(not(target_os = "macos"))]
+        let page_itself = true;
+        if page_itself {
+            refuse_outside(&navigation_app, &navigation_mount, &navigation_id, url);
+        }
         false
     })
     .on_new_window(move |url, _features| {
@@ -361,8 +383,6 @@ pub async fn space_app_page_open(
         },
         Kind::Bundle => builder,
     };
-    #[cfg(not(windows))]
-    let builder = builder.background_color(browser_background());
     #[cfg(windows)]
     let builder = builder.general_autofill_enabled(false);
     let (position, size) = logical_bounds(bounds.x, bounds.y, bounds.width, bounds.height);
@@ -381,6 +401,7 @@ pub async fn space_app_page_open(
         crate::browser::kiri_link::host_messages::install(&page)?;
     }
     permissions::install(&app, &page, &mount)?;
+    crate::browser::page_media::install(&page)?;
     #[cfg(target_os = "macos")]
     crate::browser::history_downloads::downloads::macos::install(&page)?;
     #[cfg(windows)]

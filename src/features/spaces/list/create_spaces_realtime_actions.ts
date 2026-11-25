@@ -33,7 +33,6 @@ const failedApplyStreakResetMs = 60_000;
 let failedApplyResync: { promise: Promise<void>; timer: number; settle: () => void } | null = null;
 let failedApplyStreak = 0;
 let failedApplyLastAt = 0;
-let resyncWantsApps = false;
 let realtimeReplayQuiet = true;
 let realtimeHasConnected = false;
 let realtimeProbeTimer: number | null = null;
@@ -60,7 +59,7 @@ let currentViewingActive = computeViewingActivity();
 const realtimeScope = {
   currentAccountId: () => realtimeAccountId,
   accountGeneration: () => readAccountGeneration(),
-  resync: () => (realtimeGet ? resyncSpaces(realtimeGet, { apps: true }) : Promise.resolve()),
+  resync: () => (realtimeGet ? resyncSpaces(realtimeGet) : Promise.resolve()),
   resyncAfterFailure: () => (realtimeGet ? resyncAfterFailedApply(realtimeGet) : Promise.resolve()),
 };
 
@@ -171,10 +170,10 @@ export function createSpacesRealtimeActions(
                   if (typeof envelope.newest_event_id === "number")
                     resetRealtimeCursor(accountId, envelope.newest_event_id);
                   else if (envelope.events.length === 0) doubtRealtimeCursor(accountId);
-                  void resyncSpaces(get, { apps: true });
+                  void resyncSpaces(get);
                 }
               } else if (envelope.type === "control") {
-                void resyncSpaces(get, { apps: false });
+                void resyncSpaces(get);
               } else if (envelope.type === "event") {
                 applyRealtimeEventSafely(envelope.event, accountId, get, set, realtimeScope);
               } else if (envelope.type === "presence") {
@@ -284,7 +283,7 @@ function resyncAfterFailedApply(get: () => SpacesStore): Promise<void> {
     promise,
     settle,
     timer: window.setTimeout(() => {
-      void resyncSpaces(get, { apps: true })
+      void resyncSpaces(get)
         .catch(() => undefined)
         .finally(() => {
           if (failedApplyResync === pending) failedApplyResync = null;
@@ -304,11 +303,8 @@ function cancelFailedApplyResync() {
   pending.settle();
 }
 
-function resyncSpaces(get: () => SpacesStore, options: { apps: boolean }) {
-  if (options.apps) resyncWantsApps = true;
+function resyncSpaces(get: () => SpacesStore) {
   return coalescedReload("spaces-resync", async () => {
-    const apps = resyncWantsApps;
-    resyncWantsApps = false;
     await get().load({ force: true });
     const state = get();
     const known = new Set(state.spaces.map((space) => space.id));
@@ -336,12 +332,6 @@ function resyncSpaces(get: () => SpacesStore, options: { apps: boolean }) {
         window.dispatchEvent(
           new CustomEvent(page, { detail: { type, space_id: space.id, payload: {} } }),
         );
-    if (apps)
-      window.dispatchEvent(
-        new CustomEvent("misty:space-apps-changed", {
-          detail: { accountId: realtimeAccountId, spaceId: "" },
-        }),
-      );
     await Promise.all(reads);
   });
 }
@@ -384,7 +374,6 @@ export function resetSpacesRealtimeRuntime(): void {
   stopRealtimeConnection();
   failedApplyStreak = 0;
   failedApplyLastAt = 0;
-  resyncWantsApps = false;
   resetCoalescedReloads();
   resetRealtimeCursors();
   forgetDeletedSpaceMessages();

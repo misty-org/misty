@@ -110,8 +110,10 @@ pub fn replaced_save(before: Option<&Item>, now: &Item, me: &str) -> bool {
 }
 
 pub fn revived(before: Option<&Item>, now: &Item, me: &str) -> bool {
-    before.is_some_and(|before| before.trashed && before.trashed_by.as_deref() == Some(me))
-        && now.is_live()
+    before.is_some_and(|before| {
+        before.trashed_at.is_some() && before.trashed_by.as_deref() == Some(me)
+    }) && now.is_live()
+        && now.trashed_at.is_none()
         && now.modified_by != me
 }
 
@@ -154,10 +156,8 @@ mod tests {
             modified_by: "ana".into(),
             modified_by_name: "Ana".into(),
             modified_at: String::new(),
-            trashed: false,
             trashed_at: None,
             trashed_by: None,
-            trash_hold: false,
             deleted: false,
             replaced_of: None,
             content_version: None,
@@ -243,7 +243,7 @@ mod tests {
     fn notices_come_from_the_feed() {
         let mut copy = item(1, Kind::File);
         copy.modified_by = "ben".into();
-        copy.trashed = true;
+        copy.trashed_at = Some("2028-04-01T00:00:00Z".into());
         copy.trashed_by = Some("ana".into());
         copy.replaced_of = Some(ItemId("drv_y".into()));
         assert!(replaced_save(None, &copy, "ben"));
@@ -251,7 +251,7 @@ mod tests {
         assert!(!replaced_save(None, &copy, "ana"));
 
         let mut before = item(4, Kind::File);
-        before.trashed = true;
+        before.trashed_at = Some("2028-04-01T00:00:00Z".into());
         before.trashed_by = Some("ben".into());
         let now = item(5, Kind::File);
         assert!(revived(Some(&before), &now, "ben"));

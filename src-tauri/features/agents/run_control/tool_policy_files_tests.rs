@@ -166,27 +166,15 @@ fn changes_ask_unless_the_engine_asks_nothing() {
 }
 
 #[test]
-fn files_trash_never_reaches_the_system_trash() {
+fn files_trash_never_deletes_outright() {
     let tool = include_str!("../../files/agent_tools_changes.rs");
-    let held = include_str!("../../files/agent_trash_moves.rs");
-    assert!(tool.contains("move_to_agent_trash("));
+    let moves = include_str!("../../files/agent_trash.rs");
+    assert!(tool.contains("move_to_trash_for_agent("));
+    assert!(moves.contains(".in_trash("));
     let direct = ["trash", "::delete("].concat();
-    for source in [tool, held] {
-        for system in [
-            direct.as_str(),
-            "trash_paths(",
-            "move_to_trash(",
-            "remove_dir_all(&path)",
-        ] {
-            if source == tool && system == "remove_dir_all(&path)" {
-                continue;
-            }
-            assert!(!source.contains(system), "{system}");
-        }
+    for source in [tool, moves] {
+        assert!(!source.contains(direct.as_str()));
     }
-    let root = file_access::paths::misty_root_dir().expect("a data folder");
-    let holding = crate::files::agent_trash::misty_holding().expect("a holding folder");
-    assert!(holding.starts_with(&root) && holding.ends_with("agent-trash"));
 }
 
 #[test]

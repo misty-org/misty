@@ -13,7 +13,8 @@ import type { AppFileRef } from "./space_app_files";
 import { createSpaceAppHandlers, type Source } from "./space_app_handlers";
 import { themeSource } from "./theme_source";
 import { appEntry, catalogSource, isSiteApp, runsHere, siteManifest } from "./third_party_apps";
-import { useSpaceApps } from "./use_space_apps";
+import { useInstalledApps } from "./use_installed_apps";
+import { spaceCan } from "../roles/use_space_roles";
 
 type AppRoute = { path: string; params: Record<string, string> };
 const fixedRoute = (file: string): Source<AppRoute> => {
@@ -45,14 +46,14 @@ export function SpaceAppPage({
     setViewingPlace({ spaceId: space.id, place: "app", itemId: appId });
     return () => leaveViewingPlace("app", appId);
   }, [space.id, appId]);
-  const { apps } = useSpaceApps(space.id);
+  const { apps } = useInstalledApps();
   const [pick, setPick] = useState<PickRequest | null>(null);
   const pending = useRef<PickRequest | null>(null);
   const installed = apps?.find((app) => app.app_id === appId);
   const catalog = installed ? appEntry(installed) : undefined;
   const name = catalog?.name ?? appId;
   useWorkspaceViewTitle(workspaceTabId, name);
-  const isMod = Boolean(space.permissions?.includes("apps.manage"));
+  const isMod = spaceCan(space, "administrator");
   const spaceNow = useRef({ name: space.name, isMod });
   spaceNow.current = { name: space.name, isMod };
   const spaceKey = `${space.id}:${user?.id}:${installed?.version ?? ""}:${JSON.stringify(installed?.permissions ?? [])}:${openedWith}`;
@@ -68,8 +69,8 @@ export function SpaceAppPage({
     return (
       <FramedPage>
         <EmptyState
-          title="This app isn’t added to the Space"
-          line="A mod can add it from the Apps list."
+          title="This app isn’t on this computer"
+          line="Get it from Explore to open it here."
         />
       </FramedPage>
     );

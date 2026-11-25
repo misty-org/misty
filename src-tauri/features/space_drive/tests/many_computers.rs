@@ -7,7 +7,7 @@ use std::sync::atomic::Ordering;
 
 use common::*;
 use proptest::prelude::*;
-use space_drive::{Drive, ItemId, Kind, LocalState, TrashBy};
+use space_drive::{Drive, ItemId, Kind, LocalState};
 
 const COMPUTERS: usize = 3;
 
@@ -230,14 +230,14 @@ fn run(actions: Vec<Action>) {
                     let drive = &drives[computer];
                     if let Some(node) = drive.node_at(&space(), &path(folder, file)).unwrap() {
                         intent.deleted(computer, drive, &node.id).await;
-                        drive.trash(&space(), &node.id, TrashBy::Person).unwrap();
+                        drive.trash(&space(), &node.id).unwrap();
                     }
                 }
                 Action::TrashFolder { computer } => {
                     let drive = &drives[computer];
                     if let Some(node) = drive.node_at(&space(), "/Folder").unwrap() {
                         intent.deleted(computer, drive, &node.id).await;
-                        drive.trash(&space(), &node.id, TrashBy::Person).unwrap();
+                        drive.trash(&space(), &node.id).unwrap();
                     }
                 }
                 Action::Sync { computer } => {
@@ -270,12 +270,14 @@ fn run(actions: Vec<Action>) {
         }
         let trashed = server.trashed_ids();
         for drive in &drives {
-            assert!(
-                ids(drive).is_disjoint(&trashed),
-                "a trashed item shows on a computer"
-            );
+            for id in ids(drive).intersection(&trashed) {
+                assert!(
+                    drive.in_trash(&space(), &ItemId(id.clone())).unwrap(),
+                    "a trashed item shows outside .trash on a computer"
+                );
+            }
         }
-        let wanted = server.live_tree();
+        let wanted = server.whole_tree();
         for drive in &drives {
             let shown: HashMap<String, (Kind, Option<String>)> = local_tree(drive)
                 .into_iter()

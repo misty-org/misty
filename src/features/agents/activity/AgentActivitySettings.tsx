@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { DesktopSettingsRow, DesktopSettingsSection } from "@/features/settings";
+import { DesktopSettingsRow } from "@/features/settings";
 import { invoke } from "@/native/invoke";
 import { confirmAction } from "@/shared/lib/confirm_action";
 import { hasTauriInternals } from "@/shared/platform/tauri";
@@ -27,7 +27,7 @@ export function AgentActivitySettings() {
     }
   };
   return (
-    <DesktopSettingsSection title="Agent activity">
+    <>
       <DesktopSettingsRow
         label="Clear agent steps"
         description={
@@ -46,7 +46,7 @@ export function AgentActivitySettings() {
       </DesktopSettingsRow>
       <ProjectsHomeRow native={native} />
       <ScratchFoldersRow native={native} />
-    </DesktopSettingsSection>
+    </>
   );
 }
 

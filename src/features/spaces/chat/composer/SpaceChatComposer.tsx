@@ -22,6 +22,7 @@ import { AgentMark } from "@/features/agents";
 import type { ChatComposerSuggestion } from "../../api/dto/space_chat";
 import type { SpaceMessage } from "../../api/dto/entities";
 import type { SpaceChatDraft } from "./use_space_chat_draft";
+import { useFileDropZone } from "@/shared/hooks/use_file_drop_zone";
 import { SpaceChatPicker } from "./SpaceChatPicker";
 import type { ChatSuggestionsState } from "../hooks/use_chat_suggestions";
 import type { useComposerInput } from "../hooks/use_composer_input";
@@ -118,6 +119,9 @@ export function SpaceChatComposer(props: {
   };
   const remaining = MAX_MESSAGE_LENGTH - draft.text.length;
   const noSlots = draft.attachmentSlotsLeft === 0;
+  const dropZone = useFileDropZone<HTMLDivElement>((files) => void draft.attachFiles(files), {
+    disabled: !props.canWrite || noSlots || draft.attachmentUploading,
+  });
   const addRows = (
     <>
       <MenuItem
@@ -206,7 +210,10 @@ export function SpaceChatComposer(props: {
         }}
       >
         <MessageComposer
+          ref={dropZone.ref}
           variant="card"
+          dragging={dropZone.dragging}
+          {...dropZone.handlers}
           data-tour="space-chat-composer"
           inputRef={textarea}
           inputProps={{

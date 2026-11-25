@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{State, Webview};
-use voice_speech::{Hearing, Recognizer, Voice};
+use voice_speech::{Hearing, Recognizer};
 
 use super::speech_models;
 
@@ -13,7 +13,13 @@ const SPEECH_EVENT: &str = "misty://speech";
 const SAID_EVENT: &str = "misty://speech-said";
 
 #[cfg(target_os = "macos")]
-const HELPER_PROFILE: &str = include_str!("../../tauri-permissions/permissions/speech-helper.sb");
+const HELPER_PROFILE: &str = r#"
+(version 1)
+(allow default)
+(deny process-exec)
+(allow process-exec (literal (param "TOOL")))
+(deny network*)
+"#;
 
 pub fn helper_command() -> Result<std::process::Command, String> {
     let program = crate::app::workers::program("speech")?;
@@ -60,7 +66,6 @@ pub struct SpeechState {
     next: AtomicU64,
     chosen: Mutex<Chosen>,
     recognizer: Mutex<Option<OpenRecognizer>>,
-    voices: Mutex<HashMap<String, Arc<Voice>>>,
     sessions: Mutex<HashMap<u64, Session>>,
     playing: Mutex<Vec<Arc<AtomicBool>>>,
     reading: Mutex<Option<Reading>>,
@@ -124,10 +129,7 @@ pub fn speech_support(
             .hearing
             .as_deref()
             .is_some_and(|id| speech_models::hearing_spec(id).is_some());
-    let speaking = chosen
-        .voice
-        .as_deref()
-        .is_some_and(|id| speech_models::voice_spec(id).is_some());
+    let speaking = super::voicebox::usable();
     Ok(SpeechSupport {
         recognition,
         speaking,
@@ -140,21 +142,6 @@ pub(super) fn forget_model(state: &SpeechState, id: &str) {
             slot.take();
         }
     }
-    if let Some(spec) = speech_models::voice_spec_any(id) {
-        if let Ok(mut voices) = state.voices.lock() {
-            voices.remove(&voice_key(&spec));
-        }
-    }
-}
-
-fn voice_key(spec: &voice_speech::VoiceSpec) -> String {
-    let mut files: Vec<String> = spec
-        .files
-        .iter()
-        .map(|(role, name)| format!("{role}={name}"))
-        .collect();
-    files.sort();
-    format!("{}|{}", spec.dir.display(), files.join(";"))
 }
 
 fn recognizer(state: &SpeechState) -> Result<Arc<Recognizer>, String> {
@@ -192,31 +179,21 @@ fn recognizer(state: &SpeechState) -> Result<Arc<Recognizer>, String> {
     Ok(recognizer)
 }
 
-fn voice(state: &SpeechState, id: Option<&str>) -> Result<(Arc<Voice>, i32), String> {
-    let id = match id {
-        Some(id) if !id.is_empty() => id.to_string(),
-        _ => state
-            .chosen
-            .lock()
-            .ok()
-            .and_then(|chosen| chosen.voice.clone())
-            .ok_or_else(|| voice_speech::reason("voice"))?,
-    };
-    let spec = speech_models::voice_spec(&id).ok_or_else(|| voice_speech::reason("voice"))?;
-    let key = voice_key(&spec);
-    if let Some(open) = state
-        .voices
+fn speaker(
+    app: &tauri::AppHandle,
+    state: &SpeechState,
+    id: Option<&str>,
+) -> Result<super::voicebox::Speaker, String> {
+    let (chosen_voice, language) = state
+        .chosen
         .lock()
-        .ok()
-        .and_then(|voices| voices.get(&key).cloned())
-    {
-        return Ok((open, spec.speaker));
-    }
-    let opened = Arc::new(Voice::open(&spec)?);
-    if let Ok(mut voices) = state.voices.lock() {
-        voices.insert(key, opened.clone());
-    }
-    Ok((opened, spec.speaker))
+        .map(|chosen| (chosen.voice.clone(), chosen.language.clone()))
+        .unwrap_or_default();
+    let voice = id
+        .filter(|id| !id.is_empty())
+        .map(str::to_owned)
+        .or(chosen_voice);
+    super::voicebox::Speaker::new(app, voice, language)
 }
 
 fn rate(state: &SpeechState, asked: Option<f32>) -> f32 {

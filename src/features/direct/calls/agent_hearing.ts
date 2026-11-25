@@ -12,7 +12,7 @@ export async function tapVoice(
   track: MediaStreamTrack,
   onPcm: (pcm: string) => void,
 ): Promise<() => void> {
-  const context = new AudioContext({ sampleRate: 16_000 });
+  const context = new AudioContext({ latencyHint: "interactive" });
   let stopped = false;
   try {
     await context.audioWorklet.addModule(workletUrl);
@@ -21,6 +21,7 @@ export async function tapVoice(
       numberOfInputs: 1,
       numberOfOutputs: 1,
       channelCount: 1,
+      channelCountMode: "explicit",
     });
     const silent = context.createGain();
     silent.gain.value = 0;

@@ -34,7 +34,6 @@ interface Live {
 }
 
 const KEPT = 80;
-const TRASH_SETTLE_MS = 300;
 const EARLY_KEPT = 256;
 const empty: ListingEntry = { items: null, status: "loading", generation: 0, updatedAt: 0 };
 
@@ -221,19 +220,6 @@ function followDrive(key: string, spaceId: string, path: string, hidden: boolean
   });
 }
 
-function followDriveTrash(key: string, spaceId: string) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const stop = onDriveChanged((changed) => {
-    if (changed.space_id !== spaceId) return;
-    clearTimeout(timer);
-    timer = setTimeout(() => read(key), TRASH_SETTLE_MS);
-  });
-  return () => {
-    clearTimeout(timer);
-    stop();
-  };
-}
-
 function start(key: string) {
   const state = live.get(key);
   if (!state) return;
@@ -241,7 +227,6 @@ function start(key: string) {
   if (place.kind === "disk") return openWatch(key, place.path, state.hidden);
   if (place.kind === "space-drive")
     state.stop = followDrive(key, place.spaceId, place.path, state.hidden);
-  else if (place.kind === "space-drive-trash") state.stop = followDriveTrash(key, place.spaceId);
   read(key);
 }
 

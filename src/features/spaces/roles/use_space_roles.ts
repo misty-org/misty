@@ -49,7 +49,6 @@ const memberDefaults: SpacePermission[] = [
   "messages.write",
   "attachments.upload",
   "storage.view_own_usage",
-  "studio.view",
   "ask.run",
   "space.leave",
 ];

@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Track } from "livekit-client";
 import { useNotice } from "@misty/ui";
+import { useUserStore } from "@/features/account";
 import { useSpacesStore } from "@/features/spaces";
 import { useDms } from "../direct_data";
 import { dmOf, type ActiveCall } from "./call_store";
-import { useCallSession } from "./call_session_store";
+import { callPath, useCallSession } from "./call_session_store";
 import { useCallAgent } from "./UseCallAgent";
 import { useLiveKitCall } from "./use_live_kit_call";
 import { useCallShortcuts } from "./use_call_shortcuts";
@@ -33,6 +35,11 @@ export function CallSession({ call, maxPeople }: { call: ActiveCall; maxPeople: 
     dmMembers?.find((member) => member.user_id === userId)?.username ??
     spaceMembers?.find((member) => member.user_id === userId)?.name ??
     "Someone";
+  const me = useUserStore((state) => state.me);
+  const faceOf = (userId: string) =>
+    dmMembers?.find((member) => member.user_id === userId) ??
+    spaceMembers?.find((member) => member.user_id === userId) ??
+    (me && me.id === userId ? me : undefined);
   const others = controls.people.filter((person) => !person.self).length;
   const agent = useCallAgent({
     room: controls.room,
@@ -41,16 +48,38 @@ export function CallSession({ call, maxPeople }: { call: ActiveCall; maxPeople: 
     others,
     nameOf,
   });
-  useCallShortcuts(controls);
+  const live = call.state === "live";
+  useCallShortcuts(controls, live);
+  const navigate = useNavigate();
+  const title =
+    call.place.kind === "voice"
+      ? call.place.name
+      : controls.people
+          .filter((person) => !person.self)
+          .map((person) => nameOf(person.id))
+          .join(", ") || "Call";
 
   useEffect(() => {
     useCallSession.getState().publish({
+      where: {
+        kind: "people",
+        title,
+        live,
+        canShow: true,
+        voiceSpaceId: call.place.kind === "voice" ? call.place.spaceId : undefined,
+        open: () => navigate(callPath(call)),
+        isHome: ({ pathname }) => {
+          const home = callPath(call);
+          return pathname === home || pathname.startsWith(`${home}/`);
+        },
+      },
       controls: {
         ...controls,
         people: controls.people.map((person) => ({ ...person, name: nameOf(person.id) })),
       },
       agent,
       nameOf,
+      faceOf,
     });
   });
   useEffect(() => () => useCallSession.getState().clear(), []);

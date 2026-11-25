@@ -25,8 +25,8 @@ mod changes;
 pub(crate) const INSTRUCTIONS: &str = "The files_* tools reach the files on this computer that \
 the person let Files open, by full path (start from their home folder). They never reach Misty's \
 data, keys or other secrets. Each change asks the person first unless they chose a no-asking mode. \
-Never delete: to clean up, propose a plan, then move what should go into Agent trash with \
-files_trash, where the person looks it over. files_reveal shows an item in the person's Files.";
+Never delete: to clean up, propose a plan, then move what should go with files_trash: a Space's \
+files go to its .trash and other files to the system Trash, where the person looks them over. files_reveal shows an item in the person's Files.";
 
 pub(crate) const DELETE: &str = "files.delete";
 pub(crate) const REVEAL_EVENT: &str = "files://reveal";
@@ -85,7 +85,7 @@ opening Files. Nothing was done."
         return Err(Refused {
             code: "delete_off",
             message:
-                "Agents don't delete files. Move it into Agent trash with files.trash instead. \
+                "Agents don't delete files. Move it to the trash with files.trash instead. \
 Nothing was deleted."
                     .to_owned(),
         });
@@ -377,17 +377,15 @@ mod tests {
     }
 
     #[test]
-    fn the_tools_never_name_the_system_trash() {
+    fn the_tools_never_delete_outright() {
         for source in [
             include_str!("agent_tools.rs"),
             include_str!("agent_tools_changes.rs"),
             include_str!("agent_tools_archive.rs"),
-            include_str!("agent_trash_moves.rs"),
+            include_str!("agent_trash.rs"),
         ] {
-            for system in ["trash::delete", "trash_paths", "move_to_trash"] {
-                assert!(!source.contains(&format!("{system}(")), "{system}");
-            }
+            assert!(!source.contains(&["trash", "::delete("].concat()));
         }
-        assert!(include_str!("agent_tools_changes.rs").contains("move_to_agent_trash("));
+        assert!(include_str!("agent_tools_changes.rs").contains("move_to_trash_for_agent("));
     }
 }

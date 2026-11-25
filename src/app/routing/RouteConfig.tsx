@@ -56,6 +56,10 @@ export const router = createBrowserRouter([
                 element: null,
               },
               {
+                path: "browser/*",
+                element: null,
+              },
+              {
                 path: "welcome",
                 element: <WelcomePage />,
               },

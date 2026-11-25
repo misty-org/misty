@@ -1,26 +1,22 @@
 import type { DirEntry } from "@/features/agents";
-import type { AgentTrashItem, FileEntry, FinderTag, TrashedItem } from "@/features/files";
-import type { SpaceDrivePlace, SpaceDriveTrashPlace } from "../apps/file-picker/picker_places";
-import type { DriveEntry, DriveTrashEntry } from "../drive";
+import type { FileEntry, FinderTag, TrashedItem } from "@/features/files";
+import type { SpaceDrivePlace } from "../apps/file-picker/picker_places";
+import type { DriveEntry } from "../drive";
 
 export type FilesPlace =
   | { kind: "disk"; path: string }
   | { kind: "project"; root: string; path: string }
   | SpaceDrivePlace
-  | SpaceDriveTrashPlace
   | { kind: "recent" }
   | { kind: "starred" }
   | { kind: "tag"; name: string; color: number }
-  | { kind: "trash" }
-  | { kind: "agent-trash" };
+  | { kind: "trash" };
 
 export type FileSource =
   | { kind: "disk"; entry: FileEntry }
   | { kind: "project"; path: string }
   | { kind: "drive"; entry: DriveEntry }
-  | { kind: "trash"; item: TrashedItem }
-  | { kind: "agent-trash"; item: AgentTrashItem }
-  | { kind: "drive-trash"; entry: DriveTrashEntry };
+  | { kind: "trash"; item: TrashedItem };
 
 export interface FileItem {
   id: string;
@@ -100,8 +96,6 @@ export function placeKey(place: FilesPlace): string {
       return `project:${place.path}`;
     case "space-drive":
       return `drive:${place.spaceId}:${place.path}`;
-    case "space-drive-trash":
-      return `drive-trash:${place.spaceId}`;
     case "tag":
       return `tag:${place.name}`;
     default:
@@ -182,20 +176,6 @@ export function driveItem(entry: DriveEntry): FileItem {
   };
 }
 
-export function driveTrashItem(entry: DriveTrashEntry): FileItem {
-  const trashed = entry.trashed_at ? Date.parse(entry.trashed_at) : entry.mtime_ms;
-  return {
-    id: `drive-trash:${entry.id}`,
-    name: entry.name,
-    folder: false,
-    size: entry.size,
-    modifiedMs: Number.isFinite(trashed) ? trashed : entry.mtime_ms,
-    hidden: false,
-    tags: [],
-    source: { kind: "drive-trash", entry },
-  };
-}
-
 export function trashedItem(item: TrashedItem): FileItem {
   return {
     id: `trash:${item.id}`,
@@ -209,24 +189,31 @@ export function trashedItem(item: TrashedItem): FileItem {
   };
 }
 
-export function agentTrashItem(item: AgentTrashItem): FileItem {
-  return {
-    id: `agent-trash:${item.id}`,
-    name: item.name,
-    folder: false,
-    size: item.size,
-    modifiedMs: item.trashedAt,
-    hidden: false,
-    tags: [],
-    source: { kind: "agent-trash", item },
-  };
-}
+export const SPACE_TRASH = ".trash";
+
+const spaceTrashPath = (path: string) => path.toLowerCase() === `/${SPACE_TRASH}`;
+
+export const isSpaceTrashFolder = (place: FilesPlace) =>
+  place.kind === "space-drive" && spaceTrashPath(place.path);
+
+export const isSpaceTrash = (item: FileItem) =>
+  item.source.kind === "drive" && spaceTrashPath(item.source.entry.path);
+
+export const inSpaceTrash = (item: FileItem) =>
+  item.source.kind === "drive" &&
+  item.source.entry.path.toLowerCase().startsWith(`/${SPACE_TRASH}/`);
+
+export const directlyInSpaceTrash = (item: FileItem) =>
+  inSpaceTrash(item) &&
+  item.source.kind === "drive" &&
+  !item.source.entry.path.slice(SPACE_TRASH.length + 2).includes("/");
+
+export const mayEmptySpaceTrash = (permissions: readonly string[] | undefined) =>
+  Boolean(permissions?.includes("drive.purge") || permissions?.includes("administrator"));
 
 export function itemShape(item: FileItem): "folder" | "file" {
   if (item.folder) return "folder";
   const source = item.source;
-  if (source.kind === "trash" || source.kind === "agent-trash")
-    return source.item.kind === "folder" ? "folder" : "file";
-  if (source.kind === "drive-trash") return source.entry.kind === "folder" ? "folder" : "file";
+  if (source.kind === "trash") return source.item.kind === "folder" ? "folder" : "file";
   return "file";
 }

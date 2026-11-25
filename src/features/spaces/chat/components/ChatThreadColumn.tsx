@@ -24,7 +24,12 @@ import {
   TypingLine,
 } from "@misty/ui";
 import { AgentMark } from "@/features/agents";
-import { buildChatDisplayRows, useMemberAvatarUrls } from "./ChatDisplay";
+import {
+  buildChatDisplayRows,
+  memberOutlineFor,
+  useMemberAvatarUrls,
+  useMemberOutlines,
+} from "./ChatDisplay";
 import { ChatAvatar } from "./ChatAvatar";
 import { Span } from "./ChatMessageParts";
 import { isAgentAuthoredMessage } from "./message_text";
@@ -123,6 +128,7 @@ export function ChatThreadColumn({
   const latestReplyId = replies.at(-1)?.id;
   const everyone = useMemo(() => (root ? [root, ...replies] : replies), [root, replies]);
   const avatars = useMemberAvatarUrls(spaceId, everyone);
+  const outlines = useMemberOutlines(spaceId, everyone);
   const rows = useMemo(() => buildChatDisplayRows(everyone), [everyone]);
   const replyRows = root ? rows.slice(1) : rows;
   useEffect(() => {
@@ -179,6 +185,7 @@ export function ChatThreadColumn({
               name={message.sender_name}
               src={avatarUrl || undefined}
               size="lg"
+              outline={memberOutlineFor(outlines, message)}
             />
           )
         }
@@ -215,7 +222,7 @@ export function ChatThreadColumn({
       <div
         ref={listRef}
         onScroll={() => void loadOlderFromTop()}
-        className="misty-scrollbar-flush min-h-0 flex-1 overflow-y-auto pt-4 pb-4 [overflow-anchor:none]"
+        className="misty-scrollbar-flush min-h-0 flex-1 overflow-y-auto pt-4 [overflow-anchor:none]"
       >
         {root ? (
           <>

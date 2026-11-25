@@ -10,7 +10,7 @@ use tauri::AppHandle;
 use super::{all_failed, failure, path_list, text, Agent};
 use crate::files::{
     agent_paths::{admit, admit_path},
-    agent_trash::move_to_agent_trash,
+    agent_trash::{move_to_trash_for_agent, Landed},
     display_name,
     entry::{entry_for, FinderTag},
     failed, gated, search,
@@ -156,17 +156,23 @@ pub(super) fn transfer(input: &Value, copy: bool) -> Result<Value, String> {
     Ok(result)
 }
 
-pub(super) fn trash(app: &AppHandle, agent: &Agent, input: &Value) -> Result<Value, String> {
+pub(super) fn trash(app: &AppHandle, _agent: &Agent, input: &Value) -> Result<Value, String> {
     let paths = path_list(input, "paths")?;
     let (mut done, mut failures) = (Vec::new(), Vec::new());
     for asked in &paths {
-        let held = admit(asked, Access::Write).and_then(|path| {
-            let id = move_to_agent_trash(app, &path, &agent.id, agent.chat.as_deref())?;
+        let moved = admit(asked, Access::Write).and_then(|path| {
+            let landed = move_to_trash_for_agent(app, &path)?;
             search::note_removed(&path);
-            Ok((path, id))
+            Ok((path, landed))
         });
-        match held {
-            Ok((path, id)) => done.push(json!({ "path": shown(&path), "agentTrashId": id })),
+        match moved {
+            Ok((path, landed)) => done.push(json!({
+                "path": shown(&path),
+                "to": match landed {
+                    Landed::SpaceTrash => "the Space's .trash",
+                    Landed::SystemTrash => "the system Trash",
+                },
+            })),
             Err(error) => failures.push(failure(asked, error)),
         }
     }
@@ -174,7 +180,7 @@ pub(super) fn trash(app: &AppHandle, agent: &Agent, input: &Value) -> Result<Val
     Ok(json!({
         "trashed": done,
         "failed": failures,
-        "note": "These wait in Agent trash, where the person puts back or deletes them. Nothing was deleted.",
+        "note": "A Space's files went to its .trash and other files to the system Trash, where the person puts back or deletes them. Nothing was deleted.",
     }))
 }
 

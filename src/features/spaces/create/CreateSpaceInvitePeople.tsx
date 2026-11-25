@@ -28,7 +28,7 @@ function initials(label: string) {
 
 function PersonAvatar({ label }: { label: string }) {
   return (
-    <Avatar className="size-6">
+    <Avatar size="sm">
       <AvatarFallback className={cn("text-micro", avatarColorClass(label), avatarInkClass)}>
         {initials(label)}
       </AvatarFallback>

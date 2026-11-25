@@ -14,7 +14,7 @@ use futures_util::{future::BoxFuture, Stream};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::model::{InUseBy, Item, ItemId, Kind, Seq, SpaceId, TrashPage, Version};
+use crate::model::{InUseBy, Item, ItemId, Kind, Seq, SpaceId, Version};
 
 pub type ByteStream = Pin<Box<dyn Stream<Item = io::Result<Bytes>> + Send>>;
 
@@ -344,7 +344,7 @@ pub fn refusal(status: u16, body: &[u8]) -> ApiError {
         },
         (409, "protected") => ApiError::Server {
             status,
-            message: "The Space's .mistyignore stays at its top.".to_owned(),
+            message: "The Space's .mistyignore and .trash stay at its top.".to_owned(),
         },
         (404, "parent_missing") => ApiError::ParentMissing,
         (423, _) => ApiError::InUse(
@@ -578,14 +578,9 @@ impl Api {
         ))
     }
 
-    pub async fn trash(&self, space: &SpaceId, id: &ItemId, held: bool) -> Result<Item, ApiError> {
-        self.item_answer(
-            Method::Post,
-            item_path(space, id, "/trash"),
-            None,
-            Some(json!({ "held": held })),
-        )
-        .await
+    pub async fn trash(&self, space: &SpaceId, id: &ItemId) -> Result<Item, ApiError> {
+        self.item_answer(Method::Post, item_path(space, id, "/trash"), None, None)
+            .await
     }
 
     pub async fn restore(&self, space: &SpaceId, id: &ItemId) -> Result<Item, ApiError> {
@@ -624,21 +619,6 @@ impl Api {
         self.send(Method::Delete, item_path(space, id, "/in-use"), None, None)
             .await
             .map(|_| ())
-    }
-
-    pub async fn trash_list(
-        &self,
-        space: &SpaceId,
-        after: Option<&str>,
-        limit: u32,
-    ) -> Result<TrashPage, ApiError> {
-        let mut path = space_path(space, &format!("/trash?limit={}", limit.clamp(1, 200)));
-        if let Some(after) = after.filter(|after| !after.is_empty()) {
-            path.push_str(&format!("&after={}", segment(after)));
-        }
-        let mut page: TrashPage = self.json(Method::Get, path, None, None).await?;
-        page.next_after = page.next_after.filter(|next| !next.is_empty());
-        Ok(page)
     }
 
     pub async fn realtime_ticket(&self) -> Result<String, ApiError> {

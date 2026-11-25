@@ -9,7 +9,7 @@ import { createScreenTools } from "./app_screen_tools";
 import { registerStandbyTools, serveAppTools, unregisterStandbyTools } from "./app_tool_server";
 import { appToolName } from "./app_tools";
 import { appEntry, runsHere } from "./third_party_apps";
-import { useSpaceApps } from "./use_space_apps";
+import { useInstalledApps } from "./use_installed_apps";
 
 const OPEN_WAIT_MS = 45_000;
 
@@ -30,7 +30,7 @@ function untilRunning(spaceId: string, appId: string): Promise<boolean> {
 }
 
 export function useAppStandby(spaceId: string | undefined) {
-  const { apps } = useSpaceApps(spaceId ?? "");
+  const { apps } = useInstalledApps();
   const runningIds = useRunningAppIds((state) => state.ids);
   const key = (apps ?? [])
     .flatMap((app) => {

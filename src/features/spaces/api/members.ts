@@ -1,9 +1,8 @@
-import type { SpaceIntegrationMember, SpaceInvitation, SpaceMember } from "./dto/entities";
+import type { SpaceInvitation, SpaceMember } from "./dto/entities";
 import type { SpaceRequest } from "./space_request_types";
 
 export interface SpaceMembersList {
   members: SpaceMember[];
-  integrations?: SpaceIntegrationMember[];
 }
 
 type ProtectedBlobRequest = (path: string, init?: RequestInit) => Promise<Blob>;
@@ -26,6 +25,11 @@ export function createSpaceMembersApi(
       request<SpaceInvitation>(`/spaces/${encodeURIComponent(spaceId)}/invitations`, {
         method: "POST",
         body: JSON.stringify({ email }),
+      }),
+    inviteFriend: (spaceId: string, userId: string) =>
+      request<SpaceInvitation>(`/spaces/${encodeURIComponent(spaceId)}/invitations`, {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
       }),
     pendingInvitations: (spaceId: string) =>
       request<{ invitations: SpaceInvitation[] }>(

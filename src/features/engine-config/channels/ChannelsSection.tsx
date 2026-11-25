@@ -7,7 +7,7 @@ import {
   DesktopSettingsNotice,
   DesktopSettingsRow,
   DesktopSettingsRowSkeleton,
-  DesktopSettingsSection as Section,
+  DesktopSettingsSection,
 } from "@/features/settings";
 import {
   AlertDialog,
@@ -18,22 +18,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  EmptyState,
-  ListRow,
-  ListRowSkeleton,
   Mark,
   MenuItem,
-  RowGroupSection,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Switch,
+  type SectionHeadingAction,
 } from "@misty/ui";
 import { EngineSetupSections } from "../engine-setup/EngineSetupSections";
 import { channelsApi } from "./api";
-import { ChannelRow, Pill } from "./ChannelRow";
+import { ChannelRow } from "./ChannelRow";
 import {
   CC_SWITCH_ENGINES,
   ENGINE_IDS,
@@ -114,148 +111,83 @@ function useDragOrder(cli: CliConfigState) {
   });
 }
 
-function ChannelsBody({ cli }: { cli: CliConfigState }) {
+function channelsAction(cli: CliConfigState): SectionHeadingAction | undefined {
+  if (!cli.sections || !cli.enabled) return undefined;
+  const base = { label: "Add channel", icon: Plus, showLabel: true, disabled: cli.busy };
+  if (!CC_SWITCH_ENGINES.includes(cli.engine))
+    return { ...base, onSelect: () => cli.setDialog({}) };
+  return {
+    ...base,
+    menu: (
+      <>
+        <MenuItem icon={Plus} label="New channel" onSelect={() => cli.setDialog({})} />
+        <MenuItem
+          icon={Download}
+          label="Import or update from CC Switch"
+          onSelect={() => void cli.syncCcSwitch(cli.engine)}
+        />
+        <MenuItem
+          icon={FileUp}
+          label="Choose a CC Switch file"
+          onSelect={() => void cli.importCcSwitchFile()}
+        />
+      </>
+    ),
+  };
+}
+
+function ChannelsRows({ cli }: { cli: CliConfigState }) {
   const { engine, busy, enabled, entries, currentId } = cli;
   const dragFor = useDragOrder(cli);
   const name = ENGINE_NAMES[engine];
   return (
     <>
-      <Section title={`${name} engine`}>
-        <DesktopSettingsRow
-          label={`Use ${name}`}
-          description="While it's off, this engine is hidden from pickers and can't start new chats."
-        >
-          <Switch
-            aria-label={`Use ${name}`}
-            checked={enabled}
-            disabled={busy}
-            onCheckedChange={(on) => void cli.mutate(() => channelsApi.setEnabled(engine, on))}
-          />
-        </DesktopSettingsRow>
-      </Section>
-
+      <DesktopSettingsRow
+        label={`Use ${name}`}
+        description="While it's off, this engine is hidden from pickers and can't start new chats."
+      >
+        <Switch
+          aria-label={`Use ${name}`}
+          checked={enabled}
+          disabled={busy}
+          onCheckedChange={(on) => void cli.mutate(() => channelsApi.setEnabled(engine, on))}
+        />
+      </DesktopSettingsRow>
       {enabled ? (
         <>
-          <Section title="Own config">
-            <ListRow
-              label={`${name}'s own config`}
-              leading={<Mark of={`engine:${engine}`} size={16} label={name} aria-hidden />}
-              badge={<Pill>Built in</Pill>}
-              description="Its own sign-in and config files"
-              onOpen={() => {
-                if (!busy && !cli.officialActive) cli.activate(PSEUDO_LOCAL);
-              }}
-              trailing={
-                <>
-                  {OFFICIAL_EDITABLE_ENGINES.includes(engine) ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => cli.setOfficialEditing(true)}
-                    >
-                      Edit
-                    </Button>
-                  ) : null}
-                  <Switch
-                    aria-label={`${name}'s own config`}
-                    checked={cli.officialActive}
-                    disabled={busy || cli.officialActive}
-                    onCheckedChange={(on) => {
-                      if (on) cli.activate(PSEUDO_LOCAL);
-                    }}
-                  />
-                </>
-              }
-            />
-          </Section>
-
-          <RowGroupSection
-            title="Channels"
-            count={entries.length || undefined}
-            action={
-              CC_SWITCH_ENGINES.includes(engine)
-                ? {
-                    label: "Add channel",
-                    icon: Plus,
-                    showLabel: true,
-                    disabled: busy,
-                    menu: (
-                      <>
-                        <MenuItem
-                          icon={Plus}
-                          label="New channel"
-                          onSelect={() => cli.setDialog({})}
-                        />
-                        <MenuItem
-                          icon={Download}
-                          label="Import or update from CC Switch"
-                          onSelect={() => void cli.syncCcSwitch(cli.engine)}
-                        />
-                        <MenuItem
-                          icon={FileUp}
-                          label="Choose a CC Switch file"
-                          onSelect={() => void cli.importCcSwitchFile()}
-                        />
-                      </>
-                    ),
-                  }
-                : {
-                    label: "Add channel",
-                    icon: Plus,
-                    showLabel: true,
-                    disabled: busy,
-                    onSelect: () => cli.setDialog({}),
-                  }
-            }
-            className="mb-8"
+          <DesktopSettingsRow
+            label={`${name}'s own config`}
+            description="Its own sign-in and config files"
+            leading={<Mark of={`engine:${engine}`} size={16} label={name} aria-hidden />}
           >
-            {entries.map((entry) => (
-              <ChannelRow
-                key={entry.id}
-                entry={entry}
-                current={currentId === entry.id}
-                busy={busy}
-                drag={dragFor(entry.id)}
-                onToggle={(on) => cli.activate(on ? entry.id : PSEUDO_LOCAL)}
-                onEdit={() => cli.setDialog({ entry })}
-                onDelete={() => cli.setPendingDelete(entry)}
-              />
-            ))}
-            {entries.length === 0 ? (
-              <EmptyState
-                inline
-                title="No channels yet"
-                line={`Add a provider channel for ${name}.`}
-              />
+            {OFFICIAL_EDITABLE_ENGINES.includes(engine) ? (
+              <Button type="button" disabled={busy} onClick={() => cli.setOfficialEditing(true)}>
+                Edit
+              </Button>
             ) : null}
-          </RowGroupSection>
-
-          <EngineSetupSections engine={engine} />
+            <Switch
+              aria-label={`${name}'s own config`}
+              checked={cli.officialActive}
+              disabled={busy || cli.officialActive}
+              onCheckedChange={(on) => {
+                if (on) cli.activate(PSEUDO_LOCAL);
+              }}
+            />
+          </DesktopSettingsRow>
+          {entries.map((entry) => (
+            <ChannelRow
+              key={entry.id}
+              entry={entry}
+              current={currentId === entry.id}
+              busy={busy}
+              drag={dragFor(entry.id)}
+              onToggle={(on) => cli.activate(on ? entry.id : PSEUDO_LOCAL)}
+              onEdit={() => cli.setDialog({ entry })}
+              onDelete={() => cli.setPendingDelete(entry)}
+            />
+          ))}
         </>
       ) : null}
-    </>
-  );
-}
-
-function ChannelsSkeleton({ engine }: { engine: EngineId }) {
-  const name = ENGINE_NAMES[engine];
-  return (
-    <>
-      <Section title={`${name} engine`}>
-        <DesktopSettingsRowSkeleton label="Reading channels" description control="switch" />
-      </Section>
-      <Section title="Own config">
-        <ListRowSkeleton
-          label="Reading channels"
-          rows={1}
-          leading
-          lines={2}
-          trailing={
-            OFFICIAL_EDITABLE_ENGINES.includes(engine) ? ["button-sm", "switch"] : ["switch"]
-          }
-        />
-      </Section>
     </>
   );
 }
@@ -266,22 +198,16 @@ export function ChannelsSection() {
   const editing = cli.dialog?.entry;
   return (
     <>
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <EnginePicker engine={engine} onChange={setEngine} />
-      </div>
       {cli.ccStatus?.changed ? (
         <DesktopSettingsNotice
           action={
-            <div className="flex gap-2">
-              <Button onClick={cli.dismissCcSwitch}>Later</Button>
-              <Button
-                variant="primary"
-                disabled={cli.busy}
-                onClick={() => void cli.syncCcSwitch("all")}
-              >
-                Import
-              </Button>
-            </div>
+            <Button
+              variant="primary"
+              disabled={cli.busy}
+              onClick={() => void cli.syncCcSwitch("all")}
+            >
+              Import
+            </Button>
           }
         >
           {cli.ccStatus.providers === 1
@@ -291,11 +217,26 @@ export function ChannelsSection() {
       ) : null}
       {cli.error ? <DesktopSettingsNotice>{cli.error}</DesktopSettingsNotice> : null}
       {cli.notice ? <DesktopSettingsNotice>{cli.notice}</DesktopSettingsNotice> : null}
-      {cli.sections ? (
-        <ChannelsBody cli={cli} />
-      ) : cli.error ? null : (
-        <ChannelsSkeleton engine={engine} />
-      )}
+      <DesktopSettingsSection
+        title="Channels"
+        section="engines-channels"
+        action={channelsAction(cli)}
+      >
+        <DesktopSettingsRow label="Engine">
+          <EnginePicker engine={engine} onChange={setEngine} />
+        </DesktopSettingsRow>
+        {cli.sections ? (
+          <ChannelsRows cli={cli} />
+        ) : cli.error ? null : (
+          <DesktopSettingsRowSkeleton
+            label="Reading channels"
+            rows={2}
+            description
+            control="switch"
+          />
+        )}
+      </DesktopSettingsSection>
+      {cli.sections && cli.enabled ? <EngineSetupSections engine={engine} /> : null}
 
       {cli.dialog ? (
         <ProviderDialog

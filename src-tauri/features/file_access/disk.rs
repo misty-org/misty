@@ -366,15 +366,7 @@ fn directly_in_agent_trash(held: &Path) -> io::Result<()> {
     let real = real_path::resolve_parent(held)?;
     (real.parent() == Some(folder.as_path()) && real.file_name().is_some())
         .then_some(())
-        .ok_or_else(|| closed(held, "That item isn't in Agent trash."))
-}
-
-pub fn rename_into_agent_trash(from: &Path, held: &Path) -> io::Result<()> {
-    check_agent(from, Access::Write)?;
-    directly_in_agent_trash(held)?;
-    let (from_dir, from_name) = CheckedDir::open_parent(from, Access::Write, checked::Gate::Agent)?;
-    let (held_dir, held_name) = CheckedDir::open_parent(held, Access::Write, checked::Gate::App)?;
-    place::rename_new(&from_dir, &from_name, &held_dir, &held_name)
+        .ok_or_else(|| closed(held, "That item isn't in Misty's old agent trash."))
 }
 
 pub fn rename_out_of_agent_trash(held: &Path, to: &Path) -> io::Result<()> {

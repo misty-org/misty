@@ -4,12 +4,12 @@ import { AccountDeleteDialog } from "../export/AccountDeleteDialog";
 import { useAuth } from "../sessions/auth_state";
 import { openSignInSheet } from "../setup/server_setup";
 import { useUserStore } from "../sessions/use_user_store";
-import { Button, cn, Input, Skeleton, SkeletonControl, Text, useNotice } from "@misty/ui";
+import { Button, Input, Text, useNotice } from "@misty/ui";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   DesktopSettingsNotice,
   DesktopSettingsRow as Row,
-  DesktopSettingsSection as Section,
+  DesktopSettingsRowSkeleton,
 } from "@/features/settings";
 import { AccountBannerRow } from "./AccountBannerRow";
 import { AccountPictureRow } from "./AccountPictureRow";
@@ -66,116 +66,61 @@ function AccountValue(props: { children: string }) {
   );
 }
 
-function SignedInAccount({ account }: { account: AccountMeResponse }) {
-  const { logout } = useAuth();
-  const [deleting, setDeleting] = useState(false);
-  const google = account.provider === "google";
+function AccountDetails({ account }: { account: AccountMeResponse }) {
   return (
     <>
-      <Section title="Details">
-        <AccountPictureRow account={account} />
-        <AccountBannerRow account={account} />
-        <UsernameRow account={account} />
-        <Row label="Email">
-          <AccountValue>{account.email}</AccountValue>
-        </Row>
-        <Row label="Member since">
-          <AccountValue>
-            {new Date(account.created_at).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </AccountValue>
-        </Row>
-        <Row label="User ID">
-          <AccountValue>{account.id}</AccountValue>
-        </Row>
-      </Section>
-
-      <Section title="Danger">
-        <Row label="Delete account" description="Removed after 30 days.">
-          <Button variant="secondary" onClick={() => setDeleting(true)}>
-            Delete…
-          </Button>
-          <AccountDeleteDialog
-            open={deleting}
-            onOpenChange={setDeleting}
-            email={account.email}
-            google={google}
-            onDeleted={() => void logout().catch(() => undefined)}
-          />
-        </Row>
-      </Section>
+      <AccountPictureRow account={account} />
+      <AccountBannerRow account={account} />
+      <UsernameRow account={account} />
+      <Row label="Email">
+        <AccountValue>{account.email}</AccountValue>
+      </Row>
+      <Row label="Member since">
+        <AccountValue>
+          {new Date(account.created_at).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </AccountValue>
+      </Row>
+      <Row label="User ID">
+        <AccountValue>{account.id}</AccountValue>
+      </Row>
     </>
   );
 }
 
-function AccountSkeleton() {
-  const row = "grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-8 py-3";
-  const label = (width: string) => (
-    <div className="flex h-6 items-center">
-      <Skeleton className={cn("h-4", width)} />
-    </div>
-  );
-  const value = (width: string) => (
-    <div className="flex h-6 items-center">
-      <Skeleton className={cn("h-3.5", width)} />
-    </div>
-  );
+function useShownAccount() {
+  const { user } = useAuth();
+  const me = useUserStore((state) => state.me);
+  return user && me?.id === user.id ? me : null;
+}
+
+export function AccountRemovalSection() {
+  const account = useShownAccount();
+  const { logout } = useAuth();
+  const [deleting, setDeleting] = useState(false);
+  if (!account) return null;
   return (
-    <>
-      <Section title="Details">
-        <div
-          data-setting-label=""
-          role="status"
-          aria-label="Details"
-          aria-busy="true"
-          className={row}
-        >
-          {label("w-16")}
-          <div className="flex items-center justify-end gap-2">
-            <Skeleton className="size-10 rounded-full" />
-            <SkeletonControl kind="button" />
-          </div>
-        </div>
-        <div data-setting-label="" className={row}>
-          {label("w-20")}
-          <div className="flex items-center justify-end gap-2">
-            <SkeletonControl kind="field" />
-            <SkeletonControl kind="button" className="w-14" />
-          </div>
-        </div>
-        <div data-setting-label="" className={row}>
-          {label("w-12")}
-          {value("w-48")}
-        </div>
-        <div data-setting-label="" className={row}>
-          {label("w-28")}
-          {value("w-32")}
-        </div>
-        <div data-setting-label="" className={row}>
-          {label("w-16")}
-          {value("w-64")}
-        </div>
-      </Section>
-      <Section title="Danger">
-        <div data-setting-label="" className={row}>
-          <div className="grid min-w-0 gap-1">
-            {label("w-28")}
-            {value("w-36")}
-          </div>
-          <SkeletonControl kind="button" />
-        </div>
-      </Section>
-    </>
+    <Row label="Delete account" description="Removed after 30 days.">
+      <Button variant="secondary" onClick={() => setDeleting(true)}>
+        Delete…
+      </Button>
+      <AccountDeleteDialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        email={account.email}
+        google={account.provider === "google"}
+        onDeleted={() => void logout().catch(() => undefined)}
+      />
+    </Row>
   );
 }
 
 export function AccountSection() {
   const { user } = useAuth();
-  const me = useUserStore((state) => state.me);
-  const account = user && me?.id === user.id ? me : null;
+  const account = useShownAccount();
   const [failed, setFailed] = useState(false);
   const userId = user?.id;
   const load = useCallback(() => {
@@ -198,15 +143,13 @@ export function AccountSection() {
 
   if (!user)
     return (
-      <Section title="Details">
-        <Row label="Not signed in">
-          <Button variant="secondary" onClick={() => openSignInSheet("account")}>
-            Sign in
-          </Button>
-        </Row>
-      </Section>
+      <Row label="Not signed in">
+        <Button variant="secondary" onClick={() => openSignInSheet("account")}>
+          Sign in
+        </Button>
+      </Row>
     );
-  if (account) return <SignedInAccount key={account.id} account={account} />;
+  if (account) return <AccountDetails key={account.id} account={account} />;
   if (failed)
     return (
       <DesktopSettingsNotice
@@ -219,5 +162,5 @@ export function AccountSection() {
         Your account couldn't be loaded.
       </DesktopSettingsNotice>
     );
-  return <AccountSkeleton />;
+  return <DesktopSettingsRowSkeleton label="Details" rows={6} control={["field", "button"]} />;
 }

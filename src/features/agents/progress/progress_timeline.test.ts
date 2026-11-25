@@ -11,6 +11,61 @@ import {
 } from "./progress_timeline";
 
 describe("progress timeline", () => {
+  it("keeps what a step acted on once its output arrives", () => {
+    let message: { content: string; progress?: AiProgressItem[] } = { content: "" };
+    message = withToolEvent(message, {
+      id: "1",
+      type: "tool.started",
+      toolCallId: "a",
+      toolName: "Bash",
+      args: {},
+    });
+    message = withToolEvent(message, {
+      id: "2",
+      type: "tool.detail",
+      toolCallId: "a",
+      toolName: "Bash",
+      activity: { input: { command: "npm test" }, detail: "npm test" },
+    });
+    message = withToolEvent(message, {
+      id: "3",
+      type: "tool.detail",
+      toolCallId: "a",
+      toolName: "Bash",
+      activity: { output: "ok" },
+    });
+    const step = message.progress?.[0];
+    expect(step).toMatchObject({
+      args: { command: "npm test" },
+      activity: { detail: "npm test", output: "ok" },
+    });
+  });
+
+  it("takes a streamed edit's arguments and path from its details", () => {
+    let message: { content: string; progress?: AiProgressItem[] } = { content: "" };
+    message = withToolEvent(message, {
+      id: "1",
+      type: "tool.started",
+      toolCallId: "a",
+      toolName: "Edit",
+      args: {},
+    });
+    message = withToolEvent(message, {
+      id: "2",
+      type: "tool.detail",
+      toolCallId: "a",
+      toolName: "Edit",
+      activity: {
+        input: { file_path: "src/a.ts", old_string: "a", new_string: "b" },
+        detail: "src/a.ts",
+      },
+    });
+    expect(message.progress?.[0]).toMatchObject({
+      args: { file_path: "src/a.ts", old_string: "a", new_string: "b" },
+      path: "src/a.ts",
+    });
+  });
+
   it("keeps a call's raw parameters and result on its row", () => {
     let message: { content: string; progress?: AiProgressItem[] } = { content: "" };
     message = withToolEvent(message, {

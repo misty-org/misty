@@ -1,5 +1,5 @@
 import { notify } from "@misty/ui";
-import { DesktopSettingsRow as Row, DesktopSettingsSection as Section } from "@/features/settings";
+import { DesktopSettingsRow as Row } from "@/features/settings";
 import { DropdownControl } from "@/features/settings/SettingsControls";
 import { directApi, type FriendPrivacy } from "../api";
 import { useSpaceResource } from "@/features/spaces";
@@ -17,15 +17,13 @@ export function RequestsSection() {
       .then((saved) => privacy.set(saved))
       .catch(() => notify({ message: "That couldn't be changed. Try again.", tone: "error" }));
   return (
-    <Section title="Requests">
-      <Row label="Who can send me friend requests">
-        <DropdownControl
-          value={privacy.data?.friend_requests ?? "everyone"}
-          options={choices}
-          disabled={!privacy.data}
-          onValueChange={(value) => void choose(value)}
-        />
-      </Row>
-    </Section>
+    <Row label="Who can send me friend requests">
+      <DropdownControl
+        value={privacy.data?.friend_requests ?? "everyone"}
+        options={choices}
+        disabled={!privacy.data}
+        onValueChange={(value) => void choose(value)}
+      />
+    </Row>
   );
 }

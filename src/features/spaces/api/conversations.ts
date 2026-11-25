@@ -1,4 +1,4 @@
-import type { SpaceConversation, SpaceMessage } from "./dto/entities";
+import type { SpaceChannelCategory, SpaceConversation, SpaceMessage } from "./dto/entities";
 import type { MessageSpan } from "./dto/common";
 import type { SpaceRequest } from "./space_request_types";
 import { spaceMessagePageSize, spaceMessageSendTimeoutMs } from "./chat";
@@ -6,14 +6,62 @@ import { spaceMessagePageSize, spaceMessageSendTimeoutMs } from "./chat";
 export function createSpaceConversationsApi(request: SpaceRequest) {
   return {
     conversations: (spaceId: string) =>
-      request<{ conversations: SpaceConversation[]; everyone_unread_count?: number }>(
-        `/spaces/${encodeURIComponent(spaceId)}/conversations`,
-      ),
-    createConversation: (spaceId: string, title: string, options: { voice?: boolean } = {}) =>
+      request<{
+        conversations: SpaceConversation[];
+        categories?: SpaceChannelCategory[];
+        everyone_unread_count?: number;
+      }>(`/spaces/${encodeURIComponent(spaceId)}/conversations`),
+    createConversation: (
+      spaceId: string,
+      title: string,
+      options: { voice?: boolean; categoryId?: string | null } = {},
+    ) =>
       request<SpaceConversation>(`/spaces/${encodeURIComponent(spaceId)}/conversations`, {
         method: "POST",
-        body: JSON.stringify(options.voice ? { title, voice: true } : { title }),
+        body: JSON.stringify({
+          title,
+          ...(options.voice ? { voice: true } : {}),
+          ...(options.categoryId ? { category_id: options.categoryId } : {}),
+        }),
       }),
+    placeConversation: (
+      spaceId: string,
+      conversationId: string,
+      categoryId: string | null,
+      afterId: string | null,
+    ) =>
+      request<SpaceConversation>(
+        `/spaces/${encodeURIComponent(spaceId)}/conversations/${encodeURIComponent(conversationId)}/place`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ category_id: categoryId ?? "", after_id: afterId ?? "" }),
+        },
+      ),
+    createCategory: (spaceId: string, name: string) =>
+      request<SpaceChannelCategory>(`/spaces/${encodeURIComponent(spaceId)}/categories`, {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    updateCategory: (
+      spaceId: string,
+      categoryId: string,
+      change: { name?: string; afterId?: string | null },
+    ) =>
+      request<SpaceChannelCategory>(
+        `/spaces/${encodeURIComponent(spaceId)}/categories/${encodeURIComponent(categoryId)}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            ...(change.name === undefined ? {} : { name: change.name }),
+            ...(change.afterId === undefined ? {} : { after_id: change.afterId ?? "" }),
+          }),
+        },
+      ),
+    deleteCategory: (spaceId: string, categoryId: string) =>
+      request(
+        `/spaces/${encodeURIComponent(spaceId)}/categories/${encodeURIComponent(categoryId)}`,
+        { method: "DELETE" },
+      ),
     openDirectMessage: (userId: string) =>
       request<{ id: string }>("/dms", {
         method: "POST",

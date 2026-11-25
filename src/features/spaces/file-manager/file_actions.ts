@@ -14,15 +14,24 @@ import { countText, messageOf } from "./format";
 import { createIn } from "./list_folder";
 import {
   childOf,
+  inSpaceTrash,
+  isSpaceTrash,
   localPath,
   nameOf,
   parentOf,
   placeFolder,
   placeInside,
+  SPACE_TRASH,
   type FileItem,
   type FilesPlace,
 } from "./model";
-import { bySource, sourceOf, type FileSourceAdapter } from "./sources";
+import {
+  bySource,
+  failuresOf,
+  listDriveFolder,
+  sourceOf,
+  type FileSourceAdapter,
+} from "./sources";
 import { diskSource } from "./sources/disk_source";
 import type { BrowserStore } from "./store/browser_store";
 import type { Run } from "./use_operations";
@@ -336,7 +345,11 @@ export function createFileActions(deps: ActionDeps) {
         .catch((cause) => fail(cause, "Couldn't show it."));
     },
 
-    async trash(items: FileItem[]) {
+    async trash(asked: FileItem[]) {
+      const binned = asked.filter(inSpaceTrash);
+      if (binned.length) actions.deleteFromTrash(binned);
+      const items = asked.filter((item) => !inSpaceTrash(item) && !isSpaceTrash(item));
+      if (!items.length) return;
       await guard(async () => {
         const failed: Failure[] = [];
         const groups = new Map<FileSourceAdapter, FileItem[]>();
@@ -396,14 +409,28 @@ export function createFileActions(deps: ActionDeps) {
       });
     },
 
-    emptyAgentTrash() {
+    emptyTrash(spaceId: string) {
       void ask().confirm({
-        title: "Empty agent trash?",
-        what: "Everything agents moved there is deleted for good. You can't undo this.",
+        title: "Empty trash?",
+        what: "Everything in this Space's .trash is deleted for good, for everyone in it. You can't undo this.",
         confirmLabel: "Empty",
         onConfirm: async () => {
-          const failed = await disk.agentTrashEmpty().finally(deps.changed);
-          if (failed.length) throw new Error(failed[0].error);
+          try {
+            const inside = await listDriveFolder(spaceId, `/${SPACE_TRASH}`);
+            const failed: Failure[] = [];
+            for (let at = 0; at < inside.length; at += 200)
+              failed.push(
+                ...failuresOf(
+                  await driveNative.purgeMany(
+                    spaceId,
+                    inside.slice(at, at + 200).map((entry) => entry.id),
+                  ),
+                ),
+              );
+            if (failed.length) throw new Error(failed[0].error);
+          } finally {
+            deps.changed();
+          }
         },
       });
     },

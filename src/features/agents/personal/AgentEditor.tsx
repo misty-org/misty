@@ -218,7 +218,7 @@ export function AgentEditor({
       </details>
       <div className="flex flex-wrap gap-3 empty:hidden">
         {(!profile || dirty) && (
-          <Button disabled={!draft.name.trim() || (!profile && !draft.voice) || busy} type="submit">
+          <Button disabled={!draft.name.trim() || busy} type="submit">
             {profile ? "Save changes" : "Create agent"}
           </Button>
         )}

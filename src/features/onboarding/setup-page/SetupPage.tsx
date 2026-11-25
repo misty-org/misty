@@ -14,14 +14,7 @@ import {
 } from "@/features/agents";
 import type { EngineId } from "@/features/engine-config/channels";
 import { useSettingsStore } from "@/features/settings";
-import {
-  chooseMistyVoice,
-  ensureSpeech,
-  personLanguages,
-  useSpeechModels,
-  voicesFor,
-  voiceSettings,
-} from "@/features/voice";
+import { ensureSpeech, voiceSettings } from "@/features/voice";
 import { Button, StepPage } from "@misty/ui";
 import { AppsStep } from "./AppsStep";
 import { HowMistyWorksStep } from "./HowMistyWorksStep";
@@ -32,7 +25,7 @@ type Step = "how" | "engines" | "voice" | "apps";
 const steps: { id: Step; title: string }[] = [
   { id: "how", title: "How Misty works" },
   { id: "engines", title: "Pick your default engine" },
-  { id: "voice", title: "Pick Misty's voice" },
+  { id: "voice", title: "Which language do you speak?" },
   { id: "apps", title: "Which apps should agents use?" },
 ];
 
@@ -69,16 +62,8 @@ export function SetupPage() {
   const [language, setLanguage] = useState(
     () => voiceSettings(useSettingsStore.getState().settings?.document).language,
   );
-  const [voice, setVoice] = useState(
-    () => voiceSettings(useSettingsStore.getState().settings?.document).voice,
-  );
-  const catalog = useSpeechModels((state) => state.catalog);
-  const catalogFailed = useSpeechModels((state) => Boolean(state.error));
-  const voices = catalog ? voicesFor(catalog.voices, personLanguages(language)) : [];
-  const voicePicked = voices.some((item) => item.id === voice);
   const saveSpeech = () => {
     useSettingsStore.getState().updateSetting("voice", "language", language);
-    if (voicePicked) chooseMistyVoice(voice);
     void ensureSpeech();
     setStep("apps");
   };
@@ -126,11 +111,7 @@ export function SetupPage() {
             </Button>
           </>
         ) : step === "voice" ? (
-          <Button
-            variant="primary"
-            disabled={catalogFailed ? false : !catalog || (voices.length > 0 && !voicePicked)}
-            onClick={saveSpeech}
-          >
+          <Button variant="primary" onClick={saveSpeech}>
             Continue
             <ArrowRight />
           </Button>
@@ -147,7 +128,7 @@ export function SetupPage() {
         <EnginesStep onState={onState} chosen={chosen} onChoose={setPicked} unfit={unfit} />
       </div>
       {step === "voice" ? (
-        <VoiceStep language={language} voice={voice} onLanguage={setLanguage} onVoice={setVoice} />
+        <VoiceStep language={language} onLanguage={setLanguage} />
       ) : null}
       {step === "apps" ? <AppsStep /> : null}
     </StepPage>

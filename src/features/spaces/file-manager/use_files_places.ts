@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { create } from "zustand";
 import {
   disk,
-  type AgentTrashUsage,
   type FinderTag,
   type FreeSpace,
   type Places,
@@ -11,14 +10,12 @@ import {
 interface PlacesStore {
   places: Places | null;
   tags: FinderTag[];
-  agentTrash: AgentTrashUsage | null;
   starred: ReadonlySet<string>;
 }
 
 export const usePlacesStore = create<PlacesStore>(() => ({
   places: null,
   tags: [],
-  agentTrash: null,
   starred: new Set(),
 }));
 
@@ -28,10 +25,6 @@ export function refreshPlaces() {
   if (!loaded) return;
   void disk.tags().then(
     (tags) => usePlacesStore.setState({ tags }),
-    () => undefined,
-  );
-  void disk.agentTrashUsage().then(
-    (agentTrash) => usePlacesStore.setState({ agentTrash }),
     () => undefined,
   );
   void disk.starred().then(

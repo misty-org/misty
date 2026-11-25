@@ -27,6 +27,10 @@ pub(super) struct BrowserSession {
     pub(super) agent_run_id: Option<String>,
 }
 
+pub(crate) fn is_agent_page(id: &str) -> bool {
+    id.starts_with("agent-")
+}
+
 impl BrowserSession {
     pub(super) fn context_profile_id(&self) -> Option<&str> {
         self.profile.as_deref()

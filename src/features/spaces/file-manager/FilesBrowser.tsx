@@ -1,6 +1,6 @@
 // Adapted from Kura (MIT, Copyright (c) 2026 Kura contributors). See NOTICE.
 import { useState, type ReactNode } from "react";
-import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@misty/ui";
+import { Dialog, DialogBody, DialogContent, DialogTitle } from "@misty/ui";
 import { FilesFrame } from "./FilesFrame";
 import { FilesPane } from "./FilesPane";
 import type { FileItem, FilesPlace } from "./model";
@@ -41,12 +41,10 @@ export function FilesBrowser({
         )}
       </FilesFrame>
       <Dialog open={transfers} onOpenChange={setTransfers}>
-        <DialogContent size="media">
-          <DialogHeader>
-            <DialogTitle>Transfers</DialogTitle>
-          </DialogHeader>
+        <DialogContent size="media" hideClose aria-describedby={undefined}>
+          <DialogTitle className="sr-only">Transfers</DialogTitle>
           <DialogBody>
-            <TransfersView />
+            <TransfersView onClose={() => setTransfers(false)} />
           </DialogBody>
         </DialogContent>
       </Dialog>

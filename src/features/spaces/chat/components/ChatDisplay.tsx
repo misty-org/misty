@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ChannelDivider } from "@misty/ui";
 
-import { spacesApi } from "../../api/api";
+import { memberPicture } from "../../members/member_pictures";
 import { useSpacesStore } from "../../list/use_spaces_store";
 import type { SpaceMessage } from "../../api/dto/entities";
 import { isAgentAuthoredMessage } from "./message_text";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
+import { usePicturePreviews } from "@/shared/lib/picture_previews";
+import { readyPicture } from "@/shared/lib/versioned_picture";
 
 interface ChatDisplayRow {
   message: SpaceMessage;
@@ -18,11 +21,6 @@ const MESSAGE_GROUP_WINDOW_MS = 7 * 60 * 1000;
 interface MemberAvatarRequest {
   memberId: string;
   version: number;
-}
-
-interface MemberAvatarCacheEntry extends MemberAvatarRequest {
-  spaceId: string;
-  url: string;
 }
 
 export function buildChatDisplayRows(messages: SpaceMessage[]): ChatDisplayRow[] {
@@ -95,6 +93,47 @@ export function ChatDateDivider({ label }: { label: string }) {
   return <ChannelDivider label={label} />;
 }
 
+export function messageSenderOutline(message: SpaceMessage): string | undefined {
+  if (message.sender_kind !== "person" || message.origin?.author_avatar_url) return undefined;
+  return (
+    avatarOutline(message.sender_avatar_decoration) ??
+    avatarOutline(message.sender?.avatar_decoration)
+  );
+}
+
+export function memberOutlineFor(
+  outlines: Map<string, string>,
+  message: SpaceMessage,
+): string | undefined {
+  if (message.sender_kind !== "person" || message.origin?.author_avatar_url) return undefined;
+  return outlines.get(message.sender_user_id);
+}
+
+export function useMemberOutlines(
+  spaceId: string,
+  messages: SpaceMessage[],
+): Map<string, string> {
+  const members = useSpacesStore((state) => state.membersBySpace[spaceId]);
+  return useMemo(() => {
+    const outlines = new Map<string, string>();
+    const known = new Set<string>();
+    (members ?? []).forEach((member) => {
+      known.add(member.user_id);
+      const outline = avatarOutline(member.avatar_decoration);
+      if (outline) outlines.set(member.user_id, outline);
+    });
+    messages.forEach((message) => {
+      const userId = message.sender_user_id;
+      if (message.sender_kind !== "person" || !userId || known.has(userId)) return;
+      if (message.origin?.author_avatar_url) return;
+      const outline = messageSenderOutline(message);
+      if (outline) outlines.set(userId, outline);
+      else outlines.delete(userId);
+    });
+    return outlines;
+  }, [members, messages]);
+}
+
 export function useMemberAvatarUrls(
   spaceId: string,
   messages: SpaceMessage[],
@@ -137,103 +176,62 @@ export function useMemberAvatarUrls(
     [avatarRequests],
   );
   const avatarRequestsRef = useRef<MemberAvatarRequest[]>(avatarRequests);
-  const cacheRef = useRef<Map<string, MemberAvatarCacheEntry>>(new Map());
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
+  const previews = usePicturePreviews();
 
   avatarRequestsRef.current = avatarRequests;
-
-  useEffect(
-    () => () => {
-      cacheRef.current.forEach((entry) => URL.revokeObjectURL(entry.url));
-      cacheRef.current.clear();
-    },
-    [],
-  );
 
   useEffect(() => {
     let canceled = false;
     const requests = avatarRequestsRef.current;
-    const requestMemberIds = new Set(requests.map((request) => request.memberId));
-    const cachedUrls = new Map<string, string>();
-    const missingRequests = requests.filter((request) => {
-      const cached = cacheRef.current.get(memberAvatarCacheKey(spaceId, request));
-      if (!cached) return true;
-      cachedUrls.set(request.memberId, cached.url);
+    const wanted = new Set(requests.map((request) => request.memberId));
+    const known = new Map<string, string>();
+    const missing = requests.filter((request) => {
+      const url = readyPicture(`person:${request.memberId}`, request.version);
+      if (url === undefined) return true;
+      if (url) known.set(request.memberId, url);
       return false;
     });
-
     setUrls((current) => {
       const next = new Map(current);
       let changed = false;
-      cachedUrls.forEach((url, memberId) => {
+      known.forEach((url, memberId) => {
         if (next.get(memberId) !== url) {
           next.set(memberId, url);
           changed = true;
         }
       });
       next.forEach((_, memberId) => {
-        if (!requestMemberIds.has(memberId)) {
+        if (!wanted.has(memberId)) {
           next.delete(memberId);
           changed = true;
         }
       });
       return changed ? next : current;
     });
-
-    if (missingRequests.length === 0)
-      return () => {
-        canceled = true;
-      };
-
-    void Promise.all(
-      missingRequests.map(async (request) => {
-        try {
-          const blob = await spacesApi.personAvatar(request.memberId);
-          const url = URL.createObjectURL(blob);
-          return { ...request, spaceId, url };
-        } catch {
-          return null;
-        }
-      }),
-    ).then((entries) => {
-      const loadedEntries = entries.filter((entry) => entry !== null);
-      if (canceled) {
-        loadedEntries.forEach((entry) => URL.revokeObjectURL(entry.url));
-        return;
-      }
-
-      setUrls((current) => {
-        const next = new Map(current);
-        let changed = false;
-        loadedEntries.forEach((entry) => {
-          cacheRef.current.forEach((cached, key) => {
-            if (
-              cached.spaceId === entry.spaceId &&
-              cached.memberId === entry.memberId &&
-              key !== memberAvatarCacheKey(entry.spaceId, entry)
-            ) {
-              URL.revokeObjectURL(cached.url);
-              cacheRef.current.delete(key);
-            }
-          });
-          cacheRef.current.set(memberAvatarCacheKey(entry.spaceId, entry), entry);
-          if (next.get(entry.memberId) !== entry.url) {
-            next.set(entry.memberId, entry.url);
-            changed = true;
-          }
-        });
-        return changed ? next : current;
+    missing.forEach((request) => {
+      void memberPicture(request.memberId, request.version).then((url) => {
+        if (canceled || !url) return;
+        setUrls((current) =>
+          current.get(request.memberId) === url
+            ? current
+            : new Map(current).set(request.memberId, url),
+        );
       });
     });
-
     return () => {
       canceled = true;
     };
   }, [avatarRequestKey, spaceId]);
 
-  return urls;
-}
-
-function memberAvatarCacheKey(spaceId: string, request: MemberAvatarRequest): string {
-  return [spaceId, request.memberId, request.version].join(":");
+  return useMemo(() => {
+    let shown = urls;
+    for (const { memberId } of avatarRequests) {
+      const preview = previews.get(`person:${memberId}`);
+      if (!preview || shown.get(memberId) === preview) continue;
+      if (shown === urls) shown = new Map(urls);
+      shown.set(memberId, preview);
+    }
+    return shown;
+  }, [urls, previews, avatarRequests]);
 }

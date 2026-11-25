@@ -1,13 +1,11 @@
 import { useEffect, useMemo } from "react";
-import { Moon, Volume2 } from "lucide-react";
+import { Volume2 } from "lucide-react";
 import {
   Avatar,
   AvatarFallback,
+  AvatarImage,
   Button,
-  EmptyState,
   PresenceFace,
-  RowGroupLabel,
-  Surface,
   StateMark,
   Text,
   VoicePerson,
@@ -18,12 +16,14 @@ import {
   memberAgentsIn,
   useMemberAgents,
   useSpaceConversations,
+  useMemberPicture,
   useSpacesStore,
   useVoicePresence,
   watchVoicePresence,
   type MemberAgentStatus,
   type Space,
 } from "@/features/spaces";
+import { avatarOutline } from "@/shared/lib/avatar_decoration";
 import { personTone } from "@/shared/lib/person_tone";
 import { personInitials } from "@/shared/lib/person_initials";
 import type { Person } from "./api";
@@ -48,14 +48,34 @@ export interface Activity {
   agents: AgentSpot[];
 }
 
-export function Face({ userId, name, size }: { userId: string; name: string; size?: "xs" | "sm" }) {
+type FaceData = { avatar_version?: number; avatar_decoration?: unknown };
+
+export function Face({
+  userId,
+  name,
+  size,
+  person,
+  bare = false,
+}: {
+  userId: string;
+  name: string;
+  size?: "xs" | "sm";
+  person?: FaceData;
+  bare?: boolean;
+}) {
   const presence = usePresence(userId);
+  const picture = useMemberPicture(userId, person?.avatar_version ?? 0);
   const avatar = (
-    <Avatar size={size} tone={personTone(userId)}>
+    <Avatar
+      size={size}
+      tone={personTone(userId)}
+      outline={avatarOutline(person?.avatar_decoration)}
+    >
+      {picture ? <AvatarImage src={picture} alt="" /> : null}
       <AvatarFallback>{personInitials(name)}</AvatarFallback>
     </Avatar>
   );
-  return size === "xs" ? (
+  return size === "xs" || bare ? (
     avatar
   ) : (
     <PresenceFace presence={presence} face={size ?? "default"}>
@@ -112,7 +132,15 @@ export function activityLine(activity: Activity | undefined): string | undefined
   return `${working.agent.name}: ${doing.toLowerCase()} in ${working.space.name}`;
 }
 
-function VoiceBlock({ spot, nameOf }: { spot: VoiceSpot; nameOf: (userId: string) => string }) {
+function VoiceBlock({
+  spot,
+  nameOf,
+  faceOf,
+}: {
+  spot: VoiceSpot;
+  nameOf: (userId: string) => string;
+  faceOf: (userId: string) => FaceData | undefined;
+}) {
   const { conversations } = useSpaceConversations(spot.space.id);
   const userId = useDirectUserId();
   const speaking = useCallStore((state) => state.speaking);
@@ -128,7 +156,9 @@ function VoiceBlock({ spot, nameOf }: { spot: VoiceSpot; nameOf: (userId: string
           key={person}
           name={nameOf(person)}
           speaking={speaking.includes(person)}
-          avatar={<Face userId={person} name={nameOf(person)} size="xs" />}
+          avatar={
+            <Face userId={person} name={nameOf(person)} size="xs" person={faceOf(person)} />
+          }
           className="pl-0"
         />
       ))}
@@ -171,13 +201,7 @@ function AgentLine({ spot }: { spot: AgentSpot }) {
   );
 }
 
-export function ActiveNow({
-  friends,
-  activities,
-}: {
-  friends: Person[];
-  activities: Map<string, Activity>;
-}) {
+export function FriendNow({ friends, activity }: { friends: Person[]; activity: Activity }) {
   const members = useSpacesStore((state) => state.membersBySpace);
   const nameOf = (userId: string) =>
     friends.find((friend) => friend.user_id === userId)?.username ??
@@ -185,61 +209,19 @@ export function ActiveNow({
       .flat()
       .find((member) => member.user_id === userId)?.name ??
     "Someone";
-  const active = friends.filter((friend) => activities.has(friend.user_id));
+  const faceOf = (userId: string) =>
+    friends.find((friend) => friend.user_id === userId) ??
+    Object.values(members)
+      .flat()
+      .find((member) => member.user_id === userId);
   return (
-    <div className="flex size-full flex-col overflow-y-auto px-3 pt-4 pb-6">
-      {active.length ? (
-        <section aria-label="Active now" className="grid min-w-0 gap-1.5">
-          <RowGroupLabel title="Active now" />
-          <div className="grid min-w-0 gap-2">
-            {active.map((friend) => {
-              const activity = activities.get(friend.user_id)!;
-              const where = activity.voice?.space ?? activity.agents[0]?.space;
-              return (
-                <Surface
-                  key={friend.user_id}
-                  as="section"
-                  tone="faint"
-                  radius="xl"
-                  aria-label={friend.username}
-                  className="grid min-w-0 gap-2 p-3"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Face userId={friend.user_id} name={friend.username} />
-                    <span className="grid min-w-0">
-                      <Text size="control" weight="medium" tone="bright">
-                        {friend.username}
-                      </Text>
-                      {where ? (
-                        <Text size="meta" tone="muted">
-                          {`In ${where.name}`}
-                        </Text>
-                      ) : null}
-                    </span>
-                  </div>
-                  {activity.voice ? (
-                    <Surface tone="faint" radius="lg" className="grid min-w-0 gap-2 p-2">
-                      <VoiceBlock spot={activity.voice} nameOf={nameOf} />
-                    </Surface>
-                  ) : null}
-                  {activity.agents.map((spot) => (
-                    <Surface
-                      key={`${spot.space.id}:${spot.agent.id}`}
-                      tone="faint"
-                      radius="lg"
-                      className="grid min-w-0 gap-2 p-2"
-                    >
-                      <AgentLine spot={spot} />
-                    </Surface>
-                  ))}
-                </Surface>
-              );
-            })}
-          </div>
-        </section>
-      ) : (
-        <EmptyState icon={Moon} line="Nobody's active right now" />
-      )}
+    <div className="grid min-w-0 gap-3">
+      {activity.voice ? (
+        <VoiceBlock spot={activity.voice} nameOf={nameOf} faceOf={faceOf} />
+      ) : null}
+      {activity.agents.map((spot) => (
+        <AgentLine key={`${spot.space.id}:${spot.agent.id}`} spot={spot} />
+      ))}
     </div>
   );
 }

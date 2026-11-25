@@ -2,7 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState, type FormEvent } from "react";
-import { Button, cn, Input, screenMarkClass, Surface, ViewportLayer } from "@misty/ui";
+import {
+  Button,
+  cn,
+  Input,
+  OverflowFadeText,
+  screenMarkClass,
+  Surface,
+  ViewportLayer,
+} from "@misty/ui";
 import { DictationPill } from "@/features/voice/pill";
 import "@/styles/styles.css";
 
@@ -67,12 +75,9 @@ function DesktopIsland() {
       aria-label="Misty desktop control"
     >
       <div className="flex min-w-0 items-center gap-2">
-        <span
-          className="flex-1 overflow-hidden whitespace-nowrap [mask-image:var(--mask-fade-end)]"
-          aria-live="polite"
-        >
+        <OverflowFadeText className="flex-1" aria-live="polite">
           {island.status}
-        </span>
+        </OverflowFadeText>
         {island.meta && <span className="whitespace-nowrap opacity-60">{island.meta}</span>}
       </div>
       {!island.waiting && (

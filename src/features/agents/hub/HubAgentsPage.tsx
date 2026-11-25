@@ -1,6 +1,10 @@
 import { AudioLines, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { DesktopSettingsRow, DesktopSettingsSection as Section } from "@/features/settings";
+import {
+  DesktopSettingsRow,
+  DesktopSettingsRowSkeleton,
+  useSettingsSectionAction,
+} from "@/features/settings";
 import type { AgentProfile } from "@/shared/schemas";
 import {
   Button,
@@ -14,6 +18,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuSeparator,
+  Field,
   FieldError,
   hasMark,
   Input,
@@ -58,45 +63,19 @@ function useEngines() {
   );
 }
 
-const agentNameWidths = ["w-32", "w-40", "w-28"];
-
-function AgentRowsSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <>
-      {Array.from({ length: rows }, (_, index) => (
-        <div
-          key={index}
-          data-setting-label=""
-          role={index === 0 ? "status" : undefined}
-          aria-label={index === 0 ? "Your agents" : undefined}
-          aria-busy={index === 0 || undefined}
-          className="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 py-3"
-        >
-          <div className="flex min-w-0 items-center gap-4">
-            <Skeleton className="size-10 shrink-0 rounded-full" />
-            <div className="grid min-w-0 flex-1 gap-1">
-              <div className="flex h-6 items-center">
-                <Skeleton className={`h-4 ${agentNameWidths[index % agentNameWidths.length]}`} />
-              </div>
-              <div className="flex h-6 items-center">
-                <Skeleton className="h-3.5 w-20" />
-              </div>
-            </div>
-          </div>
-          <Skeleton className="h-8 w-24 rounded-md" />
-        </div>
-      ))}
-    </>
-  );
-}
-
 function engineIcon(engine: EngineInfo) {
   return hasMark(`engine:${engine.id}`) ? (
     <Mark of={`engine:${engine.id}`} label={engine.name} size={14} aria-hidden />
   ) : undefined;
 }
 
-function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
+function NewAgentDialog({
+  onMade,
+  onClose,
+}: {
+  onMade(agent: AgentProfile): void;
+  onClose(): void;
+}) {
   const engines = useEngines();
   const agents = usePersonalAgentsStore((state) => state.agents);
   const suggested = useMemo(() => freshAgentName(agents.map((agent) => agent.name)), [agents]);
@@ -110,7 +89,7 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
   }, [engine, engines]);
   const picked = engines?.find((item) => item.id === engine);
   const create = async () => {
-    if (busy || !picked || !voice) return;
+    if (busy || !picked) return;
     setBusy(true);
     setError("");
     try {
@@ -129,9 +108,8 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
         default_run_mode: "ask",
         engine: picked.id,
       });
-      setName("");
-      setVoice("");
       onMade(agent);
+      onClose();
     } catch (failure) {
       setError(message(failure));
     } finally {
@@ -140,65 +118,68 @@ function NewAgent({ onMade }: { onMade(agent: AgentProfile): void }) {
   };
   const noneInstalled = engines !== null && !engines.some((item) => item.installed);
   return (
-    <Section title="New agent">
-      <DesktopSettingsRow label="Engine" density="compact">
+    <DialogContent size="sm">
+      <DialogHeader>
+        <DialogTitle>New agent</DialogTitle>
+      </DialogHeader>
+      <DialogBody className="grid gap-4">
         {engines === null ? (
-          <Skeleton className="h-8 w-56 rounded-md" />
+          <Skeleton className="h-8 w-full rounded-md" />
         ) : noneInstalled ? (
-          <Button onClick={() => openAgentsHub("clis")}>Install a CLI</Button>
+          <Button onClick={() => openAgentsHub("clis")}>Install an engine</Button>
         ) : (
-          <Select value={engine} onValueChange={setEngine}>
-            <SelectTrigger className="w-56" aria-label="Engine">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {engines.map((item) => (
-                <SelectItem
-                  key={item.id}
-                  value={item.id}
-                  icon={engineIcon(item)}
-                  label={item.name}
-                  disabled={!item.installed}
-                  reason={item.installed ? undefined : "Install it on the CLIs page"}
-                />
-              ))}
-            </SelectContent>
-          </Select>
+          <Field label="Engine">
+            <Select value={engine} onValueChange={setEngine}>
+              <SelectTrigger aria-label="Engine">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {engines.map((item) => (
+                  <SelectItem
+                    key={item.id}
+                    value={item.id}
+                    icon={engineIcon(item)}
+                    label={item.name}
+                    disabled={!item.installed}
+                    reason={item.installed ? undefined : "Install it under Settings › Engines"}
+                  />
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
         )}
-      </DesktopSettingsRow>
-      <DesktopSettingsRow label="Name" density="compact">
-        <Input
-          aria-label="Name"
-          className="w-56"
-          placeholder={suggested}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void create();
-          }}
-        />
-      </DesktopSettingsRow>
-      <DesktopSettingsRow label="Voice" density="compact" stacked>
+        <Field label="Name">
+          <Input
+            placeholder={suggested}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void create();
+            }}
+          />
+        </Field>
         <AgentVoicePicker
           name={name.trim() || suggested}
           voice={voice}
           disabled={busy}
           onChange={setVoice}
         />
-      </DesktopSettingsRow>
-      <div className="flex items-center justify-between gap-3">
         <FieldError message={error} />
+      </DialogBody>
+      <DialogFooter>
+        <Button size="lg" variant="quiet" onClick={onClose}>
+          Cancel
+        </Button>
         <Button
+          size="lg"
           variant="primary"
-          className="ml-auto"
-          disabled={!picked?.installed || !voice || busy}
+          disabled={!picked?.installed || busy}
           onClick={() => void create()}
         >
-          <Plus />
           Create agent
         </Button>
-      </div>
-    </Section>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 
@@ -258,7 +239,6 @@ function AgentRow({ agent, engineName }: { agent: AgentProfile; engineName: stri
       }
       muted={held}
       leading={<AgentAvatar agent={agent} />}
-      density="compact"
     >
       {engine ? (
         <EngineNextStep engine={engine as EngineId} view={view} state={held ? state : "ready"} />
@@ -307,22 +287,32 @@ export function HubAgentsPage() {
   const listed = agents.filter((agent) => agent.enabled && !agent.system_managed);
   const engines = useEngines();
   const engineName = (id?: string) => engines?.find((item) => item.id === id)?.name ?? "";
+  const [making, setMaking] = useState(false);
+  useSettingsSectionAction({
+    label: "New agent",
+    icon: Plus,
+    showLabel: true,
+    onSelect: () => setMaking(true),
+  });
   return (
-    <div className="grid gap-8">
-      <div data-tour="agents-list">
-        <Section title="Your agents">
-          {loading && !listed.length ? (
-            <AgentRowsSkeleton />
-          ) : (
-            listed.map((agent) => (
-              <AgentRow key={agent.id} agent={agent} engineName={engineName(agent.engine)} />
-            ))
-          )}
-        </Section>
-      </div>
-      <div data-tour="agents-new">
-        <NewAgent onMade={(agent) => usePersonalAgentsStore.getState().select("", agent.id)} />
-      </div>
-    </div>
+    <>
+      {loading && !listed.length ? (
+        <DesktopSettingsRowSkeleton label="Your agents" rows={3} description control="icon" />
+      ) : listed.length ? (
+        listed.map((agent) => (
+          <AgentRow key={agent.id} agent={agent} engineName={engineName(agent.engine)} />
+        ))
+      ) : (
+        <DesktopSettingsRow label="No agents yet">{null}</DesktopSettingsRow>
+      )}
+      <Dialog open={making} onOpenChange={setMaking}>
+        {making ? (
+          <NewAgentDialog
+            onMade={(agent) => usePersonalAgentsStore.getState().select("", agent.id)}
+            onClose={() => setMaking(false)}
+          />
+        ) : null}
+      </Dialog>
+    </>
   );
 }

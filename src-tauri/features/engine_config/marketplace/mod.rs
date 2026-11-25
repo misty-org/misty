@@ -246,7 +246,7 @@ pub async fn engine_market_install(
     install(checked_engine(&engine)?, &id, accept).await
 }
 
-async fn install(
+pub(crate) async fn install(
     engine: &'static str,
     id: &str,
     accept: Option<String>,
@@ -316,7 +316,7 @@ pub async fn engine_market_remove(
     remove(checked_engine(&engine)?, &id).await
 }
 
-async fn remove(engine: &'static str, id: &str) -> Result<(), String> {
+pub(crate) async fn remove(engine: &'static str, id: &str) -> Result<(), String> {
     let id = id.to_string();
     let valid = if GALLERY_ENGINES.contains(&engine) {
         valid_name(&id)
@@ -347,7 +347,7 @@ pub async fn engine_market_add_source(
     add_source(checked_engine(&engine)?, &source).await
 }
 
-async fn add_source(engine: &'static str, source: &str) -> Result<(), String> {
+pub(crate) async fn add_source(engine: &'static str, source: &str) -> Result<(), String> {
     let source = source.trim().to_string();
     if !valid_source(&source) {
         return Err("Use a GitHub owner/repo, an https:// address or a folder.".into());

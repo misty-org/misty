@@ -1,10 +1,6 @@
-import { useMemo, type RefObject } from "react";
-import { useShortcutHandler } from "@/features/shortcuts";
+import type { RefObject } from "react";
 import { FindBar } from "@misty/ui";
 import type { GlobalAiMessage } from "../../state/conversation_types";
-import { MessageAnchorRail } from "./MessageAnchorRail";
-import { createAnchorsBuilder } from "./timeline_anchors";
-import { useAnchorRailScroll } from "./use_anchor_rail_scroll";
 import { useConversationSearch } from "./use_conversation_search";
 
 const EMPTY: GlobalAiMessage[] = [];
@@ -18,21 +14,9 @@ export function ConversationNavigation({
   messages?: GlobalAiMessage[];
   scrollRef: RefObject<HTMLElement | null>;
 }) {
-  const build = useMemo(createAnchorsBuilder, [conversationId]);
-  const anchors = useMemo(() => build(messages), [build, messages]);
-  const rail = useAnchorRailScroll(scrollRef, anchors);
   const search = useConversationSearch(scrollRef, messages, conversationId);
-  const shown = () =>
-    Boolean(scrollRef.current?.isConnected && scrollRef.current.getClientRects().length);
-  useShortcutHandler("chat.previous_prompt", () => rail.step(-1), shown);
-  useShortcutHandler("chat.next_prompt", () => rail.step(1), shown);
   return (
     <>
-      <MessageAnchorRail
-        activeAnchorId={rail.activeAnchorId}
-        anchors={anchors}
-        onScrollToAnchor={rail.scrollToAnchor}
-      />
       {search.open ? (
         <div className="contents">
           <FindBar

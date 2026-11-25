@@ -34,8 +34,7 @@ fn speak_all(
             .get(usize::from(*speaker))
             .or_else(|| voices.first())
             .ok_or_else(unavailable)?;
-        let (model, speaker) = voice;
-        let speech = model.speak(text, *speaker, 1.0)?;
+        let speech = voice.speak(text, 1.0)?;
         let line = at_rate(&speech.samples, speech.rate, RATE);
         if !samples.is_empty() {
             samples.extend(std::iter::repeat_n(0, PAUSE_SAMPLES));
@@ -49,7 +48,7 @@ fn speak_all(
 }
 
 fn unavailable() -> String {
-    "Misty's voice isn't set up on this computer. Set it up in Settings › Voice.".into()
+    "Voicebox isn't on this computer. Get it in Explore to hear Misty.".into()
 }
 
 fn at_rate(samples: &[f32], from: u32, to: u32) -> Vec<f32> {

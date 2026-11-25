@@ -5,6 +5,7 @@ import { disk } from "@/features/files";
 import { useSpacesStore } from "../list/use_spaces_store";
 import { enclosing, pathSegments, searchLocations, typedPath } from "./browser_parts";
 import { canCreateIn, canPasteIn } from "./file_actions";
+import { canDropIn, draggedItems } from "./file_drag";
 import { FileInspector } from "./FileInspector";
 import { FilesListFooter } from "./FilesBottomBar";
 import { useFilesChoices } from "./files_choices";
@@ -13,7 +14,17 @@ import { FilesSidebar } from "./FilesSidebar";
 import { FilesActionBar, FilesNavBar, MoreRows, type FilesMoreMenu } from "./FilesToolbar";
 import { messageOf } from "./format";
 import { isMac } from "./key_labels";
-import { browsable, localPath, parentOf, placeFolder, type FileItem } from "./model";
+import {
+  browsable,
+  inSpaceTrash,
+  isSpaceTrash,
+  isSpaceTrashFolder,
+  localPath,
+  mayEmptySpaceTrash,
+  parentOf,
+  placeFolder,
+  type FileItem,
+} from "./model";
 import { usePane } from "./pane_context";
 import { QuickLook } from "./QuickLook";
 import { sourceOf } from "./sources";
@@ -61,9 +72,17 @@ export const PaneToolbar = memo(function PaneToolbar({
   const one = selectedItems.length === 1 ? selectedItems[0] : undefined;
   const renamable = one !== undefined && sourceOf(one).canRename;
   const trashable =
-    selectedItems.length > 0 && selectedItems.every((item) => sourceOf(item).canTrash);
-  const inTrash =
-    place.kind === "trash" || place.kind === "agent-trash" || place.kind === "space-drive-trash";
+    selectedItems.length > 0 &&
+    selectedItems.every((item) => sourceOf(item).canTrash && !isSpaceTrash(item));
+  const inSystemTrash = place.kind === "trash";
+  const mayPurgeIn = (spaceId: string) =>
+    mayEmptySpaceTrash(spaces.find((space) => space.id === spaceId)?.permissions);
+  const firstSource = selectedItems[0]?.source;
+  const binned = selectedItems.length > 0 && selectedItems.every(inSpaceTrash);
+  const mayPurgeBinned =
+    binned && firstSource?.kind === "drive" && mayPurgeIn(firstSource.entry.space_id);
+  const trashSpace = isSpaceTrashFolder(place) && place.kind === "space-drive" ? place.spaceId : "";
+  const mayEmpty = trashSpace !== "" && mayPurgeIn(trashSpace);
   const folderPath = typedPath(place);
   const hiddenToggle = browsable(place)
     ? { shown: choices.hidden, toggle: choices.toggleHidden }
@@ -98,7 +117,7 @@ export const PaneToolbar = memo(function PaneToolbar({
       : undefined,
     copySelectedPath: selectedItems.length ? () => actions.copyPath(selectedItems) : undefined,
     duplicates,
-    emptyAgentTrash: place.kind === "agent-trash" && !empty ? actions.emptyAgentTrash : undefined,
+    emptyTrash: mayEmpty && !empty ? () => actions.emptyTrash(trashSpace) : undefined,
   };
   const terminalAt = place.kind === "disk" || place.kind === "project" ? place.path : undefined;
   const suggest: SearchSuggest | undefined = picking
@@ -156,12 +175,16 @@ export const PaneToolbar = memo(function PaneToolbar({
                 : undefined
             }
             restore={
-              inTrash
+              inSystemTrash || trashSpace
                 ? { run: selectedItems.length ? () => actions.putBack(selectedItems) : undefined }
                 : undefined
             }
             rename={one && renamable ? () => actions.rename(one) : undefined}
-            trash={!inTrash && trashable ? () => void actions.trash(selectedItems) : undefined}
+            trash={
+              !inSystemTrash && trashable && (!binned || mayPurgeBinned)
+                ? () => void actions.trash(selectedItems)
+                : undefined
+            }
             view={columnsShown ? "columns" : choices.view === "columns" ? "list" : choices.view}
             onView={choices.setView}
             columns={browsable(place)}
@@ -186,14 +209,17 @@ export const PaneToolbar = memo(function PaneToolbar({
   );
 });
 
-export const PaneSidebar = memo(function PaneSidebar() {
-  const { store, granted, pick } = usePane();
+export const PaneSidebar = memo(function PaneSidebar({
+  shown,
+}: {
+  shown: Map<string, FileItem>;
+}) {
+  const { store, granted, pick, actions } = usePane();
   const picking = Boolean(pick);
   const choices = useFilesChoices(picking);
   const place = useBrowser((state) => state.place);
   const places = usePlacesStore((state) => state.places);
   const tags = usePlacesStore((state) => state.tags);
-  const agentTrash = usePlacesStore((state) => state.agentTrash);
   return (
     <FilesSidebar
       current={place}
@@ -201,11 +227,18 @@ export const PaneSidebar = memo(function PaneSidebar() {
       picking={picking}
       places={places}
       tags={tags}
-      agentTrash={agentTrash}
       macos={isMac}
       folded={choices.folded}
       onFold={choices.setFolded}
       onGo={(next) => store.getState().go(next, { root: true })}
+      drop={
+        picking
+          ? undefined
+          : {
+              canDrop: (at, ids, copy) => canDropIn(at, draggedItems(ids, shown), copy),
+              onDrop: (at, ids, copy) => actions.dropInto(at, draggedItems(ids, shown), copy),
+            }
+      }
     />
   );
 });
@@ -219,8 +252,17 @@ export const PaneInspector = memo(function PaneInspector({
 }) {
   const { actions } = usePane();
   const place = useBrowser((state) => state.place);
+  const lead = useBrowser((state) => state.lead);
   const selectedItems = useSelectedItems(shown);
-  return <FileInspector items={selectedItems} from={place} hidden={hidden} onOpen={actions.open} />;
+  return (
+    <FileInspector
+      items={selectedItems}
+      lead={lead}
+      from={place}
+      hidden={hidden}
+      onOpen={actions.open}
+    />
+  );
 });
 
 export const PaneFooter = memo(function PaneFooter({

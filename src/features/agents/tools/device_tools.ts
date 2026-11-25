@@ -10,6 +10,7 @@ import {
 import { loadRunEntry, type RunEntry } from "./run_contexts";
 import { runProgramTool } from "./program_tool";
 import { runScreenClose, runScreenLook, runScreenOpen } from "./screen_tools";
+import { runTabList, runTabUse } from "./tab_tools";
 import { requestUserAction } from "./user_action_wait";
 
 const inputLimit = 256 << 10;
@@ -25,6 +26,7 @@ const writes = new Set([
   "browser.skill",
   "browser.fill_form",
   "browser.run",
+  "browser.tab.use",
   "folder.send",
   "shell.run",
 ]);
@@ -90,4 +92,6 @@ export const deviceTools: Record<string, LocalToolHandler> = {
   "screen.open": tool("screen.open", runScreenOpen),
   "screen.look": tool("screen.look", runScreenLook),
   "screen.close": tool("screen.close", runScreenClose),
+  "browser.tab.list": tool("browser.tab.list", runTabList),
+  "browser.tab.use": tool("browser.tab.use", runTabUse),
 };

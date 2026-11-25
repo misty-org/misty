@@ -30,7 +30,9 @@ pub(super) fn summary(input: &Value) -> String {
     });
     let text = match field {
         Some(text) => text.to_string(),
-        None if input.is_null() => String::new(),
+        None if input.is_null() || input.as_object().is_some_and(|fields| fields.is_empty()) => {
+            String::new()
+        }
         None => input.to_string(),
     };
     clip(&text, 600)

@@ -96,7 +96,7 @@ use windows::Win32::System::IO::{
 
 use crate::{
     lock, names, Drive, DriveError, Item, ItemId, Kind, LocalState, NewNode, Node, OsFace, SpaceId,
-    SpaceMount, TrashBy, Version,
+    SpaceMount, Version,
 };
 
 const PROVIDER: &str = if cfg!(debug_assertions) {
@@ -958,7 +958,7 @@ impl Root {
                 continue;
             }
             if node.state == LocalState::NotSynced {
-                let _ = self.drive.trash(&self.space, &node.id, TrashBy::Person);
+                let _ = self.drive.trash(&self.space, &node.id);
                 continue;
             }
             missing.push(node);
@@ -1345,7 +1345,7 @@ impl Root {
             Err(_) => {
                 if let Ok(Some(node)) = self.drive.node_at(&self.space, &drive_path) {
                     if node.state == LocalState::NotSynced {
-                        let _ = self.drive.trash(&self.space, &node.id, TrashBy::Person);
+                        let _ = self.drive.trash(&self.space, &node.id);
                     }
                 }
                 return Outcome::Done;

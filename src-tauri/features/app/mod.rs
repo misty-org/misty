@@ -19,6 +19,8 @@ pub mod settings_commands;
 pub(crate) mod setup;
 pub(crate) mod shell_plugins;
 #[cfg(desktop)]
+pub mod badge;
+#[cfg(desktop)]
 pub mod tray;
 #[cfg(target_os = "macos")]
 mod tray_mark;
