@@ -41,7 +41,8 @@ import { ExploreProduct } from "./ExploreProducts";
 import { AppsPage } from "./ExploreApps";
 import { EnginesPage } from "./ExploreEngines";
 import { SpeechPage } from "./ExploreSpeech";
-import { MyAppsPage, useMyAppsCount } from "./ExploreUpdates";
+import { MyAppsPage } from "./ExploreUpdates";
+import { useMyAppsCount } from "./explore_updates";
 import { ListingList } from "./ListingList";
 import { ActionButton } from "./ListingRows";
 import { kindNames, useCategories, useListing, type ExploreSort } from "./explore_index";
@@ -271,13 +272,7 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
 
   let body: ReactNode;
   if (view.at === "item")
-    body = (
-      <ExploreProduct
-        key={viewKey}
-        item={view.item}
-        spaceId={spaceId}
-      />
-    );
+    body = <ExploreProduct key={viewKey} item={view.item} spaceId={spaceId} />;
   else if (view.at === "list")
     body = (
       <ListingList
@@ -291,16 +286,12 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
       />
     );
   else if (view.at === "search")
-    body = (
-      <SearchPage query={view.query} sort={sort} spaceId={spaceId} />
-    );
+    body = <SearchPage query={view.query} sort={sort} spaceId={spaceId} />;
   else if (view.page === "all") body = <AllPage spaceId={spaceId} />;
-  else if (view.page === "apps")
-    body = <AppsPage spaceId={spaceId} />;
+  else if (view.page === "apps") body = <AppsPage spaceId={spaceId} />;
   else if (view.page === "engines") body = <EnginesPage />;
   else if (view.page === "speech") body = <SpeechPage />;
-  else if (view.page === "mine")
-    body = <MyAppsPage spaceId={spaceId} />;
+  else if (view.page === "mine") body = <MyAppsPage spaceId={spaceId} />;
   else body = <KindPage kind={view.page} sort={sort} category={category} facet={facet} />;
 
   const flush = view.at === "list" && layout === "list";
@@ -326,11 +317,7 @@ export function ExplorePage({ spaceId }: ExplorePageProps) {
                   >
                     <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-4 pb-8">
                       <RowGroupStack>
-                        <ExploreManage
-                          key={itemKey(managing)}
-                          item={managing}
-                          spaceId={spaceId}
-                        />
+                        <ExploreManage key={itemKey(managing)} item={managing} spaceId={spaceId} />
                       </RowGroupStack>
                     </div>
                   </SidePanel>
