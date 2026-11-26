@@ -34,7 +34,7 @@ const LISTINGS: &[&str] = &["plugins", "skills", "templates", "mcps"];
 const SECTIONS: &[&str] = &["categories", "apps", "engines", "speech", "ignore"];
 
 pub const REGISTRY_KEYS: &[(&str, &str)] =
-    &[("misty-registry", "Nbnp8dQWU7ibTphBreL9xu1zOaBIBQqT2yY6rIcmqkU=")];
+    &[("misty-registry-2", "VJ+xEM4XzgU5TO8sQNvKp6uAr082gCWUFksnpZ4zH2M=")];
 
 pub const CHANGED_EVENT: &str = "misty://registry-changed";
 
